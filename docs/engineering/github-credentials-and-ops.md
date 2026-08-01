@@ -105,9 +105,9 @@ Estado actual del árbol local:
 |------|--------|
 | Empaquetado (`CHANGELOG`, checklist, versión 1.0.0) | Hecho |
 | `git init -b main` | Hecho |
-| Primer commit | Pendiente (tu OK) |
-| `gh repo create` + push | Pendiente (tu OK) |
-| Tag `v1.0.0` + GitHub Release | Pendiente (tu OK) |
+| Primer commit | Hecho |
+| `gh repo create` + push | Hecho → https://github.com/jvelasca/Bolsa_V1 |
+| Tag `v1.0.0` + GitHub Release | Hecho → https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.0.0 |
 
 Cuando digas **sí**, el agente ejecutará (o tú a mano):
 
@@ -184,4 +184,4 @@ Plantilla pública: [`.env.example`](../../.env.example).
 
 ---
 
-*Última actualización: 2026-08-01 · Empaquetado V1 local; push pendiente de confirmación.*
+*Última actualización: 2026-08-01 · Repo privado + release v1.0.0 publicados.*

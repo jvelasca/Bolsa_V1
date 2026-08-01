@@ -1,7 +1,7 @@
 # Handoff sesión 2026-08-01 — cierre de racha + sync Ayuda
 
-> **Estado:** producto listo para **GitHub V1** · `git init` hecho · falta commit/push/tag con OK.  
-> Checklist: [`github-v1-release.md`](./github-v1-release.md) · `CHANGELOG.md`.  
+> **Estado:** **GitHub V1 publicado** — https://github.com/jvelasca/Bolsa_V1 · release [v1.0.0](https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.0.0).  
+> Siguiente: BETA1 (simulaciones; issues cortas).  
 > Handoff previo: [`session-handoff-2026-07-31.md`](./session-handoff-2026-07-31.md).
 
 **As-of Ayuda:** `HELP_CONTENT_AS_OF` = **2026-08-01**.

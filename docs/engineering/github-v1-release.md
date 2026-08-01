@@ -19,9 +19,9 @@ pnpm test:fa
 - [x] `.env` en `.gitignore` (no subir secretos)
 - [x] `CHANGELOG.md` · versión producto 1.0.0
 - [x] `git init -b main`
-- [ ] Primer commit
-- [ ] `gh repo create` + push `main`
-- [ ] Tag `v1.0.0` + release notes (desde CHANGELOG)
+- [x] Primer commit
+- [x] `gh repo create` + push `main` → https://github.com/jvelasca/Bolsa_V1 (private)
+- [x] Tag `v1.0.0` + release notes → https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.0.0
 
 ## Comandos (cuando el usuario confirme)
 
