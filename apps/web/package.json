@@ -1,0 +1,42 @@
+{
+  "name": "@bolsa/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src/",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@bolsa/shared": "workspace:*",
+    "@tanstack/react-query": "^5.80.6",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lightweight-charts": "^5.0.7",
+    "lucide-react": "^0.513.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-resizable-panels": "^4.12.0",
+    "react-router-dom": "^7.6.2",
+    "tailwind-merge": "^3.3.0",
+    "zustand": "^5.0.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.8",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.5.2",
+    "jsdom": "^26.1.0",
+    "tailwindcss": "^4.1.8",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.3"
+  }
+}

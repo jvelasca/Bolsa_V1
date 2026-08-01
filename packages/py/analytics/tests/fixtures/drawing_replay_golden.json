@@ -1,0 +1,75 @@
+{
+  "bars": [
+    {
+      "timestamp": "2024-01-02",
+      "open": 98,
+      "high": 102,
+      "low": 97,
+      "close": 100,
+      "volume": 1000
+    },
+    {
+      "timestamp": "2024-01-03",
+      "open": 101,
+      "high": 112,
+      "low": 100,
+      "close": 110,
+      "volume": 1200
+    },
+    {
+      "timestamp": "2024-01-04",
+      "open": 109,
+      "high": 111,
+      "low": 108,
+      "close": 110,
+      "volume": 900
+    },
+    {
+      "timestamp": "2024-01-05",
+      "open": 108,
+      "high": 112,
+      "low": 107,
+      "close": 110,
+      "volume": 1100
+    }
+  ],
+  "drawings": [
+    {
+      "id": "hline-resistance",
+      "type": "hline",
+      "price": 108,
+      "color": "#ef4444",
+      "visible": true,
+      "alertOnCross": true
+    },
+    {
+      "id": "line-support",
+      "type": "line",
+      "color": "#22c55e",
+      "visible": true,
+      "alertOnCross": true,
+      "p1": { "time": "2024-01-04", "price": 111 },
+      "p2": { "time": "2024-01-05", "price": 107 }
+    }
+  ],
+  "expectedMarkers": [
+    {
+      "id": "hline-resistance:2024-01-03",
+      "drawingId": "hline-resistance",
+      "timestamp": "2024-01-03",
+      "price": 110,
+      "level": 108,
+      "direction": "up",
+      "drawingType": "hline"
+    },
+    {
+      "id": "line-support:2024-01-05",
+      "drawingId": "line-support",
+      "timestamp": "2024-01-05",
+      "price": 110,
+      "level": 107,
+      "direction": "up",
+      "drawingType": "line"
+    }
+  ]
+}

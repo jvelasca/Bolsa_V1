@@ -1,0 +1,40 @@
+{
+  "name": "@bolsa/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "dotenv -e ../../.env -- prisma generate && tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "dotenv -e ../../.env -- prisma generate",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
+    "db:migrate:resolve-baseline": "dotenv -e ../../.env -- prisma migrate resolve --applied 20250101000000_baseline",
+    "db:migrate:deploy": "dotenv -e ../../.env -- prisma migrate deploy",
+    "db:push": "dotenv -e ../../.env -- prisma db push",
+    "db:seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@bolsa/shared": "workspace:*",
+    "@prisma/client": "^6.9.0"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^8.0.0",
+    "prisma": "^6.9.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  }
+}

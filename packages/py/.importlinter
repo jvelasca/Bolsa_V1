@@ -1,0 +1,46 @@
+[importlinter]
+root_packages =
+    bolsa_domain
+    bolsa_application
+    bolsa_analytics
+    bolsa_market
+    bolsa_infrastructure
+    bolsa_ai
+    bolsa_api
+include_external_packages = True
+
+[importlinter:contract:domain-purity]
+name = Domain no importa infra, analytics, application ni SDKs LLM
+type = forbidden
+source_modules =
+    bolsa_domain
+forbidden_modules =
+    bolsa_infrastructure
+    bolsa_analytics
+    bolsa_application
+    bolsa_ai
+    bolsa_api
+    openai
+    ollama
+
+[importlinter:contract:no-ai-sdk-outside-bolsa-ai]
+name = SDKs LLM solo vía bolsa_ai (Proxy First)
+type = forbidden
+source_modules =
+    bolsa_domain
+    bolsa_application
+    bolsa_analytics
+    bolsa_market
+    bolsa_infrastructure
+    bolsa_api
+forbidden_modules =
+    openai
+    ollama
+
+[importlinter:contract:no-ai-package-in-domain]
+name = bolsa_ai no entra en domain
+type = forbidden
+source_modules =
+    bolsa_domain
+forbidden_modules =
+    bolsa_ai

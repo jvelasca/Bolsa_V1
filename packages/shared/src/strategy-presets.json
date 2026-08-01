@@ -1,0 +1,765 @@
+{
+  "version": 1,
+  "presets": {
+    "sma_crossover": {
+      "label": "Cruce SMA 20/50",
+      "description": "Compra en cruce alcista SMA20 sobre SMA50; venta en cruce bajista.",
+      "category": "trend",
+      "tags": ["sma", "crossover", "swing"],
+      "hybridGate": true,
+      "indicatorSpecs": [
+        { "definitionId": "sma", "parameters": { "period": 20 } },
+        { "definitionId": "sma", "parameters": { "period": 50 } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 20 } },
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "direction": "bullish",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 20 } },
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "direction": "bearish",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "rsi_mean_reversion": {
+      "label": "RSI reversión a la media",
+      "description": "Compra con RSI < 30; venta con RSI > 70.",
+      "category": "mean_reversion",
+      "tags": ["rsi", "oversold", "overbought"],
+      "indicatorSpecs": [{ "definitionId": "rsi", "parameters": { "period": 14 } }],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "lt",
+            "rightValue": 30,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "gt",
+            "rightValue": 70,
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "ema_crossover": {
+      "label": "Cruce EMA 12/26",
+      "description": "Momentum alcista cuando EMA12 cruza por encima de EMA26 (estilo MACD rápido).",
+      "category": "trend",
+      "tags": ["ema", "crossover", "momentum"],
+      "indicatorSpecs": [
+        { "definitionId": "ema", "parameters": { "period": 12 } },
+        { "definitionId": "ema", "parameters": { "period": 26 } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "ema", "parameters": { "period": 12 } },
+            "rightSpec": { "definitionId": "ema", "parameters": { "period": 26 } },
+            "direction": "bullish",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "ema", "parameters": { "period": 12 } },
+            "rightSpec": { "definitionId": "ema", "parameters": { "period": 26 } },
+            "direction": "bearish",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "golden_cross": {
+      "label": "Golden cross SMA 50/200",
+      "description": "Tendencia alcista de largo plazo: SMA50 cruza por encima de SMA200.",
+      "category": "trend",
+      "tags": ["sma", "golden-cross", "position"],
+      "hybridGate": true,
+      "indicatorSpecs": [
+        { "definitionId": "sma", "parameters": { "period": 50 } },
+        { "definitionId": "sma", "parameters": { "period": 200 } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "direction": "bullish",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "direction": "bearish",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "death_cross": {
+      "label": "Death cross SMA 50/200",
+      "description": "Señal bajista de largo plazo: SMA50 cruza por debajo de SMA200.",
+      "category": "trend",
+      "tags": ["sma", "death-cross", "bearish"],
+      "indicatorSpecs": [
+        { "definitionId": "sma", "parameters": { "period": 50 } },
+        { "definitionId": "sma", "parameters": { "period": 200 } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "direction": "bearish",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "direction": "bullish",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "macd_signal_cross": {
+      "label": "Cruce MACD / señal",
+      "description": "Entrada cuando la línea MACD cruza al alza su línea de señal.",
+      "category": "momentum",
+      "tags": ["macd", "crossover"],
+      "indicatorSpecs": [
+        {
+          "definitionId": "macd",
+          "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "main" }
+        },
+        {
+          "definitionId": "macd",
+          "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "signal" }
+        }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": {
+              "definitionId": "macd",
+              "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "main" }
+            },
+            "rightSpec": {
+              "definitionId": "macd",
+              "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "signal" }
+            },
+            "direction": "bullish",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": {
+              "definitionId": "macd",
+              "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "main" }
+            },
+            "rightSpec": {
+              "definitionId": "macd",
+              "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "signal" }
+            },
+            "direction": "bearish",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "macd_zero_line": {
+      "label": "MACD cruza línea cero",
+      "description": "Momentum alcista cuando MACD pasa de negativo a positivo.",
+      "category": "momentum",
+      "tags": ["macd", "momentum"],
+      "indicatorSpecs": [
+        {
+          "definitionId": "macd",
+          "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "main" }
+        }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": {
+              "definitionId": "macd",
+              "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "main" }
+            },
+            "operator": "gt",
+            "rightValue": 0,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": {
+              "definitionId": "macd",
+              "parameters": { "fastPeriod": 12, "slowPeriod": 26, "signalPeriod": 9, "line": "main" }
+            },
+            "operator": "lt",
+            "rightValue": 0,
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "rsi_momentum": {
+      "label": "RSI momentum (>50)",
+      "description": "Fuerza alcista: RSI por encima de 50 (estilo screener momentum).",
+      "category": "momentum",
+      "tags": ["rsi", "momentum"],
+      "hybridGate": true,
+      "indicatorSpecs": [{ "definitionId": "rsi", "parameters": { "period": 14 } }],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "gt",
+            "rightValue": 50,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "lt",
+            "rightValue": 50,
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "rsi_oversold_bounce": {
+      "label": "RSI sobreventa (<30)",
+      "description": "Valores en sobreventa; salida cuando RSI recupera por encima de 55.",
+      "category": "mean_reversion",
+      "tags": ["rsi", "oversold"],
+      "indicatorSpecs": [{ "definitionId": "rsi", "parameters": { "period": 14 } }],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "lt",
+            "rightValue": 30,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "gt",
+            "rightValue": 55,
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "stoch_oversold": {
+      "label": "Estocástico sobreventa",
+      "description": "Entrada con %K < 20; salida con %K > 80.",
+      "category": "mean_reversion",
+      "tags": ["stoch", "oversold"],
+      "indicatorSpecs": [{ "definitionId": "stoch", "parameters": { "kPeriod": 14 } }],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "stoch", "parameters": { "kPeriod": 14 } },
+            "operator": "lt",
+            "rightValue": 20,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "stoch", "parameters": { "kPeriod": 14 } },
+            "operator": "gt",
+            "rightValue": 80,
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "bollinger_lower_bounce": {
+      "label": "Rebote banda Bollinger inferior",
+      "description": "Precio en o por debajo de la banda inferior (posible rebote).",
+      "category": "mean_reversion",
+      "tags": ["bollinger", "volatility"],
+      "indicatorSpecs": [
+        { "definitionId": "bb", "parameters": { "period": 20, "stdDev": 2, "line": "lower" } },
+        { "definitionId": "bb", "parameters": { "period": 20, "stdDev": 2, "line": "mid" } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "bb", "parameters": { "period": 20, "stdDev": 2, "line": "lower" } },
+            "operator": "lte",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "bb", "parameters": { "period": 20, "stdDev": 2, "line": "mid" } },
+            "operator": "gte",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "bollinger_upper_breakout": {
+      "label": "Ruptura banda Bollinger superior",
+      "description": "Precio cierra por encima de la banda superior (breakout / momentum).",
+      "category": "volatility",
+      "tags": ["bollinger", "breakout"],
+      "indicatorSpecs": [
+        { "definitionId": "bb", "parameters": { "period": 20, "stdDev": 2, "line": "upper" } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "bb", "parameters": { "period": 20, "stdDev": 2, "line": "upper" } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "bb", "parameters": { "period": 20, "stdDev": 2, "line": "upper" } },
+            "operator": "lt",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "price_above_sma200": {
+      "label": "Precio sobre SMA 200",
+      "description": "Filtro de tendencia alcista: cierre por encima de la media de 200 sesiones.",
+      "category": "trend",
+      "tags": ["sma", "trend-filter"],
+      "hybridGate": true,
+      "indicatorSpecs": [{ "definitionId": "sma", "parameters": { "period": 200 } }],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "operator": "lt",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "ma_stack_bullish": {
+      "label": "Apilamiento alcista MA",
+      "description": "SMA20 > SMA50 y precio > SMA200 (tendencia alineada estilo Finviz).",
+      "category": "composite",
+      "tags": ["sma", "multi-filter", "trend"],
+      "hybridGate": true,
+      "indicatorSpecs": [
+        { "definitionId": "sma", "parameters": { "period": 20 } },
+        { "definitionId": "sma", "parameters": { "period": 50 } },
+        { "definitionId": "sma", "parameters": { "period": 200 } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_vs_indicator",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 20 } },
+            "operator": "gt",
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "signalKind": "entry_long"
+          },
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "any",
+        "rules": [
+          {
+            "type": "indicator_vs_indicator",
+            "leftSpec": { "definitionId": "sma", "parameters": { "period": 20 } },
+            "operator": "lt",
+            "rightSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "signalKind": "exit"
+          },
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "sma", "parameters": { "period": 200 } },
+            "operator": "lt",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "pullback_in_uptrend": {
+      "label": "Pullback en tendencia",
+      "description": "Precio sobre SMA50 con RSI en zona de pullback (<42).",
+      "category": "composite",
+      "tags": ["rsi", "sma", "pullback"],
+      "hybridGate": true,
+      "indicatorSpecs": [
+        { "definitionId": "sma", "parameters": { "period": 50 } },
+        { "definitionId": "rsi", "parameters": { "period": 14 } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          },
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "lt",
+            "rightValue": 42,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "any",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "sma", "parameters": { "period": 50 } },
+            "operator": "lt",
+            "signalKind": "exit"
+          },
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "rsi", "parameters": { "period": 14 } },
+            "operator": "gt",
+            "rightValue": 65,
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "cci_oversold": {
+      "label": "CCI sobreventa",
+      "description": "Commodity Channel Index por debajo de -100 (sobreventa clásica).",
+      "category": "mean_reversion",
+      "tags": ["cci", "oversold"],
+      "indicatorSpecs": [{ "definitionId": "cci", "parameters": { "period": 20 } }],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "cci", "parameters": { "period": 20 } },
+            "operator": "lt",
+            "rightValue": -100,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "cci", "parameters": { "period": 20 } },
+            "operator": "gt",
+            "rightValue": 0,
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "donchian_breakout": {
+      "label": "Rotura Donchian 20",
+      "description": "Compra al cerrar por encima del canal Donchian superior (20); sale al caer bajo el medio.",
+      "category": "volatility",
+      "tags": ["donchian", "breakout", "channel"],
+      "hybridGate": true,
+      "indicatorSpecs": [
+        { "definitionId": "dc", "parameters": { "period": 20, "line": "upper" } },
+        { "definitionId": "dc", "parameters": { "period": 20, "line": "mid" } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "dc", "parameters": { "period": 20, "line": "upper" } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "dc", "parameters": { "period": 20, "line": "mid" } },
+            "operator": "lt",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "adx_di_trend": {
+      "label": "ADX + DI tendencia",
+      "description": "Entrada cuando +DI cruza −DI al alza con ADX > 25 (tendencia con fuerza).",
+      "category": "trend",
+      "tags": ["adx", "di", "trend"],
+      "indicatorSpecs": [
+        { "definitionId": "adx", "parameters": { "period": 14, "line": "main" } },
+        { "definitionId": "adx", "parameters": { "period": 14, "line": "plus_di" } },
+        { "definitionId": "adx", "parameters": { "period": 14, "line": "minus_di" } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "adx", "parameters": { "period": 14, "line": "plus_di" } },
+            "rightSpec": { "definitionId": "adx", "parameters": { "period": 14, "line": "minus_di" } },
+            "direction": "bullish",
+            "signalKind": "entry_long"
+          },
+          {
+            "type": "indicator_compare",
+            "leftSpec": { "definitionId": "adx", "parameters": { "period": 14, "line": "main" } },
+            "operator": "gt",
+            "rightValue": 25,
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "adx", "parameters": { "period": 14, "line": "plus_di" } },
+            "rightSpec": { "definitionId": "adx", "parameters": { "period": 14, "line": "minus_di" } },
+            "direction": "bearish",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "ichimoku_tk_cross": {
+      "label": "Ichimoku Tenkan/Kijun",
+      "description": "Cruce alcista Tenkan sobre Kijun con precio por encima de la nube (Span A/B).",
+      "category": "composite",
+      "tags": ["ichimoku", "tenkan", "kijun", "cloud"],
+      "indicatorSpecs": [
+        { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "tenkan" } },
+        { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "kijun" } },
+        { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "spanA" } },
+        { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "spanB" } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "tenkan" } },
+            "rightSpec": { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "kijun" } },
+            "direction": "bullish",
+            "signalKind": "entry_long"
+          },
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "spanA" } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          },
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "spanB" } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "indicator_cross",
+            "leftSpec": { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "tenkan" } },
+            "rightSpec": { "definitionId": "ich", "parameters": { "tenkanPeriod": 9, "kijunPeriod": 26, "senkouBPeriod": 52, "displacement": 26, "line": "kijun" } },
+            "direction": "bearish",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "vwap_reclaim": {
+      "label": "Recuperación VWAP",
+      "description": "Compra cuando el precio recupera el VWAP acumulado; sale al perderlo.",
+      "category": "mean_reversion",
+      "tags": ["vwap", "reclaim", "volume"],
+      "indicatorSpecs": [{ "definitionId": "vwap", "parameters": {} }],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "vwap", "parameters": {} },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "vwap", "parameters": {} },
+            "operator": "lt",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    },
+    "supertrend_follow": {
+      "label": "SuperTrend ATR",
+      "description": "Sigue la tendencia según SuperTrend (ATR 10 × 3): compra por encima, sale por debajo.",
+      "category": "trend",
+      "tags": ["supertrend", "atr", "trend"],
+      "hybridGate": true,
+      "indicatorSpecs": [
+        { "definitionId": "st", "parameters": { "atrPeriod": 10, "multiplier": 3 } }
+      ],
+      "entries": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "st", "parameters": { "atrPeriod": 10, "multiplier": 3 } },
+            "operator": "gt",
+            "signalKind": "entry_long"
+          }
+        ]
+      },
+      "exits": {
+        "operator": "all",
+        "rules": [
+          {
+            "type": "price_vs_indicator",
+            "indicatorSpec": { "definitionId": "st", "parameters": { "atrPeriod": 10, "multiplier": 3 } },
+            "operator": "lt",
+            "signalKind": "exit"
+          }
+        ]
+      }
+    }
+  }
+}

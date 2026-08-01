@@ -1,0 +1,51 @@
+# Fase 2 científica — batería obligatoria (Evidence → MKL stub).
+name: Fase 2 scientific
+
+on:
+  push:
+    paths:
+      - 'packages/py/application/**'
+      - 'packages/py/domain/**'
+      - 'packages/py/infrastructure/**'
+      - 'apps/api-python/src/bolsa_api/api/v1/routes/research.py'
+      - 'apps/api-python/src/bolsa_api/schemas/research.py'
+      - 'apps/api-python/src/bolsa_api/api/dependencies.py'
+      - 'packages/database/prisma/**'
+      - 'scripts/research/verify_fase2*'
+      - 'docs/engineering/research-lifecycle.md'
+      - 'docs/adr/018-fase2-evidence-store-v0.md'
+      - '.github/workflows/fase2-scientific.yml'
+  pull_request:
+    paths:
+      - 'packages/py/application/**'
+      - 'packages/py/domain/**'
+      - 'packages/py/infrastructure/**'
+      - 'apps/api-python/src/bolsa_api/api/v1/routes/research.py'
+      - 'apps/api-python/src/bolsa_api/schemas/research.py'
+      - 'apps/api-python/src/bolsa_api/api/dependencies.py'
+      - 'packages/database/prisma/**'
+      - 'scripts/research/verify_fase2*'
+      - 'docs/engineering/research-lifecycle.md'
+      - 'docs/adr/018-fase2-evidence-store-v0.md'
+      - '.github/workflows/fase2-scientific.yml'
+
+jobs:
+  fase2-battery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - name: Install Python packages
+        run: |
+          pip install -e packages/py/domain -e packages/py/analytics -e packages/py/market -e packages/py/infrastructure -e packages/py/application -e "apps/api-python[dev]"
+      - name: Fase 2 battery
+        run: pnpm test:fase2

@@ -1,0 +1,104 @@
+{
+  "snapshotVersion": 1,
+  "capturedAt": "2026-07-05",
+  "purpose": "Machine-readable backup before ADR-008 Phase 0. Do not delete.",
+  "adr": "docs/adr/008-investment-accounts-and-ledger.md",
+  "architecture": "docs/architecture/investment-platform.md",
+  "decisions": {
+    "multiAccountFromDayOne": true,
+    "multiPortfolioInDbFromPhase0": true,
+    "simplePortfolioUiUntilPhase2": true,
+    "configModalReplacesSettingsPage": true,
+    "ledgerAsSourceOfTruth": true,
+    "transactionsBecomeDerivedOrMigrated": true,
+    "userIdNullableUntilFullAuth": true
+  },
+  "legacySchema": {
+    "tables": {
+      "portfolios": {
+        "fields": ["id", "name", "currency", "cash", "createdAt", "updatedAt"],
+        "defaults": { "name": "Cartera principal", "currency": "EUR", "cash": 100000 },
+        "seedId": "default-portfolio-seed"
+      },
+      "positions": {
+        "fields": ["id", "portfolioId", "instrumentId", "quantity", "avgCost", "updatedAt"],
+        "unique": ["portfolioId", "instrumentId"]
+      },
+      "transactions": {
+        "fields": ["id", "portfolioId", "instrumentId", "type", "quantity", "price", "total", "executedAt"],
+        "types": ["buy", "sell"]
+      },
+      "pending_orders": {
+        "fields": ["id", "instrumentId", "symbol", "side", "orderType", "quantity", "limitPrice", "expiryAt", "createdAt"],
+        "scopedToAccount": false
+      }
+    }
+  },
+  "legacyApi": {
+    "portfolio": {
+      "GET /api/portfolio": "PortfolioSummaryResponseDto",
+      "GET /api/portfolio/transactions": "limit 1-200",
+      "POST /api/portfolio/trade": "TradeRequestDto instrument_id type quantity price"
+    },
+    "pendingOrders": {
+      "GET /api/pending-orders": "list",
+      "POST /api/pending-orders": "create",
+      "DELETE /api/pending-orders/{id}": "cancel"
+    }
+  },
+  "legacySharedTypes": {
+    "file": "packages/shared/src/types.ts",
+    "interfaces": ["PortfolioDto", "PositionDto", "TransactionDto", "PortfolioSummaryDto"],
+    "transactionType": ["buy", "sell"]
+  },
+  "legacyFrontend": {
+    "routes": {
+      "/overview": "OverviewPage",
+      "/trading": "ChartWorkspacePage",
+      "/portfolio": "PortfolioPage",
+      "/settings": "SettingsPage"
+    },
+    "virtualLists": {
+      "portfolio": "__builtin:portfolio__",
+      "pendingOrders": "__builtin:pending-orders__",
+      "visualization": "__builtin:visualization__"
+    },
+    "reactQueryKeys": ["portfolio", "transactions", "pending-orders"],
+    "stores": {
+      "workspace": "apps/web/src/stores/workspace-store.ts",
+      "tradingUi": "apps/web/src/stores/trading-ui-store.ts",
+      "visualization": "apps/web/src/stores/visualization-store.ts"
+    }
+  },
+  "legacyBackend": {
+    "defaultPortfolioName": "Cartera principal",
+    "repository": "packages/py/infrastructure/src/bolsa_infrastructure/database/repositories/portfolio_repository.py",
+    "useCase": "packages/py/application/src/bolsa_application/portfolio.py",
+    "routes": [
+      "apps/api-python/src/bolsa_api/api/v1/routes/portfolio.py",
+      "apps/api-python/src/bolsa_api/api/v1/routes/pending_orders.py"
+    ]
+  },
+  "targetPhase0Entities": [
+    "InvestmentAccount",
+    "InvestmentPortfolio",
+    "LedgerEntry",
+    "Order",
+    "PlatformSettings"
+  ],
+  "targetPhase0Tables": [
+    "investment_accounts",
+    "investment_portfolios",
+    "ledger_entries",
+    "orders",
+    "platform_settings"
+  ],
+  "migrationRules": [
+    "One InvestmentAccount per legacy Portfolio (or single default account)",
+    "One InvestmentPortfolio 1:1 with legacy Portfolio",
+    "transactions rows copied to ledger_entries with referenceType migration",
+    "pending_orders copied to orders with accountId and portfolioId default",
+    "positions gain accountId and portfolioId FKs",
+    "Keep /api/portfolio as shim to default account summary"
+  ]
+}

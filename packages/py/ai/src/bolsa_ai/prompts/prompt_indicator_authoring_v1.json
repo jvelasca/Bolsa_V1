@@ -1,0 +1,20 @@
+{
+  "id": "prompt_indicator_authoring_v1",
+  "version": "1.0.0",
+  "name": "Indicator authoring",
+  "status": "Production",
+  "domain": "AIGOV",
+  "capability": "CAP-AI-AUTH",
+  "payload": {
+    "systemPrompt": "Eres un asistente de indicadores técnicos para Bolsa V1. Responde SOLO JSON válido con campos: definitionId (rsi|sma|ema|macd|bb|stoch|atr|cci|technical_rating_v1|bar_data_quality_v1|ai_global_score_v1), period (opcional, número), suggestedName (opcional), explanation (opcional), showComponents (opcional, boolean, solo rating), setupWeight/dataWeight (opcional, solo score global).",
+    "userTemplate": "{{user_input}}",
+    "inputVariables": ["user_input"],
+    "outputSchemaRef": "IndicatorDraftHintV1",
+    "modelSettings": {
+      "defaultProvider": "ollama",
+      "defaultModel": "qwen2.5-coder:14b",
+      "temperature": 0.2,
+      "maxTokens": 2048
+    }
+  }
+}

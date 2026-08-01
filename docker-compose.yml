@@ -1,0 +1,22 @@
+# Core stack. Ollama opcional: docker-compose.ollama.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: bolsa-postgres
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: bolsa
+      POSTGRES_PASSWORD: bolsa_dev
+      POSTGRES_DB: bolsa_v1
+    volumes:
+      - bolsa_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U bolsa -d bolsa_v1']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  bolsa_pg_data:

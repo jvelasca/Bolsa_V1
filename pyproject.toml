@@ -1,0 +1,42 @@
+[tool.uv.workspace]
+members = [
+  "packages/py/domain",
+  "packages/py/market",
+  "packages/py/infrastructure",
+  "packages/py/application",
+  "packages/py/analytics",
+  "packages/py/ai",
+  "apps/api-python",
+]
+
+[tool.uv]
+dev-dependencies = [
+  "pytest>=8.3",
+  "pytest-asyncio>=0.25",
+  "httpx>=0.28",
+  "mypy>=1.14",
+  "ruff>=0.9",
+  "import-linter>=2.1",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+plugins = ["pydantic.mypy", "sqlalchemy.ext.mypy.plugin"]
+
+[[tool.mypy.overrides]]
+module = ["pandas.*", "pandas_ta.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+markers = [
+  "ollama: tests that require a running Ollama service",
+  "integration: tests that require external services",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

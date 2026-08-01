@@ -1,0 +1,439 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-background: #0b0f14;
+  --color-foreground: #e8edf4;
+  --color-card: #121821;
+  --color-card-foreground: #e8edf4;
+  --color-muted: #1a2230;
+  --color-muted-foreground: #8b98a8;
+  --color-border: #243044;
+  --color-primary: #14b8a6;
+  --color-primary-foreground: #042f2e;
+  --color-accent: #1e293b;
+  --color-accent-foreground: #e8edf4;
+  --color-destructive: #ef4444;
+  --color-success: #22c55e;
+  --font-sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Scrollbars finos — tema oscuro */
+:root {
+  scrollbar-color: color-mix(in srgb, var(--color-border) 85%, transparent)
+    transparent;
+  scrollbar-width: thin;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-muted-foreground) 35%, transparent)
+    transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-muted-foreground) 28%, transparent);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-muted-foreground) 45%, transparent);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Áreas con scroll intenso — aún más discretas */
+.scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 25%, transparent) transparent;
+  scrollbar-gutter: stable;
+}
+
+.scroll-area::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.scroll-area::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 9999px;
+}
+
+.scroll-area::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+}
+
+/* ─── Responsive del workspace de gráficos (ancho del panel, no solo viewport) ─── */
+/* Documentación: docs/CHART_RESPONSIVE.md */
+
+.chart-workspace-shell {
+  container-type: inline-size;
+  container-name: chart-workspace;
+}
+
+/* Scroll horizontal en zonas de barra sin romper el layout */
+.chart-bar-zone-scroll {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.chart-bar-zone-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+/* Barra global: mismo modelo flex-wrap que la barra por gráfico */
+.chart-toolbar-global-stack.chart-toolbar--wrap {
+  flex-direction: row;
+}
+
+.chart-toolbar-global-main {
+  flex: 1 1 0;
+}
+
+.chart-toolbar-global-actions {
+  margin-left: auto;
+}
+
+.chart-toolbar-global-rail-break {
+  display: none;
+  flex-basis: 100%;
+  height: 0;
+}
+
+@container chart-workspace (max-width: 47.99rem) {
+  .chart-toolbar-global--adaptive .chart-toolbar-global-rail-break {
+    display: block;
+  }
+
+  .chart-toolbar-global--adaptive .chart-toolbar-global-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+    padding-top: 2px;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+  }
+}
+
+@container chart-workspace (min-width: 30rem) {
+  .chart-toolbar-global-stack.chart-toolbar--scroll {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+/* Modo apilado: flex-wrap sin scroll horizontal */
+.chart-toolbar--wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 2px 0;
+  overflow: visible;
+}
+
+.chart-toolbar--wrap .chart-toolbar-wrap-break {
+  height: 0;
+}
+
+.chart-toolbar--wrap .chart-toolbar-zone {
+  max-width: 100%;
+}
+
+/* Modo scroll: una fila con desplazamiento horizontal */
+.chart-toolbar--scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.chart-toolbar--scroll .chart-toolbar-zone {
+  flex-shrink: 0;
+}
+
+.chart-toolbar--wrap .chart-toolbar-zone {
+  min-width: 0;
+}
+
+/* ─── Barra de datos del gráfico (Escala / Valor / Cursor) ─── */
+
+.chart-toolbar-chart-stack {
+  container-type: inline-size;
+  container-name: chart-toolbar-chart;
+}
+
+.chart-toolbar-chart--adaptive {
+  align-content: flex-start;
+}
+
+.chart-toolbar-chart-data {
+  flex: 1 1 0;
+}
+
+.chart-toolbar-chart-rail-break {
+  display: none;
+  flex-basis: 100%;
+  height: 0;
+  order: 5;
+}
+
+.chart-toolbar-chart-actions {
+  margin-left: auto;
+}
+
+/* Panel estrecho: atajos + ⚙ en segunda rail alineada a la derecha */
+@container chart-workspace (max-width: 47.99rem) {
+  .chart-toolbar-chart--adaptive .chart-toolbar-chart-rail-break {
+    display: block;
+  }
+
+  .chart-toolbar-chart--adaptive .chart-toolbar-chart-actions {
+    order: 6;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+    padding-top: 2px;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+  }
+}
+
+/* Panel muy estrecho: cada zona de datos ocupa el ancho completo */
+@container chart-workspace (max-width: 31.99rem) {
+  .chart-toolbar-chart--adaptive .chart-toolbar-chart-data {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .chart-toolbar-chart--adaptive .chart-toolbar-data-zone {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .chart-toolbar-chart--adaptive .chart-bar-zone-row {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Barra global: zonas pueden envolver en panel estrecho */
+@container chart-workspace (max-width: 31.99rem) {
+  .chart-toolbar-global-stack.chart-toolbar--wrap .chart-toolbar-zone {
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+}
+
+/* Cursor: ancho natural en panel ancho; scroll interno si hace falta en zona estrecha */
+.chart-toolbar-cursor-zone {
+  min-width: 0;
+}
+
+@container chart-workspace (max-width: 31.99rem) {
+  .chart-toolbar-cursor-zone .chart-bar-zone-chip-row {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+}
+
+/* Inspector: dock lateral vs panel flotante */
+.chart-inspector-backdrop {
+  display: none;
+}
+
+@container chart-workspace (max-width: 41.99rem) {
+  .chart-inspector-backdrop.is-open {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 25;
+    background: color-mix(in srgb, var(--color-background) 40%, transparent);
+  }
+}
+
+.chart-inspector-panel {
+  display: none;
+}
+
+.chart-inspector-panel.is-open {
+  display: flex;
+}
+
+@container chart-workspace (min-width: 42rem) {
+  .chart-inspector-panel.is-open {
+    position: relative;
+    width: 17rem;
+    flex-shrink: 0;
+  }
+
+  .chart-inspector-backdrop.is-open {
+    display: none;
+  }
+}
+
+@container chart-workspace (max-width: 41.99rem) {
+  .chart-inspector-panel.is-open {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(17rem, 92%);
+    box-shadow: -6px 0 20px color-mix(in srgb, var(--color-background) 70%, transparent);
+  }
+}
+
+/* Chrome de paneles inferiores: ocultar reordenar en panel muy estrecho */
+@container chart-workspace (max-width: 28rem) {
+  .indicator-panel-move-btns {
+    display: none;
+  }
+
+  .chart-indicators-label-text {
+    display: none;
+  }
+
+  .chart-indicators-label-short {
+    display: inline;
+  }
+
+  .chart-overlay-zone-label-full {
+    display: none;
+  }
+
+  .chart-overlay-zone-label-short {
+    display: inline;
+  }
+
+  .chart-drawing-sidebar-rail {
+    width: 2rem;
+  }
+
+  .chart-drawing-sidebar-rail button {
+    height: 1.75rem;
+    width: 1.75rem;
+  }
+}
+
+.chart-indicators-label-short,
+.chart-overlay-zone-label-short {
+  display: none;
+}
+
+.chart-drawing-family-group {
+  border-inline: 1px solid hsl(var(--border) / 0.65);
+  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.22);
+  box-shadow: inset 0 1px 0 hsl(var(--background) / 0.08);
+}
+
+/* Barra de estado: abreviar etiquetas en viewport estrecho */
+@media (max-width: 640px) {
+  .trading-status-label-full {
+    display: none;
+  }
+
+  .trading-status-label-short {
+    display: inline;
+  }
+}
+
+@media (min-width: 641px) {
+  .trading-status-label-full {
+    display: inline;
+  }
+
+  .trading-status-label-short {
+    display: none;
+  }
+}
+
+/* Screener hub — sidebar scroll + touch-friendly panels */
+.screener-sidebar {
+  scrollbar-gutter: stable;
+}
+
+.screener-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.screener-sidebar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: hsl(var(--border));
+}
+
+.screener-main {
+  container-type: inline-size;
+  container-name: screener-main;
+}
+
+.screener-resize-separator {
+  position: relative;
+  z-index: 20;
+  flex-shrink: 0;
+}
+
+@media (min-width: 1024px) {
+  .screener-hub-shell [role='separator'] {
+    flex-shrink: 0;
+  }
+
+  .screener-hub-shell [role='separator'][aria-orientation='vertical'] {
+    width: 6px;
+    margin: 0 -2px;
+    background: color-mix(in srgb, var(--color-border) 90%, transparent);
+  }
+
+  .screener-hub-shell [role='separator'][aria-orientation='horizontal'] {
+    height: 6px;
+    margin: -2px 0;
+    background: color-mix(in srgb, var(--color-border) 90%, transparent);
+  }
+
+  .screener-hub-shell [role='separator']:hover,
+  .screener-hub-shell [role='separator']:active {
+    background: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
+  }
+}
+
+@media (max-width: 1023px) {
+  .screener-hub-shell {
+    min-height: 0;
+    overflow: auto;
+  }
+}

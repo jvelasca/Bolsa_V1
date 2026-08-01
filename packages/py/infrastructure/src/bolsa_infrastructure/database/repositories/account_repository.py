@@ -1,0 +1,732 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from bolsa_domain.account_settings import (
+    AccountSettings,
+    default_account_settings,
+    settings_from_dict,
+    settings_to_dict,
+)
+from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
+from bolsa_infrastructure.database.models import (
+    ConfidenceStateRow,
+    DecisionMemoryRow,
+    DecisionSessionRow,
+    EdgeReportRow,
+    InvestmentAccountRow,
+    InvestmentPortfolioRow,
+    LedgerEntryRow,
+    PortfolioRow,
+    PendingOrderRow,
+    PositionRow,
+    TransactionRow,
+    TrialRecordRow,
+)
+from bolsa_infrastructure.ids import new_id
+
+DEFAULT_ACCOUNT_SEED_ID = "default-account-seed"
+DEFAULT_PORTFOLIO_SEED_ID = "default-portfolio-seed"
+DEFAULT_PORTFOLIO_NAME = "Cartera principal"
+INITIAL_CASH = Decimal("100000")
+
+
+def _account_from_row(row: InvestmentAccountRow) -> InvestmentAccount:
+    raw_settings = dict(row.settings_json) if row.settings_json else None
+    if raw_settings and "investorProfile" in raw_settings:
+        # Clave obsoleta: perfil vive en investor_profiles + active_profile_id
+        raw_settings = {k: v for k, v in raw_settings.items() if k != "investorProfile"}
+    lab_evidence = None
+    if raw_settings and isinstance(raw_settings.get("labEvidence"), dict):
+        lab_evidence = dict(raw_settings["labEvidence"])
+    return InvestmentAccount(
+        id=row.id,
+        user_id=row.user_id,
+        name=row.name,
+        description=row.description,
+        type=row.type,
+        status=row.status,
+        currency=row.currency,
+        base_currency=row.base_currency,
+        initial_deposit=float(row.initial_deposit),
+        leverage=float(row.leverage),
+        margin_call_level_pct=float(row.margin_call_level_pct)
+        if row.margin_call_level_pct is not None
+        else None,
+        is_default=row.is_default,
+        settings=settings_from_dict(raw_settings),
+        strategy_definition_id=row.strategy_definition_id,
+        source_backtest_run_id=row.source_backtest_run_id,
+        created_at=row.created_at.isoformat(),
+        updated_at=row.updated_at.isoformat(),
+        last_activity_at=row.last_activity_at.isoformat() if row.last_activity_at else None,
+        active_profile_id=getattr(row, "active_profile_id", None),
+        lab_evidence=lab_evidence,
+    )
+
+
+def _portfolio_from_row(row: InvestmentPortfolioRow) -> InvestmentPortfolio:
+    return InvestmentPortfolio(
+        id=row.id,
+        account_id=row.account_id,
+        legacy_portfolio_id=row.legacy_portfolio_id,
+        name=row.name,
+        description=row.description,
+        strategy_tag=row.strategy_tag,
+        sort_order=row.sort_order,
+        is_default=row.is_default,
+    )
+
+
+class SqlAlchemyAccountRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+        self._migration_done = False
+
+    async def ensure_migrated(self) -> None:
+        if self._migration_done:
+            return
+        await self._ensure_default_account()
+        default_scope = await self._load_scope(None)
+        await self._backfill_ledger_from_transactions(default_scope)
+        await self._backfill_pending_order_accounts(default_scope)
+        await self._consolidate_single_portfolio_per_account()
+        self._migration_done = True
+
+    async def _ensure_default_account(self) -> None:
+        now = datetime.now(timezone.utc)
+
+        legacy_stmt = select(PortfolioRow).where(PortfolioRow.id == DEFAULT_PORTFOLIO_SEED_ID)
+        legacy = (await self._session.execute(legacy_stmt)).scalar_one_or_none()
+        if legacy is None:
+            legacy_stmt = select(PortfolioRow).where(PortfolioRow.name == DEFAULT_PORTFOLIO_NAME)
+            legacy = (await self._session.execute(legacy_stmt)).scalar_one_or_none()
+        if legacy is None:
+            legacy = PortfolioRow(
+                id=DEFAULT_PORTFOLIO_SEED_ID,
+                name=DEFAULT_PORTFOLIO_NAME,
+                currency="EUR",
+                cash=INITIAL_CASH,
+                created_at=now,
+                updated_at=now,
+            )
+            self._session.add(legacy)
+            await self._session.flush()
+
+        account = await self._session.get(InvestmentAccountRow, DEFAULT_ACCOUNT_SEED_ID)
+        if account is None:
+            any_default_stmt = select(InvestmentAccountRow.id).where(
+                InvestmentAccountRow.is_default.is_(True),
+            )
+            has_default = (await self._session.execute(any_default_stmt)).scalar_one_or_none()
+            account = InvestmentAccountRow(
+                id=DEFAULT_ACCOUNT_SEED_ID,
+                user_id=None,
+                name="Cuenta demo EUR",
+                type="simulated",
+                status="active",
+                currency=legacy.currency,
+                base_currency=legacy.currency,
+                initial_deposit=legacy.cash if legacy.cash > 0 else INITIAL_CASH,
+                leverage=Decimal("1"),
+                margin_call_level_pct=Decimal("100"),
+                is_default=has_default is None,
+                created_at=now,
+                updated_at=now,
+                last_activity_at=now,
+            )
+            self._session.add(account)
+            await self._session.flush()
+
+        inv_portfolio_stmt = select(InvestmentPortfolioRow).where(
+            InvestmentPortfolioRow.account_id == account.id,
+            InvestmentPortfolioRow.is_default.is_(True),
+        )
+        inv_portfolio = (await self._session.execute(inv_portfolio_stmt)).scalar_one_or_none()
+        if inv_portfolio is None:
+            inv_portfolio = InvestmentPortfolioRow(
+                id=new_id(),
+                account_id=account.id,
+                legacy_portfolio_id=legacy.id,
+                name=legacy.name,
+                description="Cartera principal migrada",
+                strategy_tag="core",
+                sort_order=0,
+                is_default=True,
+                created_at=now,
+                updated_at=now,
+            )
+            self._session.add(inv_portfolio)
+            await self._session.flush()
+
+        if inv_portfolio.legacy_portfolio_id != legacy.id:
+            inv_portfolio.legacy_portfolio_id = legacy.id
+            inv_portfolio.updated_at = now
+
+        if account.settings_json is None:
+            account.settings_json = settings_to_dict(default_account_settings())
+            account.description = account.description or "Cuenta demo migrada desde cartera única"
+
+        deposit_stmt = select(LedgerEntryRow.id).where(
+            LedgerEntryRow.account_id == account.id,
+            LedgerEntryRow.type == "deposit",
+            LedgerEntryRow.reference_type == "migration",
+        )
+        has_deposit = (await self._session.execute(deposit_stmt)).scalar_one_or_none()
+        if has_deposit is None:
+            self._session.add(
+                LedgerEntryRow(
+                    id=new_id(),
+                    account_id=account.id,
+                    portfolio_id=inv_portfolio.id,
+                    type="deposit",
+                    amount=legacy.cash,
+                    currency=legacy.currency,
+                    balance_after=legacy.cash,
+                    reference_type="migration",
+                    reference_id="initial-deposit",
+                    description="Depósito inicial (migración)",
+                    executed_at=legacy.created_at,
+                    created_at=now,
+                ),
+            )
+
+        await self._session.flush()
+
+    async def _load_scope(
+        self,
+        account_id: str | None,
+        portfolio_id: str | None = None,
+    ) -> AccountScope:
+        if account_id:
+            stmt = (
+                select(InvestmentAccountRow)
+                .where(
+                    InvestmentAccountRow.id == account_id,
+                    InvestmentAccountRow.status == "active",
+                )
+                .options(selectinload(InvestmentAccountRow.portfolios))
+            )
+            account_row = (await self._session.execute(stmt)).scalar_one_or_none()
+            if account_row is None:
+                raise ValueError("Cuenta no encontrada o inactiva")
+        else:
+            stmt = (
+                select(InvestmentAccountRow)
+                .where(InvestmentAccountRow.is_default.is_(True))
+                .options(selectinload(InvestmentAccountRow.portfolios))
+            )
+            account_row = (await self._session.execute(stmt)).scalar_one_or_none()
+            if account_row is None:
+                raise ValueError("No hay cuenta por defecto")
+
+        # Una cuenta = una cartera operativa (modelo XTB; portfolio_id ignorado).
+        portfolio_row = next(
+            (item for item in account_row.portfolios if item.is_default),
+            account_row.portfolios[0] if account_row.portfolios else None,
+        )
+        if portfolio_row is None or not portfolio_row.legacy_portfolio_id:
+            raise ValueError("La cuenta no tiene cartera legacy vinculada")
+
+        return AccountScope(
+            account=_account_from_row(account_row),
+            portfolio=_portfolio_from_row(portfolio_row),
+            legacy_portfolio_id=portfolio_row.legacy_portfolio_id,
+        )
+
+    async def _backfill_ledger_from_transactions(self, scope: AccountScope) -> None:
+        existing_stmt = select(LedgerEntryRow.reference_id).where(
+            LedgerEntryRow.account_id == scope.account.id,
+            LedgerEntryRow.reference_type == "transaction",
+        )
+        existing_ids = set((await self._session.execute(existing_stmt)).scalars().all())
+
+        tx_stmt = (
+            select(TransactionRow)
+            .where(TransactionRow.portfolio_id == scope.legacy_portfolio_id)
+            .order_by(TransactionRow.executed_at.asc())
+        )
+        transactions = (await self._session.execute(tx_stmt)).scalars().all()
+        if not transactions:
+            return
+
+        portfolio_row = await self._session.get(PortfolioRow, scope.legacy_portfolio_id)
+        if portfolio_row is None:
+            return
+
+        running = scope.account.initial_deposit
+        if existing_ids:
+            last_stmt = (
+                select(LedgerEntryRow.balance_after)
+                .where(LedgerEntryRow.account_id == scope.account.id)
+                .order_by(LedgerEntryRow.executed_at.desc())
+                .limit(1)
+            )
+            last_balance = (await self._session.execute(last_stmt)).scalar_one_or_none()
+            if last_balance is not None:
+                running = float(last_balance)
+
+        now = datetime.now(timezone.utc)
+        for tx in transactions:
+            if tx.id in existing_ids:
+                continue
+            total = float(tx.total)
+            amount = -total if tx.type == "buy" else total
+            running += amount
+            self._session.add(
+                LedgerEntryRow(
+                    id=new_id(),
+                    account_id=scope.account.id,
+                    portfolio_id=scope.portfolio.id,
+                    type=tx.type,
+                    amount=Decimal(str(amount)),
+                    currency=portfolio_row.currency,
+                    balance_after=Decimal(str(running)),
+                    instrument_id=tx.instrument_id,
+                    quantity=tx.quantity,
+                    price=tx.price,
+                    reference_type="transaction",
+                    reference_id=tx.id,
+                    description=f"Migración transacción {tx.type}",
+                    executed_at=tx.executed_at,
+                    created_at=now,
+                ),
+            )
+        await self._session.flush()
+
+    async def _backfill_pending_order_accounts(self, scope: AccountScope) -> None:
+        await self._session.execute(
+            update(PendingOrderRow)
+            .where(PendingOrderRow.account_id.is_(None))
+            .values(account_id=scope.account.id),
+        )
+        await self._session.flush()
+
+    async def resolve_scope(
+        self,
+        account_id: str | None,
+        portfolio_id: str | None = None,
+    ) -> AccountScope:
+        await self.ensure_migrated()
+        return await self._load_scope(account_id, portfolio_id)
+
+    async def list_accounts(self, account_type: str | None = None) -> list[InvestmentAccount]:
+        await self.ensure_migrated()
+        stmt = select(InvestmentAccountRow).order_by(
+            InvestmentAccountRow.is_default.desc(),
+            InvestmentAccountRow.created_at.asc(),
+        )
+        if account_type:
+            stmt = stmt.where(InvestmentAccountRow.type == account_type)
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_account_from_row(row) for row in rows]
+
+    async def get_account(self, account_id: str) -> InvestmentAccount:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        return _account_from_row(row)
+
+    async def _create_investment_account(
+        self,
+        *,
+        account_type: str,
+        name: str,
+        description: str | None = None,
+        currency: str = "EUR",
+        base_currency: str | None = None,
+        initial_deposit: float = 100_000.0,
+        leverage: float = 1.0,
+        margin_call_level_pct: float | None = 100.0,
+        portfolio_name: str | None = None,
+        portfolio_description: str | None = None,
+        strategy_tag: str | None = "core",
+        settings: AccountSettings | None = None,
+        commission_preset_id: str | None = None,
+        strategy_definition_id: str | None = None,
+        source_backtest_run_id: str | None = None,
+    ) -> AccountScope:
+        await self.ensure_migrated()
+        now = datetime.now(timezone.utc)
+        deposit = Decimal(str(initial_deposit))
+        base = base_currency or currency
+        resolved_settings = settings or default_account_settings(
+            commission_preset_id or "standard_es",
+            "ES",
+        )
+        if commission_preset_id and settings is None:
+            resolved_settings = default_account_settings(commission_preset_id, "ES")
+
+        default_name = "Cuenta simulada" if account_type == "simulated" else "Cuenta paper"
+        account = InvestmentAccountRow(
+            id=new_id(),
+            user_id=None,
+            name=name.strip() or default_name,
+            description=description,
+            type=account_type,
+            status="active",
+            currency=currency,
+            base_currency=base,
+            initial_deposit=deposit,
+            leverage=Decimal(str(leverage)),
+            margin_call_level_pct=Decimal(str(margin_call_level_pct))
+            if margin_call_level_pct is not None
+            else None,
+            is_default=False,
+            settings_json=settings_to_dict(resolved_settings),
+            strategy_definition_id=strategy_definition_id,
+            source_backtest_run_id=source_backtest_run_id,
+            created_at=now,
+            updated_at=now,
+            last_activity_at=now,
+        )
+        self._session.add(account)
+        await self._session.flush()
+
+        legacy = PortfolioRow(
+            id=new_id(),
+            name=f"{account.name} — cartera",
+            currency=currency,
+            cash=deposit,
+            created_at=now,
+            updated_at=now,
+        )
+        self._session.add(legacy)
+        await self._session.flush()
+
+        inv_portfolio = InvestmentPortfolioRow(
+            id=new_id(),
+            account_id=account.id,
+            legacy_portfolio_id=legacy.id,
+            name=portfolio_name or "Cartera principal",
+            description=portfolio_description,
+            strategy_tag=strategy_tag,
+            sort_order=0,
+            is_default=True,
+            created_at=now,
+            updated_at=now,
+        )
+        self._session.add(inv_portfolio)
+
+        deposit_label = "Depósito inicial"
+        if account_type == "paper":
+            deposit_label = "Depósito inicial (paper forward-test)"
+        self._session.add(
+            LedgerEntryRow(
+                id=new_id(),
+                account_id=account.id,
+                portfolio_id=inv_portfolio.id,
+                type="deposit",
+                amount=deposit,
+                currency=currency,
+                balance_after=deposit,
+                reference_type="manual",
+                reference_id=account.id,
+                description=deposit_label,
+                executed_at=now,
+                created_at=now,
+            ),
+        )
+        await self._session.flush()
+
+        return AccountScope(
+            account=_account_from_row(account),
+            portfolio=_portfolio_from_row(inv_portfolio),
+            legacy_portfolio_id=legacy.id,
+        )
+
+    async def create_simulated_account(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        currency: str = "EUR",
+        base_currency: str | None = None,
+        initial_deposit: float = 100_000.0,
+        leverage: float = 1.0,
+        margin_call_level_pct: float | None = 100.0,
+        portfolio_name: str | None = None,
+        portfolio_description: str | None = None,
+        strategy_tag: str | None = "core",
+        settings: AccountSettings | None = None,
+        commission_preset_id: str | None = None,
+    ) -> AccountScope:
+        return await self._create_investment_account(
+            account_type="simulated",
+            name=name,
+            description=description,
+            currency=currency,
+            base_currency=base_currency,
+            initial_deposit=initial_deposit,
+            leverage=leverage,
+            margin_call_level_pct=margin_call_level_pct,
+            portfolio_name=portfolio_name,
+            portfolio_description=portfolio_description,
+            strategy_tag=strategy_tag,
+            settings=settings,
+            commission_preset_id=commission_preset_id,
+        )
+
+    async def create_paper_account(
+        self,
+        *,
+        name: str,
+        description: str | None = None,
+        currency: str = "EUR",
+        base_currency: str | None = None,
+        initial_deposit: float = 10_000.0,
+        leverage: float = 1.0,
+        margin_call_level_pct: float | None = 100.0,
+        portfolio_name: str | None = None,
+        portfolio_description: str | None = None,
+        strategy_tag: str | None = "paper",
+        settings: AccountSettings | None = None,
+        commission_preset_id: str | None = None,
+        strategy_definition_id: str,
+        source_backtest_run_id: str | None = None,
+    ) -> AccountScope:
+        return await self._create_investment_account(
+            account_type="paper",
+            name=name,
+            description=description,
+            currency=currency,
+            base_currency=base_currency,
+            initial_deposit=initial_deposit,
+            leverage=leverage,
+            margin_call_level_pct=margin_call_level_pct,
+            portfolio_name=portfolio_name,
+            portfolio_description=portfolio_description,
+            strategy_tag=strategy_tag,
+            settings=settings,
+            commission_preset_id=commission_preset_id,
+            strategy_definition_id=strategy_definition_id,
+            source_backtest_run_id=source_backtest_run_id,
+        )
+
+    async def update_settings(self, account_id: str, settings: AccountSettings) -> InvestmentAccount:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        previous = dict(row.settings_json) if row.settings_json else {}
+        merged = settings_to_dict(settings)
+        # Preservar claves operativas no modeladas en AccountSettings
+        for key in ("equityMarks", "labEvidence"):
+            if key in previous and key not in merged:
+                merged[key] = previous[key]
+        row.settings_json = merged
+        row.updated_at = datetime.now(timezone.utc)
+        await self._session.flush()
+        return _account_from_row(row)
+
+    async def get_settings_json(self, account_id: str) -> dict | None:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        return dict(row.settings_json) if row.settings_json else None
+
+    async def merge_settings_json(self, account_id: str, fragment: dict) -> dict:
+        """Fusiona claves en settings_json sin pasar por AccountSettings (F4 equityMarks)."""
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        current = dict(row.settings_json) if row.settings_json else settings_to_dict(default_account_settings())
+        current.update(fragment)
+        row.settings_json = current
+        row.updated_at = datetime.now(timezone.utc)
+        await self._session.flush()
+        return current
+
+    async def get_settings(self, account_id: str) -> AccountSettings:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        return settings_from_dict(row.settings_json)
+
+    async def touch_activity(self, account_id: str) -> None:
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            return
+        now = datetime.now(timezone.utc)
+        row.last_activity_at = now
+        row.updated_at = now
+
+    async def list_portfolios(self, account_id: str) -> list[InvestmentPortfolio]:
+        await self.ensure_migrated()
+        stmt = (
+            select(InvestmentPortfolioRow)
+            .where(InvestmentPortfolioRow.account_id == account_id)
+            .order_by(InvestmentPortfolioRow.sort_order.asc())
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_portfolio_from_row(row) for row in rows]
+
+    async def _consolidate_single_portfolio_per_account(self) -> None:
+        """Una cuenta = una cartera operativa (modelo XTB). Fusiona subcarteras legacy."""
+        account_ids = (await self._session.execute(select(InvestmentAccountRow.id))).scalars().all()
+        for account_id in account_ids:
+            stmt = (
+                select(InvestmentPortfolioRow)
+                .where(InvestmentPortfolioRow.account_id == account_id)
+                .order_by(InvestmentPortfolioRow.sort_order.asc())
+            )
+            rows = (await self._session.execute(stmt)).scalars().all()
+            if len(rows) <= 1:
+                continue
+
+            default_row = next((r for r in rows if r.is_default), rows[0])
+            if not default_row.legacy_portfolio_id:
+                continue
+            default_legacy = await self._session.get(PortfolioRow, default_row.legacy_portfolio_id)
+            if default_legacy is None:
+                continue
+
+            for extra in rows:
+                if extra.id == default_row.id or not extra.legacy_portfolio_id:
+                    continue
+                extra_legacy = await self._session.get(PortfolioRow, extra.legacy_portfolio_id)
+                if extra_legacy is None:
+                    await self._session.delete(extra)
+                    continue
+
+                default_legacy.cash += extra_legacy.cash
+                pos_stmt = select(PositionRow).where(
+                    PositionRow.portfolio_id == extra.legacy_portfolio_id,
+                )
+                for pos in (await self._session.execute(pos_stmt)).scalars().all():
+                    pos.portfolio_id = default_row.legacy_portfolio_id
+
+                tx_stmt = select(TransactionRow).where(
+                    TransactionRow.portfolio_id == extra.legacy_portfolio_id,
+                )
+                for tx in (await self._session.execute(tx_stmt)).scalars().all():
+                    tx.portfolio_id = default_row.legacy_portfolio_id
+
+                await self._session.delete(extra_legacy)
+                await self._session.delete(extra)
+
+            default_legacy.updated_at = datetime.now(timezone.utc)
+            await self._session.flush()
+
+    async def update_account(
+        self,
+        account_id: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+    ) -> InvestmentAccount:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        if row.status == "closed":
+            raise ValueError("No se puede editar una cuenta cerrada")
+        now = datetime.now(timezone.utc)
+        if name is not None and name.strip():
+            row.name = name.strip()
+        if description is not None:
+            row.description = description.strip() or None
+        row.updated_at = now
+        await self._session.flush()
+        return _account_from_row(row)
+
+    async def set_default_account(self, account_id: str) -> InvestmentAccount:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        if row.status != "active":
+            raise ValueError("Solo una cuenta activa puede marcarse como principal")
+        await self._session.execute(
+            update(InvestmentAccountRow)
+            .where(InvestmentAccountRow.id != account_id)
+            .values(is_default=False),
+        )
+        row.is_default = True
+        row.updated_at = datetime.now(timezone.utc)
+        await self._session.flush()
+        return _account_from_row(row)
+
+    async def close_account(self, account_id: str) -> InvestmentAccount:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        if row.status == "closed":
+            return _account_from_row(row)
+        now = datetime.now(timezone.utc)
+        row.status = "closed"
+        row.updated_at = now
+        row.last_activity_at = now
+        await self._session.flush()
+        return _account_from_row(row)
+
+    async def delete_simulated_account(self, account_id: str) -> None:
+        await self.ensure_migrated()
+        row = await self._session.get(InvestmentAccountRow, account_id)
+        if row is None:
+            raise ValueError("Cuenta no encontrada")
+        if row.type != "simulated":
+            raise ValueError("Solo se pueden eliminar cuentas simuladas (modo demo)")
+        if row.status != "closed":
+            raise ValueError("Cierra la cuenta antes de eliminarla (conservación contable)")
+
+        portfolios_stmt = select(InvestmentPortfolioRow).where(
+            InvestmentPortfolioRow.account_id == account_id,
+        )
+        portfolio_rows = (await self._session.execute(portfolios_stmt)).scalars().all()
+        legacy_ids = [p.legacy_portfolio_id for p in portfolio_rows if p.legacy_portfolio_id]
+
+        for legacy_id in legacy_ids:
+            await self._session.execute(
+                delete(PositionRow).where(PositionRow.portfolio_id == legacy_id),
+            )
+            await self._session.execute(
+                delete(TransactionRow).where(TransactionRow.portfolio_id == legacy_id),
+            )
+            await self._session.execute(delete(PortfolioRow).where(PortfolioRow.id == legacy_id))
+
+        await self._session.execute(
+            delete(PendingOrderRow).where(PendingOrderRow.account_id == account_id),
+        )
+        await self._session.execute(
+            delete(LedgerEntryRow).where(LedgerEntryRow.account_id == account_id),
+        )
+        await self._session.execute(
+            delete(InvestmentPortfolioRow).where(InvestmentPortfolioRow.account_id == account_id),
+        )
+
+        # Referencias sueltas (sin FK): desvincular, conservar filas de auditoría cognitiva
+        for model in (
+            DecisionMemoryRow,
+            DecisionSessionRow,
+            TrialRecordRow,
+            ConfidenceStateRow,
+            EdgeReportRow,
+        ):
+            await self._session.execute(
+                update(model).where(model.account_id == account_id).values(account_id=None),
+            )
+
+        was_default = row.is_default
+        await self._session.delete(row)
+        await self._session.flush()
+
+        if was_default:
+            stmt = (
+                select(InvestmentAccountRow)
+                .where(InvestmentAccountRow.status == "active")
+                .order_by(InvestmentAccountRow.created_at.asc())
+                .limit(1)
+            )
+            next_default = (await self._session.execute(stmt)).scalar_one_or_none()
+            if next_default is not None:
+                next_default.is_default = True
+                await self._session.flush()

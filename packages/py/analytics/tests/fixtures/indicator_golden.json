@@ -1,0 +1,3788 @@
+{
+  "bars": [
+    {
+      "timestamp": "2024-01-01",
+      "open": 100,
+      "high": 105,
+      "low": 99,
+      "close": 102,
+      "volume": 1000,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-02",
+      "open": 102,
+      "high": 106,
+      "low": 101,
+      "close": 104,
+      "volume": 1100,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-03",
+      "open": 104,
+      "high": 108,
+      "low": 103,
+      "close": 106,
+      "volume": 1200,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-04",
+      "open": 106,
+      "high": 110,
+      "low": 105,
+      "close": 108,
+      "volume": 1300,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-05",
+      "open": 108,
+      "high": 112,
+      "low": 107,
+      "close": 110,
+      "volume": 1400,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-06",
+      "open": 110,
+      "high": 111,
+      "low": 106,
+      "close": 107,
+      "volume": 1500,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-07",
+      "open": 107,
+      "high": 109,
+      "low": 104,
+      "close": 105,
+      "volume": 1600,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-08",
+      "open": 105,
+      "high": 108,
+      "low": 103,
+      "close": 107,
+      "volume": 1700,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-09",
+      "open": 107,
+      "high": 113,
+      "low": 106,
+      "close": 112,
+      "volume": 1800,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-10",
+      "open": 112,
+      "high": 115,
+      "low": 111,
+      "close": 114,
+      "volume": 1900,
+      "adjClose": null,
+      "source": "yahoo"
+    }
+  ],
+  "barsExtended": [
+    {
+      "timestamp": "2024-01-01",
+      "open": 100.9,
+      "high": 103.2,
+      "low": 99.2,
+      "close": 101.2,
+      "volume": 1025,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-02",
+      "open": 101.3,
+      "high": 103.6,
+      "low": 99.6,
+      "close": 101.6,
+      "volume": 1050,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-03",
+      "open": 101.7,
+      "high": 104.0,
+      "low": 100.0,
+      "close": 102.0,
+      "volume": 1075,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-04",
+      "open": 102.1,
+      "high": 104.4,
+      "low": 100.4,
+      "close": 102.4,
+      "volume": 1100,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-05",
+      "open": 100.2,
+      "high": 102.5,
+      "low": 98.5,
+      "close": 100.5,
+      "volume": 1125,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-06",
+      "open": 102.9,
+      "high": 105.2,
+      "low": 101.2,
+      "close": 103.2,
+      "volume": 1150,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-07",
+      "open": 105.5,
+      "high": 107.8,
+      "low": 103.8,
+      "close": 105.8,
+      "volume": 1175,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-08",
+      "open": 103.7,
+      "high": 106.0,
+      "low": 102.0,
+      "close": 104.0,
+      "volume": 1200,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-09",
+      "open": 104.1,
+      "high": 106.4,
+      "low": 102.4,
+      "close": 104.4,
+      "volume": 1225,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-10",
+      "open": 102.2,
+      "high": 104.5,
+      "low": 100.5,
+      "close": 102.5,
+      "volume": 1250,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-11",
+      "open": 104.9,
+      "high": 107.2,
+      "low": 103.2,
+      "close": 105.2,
+      "volume": 1275,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-12",
+      "open": 105.3,
+      "high": 107.6,
+      "low": 103.6,
+      "close": 105.6,
+      "volume": 1300,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-13",
+      "open": 105.7,
+      "high": 108.0,
+      "low": 104.0,
+      "close": 106.0,
+      "volume": 1325,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-14",
+      "open": 108.3,
+      "high": 110.6,
+      "low": 106.6,
+      "close": 108.6,
+      "volume": 1350,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-15",
+      "open": 104.2,
+      "high": 106.5,
+      "low": 102.5,
+      "close": 104.5,
+      "volume": 1375,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-16",
+      "open": 106.9,
+      "high": 109.2,
+      "low": 105.2,
+      "close": 107.2,
+      "volume": 1400,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-17",
+      "open": 107.3,
+      "high": 109.6,
+      "low": 105.6,
+      "close": 107.6,
+      "volume": 1425,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-18",
+      "open": 107.7,
+      "high": 110.0,
+      "low": 106.0,
+      "close": 108.0,
+      "volume": 1450,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-19",
+      "open": 108.1,
+      "high": 110.4,
+      "low": 106.4,
+      "close": 108.4,
+      "volume": 1475,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-20",
+      "open": 106.2,
+      "high": 108.5,
+      "low": 104.5,
+      "close": 106.5,
+      "volume": 1500,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-21",
+      "open": 111.1,
+      "high": 113.4,
+      "low": 109.4,
+      "close": 111.4,
+      "volume": 1525,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-22",
+      "open": 109.3,
+      "high": 111.6,
+      "low": 107.6,
+      "close": 109.6,
+      "volume": 1550,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-23",
+      "open": 109.7,
+      "high": 112.0,
+      "low": 108.0,
+      "close": 110.0,
+      "volume": 1575,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-24",
+      "open": 110.1,
+      "high": 112.4,
+      "low": 108.4,
+      "close": 110.4,
+      "volume": 1600,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-25",
+      "open": 108.2,
+      "high": 110.5,
+      "low": 106.5,
+      "close": 108.5,
+      "volume": 1625,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-26",
+      "open": 110.9,
+      "high": 113.2,
+      "low": 109.2,
+      "close": 111.2,
+      "volume": 1650,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-27",
+      "open": 111.3,
+      "high": 113.6,
+      "low": 109.6,
+      "close": 111.6,
+      "volume": 1675,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-28",
+      "open": 113.9,
+      "high": 116.2,
+      "low": 112.2,
+      "close": 114.2,
+      "volume": 1700,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-29",
+      "open": 112.1,
+      "high": 114.4,
+      "low": 110.4,
+      "close": 112.4,
+      "volume": 1725,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-30",
+      "open": 110.2,
+      "high": 112.5,
+      "low": 108.5,
+      "close": 110.5,
+      "volume": 1750,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-01-31",
+      "open": 112.9,
+      "high": 115.2,
+      "low": 111.2,
+      "close": 113.2,
+      "volume": 1775,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-01",
+      "open": 113.3,
+      "high": 115.6,
+      "low": 111.6,
+      "close": 113.6,
+      "volume": 1800,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-02",
+      "open": 113.7,
+      "high": 116.0,
+      "low": 112.0,
+      "close": 114.0,
+      "volume": 1825,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-03",
+      "open": 114.1,
+      "high": 116.4,
+      "low": 112.4,
+      "close": 114.4,
+      "volume": 1850,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-04",
+      "open": 116.7,
+      "high": 119.0,
+      "low": 115.0,
+      "close": 117.0,
+      "volume": 1875,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-05",
+      "open": 114.9,
+      "high": 117.2,
+      "low": 113.2,
+      "close": 115.2,
+      "volume": 1900,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-06",
+      "open": 115.3,
+      "high": 117.6,
+      "low": 113.6,
+      "close": 115.6,
+      "volume": 1925,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-07",
+      "open": 115.7,
+      "high": 118.0,
+      "low": 114.0,
+      "close": 116.0,
+      "volume": 1950,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-08",
+      "open": 116.1,
+      "high": 118.4,
+      "low": 114.4,
+      "close": 116.4,
+      "volume": 1975,
+      "adjClose": null,
+      "source": "yahoo"
+    },
+    {
+      "timestamp": "2024-02-09",
+      "open": 114.2,
+      "high": 116.5,
+      "low": 112.5,
+      "close": 114.5,
+      "volume": 2000,
+      "adjClose": null,
+      "source": "yahoo"
+    }
+  ],
+  "cases": [
+    {
+      "definitionId": "sma",
+      "parameters": {
+        "period": 3
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-03",
+          "value": 104
+        },
+        {
+          "timestamp": "2024-01-04",
+          "value": 106
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 108
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 108.33333333333333
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 107.33333333333333
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 106.33333333333333
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 108
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 111
+        }
+      ]
+    },
+    {
+      "definitionId": "ema",
+      "parameters": {
+        "period": 3
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-03",
+          "value": 104
+        },
+        {
+          "timestamp": "2024-01-04",
+          "value": 106
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 108
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 107.5
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 106.25
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 106.625
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 109.3125
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 111.65625
+        }
+      ]
+    },
+    {
+      "definitionId": "rsi",
+      "parameters": {
+        "period": 3
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-04",
+          "value": 100
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 100
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 57.14285714285714
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 39.99999999999999
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 58.62068965517242
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 80.87649402390439
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 85.5421686746988
+        }
+      ]
+    },
+    {
+      "definitionId": "willr",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": -15.384615384615385
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": -45.45454545454545
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": -77.77777777777777
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": -55.55555555555556
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": -10.0
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": -8.333333333333334
+        }
+      ]
+    },
+    {
+      "definitionId": "mom",
+      "parameters": {
+        "period": 3
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-04",
+          "value": 6
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 6
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 1
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": -3
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": -3
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 5
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 9
+        }
+      ]
+    },
+    {
+      "definitionId": "sd",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 2.8284271247461903
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 2.0
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 1.7204650534085253
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 1.624807680927192
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 2.4819347291981715
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 3.40587727318528
+        }
+      ]
+    },
+    {
+      "definitionId": "dc",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "upper",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 112
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 112
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 112
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 112
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 113
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 115
+        }
+      ]
+    },
+    {
+      "definitionId": "dc",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "mid",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 105.5
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 106.5
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 107.5
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 107.5
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 108.0
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 109.0
+        }
+      ]
+    },
+    {
+      "definitionId": "dc",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "lower",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 99
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 101
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 103
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 103
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 103
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 103
+        }
+      ]
+    },
+    {
+      "definitionId": "vwap",
+      "parameters": {},
+      "lineKey": "main",
+      "barsRef": "extended",
+      "points": [
+        {
+          "timestamp": "2024-01-01",
+          "value": 101.2
+        },
+        {
+          "timestamp": "2024-01-02",
+          "value": 101.40240963855422
+        },
+        {
+          "timestamp": "2024-01-03",
+          "value": 101.60634920634921
+        },
+        {
+          "timestamp": "2024-01-04",
+          "value": 101.81176470588235
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 101.53720930232558
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 101.83026819923371
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 102.43603896103896
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 102.64691011235955
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 102.859012345679
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 102.81956043956043
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 103.0594861660079
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 103.29623655913979
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 103.53076923076924
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 103.94240601503759
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 103.985
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 104.21701030927835
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 104.44849939975991
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 104.67968574635242
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 104.91073684210527
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 105.00514851485148
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 105.36937441643325
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 105.6008826125331
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 105.83260869565217
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 106.06460317460318
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 106.18407547169811
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 106.42207045291157
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 106.66001371742112
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 106.99600262123198
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 107.22978056426332
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 107.36726726726727
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 107.60581797235022
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 107.84452433628319
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 108.08341307814992
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 108.32250639386189
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 108.64310344827587
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 108.87972459639127
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 109.11676591846083
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 109.35422379478106
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 109.59209401709401
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 109.7543388429752
+        }
+      ]
+    },
+    {
+      "definitionId": "st",
+      "parameters": {
+        "atrPeriod": 5,
+        "multiplier": 2
+      },
+      "lineKey": "main",
+      "barsRef": "extended",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 92.5
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 94.92
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 97.336
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 97.336
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 97.336
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 97.336
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 97.336
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 97.336
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 97.699165184
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 100.1193321472
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 100.1193321472
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 100.1193321472
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 100.1193321472
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 100.1193321472
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 100.1193321472
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 100.1193321472
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 101.82724528511648
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 101.82724528511648
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 101.82724528511648
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 101.82724528511648
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 101.82724528511648
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 102.40463973502696
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 102.96371178802157
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 105.45096943041726
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 105.45096943041726
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 105.45096943041726
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 105.45096943041726
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 105.45096943041726
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 105.57535766295912
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 106.0602861303673
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 108.48822890429385
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 108.48822890429385
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 108.48822890429385
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 108.48822890429385
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 108.48822890429385
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 108.48822890429385
+        }
+      ]
+    },
+    {
+      "definitionId": "srsi",
+      "parameters": {
+        "rsiPeriod": 5,
+        "stochPeriod": 5,
+        "kPeriod": 3,
+        "dPeriod": 3
+      },
+      "lineKey": "main",
+      "barsRef": "extended",
+      "points": [
+        {
+          "timestamp": "2024-01-12",
+          "value": 50.91787724022495
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 84.25121057355828
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 100.0
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 66.66666666666667
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 47.17747070859617
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 29.522963805388844
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 47.27794175159781
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 66.7671377096683
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 51.088311279542296
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 66.66666666666667
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 48.97053880968349
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 67.22316138572585
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 55.08851711326995
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 39.451311636919804
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 54.53202239421077
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 66.66666666666667
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 100.0
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 81.29210944942461
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 47.95877611609128
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 31.495002371218323
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 35.890396644817066
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 69.2237299781504
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 85.68750372302334
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 100.0
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 66.66666666666667
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 37.628287745262895
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 13.274860618720973
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 27.254425979096037
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 22.959471567166474
+        }
+      ]
+    },
+    {
+      "definitionId": "srsi",
+      "parameters": {
+        "rsiPeriod": 5,
+        "stochPeriod": 5,
+        "kPeriod": 3,
+        "dPeriod": 3
+      },
+      "lineKey": "signal",
+      "barsRef": "extended",
+      "points": [
+        {
+          "timestamp": "2024-01-14",
+          "value": 78.38969593792774
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 83.63929241340831
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 71.28137912508761
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 47.78903372688389
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 41.326125421860944
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 47.85601442221832
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 55.04446358026947
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 61.50737188529242
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 55.57517225196415
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 60.953455620692004
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 57.09407243622643
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 53.92099671197187
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 49.690617048133504
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 53.55000023259908
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 73.7328963536258
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 82.65292537203042
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 76.41696185517196
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 53.58196264557807
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 38.44805837737555
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 45.53637633139527
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 63.60054344866361
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 84.97041123372458
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 84.11805679656334
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 68.09831813730985
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 39.18993834355018
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 26.052524781026634
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 21.16291938832783
+        }
+      ]
+    },
+    {
+      "definitionId": "adx",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "main",
+      "barsRef": "extended",
+      "points": [
+        {
+          "timestamp": "2024-01-09",
+          "value": 52.94390396325197
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 43.488653576096894
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 41.25550958425864
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 40.31392001671996
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 40.47920253425408
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 44.97076395591078
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 37.13941629254226
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 34.004382132465786
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 32.2120429988714
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 31.58600864252918
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 31.9802714323587
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 26.153452015075267
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 29.97395820398932
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 27.894248364667057
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 26.983430439665796
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 27.1023131792132
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 22.471495435653985
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 23.529404858934846
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 25.14825507937484
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 30.58510181434441
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 28.607702585000446
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 23.938334020473892
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 23.917971209738443
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 24.64348359301265
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 26.05537683586063
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 28.099040721450354
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 34.223255394420654
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 31.706959831060924
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 30.648905210634048
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 30.84410364547403
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 32.111812011918275
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 27.184002447615562
+        }
+      ]
+    },
+    {
+      "definitionId": "adx",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "plus_di",
+      "barsRef": "extended",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 6.000000000000014
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 36.607594936708885
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 44.996336996336986
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 30.86432160804019
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 24.982408660351858
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 18.47277578587512
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 29.260112578700532
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 24.878997118944334
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 21.584948541367833
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 30.0192756149388
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 21.43966690044571
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 29.211701810196143
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 25.624039416775368
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 22.667152348566525
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 20.243818267359384
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 16.33704785102206
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 32.40390639255284
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 26.715323299333466
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 23.707371154044438
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 21.190241367933723
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 17.234261091997
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 25.887732655984962
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 22.928112069827883
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 30.02379433939628
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 24.41776521135915
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 19.79712708392326
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 27.985475543020684
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 24.606068595702464
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 21.828015897026873
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 19.556076363998816
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 27.55443396106112
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 22.307893221329206
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 19.94169112545134
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 18.01546649807917
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 16.45268823907612
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 13.228686335248701
+        }
+      ]
+    },
+    {
+      "definitionId": "adx",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "minus_di",
+      "barsRef": "extended",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 9.500000000000028
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 3.848101265822794
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 2.227106227106234
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 15.660804020100487
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 11.245827695083436
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 20.692528975235586
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 14.965195580522815
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 11.56104882654125
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 9.001558012884647
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 6.8284309690928335
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 24.08657423241417
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 18.887558497779278
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 15.360427794030075
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 12.453429859964592
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 10.070982710271128
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 17.294253317074766
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 12.212371343222307
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 17.968317795609536
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 14.734887063061612
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 12.029071140767373
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 18.651095519811175
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 14.63750436286073
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 11.910780532574803
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 9.394972576225346
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 16.043126989551066
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 21.99579405567441
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 17.211975985049097
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 13.97790685622252
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 11.319329593673531
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 9.145099138191483
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 7.166350004704913
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 14.370119325953906
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 11.607452648917656
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 9.358483044927187
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 7.5338563880300615
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 15.365459419782832
+        }
+      ]
+    },
+    {
+      "definitionId": "obv",
+      "parameters": {},
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-01",
+          "value": 0.0
+        },
+        {
+          "timestamp": "2024-01-02",
+          "value": 1050.0
+        },
+        {
+          "timestamp": "2024-01-03",
+          "value": 2125.0
+        },
+        {
+          "timestamp": "2024-01-04",
+          "value": 3225.0
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 2100.0
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 3250.0
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 4425.0
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 3225.0
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 4450.0
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 3200.0
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 4475.0
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 5775.0
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 7100.0
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 8450.0
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 7075.0
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 8475.0
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 9900.0
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 11350.0
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 12825.0
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 11325.0
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 12850.0
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 11300.0
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 12875.0
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 14475.0
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 12850.0
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 14500.0
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 16175.0
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 17875.0
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 16150.0
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 14400.0
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 16175.0
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 17975.0
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 19800.0
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 21650.0
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 23525.0
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 21625.0
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 23550.0
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 25500.0
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 27475.0
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 25475.0
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "roc",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-06",
+          "value": 4.901960784313726
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 0.9615384615384616
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 0.9433962264150944
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 3.7037037037037037
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 3.6363636363636362
+        }
+      ]
+    },
+    {
+      "definitionId": "mfi",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-06",
+          "value": 76.73528003829584
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 55.89839074344993
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 46.952487601983684
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 51.5015600624025
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 55.52177412143432
+        }
+      ]
+    },
+    {
+      "definitionId": "aroon",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "up",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 100.0
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 80.0
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 60.0
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 40.0
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 100.0
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 100.0
+        }
+      ]
+    },
+    {
+      "definitionId": "aroon",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "down",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 20.0
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 20.0
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 20.0
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 100.0
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 80.0
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 60.0
+        }
+      ]
+    },
+    {
+      "definitionId": "sar",
+      "parameters": {
+        "step": 0.02,
+        "maxAf": 0.2
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-01",
+          "value": 99.2
+        },
+        {
+          "timestamp": "2024-01-02",
+          "value": 99.2
+        },
+        {
+          "timestamp": "2024-01-03",
+          "value": 99.2
+        },
+        {
+          "timestamp": "2024-01-04",
+          "value": 99.488
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 104.4
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 98.5
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 98.5
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 98.872
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 99.22912
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 99.57195519999999
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 99.90107699199999
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 100.21703391231999
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 100.52035255582719
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 100.96913140247756
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 101.73960089027935
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 102.448432819057
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 102.5
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 103.148
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 103.74416
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 104.2926272
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 104.5
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 104.5
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 105.39
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 106.191
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 113.4
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 113.262
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 106.5
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 106.642
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 107.02432
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 107.3913472
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 107.743693312
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 108.08194557952001
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 108.4066677563392
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 108.71840104608563
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 109.1792969833205
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 109.96495322465486
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 110.68775696668247
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 111.35273640934787
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 111.96451749660004
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 119.0
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "bears",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": -3.039999999999992
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": -0.8933333333333309
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 0.4711111111110995
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": -1.5525925925926174
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": -1.435061728395084
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": -2.890041152263393
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": -0.793360768175603
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": -0.92890717878376
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": -1.0192714525225028
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 0.38715236498498484
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": -3.141898423343349
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": -0.9612656155622403
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": -1.040843743708166
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": -1.0938958291387877
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": -1.1292638860925308
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": -2.6861759240617005
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 0.8092160506255368
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": -1.3271892995829973
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": -1.2847928663886705
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": -1.256528577592448
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": -2.7710190517283024
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": -0.7140127011521997
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": -0.876008467434815
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 0.48266102171012903
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": -1.544892652193255
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": -2.963261768128845
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": -0.8421745120859043
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": -0.9614496747239514
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": -1.0409664498159685
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": -1.093977633210642
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 0.33734824452622547
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": -1.6417678369825097
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": -1.494511891321693
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": -1.3963412608811439
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": -1.3308941739207683
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": -2.8205961159471826
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "bulls",
+      "parameters": {
+        "period": 5
+      },
+      "lineKey": "main",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 0.960000000000008
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 3.106666666666669
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 4.4711111111110995
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 2.4474074074073826
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 2.564938271604916
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 1.109958847736607
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 3.206639231824397
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 3.07109282121624
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 2.980728547477497
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 4.387152364984985
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 0.8581015766566509
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 3.0387343844377597
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 2.959156256291834
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 2.9061041708612123
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 2.870736113907469
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 1.3138240759382995
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 4.809216050625537
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 2.6728107004170027
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 2.7152071336113295
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 2.743471422407552
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 1.2289809482716976
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 3.2859872988478003
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 3.123991532565185
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 4.482661021710129
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 2.455107347806745
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 1.0367382318711549
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 3.1578254879140957
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 3.0385503252760486
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 2.9590335501840315
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 2.906022366789358
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 4.3373482445262255
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 2.3582321630174903
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 2.505488108678307
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 2.603658739118856
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 2.6691058260792317
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 1.1794038840528174
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ali",
+      "parameters": {},
+      "lineKey": "jaw",
+      "points": [
+        {
+          "timestamp": "2024-01-21",
+          "value": 103.41538461538462
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 103.81420118343196
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 103.86695493855258
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 104.12334302020238
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 104.3907781724945
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 104.66841062076416
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 104.95545595762846
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 105.07426703781087
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 105.5608618810562
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 105.87156481328263
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 106.18913675072243
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 106.51304930835917
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 106.6658916692546
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 107.0146692331581
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 107.36738698445363
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 107.89297260103413
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 108.23966701633921
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 108.4135387843131
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 108.78172810859671
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 109.15236440793541
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ali",
+      "parameters": {},
+      "lineKey": "teeth",
+      "points": [
+        {
+          "timestamp": "2024-01-13",
+          "value": 102.5875
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 102.8140625
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 102.77480468750001
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 103.07795410156251
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 103.39320983886721
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 103.71905860900881
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 104.32917628288271
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 104.35052924752237
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 104.70671309158209
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 105.06837395513433
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 105.43482721074254
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 105.80547380939971
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 105.89228958322475
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 106.58075338532166
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 106.95815921215645
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 107.33838931063688
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 107.72109064680727
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 107.81845431595636
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 108.24114752646182
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 108.66100408565408
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 109.35337857494733
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 109.73420625307891
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 109.82993047144404
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 110.25118916251354
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 110.66979051719935
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 111.08606670254943
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 111.50030836473074
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 112.1877698191394
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ali",
+      "parameters": {},
+      "lineKey": "lips",
+      "points": [
+        {
+          "timestamp": "2024-01-08",
+          "value": 101.53999999999999
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 101.87199999999999
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 102.65759999999997
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 102.92607999999998
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 103.22086399999998
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 103.07669119999998
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 103.50135295999999
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 103.921082368
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 104.33686589439999
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 105.18949271551999
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 105.05159417241597
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 105.48127533793279
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 105.90502027034623
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 106.32401621627699
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 106.73921297302158
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 106.69137037841726
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 107.63309630273382
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 108.02647704218705
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 108.42118163374964
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 108.81694530699971
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 108.75355624559977
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 109.24284499647982
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 109.71427599718386
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 110.61142079774709
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 110.96913663819767
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 110.87530931055812
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 111.3402474484465
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 111.7921979587572
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 112.23375836700575
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 112.66700669360459
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 113.53360535488369
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 113.86688428390696
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 114.21350742712556
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "fr",
+      "parameters": {},
+      "lineKey": "up",
+      "points": [
+        {
+          "timestamp": "2024-01-07",
+          "value": 107.8
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 110.6
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 113.4
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 116.2
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 119.0
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "fr",
+      "parameters": {},
+      "lineKey": "down",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 98.5
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 100.5
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 102.5
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 104.5
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 106.5
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 108.5
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ich",
+      "parameters": {
+        "tenkanPeriod": 3,
+        "kijunPeriod": 5,
+        "senkouBPeriod": 8,
+        "displacement": 3
+      },
+      "lineKey": "tenkan",
+      "points": [
+        {
+          "timestamp": "2024-01-03",
+          "value": 101.6
+        },
+        {
+          "timestamp": "2024-01-04",
+          "value": 102.0
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 101.45
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 101.85
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 104.5
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 104.9
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 103.45
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 103.85
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 104.05
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 105.6
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 107.1
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 106.05
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 107.6
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 108.0
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 107.45
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 110.5
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 110.0
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 109.45
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 109.85
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 110.05
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 112.7
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 112.9
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 112.35
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 111.85
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 112.05
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 113.6
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 114.0
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 115.5
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 115.7
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 116.1
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 115.6
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 116.0
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 115.45
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ich",
+      "parameters": {
+        "tenkanPeriod": 3,
+        "kijunPeriod": 5,
+        "senkouBPeriod": 8,
+        "displacement": 3
+      },
+      "lineKey": "kijun",
+      "points": [
+        {
+          "timestamp": "2024-01-05",
+          "value": 101.45
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 101.85
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 104.15
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 104.15
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 104.05
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 104.25
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 105.55
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 106.45
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 107.45
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 109.95
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 109.85
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 110.05
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 111.35
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 111.35
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 112.35
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 112.35
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 112.35
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 112.25
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 112.45
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 115.1
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 115.3
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 115.5
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 115.7
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 116.1
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 115.45
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ich",
+      "parameters": {
+        "tenkanPeriod": 3,
+        "kijunPeriod": 5,
+        "senkouBPeriod": 8,
+        "displacement": 3
+      },
+      "lineKey": "spanA",
+      "points": [
+        {
+          "timestamp": "2024-01-08",
+          "value": 101.45
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 101.85
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 103.825
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 104.025
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 103.80000000000001
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 104.0
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 104.05
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 104.925
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 106.32499999999999
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 106.3
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 107.07499999999999
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 107.225
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 107.45
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 109.725
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 109.475
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 109.7
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 109.85
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 110.05
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 112.025
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 112.125
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 112.35
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 112.1
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 112.19999999999999
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 112.925
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 113.225
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 115.3
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 115.5
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 115.8
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ich",
+      "parameters": {
+        "tenkanPeriod": 3,
+        "kijunPeriod": 5,
+        "senkouBPeriod": 8,
+        "displacement": 3
+      },
+      "lineKey": "spanB",
+      "points": [
+        {
+          "timestamp": "2024-01-11",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 103.15
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 104.25
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 105.55
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 105.55
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 105.55
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 105.55
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 106.55
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 107.95
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 107.95
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 108.95
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 109.05
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 111.35
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 111.35
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 111.35
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 111.35
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 111.35
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 112.35
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 112.45
+        },
+        {
+          "timestamp": "2024-02-07",
+          "value": 113.75
+        },
+        {
+          "timestamp": "2024-02-08",
+          "value": 113.75
+        },
+        {
+          "timestamp": "2024-02-09",
+          "value": 113.75
+        }
+      ],
+      "barsRef": "extended"
+    },
+    {
+      "definitionId": "ich",
+      "parameters": {
+        "tenkanPeriod": 3,
+        "kijunPeriod": 5,
+        "senkouBPeriod": 8,
+        "displacement": 3
+      },
+      "lineKey": "chikou",
+      "points": [
+        {
+          "timestamp": "2024-01-01",
+          "value": 102.4
+        },
+        {
+          "timestamp": "2024-01-02",
+          "value": 100.5
+        },
+        {
+          "timestamp": "2024-01-03",
+          "value": 103.2
+        },
+        {
+          "timestamp": "2024-01-04",
+          "value": 105.8
+        },
+        {
+          "timestamp": "2024-01-05",
+          "value": 104.0
+        },
+        {
+          "timestamp": "2024-01-06",
+          "value": 104.4
+        },
+        {
+          "timestamp": "2024-01-07",
+          "value": 102.5
+        },
+        {
+          "timestamp": "2024-01-08",
+          "value": 105.2
+        },
+        {
+          "timestamp": "2024-01-09",
+          "value": 105.6
+        },
+        {
+          "timestamp": "2024-01-10",
+          "value": 106.0
+        },
+        {
+          "timestamp": "2024-01-11",
+          "value": 108.6
+        },
+        {
+          "timestamp": "2024-01-12",
+          "value": 104.5
+        },
+        {
+          "timestamp": "2024-01-13",
+          "value": 107.2
+        },
+        {
+          "timestamp": "2024-01-14",
+          "value": 107.6
+        },
+        {
+          "timestamp": "2024-01-15",
+          "value": 108.0
+        },
+        {
+          "timestamp": "2024-01-16",
+          "value": 108.4
+        },
+        {
+          "timestamp": "2024-01-17",
+          "value": 106.5
+        },
+        {
+          "timestamp": "2024-01-18",
+          "value": 111.4
+        },
+        {
+          "timestamp": "2024-01-19",
+          "value": 109.6
+        },
+        {
+          "timestamp": "2024-01-20",
+          "value": 110.0
+        },
+        {
+          "timestamp": "2024-01-21",
+          "value": 110.4
+        },
+        {
+          "timestamp": "2024-01-22",
+          "value": 108.5
+        },
+        {
+          "timestamp": "2024-01-23",
+          "value": 111.2
+        },
+        {
+          "timestamp": "2024-01-24",
+          "value": 111.6
+        },
+        {
+          "timestamp": "2024-01-25",
+          "value": 114.2
+        },
+        {
+          "timestamp": "2024-01-26",
+          "value": 112.4
+        },
+        {
+          "timestamp": "2024-01-27",
+          "value": 110.5
+        },
+        {
+          "timestamp": "2024-01-28",
+          "value": 113.2
+        },
+        {
+          "timestamp": "2024-01-29",
+          "value": 113.6
+        },
+        {
+          "timestamp": "2024-01-30",
+          "value": 114.0
+        },
+        {
+          "timestamp": "2024-01-31",
+          "value": 114.4
+        },
+        {
+          "timestamp": "2024-02-01",
+          "value": 117.0
+        },
+        {
+          "timestamp": "2024-02-02",
+          "value": 115.2
+        },
+        {
+          "timestamp": "2024-02-03",
+          "value": 115.6
+        },
+        {
+          "timestamp": "2024-02-04",
+          "value": 116.0
+        },
+        {
+          "timestamp": "2024-02-05",
+          "value": 116.4
+        },
+        {
+          "timestamp": "2024-02-06",
+          "value": 114.5
+        }
+      ],
+      "barsRef": "extended"
+    }
+  ]
+}

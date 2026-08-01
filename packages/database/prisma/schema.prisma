@@ -1,0 +1,1088 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum InstrumentType {
+  stock
+}
+
+enum Timeframe {
+  m1  @map("1m")
+  m5  @map("5m")
+  m15 @map("15m")
+  m30 @map("30m")
+  h1  @map("1h")
+  h4  @map("4h")
+  d1  @map("1d")
+  w1  @map("1wk")
+  mo1 @map("1mo")
+}
+
+enum DataProvider {
+  yahoo
+  xtb
+}
+
+enum SyncStatus {
+  success
+  partial
+  failed
+}
+
+enum TransactionType {
+  buy
+  sell
+}
+
+enum BacktestStrategyType {
+  sma_crossover
+  rsi_mean_reversion
+  ema_crossover
+  golden_cross
+  death_cross
+  macd_signal_cross
+  macd_zero_line
+  rsi_momentum
+  rsi_oversold_bounce
+  stoch_oversold
+  bollinger_lower_bounce
+  bollinger_upper_breakout
+  price_above_sma200
+  ma_stack_bullish
+  pullback_in_uptrend
+  cci_oversold
+  donchian_breakout
+  adx_di_trend
+  ichimoku_tk_cross
+  vwap_reclaim
+  supertrend_follow
+}
+
+model Instrument {
+  id          String         @id @default(cuid())
+  symbol      String
+  yahooSymbol String         @unique @map("yahoo_symbol")
+  isin        String?
+  name        String
+  exchange    String
+  country     String         @default("ES")
+  currency    String         @default("EUR")
+  sector      String?
+  type        InstrumentType @default(stock)
+  isActive    Boolean        @default(true) @map("is_active")
+  profileSnapshot Json?      @map("profile_snapshot")
+  lastXtbValidation Json?    @map("last_xtb_validation")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  ohlcvBars   OhlcvBar[]
+  syncLogs    DataSyncLog[]
+  positions   Position[]
+  transactions Transaction[]
+  backtestRuns BacktestRun[]
+  optimizationRuns OptimizationRun[]
+  researchTrials   ResearchTrial[]
+  researchEvidence ResearchEvidence[]
+  listItems    InstrumentListItem[]
+  priceAlerts  PriceAlert[]
+  signalAlertSubscriptions SignalAlertSubscription[]
+  syncQueueItems SyncQueueItem[]
+  pendingOrders PendingOrder[]
+  ledgerEntries LedgerEntry[]
+  dataSnapshots DataSnapshot[]
+  positionPolicies PositionPolicy[]
+  strategyTops InstrumentStrategyTop[]
+
+  @@unique([symbol, exchange])
+  @@index([exchange])
+  @@index([isActive])
+  @@map("instruments")
+}
+
+model OhlcvBar {
+  id           String       @id @default(cuid())
+  instrumentId String       @map("instrument_id")
+  timeframe    Timeframe    @default(d1)
+  timestamp    DateTime     @db.Timestamptz(3)
+  open         Decimal      @db.Decimal(18, 6)
+  high         Decimal      @db.Decimal(18, 6)
+  low          Decimal      @db.Decimal(18, 6)
+  close        Decimal      @db.Decimal(18, 6)
+  volume       BigInt
+  adjClose     Decimal?     @map("adj_close") @db.Decimal(18, 6)
+  source       DataProvider @default(yahoo)
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, timeframe, timestamp])
+  @@index([instrumentId, timeframe, timestamp(sort: Desc)])
+  @@map("ohlcv_bars")
+}
+
+model DataSyncLog {
+  id           String       @id @default(cuid())
+  instrumentId String       @map("instrument_id")
+  provider     DataProvider
+  status       SyncStatus
+  barsAdded    Int          @default(0) @map("bars_added")
+  error        String?
+  syncedAt     DateTime     @default(now()) @map("synced_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([instrumentId, syncedAt(sort: Desc)])
+  @@map("data_sync_log")
+}
+
+model Portfolio {
+  id        String   @id @default(cuid())
+  name      String   @default("Cartera principal")
+  currency  String   @default("EUR")
+  cash      Decimal  @default(100000) @db.Decimal(18, 6)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  positions    Position[]
+  transactions Transaction[]
+  investmentPortfolio InvestmentPortfolio?
+
+  @@map("portfolios")
+}
+
+model Position {
+  id           String   @id @default(cuid())
+  portfolioId  String   @map("portfolio_id")
+  instrumentId String   @map("instrument_id")
+  quantity     Decimal  @db.Decimal(18, 6)
+  avgCost      Decimal  @map("avg_cost") @db.Decimal(18, 6)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  portfolio  Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, instrumentId])
+  @@map("positions")
+}
+
+model Transaction {
+  id           String          @id @default(cuid())
+  portfolioId  String          @map("portfolio_id")
+  instrumentId String          @map("instrument_id")
+  type         TransactionType
+  quantity     Decimal         @db.Decimal(18, 6)
+  price        Decimal         @db.Decimal(18, 6)
+  total        Decimal         @db.Decimal(18, 6)
+  executedAt   DateTime        @default(now()) @map("executed_at")
+
+  portfolio  Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([portfolioId, executedAt(sort: Desc)])
+  @@map("transactions")
+}
+
+model BacktestRun {
+  id               String               @id @default(cuid())
+  instrumentId     String               @map("instrument_id")
+  strategyType     BacktestStrategyType @map("strategy_type")
+  initialCash      Decimal              @map("initial_cash") @db.Decimal(18, 6)
+  finalEquity      Decimal              @map("final_equity") @db.Decimal(18, 6)
+  totalReturnPct   Decimal              @map("total_return_pct") @db.Decimal(10, 4)
+  maxDrawdownPct   Decimal              @map("max_drawdown_pct") @db.Decimal(10, 4)
+  tradeCount       Int                  @map("trade_count")
+  winCount         Int                  @map("win_count")
+  barCount         Int                  @map("bar_count")
+  firstDate        DateTime             @map("first_date") @db.Date
+  lastDate         DateTime             @map("last_date") @db.Date
+  createdAt        DateTime             @default(now()) @map("created_at")
+  timeframe        String               @default("1d")
+  dataVersion      String?              @map("data_version")
+  commissionBps    Int                  @default(0) @map("commission_bps")
+  slippageBps      Int                  @default(0) @map("slippage_bps")
+  manifest         Json?
+  strategyDefinitionId String?            @map("strategy_definition_id")
+
+  instrument         Instrument      @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  strategyDefinition StrategyDefinition? @relation(fields: [strategyDefinitionId], references: [id], onDelete: SetNull)
+  trades             BacktestTrade[]
+  researchTrials     ResearchTrial[]
+
+  @@index([instrumentId, createdAt(sort: Desc)])
+  @@index([strategyDefinitionId])
+  @@map("backtest_runs")
+}
+
+model StrategyDefinition {
+  id         String   @id @default(cuid())
+  name       String
+  definition Json
+  presetKey  String?  @map("preset_key")
+  origin     String   @default("manual")
+  timeframe  String   @default("1d")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  backtestRuns BacktestRun[]
+  researchTrials ResearchTrial[]
+  paperAccounts InvestmentAccount[]
+  signalAlertSubscriptions SignalAlertSubscription[]
+  trackerDefinitions TrackerDefinition[]
+  scanManifests      ScanManifest[]
+  executionPolicies  ExecutionPolicy[]
+  positionPoliciesExitStrategy PositionPolicy[] @relation("PositionPolicyExitStrategy")
+
+  @@index([updatedAt(sort: Desc)])
+  @@map("strategy_definitions")
+}
+
+model TrackerDefinition {
+  id                   String   @id @default(cuid())
+  name                 String
+  definition           Json
+  strategyDefinitionId String   @map("strategy_definition_id")
+  strategyVersion      Int?     @map("strategy_version")
+  timeframe            String   @default("1d")
+  evaluationMode       String   @default("bar_close") @map("evaluation_mode")
+  origin               String   @default("manual")
+  enabled              Boolean  @default(true)
+  userId               String?  @map("user_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  strategyDefinition StrategyDefinition @relation(fields: [strategyDefinitionId], references: [id])
+  scanJobs           ScanJob[]
+  scanManifests      ScanManifest[]
+
+  @@index([enabled, updatedAt(sort: Desc)])
+  @@map("tracker_definitions")
+}
+
+model SignalAlertSubscription {
+  id                   String    @id @default(cuid())
+  instrumentId         String    @map("instrument_id")
+  symbol               String
+  strategyDefinitionId String?   @map("strategy_definition_id")
+  presetKey            String?   @map("preset_key")
+  timeframe            String    @default("1d")
+  signalKinds          Json      @default("[\"entry_long\",\"exit\"]") @map("signal_kinds")
+  channels             Json      @default("[\"toast\"]")
+  webhookUrl           String?   @map("webhook_url")
+  emailTo              String?   @map("email_to")
+  isActive             Boolean   @default(true) @map("is_active")
+  lastTriggeredAt      DateTime? @map("last_triggered_at")
+  lastBarTimestamp     String?   @map("last_bar_timestamp")
+  lastSignalKind       String?   @map("last_signal_kind")
+  lastSignalPrice      Decimal?  @map("last_signal_price") @db.Decimal(18, 6)
+  note                 String?
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  instrument           Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  strategyDefinition   StrategyDefinition? @relation(fields: [strategyDefinitionId], references: [id], onDelete: SetNull)
+
+  @@index([isActive, createdAt(sort: Desc)])
+  @@map("signal_alert_subscriptions")
+}
+
+model ScanJob {
+  id                   String    @id @default(cuid())
+  status               String    @default("pending")
+  payload              Json
+  result               Json?
+  error                String?
+  cacheHits            Int?      @map("cache_hits")
+  cacheMisses          Int?      @map("cache_misses")
+  trackerDefinitionId  String?   @map("tracker_definition_id")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  completedAt          DateTime? @map("completed_at")
+
+  trackerDefinition TrackerDefinition? @relation(fields: [trackerDefinitionId], references: [id])
+  scanManifest      ScanManifest?
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([trackerDefinitionId])
+  @@map("scan_jobs")
+}
+
+model DataSnapshot {
+  id           String   @id
+  instrumentId String   @map("instrument_id")
+  timeframe    String
+  dataVersion  String   @map("data_version")
+  barCount     Int      @map("bar_count")
+  fromTs       String   @map("from_ts")
+  toTs         String   @map("to_ts")
+  source       String   @default("postgres")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, timeframe, dataVersion])
+  @@map("data_snapshots")
+}
+
+model ScanManifest {
+  id                   String   @id
+  scanJobId            String?  @unique @map("scan_job_id")
+  trackerDefinitionId  String?  @map("tracker_definition_id")
+  strategyDefinitionId String?  @map("strategy_definition_id")
+  manifest             Json
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  scanJob            ScanJob?            @relation(fields: [scanJobId], references: [id], onDelete: SetNull)
+  trackerDefinition  TrackerDefinition?  @relation(fields: [trackerDefinitionId], references: [id], onDelete: SetNull)
+  strategyDefinition StrategyDefinition? @relation(fields: [strategyDefinitionId], references: [id])
+
+  @@index([trackerDefinitionId])
+  @@map("scan_manifests")
+}
+
+model ExecutionPolicy {
+  id                   String   @id @default(cuid())
+  name                 String
+  definition           Json
+  mode                 String
+  accountId            String?  @map("account_id")
+  strategyDefinitionId String?  @map("strategy_definition_id")
+  origin               String   @default("manual")
+  enabled              Boolean  @default(true)
+  userId               String?  @map("user_id")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  account            InvestmentAccount?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  strategyDefinition StrategyDefinition? @relation(fields: [strategyDefinitionId], references: [id], onDelete: SetNull)
+  positionPolicies   PositionPolicy[]
+
+  @@index([enabled, updatedAt(sort: Desc)])
+  @@map("execution_policies")
+}
+
+model PositionPolicy {
+  id                       String   @id @default(cuid())
+  accountId                String   @map("account_id")
+  instrumentId             String   @map("instrument_id")
+  definition               Json
+  mode                     String   @default("manual")
+  exitStrategyDefinitionId String?  @map("exit_strategy_definition_id")
+  executionPolicyId        String?  @map("execution_policy_id")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  account                InvestmentAccount  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instrument             Instrument         @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  exitStrategyDefinition StrategyDefinition? @relation("PositionPolicyExitStrategy", fields: [exitStrategyDefinitionId], references: [id], onDelete: SetNull)
+  executionPolicy        ExecutionPolicy?   @relation(fields: [executionPolicyId], references: [id], onDelete: SetNull)
+
+  @@unique([accountId, instrumentId])
+  @@index([accountId])
+  @@map("position_policies")
+}
+
+model PlatformEvent {
+  id            String   @id @default(cuid())
+  type          String
+  payload       Json
+  correlationId String?  @map("correlation_id")
+  userId        String?  @map("user_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([type, createdAt(sort: Desc)])
+  @@index([correlationId])
+  @@map("platform_events")
+}
+
+/// ART-LLM-CALL — auditoría append-only (RFC-007). Sin deletes en app.
+model LlmCall {
+  id                String   @id
+  provider          String
+  model             String
+  promptTemplateId  String   @map("prompt_template_id")
+  promptRendered    String   @map("prompt_rendered") @db.Text
+  responseRaw       String?  @map("response_raw") @db.Text
+  responseParsed    Json?    @map("response_parsed")
+  validationPassed  Boolean  @map("validation_passed")
+  validationErrors  Json     @default("[]") @map("validation_errors")
+  elapsedMs         Int      @map("elapsed_ms")
+  costUsd           Decimal  @default(0) @map("cost_usd") @db.Decimal(12, 6)
+  status            String
+  error             String?  @db.Text
+  traceId           String   @map("trace_id")
+  causationId       String?  @map("causation_id")
+  producerVersion   String   @map("producer_version")
+  payload           Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([provider, createdAt(sort: Desc)])
+  @@index([traceId])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("llm_calls")
+}
+
+/// ART-DECISION-MEMORY — append-only (RFC-008 D7+).
+model DecisionMemory {
+  id                 String   @id
+  decisionId         String   @map("decision_id")
+  instrumentId       String   @map("instrument_id")
+  accountId          String?  @map("account_id")
+  outcome            String
+  reasons            Json     @default("[]")
+  policyRuleIds      Json     @default("[]") @map("policy_rule_ids")
+  reevaluateWhen     Json     @default("[]") @map("reevaluate_when")
+  opportunityIntact  Boolean  @map("opportunity_intact")
+  policyId           String?  @map("policy_id")
+  policyVersion      String?  @map("policy_version")
+  payload            Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([decisionId])
+  @@index([instrumentId, createdAt(sort: Desc)])
+  @@index([accountId, createdAt(sort: Desc)])
+  @@index([outcome, createdAt(sort: Desc)])
+  @@map("decision_memory")
+}
+
+/// ART-DECISION-SESSION — fotografía completa del razonamiento (propose+).
+model DecisionSession {
+  id                 String   @id
+  kind               String
+  status             String
+  instrumentId       String   @map("instrument_id")
+  accountId          String?  @map("account_id")
+  symbol             String?
+  recommendationId   String?  @map("recommendation_id")
+  decisionId         String?  @map("decision_id")
+  payload            Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([instrumentId, createdAt(sort: Desc)])
+  @@index([accountId, createdAt(sort: Desc)])
+  @@index([recommendationId])
+  @@index([decisionId])
+  @@index([kind, createdAt(sort: Desc)])
+  @@map("decision_sessions")
+}
+
+/// ART-MODEL — registro de modelos cuantitativos (F2).
+model ModelArtifact {
+  id               String    @id
+  modelId          String    @unique @map("model_id")
+  modelVersion     String    @map("model_version")
+  framework        String
+  featureSetId     String    @map("feature_set_id")
+  compositionHash  String?   @map("composition_hash")
+  modelChecksum    String?   @map("model_checksum")
+  trainedAt        DateTime? @map("trained_at")
+  payload          Json?
+  updatedAt        DateTime  @default(now()) @map("updated_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  @@index([framework])
+  @@map("model_artifacts")
+}
+
+/// ART-PREDICTION — predicciones (append-only; no ordenan).
+model Prediction {
+  id             String    @id
+  instrumentId   String    @map("instrument_id")
+  modelId        String    @map("model_id")
+  modelVersion   String    @map("model_version")
+  horizon        String?
+  value          Float?
+  confidence     Float?
+  asOf           DateTime? @map("as_of")
+  payload        Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([instrumentId, createdAt(sort: Desc)])
+  @@index([modelId, createdAt(sort: Desc)])
+  @@index([instrumentId, modelId, createdAt(sort: Desc)])
+  @@map("predictions")
+}
+
+/// Trials / hipótesis — filas planas para DSR (RFC-008 D3/D7).
+model TrialRecord {
+  id                 String   @id
+  logId              String   @map("log_id")
+  strategyFamilyRef  String   @map("strategy_family_ref")
+  hypothesisRef      String   @map("hypothesis_ref")
+  paramsHash         String   @map("params_hash")
+  sharpeIs           Decimal? @map("sharpe_is") @db.Decimal(12, 4)
+  notes              String?  @db.Text
+  accountId          String?  @map("account_id")
+  payload            Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([logId])
+  @@index([strategyFamilyRef, createdAt(sort: Desc)])
+  @@index([accountId, createdAt(sort: Desc)])
+  @@map("trial_records")
+}
+
+/// ART-CONFIDENCE-STATE — estado mutable de tesis abierta (RFC-008 D7).
+model ConfidenceState {
+  id            String    @id
+  decisionId    String    @map("decision_id")
+  instrumentId  String    @map("instrument_id")
+  accountId     String?   @map("account_id")
+  confidence0   Decimal   @map("confidence_0") @db.Decimal(8, 4)
+  confidence    Decimal   @db.Decimal(8, 4)
+  hint          String
+  expiresAt     DateTime? @map("expires_at")
+  expired       Boolean   @default(false)
+  events        Json      @default("[]")
+  notes         Json      @default("[]")
+  payload       Json?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([decisionId])
+  @@index([instrumentId, updatedAt(sort: Desc)])
+  @@index([expired, updatedAt(sort: Desc)])
+  @@index([accountId, updatedAt(sort: Desc)])
+  @@map("confidence_states")
+}
+
+/// ART-EDGE-REPORT — append-only snapshots (RFC-008 D3/D7).
+model EdgeReport {
+  id                   String   @id
+  version              String
+  strategyOrSignalRef  String   @map("strategy_or_signal_ref")
+  instrumentUniverseRef String? @map("instrument_universe_ref")
+  accountId            String?  @map("account_id")
+  credibility          Decimal  @db.Decimal(8, 2)
+  edgeScore            Decimal  @map("edge_score") @db.Decimal(8, 2)
+  band                 String
+  suite                Json
+  notes                Json     @default("[]")
+  payload              Json?
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  @@index([strategyOrSignalRef, createdAt(sort: Desc)])
+  @@index([band, createdAt(sort: Desc)])
+  @@index([accountId, createdAt(sort: Desc)])
+  @@map("edge_reports")
+}
+
+model OptimizationRun {
+  id           String    @id @default(cuid())
+  instrumentId String    @map("instrument_id")
+  symbol       String
+  status       String    @default("pending")
+  payload      Json
+  result       Json?
+  error        String?
+  engine       String?
+  bestScore    Decimal?  @map("best_score") @db.Decimal(12, 4)
+  trialCount   Int?      @map("trial_count")
+  barCount     Int?      @map("bar_count")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  completedAt  DateTime? @map("completed_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  researchTrials ResearchTrial[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("optimization_runs")
+}
+
+/// Hypothesis (ADR-018 P2.A/B). Belief state is separate (P2.C).
+model Hypothesis {
+  id          String   @id @default(cuid())
+  kind        String   @default("hypothesis") // hypothesis | anti
+  statement   String
+  domain      String?
+  context     Json?
+  falsifiers  Json     @default("[]")
+  status      String   @default("open") // open | paused | abandoned | consolidated
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  researchTrials   ResearchTrial[]
+  researchEvidence ResearchEvidence[]
+  belief           HypothesisBelief?
+  beliefHistory    BeliefHistory[]
+  knowledgeNodes   KnowledgeNode[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("hypotheses")
+}
+
+/// Knowledge node (ADR-013 continuum; P2.D). Consolidation is explicit — never auto.
+model KnowledgeNode {
+  id                   String   @id @default(cuid())
+  hypothesisId         String   @map("hypothesis_id")
+  stage                String   @default("EMERGING") // CANDIDATE|EMERGING|ACCEPTED|CANONICAL|DEPRECATED
+  statement            String
+  knowledgeConfidence  Decimal  @map("knowledge_confidence") @db.Decimal(8, 4)
+  validityContext      Json     @default("{}") @map("validity_context")
+  evidenceIds          Json     @default("[]") @map("evidence_ids")
+  beliefSnapshot       Json     @map("belief_snapshot")
+  consolidationReport  Json     @map("consolidation_report")
+  mathVersion          String   @map("math_version")
+  notes                String?
+  consolidatedAt       DateTime @map("consolidated_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  hypothesis Hypothesis @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  mklSyncEvents MklSyncEvent[]
+
+  @@index([hypothesisId, createdAt(sort: Desc)])
+  @@index([stage, updatedAt(sort: Desc)])
+  @@map("knowledge_nodes")
+}
+
+/// Research Tree edges (ADR-011 D20 / P2.E). Soft-delete via deletedAt.
+model ResearchTreeEdge {
+  id           String    @id @default(cuid())
+  fromRefType  String    @map("from_ref_type") // hypothesis|knowledge|evidence
+  fromRefId    String    @map("from_ref_id")
+  toRefType    String    @map("to_ref_type")
+  toRefId      String    @map("to_ref_id")
+  edgeType     String    @map("edge_type") // SUPPORTS|CONTRADICTS|…
+  notes        String?
+  payload      Json?
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([fromRefType, fromRefId])
+  @@index([toRefType, toRefId])
+  @@index([edgeType, createdAt(sort: Desc)])
+  @@index([deletedAt])
+  @@map("research_tree_edges")
+}
+
+/// MKL sync stub log (RFC-008 D5 / P2.F). Append-only; does not drive trading.
+model MklSyncEvent {
+  id              String   @id @default(cuid())
+  knowledgeNodeId String   @map("knowledge_node_id")
+  status          String // dry_run|stub_recorded|rejected
+  factPayload     Json     @map("fact_payload")
+  mathVersion     String   @map("math_version")
+  notes           Json     @default("[]")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  knowledgeNode KnowledgeNode @relation(fields: [knowledgeNodeId], references: [id], onDelete: Cascade)
+
+  @@index([knowledgeNodeId, createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("mkl_sync_events")
+}
+
+/// Mutable Belief state for a hypothesis (ADR-011 D13; P2.C).
+model HypothesisBelief {
+  id               String   @id @default(cuid())
+  hypothesisId     String   @unique @map("hypothesis_id")
+  belief           Decimal  @db.Decimal(8, 4)
+  beliefCiLow      Decimal  @map("belief_ci_low") @db.Decimal(8, 4)
+  beliefCiHigh     Decimal  @map("belief_ci_high") @db.Decimal(8, 4)
+  nExperiments     Int      @default(0) @map("n_experiments")
+  evidenceWeight   Decimal  @default(0) @map("evidence_weight") @db.Decimal(12, 4)
+  contextsOk       Json     @default("[]") @map("contexts_ok")
+  contextsFail     Json     @default("[]") @map("contexts_fail")
+  evidenceIds      Json     @default("[]") @map("evidence_ids")
+  trialIds         Json     @default("[]") @map("trial_ids")
+  mathVersion      String   @map("math_version")
+  lastReviewedAt   DateTime @map("last_reviewed_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  hypothesis Hypothesis     @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  history    BeliefHistory[]
+
+  @@index([lastReviewedAt(sort: Desc)])
+  @@map("hypothesis_beliefs")
+}
+
+/// Append-only Belief snapshots (audit / L-T).
+model BeliefHistory {
+  id               String   @id @default(cuid())
+  hypothesisId     String   @map("hypothesis_id")
+  beliefId         String   @map("belief_id")
+  belief           Decimal  @db.Decimal(8, 4)
+  beliefCiLow      Decimal  @map("belief_ci_low") @db.Decimal(8, 4)
+  beliefCiHigh     Decimal  @map("belief_ci_high") @db.Decimal(8, 4)
+  nExperiments     Int      @map("n_experiments")
+  evidenceWeight   Decimal  @map("evidence_weight") @db.Decimal(12, 4)
+  triggerEvidenceId String? @map("trigger_evidence_id")
+  delta            Json?
+  mathVersion      String   @map("math_version")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  hypothesis Hypothesis       @relation(fields: [hypothesisId], references: [id], onDelete: Cascade)
+  beliefRow  HypothesisBelief @relation(fields: [beliefId], references: [id], onDelete: Cascade)
+
+  @@index([hypothesisId, createdAt(sort: Desc)])
+  @@index([beliefId, createdAt(sort: Desc)])
+  @@map("belief_history")
+}
+
+/// Evidence snapshot append-only (ADR-012 levels A–D; ADR-018 P2.A).
+model ResearchEvidence {
+  id               String   @id @default(cuid())
+  instrumentId     String   @map("instrument_id")
+  trialId          String?  @map("trial_id")
+  hypothesisId     String?  @map("hypothesis_id")
+  edgeReportId     String?  @map("edge_report_id")
+  level            String // A | B | C | D
+  source           String // trial_is | holdout | walkforward | cpcv | narrative
+  evidenceWeight   Decimal  @default(0) @map("evidence_weight") @db.Decimal(8, 4)
+  summary          Json
+  mathVersion      String?  @map("math_version")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  instrument Instrument     @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  trial      ResearchTrial? @relation(fields: [trialId], references: [id], onDelete: SetNull)
+  hypothesis Hypothesis?    @relation(fields: [hypothesisId], references: [id], onDelete: SetNull)
+
+  @@index([instrumentId, createdAt(sort: Desc)])
+  @@index([trialId])
+  @@index([hypothesisId])
+  @@index([level, createdAt(sort: Desc)])
+  @@map("research_evidence")
+}
+
+/// QROS scientific ledger (K) — append-only. Distinct from trial_records (RFC-008 cognitive).
+/// ADR-016 §3.
+model ResearchTrial {
+  id                   String   @id @default(cuid())
+  instrumentId         String   @map("instrument_id")
+  hypothesisId         String?  @map("hypothesis_id")
+  researchQuestionId   String?  @map("research_question_id")
+  backtestRunId        String?  @map("backtest_run_id")
+  optimizationRunId    String?  @map("optimization_run_id")
+  strategyDefinitionId String?  @map("strategy_definition_id")
+  presetKey            String?  @map("preset_key")
+  strategyName         String?  @map("strategy_name")
+  params               Json
+  blocks               Json?
+  isMetrics            Json     @map("is_metrics")
+  isScore              Decimal? @map("is_score") @db.Decimal(18, 6)
+  kContribution        Int      @default(1) @map("k_contribution")
+  proposedBy           String   @map("proposed_by")
+  parentTrialId        String?  @map("parent_trial_id")
+  failCode             String?  @map("fail_code")
+  manifestRef          Json?    @map("manifest_ref")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  instrument         Instrument          @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  hypothesis         Hypothesis?         @relation(fields: [hypothesisId], references: [id], onDelete: SetNull)
+  backtestRun        BacktestRun?        @relation(fields: [backtestRunId], references: [id], onDelete: SetNull)
+  optimizationRun    OptimizationRun?    @relation(fields: [optimizationRunId], references: [id], onDelete: SetNull)
+  strategyDefinition StrategyDefinition? @relation(fields: [strategyDefinitionId], references: [id], onDelete: SetNull)
+  parentTrial        ResearchTrial?      @relation("ResearchTrialLineage", fields: [parentTrialId], references: [id], onDelete: SetNull)
+  childTrials        ResearchTrial[]     @relation("ResearchTrialLineage")
+  researchEvidence   ResearchEvidence[]
+
+  @@index([instrumentId, createdAt(sort: Desc)])
+  @@index([hypothesisId])
+  @@index([backtestRunId])
+  @@index([optimizationRunId])
+  @@index([proposedBy, createdAt(sort: Desc)])
+  @@map("research_trials")
+}
+
+model BacktestTrade {
+  id            String          @id @default(cuid())
+  backtestRunId String          @map("backtest_run_id")
+  type          TransactionType
+  timestamp     DateTime        @db.Date
+  price         Decimal         @db.Decimal(18, 6)
+  quantity      Decimal         @db.Decimal(18, 6)
+  equityAfter   Decimal         @map("equity_after") @db.Decimal(18, 6)
+
+  backtestRun BacktestRun @relation(fields: [backtestRunId], references: [id], onDelete: Cascade)
+
+  @@index([backtestRunId, timestamp])
+  @@map("backtest_trades")
+}
+
+/// TOP-3 estrategias AT por instrumento (semifinal embudo coach → lab → paper).
+model InstrumentStrategyTop {
+  id             String   @id @default(cuid())
+  instrumentId   String   @map("instrument_id")
+  symbol         String?
+  timeframe      String   @default("1d")
+  periodLabel    String?  @map("period_label")
+  status         String   @default("semifinal")
+  version        Int      @default(1)
+  evidenceLevel  String   @default("in_sample_only") @map("evidence_level")
+  slots          Json     @default("[]")
+  coachHeadline  String?  @map("coach_headline")
+  coachFacts     Json?    @map("coach_facts")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, timeframe])
+  @@index([instrumentId, updatedAt(sort: Desc)])
+  @@map("instrument_strategy_tops")
+}
+
+model InstrumentList {
+  id        String   @id @default(cuid())
+  name      String
+  source    String   @default("custom")
+  /// personal | linked_universe | snapshot (L2; source sigue siendo catalog|custom)
+  kind      String?
+  universeCode String? @map("universe_code")
+  lastSyncedAt DateTime? @map("last_synced_at")
+  contentHash  String?   @map("content_hash")
+  /// Último diff de membresía: { at, joined[], left[], joinedCount, leftCount }
+  membershipChangelog Json? @map("membership_changelog")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  items InstrumentListItem[]
+
+  @@index([kind])
+  @@index([universeCode])
+  @@map("instrument_lists")
+}
+
+/// Suscripción / re-sync de índice en segundo plano (L2 job+poll).
+model IndexSubscribeJob {
+  id          String    @id @default(cuid())
+  status      String    @default("pending")
+  payload     Json
+  result      Json?
+  error       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  completedAt DateTime? @map("completed_at")
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("index_subscribe_jobs")
+}
+
+model InstrumentListItem {
+  id           String @id @default(cuid())
+  listId       String @map("list_id")
+  instrumentId String @map("instrument_id")
+  sortOrder    Int    @default(0) @map("sort_order")
+
+  list       InstrumentList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  instrument Instrument     @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, instrumentId])
+  @@index([listId, sortOrder])
+  @@map("instrument_list_items")
+}
+
+enum AlertCondition {
+  above
+  below
+}
+
+enum AlertPriceSource {
+  daily_close
+  xtb_last
+}
+
+model PriceAlert {
+  id             String           @id @default(cuid())
+  instrumentId   String           @map("instrument_id")
+  symbol         String
+  condition      AlertCondition
+  priceSource    AlertPriceSource @default(daily_close) @map("price_source")
+  targetPrice    Decimal          @map("target_price") @db.Decimal(18, 6)
+  isActive       Boolean         @default(true) @map("is_active")
+  triggeredAt    DateTime?       @map("triggered_at")
+  triggeredPrice Decimal?        @map("triggered_price") @db.Decimal(18, 6)
+  note           String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([isActive, createdAt(sort: Desc)])
+  @@map("price_alerts")
+}
+
+model Workspace {
+  id         String   @id @default(cuid())
+  name       String
+  document   Json
+  dockLayout Json?    @map("dock_layout")
+  isDefault  Boolean  @default(false) @map("is_default")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([isDefault])
+  @@map("workspaces")
+}
+
+/// Configuración global del actualizador automático de OHLCV.
+model SyncSettings {
+  id                  String   @id @default("default")
+  autoSyncEnabled     Boolean  @default(true) @map("auto_sync_enabled")
+  scanIntervalMinutes Int      @default(30) @map("scan_interval_minutes")
+  minDelaySeconds     Int      @default(3) @map("min_delay_seconds")
+  postMarketOnly      Boolean  @default(false) @map("post_market_only")
+  maxRetries          Int      @default(5) @map("max_retries")
+  retryBackoffMinutes Int      @default(45) @map("retry_backoff_minutes")
+  scope               String   @default("lists")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("sync_settings")
+}
+
+/// Cola de sincronización — reintentos espaciados ante rate limits (Yahoo, etc.).
+model SyncQueueItem {
+  id           String   @id @default(cuid())
+  instrumentId String   @map("instrument_id")
+  status       String   @default("pending")
+  priority     Int      @default(0)
+  scheduledAt  DateTime @map("scheduled_at")
+  attempts     Int      @default(0)
+  lastError    String?  @map("last_error")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([instrumentId, status])
+  @@map("sync_queue")
+}
+
+/// Órdenes stop/limit pendientes de ejecución.
+model PendingOrder {
+  id           String    @id @default(cuid())
+  accountId    String?   @map("account_id")
+  instrumentId String    @map("instrument_id")
+  symbol       String
+  side         String
+  orderType    String    @default("stop_limit") @map("order_type")
+  quantity     Decimal   @db.Decimal(18, 6)
+  limitPrice   Decimal   @map("limit_price") @db.Decimal(18, 6)
+  expiryAt     DateTime? @map("expiry_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  account    InvestmentAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  instrument Instrument         @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, createdAt(sort: Desc)])
+  @@map("pending_orders")
+}
+
+/// Cuenta de inversión (simulada, paper o live en el futuro).
+/// ART-PROFILE — catálogo de perfiles de inversor (RFC-008). Declared ≠ Observed.
+model InvestorProfile {
+  id                        String   @id
+  name                      String
+  version                   String   @default("1.0.0")
+  userId                    String?  @map("user_id")
+  horizon                   String
+  objectives                Json     @default("[]")
+  riskTolerance             String   @map("risk_tolerance")
+  experience                String
+  maxAcceptableLossPct      Decimal? @map("max_acceptable_loss_pct") @db.Decimal(8, 4)
+  notes                     String?  @db.Text
+  suggestedPolicyTemplateId String   @map("suggested_policy_template_id")
+  selectedPolicyTemplateId  String   @map("selected_policy_template_id")
+  observedJson              Json?    @map("observed_json")
+  updatedBy                 String   @default("user") @map("updated_by")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  accounts InvestmentAccount[]
+
+  @@index([userId])
+  @@index([updatedAt(sort: Desc)])
+  @@map("investor_profiles")
+}
+
+model InvestmentAccount {
+  id                 String   @id @default(cuid())
+  userId             String?  @map("user_id")
+  name               String
+  type               String   @default("simulated")
+  status             String   @default("active")
+  currency           String   @default("EUR")
+  baseCurrency       String   @default("EUR") @map("base_currency")
+  initialDeposit     Decimal  @default(100000) @map("initial_deposit") @db.Decimal(18, 6)
+  leverage           Decimal  @default(1) @db.Decimal(10, 4)
+  marginCallLevelPct Decimal? @map("margin_call_level_pct") @db.Decimal(10, 4)
+  isDefault          Boolean  @default(false) @map("is_default")
+  description        String?
+  settingsJson       Json?    @map("settings_json")
+  activeProfileId    String?  @map("active_profile_id")
+  strategyDefinitionId String? @map("strategy_definition_id")
+  sourceBacktestRunId  String? @map("source_backtest_run_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  lastActivityAt     DateTime? @map("last_activity_at")
+
+  activeProfile      InvestorProfile?    @relation(fields: [activeProfileId], references: [id], onDelete: SetNull)
+  strategyDefinition StrategyDefinition? @relation(fields: [strategyDefinitionId], references: [id], onDelete: SetNull)
+  portfolios    InvestmentPortfolio[]
+  ledgerEntries LedgerEntry[]
+  pendingOrders PendingOrder[]
+  executionPolicies ExecutionPolicy[]
+  positionPolicies  PositionPolicy[]
+
+  @@index([isDefault])
+  @@index([userId])
+  @@index([type])
+  @@index([strategyDefinitionId])
+  @@index([activeProfileId])
+  @@map("investment_accounts")
+}
+
+/// Cartera lógica dentro de una cuenta (enlazada a portfolios legacy para posiciones).
+model InvestmentPortfolio {
+  id                String   @id @default(cuid())
+  accountId         String   @map("account_id")
+  legacyPortfolioId String?  @unique @map("legacy_portfolio_id")
+  name              String
+  description       String?
+  strategyTag       String?  @map("strategy_tag")
+  sortOrder         Int      @default(0) @map("sort_order")
+  isDefault         Boolean  @default(false) @map("is_default")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  account         InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  legacyPortfolio Portfolio?        @relation(fields: [legacyPortfolioId], references: [id], onDelete: SetNull)
+  ledgerEntries   LedgerEntry[]
+
+  @@index([accountId, sortOrder])
+  @@map("investment_portfolios")
+}
+
+/// Libro mayor append-only — fuente de verdad de movimientos de caja.
+model LedgerEntry {
+  id            String   @id @default(cuid())
+  accountId     String   @map("account_id")
+  portfolioId   String?  @map("portfolio_id")
+  type          String
+  amount        Decimal  @db.Decimal(18, 6)
+  currency      String   @default("EUR")
+  balanceAfter  Decimal  @map("balance_after") @db.Decimal(18, 6)
+  instrumentId  String?  @map("instrument_id")
+  quantity      Decimal? @db.Decimal(18, 6)
+  price         Decimal? @db.Decimal(18, 6)
+  referenceType String?  @map("reference_type")
+  referenceId   String?  @map("reference_id")
+  description   String?
+  executedAt    DateTime @map("executed_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  account   InvestmentAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  portfolio InvestmentPortfolio? @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+  instrument Instrument?         @relation(fields: [instrumentId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, executedAt(sort: Desc)])
+  @@index([referenceType, referenceId])
+  @@map("ledger_entries")
+}

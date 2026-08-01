@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "name": "Bolsa: F5 Dev (recomendado)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/scripts/run-dev.mjs",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "serverReadyAction": {
+        "pattern": "Web lista -> (https?://\\S+)|Local:\\s+(https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    },
+    {
+      "name": "Bolsa: Solo API (avanzado)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}/scripts/dev-api-python.mjs",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Bolsa: Solo Web (avanzado)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/apps/web",
+      "runtimeExecutable": "pnpm.cmd",
+      "runtimeArgs": ["dev"],
+      "preLaunchTask": "Bolsa: Esperar API",
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}

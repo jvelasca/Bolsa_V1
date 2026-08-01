@@ -1,0 +1,101 @@
+# Laboratorio Optimizar — batería obligatoria (piezas + conjunto).
+# API smoke live: SKIP si no hay backend; en CI no se exige OPTIMIZE_API_REQUIRED
+# (falta OHLCV/BD). El contrato HTTP se cubre vía pytest de schemas + pipeline.
+name: Optimize lab
+
+on:
+  push:
+    paths:
+      - 'apps/web/src/features/backtests/**'
+      - 'apps/api-python/src/bolsa_api/schemas/backtests.py'
+      - 'apps/api-python/src/bolsa_api/api/v1/routes/backtests.py'
+      - 'packages/py/analytics/**'
+      - 'packages/shared/src/cognitive/**'
+      - 'packages/py/application/**'
+      - 'packages/shared/src/optimize-api.ts'
+      - 'scripts/research/verify_optimize*.py'
+      - 'scripts/research/verify_optimize_battery.mjs'
+      - 'scripts/research/verify_oos_warmup.py'
+      - 'docs/engineering/research-lifecycle.md'
+      - '.github/workflows/optimize-lab.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - 'apps/web/src/features/backtests/**'
+      - 'apps/api-python/src/bolsa_api/schemas/backtests.py'
+      - 'apps/api-python/src/bolsa_api/api/v1/routes/backtests.py'
+      - 'packages/py/analytics/**'
+      - 'packages/shared/src/cognitive/**'
+      - 'packages/py/application/**'
+      - 'packages/shared/src/optimize-api.ts'
+      - 'scripts/research/verify_optimize*.py'
+      - 'scripts/research/verify_optimize_battery.mjs'
+      - 'scripts/research/verify_oos_warmup.py'
+      - 'docs/engineering/research-lifecycle.md'
+      - '.github/workflows/optimize-lab.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+jobs:
+  battery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared DTOs
+        run: pnpm --filter @bolsa/shared build
+
+      - name: Install Python packages
+        run: |
+          python -m pip install -U pip
+          pip install -e packages/py/domain -e packages/py/analytics -e packages/py/market \
+            -e packages/py/infrastructure -e packages/py/application \
+            -e "apps/api-python[dev]"
+
+      - name: Optimize battery (pnpm test:optimize)
+        env:
+          # Live API smoke remains optional in CI (no seeded OHLCV).
+          OPTIMIZE_API_REQUIRED: '0'
+        run: pnpm test:optimize
+
+      - name: Walk-forward DTO contract (API schema)
+        run: |
+          python - <<'PY'
+          from bolsa_api.schemas.backtests import WalkForwardSummaryDto
+
+          dto = WalkForwardSummaryDto.model_validate(
+              {
+                  "nFolds": 3,
+                  "mode": "expanding",
+                  "meanOosScore": 6.0,
+                  "stdOosScore": 1.0,
+                  "foldCount": 3,
+                  "foldScores": [5.0, 6.0, 7.0],
+                  "folds": [],
+                  "meanIsScore": 10.0,
+                  "walkForwardEfficiency": 0.6,
+                  "positiveOosFoldShare": 1.0,
+                  "oosCv": 0.1667,
+              }
+          )
+          assert dto.walk_forward_efficiency == 0.6
+          assert dto.positive_oos_fold_share == 1.0
+          print("OK WalkForwardSummaryDto WFE contract")
+          PY

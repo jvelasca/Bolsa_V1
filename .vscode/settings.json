@@ -1,0 +1,9 @@
+{
+  "terminal.integrated.automationProfile.windows": {
+    "path": "${env:windir}\\System32\\cmd.exe"
+  },
+  // Falso positivo conocido en Cursor/pnpm monorepos: el detector npm
+  // etiqueta fallos de lectura como «failed to parse» aunque el JSON sea válido.
+  // Las tareas de .vscode/tasks.json (Bolsa: …) siguen disponibles.
+  "npm.autoDetect": "off"
+}

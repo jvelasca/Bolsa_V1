@@ -1,0 +1,387 @@
+[
+  {
+    "symbol": "ACS",
+    "yahooSymbol": "ACS.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 1277,
+      "lastClose": 129.899994,
+      "changePct": -0.23041705600039594,
+      "lastSyncStatus": "success"
+    }
+  },
+  {
+    "symbol": "ACX",
+    "yahooSymbol": "ACX.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 1279,
+      "lastClose": 15.78,
+      "changePct": -0.6297229219143666,
+      "lastSyncStatus": "success"
+    }
+  },
+  {
+    "symbol": "AENA",
+    "yahooSymbol": "AENA.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "ALM",
+    "yahooSymbol": "ALM.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "AMS",
+    "yahooSymbol": "AMS.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "ANA",
+    "yahooSymbol": "ANA.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "BBVA",
+    "yahooSymbol": "BBVA.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "BKT",
+    "yahooSymbol": "BKT.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "CABK",
+    "yahooSymbol": "CABK.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "CAF",
+    "yahooSymbol": "CAF.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "CLNX",
+    "yahooSymbol": "CLNX.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "COL",
+    "yahooSymbol": "COL.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "ELE",
+    "yahooSymbol": "ELE.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "ENG",
+    "yahooSymbol": "ENG.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "FDR",
+    "yahooSymbol": "FDR.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "FER",
+    "yahooSymbol": "FER.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "GRF",
+    "yahooSymbol": "GRF.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "IAG",
+    "yahooSymbol": "IAG.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "IBE",
+    "yahooSymbol": "IBE.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "IDR",
+    "yahooSymbol": "IDR.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "ITX",
+    "yahooSymbol": "ITX.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "LOG",
+    "yahooSymbol": "LOG.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "MAP",
+    "yahooSymbol": "MAP.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "MEL",
+    "yahooSymbol": "MEL.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "NTGY",
+    "yahooSymbol": "NTGY.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "PHM",
+    "yahooSymbol": "PHM.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "RED",
+    "yahooSymbol": "RED.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "REP",
+    "yahooSymbol": "REP.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "ROVI",
+    "yahooSymbol": "ROVI.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "SAB",
+    "yahooSymbol": "SAB.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "SAN",
+    "yahooSymbol": "SAN.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "SCYR",
+    "yahooSymbol": "SCYR.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "TEF",
+    "yahooSymbol": "TEF.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "UNI",
+    "yahooSymbol": "UNI.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  },
+  {
+    "symbol": "VIS",
+    "yahooSymbol": "VIS.MC",
+    "exchange": "BME",
+    "meta": {
+      "barCount": 0,
+      "lastClose": null,
+      "changePct": null,
+      "lastSyncStatus": null
+    }
+  }
+]

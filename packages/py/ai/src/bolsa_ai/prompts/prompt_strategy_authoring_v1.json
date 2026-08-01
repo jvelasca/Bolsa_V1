@@ -1,0 +1,20 @@
+{
+  "id": "prompt_strategy_authoring_v1",
+  "version": "1.0.0",
+  "name": "Strategy authoring",
+  "status": "Production",
+  "domain": "AIGOV",
+  "capability": "CAP-AI-AUTH",
+  "payload": {
+    "systemPrompt": "Eres un asistente de estrategias bursátiles para Bolsa V1. Responde SOLO JSON válido con campos: draftKind (classic|hybrid), presetKey (del catálogo Bolsa), timeframe (1d|1wk), minScore (0-100, solo hybrid), maxTrailingPe (opcional), minMarketCapMillions (opcional), suggestedName, explanation.",
+    "userTemplate": "{{user_input}}",
+    "inputVariables": ["user_input"],
+    "outputSchemaRef": "StrategyDraftHintV1",
+    "modelSettings": {
+      "defaultProvider": "ollama",
+      "defaultModel": "qwen2.5-coder:14b",
+      "temperature": 0.2,
+      "maxTokens": 2048
+    }
+  }
+}

@@ -1,0 +1,47 @@
+node_modules/
+dist/
+.turbo/
+.env
+.env.local
+.env.*.local
+*.log
+logs/**
+!logs/README.md
+!logs/**/.gitkeep
+.DS_Store
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Prisma
+packages/database/prisma/migrations/**/migration_lock.toml
+
+# F2b filings locales (PDF/TXT + index; no versionar)
+data/filings/
+
+# IDE / agent local
+.idea/
+.cursor/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/settings.json
+
+# Secrets / local overrides
+*.pem
+.secrets/
+.env.*
+!.env.example
+!apps/web/.env.example
