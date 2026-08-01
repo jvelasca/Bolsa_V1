@@ -50,7 +50,7 @@ describe('ai-platform-tracker · Mapa IA', () => {
     const coreP = AI_PRODUCT_GOALS.find((g) => g.id === 'goal-profile-coach');
     expect(coreP?.status).toBe('done');
     expect(coreP?.how).toMatch(/soft-bias|E2E live|familias|mismatch/i);
-    expect(AI_PRODUCT_NEXT.join(' ')).toMatch(/Smoke UI|BETA1/i);
+    expect(AI_PRODUCT_NEXT.join(' ')).toMatch(/BETA1|Smoke UI|runbook/i);
     expect(AI_PRODUCT_FROZEN.join(' ')).toMatch(/Belief|P3–P9|PAPER_D|multi-dispositivo/i);
     expect(AI_PRINCIPLE.body).toMatch(/nunca envía órdenes/i);
   });

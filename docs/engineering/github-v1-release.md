@@ -44,5 +44,6 @@ Ver `AI_PRODUCT_FROZEN` en Ayuda → Plataforma IA.
 
 ## Post-release
 
-- BETA1: simulaciones; issues cortas en `research/observations/ISSUES.md`
+- BETA1: [`beta1-simulation-runbook.md`](./beta1-simulation-runbook.md)
+- Issues cortas en `research/observations/ISSUES.md`
 - No reabrir tracks congelados sin decisión explícita

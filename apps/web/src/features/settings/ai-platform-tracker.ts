@@ -226,12 +226,11 @@ export const AI_PRODUCT_GOALS: AiTrackItem[] = [
 
 /** Próximos pasos accionables (no congelados). Visible en Ayuda → Plataforma IA. */
 export const AI_PRODUCT_NEXT = [
-  'Smoke UI humano: D1–D12 + R1–R9 (operativa-test-plan) · checklist FA APP · Lista AUTO live',
-  'BETA1: vigilar simulaciones multi-perfil / frescura / DÍA D (issues cortas si falla)',
+  'BETA1: runbook docs/engineering/beta1-simulation-runbook.md · bloques A–E',
+  'Smoke UI: D1–D12 + R1–R9 · FA APP · Lista AUTO live (issues cortas si falla)',
   'Indicadores IA: DSL/Pine + sandbox (cuando producto priorice)',
   'F2 Predictions: persistencia binarios modelo (PG/S3)',
   'F5 Backtest-by-IA (orquestación NL→BT) — planificado',
-  'BETA1 post-V1: issues cortas si fallan simulaciones (no reabrir congelados)',
 ] as const;
 
 /** Tracks congelados hasta decisión explícita. */

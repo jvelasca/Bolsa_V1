@@ -5,7 +5,7 @@ Plataforma personal de gestión bursátil: IBEX, Europa y acciones (sin CFD).
 **Stack actual:** React + Vite (frontend) · **FastAPI Python** (API por defecto) · PostgreSQL.
 
 **Producto (v1.0.0 · 2026-08-01):** Embudo + Lista AUTO · Finalistas · **DÍA D v0.11** · **CORE-R v1.8** · **CORE-P** · FA/FIE · DEMO only (paper broker futuro).  
-Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · Release checklist: [`docs/engineering/github-v1-release.md`](./docs/engineering/github-v1-release.md).
+Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · GitHub: [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) · BETA1: [`docs/engineering/beta1-simulation-runbook.md`](./docs/engineering/beta1-simulation-runbook.md).
 
 ## Requisitos
 

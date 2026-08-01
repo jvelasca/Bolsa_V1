@@ -49,17 +49,17 @@ pnpm test:coach:api          # ASGI (DB) + smoke live
 
 ---
 
-## 3. Siguiente = humano (checklist)
+## 3. Siguiente = BETA1 (humano)
 
-Detalle: [`operativa-test-plan-2026-07-31.md`](./operativa-test-plan-2026-07-31.md) · Ayuda → Backtesting / Análisis del valor / Trading.
+Runbook: [`beta1-simulation-runbook.md`](./beta1-simulation-runbook.md) · detalle UI: [`operativa-test-plan-2026-07-31.md`](./operativa-test-plan-2026-07-31.md).
 
-| # | Qué | Dónde verificar |
-|---|-----|-----------------|
-| 1 | Smoke **D1–D12** | DÍA D; D6 recarga sin full-bleed; D12 Operaciones |
-| 2 | Smoke **R1–R9** | Monitor CORE-R |
-| 3 | Lista AUTO live | Reinicio → Play IBEX → Omitido (v1.3) |
-| 4 | Checklist FA APP | Refresh · CAPM footnote · Composite v1.1 · Screener · Paper D dry-run |
-| 5 | Ayuda visual | Guías DÍA D / CORE-R / Archivo · fila Lab CORE-B · sección Trading DÍA D |
+| Bloque | Qué |
+|--------|-----|
+| A | Embudo + multi-perfil CORE-P |
+| B | Smoke **D1–D12** DÍA D |
+| C | Smoke **R1–R9** CORE-R |
+| D | FA APP (CAPM · Composite v1.1 · Screener · Paper D dry-run) |
+| E | Lista AUTO live (frescura v1.3) |
 
 Si falla: issue corta en `research/observations/ISSUES.md` — no reabrir congelados.
 
