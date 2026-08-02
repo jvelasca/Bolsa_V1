@@ -44,4 +44,14 @@ jobs:
           --follow-imports=silent
 
       - name: Pytest
-        run: uv run pytest packages/py/market/tests packages/py/analytics/tests apps/api-python/tests -q
+        # Sin servicio Postgres en este workflow: unitarios + API tests offline.
+        # Integración ASGI/DB → pnpm test:coach:api / jobs con DB.
+        run: >
+          uv run pytest
+          packages/py/market/tests
+          packages/py/analytics/tests
+          apps/api-python/tests
+          --ignore=apps/api-python/tests/integration
+          --ignore=apps/api-python/tests/test_lists.py
+          --ignore=apps/api-python/tests/test_workspaces.py
+          -q
