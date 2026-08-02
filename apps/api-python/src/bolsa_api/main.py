@@ -29,6 +29,7 @@ from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluat
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
+from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
 from bolsa_api.middleware.auth import AuthMiddleware
 from bolsa_api.middleware.rate_limit import RateLimitMiddleware
 from bolsa_api.logging_redact import install_log_redact
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     signal_alert_task = start_signal_alert_evaluator(app.state.session_factory)
     tracker_schedule_task = start_tracker_schedule_worker(app.state.session_factory)
     fa_weekly_task = start_fa_weekly_worker(app.state.session_factory)
+    core_r_cron_task = start_core_r_cron_worker(app.state.session_factory)
     auto_sync_task = start_auto_sync_worker(app.state.session_factory)
     index_subscribe_task = start_index_subscribe_worker(app.state.session_factory)
     scan_worker_task: asyncio.Task[None] | None = None
@@ -82,12 +84,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             tracker_schedule_task.cancel()
         if fa_weekly_task is not None:
             fa_weekly_task.cancel()
+        if core_r_cron_task is not None:
+            core_r_cron_task.cancel()
         evaluator_task.cancel()
         tasks = [index_subscribe_task, auto_sync_task, signal_alert_task, evaluator_task]
         if tracker_schedule_task is not None:
             tasks.append(tracker_schedule_task)
         if fa_weekly_task is not None:
             tasks.append(fa_weekly_task)
+        if core_r_cron_task is not None:
+            tasks.append(core_r_cron_task)
         if scan_worker_task is not None:
             tasks.insert(0, scan_worker_task)
         if optimization_worker_task is not None:

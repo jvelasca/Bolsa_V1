@@ -5,11 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.schemas.core_r import CoreRBundleDto, CoreRBundleResponseDto, SyncCoreRBundleDto
+from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 from bolsa_infrastructure.database.repositories.core_r_repository import SqlAlchemyCoreRRepository
 
 router = APIRouter()
@@ -83,3 +84,17 @@ async def sync_account_core_r(
             updated_at=_iso(row.updated_at),
         )
     )
+
+
+@router.post("/core-r/cron/tick")
+async def run_core_r_cron_tick(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    force: bool = Query(default=False, description="Ignora intervalMinutes"),
+) -> dict[str, Any]:
+    """
+    Ops: un tick CORE-R servidor sobre todos los blobs.
+    Re-encola desde ``reports_json`` si scheduler.enabled + listId.
+    No Lista AUTO · no TOP · no paper.
+    """
+    result = await RunCoreRServerCron(SqlAlchemyCoreRRepository(session)).execute(force=force)
+    return {"data": result}

@@ -826,6 +826,17 @@ export const api = {
       { method: 'PUT', body: JSON.stringify(body) },
     ),
 
+  /** Ops: tick CORE-R servidor (re-encola desde informes BD). */
+  runCoreRCronTick: (force = false) =>
+    request<{
+      data: {
+        accounts: number;
+        ticked: number;
+        totalAdded: number;
+        results: Array<Record<string, unknown>>;
+      };
+    }>(`/api/core-r/cron/tick${force ? '?force=true' : ''}`, { method: 'POST' }),
+
   queryInstrumentStrategyTops: (body: {
     instrumentIds: string[];
     timeframe?: string;

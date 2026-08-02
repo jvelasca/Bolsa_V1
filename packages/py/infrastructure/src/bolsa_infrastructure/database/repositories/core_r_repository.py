@@ -42,6 +42,11 @@ class SqlAlchemyCoreRRepository:
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         return None if row is None else self._map(row)
 
+    async def list_all(self) -> list[CoreRAccountStateRecord]:
+        stmt = select(CoreRAccountStateRow)
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [self._map(row) for row in rows]
+
     async def upsert(
         self,
         account_id: str,
