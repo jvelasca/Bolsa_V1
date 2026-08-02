@@ -10,10 +10,11 @@ import {
 import { ExpiryDateTimeField } from '@/components/ui/expiry-datetime-field';
 import { defaultExpiryFromNow } from '@/lib/datetime-input';
 import { formatPrice } from '@/features/charts/chart-utils';
-import { useActiveAccountSettings } from '@/features/accounts/use-active-account';
+import { useActiveAccount, useActiveAccountSettings } from '@/features/accounts/use-active-account';
 import { TradeConfirmPanel } from '@/features/trading/trade-confirm-panel';
 import { TradeFeeBreakdown } from '@/features/trading/trade-fee-breakdown';
 import { useTradeNotional } from '@/features/trading/use-trade-notional';
+import { linkTradeToMandate } from '@/features/platform/operating-mandate';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { usePendingOrders } from '@/features/trading/use-pending-orders';
@@ -37,6 +38,7 @@ export function OrderDialog() {
   const queryClient = useQueryClient();
   const confirmBeforeTrade = useTradePreferencesStore((s) => s.confirmBeforeTrade);
   const { settings, currency: accountCurrency, accountName } = useActiveAccountSettings();
+  const { effectiveAccountId } = useActiveAccount();
   const [mode, setMode] = useState<OrderMode>('market');
   const [sizeMode, setSizeMode] = useState<SizeMode>('volume');
   const [volume, setVolume] = useState('10');
@@ -77,7 +79,15 @@ export function OrderDialog() {
       quantity: number;
       price: number;
     }) => api.executeTrade(body),
-    onSuccess: async () => {
+    onSuccess: async (res, vars) => {
+      const txId = res?.data?.transaction?.id;
+      if (txId && effectiveAccountId) {
+        linkTradeToMandate({
+          transactionId: txId,
+          instrumentId: vars.instrumentId,
+          accountId: effectiveAccountId,
+        });
+      }
       await queryClient.invalidateQueries({ queryKey: ['portfolio'] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['ledger'] });

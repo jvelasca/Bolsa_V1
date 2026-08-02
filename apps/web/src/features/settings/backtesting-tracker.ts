@@ -3,12 +3,14 @@
  * Resumen no técnico primero; pantallas, seguimiento de plataforma y detalle después.
  * El detalle vivo está en docs (no duplicar aquí el lifecycle completo).
  *
- * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.8 + CORE-B v0.2 (2026-08-01).
+ * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.8 + CORE-B v0.2 + ADR-019 universos (2026-08-02).
  *
  * @see docs/HELP.md
  * @see docs/engineering/research-lifecycle.md
  * @see docs/engineering/list-auto-ops-2026-07-29.md
  * @see docs/engineering/backtesting-dia-d-premises-2026-07-31.md
+ * @see docs/engineering/dual-universes-lab-trading-design-2026-08-02.md
+ * @see docs/adr/019-dual-universes-lab-vs-trading.md
  * @see docs/engineering/operativa-test-plan-2026-07-31.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  * @see docs/engineering/session-handoff-2026-08-01.md
@@ -25,6 +27,8 @@ export const BACKTESTING_SYNC = {
   listsUniverses: 'docs/engineering/lists-universes-design-2026-07-30.md',
   funnelHandoff: 'docs/engineering/backtesting-funnel-handoff-2026-07-29.md',
   diaDPremises: 'docs/engineering/backtesting-dia-d-premises-2026-07-31.md',
+  dualUniverses: 'docs/engineering/dual-universes-lab-trading-design-2026-08-02.md',
+  adrUniverses: 'docs/adr/019-dual-universes-lab-vs-trading.md',
   operativaTestPlan: 'docs/engineering/operativa-test-plan-2026-07-31.md',
   adrH0: 'docs/adr/009-backtesting-research-platform-h0.md',
   dataArch: 'docs/BACKTESTING_DATA_ARCHITECTURE.md',
@@ -44,9 +48,10 @@ export const BACKTESTING_SUMMARY = {
     'Lista AUTO: puedes ir a Trading mientras corre (barra de estado abajo). Tras reinicio, omite si no cambió nada.',
     'Universo → Lista: miembros con resumen (Finalistas / ★ / Lab / AUTO). Clic = pestaña Valor. Soft-cap 40 + confirm; filtro opcional «solo sin Finalistas».',
     'Finalistas: Checklist = demo activa (A); Rastreador = Radar (B); Proponer = Supervisado F3 (C). Distintos.',
-    'DÍA D: fecha «hoy simulado» en Probar → Play → Finalistas #1 «Simular D→hoy» → Trading (película ± pantalla completa + Manual/Semi/Auto + Evidence + archivo JSON import/export).',
-    'Monitor Finalistas: hub Probar / Ayuda — TOP + DEMO retorno % + cola CORE-R (Encolar / Narrar / auto-sync / chip barra). Solo lectura; no es auto-paper.',
-    'Cuentas: una Activa · hoy solo DEMO. Paper = broker futuro. docs/engineering/account-premises-demo-vs-paper-2026-07-31.md',
+    'DÍA D: fecha en Probar → Play (F-D sin pisar F-hoy) → Verificar D→hoy → reconciliación SAME/DRIFT (ADR-021).',
+    'Universos: LAB = estudiar/verificar · TRADING = invertir DEMO + rail Coach. docs/adr/019-dual-universes-lab-vs-trading.md',
+    'Monitor Finalistas: hub Probar / Ayuda — TOP + DEMO retorno % + adopción + cola CORE-R. Solo lectura; no es auto-paper.',
+    'Cuentas: una Activa TRADING · hoy solo DEMO · Cartera LAB = sandbox research. docs/engineering/account-premises-demo-vs-paper-2026-07-31.md',
     'Unificación Research→Radar: docs/engineering/research-radar-unification-2026-07-31.md',
   ],
 } as const;
@@ -71,28 +76,26 @@ export const BACKTESTING_YOU_ARE_HERE = {
 export const BACKTESTING_DIA_D_GUIDE = {
   title: 'Backtesting DÍA D — cómo arrancar',
   body:
-    'Simula que «hoy» es una fecha pasada (D), construye Finalistas solo con datos ≤ D, y verifica en Trading qué habría pasado de D a hoy con la #1.',
+    'Simula que «hoy» es una fecha pasada (D), construye un TOP experimento (F-D) solo con datos ≤ D sin pisar Finalistas operativos (F-hoy), y verifica en LAB qué habría pasado de D a hoy. Al final: reconciliación SAME/DRIFT vs F-hoy #1 (ADR-021).',
   steps: [
-    'Backtesting → Probar estrategia → bloque amarillo/gris «Backtesting DÍA D».',
-    'Elige una fecha pasada (p. ej. hace 1 año). No dejes «hoy» si quieres la verificación.',
-    'Elige un valor con histórico → Play (ciclo completo) hasta Finalistas.',
-    'En el panel derecho, pestaña Finalistas. En la fila #1 pulsa «Simular D→hoy».',
-    'Se abre Trading con banner MODO DÍA D + película (sandbox; no escribe la DEMO live).',
-    'Elige modo: Auto (fills solos), Semi (pausa → Aceptar/Rechazar reescribe equity), Manual (▶ + mismo gate).',
-    'Opcional: «Pantalla completa» en el banner (oculta watchlist/gráfico/Operaciones); «Salir pantalla completa» vuelve. Al recargar, full-bleed no se restaura (siempre docks).',
-    'Revisa el Informe lateral (Evidence band + retorno gate vs Auto). «Narrar con IA» opcional.',
-    '«Guardar Evidence»: archivo local + Fase 2. Archivo en Trading + Ayuda (preview / JSON / Importar). «Salir DÍA D» cierra la sesión y restaura Trading normal (Operaciones).',
+    'Opcional pero recomendado: con D = Hoy, deja Finalistas operativos (F-hoy) ya guardados para el valor.',
+    'Backtesting → selector «Hoy · fecha» / «DÍA D · fecha» → elige una fecha pasada.',
+    'Play (ciclo completo): el embudo usa solo datos ≤ D y guarda F-D (experimento). F-hoy en BD no se pisa.',
+    'En Finalistas verás aviso de experimento F-D. Pulsa «Verificar D→hoy» (usa F-D #1 congelada).',
+    'Análisis técnico LAB: banner Verificar + película (Cartera LAB; no escribe la DEMO).',
+    'Modo Auto / Semi / Manual como siempre. Revisa Evidence + panel «Reconciliación DÍA D» (SAME_* / DRIFT_*).',
+    'Opcional: Pantalla completa · Narrar con IA · Guardar Evidence · Salir verificación.',
   ],
   notes: [
-    'Sin fecha en el pasado no aparece el CTA «Simular D→hoy».',
-    'Hay que tener Finalistas con #1 (strategyDefinitionId). Si el embudo no guardó TOP, no hay botón.',
-    'Semi/Manual: solo Aceptar ejecuta el fill. Rechazar un buy anula también su sell. Equity y markers se recalculan.',
-    'FA as-of: con statementPack (tras refresh FA) reconstruye estados ≤ D (pointInTime=reconstructed). Sin pack → blocked. Composite TA corta OHLCV ≤ D.',
-    'Evidence sesión C: no es Coach FA. Archivo también en Ayuda → Backtesting. Export/Import JSON = local (mismo valor).',
-    'fullBleedMovie no se persiste (2026-08-01): si Trading «desapareció», Salir DÍA D o recarga.',
-    'Reinicia api-python tras pulls para rutas Evidence / asOf / CORE-R.',
-    'Doc técnico: docs/engineering/backtesting-dia-d-premises-2026-07-31.md',
-    'Plan de prueba: docs/engineering/operativa-test-plan-2026-07-31.md · pnpm test:operativa',
+    'F-hoy = Finalistas operativos (BD). F-D = TOP experimento local (bolsa-dia-d-experiment-top-v1). V = sesión Verificar D→hoy.',
+    'Si F-D #1 ≈ F-hoy #1 y OOS va bien → SAME_CONFIRMED. Si es distinta y OOS bien → DRIFT_BETTER (revisar Finalistas).',
+    'Contrafactual: si F-hoy#1 ≠ F-D#1, Verify también simula F-hoy#1 en D→hoy y muestra Δ pp en reconciliación.',
+    'El origen temporal se ve junto a «Backtesting»: Hoy = calendario real; DÍA D = embudo ≤ esa fecha.',
+    'Favoritos ★ de fechas se guardan en este dispositivo.',
+    'Sin fecha en el pasado no aparece el CTA «Verificar D→hoy».',
+    'Semi/Manual: solo Aceptar ejecuta el fill. Rechazar un buy anula también su sell.',
+    'FA as-of / Evidence / fullBleed: igual que antes (ADR-019 LAB).',
+    'Doc: docs/adr/021-dia-d-reconciliation.md · premisas DÍA D · pnpm test:operativa',
   ],
 } as const;
 
@@ -132,9 +135,9 @@ export const BACKTESTING_SCREENS = [
     id: 'dia-d',
     title: 'Backtesting DÍA D',
     plain:
-      'Fecha «hoy simulado» en Probar → embudo ≤ D → Finalistas #1 «Simular D→hoy» → Trading (película).',
+      'Fecha «hoy simulado» en Probar → embudo ≤ D → Finalistas #1 «Verificar D→hoy» → LAB Análisis técnico.',
     detail:
-      'Sandbox ≠ DEMO live. Manual/Semi/Auto. Pantalla completa efímera (no persiste al recargar) + Guardar Evidence + archivo. Premisas: backtesting-dia-d-premises-2026-07-31.md',
+      'Cartera LAB ≠ DEMO. Manual/Semi/Auto. Pantalla completa efímera + Guardar Evidence. ADR-019 / dual-universes-lab-trading-design.',
   },
   {
     id: 'resultado',
@@ -205,10 +208,10 @@ export const BACKTESTING_TRACKING = [
   },
   {
     id: 'dia-d',
-    title: 'Backtesting DÍA D (v0.11)',
+    title: 'Backtesting DÍA D (v0.11 · ADR-019)',
     status: 'listo' as const,
     plain:
-      'asOf + gate + full-bleed efímero + Evidence + archivo. Salir DÍA D restaura Operaciones. DÍA D v1 operable.',
+      'asOf + gate + full-bleed efímero + Evidence en LAB. Salir verificación restaura el hub. Cartera LAB ≠ DEMO.',
   },
   {
     id: 'lab-core-b',

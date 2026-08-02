@@ -1,21 +1,40 @@
 # Premisas de cuenta — DEMO vs PAPER (2026-07-31)
 
-> Premisas de producto **bloqueadas**. Complementa [DATA_MODEL](../DATA_MODEL.md), [ADR-010](../adr/010-platform-kernel-radar-execution.md), [research-radar-unification](./research-radar-unification-2026-07-31.md).
+> Premisas de producto **bloqueadas**. Complementa [DATA_MODEL](../DATA_MODEL.md), [ADR-010](../adr/010-platform-kernel-radar-execution.md), [research-radar-unification](./research-radar-unification-2026-07-31.md).  
+> **Universos LAB vs TRADING (2026-08-02):** [ADR-019](../adr/019-dual-universes-lab-vs-trading.md) · [diseño](./dual-universes-lab-trading-design-2026-08-02.md).
 
-**AsOf:** 2026-07-31
+**AsOf:** 2026-07-31 · **Enmienda:** 2026-08-02 (Cartera LAB)
 
 ---
 
 ## 1. Veredicto
 
-Sí: **correcto y óptimo** para esta fase.
+Sí: **correcto y óptimo** para el universo **TRADING**.
 
 | Premisa | Decisión |
 |---------|----------|
-| **Una sola cuenta operativa** | La marcada como **Activa** en Cuentas (barra inferior / «Usar ahora»). Trading, ledger, perfil Coach, Checklist, Radar, Supervisado y propose usan **solo** esa. |
+| **Una sola cuenta operativa (TRADING)** | La marcada como **Activa** en Cuentas (barra inferior / «Usar ahora»). Trading, ledger, perfil Coach *de deploy*, Checklist, Radar, Supervisado y propose usan **solo** esa. |
 | **Ahora = solo DEMO** | Tipo técnico `simulated`. Capital y PnL **simulados** en ledger interno. |
 | **PAPER = futuro broker real** | Tipo técnico `paper` (y/o `live` más adelante): cuentas con **API de operador bursátil**, dinero/órdenes reales. **No** es “paper trading” de simulación. |
 | **Hasta brokers** | No crear ni operar cuentas `paper`. Los caminos A/B/C/D escriben en la **cuenta activa DEMO**. |
+| **Cartera LAB (research)** | Sandbox del universo **Backtesting** (Play, Ver, Verificar D→hoy). **No** es una segunda «cuenta Activa» de inversión. **Nunca** escribe el ledger DEMO salvo acciones de puente (Adoptar / Desplegar / Proponer). |
+
+---
+
+## 1b. Enmienda 2026-08-02 — Cartera LAB vs cuenta operativa
+
+```text
+Universo TRADING                         Universo LAB
+────────────────                         ────────────
+Una cuenta ACTIVA (DEMO hoy)             Cartera / sesión LAB (sandbox)
+  A/B/C/D, trades, Radar…                  embudo, Ver, Verificar D→hoy
+  «Usar ahora» en Cuentas                  sin selector «Activa»
+```
+
+La frase histórica «Ningún camino abre una segunda cartera en paralelo» aplica a **caminos de inversión A/B/C/D**.  
+El sandbox DÍA D / Cartera LAB **sí** es paralelo, pero es **research**, no una segunda DEMO operativa.
+
+Detalle: [diseño dual §2](./dual-universes-lab-trading-design-2026-08-02.md).
 
 ---
 
@@ -48,7 +67,8 @@ Cuenta ACTIVA (hoy: DEMO / simulated)
         └─ D Paper D propose/execute       → misma cuenta DEMO (execute off-by-default)
 ```
 
-Ningún camino abre una segunda cartera “en paralelo” distinta de la activa.
+Ningún camino **de inversión** (A/B/C/D) abre una segunda cartera operativa distinta de la activa.  
+El sandbox **LAB** (DÍA D / Verificar) es paralelo y **no** cuenta como segunda Activa — ver §1b.
 
 ---
 
@@ -83,3 +103,4 @@ No se borran enums ni modos `paper_auto` (rompe APIs); se **reencuadra** el sign
 - Tipos: `packages/shared/src/accounts.ts`
 - Ayuda: Ayuda → Cuentas / Overview (`app-help-menu.tsx`)
 - Kernel: `PAPER_ACCOUNT_TYPES` en `bolsa_domain.platform_kernel`
+- Universos LAB/TRADING: [ADR-019](../adr/019-dual-universes-lab-vs-trading.md)

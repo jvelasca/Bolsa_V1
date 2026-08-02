@@ -1,9 +1,14 @@
 import { ensureProjectDatabase, printDockerInstallHelp, checkPort } from './lib/docker.mjs';
 import { runDbMigrateDeploy, runDbSeed } from './lib/db.mjs';
 import { logError, logInfo, writeAgentLog } from './lib/logger.mjs';
+import {
+  shouldSkipMigrateDeploy,
+  writeMigrateStamp,
+} from './lib/migrate-cache.mjs';
 
 const pingOnly = process.argv.includes('--ping');
 const withMigrate = process.argv.includes('--migrate');
+const forceMigrate = process.argv.includes('--force-migrate');
 
 async function ensurePing() {
   const postgresUp = await checkPort('127.0.0.1', 5432);
@@ -17,6 +22,17 @@ async function ensurePing() {
     message:
       'PostgreSQL no responde en localhost:5432. Abre Docker Desktop y ejecuta: node scripts/db-ensure.mjs',
   };
+}
+
+function applyMigrations({ label }) {
+  const { skip, fp } = shouldSkipMigrateDeploy();
+  if (skip && !forceMigrate) {
+    logInfo('db-ensure', `Migraciones al día — skip Prisma deploy (${label})`);
+    return;
+  }
+  logInfo('db-ensure', 'Aplicando migraciones Prisma...');
+  runDbMigrateDeploy();
+  writeMigrateStamp(fp);
 }
 
 const result = pingOnly ? await ensurePing() : await ensureProjectDatabase();
@@ -45,8 +61,7 @@ if (result.postgresStarted) {
 
 if (!pingOnly) {
   try {
-    logInfo('db-ensure', 'Aplicando migraciones Prisma...');
-    runDbMigrateDeploy();
+    applyMigrations({ label: 'full' });
     logInfo('db-ensure', 'Cargando catálogo IBEX...');
     runDbSeed();
   } catch (error) {
@@ -56,8 +71,7 @@ if (!pingOnly) {
   logInfo('db-ensure', 'Docker, PostgreSQL y catálogo IBEX listos');
 } else if (withMigrate) {
   try {
-    logInfo('db-ensure', 'Aplicando migraciones Prisma...');
-    runDbMigrateDeploy();
+    applyMigrations({ label: 'ping+migrate' });
   } catch (error) {
     logError('db-ensure', error instanceof Error ? error.message : 'Error en BD');
     process.exit(1);

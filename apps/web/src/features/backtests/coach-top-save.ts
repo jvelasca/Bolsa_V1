@@ -86,10 +86,23 @@ export async function buildCoachTopSlots(opts: {
     }
     if (presetKey && !rec.row.strategyDefinitionId) usedTypes.add(presetKey);
 
+    let resolvedType = presetKey ?? rec.row.strategyType ?? null;
+    if (strategyDefinitionId) {
+      const fromExisting = existing.find((s) => s.id === strategyDefinitionId);
+      if (fromExisting?.presetKey) resolvedType = fromExisting.presetKey;
+      else if (opts.lookup.getById) {
+        const fetched = await opts.lookup.getById(strategyDefinitionId);
+        if (fetched?.presetKey) {
+          resolvedType = fetched.presetKey;
+          existing.push(fetched);
+        }
+      }
+    }
+
     rawSlots.push({
       rank: (rawSlots.length + 1) as 1 | 2 | 3,
       label: rec.row.label,
-      strategyType: rec.row.strategyType,
+      strategyType: resolvedType,
       strategyDefinitionId,
       stars: rec.stars,
       score: rec.score,

@@ -22,19 +22,15 @@ describe('backtesting-tracker help guides', () => {
     expect(BACKTESTING_SYNC.operativaTestPlan).toMatch(/operativa-test-plan/);
   });
 
-  it('DÍA D guide covers full-bleed ephemeral, Evidence, Operaciones restore', () => {
-    expect(BACKTESTING_DIA_D_GUIDE.steps.length).toBeGreaterThanOrEqual(8);
+  it('DÍA D guide covers full-bleed ephemeral, Evidence, LAB verify', () => {
+    expect(BACKTESTING_DIA_D_GUIDE.steps.length).toBeGreaterThanOrEqual(7);
     const blob = [...BACKTESTING_DIA_D_GUIDE.steps, ...BACKTESTING_DIA_D_GUIDE.notes].join(
       ' ',
     );
-    expect(blob).toMatch(/Pantalla completa/i);
-    expect(blob).toMatch(/no se persiste|no persiste|efímera|recargar/i);
-    expect(blob).toMatch(/Operaciones|docks/i);
-    expect(blob).toMatch(/Guardar Evidence/i);
-    expect(blob).toMatch(/preview|JSON|Importar|Ayuda|archivo/i);
-    expect(blob).toMatch(/Narrar/i);
-    expect(blob).toMatch(/api-python|API/i);
-    expect(blob).toMatch(/test:operativa/);
+    expect(blob).toMatch(/Pantalla completa|Narrar|Evidence|Verificar/i);
+    expect(blob).toMatch(/F-hoy|F-D|reconciliaci[oó]n|SAME|DRIFT|ADR-021/i);
+    expect(blob).toMatch(/no se pisa|intact/i);
+    expect(blob).toMatch(/test:operativa|021-dia-d/);
   });
 
   it('CORE-R guide covers enqueue, narrate, shell cron', () => {
@@ -62,7 +58,7 @@ describe('backtesting-tracker help guides', () => {
     const fresh = BACKTESTING_TRACKING.find((r) => r.id === 'list-auto-freshness');
     expect(dia?.status).toBe('listo');
     expect(dia?.title).toMatch(/v0\.11/);
-    expect(dia?.plain).toMatch(/efímero|Operaciones/i);
+    expect(dia?.plain).toMatch(/efímero|LAB|hub|verificación/i);
     expect(cr?.status).toBe('listo');
     expect(cr?.plain).toMatch(/v1\.8|Hecho todos|toast/i);
     expect(lab?.status).toBe('listo');

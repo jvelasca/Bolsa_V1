@@ -4,7 +4,7 @@
 > Para nuevos desarrolladores: el camino completo en minutos.  
 > **Ayuda en app:** pestaña Backtesting ← tracker `apps/web/src/features/settings/backtesting-tracker.ts` ([HELP.md](../HELP.md)).
 
-**Sync:** 2026-08-01 · **Baseline v1.5** ([ADR-017](../adr/017-baseline-v1-5-research-observatory.md)) · Fase 1 + 1.5 · **Fase 2 P2.A–P2.F cerrada** ([ADR-018](../adr/018-fase2-evidence-store-v0.md)) · Batería `pnpm test:fase2` · Track lab UI P3–P9 cerrado · Embudo coach A–D + **Play ciclo** + **Lista AUTO frescura v1.3** · Finalistas → paper (A) / Supervisado (C) · **Monitor Finalistas** + **CORE-R v1.8** · **Backtesting DÍA D v0.11** · **CORE-B v0.2** ([premisas](./backtesting-dia-d-premises-2026-07-31.md) · [plan prueba](./operativa-test-plan-2026-07-31.md)) · Handoff: [session-handoff-2026-08-01.md](./session-handoff-2026-08-01.md) · ops [list-auto-ops-2026-07-29.md](./list-auto-ops-2026-07-29.md).
+**Sync:** 2026-08-02 · **Baseline v1.5** ([ADR-017](../adr/017-baseline-v1-5-research-observatory.md)) · Fase 1 + 1.5 · **Fase 2 P2.A–P2.F cerrada** ([ADR-018](../adr/018-fase2-evidence-store-v0.md)) · Batería `pnpm test:fase2` · Track lab UI P3–P9 cerrado · Embudo coach A–D + **Play ciclo** + **Lista AUTO frescura v1.3** · Finalistas → paper (A) / Supervisado (C) · **Monitor Finalistas** + **CORE-R v1.8** · **Backtesting DÍA D v0.11** · **CORE-B v0.2** · **ADR-019 dos universos LAB/TRADING** ([diseño](./dual-universes-lab-trading-design-2026-08-02.md) · [premisas](./backtesting-dia-d-premises-2026-07-31.md) · [plan prueba](./operativa-test-plan-2026-07-31.md)) · Handoff: [session-handoff-2026-08-01.md](./session-handoff-2026-08-01.md) · ops [list-auto-ops-2026-07-29.md](./list-auto-ops-2026-07-29.md).
 
 ---
 
@@ -18,10 +18,12 @@ Backtesting simula «qué habría pasado» con una regla en el pasado. No predic
 4. Alternativa manual: **Probar + coach** → Lab → Reanalizar → Guardar Finalistas.
 5. Desde **Finalistas**: **Checklist** = deploy en **cuenta activa DEMO** (A); **Proponer** = Supervisado F3 (C). Distintos; ninguno es broker Paper.
 6. En Ayuda → Backtesting: **Monitor Finalistas** = estado TOP/demo/Proponer (solo lectura). Plan D: Screeners propose/execute sobre DEMO (`PAPER_D_EXECUTE` off-by-default).
-7. **DÍA D (verificación):** en Probar, fecha pasada en **Backtesting DÍA D** → Play → Finalistas **#1** → **Simular D→hoy** → Trading MODO DÍA D (película ± pantalla completa efímera; Manual/Semi/Auto; Guardar Evidence; **Salir DÍA D** restaura Operaciones). Sandbox ≠ DEMO. Guía: [HELP.md § DÍA D](../HELP.md) · [premisas](./backtesting-dia-d-premises-2026-07-31.md) · [plan](./operativa-test-plan-2026-07-31.md).
+7. **DÍA D (verificación):** en Probar, fecha pasada en **Backtesting DÍA D** → Play → Finalistas **#1** → **Verificar D→hoy** → LAB Análisis técnico (película ± pantalla completa; Manual/Semi/Auto; Guardar Evidence; **Salir verificación**). Cartera LAB ≠ DEMO. Guía: [HELP.md § DÍA D](../HELP.md) · [premisas](./backtesting-dia-d-premises-2026-07-31.md) · [universos](./dual-universes-lab-trading-design-2026-08-02.md) · [plan](./operativa-test-plan-2026-07-31.md).
 8. **CORE-R:** Monitor → Encolar / Narrar / Auto-sync · chip · toast **Abrir Monitor**. No pisa TOP. Ops: `pnpm test:operativa`.
 
-**Premisa cuentas:** [account-premises-demo-vs-paper-2026-07-31.md](./account-premises-demo-vs-paper-2026-07-31.md) — una Activa; hoy solo DEMO.
+**Premisa cuentas:** [account-premises-demo-vs-paper-2026-07-31.md](./account-premises-demo-vs-paper-2026-07-31.md) — una Activa **TRADING**; hoy solo DEMO · Cartera LAB = sandbox research.
+
+**Universos:** [ADR-019](../adr/019-dual-universes-lab-vs-trading.md) — LAB (estudiar/verificar) ≠ TRADING (operar + rail Coach) · puente Adoptar / Abrir estudio.
 
 Detalle: Ayuda (?) → **Backtesting** (tarjetas DÍA D + CORE-R). Cierre de sesión: [handoff 2026-07-29](./backtesting-funnel-handoff-2026-07-29.md).
 

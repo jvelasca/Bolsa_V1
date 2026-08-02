@@ -80,7 +80,7 @@ describe('filterMineStrategies', () => {
     ).toHaveLength(0);
   });
 
-  it('filters by timeframe, origin and query', () => {
+  it('filters by timeframe, origin, instrument and query', () => {
     expect(
       filterMineStrategies(rows, {
         ...defaultMineStrategiesFilters(),
@@ -96,8 +96,23 @@ describe('filterMineStrategies', () => {
     expect(
       filterMineStrategies(rows, {
         ...defaultMineStrategiesFilters(),
-        query: 'aapl',
+        instrumentId: 'inst-msft',
       }).map((r) => r.id),
+    ).toEqual(['3']);
+    expect(
+      filterMineStrategies(
+        rows,
+        {
+          ...defaultMineStrategiesFilters(),
+          query: 'aapl',
+        },
+        {
+          symbolById: new Map([
+            ['inst-aapl', 'AAPL'],
+            ['inst-msft', 'MSFT'],
+          ]),
+        },
+      ).map((r) => r.id),
     ).toEqual(['2', '3']);
   });
 });
@@ -121,6 +136,12 @@ describe('isMineStrategiesFilterActive', () => {
     expect(isMineStrategiesFilterActive(defaultMineStrategiesFilters())).toBe(false);
     expect(
       isMineStrategiesFilterActive({ ...defaultMineStrategiesFilters(), query: 'x' }),
+    ).toBe(true);
+    expect(
+      isMineStrategiesFilterActive({
+        ...defaultMineStrategiesFilters(),
+        instrumentId: 'inst-aapl',
+      }),
     ).toBe(true);
   });
 });

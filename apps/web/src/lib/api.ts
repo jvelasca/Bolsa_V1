@@ -790,6 +790,24 @@ export const api = {
       `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top?timeframe=${encodeURIComponent(timeframe)}`,
     ),
 
+  getAccountMandates: (accountId: string, instrumentId?: string) => {
+    const q = instrumentId
+      ? `?instrumentId=${encodeURIComponent(instrumentId)}`
+      : '';
+    return request<{ data: import('@bolsa/shared').MandateBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/mandates${q}`,
+    );
+  },
+
+  syncAccountMandates: (
+    accountId: string,
+    body: import('@bolsa/shared').MandateBundleDto,
+  ) =>
+    request<{ data: import('@bolsa/shared').MandateBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/mandates`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
   queryInstrumentStrategyTops: (body: {
     instrumentIds: string[];
     timeframe?: string;

@@ -1201,3 +1201,61 @@ class InstrumentStrategyTopRow(Base):
     coach_facts: Mapped[dict | None] = mapped_column("coach_facts", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
+
+
+class MandateTenureRow(Base):
+    """ADR-020 — tenure de mandato operativo por cuenta×instrumento."""
+
+    __tablename__ = "mandate_tenures"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        ForeignKey("investment_accounts.id", ondelete="CASCADE"),
+    )
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id",
+        ForeignKey("instruments.id", ondelete="CASCADE"),
+    )
+    timeframe: Mapped[str | None] = mapped_column(String, nullable=True)
+    strategy_definition_id: Mapped[str | None] = mapped_column(
+        "strategy_definition_id", String, nullable=True
+    )
+    strategy_label_snapshot: Mapped[str | None] = mapped_column(
+        "strategy_label_snapshot", String, nullable=True
+    )
+    effective_from: Mapped[datetime] = mapped_column("effective_from", DateTime(timezone=True))
+    effective_to: Mapped[datetime | None] = mapped_column(
+        "effective_to", DateTime(timezone=True), nullable=True
+    )
+    actor: Mapped[str] = mapped_column(String)
+    reason: Mapped[str] = mapped_column(String)
+    source_top_id: Mapped[str | None] = mapped_column("source_top_id", String, nullable=True)
+    source_top_version: Mapped[int | None] = mapped_column(
+        "source_top_version", Integer, nullable=True
+    )
+    evidence_level: Mapped[str | None] = mapped_column("evidence_level", String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
+
+
+class MandateTradeLinkRow(Base):
+    """ADR-020 — enlace fill DEMO → tenure de mandato."""
+
+    __tablename__ = "mandate_trade_links"
+
+    transaction_id: Mapped[str] = mapped_column("transaction_id", String, primary_key=True)
+    mandate_tenure_id: Mapped[str] = mapped_column(
+        "mandate_tenure_id",
+        ForeignKey("mandate_tenures.id", ondelete="CASCADE"),
+    )
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id",
+        ForeignKey("instruments.id", ondelete="CASCADE"),
+    )
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        ForeignKey("investment_accounts.id", ondelete="CASCADE"),
+    )
+    linked_at: Mapped[datetime] = mapped_column("linked_at", DateTime(timezone=True))
+    engine: Mapped[str] = mapped_column(String, default="mandate-trade-links-v1")

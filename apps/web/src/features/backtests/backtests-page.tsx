@@ -105,7 +105,7 @@ import {
 } from '@/features/backtests/backtest-list-auto';
 import { summarizeListMemberBacktest } from '@/features/backtests/backtest-list-member-status';
 import { summarizeListMemberFa } from '@/features/backtests/backtest-list-member-fa';
-import { universeEmptyStatus } from '@/features/backtests/backtest-assistant-full-cycle';
+import { instrumentTopIsDurable, universeEmptyStatus } from '@/features/backtests/backtest-assistant-full-cycle';
 import {
   isCoach1AckSatisfied,
   isFinalistsSavedStatusMessage,
@@ -241,6 +241,12 @@ import {
   todayIsoDate,
   type PeriodPreset,
 } from '@/features/backtests/backtest-period';
+import { BacktestDiaDOriginControl } from '@/features/backtests/backtest-dia-d-origin-control';
+import { formatDiaDDisplay } from '@/features/backtests/dia-d-favorites';
+import { DiaDVerifyHost } from '@/features/backtests/dia-d-verify-host';
+import { UniverseChip } from '@/features/platform/universe-chip';
+import { setAdoption } from '@/features/platform/strategy-adoption';
+import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
 
 const STRATEGY_OPTIONS = Object.entries(BACKTEST_STRATEGIES) as [
   BacktestStrategyType,
@@ -289,6 +295,13 @@ export function BacktestsPage() {
 
   const queryClient = useQueryClient();
   const { effectiveAccountId } = useActiveAccount();
+  const diaDVerifySession = useDiaDTradingSessionStore((s) => s.session);
+  /** Solo hijack Análisis técnico con ?verify=1 (no por sesión residual en localStorage). */
+  const diaDVerifyActive =
+    searchParams.get('verify') === '1' && Boolean(diaDVerifySession);
+  const diaDVerifyFullBleed = Boolean(
+    diaDVerifyActive && diaDVerifySession?.fullBleedMovie,
+  );
   const pushToast = useAlertsStore((s) => s.pushToast);
   const enqueueSupervised = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActiveSupervised = useSupervisedF3QueueStore((s) => s.setActive);
@@ -825,6 +838,26 @@ export function BacktestsPage() {
   }, [strategiesQuery.data?.data, missingFinalistKey, missingFinalistQueries]);
   const runs = runsQuery.data?.data ?? [];
   const instrumentTop = instrumentTopQuery.data?.data ?? null;
+  const knownStrategyIds = useMemo(
+    () => new Set(strategies.map((s) => s.id)),
+    [strategies],
+  );
+  /**
+   * Mientras hay lookups de slots huérfanos en vuelo, asumir TOP durable
+   * (no pisar). Cuando fallan todos → huérfano ≡ sin TOP.
+   */
+  const finalistStrategyLookupPending =
+    missingFinalistIds.length > 0 &&
+    missingFinalistQueries.some((q) => q.isPending || q.isFetching);
+  const hasDurableInstrumentTop = instrumentTopIsDurable(
+    instrumentTop,
+    knownStrategyIds,
+  );
+  const hasExistingTopForSave = !instrumentTop
+    ? false
+    : finalistStrategyLookupPending
+      ? true
+      : hasDurableInstrumentTop;
   const instrumentSymbolById = useMemo(() => {
     const map = new Map<string, string>();
     for (const inst of instruments) {
@@ -841,6 +874,20 @@ export function BacktestsPage() {
     () => uniqueSortedValues(strategies.map((s) => s.origin)),
     [strategies],
   );
+  const mineFilterInstruments = useMemo(() => {
+    const ids = new Set<string>();
+    for (const s of strategies) {
+      for (const id of s.instrumentIds ?? []) {
+        if (id) ids.add(id);
+      }
+    }
+    return [...ids]
+      .map((id) => ({
+        id,
+        symbol: instrumentSymbolById.get(id) ?? id.slice(0, 8),
+      }))
+      .sort((a, b) => a.symbol.localeCompare(b.symbol, 'es'));
+  }, [strategies, instrumentSymbolById]);
 
   const filteredStrategies = useMemo(() => {
     if (strategiesListFilter === 'generics') {
@@ -850,8 +897,18 @@ export function BacktestsPage() {
       strategiesListFilter === 'finalists'
         ? strategies.filter((s) => topStrategyIds.has(s.id))
         : strategies;
-    return filterMineStrategies(base, mineFilters, { currentInstrumentId: instrumentId });
-  }, [strategies, strategiesListFilter, topStrategyIds, mineFilters, instrumentId]);
+    return filterMineStrategies(base, mineFilters, {
+      currentInstrumentId: instrumentId,
+      symbolById: instrumentSymbolById,
+    });
+  }, [
+    strategies,
+    strategiesListFilter,
+    topStrategyIds,
+    mineFilters,
+    instrumentId,
+    instrumentSymbolById,
+  ]);
 
   const exploreOkCount = exploreRows.filter((r) => r.status === 'ok').length;
   const coachRunProgress = useMemo((): StrategyMatrixRunProgress => {
@@ -1407,6 +1464,8 @@ export function BacktestsPage() {
       label: item.label,
       subtitle: 'Lab · Mejor',
       // Identidad explore/coach = tipo Coach original (evita colapsar 2 proxies SMA en 1).
+      // Identidad explore/coach = tipo Coach original (evita colapsar 2 proxies SMA en 1).
+      // El preset ejecutable va en la def; buildCoachTopSlots/sanitize lo usan al grabar TOP.
       presetKey: (item.strategyType ?? item.presetKey ?? undefined) as
         | BacktestStrategyType
         | undefined,
@@ -1860,6 +1919,8 @@ export function BacktestsPage() {
       if (options?.focus) params.set('focus', options.focus);
       if (options?.openAnalysis) params.set('openAnalysis', '1');
       else params.delete('openAnalysis');
+      // Ver / checklist = Análisis técnico normal (no Verificar D→hoy).
+      params.delete('verify');
     });
   }
 
@@ -1867,9 +1928,20 @@ export function BacktestsPage() {
   function openFinalistChecklist(slot: {
     strategyDefinitionId: string;
     runId?: string | null;
+    label?: string;
   }) {
     setSavedStrategyId(slot.strategyDefinitionId);
     setRunSource('saved');
+    if (instrumentId && effectiveAccountId) {
+      setAdoption({
+        instrumentId,
+        accountId: effectiveAccountId,
+        state: 'adoptada',
+        strategyDefinitionId: slot.strategyDefinitionId,
+        strategyLabel: slot.label ?? null,
+        timeframe: runTimeframe,
+      });
+    }
     if (slot.runId) {
       selectRun(slot.runId, { tab: 'run', openAnalysis: true, focus: 'detail' });
       setAssistantStatus(PAPER_PATH_LAB.finalistsHint);
@@ -1901,6 +1973,16 @@ export function BacktestsPage() {
       });
     },
     onSuccess: (payload, slot) => {
+      if (instrumentId && effectiveAccountId) {
+        setAdoption({
+          instrumentId,
+          accountId: effectiveAccountId,
+          state: 'propuesta',
+          strategyDefinitionId: slot.strategyDefinitionId,
+          strategyLabel: slot.label,
+          timeframe: runTimeframe,
+        });
+      }
       const id = enqueueSupervised(payload, {
         symbol: payload.symbol ?? undefined,
         origin: 'finalists',
@@ -1940,6 +2022,24 @@ export function BacktestsPage() {
       setResultFocus(focus);
     }
   }, [searchParams, onBacktestsRoute]);
+
+  // ADR-019 U2: ?verify=1 → Análisis técnico + host Verificar (sesión LAB)
+  useEffect(() => {
+    if (!onBacktestsRoute) return;
+    if (searchParams.get('verify') !== '1') return;
+    setTab('run');
+    setResultFocus('detail');
+  }, [searchParams, onBacktestsRoute]);
+
+  // Si la URL pide verify pero no hay sesión LAB, quitar el flag (evita pantallas rotas).
+  useEffect(() => {
+    if (!onBacktestsRoute) return;
+    if (searchParams.get('verify') !== '1') return;
+    if (diaDVerifySession) return;
+    patchSearchParams((params) => {
+      params.delete('verify');
+    });
+  }, [searchParams, onBacktestsRoute, diaDVerifySession]);
 
   // Deep-link Biblioteca: ?tab=strategies&library=&strategyId=&preset=&q=
   useEffect(() => {
@@ -3148,14 +3248,21 @@ export function BacktestsPage() {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      {diaDVerifyFullBleed ? (
+        <DiaDVerifyHost fullBleed />
+      ) : null}
+      {!diaDVerifyFullBleed ? (
+      <>
       <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="flex min-w-0 flex-wrap items-end gap-2.5 sm:gap-3">
+          <UniverseChip force="lab" className="mb-1" />
           <h2
             className="text-2xl font-semibold tracking-tight"
             title="Prueba una estrategia sobre un valor y un periodo. El resto de pestañas es secundario. En Probar, arrastra los separadores entre paneles para adaptar el espacio; se guarda en este dispositivo."
           >
             Backtesting
           </h2>
+          <BacktestDiaDOriginControl diaD={diaD} onDiaDChange={setDiaD} className="mb-0.5" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap rounded-lg border border-border p-0.5">
@@ -3193,6 +3300,13 @@ export function BacktestsPage() {
         onPlay={playAssistantSequence}
         profileLabel={coachProfileRailLabel}
         profileMissing={!coachProfilePolicy.profileId}
+        playBusy={
+          (fullCycleActive ||
+            Boolean(listAutoUi) ||
+            exploreRunning ||
+            semifinalEnqueuePending) &&
+          !(listAutoBoard?.paused)
+        }
         playDisabled={
           Boolean(listAutoUi) ||
           Boolean(listAutoBoard && !listAutoBoard.done && !listAutoBoard.aborted) ||
@@ -3311,54 +3425,24 @@ export function BacktestsPage() {
 
               <div
                 className={cn(
-                  'rounded-md border px-2.5 py-2',
+                  'rounded-md border px-2.5 py-2 text-[10px] leading-snug',
                   isDiaDInPast(diaD)
-                    ? 'border-amber-500/50 bg-amber-500/10'
-                    : 'border-border/60 bg-muted/15',
+                    ? 'border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-50'
+                    : 'border-border/60 bg-muted/15 text-muted-foreground',
                 )}
               >
-                <div className="flex flex-wrap items-end gap-2">
-                  <label
-                    className="min-w-[10rem] flex-1 text-[11px] font-semibold text-foreground"
-                    title="Hoy simulado. El embudo solo usa datos ≤ esta fecha. Luego, en Finalistas #1, «Simular D→hoy» abre Trading."
-                  >
-                    Backtesting DÍA D
-                    <input
-                      type="date"
-                      max={todayIsoDate()}
-                      value={diaD || todayIsoDate()}
-                      onChange={(e) =>
-                        setDiaD(e.target.value === todayIsoDate() ? '' : e.target.value)
-                      }
-                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-                    />
-                  </label>
-                  {isDiaDInPast(diaD) ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-[10px]"
-                      onClick={() => setDiaD('')}
-                    >
-                      Volver a hoy
-                    </Button>
-                  ) : null}
-                </div>
                 {isDiaDInPast(diaD) ? (
-                  <ol className="mt-2 list-decimal space-y-0.5 pl-4 text-[10px] leading-snug text-amber-950 dark:text-amber-50">
-                    <li>Pulsa Play (embudo con datos ≤ {effectiveDiaD(diaD)}).</li>
-                    <li>Abre pestaña Finalistas del resultado.</li>
-                    <li>
-                      En la estrategia <strong>#1</strong> pulsa <strong>Simular D→hoy</strong> →
-                      Trading (película + Manual/Semi/Auto).
-                    </li>
-                  </ol>
+                  <p>
+                    <strong className="font-semibold">Origen DÍA D {formatDiaDDisplay(effectiveDiaD(diaD))}</strong>
+                    {' — '}
+                    embudo con datos ≤ esa fecha (cámbialo junto al título). Tras Play → Finalistas #1 →{' '}
+                    <strong>Verificar D→hoy</strong>.
+                  </p>
                 ) : (
-                  <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
-                    Para verificar una estrategia «como si hoy fuera el pasado»: elige una fecha
-                    anterior → Play → Finalistas → <strong>Simular D→hoy</strong>. Ayuda →
-                    Backtesting → DÍA D.
+                  <p>
+                    Origen <strong className="text-foreground/80">Hoy {formatDiaDDisplay(todayIsoDate())}</strong>
+                    . Para simular «como si hoy fuera el pasado», abre el selector junto a{' '}
+                    <strong className="text-foreground/80">Backtesting</strong> y elige DÍA D (guarda fechas con ★).
                   </p>
                 )}
               </div>
@@ -3791,6 +3875,9 @@ export function BacktestsPage() {
                     void api.deleteStrategy(row.strategyDefinitionId).then(
                       () => {
                         void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+                        void queryClient.invalidateQueries({
+                          queryKey: ['instrument-strategy-top'],
+                        });
                         if (savedStrategyId === row.strategyDefinitionId) {
                           setSavedStrategyId('');
                         }
@@ -3964,6 +4051,8 @@ export function BacktestsPage() {
                       patchSearchParams((params) => {
                         params.set('focus', t.id);
                         if (instrumentId) params.set('instrumentId', instrumentId);
+                        // Salir del modo Verificar D→hoy al cambiar de pestaña de resultado.
+                        params.delete('verify');
                       });
                     }}
                   >
@@ -4118,6 +4207,10 @@ export function BacktestsPage() {
                     !assistantProgress.finalistsSaved &&
                     !assistantProgress.finalistsSkipped
                   }
+                  hasExistingTopForSave={hasExistingTopForSave}
+                  experimentAsOf={
+                    isDiaDInPast(diaD) ? effectiveDiaD(diaD) : null
+                  }
                   autoSaveSemifinal={semifinalShortcutArmed}
                   cycleCoach1Active={
                     fullCycleActive &&
@@ -4248,18 +4341,93 @@ export function BacktestsPage() {
                         message.includes('Lab sin zonas') ||
                         message.includes('Lab timeout')
                       ) {
-                        // Sin TOP en BD: pasar a Coach² / auto-save con el lote actual
-                        // (primera escritura aunque Lab no mejorara).
-                        if (!instrumentTop && exploreOkCount > 0) {
-                          setLabImprovedThisCycle(0);
-                          setCoachPass('post_lab');
-                          setResultFocus('coach');
-                          setAssistantStatus(
-                            'Ciclo: Lab sin mejora · sin TOP previo → grabando Finalistas (primera escritura)…',
-                          );
-                          return;
-                        }
-                        settleFullCycle('skip_lab', message);
+                        // Sin TOP durable (vacío o huérfano tras borrar estrategias):
+                        // Coach² / auto-save con el lote actual (primera escritura).
+                        void (async () => {
+                          let durable = hasExistingTopForSave;
+                          try {
+                            await queryClient.invalidateQueries({
+                              queryKey: ['strategies'],
+                            });
+                            if (instrumentId) {
+                              await queryClient.invalidateQueries({
+                                queryKey: [
+                                  'instrument-strategy-top',
+                                  instrumentId,
+                                  runTimeframe,
+                                ],
+                              });
+                            }
+                            const [stratsRes, topRes] = await Promise.all([
+                              queryClient.fetchQuery({
+                                queryKey: ['strategies'],
+                                queryFn: api.getStrategies,
+                              }),
+                              instrumentId
+                                ? queryClient.fetchQuery({
+                                    queryKey: [
+                                      'instrument-strategy-top',
+                                      instrumentId,
+                                      runTimeframe,
+                                    ],
+                                    queryFn: () =>
+                                      api.getInstrumentStrategyTop(
+                                        instrumentId,
+                                        runTimeframe,
+                                      ),
+                                  })
+                                : Promise.resolve(null),
+                            ]);
+                            const ids = new Set(
+                              (stratsRes?.data ?? []).map((s) => s.id),
+                            );
+                            const top = topRes?.data ?? null;
+                            for (const slot of top?.slots ?? []) {
+                              const sid = slot.strategyDefinitionId;
+                              if (!sid || ids.has(sid)) continue;
+                              try {
+                                const one = await api.getStrategy(sid);
+                                if (one?.data?.id) ids.add(one.data.id);
+                              } catch {
+                                /* slot huérfano */
+                              }
+                            }
+                            durable = instrumentTopIsDurable(top, ids);
+                            const experimentMode = isDiaDInPast(diaD);
+                            if ((!durable || experimentMode) && exploreOkCount > 0) {
+                              setLabImprovedThisCycle(0);
+                              setCoachPass('post_lab');
+                              setResultFocus('coach');
+                              setAssistantStatus(
+                                experimentMode
+                                  ? `Ciclo: Lab sin mejora · DÍA D ${effectiveDiaD(diaD)} → grabando F-D (F-hoy intacto)…`
+                                  : top
+                                    ? 'Ciclo: Lab sin mejora · Finalistas huérfanos → grabando (primera escritura)…'
+                                    : 'Ciclo: Lab sin mejora · sin TOP previo → grabando Finalistas (primera escritura)…',
+                              );
+                              return;
+                            }
+                            settleFullCycle('skip_lab', message);
+                            return;
+                          } catch {
+                            durable = hasExistingTopForSave;
+                          }
+                          if (
+                            (!durable || isDiaDInPast(diaD)) &&
+                            exploreOkCount > 0
+                          ) {
+                            setLabImprovedThisCycle(0);
+                            setCoachPass('post_lab');
+                            setResultFocus('coach');
+                            setAssistantStatus(
+                              isDiaDInPast(diaD)
+                                ? `Ciclo: Lab sin mejora · DÍA D ${effectiveDiaD(diaD)} → grabando F-D (F-hoy intacto)…`
+                                : 'Ciclo: Lab sin mejora · sin TOP previo → grabando Finalistas (primera escritura)…',
+                            );
+                            return;
+                          }
+                          settleFullCycle('skip_lab', message);
+                        })();
                         return;
                       }
                       setAssistantStatus(message);
@@ -4356,7 +4524,14 @@ export function BacktestsPage() {
                 </p>
               )}
 
+              {resultFocus === 'detail' && diaDVerifyActive ? (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <DiaDVerifyHost />
+                </div>
+              ) : null}
+
               {resultFocus === 'detail' &&
+                !diaDVerifyActive &&
                 !detail &&
                 instrumentId &&
                 !(
@@ -4380,9 +4555,12 @@ export function BacktestsPage() {
                 </div>
               )}
 
-              {resultFocus === 'detail' && !detail && !instrumentId && <BacktestResultEmpty />}
+              {resultFocus === 'detail' && !diaDVerifyActive && !detail && !instrumentId && (
+                <BacktestResultEmpty />
+              )}
 
               {resultFocus === 'detail' &&
+                !diaDVerifyActive &&
                 !detail &&
                 selectedId &&
                 detailQuery.isFetching &&
@@ -4391,7 +4569,11 @@ export function BacktestsPage() {
                 <p className="text-sm text-muted-foreground">Cargando resultado…</p>
               )}
 
-              {resultFocus === 'detail' && selectedId && !detail && detailQuery.isError && (
+              {resultFocus === 'detail' &&
+                !diaDVerifyActive &&
+                selectedId &&
+                !detail &&
+                detailQuery.isError && (
                 <p className="text-sm text-destructive">
                   {detailQuery.error instanceof ApiError
                     ? detailQuery.error.message
@@ -4401,7 +4583,7 @@ export function BacktestsPage() {
                 </p>
               )}
 
-              {resultFocus === 'detail' && detail && (
+              {resultFocus === 'detail' && !diaDVerifyActive && detail && (
                 <div className="flex min-h-0 flex-1 flex-col">
                   <BacktestResultView
                   fillHeight
@@ -4651,6 +4833,7 @@ export function BacktestsPage() {
           }}
           mineFilterTimeframes={mineFilterTimeframes}
           mineFilterOrigins={mineFilterOrigins}
+          mineFilterInstruments={mineFilterInstruments}
           instrumentId={instrumentId}
           instrumentSymbol={instrumentSymbol}
           runTimeframe={runTimeframe}
@@ -4719,7 +4902,8 @@ export function BacktestsPage() {
           onGoToRun={() => setTab('run')}
         />
       )}
-
+      </>
+      ) : null}
     </div>
   );
 }

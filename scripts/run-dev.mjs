@@ -184,6 +184,53 @@ children.push(apiChild);
 tee(apiChild.stdout, 'stdout', log);
 tee(apiChild.stderr, 'stderr', log);
 
+// Vite en paralelo con el boot de la API (no esperar health para abrir UI).
+logInfo('dev', 'Arrancando Web (Vite)...');
+timeline.mark('web_spawn');
+const webChild = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
+  stdio: ['inherit', 'pipe', 'pipe'],
+  env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
+});
+children.push(webChild);
+
+let webReadyMarked = false;
+let apiReadyMarked = false;
+
+webChild.stdout.on('data', (chunk) => {
+  process.stdout.write(chunk);
+  const text = chunk.toString();
+  if (!webReadyMarked && (text.includes('ready in') || text.includes(`localhost:${WEB_PORT}`))) {
+    webReadyMarked = true;
+    logInfo('dev', `Web lista -> http://localhost:${WEB_PORT}`);
+    timeline.mark('web_ready');
+    if (apiReadyMarked) {
+      timeline.finish('ready');
+      writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
+      writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
+    }
+  }
+  log(`[stdout] ${text}`);
+});
+webChild.stderr.on('data', (chunk) => {
+  process.stderr.write(chunk);
+  log(`[stderr] ${chunk.toString()}`);
+});
+
+const xtbChildEarly = XTB_BRIDGE_AUTOSTART
+  ? spawn(process.execPath, [join(ROOT, 'scripts', 'xtb-bridge-mock.mjs')], {
+      cwd: ROOT,
+      stdio: ['inherit', 'pipe', 'pipe'],
+      env: { ...process.env, XTB_BRIDGE_PORT: String(XTB_BRIDGE_PORT) },
+      shell: false,
+    })
+  : null;
+if (xtbChildEarly) {
+  children.push(xtbChildEarly);
+  logInfo('dev', `Bridge XTB mock -> http://localhost:${XTB_BRIDGE_PORT}`);
+  tee(xtbChildEarly.stdout, 'stdout', log);
+  tee(xtbChildEarly.stderr, 'stderr', log);
+}
+
 const apiReady = await waitForApi({
   port: API_PORT,
   maxWaitMs: 120_000,
@@ -197,34 +244,14 @@ if (!apiReady.ok) {
   process.exit(1);
 }
 timeline.mark('api_ready', { waitMs: apiReady.elapsedMs });
-
-logInfo('dev', 'Arrancando Web (Vite)...');
-timeline.mark('web_spawn');
-const webChild = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
-  stdio: ['inherit', 'pipe', 'pipe'],
-  env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
-});
-children.push(webChild);
-
-let webReadyMarked = false;
-
-webChild.stdout.on('data', (chunk) => {
-  process.stdout.write(chunk);
-  const text = chunk.toString();
-  if (!webReadyMarked && (text.includes('ready in') || text.includes(`localhost:${WEB_PORT}`))) {
-    webReadyMarked = true;
-    logInfo('dev', `Web lista -> http://localhost:${WEB_PORT}`);
-    timeline.mark('web_ready');
-    timeline.finish('ready');
-    writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
-    writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
-  }
-  log(`[stdout] ${text}`);
-});
-webChild.stderr.on('data', (chunk) => {
-  process.stderr.write(chunk);
-  log(`[stderr] ${chunk.toString()}`);
-});
+apiReadyMarked = true;
+if (webReadyMarked) {
+  timeline.finish('ready');
+  writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
+  writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
+} else {
+  logInfo('dev', 'API lista — esperando Vite…');
+}
 
 const arqChild =
   SCAN_QUEUE_BACKEND === 'arq'
@@ -240,21 +267,6 @@ if (arqChild) {
   logInfo('dev', 'Worker Arq (SCAN_QUEUE_BACKEND=arq)');
   tee(arqChild.stdout, 'stdout', log);
   tee(arqChild.stderr, 'stderr', log);
-}
-
-const xtbChild = XTB_BRIDGE_AUTOSTART
-  ? spawn(process.execPath, [join(ROOT, 'scripts', 'xtb-bridge-mock.mjs')], {
-      cwd: ROOT,
-      stdio: ['inherit', 'pipe', 'pipe'],
-      env: { ...process.env, XTB_BRIDGE_PORT: String(XTB_BRIDGE_PORT) },
-      shell: false,
-    })
-  : null;
-if (xtbChild) {
-  children.push(xtbChild);
-  logInfo('dev', `Bridge XTB mock -> http://localhost:${XTB_BRIDGE_PORT}`);
-  tee(xtbChild.stdout, 'stdout', log);
-  tee(xtbChild.stderr, 'stderr', log);
 }
 
 function shutdown(code = 0) {

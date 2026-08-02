@@ -37,6 +37,20 @@ import {
   DIA_D_EVIDENCE_BAND_LABELS,
   type DiaDSessionEvidenceV1,
 } from '@/features/trading/dia-d-session-evidence';
+import { DiaDReconciliationPanel } from '@/features/trading/dia-d-reconciliation-panel';
+import {
+  buildCounterfactualOos,
+  buildDiaDReconciliation,
+  resolveDiaDIdentity,
+} from '@/features/backtests/dia-d-reconciliation';
+import { getDiaDExperimentTop1 } from '@/features/backtests/dia-d-experiment-top';
+import {
+  dayKey as verifyDayKey,
+  portfolioJustBeforeDiaD,
+  sliceDetailFromDiaD,
+  tradesOnOrAfterDiaD,
+  verifyApiDateFrom,
+} from '@/features/trading/dia-d-verify-continuity';
 import {
   downloadDiaDEvidenceJson,
   formatDiaDArchiveRowLabel,
@@ -64,7 +78,7 @@ function equityAtOrBefore(
 }
 
 function dayKey(timestamp: string): string {
-  return timestamp.slice(0, 10);
+  return verifyDayKey(timestamp);
 }
 
 /** Si se rechaza un buy, el sell del mismo round-trip deja de ser propuesta. */
@@ -115,13 +129,16 @@ export function TradingDiaDReplayPanel() {
     staleTime: 60_000,
   });
 
+  const rawAutoDetail: BacktestRunDetailDto | null = detailQuery.data?.data ?? null;
+
   const runMutation = useMutation({
     mutationFn: async () => {
       if (!session) throw new Error('Sin sesión DÍA D');
+      // Lookback antes de D: indicadores + posición continua (evita 0 ops en frío).
       return api.runBacktest({
         instrumentId: session.instrumentId,
         strategyDefinitionId: session.strategyDefinitionId,
-        dateFrom: session.diaD,
+        dateFrom: verifyApiDateFrom(session.diaD),
         dateTo: session.endDate,
         limit: 10_000,
         timeframe: String(runCtx.timeframe || '1d'),
@@ -153,57 +170,98 @@ export function TradingDiaDReplayPanel() {
     session?.autoRunId,
   ]);
 
-  const autoDetail: BacktestRunDetailDto | null = detailQuery.data?.data ?? null;
+  /** Sesiones cacheadas pre-fix (dateFrom=D en frío) → re-lanzar con lookback. */
+  useEffect(() => {
+    if (!session?.autoRunId || !rawAutoDetail) return;
+    if (runMutation.isPending) return;
+    const runFrom = dayKey(rawAutoDetail.firstDate);
+    const d = dayKey(session.diaD);
+    if (runFrom >= d) {
+      setAutoRunId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.autoRunId, session?.diaD, rawAutoDetail?.id, rawAutoDetail?.firstDate]);
 
   const ohlcvQuery = useQuery({
     queryKey: [
       'dia-d-replay-ohlcv',
       session?.instrumentId,
-      autoDetail?.barCount,
-      autoDetail?.timeframe ?? runCtx.timeframe,
+      rawAutoDetail?.barCount,
+      rawAutoDetail?.timeframe ?? runCtx.timeframe,
     ],
     queryFn: () =>
       api.getOhlcv(
         session!.instrumentId,
-        Math.min(10_000, Math.max(500, (autoDetail?.barCount ?? 400) + 200)),
-        String(autoDetail?.timeframe ?? runCtx.timeframe ?? '1d'),
+        Math.min(10_000, Math.max(500, (rawAutoDetail?.barCount ?? 400) + 200)),
+        String(rawAutoDetail?.timeframe ?? runCtx.timeframe ?? '1d'),
       ),
-    enabled: Boolean(session?.instrumentId && autoDetail),
+    enabled: Boolean(session?.instrumentId && rawAutoDetail),
     staleTime: 60_000,
   });
 
   const bars = ohlcvQuery.data?.data ?? [];
 
-  const runBars = useMemo(() => {
-    if (!autoDetail || bars.length === 0) return bars;
-    const from = dayKey(autoDetail.firstDate);
-    const to = dayKey(autoDetail.lastDate);
+  /** Barras lookback→fin del run (para portfolio@D). */
+  const fullRunBars = useMemo(() => {
+    if (!rawAutoDetail || bars.length === 0) return bars;
+    const from = dayKey(rawAutoDetail.firstDate);
+    const to = dayKey(rawAutoDetail.lastDate);
     const inWindow = bars.filter((bar) => {
       const day = dayKey(bar.timestamp);
       return day >= from && day <= to;
     });
     return inWindow.length > 0 ? inWindow : bars;
-  }, [autoDetail, bars]);
+  }, [rawAutoDetail, bars]);
+
+  /** Ventana de película / métricas: D→hoy. */
+  const runBars = useMemo(() => {
+    if (!session) return fullRunBars;
+    const d = dayKey(session.diaD);
+    return fullRunBars.filter((bar) => dayKey(bar.timestamp) >= d);
+  }, [fullRunBars, session]);
+
+  /** Auto recortado a D→hoy con carry de posición. */
+  const autoDetail: BacktestRunDetailDto | null = useMemo(() => {
+    if (!rawAutoDetail || !session) return null;
+    return sliceDetailFromDiaD(rawAutoDetail, session.diaD, fullRunBars);
+  }, [rawAutoDetail, session, fullRunBars]);
+
+  const carryAtD = useMemo(() => {
+    if (!rawAutoDetail || !session) return { cash: 0, shares: 0, equity: 0 };
+    const d = dayKey(session.diaD);
+    const mark = fullRunBars.find((b) => dayKey(b.timestamp) >= d);
+    return portfolioJustBeforeDiaD(
+      rawAutoDetail.initialCash,
+      rawAutoDetail.trades,
+      session.diaD,
+      mark?.close ?? null,
+    );
+  }, [rawAutoDetail, session, fullRunBars]);
 
   const gatePolicy = session?.mode === 'auto' ? 'auto' : 'gated';
 
   const gatedMetrics = useMemo(() => {
-    if (!autoDetail || !session) return null;
+    if (!rawAutoDetail || !session || !autoDetail) return null;
+    const oosTrades = tradesOnOrAfterDiaD(rawAutoDetail.trades, session.diaD);
     return computeGatedSessionMetrics({
-      initialCash: autoDetail.initialCash,
+      initialCash: carryAtD.cash,
+      initialShares: carryAtD.shares,
       bars: runBars,
-      autoTrades: autoDetail.trades,
+      autoTrades: oosTrades,
       decisions: session.gateDecisions,
       policy: gatePolicy,
     });
-  }, [autoDetail, session, runBars, gatePolicy]);
+  }, [rawAutoDetail, session, autoDetail, carryAtD, runBars, gatePolicy]);
 
   const detail = useMemo(() => {
     if (!autoDetail) return null;
     if (!gatedMetrics || session?.mode === 'auto') {
       return {
         ...autoDetail,
-        equityCurve: equityCurveFromDetail(autoDetail),
+        equityCurve:
+          autoDetail.equityCurve && autoDetail.equityCurve.length > 0
+            ? autoDetail.equityCurve
+            : equityCurveFromDetail(autoDetail),
       };
     }
     return detailWithGatedFills(autoDetail, gatedMetrics);
@@ -266,6 +324,166 @@ export function TradingDiaDReplayPanel() {
       gate: { accepted: ok, rejected: ko },
     });
   }, [session, autoDetail, detail]);
+
+  const productionTopQuery = useQuery({
+    queryKey: [
+      'instrument-strategy-top',
+      session?.instrumentId,
+      String(runCtx.timeframe || '1d'),
+    ],
+    queryFn: () =>
+      api.getInstrumentStrategyTop(
+        session!.instrumentId,
+        String(runCtx.timeframe || '1d'),
+      ),
+    enabled: Boolean(session?.instrumentId),
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  const prod1 = useMemo(() => {
+    const slots = productionTopQuery.data?.data?.slots ?? [];
+    return [...slots].sort((a, b) => a.rank - b.rank)[0] ?? null;
+  }, [productionTopQuery.data?.data?.slots]);
+
+  const sameAsExperiment =
+    Boolean(session?.strategyDefinitionId) &&
+    Boolean(prod1?.strategyDefinitionId) &&
+    session!.strategyDefinitionId === prod1!.strategyDefinitionId;
+
+  /** Contrafactual F-hoy#1 en la misma ventana (lookback → end), slice a D. */
+  const counterfactualQuery = useQuery({
+    queryKey: [
+      'dia-d-counterfactual',
+      session?.instrumentId,
+      prod1?.strategyDefinitionId,
+      session?.diaD,
+      session?.endDate,
+    ],
+    queryFn: async () => {
+      const res = await api.runBacktest({
+        instrumentId: session!.instrumentId,
+        strategyDefinitionId: prod1!.strategyDefinitionId!,
+        dateFrom: verifyApiDateFrom(session!.diaD),
+        dateTo: session!.endDate,
+        limit: 10_000,
+        timeframe: String(runCtx.timeframe || '1d'),
+        initialCash: Number(runCtx.initialCash) || 10_000,
+        commissionBps: Number(runCtx.commissionBps) || 0,
+        slippageBps: Number(runCtx.slippageBps) || 0,
+      });
+      return res.data;
+    },
+    enabled: Boolean(
+      session &&
+        sessionEvidence &&
+        prod1?.strategyDefinitionId &&
+        !sameAsExperiment,
+    ),
+    staleTime: 120_000,
+    retry: 1,
+  });
+
+  const counterfactualSliced = useMemo(() => {
+    if (!session || !counterfactualQuery.data) return null;
+    return sliceDetailFromDiaD(counterfactualQuery.data, session.diaD, bars);
+  }, [counterfactualQuery.data, session, bars]);
+
+  const reconciliation = useMemo(() => {
+    if (!session || !sessionEvidence) return null;
+    const tf = String(runCtx.timeframe || '1d');
+    const expSlot = getDiaDExperimentTop1(session.instrumentId, tf, session.diaD);
+    const identity = resolveDiaDIdentity(
+      {
+        strategyDefinitionId: session.strategyDefinitionId,
+        label: session.strategyLabel,
+        strategyType: expSlot?.strategyType ?? null,
+      },
+      prod1
+        ? {
+            strategyDefinitionId: prod1.strategyDefinitionId ?? null,
+            label: prod1.label,
+            strategyType: prod1.strategyType ?? null,
+          }
+        : null,
+    );
+    const expRet = detail?.totalReturnPct ?? autoDetail?.totalReturnPct ?? null;
+    let counterfactual = null as ReturnType<typeof buildCounterfactualOos> | null;
+    if (!prod1) {
+      counterfactual = buildCounterfactualOos({
+        experimentReturnPct: expRet,
+        productionReturnPct: null,
+        identity: 'unknown',
+        status: 'unavailable',
+        note: 'Sin F-hoy#1',
+      });
+    } else if (sameAsExperiment) {
+      counterfactual = buildCounterfactualOos({
+        experimentReturnPct: expRet,
+        productionReturnPct: expRet,
+        productionTradeCount: detail?.tradeCount ?? autoDetail?.tradeCount ?? null,
+        productionMaxDrawdownPct: detail?.maxDrawdownPct ?? autoDetail?.maxDrawdownPct ?? null,
+        identity: 'same_id',
+      });
+    } else if (counterfactualQuery.isError) {
+      counterfactual = buildCounterfactualOos({
+        experimentReturnPct: expRet,
+        productionReturnPct: null,
+        identity,
+        status: 'error',
+        note: 'No se pudo simular F-hoy#1',
+      });
+    } else if (counterfactualSliced) {
+      counterfactual = buildCounterfactualOos({
+        experimentReturnPct: expRet,
+        productionReturnPct: counterfactualSliced.totalReturnPct,
+        productionTradeCount: counterfactualSliced.tradeCount,
+        productionMaxDrawdownPct: counterfactualSliced.maxDrawdownPct,
+        identity,
+        status: 'ready',
+      });
+    } else {
+      counterfactual = buildCounterfactualOos({
+        experimentReturnPct: expRet,
+        productionReturnPct: null,
+        identity,
+        status: 'pending',
+        note: 'Simulando F-hoy#1…',
+      });
+    }
+
+    return buildDiaDReconciliation({
+      experimentSlot: {
+        strategyDefinitionId: session.strategyDefinitionId,
+        label: session.strategyLabel,
+        strategyType: expSlot?.strategyType ?? null,
+      },
+      productionSlot: prod1
+        ? {
+            strategyDefinitionId: prod1.strategyDefinitionId ?? null,
+            label: prod1.label,
+            strategyType: prod1.strategyType ?? null,
+          }
+        : null,
+      evidenceBand: sessionEvidence.band,
+      oosReturnPct: expRet,
+      counterfactual,
+    });
+  }, [
+    session,
+    sessionEvidence,
+    prod1,
+    sameAsExperiment,
+    detail?.totalReturnPct,
+    detail?.tradeCount,
+    detail?.maxDrawdownPct,
+    autoDetail?.totalReturnPct,
+    autoDetail?.tradeCount,
+    autoDetail?.maxDrawdownPct,
+    counterfactualQuery.isError,
+    counterfactualSliced,
+    runCtx.timeframe,
+  ]);
 
   useEffect(() => {
     setIaNarrative(null);
@@ -674,6 +892,13 @@ export function TradingDiaDReplayPanel() {
                   </span>
                   <span className="text-muted-foreground">{sessionEvidence.confidence}</span>
                 </div>
+                {reconciliation ? (
+                  <DiaDReconciliationPanel
+                    result={reconciliation}
+                    instrumentId={session.instrumentId}
+                    timeframe={String(runCtx.timeframe || '1d')}
+                  />
+                ) : null}
                 <ul className="space-y-1 leading-snug text-foreground/90">
                   {(iaNarrative ?? sessionEvidence.paragraphs).map((p, i) => (
                     <li key={i}>{p}</li>

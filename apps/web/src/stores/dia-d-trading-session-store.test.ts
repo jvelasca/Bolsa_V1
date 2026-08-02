@@ -23,6 +23,7 @@ describe('dia-d fullBleedMovie', () => {
       endDate: '2024-12-31',
     });
     expect(useDiaDTradingSessionStore.getState().session?.fullBleedMovie).toBe(false);
+    expect(useDiaDTradingSessionStore.getState().session?.universe).toBe('lab');
     store.setFullBleedMovie(true);
     expect(useDiaDTradingSessionStore.getState().session?.fullBleedMovie).toBe(true);
     store.setFullBleedMovie(false);

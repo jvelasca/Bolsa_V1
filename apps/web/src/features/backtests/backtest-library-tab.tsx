@@ -36,6 +36,8 @@ type Props = {
   onMineFiltersChange: (next: MineStrategiesFilterState) => void;
   mineFilterTimeframes: string[];
   mineFilterOrigins: string[];
+  /** Instrumentos presentes en Mis estrategias (id + symbol) para el filtro. */
+  mineFilterInstruments: Array<{ id: string; symbol: string }>;
   instrumentId: string;
   instrumentSymbol?: string | null;
   runTimeframe: string;
@@ -74,6 +76,7 @@ export function BacktestLibraryTab({
   onMineFiltersChange,
   mineFilterTimeframes,
   mineFilterOrigins,
+  mineFilterInstruments,
   instrumentId,
   instrumentSymbol,
   runTimeframe,
@@ -193,10 +196,35 @@ export function BacktestLibraryTab({
                   onChange={(e) =>
                     onMineFiltersChange({ ...mineFilters, query: e.target.value })
                   }
-                  placeholder="Buscar…"
+                  placeholder="Buscar nombre o ticker…"
                   className="h-9 min-w-[12rem] flex-1 rounded-md border border-border bg-background px-2.5 text-sm"
                   aria-label="Buscar en Mis estrategias"
                 />
+                <select
+                  value={mineFilters.instrumentId}
+                  onChange={(e) =>
+                    onMineFiltersChange({
+                      ...mineFilters,
+                      instrumentId: e.target.value,
+                    })
+                  }
+                  className="h-9 max-w-[11rem] rounded-md border border-border bg-background px-2 text-xs"
+                  aria-label="Instrumento"
+                  title="Estrategias ajustadas a este valor"
+                >
+                  <option value="">Instrumento: todos</option>
+                  {instrumentId &&
+                    !mineFilterInstruments.some((i) => i.id === instrumentId) && (
+                      <option value={instrumentId}>
+                        {instrumentSymbol ?? 'Valor actual'}
+                      </option>
+                    )}
+                  {mineFilterInstruments.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.symbol}
+                    </option>
+                  ))}
+                </select>
                 <select
                   value={mineFilters.scope}
                   onChange={(e) =>
@@ -339,7 +367,9 @@ export function BacktestLibraryTab({
                     ? instrumentId
                       ? isMineStrategiesFilterActive(mineFilters)
                         ? 'Ninguna finalista coincide con los filtros.'
-                        : `Aún no hay finalistas ligadas a ${instrumentSymbol ?? 'este valor'}. Guardar TOP-3 en Coach o adopta en Lab.`
+                        : topStrategyIds.size > 0
+                          ? `TOP de ${instrumentSymbol ?? 'este valor'} referencia ${topStrategyIds.size} estrategia(s) que ya no están en Biblioteca (huérfanas tras purga). En Finalistas → Eliminar Finalistas, o vuelve a Play: el ciclo trata el TOP huérfano como vacío y puede grabar candidatas Coach.`
+                          : `Aún no hay finalistas ligadas a ${instrumentSymbol ?? 'este valor'}. El Coach muestra candidatas ★; solo se graban en BD con «Guardar TOP-3» (semifinal) o ciclo completo Lab → «Guardar Finalistas».`
                       : 'Elige un valor en Probar estrategia.'
                     : strategies.length === 0
                       ? 'Aún no tienes ninguna. Clona una genérica abajo o importa desde el gráfico.'

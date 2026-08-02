@@ -9,6 +9,8 @@ export type MineStrategiesFilterState = {
   timeframe: string;
   origin: string;
   scope: MineStrategyScopeFilter;
+  /** Filtro por instrumento ajustado (id). Vacío = todos. */
+  instrumentId: string;
 };
 
 export type MineStrategyFilterable = {
@@ -30,7 +32,7 @@ export const MINE_STRATEGY_ORIGIN_LABELS: Record<StrategyOrigin, string> = {
 };
 
 export function defaultMineStrategiesFilters(): MineStrategiesFilterState {
-  return { query: '', timeframe: '', origin: '', scope: 'all' };
+  return { query: '', timeframe: '', origin: '', scope: 'all', instrumentId: '' };
 }
 
 export function strategyScopeKind(
@@ -41,21 +43,33 @@ export function strategyScopeKind(
 
 export function isMineStrategiesFilterActive(filters: MineStrategiesFilterState): boolean {
   return Boolean(
-    filters.query.trim() || filters.timeframe || filters.origin || filters.scope !== 'all',
+    filters.query.trim() ||
+      filters.timeframe ||
+      filters.origin ||
+      filters.instrumentId ||
+      filters.scope !== 'all',
   );
 }
 
 export function filterMineStrategies<T extends MineStrategyFilterable>(
   strategies: T[],
   filters: MineStrategiesFilterState,
-  opts?: { currentInstrumentId?: string | null },
+  opts?: {
+    currentInstrumentId?: string | null;
+    /** Para buscar por ticker (VIS, ACS…) además del id. */
+    symbolById?: ReadonlyMap<string, string>;
+  },
 ): T[] {
   const q = filters.query.trim().toLowerCase();
   const currentId = opts?.currentInstrumentId ?? null;
+  const symbolById = opts?.symbolById;
 
   return strategies.filter((s) => {
     if (filters.timeframe && s.timeframe !== filters.timeframe) return false;
     if (filters.origin && s.origin !== filters.origin) return false;
+    if (filters.instrumentId) {
+      if (!(s.instrumentIds ?? []).includes(filters.instrumentId)) return false;
+    }
 
     const scope = strategyScopeKind(s.instrumentIds);
     if (filters.scope === 'reusable' && scope !== 'reusable') return false;
@@ -65,12 +79,16 @@ export function filterMineStrategies<T extends MineStrategyFilterable>(
     }
 
     if (!q) return true;
+    const symbolLabels = (s.instrumentIds ?? [])
+      .map((id) => symbolById?.get(id) ?? '')
+      .filter(Boolean);
     const haystack = [
       s.name,
       s.kind,
       s.timeframe,
       s.origin,
       s.presetKey ?? '',
+      ...symbolLabels,
       ...(s.instrumentIds ?? []),
     ]
       .join(' ')

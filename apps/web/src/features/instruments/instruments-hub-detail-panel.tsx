@@ -132,7 +132,7 @@ export function InstrumentsHubDetailPanel({
             open={sectionsOpen.resumen}
             onToggle={() => onToggleSection('resumen')}
           >
-            <KeyValueList>
+            <KeyValueList columns={3}>
               <KeyValueRow label="Precio">
                 {instrument.meta.lastClose != null
                   ? formatPrice(instrument.meta.lastClose)

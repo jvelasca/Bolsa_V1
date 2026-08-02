@@ -152,6 +152,7 @@ export function BacktestLabBoard({
             rank: handoff.rank,
             strategyId: saved.strategyId,
             label: saved.name,
+            /** Preset ejecutable de la def (SMA…); strategyType sigue siendo identidad Coach/seed. */
             presetKey: saved.presetKey,
             strategyType: handoff.strategyType,
           });

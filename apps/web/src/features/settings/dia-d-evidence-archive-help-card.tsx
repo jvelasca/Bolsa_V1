@@ -40,7 +40,7 @@ export function DiaDEvidenceArchiveHelpCard() {
       <CardContent className="space-y-2 text-sm">
         {recent.length === 0 ? (
           <p className="text-xs text-muted-foreground">
-            Vacío. En Trading MODO DÍA D → Guardar Evidence o Importar JSON.
+            Vacío. En LAB Verificar D→hoy → Guardar Evidence o Importar JSON.
           </p>
         ) : (
           <>

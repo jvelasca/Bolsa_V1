@@ -39,6 +39,8 @@ data/filings/
 !.vscode/tasks.json
 !.vscode/settings.json
 
+.cache/
+
 # Secrets / local overrides
 *.pem
 .secrets/

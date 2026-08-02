@@ -34,6 +34,7 @@
     "test:coach": "node scripts/research/verify_coach_battery.mjs",
     "test:coach:smoke": "python scripts/research/verify_core_p_api_smoke.py",
     "test:coach:api": "python -m pytest apps/api-python/tests/integration/test_core_p_multi_profile.py -q && python scripts/research/verify_core_p_api_smoke.py",
+    "test:finalists:smoke": "python scripts/research/verify_finalists_roundtrip_smoke.py --replace",
     "test:play-chain": "node scripts/research/verify_play_chain_grf.mjs",
     "audit:ibex35": "python scripts/research/audit_ibex35_operativa.py --write-md",
     "audit:ibex35:missing": "python scripts/research/audit_ibex35_operativa.py --print-missing",

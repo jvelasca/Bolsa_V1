@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   fullCyclePlayTitle,
   isLabZoneTerminal,
+  instrumentTopIsDurable,
   labEmptyZonesStatus,
   labNoImproveStatus,
   labWatchdogStatus,
@@ -11,6 +12,32 @@ import {
   universeEmptyStatus,
   coachNeedsHumanAck,
 } from '@/features/backtests/backtest-assistant-full-cycle';
+
+describe('instrumentTopIsDurable', () => {
+  it('is false when top is missing or slots lack known strategies', () => {
+    expect(instrumentTopIsDurable(null, new Set(['a']))).toBe(false);
+    expect(
+      instrumentTopIsDurable(
+        { slots: [{ strategyDefinitionId: 'gone' }] },
+        new Set(['alive']),
+      ),
+    ).toBe(false);
+  });
+
+  it('is true when at least one slot strategy still exists', () => {
+    expect(
+      instrumentTopIsDurable(
+        {
+          slots: [
+            { strategyDefinitionId: 'gone' },
+            { strategyDefinitionId: 'alive' },
+          ],
+        },
+        new Set(['alive']),
+      ),
+    ).toBe(true);
+  });
+});
 
 describe('coachNeedsHumanAck', () => {
   it('flags weak and discrepancy', () => {
@@ -77,6 +104,18 @@ describe('resolveFullCycleSaveDecision', () => {
         postLab: true,
         labImprovedCount: 0,
         canSaveTop: true,
+        hasExistingTop: false,
+      }).action,
+    ).toBe('save_active');
+  });
+
+  it('saves first write when existing TOP is orphan (hasExistingTop false)', () => {
+    expect(
+      resolveFullCycleSaveDecision({
+        postLab: true,
+        labImprovedCount: 0,
+        canSaveTop: true,
+        existingTopStatus: 'active',
         hasExistingTop: false,
       }).action,
     ).toBe('save_active');

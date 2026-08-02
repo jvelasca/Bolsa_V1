@@ -46,6 +46,7 @@ import {
   optimizeFamilyProxyNote,
 } from '@/features/backtests/backtest-optimize-seed';
 import { buildCoachTopSlots } from '@/features/backtests/coach-top-save';
+import { sanitizeTopSlotsStrategyTypes } from '@/features/backtests/instrument-top-strategy-type';
 import {
   buildCoachProfileBindingFacts,
   resolveCoachProfilePolicy,
@@ -54,6 +55,7 @@ import {
   buildLabAdoptionFacts,
   readLabAdoption,
 } from '@/features/backtests/lab-adoption-memory';
+import { saveDiaDExperimentTop } from '@/features/backtests/dia-d-experiment-top';
 import { resolveFullCycleSaveDecision, shouldWaitBeforeFinalistsAutoSave } from '@/features/backtests/backtest-assistant-full-cycle';
 import {
   isCoach1AckSatisfied,
@@ -134,6 +136,10 @@ type Props = {
    * Mejoras Lab reportadas por el hub al entrar en Coach² (fuente de verdad del ciclo).
    */
   labImprovedCountHint?: number;
+  /**
+   * Si se pasa, manda sobre `savedTop` al decidir auto-save (p. ej. TOP huérfano → false).
+   */
+  hasExistingTopForSave?: boolean;
   /** Estado del gate Coach para que el hub avance Lab / atajo. */
   onCoachGateChange?: (gate: {
     needsAck: boolean;
@@ -151,6 +157,11 @@ type Props = {
    * OFF → no auto-llama; ranking ★ + auditor heurístico locales.
    */
   llmNarrate?: boolean;
+  /**
+   * ADR-021: si hay fecha DÍA D en el pasado, el auto-save escribe F-D
+   * (experimento) y **no** pisa Finalistas operativos (F-hoy).
+   */
+  experimentAsOf?: string | null;
 };
 
 function batteryText(rows: ExplorePresetRow[]): string {
@@ -215,12 +226,15 @@ export function BacktestExploreRanking({
   autoSaveSemifinal = false,
   cycleCoach1Active = false,
   labImprovedCountHint = 0,
+  hasExistingTopForSave,
   onCoachGateChange,
   freshnessInputFingerprint = null,
   llmNarrate = true,
+  experimentAsOf = null,
 }: Props) {
   const queryClient = useQueryClient();
   const postLab = coachPass === 'post_lab';
+  const savingExperiment = Boolean(experimentAsOf);
   const autoSaveFiredRef = useRef(false);
   const softAckLatchedRef = useRef(false);
   const loteKey = rows.map((r) => r.strategyDefinitionId ?? r.runId ?? r.strategyType).join('|');
@@ -458,6 +472,22 @@ export function BacktestExploreRanking({
       });
       if (slots.length === 0) throw new Error('Sin recomendaciones para guardar');
 
+      const strategiesFresh = await api.getStrategies();
+      const presetById = new Map(
+        (strategiesFresh.data ?? []).map((s) => [s.id, s.presetKey ?? null]),
+      );
+      for (const slot of slots) {
+        const id = slot.strategyDefinitionId?.trim();
+        if (!id || presetById.has(id)) continue;
+        try {
+          const one = await api.getStrategy(id);
+          if (one?.data?.presetKey) presetById.set(id, one.data.presetKey);
+        } catch {
+          /* ignore */
+        }
+      }
+      const slotsSanitized = sanitizeTopSlotsStrategyTypes(slots, presetById);
+
       const policy = resolveCoachProfilePolicy({
         profileId: profile?.profileId,
         profileName: profile?.name,
@@ -490,6 +520,31 @@ export function BacktestExploreRanking({
             )
           : baseFacts;
 
+      // ADR-021: experimento DÍA D → F-D local; no pisa F-hoy en BD.
+      if (experimentAsOf) {
+        const prodSlot1 = [...(savedTop?.slots ?? [])]
+          .sort((a, b) => a.rank - b.rank)[0];
+        saveDiaDExperimentTop({
+          instrumentId,
+          timeframe: tf,
+          asOfDiaD: experimentAsOf,
+          slots: slotsSanitized,
+          coachHeadline: note.headline,
+          productionTop1AtSave: prodSlot1
+            ? {
+                strategyDefinitionId: prodSlot1.strategyDefinitionId ?? null,
+                label: prodSlot1.label ?? null,
+                strategyType: prodSlot1.strategyType ?? null,
+              }
+            : null,
+        });
+        return {
+          experiment: true as const,
+          asOfDiaD: experimentAsOf,
+          slotCount: slotsSanitized.length,
+        };
+      }
+
       return api.upsertInstrumentStrategyTop(instrumentId, {
         instrumentId,
         symbol,
@@ -497,12 +552,21 @@ export function BacktestExploreRanking({
         periodLabel: periodLabel ?? null,
         status: postLab ? 'active' : 'semifinal',
         evidenceLevel: postLab ? 'lab_validated' : noteFacts.evidenceLevel,
-        slots,
+        slots: slotsSanitized,
         coachHeadline: note.headline,
         coachFacts: stampedFacts,
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data && typeof data === 'object' && 'experiment' in data && data.experiment) {
+        setSaveMsg(
+          `Experimento DÍA D ${data.asOfDiaD}: TOP F-D guardado (${data.slotCount}) · Finalistas operativos intactos`,
+        );
+        onAutoSaveStatus?.(
+          `Ciclo: F-D guardado (DÍA D ${data.asOfDiaD}) · F-hoy no se pisó.`,
+        );
+        return;
+      }
       setSaveMsg(
         postLab
           ? 'Finalistas actualizados (lab_validated) · en Mis estrategias'
@@ -638,8 +702,13 @@ export function BacktestExploreRanking({
       postLab: true,
       labImprovedCount,
       canSaveTop: canSave,
-      existingTopStatus: savedTop?.status ?? null,
-      hasExistingTop: Boolean(savedTop),
+      existingTopStatus: savingExperiment ? null : savedTop?.status ?? null,
+      // Experimento DÍA D: F-hoy no bloquea primera escritura de F-D.
+      hasExistingTop: savingExperiment
+        ? false
+        : hasExistingTopForSave !== undefined
+          ? hasExistingTopForSave
+          : Boolean(savedTop),
     });
 
     if (decision.action === 'save_active') {
@@ -684,6 +753,9 @@ export function BacktestExploreRanking({
     labImprovedCountHint,
     savedTop,
     savedTop?.status,
+    hasExistingTopForSave,
+    savingExperiment,
+    experimentAsOf,
     discrepancyAck,
     prefsAutoAck,
     autoAckOnCycle,

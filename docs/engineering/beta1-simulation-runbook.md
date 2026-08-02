@@ -74,4 +74,21 @@ Solo con decisión explícita: Indicadores DSL/Pine · Predictions binarios · F
 
 ---
 
+---
+
+## 4. Sesión 2026-08-01 (auto + UI pendiente)
+
+| Capacidad | Auto | UI humano |
+|-----------|------|-----------|
+| **A** CORE-P multi-perfil | PASS (`test:coach:api` + smoke live) | A1–A4 en app |
+| **B** DÍA D | PASS (`test:operativa` + smoke asOf/Evidence) | D1–D12 en app |
+| Health API/Web/DB | OK | — |
+
+**UI ahora (orden corto A→B):**
+
+1. Config → Perfil **low** → Backtesting → Play 1 valor → mirar Lab/rail  
+2. Cambiar perfil **high** → aviso mismatch si había Finalistas · hint Lab espacio  
+3. Probar → fecha DÍA D pasada → Play → **Simular D→hoy**  
+4. Pantalla completa → recarga (D6) → **Salir DÍA D** (D12 Operaciones)
+
 *As-of: 2026-08-01 · V1.0.0 en GitHub.*

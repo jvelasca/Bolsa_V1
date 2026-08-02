@@ -7,6 +7,8 @@ import {
 } from '@/features/instruments/use-instrument-live-quotes-batch';
 import { usePendingOrders } from '@/features/trading/use-pending-orders';
 import { useAlertsStore } from '@/stores/alerts-store';
+import { useActiveAccount } from '@/features/accounts/use-active-account';
+import { linkTradeToMandate } from '@/features/platform/operating-mandate';
 import { api } from '@/lib/api';
 
 const EVALUATE_INTERVAL_MS = 15_000;
@@ -32,6 +34,7 @@ export function PendingOrdersMonitor() {
   const { pendingOrders, removePendingOrder } = usePendingOrders();
   const pushToast = useAlertsStore((s) => s.pushToast);
   const queryClient = useQueryClient();
+  const { effectiveAccountId } = useActiveAccount();
   const processing = useRef<Set<string>>(new Set());
   const errorNotified = useRef<Set<string>>(new Set());
   const orderSignature = pendingOrders.map((order) => order.id).join(',');
@@ -87,12 +90,20 @@ export function PendingOrdersMonitor() {
 
         processing.current.add(order.id);
         try {
-          await api.executeTrade({
+          const res = await api.executeTrade({
             instrumentId: order.instrumentId,
             type: order.side,
             quantity: order.quantity,
             price: order.limitPrice,
           });
+          const txId = res?.data?.transaction?.id;
+          if (txId && effectiveAccountId) {
+            linkTradeToMandate({
+              transactionId: txId,
+              instrumentId: order.instrumentId,
+              accountId: effectiveAccountId,
+            });
+          }
           await removePendingOrder(order.id);
           errorNotified.current.delete(order.id);
           pushToast(
@@ -123,6 +134,7 @@ export function PendingOrdersMonitor() {
     quotesQuery.data,
     quotesQuery.dataUpdatedAt,
     removePendingOrder,
+    effectiveAccountId,
   ]);
 
   return null;

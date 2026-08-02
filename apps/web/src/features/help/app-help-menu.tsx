@@ -343,14 +343,40 @@ function TradingContent() {
         activa DEMO</strong>.
       </p>
       <section>
-        <h3 className="mb-2 font-semibold text-foreground">MODO DÍA D (sandbox)</h3>
+        <h3 className="mb-2 font-semibold text-foreground">Coach en vivo (rail)</h3>
         <p>
-          Desde Backtesting → Finalistas #1 → <strong className="text-foreground">Simular D→hoy</strong>{' '}
-          se abre Trading con banner ámbar. Es una película sandbox: no escribe la DEMO live.
-          <strong className="text-foreground"> Pantalla completa</strong> oculta watchlist/gráfico/Operaciones
-          solo en esa sesión; al recargar vuelve el layout normal (full-bleed no se guarda).
-          <strong className="text-foreground"> Salir DÍA D</strong> cierra la sesión y restaura Operaciones.
-          Evidence: Guardar / Archivo (también en Ayuda → Backtesting).
+          En Trading, el rail derecho muestra TOP / adopción del valor abierto y enlaces{' '}
+          <strong className="text-foreground">Abrir estudio (LAB)</strong> y{' '}
+          <strong className="text-foreground">Verificar D→hoy</strong> (si hay DÍA D en el pasado).
+          La verificación ya no vive en la mesa Trading (ADR-019).
+        </p>
+      </section>
+      <section>
+        <h3 className="mb-2 font-semibold text-foreground">Mandato operativo (ADR-020)</h3>
+        <p>
+          Cuando <strong className="text-foreground">Adoptas</strong> un Finalista (Checklist /
+          Camino A), se abre un <strong className="text-foreground">mandato vigente</strong> para
+          ese instrumento×cuenta: qué estrategia gobierna la operativa y desde cuándo. Si adoptas
+          otra, el tramo anterior se cierra y queda en el historial (actor usuario / Coach /
+          CORE-R).
+        </p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>
+            Timeline en el rail Coach: tramos, motivo del cambio y resumen de churn (usuario vs
+            Coach).
+          </li>
+          <li>
+            Los trades DEMO (orden mercado / pendientes) se <strong className="text-foreground">
+            enlazan
+            </strong>{' '}
+            al mandato vigente (local) para atribución futura.
+          </li>
+          <li>
+            Distinto de Finalistas LAB (estudio) y del tag “setup” de un trade suelto.
+          </li>
+        </ul>
+        <p className="mt-2">
+          Docs: <code className="text-[0.85em]">docs/adr/020-operating-mandate-tenure.md</code>.
         </p>
       </section>
       <section>

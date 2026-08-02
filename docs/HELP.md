@@ -1,7 +1,9 @@
 # Ayuda en la app — coordinación con trackers y docs
 
-> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-01**  
-> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.8**, **DÍA D v0.11**, Lab **CORE-B v0.2**) + Trading (MODO DÍA D).  
+> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-02**  
+> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.8**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2**) + Trading (rail Coach · ADR-019 · **Mandato ADR-020 M1b BD**).  
+> **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
+> **Universos:** [LAB vs TRADING](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [Mandato](./adr/020-operating-mandate-tenure.md) · [Reconciliación DÍA D](./adr/021-dia-d-reconciliation.md).  
 > Configuración → **BD** (estado PostgreSQL, purga de huérfanos y demos cerradas).  
 > **Espacios de trabajo:** chip superior → gestor (nuevo blanco / duplicar / renombrar); arranque = último activo.  
 > Handoff: [engineering/session-handoff-2026-08-01.md](./engineering/session-handoff-2026-08-01.md) (cierre racha) · previo [07-31](./engineering/session-handoff-2026-07-31.md) · DÍA D: [engineering/backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md) · Plan prueba: [engineering/operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md) · Lista AUTO: [engineering/list-auto-ops-2026-07-29.md](./engineering/list-auto-ops-2026-07-29.md).  
@@ -24,7 +26,8 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 
 | Sección Ayuda | Tracker / UI | Docs |
 |---------------|--------------|------|
-| **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
+| **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [universos LAB/TRADING](./engineering/dual-universes-lab-trading-design-2026-08-02.md), [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020 Mandato](./adr/020-operating-mandate-tenure.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
+| **Trading** | rail Coach + `mandate-timeline-panel` | [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020](./adr/020-operating-mandate-tenure.md), account premises |
 | Análisis del valor | `value-analysis-tracker.ts` | FA status / FIE |
 | Datos de mercado | `data-market-tracker.ts` | data capture |
 | Watchlist / listas | `watchlist-lists-tracker.ts` | lists-universes |
@@ -33,24 +36,58 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 
 (El resto de filas del mapa histórico se mantienen en los trackers; este archivo prioriza Backtesting operativo.)
 
-## Backtesting DÍA D (usuario · sync 2026-08-01 · v0.11)
+## Backtesting DÍA D (usuario · sync 2026-08-02 · U2)
 
-Guía en Ayuda → Backtesting (`BACKTESTING_DIA_D_GUIDE`). Premisas: [backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md). Plan de prueba: [operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md).
+**LAB (ADR-019):** **Verificar D→hoy** en Backtesting · Análisis técnico (Cartera LAB). Trading = inversión diaria + rail Coach. Detalle: [diseño dual](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [premisas](./engineering/backtesting-dia-d-premises-2026-07-31.md).
+
+Guía en Ayuda → Backtesting (`BACKTESTING_DIA_D_GUIDE`). Plan: [operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md).
 
 | Paso | Dónde | Qué hacer |
 |------|--------|-----------|
 | 1 | Backtesting → Probar | Bloque **Backtesting DÍA D** → fecha **pasada** |
 | 2 | Mismo hub | **Play** hasta Finalistas (embudo ≤ D) |
-| 3 | Resultado → Finalistas | En **#1** → **Simular D→hoy** |
-| 4 | Trading | Banner MODO DÍA D + película · modos Manual / Semi / Auto |
+| 3 | Resultado → Finalistas | En **#1** → **Verificar D→hoy** |
+| 4 | Análisis técnico (LAB) | Banner Verificar + película · modos Manual / Semi / Auto |
 | 5 | Semi/Manual | En cada señal → **Aceptar** (fill) / **Rechazar** (no fill; buy KO anula sell) |
-| 6 | Opcional | **Pantalla completa** (efímera: no sobrevive a recarga) · **Narrar con IA** · **Guardar Evidence** |
-| 7 | Archivo | Trading (preview/JSON/Importar) · también **Ayuda → Backtesting** |
-| 8 | Salir | Banner → **Salir DÍA D** → restaura docks / **Operaciones** (sandbox; no toca DEMO live) |
+| 6 | Opcional | **Pantalla completa** (efímera) · **Narrar con IA** · **Guardar Evidence** |
+| 7 | Archivo | Ayuda → Backtesting (preview/JSON/Importar) |
+| 8 | Salir | Banner → **Salir verificación** (sandbox LAB; no toca DEMO) |
 
-Si Trading «desapareció» (solo película): **Salir pantalla completa** o **Salir DÍA D**, o recarga (full-bleed no se persiste).
+Si el hub «desapareció» (solo película): **Salir pantalla completa** o **Salir verificación**, o recarga (full-bleed no se persiste).
 
 Si no ves el CTA: la fecha DÍA D sigue en «hoy», o no hay Finalistas #1 con estrategia guardada.
+
+## Mandato operativo (usuario · ADR-020 · M0–M3 + M1b)
+
+Playbook **vigente** en TRADING por instrumento×cuenta, con historial de periodos.
+
+| Paso | Dónde | Qué |
+|------|--------|-----|
+| 1 | Backtesting → Finalistas | **Checklist** / Adoptar → estado `adoptada` |
+| 2 | Trading → rail Coach | Timeline **Mandato operativo** (tramo vigente + cerrados + flujo enlazado) |
+| 3 | Trading → orden DEMO | El fill se **enlaza** al mandato vigente |
+| 4 | Cambiar Finalista | Nuevo Adoptar → cierra tramo anterior (motivo *Cambio*) |
+| 5 | Otro dispositivo | Tras migrate M1b: hydrate desde `GET /api/accounts/{id}/mandates` |
+
+- **No** es Finalistas LAB ni un tag de setup por trade.  
+- Cache cliente: `bolsa-mandate-tenures-v1` · `bolsa-mandate-trade-links-v1` · adopción en `bolsa-strategy-adoption-v1`.  
+- **SoT multi-dispositivo (M1b):** PostgreSQL `mandate_tenures` / `mandate_trade_links` · sync `operating-mandate-sync.ts`.  
+- Flujo enlazado = ventas − compras de fills ligados (no mark-to-market).  
+- Doc: [ADR-020](./adr/020-operating-mandate-tenure.md) · auditoría [stage-audit…](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).
+
+## Reconciliación DÍA D (usuario · ADR-021 + v1.1)
+
+Pregunta: *¿La operativa que habría elegido el día D (y verifico hasta hoy) es la misma o distinta que la Finalista #1 de ahora?*
+
+| Paso | Qué |
+|------|-----|
+| 1 | Ten Finalistas operativos (**F-hoy**) con D = hoy |
+| 2 | Fija DÍA D pasado → Play → se guarda **F-D** (experimento); **F-hoy no se pisa** |
+| 3 | **Verificar D→hoy** con F-D#1 congelada (lookback 3y + carry de posición) |
+| 4 | Informe **Reconciliación**: SAME_* / DRIFT_* / INCONCLUSIVE |
+| 5 | Si F-hoy#1 ≠ F-D#1 → **contrafactual** OOS F-hoy + Δ pp |
+
+Doc: [ADR-021](./adr/021-dia-d-reconciliation.md). Persistencia F-D: `bolsa-dia-d-experiment-top-v1`.
 
 En **Análisis fundamental** con D en el pasado: la API pide `asOf=D`. Si hay ``statementPack`` (tras **refresh FA** del valor), reconstruye ratios desde estados ≤ D (`pointInTime=reconstructed`). Si no hay pack, **blocked**. El Composite corta TA a barras ≤ D.
 
