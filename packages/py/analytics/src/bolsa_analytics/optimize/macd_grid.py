@@ -9,6 +9,7 @@ from typing import Any
 from bolsa_analytics.backtest import BacktestBarInput
 from bolsa_analytics.indicators.compute import compute_ema, compute_macd_line
 from bolsa_analytics.optimize.grid_is_metrics import finalize_grid_is_metrics
+from bolsa_analytics.warmup_matrix import assert_grid_warmup
 
 ProgressCallback = Callable[[int, int, float | None], None]
 
@@ -174,6 +175,15 @@ def run_macd_signal_cross_grid(
 
     # Compact classic MACD neighbourhood (~25) — fast < slow always.
     resolved = triples or list(DEFAULT_MACD_TRIPLES)
+    assert_grid_warmup(
+        "macd",
+        len(bars),
+        (
+            {"fast": fast, "slow": slow, "signal": signal}
+            for fast, slow, signal in resolved
+            if fast < slow
+        ),
+    )
     total = estimate_macd_grid_trial_total(resolved, max_trials=max_trials)
 
     trials: list[MacdGridTrial] = []

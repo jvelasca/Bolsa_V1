@@ -5,20 +5,6 @@ No abren Fase 2 ni entidades nuevas.
 
 ## Open
 
-### warmup-audit (Q0.3)
-
-| Campo | Valor |
-|-------|--------|
-| Estado | Open · matriz + smoke tests · 2026-08-02 |
-| Severidad | Media (reproducibilidad OOS) |
-| Código | `bolsa_analytics.warmup_matrix` · `scripts/research/warmup_audit_report.py` · `verify_oos_warmup.py` |
-| Relacionado | `#macd-signal-ema-warmup` |
-
-**Hecho:** matriz SMA/EMA/RSI/MACD/Bollinger/ADX/ATR con `minBars` por defaults; tests smoke.  
-**Pendiente:** wire assert en grids de campaña al cerrar (gate Q1.6).
-
----
-
 ### CORE-R continuous-strategy-reevaluation · **CRÍTICO**
 
 | Campo | Valor |
@@ -189,6 +175,19 @@ sin_TOP (live): BKT, CABK, IAG, IBE, IDR, ITX, LOG, MAP, MEL, NTGY, PHM, RED, RE
 ---
 
 ## Closed
+
+### warmup-audit (Q0.3 → Q1.6) · 2026-08-03
+
+| Campo | Valor |
+|-------|--------|
+| Estado | Closed |
+| Severidad | Media (reproducibilidad OOS) |
+| Código | `bolsa_analytics.warmup_matrix` · grids SMA/RSI/MACD · `campaign_close_gate.py` · `verify_oos_warmup.py` |
+| Relacionado | `#macd-signal-ema-warmup` |
+
+**Hecho:** matriz + `assert_grid_warmup` en `run_*_grid` · `check_manifest_warmup` en gate Q1.6 · campaign RSI salta con `WarmupInsufficientError`. No reescribe K histórico.
+
+---
 
 ### coach2-soft-ack-race (2026-07-30)
 

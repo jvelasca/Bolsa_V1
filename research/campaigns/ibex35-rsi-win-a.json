@@ -4,7 +4,7 @@
   "timeframe": "1d",
   "engine": "rsi_grid_h0",
   "indicators_version": null,
-  "git_commit": "4604976a5eb827933b8a3729828f07496c94f253",
+  "git_commit": "315dd1c3b487cfb98e57674ff44476d7e3aee08e",
   "dataset_start": "2021-07-01",
   "dataset_end": "2023-12-31",
   "bar_count": 500,
@@ -16,8 +16,8 @@
   "presets": [
     "rsi_mean_reversion"
   ],
-  "notes": "human_ok=3 grid_trials=0",
+  "notes": "human_ok=35 grid_trials=0",
   "schema_version": "campaign_manifest_v0",
-  "created_at": "2026-08-02T21:23:19.492489+00:00",
+  "created_at": "2026-08-02T22:25:57.171227+00:00",
   "cpu_cost_units": null
 }

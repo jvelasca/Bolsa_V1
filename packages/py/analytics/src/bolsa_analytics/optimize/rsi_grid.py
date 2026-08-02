@@ -9,6 +9,7 @@ from typing import Any
 from bolsa_analytics.backtest import BacktestBarInput
 from bolsa_analytics.indicators.legacy import rsi
 from bolsa_analytics.optimize.grid_is_metrics import finalize_grid_is_metrics
+from bolsa_analytics.warmup_matrix import assert_grid_warmup
 
 ProgressCallback = Callable[[int, int, float | None], None]
 
@@ -135,6 +136,11 @@ def run_rsi_mean_reversion_grid(
     resolved_periods = periods or [10, 12, 14, 16, 18, 20]
     resolved_os = oversold_levels or [20.0, 25.0, 30.0, 35.0]
     resolved_ob = overbought_levels or [65.0, 70.0, 75.0, 80.0]
+    assert_grid_warmup(
+        "rsi",
+        len(bars),
+        ({"period": period} for period in resolved_periods),
+    )
     total = estimate_rsi_grid_trial_total(
         resolved_periods, resolved_os, resolved_ob, max_trials=max_trials
     )

@@ -10,6 +10,7 @@ from bolsa_analytics.backtest import BacktestBarInput, run_backtest
 from bolsa_analytics.indicators.legacy import sma
 from bolsa_analytics.optimize.grid_is_metrics import finalize_grid_is_metrics
 from bolsa_analytics.signals.evaluate import PresetFeatureSeries, evaluate_preset_signals_gated
+from bolsa_analytics.warmup_matrix import assert_grid_warmup
 
 ProgressCallback = Callable[[int, int, float | None], None]
 
@@ -131,6 +132,17 @@ def run_sma_grid_search(
 ) -> list[SmaGridTrial]:
     if not bars:
         raise ValueError("bars must not be empty")
+
+    assert_grid_warmup(
+        "sma",
+        len(bars),
+        (
+            {"fast": fast, "slow": slow}
+            for fast in fast_periods
+            for slow in slow_periods
+            if fast < slow
+        ),
+    )
 
     total = estimate_sma_grid_trial_total(
         fast_periods, slow_periods, max_trials=max_trials

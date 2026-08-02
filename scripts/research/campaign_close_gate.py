@@ -34,13 +34,18 @@ async def _run(args: argparse.Namespace) -> int:
 
     errors: list[str] = []
 
+    manifest_data: dict | None = None
     if args.manifest:
         path = Path(args.manifest)
         if not path.is_file():
             errors.append(f"manifest not found: {path}")
         else:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            errors.extend(validate_campaign_manifest(data))
+            manifest_data = json.loads(path.read_text(encoding="utf-8"))
+            errors.extend(validate_campaign_manifest(manifest_data))
+            if not args.skip_warmup_check:
+                from bolsa_analytics.warmup_matrix import check_manifest_warmup
+
+                errors.extend(check_manifest_warmup(manifest_data))
 
     get_settings.cache_clear()
     engine = create_engine(get_settings())
@@ -85,6 +90,11 @@ def main() -> int:
         "--allow-missing-campaign",
         action="store_true",
         help="Skip ledger campaign tag check (manifest-only)",
+    )
+    p.add_argument(
+        "--skip-warmup-check",
+        action="store_true",
+        help="Skip Q1.6 warm-up assert against manifest bar_count/engine",
     )
     args = p.parse_args()
     if sys.platform.startswith("win"):
