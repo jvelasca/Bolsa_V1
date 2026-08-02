@@ -136,28 +136,20 @@ No abren Fase 2 ni entidades nuevas.
 
 **Hecho v1.3:** histéresis `lastBarDate` (`1d` ≤5 días calendario → `bar_hysteresis`; stamp no desliza; «Reevaluar resto» fuerza).
 
-### ibex35-partial-tops-coverage
+## Closed
+
+### ibex35-partial-tops-coverage · 2026-08-03
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · ops (Lista AUTO) |
+| Estado | Closed (ops) |
 | Severidad | Media (cobertura operativa) |
-| Origen | misma auditoría 2026-07-29 · recheck live |
-| Hallazgo | **19/35** sin TOP (`con_TOP=16/35`); `TOP_sin_runId=0` |
+| Origen | auditoría 2026-07-29 · recheck live |
+| Hallazgo cierre | `pnpm audit:ibex35:missing` → **con_TOP=35/35**, `TOP_sin_runId=0` |
 
-**Problema:** Lista AUTO / Play ciclo no se ha corrido (o no guardó) sobre todo el índice. Monitor y embudo incompletos.
-
-**Qué hacer:**  
-1. `pnpm audit:ibex35:missing` → símbolos sin TOP / sin runId  
-2. Universo → Lista **IBEX 35** → **Play ciclo** (frescura v1.3 omite valores **con** Finalistas; histéresis lastBar)  
-   · **No** crear/usar lista «IBEX sin TOP» de producto ([pausa](../../docs/engineering/product-pause-audit-2026-07-30.md))  
-3. No confundir con Fase C «Probar lista»  
-
-sin_TOP (live): BKT, CABK, IAG, IBE, IDR, ITX, LOG, MAP, MEL, NTGY, PHM, RED, REP, ROVI, SAB, SAN, SCYR, UNI, VIS
+**Cierre:** cobertura completa IBEX 35 en Finalistas. Vigilancia: re-auditar tras cambios de universo; Play ciclo / «Reevaluar resto» si aparecen huecos.
 
 ---
-
-## Closed
 
 ### macd-signal-ema-warmup · 2026-08-03
 
