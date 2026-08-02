@@ -44,6 +44,8 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
+      - name: Install Node deps
+        run: pnpm install --frozen-lockfile
       - name: Install Python packages
         run: |
           pip install -e packages/py/domain -e packages/py/ai -e packages/py/analytics \
