@@ -113,7 +113,8 @@ Guía en Ayuda → Backtesting (`BACKTESTING_CORE_R_GUIDE`). Detalle: [list-auto
 | 5 | Chip **CORE-R N** · toast «Abrir Monitor» (shell o cron servidor / otro device) |
 | 6 | **Hecho todos** cierra las abiertas de la lista actual |
 
-No pisa TOP · no auto-paper D. Cola: localStorage = cache; BD = SoT multi-dispositivo. Cron servidor opcional: `CORE_R_CRON_ENABLED`.
+No pisa TOP · no auto-paper D. Cola: localStorage = cache; BD = SoT multi-dispositivo.  
+Flags ops (off por defecto — ver [github-credentials-and-ops §9](./engineering/github-credentials-and-ops.md)): `CORE_R_CRON_ENABLED`, `COST_MODEL_V2_ENABLED`.
 
 ## Lista AUTO frescura (v1.3)
 

@@ -2,9 +2,15 @@ from bolsa_analytics.backtest import BacktestBarInput
 from bolsa_analytics.optimize.sma_grid import run_baseline_preset_backtest, run_sma_grid_search
 
 
-def _trend_bars(count: int = 80, start: float = 100.0, step: float = 0.5) -> list[BacktestBarInput]:
+def _trend_bars(count: int = 120, start: float = 100.0, step: float = 0.5) -> list[BacktestBarInput]:
+    from datetime import date, timedelta
+
+    start_d = date(2024, 1, 1)
     return [
-        BacktestBarInput(timestamp=f"2024-01-{day:02d}", close=start + day * step)
+        BacktestBarInput(
+            timestamp=(start_d + timedelta(days=day)).isoformat(),
+            close=start + day * step,
+        )
         for day in range(1, count + 1)
     ]
 

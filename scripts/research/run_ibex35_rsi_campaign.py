@@ -67,6 +67,7 @@ async def _main() -> int:
 
     from bolsa_analytics.backtest import BacktestBarInput
     from bolsa_analytics.optimize.rsi_grid import run_rsi_mean_reversion_grid
+    from bolsa_analytics.warmup_matrix import WarmupInsufficientError
     from bolsa_application.backtests import RunAndSaveBacktest
     from bolsa_application.campaign_manifest import (
         build_campaign_manifest,
@@ -198,18 +199,19 @@ async def _main() -> int:
                         date_from=args.date_from,
                         date_to=args.date_to,
                     )
-                    if len(bars) < 50:
-                        human_skip += 1
-                        print(f"  GRID {symbol:6} SKIP: <50 bars")
-                        continue
                     inputs = [
                         BacktestBarInput(timestamp=bar.timestamp, close=bar.close) for bar in bars
                     ]
-                    grid_trials = run_rsi_mean_reversion_grid(
-                        inputs,
-                        initial_cash=args.initial_cash,
-                        max_trials=args.max_grid_trials,
-                    )
+                    try:
+                        grid_trials = run_rsi_mean_reversion_grid(
+                            inputs,
+                            initial_cash=args.initial_cash,
+                            max_trials=args.max_grid_trials,
+                        )
+                    except WarmupInsufficientError as exc:
+                        human_skip += 1
+                        print(f"  GRID {symbol:6} SKIP: {exc}")
+                        continue
                     grid_trials = sorted(grid_trials, key=lambda t: t.score, reverse=True)
                     campaign_manifest = build_campaign_manifest(
                         campaign_id=args.campaign_id,

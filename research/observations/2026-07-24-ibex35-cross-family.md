@@ -106,7 +106,7 @@ Ver [improvement-roadmap-post-audits-2026-08-02.md](../../docs/engineering/impro
 2. **Dependencia de familia es minoritaria** (4/35). La mayoría no “cambia de tercio” al cambiar de indicador.
 3. **Asimetría K grid/human** se confirma otra vez (~92% grid), pero aquí no se corrige — solo se constata.
 4. **Hueco métrico del grid:** sin `sharpeRatio` en `is_metrics` del grid, cualquier ranking cross-family fiable debe anclarse en **human** (como este informe) o enriquecer el payload del grid en una pasada futura de instrumentación (no es Belief).
-5. **Nota motor MACD:** `_macd_signal_line` siembra `None→0.0` antes de la EMA de señal — distorsión de calentamiento. Anotado en código (`macd_grid.py`); revisar antes de tratar `macd_grid_h0` como referencia definitiva.
+5. **Nota motor MACD:** seed `None→0.0` corregido **forward-only** 2026-08-03 (`compute_macd_signal_line`). Trials C3 históricos no se reescriben; ver `ISSUES.md#macd-signal-ema-warmup`.
 
 ## Implicación para Campaña 4
 

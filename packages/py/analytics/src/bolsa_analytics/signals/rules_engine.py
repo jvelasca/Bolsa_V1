@@ -15,6 +15,7 @@ from bolsa_analytics.indicators.compute import (
     compute_ema,
     compute_ichimoku,
     compute_macd_line,
+    compute_macd_signal_line,
     compute_rsi,
     compute_sma,
     compute_stoch_k,
@@ -42,12 +43,6 @@ def _spec_input(raw: dict[str, Any]) -> IndicatorSpecInput:
 def _spec_key(raw: dict[str, Any]) -> str:
     spec = _spec_input(raw)
     return instance_spec_key(spec.definition_id, spec.parameters)
-
-
-def _compute_macd_signal_line(closes: list[float], fast: int, slow: int, signal_period: int) -> list[float | None]:
-    macd_line = compute_macd_line(closes, fast, slow)
-    numeric = [value if value is not None else 0.0 for value in macd_line]
-    return compute_ema(numeric, signal_period)
 
 
 def _series_for_spec(
@@ -88,7 +83,7 @@ def _series_for_spec(
         slow = int(parameters.get("slowPeriod", 26))
         signal_period = int(parameters.get("signalPeriod", 9))
         if line == "signal":
-            return _compute_macd_signal_line(closes, fast, slow, signal_period)
+            return compute_macd_signal_line(closes, fast, slow, signal_period)
         return compute_macd_line(closes, fast, slow)
     if definition_id == "atr":
         return compute_atr(bars, period)

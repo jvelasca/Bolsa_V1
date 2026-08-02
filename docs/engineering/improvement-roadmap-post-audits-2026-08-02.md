@@ -189,13 +189,13 @@ Abrir **solo** si Q0–Q1 hechos y hay demanda explícita:
 |------|--------|
 | Q0.1 Lab Health API/UI/script | Hecho — `GET /api/research/lab-health`, Observatory, `lab_health_report.py` |
 | Q0.2 Campaign manifest v0 | Hecho — `campaign_manifest.py` + plantilla `research/campaigns/` |
-| Q0.3 Warm-up audit | Hecho — `warmup_matrix` + tests + script |
+| Q0.3 Warm-up audit | Hecho — `warmup_matrix` + asserts en grids + gate Q1.6 (2026-08-03) |
 | Q0.4 Caveat Sharpe | Hecho — C3.5 notebook + Lab Health caveat + HELP |
 | Q1.1 Dataset metadata | Hecho (trials human) — `dataset_metadata` en `RunAndSaveBacktest` |
-| Q1.2–Q1.3 Estabilidad multi-ventana | Protocolo + filter + Δ + `stability_windows_smoke.py` (limit pequeño) |
+| Q1.2–Q1.3 Estabilidad multi-ventana | Hecho — smoke + IBEX `--full` · `2026-08-03-stability-delta-ibex.md` |
 | Q1.4 family.yaml | Hecho — SMA/RSI/MACD |
 | Q1.5 cpu_cost_units | Hecho (campo opcional en manifest; no altera K) |
-| Q1.6 Gate cierre campaña | Hecho — `campaign_close_gate.py` · RSI campaign wire manifest/fechas |
+| Q1.6 Gate cierre campaña | Hecho — manifest + warm-up OK + zero-trades · `campaign_close_gate.py` |
 | Q2.1 Confidence/stale/warnings | Hecho (card + provider) |
 | Q2.2 OHLCV intradía | Hecho (quarantine barras incoherentes) |
 | Q2.3 Health components | Hecho |

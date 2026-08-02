@@ -1,6 +1,6 @@
 # Protocolo de estabilidad temporal (Q1.2 / Q1.3)
 
-> **AsOf:** 2026-08-02 · Gate C4 sigue cerrado hasta informe + hipótesis escrita.
+> **AsOf:** 2026-08-03 · Gate C4 sigue cerrado hasta informe + hipótesis escrita.
 
 ## Objetivo
 
@@ -22,7 +22,21 @@ Ajustar a disponibilidad real de OHLCV; registrar `bar_count` en `campaign_manif
 3. Tag `params.campaign` + `manifest_ref` vía `CampaignManifestV0.to_manifest_ref()`.
 4. Ledger-only: `cross_family_consolidation.py --campaign <id>` por ventana.
 5. Informe Δ: `python scripts/research/stability_ranking_delta.py --campaign-a <A> --campaign-b <B> --write-md research/observations/...`.
-6. Gate cierre: `python scripts/research/campaign_close_gate.py --campaign <id> --manifest ...`
+6. Gate cierre: `python scripts/research/campaign_close_gate.py --campaign <id> --manifest ...`  
+   (incluye warm-up OK vía `check_manifest_warmup` / Q1.6).
+
+## Smoke vs IBEX completo
+
+```bash
+# Smoke (3 símbolos) — CI / diagnóstico local
+python scripts/research/stability_windows_smoke.py --limit 3
+
+# IBEX completo (ops; API/DB + OHLCV listos)
+python scripts/research/stability_windows_smoke.py --full
+```
+
+Observaciones: `research/observations/2026-08-02-stability-delta-smoke.md` (smoke) ·
+`2026-08-03-stability-delta-ibex.md` (corrida `--full`).
 
 ## Anti-objetivos
 

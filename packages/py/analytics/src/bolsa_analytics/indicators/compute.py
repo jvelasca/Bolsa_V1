@@ -244,6 +244,48 @@ def compute_macd_line(closes: list[float], fast: int, slow: int) -> list[float |
     return result
 
 
+def compute_macd_signal_line(
+    closes: list[float],
+    fast: int,
+    slow: int,
+    signal_period: int,
+) -> list[float | None]:
+    """MACD signal = EMA of MACD line with classic warm-up (no None→0 seed).
+
+    TradingView / classic: wait until MACD is valid, then seed signal EMA on the
+    first ``signal_period`` MACD values. Earlier bars stay ``None``.
+    """
+    return compute_macd_signal_from_line(
+        compute_macd_line(closes, fast, slow),
+        signal_period,
+    )
+
+
+def compute_macd_signal_from_line(
+    macd_line: list[float | None],
+    signal_period: int,
+) -> list[float | None]:
+    """EMA of a (possibly leading-None) MACD line — classic seed, no zero-fill."""
+    n = len(macd_line)
+    result: list[float | None] = [None] * n
+    if signal_period < 1 or n == 0:
+        return result
+    first = next((i for i, value in enumerate(macd_line) if value is not None), None)
+    if first is None:
+        return result
+    dense: list[float] = []
+    for value in macd_line[first:]:
+        if value is None:
+            break
+        dense.append(float(value))
+    if len(dense) < signal_period:
+        return result
+    ema_dense = compute_ema(dense, signal_period)
+    for offset, value in enumerate(ema_dense):
+        result[first + offset] = value
+    return result
+
+
 def compute_bollinger(
     closes: list[float],
     period: int,

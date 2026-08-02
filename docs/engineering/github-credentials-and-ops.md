@@ -184,4 +184,18 @@ Plantilla pública: [`.env.example`](../../.env.example).
 
 ---
 
-*Última actualización: 2026-08-01 · Repo privado + release v1.0.0 publicados.*
+## 9. Feature flags de laboratorio (off por defecto)
+
+| Variable | Default | Efecto |
+|----------|---------|--------|
+| `CORE_R_CRON_ENABLED` | `false` | Worker servidor: tick CORE-R (cola/informe) sin app abierta + PnL DEMO/paper |
+| `CORE_R_CRON_INTERVAL_SECONDS` | `300` | Intervalo del worker (solo si cron on) |
+| `COST_MODEL_V2_ENABLED` | `false` | Costes Lab v2 (iliquidez / volumen) en `run_backtest` |
+| `COST_MODEL_V2_ILLIQUID_EXTRA_BPS` | `8` | Extra bps si ratio volumen bajo |
+| `COST_MODEL_V2_VOLUME_RATIO_ILLIQUID` | `0.35` | Umbral ratio volumen |
+
+**No activar en prod/demo sin decisión explícita.** Documentación producto: HELP → CORE-R; roadmap Q3.4/Q3.5.
+
+---
+
+*Última actualización: 2026-08-03 · Flags CORE-R / cost v2 documentados.*

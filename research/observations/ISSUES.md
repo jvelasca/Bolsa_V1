@@ -5,20 +5,6 @@ No abren Fase 2 ni entidades nuevas.
 
 ## Open
 
-### warmup-audit (Q0.3)
-
-| Campo | Valor |
-|-------|--------|
-| Estado | Open · matriz + smoke tests · 2026-08-02 |
-| Severidad | Media (reproducibilidad OOS) |
-| Código | `bolsa_analytics.warmup_matrix` · `scripts/research/warmup_audit_report.py` · `verify_oos_warmup.py` |
-| Relacionado | `#macd-signal-ema-warmup` |
-
-**Hecho:** matriz SMA/EMA/RSI/MACD/Bollinger/ADX/ATR con `minBars` por defaults; tests smoke.  
-**Pendiente:** wire assert en grids de campaña al cerrar (gate Q1.6).
-
----
-
 ### CORE-R continuous-strategy-reevaluation · **CRÍTICO**
 
 | Campo | Valor |
@@ -150,45 +136,48 @@ No abren Fase 2 ni entidades nuevas.
 
 **Hecho v1.3:** histéresis `lastBarDate` (`1d` ≤5 días calendario → `bar_hysteresis`; stamp no desliza; «Reevaluar resto» fuerza).
 
-### ibex35-partial-tops-coverage
+## Closed
+
+### ibex35-partial-tops-coverage · 2026-08-03
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · ops (Lista AUTO) |
+| Estado | Closed (ops) |
 | Severidad | Media (cobertura operativa) |
-| Origen | misma auditoría 2026-07-29 · recheck live |
-| Hallazgo | **19/35** sin TOP (`con_TOP=16/35`); `TOP_sin_runId=0` |
+| Origen | auditoría 2026-07-29 · recheck live |
+| Hallazgo cierre | `pnpm audit:ibex35:missing` → **con_TOP=35/35**, `TOP_sin_runId=0` |
 
-**Problema:** Lista AUTO / Play ciclo no se ha corrido (o no guardó) sobre todo el índice. Monitor y embudo incompletos.
-
-**Qué hacer:**  
-1. `pnpm audit:ibex35:missing` → símbolos sin TOP / sin runId  
-2. Universo → Lista **IBEX 35** → **Play ciclo** (frescura v1.3 omite valores **con** Finalistas; histéresis lastBar)  
-   · **No** crear/usar lista «IBEX sin TOP» de producto ([pausa](../../docs/engineering/product-pause-audit-2026-07-30.md))  
-3. No confundir con Fase C «Probar lista»  
-
-sin_TOP (live): BKT, CABK, IAG, IBE, IDR, ITX, LOG, MAP, MEL, NTGY, PHM, RED, REP, ROVI, SAB, SAN, SCYR, UNI, VIS
+**Cierre:** cobertura completa IBEX 35 en Finalistas. Vigilancia: re-auditar tras cambios de universo; Play ciclo / «Reevaluar resto» si aparecen huecos.
 
 ---
 
-### macd-signal-ema-warmup
+### macd-signal-ema-warmup · 2026-08-03
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open |
+| Estado | Closed (forward-only) |
 | Severidad | Baja (instrumentación / fidelidad del indicador) |
 | Origen | Auditoría post-C3 / C3.5 |
-| Código | `bolsa_analytics.optimize.macd_grid._macd_signal_line` |
+| Código | `compute_macd_signal_line` · `macd_grid` · `rules_engine` (preset `macd_signal_cross`) |
 
-**Problema:** la EMA de señal se calienta sembrando `None → 0.0` en la línea MACD. El backtest H0 funciona, pero el arranque no es el warm-up clásico del indicador.
+**Problema:** la EMA de señal se calentaba con `None → 0.0` en la línea MACD.
 
-**Qué no hacer ahora:** no tocar el motor ni re-ejecutar C3.
-
-**Criterio de cierre:** antes de tratar `macd_grid_h0` como referencia estable, implementar seed clásico (retrasar hasta datos válidos / EMA sobre tramo no nulo) y documentar paridad vs. preset human `macd_signal_cross`.
+**Fix:** seed clásico — EMA solo sobre el tramo MACD no nulo; barras previas `None`. Grid y human comparten helper. Trials C1–C3 **no** se re-ejecutan ni reescriben K.
 
 ---
 
-## Closed
+### warmup-audit (Q0.3 → Q1.6) · 2026-08-03
+
+| Campo | Valor |
+|-------|--------|
+| Estado | Closed |
+| Severidad | Media (reproducibilidad OOS) |
+| Código | `bolsa_analytics.warmup_matrix` · grids SMA/RSI/MACD · `campaign_close_gate.py` · `verify_oos_warmup.py` |
+| Relacionado | `#macd-signal-ema-warmup` |
+
+**Hecho:** matriz + `assert_grid_warmup` en `run_*_grid` · `check_manifest_warmup` en gate Q1.6 · campaign RSI salta con `WarmupInsufficientError`. No reescribe K histórico.
+
+---
 
 ### coach2-soft-ack-race (2026-07-30)
 
