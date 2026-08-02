@@ -3,7 +3,8 @@
 Registro **ligero** de issues del laboratorio. No son tickets de producto ni ADR.
 No abren Fase 2 ni entidades nuevas.
 
-**Higiene 2026-08-03:** Open = vigilancia / bloqueados; Closed = entregado o ops resuelto.
+**Higiene 2026-08-03:** Open = vigilancia / bloqueados; Closed = entregado o ops resuelto.  
+**Decisión freeze:** [post-audit-decision-freeze-2026-08-03.md](../../docs/engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · flags ops off.
 
 ## Open
 
@@ -21,7 +22,8 @@ No abren Fase 2 ni entidades nuevas.
 
 **Entregado (v0–v1.12):** juicio heurístico · cola Monitor · OOS/PnL · narración · cron shell · chip/toast · Hecho todos · BD multi-dispositivo · cron servidor (`CORE_R_CRON_ENABLED`, off) · PnL en cron · toast remoto. **No** pisa `active`. **No** auto-paper D.
 
-**Pendiente:** ninguno crítico en cola/cron — vigilar uso real; issues cortas si falla.
+**Pendiente:** ninguno crítico en cola/cron — vigilar uso real; issues cortas si falla.  
+**Freeze 2026-08-03:** `CORE_R_CRON_ENABLED` permanece off (ver decision freeze).
 
 **Ops:** `pnpm test:operativa` · `pnpm test:operativa:smoke` (API opcional).
 
@@ -38,7 +40,8 @@ No abren Fase 2 ni entidades nuevas.
 
 **Hecho (v0):** toggle Narración LLM en rail; OFF = solo ★ local + auditor heurístico; tests «LLM no corona TOP»; hint UI de pasada previa (`dualAudit`) sin modular score.
 
-**Pendiente:** aprendizaje outcomes / Belief → Coach (requiere decisión; Belief UI congelada en handoff).
+**Pendiente:** aprendizaje outcomes / Belief → Coach.  
+**Freeze 2026-08-03:** **no** abrir Belief Fase 2 sin brief de producto (decision freeze).
 
 ---
 
