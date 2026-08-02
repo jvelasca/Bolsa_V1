@@ -38,6 +38,7 @@
 | [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md) | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual) |
 | [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
 | [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) | **Roadmap mejoras** post-auditorías (Q0–Q3 · horizonte TOP) |
+| [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) | **Freeze** post-Q3: C4 no · Belief no · flags ops off |
 | [engineering/stability-campaign-protocol-2026-08-02.md](./engineering/stability-campaign-protocol-2026-08-02.md) | Protocolo estabilidad multi-ventana (Q1.2/Q1.3) |
 | [adr/016-research-persistence-model.md](./adr/016-research-persistence-model.md) | **Persistencia** científica (tablas, \(K\), Fase 1) |
 | [adr/017-baseline-v1-5-research-observatory.md](./adr/017-baseline-v1-5-research-observatory.md) | **Baseline v1.5** — laboratorio observable (congelado) |

@@ -3,7 +3,8 @@
 > **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-03**  
 > Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.12**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2** · Lab Health Q0 · warm-up Q1.6) + Trading (rail Coach · ADR-019 · **Mandato ADR-020 M1b BD**).  
 > **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
-> **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho; Gate C4 cerrado (Δ RSI IBEX).  
+> **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho.  
+> **Decisión freeze:** [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · `CORE_R_CRON` / `COST_MODEL_V2` off.  
 > **Universos:** [LAB vs TRADING](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [Mandato](./adr/020-operating-mandate-tenure.md) · [Reconciliación DÍA D](./adr/021-dia-d-reconciliation.md).  
 > Configuración → **BD** (estado PostgreSQL, purga de huérfanos y demos cerradas).  
 > **Espacios de trabajo:** chip superior → gestor (nuevo blanco / duplicar / renombrar); arranque = último activo.  
