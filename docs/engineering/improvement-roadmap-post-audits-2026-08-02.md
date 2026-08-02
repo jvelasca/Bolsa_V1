@@ -205,7 +205,7 @@ Abrir **solo** si Q0–Q1 hechos y hay demanda explícita:
 | Q2.7 UI chips FA | Parcial — ya existían; sin rehacer FIE |
 | Q3.1 Robustness map | Label Lab heatmap (mapa ya existía) |
 | Q3.3 Comparación masiva | Hecho — UI panel + `mass_compare_list.py` (soft-cap 40×8 / 120 celdas) |
-| Q3.4 CORE-R BD | Hecho — blob + sync + cron servidor + **PnL live** en tick (`CORE_R_CRON_ENABLED`, off-by-default) |
+| Q3.4 CORE-R BD | Hecho — blob + sync + cron + PnL live + **toast remoto** (`CORE_R_CRON_ENABLED`, off-by-default) |
 | Q3.5 Costes v2 | Hecho (gated) — `COST_MODEL_V2_ENABLED=false` por defecto; wire en `run_backtest` |
 | Fase H | No abierta |
 

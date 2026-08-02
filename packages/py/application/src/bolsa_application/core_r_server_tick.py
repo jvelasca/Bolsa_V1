@@ -302,6 +302,10 @@ def apply_server_tick(
     )
     scheduler["lastTickAt"] = now_iso
     scheduler["lastTickSource"] = "server_cron"
+    # Señal multi-dispositivo: clientes con app abierta hacen toast al hidratar.
+    if added > 0:
+        scheduler["lastRemoteEnqueueAt"] = now_iso
+        scheduler["lastRemoteEnqueueAdded"] = added
 
     meta = {"skipped": False, "added": added, "listId": list_id, "reason": "ok"}
     return {

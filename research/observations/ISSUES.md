@@ -23,7 +23,7 @@ No abren Fase 2 ni entidades nuevas.
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · **v0–v1.11** (… + BD blob + cron servidor + **PnL live** en tick) · toast remoto aún no |
+| Estado | Open · **v0–v1.12** (… + PnL live + **toast remoto** multi-dispositivo) |
 | Severidad | **Crítica (producto a medio plazo)** |
 | Origen | Decisión usuario 2026-07-29 (tras pulir Lista AUTO) |
 | Código | `core-r-judgment.ts` · `core-r-scheduler.ts` · `core-r-scheduler-host.tsx` · `core_r_review_evidence.py` · Monitor · tablero Lista AUTO |
@@ -57,7 +57,9 @@ No abren Fase 2 ni entidades nuevas.
 
 **Hecho (v1.11 · PnL en cron · 2026-08-02):** mismo tick incluye degradación DEMO/paper (−5% `review_lab` / −10% `consider_replace`) vía `ListAccountSummaries` + TOP match (prefer `simulated`). `include_pnl=false` opcional en el endpoint. Sin TOP overwrite · sin auto-paper.
 
-**Pendiente:** toast remoto multi-dispositivo.
+**Hecho (v1.12 · toast remoto · 2026-08-02):** señal `lastRemoteEnqueueAt` / `lastRemoteEnqueueAdded` en blob scheduler · `CoreRSchedulerHost` poll 60s → toast «Abrir Monitor» en otros dispositivos (dedupe `bolsa-core-r-last-seen-remote-enqueue`).
+
+**Pendiente:** ninguno crítico en CORE-R cola/cron (vigilar uso real).
 
 **Ops:** `pnpm test:operativa` · `pnpm test:operativa:smoke` (API opcional).
 

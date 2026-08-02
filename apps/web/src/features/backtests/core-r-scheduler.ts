@@ -4,7 +4,8 @@
  * v1.2 lite: solo con Monitor abierto.
  * v1.4 shell: ticks mientras la app está abierta (`CoreRSchedulerHost`).
  * v1.6: toast al encolar (host escucha `CORE_R_SCHEDULER_EVENT`).
- * No lanza Lista AUTO ni pisa TOP. Cola sigue en localStorage (≠ cron multi-dispositivo).
+ * v1.12: `lastRemoteEnqueue*` para toast multi-dispositivo tras cron/BD.
+ * No lanza Lista AUTO ni pisa TOP.
  */
 
 export const CORE_R_SCHEDULER_KEY = 'bolsa-core-r-scheduler-v1';
@@ -21,6 +22,11 @@ export type CoreRSchedulerPrefs = {
    * `shell` = PlatformShell (app abierta).
    */
   scope: 'monitor' | 'shell';
+  /** Origen del último tick que escribió el blob (shell | server_cron). */
+  lastTickSource?: 'shell' | 'server_cron' | null;
+  /** Señal multi-dispositivo: último encolado remoto (ISO). */
+  lastRemoteEnqueueAt?: string | null;
+  lastRemoteEnqueueAdded?: number;
 };
 
 const DEFAULT: CoreRSchedulerPrefs = {
@@ -29,23 +35,40 @@ const DEFAULT: CoreRSchedulerPrefs = {
   lastTickAt: null,
   listId: null,
   scope: 'shell',
+  lastTickSource: null,
+  lastRemoteEnqueueAt: null,
+  lastRemoteEnqueueAdded: 0,
 };
+
+function normalizePrefs(parsed: Partial<CoreRSchedulerPrefs>): CoreRSchedulerPrefs {
+  const interval = Number(parsed.intervalMinutes);
+  const scope = parsed.scope === 'monitor' ? 'monitor' : 'shell';
+  const source =
+    parsed.lastTickSource === 'server_cron' || parsed.lastTickSource === 'shell'
+      ? parsed.lastTickSource
+      : null;
+  const remoteAdded = Number(parsed.lastRemoteEnqueueAdded);
+  return {
+    enabled: Boolean(parsed.enabled),
+    intervalMinutes:
+      Number.isFinite(interval) && interval >= 5 ? Math.min(24 * 60, interval) : 60,
+    lastTickAt: typeof parsed.lastTickAt === 'string' ? parsed.lastTickAt : null,
+    listId: typeof parsed.listId === 'string' && parsed.listId ? parsed.listId : null,
+    scope,
+    lastTickSource: source,
+    lastRemoteEnqueueAt:
+      typeof parsed.lastRemoteEnqueueAt === 'string' && parsed.lastRemoteEnqueueAt
+        ? parsed.lastRemoteEnqueueAt
+        : null,
+    lastRemoteEnqueueAdded: Number.isFinite(remoteAdded) ? Math.max(0, remoteAdded) : 0,
+  };
+}
 
 export function loadCoreRSchedulerPrefs(): CoreRSchedulerPrefs {
   try {
     const raw = localStorage.getItem(CORE_R_SCHEDULER_KEY);
     if (!raw) return { ...DEFAULT };
-    const parsed = JSON.parse(raw) as Partial<CoreRSchedulerPrefs>;
-    const interval = Number(parsed.intervalMinutes);
-    const scope = parsed.scope === 'monitor' ? 'monitor' : 'shell';
-    return {
-      enabled: Boolean(parsed.enabled),
-      intervalMinutes:
-        Number.isFinite(interval) && interval >= 5 ? Math.min(24 * 60, interval) : 60,
-      lastTickAt: typeof parsed.lastTickAt === 'string' ? parsed.lastTickAt : null,
-      listId: typeof parsed.listId === 'string' && parsed.listId ? parsed.listId : null,
-      scope,
-    };
+    return normalizePrefs(JSON.parse(raw) as Partial<CoreRSchedulerPrefs>);
   } catch {
     return { ...DEFAULT };
   }

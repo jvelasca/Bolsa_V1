@@ -2,6 +2,7 @@
  * Host CORE-R cron shell — ticks mientras la app está abierta (PlatformShell).
  * v1.6–v1.7: toast si encola; acción **Abrir Monitor**.
  * v1.9 Q3.4: hydrate cola/informe/scheduler desde BD (multi-dispositivo).
+ * v1.12: poll remoto → toast si cron servidor / otro device encoló.
  * No pisa TOP · no auto-paper D.
  */
 
@@ -15,6 +16,7 @@ import { runCoreRSchedulerTick } from '@/features/backtests/core-r-scheduler-tic
 import { formatCoreREnqueueToast } from '@/features/backtests/core-r-status';
 import {
   ensureCoreRHydrated,
+  pollCoreRRemoteEnqueueToast,
   wireCoreRPushSubscriptions,
 } from '@/features/backtests/core-r-sync';
 import { useAlertsStore } from '@/stores/alerts-store';
@@ -49,6 +51,24 @@ export function CoreRSchedulerHost() {
       window.clearInterval(id);
     };
   }, []);
+
+  /** Multi-dispositivo: hidrata + toast si hay señal remota nueva. */
+  useEffect(() => {
+    if (!activeAccountId) return;
+    let cancelled = false;
+    const poll = () => {
+      if (cancelled) return;
+      void pollCoreRRemoteEnqueueToast(activeAccountId);
+    };
+    // Tras hydrate inicial, un poll corto captura encolados del cron servidor.
+    const boot = window.setTimeout(poll, 2_500);
+    const id = window.setInterval(poll, POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(boot);
+      window.clearInterval(id);
+    };
+  }, [activeAccountId]);
 
   useEffect(() => {
     function onTick(event: Event) {

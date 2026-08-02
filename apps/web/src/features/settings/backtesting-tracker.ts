@@ -116,7 +116,8 @@ export const BACKTESTING_CORE_R_GUIDE = {
   ],
   notes: [
     'Sandbox DÍA D ≠ DEMO live. CORE-R lee DEMO/paper vinculadas al TOP (prefer simulated).',
-    'Cron servidor opcional (CORE_R_CRON_ENABLED): informe BD + PnL DEMO (−5/−10) sin app abierta.',
+    'Cola/informe: localStorage = cache; BD = SoT multi-dispositivo.',
+    'Cron servidor opcional (CORE_R_CRON_ENABLED): informe BD + PnL DEMO (−5/−10); toast remoto multi-dispositivo al hidratar.',
     'Chip barra / toast «Abrir Monitor» → Ayuda · Monitor. También /backtests?tab=run&focus=monitor',
     'Hecho todos cierra abiertas de la lista actual (no borra; clearDone limpia done).',
     'Toast solo si added > 0 (sin ruido en ticks vacíos).',
@@ -254,7 +255,7 @@ export const BACKTESTING_TRACKING = [
     title: 'CORE-R cola revisión (Monitor)',
     status: 'listo' as const,
     plain:
-      'v1.11: cron servidor + PnL DEMO (−5/−10). Sin overwrite TOP ni auto-paper D.',
+      'v1.12: + toast remoto multi-dispositivo (señal lastRemoteEnqueue*). Sin overwrite TOP ni auto-paper D.',
   },
   {
     id: 'lab-ui',

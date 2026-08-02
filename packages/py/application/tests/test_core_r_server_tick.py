@@ -215,3 +215,5 @@ def test_apply_server_tick_marks_last() -> None:
     assert meta["added"] == 1
     assert new_state["scheduler"]["lastTickSource"] == "server_cron"
     assert new_state["scheduler"]["lastTickAt"]
+    assert new_state["scheduler"]["lastRemoteEnqueueAt"] == new_state["scheduler"]["lastTickAt"]
+    assert new_state["scheduler"]["lastRemoteEnqueueAdded"] == 1

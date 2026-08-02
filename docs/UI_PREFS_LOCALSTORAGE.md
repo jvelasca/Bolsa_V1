@@ -46,7 +46,7 @@
 | TOP experimento DÍA D (F-D) | `bolsa-dia-d-experiment-top-v1` ([ADR-021](./adr/021-dia-d-reconciliation.md)) |
 | Evidence DÍA D (archivo) | `bolsa-dia-d-evidence-archive-v1` (cap 30; opcional `researchEvidenceId`) |
 | CORE-R cola revisión | `bolsa-core-r-review-queue-v1` (cap 40; open/done) · **SoT BD** `GET\|PUT /api/accounts/{id}/core-r` (Q3.4) |
-| CORE-R scheduler | `bolsa-core-r-scheduler-v1` (`enabled`, `intervalMinutes`, `listId`, `scope`) · sync BD · cron servidor opcional `CORE_R_CRON_ENABLED` (informe + PnL DEMO) |
+| CORE-R scheduler | `bolsa-core-r-scheduler-v1` (`enabled`, `intervalMinutes`, `listId`, `scope`, `lastRemoteEnqueue*`) · sync BD · cron `CORE_R_CRON_ENABLED` · toast remoto `bolsa-core-r-last-seen-remote-enqueue` |
 | CORE-R informe Lista AUTO | `bolsa-core-r-report-v1` (juicio post-settle; fuente de Encolar) · sync BD |
 | Inbox alarmas Tracker | `bolsa-tracker-alarm-inbox-v1` |
 | Preferencias de trade / cuenta activa | `bolsa-trade-preferences`, `bolsa-active-account` |
