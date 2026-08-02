@@ -154,8 +154,8 @@ export const AI_PRODUCT_GOALS: AiTrackItem[] = [
     id: 'goal-core-r',
     title: 'Reevaluación continua (CORE-R)',
     status: 'done',
-    how: 'v1.8: juicio + cola Monitor + OOS/PnL + narración + cron shell + chip + toast + Hecho todos.',
-    note: 'Hecho en este navegador (localStorage). Congelado: cron multi-dispositivo / auto-paper D.',
+    how: 'v1.12: juicio + cola Monitor + OOS/PnL + narración + cron shell + chip/toast + Hecho todos + BD multi-dispositivo + cron servidor (off) + toast remoto.',
+    note: 'LS=cache · BD=SoT. Congelado: auto-paper D · activar CORE_R_CRON sin decisión ops.',
     docRef: 'docs/engineering/list-auto-ops-2026-07-29.md · ISSUES CORE-R',
   },
   {

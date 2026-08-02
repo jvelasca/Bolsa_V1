@@ -3,7 +3,7 @@
  * Actualizar al cambiar estado de producto (no tipografía).
  *
  * Incluye: espacios, BD, perfiles, listas/índices, embudo Play,
- * Finalistas→A/C, Monitor MVP, CORE-P, CORE-R v1.8 (Hecho todos),
+ * Finalistas→A/C, Monitor MVP, CORE-P, CORE-R **v1.12** (BD + cron off + toast remoto),
  * **Backtesting DÍA D** (v0.11 · archivo también en Ayuda),
  * Lista AUTO frescura **v1.3**, CORE-B **v0.2**, CAPM Tarjeta v0,
  * Composite **v1.1**, fix Trading fullBleed,
@@ -11,6 +11,7 @@
  * **ADR-020** Mandato operativo (M0–M3 + **M1b BD** · tenure + trades + churn + sync).
  * **ADR-021** Reconciliación DÍA D (F-hoy · F-D · V · SAME/DRIFT · contrafactual).
  * Continuidad Verify (lookback + carry) · higiene `strategyType` Finalistas.
+ * Post-auditorías Q0–Q3 + Q1.6 warm-up + estabilidad IBEX (Gate C4 cerrado).
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -39,4 +40,4 @@
  * @see docs/engineering/session-handoff-2026-08-01.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = '2026-08-02' as const;
+export const HELP_CONTENT_AS_OF = '2026-08-03' as const;
