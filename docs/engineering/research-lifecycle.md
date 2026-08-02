@@ -722,7 +722,7 @@ Regla Cursor: `.cursor/rules/optimize-lab-quality.mdc` · CI: workflow **Optimiz
 | Discovery / Planner IA / Decay+Pruning / UI cognitiva | Congelado tras P2.F; dominio Evidence→MKL stub cerrado |
 | PBO eventos / CSCV S=16 | Lab usa S=4–6 sobre scores |
 | Auto-live / production gate | Solo provenance + checklist UX |
-| `macd-signal-ema-warmup` | Deuda en `research/observations/ISSUES.md` |
+| `macd-signal-ema-warmup` | Closed 2026-08-03 — `compute_macd_signal_line` (forward-only; no re-run C3) |
 
 ### Narrativa unificada — caminos a paper / auto (NO OLVIDAR)
 

@@ -101,7 +101,7 @@ WARMUP_MATRIX: tuple[WarmupSpec, ...] = (
         description="MACD signal / zero-line",
         default_params={"fast": 12, "slow": 26, "signal": 9},
         min_bars=_macd_min,
-        notes="ISSUE #macd-signal-ema-warmup — cold OOS false negatives",
+        notes="signal EMA = classic seed (compute_macd_signal_line); no None→0",
     ),
     WarmupSpec(
         family="bollinger",

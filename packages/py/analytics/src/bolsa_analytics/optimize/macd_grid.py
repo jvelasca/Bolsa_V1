@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from bolsa_analytics.backtest import BacktestBarInput
-from bolsa_analytics.indicators.compute import compute_ema, compute_macd_line
+from bolsa_analytics.indicators.compute import compute_macd_line, compute_macd_signal_line
 from bolsa_analytics.optimize.grid_is_metrics import finalize_grid_is_metrics
 from bolsa_analytics.warmup_matrix import assert_grid_warmup
 
@@ -25,17 +25,6 @@ class MacdGridTrial:
     score: float
     is_metrics: dict[str, Any] = field(default_factory=dict)
     oos_metrics: dict[str, Any] | None = None
-
-
-def _macd_signal_line(
-    closes: list[float], fast: int, slow: int, signal_period: int
-) -> list[float | None]:
-    macd_line = compute_macd_line(closes, fast, slow)
-    # NOTE (C3.5): seeding None→0.0 warms EMA on artificial zeros; revisit before
-    # treating macd_grid_h0 as definitive reference (classic MACD waits for valid seed).
-    # Issue: research/observations/ISSUES.md#macd-signal-ema-warmup
-    numeric = [value if value is not None else 0.0 for value in macd_line]
-    return compute_ema(numeric, signal_period)
 
 
 def _simulate_macd_signal_cross(
@@ -57,7 +46,9 @@ def _simulate_macd_signal_cross(
 
     closes = [bar.close for bar in bars]
     macd_line = compute_macd_line(closes, fast_period, slow_period)
-    signal_line = _macd_signal_line(closes, fast_period, slow_period, signal_period)
+    signal_line = compute_macd_signal_line(
+        closes, fast_period, slow_period, signal_period
+    )
 
     cash = initial_cash
     shares = 0.0

@@ -157,24 +157,22 @@ sin_TOP (live): BKT, CABK, IAG, IBE, IDR, ITX, LOG, MAP, MEL, NTGY, PHM, RED, RE
 
 ---
 
-### macd-signal-ema-warmup
+## Closed
+
+### macd-signal-ema-warmup · 2026-08-03
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open |
+| Estado | Closed (forward-only) |
 | Severidad | Baja (instrumentación / fidelidad del indicador) |
 | Origen | Auditoría post-C3 / C3.5 |
-| Código | `bolsa_analytics.optimize.macd_grid._macd_signal_line` |
+| Código | `compute_macd_signal_line` · `macd_grid` · `rules_engine` (preset `macd_signal_cross`) |
 
-**Problema:** la EMA de señal se calienta sembrando `None → 0.0` en la línea MACD. El backtest H0 funciona, pero el arranque no es el warm-up clásico del indicador.
+**Problema:** la EMA de señal se calentaba con `None → 0.0` en la línea MACD.
 
-**Qué no hacer ahora:** no tocar el motor ni re-ejecutar C3.
-
-**Criterio de cierre:** antes de tratar `macd_grid_h0` como referencia estable, implementar seed clásico (retrasar hasta datos válidos / EMA sobre tramo no nulo) y documentar paridad vs. preset human `macd_signal_cross`.
+**Fix:** seed clásico — EMA solo sobre el tramo MACD no nulo; barras previas `None`. Grid y human comparten helper. Trials C1–C3 **no** se re-ejecutan ni reescriben K.
 
 ---
-
-## Closed
 
 ### warmup-audit (Q0.3 → Q1.6) · 2026-08-03
 
