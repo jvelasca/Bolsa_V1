@@ -50,6 +50,7 @@ export const BACKTESTING_SUMMARY = {
     'Lista AUTO: puedes ir a Trading mientras corre (barra de estado abajo). Tras reinicio, omite si no cambió nada.',
     'Universo → Lista: miembros con resumen (Finalistas / ★ / Lab / AUTO). Clic = pestaña Valor. Soft-cap 40 + confirm; filtro opcional «solo sin Finalistas».',
     'Finalistas: Checklist = demo activa (A); Rastreador = Radar (B); Proponer = Supervisado F3 (C). Distintos.',
+    'Tras Lab, Finalistas/Coach muestran resumen Hold-out/WF/CPCV (`coachFacts.labEvidence`, Q3.2).',
     'DÍA D: fecha en Probar → Play (F-D sin pisar F-hoy) → Verificar D→hoy → reconciliación SAME/DRIFT (ADR-021).',
     'Universos: LAB = estudiar/verificar · TRADING = invertir DEMO + rail Coach. docs/adr/019-dual-universes-lab-vs-trading.md',
     'Monitor Finalistas: hub Probar / Ayuda — TOP + DEMO retorno % + adopción + cola CORE-R. Solo lectura; no es auto-paper.',

@@ -96,6 +96,10 @@ Informe lateral: retorno/DD/ops del **gate** (+ referencia Auto) y bloque **Evid
 
 **Reinicia api-python** tras actualizar código para rutas Evidence / asOf / CORE-R.
 
+## Estabilidad Lab en embudo (Q3.2)
+
+Tras Lab → **Guardar Finalistas**, el resumen Hold-out / WF / CPCV (mismo vocabulario que el checklist) queda en `coachFacts.labEvidence` y se muestra en Finalistas y en el rail Coach. No es campaña multi-ventana ledger (eso sigue en Observatory / protocolo Q1.3).
+
 ## CORE-R / Monitor Finalistas (usuario · v1.8)
 
 Guía en Ayuda → Backtesting (`BACKTESTING_CORE_R_GUIDE`). Detalle: [list-auto-ops § CORE-R](./engineering/list-auto-ops-2026-07-29.md).

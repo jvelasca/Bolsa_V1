@@ -138,6 +138,7 @@ import {
   type CoreRDualAuditSnap,
 } from '@/features/backtests/core-r-judgment';
 import { readStashedOosEvidence } from '@/features/backtests/backtest-oos-evidence';
+import { readLabEvidenceFromCoachFacts } from '@/features/backtests/finalists-stability-summary';
 import {
   boardFromContinueSnapshot,
   buildListAutoContinueSnapshot,
@@ -2386,19 +2387,22 @@ export function BacktestsPage() {
       });
       const facts = instrumentTop?.coachFacts as Record<string, unknown> | null | undefined;
       const slot1StrategyId = instrumentTop?.slots?.[0]?.strategyDefinitionId ?? null;
+      const oosFromFacts = readLabEvidenceFromCoachFacts(facts);
       const oosStash = readStashedOosEvidence(slot1StrategyId);
+      const oosForJudge =
+        oosFromFacts && oosFromFacts.kind !== 'none' ? oosFromFacts : oosStash;
       const reeval = judgeCoreR({
         settleReason: reason,
         change: changeKind,
         evidenceLevel: instrumentTop?.evidenceLevel ?? null,
         dualAudit: (facts?.dualAudit as CoreRDualAuditSnap | undefined) ?? null,
-        oos: oosStash
+        oos: oosForJudge
           ? {
-              kind: oosStash.kind,
-              pbo: oosStash.pbo,
-              credibility: oosStash.credibility,
-              oosReturnPct: oosStash.oosReturnPct,
-              edgeBand: oosStash.edgeBand,
+              kind: oosForJudge.kind,
+              pbo: oosForJudge.pbo,
+              credibility: oosForJudge.credibility,
+              oosReturnPct: oosForJudge.oosReturnPct,
+              edgeBand: oosForJudge.edgeBand,
             }
           : null,
         topProfileId:

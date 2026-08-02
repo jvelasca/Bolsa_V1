@@ -53,6 +53,11 @@ import {
   getDiaDExperimentTop1,
 } from '@/features/backtests/dia-d-experiment-top';
 import { sanitizeTopSlotsStrategyTypes } from '@/features/backtests/instrument-top-strategy-type';
+import {
+  finalistsStabilityWarnTitle,
+  formatFinalistsStabilityBadge,
+  readLabEvidenceFromCoachFacts,
+} from '@/features/backtests/finalists-stability-summary';
 /** Deep-link hub → foco Finalistas del valor. */
 export function instrumentTopBacktestsHref(instrumentId: string, timeframe = '1d'): string {
   const params = new URLSearchParams({
@@ -511,9 +516,25 @@ export function InstrumentStrategyTopPanel({
               ? `${top.slots.length} estrategias de ${symbol}`
               : `TOP · ${top.slots.length} estrategias`}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p
+            className="text-[11px] text-muted-foreground"
+            title={
+              finalistsStabilityWarnTitle(
+                readLabEvidenceFromCoachFacts(
+                  top.coachFacts as Record<string, unknown> | null | undefined,
+                ),
+              ) ?? undefined
+            }
+          >
             {top.status} · v{top.version} · TF {top.timeframe}
-            {top.evidenceLevel === 'lab_validated' ? ' · lab OOS' : ' · in-sample'}
+            {(() => {
+              const snap = readLabEvidenceFromCoachFacts(
+                top.coachFacts as Record<string, unknown> | null | undefined,
+              );
+              const badge = formatFinalistsStabilityBadge(snap);
+              if (badge) return ` · ${badge}`;
+              return top.evidenceLevel === 'lab_validated' ? ' · lab OOS' : ' · in-sample';
+            })()}
             {diaDActive ? ` · DÍA D ${effectiveDiaD(diaD)} (F-hoy intacto)` : ''}
           </p>
         </div>

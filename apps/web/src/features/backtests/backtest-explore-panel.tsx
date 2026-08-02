@@ -66,6 +66,10 @@ import {
   mergeFreshnessIntoCoachFacts,
   writeLocalFreshnessFingerprint,
 } from '@/features/backtests/backtest-finalists-freshness';
+import {
+  mergeLabEvidenceIntoCoachFacts,
+  resolveLabEvidenceForFinalistsSave,
+} from '@/features/backtests/finalists-stability-summary';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -509,7 +513,7 @@ export function BacktestExploreRanking({
         coachPass: postLab ? 'post_lab' : 'initial',
         cycleAutoAck: Boolean(opts?.forceCycleAck) || prefsAutoAck,
       };
-      const stampedFacts =
+      const withFreshness =
         freshnessInputFingerprint && postLab
           ? mergeFreshnessIntoCoachFacts(
               baseFacts,
@@ -519,6 +523,17 @@ export function BacktestExploreRanking({
               }),
             )
           : baseFacts;
+      const slot1ForEvidence = [...slotsSanitized].sort((a, b) => a.rank - b.rank)[0];
+      const labEvidenceSnap = postLab
+        ? resolveLabEvidenceForFinalistsSave({
+            strategyDefinitionId: slot1ForEvidence?.strategyDefinitionId,
+            runId: slot1ForEvidence?.runId,
+          })
+        : null;
+      const stampedFacts = mergeLabEvidenceIntoCoachFacts(
+        withFreshness,
+        labEvidenceSnap,
+      );
 
       // ADR-021: experimento DÍA D → F-D local; no pisa F-hoy en BD.
       if (experimentAsOf) {

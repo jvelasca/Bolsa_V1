@@ -9,6 +9,11 @@ import { FlaskConical } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { instrumentTopBacktestsHref } from '@/features/backtests/instrument-strategy-top-panel';
+import {
+  finalistsStabilityWarnTitle,
+  formatFinalistsStabilityBadge,
+  readLabEvidenceFromCoachFacts,
+} from '@/features/backtests/finalists-stability-summary';
 import { diaDVerifyHref, VERIFY_DIA_D_CTA } from '@/features/platform/product-universe';
 import {
   STRATEGY_ADOPTION_LABELS,
@@ -56,6 +61,11 @@ export function TradingCoachRail({ className }: { className?: string }) {
 
   const top = topQuery.data?.data ?? null;
   const slot1 = top?.slots?.slice().sort((a, b) => a.rank - b.rank)[0] ?? null;
+  const labEvidence = readLabEvidenceFromCoachFacts(
+    top?.coachFacts as Record<string, unknown> | null | undefined,
+  );
+  const stabilityBadge = formatFinalistsStabilityBadge(labEvidence);
+  const stabilityWarn = finalistsStabilityWarnTitle(labEvidence);
   const adoption = instrumentId
     ? getAdoptionState(instrumentId, effectiveAccountId)
     : 'none';
@@ -124,6 +134,15 @@ export function TradingCoachRail({ className }: { className?: string }) {
               ? ` · ret ${slot1.totalReturnPct.toFixed(1)}%`
               : ''}
           </p>
+          {stabilityBadge ? (
+            <p
+              className="mt-0.5 text-[10px] text-muted-foreground"
+              title={stabilityWarn ?? undefined}
+              data-testid="coach-rail-stability"
+            >
+              {stabilityBadge}
+            </p>
+          ) : null}
         </div>
       ) : (
         <p className="text-muted-foreground">Sin Finalistas TOP aún.</p>
