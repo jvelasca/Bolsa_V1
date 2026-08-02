@@ -138,7 +138,7 @@ def heuristic_fundamental_explanation(card: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-_ROE_CLAIM = re.compile(r"\bROE\b[^0-9%]{0,24}(\d+(?:[.,]\d+)?)\s*%", re.I)
+_ROE_CLAIM = re.compile(r"\bROE\b[^0-9%]{0,24}(\d+(?:[.,]\d+)?)\s*%", re.IGNORECASE)
 
 
 def sanitize_copilot_query(text: str, *, max_len: int = 800) -> str:

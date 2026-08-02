@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from bolsa_analytics.signals.fundamental_gate import (
     build_fundamental_gate,
@@ -29,12 +29,12 @@ def test_fundamentals_need_refresh_missing() -> None:
 
 
 def test_fundamentals_need_refresh_fresh() -> None:
-    fetched_at = datetime.now(timezone.utc).isoformat()
+    fetched_at = datetime.now(UTC).isoformat()
     assert fundamentals_need_refresh({"fetchedAt": fetched_at}, 30) is False
 
 
 def test_fundamentals_need_refresh_stale() -> None:
-    stale = (datetime.now(timezone.utc) - timedelta(days=45)).isoformat()
+    stale = (datetime.now(UTC) - timedelta(days=45)).isoformat()
     assert fundamentals_need_refresh({"fetchedAt": stale}, 30) is True
 
 
@@ -48,7 +48,7 @@ def test_fundamentals_thin_for_cognitive() -> None:
 
 def _fresh(**overrides):
     base = {
-        "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "fetchedAt": datetime.now(UTC).isoformat(),
         "sector": "Technology",
         "trailingPe": 18.0,
         "marketCap": 5e9,

@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
+from bolsa_domain.entities.hypothesis import Hypothesis
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.hypothesis import Hypothesis
 from bolsa_infrastructure.database.models import HypothesisRow
 from bolsa_infrastructure.ids import new_id
 
@@ -38,7 +38,7 @@ class SqlAlchemyHypothesisRepository:
         status: str = "open",
         hypothesis_id: str | None = None,
     ) -> Hypothesis:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = HypothesisRow(
             id=hypothesis_id or new_id(),
             kind=kind,
@@ -121,6 +121,6 @@ class SqlAlchemyHypothesisRepository:
             row.context = None
         elif context is not None:
             row.context = context
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return self._map(row)

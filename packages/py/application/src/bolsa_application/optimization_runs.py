@@ -8,6 +8,14 @@ from bolsa_analytics.optimize.macd_grid import (
 )
 from bolsa_analytics.optimize.rsi_grid import estimate_rsi_grid_trial_total
 from bolsa_analytics.optimize.sma_grid import estimate_sma_grid_trial_total
+from bolsa_domain.repositories.research_trial_repository import ResearchTrialRepository
+from bolsa_infrastructure.database.repositories.optimization_run_repository import (
+    OptimizationRunRecord,
+    SqlAlchemyOptimizationRunRepository,
+)
+from bolsa_infrastructure.queue.scan_job_arq import OPTIMIZE_JOB_ARQ_TASK, ScanJobArqQueue
+
+from bolsa_application.cognitive_persistence import CognitiveStore
 from bolsa_application.optimize import (
     STRATEGY_FAMILY_MACD,
     STRATEGY_FAMILY_RSI,
@@ -17,18 +25,11 @@ from bolsa_application.optimize import (
     RunSmaGridOptimize,
     normalize_strategy_family,
 )
-from bolsa_application.cognitive_persistence import CognitiveStore
 from bolsa_application.persist_lab_edge_report import (
     persist_lab_edge_report_if_present,
     stamp_persisted_edge_report_id,
 )
 from bolsa_application.research_evidence import emit_evidence_for_trial
-from bolsa_domain.repositories.research_trial_repository import ResearchTrialRepository
-from bolsa_infrastructure.database.repositories.optimization_run_repository import (
-    OptimizationRunRecord,
-    SqlAlchemyOptimizationRunRepository,
-)
-from bolsa_infrastructure.queue.scan_job_arq import OPTIMIZE_JOB_ARQ_TASK, ScanJobArqQueue
 
 
 def _trial_dict(trial: OptimizeGridTrial) -> dict[str, Any]:

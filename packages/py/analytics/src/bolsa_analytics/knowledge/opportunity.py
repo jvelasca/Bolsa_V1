@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.cognitive.market_state import MarketState
@@ -25,11 +25,11 @@ from bolsa_analytics.knowledge.technical_assessment import build_technical_asses
 
 __all__ = [
     "HorizonHint",
-    "WeightRuleResult",
-    "weight_rules_for_horizon",
-    "resolve_weight_rules",
     "OpportunityResult",
+    "WeightRuleResult",
     "build_opportunity_package",
+    "resolve_weight_rules",
+    "weight_rules_for_horizon",
 ]
 
 
@@ -88,7 +88,7 @@ def build_opportunity_package(
     Opportunity = Assessments (TA [+ FUND] [+ Macro]) → DecisionRuntime.
     Ya no construye la acción aquí; el Runtime es el único cerebro.
     """
-    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     regime = market_state.regime if market_state is not None else "neutral"
 
     ta_assess, fact_ta, score_ta = build_technical_assessment(

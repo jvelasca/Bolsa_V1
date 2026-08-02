@@ -11,8 +11,8 @@ from bolsa_analytics.signals.evaluate import (
     evaluate_preset_signals_gated,
 )
 from bolsa_analytics.signals.strategy import (
-    SignalEventV1,
     SignalEvaluationMode,
+    SignalEventV1,
     StrategyBarInput,
     drawing_marker_to_signal_event_v1,
     evaluate_strategy,
@@ -23,9 +23,9 @@ from bolsa_analytics.signals.strategy import (
 __all__ = [
     "PresetFeatureSeries",
     "PresetStrategyType",
+    "SignalEvaluationMode",
     "SignalEvent",
     "SignalEventV1",
-    "SignalEvaluationMode",
     "SignalKind",
     "StrategyBarInput",
     "build_preset_features",

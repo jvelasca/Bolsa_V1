@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from bolsa_analytics.cognitive import MarketEventCalendar, build_market_event, MODERATE_POLICY, evaluate_policy_gate
+from bolsa_analytics.cognitive import (
+    MODERATE_POLICY,
+    MarketEventCalendar,
+    build_market_event,
+    evaluate_policy_gate,
+)
 from bolsa_analytics.knowledge import (
     TechnicalInputs,
     build_news_assessment,
@@ -31,7 +36,7 @@ def _bullish_ta() -> TechnicalInputs:
 
 
 def test_news_assessment_aggregates_sentiment():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cal = MarketEventCalendar()
     cal.add(
         build_market_event(
@@ -54,7 +59,7 @@ def test_news_assessment_aggregates_sentiment():
 
 def test_runtime_fuses_news_weight():
     ta, _, _ = build_technical_assessment("inst-1", _bullish_ta())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cal = MarketEventCalendar()
     cal.add(
         build_market_event(

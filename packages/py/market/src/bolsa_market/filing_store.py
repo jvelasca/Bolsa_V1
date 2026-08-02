@@ -15,7 +15,7 @@ import json
 import os
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
@@ -70,7 +70,7 @@ def _write_index(instrument_id: str, filings: list[dict[str, Any]]) -> None:
         "storeVersion": FILING_STORE_VERSION,
         "instrumentId": instrument_id,
         "filings": filings,
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
+        "updatedAt": datetime.now(UTC).isoformat(),
     }
     _index_path(instrument_id).write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
@@ -249,7 +249,7 @@ def save_filing(
         "contentType": content_type or "application/octet-stream",
         "byteSize": len(content),
         "sha256": digest,
-        "uploadedAt": datetime.now(timezone.utc).isoformat(),
+        "uploadedAt": datetime.now(UTC).isoformat(),
         "extractStatus": extract_status,
         "charCount": len(text),
         "chunkCount": chunk_count,

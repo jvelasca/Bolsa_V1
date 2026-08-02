@@ -34,9 +34,9 @@ def test_ingest_rejects_invalid_ohlc() -> None:
     with pytest.raises(ValueError, match="high"):
         OhlcvBarIngest(
             timestamp=date(2024, 1, 2),
-            open=Decimal("10"),
-            high=Decimal("9"),
-            low=Decimal("8"),
-            close=Decimal("10"),
+            open=Decimal(10),
+            high=Decimal(9),
+            low=Decimal(8),
+            close=Decimal(10),
             volume=100,
         )

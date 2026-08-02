@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from bolsa_analytics.cognitive import MarketEventCalendar, build_market_event
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+
 from bolsa_application.trading_policy_guard import (
     enforce_cognitive_policy_for_opening,
     resolve_trading_policy,
 )
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
 
 def _profile(
@@ -53,7 +54,7 @@ def test_exit_bypasses_gate():
 
 
 def test_earnings_event_vetoes_opening():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cal = MarketEventCalendar()
     earnings_at = now + timedelta(hours=12)
     cal.add(

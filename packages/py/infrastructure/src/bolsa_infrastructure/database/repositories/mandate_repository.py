@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -46,12 +46,12 @@ def _parse_dt(value: str | datetime | None) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     raw = str(value).strip()
     if raw.endswith("Z"):
         raw = raw[:-1] + "+00:00"
     dt = datetime.fromisoformat(raw)
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def _map_tenure(row: MandateTenureRow) -> MandateTenureRecord:
@@ -121,7 +121,7 @@ class SqlAlchemyMandateRepository:
         links: list[dict[str, Any]],
     ) -> tuple[list[MandateTenureRecord], list[MandateTradeLinkRecord]]:
         """Upsert tenures/links for account; drop local rows not present in payload."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         incoming_tenure_ids = set()
 
         for raw in tenures:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -65,7 +65,7 @@ async def test_core_r_upsert_roundtrip(db_session) -> None:
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"core_r_account_state no migrada: {exc}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     account_id = f"acc_corer_{uuid.uuid4().hex[:16]}"
     db_session.add(
         InvestmentAccountRow(

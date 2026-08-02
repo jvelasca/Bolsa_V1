@@ -28,7 +28,8 @@ jobs:
         run: uv sync
 
       - name: Ruff
-        run: uv run ruff check packages/py apps/api-python
+        # Root pyproject select (E/F/I/UP/B); package pyprojects lack lint.select.
+        run: uv run ruff check packages/py apps/api-python --config pyproject.toml
 
       - name: Mypy
         run: uv run mypy packages/py/domain/src packages/py/market/src packages/py/infrastructure/src apps/api-python/src

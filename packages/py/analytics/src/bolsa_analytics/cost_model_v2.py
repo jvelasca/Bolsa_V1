@@ -7,9 +7,9 @@ Defaults: ``enabled=False`` — no cambia paper/Lab hasta ``COST_MODEL_V2_ENABLE
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from statistics import median
-from typing import Sequence
 
 
 @dataclass(frozen=True, slots=True)

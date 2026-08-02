@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from bolsa_domain.entities.platform_event import PlatformEventRecord
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.platform_event import PlatformEventRecord
 from bolsa_infrastructure.database.models import PlatformEventRow
 from bolsa_infrastructure.ids import new_id
 

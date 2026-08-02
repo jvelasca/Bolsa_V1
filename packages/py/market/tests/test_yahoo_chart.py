@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from bolsa_market.yahoo_chart import parse_chart_payload, parse_intraday_chart_payload
 from bolsa_market.yahoo_client import normalize_yahoo_error
@@ -34,7 +34,7 @@ def test_parse_chart_payload_maps_daily_bars() -> None:
 
 
 def test_parse_intraday_chart_payload_maps_iso_timestamps() -> None:
-    ts = int(datetime(2024, 6, 15, 14, 30, tzinfo=timezone.utc).timestamp())
+    ts = int(datetime(2024, 6, 15, 14, 30, tzinfo=UTC).timestamp())
     payload = {
         "chart": {
             "result": [
@@ -64,7 +64,7 @@ def test_parse_intraday_chart_payload_maps_iso_timestamps() -> None:
 
 
 def test_parse_intraday_rejects_incoherent_ohlc() -> None:
-    ts = int(datetime(2024, 6, 15, 14, 30, tzinfo=timezone.utc).timestamp())
+    ts = int(datetime(2024, 6, 15, 14, 30, tzinfo=UTC).timestamp())
     payload = {
         "chart": {
             "result": [

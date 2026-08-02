@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -102,7 +102,7 @@ def build_fundamental_assessment(
     timestamp: str | None = None,
     assessment_id: str | None = None,
 ) -> tuple[FundamentalAssessment, FactSet, ScoreFundResult]:
-    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     if isinstance(inputs, FactSet):
         fact_set = inputs
     else:

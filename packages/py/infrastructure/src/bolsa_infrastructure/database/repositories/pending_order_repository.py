@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -68,7 +68,7 @@ class SqlAlchemyPendingOrderRepository:
         limit_price: float,
         expiry_at: datetime | None,
     ) -> PendingOrderRecord:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = PendingOrderRow(
             id=new_id(),
             account_id=account_id,

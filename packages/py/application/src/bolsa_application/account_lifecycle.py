@@ -5,9 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from bolsa_infrastructure.database.models import (
     InvestmentAccountRow,
     InvestmentPortfolioRow,
@@ -19,6 +16,8 @@ from bolsa_infrastructure.database.models import (
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @dataclass(frozen=True, slots=True)

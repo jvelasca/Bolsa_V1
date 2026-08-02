@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from bolsa_application.import_instrument import ImportInstrument
 from bolsa_infrastructure.database.repositories.index_subscribe_job_repository import (
     IndexSubscribeJobRecord,
     SqlAlchemyIndexSubscribeJobRepository,
@@ -32,6 +31,8 @@ from bolsa_market.indices import (
 )
 from bolsa_market.indices.registry import KNOWN_INDICES
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
+
+from bolsa_application.import_instrument import ImportInstrument
 
 ProgressCallback = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -348,7 +349,7 @@ class ProcessIndexSubscribeJob:
 
         async def on_progress(progress: dict[str, Any]) -> None:
             await self._jobs.update_progress(record.id, progress)
-            await self._jobs._session.commit()  # noqa: SLF001
+            await self._jobs._session.commit()
 
         try:
             result = await self._subscribe.execute(

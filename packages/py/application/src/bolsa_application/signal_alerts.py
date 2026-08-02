@@ -3,8 +3,11 @@ from typing import Any, Literal
 
 from bolsa_analytics.research.manifest import strategy_definition_from_preset
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
-from bolsa_analytics.signals.strategy import SignalEventV1, StrategyBarInput, evaluate_strategy_last_bar
-from bolsa_application.scans import MIN_SCAN_BARS
+from bolsa_analytics.signals.strategy import (
+    SignalEventV1,
+    StrategyBarInput,
+    evaluate_strategy_last_bar,
+)
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
@@ -20,6 +23,8 @@ from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     filter_signal_events_by_kinds,
     should_emit_for_bar,
 )
+
+from bolsa_application.scans import MIN_SCAN_BARS
 
 
 @dataclass(frozen=True, slots=True)

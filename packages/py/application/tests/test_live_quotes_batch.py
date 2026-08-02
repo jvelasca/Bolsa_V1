@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-from bolsa_application.market import GetInstrumentLiveQuotes
 from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta, SyncLogSnapshot
 from bolsa_market.providers import XtbBridgeQuote
+
+from bolsa_application.market import GetInstrumentLiveQuotes
 
 
 def _meta(instrument_id: str, *, close: float = 10.0) -> InstrumentWithMeta:

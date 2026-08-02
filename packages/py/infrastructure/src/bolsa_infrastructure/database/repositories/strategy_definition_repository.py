@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
-
-from sqlalchemy import delete, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
 from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_infrastructure.database.models import (
     BacktestRunRow,
     ExecutionPolicyRow,
@@ -66,7 +66,7 @@ class SqlAlchemyStrategyDefinitionRepository:
         origin: str,
         timeframe: str,
     ) -> StrategyDefinitionRecord:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = StrategyDefinitionRow(
             id=new_id(),
             name=name,
@@ -91,7 +91,7 @@ class SqlAlchemyStrategyDefinitionRepository:
         origin: str | None = None,
         timeframe: str | None = None,
     ) -> StrategyDefinitionRecord | None:
-        values: dict[str, Any] = {"updated_at": datetime.now(timezone.utc)}
+        values: dict[str, Any] = {"updated_at": datetime.now(UTC)}
         if name is not None:
             values["name"] = name
         if definition is not None:

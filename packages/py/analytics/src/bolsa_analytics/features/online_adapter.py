@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.features.catalog import FeatureCatalog, bootstrap_catalog
 from bolsa_analytics.features.models import FeatureSnapshot
-from bolsa_analytics.signals.feature_cache import FeatureCache, InMemoryFeatureCache, hash_indicator_specs
+from bolsa_analytics.signals.feature_cache import (
+    FeatureCache,
+    InMemoryFeatureCache,
+    hash_indicator_specs,
+)
 
 
 class OnlineFeatureAdapter:
@@ -63,7 +67,7 @@ class OnlineFeatureAdapter:
         tolerance_seconds: int = 0,
     ) -> FeatureSnapshot | None:
         if as_of.tzinfo is None:
-            as_of = as_of.replace(tzinfo=timezone.utc)
+            as_of = as_of.replace(tzinfo=UTC)
         candidates = [
             snap
             for snap in self._history
@@ -111,7 +115,7 @@ class OnlineFeatureAdapter:
         feature_set = self._catalog.get_set(feature_set_id)
         snap = FeatureSnapshot(
             instrument_id=instrument_id,
-            timestamp=timestamp or datetime.now(timezone.utc),
+            timestamp=timestamp or datetime.now(UTC),
             feature_set_id=feature_set_id,
             composition_hash=feature_set.composition_hash,
             values=values,

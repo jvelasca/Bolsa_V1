@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.research.data_snapshot import (
@@ -99,7 +99,7 @@ def build_run_manifest(
         trade_count=trade_count,
         final_equity=final_equity,
     )
-    created_at = datetime.now(timezone.utc).isoformat()
+    created_at = datetime.now(UTC).isoformat()
     outputs: dict[str, Any] = {
         "metricsHash": outputs_hash,
         "tradeCount": trade_count,

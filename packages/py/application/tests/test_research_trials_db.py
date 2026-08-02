@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -70,7 +70,7 @@ async def test_research_trial_k_summable_by_instrument(db_session) -> None:
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"research_trials no migrada: {exc}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     instrument_id = _new_id("inst")
     yahoo = f"TESTK.{uuid.uuid4().hex[:8]}"
 

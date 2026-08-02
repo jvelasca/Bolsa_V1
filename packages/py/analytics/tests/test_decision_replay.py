@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from bolsa_analytics.cognitive import build_decision_replay, build_propose_session, resolve_weight_rules
+from bolsa_analytics.cognitive import (
+    build_decision_replay,
+    build_propose_session,
+    resolve_weight_rules,
+)
 
 
 def test_replay_builds_timeline_steps():

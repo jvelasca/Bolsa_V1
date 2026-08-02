@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from bolsa_analytics.knowledge.filing_summary import heuristic_filing_summary
+
 from bolsa_market.filing_store import (
     FILING_STORE_VERSION,
     delete_filing,
@@ -14,7 +16,6 @@ from bolsa_market.filing_store import (
     save_filing,
     update_filing_summary,
 )
-from bolsa_analytics.knowledge.filing_summary import heuristic_filing_summary
 
 
 def test_save_list_delete_txt(tmp_path: Path, monkeypatch) -> None:
@@ -46,7 +47,7 @@ def test_reject_bad_kind(tmp_path: Path, monkeypatch) -> None:
             content_type="text/plain",
             content=b"hello",
         )
-        assert False, "expected ValueError"
+        raise AssertionError("expected ValueError")
     except ValueError:
         pass
 

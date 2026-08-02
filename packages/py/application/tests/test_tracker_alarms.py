@@ -1,5 +1,5 @@
-from bolsa_application.tracker_alarms import ALARM_SAFE_MODES, execution_route_to_dict
 from bolsa_application.execution_router import ExecutionActionResult, ExecutionRouteResult
+from bolsa_application.tracker_alarms import ALARM_SAFE_MODES, execution_route_to_dict
 
 
 def test_alarm_safe_modes_exclude_paper() -> None:

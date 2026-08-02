@@ -1,7 +1,18 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -127,7 +138,7 @@ class PortfolioRow(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String, default="Cartera principal")
     currency: Mapped[str] = mapped_column(String, default="EUR")
-    cash: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("100000"))
+    cash: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal(100000))
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
@@ -549,7 +560,7 @@ class LlmCallRow(Base):
     validation_passed: Mapped[bool] = mapped_column("validation_passed", Boolean)
     validation_errors: Mapped[list] = mapped_column("validation_errors", JSONB, default=list)
     elapsed_ms: Mapped[int] = mapped_column("elapsed_ms", Integer)
-    cost_usd: Mapped[Decimal] = mapped_column("cost_usd", Numeric(12, 6), default=Decimal("0"))
+    cost_usd: Mapped[Decimal] = mapped_column("cost_usd", Numeric(12, 6), default=Decimal(0))
     status: Mapped[str] = mapped_column(String)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     trace_id: Mapped[str] = mapped_column("trace_id", String)
@@ -779,7 +790,7 @@ class HypothesisBeliefRow(Base):
     belief_ci_high: Mapped[Decimal] = mapped_column("belief_ci_high", Numeric(8, 4))
     n_experiments: Mapped[int] = mapped_column("n_experiments", Integer, default=0)
     evidence_weight: Mapped[Decimal] = mapped_column(
-        "evidence_weight", Numeric(12, 4), default=Decimal("0")
+        "evidence_weight", Numeric(12, 4), default=Decimal(0)
     )
     contexts_ok: Mapped[list] = mapped_column("contexts_ok", JSONB, default=list)
     contexts_fail: Mapped[list] = mapped_column("contexts_fail", JSONB, default=list)
@@ -910,7 +921,7 @@ class ResearchEvidenceRow(Base):
     level: Mapped[str] = mapped_column(String)
     source: Mapped[str] = mapped_column(String)
     evidence_weight: Mapped[Decimal] = mapped_column(
-        "evidence_weight", Numeric(8, 4), default=Decimal("0")
+        "evidence_weight", Numeric(8, 4), default=Decimal(0)
     )
     summary: Mapped[dict] = mapped_column(JSONB)
     math_version: Mapped[str | None] = mapped_column("math_version", String, nullable=True)
@@ -1081,8 +1092,8 @@ class InvestmentAccountRow(Base):
     status: Mapped[str] = mapped_column(String, default="active")
     currency: Mapped[str] = mapped_column(String, default="EUR")
     base_currency: Mapped[str] = mapped_column("base_currency", String, default="EUR")
-    initial_deposit: Mapped[Decimal] = mapped_column("initial_deposit", Numeric(18, 6), default=Decimal("100000"))
-    leverage: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("1"))
+    initial_deposit: Mapped[Decimal] = mapped_column("initial_deposit", Numeric(18, 6), default=Decimal(100000))
+    leverage: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal(1))
     margin_call_level_pct: Mapped[Decimal | None] = mapped_column(
         "margin_call_level_pct",
         Numeric(10, 4),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC
 
 from bolsa_application.propose_recommendation import ProposeRecommendationFromTa
 
@@ -28,9 +29,9 @@ class _FakeFeaturePort:
 
 class _Bar:
     def __init__(self, i: int) -> None:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
-        self.timestamp = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(days=i)
+        self.timestamp = datetime(2026, 1, 1, tzinfo=UTC) + timedelta(days=i)
         self.open = 100 + i * 0.2
         self.high = self.open + 1
         self.low = self.open - 1
@@ -43,17 +44,18 @@ def test_propose_from_ta_bullish_bars():
     ohlcv = _FakeOhlcv(bars)
     port = _FakeFeaturePort()
 
-    import bolsa_application.propose_recommendation as mod
     from bolsa_analytics.features.models import FeatureSnapshot
+
+    import bolsa_application.propose_recommendation as mod
 
     real_materialize = mod.materialize_feature_snapshot
 
     def fake_materialize(feature_port, *, instrument_id, bars, feature_set_id):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         snap = FeatureSnapshot(
             instrument_id=instrument_id,
-            timestamp=datetime(2026, 3, 20, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 3, 20, tzinfo=UTC),
             feature_set_id=feature_set_id,
             composition_hash="test",
             values={
@@ -120,17 +122,18 @@ def test_propose_with_fundamentals_port():
                 "fetchedAt": "2026-07-23T00:00:00Z",
             }
 
-    import bolsa_application.propose_recommendation as mod
     from bolsa_analytics.features.models import FeatureSnapshot
+
+    import bolsa_application.propose_recommendation as mod
 
     real_materialize = mod.materialize_feature_snapshot
 
     def fake_materialize(feature_port, *, instrument_id, bars, feature_set_id):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         snap = FeatureSnapshot(
             instrument_id=instrument_id,
-            timestamp=datetime(2026, 3, 20, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 3, 20, tzinfo=UTC),
             feature_set_id=feature_set_id,
             composition_hash="test",
             values={
@@ -192,17 +195,18 @@ def test_propose_with_macro_and_evidence():
         async def latest_edge_report(self, *, strategy_or_signal_ref=None, account_id=None):
             return report
 
-    import bolsa_application.propose_recommendation as mod
     from bolsa_analytics.features.models import FeatureSnapshot
+
+    import bolsa_application.propose_recommendation as mod
 
     real_materialize = mod.materialize_feature_snapshot
 
     def fake_materialize(feature_port, *, instrument_id, bars, feature_set_id):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         snap = FeatureSnapshot(
             instrument_id=instrument_id,
-            timestamp=datetime(2026, 3, 20, tzinfo=timezone.utc),
+            timestamp=datetime(2026, 3, 20, tzinfo=UTC),
             feature_set_id=feature_set_id,
             composition_hash="test",
             values={

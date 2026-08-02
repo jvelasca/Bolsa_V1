@@ -8,14 +8,15 @@ modo ``paper_auto``. Distinto de radar (B) y Supervisado (C).
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
 from bolsa_analytics.knowledge.composite_score import build_composite_card
 from bolsa_analytics.signals.fundamental_screener import week_key_utc
-from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
+
+from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
 
 PAPER_D_PROPOSE_VERSION = "paper_d_propose_v2"
 PAPER_D_EXECUTE_ENV = "PAPER_D_EXECUTE"
@@ -46,7 +47,7 @@ def build_paper_d_hits(
     plan_id: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Construye hits estilo scan para ``entry_long``. Returns (hits, skipped)."""
-    ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     hits: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     strat = strategy_definition_id or "paper_d_unbound"
@@ -306,5 +307,5 @@ class ProposePaperDPlan:
             "executeStatus": execute_status,
             "execution": execution,
             "notes": notes,
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }

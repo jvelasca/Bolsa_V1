@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.entities.research_evidence import ResearchEvidence
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.research_evidence import ResearchEvidence
 from bolsa_infrastructure.database.models import ResearchEvidenceRow
 from bolsa_infrastructure.ids import new_id
 
@@ -55,7 +55,7 @@ class SqlAlchemyResearchEvidenceRepository:
             evidence_weight=Decimal(str(evidence_weight)),
             summary=summary,
             math_version=math_version,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()

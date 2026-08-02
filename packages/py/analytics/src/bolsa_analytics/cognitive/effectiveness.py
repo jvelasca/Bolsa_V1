@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.decision_memory import DecisionMemoryEntry
@@ -74,7 +74,7 @@ def build_effectiveness_summary(
     status: EffectivenessStatus | None = None,
 ) -> EffectivenessSummary:
     """Agrega Edge + Trials + Decision Memory + Observed para el panel Efectividad."""
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     mem = list(memory_entries)
     accepted = sum(1 for m in mem if m.outcome == "accepted")
     rejected = sum(1 for m in mem if m.outcome == "rejected")

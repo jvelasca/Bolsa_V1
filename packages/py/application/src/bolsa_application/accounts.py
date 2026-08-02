@@ -1,5 +1,5 @@
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bolsa_domain.account_settings import calculate_trade_fees, settings_from_dict
 from bolsa_domain.entities.account import (
@@ -15,10 +15,14 @@ from bolsa_domain.tax_report import (
     build_tax_report,
     map_ledger_fees_to_transactions,
 )
-from bolsa_infrastructure.ids import new_id
-from bolsa_infrastructure.database.repositories.account_repository import SqlAlchemyAccountRepository
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
 from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlchemyLedgerRepository
-from bolsa_infrastructure.database.repositories.portfolio_repository import SqlAlchemyPortfolioRepository
+from bolsa_infrastructure.database.repositories.portfolio_repository import (
+    SqlAlchemyPortfolioRepository,
+)
+from bolsa_infrastructure.ids import new_id
 
 
 class ListAccounts:
@@ -327,9 +331,9 @@ class ApplyCustodyFees:
             return False
 
         last = await self._ledger_repo.last_custody_charge_at(scope.account.id)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if last is not None:
-            last_dt = last if last.tzinfo else last.replace(tzinfo=timezone.utc)
+            last_dt = last if last.tzinfo else last.replace(tzinfo=UTC)
             if (now - last_dt).days < self.CUSTODY_INTERVAL_DAYS:
                 return False
 

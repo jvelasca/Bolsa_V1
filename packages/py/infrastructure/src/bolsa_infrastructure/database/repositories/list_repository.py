@@ -1,22 +1,22 @@
 from dataclasses import dataclass
-
 from datetime import UTC, datetime
-
 from typing import Any
 
+from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from sqlalchemy import delete, func, select
-
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from sqlalchemy.orm import selectinload
 
-from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
-
-from bolsa_infrastructure.database.models import InstrumentListItemRow, InstrumentListRow, InstrumentRow
-
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
-
+from bolsa_infrastructure.database.models import (
+    InstrumentListItemRow,
+    InstrumentListRow,
+    InstrumentRow,
+)
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 from bolsa_infrastructure.ids import new_id
+
 
 def derive_list_kind(source: str) -> str:
 

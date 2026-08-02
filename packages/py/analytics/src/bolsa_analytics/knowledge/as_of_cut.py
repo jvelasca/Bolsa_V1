@@ -13,14 +13,14 @@ TA legs use OHLCV ``date_to=as_of`` separately (caller).
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any, Literal
 
 PointInTimeStatus = Literal["live", "snapshot", "blocked", "reconstructed"]
 
 
 def today_iso_utc() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    return datetime.now(UTC).date().isoformat()
 
 
 def normalize_as_of_date(value: str | None) -> str | None:
@@ -34,7 +34,7 @@ def normalize_as_of_date(value: str | None) -> str | None:
         d = date.fromisoformat(raw)
     except ValueError:
         return None
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     if d > today:
         return today.isoformat()
     return d.isoformat()
@@ -53,8 +53,8 @@ def fetched_at_calendar_day(fetched_at: str | None) -> str | None:
         except ValueError:
             return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc).date().isoformat()
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).date().isoformat()
 
 
 def resolve_fundamentals_pit(

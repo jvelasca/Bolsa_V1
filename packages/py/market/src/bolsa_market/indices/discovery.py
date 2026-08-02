@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from bolsa_market.indices.aliases import canonical_index_code, expand_index_query_aliases
 from bolsa_market.indices.registry import KNOWN_INDICES, KnownIndex, get_known_index

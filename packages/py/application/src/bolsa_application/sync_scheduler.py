@@ -4,14 +4,17 @@ from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
-from bolsa_application.sync_instrument import SyncInstrumentDailyBars
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 from bolsa_infrastructure.database.repositories.sync_scheduler_repository import (
     SqlAlchemySyncSchedulerRepository,
     SyncQueueItemRecord,
     SyncSettingsRecord,
 )
+
+from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
+from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 
 MADRID = ZoneInfo("Europe/Madrid")
 POST_CLOSE_HOUR = 17

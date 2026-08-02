@@ -7,6 +7,7 @@ from bolsa_analytics.cognitive import (
     build_edge_report,
     build_memory_entry,
 )
+
 from bolsa_application.cognitive_persistence import (
     edge_report_to_record,
     memory_entry_to_record,

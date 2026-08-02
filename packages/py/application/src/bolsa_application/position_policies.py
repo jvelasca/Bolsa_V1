@@ -6,7 +6,9 @@ from bolsa_domain.repositories.execution_policy_repository import ExecutionPolic
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.position_policy_repository import PositionPolicyRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
-from bolsa_infrastructure.database.repositories.account_repository import SqlAlchemyAccountRepository
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
 
 
 def build_position_policy_definition(

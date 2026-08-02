@@ -1,10 +1,10 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
+from bolsa_domain.entities.research_tree import MklSyncEvent
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.research_tree import MklSyncEvent
 from bolsa_infrastructure.database.models import MklSyncEventRow
 from bolsa_infrastructure.ids import new_id
 
@@ -42,7 +42,7 @@ class SqlAlchemyMklSyncRepository:
             fact_payload=fact_payload,
             math_version=math_version,
             notes=list(notes or []),
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()

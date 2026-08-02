@@ -1,26 +1,26 @@
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
+from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
+from bolsa_analytics.indicators.compute import OhlcvBar
 from bolsa_analytics.research.manifest import strategy_definition_from_preset
 from bolsa_analytics.research.scan_manifest import (
     build_instrument_snapshot_meta,
     hash_fundamentals_batch,
     hash_gate_config,
 )
-from bolsa_analytics.signals.fundamental_gate import (
-    definition_has_fundamental_gate,
-    fundamental_gate_max_age_days,
-    passes_fundamental_gate,
-)
-from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
-from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
 from bolsa_analytics.signals.feature_cache import (
     FeatureCache,
     FeatureCacheKey,
     get_or_build_preset_features,
     hash_indicator_specs,
 )
-from bolsa_analytics.signals.preset_rules import definition_has_rules, enrich_definition_with_preset_rules
+from bolsa_analytics.signals.fundamental_gate import (
+    definition_has_fundamental_gate,
+    fundamental_gate_max_age_days,
+    passes_fundamental_gate,
+)
 from bolsa_analytics.signals.hybrid_scan import (
     DataQualityScanContext,
     build_indicator_context_for_definition,
@@ -29,22 +29,29 @@ from bolsa_analytics.signals.hybrid_scan import (
     is_hybrid_definition,
 )
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_analytics.signals.preset_rules import (
+    definition_has_rules,
+    enrich_definition_with_preset_rules,
+)
 from bolsa_analytics.signals.rules_engine import build_indicator_context
-from bolsa_analytics.indicators.compute import OhlcvBar
-from bolsa_analytics.signals.strategy import SignalEventV1, StrategyBarInput, evaluate_strategy_last_bar
+from bolsa_analytics.signals.strategy import (
+    SignalEventV1,
+    StrategyBarInput,
+    evaluate_strategy_last_bar,
+)
+from bolsa_domain.platform_kernel import MIN_SCAN_BARS, validate_kernel_timeframe
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
 from bolsa_infrastructure.ids import new_id
-
-from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
-from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
-from bolsa_application.events.platform_event_bus import PlatformEventBus
-from bolsa_application.events.payloads import scan_completed_payload
-from bolsa_domain.platform_kernel import MIN_SCAN_BARS, validate_kernel_timeframe
 from bolsa_market.market_calendar import expected_last_daily_bar
+
+from bolsa_application.events.payloads import scan_completed_payload
+from bolsa_application.events.platform_event_bus import PlatformEventBus
+from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
+from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,8 +297,14 @@ class RunScan:
                     specs_hash,
                 )
                 if hybrid_mode or definition_has_rules(enriched_definition):
-                    def build_context() -> dict[str, list[float | None]]:
-                        return build_indicator_context(ohlcv_bars, indicator_specs)
+                    bars_for_ctx = ohlcv_bars
+                    specs_for_ctx = indicator_specs
+
+                    def build_context(
+                        _bars: list = bars_for_ctx,
+                        _specs: list = specs_for_ctx,
+                    ) -> dict[str, list[float | None]]:
+                        return build_indicator_context(_bars, _specs)
 
                     indicator_context = self._feature_cache.get_or_build(cache_key, build_context)
                 else:

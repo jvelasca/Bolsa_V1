@@ -1,8 +1,8 @@
-from bolsa_analytics.indicators.compute import OhlcvBar, compute_spec, IndicatorSpecInput
+from bolsa_analytics.indicators.compute import IndicatorSpecInput, OhlcvBar, compute_spec
 from bolsa_analytics.research.llm_indicator_draft import draft_indicator_from_prompt_with_llm
 from bolsa_analytics.research.prompt_indicator_draft import draft_indicator_from_prompt
-from bolsa_analytics.signals.rules_engine import compute_rule_group_pass_series
 from bolsa_analytics.signals.preset_catalog import preset_indicator_specs, preset_rule_groups
+from bolsa_analytics.signals.rules_engine import compute_rule_group_pass_series
 
 
 def _bars(count: int = 120) -> list[OhlcvBar]:

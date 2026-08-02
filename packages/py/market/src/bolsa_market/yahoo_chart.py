@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 from bolsa_domain.value_objects.timeframe import TimeFrame
+
 from bolsa_market.ingest import OhlcvBarIngest
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
 
@@ -55,7 +56,7 @@ def parse_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> list[Ohlc
         v = quotes.get("volume", [None] * len(timestamps))[i]
         if o is None or h is None or lo is None or c is None:
             continue
-        bar_date = datetime.fromtimestamp(ts, tz=timezone.utc).date()
+        bar_date = datetime.fromtimestamp(ts, tz=UTC).date()
         adj = adjclose[i] if adjclose and i < len(adjclose) and adjclose[i] is not None else None
         bars.append(
             OhlcvBarIngest(
@@ -105,7 +106,7 @@ def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> 
         vol = int(v or 0)
         if not _intraday_ohlc_ok(fo, fh, flo, fc, vol):
             continue
-        moment = datetime.fromtimestamp(ts, tz=timezone.utc)
+        moment = datetime.fromtimestamp(ts, tz=UTC)
         bars.append(
             IntradayOhlcvBar(
                 timestamp=moment.isoformat().replace("+00:00", "Z"),
@@ -132,9 +133,9 @@ class YahooMarketDataProvider:
         from_date,
         to_date,
     ) -> list[OhlcvBarIngest]:
-        period1 = int(datetime(from_date.year, from_date.month, from_date.day, tzinfo=timezone.utc).timestamp())
+        period1 = int(datetime(from_date.year, from_date.month, from_date.day, tzinfo=UTC).timestamp())
         period2 = int(
-            datetime(to_date.year, to_date.month, to_date.day, 23, 59, 59, tzinfo=timezone.utc).timestamp(),
+            datetime(to_date.year, to_date.month, to_date.day, 23, 59, 59, tzinfo=UTC).timestamp(),
         )
 
         try:
@@ -159,7 +160,7 @@ class YahooMarketDataProvider:
             raise ValueError("fetch_interval_bars no aplica a 1d; usar fetch_daily_bars")
 
         yahoo_interval, range_days = YAHOO_INTERVAL_BY_TIMEFRAME[timeframe]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         period2 = int(now.timestamp())
         period1 = int((now - timedelta(days=range_days)).timestamp())
 

@@ -3,10 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from bolsa_infrastructure.database.models import OhlcvBarRow
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from bolsa_infrastructure.database.models import OhlcvBarRow
 
 TABLE_LABELS: tuple[tuple[str, str], ...] = (
     ("instruments", "Instrumentos"),
@@ -71,7 +70,7 @@ class GetDatabaseSummary:
         tables: list[DatabaseTableCount] = []
         for table_name, label in TABLE_LABELS:
             result = await self._session.execute(
-                text(f"SELECT COUNT(*) FROM {table_name}"),  # noqa: S608 — nombres fijos
+                text(f"SELECT COUNT(*) FROM {table_name}"),
             )
             tables.append(
                 DatabaseTableCount(table=table_name, label=label, count=int(result.scalar_one())),

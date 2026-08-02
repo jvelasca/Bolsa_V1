@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -59,15 +59,16 @@ async def db_session():
 
 @pytest.mark.asyncio
 async def test_research_list_filter_and_summary(db_session) -> None:
+    from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
     from bolsa_application.research_trials import (
         GetInstrumentResearchSummary,
         GetLaboratoryResearchSummary,
         GetResearchTrial,
         ListResearchTrials,
-    )
-    from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
-    from bolsa_infrastructure.database.repositories.research_trial_repository import (
-        SqlAlchemyResearchTrialRepository,
     )
 
     try:
@@ -75,7 +76,7 @@ async def test_research_list_filter_and_summary(db_session) -> None:
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"research_trials no migrada: {exc}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     instrument_id = _new_id("inst")
     yahoo = f"TESTRES.{uuid.uuid4().hex[:8]}"
 

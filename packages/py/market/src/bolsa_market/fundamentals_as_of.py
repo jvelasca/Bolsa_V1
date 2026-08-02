@@ -8,7 +8,7 @@ marketCap ≈ close×shares si hay precio as-of.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_market.instrument_fundamentals import (
@@ -38,7 +38,7 @@ def statement_end_date(row: dict[str, Any] | None) -> str | None:
         if isinstance(raw, (int, float)):
             # Yahoo epoch seconds
             try:
-                return datetime.fromtimestamp(float(raw), tz=timezone.utc).date().isoformat()
+                return datetime.fromtimestamp(float(raw), tz=UTC).date().isoformat()
             except (OverflowError, OSError, ValueError):
                 return None
         if isinstance(raw, str) and len(raw) >= 10:

@@ -1,8 +1,11 @@
 """Mappers Prediction / ModelArtifact → records."""
 
-from bolsa_application.prediction_mappers import model_artifact_to_record, prediction_to_record
+from datetime import UTC
+
 from bolsa_analytics.prediction import PredictionService
 from bolsa_analytics.prediction.heuristic import heuristic_model_artifact
+
+from bolsa_application.prediction_mappers import model_artifact_to_record, prediction_to_record
 
 
 def test_model_artifact_to_record():
@@ -14,7 +17,7 @@ def test_model_artifact_to_record():
 
 
 def test_prediction_to_record():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     # Minimal via service heuristic needs bars — build Prediction manually
     from bolsa_analytics.prediction.models import Prediction
@@ -27,8 +30,8 @@ def test_prediction_to_record():
         model_checksum="x",
         feature_set_id="fset_core_v1",
         composition_hash="h",
-        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        as_of=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        as_of=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         horizon="1d",
         value=0.4,
         confidence=0.7,

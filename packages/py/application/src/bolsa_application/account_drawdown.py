@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _day_key(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d")
+    return dt.astimezone(UTC).strftime("%Y-%m-%d")
 
 
 def _week_key(dt: datetime) -> str:
-    iso = dt.astimezone(timezone.utc).isocalendar()
+    iso = dt.astimezone(UTC).isocalendar()
     return f"{iso.year}-W{iso.week:02d}"
 
 

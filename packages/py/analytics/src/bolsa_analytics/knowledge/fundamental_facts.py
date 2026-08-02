@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from bolsa_analytics.knowledge.fundamental_inputs import FundamentalInputs
@@ -355,7 +355,7 @@ def build_fundamental_fact_set(
     fact_set_id: str | None = None,
 ) -> FactSet:
     inp = inputs if isinstance(inputs, FundamentalInputs) else FundamentalInputs.from_dict(inputs)
-    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     facts = (
         _valuation_fact(inp),
         _quality_fact(inp),

@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
+from bolsa_domain.entities.account import LedgerEntry
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bolsa_domain.entities.account import LedgerEntry
 from bolsa_infrastructure.database.models import LedgerEntryRow
 from bolsa_infrastructure.ids import new_id
 
@@ -49,7 +49,7 @@ class SqlAlchemyLedgerRepository:
         reference_id: str,
         executed_at: datetime | None = None,
     ) -> LedgerEntry:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
@@ -84,7 +84,7 @@ class SqlAlchemyLedgerRepository:
         description: str | None = None,
         executed_at: datetime | None = None,
     ) -> LedgerEntry:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         executed = executed_at or now
         row = LedgerEntryRow(
             id=new_id(),
@@ -162,7 +162,7 @@ class SqlAlchemyLedgerRepository:
         reference_id: str,
         description: str,
     ) -> LedgerEntry:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,
@@ -205,7 +205,7 @@ class SqlAlchemyLedgerRepository:
         reference_type: str = "transfer",
         description: str | None = None,
     ) -> LedgerEntry:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = LedgerEntryRow(
             id=new_id(),
             account_id=account_id,

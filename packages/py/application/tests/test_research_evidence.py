@@ -3,6 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from bolsa_domain.entities.research_evidence import ResearchEvidence
+from bolsa_domain.entities.research_trial import ResearchTrial
 
 from bolsa_application.research_evidence import (
     MATH_VERSION_EVIDENCE_V0,
@@ -14,8 +16,6 @@ from bolsa_application.research_evidence import (
     emit_evidence_for_trial,
     evidence_weight_for_level,
 )
-from bolsa_domain.entities.research_evidence import ResearchEvidence
-from bolsa_domain.entities.research_trial import ResearchTrial
 
 
 def _trial(**overrides) -> ResearchTrial:
@@ -150,8 +150,9 @@ async def test_emit_inserts_via_repo():
 @pytest.mark.asyncio
 async def test_run_and_save_emits_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
     from bolsa_analytics.backtest import BacktestEngineResult, BacktestEquityPoint
-    from bolsa_application.backtests import RunAndSaveBacktest
     from bolsa_domain.entities.backtest import BacktestRunDetail
+
+    from bolsa_application.backtests import RunAndSaveBacktest
 
     def _bar(ts: str, close: float) -> MagicMock:
         bar = MagicMock()

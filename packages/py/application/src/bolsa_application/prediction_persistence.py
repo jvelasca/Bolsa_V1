@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from bolsa_application.prediction_mappers import model_artifact_to_record, prediction_to_record
 from bolsa_domain.entities.cognitive_artifacts import ModelArtifactRecord, PredictionRecord
+
+from bolsa_application.prediction_mappers import model_artifact_to_record, prediction_to_record
 
 
 class PredictionStore(Protocol):

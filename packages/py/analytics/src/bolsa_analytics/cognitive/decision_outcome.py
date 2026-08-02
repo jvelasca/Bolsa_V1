@@ -9,9 +9,10 @@ Criterio v1.1 (OUTCOME_CRITERIA_VERSION):
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Literal, Sequence
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 OUTCOME_CRITERIA_VERSION = "1.1.0"
 
@@ -66,7 +67,7 @@ class SessionOutcome:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def eval_bars_for_horizon(horizon: str | None) -> int:
@@ -188,7 +189,7 @@ def _parse_iso_date(value: Any) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     text = str(value).strip()
     if not text:
         return None
@@ -196,7 +197,7 @@ def _parse_iso_date(value: Any) -> datetime | None:
         # 2026-07-23T10:00:00Z | 2026-07-23
         normalized = text.replace("Z", "+00:00")
         if len(normalized) == 10:
-            return datetime.fromisoformat(normalized).replace(tzinfo=timezone.utc)
+            return datetime.fromisoformat(normalized).replace(tzinfo=UTC)
         return datetime.fromisoformat(normalized)
     except ValueError:
         return None

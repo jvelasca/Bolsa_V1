@@ -1,12 +1,12 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
+from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail, BacktestTrade
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail, BacktestTrade
 from bolsa_infrastructure.database.models import BacktestRunRow, BacktestTradeRow
 from bolsa_infrastructure.ids import new_id
 
@@ -142,7 +142,7 @@ class SqlAlchemyBacktestRepository:
         run_id: str | None = None,
         strategy_definition_id: str | None = None,
     ) -> BacktestRunDetail:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         resolved_run_id = run_id or new_id()
         run = BacktestRunRow(
             id=resolved_run_id,

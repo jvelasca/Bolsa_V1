@@ -1,11 +1,11 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from bolsa_domain.entities.scan_manifest import DataSnapshotRecord, ScanManifestRecord
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.scan_manifest import DataSnapshotRecord, ScanManifestRecord
 from bolsa_infrastructure.database.models import DataSnapshotRow, ScanManifestRow
 
 

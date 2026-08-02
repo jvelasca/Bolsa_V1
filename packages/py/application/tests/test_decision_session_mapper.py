@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from bolsa_analytics.cognitive import build_propose_session, resolve_weight_rules
+
 from bolsa_application.cognitive_persistence import decision_session_to_record
 
 

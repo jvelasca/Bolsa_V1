@@ -6,8 +6,9 @@ import asyncio
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from bolsa_application.accounts import ListAccountSummaries
 from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary
+
+from bolsa_application.accounts import ListAccountSummaries
 
 
 @dataclass

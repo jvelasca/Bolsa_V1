@@ -4,7 +4,7 @@ import asyncio
 import os
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
 import httpx
@@ -444,7 +444,7 @@ class YahooFinanceClient:
             if amount is None:
                 continue
             try:
-                date = datetime.fromtimestamp(int(timestamp), tz=timezone.utc).date().isoformat()
+                date = datetime.fromtimestamp(int(timestamp), tz=UTC).date().isoformat()
             except (TypeError, ValueError, OSError):
                 date = str(timestamp)
             history.append({"date": date, "amount": float(amount)})

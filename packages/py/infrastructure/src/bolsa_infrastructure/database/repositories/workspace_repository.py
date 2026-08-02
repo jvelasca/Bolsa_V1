@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -89,7 +89,7 @@ class SqlAlchemyWorkspaceRepository:
         dock_layout: dict | None = None,
         is_default: bool = False,
     ) -> WorkspaceRecord:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if is_default:
             await self._clear_default_flag()
 
@@ -131,7 +131,7 @@ class SqlAlchemyWorkspaceRepository:
             if is_default:
                 await self._clear_default_flag(exclude_id=workspace_id)
             row.is_default = is_default
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _to_record(row)
 

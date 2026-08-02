@@ -1,12 +1,12 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
+from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+from bolsa_domain.ohlcv_time import format_bar_timestamp, parse_bar_timestamp
+from bolsa_domain.value_objects.timeframe import TimeFrame
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.ohlcv_bar import OhlcvBar
-from bolsa_domain.value_objects.timeframe import TimeFrame
-from bolsa_domain.ohlcv_time import format_bar_timestamp, parse_bar_timestamp
 from bolsa_infrastructure.database.models import OhlcvBarRow
 from bolsa_infrastructure.ids import new_id
 
@@ -30,10 +30,10 @@ class SqlAlchemyOhlcvRepository:
         ]
         if date_from:
             start = date.fromisoformat(date_from[:10])
-            filters.append(OhlcvBarRow.timestamp >= datetime(start.year, start.month, start.day, tzinfo=timezone.utc))
+            filters.append(OhlcvBarRow.timestamp >= datetime(start.year, start.month, start.day, tzinfo=UTC))
         if date_to:
             end = date.fromisoformat(date_to[:10])
-            end_exclusive = datetime(end.year, end.month, end.day, tzinfo=timezone.utc) + timedelta(
+            end_exclusive = datetime(end.year, end.month, end.day, tzinfo=UTC) + timedelta(
                 days=1
             )
             filters.append(OhlcvBarRow.timestamp < end_exclusive)
@@ -126,7 +126,7 @@ class SqlAlchemyOhlcvRepository:
         if not date_keys:
             return {}
 
-        from sqlalchemy import cast, Date
+        from sqlalchemy import Date, cast
 
         unique_keys = sorted({key[:10] for key in date_keys})
         stmt = (
@@ -168,7 +168,7 @@ class SqlAlchemyOhlcvRepository:
         if not bars:
             return 0
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for bar in bars:
             bar_moment = parse_bar_timestamp(bar.timestamp)
             stmt = insert(OhlcvBarRow).values(

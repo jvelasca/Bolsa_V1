@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from bolsa_analytics.signals.fundamental_gate import (
@@ -15,9 +15,10 @@ from bolsa_analytics.signals.fundamental_screener import (
     evaluate_fundamental_candidate,
     week_key_utc,
 )
+from bolsa_domain.repositories.instrument_repository import InstrumentRepository
+
 from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
 from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
-from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 
 
 class _ListRepo(Protocol):
@@ -173,7 +174,7 @@ class RunFundamentalScreener:
             instrument_ids=instrument_ids,
             kind="snapshot",
             universe_code=f"fa_whitelist_{week}",
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=datetime.now(UTC),
             membership_changelog={
                 "source": FUNDAMENTAL_SCREENER_VERSION,
                 "weekKey": week,

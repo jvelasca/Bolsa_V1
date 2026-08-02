@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from bolsa_analytics.cognitive import (
     MarketEventCalendar,
@@ -12,7 +12,7 @@ from bolsa_analytics.cognitive import (
 
 
 def test_decay_weight_inside_window():
-    now = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 23, 12, 0, tzinfo=UTC)
     ev = build_market_event(
         entity="MACRO",
         event_type="FOMC",
@@ -29,7 +29,7 @@ def test_decay_weight_inside_window():
 
 
 def test_earnings_blackout_uses_valid_from_as_event_time():
-    now = datetime(2026, 7, 23, 12, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 23, 12, 0, tzinfo=UTC)
     earnings_at = now + timedelta(hours=24)
     cal = MarketEventCalendar()
     cal.add(
@@ -68,7 +68,7 @@ def test_earnings_blackout_uses_valid_from_as_event_time():
 
 
 def test_expired_event_has_zero_weight():
-    now = datetime(2026, 7, 23, tzinfo=timezone.utc)
+    now = datetime(2026, 7, 23, tzinfo=UTC)
     ev = build_market_event(
         entity="MSFT",
         event_type="CPI",

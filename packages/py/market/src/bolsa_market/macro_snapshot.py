@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
@@ -75,7 +75,7 @@ async def fetch_macro_snapshot_dict(
         "vix": vix,
         "vixPercentile": vix_pct,
         "yieldCurve10y2yBps": curve_bps,
-        "fetchedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "fetchedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "sourceVersion": "yahoo_macro_v1",
         "notes": ["curve=10Y−5Y (^TNX−^FVX) proxy"],
     }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.knowledge.filing_ask import (
@@ -208,7 +208,7 @@ class SummarizeInstrumentFiling:
             "engine": engine,
             "paragraphs": payload["paragraphs"],
             "disclaimer": payload["disclaimer"],
-            "summarizedAt": datetime.now(timezone.utc).isoformat(),
+            "summarizedAt": datetime.now(UTC).isoformat(),
             "provider": provider,
             "model": model,
         }

@@ -1,4 +1,6 @@
-from bolsa_infrastructure.database.repositories.account_repository import SqlAlchemyAccountRepository
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
 from bolsa_infrastructure.database.repositories.pending_order_repository import (
     SqlAlchemyPendingOrderRepository,
 )

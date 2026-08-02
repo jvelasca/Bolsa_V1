@@ -9,7 +9,7 @@ beta, ADV (null si incompletos). Filings no forman parte del card numérico.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.knowledge.as_of_cut import (
@@ -150,15 +150,15 @@ def _parse_fetched_at(value: Any) -> datetime | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _freshness(fetched_at: str | None, *, max_age_days: int = STALE_DAYS_DEFAULT) -> tuple[int | None, bool]:
     dt = _parse_fetched_at(fetched_at)
     if dt is None:
         return None, True
-    age = (datetime.now(timezone.utc) - dt).total_seconds() / 86400.0
+    age = (datetime.now(UTC) - dt).total_seconds() / 86400.0
     days = int(age) if age >= 0 else 0
     return days, days > max_age_days
 

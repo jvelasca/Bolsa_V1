@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -127,7 +127,7 @@ def build_evidence_assessment(
         assessment_id=assessment_id or f"EA-{uuid4().hex[:12]}",
         instrument_id=instrument_id,
         timestamp=edge_report.created_at
-        or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         score=score,
         confidence=conf,
         band=edge_report.band,

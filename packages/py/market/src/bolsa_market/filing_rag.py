@@ -49,8 +49,7 @@ def chunk_text(
     cleaned = (text or "").strip()
     if not cleaned:
         return []
-    if chunk_size < 200:
-        chunk_size = 200
+    chunk_size = max(chunk_size, 200)
     if overlap < 0 or overlap >= chunk_size:
         overlap = max(0, chunk_size // 6)
 

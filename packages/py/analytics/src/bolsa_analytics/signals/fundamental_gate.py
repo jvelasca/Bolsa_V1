@@ -6,7 +6,7 @@ y aplica bandas sectoriales si `sectorBandsVersion` está presente.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.signals.sector_bands import (
@@ -201,7 +201,7 @@ def _is_stale(fundamentals: dict[str, Any], max_age_days: int) -> bool:
         fetched = datetime.fromisoformat(fetched_at.replace("Z", "+00:00"))
     except ValueError:
         return True
-    age = datetime.now(timezone.utc) - fetched.astimezone(timezone.utc)
+    age = datetime.now(UTC) - fetched.astimezone(UTC)
     return age.days > max_age_days
 
 

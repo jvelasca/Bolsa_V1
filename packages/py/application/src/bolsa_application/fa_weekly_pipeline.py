@@ -7,7 +7,7 @@ Execute sigue gated por ``PAPER_D_EXECUTE`` (no lo activa este módulo).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 from zoneinfo import ZoneInfo
 
@@ -160,7 +160,7 @@ class RunFaWeeklyPipeline:
                 "screener": screener_result,
                 "propose": None,
                 "notes": notes,
-                "generatedAt": datetime.now(timezone.utc).isoformat(),
+                "generatedAt": datetime.now(UTC).isoformat(),
             }
 
         propose_result = await self._propose.execute(
@@ -188,5 +188,5 @@ class RunFaWeeklyPipeline:
             "screener": screener_result,
             "propose": propose_result,
             "notes": notes,
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "generatedAt": datetime.now(UTC).isoformat(),
         }

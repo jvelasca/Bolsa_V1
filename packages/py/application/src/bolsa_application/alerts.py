@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from bolsa_application.market import GetInstrumentLiveQuote
 from bolsa_infrastructure.database.repositories.alert_repository import (
     AlertCondition,
     AlertPriceSource,
@@ -11,6 +10,8 @@ from bolsa_infrastructure.database.repositories.alert_repository import (
 from bolsa_infrastructure.database.repositories.instrument_repository import (
     SqlAlchemyInstrumentRepository,
 )
+
+from bolsa_application.market import GetInstrumentLiveQuote
 
 
 @dataclass(frozen=True, slots=True)

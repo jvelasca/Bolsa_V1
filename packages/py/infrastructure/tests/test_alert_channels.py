@@ -11,7 +11,9 @@ from bolsa_infrastructure.alerts.alert_channels import (
     validate_alert_channel_config,
 )
 from bolsa_infrastructure.config import Settings
-from bolsa_infrastructure.database.repositories.signal_alert_repository import SignalAlertSubscriptionRecord
+from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+    SignalAlertSubscriptionRecord,
+)
 
 
 class _FakeSignal:

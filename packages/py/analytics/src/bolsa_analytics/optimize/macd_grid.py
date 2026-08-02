@@ -105,12 +105,10 @@ def _simulate_macd_signal_cross(
 
         equity = cash + shares * price
         equity_values.append(equity)
-        if equity > peak:
-            peak = equity
+        peak = max(peak, equity)
         if peak > 0:
             drawdown = ((peak - equity) / peak) * 100
-            if drawdown > max_drawdown:
-                max_drawdown = drawdown
+            max_drawdown = max(max_drawdown, drawdown)
 
     if not equity_values:
         raise ValueError("trade_from_index deja el tramo de trading vacío")

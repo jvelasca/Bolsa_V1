@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_analytics.features.catalog import FeatureCatalog, bootstrap_catalog
@@ -91,9 +91,9 @@ def materialize_feature_snapshot(
     try:
         timestamp = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
     except ValueError:
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
     if timestamp.tzinfo is None:
-        timestamp = timestamp.replace(tzinfo=timezone.utc)
+        timestamp = timestamp.replace(tzinfo=UTC)
     return adapter.materialize_latest_from_values(
         instrument_id=instrument_id,
         feature_set_id=feature_set_id,

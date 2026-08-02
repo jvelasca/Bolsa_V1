@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
 from bolsa_infrastructure.database.models import BeliefHistoryRow, HypothesisBeliefRow
 from bolsa_infrastructure.ids import new_id
 
@@ -82,7 +82,7 @@ class SqlAlchemyHypothesisBeliefRepository:
         math_version: str,
         belief_id: str | None = None,
     ) -> HypothesisBelief:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing = await self.get_by_hypothesis_id(hypothesis_id)
         if existing is None:
             row = HypothesisBeliefRow(
@@ -151,7 +151,7 @@ class SqlAlchemyHypothesisBeliefRepository:
             trigger_evidence_id=trigger_evidence_id,
             delta=delta,
             math_version=math_version,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()

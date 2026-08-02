@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
-from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
 from bolsa_market.fundamentals_as_of import extract_statement_pack
+from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
 
 
 def _raw(node: Any) -> Any:
@@ -170,7 +170,7 @@ def build_profile_snapshot(
     history = dividend_history or []
 
     return {
-        "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "fetchedAt": datetime.now(UTC).isoformat(),
         "fundamentals": fundamentals,
         "statementPack": statement_pack,
         "basic": {"sections": basic_sections},

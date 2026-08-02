@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from bolsa_infrastructure.database.models import TrackerDefinitionRow
 from bolsa_infrastructure.ids import new_id
 

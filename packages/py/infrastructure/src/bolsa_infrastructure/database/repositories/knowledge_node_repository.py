@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
 from bolsa_infrastructure.database.models import KnowledgeNodeRow
 from bolsa_infrastructure.ids import new_id
 
@@ -58,7 +58,7 @@ class SqlAlchemyKnowledgeNodeRepository:
         notes: str | None = None,
         node_id: str | None = None,
     ) -> KnowledgeNode:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = KnowledgeNodeRow(
             id=node_id or new_id(),
             hypothesis_id=hypothesis_id,
@@ -127,6 +127,6 @@ class SqlAlchemyKnowledgeNodeRepository:
         if row is None:
             return None
         row.stage = stage
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return self._map(row)

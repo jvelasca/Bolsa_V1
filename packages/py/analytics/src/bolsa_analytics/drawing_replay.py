@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 
@@ -29,7 +29,7 @@ def _parse_bar_time_ms(timestamp: str) -> float:
     normalized = timestamp if "T" in timestamp else f"{timestamp}T00:00:00.000Z"
     dt = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     return dt.timestamp() * 1000
 
 

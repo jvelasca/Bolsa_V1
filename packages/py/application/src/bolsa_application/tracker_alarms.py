@@ -10,10 +10,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from bolsa_application.execution_router import ExecutionRouteResult, ExecutionRouter
-from bolsa_application.scans import ScanHit
 from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
+
+from bolsa_application.execution_router import ExecutionRouter, ExecutionRouteResult
+from bolsa_application.scans import ScanHit
 
 logger = logging.getLogger(__name__)
 

@@ -13,14 +13,17 @@ from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.repositories.sync_log_repository import SyncLogRepository
 from bolsa_domain.value_objects.market import SyncResult
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
+from bolsa_infrastructure.database.repositories.ohlcv_repository import SqlAlchemyOhlcvRepository
 from bolsa_market.ingest import OhlcvBarIngest
 from bolsa_market.ohlcv_consolidation import plan_daily_consolidation
 from bolsa_market.sanity import run_sanity_checks
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
+
 from bolsa_application.refresh_instrument_fundamentals import RefreshInstrumentFundamentals
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
-from bolsa_infrastructure.database.repositories.ohlcv_repository import SqlAlchemyOhlcvRepository
 
 
 def resolve_sync_date_range(
@@ -34,8 +37,7 @@ def resolve_sync_date_range(
     if latest_bar_date:
         latest = date.fromisoformat(latest_bar_date[:10])
         from_date = latest - timedelta(days=overlap_days)
-        if from_date > to_date:
-            from_date = to_date
+        from_date = min(from_date, to_date)
         return from_date, to_date, True
 
     from_date = date(to_date.year - years_back, to_date.month, to_date.day)

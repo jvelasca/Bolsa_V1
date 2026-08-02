@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
+from bolsa_domain.entities.research_trial import ResearchTrial
 from sqlalchemy import Float, and_, asc, cast, desc, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.research_trial import ResearchTrial
 from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
 from bolsa_infrastructure.ids import new_id
 
@@ -87,7 +87,7 @@ class SqlAlchemyResearchTrialRepository:
             parent_trial_id=parent_trial_id,
             fail_code=fail_code,
             manifest_ref=manifest_ref,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()

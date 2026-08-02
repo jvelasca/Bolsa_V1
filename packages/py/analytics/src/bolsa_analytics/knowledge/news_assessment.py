@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Sequence
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
-from bolsa_analytics.cognitive.market_events import MarketEvent, MarketEventCalendar, event_decay_weight
+from bolsa_analytics.cognitive.market_events import (
+    MarketEvent,
+    MarketEventCalendar,
+    event_decay_weight,
+)
 from bolsa_analytics.knowledge.assessment import Assessment
 from bolsa_analytics.knowledge.technical_assessment import (
     BEARISH_THRESHOLD,
@@ -104,8 +109,8 @@ def build_news_assessment(
     Agrega sentiment×decay de eventos activos.
     Sin eventos → score 0, coverage baja, warning news_unavailable.
     """
-    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-    now = datetime.now(timezone.utc)
+    ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC)
     sym = (symbol or instrument_id).upper()
 
     weighted: list[tuple[MarketEvent, float]] = []

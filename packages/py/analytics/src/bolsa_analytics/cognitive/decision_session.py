@@ -5,9 +5,10 @@ Session ≠ Memory: Memory = outcome del Gate; Session = caja negra del propose/
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Any, Literal, Sequence
+from datetime import UTC, datetime
+from typing import Any, Literal
 from uuid import uuid4
 
 from bolsa_analytics.cognitive.weight_rules import WEIGHT_RULES_VERSION, WeightRuleResult
@@ -165,7 +166,7 @@ def build_propose_session(
             missing=missing_assessments,
             policy_id=policy_version,
         )
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     rec_id = recommendation.get("recommendationId") or recommendation.get("id")
     return DecisionSession(
         session_id=new_session_id(),
@@ -227,7 +228,7 @@ def build_auto_session(
     status: SessionStatus = "open",
 ) -> DecisionSession:
     """Session de follow-up (confirm / paper_auto / live_dry_run) — no re-ejecuta Runtime."""
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     lin = dict(lineage or {})
     if parent_session_id:
         lin["parentSessionId"] = parent_session_id

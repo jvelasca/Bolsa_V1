@@ -4,8 +4,13 @@ from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from bolsa_domain.platform_kernel import DEFAULT_SIGNAL_KINDS, validate_execution_mode
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
-from bolsa_infrastructure.alerts.alert_channels import normalize_alert_channels, validate_alert_channel_config
-from bolsa_infrastructure.database.repositories.account_repository import SqlAlchemyAccountRepository
+from bolsa_infrastructure.alerts.alert_channels import (
+    normalize_alert_channels,
+    validate_alert_channel_config,
+)
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
 
 
 def build_execution_policy_definition(

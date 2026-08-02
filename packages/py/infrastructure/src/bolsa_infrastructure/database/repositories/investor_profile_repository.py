@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorProfileRow
 from bolsa_infrastructure.ids import new_id
 

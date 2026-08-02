@@ -31,9 +31,7 @@ def _pivot_indices(values: list[float], *, kind: str, window: int = 3) -> list[i
     for index in range(window, len(values) - window):
         segment = values[index - window : index + window + 1]
         center = values[index]
-        if kind == "high" and center == max(segment):
-            pivots.append(index)
-        elif kind == "low" and center == min(segment):
+        if kind == "high" and center == max(segment) or kind == "low" and center == min(segment):
             pivots.append(index)
     return pivots
 

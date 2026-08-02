@@ -1,4 +1,4 @@
-from bolsa_analytics.indicators.compute import OhlcvBar, compute_spec, IndicatorSpecInput
+from bolsa_analytics.indicators.compute import IndicatorSpecInput, OhlcvBar, compute_spec
 
 
 def _bars(count: int = 120) -> list[OhlcvBar]:

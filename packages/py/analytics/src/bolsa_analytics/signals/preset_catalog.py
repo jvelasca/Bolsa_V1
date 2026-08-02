@@ -4,21 +4,13 @@
 
 from __future__ import annotations
 
-
-
 import json
-
 import os
-
 from functools import lru_cache
-
 from pathlib import Path
+from typing import Any, Literal, TypeGuard
 
-from typing import Any, Literal, TypeAlias, TypeGuard
-
-
-
-PresetStrategyType: TypeAlias = str
+type PresetStrategyType = str
 
 
 

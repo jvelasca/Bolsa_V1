@@ -46,6 +46,8 @@ jobs:
           cache: 'pnpm'
       - name: Install Python packages
         run: |
-          pip install -e packages/py/domain -e packages/py/analytics -e packages/py/market -e packages/py/infrastructure -e packages/py/application -e "apps/api-python[dev]"
+          pip install -e packages/py/domain -e packages/py/ai -e packages/py/analytics \
+            -e packages/py/market -e packages/py/infrastructure -e packages/py/application \
+            -e "apps/api-python[dev]"
       - name: Fase 2 battery
         run: pnpm test:fase2

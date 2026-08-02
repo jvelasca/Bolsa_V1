@@ -1005,7 +1005,10 @@ def compute_spec(bars: list[OhlcvBar], spec: IndicatorSpecInput) -> ComputedSpec
                 combined.append(max(0.0, min(100.0, setup * setup_ratio + data * data_ratio)))
         lines.append(ComputedLine(key="main", points=_series_from_values(bars, combined)))
     elif definition_id == "strategy_hybrid_score_v1":
-        from bolsa_analytics.signals.preset_catalog import preset_indicator_specs, preset_rule_groups
+        from bolsa_analytics.signals.preset_catalog import (
+            preset_indicator_specs,
+            preset_rule_groups,
+        )
         from bolsa_analytics.signals.rules_engine import compute_rule_group_pass_series
         from bolsa_analytics.signals.technical_rating_v1 import compute_technical_rating_series_v1
 

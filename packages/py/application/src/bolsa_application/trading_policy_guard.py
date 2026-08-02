@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.decision_memory import DecisionMemoryEntry
@@ -11,7 +12,10 @@ from bolsa_analytics.cognitive.gate_decision import ProposedTradeContext, gate_d
 from bolsa_analytics.cognitive.market_events import MarketEventCalendar
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
 from bolsa_analytics.cognitive.trading_policy_templates import get_policy_template
-from bolsa_analytics.knowledge.decision_package_ta import DecisionPackageTa, build_decision_package_ta
+from bolsa_analytics.knowledge.decision_package_ta import (
+    DecisionPackageTa,
+    build_decision_package_ta,
+)
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
@@ -119,7 +123,7 @@ def enforce_cognitive_policy_for_opening(
 
             package = replace(package, action=action)
     else:
-        from datetime import datetime, timezone
+        from datetime import datetime
         from uuid import uuid4
 
         from bolsa_analytics.knowledge.decision_package_ta import DecisionMetrics
@@ -127,7 +131,7 @@ def enforce_cognitive_policy_for_opening(
         package = DecisionPackageTa(
             decision_id=f"DEC-{uuid4().hex[:12]}",
             instrument_id=instrument_id,
-            timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             action=action,
             overall_confidence=0.5,
             metrics=DecisionMetrics(

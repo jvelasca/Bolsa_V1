@@ -11,7 +11,10 @@ from bolsa_analytics.cost_model_v2 import (
     resolve_bar_costs_v2,
 )
 from bolsa_analytics.indicators.compute import OhlcvBar
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key, strategy_definition_from_preset
+from bolsa_analytics.signals.preset_catalog import (
+    is_valid_preset_key,
+    strategy_definition_from_preset,
+)
 from bolsa_analytics.signals.preset_rules import enrich_definition_with_preset_rules
 from bolsa_analytics.signals.rules_engine import (
     build_indicator_context,
@@ -124,12 +127,10 @@ def _compute_max_drawdown(equity_curve: list[float]) -> float:
     max_drawdown = 0.0
 
     for equity in equity_curve:
-        if equity > peak:
-            peak = equity
+        peak = max(peak, equity)
         if peak > 0:
             drawdown = ((peak - equity) / peak) * 100
-            if drawdown > max_drawdown:
-                max_drawdown = drawdown
+            max_drawdown = max(max_drawdown, drawdown)
 
     return max_drawdown
 
