@@ -3,13 +3,15 @@
 Registro **ligero** de issues del laboratorio. No son tickets de producto ni ADR.
 No abren Fase 2 ni entidades nuevas.
 
+**Higiene 2026-08-03:** Open = vigilancia / bloqueados; Closed = entregado o ops resuelto.
+
 ## Open
 
-### CORE-R continuous-strategy-reevaluation · **CRÍTICO**
+### CORE-R continuous-strategy-reevaluation · **vigilancia**
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · **v0–v1.12** (… + PnL live + **toast remoto** multi-dispositivo) |
+| Estado | Open · **v0–v1.12** entregado · vigilar uso real |
 | Severidad | **Crítica (producto a medio plazo)** |
 | Origen | Decisión usuario 2026-07-29 (tras pulir Lista AUTO) |
 | Código | `core-r-judgment.ts` · `core-r-scheduler.ts` · `core-r-scheduler-host.tsx` · `core_r_review_evidence.py` · Monitor · tablero Lista AUTO |
@@ -17,63 +19,15 @@ No abren Fase 2 ni entidades nuevas.
 
 **Idea:** de forma **periódica** (manual y automática), volver a evaluar si la estrategia / Finalistas **en curso** siguen siendo los adecuados o conviene **mejorar / optimizar / cambiar**.
 
-**Hecho (v0):** juicio heurístico post-settle (`keep` / `fresh_ok` / `review_lab` / `consider_replace` / `profile_mismatch` / `skipped_weak`) · columna Reeval + acciones Lab/Finalistas/F3/Checklist · «Reevaluar resto» (forceRescan) · informe `bolsa-core-r-report-v1` · badge Monitor. **No** pisa `active`. **No** auto-paper D.
+**Entregado (v0–v1.12):** juicio heurístico · cola Monitor · OOS/PnL · narración · cron shell · chip/toast · Hecho todos · BD multi-dispositivo · cron servidor (`CORE_R_CRON_ENABLED`, off) · PnL en cron · toast remoto. **No** pisa `active`. **No** auto-paper D.
 
-**Hecho (v1 · 2026-07-30):** Monitor → **Encolar revisiones** desde informe · cola persistida `bolsa-core-r-review-queue-v1` · deep-link + Hecho. Humano; sin cron servidor.
-
-**Hecho (v1.1 OOS):** `coreROosDegradation` (PBO / credibilidad / retorno OOS / edge band) alimenta juicio desde stash Lab · no pisa `active`.
-
-**Hecho (v1.2 · 2026-07-31):** PnL live DEMO/paper en Monitor (`getAccountSummary`) · match `simulated` preferido · degradación −5% `review_lab` / −10% `consider_replace` → cola · **scheduler lite** (`bolsa-core-r-scheduler-v1`) solo mientras el panel está abierto.
-
-**Hecho (v1.3 · 2026-07-31):** **Narrar cola** — Evidence heurística + Proxy First (`POST /api/ai/core-r/review-evidence`). LLM solo narra; sin FA/Coach/overwrite TOP.
-
-**Hecho (v1.4 · 2026-07-31):** **Cron shell** — `CoreRSchedulerHost` en PlatformShell; ticks con app abierta (`scope=shell` + `listId`). Cola sigue en localStorage (no multi-dispositivo).
-
-**Hecho (v1.5 · 2026-07-31):** **Chip barra** — si hay cola abierta, «CORE-R N» en hilos de la barra Trading → Ayuda · Monitor (`openHelpBacktesting`). Deep-link hub: `/backtests?tab=run&focus=monitor`.
-
-**Hecho (v1.6 · 2026-07-31):** **Toast al encolar** — `CoreRSchedulerHost` escucha tick; si `added > 0` → toast («revisa Monitor / chip»). Sin ruido en ticks vacíos.
-
-**Hecho (v1.7 · 2026-07-31):** Toast con acción **Abrir Monitor** (`openHelpBacktesting`).
-
-**Hecho (v1.8 · 2026-08-01):** **Hecho todos** en Monitor (lista actual) · `dismissOpen` · regresión chip (selector zustand estable).
-
-**Hecho (v1.9 · Q3.4 · 2026-08-02):** tabla `core_r_account_state` + `GET\|PUT /api/accounts/{id}/core-r` + `core-r-sync.ts` (hydrate en `CoreRSchedulerHost`; LS = cache). Multi-dispositivo para cola/informe/scheduler prefs.
-
-**Hecho (v1.10 · cron servidor · 2026-08-02):** worker `CORE_R_CRON_ENABLED` (off-by-default) + `POST /api/core-r/cron/tick?force=` · re-encola desde `reports_json` sin app abierta.
-
-**Hecho (v1.11 · PnL en cron · 2026-08-02):** mismo tick incluye degradación DEMO/paper (−5% `review_lab` / −10% `consider_replace`) vía `ListAccountSummaries` + TOP match (prefer `simulated`). `include_pnl=false` opcional en el endpoint. Sin TOP overwrite · sin auto-paper.
-
-**Hecho (v1.12 · toast remoto · 2026-08-02):** señal `lastRemoteEnqueueAt` / `lastRemoteEnqueueAdded` en blob scheduler · `CoreRSchedulerHost` poll 60s → toast «Abrir Monitor» en otros dispositivos (dedupe `bolsa-core-r-last-seen-remote-enqueue`).
-
-**Pendiente:** ninguno crítico en CORE-R cola/cron (vigilar uso real).
+**Pendiente:** ninguno crítico en cola/cron — vigilar uso real; issues cortas si falla.
 
 **Ops:** `pnpm test:operativa` · `pnpm test:operativa:smoke` (API opcional).
 
 ---
 
-### CORE-P profile-coach-lab-binding
-
-| Campo | Valor |
-|-------|--------|
-| Estado | Closed · **v1 + deep-dive + E2E live smoke** · BETA1 vigilancia |
-| Severidad | Alta (coherencia inversor ↔ estrategias) |
-| Origen | Decisión producto 2026-07-29 (Asistente 1-Play) |
-| Doc | `docs/engineering/profile-coach-lab-binding.md` · funnel design §3 |
-| Código | `coach-profile-policy.ts` · explore stamp · Lab DD · rail · invalidate ciclo |
-
-**Hecho (v0):** `allowLabIfWeak` desde `riskTolerance`; gate Universo→Lab; `skip_lab` → Lista AUTO next.
-
-**Hecho (v1):** stamp `profileId`/`policyVersion` en Finalistas; techo DD Lab (`maxDrawdownSoftPct`); fingerprint frescura con perfil; rail «Perfil: …»; abort ciclo al cambiar cuenta/perfil; tests multi-perfil.
-
-**Hecho (deep-dive):** `preferredLabFamiliesForHorizon` + hint/orden · `resolveDefaultLabFamily` · soft-bias espacio por riesgo · aviso `activeTopProfileMismatch`.
-
-**Hecho (E2E live · 2026-08-01):** `verify_core_p_api_smoke.py` · `pnpm test:coach:smoke` (fase 2 de `test:coach`, SKIP si API down). ASGI: `apps/api-python/tests/integration/test_core_p_multi_profile.py` (con DB). Offline: `coach-profile-battery-scenario.test.ts`.
-
-**Pendiente (BETA1):** vigilar simulaciones multi-perfil en uso real — issues cortas si falla; no reabrir congelados.
-
----
-
-### CORE-A coach-soft
+### CORE-A coach-soft · **bloqueado**
 
 | Campo | Valor |
 |-------|--------|
@@ -88,55 +42,66 @@ No abren Fase 2 ni entidades nuevas.
 
 ---
 
-### CORE-B lab-adoption-memory
+### CORE-B lab-adoption-memory · **parked**
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · **v0.2 en código** · iteraciones pendientes |
+| Estado | Open · **v0.2 en código** · sin más UI Lab |
 | Severidad | Media (aprendizaje Lab entre pasadas) |
 | Origen | Funnel design §6 · tras CORE A |
 | Código | `lab-adoption-memory.ts` · `backtest-optimize-heatmap.ts` · optimize panel · explore stamp |
 
-**Hecho (v0):** memoria localStorage del último Mejor; espacio guiado SMA/RSI; hint UI; stamp `labAdoption` en Finalistas post-Lab.
-
-**Hecho (v0.1 · 2026-08-01):** al adoptar/guardar Mejor se persiste snapshot de meseta heatmap (`plateau`); espacio guiado **más ancho** si meseta, **más estrecho** si pico; hint «· meseta / · pico».
-
-**Hecho (v0.2 · 2026-08-01):** sin semilla Coach, Lab elige familia por `resolveDefaultLabFamily` (adopción → horizonte perfil → SMA); elección manual no se pisa. Hint/orden de familias ya en CORE-P.
+**Hecho (v0–v0.2):** memoria último Mejor · meseta heatmap → espacio · `resolveDefaultLabFamily` sin semilla Coach · stamp `labAdoption`.
 
 **Pendiente:** no reabre Lab UI P3–P9 / Discovery.
 
 ---
 
-### finalists-top-without-runid (AENA)
+## Closed
+
+### CORE-P profile-coach-lab-binding · 2026-08-01
 
 | Campo | Valor |
 |-------|--------|
-| Estado | **Closed** (dato OK en live 2026-07-29; prevención en código) |
-| Severidad | Alta (Camino A Checklist roto para ese valor) |
-| Origen | `pnpm audit:ibex35` / `audit_ibex35_operativa.py` 2026-07-29 |
-| Hallazgo | AENA TOP `active` + `lab_validated` **sin `runId`** en slots |
+| Estado | Closed · **v1 + deep-dive + E2E live smoke** · BETA1 vigilancia |
+| Severidad | Alta (coherencia inversor ↔ estrategias) |
+| Origen | Decisión producto 2026-07-29 (Asistente 1-Play) |
+| Doc | `docs/engineering/profile-coach-lab-binding.md` · funnel design §3 |
+| Código | `coach-profile-policy.ts` · explore stamp · Lab DD · rail · invalidate ciclo |
 
-**Problema:** Finalistas Checklist no puede abrir el run; el usuario queda en mensaje «sin run guardado».
+**Hecho:** gate Lab · stamp perfil · techo DD · familias/horizonte · mismatch · soft-bias · `pnpm test:coach:smoke` / ASGI multi-perfil.
 
-**Hecho:** API/app rechazan upsert `lab_validated`/`active` sin `runId` · promote TS exige runId · `pnpm backfill:top-runids -- --symbol AENA --dry-run` → `ya OK` · `TOP_sin_runId (0)`.
+**Vigilancia BETA1:** simulaciones multi-perfil en uso real — issues cortas si falla; no reabrir congelados.
 
-**Si reaparece:** `pnpm backfill:top-runids -- --symbol SYM --apply` o re-Lab.
+---
 
-### list-auto-freshness-restart
+### list-auto-freshness-restart · 2026-08-01
 
 | Campo | Valor |
 |-------|--------|
-| Estado | **Fixed** 2026-07-30 (v1.2) · **histéresis v1.3** 2026-08-01 |
+| Estado | Closed · Fixed v1.2 (2026-07-30) · histéresis **v1.3** 2026-08-01 |
 | Severidad | Alta (recomputaba IBEX tras reinicio / 1 barra) |
 | Código | `backtest-finalists-freshness.ts` · run-context · gate perfil en `backtests-page` |
 
-**Problema:** Play tras reinicio re-analizaba todos los valores aunque el análisis fuese de minutos atrás. Además 1 barra nueva invalidaba toda la huella.
+**Problema:** Play tras reinicio re-analizaba todos los valores; 1 barra nueva invalidaba la huella.
 
-**Hecho v1.2:** omitir solo con Finalistas reales + huella · esperar perfil · persistir run-context · no forzar Universo si falla TOP.
+**Fix:** omitir con Finalistas + huella · histéresis `lastBarDate` (`1d` ≤5 días → `bar_hysteresis`); «Reevaluar resto» fuerza.
 
-**Hecho v1.3:** histéresis `lastBarDate` (`1d` ≤5 días calendario → `bar_hysteresis`; stamp no desliza; «Reevaluar resto» fuerza).
+---
 
-## Closed
+### finalists-top-without-runid (AENA) · 2026-07-29
+
+| Campo | Valor |
+|-------|--------|
+| Estado | Closed (dato OK + prevención en código) |
+| Severidad | Alta (Camino A Checklist roto para ese valor) |
+| Origen | `pnpm audit:ibex35` / `audit_ibex35_operativa.py` 2026-07-29 |
+
+**Problema:** TOP `lab_validated`/`active` sin `runId` → Checklist «sin run guardado».
+
+**Fix:** API/app rechazan upsert sin `runId` · promote exige runId · `pnpm backfill:top-runids`. Si reaparece: backfill `--apply` o re-Lab.
+
+---
 
 ### ibex35-partial-tops-coverage · 2026-08-03
 

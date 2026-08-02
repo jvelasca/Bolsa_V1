@@ -61,7 +61,7 @@ describe('backtesting-tracker help guides', () => {
     expect(dia?.title).toMatch(/v0\.11/);
     expect(dia?.plain).toMatch(/efímero|LAB|hub|verificación/i);
     expect(cr?.status).toBe('listo');
-    expect(cr?.plain).toMatch(/v1\.8|Hecho todos|toast/i);
+    expect(cr?.plain).toMatch(/v1\.12|Hecho todos|toast/i);
     expect(lab?.status).toBe('listo');
     expect(lab?.plain).toMatch(/meseta|horizonte|CORE-B/i);
     expect(fresh?.plain).toMatch(/v1\.3|bar_hysteresis|histéresis/i);
@@ -71,7 +71,7 @@ describe('backtesting-tracker help guides', () => {
     const next = BACKTESTING_NEXT.join(' ');
     expect(next).toMatch(/test:operativa/);
     expect(next).toMatch(/operativa-test-plan|D1|smoke/i);
-    expect(next).toMatch(/multi-dispositivo|Congelado|P3–P9/i);
+    expect(next).toMatch(/Congelado|P3–P9|Belief|CORE_R_CRON/i);
     expect(next).toMatch(/handoff-2026-08-01/);
   });
 });

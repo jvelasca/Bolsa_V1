@@ -211,3 +211,5 @@ Abrir **solo** si Q0–Q1 hechos y hay demanda explícita:
 | Fase H | No abierta |
 
 **No hecho a propósito:** C4, Belief Fase 2, OTel, DuckDB, Monte Carlo, Strategy Studio.
+
+**Higiene ISSUES (2026-08-03):** Open = CORE-R vigilancia · CORE-A bloqueado Belief · CORE-B parked; Closed incluye CORE-P, frescura Lista AUTO, IBEX TOP 35/35, warm-up Q1.6, MACD signal.

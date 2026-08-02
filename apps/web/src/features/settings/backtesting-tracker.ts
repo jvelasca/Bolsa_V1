@@ -3,7 +3,7 @@
  * Resumen no técnico primero; pantallas, seguimiento de plataforma y detalle después.
  * El detalle vivo está en docs (no duplicar aquí el lifecycle completo).
  *
- * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.9 BD + CORE-B v0.2 + ADR-019 universos (2026-08-02).
+ * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.12 + CORE-B v0.2 + ADR-019 universos (2026-08-03).
  *
  * @see docs/HELP.md
  * @see docs/engineering/research-lifecycle.md
@@ -330,7 +330,7 @@ export const BACKTESTING_NEXT = [
   'Checklist FA APP: refresh · Tarjeta CAPM/ADV · Screener · Paper D dry-run',
   'Ops: pnpm test:operativa · test:operativa:smoke · test:fa · test:coach',
   'Handoff: docs/engineering/session-handoff-2026-08-01.md',
-  'Congelado: auto-paper D · Lab P3–P9 / Belief · CORE-R multi-dispositivo',
+  'Congelado: auto-paper D · Lab P3–P9 / Belief · activar CORE_R_CRON / COST_MODEL_V2 sin decisión ops',
 ] as const;
 
 export function backtestingStatusLabel(
