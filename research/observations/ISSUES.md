@@ -23,7 +23,7 @@ No abren Fase 2 ni entidades nuevas.
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · **v0–v1.10** (… + BD blob + **cron servidor** gated) · PnL en cron servidor aún no |
+| Estado | Open · **v0–v1.11** (… + BD blob + cron servidor + **PnL live** en tick) · toast remoto aún no |
 | Severidad | **Crítica (producto a medio plazo)** |
 | Origen | Decisión usuario 2026-07-29 (tras pulir Lista AUTO) |
 | Código | `core-r-judgment.ts` · `core-r-scheduler.ts` · `core-r-scheduler-host.tsx` · `core_r_review_evidence.py` · Monitor · tablero Lista AUTO |
@@ -53,9 +53,11 @@ No abren Fase 2 ni entidades nuevas.
 
 **Hecho (v1.9 · Q3.4 · 2026-08-02):** tabla `core_r_account_state` + `GET\|PUT /api/accounts/{id}/core-r` + `core-r-sync.ts` (hydrate en `CoreRSchedulerHost`; LS = cache). Multi-dispositivo para cola/informe/scheduler prefs.
 
-**Hecho (v1.10 · cron servidor · 2026-08-02):** worker `CORE_R_CRON_ENABLED` (off-by-default) + `POST /api/core-r/cron/tick?force=` · re-encola desde `reports_json` sin app abierta. Shell host sigue útil para PnL DEMO.
+**Hecho (v1.10 · cron servidor · 2026-08-02):** worker `CORE_R_CRON_ENABLED` (off-by-default) + `POST /api/core-r/cron/tick?force=` · re-encola desde `reports_json` sin app abierta.
 
-**Pendiente:** PnL live en tick servidor; toast remoto multi-dispositivo.
+**Hecho (v1.11 · PnL en cron · 2026-08-02):** mismo tick incluye degradación DEMO/paper (−5% `review_lab` / −10% `consider_replace`) vía `ListAccountSummaries` + TOP match (prefer `simulated`). `include_pnl=false` opcional en el endpoint. Sin TOP overwrite · sin auto-paper.
+
+**Pendiente:** toast remoto multi-dispositivo.
 
 **Ops:** `pnpm test:operativa` · `pnpm test:operativa:smoke` (API opcional).
 

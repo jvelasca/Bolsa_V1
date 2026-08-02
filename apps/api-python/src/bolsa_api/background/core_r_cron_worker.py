@@ -1,4 +1,4 @@
-"""Worker — CORE-R cron servidor (re-encola desde informes BD).
+"""Worker — CORE-R cron servidor (informe BD + PnL DEMO).
 
 Off-by-default: ``CORE_R_CRON_ENABLED=false``.
 Solo actúa sobre cuentas con ``scheduler.enabled`` + ``listId`` en blob.
@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.repositories.core_r_repository import SqlAlchemyCoreRRepository
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ logger = logging.getLogger(__name__)
 async def _run_core_r_cron_once(session_factory: async_sessionmaker[AsyncSession]) -> dict:
     async with session_factory() as session:
         try:
-            result = await RunCoreRServerCron(SqlAlchemyCoreRRepository(session)).execute()
+            result = await RunCoreRServerCron(session).execute()
             await session.commit()
             if result.get("ticked"):
                 logger.info(

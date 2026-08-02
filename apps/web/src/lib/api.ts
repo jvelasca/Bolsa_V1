@@ -826,16 +826,21 @@ export const api = {
       { method: 'PUT', body: JSON.stringify(body) },
     ),
 
-  /** Ops: tick CORE-R servidor (re-encola desde informes BD). */
-  runCoreRCronTick: (force = false) =>
-    request<{
+  /** Ops: tick CORE-R servidor (informe BD + PnL DEMO). */
+  runCoreRCronTick: (force = false, includePnl = true) => {
+    const q = new URLSearchParams();
+    if (force) q.set('force', 'true');
+    if (!includePnl) q.set('include_pnl', 'false');
+    const qs = q.toString();
+    return request<{
       data: {
         accounts: number;
         ticked: number;
         totalAdded: number;
         results: Array<Record<string, unknown>>;
       };
-    }>(`/api/core-r/cron/tick${force ? '?force=true' : ''}`, { method: 'POST' }),
+    }>(`/api/core-r/cron/tick${qs ? `?${qs}` : ''}`, { method: 'POST' });
+  },
 
   queryInstrumentStrategyTops: (body: {
     instrumentIds: string[];

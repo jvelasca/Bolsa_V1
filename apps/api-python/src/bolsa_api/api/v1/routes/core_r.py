@@ -90,11 +90,12 @@ async def sync_account_core_r(
 async def run_core_r_cron_tick(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     force: bool = Query(default=False, description="Ignora intervalMinutes"),
+    include_pnl: bool = Query(default=True, description="Incluye degradación PnL DEMO/paper"),
 ) -> dict[str, Any]:
     """
     Ops: un tick CORE-R servidor sobre todos los blobs.
-    Re-encola desde ``reports_json`` si scheduler.enabled + listId.
+    Re-encola desde ``reports_json`` + PnL DEMO (−5/−10) si scheduler.enabled + listId.
     No Lista AUTO · no TOP · no paper.
     """
-    result = await RunCoreRServerCron(SqlAlchemyCoreRRepository(session)).execute(force=force)
+    result = await RunCoreRServerCron(session).execute(force=force, include_pnl=include_pnl)
     return {"data": result}
