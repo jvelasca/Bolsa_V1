@@ -30,7 +30,9 @@ from bolsa_application.signal_alerts import (
     ResetSignalAlertDedupe,
 )
 from bolsa_infrastructure.alerts.alert_channels import AlertChannelDispatchResult
-from bolsa_infrastructure.database.repositories.signal_alert_repository import SignalAlertSubscriptionRecord
+from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+    SignalAlertSubscriptionRecord,
+)
 
 router = APIRouter()
 
@@ -138,7 +140,10 @@ async def delete_signal_alert(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/signal-alerts/{subscription_id}/reset-dedupe", response_model=SignalAlertSubscriptionResponseDto)
+@router.post(
+    "/signal-alerts/{subscription_id}/reset-dedupe",
+    response_model=SignalAlertSubscriptionResponseDto,
+)
 async def reset_signal_alert_dedupe(
     subscription_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],

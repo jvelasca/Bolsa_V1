@@ -3,7 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_api.api.dependencies import get_db_session, get_fx_rate_use_case, get_market_status_use_case
+from bolsa_api.api.dependencies import (
+    get_db_session,
+    get_fx_rate_use_case,
+    get_market_status_use_case,
+)
 from bolsa_api.schemas.extra_mappers import to_market_provider_dto
 from bolsa_api.schemas.market import FxRateDto, FxRateResponseDto, MarketProvidersResponseDto
 

@@ -11,6 +11,7 @@
       "envFile": "${workspaceFolder}/.env",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
+      "autoAttachChildProcesses": false,
       "serverReadyAction": {
         "pattern": "Web lista -> (https?://\\S+)|Local:\\s+(https?://\\S+)",
         "uriFormat": "%s",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from bolsa_analytics.cognitive import (
     MODERATE_POLICY,
@@ -17,7 +18,6 @@ from bolsa_analytics.cognitive import (
     run_evidence_suite,
 )
 from bolsa_analytics.knowledge import TechnicalInputs, build_decision_package_ta
-import pytest
 
 
 def test_psr_high_for_strong_edge():

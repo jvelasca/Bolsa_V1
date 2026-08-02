@@ -11,6 +11,11 @@ from bolsa_api.api.dependencies import (
     get_list_trackers_for_list_use_case,
     get_remove_instrument_from_list_use_case,
 )
+from bolsa_api.schemas.instrument_lifecycle import (
+    RemoveInstrumentFromListRequestDto,
+    RemoveInstrumentFromListResponseDto,
+)
+from bolsa_api.schemas.lifecycle_mappers import to_remove_from_list_result_dto
 from bolsa_api.schemas.lists import (
     CreateListRequestDto,
     InstrumentListDetailDto,
@@ -20,11 +25,6 @@ from bolsa_api.schemas.lists import (
     ListQuotesResponseDto,
     UpdateListRequestDto,
 )
-from bolsa_api.schemas.instrument_lifecycle import (
-    RemoveInstrumentFromListRequestDto,
-    RemoveInstrumentFromListResponseDto,
-)
-from bolsa_api.schemas.lifecycle_mappers import to_remove_from_list_result_dto
 from bolsa_api.schemas.mappers import to_instrument_dto
 from bolsa_api.schemas.trackers import (
     TrackerDefinitionDetailDto,
@@ -45,7 +45,6 @@ from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from bolsa_infrastructure.database.repositories.list_repository import (
     InstrumentListDetail,
     InstrumentListSummary,
-    SqlAlchemyListRepository,
 )
 
 router = APIRouter()
@@ -155,7 +154,9 @@ async def get_list_trackers(
         raise HTTPException(status_code=404, detail="List not found")
     use_case: ListTrackerDefinitionsForList = get_list_trackers_for_list_use_case(session)
     records = await use_case.execute(list_id, limit=50)
-    return TrackerDefinitionDetailsListResponseDto(data=[_tracker_detail(record) for record in records])
+    return TrackerDefinitionDetailsListResponseDto(
+        data=[_tracker_detail(record) for record in records],
+    )
 
 
 @router.post("/lists", response_model=InstrumentListResponseDto, status_code=201)
@@ -224,6 +225,7 @@ async def remove_instrument_from_list(
         )
     except ValueError as exc:
         detail = str(exc)
-        status = 404 if "no encontrada" in detail.lower() or "no encontrado" in detail.lower() else 400
+        missing = "no encontrada" in detail.lower() or "no encontrado" in detail.lower()
+        status = 404 if missing else 400
         raise HTTPException(status_code=status, detail=detail) from exc
     return RemoveInstrumentFromListResponseDto(data=to_remove_from_list_result_dto(result))

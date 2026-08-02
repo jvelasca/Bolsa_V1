@@ -4,34 +4,18 @@
 
 from __future__ import annotations
 
-
-
 from dataclasses import dataclass
-
 from datetime import UTC, datetime
-
 from typing import Protocol
 
-
-
 from bolsa_market.indices.curated_ibex35 import IBEX35_CURATED
-
 from bolsa_market.indices.registry import get_known_index
-
 from bolsa_market.indices.remote_market_constituents import (
-
     YFIUA_CSV_BY_CODE,
-
     fetch_stoxx50e_members,
-
     fetch_yfiua_members,
-
 )
-
 from bolsa_market.indices.wikipedia_constituents import fetch_sp100_members, fetch_sp500_members
-
-
-
 
 
 @dataclass(frozen=True, slots=True)

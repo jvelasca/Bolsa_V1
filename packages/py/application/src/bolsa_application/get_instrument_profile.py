@@ -1,4 +1,6 @@
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 
 
 class GetInstrumentProfile:

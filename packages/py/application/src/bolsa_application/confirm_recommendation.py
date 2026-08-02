@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any
 
 from bolsa_analytics.cognitive.decision_session import (
@@ -120,9 +121,9 @@ class ConfirmRecommendationIntent:
         execution: dict[str, Any],
     ) -> dict[str, Any]:
         assert self._store is not None
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
         if session_id:
             existing = await self._store.get_decision_session(session_id)

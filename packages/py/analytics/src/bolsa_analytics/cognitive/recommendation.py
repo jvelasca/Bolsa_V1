@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -80,7 +80,7 @@ def recommendation_from_decision_package(
     edge_report_ref: str | None = None,
 ) -> Recommendation:
     """Mapea DecisionPackage → Recommendation (sizing inyectado; no ejecuta)."""
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     notional = None
     if suggested_price is not None:
         notional = abs(suggested_quantity * suggested_price)

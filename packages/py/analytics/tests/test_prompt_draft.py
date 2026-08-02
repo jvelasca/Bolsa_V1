@@ -1,13 +1,7 @@
 import pytest
 
-
-
 from bolsa_analytics.research.prompt_draft import draft_strategy_from_prompt
-
 from bolsa_analytics.research.strategy_definition_validator import validate_strategy_definition
-
-
-
 
 
 def test_draft_sma_crossover_daily() -> None:

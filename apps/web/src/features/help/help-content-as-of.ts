@@ -6,15 +6,26 @@
  * Finalistas→A/C, Monitor MVP, CORE-P, CORE-R v1.8 (Hecho todos),
  * **Backtesting DÍA D** (v0.11 · archivo también en Ayuda),
  * Lista AUTO frescura **v1.3**, CORE-B **v0.2**, CAPM Tarjeta v0,
- * Composite **v1.1**, fix Trading fullBleed.
+ * Composite **v1.1**, fix Trading fullBleed,
+ * **ADR-019** dos universos LAB vs TRADING (U1–U5).
+ * **ADR-020** Mandato operativo (M0–M3 + **M1b BD** · tenure + trades + churn + sync).
+ * **ADR-021** Reconciliación DÍA D (F-hoy · F-D · V · SAME/DRIFT · contrafactual).
+ * Continuidad Verify (lookback + carry) · higiene `strategyType` Finalistas.
+ *
+ * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
  * Track FA / FIE (2026-08-01): valoración cerrada en código
  * F0–F2.8 + F3 Composite + F4 Screener + Paper D + cron FA→D ·
  * Beneish→distress · Tarjeta densificada · CAPM rf/ERP visibles.
- * Fase actual: **smoke UI humano** (código de racha cerrado).
+ * Fase actual: **cierre etapa** LAB/DÍA D/Mandato (smoke UI + auditoría).
  *
  * Docs:
- * - `docs/engineering/session-handoff-2026-08-01.md` ← handoff actual
+ * - `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
+ * - `docs/adr/019-dual-universes-lab-vs-trading.md`
+ * - `docs/adr/020-operating-mandate-tenure.md`
+ * - `docs/adr/021-dia-d-reconciliation.md`
+ * - `docs/engineering/dual-universes-lab-trading-design-2026-08-02.md`
+ * - `docs/engineering/session-handoff-2026-08-01.md` ← handoff código racha
  * - `docs/engineering/fa-status-and-test-plan-2026-07-31.md`
  * - `docs/engineering/backtesting-dia-d-premises-2026-07-31.md`
  * - `docs/engineering/operativa-test-plan-2026-07-31.md`
@@ -23,7 +34,9 @@
  *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *
+ * @see docs/engineering/dual-universes-lab-trading-design-2026-08-02.md
+ * @see docs/adr/020-operating-mandate-tenure.md
  * @see docs/engineering/session-handoff-2026-08-01.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = '2026-08-01' as const;
+export const HELP_CONTENT_AS_OF = '2026-08-02' as const;

@@ -790,6 +790,58 @@ export const api = {
       `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top?timeframe=${encodeURIComponent(timeframe)}`,
     ),
 
+  getAccountMandates: (accountId: string, instrumentId?: string) => {
+    const q = instrumentId
+      ? `?instrumentId=${encodeURIComponent(instrumentId)}`
+      : '';
+    return request<{ data: import('@bolsa/shared').MandateBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/mandates${q}`,
+    );
+  },
+
+  syncAccountMandates: (
+    accountId: string,
+    body: import('@bolsa/shared').MandateBundleDto,
+  ) =>
+    request<{ data: import('@bolsa/shared').MandateBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/mandates`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  getAccountCoreR: (accountId: string) =>
+    request<{ data: import('@bolsa/shared').CoreRBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/core-r`,
+    ),
+
+  syncAccountCoreR: (
+    accountId: string,
+    body: {
+      queue: Array<Record<string, unknown>>;
+      reports: Record<string, unknown>;
+      scheduler: Record<string, unknown>;
+    },
+  ) =>
+    request<{ data: import('@bolsa/shared').CoreRBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/core-r`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  /** Ops: tick CORE-R servidor (informe BD + PnL DEMO). */
+  runCoreRCronTick: (force = false, includePnl = true) => {
+    const q = new URLSearchParams();
+    if (force) q.set('force', 'true');
+    if (!includePnl) q.set('include_pnl', 'false');
+    const qs = q.toString();
+    return request<{
+      data: {
+        accounts: number;
+        ticked: number;
+        totalAdded: number;
+        results: Array<Record<string, unknown>>;
+      };
+    }>(`/api/core-r/cron/tick${qs ? `?${qs}` : ''}`, { method: 'POST' });
+  },
+
   queryInstrumentStrategyTops: (body: {
     instrumentIds: string[];
     timeframe?: string;
@@ -1079,6 +1131,9 @@ export const api = {
 
   getLaboratoryResearchSummary: () =>
     request<{ data: import('@bolsa/shared').LaboratoryResearchSummaryDto }>('/api/research/summary'),
+
+  getLabHealth: () =>
+    request<{ data: import('@bolsa/shared').LabHealthDto }>('/api/research/lab-health'),
 
   /** Evidence sesión C DÍA D → Fase 2 research_evidence (source=dia_d_session). */
   persistDiaDSessionEvidence: (body: {

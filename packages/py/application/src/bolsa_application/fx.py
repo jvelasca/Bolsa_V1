@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
 
@@ -26,7 +26,7 @@ class GetFxRate:
                 to_currency=quote,
                 rate=1.0,
                 yahoo_symbol=f"{base}{quote}",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             )
 
         client = get_yahoo_finance_client()

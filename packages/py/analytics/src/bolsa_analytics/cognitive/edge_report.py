@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -152,7 +152,7 @@ def build_edge_report(
         edge_report_id=f"EDGE-{uuid4().hex[:12]}",
         version=version,
         strategy_or_signal_ref=strategy_or_signal_ref,
-        created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        created_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         suite=suite,
         credibility=credibility,
         edge_score=edge_score,

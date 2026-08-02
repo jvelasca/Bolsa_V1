@@ -17,7 +17,7 @@ Filings (SEC/RAG) viven fuera de este snapshot y no alimentan Score_FUND.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_market.beneish import compute_beneish_from_yahoo_modules
@@ -303,7 +303,7 @@ def build_fundamentals_snapshot(*, yahoo_modules: dict[str, Any]) -> dict[str, A
         "averageVolume": average_volume,
         "advUsd": adv_usd,
         **valuation,
-        "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "fetchedAt": datetime.now(UTC).isoformat(),
         "sourceVersion": FUNDAMENTALS_SOURCE_VERSION,
     }
 

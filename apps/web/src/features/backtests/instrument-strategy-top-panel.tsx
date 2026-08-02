@@ -14,7 +14,7 @@
  * @see docs/engineering/research-radar-unification-2026-07-31.md
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InstrumentStrategyTopV1 } from '@bolsa/shared';
@@ -42,8 +42,22 @@ import {
 } from '@/features/backtests/backtest-period';
 import { loadBacktestRunContext } from '@/features/backtests/backtest-run-context';
 import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
-import { openHitInTrading } from '@/features/screeners/open-hit-in-trading';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import {
+  diaDVerifyHref,
+  VERIFY_DIA_D_CTA,
+} from '@/features/platform/product-universe';
+import { setAdoption } from '@/features/platform/strategy-adoption';
+import { useActiveAccount } from '@/features/accounts/use-active-account';
+import {
+  getDiaDExperimentTop,
+  getDiaDExperimentTop1,
+} from '@/features/backtests/dia-d-experiment-top';
+import { sanitizeTopSlotsStrategyTypes } from '@/features/backtests/instrument-top-strategy-type';
+import {
+  finalistsStabilityWarnTitle,
+  formatFinalistsStabilityBadge,
+  readLabEvidenceFromCoachFacts,
+} from '@/features/backtests/finalists-stability-summary';
 /** Deep-link hub → foco Finalistas del valor. */
 export function instrumentTopBacktestsHref(instrumentId: string, timeframe = '1d'): string {
   const params = new URLSearchParams({
@@ -169,10 +183,10 @@ function SlotRow({
             size="sm"
             variant="default"
             className="h-7 text-[11px]"
-            title="Abrir Trading en MODO DÍA D con esta #1 (sandbox · Manual/Semi/Auto)"
+            title="Verificar D→hoy en LAB (Análisis técnico · Cartera LAB · Manual/Semi/Auto)"
             onClick={() => onSimulateDiaD!(usePayload)}
           >
-            Simular D→hoy
+            {VERIFY_DIA_D_CTA}
           </Button>
         ) : null}
         {canPropose ? (
@@ -291,9 +305,7 @@ export function InstrumentStrategyTopPanel({
   const navigate = useNavigate();
   const pushToast = useAlertsStore((s) => s.pushToast);
   const enterDiaDSession = useDiaDTradingSessionStore((s) => s.enterSession);
-  const openChartTab = useWorkspaceStore((s) => s.openChartTab);
-  const updateChartTimeframe = useWorkspaceStore((s) => s.updateChartTimeframe);
-  const focusInstrumentFromList = useWorkspaceStore((s) => s.focusInstrumentFromList);
+  const { effectiveAccountId } = useActiveAccount();
   const diaD = asOfDiaD ?? loadBacktestRunContext().diaD;
   const diaDActive = isDiaDInPast(diaD);
   const [deleting, setDeleting] = useState(false);
@@ -307,6 +319,71 @@ export function InstrumentStrategyTopPanel({
     retry: false,
   });
   const top = topProp !== undefined ? topProp : (query.data?.data ?? null);
+  const experimentAsOf = diaDActive ? effectiveDiaD(diaD) : null;
+  const experimentTop = experimentAsOf
+    ? getDiaDExperimentTop(instrumentId, timeframe, experimentAsOf)
+    : null;
+  const experimentTop1 = experimentAsOf
+    ? getDiaDExperimentTop1(instrumentId, timeframe, experimentAsOf)
+    : null;
+
+  const strategiesQuery = useQuery({
+    queryKey: ['strategies'],
+    queryFn: () => api.getStrategies(),
+    staleTime: 60_000,
+  });
+
+  const repairedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!top?.slots?.length || topProp !== undefined) return;
+    if (!strategiesQuery.data?.data) return;
+    const key = `${instrumentId}:${timeframe}:${top.version ?? 0}`;
+    if (repairedRef.current === key) return;
+    const presetById = new Map(
+      strategiesQuery.data.data.map((s) => [s.id, s.presetKey ?? null]),
+    );
+    const sanitized = sanitizeTopSlotsStrategyTypes(top.slots, presetById);
+    const changed = sanitized.some(
+      (s, i) => s.strategyType !== top.slots[i]?.strategyType,
+    );
+    if (!changed) {
+      repairedRef.current = key;
+      return;
+    }
+    repairedRef.current = key;
+    void api
+      .upsertInstrumentStrategyTop(instrumentId, {
+        instrumentId,
+        symbol: top.symbol ?? undefined,
+        timeframe: top.timeframe || timeframe,
+        periodLabel: top.periodLabel ?? null,
+        status: top.status,
+        evidenceLevel: top.evidenceLevel,
+        slots: sanitized,
+        coachHeadline: top.coachHeadline ?? null,
+        coachFacts: (top.coachFacts as Record<string, unknown> | null) ?? null,
+      })
+      .then(() => {
+        void queryClient.invalidateQueries({
+          queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ['instrument-strategy-tops-batch'],
+        });
+        pushToast('Finalistas: tipos de estrategia alineados con la definición');
+      })
+      .catch(() => {
+        repairedRef.current = null;
+      });
+  }, [
+    top,
+    topProp,
+    strategiesQuery.data?.data,
+    instrumentId,
+    timeframe,
+    queryClient,
+    pushToast,
+  ]);
 
   const createTrackerMutation = useMutation({
     mutationFn: async (slotUse: FinalistSlotUse) => {
@@ -435,12 +512,30 @@ export function InstrumentStrategyTopPanel({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-foreground">
-            {symbol ? `3 estrategias de ${symbol}` : 'TOP del valor'}
+            {symbol
+              ? `${top.slots.length} estrategias de ${symbol}`
+              : `TOP · ${top.slots.length} estrategias`}
           </p>
-          <p className="text-[11px] text-muted-foreground">
+          <p
+            className="text-[11px] text-muted-foreground"
+            title={
+              finalistsStabilityWarnTitle(
+                readLabEvidenceFromCoachFacts(
+                  top.coachFacts as Record<string, unknown> | null | undefined,
+                ),
+              ) ?? undefined
+            }
+          >
             {top.status} · v{top.version} · TF {top.timeframe}
-            {top.evidenceLevel === 'lab_validated' ? ' · lab OOS' : ' · in-sample'}
-            {diaDActive ? ` · válido a DÍA D ${effectiveDiaD(diaD)}` : ''}
+            {(() => {
+              const snap = readLabEvidenceFromCoachFacts(
+                top.coachFacts as Record<string, unknown> | null | undefined,
+              );
+              const badge = formatFinalistsStabilityBadge(snap);
+              if (badge) return ` · ${badge}`;
+              return top.evidenceLevel === 'lab_validated' ? ' · lab OOS' : ' · in-sample';
+            })()}
+            {diaDActive ? ` · DÍA D ${effectiveDiaD(diaD)} (F-hoy intacto)` : ''}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -469,6 +564,24 @@ export function InstrumentStrategyTopPanel({
           {deleteError}
         </p>
       ) : null}
+      {diaDActive && experimentTop ? (
+        <p
+          className="rounded-md border border-sky-600/30 bg-sky-500/10 px-2 py-1.5 text-[11px] text-sky-950 dark:text-sky-50"
+          role="status"
+        >
+          Experimento F-D ({experimentAsOf}): {experimentTop.slots.length} slot(s)
+          {experimentTop1 ? ` · #1 ${experimentTop1.label}` : ''}. Verificar usa F-D; Finalistas
+          operativos (arriba) no se pisan.
+        </p>
+      ) : diaDActive ? (
+        <p
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-950 dark:text-amber-50"
+          role="status"
+        >
+          DÍA D activo: Play guardará un TOP experimento (F-D) sin pisar Finalistas operativos.
+          Luego Verificar D→hoy.
+        </p>
+      ) : null}
       {profileWarn.mismatch && profileWarn.message ? (
         <p
           className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-50"
@@ -479,8 +592,8 @@ export function InstrumentStrategyTopPanel({
       ) : null}
       {diaDActive ? (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-50">
-          Embudo as-of · DÍA D {effectiveDiaD(diaD)}. La #1 puede abrir Trading en MODO DÍA D
-          (sandbox · Manual / Semi / Auto) para verificar {effectiveDiaD(diaD)} → hoy.
+          Embudo as-of · DÍA D {effectiveDiaD(diaD)}. La #1 puede abrir{' '}
+          <strong>Verificar D→hoy</strong> en LAB (Cartera LAB · Manual / Semi / Auto).
         </p>
       ) : null}
       {onOpenChecklist && top.evidenceLevel === 'lab_validated' ? (
@@ -526,24 +639,41 @@ export function InstrumentStrategyTopPanel({
               diaDActive={diaDActive}
               onSimulateDiaD={(use) => {
                 const sym = symbol?.trim() || instrumentId.slice(0, 8);
+                const fromExp =
+                  experimentTop1?.strategyDefinitionId
+                    ? {
+                        strategyDefinitionId: experimentTop1.strategyDefinitionId,
+                        strategyLabel: experimentTop1.label,
+                        rank: experimentTop1.rank,
+                      }
+                    : null;
                 enterDiaDSession({
                   instrumentId,
                   symbol: sym,
-                  strategyDefinitionId: use.strategyDefinitionId,
-                  strategyLabel: use.label,
-                  rank: use.rank,
+                  strategyDefinitionId:
+                    fromExp?.strategyDefinitionId ?? use.strategyDefinitionId,
+                  strategyLabel: fromExp?.strategyLabel ?? use.label,
+                  rank: fromExp?.rank ?? use.rank,
                   diaD: effectiveDiaD(diaD),
                   endDate: todayIsoDate(),
                   mode: 'auto',
                 });
-                openHitInTrading(
-                  navigate,
-                  { openChartTab, updateChartTimeframe, focusInstrumentFromList },
-                  { instrumentId, symbol: sym },
-                  { timeframe: timeframe || '1d' },
-                );
+                if (effectiveAccountId) {
+                  setAdoption({
+                    instrumentId,
+                    accountId: effectiveAccountId,
+                    state: 'candidata',
+                    strategyDefinitionId:
+                      fromExp?.strategyDefinitionId ?? use.strategyDefinitionId,
+                    strategyLabel: fromExp?.strategyLabel ?? use.label,
+                    timeframe,
+                  });
+                }
+                navigate(diaDVerifyHref(instrumentId));
                 pushToast(
-                  `MODO DÍA D · ${effectiveDiaD(diaD)} → hoy · Auto (película en Trading)`,
+                  fromExp
+                    ? `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · F-D #1 (experimento)`
+                    : `LAB · Verificar ${effectiveDiaD(diaD)} → hoy · Auto (Cartera LAB)`,
                 );
               }}
             />

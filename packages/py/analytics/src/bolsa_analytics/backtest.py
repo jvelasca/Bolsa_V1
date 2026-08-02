@@ -5,8 +5,16 @@ from math import sqrt
 from statistics import mean, pstdev
 from typing import Any, Literal
 
+from bolsa_analytics.cost_model_v2 import (
+    CostModelV2Config,
+    median_volume,
+    resolve_bar_costs_v2,
+)
 from bolsa_analytics.indicators.compute import OhlcvBar
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key, strategy_definition_from_preset
+from bolsa_analytics.signals.preset_catalog import (
+    is_valid_preset_key,
+    strategy_definition_from_preset,
+)
 from bolsa_analytics.signals.preset_rules import enrich_definition_with_preset_rules
 from bolsa_analytics.signals.rules_engine import (
     build_indicator_context,
@@ -80,6 +88,25 @@ def _bps_frac(bps: int) -> float:
     return bps / 10_000.0
 
 
+def _bar_costs(
+    base: BacktestCostModel,
+    *,
+    cost_v2: CostModelV2Config | None,
+    volume: float,
+    median_vol: float | None,
+) -> BacktestCostModel:
+    if cost_v2 is None or not cost_v2.enabled:
+        return base
+    commission, slippage, spread = resolve_bar_costs_v2(
+        cost_v2, volume=volume, median_vol=median_vol
+    )
+    return BacktestCostModel(
+        commission_bps=commission,
+        slippage_bps=slippage,
+        spread_bps=spread,
+    )
+
+
 def _buy_fill_price(mid: float, costs: BacktestCostModel) -> float:
     return mid * (1.0 + _bps_frac(costs.slippage_bps) + _bps_frac(costs.spread_bps) / 2.0)
 
@@ -100,12 +127,10 @@ def _compute_max_drawdown(equity_curve: list[float]) -> float:
     max_drawdown = 0.0
 
     for equity in equity_curve:
-        if equity > peak:
-            peak = equity
+        peak = max(peak, equity)
         if peak > 0:
             drawdown = ((peak - equity) / peak) * 100
-            if drawdown > max_drawdown:
-                max_drawdown = drawdown
+            max_drawdown = max(max_drawdown, drawdown)
 
     return max_drawdown
 
@@ -209,6 +234,7 @@ def run_backtest(
     commission_bps: int = 0,
     slippage_bps: int = 0,
     spread_bps: int = 0,
+    cost_v2: CostModelV2Config | None = None,
     strategy_definition: dict[str, Any] | None = None,
 ) -> BacktestEngineResult:
     if not bars:
@@ -220,6 +246,11 @@ def run_backtest(
         commission_bps=commission_bps,
         slippage_bps=slippage_bps,
         spread_bps=spread_bps,
+    )
+    median_vol = (
+        median_volume([float(b.volume or 0.0) for b in bars])
+        if cost_v2 is not None and cost_v2.enabled
+        else None
     )
 
     if not is_valid_preset_key(strategy_type):
@@ -277,13 +308,20 @@ def run_backtest(
                 strategy_def, index=i, context=context, closes=closes, side="exits"
             )
 
+        bar_costs = _bar_costs(
+            resolved_costs,
+            cost_v2=cost_v2,
+            volume=float(bar.volume or 0.0),
+            median_vol=median_vol,
+        )
+
         if signal == "buy" and shares == 0:
-            fill = _buy_fill_price(mid, resolved_costs)
-            cost_per_share = fill * (1.0 + _bps_frac(resolved_costs.commission_bps))
+            fill = _buy_fill_price(mid, bar_costs)
+            cost_per_share = fill * (1.0 + _bps_frac(bar_costs.commission_bps))
             quantity = int(cash // cost_per_share) if cost_per_share > 0 else 0
             if quantity > 0:
                 notional = quantity * fill
-                commission = _commission(notional, resolved_costs)
+                commission = _commission(notional, bar_costs)
                 cash -= notional + commission
                 shares = float(quantity)
                 total_commission += commission
@@ -301,9 +339,9 @@ def run_backtest(
                     )
                 )
         elif signal == "sell" and shares > 0:
-            fill = _sell_fill_price(mid, resolved_costs)
+            fill = _sell_fill_price(mid, bar_costs)
             notional = shares * fill
-            commission = _commission(notional, resolved_costs)
+            commission = _commission(notional, bar_costs)
             cash += notional - commission
             quantity = shares
             shares = 0.0
@@ -347,6 +385,7 @@ def run_backtest(
     buy_hold_return_pct = compute_buy_hold_return_pct(bars[0].close, bars[-1].close)
     is_metrics["buyHoldReturnPct"] = round(buy_hold_return_pct, 6)
     is_metrics["excessReturnPct"] = round(total_return_pct - buy_hold_return_pct, 6)
+    is_metrics["costModelV2"] = bool(cost_v2 is not None and cost_v2.enabled)
 
     return BacktestEngineResult(
         initial_cash=initial_cash,

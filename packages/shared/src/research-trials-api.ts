@@ -74,6 +74,35 @@ export interface LaboratoryResearchSummaryDto {
   }>;
 }
 
+/** Q0.1 Lab Health — coverage / zero-trades / campaigns. */
+export interface LabHealthMetricCoverageDto {
+  present: number;
+  pct: number;
+}
+
+export interface LabHealthCampaignDto {
+  campaignId: string;
+  trials: number;
+}
+
+export interface LabHealthDto {
+  totalTrials: number;
+  coverage: {
+    sharpeRatio: LabHealthMetricCoverageDto;
+    sortinoRatio: LabHealthMetricCoverageDto;
+    calmarRatio: LabHealthMetricCoverageDto;
+    [key: string]: LabHealthMetricCoverageDto;
+  };
+  zeroTradeCount: number;
+  zeroTradePct: number;
+  campaigns: LabHealthCampaignDto[];
+  campaignCount: number;
+  instrumentsWithTrials: number;
+  activeInstruments: number;
+  instrumentsWithoutTrials: number;
+  caveat: string;
+}
+
 export type ResearchTrialSort =
   | 'created_at'
   | 'sharpe'

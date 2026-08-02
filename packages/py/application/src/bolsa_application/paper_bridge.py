@@ -5,8 +5,12 @@ from bolsa_application.paper_lab_evidence import (
 )
 from bolsa_domain.entities.account import InvestmentAccount
 from bolsa_domain.repositories.research_trial_repository import ResearchTrialRepository
-from bolsa_infrastructure.database.repositories.account_repository import SqlAlchemyAccountRepository
-from bolsa_infrastructure.database.repositories.backtest_repository import SqlAlchemyBacktestRepository
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
+from bolsa_infrastructure.database.repositories.backtest_repository import (
+    SqlAlchemyBacktestRepository,
+)
 from bolsa_infrastructure.database.repositories.strategy_definition_repository import (
     SqlAlchemyStrategyDefinitionRepository,
 )

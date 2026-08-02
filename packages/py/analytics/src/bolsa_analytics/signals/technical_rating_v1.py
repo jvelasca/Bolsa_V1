@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 
 from bolsa_analytics.indicators.compute import (
     OhlcvBar,
@@ -14,7 +14,6 @@ from bolsa_analytics.indicators.compute import (
     compute_sma,
     compute_stoch_k,
 )
-
 from bolsa_analytics.signals.pattern_uptrend_v1 import score_uptrend_pattern_v1
 
 TECHNICAL_RATING_V1_VERSION = "1.1.0"

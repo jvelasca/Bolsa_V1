@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from typing import Any
 
 from bolsa_analytics.indicators.compute import OhlcvBar
-from bolsa_analytics.signals.fundamental_gate import passes_fundamental_gate
-from bolsa_analytics.signals.rules_engine import build_indicator_context, evaluate_rule_group
-from bolsa_analytics.signals.strategy import SignalEventV1, StrategyBarInput, _signal_event_id
 from bolsa_analytics.signals.data_quality_v1 import (
     DataQualityBreakdown,
     compute_data_quality_v1,
     compute_global_score,
 )
+from bolsa_analytics.signals.fundamental_gate import passes_fundamental_gate
+from bolsa_analytics.signals.rules_engine import build_indicator_context, evaluate_rule_group
+from bolsa_analytics.signals.strategy import SignalEventV1, StrategyBarInput, _signal_event_id
 from bolsa_analytics.signals.technical_rating_v1 import (
     TECHNICAL_RATING_V1_VERSION,
     TechnicalRatingBreakdown,

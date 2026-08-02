@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from sqlalchemy import Float, asc, cast, desc, func, nulls_last, select
+from sqlalchemy import Float, and_, asc, cast, desc, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_domain.entities.research_trial import ResearchTrial
@@ -87,7 +87,7 @@ class SqlAlchemyResearchTrialRepository:
             parent_trial_id=parent_trial_id,
             fail_code=fail_code,
             manifest_ref=manifest_ref,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()
@@ -346,4 +346,115 @@ class SqlAlchemyResearchTrialRepository:
             "byInstrument": by_instrument,
             "byPreset": by_preset,
             "byOrigin": by_origin,
+        }
+
+    def _metric_present(self, key: str):
+        raw = ResearchTrialRow.is_metrics[key].as_string()
+        return and_(raw.isnot(None), raw != "null", raw != "")
+
+    async def lab_health(self) -> dict[str, Any]:
+        """Q0.1 aggregates: metric coverage, zero-trades, campaigns, instrument coverage."""
+        total = int(
+            (await self._session.execute(select(func.count()).select_from(ResearchTrialRow))).scalar_one()
+        )
+
+        def _pct(n: int) -> float:
+            return 0.0 if total == 0 else round(100.0 * n / total, 2)
+
+        sharpe_n = int(
+            (
+                await self._session.execute(
+                    select(func.count()).select_from(ResearchTrialRow).where(
+                        self._metric_present("sharpeRatio")
+                    )
+                )
+            ).scalar_one()
+        )
+        sortino_n = int(
+            (
+                await self._session.execute(
+                    select(func.count()).select_from(ResearchTrialRow).where(
+                        self._metric_present("sortinoRatio")
+                    )
+                )
+            ).scalar_one()
+        )
+        calmar_n = int(
+            (
+                await self._session.execute(
+                    select(func.count()).select_from(ResearchTrialRow).where(
+                        self._metric_present("calmarRatio")
+                    )
+                )
+            ).scalar_one()
+        )
+
+        trade_count = cast(ResearchTrialRow.is_metrics["tradeCount"].as_string(), Float)
+        zero_n = int(
+            (
+                await self._session.execute(
+                    select(func.count()).select_from(ResearchTrialRow).where(trade_count == 0.0)
+                )
+            ).scalar_one()
+        )
+
+        campaign_expr = func.coalesce(
+            ResearchTrialRow.params["campaign"].as_string(),
+            ResearchTrialRow.manifest_ref["campaign"].as_string(),
+        )
+        campaign_rows = (
+            await self._session.execute(
+                select(campaign_expr.label("campaign"), func.count().label("trials"))
+                .where(
+                    and_(
+                        campaign_expr.isnot(None),
+                        campaign_expr != "null",
+                        campaign_expr != "",
+                    )
+                )
+                .group_by(campaign_expr)
+                .order_by(desc("trials"))
+                .limit(40)
+            )
+        ).all()
+        campaigns = [
+            {"campaignId": str(row.campaign), "trials": int(row.trials)}
+            for row in campaign_rows
+        ]
+
+        instruments_with_trials = int(
+            (
+                await self._session.execute(
+                    select(func.count(func.distinct(ResearchTrialRow.instrument_id)))
+                )
+            ).scalar_one()
+        )
+        active_instruments = int(
+            (
+                await self._session.execute(
+                    select(func.count())
+                    .select_from(InstrumentRow)
+                    .where(InstrumentRow.is_active.is_(True))
+                )
+            ).scalar_one()
+        )
+
+        return {
+            "totalTrials": total,
+            "coverage": {
+                "sharpeRatio": {"present": sharpe_n, "pct": _pct(sharpe_n)},
+                "sortinoRatio": {"present": sortino_n, "pct": _pct(sortino_n)},
+                "calmarRatio": {"present": calmar_n, "pct": _pct(calmar_n)},
+            },
+            "zeroTradeCount": zero_n,
+            "zeroTradePct": _pct(zero_n),
+            "campaigns": campaigns,
+            "campaignCount": len(campaigns),
+            "instrumentsWithTrials": instruments_with_trials,
+            "activeInstruments": active_instruments,
+            "instrumentsWithoutTrials": max(0, active_instruments - instruments_with_trials),
+            "caveat": (
+                "Sharpe mediano cross-family ≠ verdad científica; "
+                "revisar tradeCount y Calmar (Q0.4)."
+            ),
         }

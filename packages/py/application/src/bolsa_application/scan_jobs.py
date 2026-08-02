@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from bolsa_analytics.signals.feature_cache import FeatureCache, get_preset_feature_cache
@@ -14,7 +14,10 @@ from bolsa_application.scan_chunking import (
     split_instrument_chunks,
 )
 from bolsa_application.scan_manifests import PersistScanManifest
-from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids, universe_from_payload
+from bolsa_application.scan_universe import (
+    resolve_scan_universe_instrument_ids,
+    universe_from_payload,
+)
 from bolsa_application.scans import RunScan, scan_run_result_to_dict
 from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
 from bolsa_domain.platform_kernel import validate_kernel_timeframe
@@ -27,7 +30,6 @@ from bolsa_infrastructure.database.repositories.scan_job_repository import (
 )
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
-
 
 logger = logging.getLogger(__name__)
 

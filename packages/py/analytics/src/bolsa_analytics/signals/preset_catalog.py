@@ -4,21 +4,13 @@
 
 from __future__ import annotations
 
-
-
 import json
-
 import os
-
 from functools import lru_cache
-
 from pathlib import Path
+from typing import Any, Literal, TypeGuard
 
-from typing import Any, Literal, TypeAlias
-
-
-
-PresetStrategyType: TypeAlias = str
+type PresetStrategyType = str
 
 
 
@@ -114,7 +106,7 @@ def hybrid_gate_preset_keys() -> frozenset[str]:
 
 
 
-def is_valid_preset_key(value: str | None) -> value is PresetStrategyType:
+def is_valid_preset_key(value: str | None) -> TypeGuard[PresetStrategyType]:
 
     return value is not None and value in preset_strategy_keys()
 

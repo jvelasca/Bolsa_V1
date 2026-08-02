@@ -1,0 +1,21 @@
+{
+  "schema_version": "campaign_manifest_v0",
+  "campaign_id": "example-ibex35-template",
+  "universe": "ibex35",
+  "timeframe": "1d",
+  "engine": "h0",
+  "indicators_version": null,
+  "git_commit": null,
+  "dataset_start": null,
+  "dataset_end": null,
+  "bar_count": 500,
+  "costs": {
+    "commission_bps": 10,
+    "slippage_bps": 5,
+    "spread_bps": 2
+  },
+  "presets": ["sma_crossover"],
+  "notes": "Plantilla Q0.2 — copiar al cerrar una campaña real.",
+  "cpu_cost_units": null,
+  "created_at": "2026-08-02T00:00:00+00:00"
+}

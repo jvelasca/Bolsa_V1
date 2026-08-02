@@ -13,10 +13,10 @@ from bolsa_analytics.research.manifest import (
 )
 
 __all__ = [
-    "BarFingerprint",
     "ENGINE_NAME",
     "ENGINE_VERSION",
     "RUN_MANIFEST_VERSION",
+    "BarFingerprint",
     "build_data_snapshot_id",
     "build_run_manifest",
     "compute_data_version",

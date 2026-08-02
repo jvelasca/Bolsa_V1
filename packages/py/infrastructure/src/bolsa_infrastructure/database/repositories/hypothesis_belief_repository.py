@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -82,7 +82,7 @@ class SqlAlchemyHypothesisBeliefRepository:
         math_version: str,
         belief_id: str | None = None,
     ) -> HypothesisBelief:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing = await self.get_by_hypothesis_id(hypothesis_id)
         if existing is None:
             row = HypothesisBeliefRow(
@@ -151,7 +151,7 @@ class SqlAlchemyHypothesisBeliefRepository:
             trigger_evidence_id=trigger_evidence_id,
             delta=delta,
             math_version=math_version,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()

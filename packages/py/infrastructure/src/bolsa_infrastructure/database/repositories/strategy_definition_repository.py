@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import delete, select, update
@@ -66,7 +66,7 @@ class SqlAlchemyStrategyDefinitionRepository:
         origin: str,
         timeframe: str,
     ) -> StrategyDefinitionRecord:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = StrategyDefinitionRow(
             id=new_id(),
             name=name,
@@ -91,7 +91,7 @@ class SqlAlchemyStrategyDefinitionRepository:
         origin: str | None = None,
         timeframe: str | None = None,
     ) -> StrategyDefinitionRecord | None:
-        values: dict[str, Any] = {"updated_at": datetime.now(timezone.utc)}
+        values: dict[str, Any] = {"updated_at": datetime.now(UTC)}
         if name is not None:
             values["name"] = name
         if definition is not None:

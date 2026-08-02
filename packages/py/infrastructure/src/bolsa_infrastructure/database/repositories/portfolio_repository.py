@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -6,7 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, Position, TradeResult, Transaction
+from bolsa_domain.entities.portfolio import (
+    Portfolio,
+    PortfolioSummary,
+    Position,
+    TradeResult,
+    Transaction,
+)
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
@@ -18,7 +24,7 @@ from bolsa_infrastructure.database.models import (
 from bolsa_infrastructure.ids import new_id
 
 DEFAULT_PORTFOLIO_NAME = "Cartera principal"
-INITIAL_CASH = Decimal("100000")
+INITIAL_CASH = Decimal(100000)
 
 
 class SqlAlchemyPortfolioRepository:
@@ -30,7 +36,7 @@ class SqlAlchemyPortfolioRepository:
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
         if row is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             row = PortfolioRow(
                 id=new_id(),
                 name=DEFAULT_PORTFOLIO_NAME,
@@ -220,7 +226,7 @@ class SqlAlchemyPortfolioRepository:
             if held < quantity:
                 raise ValueError(f"No tienes suficientes acciones. En cartera: {held}")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         transaction = TransactionRow(
             id=new_id(),
             portfolio_id=portfolio.id,
@@ -290,10 +296,9 @@ class SqlAlchemyPortfolioRepository:
         if row is None:
             raise ValueError("Cartera no encontrada")
         fee = Decimal(str(amount))
-        if row.cash < fee:
-            fee = row.cash
+        fee = min(fee, row.cash)
         row.cash -= fee
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return float(row.cash)
 
@@ -323,7 +328,7 @@ class SqlAlchemyPortfolioRepository:
 
         from_row.cash -= amount_dec
         to_row.cash += amount_dec
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         from_row.updated_at = now
         to_row.updated_at = now
         await self._session.flush()
@@ -338,6 +343,6 @@ class SqlAlchemyPortfolioRepository:
             raise ValueError("Cartera no encontrada")
         credit = Decimal(str(amount))
         row.cash += credit
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return float(row.cash)

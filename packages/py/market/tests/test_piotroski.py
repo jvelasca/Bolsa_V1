@@ -1,11 +1,11 @@
 """Piotroski F-Score F2.1 — 9/9 o null."""
 
+from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
 from bolsa_market.piotroski import (
     PIOTROSKI_METHOD,
     compute_piotroski_f,
     compute_piotroski_from_yahoo_modules,
 )
-from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
 
 
 def _raw(n: float) -> dict:

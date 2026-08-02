@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.investor_profile import (
@@ -66,7 +66,7 @@ def observe_investor_profile(
     Calcula Observed desde muestras de trades.
     Prohibido: reescribir declared / policy — solo scores + flags de divergencia.
     """
-    ts = now or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = now or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     trades = list(samples)
     n = len(trades)
     if n == 0:

@@ -28,10 +28,11 @@ export function applyGateFills(
   trades: BacktestTradeDto[],
   decisions: ReadonlyArray<GateDecisionLike>,
   policy: GateFillPolicy = 'auto',
+  opts?: { initialShares?: number },
 ): BacktestTradeDto[] {
   const decision = new Map(decisions.map((d) => [d.tradeId, d.action]));
   const applied: BacktestTradeDto[] = [];
-  let shares = 0;
+  let shares = opts?.initialShares ?? 0;
   for (const trade of trades) {
     const action = decision.get(trade.id);
     if (policy === 'gated') {
@@ -56,11 +57,13 @@ export function applyGateFills(
 
 export function rebuildEquityCurve(opts: {
   initialCash: number;
+  /** Posición ya abierta al inicio de la ventana (p. ej. carry a DÍA D). */
+  initialShares?: number;
   bars: ReadonlyArray<{ timestamp: string; close: number }>;
   trades: ReadonlyArray<BacktestTradeDto>;
 }): BacktestEquityPointDto[] {
   let cash = opts.initialCash;
-  let shares = 0;
+  let shares = opts.initialShares ?? 0;
   let tradeIdx = 0;
   const curve: BacktestEquityPointDto[] = [];
 
@@ -114,26 +117,34 @@ export type GatedSessionMetrics = {
 
 export function computeGatedSessionMetrics(opts: {
   initialCash: number;
+  /** Carry de posición al inicio (Verify continuo desde D). */
+  initialShares?: number;
   bars: ReadonlyArray<{ timestamp: string; close: number }>;
   autoTrades: ReadonlyArray<BacktestTradeDto>;
   decisions: ReadonlyArray<GateDecisionLike>;
   policy?: GateFillPolicy;
 }): GatedSessionMetrics {
   const policy = opts.policy ?? 'auto';
-  const trades = applyGateFills([...opts.autoTrades], opts.decisions, policy);
+  const initialShares = opts.initialShares ?? 0;
+  const trades = applyGateFills([...opts.autoTrades], opts.decisions, policy, {
+    initialShares,
+  });
   const equityCurve = rebuildEquityCurve({
     initialCash: opts.initialCash,
+    initialShares,
     bars: opts.bars,
     trades,
   });
+  const startEquity =
+    opts.bars.length > 0
+      ? opts.initialCash + initialShares * opts.bars[0]!.close
+      : opts.initialCash;
   const finalEquity =
     equityCurve.length > 0
       ? equityCurve[equityCurve.length - 1]!.equity
-      : opts.initialCash;
+      : startEquity;
   const totalReturnPct =
-    opts.initialCash > 0
-      ? ((finalEquity - opts.initialCash) / opts.initialCash) * 100
-      : 0;
+    startEquity > 0 ? ((finalEquity - startEquity) / startEquity) * 100 : 0;
   return {
     trades,
     equityCurve,

@@ -43,5 +43,5 @@ def test_persist_llm_call_sync_maps_payload() -> None:
     assert row.provider == "none"
     assert row.trace_id == "tr_abc"
     assert row.causation_id == "req_1"
-    assert row.cost_usd == Decimal("0")
+    assert row.cost_usd == Decimal(0)
     assert session.commit.called

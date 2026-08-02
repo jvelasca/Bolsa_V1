@@ -348,7 +348,7 @@ class ProcessIndexSubscribeJob:
 
         async def on_progress(progress: dict[str, Any]) -> None:
             await self._jobs.update_progress(record.id, progress)
-            await self._jobs._session.commit()  # noqa: SLF001
+            await self._jobs._session.commit()
 
         try:
             result = await self._subscribe.execute(

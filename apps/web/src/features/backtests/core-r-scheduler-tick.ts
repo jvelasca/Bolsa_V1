@@ -20,7 +20,9 @@ import {
   emitCoreRSchedulerTick,
   loadCoreRSchedulerPrefs,
   markCoreRSchedulerTick,
+  saveCoreRSchedulerPrefs,
 } from '@/features/backtests/core-r-scheduler';
+import { markCoreRRemoteEnqueueSeen } from '@/features/backtests/core-r-remote-toast';
 import {
   buildStrategyMonitorRow,
   sliceMonitorInstruments,
@@ -135,7 +137,17 @@ export async function runCoreRSchedulerTick(opts?: {
   const added = useCoreRReviewQueueStore
     .getState()
     .syncFromReport(prefs.listId, report, extras);
-  markCoreRSchedulerTick(prefs);
+  const marked = markCoreRSchedulerTick(prefs);
+  if (added > 0) {
+    saveCoreRSchedulerPrefs({
+      ...marked,
+      lastTickSource: 'shell',
+      lastRemoteEnqueueAt: marked.lastTickAt,
+      lastRemoteEnqueueAdded: added,
+    });
+    // Evita toast duplicado en el poll remoto de este mismo dispositivo.
+    markCoreRRemoteEnqueueSeen(marked.lastTickAt);
+  }
   emitCoreRSchedulerTick({
     listId: prefs.listId,
     added,

@@ -24,10 +24,13 @@ async def scan_worker_loop(session_factory: async_sessionmaker[AsyncSession]) ->
     if use_redis:
         redis_queue = ScanJobRedisQueue(settings.redis_url)
         if not await redis_queue.ping():
-            logger.warning("SCAN_QUEUE_BACKEND=redis pero Redis no responde — fallback postgres poll")
+            logger.warning(
+                "SCAN_QUEUE_BACKEND=redis pero Redis no responde — fallback postgres poll",
+            )
             use_redis = False
 
-    logger.info("Worker scan jobs (RD-2) iniciado — backend=%s", "redis" if use_redis else "postgres")
+    backend = "redis" if use_redis else "postgres"
+    logger.info("Worker scan jobs (RD-2) iniciado — backend=%s", backend)
     try:
         while True:
             try:

@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -142,7 +142,7 @@ class SqlAlchemyBacktestRepository:
         run_id: str | None = None,
         strategy_definition_id: str | None = None,
     ) -> BacktestRunDetail:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         resolved_run_id = run_id or new_id()
         run = BacktestRunRow(
             id=resolved_run_id,

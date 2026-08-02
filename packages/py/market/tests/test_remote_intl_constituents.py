@@ -4,40 +4,21 @@
 
 from __future__ import annotations
 
-
-
 import httpx
-
 import pytest
 
-
-
 from bolsa_market.indices.remote_market_constituents import (
-
     DAX_CSV_URL,
-
     NDX_CSV_URL,
-
     STOXX50E_MIRROR_URL,
-
     STOXX50E_WIKI_URL,
-
     clear_remote_intl_constituents_cache,
-
     fetch_dax_members,
-
     fetch_ndx_members,
-
     fetch_stoxx50e_members,
-
     fetch_yfiua_members,
-
     yfiua_csv_url,
-
 )
-
-
-
 
 
 @pytest.fixture(autouse=True)

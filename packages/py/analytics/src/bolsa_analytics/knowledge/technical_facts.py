@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from bolsa_analytics.knowledge.models import Fact, FactSet, TechnicalInputs
@@ -317,7 +317,7 @@ def build_technical_fact_set(
 ) -> FactSet:
     """Transforma inputs técnicos en ART-FACT-SET interpretable."""
     inp = inputs if isinstance(inputs, TechnicalInputs) else TechnicalInputs.from_feature_map(inputs)
-    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     facts = (
         _trend_fact(inp),
         _momentum_fact(inp),

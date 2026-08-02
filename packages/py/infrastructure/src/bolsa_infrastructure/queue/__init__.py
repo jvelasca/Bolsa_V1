@@ -1,6 +1,6 @@
 """Cola de jobs de research."""
 
-from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
+from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
-__all__ = ["ScanJobRedisQueue", "ScanJobArqQueue"]
+__all__ = ["ScanJobArqQueue", "ScanJobRedisQueue"]

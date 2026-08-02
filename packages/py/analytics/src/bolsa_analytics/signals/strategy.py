@@ -14,7 +14,10 @@ from bolsa_analytics.signals.evaluate import (
     evaluate_preset_signals_gated,
 )
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
-from bolsa_analytics.signals.preset_rules import definition_has_rules, enrich_definition_with_preset_rules
+from bolsa_analytics.signals.preset_rules import (
+    definition_has_rules,
+    enrich_definition_with_preset_rules,
+)
 from bolsa_analytics.signals.rules_engine import evaluate_rules_signals
 
 SignalEvaluationMode = Literal["raw", "gated"]

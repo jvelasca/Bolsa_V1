@@ -37,6 +37,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { AppHelpMenu } from '@/features/help/app-help-menu';
+import { UniverseChip } from '@/features/platform/universe-chip';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
@@ -430,6 +431,7 @@ export function AppTopBar() {
       ) : null}
 
       <div className="ml-auto flex items-center gap-1">
+        <UniverseChip />
         <button
           type="button"
           onClick={openWorkspacePicker}

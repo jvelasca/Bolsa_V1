@@ -1,5 +1,6 @@
 """F2.3 — Graham Number + DCF FCF 2 etapas."""
 
+from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
 from bolsa_market.valuation import (
     DCF_METHOD,
     GRAHAM_METHOD,
@@ -9,7 +10,6 @@ from bolsa_market.valuation import (
     compute_price_per_share,
     compute_valuation_from_yahoo_fields,
 )
-from bolsa_market.instrument_fundamentals import build_fundamentals_snapshot
 
 
 def _raw(n: float) -> dict:

@@ -45,6 +45,14 @@ describe('applyGateFills', () => {
     expect(out.map((t) => t.id)).toEqual(['b1', 's2']);
   });
 
+  it('auto: initialShares carry allows OOS sell without prior buy in window', () => {
+    const oosOnly = [
+      trade({ id: 's1', type: 'sell', timestamp: '2024-01-10', price: 110, quantity: 10 }),
+    ];
+    const out = applyGateFills(oosOnly, [], 'auto', { initialShares: 10 });
+    expect(out.map((t) => t.id)).toEqual(['s1']);
+  });
+
   it('gated: undecided does not fill; only accept executes', () => {
     expect(applyGateFills(trades, [], 'gated')).toEqual([]);
     const out = applyGateFills(

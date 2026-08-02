@@ -8,7 +8,12 @@ from bolsa_ai.audit_sink import (
     build_audit_sink,
 )
 from bolsa_ai.models import DraftV1, LlmCallV1, LlmProvider, StructuredCompletion, llm_call_to_dict
-from bolsa_ai.proxy import AIGovernanceProxy, get_default_proxy, reset_default_proxy, set_default_proxy
+from bolsa_ai.proxy import (
+    AIGovernanceProxy,
+    get_default_proxy,
+    reset_default_proxy,
+    set_default_proxy,
+)
 
 __all__ = [
     "AIGovernanceProxy",

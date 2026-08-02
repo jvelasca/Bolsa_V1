@@ -18,23 +18,13 @@ Cache en memoria por proceso (TTL).
 
 from __future__ import annotations
 
-
-
 import csv
-
 import io
-
 import re
-
 import time
-
 from dataclasses import dataclass
 
-
-
 import httpx
-
-
 
 SP500_CSV_URL = (
 

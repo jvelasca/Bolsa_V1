@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from bolsa_analytics.cognitive import (
@@ -16,7 +16,7 @@ def test_recommendation_from_package_and_intent():
     package = DecisionPackageTa(
         decision_id=f"DEC-{uuid4().hex[:8]}",
         instrument_id="inst-1",
-        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         action="recommend_long",
         overall_confidence=0.7,
         metrics=DecisionMetrics(0.7, 0.6, 0.5, 0.55, 0.65),

@@ -8,6 +8,7 @@ import type {
   InstrumentStrategyTopV1,
   UpsertInstrumentStrategyTopRequestV1,
 } from '@bolsa/shared';
+import { resolveLabEvidenceForFinalistsSave } from '@/features/backtests/finalists-stability-summary';
 
 export type LabPromotionSlotInput = {
   label: string;
@@ -145,6 +146,13 @@ export function buildLabPromotionUpsertMany(opts: {
   const slots = dedupeInstrumentTopSlots([...labSlots, ...prior], 3);
   assertLabValidatedSlotsHaveRunId(slots);
   const topLabel = slots[0]?.label ?? 'lab';
+  const slot1 = slots[0];
+  const labEvidence =
+    (opts.labFacts?.labEvidence as object | undefined) ??
+    resolveLabEvidenceForFinalistsSave({
+      strategyDefinitionId: slot1?.strategyDefinitionId,
+      runId: slot1?.runId,
+    });
 
   return {
     instrumentId: opts.instrumentId,
@@ -161,6 +169,7 @@ export function buildLabPromotionUpsertMany(opts: {
     coachFacts: {
       ...(opts.existing?.coachFacts ?? {}),
       ...(opts.labFacts ?? {}),
+      ...(labEvidence ? { labEvidence } : {}),
       promotedAt: new Date().toISOString(),
       promotionSource: opts.promoted.length > 1 ? 'lab_adopt_many' : 'lab_adopt',
       promotedCount: opts.promoted.length,

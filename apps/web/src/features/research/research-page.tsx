@@ -58,6 +58,11 @@ export function ResearchPage() {
     queryFn: api.getLaboratoryResearchSummary,
   });
 
+  const labHealthQuery = useQuery({
+    queryKey: ['research', 'lab-health'],
+    queryFn: api.getLabHealth,
+  });
+
   const trialsQuery = useQuery({
     queryKey: [
       'research',
@@ -133,6 +138,7 @@ export function ResearchPage() {
   }
 
   const summary = summaryQuery.data?.data;
+  const labHealth = labHealthQuery.data?.data;
   const trials = trialsQuery.data?.data ?? [];
   const total = trialsQuery.data?.total ?? 0;
   const selected: ResearchTrialDto | undefined = trialDetailQuery.data?.data;
@@ -193,6 +199,57 @@ export function ResearchPage() {
                   value={summary.avgSharpe == null ? '—' : summary.avgSharpe.toFixed(2)}
                 />
               </div>
+
+              {labHealthQuery.isLoading && (
+                <p className="text-sm text-muted-foreground">Cargando Lab Health…</p>
+              )}
+              {labHealth && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Lab Health</CardTitle>
+                    <CardDescription>
+                      Cobertura de métricas IS, zero-trades y campañas (Q0.1)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <Stat
+                        label="Sharpe presente"
+                        value={`${labHealth.coverage.sharpeRatio.pct.toFixed(1)}%`}
+                      />
+                      <Stat
+                        label="Sortino presente"
+                        value={`${labHealth.coverage.sortinoRatio.pct.toFixed(1)}%`}
+                      />
+                      <Stat
+                        label="Calmar presente"
+                        value={`${labHealth.coverage.calmarRatio.pct.toFixed(1)}%`}
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <Stat
+                        label="tradeCount=0"
+                        value={`${labHealth.zeroTradePct.toFixed(1)}% (${labHealth.zeroTradeCount})`}
+                      />
+                      <Stat label="Campañas" value={String(labHealth.campaignCount)} />
+                      <Stat
+                        label="Sin trials"
+                        value={`${labHealth.instrumentsWithoutTrials} / ${labHealth.activeInstruments}`}
+                      />
+                    </div>
+                    {labHealth.campaigns.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Top campañas:{' '}
+                        {labHealth.campaigns
+                          .slice(0, 5)
+                          .map((c) => `${c.campaignId} (${c.trials})`)
+                          .join(' · ')}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">{labHealth.caveat}</p>
+                  </CardContent>
+                </Card>
+              )}
 
               <div className="grid gap-4 lg:grid-cols-2">
                 <Card>

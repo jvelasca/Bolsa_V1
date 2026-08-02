@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bolsa_domain.ohlcv_time import is_cache_stale, parse_bar_timestamp
 from bolsa_domain.value_objects.timeframe import TimeFrame
@@ -6,7 +6,7 @@ from bolsa_domain.value_objects.timeframe import TimeFrame
 
 def test_parse_bar_timestamp_daily() -> None:
     moment = parse_bar_timestamp("2024-06-15")
-    assert moment == datetime(2024, 6, 15, tzinfo=timezone.utc)
+    assert moment == datetime(2024, 6, 15, tzinfo=UTC)
 
 
 def test_parse_bar_timestamp_intraday() -> None:
@@ -20,5 +20,5 @@ def test_is_cache_stale_when_empty() -> None:
 
 
 def test_is_cache_stale_when_recent() -> None:
-    recent = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    recent = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     assert is_cache_stale(TimeFrame.H1, recent) is False

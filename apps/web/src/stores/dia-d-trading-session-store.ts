@@ -1,15 +1,13 @@
 /**
- * Sesión Trading MODO DÍA D (sandbox) — handoff desde Backtesting Finalistas #1.
+ * Sesión LAB — Verificar D→hoy (sandbox Cartera LAB).
  *
- * Persistida en `bolsa-dia-d-trading-session-v1`.
- * Incluye modo mesa, gate decisions, autoRunId.
+ * Antes: Trading MODO DÍA D. Desde ADR-019 vive en Backtesting (universo LAB).
+ * Clave localStorage conservada por compatibilidad de sesiones abiertas.
  *
- * `fullBleedMovie` **no se persiste**: al recargar siempre vuelve el layout Trading
- * (watchlist / gráfico / Operaciones). Si se persistiera en true, la página original
- * desaparecía y solo se veía la película DÍA D.
+ * `fullBleedMovie` **no se persiste**.
  *
- * @see docs/engineering/backtesting-dia-d-premises-2026-07-31.md
- * @see docs/UI_PREFS_LOCALSTORAGE.md
+ * @see docs/adr/019-dual-universes-lab-vs-trading.md
+ * @see docs/engineering/dual-universes-lab-trading-design-2026-08-02.md
  */
 
 import { create } from 'zustand';
@@ -27,6 +25,8 @@ export type DiaDGateDecision = {
 };
 
 export type DiaDTradingSession = {
+  /** Universo de producto (U5): siempre lab para verificación. */
+  universe: 'lab';
   instrumentId: string;
   symbol: string;
   strategyDefinitionId: string;
@@ -41,16 +41,22 @@ export type DiaDTradingSession = {
   autoRunId?: string | null;
   /** Log Semi/Manual: aceptaciones/rechazos. Reescriben fills/equity en v0.4. */
   gateDecisions: DiaDGateDecision[];
-  /** Película a pantalla completa (oculta docks Trading). */
+  /** Película a pantalla completa (oculta docks del host). */
   fullBleedMovie?: boolean;
 };
 
 type DiaDTradingSessionState = {
   session: DiaDTradingSession | null;
-  enterSession: (session: Omit<DiaDTradingSession, 'mode' | 'autoRunId' | 'gateDecisions' | 'fullBleedMovie'> & {
-    mode?: DiaDTradingMode;
-    fullBleedMovie?: boolean;
-  }) => void;
+  enterSession: (
+    session: Omit<
+      DiaDTradingSession,
+      'mode' | 'autoRunId' | 'gateDecisions' | 'fullBleedMovie' | 'universe'
+    > & {
+      mode?: DiaDTradingMode;
+      fullBleedMovie?: boolean;
+      universe?: 'lab';
+    },
+  ) => void;
   setMode: (mode: DiaDTradingMode) => void;
   setAutoRunId: (autoRunId: string | null) => void;
   setFullBleedMovie: (fullBleed: boolean) => void;
@@ -66,6 +72,7 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
       enterSession: (input) =>
         set({
           session: {
+            universe: 'lab',
             instrumentId: input.instrumentId,
             symbol: input.symbol,
             strategyDefinitionId: input.strategyDefinitionId,
@@ -108,17 +115,17 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
       partialize: (s) => {
         if (!s.session) return { session: null };
         const { fullBleedMovie: _omit, ...rest } = s.session;
-        return { session: { ...rest, fullBleedMovie: false } };
+        return { session: { ...rest, universe: 'lab' as const, fullBleedMovie: false } };
       },
       merge: (persisted, current) => {
         const stored = (persisted ?? {}) as Partial<DiaDTradingSessionState>;
         const session = stored.session
           ? {
               ...stored.session,
+              universe: 'lab' as const,
               gateDecisions: Array.isArray(stored.session.gateDecisions)
                 ? stored.session.gateDecisions
                 : [],
-              // Never hydrate into full-bleed: restores docks / Operaciones.
               fullBleedMovie: false,
             }
           : null;

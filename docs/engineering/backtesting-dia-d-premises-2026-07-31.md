@@ -2,29 +2,41 @@
 
 > Decisiones de producto **bloqueadas** + guía de arranque.  
 > Complementa [research-lifecycle.md](./research-lifecycle.md), [UI_PREFS_LOCALSTORAGE.md](../UI_PREFS_LOCALSTORAGE.md), [account-premises-demo-vs-paper-2026-07-31.md](./account-premises-demo-vs-paper-2026-07-31.md), [HELP.md](../HELP.md), [operativa-test-plan-2026-07-31.md](./operativa-test-plan-2026-07-31.md).  
-> **Ayuda en app:** (?) → Backtesting → tarjeta «Backtesting DÍA D».
+> **Ayuda en app:** (?) → Backtesting → tarjeta «Backtesting DÍA D».  
+> **To-be universos (2026-08-02):** [ADR-019](../adr/019-dual-universes-lab-vs-trading.md) · [diseño dual](./dual-universes-lab-trading-design-2026-08-02.md) — fase C vive en **LAB**, no en Trading.
 
-**AsOf:** 2026-07-31 · Investigación: **Backtesting DÍA D** · Operación: **Trading MODO DÍA D** · Producto: **v0.11 operable**
+**AsOf premisas v0.11:** 2026-07-31 · **Enmienda producto + código U1–U5:** 2026-08-02 (Modo A / dos universos)  
+**Código:** Verificar D→hoy en **Backtesting LAB** · Trading = DEMO + rail Coach.
+
+---
+
+## 0b. Enmienda 2026-08-02 — Modo A (supersede híbrido UI)
+
+| # | Tema | Antes (2026-07-31) | Ahora (bloqueado + código) |
+|---|------|--------------------|-------------------|
+| 5 | **Arquitectura UI** | Híbrido: A+B en Backtesting · **C en Trading MODO DÍA D** | **Modo A:** A+B+**C en Backtesting (LAB)** · Trading solo inversión diaria + Coach rail |
+| — | **Carteras** | Sandbox ≠ DEMO (sin cartera LAB nombrada) | **Cartera LAB** (`universe: lab` en sesión) ≠ **Cartera TRADING** (DEMO) |
+| — | **CTA** | «Simular D→hoy» → `/trading` | **Verificar D→hoy** → Análisis técnico LAB |
+
+Reglas point-in-time, #1 congelada, Manual/Semi/Auto (§3c) y Evidence **se mantienen**. Solo cambia el **universo UI** de la fase C.
 
 ---
 
 ## 0. Cómo arrancar (usuario)
 
-Estado actual: **v0.11 operable** (DÍA D v1 cerrado en producto; mejoras opcionales aparte).
-
 1. Abre **Backtesting** → pestaña **Probar estrategia**.  
 2. En el bloque **Backtesting DÍA D** (debajo del selector de valor), elige una **fecha pasada**.  
 3. Elige un valor con histórico → **Play** (ciclo completo) hasta **Finalistas**.  
-4. En Finalistas, fila **#1** → botón **Simular D→hoy**.  
-5. Entras en **Trading** con banner **MODO DÍA D** + **película** + modos **Manual / Semi / Auto**.  
+4. En Finalistas, fila **#1** → botón **Verificar D→hoy**.  
+5. Entras en **Análisis técnico (LAB)** con banner **Verificar** + **película** + modos **Manual / Semi / Auto**.  
 6. Opcional: **Pantalla completa** · **Narrar con IA** · **Guardar Evidence**.  
-7. **Salir DÍA D** en el banner cierra el sandbox (no escribe la DEMO live).
+7. **Salir verificación** cierra el sandbox LAB (no escribe la DEMO live).
 
 | Si no ves… | Causa habitual |
 |------------|----------------|
 | Bloque DÍA D | Estás en otra pestaña (Biblioteca / Historial), no en Probar |
-| Botón Simular D→hoy | Fecha DÍA D = hoy, o no hay #1 con `strategyDefinitionId` |
-| Película en Trading | No pulsaste Simular (solo cambiaste de ruta a /trading) |
+| Botón Verificar D→hoy | Fecha DÍA D = hoy, o no hay #1 con `strategyDefinitionId` |
+| Película en LAB | No pulsaste Verificar (solo cambiaste de foco) |
 | Guardar → Fase 2 | API sin reiniciar tras pull (`POST /api/research/dia-d-session-evidence`) |
 
 **Offline:** `pnpm test:operativa` · checklist UI: [operativa-test-plan-2026-07-31.md](./operativa-test-plan-2026-07-31.md).
@@ -39,7 +51,7 @@ Simular que «hoy» es una fecha pasada **D**, construir el embudo (Probar → C
 |------|----------------|----------|-------|
 | **A** | As-of | ¿Qué sé el día D? | Todo point-in-time ≤ D |
 | **B** | Embudo ≤ D | ¿TOP / Coach / Lab? | Solo ≤ D (mismo Play actual) |
-| **C** | Replay D→hoy | ¿Y si hubiera operado? | Barras D→hoy · reglas **fijadas** en B |
+| **C** | Replay D→hoy | ¿Y si hubiera operado? | Reglas **fijadas** en B · run con **lookback ≤D** (indicadores + posición a D) · película/métricas **D→hoy** (carry; no arrancar flat) |
 
 Default de D = **hoy** → comportamiento actual de Backtesting (sin cambio percibido).
 
@@ -53,9 +65,9 @@ Default de D = **hoy** → comportamiento actual de Backtesting (sin cambio perc
 | 2 | **Replay opera** | Solo la estrategia **#1** (mejor Finalista / slot activo #1), no las 3 en paralelo |
 | 3 | **Re-Lab en C** | **Prohibido en v1.** Params y definición de #1 quedan **congelados** el día D |
 | 4 | **FA / Composite / scores** | **También cortados a D** (point-in-time; sin trampas) |
-| 5 | **Arquitectura UI** | **Híbrido:** A+B en Backtesting · C en **Trading MODO DÍA D** |
-| 6 | **Película** | Embebida por defecto · **pantalla completa** opcional (banner / toolbar) |
-| 7 | **Modos de mesa (C)** | Exactamente **tres:** **Manual** · **Semi** · **Auto** (contrato §3c). Selector obligatorio al entrar en Trading DÍA D |
+| 5 | **Arquitectura UI** | **Modo A (2026-08-02):** A+B+C en **Backtesting (LAB)**. ~~Híbrido C en Trading~~ superseded — ver §0b. *As-is código aún híbrido hasta U2.* |
+| 6 | **Película** | Embebida por defecto · **pantalla completa** opcional (en LAB tras U2; hoy en banner Trading) |
+| 7 | **Modos de mesa (C)** | Exactamente **tres:** **Manual** · **Semi** · **Auto** (contrato §3c). Selector obligatorio al entrar en **Verificar** (hoy: Trading DÍA D; to-be: LAB) |
 
 ### Qué significaba «re-Lab» (punto 3)
 
@@ -63,28 +75,41 @@ Re-optimizar params *mientras* avanza D→hoy. **No en v1:** el día D eliges #1
 
 ---
 
-## 3. UI — híbrido bloqueado
+## 3. UI — to-be Modo A (LAB) · as-is híbrido hasta U2
+
+### 3a. To-be (bloqueado 2026-08-02)
 
 ```text
-Backtesting (DÍA D)                 Trading (MODO DÍA D)
-  fecha D · embudo ≤ D         →      banner MODO DÍA D
-  Finalistas → #1              →      Manual | Semi | Auto  (determinan la mesa)
-  CTA «Simular operación D→hoy» →     sandbox ≠ DEMO live
-                                   →  película embebida (motor movie) + informe
+Backtesting / LAB
+  fecha D · embudo ≤ D
+  Finalistas → #1
+  CTA «Verificar D→hoy» → Análisis técnico (modo Verificar)
+       Manual | Semi | Auto · película · informe · Evidence
+       Cartera LAB (sandbox) ≠ DEMO
 ```
 
-| Pieza | Dónde | Notas |
-|-------|--------|-------|
-| Control fecha **DÍA D** | Backtesting · Probar | Default = hoy |
-| Embudo Play/Coach/Lab/Finalistas | Backtesting | Sin look-ahead &gt; D |
-| CTA tras #1 | Backtesting → Trading | Handoff: instrumentId, #1, D, end=hoy |
-| Selector Manual / Semi / Auto | Trading DÍA D | Lo que más cambia la UX de C |
-| Órdenes / posiciones / alertas | Trading DÍA D | Mesa operativa en tiempo simulado |
-| Película (scrubber / play / HUD) | Embebida o **pantalla completa** | Misma familia que `backtest-replay-chart` · toggle banner |
+Trading **no** hospeda la fase C; solo el **rail Coach** puede deep-link a Verificar.
+
+### 3b. As-is (código v0.11 — deprecado en producto)
+
+```text
+Backtesting (DÍA D)                 Trading (MODO DÍA D)  ← migrar fuera
+  fecha D · embudo ≤ D         →      banner MODO DÍA D
+  Finalistas → #1              →      Manual | Semi | Auto
+  CTA «Simular D→hoy»          →      sandbox ≠ DEMO live
+```
+
+| Pieza | Dónde (as-is) | Dónde (to-be) |
+|-------|---------------|---------------|
+| Control fecha **DÍA D** | Backtesting · Probar | Igual |
+| Embudo Play/Coach/Lab/Finalistas | Backtesting | Igual |
+| CTA tras #1 | → Trading | → Análisis técnico LAB (**Verificar**) |
+| Selector Manual / Semi / Auto | Trading DÍA D | LAB Verificar |
+| Película / Informe / Evidence | Trading | LAB Verificar |
 | Prefs UI | `localStorage` | [UI_PREFS_LOCALSTORAGE](../UI_PREFS_LOCALSTORAGE.md) |
 
 **No** mover Coach/Lab/Finalistas a Trading.  
-**No** escribir el ledger DEMO “de verdad”: sesión **sandbox** aislada; al salir, DEMO live intacta.
+**No** escribir el ledger DEMO: sesión **sandbox / Cartera LAB**; al salir, DEMO intacta.
 
 ### 3c. Contrato Manual · Semi · Auto (bloqueado)
 
@@ -120,8 +145,9 @@ Misma #1, mismo D→hoy, mismo sandbox. Solo cambia **quién decide** y **cómo 
 
 1. **Point-in-time:** precios, FA, composite, Coach, Lab y Finalistas de B solo ven ≤ D.
 2. **Congelar #1 en C:** sin re-opt / re-Lab / re-Coach que use barras &gt; D.
-3. **Dos informes:** métricas embudo (≤ D) ≠ métricas sesión Trading DÍA D (D→hoy).
+3. **Dos informes:** métricas embudo (≤ D) ≠ métricas sesión Verificar (D→hoy).
 4. **TOP-3 en B** sigue existiendo; **C solo ejecuta #1**.
+5. **ADR-021:** Play+D escribe **F-D** (experimento) y **no** pisa **F-hoy**; post-V = reconciliación SAME/DRIFT vs Finalista operativa #1.
 5. **Sandbox ≠ DEMO live.**
 
 ---
@@ -131,12 +157,14 @@ Misma #1, mismo D→hoy, mismo sandbox. Solo cambia **quién decide** y **cómo 
 - Re-Lab / re-opt periódico durante C  
 - Operar las 3 Finalistas en paralelo en C  
 - Cron CORE-R multi-dispositivo (cola hoy en localStorage; shell cron v1.4 cubre app abierta)  
-- App/ruta “Verificación” separada del shell Trading  
+- ~~App/ruta “Verificación” separada del shell Trading~~ → **reabierto** como Modo A (C en LAB / Análisis técnico); ver [diseño dual §11](./dual-universes-lab-trading-design-2026-08-02.md)  
 - Sync cross-device de prefs (sigue localStorage)
 
 ---
 
 ## 6. Siguiente paso (cuando se retome)
+
+**Producto (2026-08-02):** migración U1–U2 del [diseño dual](./dual-universes-lab-trading-design-2026-08-02.md) (chip + Verificar en LAB).
 
 **Hecho (v0 UI · 2026-07-31):** campo DÍA D en Probar · corte `dateTo` en ventana BT · sello/CTA Finalistas · handoff Trading banner + modos.
 

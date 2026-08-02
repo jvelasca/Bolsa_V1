@@ -1,9 +1,9 @@
 /**
- * Banner Trading MODO DÍA D — sandbox ≠ DEMO live.
+ * Banner LAB · Verificar D→hoy — sandbox Cartera LAB ≠ DEMO.
  *
  * Selector Manual / Semi / Auto · Pantalla completa · Volver Finalistas · Salir.
- * El layout (`trading-layout.tsx`) oculta docks cuando `fullBleedMovie`.
  *
+ * @see docs/adr/019-dual-universes-lab-vs-trading.md
  * @see docs/engineering/backtesting-dia-d-premises-2026-07-31.md §3c
  */
 
@@ -14,11 +14,17 @@ import {
   type DiaDTradingMode,
 } from '@/stores/dia-d-trading-session-store';
 import { Button } from '@/components/ui/button';
+import { UniverseChip } from '@/features/platform/universe-chip';
 import { cn } from '@/lib/utils';
 
 const MODES: DiaDTradingMode[] = ['manual', 'semi', 'auto'];
 
+/** @deprecated alias — prefer DiaDVerifyBanner */
 export function TradingDiaDBanner() {
+  return <DiaDVerifyBanner />;
+}
+
+export function DiaDVerifyBanner() {
   const session = useDiaDTradingSessionStore((s) => s.session);
   const setMode = useDiaDTradingSessionStore((s) => s.setMode);
   const setFullBleedMovie = useDiaDTradingSessionStore((s) => s.setFullBleedMovie);
@@ -32,13 +38,17 @@ export function TradingDiaDBanner() {
     <div
       className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px]"
       role="status"
+      data-testid="dia-d-verify-banner"
     >
-      <span className="font-semibold text-amber-950 dark:text-amber-50">MODO DÍA D</span>
+      <UniverseChip force="lab" />
+      <span className="font-semibold text-amber-950 dark:text-amber-50">Verificar D→hoy</span>
       <span className="text-amber-900/90 dark:text-amber-100/90">
         {session.symbol} · #{session.rank} {session.strategyLabel} · {session.diaD} →{' '}
         {session.endDate}
       </span>
-      <span className="text-amber-800/80 dark:text-amber-200/80">Sandbox · no escribe DEMO live</span>
+      <span className="text-amber-800/80 dark:text-amber-200/80">
+        Cartera LAB · no escribe DEMO
+      </span>
 
       <div className="flex items-center gap-0.5 rounded-md border border-amber-600/30 bg-background/60 p-0.5">
         {MODES.map((mode) => (
@@ -70,13 +80,10 @@ export function TradingDiaDBanner() {
           type="button"
           size="sm"
           variant={fullBleed ? 'default' : 'outline'}
-          className={cn(
-            'h-6 px-2 text-[10px]',
-            !fullBleed && 'border-amber-600/40',
-          )}
+          className={cn('h-6 px-2 text-[10px]', !fullBleed && 'border-amber-600/40')}
           title={
             fullBleed
-              ? 'Volver al layout Trading (watchlist / gráfico live)'
+              ? 'Volver al layout del hub Backtesting'
               : 'Película a pantalla completa'
           }
           onClick={() => setFullBleedMovie(!fullBleed)}
@@ -96,7 +103,7 @@ export function TradingDiaDBanner() {
           className="h-6 border-amber-600/40 px-2 text-[10px]"
           onClick={() => exitSession()}
         >
-          Salir DÍA D
+          Salir verificación
         </Button>
       </span>
     </div>

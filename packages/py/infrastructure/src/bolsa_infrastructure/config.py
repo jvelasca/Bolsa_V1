@@ -87,6 +87,23 @@ class Settings(BaseSettings):
         default=512,
         validation_alias="FEATURE_CACHE_MAX_ENTRIES",
     )
+    # Q3.4 — CORE-R cron servidor (re-encola desde reports BD). Off-by-default.
+    core_r_cron_enabled: bool = Field(
+        default=False, validation_alias="CORE_R_CRON_ENABLED"
+    )
+    core_r_cron_interval_seconds: float = Field(
+        default=300.0, validation_alias="CORE_R_CRON_INTERVAL_SECONDS"
+    )
+    # Q3.5 — cost model v2 (volume-aware). Off by default; does not change Lab/paper tips.
+    cost_model_v2_enabled: bool = Field(
+        default=False, validation_alias="COST_MODEL_V2_ENABLED"
+    )
+    cost_model_v2_illiquid_extra_bps: int = Field(
+        default=8, validation_alias="COST_MODEL_V2_ILLIQUID_EXTRA_BPS"
+    )
+    cost_model_v2_volume_ratio_illiquid: float = Field(
+        default=0.35, validation_alias="COST_MODEL_V2_VOLUME_RATIO_ILLIQUID"
+    )
 
     @field_validator("database_url")
     @classmethod

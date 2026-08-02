@@ -7,6 +7,7 @@ from typing import Any
 from bolsa_analytics.knowledge.fundamental_copilot import (
     build_fundamental_copilot_variables,
     heuristic_fundamental_explanation,
+    validate_copilot_does_not_invent_roe,
 )
 from bolsa_application.get_instrument_fundamentals import GetInstrumentFundamentals
 
@@ -41,6 +42,7 @@ class ExplainInstrumentFundamentals:
                 "provider": None,
                 "model": None,
                 "card": card,
+                "guardrailViolations": [],
             }
 
         payload = completion.payload if isinstance(completion.payload, dict) else None
@@ -59,10 +61,17 @@ class ExplainInstrumentFundamentals:
             )
             payload = {"paragraphs": cleaned, "disclaimer": disclaimer}
 
+        prose = " ".join(str(p) for p in (payload.get("paragraphs") or []))
+        violations = validate_copilot_does_not_invent_roe(prose, card)
+        if violations:
+            # Fallback seguro: no publicar cifras inventadas.
+            payload = heuristic
+
         return {
             "engine": f"{completion.provider}_structured_v1",
             "payload": payload,
             "provider": completion.provider,
             "model": completion.model_name,
             "card": card,
+            "guardrailViolations": violations,
         }

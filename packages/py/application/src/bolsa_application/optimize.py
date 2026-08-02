@@ -11,37 +11,26 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from bolsa_analytics.backtest import BacktestBarInput, run_backtest
+from bolsa_analytics.optimize.cpcv import (
+    CPCV_EMBARGO_DEFAULT,
+    CPCV_EMBARGO_MAX,
+    CPCV_PURGE_DEFAULT,
+    CPCV_PURGE_MAX,
+    CPCV_TEST_GROUPS,
+    aggregate_cpcv_metrics,
+    normalize_cpcv_gap,
+    normalize_cpcv_groups,
+    split_cpcv_paths,
+)
 from bolsa_analytics.optimize.engines import engine_result_label, resolve_optimize_engine
 from bolsa_analytics.optimize.holdout import (
     HoldoutSplit,
     metrics_to_oos_summary,
     split_holdout_bars,
 )
-from bolsa_analytics.optimize.cpcv import (
-    aggregate_cpcv_metrics,
-    normalize_cpcv_gap,
-    normalize_cpcv_groups,
-    split_cpcv_paths,
-    CPCV_EMBARGO_DEFAULT,
-    CPCV_EMBARGO_MAX,
-    CPCV_PURGE_DEFAULT,
-    CPCV_PURGE_MAX,
-    CPCV_TEST_GROUPS,
-)
 from bolsa_analytics.optimize.lab_edge_report import (
     build_lab_edge_report_lite,
     trade_returns_from_pnls,
-)
-from bolsa_analytics.optimize.pbo import (
-    equal_segment_ranges,
-    estimate_pbo_cscv,
-    pbo_segment_count,
-)
-from bolsa_analytics.optimize.walk_forward import (
-    aggregate_walk_forward_metrics,
-    fold_walk_forward_efficiency,
-    normalize_walk_forward_folds,
-    split_walk_forward_bars,
 )
 from bolsa_analytics.optimize.macd_grid import (
     DEFAULT_MACD_TRIPLES,
@@ -49,6 +38,11 @@ from bolsa_analytics.optimize.macd_grid import (
     _simulate_macd_signal_cross,
     estimate_macd_grid_trial_total,
     run_macd_signal_cross_grid,
+)
+from bolsa_analytics.optimize.pbo import (
+    equal_segment_ranges,
+    estimate_pbo_cscv,
+    pbo_segment_count,
 )
 from bolsa_analytics.optimize.rsi_grid import (
     RsiGridTrial,
@@ -61,6 +55,12 @@ from bolsa_analytics.optimize.sma_grid import (
     _simulate_sma_crossover,
     estimate_sma_grid_trial_total,
     run_baseline_preset_backtest,
+)
+from bolsa_analytics.optimize.walk_forward import (
+    aggregate_walk_forward_metrics,
+    fold_walk_forward_efficiency,
+    normalize_walk_forward_folds,
+    split_walk_forward_bars,
 )
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository

@@ -6,10 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bolsa_api.api.dependencies import (
     get_db_session,
     get_enqueue_stale_use_case,
-    get_sync_scheduler_repository,
+    get_list_sync_queue_use_case,
     get_sync_settings_use_case,
     get_update_sync_settings_use_case,
-    get_list_sync_queue_use_case,
 )
 from bolsa_api.schemas.sync import (
     EnqueueStaleResponseDto,

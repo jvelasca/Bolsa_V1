@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ class SqlAlchemySyncLogRepository:
                 status=status,
                 bars_added=bars_added,
                 error=error,
-                synced_at=datetime.now(timezone.utc),
+                synced_at=datetime.now(UTC),
             ),
         )
         await self._session.flush()

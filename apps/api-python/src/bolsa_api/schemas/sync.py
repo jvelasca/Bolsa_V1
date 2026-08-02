@@ -18,11 +18,21 @@ class UpdateSyncSettingsDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
     auto_sync_enabled: bool | None = Field(alias="autoSyncEnabled", default=None)
-    scan_interval_minutes: int | None = Field(alias="scanIntervalMinutes", default=None, ge=5, le=1440)
+    scan_interval_minutes: int | None = Field(
+        alias="scanIntervalMinutes",
+        default=None,
+        ge=5,
+        le=1440,
+    )
     min_delay_seconds: int | None = Field(alias="minDelaySeconds", default=None, ge=1, le=120)
     post_market_only: bool | None = Field(alias="postMarketOnly", default=None)
     max_retries: int | None = Field(alias="maxRetries", default=None, ge=1, le=20)
-    retry_backoff_minutes: int | None = Field(alias="retryBackoffMinutes", default=None, ge=5, le=1440)
+    retry_backoff_minutes: int | None = Field(
+        alias="retryBackoffMinutes",
+        default=None,
+        ge=5,
+        le=1440,
+    )
     scope: str | None = None
 
 

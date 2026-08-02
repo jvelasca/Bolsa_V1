@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from bolsa_analytics.cognitive.edge_report import StatisticalSuiteResult
+from bolsa_application.optimization_runs import ProcessOptimizationRun
+from bolsa_application.optimize import OptimizeGridTrial, OptimizeSmaGridResult
 from bolsa_application.persist_lab_edge_report import (
     LAB_PERSIST_NOTE,
     lab_edge_report_notes,
@@ -14,8 +16,6 @@ from bolsa_application.persist_lab_edge_report import (
     persist_lab_edge_report_if_present,
     stamp_persisted_edge_report_id,
 )
-from bolsa_application.optimization_runs import ProcessOptimizationRun
-from bolsa_application.optimize import OptimizeGridTrial, OptimizeSmaGridResult
 
 
 def _lab_edge_report(**overrides):

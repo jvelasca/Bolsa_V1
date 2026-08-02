@@ -72,3 +72,4 @@ Ver `packages/shared/src/portfolio-cash.ts` y `packages/shared/src/accounts.ts`.
 - Transferencias entre cuentas distintas
 - Ledger como única fuente de verdad (reconciliación cash vs ledger)
 - Posiciones referenciando `investment_portfolios.id` directamente
+- **Cartera LAB** como entidad BD opcional (U5) — hoy el sandbox DÍA D/Verificar es cliente + Evidence; no compite con la cuenta Activa. Ver [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [diseño dual](./engineering/dual-universes-lab-trading-design-2026-08-02.md).

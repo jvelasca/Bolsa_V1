@@ -3,7 +3,11 @@ from typing import Any, Literal
 
 from bolsa_analytics.research.manifest import strategy_definition_from_preset
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
-from bolsa_analytics.signals.strategy import SignalEventV1, StrategyBarInput, evaluate_strategy_last_bar
+from bolsa_analytics.signals.strategy import (
+    SignalEventV1,
+    StrategyBarInput,
+    evaluate_strategy_last_bar,
+)
 from bolsa_application.scans import MIN_SCAN_BARS
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 LAB_EVIDENCE_SETTINGS_KEY = "labEvidence"
 
 LAB_EVIDENCE_NOTE = (

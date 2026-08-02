@@ -47,6 +47,8 @@ export * from './chart-strategy-bridge-api.js';
 export * from './ai-indicator-draft-api.js';
 export * from './chart-strategy-bridge.js';
 export * from './instrument-strategy-top.js';
+export * from './operating-mandate.js';
+export * from './core-r-api.js';
 export * from './paper-bridge-api.js';
 export * from './signal-events.js';
 export * from './signal-evaluate-api.js';

@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from bolsa_ai import get_default_proxy
-from bolsa_analytics.research.prompt_draft import PromptDraftResult, draft_strategy_from_prompt, _ENGINE_LABELS
+from bolsa_analytics.research.prompt_draft import (
+    _ENGINE_LABELS,
+    PromptDraftResult,
+    draft_strategy_from_prompt,
+)
 
 LLM_ENGINE_OPENAI = "openai_structured_v1"
 LLM_ENGINE_OLLAMA = "ollama_structured_v1"

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -49,7 +49,7 @@ class SqlAlchemyResearchTreeRepository:
             notes=notes,
             payload=payload,
             deleted_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()
@@ -66,7 +66,7 @@ class SqlAlchemyResearchTreeRepository:
         if row is None:
             return None
         if row.deleted_at is None:
-            row.deleted_at = datetime.now(timezone.utc)
+            row.deleted_at = datetime.now(UTC)
             await self._session.flush()
         return self._map(row)
 

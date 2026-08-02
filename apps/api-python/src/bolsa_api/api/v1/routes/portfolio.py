@@ -1,52 +1,27 @@
 from typing import Annotated
 
-
-
 from fastapi import APIRouter, Depends, HTTPException, Query
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-
 from bolsa_api.api.dependencies import (
-
     get_account_id_header,
-
     get_db_session,
-
     get_execute_trade_use_case,
-
     get_list_transactions_use_case,
-
     get_portfolio_summary_use_case,
-
 )
-
 from bolsa_api.schemas.extra_mappers import (
-
     to_portfolio_summary_dto,
-
     to_trade_response_data,
-
     to_transaction_dto,
-
 )
-
 from bolsa_api.schemas.portfolio import (
-
     PortfolioSummaryResponseDto,
-
     TradeRequestDto,
-
     TradeResponseDto,
-
     TransactionsResponseDto,
-
 )
-
 from bolsa_application.accounts import ExecuteTrade
-
-
 
 router = APIRouter()
 

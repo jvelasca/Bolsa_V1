@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bolsa_analytics.features import (
     OnlineFeatureAdapter,
@@ -83,7 +83,7 @@ def test_materialize_snapshot_via_port() -> None:
     as_of = adapter.get_as_of(
         "inst_demo",
         "fset_core_v1",
-        datetime(2024, 1, 30, tzinfo=timezone.utc),
+        datetime(2024, 1, 30, tzinfo=UTC),
     )
     assert as_of is not None
 

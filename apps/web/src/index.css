@@ -437,3 +437,20 @@ body {
     overflow: auto;
   }
 }
+
+/* Play del Asistente: parpadeo mientras el ciclo / Lista AUTO calcula */
+@keyframes assistant-play-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.28;
+    transform: scale(0.92);
+  }
+}
+
+.animate-assistant-play-blink {
+  animation: assistant-play-blink 0.85s ease-in-out infinite;
+}

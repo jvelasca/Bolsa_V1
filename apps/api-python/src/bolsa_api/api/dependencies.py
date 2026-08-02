@@ -3,6 +3,11 @@ from collections.abc import AsyncGenerator
 from fastapi import Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
+from bolsa_application.account_lifecycle import (
+    ListClosedSimulatedAccounts,
+    PurgeClosedSimulatedAccounts,
+)
 from bolsa_application.accounts import (
     CloseAccount,
     CreateSimulatedAccount,
@@ -22,15 +27,6 @@ from bolsa_application.accounts import (
     UpdateAccountSettings,
     WithdrawCashFromAccount,
 )
-from bolsa_application.search_instruments import SearchInstruments
-from bolsa_application.sync_instrument import SyncInstrumentDailyBars
-from bolsa_application.sync_scheduler import (
-    EnqueueStaleInstruments,
-    GetSyncSettings,
-    ListSyncQueue,
-    ProcessNextSyncQueueItem,
-    UpdateSyncSettings,
-)
 from bolsa_application.alerts import EvaluatePriceAlerts
 from bolsa_application.backtests import (
     GetBacktestRun,
@@ -38,15 +34,64 @@ from bolsa_application.backtests import (
     PruneBacktestRuns,
     RunAndSaveBacktest,
 )
-from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
-from bolsa_application.scans import RunScan
-from bolsa_application.optimize import RunSmaGridOptimize
+from bolsa_application.events.platform_event_bus import PlatformEventBus
+from bolsa_application.execution_policies import (
+    CreateExecutionPolicy,
+    DeleteExecutionPolicy,
+    GetExecutionPolicy,
+    ListExecutionPolicies,
+    UpdateExecutionPolicy,
+)
+from bolsa_application.execution_router import ExecuteScanJobHits, ExecutionRouter
+from bolsa_application.fx import GetFxRate
+from bolsa_application.get_database_summary import GetDatabaseSummary
+from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
+from bolsa_application.get_instrument_db_inventory import GetInstrumentDbInventory
+from bolsa_application.get_instrument_detail import GetInstrumentDetail
+from bolsa_application.get_instrument_fundamentals import GetInstrumentFundamentals
+from bolsa_application.get_instrument_indicators import GetInstrumentIndicators
+from bolsa_application.get_instrument_profile import GetInstrumentProfile
+from bolsa_application.get_instrument_quotes import GetInstrumentQuotes
+from bolsa_application.get_ohlcv_bars import GetOhlcvBars
+from bolsa_application.import_instrument import ImportInstrument
+from bolsa_application.indicator_draft import DraftIndicatorFromPrompt
+from bolsa_application.instrument_lifecycle import GetInstrumentRemovalPreview
+from bolsa_application.instruments import ListInstrumentsWithMeta
+from bolsa_application.market import (
+    GetInstrumentLiveQuote,
+    GetInstrumentLiveQuotes,
+    GetMarketStatus,
+)
 from bolsa_application.optimization_runs import (
     EnqueueOptimizationRun,
     GetOptimizationRun,
     ListOptimizationRuns,
     ProcessOptimizationRun,
     RunSmaGridOptimizeAndSave,
+)
+from bolsa_application.optimize import RunSmaGridOptimize
+from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
+from bolsa_application.pending_orders import (
+    CreatePendingOrder,
+    DeletePendingOrder,
+    ListPendingOrders,
+)
+from bolsa_application.platform_events import ListPlatformEvents
+from bolsa_application.position_exit_evaluator import EvaluatePositionExits
+from bolsa_application.position_policies import (
+    CreatePositionPolicy,
+    DeletePositionPolicy,
+    GetPositionPolicy,
+    GetPositionPolicyForHolding,
+    ListPositionPolicies,
+    UpdatePositionPolicy,
+)
+from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
+from bolsa_application.remove_list_instrument import (
+    DeleteInstrument,
+    ListOrphanInstruments,
+    PurgeOrphanInstruments,
+    RemoveInstrumentFromList,
 )
 from bolsa_application.scan_jobs import (
     EnqueueScanJob,
@@ -55,10 +100,15 @@ from bolsa_application.scan_jobs import (
     ProcessScanJob,
 )
 from bolsa_application.scan_manifests import GetScanManifest, PersistScanManifest
-from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
-from bolsa_infrastructure.cache.feature_cache_factory import get_feature_cache
-from bolsa_application.indicator_draft import DraftIndicatorFromPrompt
-from bolsa_application.strategy_draft import DraftStrategyFromPrompt
+from bolsa_application.scans import RunScan
+from bolsa_application.search_instruments import SearchInstruments
+from bolsa_application.signal_alerts import (
+    CreateSignalAlertSubscription,
+    DeleteSignalAlertSubscription,
+    EvaluateSignalAlertSubscriptions,
+    ListSignalAlertSubscriptions,
+    ResetSignalAlertDedupe,
+)
 from bolsa_application.strategies import (
     CreateStrategyDefinition,
     CreateStrategyFromPreset,
@@ -67,6 +117,16 @@ from bolsa_application.strategies import (
     ListStrategyDefinitions,
     UpdateStrategyDefinition,
 )
+from bolsa_application.strategy_draft import DraftStrategyFromPrompt
+from bolsa_application.sync_instrument import SyncInstrumentDailyBars
+from bolsa_application.sync_scheduler import (
+    EnqueueStaleInstruments,
+    GetSyncSettings,
+    ListSyncQueue,
+    ProcessNextSyncQueueItem,
+    UpdateSyncSettings,
+)
+from bolsa_application.tracker_schedule import ProcessTrackerSchedules
 from bolsa_application.trackers import (
     CreateTrackerDefinition,
     DeleteTrackerDefinition,
@@ -77,134 +137,94 @@ from bolsa_application.trackers import (
     RunTrackerScan,
     UpdateTrackerDefinition,
 )
-from bolsa_application.tracker_schedule import ProcessTrackerSchedules
-from bolsa_application.execution_policies import (
-    CreateExecutionPolicy,
-    DeleteExecutionPolicy,
-    GetExecutionPolicy,
-    ListExecutionPolicies,
-    UpdateExecutionPolicy,
-)
-from bolsa_application.execution_router import ExecuteScanJobHits, ExecutionRouter
-from bolsa_application.position_policies import (
-    CreatePositionPolicy,
-    DeletePositionPolicy,
-    GetPositionPolicy,
-    GetPositionPolicyForHolding,
-    ListPositionPolicies,
-    UpdatePositionPolicy,
-)
-from bolsa_application.position_exit_evaluator import EvaluatePositionExits
-from bolsa_application.platform_events import ListPlatformEvents
-from bolsa_application.events.platform_event_bus import PlatformEventBus
-from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
-from bolsa_application.signal_alerts import (
-    CreateSignalAlertSubscription,
-    DeleteSignalAlertSubscription,
-    EvaluateSignalAlertSubscriptions,
-    ListSignalAlertSubscriptions,
-    ResetSignalAlertDedupe,
-)
-from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
-from bolsa_application.get_instrument_detail import GetInstrumentDetail
-from bolsa_application.get_instrument_indicators import GetInstrumentIndicators
-from bolsa_application.get_ohlcv_bars import GetOhlcvBars
-from bolsa_application.get_instrument_db_inventory import GetInstrumentDbInventory
-from bolsa_application.get_instrument_profile import GetInstrumentProfile
-from bolsa_application.get_instrument_fundamentals import GetInstrumentFundamentals
-from bolsa_application.get_instrument_quotes import GetInstrumentQuotes
-from bolsa_application.account_lifecycle import (
-    ListClosedSimulatedAccounts,
-    PurgeClosedSimulatedAccounts,
-)
-from bolsa_application.get_database_summary import GetDatabaseSummary
-from bolsa_application.instrument_lifecycle import GetInstrumentRemovalPreview
-from bolsa_application.remove_list_instrument import (
-    DeleteInstrument,
-    ListOrphanInstruments,
-    PurgeOrphanInstruments,
-    RemoveInstrumentFromList,
-)
 from bolsa_application.validate_instrument_xtb import ValidateInstrumentWithXtb
-from bolsa_application.instruments import ListInstrumentsWithMeta
-from bolsa_application.market import GetInstrumentLiveQuote, GetInstrumentLiveQuotes, GetMarketStatus
-from bolsa_application.fx import GetFxRate
-from bolsa_application.import_instrument import ImportInstrument
-from bolsa_application.pending_orders import CreatePendingOrder, DeletePendingOrder, ListPendingOrders
+from bolsa_infrastructure.cache.feature_cache_factory import get_feature_cache
 from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.repositories.account_repository import SqlAlchemyAccountRepository
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
 from bolsa_infrastructure.database.repositories.alert_repository import SqlAlchemyAlertRepository
-from bolsa_infrastructure.database.repositories.signal_alert_repository import SqlAlchemySignalAlertRepository
-from bolsa_infrastructure.database.repositories.backtest_repository import SqlAlchemyBacktestRepository
-from bolsa_infrastructure.database.repositories.instrument_repository import (
-    SqlAlchemyInstrumentRepository,
+from bolsa_infrastructure.database.repositories.backtest_repository import (
+    SqlAlchemyBacktestRepository,
 )
-from bolsa_infrastructure.database.repositories.ohlcv_repository import SqlAlchemyOhlcvRepository
-from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlchemyLedgerRepository
-from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
-from bolsa_infrastructure.database.repositories.optimization_run_repository import (
-    SqlAlchemyOptimizationRunRepository,
+from bolsa_infrastructure.database.repositories.cognitive_repository import (
+    SqlAlchemyCognitiveRepository,
 )
-from bolsa_infrastructure.database.repositories.research_trial_repository import (
-    SqlAlchemyResearchTrialRepository,
-)
-from bolsa_infrastructure.database.repositories.research_evidence_repository import (
-    SqlAlchemyResearchEvidenceRepository,
-)
-from bolsa_infrastructure.database.repositories.hypothesis_repository import (
-    SqlAlchemyHypothesisRepository,
+from bolsa_infrastructure.database.repositories.execution_policy_repository import (
+    SqlAlchemyExecutionPolicyRepository,
 )
 from bolsa_infrastructure.database.repositories.hypothesis_belief_repository import (
     SqlAlchemyHypothesisBeliefRepository,
 )
+from bolsa_infrastructure.database.repositories.hypothesis_repository import (
+    SqlAlchemyHypothesisRepository,
+)
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
+from bolsa_infrastructure.database.repositories.investor_profile_repository import (
+    SqlAlchemyInvestorProfileRepository,
+)
 from bolsa_infrastructure.database.repositories.knowledge_node_repository import (
     SqlAlchemyKnowledgeNodeRepository,
+)
+from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlchemyLedgerRepository
+from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
+from bolsa_infrastructure.database.repositories.mkl_sync_repository import (
+    SqlAlchemyMklSyncRepository,
+)
+from bolsa_infrastructure.database.repositories.ohlcv_repository import SqlAlchemyOhlcvRepository
+from bolsa_infrastructure.database.repositories.optimization_run_repository import (
+    SqlAlchemyOptimizationRunRepository,
+)
+from bolsa_infrastructure.database.repositories.pending_order_repository import (
+    SqlAlchemyPendingOrderRepository,
+)
+from bolsa_infrastructure.database.repositories.platform_event_repository import (
+    SqlAlchemyPlatformEventRepository,
+)
+from bolsa_infrastructure.database.repositories.portfolio_repository import (
+    SqlAlchemyPortfolioRepository,
+)
+from bolsa_infrastructure.database.repositories.position_policy_repository import (
+    SqlAlchemyPositionPolicyRepository,
+)
+from bolsa_infrastructure.database.repositories.research_evidence_repository import (
+    SqlAlchemyResearchEvidenceRepository,
 )
 from bolsa_infrastructure.database.repositories.research_tree_repository import (
     SqlAlchemyResearchTreeRepository,
 )
-from bolsa_infrastructure.database.repositories.mkl_sync_repository import (
-    SqlAlchemyMklSyncRepository,
+from bolsa_infrastructure.database.repositories.research_trial_repository import (
+    SqlAlchemyResearchTrialRepository,
+)
+from bolsa_infrastructure.database.repositories.scan_job_repository import (
+    SqlAlchemyScanJobRepository,
 )
 from bolsa_infrastructure.database.repositories.scan_manifest_repository import (
     SqlAlchemyDataSnapshotRepository,
     SqlAlchemyScanManifestRepository,
 )
-from bolsa_infrastructure.database.repositories.scan_job_repository import SqlAlchemyScanJobRepository
-from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
-from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
-from bolsa_infrastructure.database.repositories.portfolio_repository import (
-    SqlAlchemyPortfolioRepository,
+from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+    SqlAlchemySignalAlertRepository,
 )
-from bolsa_infrastructure.database.repositories.pending_order_repository import (
-    SqlAlchemyPendingOrderRepository,
-)
-from bolsa_infrastructure.database.repositories.sync_log_repository import SqlAlchemySyncLogRepository
 from bolsa_infrastructure.database.repositories.strategy_definition_repository import (
     SqlAlchemyStrategyDefinitionRepository,
 )
-from bolsa_infrastructure.database.repositories.tracker_definition_repository import (
-    SqlAlchemyTrackerDefinitionRepository,
-)
-from bolsa_infrastructure.database.repositories.execution_policy_repository import (
-    SqlAlchemyExecutionPolicyRepository,
-)
-from bolsa_infrastructure.database.repositories.position_policy_repository import (
-    SqlAlchemyPositionPolicyRepository,
-)
-from bolsa_infrastructure.database.repositories.cognitive_repository import (
-    SqlAlchemyCognitiveRepository,
-)
-from bolsa_infrastructure.database.repositories.investor_profile_repository import (
-    SqlAlchemyInvestorProfileRepository,
-)
-from bolsa_infrastructure.database.repositories.platform_event_repository import (
-    SqlAlchemyPlatformEventRepository,
+from bolsa_infrastructure.database.repositories.sync_log_repository import (
+    SqlAlchemySyncLogRepository,
 )
 from bolsa_infrastructure.database.repositories.sync_scheduler_repository import (
     SqlAlchemySyncSchedulerRepository,
 )
-from bolsa_infrastructure.database.repositories.workspace_repository import SqlAlchemyWorkspaceRepository
+from bolsa_infrastructure.database.repositories.tracker_definition_repository import (
+    SqlAlchemyTrackerDefinitionRepository,
+)
+from bolsa_infrastructure.database.repositories.workspace_repository import (
+    SqlAlchemyWorkspaceRepository,
+)
+from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
+from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
@@ -779,7 +799,9 @@ def get_process_optimization_run_use_case(session: AsyncSession) -> ProcessOptim
     )
 
 
-def get_strategy_definition_repository(session: AsyncSession) -> SqlAlchemyStrategyDefinitionRepository:
+def get_strategy_definition_repository(
+    session: AsyncSession,
+) -> SqlAlchemyStrategyDefinitionRepository:
     return SqlAlchemyStrategyDefinitionRepository(session)
 
 
@@ -807,7 +829,9 @@ def get_delete_strategy_use_case(session: AsyncSession) -> DeleteStrategyDefinit
     return DeleteStrategyDefinition(get_strategy_definition_repository(session))
 
 
-def get_tracker_definition_repository(session: AsyncSession) -> SqlAlchemyTrackerDefinitionRepository:
+def get_tracker_definition_repository(
+    session: AsyncSession,
+) -> SqlAlchemyTrackerDefinitionRepository:
     return SqlAlchemyTrackerDefinitionRepository(session)
 
 
@@ -1049,8 +1073,14 @@ def get_list_pending_orders_use_case(session: AsyncSession) -> ListPendingOrders
 
 
 def get_create_pending_order_use_case(session: AsyncSession) -> CreatePendingOrder:
-    return CreatePendingOrder(get_pending_order_repository(session), get_account_repository(session))
+    return CreatePendingOrder(
+        get_pending_order_repository(session),
+        get_account_repository(session),
+    )
 
 
 def get_delete_pending_order_use_case(session: AsyncSession) -> DeletePendingOrder:
-    return DeletePendingOrder(get_pending_order_repository(session), get_account_repository(session))
+    return DeletePendingOrder(
+        get_pending_order_repository(session),
+        get_account_repository(session),
+    )

@@ -11,7 +11,7 @@
 | [rfc/README.md](./rfc/README.md) | Constitución RFC-000…007 · fases código |
 | [API_REFERENCE.md](./API_REFERENCE.md) | Endpoints HTTP |
 | [ONBOARDING.md](./ONBOARDING.md) | Setup primer día |
-| [domain-language.md](./domain-language.md) | **Diccionario QROS** (Scientific / Trading / Infra) |
+| [domain-language.md](./domain-language.md) | **Diccionario QROS** (Scientific / Trading / Infra · universos LAB/TRADING) |
 
 ## Operación y producto
 
@@ -33,13 +33,21 @@
 | [adr/012-scientific-validation-knowledge-evolution.md](./adr/012-scientific-validation-knowledge-evolution.md) | **Leyes** científicas Evidence→Belief→Knowledge |
 | [adr/013-research-mathematics-statistical-foundations.md](./adr/013-research-mathematics-statistical-foundations.md) | **Matemáticas** research (Discovery Vector, \(V_r\), EIG) — v1.1 |
 | [adr/015-scientific-domain-vs-trading-domain.md](./adr/015-scientific-domain-vs-trading-domain.md) | **Scientific Domain ≠ Trading Domain** |
+| [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md) | **LAB ≠ TRADING** (universos UI; Cartera LAB) |
+| [adr/020-operating-mandate-tenure.md](./adr/020-operating-mandate-tenure.md) | **Mandato operativo** — tenure estrategia×instrumento (TRADING · M1b BD) |
+| [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md) | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual) |
+| [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
+| [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) | **Roadmap mejoras** post-auditorías (Q0–Q3 · horizonte TOP) |
+| [engineering/stability-campaign-protocol-2026-08-02.md](./engineering/stability-campaign-protocol-2026-08-02.md) | Protocolo estabilidad multi-ventana (Q1.2/Q1.3) |
 | [adr/016-research-persistence-model.md](./adr/016-research-persistence-model.md) | **Persistencia** científica (tablas, \(K\), Fase 1) |
 | [adr/017-baseline-v1-5-research-observatory.md](./adr/017-baseline-v1-5-research-observatory.md) | **Baseline v1.5** — laboratorio observable (congelado) |
 | [engineering/research-lifecycle.md](./engineering/research-lifecycle.md) | **Flujo** operativo BT → trials → Observatory · embudo · paper |
 | [engineering/session-handoff-2026-08-01.md](./engineering/session-handoff-2026-08-01.md) | **Handoff** frescura v1.3 · FA · Composite v1.1 |
 | [engineering/session-handoff-2026-07-31.md](./engineering/session-handoff-2026-07-31.md) | Handoff cierre DÍA D v0.11 + CORE-R v1.8 |
 | [engineering/operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md) | Plan smoke UI DÍA D + CORE-R |
-| [engineering/backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md) | **Backtesting DÍA D** — as-of + replay (premisas bloqueadas) |
+| [engineering/backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md) | **Backtesting DÍA D** — as-of + replay (premisas; Modo A 2026-08-02) |
+| [engineering/dual-universes-lab-trading-design-2026-08-02.md](./engineering/dual-universes-lab-trading-design-2026-08-02.md) | **Dos universos** LAB vs TRADING — diseño UI/carteras/puente |
+| [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md) | **ADR-019** — LAB ≠ TRADING (producto) |
 | [engineering/backtesting-funnel-handoff-2026-07-29.md](./engineering/backtesting-funnel-handoff-2026-07-29.md) | Handoff embudo→Finalistas A/C + Monitor MVP (retomar) |
 | [HYBRID_TRACKERS.md](./HYBRID_TRACKERS.md) | Rastreadores híbridos |
 | [PERFORMANCE.md](./PERFORMANCE.md) | Rendimiento frontend |

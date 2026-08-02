@@ -1,9 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 
-
-
-
 class IndexHitDto(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)

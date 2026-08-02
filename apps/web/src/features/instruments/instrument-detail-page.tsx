@@ -7,13 +7,14 @@ import { api, ApiError } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, inputClassName } from '@/components/ui/dialog';
-import { useActiveAccountSettings } from '@/features/accounts/use-active-account';
+import { useActiveAccount, useActiveAccountSettings } from '@/features/accounts/use-active-account';
 import { InstrumentStrategyTopPanel } from '@/features/backtests/instrument-strategy-top-panel';
 import { OhlcvChart } from '@/features/charts/ohlcv-chart';
 import { formatPct, formatPrice } from '@/features/charts/chart-utils';
 import { TradeConfirmPanel } from '@/features/trading/trade-confirm-panel';
 import { TradeFeeBreakdown } from '@/features/trading/trade-fee-breakdown';
 import { useTradeNotional } from '@/features/trading/use-trade-notional';
+import { linkTradeToMandate } from '@/features/platform/operating-mandate';
 import { cn } from '@/lib/utils';
 import { invalidateInstrumentMarketData } from '@/lib/query-invalidation';
 import { useTradePreferencesStore } from '@/stores/trade-preferences-store';
@@ -28,6 +29,7 @@ export function InstrumentDetailPage() {
   const [tradeError, setTradeError] = useState<string | null>(null);
   const confirmBeforeTrade = useTradePreferencesStore((s) => s.confirmBeforeTrade);
   const { settings, currency: accountCurrency, accountName } = useActiveAccountSettings();
+  const { effectiveAccountId } = useActiveAccount();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
   const openChartInspector = useWorkspaceStore((s) => s.openChartInspector);
 
@@ -96,7 +98,15 @@ export function InstrumentDetailPage() {
         quantity,
         price: lastPrice,
       }),
-    onSuccess: async () => {
+    onSuccess: async (res, vars) => {
+      const txId = res?.data?.transaction?.id;
+      if (txId && effectiveAccountId && id) {
+        linkTradeToMandate({
+          transactionId: txId,
+          instrumentId: id,
+          accountId: effectiveAccountId,
+        });
+      }
       await queryClient.invalidateQueries({ queryKey: ['portfolio'] });
       await queryClient.invalidateQueries({ queryKey: ['transactions'] });
       await queryClient.invalidateQueries({ queryKey: ['ledger'] });

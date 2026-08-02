@@ -55,7 +55,7 @@ def estimate_cpcv_path_count(n_groups: int, n_test_groups: int = CPCV_TEST_GROUP
     resolved = normalize_cpcv_groups(n_groups)
     if resolved is None:
         return 0
-    return int(comb(resolved, n_test_groups))
+    return comb(resolved, n_test_groups)
 
 
 def _ts(bar: BacktestBarInput) -> str:
@@ -104,7 +104,7 @@ def split_cpcv_paths(
         )
     if seg * (resolved - n_test_groups) < MIN_IS_BARS:
         raise ValueError(
-            f"CPCV: train estimado demasiado corto. Sube barLimit o baja cpcvGroups."
+            "CPCV: train estimado demasiado corto. Sube barLimit o baja cpcvGroups."
         )
 
     ranges = _group_ranges(n, resolved)

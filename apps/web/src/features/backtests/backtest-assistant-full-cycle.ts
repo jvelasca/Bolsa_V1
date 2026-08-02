@@ -6,8 +6,10 @@
  * Política conservadora (producto):
  * - ACK¹ (si débil/discrepancia y `requireAckBeforeLab`) puerta al Lab.
  * - Atajo opcional `saveSemifinalSkipLab` (OFF): semifinal sin optimizar.
- * - Finalistas `active` solo si hubo ≥1 Mejor Lab + Coach² `canSaveTop`.
- * - Sin mejora Lab: **no** Revalidar y **no pisar** TOP `active` previo.
+ * - Finalistas `active` si hubo ≥1 Mejor Lab + Coach² `canSaveTop`, **o**
+ *   primera escritura (sin TOP durable previo) aunque Lab no mejore.
+ * - Sin mejora Lab + TOP durable: **no** Revalidar y **no pisar** TOP previo.
+ * - TOP huérfano (slots sin estrategia en BD) ≡ sin TOP → primera escritura.
  *
  * Orquestación UI: `backtests-page.tsx` (`fullCycleActive`, `settleFullCycle`).
  * Lab board: `autoHandoff` → `shouldAutoHandoffLab`.
@@ -25,6 +27,28 @@ export function coachNeedsHumanAck(
   confidence: string | null | undefined,
 ): boolean {
   return confidence === 'weak' || confidence === 'discrepancy';
+}
+
+/**
+ * TOP usable para «conservar previos»: ≥1 slot con `strategyDefinitionId`
+ * que aún existe en Biblioteca. Si todos los slots están huérfanos (estrategias
+ * borradas sin Eliminar Finalistas), no cuenta como TOP durable.
+ */
+export function instrumentTopIsDurable(
+  top:
+    | {
+        slots?: Array<{ strategyDefinitionId?: string | null }> | null;
+      }
+    | null
+    | undefined,
+  knownStrategyIds: ReadonlySet<string>,
+): boolean {
+  if (!top?.slots?.length) return false;
+  const ids = top.slots
+    .map((s) => s.strategyDefinitionId)
+    .filter((id): id is string => Boolean(id));
+  if (ids.length === 0) return false;
+  return ids.some((id) => knownStrategyIds.has(id));
 }
 
 export type FullCyclePhase =
@@ -107,16 +131,18 @@ export function universeEmptyStatus(detail?: string | null): string {
 /**
  * Tras Coach² (`post_lab`):
  * - Con mejora Lab + TOP guardable → save_active
- * - Sin mejora Lab + ya hay TOP en BD → skip_keep_previous
- * - Sin mejora Lab + sin TOP en BD → save_active (primera escritura)
+ * - Sin mejora Lab + TOP durable en BD → skip_keep_previous
+ * - Sin mejora Lab + sin TOP (o TOP huérfano) → save_active (primera escritura)
  * - Sin candidatas / ACK → skip_no_candidates
+ *
+ * `hasExistingTop` debe ser false si el TOP solo referencia estrategias borradas.
  */
 export function resolveFullCycleSaveDecision(opts: {
   postLab: boolean;
   labImprovedCount: number;
   canSaveTop: boolean;
   existingTopStatus?: string | null;
-  /** Hay algún TOP persistido (active o semifinal). */
+  /** TOP durable (slots con estrategia aún en BD). Huérfano ≡ false. */
   hasExistingTop?: boolean;
 }): FullCycleSaveDecision {
   if (!opts.postLab) {
@@ -127,9 +153,10 @@ export function resolveFullCycleSaveDecision(opts: {
   }
 
   const hasTop =
-    opts.hasExistingTop === true ||
-    opts.existingTopStatus === 'active' ||
-    opts.existingTopStatus === 'semifinal';
+    opts.hasExistingTop !== undefined
+      ? opts.hasExistingTop
+      : opts.existingTopStatus === 'active' ||
+        opts.existingTopStatus === 'semifinal';
 
   if (opts.labImprovedCount <= 0) {
     if (hasTop) {

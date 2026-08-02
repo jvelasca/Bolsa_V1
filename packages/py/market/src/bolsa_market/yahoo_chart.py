@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -55,7 +55,7 @@ def parse_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> list[Ohlc
         v = quotes.get("volume", [None] * len(timestamps))[i]
         if o is None or h is None or lo is None or c is None:
             continue
-        bar_date = datetime.fromtimestamp(ts, tz=timezone.utc).date()
+        bar_date = datetime.fromtimestamp(ts, tz=UTC).date()
         adj = adjclose[i] if adjclose and i < len(adjclose) and adjclose[i] is not None else None
         bars.append(
             OhlcvBarIngest(
@@ -72,6 +72,16 @@ def parse_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> list[Ohlc
     if not bars:
         raise RuntimeError(f"Yahoo no devolvió barras diarias para {yahoo_symbol}")
     return bars
+
+
+def _intraday_ohlc_ok(o: float, h: float, lo: float, c: float, v: int) -> bool:
+    if o <= 0 or h <= 0 or lo <= 0 or c <= 0 or v < 0:
+        return False
+    if h < lo:
+        return False
+    if h < max(o, c) or lo > min(o, c):
+        return False
+    return True
 
 
 def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> list[IntradayOhlcvBar]:
@@ -91,15 +101,19 @@ def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> 
         v = quotes.get("volume", [None] * len(timestamps))[i]
         if o is None or h is None or lo is None or c is None:
             continue
-        moment = datetime.fromtimestamp(ts, tz=timezone.utc)
+        fo, fh, flo, fc = float(o), float(h), float(lo), float(c)
+        vol = int(v or 0)
+        if not _intraday_ohlc_ok(fo, fh, flo, fc, vol):
+            continue
+        moment = datetime.fromtimestamp(ts, tz=UTC)
         bars.append(
             IntradayOhlcvBar(
                 timestamp=moment.isoformat().replace("+00:00", "Z"),
-                open=float(o),
-                high=float(h),
-                low=float(lo),
-                close=float(c),
-                volume=int(v or 0),
+                open=fo,
+                high=fh,
+                low=flo,
+                close=fc,
+                volume=vol,
             ),
         )
 
@@ -118,9 +132,9 @@ class YahooMarketDataProvider:
         from_date,
         to_date,
     ) -> list[OhlcvBarIngest]:
-        period1 = int(datetime(from_date.year, from_date.month, from_date.day, tzinfo=timezone.utc).timestamp())
+        period1 = int(datetime(from_date.year, from_date.month, from_date.day, tzinfo=UTC).timestamp())
         period2 = int(
-            datetime(to_date.year, to_date.month, to_date.day, 23, 59, 59, tzinfo=timezone.utc).timestamp(),
+            datetime(to_date.year, to_date.month, to_date.day, 23, 59, 59, tzinfo=UTC).timestamp(),
         )
 
         try:
@@ -145,7 +159,7 @@ class YahooMarketDataProvider:
             raise ValueError("fetch_interval_bars no aplica a 1d; usar fetch_daily_bars")
 
         yahoo_interval, range_days = YAHOO_INTERVAL_BY_TIMEFRAME[timeframe]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         period2 = int(now.timestamp())
         period1 = int((now - timedelta(days=range_days)).timestamp())
 

@@ -1,0 +1,23 @@
+{
+  "campaign_id": "ibex35-rsi-win-a",
+  "universe": "ibex35",
+  "timeframe": "1d",
+  "engine": "rsi_grid_h0",
+  "indicators_version": null,
+  "git_commit": "4604976a5eb827933b8a3729828f07496c94f253",
+  "dataset_start": "2021-07-01",
+  "dataset_end": "2023-12-31",
+  "bar_count": 500,
+  "costs": {
+    "commission_bps": 10,
+    "slippage_bps": 5,
+    "spread_bps": 2
+  },
+  "presets": [
+    "rsi_mean_reversion"
+  ],
+  "notes": "human_ok=3 grid_trials=0",
+  "schema_version": "campaign_manifest_v0",
+  "created_at": "2026-08-02T21:23:19.492489+00:00",
+  "cpu_cost_units": null
+}

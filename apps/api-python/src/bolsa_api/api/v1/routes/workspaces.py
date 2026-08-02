@@ -16,7 +16,6 @@ from bolsa_api.schemas.workspaces import (
     CreateWorkspaceRequestDto,
     UpdateWorkspaceRequestDto,
     WorkspaceDetailDto,
-    WorkspacePayloadDto,
     WorkspaceResponseDto,
     WorkspacesListResponseDto,
     WorkspaceSummaryDto,
@@ -30,7 +29,6 @@ from bolsa_application.workspaces import (
     UpdateWorkspace,
 )
 from bolsa_infrastructure.database.repositories.workspace_repository import (
-    SqlAlchemyWorkspaceRepository,
     WorkspaceRecord,
     WorkspaceSummary,
 )

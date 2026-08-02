@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -17,7 +17,7 @@ HIGH_IMPACT_MACRO = frozenset({"CPI", "PCE", "NFP", "PMI", "FOMC", "ECB", "GDP"}
 
 def _parse_ts(value: str | datetime) -> datetime:
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     text = value.replace("Z", "+00:00")
     return datetime.fromisoformat(text)
 
@@ -92,7 +92,7 @@ def event_decay_weight(event: MarketEvent, *, now: datetime | None = None) -> fl
     Peso efectivo 0–1 con decay lineal en [valid_from, valid_to].
     Fuera de ventana → 0. Credibility acota el máximo.
     """
-    now_dt = now or datetime.now(timezone.utc)
+    now_dt = now or datetime.now(UTC)
     start = _parse_ts(event.valid_from)
     end = _parse_ts(event.valid_to)
     if now_dt < start or now_dt > end:
@@ -143,16 +143,14 @@ class MarketEventCalendar:
         now: datetime | None = None,
         min_weight: float = 0.05,
     ) -> list[tuple[MarketEvent, float]]:
-        now_dt = now or datetime.now(timezone.utc)
+        now_dt = now or datetime.now(UTC)
         sym = (symbol or "").upper()
         out: list[tuple[MarketEvent, float]] = []
         for ev in self.events:
             w = event_decay_weight(ev, now=now_dt)
             if w < min_weight:
                 continue
-            if ev.entity in {"MACRO", "*"} or ev.entity == sym or sym in ev.affects:
-                out.append((ev, w))
-            elif not sym and ev.entity == "MACRO":
+            if ev.entity in {"MACRO", "*"} or ev.entity == sym or sym in ev.affects or not sym and ev.entity == "MACRO":
                 out.append((ev, w))
         return out
 
@@ -169,7 +167,7 @@ class MarketEventCalendar:
         Se considera en ±7 días aunque el decay de evidencia sea 0 (pre-ventana).
         Macro (FOMC/ECB/CPI…): usa ventana valid_from–valid_to con decay > 0.
         """
-        now_dt = now or datetime.now(timezone.utc)
+        now_dt = now or datetime.now(UTC)
         sym = symbol.upper()
         hours_to: float | None = None
         hours_since: float | None = None

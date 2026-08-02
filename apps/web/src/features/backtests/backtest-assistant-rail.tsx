@@ -56,6 +56,8 @@ type Props = {
   onPlay?: () => void;
   playDisabled?: boolean;
   playTitle?: string;
+  /** Ciclo / Lista AUTO / explore en curso → el icono Play parpadea hasta terminar. */
+  playBusy?: boolean;
   listAutoControls?: ListAutoRailControls | null;
   profileLabel?: string | null;
   profileMissing?: boolean;
@@ -92,6 +94,7 @@ export function BacktestAssistantRail({
   onPlay,
   playDisabled,
   playTitle,
+  playBusy = false,
   listAutoControls,
   profileLabel = null,
   profileMissing = false,
@@ -148,13 +151,26 @@ export function BacktestAssistantRail({
           {onPlay ? (
             <button
               type="button"
-              className="rounded p-1 text-primary hover:bg-primary/10 disabled:opacity-40"
-              title={playTitle ?? 'Play'}
-              aria-label="Ejecutar asistente"
+              className={cn(
+                'rounded p-1 text-primary hover:bg-primary/10 disabled:opacity-40',
+                playBusy && 'bg-primary/10',
+              )}
+              title={
+                playBusy
+                  ? `${playTitle ?? 'Play'} · en curso…`
+                  : (playTitle ?? 'Play')
+              }
+              aria-label={playBusy ? 'Asistente en curso' : 'Ejecutar asistente'}
+              aria-busy={playBusy || undefined}
               disabled={playDisabled}
               onClick={onPlay}
             >
-              <Play className="h-3.5 w-3.5 fill-current" />
+              <Play
+                className={cn(
+                  'h-3.5 w-3.5 fill-current',
+                  playBusy && 'animate-assistant-play-blink',
+                )}
+              />
             </button>
           ) : null}
           {listAutoControls?.visible && listAutoControls.canPause ? (

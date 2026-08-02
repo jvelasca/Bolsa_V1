@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from bolsa_analytics.features.models import FeatureSnapshot
 from bolsa_analytics.indicators.compute import OhlcvBar
@@ -49,7 +49,7 @@ def prediction_from_technical_rating(
     # total 0–100 → value [-1,+1]
     value = round((float(rating.total) - 50.0) / 50.0, 4)
     conf = min(1.0, abs(value) * 0.6 + 0.25)
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     fs_id = snapshot.feature_set_id if snapshot else "fset_core_v1"
     comp = snapshot.composition_hash if snapshot else "ohlcv_direct"
     return Prediction(

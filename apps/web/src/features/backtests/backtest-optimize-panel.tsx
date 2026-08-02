@@ -1242,8 +1242,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                 strategyId: created.data.id,
                 name,
                 definition,
-                // Identidad Coach = tipo original (donchian…); la def guarda familia lab.
-                presetKey: seed?.strategyType ?? definition.presetKey ?? null,
+                // Identidad ejecutable = preset de la def (grid SMA), no seed proxy (SuperTrend…).
+                presetKey: definition.presetKey ?? family ?? seed?.strategyType ?? null,
               };
             } catch (err) {
               return {

@@ -20,13 +20,14 @@ from bolsa_api.schemas.research import (
     ConsolidationRequestDto,
     ConsolidationResultDto,
     ConsolidationResultResponseDto,
+    DiaDSessionEvidencePersistRequestDto,
     EvidenceLevelParam,
+    HypothesesListResponseDto,
     HypothesisBeliefDto,
     HypothesisBeliefResponseDto,
     HypothesisCreateRequestDto,
     HypothesisDetailResponseDto,
     HypothesisDto,
-    HypothesesListResponseDto,
     HypothesisKindParam,
     HypothesisStatusParam,
     HypothesisUpdateRequestDto,
@@ -36,29 +37,32 @@ from bolsa_api.schemas.research import (
     KnowledgeNodeDto,
     KnowledgeNodesListResponseDto,
     KnowledgeStageParam,
+    LabByInstrumentDto,
+    LabByOriginDto,
+    LabByPresetDto,
+    LabHealthCampaignDto,
+    LabHealthDto,
+    LabHealthMetricCoverageDto,
+    LabHealthResponseDto,
+    LaboratoryResearchSummaryDto,
+    LaboratoryResearchSummaryResponseDto,
+    LinkTrialHypothesisRequestDto,
     MklSyncEventDto,
     MklSyncEventsListResponseDto,
     MklSyncRequestDto,
     MklSyncResultDto,
     MklSyncResultResponseDto,
+    ResearchEvidenceDetailResponseDto,
+    ResearchEvidenceDto,
+    ResearchEvidenceListResponseDto,
     ResearchTreeEdgeCreateRequestDto,
     ResearchTreeEdgeDetailResponseDto,
     ResearchTreeEdgeDto,
     ResearchTreeEdgesListResponseDto,
-    LaboratoryResearchSummaryDto,
-    LaboratoryResearchSummaryResponseDto,
-    LabByInstrumentDto,
-    LabByOriginDto,
-    LabByPresetDto,
-    LinkTrialHypothesisRequestDto,
-    ResearchEvidenceDetailResponseDto,
-    ResearchEvidenceDto,
-    ResearchEvidenceListResponseDto,
-    DiaDSessionEvidencePersistRequestDto,
     ResearchTrialDetailResponseDto,
     ResearchTrialDto,
-    ResearchTrialSortParam,
     ResearchTrialsListResponseDto,
+    ResearchTrialSortParam,
 )
 from bolsa_application.belief_engine import GetHypothesisBelief, ListBeliefHistory
 from bolsa_application.hypotheses import (
@@ -76,18 +80,19 @@ from bolsa_application.knowledge_consolidation import (
     ListKnowledgeNodes,
 )
 from bolsa_application.mkl_sync import ListMklSyncEvents, SyncKnowledgeToMkl
-from bolsa_application.research_tree import (
-    CreateResearchTreeEdge,
-    ListResearchTreeEdges,
-    SoftDeleteResearchTreeEdge,
-)
 from bolsa_application.research_evidence import (
     GetResearchEvidence,
     ListResearchEvidence,
     emit_evidence_for_dia_d_session,
 )
+from bolsa_application.research_tree import (
+    CreateResearchTreeEdge,
+    ListResearchTreeEdges,
+    SoftDeleteResearchTreeEdge,
+)
 from bolsa_application.research_trials import (
     GetInstrumentResearchSummary,
+    GetLabHealth,
     GetLaboratoryResearchSummary,
     GetResearchTrial,
     ListResearchTrials,
@@ -306,7 +311,10 @@ async def get_research_trial(
     return ResearchTrialDetailResponseDto(data=_to_trial_dto(trial))
 
 
-@router.patch("/research/trials/{trial_id}/hypothesis", response_model=ResearchTrialDetailResponseDto)
+@router.patch(
+    "/research/trials/{trial_id}/hypothesis",
+    response_model=ResearchTrialDetailResponseDto,
+)
 async def link_trial_hypothesis(
     trial_id: str,
     body: LinkTrialHypothesisRequestDto,
@@ -793,5 +801,32 @@ async def get_laboratory_research_summary(
             by_instrument=[LabByInstrumentDto.model_validate(x) for x in summary["byInstrument"]],
             by_preset=[LabByPresetDto.model_validate(x) for x in summary["byPreset"]],
             by_origin=[LabByOriginDto.model_validate(x) for x in summary["byOrigin"]],
+        )
+    )
+
+
+@router.get("/research/lab-health", response_model=LabHealthResponseDto)
+async def get_lab_health(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> LabHealthResponseDto:
+    """Q0.1 — sanidad del laboratorio (cobertura Sharpe/Sortino/Calmar, zero-trades)."""
+    use_case = GetLabHealth(get_research_trial_repository(session))
+    health = await use_case.execute()
+    coverage = {
+        key: LabHealthMetricCoverageDto.model_validate(val)
+        for key, val in health["coverage"].items()
+    }
+    return LabHealthResponseDto(
+        data=LabHealthDto(
+            total_trials=health["totalTrials"],
+            coverage=coverage,
+            zero_trade_count=health["zeroTradeCount"],
+            zero_trade_pct=health["zeroTradePct"],
+            campaigns=[LabHealthCampaignDto.model_validate(c) for c in health["campaigns"]],
+            campaign_count=health["campaignCount"],
+            instruments_with_trials=health["instrumentsWithTrials"],
+            active_instruments=health["activeInstruments"],
+            instruments_without_trials=health["instrumentsWithoutTrials"],
+            caveat=health["caveat"],
         )
     )

@@ -6,9 +6,10 @@ Evidence modula confianza (no dirección).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Any, Sequence
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from bolsa_analytics.cognitive.weight_rules import (
@@ -271,7 +272,7 @@ def run_decision_runtime(
     Evidence no vota dirección; modula confianza.
     Policy Gate en propose: pasivo (SKIPPED) salvo evaluate_policy_gate.
     """
-    ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     envelopes, ta = _normalize_assessments(assessments=assessments, technical=technical)
 
     if not any(a.assessment_type == "technical" for a in envelopes):

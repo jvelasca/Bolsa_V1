@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import pickle
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -149,8 +148,8 @@ def train_direction_model(
                 "kind": "numpy_fallback",
                 "weights": model.weights.tolist(),
                 "bias": model.bias,
-                "mu": getattr(model, "mu").tolist(),
-                "sigma": getattr(model, "sigma").tolist(),
+                "mu": model.mu.tolist(),
+                "sigma": model.sigma.tolist(),
             }
         )
         framework = "numpy_fallback"
@@ -169,7 +168,7 @@ def train_direction_model(
         model_checksum=checksum,
         metrics=metrics,
         hyperparameters=hyper,
-        trained_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        trained_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         binary=binary,
     )
 
@@ -213,7 +212,7 @@ def predict_direction(
     # value ∈ [-1,+1] desde P(up)
     value = round(2.0 * p_up - 1.0, 4)
     conf = round(min(1.0, abs(value) * 0.5 + 0.35), 3)
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return Prediction(
         prediction_id=new_prediction_id(),
         instrument_id=instrument_id,

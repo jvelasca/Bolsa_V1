@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -33,7 +33,7 @@ from bolsa_api.schemas.instrument_lifecycle import (
 )
 from bolsa_api.schemas.lifecycle_mappers import to_orphans_dto, to_purge_orphans_result_dto
 from bolsa_application.account_lifecycle import ListClosedSimulatedAccountsResult
-from bolsa_application.get_database_summary import DatabaseSummary, GetDatabaseSummary
+from bolsa_application.get_database_summary import DatabaseSummary
 
 router = APIRouter()
 

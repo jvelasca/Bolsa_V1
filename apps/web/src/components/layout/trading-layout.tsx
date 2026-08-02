@@ -12,11 +12,9 @@ import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
 import { WatchlistPanel } from '@/features/trading/lists-tab/watchlist-panel';
 import { ChartsZone } from '@/features/trading/charts-zone';
 import { OperationsPanel } from '@/features/trading/operations-panel';
-import { TradingDiaDBanner } from '@/features/trading/trading-dia-d-banner';
-import { TradingDiaDReplayPanel } from '@/features/trading/trading-dia-d-replay-panel';
+import { TradingCoachRail } from '@/features/trading/trading-coach-rail';
 import { useChartListMembershipSync } from '@/features/trading/lists-tab/use-chart-list-membership-sync';
 import { useChartVisualizationSync } from '@/features/trading/lists-tab/use-chart-visualization-sync';
-import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -26,13 +24,15 @@ function pxToPct(px: number, total: number) {
   return total > 0 ? (px / total) * 100 : 0;
 }
 
+/**
+ * Mesa TRADING (ADR-019): sin película Verificar D→hoy (vive en LAB / Backtesting).
+ * Rail Coach = puente al estudio LAB del instrumento activo.
+ */
 export function TradingLayout({ children }: { children: ReactNode }) {
   useChartListMembershipSync();
   useChartVisualizationSync();
   const containerRef = useRef<HTMLDivElement>(null);
   const layout = useTradingLayoutStore();
-  const diaDSession = useDiaDTradingSessionStore((s) => s.session);
-  const fullBleedMovie = Boolean(diaDSession?.fullBleedMovie);
 
   const [liveListsPct, setLiveListsPct] = useState(layout.listsWidthPct);
   const [liveOpsPct, setLiveOpsPct] = useState(layout.operationsHeightPct);
@@ -73,25 +73,9 @@ export function TradingLayout({ children }: { children: ReactNode }) {
     setLiveOpsPct(next);
   }, []);
 
-  /** Película DÍA D a pantalla completa: solo banner + replay (sesión activa). */
-  if (diaDSession && fullBleedMovie) {
-    return (
-      <div
-        ref={containerRef}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        data-testid="trading-dia-d-full-bleed"
-      >
-        <TradingDiaDBanner />
-        <TradingDiaDReplayPanel />
-      </div>
-    );
-  }
-
   if (layout.listsMaximized && layout.listsOpen) {
     return (
       <div ref={containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <TradingDiaDBanner />
-        {diaDSession ? <TradingDiaDReplayPanel /> : null}
         <DockZone
           title="Watchlist"
           open
@@ -109,8 +93,6 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   if (layout.operationsMaximized && layout.operationsOpen) {
     return (
       <div ref={containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <TradingDiaDBanner />
-        {diaDSession ? <TradingDiaDReplayPanel /> : null}
         <DockZone
           title="Operaciones"
           open
@@ -132,8 +114,6 @@ export function TradingLayout({ children }: { children: ReactNode }) {
 
   return (
     <div ref={containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <TradingDiaDBanner />
-      {diaDSession ? <TradingDiaDReplayPanel /> : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {showLists && (
           <>
@@ -176,7 +156,12 @@ export function TradingLayout({ children }: { children: ReactNode }) {
             maximizable={false}
             className="min-w-0 flex-1"
           >
-            <ChartsZone>{children}</ChartsZone>
+            <div className="flex h-full min-h-0">
+              <div className="min-w-0 flex-1">
+                <ChartsZone>{children}</ChartsZone>
+              </div>
+              <TradingCoachRail className="hidden md:flex" />
+            </div>
           </DockZone>
         )}
 

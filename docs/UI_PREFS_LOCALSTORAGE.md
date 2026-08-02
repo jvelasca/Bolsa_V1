@@ -39,11 +39,15 @@
 | Backtesting splits / HUD / zona | `bolsa-backtest-layout-*`, `bolsa-backtest-hud-prefs-v1`, … |
 | Hub Instrumentos | `bolsa-instruments-hub-prefs-v2` (wide/stack + secciones) |
 | Backtesting DÍA D (fecha) | `bolsa-backtest-run-context-v1` → campo `diaD` |
-| Trading MODO DÍA D (sesión) | `bolsa-dia-d-trading-session-v1` (mode, gateDecisions, autoRunId; `fullBleedMovie` no se persiste — al recargar vuelven docks/Operaciones) |
+| Trading MODO DÍA D (sesión) | `bolsa-dia-d-trading-session-v1` — ahora **LAB Verificar** (`universe: lab`; mode, gateDecisions, autoRunId; `fullBleedMovie` no se persiste) |
+| Adopción TOP→TRADING | `bolsa-strategy-adoption-v1` (proyección del mandato vigente · ADR-020) |
+| Mandato operativo (tenures) | `bolsa-mandate-tenures-v1` (**cache**; SoT BD M1b) |
+| Mandato ↔ trades DEMO | `bolsa-mandate-trade-links-v1` (**cache**; SoT BD M1b) |
+| TOP experimento DÍA D (F-D) | `bolsa-dia-d-experiment-top-v1` ([ADR-021](./adr/021-dia-d-reconciliation.md)) |
 | Evidence DÍA D (archivo) | `bolsa-dia-d-evidence-archive-v1` (cap 30; opcional `researchEvidenceId`) |
-| CORE-R cola revisión | `bolsa-core-r-review-queue-v1` (cap 40; open/done) |
-| CORE-R scheduler | `bolsa-core-r-scheduler-v1` (`enabled`, `intervalMinutes`, `listId`, `scope` shell\|monitor) |
-| CORE-R informe Lista AUTO | `bolsa-core-r-report-v1` (juicio post-settle; fuente de Encolar) |
+| CORE-R cola revisión | `bolsa-core-r-review-queue-v1` (cap 40; open/done) · **SoT BD** `GET\|PUT /api/accounts/{id}/core-r` (Q3.4) |
+| CORE-R scheduler | `bolsa-core-r-scheduler-v1` (`enabled`, `intervalMinutes`, `listId`, `scope`, `lastRemoteEnqueue*`) · sync BD · cron `CORE_R_CRON_ENABLED` · toast remoto `bolsa-core-r-last-seen-remote-enqueue` |
+| CORE-R informe Lista AUTO | `bolsa-core-r-report-v1` (juicio post-settle; fuente de Encolar) · sync BD |
 | Inbox alarmas Tracker | `bolsa-tracker-alarm-inbox-v1` |
 | Preferencias de trade / cuenta activa | `bolsa-trade-preferences`, `bolsa-active-account` |
 

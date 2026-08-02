@@ -39,13 +39,17 @@ jobs:
           python-version: '3.12'
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10.12.1
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'pnpm'
+      - name: Install Node deps
+        run: pnpm install --frozen-lockfile
       - name: Install Python packages
         run: |
-          pip install -e packages/py/domain -e packages/py/analytics -e packages/py/market -e packages/py/infrastructure -e packages/py/application -e "apps/api-python[dev]"
+          pip install -e packages/py/domain -e packages/py/ai -e packages/py/analytics \
+            -e packages/py/market -e packages/py/infrastructure -e packages/py/application \
+            -e "apps/api-python[dev]"
       - name: Fase 2 battery
         run: pnpm test:fase2

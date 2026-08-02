@@ -4,81 +4,42 @@
 
 from typing import Annotated
 
-
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
-
-
 from bolsa_api.api.dependencies import (
-
     get_db_session,
-
     get_import_instrument_use_case,
-
     get_instrument_repository,
-
     get_list_repository,
-
 )
-
 from bolsa_api.schemas.market_indices import (
-
     CatalogIndexEntryDto,
-
     IndexConstituentDto,
-
     IndexConstituentMemberDto,
-
     IndexConstituentsResponseDto,
-
     IndexHitDto,
-
     IndexSubscribeJobDto,
-
     IndexSubscribeJobResponseDto,
-
     MarketIndexCatalogResponseDto,
-
     MarketIndicesSearchResponseDto,
-
     SubscribeMarketIndexRequestDto,
-
     SubscribeMarketIndexResponseDto,
-
     SubscribeMarketIndexResultDto,
-
     SubscribeProgressDto,
-
 )
-
 from bolsa_application.market_indices import (
-
     EnqueueIndexSubscribeJob,
-
     GetIndexSubscribeJob,
-
     ListMarketIndexCatalog,
-
     ResolveIndexConstituents,
-
     SearchMarketIndices,
-
     SubscribeMarketIndex,
-
 )
-
 from bolsa_infrastructure.database.repositories.index_subscribe_job_repository import (
-
     IndexSubscribeJobRecord,
-
     SqlAlchemyIndexSubscribeJobRepository,
-
 )
-
-
 
 router = APIRouter()
 
@@ -308,7 +269,10 @@ async def subscribe_market_index(
 
     except Exception as exc:
 
-        raise HTTPException(status_code=500, detail=f"No se pudo suscribir el índice: {exc}") from exc
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo suscribir el índice: {exc}",
+        ) from exc
 
 
 
@@ -406,7 +370,8 @@ async def get_index_subscribe_job(
 
 ) -> IndexSubscribeJobResponseDto:
 
-    record = await GetIndexSubscribeJob(SqlAlchemyIndexSubscribeJobRepository(session)).execute(job_id)
+    job_repo = SqlAlchemyIndexSubscribeJobRepository(session)
+    record = await GetIndexSubscribeJob(job_repo).execute(job_id)
 
     if record is None:
 

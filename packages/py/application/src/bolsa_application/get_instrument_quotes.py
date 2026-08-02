@@ -1,5 +1,7 @@
 from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 
 
 class GetInstrumentQuotes:

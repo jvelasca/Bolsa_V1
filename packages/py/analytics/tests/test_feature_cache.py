@@ -23,8 +23,6 @@ def test_feature_cache_hit_on_same_key() -> None:
 
 def test_feature_cache_evicts_when_full() -> None:
     cache = InMemoryFeatureCache(max_entries=2, ttl_seconds=60)
-    timestamps = ["2024-01-01"]
-    closes = [100.0]
 
     cache.get_or_build("a", lambda: {"v": 1})
     cache.get_or_build("b", lambda: {"v": 2})

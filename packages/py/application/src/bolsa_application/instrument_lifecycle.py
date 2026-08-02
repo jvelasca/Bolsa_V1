@@ -235,7 +235,7 @@ class GetInstrumentRemovalPreview:
 
     async def _count_table(self, table: str, instrument_id: str) -> int:
         result = await self._session.execute(
-            text(f"SELECT COUNT(*) FROM {table} WHERE instrument_id = :id"),  # noqa: S608
+            text(f"SELECT COUNT(*) FROM {table} WHERE instrument_id = :id"),
             {"id": instrument_id},
         )
         return int(result.scalar_one())

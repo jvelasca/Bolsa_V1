@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -14,7 +14,7 @@ FUNDAMENTAL_SCREENER_VERSION = "fund_screener_v1"
 
 def week_key_utc(now: datetime | None = None) -> str:
     """Clave ISO semana (YYYY-Www) en UTC — lista blanca semanal."""
-    dt = now or datetime.now(timezone.utc)
+    dt = now or datetime.now(UTC)
     iso = dt.isocalendar()
     return f"{iso.year}-W{iso.week:02d}"
 

@@ -1,5 +1,5 @@
-from typing import Annotated, Any
 import logging
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,7 @@ from bolsa_api.schemas.scans import (
 from bolsa_api.schemas.signals_evaluate import SignalEventV1Dto
 from bolsa_application.scan_jobs import EnqueueScanJob, GetScanJob, ListScanJobs
 from bolsa_application.scan_manifests import GetScanManifest, PersistScanManifest
+from bolsa_application.scans import RunScan
 from bolsa_domain.platform_kernel import (
     validate_kernel_timeframe,
     validate_scan_bar_limit,

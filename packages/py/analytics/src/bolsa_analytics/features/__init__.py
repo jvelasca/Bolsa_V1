@@ -6,7 +6,12 @@ from bolsa_analytics.features.compute_bridge import (
     compute_feature_value,
     materialize_feature_snapshot,
 )
-from bolsa_analytics.features.models import FeatureDef, FeatureSet, FeatureSnapshot, composition_hash
+from bolsa_analytics.features.models import (
+    FeatureDef,
+    FeatureSet,
+    FeatureSnapshot,
+    composition_hash,
+)
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_analytics.features.ports import IFeaturePort
 

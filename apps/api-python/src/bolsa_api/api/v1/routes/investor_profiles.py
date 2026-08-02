@@ -32,10 +32,10 @@ from bolsa_application.investor_profiles import (
     RefreshObservedProfile,
     UpdateInvestorProfile,
 )
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_infrastructure.database.repositories.cognitive_repository import (
     SqlAlchemyCognitiveRepository,
 )
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_infrastructure.database.repositories.investor_profile_repository import (
     SqlAlchemyInvestorProfileRepository,
 )

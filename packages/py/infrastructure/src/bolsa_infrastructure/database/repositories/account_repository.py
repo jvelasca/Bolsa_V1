@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import delete, select, update
@@ -20,8 +20,8 @@ from bolsa_infrastructure.database.models import (
     InvestmentAccountRow,
     InvestmentPortfolioRow,
     LedgerEntryRow,
-    PortfolioRow,
     PendingOrderRow,
+    PortfolioRow,
     PositionRow,
     TransactionRow,
     TrialRecordRow,
@@ -31,7 +31,7 @@ from bolsa_infrastructure.ids import new_id
 DEFAULT_ACCOUNT_SEED_ID = "default-account-seed"
 DEFAULT_PORTFOLIO_SEED_ID = "default-portfolio-seed"
 DEFAULT_PORTFOLIO_NAME = "Cartera principal"
-INITIAL_CASH = Decimal("100000")
+INITIAL_CASH = Decimal(100000)
 
 
 def _account_from_row(row: InvestmentAccountRow) -> InvestmentAccount:
@@ -97,7 +97,7 @@ class SqlAlchemyAccountRepository:
         self._migration_done = True
 
     async def _ensure_default_account(self) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         legacy_stmt = select(PortfolioRow).where(PortfolioRow.id == DEFAULT_PORTFOLIO_SEED_ID)
         legacy = (await self._session.execute(legacy_stmt)).scalar_one_or_none()
@@ -131,8 +131,8 @@ class SqlAlchemyAccountRepository:
                 currency=legacy.currency,
                 base_currency=legacy.currency,
                 initial_deposit=legacy.cash if legacy.cash > 0 else INITIAL_CASH,
-                leverage=Decimal("1"),
-                margin_call_level_pct=Decimal("100"),
+                leverage=Decimal(1),
+                margin_call_level_pct=Decimal(100),
                 is_default=has_default is None,
                 created_at=now,
                 updated_at=now,
@@ -269,7 +269,7 @@ class SqlAlchemyAccountRepository:
             if last_balance is not None:
                 running = float(last_balance)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         for tx in transactions:
             if tx.id in existing_ids:
                 continue
@@ -351,7 +351,7 @@ class SqlAlchemyAccountRepository:
         source_backtest_run_id: str | None = None,
     ) -> AccountScope:
         await self.ensure_migrated()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         deposit = Decimal(str(initial_deposit))
         base = base_currency or currency
         resolved_settings = settings or default_account_settings(
@@ -519,7 +519,7 @@ class SqlAlchemyAccountRepository:
             if key in previous and key not in merged:
                 merged[key] = previous[key]
         row.settings_json = merged
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _account_from_row(row)
 
@@ -539,7 +539,7 @@ class SqlAlchemyAccountRepository:
         current = dict(row.settings_json) if row.settings_json else settings_to_dict(default_account_settings())
         current.update(fragment)
         row.settings_json = current
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return current
 
@@ -554,7 +554,7 @@ class SqlAlchemyAccountRepository:
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row.last_activity_at = now
         row.updated_at = now
 
@@ -612,7 +612,7 @@ class SqlAlchemyAccountRepository:
                 await self._session.delete(extra_legacy)
                 await self._session.delete(extra)
 
-            default_legacy.updated_at = datetime.now(timezone.utc)
+            default_legacy.updated_at = datetime.now(UTC)
             await self._session.flush()
 
     async def update_account(
@@ -628,7 +628,7 @@ class SqlAlchemyAccountRepository:
             raise ValueError("Cuenta no encontrada")
         if row.status == "closed":
             raise ValueError("No se puede editar una cuenta cerrada")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if name is not None and name.strip():
             row.name = name.strip()
         if description is not None:
@@ -650,7 +650,7 @@ class SqlAlchemyAccountRepository:
             .values(is_default=False),
         )
         row.is_default = True
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _account_from_row(row)
 
@@ -661,7 +661,7 @@ class SqlAlchemyAccountRepository:
             raise ValueError("Cuenta no encontrada")
         if row.status == "closed":
             return _account_from_row(row)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row.status = "closed"
         row.updated_at = now
         row.last_activity_at = now

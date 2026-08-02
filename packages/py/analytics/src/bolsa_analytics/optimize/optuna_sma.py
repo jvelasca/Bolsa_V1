@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 import optuna
 import vectorbt as vbt
-
-from collections.abc import Callable
 
 from bolsa_analytics.backtest import BacktestBarInput
 from bolsa_analytics.optimize.metrics import trial_score, vectorbt_freq

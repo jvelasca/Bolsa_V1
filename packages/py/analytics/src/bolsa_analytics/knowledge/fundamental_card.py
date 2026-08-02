@@ -9,8 +9,8 @@ beta, ADV (null si incompletos). Filings no forman parte del card numérico.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Literal
+from datetime import UTC, datetime
+from typing import Any
 
 from bolsa_analytics.knowledge.as_of_cut import (
     LOOKAHEAD_BLOCKED_WARNING,
@@ -118,10 +118,12 @@ def resolve_card_confidence(
     input_confidence: DataConfidence,
     pillar_coverage: float | None,
     is_stale: bool,
+    provider: str | None = None,
 ) -> DataConfidence:
     """
     Confianza de la tarjeta (dominio Python; UI solo pinta).
     - Stale → LOW (datos pueden mentir vs precio).
+    - Provider desconocido / vacío → no sube de MEDIUM.
     - Peor entre cobertura de inputs y coverage de pilares Score_FUND.
     """
     if is_stale:
@@ -132,6 +134,10 @@ def resolve_card_confidence(
         pillar_conf = coverage_to_confidence(pillar_coverage)
         if rank[pillar_conf] < rank[conf]:
             conf = pillar_conf
+    prov = (provider or "").strip().lower()
+    if not prov or prov in {"unknown", "none", "null"}:
+        if rank[conf] > rank["MEDIUM"]:
+            conf = "MEDIUM"
     return conf
 
 
@@ -144,15 +150,15 @@ def _parse_fetched_at(value: Any) -> datetime | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
 
 
 def _freshness(fetched_at: str | None, *, max_age_days: int = STALE_DAYS_DEFAULT) -> tuple[int | None, bool]:
     dt = _parse_fetched_at(fetched_at)
     if dt is None:
         return None, True
-    age = (datetime.now(timezone.utc) - dt).total_seconds() / 86400.0
+    age = (datetime.now(UTC) - dt).total_seconds() / 86400.0
     days = int(age) if age >= 0 else 0
     return days, days > max_age_days
 
@@ -221,6 +227,9 @@ def build_fundamental_card(
     elif raw:
         if pit == "reconstructed":
             warnings.append(RECONSTRUCTED_WARNING)
+        if is_stale:
+            days = stale_days if stale_days is not None else "?"
+            warnings.append(f"Fundamentals stale ({days}d > {max_age_days}d) — confidence LOW")
         inputs = FundamentalInputs.from_dict(raw)
         has_signal = any(
             v is not None
@@ -261,6 +270,7 @@ def build_fundamental_card(
         input_confidence=input_conf,
         pillar_coverage=coverage,
         is_stale=is_stale,
+        provider=provider,
     )
     if pit == "blocked":
         confidence = "LOW"

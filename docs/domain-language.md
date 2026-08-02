@@ -2,10 +2,10 @@
 
 > **Documento vivo** (diccionario canónico). Una palabra → un significado.  
 > Complementa [RFC-000](./rfc/000-ubiquitous-language.md) (cadena Trading/Feature/Execution).  
-> Fronteras: [ADR-015](./adr/015-scientific-domain-vs-trading-domain.md).  
+> Fronteras: [ADR-015](./adr/015-scientific-domain-vs-trading-domain.md) (objetos) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) (universos UI LAB vs TRADING).  
 > Actualizar **aquí** (o enmienda RFC-000) al introducir términos nuevos — no en ADRs filosóficos sueltos.
 
-**Última sync:** 2026-07-31 (cuentas DEMO vs Paper broker).
+**Última sync:** 2026-08-02 (universos LAB / TRADING · Mandato operativo ADR-020).
 
 ---
 
@@ -18,7 +18,17 @@
 | `INFRA` | Infrastructure Domain *(conceptual; no ADR propio aún)* | Docker, PG, workers, cache, broker adapters, logs, telemetry | Hipótesis, Beliefs, Strategies |
 
 Puente operativo: **Scientific → Reasoning → Trading** (ADR-015).  
+Puente de producto UI: **LAB ↔ TRADING** por instrumento (Adoptar / Vigilar / Proponer / Abrir estudio) — [ADR-019](./adr/019-dual-universes-lab-vs-trading.md).  
 Infra sirve a ambos; no es dueña del significado de Belief ni de Position.
+
+### 0.1 Universos de producto (experiencia)
+
+| Universo UI | Alineado con | Contiene (producto) | **No** contiene |
+|-------------|--------------|---------------------|-----------------|
+| **LAB** (Backtesting) | Scientific + experiments H0 | Embudo, Ver, Verificar D→hoy, Cartera LAB, CORE-R study | Ledger DEMO / Paper como PnL “mío” |
+| **TRADING** | Trading Domain | Cuenta activa, órdenes, rail Coach (vista), caminos A/B/C/D | Película DÍA D / mesa Verificar (to-be) |
+
+Canónico: [diseño dual](./engineering/dual-universes-lab-trading-design-2026-08-02.md).
 
 ---
 
@@ -106,16 +116,25 @@ Ver cadena completa en [RFC-000 §4](./rfc/000-ubiquitous-language.md).
 Términos `INFRA.*` (no son Knowledge ni Trading): PostgreSQL, worker/queue, cache, broker adapter, connector de mercado, object storage, telemetry, scheduler.  
 Detalle de plataforma: ADR-010, docs operativos — **no** mezclar en schemas de Belief.
 
-### 4.1 Cuentas (Trading · producto)
+### 4.1 Cuentas y carteras (producto)
 
 | Término | Definición oficial | **No** significa |
 |---------|-------------------|------------------|
-| **Cuenta activa** | Única cuenta con la que opera la app en un momento dado | Multi-ledger paralelo |
+| **Cuenta activa** | Única cuenta **TRADING** con la que opera la app | Multi-ledger operativo; Cartera LAB |
 | **Demo** (`simulated`) | Cuenta simulada; único tipo operativo hoy | Broker real |
 | **Paper** (tipo cuenta) | Futuro: cuenta **real** enlazada a broker por API | Paper-trading / simulación |
 | **Desplegar en demo** | Camino A → ledger de la cuenta activa DEMO | Crear cuenta tipo Paper |
+| **Cartera LAB** | Sandbox del universo Backtesting (sims / Verificar); no es «Activa» | Segunda DEMO de inversión |
+| **Adoptar** | Puente: ligar TOP/#1 a operativa TRADING (abre/cierra **mandato**) | Escribir fills desde la película Verificar |
+| **Mandato operativo** | Playbook vigente en TRADING para un instrumento×cuenta; con **tenure** (desde/hasta) | Finalistas LAB; tag *setup* de un trade suelto |
+| **F-hoy / F-D** | Finalistas operativos vs TOP experimento as-of D ([ADR-021](./adr/021-dia-d-reconciliation.md)) | Un solo TOP que se pisa al cambiar DÍA D |
+| **Historial de mandato** | Tramos cerrados + vigente (`MandateTenure`) | Snapshot de adopción sin fechas |
+| **Verificar (D→hoy)** | Sesión LAB fase C con #1 congelada | Operar en Trading / MODO DÍA D (as-is deprecado) |
+| **Coach en vivo** | Rail en Trading con estado Lab del mismo instrumento | Reabrir embudo dentro del desk |
 
-Canónico: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md).
+Canónico cuentas: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md).  
+Canónico universos: [ADR-019](./adr/019-dual-universes-lab-vs-trading.md).  
+Canónico mandato: [ADR-020](./adr/020-operating-mandate-tenure.md).
 
 ---
 
@@ -124,7 +143,7 @@ Canónico: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-
 1. PRs que introduzcan entidades de dominio **actualizan esta tabla** (o RFC-000) en el mismo PR.  
 2. Si un término responde a **dos preguntas**, dividirlo (ADR-012 / ADR-013).  
 3. Contaminación cruzada (p.ej. campo `belief` en `orders`) = violación ADR-015.  
-4. UI: “laboratorio / research” vs “operativa / trading” en copy.
+4. UI: “laboratorio / LAB / research” vs “operativa / TRADING” en copy ([ADR-019](./adr/019-dual-universes-lab-vs-trading.md)).
 
 ---
 
@@ -135,7 +154,10 @@ Canónico: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-
 | [011](./adr/011-quantitative-research-platform.md) | ¿Qué es el QROS? |
 | [012](./adr/012-scientific-validation-knowledge-evolution.md) | ¿Cómo evoluciona el conocimiento? |
 | [013](./adr/013-research-mathematics-statistical-foundations.md) | ¿Qué significa matemáticamente? |
-| [015](./adr/015-scientific-domain-vs-trading-domain.md) | Scientific ≠ Trading |
+| [015](./adr/015-scientific-domain-vs-trading-domain.md) | Scientific ≠ Trading (objetos) |
+| [019](./adr/019-dual-universes-lab-vs-trading.md) | LAB ≠ TRADING (universos UI / carteras) |
+| [020](./adr/020-operating-mandate-tenure.md) | Mandato operativo (tenure estrategia×instrumento) |
+| [021](./adr/021-dia-d-reconciliation.md) | Reconciliación DÍA D (F-hoy · F-D · V) |
 | [016](./adr/016-research-persistence-model.md) | Persistencia Scientific Domain |
 | [017](./adr/017-baseline-v1-5-research-observatory.md) | **Baseline v1.5** — laboratorio congelado |
 | [009](./adr/009-backtesting-research-platform-h0.md) | Motor de medición H0 |

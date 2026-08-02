@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -79,7 +79,7 @@ def intent_from_recommendation(
         side = "buy"
     elif recommendation.action in {"recommend_short", "exit_hint", "reduce"}:
         side = "sell"
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return OrderIntent(
         intent_id=f"INT-{uuid4().hex[:12]}",
         account_id=account_id,

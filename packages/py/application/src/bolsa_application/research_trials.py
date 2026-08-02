@@ -76,3 +76,13 @@ class GetLaboratoryResearchSummary:
 
     async def execute(self) -> dict[str, Any]:
         return await self._repository.laboratory_summary()
+
+
+class GetLabHealth:
+    """Q0.1 — cobertura métricas, zero-trades, campañas (sin Belief)."""
+
+    def __init__(self, repository: ResearchTrialRepository) -> None:
+        self._repository = repository
+
+    async def execute(self) -> dict[str, Any]:
+        return await self._repository.lab_health()

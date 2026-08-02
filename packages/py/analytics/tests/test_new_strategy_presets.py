@@ -11,7 +11,6 @@ from bolsa_analytics.signals.preset_catalog import (
 )
 from bolsa_analytics.signals.rules_engine import build_indicator_context
 
-
 NEW_PRESETS = (
     "donchian_breakout",
     "adx_di_trend",

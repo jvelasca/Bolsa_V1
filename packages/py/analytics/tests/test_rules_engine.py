@@ -32,7 +32,10 @@ def test_rules_engine_gated_matches_preset_sma() -> None:
 def test_evaluate_strategy_uses_rules_path_with_preset_definition() -> None:
     timestamps, closes = _sample_bars()
     definition = strategy_definition_from_preset("sma_crossover", ["inst-1"])
-    bars = [StrategyBarInput(timestamp=ts, close=close) for ts, close in zip(timestamps, closes)]
+    bars = [
+        StrategyBarInput(timestamp=ts, close=close)
+        for ts, close in zip(timestamps, closes, strict=True)
+    ]
 
     rule_events = evaluate_rules_signals(definition, timestamps, closes, mode="gated")
     strategy_events = evaluate_strategy(definition, bars, mode="gated")

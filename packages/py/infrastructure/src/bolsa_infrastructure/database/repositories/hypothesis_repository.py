@@ -1,4 +1,6 @@
-from datetime import datetime, timezone
+from __future__ import annotations
+
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -38,7 +40,7 @@ class SqlAlchemyHypothesisRepository:
         status: str = "open",
         hypothesis_id: str | None = None,
     ) -> Hypothesis:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = HypothesisRow(
             id=hypothesis_id or new_id(),
             kind=kind,
@@ -121,6 +123,6 @@ class SqlAlchemyHypothesisRepository:
             row.context = None
         elif context is not None:
             row.context = context
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return self._map(row)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from bolsa_market.ingest import OhlcvBarIngest
@@ -17,14 +17,14 @@ class DataSanityReport:
 
 def _pct_change(prev: Decimal, curr: Decimal) -> Decimal:
     if prev == 0:
-        return Decimal("0")
-    return abs((curr - prev) / prev) * Decimal("100")
+        return Decimal(0)
+    return abs((curr - prev) / prev) * Decimal(100)
 
 
 def run_sanity_checks(
     bars: list[OhlcvBarIngest],
     *,
-    max_single_day_move_pct: Decimal = Decimal("50"),
+    max_single_day_move_pct: Decimal = Decimal(50),
     max_gap_days: int = 10,
 ) -> DataSanityReport:
     """

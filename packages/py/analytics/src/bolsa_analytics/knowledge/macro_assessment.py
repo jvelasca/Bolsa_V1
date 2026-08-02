@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -113,7 +113,7 @@ def build_macro_assessment(
     tradability: Tradability | None = None,
 ) -> tuple[MacroAssessment, FactSet, ScoreMacroResult]:
     """Desde MacroInputs / FactSet / MarketState → MacroAssessment."""
-    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     if isinstance(inputs, MarketState):
         fact_set = inputs.fact_set
@@ -124,14 +124,14 @@ def build_macro_assessment(
     elif isinstance(inputs, FactSet):
         fact_set = inputs
         score_result = score_macro_from_facts(fact_set)
-        from bolsa_analytics.cognitive.market_state import classify_regime, _tradability
+        from bolsa_analytics.cognitive.market_state import _tradability, classify_regime
 
         regime_v = regime or classify_regime(score_result, fact_set)
         tradability_v = tradability or _tradability(regime_v, score_result)
     else:
         fact_set = build_macro_fact_set(inputs if isinstance(inputs, MacroInputs) else MacroInputs.from_dict(inputs), timestamp=ts)
         score_result = score_macro_from_facts(fact_set)
-        from bolsa_analytics.cognitive.market_state import classify_regime, _tradability
+        from bolsa_analytics.cognitive.market_state import _tradability, classify_regime
 
         regime_v = regime or classify_regime(score_result, fact_set)
         tradability_v = tradability or _tradability(regime_v, score_result)

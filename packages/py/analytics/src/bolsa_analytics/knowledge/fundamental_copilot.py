@@ -6,6 +6,7 @@ El LLM solo recibe estos strings; nunca recalcula Score_FUND.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -71,6 +72,7 @@ def build_fundamental_copilot_variables(card: dict[str, Any]) -> dict[str, str]:
 def heuristic_fundamental_explanation(card: dict[str, Any]) -> dict[str, Any]:
     """Fallback sin Ollama: prosa desde facts/warnings ya calculados."""
     vars_ = build_fundamental_copilot_variables(card)
+    derived = card.get("derived") if isinstance(card.get("derived"), dict) else {}
     conf = vars_["confidence"]
     p1_bits: list[str] = []
     if conf == "LOW":
@@ -89,7 +91,8 @@ def heuristic_fundamental_explanation(card: dict[str, Any]) -> dict[str, Any]:
         p1_bits.append(f"FCF Yield {vars_['fcfYield']}.")
     if vars_["dcfUpside"] != "—":
         wacc_bit = f" WACC {vars_['wacc']}" if vars_["wacc"] != "—" else ""
-        scen = derived.get("dcfScenarios") if isinstance(derived.get("dcfScenarios"), dict) else None
+        dcf_scenarios = derived.get("dcfScenarios")
+        scen = dcf_scenarios if isinstance(dcf_scenarios, dict) else None
         scen_bit = ""
         if scen and isinstance(scen.get("bear"), dict) and isinstance(scen.get("bull"), dict):
             bear_u = _fmt(scen["bear"].get("upside"), pct=True, digits=1)
@@ -133,3 +136,40 @@ def heuristic_fundamental_explanation(card: dict[str, Any]) -> dict[str, Any]:
             "No es consejo de inversión ni sustituye el análisis propio."
         ),
     }
+
+
+_ROE_CLAIM = re.compile(r"\bROE\b[^0-9%]{0,24}(\d+(?:[.,]\d+)?)\s*%", re.IGNORECASE)
+
+
+def sanitize_copilot_query(text: str, *, max_len: int = 800) -> str:
+    """Q2.6 — recorta y limpia query de usuario al copiloto FA."""
+    cleaned = " ".join((text or "").split())
+    return cleaned[:max_len]
+
+
+def validate_copilot_does_not_invent_roe(
+    prose: str,
+    card: dict[str, Any],
+) -> list[str]:
+    """
+    Guardrail: si el texto afirma un ROE %, debe coincidir (aprox) con facts.roe.
+    Devuelve lista de violaciones (vacía = OK).
+    """
+    facts = card.get("facts") if isinstance(card.get("facts"), dict) else {}
+    roe = facts.get("roe")
+    violations: list[str] = []
+    for match in _ROE_CLAIM.finditer(prose or ""):
+        claimed = float(match.group(1).replace(",", "."))
+        if roe is None:
+            violations.append(f"ROE {claimed}% inventado (facts.roe ausente)")
+            continue
+        try:
+            expected_pct = float(roe) * 100.0 if abs(float(roe)) <= 1.5 else float(roe)
+        except (TypeError, ValueError):
+            violations.append("facts.roe no numérico")
+            continue
+        if abs(claimed - expected_pct) > 0.6:
+            violations.append(
+                f"ROE {claimed}% no coincide con facts ({expected_pct:.1f}%)"
+            )
+    return violations

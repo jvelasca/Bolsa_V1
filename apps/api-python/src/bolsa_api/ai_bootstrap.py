@@ -14,7 +14,7 @@ from bolsa_ai import (
     reset_default_proxy,
     set_default_proxy,
 )
-from bolsa_infrastructure.database.llm_call_audit import pg_audit_enabled, persist_llm_call_sync
+from bolsa_infrastructure.database.llm_call_audit import persist_llm_call_sync, pg_audit_enabled
 
 logger = logging.getLogger(__name__)
 

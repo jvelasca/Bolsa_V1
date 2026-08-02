@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
@@ -180,7 +180,7 @@ def build_macro_fact_set(
     market_id: str = MARKET_ID,
 ) -> FactSet:
     inp = inputs if isinstance(inputs, MacroInputs) else MacroInputs.from_dict(inputs)
-    ts = timestamp or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     vol = _vol_fact(inp)
     curve = _curve_fact(inp)
     credit = _credit_fact(inp)

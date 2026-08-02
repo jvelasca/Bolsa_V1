@@ -116,7 +116,10 @@ export function isFinalistsSavedStatusMessage(message: string): boolean {
     m.includes('lab_validated') ||
     m.includes('→ finalistas') ||
     m.includes('mejores lab + coach') ||
-    (m.includes('finalistas') && m.includes('ok'))
+    (m.includes('finalistas') && m.includes('ok')) ||
+    // ADR-021: TOP experimento F-D (no pisa F-hoy)
+    m.includes('f-d guardado') ||
+    (m.includes('experimento') && m.includes('día d'))
   );
 }
 

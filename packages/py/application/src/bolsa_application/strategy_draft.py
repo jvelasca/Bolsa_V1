@@ -1,14 +1,8 @@
 from dataclasses import dataclass
-
 from typing import Any, Literal
-
-
 
 from bolsa_analytics.research.llm_draft import draft_strategy_from_prompt_with_llm
 from bolsa_analytics.research.prompt_draft import PromptDraftResult
-
-
-
 
 
 @dataclass(frozen=True, slots=True)

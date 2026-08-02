@@ -6,6 +6,7 @@ from bolsa_api.api.v1.routes import (
     alerts,
     auth,
     backtests,
+    core_r,
     database,
     drawing_replay,
     execution_policies,
@@ -13,17 +14,18 @@ from bolsa_api.api.v1.routes import (
     health,
     indicators_compute,
     indicators_draft,
-    instruments,
     instrument_strategy_tops,
+    instruments,
     investor_profiles,
     lists,
+    mandates,
     market,
     market_indices,
     paper_d,
     pending_orders,
+    platform_events,
     portfolio,
     position_policies,
-    platform_events,
     predictions,
     research,
     scans,
@@ -55,6 +57,8 @@ api_v1_router.include_router(lists.router, tags=["lists"])
 api_v1_router.include_router(market_indices.router, tags=["market-indices"])
 api_v1_router.include_router(alerts.router, tags=["alerts"])
 api_v1_router.include_router(accounts.router, tags=["accounts"])
+api_v1_router.include_router(mandates.router, tags=["mandates"])
+api_v1_router.include_router(core_r.router, tags=["core-r"])
 api_v1_router.include_router(investor_profiles.router, tags=["investor-profiles"])
 api_v1_router.include_router(portfolio.router, tags=["portfolio"])
 api_v1_router.include_router(backtests.router, tags=["backtests"])

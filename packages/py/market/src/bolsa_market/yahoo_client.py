@@ -4,7 +4,7 @@ import asyncio
 import os
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 
 import httpx
@@ -408,15 +408,12 @@ class YahooFinanceClient:
         return payload
 
     async def fetch_dividend_history(self, yahoo_symbol: str, *, years: int = 5) -> list[dict]:
-        import time
-
         normalized = yahoo_symbol.strip()
         if not normalized:
             return []
 
         client = await self._get_client()
         await self._ensure_crumb(client)
-        now = int(time.time())
         params: dict[str, str | int] = {
             "range": f"{years}y",
             "interval": "1d",
@@ -447,7 +444,7 @@ class YahooFinanceClient:
             if amount is None:
                 continue
             try:
-                date = datetime.fromtimestamp(int(timestamp), tz=timezone.utc).date().isoformat()
+                date = datetime.fromtimestamp(int(timestamp), tz=UTC).date().isoformat()
             except (TypeError, ValueError, OSError):
                 date = str(timestamp)
             history.append({"date": date, "amount": float(amount)})

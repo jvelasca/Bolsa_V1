@@ -1,9 +1,5 @@
 from dataclasses import dataclass
-
 from typing import Literal
-
-
-
 
 
 def sma(values: list[float], period: int) -> list[float | None]:

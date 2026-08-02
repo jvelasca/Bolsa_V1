@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from bolsa_application.lists import DeleteInstrumentList, ListInstrumentLists
-from bolsa_infrastructure.database.repositories.list_repository import InstrumentListDetail
 
 
 @pytest.mark.asyncio

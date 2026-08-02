@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -99,7 +99,7 @@ def open_confidence_state(
     notes: list[str] | tuple[str, ...] = (),
 ) -> ConfidenceState:
     """Abre lifecycle desde DecisionPackage.overallConfidence (no recomputa pipeline)."""
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     c0 = round(_clamp01(confidence_0), 4)
     return ConfidenceState(
         state_id=f"CFS-{uuid4().hex[:12]}",
@@ -166,7 +166,7 @@ def apply_time_decay(
     factor = 0.5 ** (elapsed_hours / half_life_hours)
     target = state.confidence * factor
     delta = target - state.confidence
-    ts = at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    ts = at or datetime.now(UTC).isoformat().replace("+00:00", "Z")
     return apply_confidence_event(
         state,
         ConfidenceEvent(

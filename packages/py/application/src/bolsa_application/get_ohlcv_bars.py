@@ -1,8 +1,8 @@
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+from bolsa_domain.ohlcv_time import is_cache_stale
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
-from bolsa_domain.ohlcv_time import is_cache_stale
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
 
 

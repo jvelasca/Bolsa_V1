@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from typing import Any, Protocol
 
 from bolsa_analytics.cognitive import (
@@ -243,7 +244,7 @@ class PersistTrial:
         notes: str | None = None,
         account_id: str | None = None,
     ) -> TrialRecordPersist:
-        from datetime import datetime, timezone
+        from datetime import datetime
         from uuid import uuid4
 
         rec = TrialRecord(
@@ -251,7 +252,7 @@ class PersistTrial:
             hypothesis_ref=hypothesis_ref,
             params_hash=params_hash,
             sharpe_is=sharpe_is,
-            created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            created_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             notes=notes,
         )
         return await self._store.append_trial(
@@ -290,7 +291,7 @@ class PersistEdgeReport:
         )
         # Auto-persist trial para que TrialsLog / Efectividad no queden vacíos.
         if auto_trial:
-            from datetime import datetime, timezone
+            from datetime import datetime
             from uuid import uuid4
 
             await self._store.append_trial(
@@ -300,7 +301,7 @@ class PersistEdgeReport:
                     strategy_family_ref=strategy_or_signal_ref,
                     hypothesis_ref=f"edge:{rec.id}",
                     params_hash=rec.id,
-                    created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    created_at=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
                     sharpe_is=suite.psr,
                     notes="auto from PersistEdgeReport",
                     account_id=account_id,

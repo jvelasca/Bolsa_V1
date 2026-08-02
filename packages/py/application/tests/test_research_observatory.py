@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -75,7 +75,7 @@ async def test_research_list_filter_and_summary(db_session) -> None:
     except Exception as exc:  # noqa: BLE001
         pytest.skip(f"research_trials no migrada: {exc}")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     instrument_id = _new_id("inst")
     yahoo = f"TESTRES.{uuid.uuid4().hex[:8]}"
 
@@ -183,3 +183,11 @@ async def test_research_list_filter_and_summary(db_session) -> None:
     lab = await GetLaboratoryResearchSummary(repo).execute()
     assert lab["totalTrials"] >= 3
     assert lab["totalK"] >= 3
+
+    from bolsa_application.research_trials import GetLabHealth
+
+    health = await GetLabHealth(repo).execute()
+    assert health["totalTrials"] >= 3
+    assert "sharpeRatio" in health["coverage"]
+    assert "zeroTradePct" in health
+    assert "caveat" in health

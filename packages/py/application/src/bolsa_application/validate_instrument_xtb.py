@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from typing import Literal
 
 from bolsa_application.get_instrument_detail import GetInstrumentDetail
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.sync_log_repository import SyncLogRepository
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 from bolsa_market.providers import XtbBridgeClient, format_xtb_bridge_connect_error
 from bolsa_market.xtb_symbols import to_xtb_symbol
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
 
 Recommendation = Literal["aligned", "review", "unavailable", "no_db_reference"]
 
@@ -52,7 +54,7 @@ class ValidateInstrumentWithXtb:
         if instrument is None:
             return None
 
-        validated_at = datetime.now(timezone.utc).isoformat()
+        validated_at = datetime.now(UTC).isoformat()
         detail = await self._detail.execute(instrument_id)
         db_close: float | None = None
         db_date: str | None = None

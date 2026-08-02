@@ -1,9 +1,5 @@
 from bolsa_application.market_indices import SyncSubscribedCatalogIndices
-
 from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
-
-
-
 
 
 class ListInstrumentLists:

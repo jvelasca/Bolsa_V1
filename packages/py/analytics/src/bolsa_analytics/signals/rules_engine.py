@@ -23,8 +23,11 @@ from bolsa_analytics.indicators.compute import (
     compute_williams_r,
     instance_spec_key,
 )
-from bolsa_analytics.signals.evaluate import SignalKind, SignalEvent
-from bolsa_analytics.signals.preset_rules import enrich_definition_with_preset_rules, rule_group_has_rules
+from bolsa_analytics.signals.evaluate import SignalEvent, SignalKind
+from bolsa_analytics.signals.preset_rules import (
+    enrich_definition_with_preset_rules,
+    rule_group_has_rules,
+)
 
 RuleOperator = Literal["lt", "lte", "gt", "gte", "eq"]
 

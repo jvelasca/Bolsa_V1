@@ -6,7 +6,9 @@ from zoneinfo import ZoneInfo
 
 from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
 from bolsa_application.sync_instrument import SyncInstrumentDailyBars
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 from bolsa_infrastructure.database.repositories.sync_scheduler_repository import (
     SqlAlchemySyncSchedulerRepository,
     SyncQueueItemRecord,

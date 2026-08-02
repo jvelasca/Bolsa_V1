@@ -1,5 +1,7 @@
 """FIE F2.2 — sector bands + allowlist sector."""
 
+from datetime import UTC, datetime
+
 from bolsa_analytics.signals.fundamental_gate import (
     build_fundamental_gate,
     passes_fundamental_gate,
@@ -9,12 +11,11 @@ from bolsa_analytics.signals.sector_bands import (
     apply_sector_bands_to_conditions,
     resolve_sector_band_profile,
 )
-from datetime import datetime, timezone
 
 
 def _fresh(**overrides):
     base = {
-        "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "fetchedAt": datetime.now(UTC).isoformat(),
         "sector": "Technology",
         "trailingPe": 30.0,
         "marketCap": 5e9,

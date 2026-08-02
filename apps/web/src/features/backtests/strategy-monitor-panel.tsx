@@ -27,6 +27,11 @@ import {
   type StrategyMonitorInstrument,
 } from '@/features/backtests/strategy-monitor';
 import {
+  STRATEGY_ADOPTION_LABELS,
+  getAdoptionState,
+} from '@/features/platform/strategy-adoption';
+import { useActiveAccount } from '@/features/accounts/use-active-account';
+import {
   buildCoreRPaperPnlReviewRow,
   coreRAccountReturnPct,
   coreRNeedsAction,
@@ -99,6 +104,7 @@ export function StrategyMonitorPanel({
   initialListId,
   embedded = false,
 }: StrategyMonitorPanelProps) {
+  const { effectiveAccountId } = useActiveAccount();
   const [listId, setListId] = useState(initialListId ?? '');
   const [timeframe] = useState('1d');
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
@@ -659,6 +665,11 @@ export function StrategyMonitorPanel({
                         {row.slot1Label
                           ? ` · #1 ${row.slot1Label}${row.slot1Stars ? ` ★${row.slot1Stars}` : ''}`
                           : ''}
+                        {' · '}
+                        Adopción:{' '}
+                        {STRATEGY_ADOPTION_LABELS[
+                          getAdoptionState(row.instrumentId, effectiveAccountId)
+                        ]}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
                         Demo/paper:{' '}

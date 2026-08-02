@@ -4,30 +4,16 @@
 
 from __future__ import annotations
 
-
-
 import httpx
-
 import pytest
 
-
-
 from bolsa_market.indices.wikipedia_constituents import (
-
     SP100_WIKI_MIRROR_URL,
-
     SP100_WIKI_URL,
-
     clear_remote_constituents_cache,
-
     fetch_sp100_members,
-
     fetch_sp500_members,
-
 )
-
-
-
 
 
 @pytest.fixture(autouse=True)

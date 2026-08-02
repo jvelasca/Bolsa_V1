@@ -374,8 +374,9 @@ def test_assembly_trials_total_scales_with_cpcv() -> None:
 
 
 def test_assembly_pbo_cscv_from_score_matrix() -> None:
-    from bolsa_analytics.optimize.pbo import estimate_pbo_cscv
     import numpy as np
+
+    from bolsa_analytics.optimize.pbo import estimate_pbo_cscv
 
     matrix = np.zeros((4, 5))
     matrix[:, 0] = 10.0

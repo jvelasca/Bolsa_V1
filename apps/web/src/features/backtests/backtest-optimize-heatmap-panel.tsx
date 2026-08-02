@@ -42,9 +42,9 @@ export function BacktestOptimizeHeatmapPanel({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-[11px] font-medium text-foreground">
-          Mapa de scores · {model.xLabel}×{model.yLabel}
+          Robustness map · {model.xLabel}×{model.yLabel}
           <span className="ml-1 font-normal text-muted-foreground">
-            ({scoreMode === 'oos' ? 'OOS' : 'IS'})
+            ({scoreMode === 'oos' ? 'OOS' : 'IS'} · Q3.1)
           </span>
         </p>
         {model.best && (

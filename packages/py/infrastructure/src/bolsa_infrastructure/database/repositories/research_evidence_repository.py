@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -55,7 +55,7 @@ class SqlAlchemyResearchEvidenceRepository:
             evidence_weight=Decimal(str(evidence_weight)),
             summary=summary,
             math_version=math_version,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()

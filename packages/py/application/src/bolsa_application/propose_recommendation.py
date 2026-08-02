@@ -7,6 +7,7 @@ from typing import Any, Protocol
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
+from bolsa_analytics.cognitive.market_events import MarketEventCalendar
 from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
@@ -41,7 +42,6 @@ from bolsa_analytics.knowledge.technical_assessment import (
     TechnicalAssessment,
     build_technical_assessment,
 )
-from bolsa_analytics.cognitive.market_events import MarketEventCalendar
 from bolsa_domain.value_objects.timeframe import TimeFrame
 
 

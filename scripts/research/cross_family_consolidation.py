@@ -43,6 +43,17 @@ class TrialLite:
     pnl: float | None
     trade_count: int | None
     score: float | None
+    campaign: str | None = None
+
+
+def _trial_campaign(trial: Any) -> str | None:
+    params = trial.params if isinstance(getattr(trial, "params", None), dict) else {}
+    manifest = trial.manifest_ref if isinstance(getattr(trial, "manifest_ref", None), dict) else {}
+    raw = params.get("campaign") or manifest.get("campaign")
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None
 
 
 def _load_env() -> None:
@@ -118,7 +129,11 @@ def _observation(marks: dict[str, str]) -> str:
     return "mixto / no extremo"
 
 
-async def _fetch_all_trials(session: Any) -> list[TrialLite]:
+async def _fetch_all_trials(
+    session: Any,
+    *,
+    campaign: str | None = None,
+) -> list[TrialLite]:
     from bolsa_infrastructure.database.repositories.instrument_repository import (
         SqlAlchemyInstrumentRepository,
     )
@@ -133,11 +148,15 @@ async def _fetch_all_trials(session: Any) -> list[TrialLite]:
     page_size = 500
     offset = 0
     rows: list[TrialLite] = []
+    campaign_filter = campaign.strip() if campaign else None
     while True:
         page, total = await trials_repo.list_trials(limit=page_size, offset=offset)
         if not page:
             break
         for trial in page:
+            camp = _trial_campaign(trial)
+            if campaign_filter and camp != campaign_filter:
+                continue
             if trial.instrument_id not in symbol_by_id:
                 inst = await instruments.get_by_id(trial.instrument_id)
                 symbol_by_id[trial.instrument_id] = (
@@ -155,6 +174,7 @@ async def _fetch_all_trials(session: Any) -> list[TrialLite]:
                     pnl=_as_float(metrics.get("totalReturnPct")),
                     trade_count=_as_int(metrics.get("tradeCount")),
                     score=_as_float(metrics.get("score")),
+                    campaign=camp,
                 )
             )
         offset += len(page)
@@ -365,6 +385,37 @@ def _markdown_matrix(report: str) -> str:
     return "\n".join(rows)
 
 
+def extract_marks_by_symbol(rows: list[TrialLite]) -> dict[str, dict[str, str]]:
+    """Symbol → {SMA/RSI/MACD: mark} for stability Δ (Q1.3)."""
+    human_sharpes: dict[str, dict[str, list[float]]] = {
+        family: defaultdict(list) for family in FAMILIES
+    }
+    symbol_by_id: dict[str, str] = {}
+    for row in rows:
+        symbol_by_id[row.instrument_id] = row.symbol
+        if row.proposed_by != "human" or row.preset_key is None or row.sharpe is None:
+            continue
+        family = PRESET_TO_FAMILY.get(row.preset_key)
+        if family is None:
+            continue
+        human_sharpes[family][row.instrument_id].append(row.sharpe)
+
+    marks_by_family: dict[str, dict[str, str]] = {}
+    for family in FAMILIES:
+        medians: list[tuple[str, float]] = []
+        for instrument_id, values in human_sharpes[family].items():
+            medians.append((instrument_id, statistics.median(values)))
+        medians.sort(key=lambda item: item[1], reverse=True)
+        marks_by_family[family] = _tertiale_marks([i for i, _ in medians])
+
+    out: dict[str, dict[str, str]] = {}
+    for instrument_id, symbol in symbol_by_id.items():
+        out[symbol] = {
+            family: marks_by_family[family].get(instrument_id, "—") for family in FAMILIES
+        }
+    return out
+
+
 async def _main() -> int:
     parser = argparse.ArgumentParser(description="IBEX35 Campaign 3.5 — cross-family consolidation")
     parser.add_argument(
@@ -372,6 +423,11 @@ async def _main() -> int:
         type=Path,
         default=None,
         help="Optional path to write markdown matrix fragment",
+    )
+    parser.add_argument(
+        "--campaign",
+        default="",
+        help="Filter params.campaign / manifest_ref.campaign (Q1.2 stability windows)",
     )
     args = parser.parse_args()
 
@@ -385,15 +441,17 @@ async def _main() -> int:
     factory = create_session_factory(engine)
 
     async with factory() as session:
-        rows = await _fetch_all_trials(session)
+        rows = await _fetch_all_trials(session, campaign=args.campaign or None)
 
     await engine.dispose()
 
     if not rows:
-        print("ERROR: research_trials vacío", file=sys.stderr)
+        print("ERROR: research_trials vacío (o campaign sin trials)", file=sys.stderr)
         return 1
 
     report = _build_report(rows)
+    if args.campaign:
+        report = f"[campaign filter: {args.campaign}]\n" + report
     # Windows consoles often default to cp1252 — force UTF-8 for ▲/○/▼.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")

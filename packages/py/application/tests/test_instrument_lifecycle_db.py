@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -78,7 +78,7 @@ async def test_purge_with_sync_logs_does_not_nullify(db_session) -> None:
         PriceAlertRow,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     instrument_id = _new_id("inst")
     list_id = _new_id("list")
     yahoo = f"TESTPURGE.{uuid.uuid4().hex[:8]}"
@@ -118,8 +118,8 @@ async def test_purge_with_sync_logs_does_not_nullify(db_session) -> None:
             instrument_id=instrument_id,
             timeframe="1d",
             timestamp=now,
-            open=Decimal("1"),
-            high=Decimal("2"),
+            open=Decimal(1),
+            high=Decimal(2),
             low=Decimal("0.5"),
             close=Decimal("1.5"),
             volume=1000,
@@ -135,7 +135,7 @@ async def test_purge_with_sync_logs_does_not_nullify(db_session) -> None:
             symbol="TPURGE",
             condition="above",
             price_source="daily_close",
-            target_price=Decimal("10"),
+            target_price=Decimal(10),
             is_active=True,
             triggered_at=None,
             triggered_price=None,
@@ -220,7 +220,7 @@ async def test_remove_without_purge_keeps_instrument(db_session) -> None:
         InstrumentRow,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     instrument_id = _new_id("inst")
     list_id = _new_id("list")
     yahoo = f"TESTKEEP.{uuid.uuid4().hex[:8]}"
@@ -294,7 +294,7 @@ async def test_delete_blocked_while_still_in_list(db_session) -> None:
         InstrumentRow,
     )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     instrument_id = _new_id("inst")
     list_id = _new_id("list")
     yahoo = f"TESTBLOCK.{uuid.uuid4().hex[:8]}"

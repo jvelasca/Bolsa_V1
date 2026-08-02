@@ -13,7 +13,9 @@ from urllib.parse import urlparse
 import httpx
 
 from bolsa_infrastructure.config import Settings, get_settings
-from bolsa_infrastructure.database.repositories.signal_alert_repository import SignalAlertSubscriptionRecord
+from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+    SignalAlertSubscriptionRecord,
+)
 
 logger = logging.getLogger(__name__)
 

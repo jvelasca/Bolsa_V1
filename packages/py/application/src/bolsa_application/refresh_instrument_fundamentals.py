@@ -7,10 +7,12 @@ from dataclasses import dataclass
 
 from bolsa_analytics.signals.fundamental_gate import fundamentals_need_refresh
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 from bolsa_market.instrument_fundamentals import parse_fundamentals_from_profile_snapshot
 from bolsa_market.instrument_profile import build_profile_snapshot
 from bolsa_market.yahoo_client import get_yahoo_finance_client
-from bolsa_infrastructure.database.repositories.instrument_repository import SqlAlchemyInstrumentRepository
 
 
 @dataclass(frozen=True, slots=True)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from bolsa_analytics.features import (
     OnlineFeatureAdapter,
@@ -43,7 +43,7 @@ def test_specs_hash_aligns_with_p8() -> None:
 
 def test_online_adapter_latest_and_pit() -> None:
     adapter = OnlineFeatureAdapter()
-    t0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    t0 = datetime(2026, 1, 1, tzinfo=UTC)
     t1 = t0 + timedelta(days=1)
     adapter.materialize_latest_from_values(
         instrument_id="inst_1",

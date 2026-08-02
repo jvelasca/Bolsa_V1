@@ -90,6 +90,24 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
         note: 'Hub Instrumentos I0–I3 · Seguimiento = Radar (chips/Activar)',
       },
       {
+        path: 'docs/adr/019-dual-universes-lab-vs-trading.md',
+        role: 'adr',
+        note: 'LAB ≠ TRADING · rail Coach',
+      },
+      {
+        path: 'docs/adr/020-operating-mandate-tenure.md',
+        role: 'adr',
+        note: 'Mandato operativo · tenure · trades enlazados',
+      },
+      {
+        path: 'apps/web/src/features/trading/trading-coach-rail.tsx',
+        role: 'code',
+      },
+      {
+        path: 'apps/web/src/features/platform/operating-mandate.ts',
+        role: 'code',
+      },
+      {
         path: 'docs/engineering/account-premises-demo-vs-paper-2026-07-31.md',
         role: 'doc',
         note: 'Cuenta activa DEMO',
@@ -244,6 +262,11 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
         path: 'docs/engineering/backtesting-dia-d-premises-2026-07-31.md',
         role: 'doc',
         note: 'DÍA D v0.11: as-of · full-bleed efímero · Evidence · archivo Trading+Ayuda',
+      },
+      {
+        path: 'docs/adr/021-dia-d-reconciliation.md',
+        role: 'adr',
+        note: 'F-hoy · F-D · V · veredictos SAME/DRIFT',
       },
       {
         path: 'docs/engineering/operativa-test-plan-2026-07-31.md',

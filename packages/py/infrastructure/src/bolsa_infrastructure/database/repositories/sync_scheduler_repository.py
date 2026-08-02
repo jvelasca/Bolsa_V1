@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -80,7 +80,7 @@ class SqlAlchemySyncSchedulerRepository:
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
         if row is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             row = SyncSettingsRow(
                 id=DEFAULT_SETTINGS_ID,
                 auto_sync_enabled=True,
@@ -107,7 +107,7 @@ class SqlAlchemySyncSchedulerRepository:
         retry_backoff_minutes: int | None = None,
         scope: str | None = None,
     ) -> SyncSettingsRecord:
-        settings = await self.get_settings()
+        await self.get_settings()  # ensure default row exists
         stmt = select(SyncSettingsRow).where(SyncSettingsRow.id == DEFAULT_SETTINGS_ID)
         result = await self._session.execute(stmt)
         row = result.scalar_one()
@@ -125,7 +125,7 @@ class SqlAlchemySyncSchedulerRepository:
             row.retry_backoff_minutes = retry_backoff_minutes
         if scope is not None:
             row.scope = scope
-        row.updated_at = datetime.now(timezone.utc)
+        row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _settings_from_row(row)
 
@@ -157,7 +157,7 @@ class SqlAlchemySyncSchedulerRepository:
     ) -> SyncQueueItemRecord | None:
         if await self.has_pending(instrument_id):
             return None
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row = SyncQueueItemRow(
             id=new_id(),
             instrument_id=instrument_id,
@@ -192,7 +192,7 @@ class SqlAlchemySyncSchedulerRepository:
         return [_queue_from_row(row) for row in result.scalars().all()]
 
     async def claim_next(self, now: datetime | None = None) -> SyncQueueItemRecord | None:
-        moment = now or datetime.now(timezone.utc)
+        moment = now or datetime.now(UTC)
         stmt = (
             select(SyncQueueItemRow)
             .where(
@@ -216,7 +216,7 @@ class SqlAlchemySyncSchedulerRepository:
         await self._session.execute(
             update(SyncQueueItemRow)
             .where(SyncQueueItemRow.id == item_id)
-            .values(status="completed", updated_at=datetime.now(timezone.utc)),
+            .values(status="completed", updated_at=datetime.now(UTC)),
         )
 
     async def fail_item(
@@ -232,7 +232,7 @@ class SqlAlchemySyncSchedulerRepository:
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         if row is None:
             return
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         row.attempts += 1
         row.last_error = error
         row.updated_at = now
@@ -254,7 +254,7 @@ class SqlAlchemySyncSchedulerRepository:
             .limit(1)
         )
         row = (await self._session.execute(stmt)).scalar_one_or_none()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if row:
             row.status = "pending"
             row.scheduled_at = now + timedelta(minutes=backoff_minutes)

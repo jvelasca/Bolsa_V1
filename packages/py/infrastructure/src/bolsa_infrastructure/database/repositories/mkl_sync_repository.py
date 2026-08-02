@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import desc, func, select
@@ -42,7 +42,7 @@ class SqlAlchemyMklSyncRepository:
             fact_payload=fact_payload,
             math_version=math_version,
             notes=list(notes or []),
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._session.add(row)
         await self._session.flush()

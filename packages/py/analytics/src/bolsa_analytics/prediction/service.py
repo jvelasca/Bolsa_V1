@@ -10,11 +10,16 @@ from bolsa_analytics.prediction.heuristic import (
 )
 from bolsa_analytics.prediction.lightgbm_direction import (
     MODEL_ID as LGBM_MODEL_ID,
+)
+from bolsa_analytics.prediction.lightgbm_direction import (
     predict_direction,
     train_direction_model,
 )
 from bolsa_analytics.prediction.models import ModelArtifact, Prediction
-from bolsa_analytics.prediction.registry import GLOBAL_PREDICTION_REGISTRY, InMemoryPredictionRegistry
+from bolsa_analytics.prediction.registry import (
+    GLOBAL_PREDICTION_REGISTRY,
+    InMemoryPredictionRegistry,
+)
 from bolsa_analytics.signals.technical_rating_v1 import MODEL_ID as HEURISTIC_MODEL_ID
 
 

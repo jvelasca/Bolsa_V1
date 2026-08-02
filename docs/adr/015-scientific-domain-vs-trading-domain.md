@@ -57,6 +57,7 @@ Trading Domain  (DecisionPackage → Gate → Paper/Live)
 | **F3** | Backtest H0 (ADR-009) es **instrumento de Experiment** en Scientific Domain; su output alimenta Evidence, no “la estrategia ganadora” como Knowledge. |
 | **F4** | APIs y paquetes deben poder etiquetarse `scientific.*` vs `trading.*` (migración gradual OK; no mezclar nombres en contratos nuevos). |
 | **F5** | UI puede mostrar ambos; copy de producto: laboratorio vs operativa (ADR-011). |
+| **F6** | Universos de experiencia **LAB vs TRADING** ([ADR-019](./019-dual-universes-lab-vs-trading.md)): verificación histórica / Cartera LAB no viven en la mesa de inversión diaria. |
 
 ### 2.2 Inference vs Reasoning (capas mentales)
 

@@ -5,10 +5,14 @@ from __future__ import annotations
 import hashlib
 import re
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from bolsa_analytics.cognitive.market_events import MarketEvent, MarketEventCalendar, build_market_event
+from bolsa_analytics.cognitive.market_events import (
+    MarketEvent,
+    MarketEventCalendar,
+    build_market_event,
+)
 from bolsa_market.yahoo_client import YahooFinanceClient, get_yahoo_finance_client
 
 _CACHE: dict[str, tuple[float, list[MarketEvent]]] = {}
@@ -94,7 +98,7 @@ def heuristic_title_sentiment(title: str) -> float:
 
 
 def _iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _event_id(prefix: str, key: str) -> str:
@@ -109,7 +113,7 @@ def news_items_to_events(
     now: datetime | None = None,
     horizon_days: float = 3.0,
 ) -> list[MarketEvent]:
-    now_dt = now or datetime.now(timezone.utc)
+    now_dt = now or datetime.now(UTC)
     sym = symbol.upper().strip()
     out: list[MarketEvent] = []
     for item in items:
@@ -122,7 +126,7 @@ def news_items_to_events(
             pub_ts = int(pub_raw) if pub_raw is not None else int(now_dt.timestamp())
         except (TypeError, ValueError):
             pub_ts = int(now_dt.timestamp())
-        published = datetime.fromtimestamp(pub_ts, tz=timezone.utc)
+        published = datetime.fromtimestamp(pub_ts, tz=UTC)
         # Noticias > 7d ignoradas
         if (now_dt - published).total_seconds() > 7 * 86400:
             continue
@@ -164,7 +168,7 @@ def earnings_from_quote_summary(
     """Extrae próximo earnings de calendarEvents si existe."""
     if not modules:
         return []
-    now_dt = now or datetime.now(timezone.utc)
+    now_dt = now or datetime.now(UTC)
     cal = modules.get("calendarEvents") or {}
     earn = cal.get("earnings") or {}
     dates = earn.get("earningsDate") or []
@@ -176,7 +180,7 @@ def earnings_from_quote_summary(
         ts = int(raw)
     except (TypeError, ValueError):
         return []
-    when = datetime.fromtimestamp(ts, tz=timezone.utc)
+    when = datetime.fromtimestamp(ts, tz=UTC)
     # ±7 días ventana de blackout/earnings
     if abs((when - now_dt).total_seconds()) > 14 * 86400:
         return []

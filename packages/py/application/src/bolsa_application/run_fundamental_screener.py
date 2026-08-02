@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Protocol
 
 from bolsa_analytics.signals.fundamental_gate import (
@@ -173,7 +173,7 @@ class RunFundamentalScreener:
             instrument_ids=instrument_ids,
             kind="snapshot",
             universe_code=f"fa_whitelist_{week}",
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=datetime.now(UTC),
             membership_changelog={
                 "source": FUNDAMENTAL_SCREENER_VERSION,
                 "weekKey": week,

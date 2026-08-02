@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -84,7 +84,7 @@ class SqlAlchemyInstrumentStrategyTopRepository:
     ) -> InstrumentStrategyTopRecord:
         if not (1 <= len(slots) <= 3):
             raise ValueError("slots debe tener entre 1 y 3 entradas")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing = await self.get(instrument_id, timeframe)
         if existing is None:
             row = InstrumentStrategyTopRow(

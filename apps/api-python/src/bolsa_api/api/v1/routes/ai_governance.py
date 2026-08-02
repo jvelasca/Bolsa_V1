@@ -1,4 +1,7 @@
-"""AI Governance (RFC-007) + Effectiveness / cognitive persist (RFC-008 D7+) — no hot path EXECUTION."""
+"""AI Governance (RFC-007) + Effectiveness / cognitive persist (RFC-008 D7+).
+
+No hot path EXECUTION.
+"""
 
 from __future__ import annotations
 
@@ -297,8 +300,9 @@ async def get_decision_session_replay(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """Caja negra: timeline a partir de la fotografía DecisionSession (sin re-ejecutar)."""
-    from bolsa_analytics.cognitive import build_decision_replay
     from fastapi import HTTPException
+
+    from bolsa_analytics.cognitive import build_decision_replay
 
     store = SqlAlchemyCognitiveRepository(session)
     rec = await store.get_decision_session(session_id)
@@ -439,7 +443,7 @@ async def propose_recommendation(
     body: ProposeRecommendationRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
-    """F3 — OHLCV → Assessments (TA[+FUND][+Macro][+Evidence]) → DecisionRuntime → Recommendation."""
+    """F3 — OHLCV → Assessments → DecisionRuntime → Recommendation."""
     from bolsa_api.api.dependencies import (
         get_cognitive_repository,
         get_feature_port,
@@ -461,9 +465,9 @@ async def propose_recommendation(
 
     instruments = get_instrument_repository(session)
     cognitive = get_cognitive_repository(session)
+    from bolsa_application.shared_event_calendar import get_shared_market_event_calendar
     from bolsa_market.macro_snapshot import YahooMacroSnapshotPort
     from bolsa_market.news_snapshot import YahooNewsEventPort
-    from bolsa_application.shared_event_calendar import get_shared_market_event_calendar
 
     calendar = get_shared_market_event_calendar()
     use_case = ProposeRecommendationFromTa(

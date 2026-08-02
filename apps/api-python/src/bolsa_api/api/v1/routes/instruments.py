@@ -11,36 +11,47 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
     get_db_session,
-    get_instrument_repository,
     get_delete_instrument_use_case,
     get_import_instrument_use_case,
     get_instrument_data_status_use_case,
     get_instrument_db_inventory_use_case,
     get_instrument_detail_use_case,
+    get_instrument_fundamentals_use_case,
     get_instrument_indicators_use_case,
     get_instrument_profile_use_case,
-    get_instrument_fundamentals_use_case,
     get_instrument_quotes_use_case,
     get_instrument_removal_preview_use_case,
+    get_instrument_repository,
     get_list_instruments_use_case,
     get_live_quote_use_case,
     get_live_quotes_use_case,
     get_ohlcv_bars_use_case,
     get_search_instruments_use_case,
-    get_sync_scheduler_repository,
     get_sync_instrument_use_case,
+    get_sync_scheduler_repository,
     get_validate_instrument_xtb_use_case,
 )
+from bolsa_api.schemas.composite_card import (
+    CompositeChipDto,
+    CompositeChipListResponseDto,
+    QueryInstrumentCompositeDto,
+)
 from bolsa_api.schemas.extra_mappers import to_live_quote_dto, to_sync_result_dto
+from bolsa_api.schemas.fundamental_card import (
+    FundamentalCardDto,
+    FundamentalCardResponseDto,
+    FundamentalChipDto,
+    FundamentalChipListResponseDto,
+    QueryInstrumentFundamentalsDto,
+)
 from bolsa_api.schemas.instrument_lifecycle import (
     InstrumentRemovalPreviewResponseDto,
 )
-from bolsa_api.schemas.lifecycle_mappers import to_removal_preview_dto
 from bolsa_api.schemas.instruments import (
     ExternalInstrumentSearchHitDto,
+    ImportInstrumentMetaDto,
     ImportInstrumentRequestDto,
     ImportInstrumentResponseDto,
-    ImportInstrumentMetaDto,
     IndicatorsResponseDto,
     InstrumentDataStatusResponseDto,
     InstrumentDbInventoryResponseDto,
@@ -52,28 +63,17 @@ from bolsa_api.schemas.instruments import (
     InstrumentXtbValidationResponseDto,
     OhlcvResponseDto,
 )
-from bolsa_api.schemas.fundamental_card import (
-    FundamentalCardDto,
-    FundamentalCardResponseDto,
-    FundamentalChipDto,
-    FundamentalChipListResponseDto,
-    QueryInstrumentFundamentalsDto,
-)
-from bolsa_api.schemas.composite_card import (
-    CompositeChipDto,
-    CompositeChipListResponseDto,
-    QueryInstrumentCompositeDto,
-)
-from bolsa_api.schemas.market import LiveQuoteEnvelopeDto, LiveQuoteListResponseDto, SyncResponseDto
+from bolsa_api.schemas.lifecycle_mappers import to_removal_preview_dto
 from bolsa_api.schemas.mappers import (
-    to_indicators_dto,
     to_data_status_dto,
     to_db_inventory_dto,
+    to_indicators_dto,
     to_instrument_detail_dto,
     to_instrument_dto,
     to_ohlcv_dto,
     to_xtb_validation_dto,
 )
+from bolsa_api.schemas.market import LiveQuoteEnvelopeDto, LiveQuoteListResponseDto, SyncResponseDto
 from bolsa_domain.value_objects.timeframe import TimeFrame
 
 router = APIRouter()
@@ -279,7 +279,10 @@ async def get_instrument(
     return to_instrument_detail_dto(detail)
 
 
-@router.get("/instruments/{instrument_id}/db-inventory", response_model=InstrumentDbInventoryResponseDto)
+@router.get(
+    "/instruments/{instrument_id}/db-inventory",
+    response_model=InstrumentDbInventoryResponseDto,
+)
 async def get_instrument_db_inventory(
     instrument_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -290,7 +293,10 @@ async def get_instrument_db_inventory(
     return InstrumentDbInventoryResponseDto(data=to_db_inventory_dto(inventory))
 
 
-@router.post("/instruments/{instrument_id}/validate-xtb", response_model=InstrumentXtbValidationResponseDto)
+@router.post(
+    "/instruments/{instrument_id}/validate-xtb",
+    response_model=InstrumentXtbValidationResponseDto,
+)
 async def validate_instrument_xtb(
     instrument_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -451,7 +457,10 @@ async def delete_instrument_filing(
     return {"ok": True}
 
 
-@router.get("/instruments/{instrument_id}/data-status", response_model=InstrumentDataStatusResponseDto)
+@router.get(
+    "/instruments/{instrument_id}/data-status",
+    response_model=InstrumentDataStatusResponseDto,
+)
 async def get_instrument_data_status(
     instrument_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],

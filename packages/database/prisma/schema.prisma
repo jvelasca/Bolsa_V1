@@ -97,6 +97,8 @@ model Instrument {
   dataSnapshots DataSnapshot[]
   positionPolicies PositionPolicy[]
   strategyTops InstrumentStrategyTop[]
+  mandateTenures MandateTenure[]
+  mandateTradeLinks MandateTradeLink[]
 
   @@unique([symbol, exchange])
   @@index([exchange])
@@ -829,6 +831,50 @@ model InstrumentStrategyTop {
   @@map("instrument_strategy_tops")
 }
 
+/// ADR-020 M1b — tenure de mandato operativo (TRADING).
+model MandateTenure {
+  id                     String    @id
+  accountId              String    @map("account_id")
+  instrumentId           String    @map("instrument_id")
+  timeframe              String?
+  strategyDefinitionId   String?   @map("strategy_definition_id")
+  strategyLabelSnapshot  String?   @map("strategy_label_snapshot")
+  effectiveFrom          DateTime  @map("effective_from")
+  effectiveTo            DateTime? @map("effective_to")
+  actor                  String
+  reason                 String
+  sourceTopId            String?   @map("source_top_id")
+  sourceTopVersion       Int?      @map("source_top_version")
+  evidenceLevel          String?   @map("evidence_level")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  account    InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instrument Instrument        @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  tradeLinks MandateTradeLink[]
+
+  @@index([accountId, instrumentId, effectiveFrom])
+  @@map("mandate_tenures")
+}
+
+/// ADR-020 M2/M1b — enlace fill DEMO → tenure.
+model MandateTradeLink {
+  transactionId    String   @id @map("transaction_id")
+  mandateTenureId  String   @map("mandate_tenure_id")
+  instrumentId     String   @map("instrument_id")
+  accountId        String   @map("account_id")
+  linkedAt         DateTime @map("linked_at")
+  engine           String   @default("mandate-trade-links-v1")
+
+  tenure     MandateTenure     @relation(fields: [mandateTenureId], references: [id], onDelete: Cascade)
+  account    InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  instrument Instrument        @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([mandateTenureId])
+  @@index([accountId, instrumentId])
+  @@map("mandate_trade_links")
+}
+
 model InstrumentList {
   id        String   @id @default(cuid())
   name      String
@@ -1030,6 +1076,9 @@ model InvestmentAccount {
   pendingOrders PendingOrder[]
   executionPolicies ExecutionPolicy[]
   positionPolicies  PositionPolicy[]
+  mandateTenures    MandateTenure[]
+  mandateTradeLinks MandateTradeLink[]
+  coreRState        CoreRAccountState?
 
   @@index([isDefault])
   @@index([userId])
@@ -1037,6 +1086,19 @@ model InvestmentAccount {
   @@index([strategyDefinitionId])
   @@index([activeProfileId])
   @@map("investment_accounts")
+}
+
+/// Q3.4 — CORE-R cola/informe/scheduler por cuenta (blob JSON; LS = cache).
+model CoreRAccountState {
+  accountId     String   @id @map("account_id")
+  queueJson     Json     @default("[]") @map("queue_json")
+  reportsJson   Json     @default("{}") @map("reports_json")
+  schedulerJson Json     @default("{}") @map("scheduler_json")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  account InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("core_r_account_state")
 }
 
 /// Cartera lógica dentro de una cuenta (enlazada a portfolios legacy para posiciones).

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
-from typing import Any, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 from bolsa_analytics.research.data_snapshot import build_data_snapshot_id, compute_data_version
 from bolsa_analytics.research.manifest import BarFingerprint
@@ -115,7 +116,7 @@ def build_scan_manifest(
         "hitCount": hit_count,
         "engine": {"name": SCAN_ENGINE_NAME, "version": SCAN_ENGINE_VERSION},
         "dataSnapshots": list(instrument_snapshots),
-        "createdAt": datetime.now(timezone.utc).isoformat(),
+        "createdAt": datetime.now(UTC).isoformat(),
     }
     if tracker_definition_id:
         manifest["trackerDefinitionId"] = tracker_definition_id
