@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 
 import pytest
+from bolsa_ai import reset_default_proxy
 from httpx import ASGITransport, AsyncClient
 
-from bolsa_ai import reset_default_proxy
 from bolsa_api.main import create_app, lifespan
 
 

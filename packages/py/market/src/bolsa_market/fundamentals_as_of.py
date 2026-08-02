@@ -144,7 +144,6 @@ def _modules_from_pack(
     modules["cashflowStatementHistory"] = {"cashflowStatements": cfs}
 
     bal = bals[0] if bals else None
-    bal_prev = bals[1] if len(bals) > 1 else None
     inc = incs[0] if incs else None
     inc_prev = incs[1] if len(incs) > 1 else None
     cf = cfs[0] if cfs else None

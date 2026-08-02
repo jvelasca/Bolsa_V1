@@ -1,9 +1,25 @@
 from typing import Annotated, Any
 
+from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_application.backtests import (
+    GetBacktestRun,
+    ListBacktestRuns,
+    PruneBacktestRuns,
+    RunAndSaveBacktest,
+)
+from bolsa_application.optimization_runs import (
+    EnqueueOptimizationRun,
+    GetOptimizationRun,
+    ListOptimizationRuns,
+    RunSmaGridOptimizeAndSave,
+)
+from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
+from bolsa_infrastructure.database.repositories.optimization_run_repository import (
+    OptimizationRunRecord,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
 from bolsa_api.api.dependencies import (
     get_backtest_run_use_case,
     get_db_session,
@@ -18,7 +34,6 @@ from bolsa_api.api.dependencies import (
 )
 from bolsa_api.schemas.account_mappers import to_investment_account_dto
 from bolsa_api.schemas.accounts import AccountResponseDto
-from bolsa_api.schemas.paper_bridge import DeployPaperAccountRequestDto
 from bolsa_api.schemas.backtests import (
     BacktestDetailResponseDto,
     BacktestListResponseDto,
@@ -37,20 +52,7 @@ from bolsa_api.schemas.extra_mappers import (
     to_backtest_run_dto,
     to_optimize_sma_grid_dto,
 )
-from bolsa_application.backtests import (
-    GetBacktestRun,
-    ListBacktestRuns,
-    PruneBacktestRuns,
-    RunAndSaveBacktest,
-)
-from bolsa_application.optimization_runs import (
-    EnqueueOptimizationRun,
-    GetOptimizationRun,
-    ListOptimizationRuns,
-    RunSmaGridOptimizeAndSave,
-)
-from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
-from bolsa_infrastructure.database.repositories.optimization_run_repository import OptimizationRunRecord
+from bolsa_api.schemas.paper_bridge import DeployPaperAccountRequestDto
 
 router = APIRouter()
 

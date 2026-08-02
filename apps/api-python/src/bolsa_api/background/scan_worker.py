@@ -5,11 +5,11 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import get_process_scan_job_use_case
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +24,13 @@ async def scan_worker_loop(session_factory: async_sessionmaker[AsyncSession]) ->
     if use_redis:
         redis_queue = ScanJobRedisQueue(settings.redis_url)
         if not await redis_queue.ping():
-            logger.warning("SCAN_QUEUE_BACKEND=redis pero Redis no responde — fallback postgres poll")
+            logger.warning(
+                "SCAN_QUEUE_BACKEND=redis pero Redis no responde — fallback postgres poll",
+            )
             use_redis = False
 
-    logger.info("Worker scan jobs (RD-2) iniciado — backend=%s", "redis" if use_redis else "postgres")
+    backend = "redis" if use_redis else "postgres"
+    logger.info("Worker scan jobs (RD-2) iniciado — backend=%s", backend)
     try:
         while True:
             try:

@@ -48,8 +48,14 @@ class CreateInvestorProfileDto(BaseModel):
     experience: str
     max_acceptable_loss_pct: float | None = Field(default=None, alias="maxAcceptableLossPct")
     notes: str | None = None
-    suggested_policy_template_id: str | None = Field(default=None, alias="suggestedPolicyTemplateId")
-    selected_policy_template_id: str | None = Field(default=None, alias="selectedPolicyTemplateId")
+    suggested_policy_template_id: str | None = Field(
+        default=None,
+        alias="suggestedPolicyTemplateId",
+    )
+    selected_policy_template_id: str | None = Field(
+        default=None,
+        alias="selectedPolicyTemplateId",
+    )
 
 
 class UpdateInvestorProfileDto(BaseModel):
@@ -62,8 +68,14 @@ class UpdateInvestorProfileDto(BaseModel):
     experience: str | None = None
     max_acceptable_loss_pct: float | None = Field(default=None, alias="maxAcceptableLossPct")
     notes: str | None = None
-    suggested_policy_template_id: str | None = Field(default=None, alias="suggestedPolicyTemplateId")
-    selected_policy_template_id: str | None = Field(default=None, alias="selectedPolicyTemplateId")
+    suggested_policy_template_id: str | None = Field(
+        default=None,
+        alias="suggestedPolicyTemplateId",
+    )
+    selected_policy_template_id: str | None = Field(
+        default=None,
+        alias="selectedPolicyTemplateId",
+    )
 
 
 class AssignProfileDto(BaseModel):

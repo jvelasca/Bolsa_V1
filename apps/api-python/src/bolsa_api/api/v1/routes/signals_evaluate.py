@@ -1,6 +1,6 @@
+from bolsa_analytics.signals.strategy import StrategyBarInput, evaluate_strategy
 from fastapi import APIRouter, HTTPException
 
-from bolsa_analytics.signals.strategy import StrategyBarInput, evaluate_strategy
 from bolsa_api.schemas.signals_evaluate import (
     EvaluateSignalsRequestDto,
     EvaluateSignalsResponseDto,

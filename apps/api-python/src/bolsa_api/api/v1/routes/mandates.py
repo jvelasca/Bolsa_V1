@@ -5,6 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
+from bolsa_infrastructure.database.repositories.mandate_repository import (
+    MandateTenureRecord,
+    MandateTradeLinkRecord,
+    SqlAlchemyMandateRepository,
+)
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,11 +20,6 @@ from bolsa_api.schemas.mandates import (
     MandateTenureDto,
     MandateTradeLinkDto,
     SyncMandateBundleDto,
-)
-from bolsa_infrastructure.database.repositories.mandate_repository import (
-    MandateTenureRecord,
-    MandateTradeLinkRecord,
-    SqlAlchemyMandateRepository,
 )
 
 router = APIRouter()
@@ -75,7 +75,7 @@ async def get_account_mandates(
     return MandateBundleResponseDto(
         data=MandateBundleDto(
             tenures=[_tenure_dto(t) for t in tenures],
-            links=[_link_dto(l) for l in links],
+            links=[_link_dto(link) for link in links],
         )
     )
 
@@ -94,11 +94,11 @@ async def sync_account_mandates(
     tenures, links = await repo.sync_account(
         account_id,
         [t.model_dump(by_alias=True) for t in body.tenures],
-        [l.model_dump(by_alias=True) for l in body.links],
+        [link.model_dump(by_alias=True) for link in body.links],
     )
     return MandateBundleResponseDto(
         data=MandateBundleDto(
             tenures=[_tenure_dto(t) for t in tenures],
-            links=[_link_dto(l) for l in links],
+            links=[_link_dto(link) for link in links],
         )
     )

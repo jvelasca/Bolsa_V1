@@ -408,15 +408,12 @@ class YahooFinanceClient:
         return payload
 
     async def fetch_dividend_history(self, yahoo_symbol: str, *, years: int = 5) -> list[dict]:
-        import time
-
         normalized = yahoo_symbol.strip()
         if not normalized:
             return []
 
         client = await self._get_client()
         await self._ensure_crumb(client)
-        now = int(time.time())
         params: dict[str, str | int] = {
             "range": f"{years}y",
             "interval": "1d",

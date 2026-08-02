@@ -5,8 +5,6 @@ from __future__ import annotations
 from functools import lru_cache
 
 from bolsa_analytics.signals.feature_cache import (
-    DEFAULT_CACHE_MAX_ENTRIES,
-    DEFAULT_CACHE_TTL_SECONDS,
     FeatureCache,
     InMemoryFeatureCache,
     set_global_feature_cache,

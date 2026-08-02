@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -44,8 +43,6 @@ async def test_subscribe_reports_join_and_leave_without_deleting_instruments() -
     # Estado previo: todos excepto el primero + un huérfano que ya no es constitutivos
     old_ids = [id_by_yahoo[y] for _, y, _ in IBEX35_CURATED[1:]] + [orphan_id]
     first_yahoo = IBEX35_CURATED[0][1]
-
-    present = set(id_by_yahoo.values())  # todos existen en BD tras "import"
 
     instrument_repo = MagicMock()
     instrument_repo.get_by_yahoo_symbol = AsyncMock(

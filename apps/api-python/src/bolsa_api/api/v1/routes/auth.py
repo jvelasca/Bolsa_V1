@@ -1,8 +1,8 @@
+from bolsa_infrastructure.config import get_settings
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from bolsa_api.auth.tokens import create_access_token
-from bolsa_infrastructure.config import get_settings
 
 router = APIRouter()
 

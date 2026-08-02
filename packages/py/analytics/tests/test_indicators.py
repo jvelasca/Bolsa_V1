@@ -1,4 +1,3 @@
-import pytest
 
 from bolsa_analytics.indicators import build_indicator_series, latest_indicator_signals, rsi, sma
 

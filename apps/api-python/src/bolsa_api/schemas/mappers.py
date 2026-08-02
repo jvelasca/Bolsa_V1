@@ -3,20 +3,25 @@ from bolsa_application.get_instrument_data_status import InstrumentDataStatus
 from bolsa_application.get_instrument_detail import InstrumentDetail
 from bolsa_domain.entities.instrument import Instrument
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
-from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta, SyncLogDetail, SyncLogSnapshot
+from bolsa_domain.repositories.instrument_repository import (
+    InstrumentWithMeta,
+    SyncLogDetail,
+)
 from bolsa_domain.value_objects.price_summary import PriceSummary
+
 from bolsa_api.schemas.instruments import (
     IndicatorPointDto,
     IndicatorSignalsDto,
     IndicatorsMetaDto,
     IndicatorsResponseDto,
     InstrumentDataStatusDto,
-    InstrumentDataStatusResponseDto,
+    InstrumentDbInventoryDto,
     InstrumentDetailMetaDto,
     InstrumentDetailResponseDto,
     InstrumentDto,
     InstrumentListMetaDto,
     InstrumentWithMetaDto,
+    InstrumentXtbValidationDto,
     OhlcvBarDto,
     OhlcvMetaDto,
     OhlcvResponseDto,
@@ -168,10 +173,9 @@ def to_data_status_dto(status: InstrumentDataStatus) -> InstrumentDataStatusDto:
     )
 
 
-def to_db_inventory_dto(inventory) -> "InstrumentDbInventoryDto":
+def to_db_inventory_dto(inventory) -> InstrumentDbInventoryDto:
     from bolsa_api.schemas.instruments import (
         InstrumentAppDataCountsDto,
-        InstrumentDbInventoryDto,
         InstrumentOhlcvLayerDto,
         InstrumentRecordDto,
         InstrumentSyncLogEntryDto,
@@ -228,9 +232,7 @@ def to_db_inventory_dto(inventory) -> "InstrumentDbInventoryDto":
     )
 
 
-def to_xtb_validation_dto(validation) -> "InstrumentXtbValidationDto":
-    from bolsa_api.schemas.instruments import InstrumentXtbValidationDto
-
+def to_xtb_validation_dto(validation) -> InstrumentXtbValidationDto:
     return InstrumentXtbValidationDto(
         available=validation.available,
         message=validation.message,

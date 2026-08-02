@@ -10,7 +10,7 @@ beta, ADV (null si incompletos). Filings no forman parte del card numérico.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any
 
 from bolsa_analytics.knowledge.as_of_cut import (
     LOOKAHEAD_BLOCKED_WARNING,

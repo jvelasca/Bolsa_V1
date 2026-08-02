@@ -5,6 +5,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
+from bolsa_application.instrument_strategy_tops import (
+    DeleteInstrumentStrategyTop,
+    GetInstrumentStrategyTop,
+    UpsertInstrumentStrategyTop,
+)
+from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
+    InstrumentStrategyTopRecord,
+    SqlAlchemyInstrumentStrategyTopRepository,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,15 +25,6 @@ from bolsa_api.schemas.instrument_strategy_tops import (
     InstrumentStrategyTopSlotDto,
     QueryInstrumentStrategyTopsDto,
     UpsertInstrumentStrategyTopDto,
-)
-from bolsa_application.instrument_strategy_tops import (
-    DeleteInstrumentStrategyTop,
-    GetInstrumentStrategyTop,
-    UpsertInstrumentStrategyTop,
-)
-from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
-    InstrumentStrategyTopRecord,
-    SqlAlchemyInstrumentStrategyTopRepository,
 )
 
 router = APIRouter()

@@ -1,9 +1,20 @@
 from typing import Annotated
 
+from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_application.signal_alerts import (
+    CreateSignalAlertSubscription,
+    DeleteSignalAlertSubscription,
+    EvaluateSignalAlertSubscriptions,
+    ListSignalAlertSubscriptions,
+    ResetSignalAlertDedupe,
+)
+from bolsa_infrastructure.alerts.alert_channels import AlertChannelDispatchResult
+from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+    SignalAlertSubscriptionRecord,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
 from bolsa_api.api.dependencies import (
     get_create_signal_alert_use_case,
     get_db_session,
@@ -22,15 +33,6 @@ from bolsa_api.schemas.signal_alerts import (
     TriggeredSignalAlertDto,
 )
 from bolsa_api.schemas.signals_evaluate import SignalEventV1Dto
-from bolsa_application.signal_alerts import (
-    CreateSignalAlertSubscription,
-    DeleteSignalAlertSubscription,
-    EvaluateSignalAlertSubscriptions,
-    ListSignalAlertSubscriptions,
-    ResetSignalAlertDedupe,
-)
-from bolsa_infrastructure.alerts.alert_channels import AlertChannelDispatchResult
-from bolsa_infrastructure.database.repositories.signal_alert_repository import SignalAlertSubscriptionRecord
 
 router = APIRouter()
 
@@ -138,7 +140,10 @@ async def delete_signal_alert(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/signal-alerts/{subscription_id}/reset-dedupe", response_model=SignalAlertSubscriptionResponseDto)
+@router.post(
+    "/signal-alerts/{subscription_id}/reset-dedupe",
+    response_model=SignalAlertSubscriptionResponseDto,
+)
 async def reset_signal_alert_dedupe(
     subscription_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],

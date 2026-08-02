@@ -88,7 +88,6 @@ def _reload_enabled() -> bool:
 
 def main() -> None:
     import uvicorn
-
     from bolsa_infrastructure.config import get_settings
 
     _configure_event_loop()

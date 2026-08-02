@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
+from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +17,6 @@ from bolsa_api.schemas.pending_orders import (
     PendingOrderDto,
     PendingOrdersResponseDto,
 )
-from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 
 router = APIRouter()
 
@@ -50,7 +50,11 @@ async def create_pending_order(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: Annotated[str | None, Depends(get_account_id_header)],
 ) -> PendingOrdersResponseDto:
-    expiry = datetime.fromisoformat(body.expiry_at.replace("Z", "+00:00")) if body.expiry_at else None
+    expiry = (
+        datetime.fromisoformat(body.expiry_at.replace("Z", "+00:00"))
+        if body.expiry_at
+        else None
+    )
     created = await get_create_pending_order_use_case(session).execute(
         instrument_id=body.instrument_id,
         symbol=body.symbol,

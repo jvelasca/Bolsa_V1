@@ -1,6 +1,7 @@
-from typing import Annotated
 from datetime import datetime
+from typing import Annotated
 
+from bolsa_application.investor_profiles import EnsureDefaultInvestorProfile
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +23,6 @@ from bolsa_api.api.dependencies import (
     get_update_account_use_case,
     get_withdraw_cash_use_case,
 )
-from bolsa_application.investor_profiles import EnsureDefaultInvestorProfile
 from bolsa_api.schemas.account_mappers import (
     settings_dto_to_domain,
     to_account_summary_dto,
@@ -33,9 +33,9 @@ from bolsa_api.schemas.account_mappers import (
 )
 from bolsa_api.schemas.accounts import (
     AccountResponseDto,
+    AccountsResponseDto,
     AccountSummariesResponseDto,
     AccountSummaryResponseDto,
-    AccountsResponseDto,
     CashMovementResponseDto,
     CreateInvestmentAccountDto,
     DepositCashDto,
@@ -218,7 +218,11 @@ async def get_account_summary(
     return AccountSummaryResponseDto(data=to_account_summary_dto(summary))
 
 
-@router.post("/accounts/{account_id}/deposits", response_model=CashMovementResponseDto, status_code=201)
+@router.post(
+    "/accounts/{account_id}/deposits",
+    response_model=CashMovementResponseDto,
+    status_code=201,
+)
 async def deposit_cash(
     account_id: str,
     body: DepositCashDto,

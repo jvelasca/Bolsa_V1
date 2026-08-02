@@ -11,7 +11,6 @@ from bolsa_market.indices import (
     expand_index_query_aliases,
     index_constituents_ready,
 )
-from bolsa_market.indices.curated_ibex35 import IBEX35_CURATED
 
 
 def test_catalog_list_id_stable() -> None:

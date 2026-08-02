@@ -6,7 +6,7 @@ import hashlib
 import json
 import sys
 from datetime import datetime, timezone
-from typing import Any, Literal
+from typing import Any
 
 from bolsa_analytics.research.data_snapshot import (
     BarFingerprint,

@@ -10,7 +10,6 @@ from bolsa_analytics.research.scan_manifest import (
 from bolsa_analytics.signals.fundamental_gate import (
     definition_has_fundamental_gate,
     fundamental_gate_max_age_days,
-    fundamentals_need_refresh,
     passes_fundamental_gate,
 )
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter

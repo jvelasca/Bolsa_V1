@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+from bolsa_application.sync_scheduler import is_post_market_window
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import (
@@ -13,7 +14,6 @@ from bolsa_api.api.dependencies import (
     get_process_sync_queue_use_case,
     get_sync_scheduler_repository,
 )
-from bolsa_application.sync_scheduler import is_post_market_window
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,11 @@ async def _run_scan(session_factory: async_sessionmaker[AsyncSession]) -> int:
             result = await get_enqueue_stale_use_case(session).execute()
             await session.commit()
             if result.enqueued:
-                logger.info("Auto-sync: %s instrumentos encolados (escaneados %s)", result.enqueued, result.scanned)
+                logger.info(
+                    "Auto-sync: %s instrumentos encolados (escaneados %s)",
+                    result.enqueued,
+                    result.scanned,
+                )
             return result.enqueued
         except Exception:
             await session.rollback()
@@ -72,15 +76,21 @@ async def auto_sync_worker_loop(session_factory: async_sessionmaker[AsyncSession
             if settings.post_market_only and not is_post_market_window():
                 continue
 
-            now = datetime.now(timezone.utc)
-            if _last_scan_at is None or (now - _last_scan_at).total_seconds() >= settings.scan_interval_minutes * 60:
+            now = datetime.now(UTC)
+            scan_due = (
+                _last_scan_at is None
+                or (now - _last_scan_at).total_seconds()
+                >= settings.scan_interval_minutes * 60
+            )
+            if scan_due:
                 await _run_scan(session_factory)
                 _last_scan_at = now
 
             processed = await _run_queue_item(session_factory)
             if processed:
                 async with session_factory() as session:
-                    delay = (await get_sync_scheduler_repository(session).get_settings()).min_delay_seconds
+                    settings = await get_sync_scheduler_repository(session).get_settings()
+                    delay = settings.min_delay_seconds
                 await asyncio.sleep(delay)
         except Exception:
             logger.exception("Error en worker auto-sync")

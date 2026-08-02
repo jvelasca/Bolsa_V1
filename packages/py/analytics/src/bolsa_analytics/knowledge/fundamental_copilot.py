@@ -72,6 +72,7 @@ def build_fundamental_copilot_variables(card: dict[str, Any]) -> dict[str, str]:
 def heuristic_fundamental_explanation(card: dict[str, Any]) -> dict[str, Any]:
     """Fallback sin Ollama: prosa desde facts/warnings ya calculados."""
     vars_ = build_fundamental_copilot_variables(card)
+    derived = card.get("derived") if isinstance(card.get("derived"), dict) else {}
     conf = vars_["confidence"]
     p1_bits: list[str] = []
     if conf == "LOW":
@@ -90,7 +91,8 @@ def heuristic_fundamental_explanation(card: dict[str, Any]) -> dict[str, Any]:
         p1_bits.append(f"FCF Yield {vars_['fcfYield']}.")
     if vars_["dcfUpside"] != "—":
         wacc_bit = f" WACC {vars_['wacc']}" if vars_["wacc"] != "—" else ""
-        scen = derived.get("dcfScenarios") if isinstance(derived.get("dcfScenarios"), dict) else None
+        dcf_scenarios = derived.get("dcfScenarios")
+        scen = dcf_scenarios if isinstance(dcf_scenarios, dict) else None
         scen_bit = ""
         if scen and isinstance(scen.get("bear"), dict) and isinstance(scen.get("bull"), dict):
             bear_u = _fmt(scen["bear"].get("upside"), pct=True, digits=1)

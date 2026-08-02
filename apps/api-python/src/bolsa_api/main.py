@@ -11,36 +11,34 @@ Responsabilidades:
 
 Ver docs/API_REFERENCE.md y docs/ONBOARDING.md.
 """
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
+from bolsa_infrastructure.database.session import (
+    create_engine,
+    create_session_factory,
+)
+from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import AsyncEngine
 
 from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
 from bolsa_api.api.v1.router import api_v1_router
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
+from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
+from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluator
+from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
+from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
 from bolsa_api.background.optimization_worker import start_optimization_worker
 from bolsa_api.background.scan_worker import start_scan_worker
-from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
-from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluator
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
-from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
-from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
+from bolsa_api.logging_redact import install_log_redact
 from bolsa_api.middleware.auth import AuthMiddleware
 from bolsa_api.middleware.rate_limit import RateLimitMiddleware
-from bolsa_api.logging_redact import install_log_redact
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
-from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
-from bolsa_infrastructure.database.session import (
-    check_database,
-    create_engine,
-    create_session_factory,
-)
 
 
 @asynccontextmanager
@@ -141,7 +139,8 @@ def _warn_if_routes_missing(app: FastAPI) -> None:
         import logging
 
         logging.getLogger("uvicorn.error").warning(
-            "Rutas /api/alerts no registradas — reinicia la API (detén depuraciones duplicadas en :8000)",
+            "Rutas /api/alerts no registradas — reinicia la API "
+            "(detén depuraciones duplicadas en :8000)",
         )
 
 

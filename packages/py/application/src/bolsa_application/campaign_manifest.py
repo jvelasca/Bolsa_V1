@@ -48,7 +48,6 @@ class CampaignManifestV0:
 
     def to_manifest_ref(self) -> dict[str, Any]:
         """Compacto para research_trials.manifest_ref."""
-        d = self.to_dict()
         return {
             "schemaVersion": self.schema_version,
             "campaign": self.campaign_id,

@@ -1,5 +1,44 @@
 from typing import Annotated, Literal
 
+from bolsa_application.belief_engine import GetHypothesisBelief, ListBeliefHistory
+from bolsa_application.hypotheses import (
+    CreateHypothesis,
+    GetHypothesis,
+    LinkTrialToHypothesis,
+    ListHypotheses,
+    UpdateHypothesis,
+)
+from bolsa_application.knowledge_consolidation import (
+    ConsolidateHypothesis,
+    DeprecateKnowledgeNode,
+    EvaluateConsolidation,
+    GetKnowledgeNode,
+    ListKnowledgeNodes,
+)
+from bolsa_application.mkl_sync import ListMklSyncEvents, SyncKnowledgeToMkl
+from bolsa_application.research_evidence import (
+    GetResearchEvidence,
+    ListResearchEvidence,
+    emit_evidence_for_dia_d_session,
+)
+from bolsa_application.research_tree import (
+    CreateResearchTreeEdge,
+    ListResearchTreeEdges,
+    SoftDeleteResearchTreeEdge,
+)
+from bolsa_application.research_trials import (
+    GetInstrumentResearchSummary,
+    GetLabHealth,
+    GetLaboratoryResearchSummary,
+    GetResearchTrial,
+    ListResearchTrials,
+)
+from bolsa_domain.entities.hypothesis import Hypothesis
+from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
+from bolsa_domain.entities.research_evidence import ResearchEvidence
+from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
+from bolsa_domain.entities.research_trial import ResearchTrial
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,13 +59,14 @@ from bolsa_api.schemas.research import (
     ConsolidationRequestDto,
     ConsolidationResultDto,
     ConsolidationResultResponseDto,
+    DiaDSessionEvidencePersistRequestDto,
     EvidenceLevelParam,
+    HypothesesListResponseDto,
     HypothesisBeliefDto,
     HypothesisBeliefResponseDto,
     HypothesisCreateRequestDto,
     HypothesisDetailResponseDto,
     HypothesisDto,
-    HypothesesListResponseDto,
     HypothesisKindParam,
     HypothesisStatusParam,
     HypothesisUpdateRequestDto,
@@ -36,73 +76,33 @@ from bolsa_api.schemas.research import (
     KnowledgeNodeDto,
     KnowledgeNodesListResponseDto,
     KnowledgeStageParam,
+    LabByInstrumentDto,
+    LabByOriginDto,
+    LabByPresetDto,
+    LabHealthCampaignDto,
+    LabHealthDto,
+    LabHealthMetricCoverageDto,
+    LabHealthResponseDto,
+    LaboratoryResearchSummaryDto,
+    LaboratoryResearchSummaryResponseDto,
+    LinkTrialHypothesisRequestDto,
     MklSyncEventDto,
     MklSyncEventsListResponseDto,
     MklSyncRequestDto,
     MklSyncResultDto,
     MklSyncResultResponseDto,
+    ResearchEvidenceDetailResponseDto,
+    ResearchEvidenceDto,
+    ResearchEvidenceListResponseDto,
     ResearchTreeEdgeCreateRequestDto,
     ResearchTreeEdgeDetailResponseDto,
     ResearchTreeEdgeDto,
     ResearchTreeEdgesListResponseDto,
-    LaboratoryResearchSummaryDto,
-    LaboratoryResearchSummaryResponseDto,
-    LabHealthCampaignDto,
-    LabHealthDto,
-    LabHealthMetricCoverageDto,
-    LabHealthResponseDto,
-    LabByInstrumentDto,
-    LabByOriginDto,
-    LabByPresetDto,
-    LinkTrialHypothesisRequestDto,
-    ResearchEvidenceDetailResponseDto,
-    ResearchEvidenceDto,
-    ResearchEvidenceListResponseDto,
-    DiaDSessionEvidencePersistRequestDto,
     ResearchTrialDetailResponseDto,
     ResearchTrialDto,
-    ResearchTrialSortParam,
     ResearchTrialsListResponseDto,
+    ResearchTrialSortParam,
 )
-from bolsa_application.belief_engine import GetHypothesisBelief, ListBeliefHistory
-from bolsa_application.hypotheses import (
-    CreateHypothesis,
-    GetHypothesis,
-    LinkTrialToHypothesis,
-    ListHypotheses,
-    UpdateHypothesis,
-)
-from bolsa_application.knowledge_consolidation import (
-    ConsolidateHypothesis,
-    DeprecateKnowledgeNode,
-    EvaluateConsolidation,
-    GetKnowledgeNode,
-    ListKnowledgeNodes,
-)
-from bolsa_application.mkl_sync import ListMklSyncEvents, SyncKnowledgeToMkl
-from bolsa_application.research_tree import (
-    CreateResearchTreeEdge,
-    ListResearchTreeEdges,
-    SoftDeleteResearchTreeEdge,
-)
-from bolsa_application.research_evidence import (
-    GetResearchEvidence,
-    ListResearchEvidence,
-    emit_evidence_for_dia_d_session,
-)
-from bolsa_application.research_trials import (
-    GetInstrumentResearchSummary,
-    GetLabHealth,
-    GetLaboratoryResearchSummary,
-    GetResearchTrial,
-    ListResearchTrials,
-)
-from bolsa_domain.entities.hypothesis import Hypothesis
-from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
-from bolsa_domain.entities.research_evidence import ResearchEvidence
-from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
-from bolsa_domain.entities.research_trial import ResearchTrial
 
 router = APIRouter()
 
@@ -311,7 +311,10 @@ async def get_research_trial(
     return ResearchTrialDetailResponseDto(data=_to_trial_dto(trial))
 
 
-@router.patch("/research/trials/{trial_id}/hypothesis", response_model=ResearchTrialDetailResponseDto)
+@router.patch(
+    "/research/trials/{trial_id}/hypothesis",
+    response_model=ResearchTrialDetailResponseDto,
+)
 async def link_trial_hypothesis(
     trial_id: str,
     body: LinkTrialHypothesisRequestDto,

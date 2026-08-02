@@ -16,7 +16,6 @@ def test_model_artifact_to_record():
 def test_prediction_to_record():
     from datetime import datetime, timezone
 
-    bars = []
     # Minimal via service heuristic needs bars — build Prediction manually
     from bolsa_analytics.prediction.models import Prediction
 

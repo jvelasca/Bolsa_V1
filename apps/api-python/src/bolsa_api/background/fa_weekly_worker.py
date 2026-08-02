@@ -5,15 +5,15 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from bolsa_analytics.signals.fundamental_screener import week_key_utc
-from bolsa_api.api.dependencies import get_run_fa_weekly_pipeline_use_case
 from bolsa_application.fa_weekly_pipeline import (
     build_cron_payload_from_settings,
     is_fa_weekly_window,
 )
 from bolsa_infrastructure.config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from bolsa_api.api.dependencies import get_run_fa_weekly_pipeline_use_case
 
 logger = logging.getLogger(__name__)
 

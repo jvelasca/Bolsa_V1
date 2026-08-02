@@ -1,5 +1,16 @@
 from typing import Annotated
 
+from bolsa_application.tracker_schedule import ProcessTrackerSchedules
+from bolsa_application.trackers import (
+    CreateTrackerDefinition,
+    DeleteTrackerDefinition,
+    EnqueueTrackerScanJob,
+    GetTrackerDefinition,
+    ListTrackerDefinitions,
+    RunTrackerScan,
+    UpdateTrackerDefinition,
+)
+from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,17 +37,6 @@ from bolsa_api.schemas.trackers import (
     TrackerScheduleRunResultDto,
     UpdateTrackerDefinitionRequestDto,
 )
-from bolsa_application.trackers import (
-    CreateTrackerDefinition,
-    DeleteTrackerDefinition,
-    EnqueueTrackerScanJob,
-    GetTrackerDefinition,
-    ListTrackerDefinitions,
-    RunTrackerScan,
-    UpdateTrackerDefinition,
-)
-from bolsa_application.tracker_schedule import ProcessTrackerSchedules
-from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 
 router = APIRouter()
 
@@ -148,7 +148,9 @@ async def update_tracker(
 ) -> TrackerDefinitionResponseDto:
     use_case: UpdateTrackerDefinition = get_update_tracker_use_case(session)
     universe = (
-        body.universe.model_dump(by_alias=True, exclude_none=True) if body.universe is not None else None
+        body.universe.model_dump(by_alias=True, exclude_none=True)
+        if body.universe is not None
+        else None
     )
     try:
         record = await use_case.execute(

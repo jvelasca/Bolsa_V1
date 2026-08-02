@@ -1,7 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from bolsa_api.schemas.accounts import AccountResponseDto
-
 
 class DeployPaperAccountRequestDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

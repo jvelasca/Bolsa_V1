@@ -23,7 +23,10 @@ async def test_lists_crud_flow() -> None:
 
             create_response = await client.post(
                 "/api/lists",
-                json={"name": "Test lista", "instrumentIds": [quotes_response.json()["data"][0]["id"]]},
+                json={
+                    "name": "Test lista",
+                    "instrumentIds": [quotes_response.json()["data"][0]["id"]],
+                },
             )
             assert create_response.status_code == 201
             created_id = create_response.json()["data"]["id"]

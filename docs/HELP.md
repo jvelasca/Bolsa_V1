@@ -100,7 +100,7 @@ Informe lateral: retorno/DD/ops del **gate** (+ referencia Auto) y bloque **Evid
 
 Tras Lab → **Guardar Finalistas**, el resumen Hold-out / WF / CPCV (mismo vocabulario que el checklist) queda en `coachFacts.labEvidence` y se muestra en Finalistas y en el rail Coach. No es campaña multi-ventana ledger (eso sigue en Observatory / protocolo Q1.3).
 
-## CORE-R / Monitor Finalistas (usuario · v1.8)
+## CORE-R / Monitor Finalistas (usuario · v1.12)
 
 Guía en Ayuda → Backtesting (`BACKTESTING_CORE_R_GUIDE`). Detalle: [list-auto-ops § CORE-R](./engineering/list-auto-ops-2026-07-29.md).
 
@@ -110,10 +110,10 @@ Guía en Ayuda → Backtesting (`BACKTESTING_CORE_R_GUIDE`). Detalle: [list-auto
 | 2 | **Encolar revisiones** (informe Lista AUTO + PnL DEMO ≤ −5%/−10%) |
 | 3 | Deep-links Lab / Finalistas / Checklist → **Hecho** |
 | 4 | Opcional: **Narrar cola** · **Auto-sync app abierta** (cron shell) |
-| 5 | Chip **CORE-R N** · toast con **Abrir Monitor** si el cron encola |
+| 5 | Chip **CORE-R N** · toast «Abrir Monitor» (shell o cron servidor / otro device) |
 | 6 | **Hecho todos** cierra las abiertas de la lista actual |
 
-No pisa TOP · no auto-paper D · cola en este navegador (localStorage).
+No pisa TOP · no auto-paper D. Cola: localStorage = cache; BD = SoT multi-dispositivo. Cron servidor opcional: `CORE_R_CRON_ENABLED`.
 
 ## Lista AUTO frescura (v1.3)
 

@@ -1,10 +1,21 @@
 from typing import Annotated, Any
 
+from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
+from bolsa_application.strategies import (
+    CreateStrategyDefinition,
+    CreateStrategyFromPreset,
+    DeleteStrategyDefinition,
+    GetStrategyDefinition,
+    ListStrategyDefinitions,
+    UpdateStrategyDefinition,
+)
+from bolsa_application.strategy_draft import DraftStrategyFromPrompt
+from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
 from bolsa_api.api.dependencies import (
     get_create_strategy_from_preset_use_case,
     get_create_strategy_use_case,
@@ -31,17 +42,6 @@ from bolsa_api.schemas.strategies import (
     UpdateStrategyDefinitionRequestDto,
     UpsertStrategyDefinitionRequestDto,
 )
-from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
-from bolsa_application.strategy_draft import DraftStrategyFromPrompt
-from bolsa_application.strategies import (
-    CreateStrategyDefinition,
-    CreateStrategyFromPreset,
-    DeleteStrategyDefinition,
-    GetStrategyDefinition,
-    ListStrategyDefinitions,
-    UpdateStrategyDefinition,
-)
-from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
 
 router = APIRouter()
 
@@ -97,7 +97,11 @@ async def get_strategy(
     return StrategyDefinitionResponseDto(data=_detail(record))
 
 
-@router.post("/strategies/from-preset", response_model=StrategyDefinitionResponseDto, status_code=201)
+@router.post(
+    "/strategies/from-preset",
+    response_model=StrategyDefinitionResponseDto,
+    status_code=201,
+)
 async def create_strategy_from_preset(
     body: CreateStrategyFromPresetRequestDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -182,13 +186,20 @@ async def delete_strategy(
     except IntegrityError as exc:
         raise HTTPException(
             status_code=409,
-            detail="No se puede eliminar la estrategia porque sigue referenciada en la base de datos.",
+            detail=(
+                "No se puede eliminar la estrategia porque sigue "
+                "referenciada en la base de datos."
+            ),
         ) from exc
     if not deleted:
         raise HTTPException(status_code=404, detail="Strategy not found")
 
 
-@router.post("/strategies/{strategy_id}/paper-account", response_model=AccountResponseDto, status_code=201)
+@router.post(
+    "/strategies/{strategy_id}/paper-account",
+    response_model=AccountResponseDto,
+    status_code=201,
+)
 async def deploy_strategy_paper_account(
     strategy_id: str,
     body: DeployPaperAccountRequestDto,

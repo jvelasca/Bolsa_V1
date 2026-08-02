@@ -6,15 +6,15 @@ import logging
 from typing import Any
 
 from arq.worker import Worker
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
+from bolsa_infrastructure.queue.scan_job_arq import redis_settings_from_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import (
     get_process_optimization_run_use_case,
     get_process_scan_job_use_case,
 )
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.session import create_engine, create_session_factory
-from bolsa_infrastructure.queue.scan_job_arq import redis_settings_from_url
 
 logger = logging.getLogger(__name__)
 

@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from bolsa_application.instrument_lifecycle import InstrumentRemovalPreview
+from bolsa_application.remove_list_instrument import (
+    ListOrphanInstrumentsResult,
+    RemoveFromListResult,
+)
+
 from bolsa_api.schemas.instrument_lifecycle import (
     InstrumentRemovalPreviewDto,
     ListMembershipRefDto,
@@ -11,11 +17,6 @@ from bolsa_api.schemas.instrument_lifecycle import (
     PurgeOrphanSkippedDto,
     PurgeOrphansResultDto,
     RemoveInstrumentFromListResultDto,
-)
-from bolsa_application.instrument_lifecycle import InstrumentRemovalPreview
-from bolsa_application.remove_list_instrument import (
-    ListOrphanInstrumentsResult,
-    RemoveFromListResult,
 )
 
 
@@ -30,7 +31,8 @@ def to_removal_preview_dto(preview: InstrumentRemovalPreview) -> InstrumentRemov
         ],
         remaining_list_count=preview.remaining_list_count,
         trackers_by_instrument=[
-            NamedRefDto(id=t.id, name=t.name, detail=t.detail) for t in preview.trackers_by_instrument
+            NamedRefDto(id=t.id, name=t.name, detail=t.detail)
+            for t in preview.trackers_by_instrument
         ],
         trackers_by_list=[
             NamedRefDto(id=t.id, name=t.name, detail=t.detail) for t in preview.trackers_by_list
@@ -52,7 +54,9 @@ def to_removal_preview_dto(preview: InstrumentRemovalPreview) -> InstrumentRemov
     )
 
 
-def to_remove_from_list_result_dto(result: RemoveFromListResult) -> RemoveInstrumentFromListResultDto:
+def to_remove_from_list_result_dto(
+    result: RemoveFromListResult,
+) -> RemoveInstrumentFromListResultDto:
     return RemoveInstrumentFromListResultDto(
         list_id=result.list_id,
         instrument_id=result.instrument_id,

@@ -9,10 +9,9 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
 from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 from bolsa_infrastructure.config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = logging.getLogger(__name__)
 

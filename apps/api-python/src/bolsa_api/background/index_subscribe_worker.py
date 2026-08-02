@@ -5,16 +5,16 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from bolsa_application.market_indices import ProcessIndexSubscribeJob, SubscribeMarketIndex
+from bolsa_infrastructure.database.repositories.index_subscribe_job_repository import (
+    SqlAlchemyIndexSubscribeJobRepository,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import (
     get_import_instrument_use_case,
     get_instrument_repository,
     get_list_repository,
-)
-from bolsa_application.market_indices import ProcessIndexSubscribeJob, SubscribeMarketIndex
-from bolsa_infrastructure.database.repositories.index_subscribe_job_repository import (
-    SqlAlchemyIndexSubscribeJobRepository,
 )
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
+from bolsa_analytics.indicators.compute import IndicatorSpecInput, OhlcvBar, compute_specs
 from fastapi import APIRouter, HTTPException
 
-from bolsa_analytics.indicators.compute import IndicatorSpecInput, OhlcvBar, compute_specs
 from bolsa_api.schemas.indicators_compute import (
     ComputeIndicatorsRequestDto,
     ComputeIndicatorsResponseDto,

@@ -107,7 +107,7 @@ class SqlAlchemySyncSchedulerRepository:
         retry_backoff_minutes: int | None = None,
         scope: str | None = None,
     ) -> SyncSettingsRecord:
-        settings = await self.get_settings()
+        await self.get_settings()  # ensure default row exists
         stmt = select(SyncSettingsRow).where(SyncSettingsRow.id == DEFAULT_SETTINGS_ID)
         result = await self._session.execute(stmt)
         row = result.scalar_one()

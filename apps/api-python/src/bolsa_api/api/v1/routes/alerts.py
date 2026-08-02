@@ -1,9 +1,23 @@
 from typing import Annotated
 
+from bolsa_application.alerts import (
+    CreatePriceAlert,
+    DeletePriceAlert,
+    ListPriceAlerts,
+    ReactivatePriceAlert,
+)
+from bolsa_infrastructure.database.repositories.alert_repository import (
+    PriceAlertRecord,
+    SqlAlchemyAlertRepository,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_api.api.dependencies import get_alert_repository, get_db_session, get_evaluate_alerts_use_case
+from bolsa_api.api.dependencies import (
+    get_alert_repository,
+    get_db_session,
+    get_evaluate_alerts_use_case,
+)
 from bolsa_api.schemas.alerts import (
     CreatePriceAlertRequestDto,
     EvaluateAlertsResponseDto,
@@ -11,8 +25,6 @@ from bolsa_api.schemas.alerts import (
     PriceAlertResponseDto,
     PriceAlertsResponseDto,
 )
-from bolsa_application.alerts import CreatePriceAlert, DeletePriceAlert, ListPriceAlerts, ReactivatePriceAlert
-from bolsa_infrastructure.database.repositories.alert_repository import PriceAlertRecord, SqlAlchemyAlertRepository
 
 router = APIRouter()
 
@@ -51,7 +63,10 @@ async def create_alert(
     if body.condition not in ("above", "below"):
         raise HTTPException(status_code=400, detail="condition debe ser 'above' o 'below'")
     if body.price_source not in ("daily_close", "xtb_last"):
-        raise HTTPException(status_code=400, detail="priceSource debe ser 'daily_close' o 'xtb_last'")
+        raise HTTPException(
+            status_code=400,
+            detail="priceSource debe ser 'daily_close' o 'xtb_last'",
+        )
     repo = get_alert_repository(session)
     try:
         alert = await CreatePriceAlert(repo).execute(

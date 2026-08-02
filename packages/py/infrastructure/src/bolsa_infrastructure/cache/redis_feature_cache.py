@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import base64
 import pickle
-import time
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import TypeVar
 
 import redis
 

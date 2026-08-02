@@ -1,5 +1,5 @@
-from typing import Annotated
 
+from bolsa_application.indicator_draft import DraftIndicatorFromPrompt
 from fastapi import APIRouter, HTTPException
 
 from bolsa_api.api.dependencies import get_draft_indicator_from_prompt_use_case
@@ -8,7 +8,6 @@ from bolsa_api.schemas.indicators_draft import (
     DraftIndicatorFromPromptResponseDto,
     DraftIndicatorFromPromptResultDto,
 )
-from bolsa_application.indicator_draft import DraftIndicatorFromPrompt
 
 router = APIRouter()
 

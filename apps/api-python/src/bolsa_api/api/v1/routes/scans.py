@@ -1,10 +1,19 @@
-from typing import Annotated, Any
 import logging
+from typing import Annotated, Any
 
+from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_application.scan_jobs import EnqueueScanJob, GetScanJob, ListScanJobs
+from bolsa_application.scan_manifests import GetScanManifest, PersistScanManifest
+from bolsa_application.scans import RunScan
+from bolsa_domain.platform_kernel import (
+    validate_kernel_timeframe,
+    validate_scan_bar_limit,
+    validate_scan_max_results,
+)
+from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
 from bolsa_api.api.dependencies import (
     get_db_session,
     get_enqueue_scan_job_use_case,
@@ -25,14 +34,6 @@ from bolsa_api.schemas.scans import (
     ScanSkippedInstrumentDto,
 )
 from bolsa_api.schemas.signals_evaluate import SignalEventV1Dto
-from bolsa_application.scan_jobs import EnqueueScanJob, GetScanJob, ListScanJobs
-from bolsa_application.scan_manifests import GetScanManifest, PersistScanManifest
-from bolsa_domain.platform_kernel import (
-    validate_kernel_timeframe,
-    validate_scan_bar_limit,
-    validate_scan_max_results,
-)
-from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
