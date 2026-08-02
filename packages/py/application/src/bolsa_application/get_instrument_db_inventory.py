@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_infrastructure.database.models import (
     BacktestRunRow,
     DataSyncLogRow,
@@ -16,8 +19,6 @@ from bolsa_infrastructure.database.models import (
     PriceAlertRow,
     TransactionRow,
 )
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @dataclass(frozen=True, slots=True)

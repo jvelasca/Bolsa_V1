@@ -46,3 +46,14 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 # E501: deuda histórica de wrap; line-length sigue para formatters.
 ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "bolsa_ai",
+  "bolsa_analytics",
+  "bolsa_api",
+  "bolsa_application",
+  "bolsa_domain",
+  "bolsa_infrastructure",
+  "bolsa_market",
+]

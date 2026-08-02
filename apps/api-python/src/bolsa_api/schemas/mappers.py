@@ -1,14 +1,4 @@
 from bolsa_analytics.indicators import IndicatorPoint, IndicatorSignals
-from bolsa_application.get_instrument_data_status import InstrumentDataStatus
-from bolsa_application.get_instrument_detail import InstrumentDetail
-from bolsa_domain.entities.instrument import Instrument
-from bolsa_domain.entities.ohlcv_bar import OhlcvBar
-from bolsa_domain.repositories.instrument_repository import (
-    InstrumentWithMeta,
-    SyncLogDetail,
-)
-from bolsa_domain.value_objects.price_summary import PriceSummary
-
 from bolsa_api.schemas.instruments import (
     IndicatorPointDto,
     IndicatorSignalsDto,
@@ -29,6 +19,15 @@ from bolsa_api.schemas.instruments import (
     SyncDetailDto,
     SyncMetaDto,
 )
+from bolsa_application.get_instrument_data_status import InstrumentDataStatus
+from bolsa_application.get_instrument_detail import InstrumentDetail
+from bolsa_domain.entities.instrument import Instrument
+from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+from bolsa_domain.repositories.instrument_repository import (
+    InstrumentWithMeta,
+    SyncLogDetail,
+)
+from bolsa_domain.value_objects.price_summary import PriceSummary
 
 
 def to_instrument_dto(item: InstrumentWithMeta) -> InstrumentWithMetaDto:

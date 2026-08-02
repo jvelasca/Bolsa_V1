@@ -8,6 +8,7 @@ Usado por POST /api/instruments/{id}/sync y por ImportInstrument cuando sync=Tru
 from datetime import date, timedelta
 from typing import Literal
 
+from bolsa_application.refresh_instrument_fundamentals import RefreshInstrumentFundamentals
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
@@ -22,8 +23,6 @@ from bolsa_market.ohlcv_consolidation import plan_daily_consolidation
 from bolsa_market.sanity import run_sanity_checks
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
-
-from bolsa_application.refresh_instrument_fundamentals import RefreshInstrumentFundamentals
 
 
 def resolve_sync_date_range(

@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Annotated
 
-from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +16,7 @@ from bolsa_api.schemas.pending_orders import (
     PendingOrderDto,
     PendingOrdersResponseDto,
 )
+from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 
 router = APIRouter()
 

@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from bolsa_domain.entities.hypothesis import Hypothesis
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_domain.entities.hypothesis import Hypothesis
 from bolsa_infrastructure.database.models import HypothesisRow
 from bolsa_infrastructure.ids import new_id
 

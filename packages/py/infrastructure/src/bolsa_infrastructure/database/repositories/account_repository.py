@@ -1,6 +1,10 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from bolsa_domain.account_settings import (
     AccountSettings,
     default_account_settings,
@@ -8,10 +12,6 @@ from bolsa_domain.account_settings import (
     settings_to_dict,
 )
 from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
-from sqlalchemy import delete, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from bolsa_infrastructure.database.models import (
     ConfidenceStateRow,
     DecisionMemoryRow,

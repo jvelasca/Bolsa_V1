@@ -1,17 +1,3 @@
-from bolsa_domain.account_settings import (
-    AccountSettings,
-    CommissionProfile,
-    TaxProfile,
-)
-from bolsa_domain.entities.account import (
-    AccountSummary,
-    CashMovementResult,
-    InvestmentAccount,
-    InvestmentPortfolio,
-    LedgerEntry,
-)
-from bolsa_domain.tax_report import TaxReportSummary
-
 from bolsa_api.schemas.accounts import (
     AccountSettingsDto,
     AccountSummaryDto,
@@ -25,6 +11,19 @@ from bolsa_api.schemas.accounts import (
     TaxReportSummaryDto,
     UnrealizedGainLineDto,
 )
+from bolsa_domain.account_settings import (
+    AccountSettings,
+    CommissionProfile,
+    TaxProfile,
+)
+from bolsa_domain.entities.account import (
+    AccountSummary,
+    CashMovementResult,
+    InvestmentAccount,
+    InvestmentPortfolio,
+    LedgerEntry,
+)
+from bolsa_domain.tax_report import TaxReportSummary
 
 
 def _commission_to_dto(profile: CommissionProfile) -> CommissionProfileDto:

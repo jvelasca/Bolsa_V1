@@ -1,16 +1,5 @@
 from typing import Annotated
 
-from bolsa_application.tracker_schedule import ProcessTrackerSchedules
-from bolsa_application.trackers import (
-    CreateTrackerDefinition,
-    DeleteTrackerDefinition,
-    EnqueueTrackerScanJob,
-    GetTrackerDefinition,
-    ListTrackerDefinitions,
-    RunTrackerScan,
-    UpdateTrackerDefinition,
-)
-from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,6 +26,17 @@ from bolsa_api.schemas.trackers import (
     TrackerScheduleRunResultDto,
     UpdateTrackerDefinitionRequestDto,
 )
+from bolsa_application.tracker_schedule import ProcessTrackerSchedules
+from bolsa_application.trackers import (
+    CreateTrackerDefinition,
+    DeleteTrackerDefinition,
+    EnqueueTrackerScanJob,
+    GetTrackerDefinition,
+    ListTrackerDefinitions,
+    RunTrackerScan,
+    UpdateTrackerDefinition,
+)
+from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 
 router = APIRouter()
 

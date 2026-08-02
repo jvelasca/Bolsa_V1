@@ -4,7 +4,6 @@ from datetime import UTC, datetime, timedelta
 
 from bolsa_analytics.backtest import BacktestBarInput
 from bolsa_analytics.optimize.holdout import split_holdout_bars
-
 from bolsa_application.optimize import (
     STRATEGY_FAMILY_SMA,
     OptimizeGridTrial,

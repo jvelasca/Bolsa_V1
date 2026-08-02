@@ -1,21 +1,10 @@
 from typing import Annotated, Any
 
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
-from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
-from bolsa_application.strategies import (
-    CreateStrategyDefinition,
-    CreateStrategyFromPreset,
-    DeleteStrategyDefinition,
-    GetStrategyDefinition,
-    ListStrategyDefinitions,
-    UpdateStrategyDefinition,
-)
-from bolsa_application.strategy_draft import DraftStrategyFromPrompt
-from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
 from bolsa_api.api.dependencies import (
     get_create_strategy_from_preset_use_case,
     get_create_strategy_use_case,
@@ -42,6 +31,17 @@ from bolsa_api.schemas.strategies import (
     UpdateStrategyDefinitionRequestDto,
     UpsertStrategyDefinitionRequestDto,
 )
+from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
+from bolsa_application.strategies import (
+    CreateStrategyDefinition,
+    CreateStrategyFromPreset,
+    DeleteStrategyDefinition,
+    GetStrategyDefinition,
+    ListStrategyDefinitions,
+    UpdateStrategyDefinition,
+)
+from bolsa_application.strategy_draft import DraftStrategyFromPrompt
+from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
 
 router = APIRouter()
 

@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
+from bolsa_application.get_instrument_detail import GetInstrumentDetail
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.sync_log_repository import SyncLogRepository
 from bolsa_infrastructure.database.repositories.instrument_repository import (
@@ -13,8 +14,6 @@ from bolsa_infrastructure.database.repositories.instrument_repository import (
 )
 from bolsa_market.providers import XtbBridgeClient, format_xtb_bridge_connect_error
 from bolsa_market.xtb_symbols import to_xtb_symbol
-
-from bolsa_application.get_instrument_detail import GetInstrumentDetail
 
 Recommendation = Literal["aligned", "review", "unavailable", "no_db_reference"]
 

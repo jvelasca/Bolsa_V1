@@ -7,12 +7,12 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+from bolsa_application.market_indices import SubscribeMarketIndex
 from bolsa_domain.entities.instrument import Instrument
 from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from bolsa_infrastructure.database.repositories.list_repository import InstrumentListDetail
 from bolsa_market.indices.curated_ibex35 import IBEX35_CURATED
-
-from bolsa_application.market_indices import SubscribeMarketIndex
 
 
 @dataclass

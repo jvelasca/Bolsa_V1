@@ -1,14 +1,5 @@
 from typing import Annotated
 
-from bolsa_application.execution_policies import (
-    CreateExecutionPolicy,
-    DeleteExecutionPolicy,
-    GetExecutionPolicy,
-    ListExecutionPolicies,
-    UpdateExecutionPolicy,
-)
-from bolsa_application.execution_router import ExecuteScanJobHits, ExecutionRouter
-from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +25,15 @@ from bolsa_api.schemas.execution_policies import (
     RouteSignalsResponseDto,
     UpdateExecutionPolicyRequestDto,
 )
+from bolsa_application.execution_policies import (
+    CreateExecutionPolicy,
+    DeleteExecutionPolicy,
+    GetExecutionPolicy,
+    ListExecutionPolicies,
+    UpdateExecutionPolicy,
+)
+from bolsa_application.execution_router import ExecuteScanJobHits, ExecutionRouter
+from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 router = APIRouter()
 

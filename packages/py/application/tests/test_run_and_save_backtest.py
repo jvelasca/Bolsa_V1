@@ -1,11 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from bolsa_analytics.backtest import BacktestEngineResult, BacktestEquityPoint
+from bolsa_application.backtests import RunAndSaveBacktest
 from bolsa_domain.entities.backtest import BacktestRunDetail
 from bolsa_domain.entities.research_trial import ResearchTrial
-
-from bolsa_application.backtests import RunAndSaveBacktest
 
 
 def _bar(ts: str, close: float) -> MagicMock:
@@ -110,7 +110,10 @@ async def test_run_and_save_writes_research_trial(monkeypatch: pytest.MonkeyPatc
     assert kwargs["proposed_by"] == "human"
     assert kwargs["k_contribution"] == 1
     assert kwargs["params"]["commissionBps"] == 10
-    assert kwargs.get("blocks") is None
+    # Q1.1: human trials stamp dataset metadata in blocks (not lab OOS).
+    blocks = kwargs.get("blocks") or {}
+    assert "dataset" in blocks
+    assert blocks["dataset"].get("schemaVersion") == "dataset_meta_v0"
 
 
 @pytest.mark.asyncio

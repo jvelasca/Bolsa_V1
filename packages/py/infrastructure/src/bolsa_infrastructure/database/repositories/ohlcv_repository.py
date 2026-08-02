@@ -1,12 +1,12 @@
 from datetime import UTC, date, datetime, timedelta
 
-from bolsa_domain.entities.ohlcv_bar import OhlcvBar
-from bolsa_domain.ohlcv_time import format_bar_timestamp, parse_bar_timestamp
-from bolsa_domain.value_objects.timeframe import TimeFrame
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+from bolsa_domain.ohlcv_time import format_bar_timestamp, parse_bar_timestamp
+from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.models import OhlcvBarRow
 from bolsa_infrastructure.ids import new_id
 

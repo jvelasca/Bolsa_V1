@@ -3,13 +3,13 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
 
 from bolsa_application.research_tree import (
     CreateResearchTreeEdge,
     consolidation_tree_edge_specs,
     validate_edge_spec,
 )
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
 
 
 def test_validate_blocks_causes():

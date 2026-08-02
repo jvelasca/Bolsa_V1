@@ -1,7 +1,6 @@
 from datetime import datetime
 from typing import Annotated
 
-from bolsa_application.investor_profiles import EnsureDefaultInvestorProfile
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +44,7 @@ from bolsa_api.schemas.accounts import (
     UpdateInvestmentAccountDto,
     WithdrawCashDto,
 )
+from bolsa_application.investor_profiles import EnsureDefaultInvestorProfile
 
 router = APIRouter()
 

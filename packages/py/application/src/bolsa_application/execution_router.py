@@ -3,6 +3,15 @@ from typing import Any, Literal
 
 from bolsa_analytics.cognitive.market_events import MarketEventCalendar
 from bolsa_analytics.signals.strategy import SignalEventV1
+from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
+from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry_to_record
+from bolsa_application.events.payloads import signal_event_payload
+from bolsa_application.events.platform_event_bus import PlatformEventBus
+from bolsa_application.investor_profiles import InvestorProfileStore
+from bolsa_application.trading_policy_guard import (
+    CognitiveGuardResult,
+    enforce_cognitive_policy_for_opening,
+)
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
@@ -19,16 +28,6 @@ from bolsa_infrastructure.database.repositories.backtest_repository import (
 )
 from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     SignalAlertSubscriptionRecord,
-)
-
-from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
-from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry_to_record
-from bolsa_application.events.payloads import signal_event_payload
-from bolsa_application.events.platform_event_bus import PlatformEventBus
-from bolsa_application.investor_profiles import InvestorProfileStore
-from bolsa_application.trading_policy_guard import (
-    CognitiveGuardResult,
-    enforce_cognitive_policy_for_opening,
 )
 
 
@@ -155,7 +154,6 @@ class ExecutionRouter:
             from dataclasses import replace
 
             from bolsa_analytics.cognitive.decision_session import build_auto_session
-
             from bolsa_application.cognitive_persistence import decision_session_to_record
 
             record = memory_entry_to_record(guard.memory, account_id=account_id)

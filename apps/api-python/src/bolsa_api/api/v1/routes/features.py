@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from bolsa_analytics.features import bootstrap_catalog, materialize_feature_snapshot
-from bolsa_analytics.indicators.compute import OhlcvBar
-from bolsa_domain.value_objects.timeframe import TimeFrame
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_analytics.features import bootstrap_catalog, materialize_feature_snapshot
+from bolsa_analytics.indicators.compute import OhlcvBar
 from bolsa_api.api.dependencies import get_db_session, get_feature_port, get_ohlcv_repository
+from bolsa_domain.value_objects.timeframe import TimeFrame
 
 router = APIRouter()
 

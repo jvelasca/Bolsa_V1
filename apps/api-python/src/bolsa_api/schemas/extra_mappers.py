@@ -1,8 +1,3 @@
-from bolsa_application.optimize import OptimizeSmaGridResult
-from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
-from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
-from bolsa_domain.value_objects.market import InstrumentLiveQuote, MarketProviderStatus, SyncResult
-
 from bolsa_api.schemas.backtests import (
     BacktestEquityPointDto,
     BacktestRunDetailDto,
@@ -24,6 +19,10 @@ from bolsa_api.schemas.portfolio import (
     PositionDto,
     TransactionDto,
 )
+from bolsa_application.optimize import OptimizeSmaGridResult
+from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
+from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
+from bolsa_domain.value_objects.market import InstrumentLiveQuote, MarketProviderStatus, SyncResult
 
 
 def to_sync_result_dto(result: SyncResult) -> SyncResultDto:

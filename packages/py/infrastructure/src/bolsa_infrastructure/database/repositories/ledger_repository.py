@@ -1,11 +1,11 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from bolsa_domain.entities.account import LedgerEntry
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from bolsa_domain.entities.account import LedgerEntry
 from bolsa_infrastructure.database.models import LedgerEntryRow
 from bolsa_infrastructure.ids import new_id
 

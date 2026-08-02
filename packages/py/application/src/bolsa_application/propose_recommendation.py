@@ -364,7 +364,6 @@ class ProposeRecommendationFromTa:
             if t not in present_types
         ]
         from bolsa_analytics.cognitive.decision_session import build_propose_session
-
         from bolsa_application.cognitive_persistence import decision_session_to_record
 
         # Prediction: fotografía auxiliar — NUNCA entra en WeightRules / Runtime.

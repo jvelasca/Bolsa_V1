@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from bolsa_analytics.indicators.compute import OhlcvBar
-from bolsa_analytics.prediction import PredictionService, lightgbm_available
-from bolsa_analytics.signals.technical_rating_v1 import MODEL_ID as HEURISTIC_MODEL_ID
-from bolsa_application.prediction_persistence import PersistPredictionArtifacts
-from bolsa_domain.value_objects.timeframe import TimeFrame
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_analytics.indicators.compute import OhlcvBar
+from bolsa_analytics.prediction import PredictionService, lightgbm_available
+from bolsa_analytics.signals.technical_rating_v1 import MODEL_ID as HEURISTIC_MODEL_ID
 from bolsa_api.api.dependencies import (
     get_db_session,
     get_ohlcv_repository,
     get_prediction_repository,
 )
+from bolsa_application.prediction_persistence import PersistPredictionArtifacts
+from bolsa_domain.value_objects.timeframe import TimeFrame
 
 router = APIRouter()
 

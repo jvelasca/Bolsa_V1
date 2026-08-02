@@ -1,6 +1,9 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import func, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_domain.entities.instrument import Instrument
 from bolsa_domain.repositories.instrument_repository import (
     InstrumentWithMeta,
@@ -8,13 +11,10 @@ from bolsa_domain.repositories.instrument_repository import (
     SyncLogSnapshot,
 )
 from bolsa_domain.value_objects.timeframe import TimeFrame
-from bolsa_market.instrument_fundamentals import parse_fundamentals_from_profile_snapshot
-from bolsa_market.list_freshness import resolve_list_freshness
-from sqlalchemy import func, or_, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from bolsa_infrastructure.database.models import DataSyncLogRow, InstrumentRow, OhlcvBarRow
 from bolsa_infrastructure.instrument_search import normalize_isin
+from bolsa_market.instrument_fundamentals import parse_fundamentals_from_profile_snapshot
+from bolsa_market.list_freshness import resolve_list_freshness
 
 
 class SqlAlchemyInstrumentRepository:

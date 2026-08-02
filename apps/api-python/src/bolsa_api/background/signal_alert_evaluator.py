@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from bolsa_infrastructure.config import get_settings
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import get_evaluate_signal_alerts_use_case
+from bolsa_infrastructure.config import get_settings
 
 logger = logging.getLogger(__name__)
 

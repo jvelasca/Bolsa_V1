@@ -5,11 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from bolsa_infrastructure.database.repositories.mandate_repository import (
-    MandateTenureRecord,
-    MandateTradeLinkRecord,
-    SqlAlchemyMandateRepository,
-)
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +15,11 @@ from bolsa_api.schemas.mandates import (
     MandateTenureDto,
     MandateTradeLinkDto,
     SyncMandateBundleDto,
+)
+from bolsa_infrastructure.database.repositories.mandate_repository import (
+    MandateTenureRecord,
+    MandateTradeLinkRecord,
+    SqlAlchemyMandateRepository,
 )
 
 router = APIRouter()

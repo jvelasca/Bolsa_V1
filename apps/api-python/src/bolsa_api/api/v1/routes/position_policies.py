@@ -1,15 +1,5 @@
 from typing import Annotated
 
-from bolsa_application.position_exit_evaluator import EvaluatePositionExits
-from bolsa_application.position_policies import (
-    CreatePositionPolicy,
-    DeletePositionPolicy,
-    GetPositionPolicy,
-    GetPositionPolicyForHolding,
-    ListPositionPolicies,
-    UpdatePositionPolicy,
-)
-from bolsa_domain.entities.position_policy import PositionPolicyRecord
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +23,16 @@ from bolsa_api.schemas.position_policies import (
     PositionPolicySummaryDto,
     UpdatePositionPolicyRequestDto,
 )
+from bolsa_application.position_exit_evaluator import EvaluatePositionExits
+from bolsa_application.position_policies import (
+    CreatePositionPolicy,
+    DeletePositionPolicy,
+    GetPositionPolicy,
+    GetPositionPolicyForHolding,
+    ListPositionPolicies,
+    UpdatePositionPolicy,
+)
+from bolsa_domain.entities.position_policy import PositionPolicyRecord
 
 router = APIRouter()
 

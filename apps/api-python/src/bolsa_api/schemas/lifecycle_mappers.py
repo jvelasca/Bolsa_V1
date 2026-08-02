@@ -2,12 +2,6 @@
 
 from __future__ import annotations
 
-from bolsa_application.instrument_lifecycle import InstrumentRemovalPreview
-from bolsa_application.remove_list_instrument import (
-    ListOrphanInstrumentsResult,
-    RemoveFromListResult,
-)
-
 from bolsa_api.schemas.instrument_lifecycle import (
     InstrumentRemovalPreviewDto,
     ListMembershipRefDto,
@@ -17,6 +11,11 @@ from bolsa_api.schemas.instrument_lifecycle import (
     PurgeOrphanSkippedDto,
     PurgeOrphansResultDto,
     RemoveInstrumentFromListResultDto,
+)
+from bolsa_application.instrument_lifecycle import InstrumentRemovalPreview
+from bolsa_application.remove_list_instrument import (
+    ListOrphanInstrumentsResult,
+    RemoveFromListResult,
 )
 
 

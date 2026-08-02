@@ -1,44 +1,5 @@
 from typing import Annotated, Literal
 
-from bolsa_application.belief_engine import GetHypothesisBelief, ListBeliefHistory
-from bolsa_application.hypotheses import (
-    CreateHypothesis,
-    GetHypothesis,
-    LinkTrialToHypothesis,
-    ListHypotheses,
-    UpdateHypothesis,
-)
-from bolsa_application.knowledge_consolidation import (
-    ConsolidateHypothesis,
-    DeprecateKnowledgeNode,
-    EvaluateConsolidation,
-    GetKnowledgeNode,
-    ListKnowledgeNodes,
-)
-from bolsa_application.mkl_sync import ListMklSyncEvents, SyncKnowledgeToMkl
-from bolsa_application.research_evidence import (
-    GetResearchEvidence,
-    ListResearchEvidence,
-    emit_evidence_for_dia_d_session,
-)
-from bolsa_application.research_tree import (
-    CreateResearchTreeEdge,
-    ListResearchTreeEdges,
-    SoftDeleteResearchTreeEdge,
-)
-from bolsa_application.research_trials import (
-    GetInstrumentResearchSummary,
-    GetLabHealth,
-    GetLaboratoryResearchSummary,
-    GetResearchTrial,
-    ListResearchTrials,
-)
-from bolsa_domain.entities.hypothesis import Hypothesis
-from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
-from bolsa_domain.entities.research_evidence import ResearchEvidence
-from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
-from bolsa_domain.entities.research_trial import ResearchTrial
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -103,6 +64,45 @@ from bolsa_api.schemas.research import (
     ResearchTrialsListResponseDto,
     ResearchTrialSortParam,
 )
+from bolsa_application.belief_engine import GetHypothesisBelief, ListBeliefHistory
+from bolsa_application.hypotheses import (
+    CreateHypothesis,
+    GetHypothesis,
+    LinkTrialToHypothesis,
+    ListHypotheses,
+    UpdateHypothesis,
+)
+from bolsa_application.knowledge_consolidation import (
+    ConsolidateHypothesis,
+    DeprecateKnowledgeNode,
+    EvaluateConsolidation,
+    GetKnowledgeNode,
+    ListKnowledgeNodes,
+)
+from bolsa_application.mkl_sync import ListMklSyncEvents, SyncKnowledgeToMkl
+from bolsa_application.research_evidence import (
+    GetResearchEvidence,
+    ListResearchEvidence,
+    emit_evidence_for_dia_d_session,
+)
+from bolsa_application.research_tree import (
+    CreateResearchTreeEdge,
+    ListResearchTreeEdges,
+    SoftDeleteResearchTreeEdge,
+)
+from bolsa_application.research_trials import (
+    GetInstrumentResearchSummary,
+    GetLabHealth,
+    GetLaboratoryResearchSummary,
+    GetResearchTrial,
+    ListResearchTrials,
+)
+from bolsa_domain.entities.hypothesis import Hypothesis
+from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
+from bolsa_domain.entities.research_evidence import ResearchEvidence
+from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
+from bolsa_domain.entities.research_trial import ResearchTrial
 
 router = APIRouter()
 

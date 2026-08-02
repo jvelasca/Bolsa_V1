@@ -1,20 +1,5 @@
 from typing import Annotated
 
-from bolsa_application.lists import (
-    CreateInstrumentList,
-    DeleteInstrumentList,
-    GetInstrumentList,
-    GetListQuotes,
-    ListInstrumentLists,
-    UpdateInstrumentList,
-)
-from bolsa_application.market_indices import SubscribeMarketIndex, SyncSubscribedCatalogIndices
-from bolsa_application.trackers import ListTrackerDefinitionsForList
-from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
-from bolsa_infrastructure.database.repositories.list_repository import (
-    InstrumentListDetail,
-    InstrumentListSummary,
-)
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +30,21 @@ from bolsa_api.schemas.trackers import (
     TrackerDefinitionDetailDto,
     TrackerDefinitionDetailsListResponseDto,
     TrackerDefinitionSummaryDto,
+)
+from bolsa_application.lists import (
+    CreateInstrumentList,
+    DeleteInstrumentList,
+    GetInstrumentList,
+    GetListQuotes,
+    ListInstrumentLists,
+    UpdateInstrumentList,
+)
+from bolsa_application.market_indices import SubscribeMarketIndex, SyncSubscribedCatalogIndices
+from bolsa_application.trackers import ListTrackerDefinitionsForList
+from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
+from bolsa_infrastructure.database.repositories.list_repository import (
+    InstrumentListDetail,
+    InstrumentListSummary,
 )
 
 router = APIRouter()

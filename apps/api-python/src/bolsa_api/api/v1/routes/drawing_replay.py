@@ -1,6 +1,6 @@
-from bolsa_analytics.drawing_replay import OhlcvBar, evaluate_drawing_replay
 from fastapi import APIRouter, HTTPException
 
+from bolsa_analytics.drawing_replay import OhlcvBar, evaluate_drawing_replay
 from bolsa_api.schemas.drawing_replay import (
     DrawingReplayMarkerDto,
     DrawingReplayRequestDto,

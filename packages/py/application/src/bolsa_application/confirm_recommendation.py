@@ -11,9 +11,8 @@ from bolsa_analytics.cognitive.decision_session import (
 )
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.recommendation import Recommendation
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 
 class ConfirmRecommendationIntent:

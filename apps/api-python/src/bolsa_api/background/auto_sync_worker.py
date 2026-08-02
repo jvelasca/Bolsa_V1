@@ -6,7 +6,6 @@ import asyncio
 import logging
 from datetime import UTC, datetime
 
-from bolsa_application.sync_scheduler import is_post_market_window
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.api.dependencies import (
@@ -14,6 +13,7 @@ from bolsa_api.api.dependencies import (
     get_process_sync_queue_use_case,
     get_sync_scheduler_repository,
 )
+from bolsa_application.sync_scheduler import is_post_market_window
 
 logger = logging.getLogger(__name__)
 

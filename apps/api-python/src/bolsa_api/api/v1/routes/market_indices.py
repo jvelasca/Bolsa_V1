@@ -4,18 +4,6 @@
 
 from typing import Annotated
 
-from bolsa_application.market_indices import (
-    EnqueueIndexSubscribeJob,
-    GetIndexSubscribeJob,
-    ListMarketIndexCatalog,
-    ResolveIndexConstituents,
-    SearchMarketIndices,
-    SubscribeMarketIndex,
-)
-from bolsa_infrastructure.database.repositories.index_subscribe_job_repository import (
-    IndexSubscribeJobRecord,
-    SqlAlchemyIndexSubscribeJobRepository,
-)
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +27,18 @@ from bolsa_api.schemas.market_indices import (
     SubscribeMarketIndexResponseDto,
     SubscribeMarketIndexResultDto,
     SubscribeProgressDto,
+)
+from bolsa_application.market_indices import (
+    EnqueueIndexSubscribeJob,
+    GetIndexSubscribeJob,
+    ListMarketIndexCatalog,
+    ResolveIndexConstituents,
+    SearchMarketIndices,
+    SubscribeMarketIndex,
+)
+from bolsa_infrastructure.database.repositories.index_subscribe_job_repository import (
+    IndexSubscribeJobRecord,
+    SqlAlchemyIndexSubscribeJobRepository,
 )
 
 router = APIRouter()

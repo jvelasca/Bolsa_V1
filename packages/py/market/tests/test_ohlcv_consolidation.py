@@ -1,6 +1,5 @@
 
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
-
 from bolsa_market.ohlcv_consolidation import plan_daily_consolidation
 
 

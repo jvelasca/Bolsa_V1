@@ -1,6 +1,5 @@
-from bolsa_domain.platform_kernel import validate_position_execution_mode
-
 from bolsa_application.position_policies import build_position_policy_definition
+from bolsa_domain.platform_kernel import validate_position_execution_mode
 
 
 def test_build_position_policy_definition() -> None:

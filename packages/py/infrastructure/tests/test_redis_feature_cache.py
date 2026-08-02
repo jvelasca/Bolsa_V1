@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 from bolsa_analytics.signals.evaluate import build_preset_features
-
 from bolsa_infrastructure.cache.redis_feature_cache import RedisFeatureCache
 
 

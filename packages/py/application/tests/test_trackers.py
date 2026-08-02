@@ -1,6 +1,5 @@
-from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
-
 from bolsa_application.trackers import build_tracker_definition_dict, tracker_to_scan_payload
+from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 
 
 def test_tracker_to_scan_payload() -> None:

@@ -1,11 +1,11 @@
 from collections.abc import Awaitable, Callable
 
-from bolsa_infrastructure.config import get_settings
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from bolsa_api.auth.tokens import verify_access_token
+from bolsa_infrastructure.config import get_settings
 
 PUBLIC_PREFIXES = (
     "/api/health",

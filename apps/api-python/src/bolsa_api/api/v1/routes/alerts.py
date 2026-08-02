@@ -1,15 +1,5 @@
 from typing import Annotated
 
-from bolsa_application.alerts import (
-    CreatePriceAlert,
-    DeletePriceAlert,
-    ListPriceAlerts,
-    ReactivatePriceAlert,
-)
-from bolsa_infrastructure.database.repositories.alert_repository import (
-    PriceAlertRecord,
-    SqlAlchemyAlertRepository,
-)
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +14,16 @@ from bolsa_api.schemas.alerts import (
     PriceAlertDto,
     PriceAlertResponseDto,
     PriceAlertsResponseDto,
+)
+from bolsa_application.alerts import (
+    CreatePriceAlert,
+    DeletePriceAlert,
+    ListPriceAlerts,
+    ReactivatePriceAlert,
+)
+from bolsa_infrastructure.database.repositories.alert_repository import (
+    PriceAlertRecord,
+    SqlAlchemyAlertRepository,
 )
 
 router = APIRouter()

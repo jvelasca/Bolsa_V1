@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from bolsa_analytics.knowledge.filing_summary import heuristic_filing_summary
-
 from bolsa_market.filing_store import (
     FILING_STORE_VERSION,
     delete_filing,

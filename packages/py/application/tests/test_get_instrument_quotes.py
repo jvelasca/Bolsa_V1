@@ -5,9 +5,8 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta, SyncLogSnapshot
-
 from bolsa_application.get_instrument_quotes import GetInstrumentQuotes
+from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta, SyncLogSnapshot
 
 
 def _meta(instrument_id: str) -> InstrumentWithMeta:

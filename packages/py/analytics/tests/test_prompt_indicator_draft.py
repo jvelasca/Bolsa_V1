@@ -23,7 +23,6 @@ def test_draft_global_score_weights() -> None:
 
 def test_llm_indicator_draft_matches_heuristic_without_key(monkeypatch) -> None:
     from bolsa_ai import reset_default_proxy
-
     from bolsa_analytics.research.llm_indicator_draft import draft_indicator_from_prompt_with_llm
 
     monkeypatch.setenv("BOLSA_LLM_PROVIDER", "none")

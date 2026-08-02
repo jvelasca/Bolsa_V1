@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-from bolsa_domain.account_settings import settings_from_dict, settings_to_dict
 
 from bolsa_analytics.cognitive import (
     AGGRESSIVE_SWING_POLICY,
@@ -24,6 +23,7 @@ from bolsa_analytics.cognitive.investor_profile import (
     InvestorProfile,
     ObservedInvestorProfile,
 )
+from bolsa_domain.account_settings import settings_from_dict, settings_to_dict
 
 
 def test_suggest_policy_from_declared():

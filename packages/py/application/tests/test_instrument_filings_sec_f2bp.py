@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
-from bolsa_market.sec_edgar import SecFilingHit
 
 from bolsa_application.instrument_filings import InstrumentFilingsService
+from bolsa_market.sec_edgar import SecFilingHit
 
 
 @dataclass

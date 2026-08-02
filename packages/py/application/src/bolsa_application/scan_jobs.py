@@ -3,17 +3,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from bolsa_analytics.signals.feature_cache import FeatureCache, get_preset_feature_cache
-from bolsa_domain.platform_kernel import validate_kernel_timeframe
-from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
-from bolsa_domain.repositories.tracker_definition_repository import TrackerDefinitionRepository
-from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
-from bolsa_infrastructure.database.repositories.scan_job_repository import (
-    ScanJobRecord,
-    SqlAlchemyScanJobRepository,
-)
-from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
-from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
-
 from bolsa_application.execution_router import ExecutionRouter
 from bolsa_application.scan_chunking import (
     JOB_KIND_CHUNK,
@@ -31,6 +20,16 @@ from bolsa_application.scan_universe import (
 )
 from bolsa_application.scans import RunScan, scan_run_result_to_dict
 from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
+from bolsa_domain.platform_kernel import validate_kernel_timeframe
+from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
+from bolsa_domain.repositories.tracker_definition_repository import TrackerDefinitionRepository
+from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
+from bolsa_infrastructure.database.repositories.scan_job_repository import (
+    ScanJobRecord,
+    SqlAlchemyScanJobRepository,
+)
+from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
+from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_infrastructure.database.repositories.optimization_run_repository import (
-    OptimizationRunRecord,
-)
 
 from bolsa_application.optimization_runs import (
     EnqueueOptimizationRun,
@@ -11,6 +8,9 @@ from bolsa_application.optimization_runs import (
     optimize_result_to_dict,
 )
 from bolsa_application.optimize import OptimizeGridTrial, OptimizeSmaGridResult
+from bolsa_infrastructure.database.repositories.optimization_run_repository import (
+    OptimizationRunRecord,
+)
 
 
 def _sample_run(*, status: str = "pending") -> OptimizationRunRecord:

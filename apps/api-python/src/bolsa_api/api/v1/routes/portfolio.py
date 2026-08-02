@@ -1,6 +1,5 @@
 from typing import Annotated
 
-from bolsa_application.accounts import ExecuteTrade
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +21,7 @@ from bolsa_api.schemas.portfolio import (
     TradeResponseDto,
     TransactionsResponseDto,
 )
+from bolsa_application.accounts import ExecuteTrade
 
 router = APIRouter()
 

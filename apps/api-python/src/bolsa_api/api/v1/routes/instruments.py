@@ -5,7 +5,6 @@ Los casos de uso se inyectan vía bolsa_api.api.dependencies.
 """
 from typing import Annotated
 
-from bolsa_domain.value_objects.timeframe import TimeFrame
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,6 +74,7 @@ from bolsa_api.schemas.mappers import (
     to_xtb_validation_dto,
 )
 from bolsa_api.schemas.market import LiveQuoteEnvelopeDto, LiveQuoteListResponseDto, SyncResponseDto
+from bolsa_domain.value_objects.timeframe import TimeFrame
 
 router = APIRouter()
 

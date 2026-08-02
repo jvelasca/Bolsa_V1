@@ -44,9 +44,8 @@ def test_propose_from_ta_bullish_bars():
     ohlcv = _FakeOhlcv(bars)
     port = _FakeFeaturePort()
 
-    from bolsa_analytics.features.models import FeatureSnapshot
-
     import bolsa_application.propose_recommendation as mod
+    from bolsa_analytics.features.models import FeatureSnapshot
 
     real_materialize = mod.materialize_feature_snapshot
 
@@ -122,9 +121,8 @@ def test_propose_with_fundamentals_port():
                 "fetchedAt": "2026-07-23T00:00:00Z",
             }
 
-    from bolsa_analytics.features.models import FeatureSnapshot
-
     import bolsa_application.propose_recommendation as mod
+    from bolsa_analytics.features.models import FeatureSnapshot
 
     real_materialize = mod.materialize_feature_snapshot
 
@@ -195,9 +193,8 @@ def test_propose_with_macro_and_evidence():
         async def latest_edge_report(self, *, strategy_or_signal_ref=None, account_id=None):
             return report
 
-    from bolsa_analytics.features.models import FeatureSnapshot
-
     import bolsa_application.propose_recommendation as mod
+    from bolsa_analytics.features.models import FeatureSnapshot
 
     real_materialize = mod.materialize_feature_snapshot
 

@@ -6,7 +6,6 @@ from decimal import Decimal
 from typing import Any
 
 from bolsa_domain.value_objects.timeframe import TimeFrame
-
 from bolsa_market.ingest import OhlcvBarIngest
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
 

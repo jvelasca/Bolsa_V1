@@ -1,5 +1,8 @@
 from collections.abc import AsyncGenerator
 
+from fastapi import Header, Request
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_application.account_lifecycle import (
     ListClosedSimulatedAccounts,
@@ -222,8 +225,6 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 )
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
-from fastapi import Header, Request
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:

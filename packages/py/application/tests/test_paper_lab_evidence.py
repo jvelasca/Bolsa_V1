@@ -5,7 +5,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
 
 from bolsa_application.paper_bridge import DeployStrategyToPaperAccount
 from bolsa_application.paper_lab_evidence import (
@@ -15,6 +14,7 @@ from bolsa_application.paper_lab_evidence import (
     merge_lab_evidence_snapshots,
     trial_blocks_from_lab_evidence_snapshot,
 )
+from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
 
 
 def test_snapshot_cpcv_with_pbo_and_edge():

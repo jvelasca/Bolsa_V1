@@ -1,11 +1,11 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
-from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord
 from bolsa_infrastructure.database.models import (
     BacktestRunRow,
     ExecutionPolicyRow,
