@@ -1,0 +1,27 @@
+# family.yaml — RSI (Q1.4)
+
+family: rsi
+preset_keys:
+  - rsi_mean_reversion
+  - rsi_momentum
+  - rsi_oversold_bounce
+hypothesis: >
+  Extremos de RSI en diario revierten (mean-reversion) o confirman momentum
+  según preset; no son la misma pregunta científica.
+research_question: >
+  ¿Periodo/umbrales RSI con edge IS reproducible en IBEX35 bajo costes tip?
+grid:
+  period: [7, 14, 21]
+  oversold: [20, 25, 30]
+  overbought: [70, 75, 80]
+variables:
+  - period
+  - oversold
+  - overbought
+explored_vs_theoretical: >
+  Grid discreto acotado; theoretical continuous thresholds no muestreado.
+warmup:
+  min_bars_rule: period_plus_1
+  see: bolsa_analytics.warmup_matrix
+status: closed_c2
+campaign_tag_example: ibex35-rsi-c2

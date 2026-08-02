@@ -105,6 +105,41 @@ class LaboratoryResearchSummaryResponseDto(BaseModel):
     data: LaboratoryResearchSummaryDto
 
 
+class LabHealthMetricCoverageDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
+    present: int
+    pct: float
+
+
+class LabHealthCampaignDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
+    campaign_id: str = Field(alias="campaignId")
+    trials: int
+
+
+class LabHealthDto(BaseModel):
+    """Q0.1 — sanidad del ledger (cobertura métricas / zero-trades / campañas)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
+    total_trials: int = Field(alias="totalTrials")
+    coverage: dict[str, LabHealthMetricCoverageDto]
+    zero_trade_count: int = Field(alias="zeroTradeCount")
+    zero_trade_pct: float = Field(alias="zeroTradePct")
+    campaigns: list[LabHealthCampaignDto]
+    campaign_count: int = Field(alias="campaignCount")
+    instruments_with_trials: int = Field(alias="instrumentsWithTrials")
+    active_instruments: int = Field(alias="activeInstruments")
+    instruments_without_trials: int = Field(alias="instrumentsWithoutTrials")
+    caveat: str
+
+
+class LabHealthResponseDto(BaseModel):
+    data: LabHealthDto
+
+
 ResearchTrialSortParam = Literal[
     "created_at",
     "sharpe",

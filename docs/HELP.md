@@ -1,8 +1,9 @@
 # Ayuda en la app — coordinación con trackers y docs
 
 > **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-02**  
-> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.8**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2**) + Trading (rail Coach · ADR-019 · **Mandato ADR-020 M1b BD**).  
+> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.9 BD**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2** · Lab Health Q0) + Trading (rail Coach · ADR-019 · **Mandato ADR-020 M1b BD**).  
 > **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
+> **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) (Lab Health · CORE-R BD · comparación masiva · costes v2 gated · estabilidad).  
 > **Universos:** [LAB vs TRADING](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [Mandato](./adr/020-operating-mandate-tenure.md) · [Reconciliación DÍA D](./adr/021-dia-d-reconciliation.md).  
 > Configuración → **BD** (estado PostgreSQL, purga de huérfanos y demos cerradas).  
 > **Espacios de trabajo:** chip superior → gestor (nuevo blanco / duplicar / renombrar); arranque = último activo.  
@@ -26,7 +27,7 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 
 | Sección Ayuda | Tracker / UI | Docs |
 |---------------|--------------|------|
-| **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [universos LAB/TRADING](./engineering/dual-universes-lab-trading-design-2026-08-02.md), [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020 Mandato](./adr/020-operating-mandate-tenure.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
+| **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [roadmap post-auditorías](./engineering/improvement-roadmap-post-audits-2026-08-02.md), [estabilidad temporal](./engineering/stability-campaign-protocol-2026-08-02.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [universos LAB/TRADING](./engineering/dual-universes-lab-trading-design-2026-08-02.md), [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020 Mandato](./adr/020-operating-mandate-tenure.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
 | **Trading** | rail Coach + `mandate-timeline-panel` | [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020](./adr/020-operating-mandate-tenure.md), account premises |
 | Análisis del valor | `value-analysis-tracker.ts` | FA status / FIE |
 | Datos de mercado | `data-market-tracker.ts` | data capture |

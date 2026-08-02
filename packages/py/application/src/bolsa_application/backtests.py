@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from bolsa_analytics.backtest import BacktestBarInput, BacktestCostModel, run_backtest
+from bolsa_analytics.cost_model_v2 import cost_v2_from_fixed
 from bolsa_analytics.research import BarFingerprint, build_run_manifest, compute_data_version
+from bolsa_infrastructure.config import get_settings
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
 from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
 from bolsa_domain.repositories.backtest_repository import BacktestRepository
@@ -13,6 +15,10 @@ from bolsa_domain.repositories.strategy_definition_repository import StrategyDef
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_application.paper_lab_evidence import trial_blocks_from_lab_evidence_snapshot
 from bolsa_application.research_evidence import emit_evidence_for_trial
+from bolsa_application.dataset_metadata import (
+    dataset_metadata_from_bars,
+    merge_dataset_into_blocks,
+)
 from bolsa_infrastructure.ids import new_id
 
 
@@ -77,6 +83,7 @@ class RunAndSaveBacktest:
         instrument_id: str,
         strategy_type: str | None = None,
         strategy_definition_id: str | None = None,
+        campaign: str | None = None,
         initial_cash: float = 10000,
         limit: int | None = 500,
         date_from: str | None = None,
@@ -150,6 +157,15 @@ class RunAndSaveBacktest:
             slippage_bps=slippage_bps,
             spread_bps=spread_bps,
         )
+        settings = get_settings()
+        cost_v2 = cost_v2_from_fixed(
+            commission_bps=commission_bps,
+            slippage_bps=slippage_bps,
+            spread_bps=spread_bps,
+            enabled=bool(settings.cost_model_v2_enabled),
+            illiquid_extra=int(settings.cost_model_v2_illiquid_extra_bps),
+            volume_ratio_illiquid=float(settings.cost_model_v2_volume_ratio_illiquid),
+        )
         result = run_backtest(
             [
                 BacktestBarInput(
@@ -165,6 +181,7 @@ class RunAndSaveBacktest:
             strategy_type,
             initial_cash,
             costs=costs,
+            cost_v2=cost_v2 if cost_v2.enabled else None,
             strategy_definition=saved_strategy.definition if saved_strategy else None,
         )
 
@@ -223,6 +240,25 @@ class RunAndSaveBacktest:
         )
 
         blocks = trial_blocks_from_lab_evidence_snapshot(lab_evidence)
+        dataset_meta = dataset_metadata_from_bars(bars)
+        blocks = merge_dataset_into_blocks(blocks, dataset_meta)
+        campaign_id = campaign.strip() if isinstance(campaign, str) and campaign.strip() else None
+        trial_params: dict[str, Any] = {
+            "initialCash": initial_cash,
+            "timeframe": tf.value,
+            "barLimit": resolved_limit,
+            "dateFrom": date_from,
+            "dateTo": date_to,
+            "commissionBps": commission_bps,
+            "slippageBps": slippage_bps,
+            "spreadBps": spread_bps,
+            "costModelV2": bool(cost_v2.enabled),
+            "datasetStart": dataset_meta.get("datasetStart"),
+            "datasetEnd": dataset_meta.get("datasetEnd"),
+            "bars": dataset_meta.get("bars"),
+        }
+        if campaign_id:
+            trial_params["campaign"] = campaign_id
         trial = await self._trials.insert_trial(
             instrument_id=instrument_id,
             backtest_run_id=run.id,
@@ -230,16 +266,7 @@ class RunAndSaveBacktest:
             preset_key=strategy_type,
             strategy_name=strategy_type,
             hypothesis_id=hypothesis_id,
-            params={
-                "initialCash": initial_cash,
-                "timeframe": tf.value,
-                "barLimit": resolved_limit,
-                "dateFrom": date_from,
-                "dateTo": date_to,
-                "commissionBps": commission_bps,
-                "slippageBps": slippage_bps,
-                "spreadBps": spread_bps,
-            },
+            params=trial_params,
             is_metrics=result.is_metrics,
             is_score=result.total_return_pct,
             proposed_by="human",
@@ -249,7 +276,11 @@ class RunAndSaveBacktest:
                 "dataVersion": data_version,
                 "engine": manifest.get("engine"),
                 "runId": run.id,
-                **({"labEvidenceSource": "adopt"} if blocks else {}),
+                "datasetStart": dataset_meta.get("datasetStart"),
+                "datasetEnd": dataset_meta.get("datasetEnd"),
+                "barCount": dataset_meta.get("bars"),
+                **({"campaign": campaign_id} if campaign_id else {}),
+                **({"labEvidenceSource": "adopt"} if lab_evidence else {}),
             },
         )
         # Attach blocks / hypothesis for evidence classification (mocks may omit).

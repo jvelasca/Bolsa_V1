@@ -63,6 +63,33 @@ def test_parse_intraday_chart_payload_maps_iso_timestamps() -> None:
     assert bars[0].volume == 50000
 
 
+def test_parse_intraday_rejects_incoherent_ohlc() -> None:
+    ts = int(datetime(2024, 6, 15, 14, 30, tzinfo=timezone.utc).timestamp())
+    payload = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [ts, ts + 60],
+                    "indicators": {
+                        "quote": [
+                            {
+                                "open": [150.0, 10.0],
+                                "high": [149.0, 11.0],  # first bar high < open/close
+                                "low": [148.0, 9.5],
+                                "close": [150.5, 10.5],
+                                "volume": [1, 2],
+                            }
+                        ],
+                    },
+                }
+            ]
+        }
+    }
+    bars = parse_intraday_chart_payload(payload, "AAPL")
+    assert len(bars) == 1
+    assert float(bars[0].open) == 10.0
+
+
 def test_normalize_yahoo_error_rate_limit() -> None:
     message = normalize_yahoo_error(RuntimeError("429 Too Many Requests"))
     assert "429" in message

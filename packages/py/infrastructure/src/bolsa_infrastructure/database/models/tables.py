@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import BigInteger, Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
@@ -1259,3 +1259,21 @@ class MandateTradeLinkRow(Base):
     )
     linked_at: Mapped[datetime] = mapped_column("linked_at", DateTime(timezone=True))
     engine: Mapped[str] = mapped_column(String, default="mandate-trade-links-v1")
+
+
+class CoreRAccountStateRow(Base):
+    """Q3.4 — blob CORE-R (queue/reports/scheduler) por cuenta."""
+
+    __tablename__ = "core_r_account_state"
+
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        ForeignKey("investment_accounts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    queue_json: Mapped[list] = mapped_column("queue_json", JSONB, default=list)
+    reports_json: Mapped[dict] = mapped_column("reports_json", JSONB, default=dict)
+    scheduler_json: Mapped[dict] = mapped_column("scheduler_json", JSONB, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
+    )

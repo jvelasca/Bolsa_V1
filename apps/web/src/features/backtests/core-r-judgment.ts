@@ -404,6 +404,14 @@ function writeStore(store: ReportStore): void {
   }
 }
 
+export function readAllCoreRReports(): ReportStore {
+  return { ...readStore() };
+}
+
+export function replaceAllCoreRReports(store: ReportStore): void {
+  writeStore(store);
+}
+
 export function saveCoreRReport(report: Omit<CoreRReport, 'engine'> & { engine?: string }): CoreRReport {
   const full: CoreRReport = {
     ...report,
@@ -412,6 +420,8 @@ export function saveCoreRReport(report: Omit<CoreRReport, 'engine'> & { engine?:
   const store = readStore();
   store[full.listId] = full;
   writeStore(store);
+  // Q3.4 — push BD (lazy import evita ciclo con core-r-sync).
+  void import('@/features/backtests/core-r-sync').then((m) => m.scheduleCoreRPush());
   return full;
 }
 

@@ -51,11 +51,17 @@ export function loadCoreRSchedulerPrefs(): CoreRSchedulerPrefs {
   }
 }
 
-export function saveCoreRSchedulerPrefs(prefs: CoreRSchedulerPrefs): void {
+export function saveCoreRSchedulerPrefs(
+  prefs: CoreRSchedulerPrefs,
+  opts?: { skipPush?: boolean },
+): void {
   try {
     localStorage.setItem(CORE_R_SCHEDULER_KEY, JSON.stringify(prefs));
   } catch {
     // quota
+  }
+  if (!opts?.skipPush) {
+    void import('@/features/backtests/core-r-sync').then((m) => m.scheduleCoreRPush());
   }
 }
 

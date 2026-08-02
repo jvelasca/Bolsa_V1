@@ -118,10 +118,12 @@ def resolve_card_confidence(
     input_confidence: DataConfidence,
     pillar_coverage: float | None,
     is_stale: bool,
+    provider: str | None = None,
 ) -> DataConfidence:
     """
     Confianza de la tarjeta (dominio Python; UI solo pinta).
     - Stale → LOW (datos pueden mentir vs precio).
+    - Provider desconocido / vacío → no sube de MEDIUM.
     - Peor entre cobertura de inputs y coverage de pilares Score_FUND.
     """
     if is_stale:
@@ -132,6 +134,10 @@ def resolve_card_confidence(
         pillar_conf = coverage_to_confidence(pillar_coverage)
         if rank[pillar_conf] < rank[conf]:
             conf = pillar_conf
+    prov = (provider or "").strip().lower()
+    if not prov or prov in {"unknown", "none", "null"}:
+        if rank[conf] > rank["MEDIUM"]:
+            conf = "MEDIUM"
     return conf
 
 
@@ -221,6 +227,9 @@ def build_fundamental_card(
     elif raw:
         if pit == "reconstructed":
             warnings.append(RECONSTRUCTED_WARNING)
+        if is_stale:
+            days = stale_days if stale_days is not None else "?"
+            warnings.append(f"Fundamentals stale ({days}d > {max_age_days}d) — confidence LOW")
         inputs = FundamentalInputs.from_dict(raw)
         has_signal = any(
             v is not None
@@ -261,6 +270,7 @@ def build_fundamental_card(
         input_confidence=input_conf,
         pillar_coverage=coverage,
         is_stale=is_stale,
+        provider=provider,
     )
     if pit == "blocked":
         confidence = "LOW"

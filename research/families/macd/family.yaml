@@ -1,0 +1,29 @@
+# family.yaml — MACD (Q1.4)
+
+family: macd
+preset_keys:
+  - macd_signal_cross
+  - macd_zero_line
+hypothesis: >
+  Cruce MACD/signal o zero-line captura cambios de momentum de medio plazo.
+research_question: >
+  ¿Params clásicos (12/26/9) y vecindario cercano aportan tradeCount>0 estable
+  en IBEX35 diario con warm-up correcto?
+grid:
+  fast: [8, 12, 16]
+  slow: [20, 26, 30]
+  signal: [7, 9, 11]
+variables:
+  - fast
+  - slow
+  - signal
+explored_vs_theoretical: >
+  Vecindario alrededor de (12,26,9); no búsqueda global.
+warmup:
+  min_bars_rule: slow_plus_signal
+  see: bolsa_analytics.warmup_matrix
+  issue: "#macd-signal-ema-warmup"
+status: closed_c3
+notes: >
+  Cold-start OOS false negatives documentados; Lab OOS usa IS warm-up.
+  No C4 Bollinger sin hipótesis post Q1.3.

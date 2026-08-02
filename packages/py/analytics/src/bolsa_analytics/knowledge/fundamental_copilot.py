@@ -6,6 +6,7 @@ El LLM solo recibe estos strings; nunca recalcula Score_FUND.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -133,3 +134,40 @@ def heuristic_fundamental_explanation(card: dict[str, Any]) -> dict[str, Any]:
             "No es consejo de inversión ni sustituye el análisis propio."
         ),
     }
+
+
+_ROE_CLAIM = re.compile(r"\bROE\b[^0-9%]{0,24}(\d+(?:[.,]\d+)?)\s*%", re.I)
+
+
+def sanitize_copilot_query(text: str, *, max_len: int = 800) -> str:
+    """Q2.6 — recorta y limpia query de usuario al copiloto FA."""
+    cleaned = " ".join((text or "").split())
+    return cleaned[:max_len]
+
+
+def validate_copilot_does_not_invent_roe(
+    prose: str,
+    card: dict[str, Any],
+) -> list[str]:
+    """
+    Guardrail: si el texto afirma un ROE %, debe coincidir (aprox) con facts.roe.
+    Devuelve lista de violaciones (vacía = OK).
+    """
+    facts = card.get("facts") if isinstance(card.get("facts"), dict) else {}
+    roe = facts.get("roe")
+    violations: list[str] = []
+    for match in _ROE_CLAIM.finditer(prose or ""):
+        claimed = float(match.group(1).replace(",", "."))
+        if roe is None:
+            violations.append(f"ROE {claimed}% inventado (facts.roe ausente)")
+            continue
+        try:
+            expected_pct = float(roe) * 100.0 if abs(float(roe)) <= 1.5 else float(roe)
+        except (TypeError, ValueError):
+            violations.append("facts.roe no numérico")
+            continue
+        if abs(claimed - expected_pct) > 0.6:
+            violations.append(
+                f"ROE {claimed}% no coincide con facts ({expected_pct:.1f}%)"
+            )
+    return violations

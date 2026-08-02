@@ -808,6 +808,24 @@ export const api = {
       { method: 'PUT', body: JSON.stringify(body) },
     ),
 
+  getAccountCoreR: (accountId: string) =>
+    request<{ data: import('@bolsa/shared').CoreRBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/core-r`,
+    ),
+
+  syncAccountCoreR: (
+    accountId: string,
+    body: {
+      queue: Array<Record<string, unknown>>;
+      reports: Record<string, unknown>;
+      scheduler: Record<string, unknown>;
+    },
+  ) =>
+    request<{ data: import('@bolsa/shared').CoreRBundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/core-r`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
   queryInstrumentStrategyTops: (body: {
     instrumentIds: string[];
     timeframe?: string;
@@ -1097,6 +1115,9 @@ export const api = {
 
   getLaboratoryResearchSummary: () =>
     request<{ data: import('@bolsa/shared').LaboratoryResearchSummaryDto }>('/api/research/summary'),
+
+  getLabHealth: () =>
+    request<{ data: import('@bolsa/shared').LabHealthDto }>('/api/research/lab-health'),
 
   /** Evidence sesión C DÍA D → Fase 2 research_evidence (source=dia_d_session). */
   persistDiaDSessionEvidence: (body: {

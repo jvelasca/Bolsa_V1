@@ -30,6 +30,8 @@ from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evalu
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
 from bolsa_api.middleware.auth import AuthMiddleware
+from bolsa_api.middleware.rate_limit import RateLimitMiddleware
+from bolsa_api.logging_redact import install_log_redact
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
 from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
@@ -153,6 +155,7 @@ def _cors_origin_regex(settings) -> str | None:
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    install_log_redact()
 
     app = FastAPI(
         title="Bolsa V1 API",
@@ -164,7 +167,9 @@ def create_app() -> FastAPI:
         redoc_url="/api/redoc",
     )
 
+    # Last added = outermost. Rate limit before auth so 429 does not require token dance.
     app.add_middleware(AuthMiddleware)
+    app.add_middleware(RateLimitMiddleware, enabled=settings.environment != "test")
 
     app.add_middleware(
         CORSMiddleware,

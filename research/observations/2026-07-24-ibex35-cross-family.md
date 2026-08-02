@@ -90,6 +90,16 @@ Interpretación: el % de Sharpe nulo **no** mide “experimentos vacíos”; mid
 | ¿Presets con más vacíos (`tradeCount=0`)? | `rsi_mean_reversion` 21.4% · `rsi_oversold_bounce` 14.3% · resto ≤1.4% |
 | ¿% Sharpe nulo? | 92.8% global; **human ~4.6%**; grid 100% sin campo — hueco de instrumentación, no de trades |
 
+## Caveat ranking (Q0.4 · 2026-08-02)
+
+**Sharpe mediano cross-family ≠ verdad científica.** El ranking ▲/○/▼ es un *mapa exploratorio* anclado en human Sharpe dentro de cada familia. Antes de decidir producto u hipótesis C4:
+
+1. Mirar **tradeCount** (vacíos operativos) y **Calmar**/maxDD, no solo Sharpe.
+2. Usar Lab Health (`GET /api/research/lab-health` · `scripts/research/lab_health_report.py`) para cobertura Sortino/Calmar.
+3. No comparar score de grid interno con ranking human cross-family.
+
+Ver [improvement-roadmap-post-audits-2026-08-02.md](../../docs/engineering/improvement-roadmap-post-audits-2026-08-02.md) Q0.4.
+
 ## Observaciones
 
 1. **El factor dominante IS es el activo, no la familia.** 9 fuertes y 8 débiles atraviesan SMA/RSI/MACD. Coincide con la intuición de C1–C3 y ahora está tabulado.

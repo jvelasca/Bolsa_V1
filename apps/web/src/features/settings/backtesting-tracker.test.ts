@@ -20,6 +20,7 @@ describe('backtesting-tracker help guides', () => {
     expect(BACKTESTING_SYNC.asOf).toBe(HELP_CONTENT_AS_OF);
     expect(BACKTESTING_SYNC.diaDPremises).toMatch(/backtesting-dia-d-premises/);
     expect(BACKTESTING_SYNC.operativaTestPlan).toMatch(/operativa-test-plan/);
+    expect(BACKTESTING_SYNC.improvementRoadmap).toMatch(/improvement-roadmap-post-audits/);
   });
 
   it('DÍA D guide covers full-bleed ephemeral, Evidence, LAB verify', () => {

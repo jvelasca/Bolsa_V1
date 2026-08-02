@@ -1,7 +1,8 @@
 /**
  * Host CORE-R cron shell — ticks mientras la app está abierta (PlatformShell).
  * v1.6–v1.7: toast si encola; acción **Abrir Monitor**.
- * No pisa TOP · no auto-paper D. Cola localStorage.
+ * v1.9 Q3.4: hydrate cola/informe/scheduler desde BD (multi-dispositivo).
+ * No pisa TOP · no auto-paper D.
  */
 
 import { useEffect } from 'react';
@@ -12,11 +13,27 @@ import {
 } from '@/features/backtests/core-r-scheduler';
 import { runCoreRSchedulerTick } from '@/features/backtests/core-r-scheduler-tick';
 import { formatCoreREnqueueToast } from '@/features/backtests/core-r-status';
+import {
+  ensureCoreRHydrated,
+  wireCoreRPushSubscriptions,
+} from '@/features/backtests/core-r-sync';
 import { useAlertsStore } from '@/stores/alerts-store';
+import { useActiveAccountStore } from '@/stores/active-account-store';
 
 const POLL_MS = 60_000;
 
 export function CoreRSchedulerHost() {
+  const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
+
+  useEffect(() => {
+    wireCoreRPushSubscriptions();
+  }, []);
+
+  useEffect(() => {
+    if (!activeAccountId) return;
+    void ensureCoreRHydrated(activeAccountId);
+  }, [activeAccountId]);
+
   useEffect(() => {
     let cancelled = false;
     const tick = () => {

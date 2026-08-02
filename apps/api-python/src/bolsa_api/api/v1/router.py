@@ -18,6 +18,7 @@ from bolsa_api.api.v1.routes import (
     investor_profiles,
     lists,
     mandates,
+    core_r,
     market,
     market_indices,
     paper_d,
@@ -57,6 +58,7 @@ api_v1_router.include_router(market_indices.router, tags=["market-indices"])
 api_v1_router.include_router(alerts.router, tags=["alerts"])
 api_v1_router.include_router(accounts.router, tags=["accounts"])
 api_v1_router.include_router(mandates.router, tags=["mandates"])
+api_v1_router.include_router(core_r.router, tags=["core-r"])
 api_v1_router.include_router(investor_profiles.router, tags=["investor-profiles"])
 api_v1_router.include_router(portfolio.router, tags=["portfolio"])
 api_v1_router.include_router(backtests.router, tags=["backtests"])

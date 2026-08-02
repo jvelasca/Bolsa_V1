@@ -1,0 +1,26 @@
+# family.yaml — SMA (Q1.4)
+# Formaliza hipótesis / pregunta / espacio explorado. No abre C4.
+
+family: sma
+preset_keys:
+  - sma_crossover
+hypothesis: >
+  Cruce de medias móviles captura régimen de tendencia a medio plazo
+  en renta variable líquida (IBEX35 diario).
+research_question: >
+  ¿Qué pares fast/slow maximizan score IS con tradeCount>0 y drawdown acotado
+  en el universo IBEX35, sin claim cross-family?
+grid:
+  fast: [5, 10, 12, 15, 20]
+  slow: [20, 30, 40, 50, 60, 100]
+variables:
+  - fastPeriod
+  - slowPeriod
+explored_vs_theoretical: >
+  Espacio teórico continuo (fast < slow); explorado = producto cartesiano
+  acotado por max_trials del grid H0. No Optuna salvo camino explícito.
+warmup:
+  min_bars_rule: slow
+  see: bolsa_analytics.warmup_matrix
+status: closed_c1
+notes: K histórico no se reescribe; nuevas corridas usan campaign_manifest_v0.

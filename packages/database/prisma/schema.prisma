@@ -1078,6 +1078,7 @@ model InvestmentAccount {
   positionPolicies  PositionPolicy[]
   mandateTenures    MandateTenure[]
   mandateTradeLinks MandateTradeLink[]
+  coreRState        CoreRAccountState?
 
   @@index([isDefault])
   @@index([userId])
@@ -1085,6 +1086,19 @@ model InvestmentAccount {
   @@index([strategyDefinitionId])
   @@index([activeProfileId])
   @@map("investment_accounts")
+}
+
+/// Q3.4 — CORE-R cola/informe/scheduler por cuenta (blob JSON; LS = cache).
+model CoreRAccountState {
+  accountId     String   @id @map("account_id")
+  queueJson     Json     @default("[]") @map("queue_json")
+  reportsJson   Json     @default("{}") @map("reports_json")
+  schedulerJson Json     @default("{}") @map("scheduler_json")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  account InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("core_r_account_state")
 }
 
 /// Cartera lógica dentro de una cuenta (enlazada a portfolios legacy para posiciones).

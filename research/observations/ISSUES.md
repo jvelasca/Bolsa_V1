@@ -5,11 +5,25 @@ No abren Fase 2 ni entidades nuevas.
 
 ## Open
 
+### warmup-audit (Q0.3)
+
+| Campo | Valor |
+|-------|--------|
+| Estado | Open · matriz + smoke tests · 2026-08-02 |
+| Severidad | Media (reproducibilidad OOS) |
+| Código | `bolsa_analytics.warmup_matrix` · `scripts/research/warmup_audit_report.py` · `verify_oos_warmup.py` |
+| Relacionado | `#macd-signal-ema-warmup` |
+
+**Hecho:** matriz SMA/EMA/RSI/MACD/Bollinger/ADX/ATR con `minBars` por defaults; tests smoke.  
+**Pendiente:** wire assert en grids de campaña al cerrar (gate Q1.6).
+
+---
+
 ### CORE-R continuous-strategy-reevaluation · **CRÍTICO**
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · **v0–v1.8** (cola + OOS + PnL + narración + cron + chip + toast + **Hecho todos**) · cron multi-dispositivo pendiente |
+| Estado | Open · **v0–v1.9** (cola + OOS + PnL + narración + cron + chip + toast + Hecho todos + **Q3.4 BD blob**) · cron servidor aún pendiente |
 | Severidad | **Crítica (producto a medio plazo)** |
 | Origen | Decisión usuario 2026-07-29 (tras pulir Lista AUTO) |
 | Código | `core-r-judgment.ts` · `core-r-scheduler.ts` · `core-r-scheduler-host.tsx` · `core_r_review_evidence.py` · Monitor · tablero Lista AUTO |
@@ -37,7 +51,9 @@ No abren Fase 2 ni entidades nuevas.
 
 **Hecho (v1.8 · 2026-08-01):** **Hecho todos** en Monitor (lista actual) · `dismissOpen` · regresión chip (selector zustand estable).
 
-**Pendiente:** cron multi-dispositivo (requiere report/cola en servidor).
+**Hecho (v1.9 · Q3.4 · 2026-08-02):** tabla `core_r_account_state` + `GET\|PUT /api/accounts/{id}/core-r` + `core-r-sync.ts` (hydrate en `CoreRSchedulerHost`; LS = cache). Multi-dispositivo para cola/informe/scheduler prefs.
+
+**Pendiente:** cron **servidor** (ticks sin app abierta); hoy sigue siendo shell host con app abierta.
 
 **Ops:** `pnpm test:operativa` · `pnpm test:operativa:smoke` (API opcional).
 

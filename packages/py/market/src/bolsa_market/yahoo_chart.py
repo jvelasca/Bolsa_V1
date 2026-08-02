@@ -74,6 +74,16 @@ def parse_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> list[Ohlc
     return bars
 
 
+def _intraday_ohlc_ok(o: float, h: float, lo: float, c: float, v: int) -> bool:
+    if o <= 0 or h <= 0 or lo <= 0 or c <= 0 or v < 0:
+        return False
+    if h < lo:
+        return False
+    if h < max(o, c) or lo > min(o, c):
+        return False
+    return True
+
+
 def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> list[IntradayOhlcvBar]:
     result = payload.get("chart", {}).get("result")
     if not result:
@@ -91,15 +101,19 @@ def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> 
         v = quotes.get("volume", [None] * len(timestamps))[i]
         if o is None or h is None or lo is None or c is None:
             continue
+        fo, fh, flo, fc = float(o), float(h), float(lo), float(c)
+        vol = int(v or 0)
+        if not _intraday_ohlc_ok(fo, fh, flo, fc, vol):
+            continue
         moment = datetime.fromtimestamp(ts, tz=timezone.utc)
         bars.append(
             IntradayOhlcvBar(
                 timestamp=moment.isoformat().replace("+00:00", "Z"),
-                open=float(o),
-                high=float(h),
-                low=float(lo),
-                close=float(c),
-                volume=int(v or 0),
+                open=fo,
+                high=fh,
+                low=flo,
+                close=fc,
+                volume=vol,
             ),
         )
 

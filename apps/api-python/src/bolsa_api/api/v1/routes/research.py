@@ -47,6 +47,10 @@ from bolsa_api.schemas.research import (
     ResearchTreeEdgesListResponseDto,
     LaboratoryResearchSummaryDto,
     LaboratoryResearchSummaryResponseDto,
+    LabHealthCampaignDto,
+    LabHealthDto,
+    LabHealthMetricCoverageDto,
+    LabHealthResponseDto,
     LabByInstrumentDto,
     LabByOriginDto,
     LabByPresetDto,
@@ -88,6 +92,7 @@ from bolsa_application.research_evidence import (
 )
 from bolsa_application.research_trials import (
     GetInstrumentResearchSummary,
+    GetLabHealth,
     GetLaboratoryResearchSummary,
     GetResearchTrial,
     ListResearchTrials,
@@ -793,5 +798,32 @@ async def get_laboratory_research_summary(
             by_instrument=[LabByInstrumentDto.model_validate(x) for x in summary["byInstrument"]],
             by_preset=[LabByPresetDto.model_validate(x) for x in summary["byPreset"]],
             by_origin=[LabByOriginDto.model_validate(x) for x in summary["byOrigin"]],
+        )
+    )
+
+
+@router.get("/research/lab-health", response_model=LabHealthResponseDto)
+async def get_lab_health(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> LabHealthResponseDto:
+    """Q0.1 — sanidad del laboratorio (cobertura Sharpe/Sortino/Calmar, zero-trades)."""
+    use_case = GetLabHealth(get_research_trial_repository(session))
+    health = await use_case.execute()
+    coverage = {
+        key: LabHealthMetricCoverageDto.model_validate(val)
+        for key, val in health["coverage"].items()
+    }
+    return LabHealthResponseDto(
+        data=LabHealthDto(
+            total_trials=health["totalTrials"],
+            coverage=coverage,
+            zero_trade_count=health["zeroTradeCount"],
+            zero_trade_pct=health["zeroTradePct"],
+            campaigns=[LabHealthCampaignDto.model_validate(c) for c in health["campaigns"]],
+            campaign_count=health["campaignCount"],
+            instruments_with_trials=health["instrumentsWithTrials"],
+            active_instruments=health["activeInstruments"],
+            instruments_without_trials=health["instrumentsWithoutTrials"],
+            caveat=health["caveat"],
         )
     )

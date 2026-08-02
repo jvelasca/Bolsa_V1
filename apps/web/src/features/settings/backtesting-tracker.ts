@@ -3,7 +3,7 @@
  * Resumen no técnico primero; pantallas, seguimiento de plataforma y detalle después.
  * El detalle vivo está en docs (no duplicar aquí el lifecycle completo).
  *
- * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.8 + CORE-B v0.2 + ADR-019 universos (2026-08-02).
+ * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.9 BD + CORE-B v0.2 + ADR-019 universos (2026-08-02).
  *
  * @see docs/HELP.md
  * @see docs/engineering/research-lifecycle.md
@@ -22,6 +22,8 @@ import { HELP_CONTENT_AS_OF } from '@/features/help/help-content-as-of';
 export const BACKTESTING_SYNC = {
   asOf: HELP_CONTENT_AS_OF,
   lifecycleDoc: 'docs/engineering/research-lifecycle.md',
+  improvementRoadmap: 'docs/engineering/improvement-roadmap-post-audits-2026-08-02.md',
+  stabilityProtocol: 'docs/engineering/stability-campaign-protocol-2026-08-02.md',
   handoffDoc: 'docs/engineering/session-handoff-2026-08-01.md',
   listAutoOps: 'docs/engineering/list-auto-ops-2026-07-29.md',
   listsUniverses: 'docs/engineering/lists-universes-design-2026-07-30.md',
@@ -114,7 +116,7 @@ export const BACKTESTING_CORE_R_GUIDE = {
   ],
   notes: [
     'Sandbox DÍA D ≠ DEMO live. CORE-R lee DEMO/paper vinculadas al TOP (prefer simulated).',
-    'Cron shell ≠ cron multi-dispositivo: la cola vive en localStorage de este navegador.',
+    'Cron shell ≠ cron servidor: cola/informe/scheduler sync BD (Q3.4); ticks siguen con app abierta.',
     'Chip barra / toast «Abrir Monitor» → Ayuda · Monitor. También /backtests?tab=run&focus=monitor',
     'Hecho todos cierra abiertas de la lista actual (no borra; clearDone limpia done).',
     'Toast solo si added > 0 (sin ruido en ticks vacíos).',
@@ -252,7 +254,7 @@ export const BACKTESTING_TRACKING = [
     title: 'CORE-R cola revisión (Monitor)',
     status: 'listo' as const,
     plain:
-      'v1.8: informe + PnL + Narrar + cron + chip + toast Abrir Monitor + Hecho todos. Sin overwrite TOP ni auto-paper D.',
+      'v1.9: + sync BD multi-dispositivo (core_r_account_state). Sin overwrite TOP ni auto-paper D. Cron servidor pendiente.',
   },
   {
     id: 'lab-ui',
