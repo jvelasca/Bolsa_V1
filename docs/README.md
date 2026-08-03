@@ -39,6 +39,7 @@
 | [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md) | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual) |
 | [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
 | [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md) | **Paquete auditoría** post-Q0–Q3 + freeze + evidencia smoke |
+| [engineering/audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md) | **Respuesta auditoría 1** — gaps reales A/B (ingesta + FIE) vs stack Bolsa_V1 |
 | [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) | **Roadmap mejoras** post-auditorías (Q0–Q3 · horizonte TOP) |
 | [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) | **Freeze** post-Q3: C4 no · Belief no · flags ops off |
 | [engineering/dev-logs.md](./engineering/dev-logs.md) | Logs locales `logs/` (no producto; sin README en carpeta) |

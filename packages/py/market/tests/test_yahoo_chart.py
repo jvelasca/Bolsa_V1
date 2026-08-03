@@ -64,6 +64,10 @@ def test_parse_intraday_chart_payload_maps_iso_timestamps() -> None:
 
 
 def test_parse_intraday_rejects_incoherent_ohlc() -> None:
+    from bolsa_market.ohlcv_quarantine import get_ohlcv_quarantine_stats
+
+    stats = get_ohlcv_quarantine_stats()
+    stats.reset()
     ts = int(datetime(2024, 6, 15, 14, 30, tzinfo=UTC).timestamp())
     payload = {
         "chart": {
@@ -88,9 +92,51 @@ def test_parse_intraday_rejects_incoherent_ohlc() -> None:
     bars = parse_intraday_chart_payload(payload, "AAPL")
     assert len(bars) == 1
     assert float(bars[0].open) == 10.0
+    snap = stats.snapshot()
+    assert snap["intradaily_rejected"] >= 1
+    assert snap["by_reason"].get("ohlc_invalid", 0) >= 1
+
+
+def test_parse_daily_quarantines_incoherent_ohlc() -> None:
+    from bolsa_market.ohlcv_quarantine import get_ohlcv_quarantine_stats
+
+    stats = get_ohlcv_quarantine_stats()
+    stats.reset()
+    payload = {
+        "chart": {
+            "result": [
+                {
+                    "timestamp": [1704067200, 1704153600],
+                    "indicators": {
+                        "quote": [
+                            {
+                                "open": [10.0, 10.5],
+                                "high": [9.0, 11.0],  # first bar high < open
+                                "low": [8.0, 10.2],
+                                "close": [10.4, 10.9],
+                                "volume": [1000, 1100],
+                            }
+                        ],
+                        "adjclose": [{"adjclose": [10.4, 10.9]}],
+                    },
+                }
+            ]
+        }
+    }
+    bars = parse_chart_payload(payload, "AENA.MC")
+    assert len(bars) == 1
+    assert float(bars[0].close) == 10.9
+    assert stats.snapshot()["daily_rejected"] >= 1
 
 
 def test_normalize_yahoo_error_rate_limit() -> None:
     message = normalize_yahoo_error(RuntimeError("429 Too Many Requests"))
     assert "429" in message
     assert "Espera" in message
+
+
+def test_normalize_yahoo_error_circuit_open() -> None:
+    from bolsa_market.yahoo_circuit_breaker import YahooCircuitOpenError
+
+    message = normalize_yahoo_error(YahooCircuitOpenError("Yahoo circuit OPEN"))
+    assert "cooldown" in message.lower() or "circuit" in message.lower()

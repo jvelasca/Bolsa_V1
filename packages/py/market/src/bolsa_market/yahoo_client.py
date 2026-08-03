@@ -9,6 +9,11 @@ from email.utils import parsedate_to_datetime
 
 import httpx
 
+from bolsa_market.yahoo_circuit_breaker import (
+    YahooCircuitBreaker,
+    YahooCircuitOpenError,
+)
+
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -25,6 +30,11 @@ class YahooRateLimitError(RuntimeError):
 
 def normalize_yahoo_error(exc: Exception) -> str:
     raw = str(exc)
+    if isinstance(exc, YahooCircuitOpenError) or "circuit OPEN" in raw:
+        return (
+            "Yahoo Finance en cooldown (circuit breaker). "
+            "Espera un minuto e inténtalo de nuevo."
+        )
     if "429" in raw or "too many requests" in raw.lower():
         return (
             "Yahoo Finance limitó las peticiones (429). "
@@ -56,7 +66,7 @@ def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
 
 @dataclass
 class YahooFinanceClient:
-    """Cliente HTTP para chart API de Yahoo con throttling y reintentos."""
+    """Cliente HTTP Yahoo: throttle, reintentos con backoff y circuit breaker."""
 
     min_interval_sec: float = field(
         default_factory=lambda: float(os.environ.get("YAHOO_MIN_INTERVAL_SEC", "2.0")),
@@ -64,6 +74,7 @@ class YahooFinanceClient:
     max_retries: int = field(
         default_factory=lambda: int(os.environ.get("YAHOO_MAX_RETRIES", "4")),
     )
+    circuit: YahooCircuitBreaker = field(default_factory=YahooCircuitBreaker)
 
     def __post_init__(self) -> None:
         self._lock = asyncio.Lock()
@@ -166,6 +177,11 @@ class YahooFinanceClient:
         period2: int,
         interval: str = "1d",
     ) -> dict:
+        try:
+            self.circuit.before_call()
+        except YahooCircuitOpenError as exc:
+            raise RuntimeError(normalize_yahoo_error(exc)) from exc
+
         client = await self._get_client()
         await self._ensure_crumb(client)
 
@@ -189,6 +205,7 @@ class YahooFinanceClient:
             except httpx.HTTPError as exc:
                 last_error = exc
                 if attempt == self.max_retries - 1:
+                    self.circuit.record_failure()
                     raise RuntimeError(normalize_yahoo_error(exc)) from exc
                 await asyncio.sleep(min(90.0, 5.0 * (2**attempt)))
                 continue
@@ -208,6 +225,7 @@ class YahooFinanceClient:
                 if response.status_code == 429:
                     await self._reset_session()
                 if attempt == self.max_retries - 1:
+                    self.circuit.record_failure()
                     raise RuntimeError(normalize_yahoo_error(last_error)) from last_error
                 await asyncio.sleep(_retry_delay_seconds(response, attempt))
                 continue
@@ -215,20 +233,25 @@ class YahooFinanceClient:
             try:
                 response.raise_for_status()
             except httpx.HTTPStatusError as exc:
+                self.circuit.record_failure()
                 raise RuntimeError(normalize_yahoo_error(exc)) from exc
 
             payload = response.json()
             chart_error = payload.get("chart", {}).get("error")
             if chart_error:
                 description = chart_error.get("description", str(chart_error))
+                self.circuit.record_failure()
                 raise RuntimeError(normalize_yahoo_error(RuntimeError(description)))
 
             result = payload.get("chart", {}).get("result")
             if not result:
+                self.circuit.record_failure()
                 raise RuntimeError(f"Yahoo no devolvió barras diarias para {yahoo_symbol}")
 
+            self.circuit.record_success()
             return payload
 
+        self.circuit.record_failure()
         if last_error:
             raise RuntimeError(normalize_yahoo_error(last_error)) from last_error
         raise RuntimeError(f"Yahoo no devolvió barras diarias para {yahoo_symbol}")

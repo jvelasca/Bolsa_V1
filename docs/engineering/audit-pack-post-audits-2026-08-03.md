@@ -17,6 +17,7 @@
 | **Estabilidad IBEX** | ¿Ranking RSI estable entre ventanas? | **No** (13 same / 22 changed) → Gate C4 **cerrado** |
 | **IBEX Finalistas** | ¿Cobertura TOP? | **35/35**, `TOP_sin_runId=0` |
 | **Freeze producto** | ¿C4 / Belief / flags ops? | **No abrir** — [decision freeze](./post-audit-decision-freeze-2026-08-03.md) |
+| **Auditoría 1 (ingesta+FIE)** | ¿Gaps A/B del informe externo? | Ver [audit1-response](./audit1-response-ingest-fie-2026-08-03.md) — CB Yahoo + cuarentena + health Redis + test FIE parcial |
 
 **Cómo auditar en 30–45 min**
 
