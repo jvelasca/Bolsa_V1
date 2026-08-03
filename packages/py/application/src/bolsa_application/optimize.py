@@ -97,6 +97,7 @@ class OptimizeGridTrial:
 
 @dataclass(frozen=True, slots=True)
 class OptimizeSmaGridResult:
+    """Resultado de Optimize Sma Grid."""
     instrument_id: str
     bar_count: int
     baseline: OptimizeGridTrial
@@ -529,6 +530,7 @@ async def _run_in_thread_with_live_progress[T](
 
 
 class RunSmaGridOptimize:
+    """Ejecuta Sma Grid Optimize."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

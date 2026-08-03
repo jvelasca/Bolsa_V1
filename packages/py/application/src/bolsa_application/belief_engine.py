@@ -275,6 +275,7 @@ async def update_belief_from_evidence(
 
 
 class GetHypothesisBelief:
+    """Obtiene Hypothesis Belief."""
     def __init__(self, repository: _BeliefRepo) -> None:
         self._repository = repository
 
@@ -283,6 +284,7 @@ class GetHypothesisBelief:
 
 
 class ListBeliefHistory:
+    """Lista Belief History."""
     def __init__(self, repository: _BeliefRepo) -> None:
         self._repository = repository
 

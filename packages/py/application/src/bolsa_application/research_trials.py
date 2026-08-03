@@ -1,3 +1,5 @@
+"""Use-cases de trials del laboratorio / resumen."""
+
 from typing import Any, Literal
 
 from bolsa_domain.entities.research_trial import ResearchTrial
@@ -13,6 +15,7 @@ ResearchTrialSort = Literal[
 
 
 class ListResearchTrials:
+    """Lista Research Trials."""
     def __init__(self, repository: ResearchTrialRepository) -> None:
         self._repository = repository
 
@@ -55,6 +58,7 @@ class ListResearchTrials:
 
 
 class GetResearchTrial:
+    """Obtiene Research Trial."""
     def __init__(self, repository: ResearchTrialRepository) -> None:
         self._repository = repository
 
@@ -63,6 +67,7 @@ class GetResearchTrial:
 
 
 class GetInstrumentResearchSummary:
+    """Obtiene Instrument Research Summary."""
     def __init__(self, repository: ResearchTrialRepository) -> None:
         self._repository = repository
 
@@ -71,6 +76,7 @@ class GetInstrumentResearchSummary:
 
 
 class GetLaboratoryResearchSummary:
+    """Obtiene Laboratory Research Summary."""
     def __init__(self, repository: ResearchTrialRepository) -> None:
         self._repository = repository
 

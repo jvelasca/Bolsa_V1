@@ -19,6 +19,7 @@ from bolsa_domain.value_objects.timeframe import TimeFrame
 
 @dataclass(frozen=True, slots=True)
 class PositionExitEvalResult:
+    """Resultado de Position Exit Eval."""
     account_id: str
     instrument_id: str
     symbol: str
@@ -43,6 +44,7 @@ class PositionExitEvalResult:
 
 @dataclass(frozen=True, slots=True)
 class EvaluatePositionExitsResult:
+    """Evalúa Position Exits Result."""
     account_id: str
     evaluated_count: int
     results: list[PositionExitEvalResult] = field(default_factory=list)
@@ -69,6 +71,7 @@ def _signal_to_hit(signal: SignalEventV1, *, symbol: str) -> dict[str, Any]:
 
 
 class EvaluatePositionExits:
+    """Evalúa Position Exits."""
     def __init__(
         self,
         portfolio_summary: GetPortfolioSummary,

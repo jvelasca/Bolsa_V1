@@ -53,10 +53,12 @@ def _exchange_currency_for_yahoo(yahoo_symbol: str) -> tuple[str, str]:
 
 @dataclass(frozen=True, slots=True)
 class SearchMarketIndicesResult:
+    """Busca Market Indices Result."""
     hits: list[IndexHit]
 
 @dataclass(frozen=True, slots=True)
 class CatalogIndexEntry:
+    """DTO fila: Catalog Index Entry."""
     code: str
     display_name: str
     yahoo_symbol: str
@@ -69,6 +71,7 @@ class CatalogIndexEntry:
 
 @dataclass(frozen=True, slots=True)
 class SubscribeProgress:
+    """Suscribe Progress."""
     total: int
     already_present: int
     imported: int
@@ -79,6 +82,7 @@ class SubscribeProgress:
 
 @dataclass(frozen=True, slots=True)
 class SubscribeMarketIndexResult:
+    """Suscribe Market Index Result."""
     list_id: str
     index_code: str
     display_name: str
@@ -90,6 +94,7 @@ class SubscribeMarketIndexResult:
     list_detail: InstrumentListDetail
 
 class SearchMarketIndices:
+    """Busca Market Indices."""
     async def execute(self, query: str, *, limit: int = 12) -> SearchMarketIndicesResult:
         client = get_yahoo_finance_client()
 
@@ -123,10 +128,12 @@ class ListMarketIndexCatalog:
         ]
 
 class ResolveIndexConstituents:
+    """Resuelve Index Constituents."""
     async def execute(self, index_code_or_yahoo: str) -> ConstituentSet | None:
         return await default_constituent_provider().resolve(index_code_or_yahoo)
 
 class SubscribeMarketIndex:
+    """Suscribe Market Index."""
     def __init__(
         self,
         list_repo: SqlAlchemyListRepository,
@@ -287,6 +294,7 @@ class SubscribeMarketIndex:
         )
 
 class SyncSubscribedCatalogIndices:
+    """Sincroniza Subscribed Catalog Indices."""
     def __init__(self, subscribe: SubscribeMarketIndex, list_repo: SqlAlchemyListRepository) -> None:
         self._subscribe = subscribe
         self._list_repo = list_repo
@@ -313,6 +321,7 @@ class SyncSubscribedCatalogIndices:
         return results
 
 class EnqueueIndexSubscribeJob:
+    """Encola Index Subscribe Job."""
     def __init__(self, jobs: SqlAlchemyIndexSubscribeJobRepository) -> None:
         self._jobs = jobs
 
@@ -328,6 +337,7 @@ class EnqueueIndexSubscribeJob:
         )
 
 class ProcessIndexSubscribeJob:
+    """Procesa Index Subscribe Job."""
     def __init__(
         self,
         jobs: SqlAlchemyIndexSubscribeJobRepository,
@@ -380,6 +390,7 @@ class ProcessIndexSubscribeJob:
             return await self._jobs.mark_failed(record.id, str(exc))
 
 class GetIndexSubscribeJob:
+    """Obtiene Index Subscribe Job."""
     def __init__(self, jobs: SqlAlchemyIndexSubscribeJobRepository) -> None:
         self._jobs = jobs
 

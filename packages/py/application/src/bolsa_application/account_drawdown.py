@@ -22,6 +22,7 @@ def _week_key(dt: datetime) -> str:
 
 @dataclass(frozen=True, slots=True)
 class AccountDrawdowns:
+    """Use-case / tipo: Account Drawdowns."""
     daily_pct: float | None
     weekly_pct: float | None
     max_pct: float | None

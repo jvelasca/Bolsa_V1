@@ -34,6 +34,7 @@ TABLE_LABELS: tuple[tuple[str, str], ...] = (
 
 @dataclass(frozen=True, slots=True)
 class DatabaseTableCount:
+    """Use-case / tipo: Database Table Count."""
     table: str
     label: str
     count: int
@@ -41,12 +42,14 @@ class DatabaseTableCount:
 
 @dataclass(frozen=True, slots=True)
 class InstrumentOhlcvBreakdown:
+    """Use-case / tipo: Instrument Ohlcv Breakdown."""
     timeframe: str
     bar_count: int
 
 
 @dataclass(frozen=True, slots=True)
 class DatabaseSummary:
+    """Use-case / tipo: Database Summary."""
     connected: bool
     message: str
     tables: tuple[DatabaseTableCount, ...]
@@ -54,6 +57,7 @@ class DatabaseSummary:
 
 
 class GetDatabaseSummary:
+    """Obtiene Database Summary."""
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 

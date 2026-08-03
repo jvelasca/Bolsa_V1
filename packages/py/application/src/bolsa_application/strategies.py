@@ -1,3 +1,5 @@
+"""Use-cases de definiciones de estrategia."""
+
 from typing import Any
 
 from bolsa_analytics.research.manifest import strategy_definition_from_preset
@@ -7,6 +9,7 @@ from bolsa_domain.repositories.strategy_definition_repository import StrategyDef
 
 
 class ListStrategyDefinitions:
+    """Lista Strategy Definitions."""
     def __init__(self, repository: StrategyDefinitionRepository) -> None:
         self._repository = repository
 
@@ -15,6 +18,7 @@ class ListStrategyDefinitions:
 
 
 class GetStrategyDefinition:
+    """Obtiene Strategy Definition."""
     def __init__(self, repository: StrategyDefinitionRepository) -> None:
         self._repository = repository
 
@@ -23,6 +27,7 @@ class GetStrategyDefinition:
 
 
 class CreateStrategyFromPreset:
+    """Crea Strategy From Preset."""
     def __init__(self, repository: StrategyDefinitionRepository) -> None:
         self._repository = repository
 
@@ -57,6 +62,7 @@ class CreateStrategyFromPreset:
 
 
 class CreateStrategyDefinition:
+    """Crea Strategy Definition."""
     def __init__(self, repository: StrategyDefinitionRepository) -> None:
         self._repository = repository
 
@@ -81,6 +87,7 @@ class CreateStrategyDefinition:
 
 
 class UpdateStrategyDefinition:
+    """Actualiza Strategy Definition."""
     def __init__(self, repository: StrategyDefinitionRepository) -> None:
         self._repository = repository
 
@@ -112,6 +119,7 @@ class UpdateStrategyDefinition:
 
 
 class DeleteStrategyDefinition:
+    """Elimina Strategy Definition."""
     def __init__(self, repository: StrategyDefinitionRepository) -> None:
         self._repository = repository
 

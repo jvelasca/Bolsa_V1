@@ -70,6 +70,7 @@ def merge_schedule_run_state(
 
 @dataclass(frozen=True, slots=True)
 class TrackerScheduleRunResult:
+    """Resultado de Tracker Schedule Run."""
     tracker_id: str
     tracker_name: str
     status: TrackerScheduleStatus
@@ -80,12 +81,14 @@ class TrackerScheduleRunResult:
 
 @dataclass(frozen=True, slots=True)
 class ProcessTrackerSchedulesResult:
+    """Procesa Tracker Schedules Result."""
     checked_count: int
     enqueued_count: int
     runs: list[TrackerScheduleRunResult] = field(default_factory=list)
 
 
 class ProcessTrackerSchedules:
+    """Procesa Tracker Schedules."""
     def __init__(
         self,
         tracker_repository: TrackerDefinitionRepository,

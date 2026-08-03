@@ -94,6 +94,7 @@ def normalize_falsifiers(raw: Any) -> list[dict[str, Any]]:
 
 
 class CreateHypothesis:
+    """Crea Hypothesis."""
     def __init__(
         self,
         repository: _HypothesisRepo,
@@ -138,6 +139,7 @@ class CreateHypothesis:
 
 
 class GetHypothesis:
+    """Obtiene Hypothesis."""
     def __init__(self, repository: _HypothesisRepo) -> None:
         self._repository = repository
 
@@ -146,6 +148,7 @@ class GetHypothesis:
 
 
 class ListHypotheses:
+    """Lista Hypotheses."""
     def __init__(self, repository: _HypothesisRepo) -> None:
         self._repository = repository
 
@@ -167,6 +170,7 @@ class ListHypotheses:
 
 
 class UpdateHypothesis:
+    """Actualiza Hypothesis."""
     def __init__(self, repository: _HypothesisRepo) -> None:
         self._repository = repository
 

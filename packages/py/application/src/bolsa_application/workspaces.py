@@ -14,6 +14,7 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 
 
 class ListWorkspaces:
+    """Lista Workspaces."""
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 
@@ -22,6 +23,7 @@ class ListWorkspaces:
 
 
 class GetWorkspace:
+    """Obtiene Workspace."""
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 
@@ -30,6 +32,7 @@ class GetWorkspace:
 
 
 class GetDefaultWorkspace:
+    """Obtiene Default Workspace."""
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 
@@ -65,6 +68,7 @@ class CreateWorkspace:
 
 
 class UpdateWorkspace:
+    """Actualiza Workspace."""
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 
@@ -92,6 +96,7 @@ class UpdateWorkspace:
 
 
 class DeleteWorkspace:
+    """Elimina Workspace."""
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 

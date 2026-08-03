@@ -1,3 +1,5 @@
+"""Use-cases de políticas de ejecución."""
+
 from typing import Any
 
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
@@ -53,6 +55,7 @@ def build_execution_policy_definition(
 
 
 class ListExecutionPolicies:
+    """Lista Execution Policies."""
     def __init__(self, repository: ExecutionPolicyRepository) -> None:
         self._repository = repository
 
@@ -61,6 +64,7 @@ class ListExecutionPolicies:
 
 
 class GetExecutionPolicy:
+    """Obtiene Execution Policy."""
     def __init__(self, repository: ExecutionPolicyRepository) -> None:
         self._repository = repository
 
@@ -69,6 +73,7 @@ class GetExecutionPolicy:
 
 
 class CreateExecutionPolicy:
+    """Crea Execution Policy."""
     def __init__(
         self,
         repository: ExecutionPolicyRepository,
@@ -144,6 +149,7 @@ class CreateExecutionPolicy:
 
 
 class UpdateExecutionPolicy:
+    """Actualiza Execution Policy."""
     def __init__(
         self,
         repository: ExecutionPolicyRepository,
@@ -239,6 +245,7 @@ class UpdateExecutionPolicy:
 
 
 class DeleteExecutionPolicy:
+    """Elimina Execution Policy."""
     def __init__(self, repository: ExecutionPolicyRepository) -> None:
         self._repository = repository
 

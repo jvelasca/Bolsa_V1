@@ -22,6 +22,7 @@ FreshnessStatus = Literal["current", "stale", "empty", "error", "gap_detected", 
 
 @dataclass(frozen=True, slots=True)
 class InstrumentDataStatus:
+    """Use-case / tipo: Instrument Data Status."""
     timeframe: str
     last_bar_date: str | None
     expected_last_bar_date: str
@@ -37,6 +38,7 @@ class InstrumentDataStatus:
 
 
 class GetInstrumentDataStatus:
+    """Obtiene Instrument Data Status."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

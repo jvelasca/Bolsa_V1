@@ -1,3 +1,5 @@
+"""Use-case: series de indicadores por instrumento."""
+
 from dataclasses import dataclass
 
 from bolsa_analytics.indicators import (
@@ -12,11 +14,13 @@ from bolsa_domain.value_objects.timeframe import TimeFrame
 
 @dataclass(frozen=True, slots=True)
 class IndicatorSeriesResult:
+    """Resultado de Indicator Series."""
     data: list[IndicatorPoint]
     signals: IndicatorSignals
 
 
 class GetInstrumentIndicators:
+    """Obtiene Instrument Indicators."""
     def __init__(self, get_ohlcv_bars: GetOhlcvBars) -> None:
         self._get_ohlcv = get_ohlcv_bars
 

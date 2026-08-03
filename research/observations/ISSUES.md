@@ -70,8 +70,8 @@ No abren Fase 2 ni entidades nuevas.
 | Doc | `docs/engineering/code-documentation-standard-2026-08-03.md` |
 | Medición | `python scripts/research/docstring_coverage_report.py` |
 
-**Hecho:** política + script de cobertura · **lote 1** (alerts/CORE-R/mandates/health · backtest · cost v2) · **lote 2** (módulo docstring en todos `bolsa_api/schemas` + `routes`).  
-**Pendiente:** lotes 3–4 (application use-cases · indicadores). No reescribe histórico solo por docs.
+**Hecho:** política + script · **lotes 1–3** (API schemas/routes · `bolsa_application` módulos + clases públicas).  
+**Pendiente:** lote 4 (indicadores / signals analytics). No reescribe histórico solo por docs.
 
 ---
 

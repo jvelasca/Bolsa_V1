@@ -1,3 +1,5 @@
+"""Router de ejecución (scan hits → acciones)."""
+
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -33,6 +35,7 @@ from bolsa_infrastructure.database.repositories.signal_alert_repository import (
 
 @dataclass(frozen=True, slots=True)
 class ExecutionActionResult:
+    """Resultado de Execution Action."""
     instrument_id: str
     signal_kind: str
     status: Literal[
@@ -50,6 +53,7 @@ class ExecutionActionResult:
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRouteResult:
+    """Resultado de Execution Route."""
     policy_id: str
     mode: str
     actions: list[ExecutionActionResult]
@@ -110,6 +114,7 @@ def _subscription_from_policy(
 
 
 class ExecutionRouter:
+    """Use-case / tipo: Execution Router."""
     def __init__(
         self,
         policy_repo: ExecutionPolicyRepository,
@@ -699,6 +704,7 @@ class ExecutionRouter:
 
 
 class ExecuteScanJobHits:
+    """Ejecuta Scan Job Hits."""
     def __init__(
         self,
         scan_job_repo,

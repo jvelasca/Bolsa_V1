@@ -1,3 +1,5 @@
+"""Use-case: borrador de estrategia desde prompt."""
+
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -8,6 +10,7 @@ from bolsa_analytics.research.prompt_draft import PromptDraftResult
 @dataclass(frozen=True, slots=True)
 
 class DraftStrategyFromPromptResult:
+    """Genera borrador Strategy From Prompt Result."""
 
     draft_kind: Literal["classic", "hybrid"]
 
@@ -38,6 +41,7 @@ class DraftStrategyFromPromptResult:
 
 
 class DraftStrategyFromPrompt:
+    """Genera borrador Strategy From Prompt."""
 
     async def execute(
 

@@ -1,3 +1,5 @@
+"""Use-cases de manifests de escáner."""
+
 from typing import Any
 
 from bolsa_analytics.research.scan_manifest import build_scan_manifest
@@ -8,6 +10,7 @@ from bolsa_domain.repositories.scan_manifest_repository import (
 
 
 class PersistScanManifest:
+    """Persiste Scan Manifest."""
     def __init__(
         self,
         snapshot_repo: DataSnapshotRepository,
@@ -84,6 +87,7 @@ class PersistScanManifest:
 
 
 class GetScanManifest:
+    """Obtiene Scan Manifest."""
     def __init__(self, manifest_repo: ScanManifestRepository) -> None:
         self._manifests = manifest_repo
 

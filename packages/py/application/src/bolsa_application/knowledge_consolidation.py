@@ -196,6 +196,7 @@ def evaluate_consolidation_eligibility(
 
 
 class EvaluateConsolidation:
+    """Evalúa Consolidation."""
     def __init__(
         self,
         hypotheses: _HypRepo,
@@ -312,6 +313,7 @@ class ConsolidateHypothesis:
 
 
 class GetKnowledgeNode:
+    """Obtiene Knowledge Node."""
     def __init__(self, repository: _KnowledgeRepo) -> None:
         self._repository = repository
 
@@ -320,6 +322,7 @@ class GetKnowledgeNode:
 
 
 class ListKnowledgeNodes:
+    """Lista Knowledge Nodes."""
     def __init__(self, repository: _KnowledgeRepo) -> None:
         self._repository = repository
 
@@ -342,6 +345,7 @@ class ListKnowledgeNodes:
 
 
 class DeprecateKnowledgeNode:
+    """Use-case / tipo: Deprecate Knowledge Node."""
     def __init__(self, repository: _KnowledgeRepo) -> None:
         self._repository = repository
 

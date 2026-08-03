@@ -22,6 +22,7 @@ from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
 @dataclass(frozen=True, slots=True)
 class CognitiveGuardResult:
+    """Resultado de Cognitive Guard."""
     allowed: bool
     reasons: tuple[str, ...]
     policy_id: str | None

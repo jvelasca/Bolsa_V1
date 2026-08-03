@@ -1,3 +1,5 @@
+"""Use-cases de cuentas DEMO/trading, ledger y trades."""
+
 from dataclasses import replace
 from datetime import UTC, datetime
 
@@ -26,6 +28,7 @@ from bolsa_infrastructure.ids import new_id
 
 
 class ListAccounts:
+    """Lista Accounts."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -34,6 +37,7 @@ class ListAccounts:
 
 
 class CreateSimulatedAccount:
+    """Crea Simulated Account."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -71,6 +75,7 @@ class CreateSimulatedAccount:
 
 
 class UpdateAccountSettings:
+    """Actualiza Account Settings."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -79,6 +84,7 @@ class UpdateAccountSettings:
 
 
 class GetAccount:
+    """Obtiene Account."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -109,6 +115,7 @@ def _account_summary_from_portfolio(
 
 
 class GetAccountSummary:
+    """Obtiene Account Summary."""
     def __init__(
         self,
         account_repo: SqlAlchemyAccountRepository,
@@ -167,6 +174,7 @@ class ListAccountSummaries:
 
 
 class UpdateAccount:
+    """Actualiza Account."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -185,6 +193,7 @@ class UpdateAccount:
 
 
 class SetDefaultAccount:
+    """Establece Default Account."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -193,6 +202,7 @@ class SetDefaultAccount:
 
 
 class CloseAccount:
+    """Cierra Account."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -201,6 +211,7 @@ class CloseAccount:
 
 
 class DeleteAccount:
+    """Elimina Account."""
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
@@ -209,6 +220,7 @@ class DeleteAccount:
 
 
 class DepositCashToAccount:
+    """Ingresa efectivo en cuenta."""
     def __init__(
         self,
         account_repo: SqlAlchemyAccountRepository,
@@ -258,6 +270,7 @@ class DepositCashToAccount:
 
 
 class WithdrawCashFromAccount:
+    """Retira efectivo de cuenta."""
     def __init__(
         self,
         account_repo: SqlAlchemyAccountRepository,
@@ -312,6 +325,7 @@ class WithdrawCashFromAccount:
 
 
 class ApplyCustodyFees:
+    """Aplica Custody Fees."""
     CUSTODY_INTERVAL_DAYS = 365
 
     def __init__(
@@ -373,6 +387,7 @@ class ApplyCustodyFees:
 
 
 class ListLedgerEntries:
+    """Lista Ledger Entries."""
     def __init__(self, ledger_repo: SqlAlchemyLedgerRepository) -> None:
         self._ledger_repo = ledger_repo
 
@@ -393,6 +408,7 @@ class ListLedgerEntries:
 
 
 class GetPortfolioSummary:
+    """Obtiene Portfolio Summary."""
     def __init__(
         self,
         account_repo: SqlAlchemyAccountRepository,
@@ -411,6 +427,7 @@ class GetPortfolioSummary:
 
 
 class ListTransactions:
+    """Lista Transactions."""
     def __init__(
         self,
         account_repo: SqlAlchemyAccountRepository,
@@ -433,6 +450,7 @@ class ListTransactions:
 
 
 class ExecuteTrade:
+    """Ejecuta Trade."""
     def __init__(
         self,
         account_repo: SqlAlchemyAccountRepository,
@@ -511,6 +529,7 @@ class ExecuteTrade:
 
 
 class GetTaxReport:
+    """Obtiene Tax Report."""
     def __init__(
         self,
         account_repo: SqlAlchemyAccountRepository,

@@ -14,6 +14,7 @@ from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
 
 class InvestorProfileStore(Protocol):
+    """Puerto / almacén de Investor Profile."""
     async def list_profiles(self, *, user_id: str | None = None) -> list[InvestorProfileRecord]: ...
     async def get(self, profile_id: str) -> InvestorProfileRecord | None: ...
     async def create(
@@ -44,6 +45,7 @@ class InvestorProfileStore(Protocol):
 
 
 class ListInvestorProfiles:
+    """Lista Investor Profiles."""
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
@@ -52,6 +54,7 @@ class ListInvestorProfiles:
 
 
 class GetInvestorProfile:
+    """Obtiene Investor Profile."""
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
@@ -60,6 +63,7 @@ class GetInvestorProfile:
 
 
 class CreateInvestorProfile:
+    """Crea Investor Profile."""
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
@@ -68,6 +72,7 @@ class CreateInvestorProfile:
 
 
 class UpdateInvestorProfile:
+    """Actualiza Investor Profile."""
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
@@ -76,6 +81,7 @@ class UpdateInvestorProfile:
 
 
 class DeleteInvestorProfile:
+    """Elimina Investor Profile."""
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
@@ -84,6 +90,7 @@ class DeleteInvestorProfile:
 
 
 class AssignInvestorProfileToAccount:
+    """Asigna Investor Profile To Account."""
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 
@@ -92,6 +99,7 @@ class AssignInvestorProfileToAccount:
 
 
 class GetAccountInvestorProfile:
+    """Obtiene Account Investor Profile."""
     def __init__(self, store: InvestorProfileStore) -> None:
         self._store = store
 

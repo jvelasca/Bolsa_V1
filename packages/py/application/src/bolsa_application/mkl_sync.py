@@ -65,6 +65,7 @@ def build_mkl_fact_payload(node: KnowledgeNode) -> dict[str, Any]:
 
 
 class SyncKnowledgeToMkl:
+    """Sincroniza Knowledge To Mkl."""
     def __init__(
         self,
         knowledge: _KnowledgeRepo,
@@ -129,6 +130,7 @@ class SyncKnowledgeToMkl:
 
 
 class ListMklSyncEvents:
+    """Lista Mkl Sync Events."""
     def __init__(self, repository: _MklRepo) -> None:
         self._repository = repository
 

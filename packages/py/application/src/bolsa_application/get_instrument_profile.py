@@ -1,9 +1,12 @@
+"""Use-case: perfil / snapshot de instrumento."""
+
 from bolsa_infrastructure.database.repositories.instrument_repository import (
     SqlAlchemyInstrumentRepository,
 )
 
 
 class GetInstrumentProfile:
+    """Obtiene Instrument Profile."""
     def __init__(self, repository: SqlAlchemyInstrumentRepository) -> None:
         self._repository = repository
 

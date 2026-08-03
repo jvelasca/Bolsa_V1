@@ -1,3 +1,5 @@
+"""Use-cases de jobs de escáner (enqueue/process)."""
+
 import logging
 from dataclasses import dataclass
 from typing import Any
@@ -36,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class ProcessScanJobResult:
+    """Procesa Scan Job Result."""
     processed: bool
     job_id: str | None = None
     status: str | None = None
@@ -43,6 +46,7 @@ class ProcessScanJobResult:
 
 
 class EnqueueScanJob:
+    """Encola Scan Job."""
     def __init__(
         self,
         job_repo: SqlAlchemyScanJobRepository,
@@ -122,6 +126,7 @@ class EnqueueScanJob:
 
 
 class GetScanJob:
+    """Obtiene Scan Job."""
     def __init__(self, job_repo: SqlAlchemyScanJobRepository) -> None:
         self._jobs = job_repo
 
@@ -130,6 +135,7 @@ class GetScanJob:
 
 
 class ListScanJobs:
+    """Lista Scan Jobs."""
     def __init__(self, job_repo: SqlAlchemyScanJobRepository) -> None:
         self._jobs = job_repo
 
@@ -138,6 +144,7 @@ class ListScanJobs:
 
 
 class ProcessScanJob:
+    """Procesa Scan Job."""
     def __init__(
         self,
         job_repo: SqlAlchemyScanJobRepository,

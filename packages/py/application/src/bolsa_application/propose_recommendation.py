@@ -46,6 +46,7 @@ from bolsa_domain.value_objects.timeframe import TimeFrame
 
 
 class OhlcvBarsPort(Protocol):
+    """Puerto (interfaz) Ohlcv Bars Port."""
     async def get_bars(
         self,
         instrument_id: str,
@@ -56,22 +57,27 @@ class OhlcvBarsPort(Protocol):
 
 
 class FeaturePortLike(Protocol):
+    """Puerto (interfaz) Feature Port Like."""
     def get_latest(self, instrument_id: str, feature_set_id: str) -> Any: ...
 
 
 class InstrumentLookupPort(Protocol):
+    """Puerto (interfaz) Instrument Lookup Port."""
     async def get_by_id(self, instrument_id: str) -> Any | None: ...
 
 
 class FundamentalsPort(Protocol):
+    """Puerto (interfaz) Fundamentals Port."""
     async def get_fundamentals(self, instrument_id: str) -> dict | None: ...
 
 
 class MacroSnapshotPort(Protocol):
+    """Puerto (interfaz) Macro Snapshot Port."""
     async def get_macro(self) -> dict | None: ...
 
 
 class EdgeReportLookupPort(Protocol):
+    """Puerto (interfaz) Edge Report Lookup Port."""
     async def latest_edge_report(
         self,
         *,
@@ -81,11 +87,13 @@ class EdgeReportLookupPort(Protocol):
 
 
 class NewsEventRefreshPort(Protocol):
+    """Puerto (interfaz) News Event Refresh Port."""
     async def refresh_for_symbol(self, yahoo_symbol: str) -> int: ...
 
 
 @dataclass(frozen=True, slots=True)
 class ProposeRecommendationResult:
+    """Resultado de Propose Recommendation."""
     recommendation: Recommendation
     package: DecisionPackageTa
     technical_assessment: TechnicalAssessment

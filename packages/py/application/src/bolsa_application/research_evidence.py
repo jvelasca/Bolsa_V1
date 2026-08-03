@@ -254,6 +254,7 @@ async def emit_evidence_for_dia_d_session(
 
 
 class ListResearchEvidence:
+    """Lista Research Evidence."""
     def __init__(self, repository: _EvidenceRepo) -> None:
         self._repository = repository
 
@@ -278,6 +279,7 @@ class ListResearchEvidence:
 
 
 class GetResearchEvidence:
+    """Obtiene Research Evidence."""
     def __init__(self, repository: _EvidenceRepo) -> None:
         self._repository = repository
 

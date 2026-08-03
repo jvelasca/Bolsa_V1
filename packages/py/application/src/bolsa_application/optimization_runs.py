@@ -1,3 +1,5 @@
+"""Use-cases de optimization runs (cola + process)."""
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -287,6 +289,7 @@ async def _persist_optimize_research_trials(
 
 @dataclass(frozen=True, slots=True)
 class ProcessOptimizationRunResult:
+    """Procesa Optimization Run Result."""
     processed: bool
     run_id: str | None = None
     status: str | None = None
@@ -294,6 +297,7 @@ class ProcessOptimizationRunResult:
 
 
 class EnqueueOptimizationRun:
+    """Encola Optimization Run."""
     def __init__(
         self,
         repo: SqlAlchemyOptimizationRunRepository,
@@ -314,6 +318,7 @@ class EnqueueOptimizationRun:
 
 
 class GetOptimizationRun:
+    """Obtiene Optimization Run."""
     def __init__(self, repo: SqlAlchemyOptimizationRunRepository) -> None:
         self._runs = repo
 
@@ -322,6 +327,7 @@ class GetOptimizationRun:
 
 
 class ListOptimizationRuns:
+    """Lista Optimization Runs."""
     def __init__(self, repo: SqlAlchemyOptimizationRunRepository) -> None:
         self._runs = repo
 
@@ -330,6 +336,7 @@ class ListOptimizationRuns:
 
 
 class ProcessOptimizationRun:
+    """Procesa Optimization Run."""
     def __init__(
         self,
         repo: SqlAlchemyOptimizationRunRepository,
@@ -420,6 +427,7 @@ class ProcessOptimizationRun:
 
 
 class RunSmaGridOptimizeAndSave:
+    """Ejecuta Sma Grid Optimize And Save."""
     def __init__(
         self,
         run_optimize: RunSmaGridOptimize,

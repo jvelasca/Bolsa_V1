@@ -17,6 +17,7 @@ from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_
 
 @dataclass(frozen=True, slots=True)
 class ExternalSearchHit:
+    """DTO fila: External Search Hit."""
     symbol: str
     yahoo_symbol: str
     name: str
@@ -27,11 +28,13 @@ class ExternalSearchHit:
 
 @dataclass(frozen=True, slots=True)
 class SearchInstrumentsResult:
+    """Busca Instruments Result."""
     catalog: list[InstrumentWithMeta]
     external: list[ExternalSearchHit]
 
 
 class SearchInstruments:
+    """Busca Instruments."""
     def __init__(self, repo: SqlAlchemyInstrumentRepository) -> None:
         self._repo = repo
 
