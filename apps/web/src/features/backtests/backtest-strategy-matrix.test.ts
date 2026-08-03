@@ -6,6 +6,7 @@ import {
   exploreBatteryRowIds,
   filterStrategyMatrixRows,
   formatPct,
+  strategyMatrixFiltersWithSelection,
 } from '@/features/backtests/backtest-strategy-matrix';
 import { ALL_PRESET_COACH_KEYS } from '@/features/backtests/backtest-explore-value';
 
@@ -52,6 +53,40 @@ describe('backtest-strategy-matrix', () => {
     expect(filterStrategyMatrixRows(rows, 'mine')).toHaveLength(1);
     expect(filterStrategyMatrixRows(rows, 'optimized')).toHaveLength(1);
     expect(filterStrategyMatrixRows(rows, 'preset').every((r) => r.kind === 'preset')).toBe(true);
+  });
+
+  it('lights carousel filters that contain the current selection', () => {
+    const rows = buildStrategyMatrixRows([
+      {
+        id: 's1',
+        name: 'X',
+        origin: 'manual',
+        timeframe: '1d',
+        kind: 'indicator_signals',
+        updatedAt: '2026-01-01',
+        createdAt: '2026-01-01',
+      },
+      {
+        id: 's2',
+        name: 'Lab clone',
+        origin: 'preset',
+        presetKey: 'sma_crossover',
+        timeframe: '1d',
+        kind: 'indicator_signals',
+        updatedAt: '2026-01-01',
+        createdAt: '2026-01-01',
+      },
+    ]);
+    const presetId = rows.find((r) => r.kind === 'preset')!.rowId;
+    const mineId = rows.find((r) => r.savedBucket === 'mine')!.rowId;
+    const lit = strategyMatrixFiltersWithSelection(
+      rows,
+      new Set([presetId, mineId]),
+    );
+    expect(lit.has('all')).toBe(true);
+    expect(lit.has('preset')).toBe(true);
+    expect(lit.has('mine')).toBe(true);
+    expect(lit.has('optimized')).toBe(false);
   });
 
   it('explore battery ids cover all generic presets within selection cap', () => {

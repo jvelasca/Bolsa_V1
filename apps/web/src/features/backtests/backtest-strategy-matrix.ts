@@ -191,6 +191,27 @@ export function filterStrategyMatrixRows(
   return rows;
 }
 
+/**
+ * Cajones del carrusel con ≥1 estrategia marcada para Probar + coach.
+ * «Todas» se enciende si hay cualquier selección.
+ */
+export function strategyMatrixFiltersWithSelection(
+  rows: readonly StrategyMatrixRow[],
+  selectedIds: ReadonlySet<string>,
+): Set<StrategyMatrixFilter> {
+  const out = new Set<StrategyMatrixFilter>();
+  if (selectedIds.size === 0) return out;
+  out.add('all');
+  for (const row of rows) {
+    if (!selectedIds.has(row.rowId)) continue;
+    if (row.kind === 'preset') out.add('preset');
+    if (row.kind === 'saved' && row.savedBucket === 'optimized') out.add('optimized');
+    if (row.kind === 'saved' && row.savedBucket === 'mine') out.add('mine');
+    if (row.topRank != null) out.add('finalists');
+  }
+  return out;
+}
+
 export function exploreBatteryRowIds(): string[] {
   return STRATEGY_PRESET_KEYS.map((key) => `preset:${key}`);
 }
