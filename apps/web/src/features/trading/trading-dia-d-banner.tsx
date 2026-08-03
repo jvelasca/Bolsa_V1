@@ -36,21 +36,19 @@ export function DiaDVerifyBanner() {
 
   return (
     <div
-      className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px]"
+      className="flex shrink-0 flex-wrap items-center gap-2 border-b-2 border-red-600 bg-red-600 px-3 py-2 text-[11px] text-white shadow-sm"
       role="status"
       data-testid="dia-d-verify-banner"
     >
       <UniverseChip force="lab" />
-      <span className="font-semibold text-amber-950 dark:text-amber-50">Verificar D→hoy</span>
-      <span className="text-amber-900/90 dark:text-amber-100/90">
+      <span className="font-bold tracking-wide">Verificar D→hoy · DÍA D</span>
+      <span className="opacity-95">
         {session.symbol} · #{session.rank} {session.strategyLabel} · {session.diaD} →{' '}
         {session.endDate}
       </span>
-      <span className="text-amber-800/80 dark:text-amber-200/80">
-        Cartera LAB · no escribe DEMO
-      </span>
+      <span className="opacity-90">Cartera LAB · no escribe DEMO</span>
 
-      <div className="flex items-center gap-0.5 rounded-md border border-amber-600/30 bg-background/60 p-0.5">
+      <div className="flex items-center gap-0.5 rounded-md border border-white/35 bg-black/15 p-0.5">
         {MODES.map((mode) => (
           <button
             key={mode}
@@ -58,8 +56,8 @@ export function DiaDVerifyBanner() {
             className={cn(
               'rounded px-2 py-0.5 text-[10px] font-medium',
               session.mode === mode
-                ? 'bg-amber-600 text-white'
-                : 'text-amber-950/80 hover:bg-amber-500/20 dark:text-amber-50/80',
+                ? 'bg-white text-red-700'
+                : 'text-white/90 hover:bg-white/15',
             )}
             title={
               mode === 'auto'
@@ -80,7 +78,10 @@ export function DiaDVerifyBanner() {
           type="button"
           size="sm"
           variant={fullBleed ? 'default' : 'outline'}
-          className={cn('h-6 px-2 text-[10px]', !fullBleed && 'border-amber-600/40')}
+          className={cn(
+            'h-6 px-2 text-[10px]',
+            !fullBleed && 'border-white/50 bg-white/10 text-white hover:bg-white/20',
+          )}
           title={
             fullBleed
               ? 'Volver al layout del hub Backtesting'
@@ -92,7 +93,7 @@ export function DiaDVerifyBanner() {
         </Button>
         <Link
           to={`/backtests?tab=run&instrumentId=${encodeURIComponent(session.instrumentId)}&focus=finalists`}
-          className="font-medium text-primary hover:underline"
+          className="font-medium text-white underline-offset-2 hover:underline"
         >
           Volver a Finalistas
         </Link>
@@ -100,7 +101,7 @@ export function DiaDVerifyBanner() {
           type="button"
           size="sm"
           variant="outline"
-          className="h-6 border-amber-600/40 px-2 text-[10px]"
+          className="h-6 border-white/50 bg-white/10 px-2 text-[10px] text-white hover:bg-white/20"
           onClick={() => exitSession()}
         >
           Salir verificación

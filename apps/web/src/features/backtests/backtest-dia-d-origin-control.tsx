@@ -104,15 +104,15 @@ export function BacktestDiaDOriginControl({
         className={cn(
           'inline-flex max-w-full items-center gap-1.5 rounded-md border px-2.5 py-1 text-left text-xs font-medium transition-colors',
           past
-            ? 'border-amber-500/55 bg-amber-500/15 text-amber-950 dark:text-amber-50'
+            ? 'border-red-600 bg-red-600 text-white shadow-sm ring-2 ring-red-500/50 dark:border-red-500 dark:bg-red-600 dark:ring-red-400/40'
             : 'border-border bg-muted/40 text-foreground hover:bg-muted/70',
         )}
       >
         <span className="min-w-0 truncate tabular-nums">
           {past ? (
             <>
-              <span className="font-semibold tracking-wide">DÍA D</span>
-              <span className="text-muted-foreground"> · </span>
+              <span className="font-bold tracking-wide">DÍA D</span>
+              <span className="opacity-90"> · </span>
               {formatDiaDDisplay(active)}
             </>
           ) : (
@@ -250,7 +250,7 @@ export function BacktestDiaDOriginControl({
               <Button
                 type="button"
                 size="sm"
-                variant={activeInCustoms ? 'secondary' : 'default'}
+                variant={activeInCustoms ? 'outline' : 'default'}
                 className="h-8 gap-1 px-2.5 text-[10px]"
                 disabled={!past}
                 title={

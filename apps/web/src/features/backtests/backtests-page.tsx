@@ -2620,6 +2620,44 @@ export function BacktestsPage() {
     }
   }
 
+  /** Al pasar a DÍA D (fecha pasada): reinicia el asistente / ciclo en curso. */
+  function handleDiaDChange(next: string) {
+    const enteringDiaD =
+      isDiaDInPast(next) &&
+      (!isDiaDInPast(diaD) || effectiveDiaD(next) !== effectiveDiaD(diaD));
+    setDiaD(next);
+    if (!enteringDiaD) return;
+    abortListAutoCampaign();
+    exploreAbortRef.current?.abort();
+    batchAbortRef.current?.abort();
+    setExploreRunning(false);
+    setExploreRows([]);
+    setExploreProgress({ done: 0, total: 0 });
+    setExploreError(null);
+    setBatchRows([]);
+    setSemifinalJobsQueued(false);
+    setSemifinalEnqueuePending(false);
+    setOptimizeSeed(null);
+    setLabZones(null);
+    setCoachPass('initial');
+    setOptimizeCompare(null);
+    setAssistantProgress(emptyAssistantProgress());
+    setAwaitingAck(false);
+    setAwaitingAckStage(null);
+    setLabImprovedThisCycle(0);
+    setSemifinalShortcutArmed(false);
+    setAssistantFocus(null);
+    setLabOpenedThisRun(false);
+    setFullCycleActive(false);
+    assistantChainRef.current = '';
+    listAutoFreshnessMemoryRef.current = new Map();
+    setListAutoBoard(null);
+    setResultFocus('detail');
+    setAssistantStatus(
+      `DÍA D ${formatDiaDDisplay(effectiveDiaD(next))} · asistente reiniciado. Pulsa Play.`,
+    );
+  }
+
   function currentFinalistsInputFingerprint(forInstrumentId: string): string {
     const lastBarDate = instrumentLastBarDate(
       instruments.find((i) => i.id === forInstrumentId),
@@ -3267,7 +3305,7 @@ export function BacktestsPage() {
           >
             Backtesting
           </h2>
-          <BacktestDiaDOriginControl diaD={diaD} onDiaDChange={setDiaD} className="mb-0.5" />
+          <BacktestDiaDOriginControl diaD={diaD} onDiaDChange={handleDiaDChange} className="mb-0.5" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap rounded-lg border border-border p-0.5">
@@ -3432,16 +3470,20 @@ export function BacktestsPage() {
                 className={cn(
                   'rounded-md border px-2.5 py-2 text-[10px] leading-snug',
                   isDiaDInPast(diaD)
-                    ? 'border-amber-500/45 bg-amber-500/10 text-amber-950 dark:text-amber-50'
+                    ? 'border-red-600 bg-red-600 text-white shadow-sm ring-1 ring-red-700/40'
                     : 'border-border/60 bg-muted/15 text-muted-foreground',
                 )}
+                role={isDiaDInPast(diaD) ? 'status' : undefined}
+                data-testid={isDiaDInPast(diaD) ? 'dia-d-mode-banner' : undefined}
               >
                 {isDiaDInPast(diaD) ? (
                   <p>
-                    <strong className="font-semibold">Origen DÍA D {formatDiaDDisplay(effectiveDiaD(diaD))}</strong>
+                    <strong className="font-bold tracking-wide">
+                      Origen DÍA D {formatDiaDDisplay(effectiveDiaD(diaD))}
+                    </strong>
                     {' — '}
                     embudo con datos ≤ esa fecha (cámbialo junto al título). Tras Play → Finalistas #1 →{' '}
-                    <strong>Verificar D→hoy</strong>.
+                    <strong className="font-semibold">Verificar D→hoy</strong>.
                   </p>
                 ) : (
                   <p>
@@ -3485,7 +3527,7 @@ export function BacktestsPage() {
                     </select>
                   </label>
                   {isDiaDInPast(diaD) ? (
-                    <p className="text-[10px] leading-snug text-amber-700 dark:text-amber-400">
+                    <p className="rounded border border-red-600/50 bg-red-600/10 px-2 py-1 text-[10px] font-medium leading-snug text-red-800 dark:text-red-300">
                       Periodo anclado a DÍA D {effectiveDiaD(diaD)} (no al calendario de hoy).
                     </p>
                   ) : null}
