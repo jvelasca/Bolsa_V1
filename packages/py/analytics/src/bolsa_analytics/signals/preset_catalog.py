@@ -60,6 +60,7 @@ def _catalog_path() -> Path:
 
 def load_preset_catalog() -> dict[str, Any]:
 
+    """Función pública ``load_preset_catalog``."""
     path = _catalog_path()
 
     with path.open(encoding="utf-8") as handle:
@@ -74,6 +75,7 @@ def load_preset_catalog() -> dict[str, Any]:
 
 def preset_strategy_keys() -> frozenset[str]:
 
+    """Función pública ``preset_strategy_keys``."""
     catalog = load_preset_catalog()
 
     return frozenset(catalog.get("presets", {}).keys())
@@ -92,6 +94,7 @@ PRESET_STRATEGY_KEYS: frozenset[str] = preset_strategy_keys()
 
 def hybrid_gate_preset_keys() -> frozenset[str]:
 
+    """Función pública ``hybrid_gate_preset_keys``."""
     catalog = load_preset_catalog()
 
     presets = catalog.get("presets") or {}
@@ -108,6 +111,7 @@ def hybrid_gate_preset_keys() -> frozenset[str]:
 
 def is_valid_preset_key(value: str | None) -> TypeGuard[PresetStrategyType]:
 
+    """Helper: ``is_valid_preset_key``."""
     return value is not None and value in preset_strategy_keys()
 
 
@@ -115,6 +119,7 @@ def is_valid_preset_key(value: str | None) -> TypeGuard[PresetStrategyType]:
 
 def preset_definition(preset_key: str) -> dict[str, Any]:
 
+    """Función pública ``preset_definition``."""
     catalog = load_preset_catalog()
 
     presets = catalog.get("presets") or {}
@@ -131,6 +136,7 @@ def preset_definition(preset_key: str) -> dict[str, Any]:
 
 def preset_rule_groups(preset_key: str) -> dict[str, dict[str, Any]]:
 
+    """Función pública ``preset_rule_groups``."""
     definition = preset_definition(preset_key)
 
     return {
@@ -147,6 +153,7 @@ def preset_rule_groups(preset_key: str) -> dict[str, dict[str, Any]]:
 
 def preset_indicator_specs(preset_key: str) -> list[dict[str, Any]]:
 
+    """Función pública ``preset_indicator_specs``."""
     definition = preset_definition(preset_key)
 
     return list(definition.get("indicatorSpecs") or [])
@@ -157,6 +164,7 @@ def preset_indicator_specs(preset_key: str) -> list[dict[str, Any]]:
 
 def preset_label(preset_key: str) -> str:
 
+    """Función pública ``preset_label``."""
     return str(preset_definition(preset_key).get("label") or preset_key)
 
 
@@ -165,6 +173,7 @@ def preset_label(preset_key: str) -> str:
 
 def rule_group_has_rules(group: dict[str, Any] | None) -> bool:
 
+    """Función pública ``rule_group_has_rules``."""
     if not group:
 
         return False
@@ -179,6 +188,7 @@ def rule_group_has_rules(group: dict[str, Any] | None) -> bool:
 
 def definition_has_rules(definition: dict[str, Any]) -> bool:
 
+    """Función pública ``definition_has_rules``."""
     return rule_group_has_rules(definition.get("entries")) or rule_group_has_rules(
 
         definition.get("exits")
@@ -191,6 +201,7 @@ def definition_has_rules(definition: dict[str, Any]) -> bool:
 
 def enrich_definition_with_preset_rules(definition: dict[str, Any]) -> dict[str, Any]:
 
+    """Función pública ``enrich_definition_with_preset_rules``."""
     if definition_has_rules(definition):
 
         return definition
@@ -233,6 +244,7 @@ def strategy_definition_from_preset(
 
 ) -> dict[str, Any]:
 
+    """Función pública ``strategy_definition_from_preset``."""
     if not is_valid_preset_key(preset_key):
 
         raise ValueError(f"Unsupported preset: {preset_key}")

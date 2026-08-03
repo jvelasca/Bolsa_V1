@@ -25,12 +25,14 @@ SignalEvaluationMode = Literal["raw", "gated"]
 
 @dataclass(frozen=True, slots=True)
 class StrategyBarInput:
+    """Especificación / input: Strategy Bar Input."""
     timestamp: str
     close: float
 
 
 @dataclass(frozen=True, slots=True)
 class SignalEventV1:
+    """Tipo analytics: Signal Event 1."""
     id: str
     instrument_id: str
     timestamp: str
@@ -62,6 +64,7 @@ def _infer_preset_from_indicator_specs(specs: list[dict[str, Any]]) -> PresetStr
 
 
 def resolve_preset_key(definition: dict[str, Any]) -> PresetStrategyType:
+    """Resuelve ``preset_key``."""
     preset = definition.get("presetKey")
     if is_valid_preset_key(preset):
         return preset

@@ -11,6 +11,7 @@ STYLE_PARAMETER_IDS = frozenset({"color"})
 
 @dataclass(frozen=True, slots=True)
 class OhlcvBar:
+    """Barra OHLCV / input: Ohlcv Bar."""
     timestamp: str
     open: float
     high: float
@@ -21,24 +22,28 @@ class OhlcvBar:
 
 @dataclass(frozen=True, slots=True)
 class IndicatorSpecInput:
+    """Especificación / input: Indicator Spec Input."""
     definition_id: str
     parameters: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
 class LinePoint:
+    """Serie / evento: Line Point."""
     timestamp: str
     value: float
 
 
 @dataclass(frozen=True, slots=True)
 class ComputedLine:
+    """Tipo analytics: Computed Line."""
     key: str
     points: list[LinePoint]
 
 
 @dataclass(frozen=True, slots=True)
 class ComputedSpecResult:
+    """Resultado: Computed Spec Result."""
     definition_id: str
     parameters: dict[str, Any]
     spec_key: str
@@ -46,6 +51,7 @@ class ComputedSpecResult:
 
 
 def parameters_key(parameters: dict[str, Any]) -> str:
+    """Helper: ``parameters_key``."""
     entries = sorted(parameters.items(), key=lambda item: item[0])
     if not entries:
         return "default"
@@ -53,6 +59,7 @@ def parameters_key(parameters: dict[str, Any]) -> str:
 
 
 def data_parameters_key(parameters: dict[str, Any]) -> str:
+    """Helper: ``data_parameters_key``."""
     entries = sorted(
         (key, value) for key, value in parameters.items() if key not in STYLE_PARAMETER_IDS
     )
@@ -62,6 +69,7 @@ def data_parameters_key(parameters: dict[str, Any]) -> str:
 
 
 def instance_spec_key(definition_id: str, parameters: dict[str, Any]) -> str:
+    """Helper: ``instance_spec_key``."""
     return f"{definition_id}::{parameters_key(parameters)}"
 
 
@@ -89,6 +97,7 @@ def _series_from_values(bars: list[OhlcvBar], values: list[float | None]) -> lis
 
 
 def compute_sma(closes: list[float], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``sma``."""
     result: list[float | None] = []
     for index in range(len(closes)):
         if index + 1 < period:
@@ -100,6 +109,7 @@ def compute_sma(closes: list[float], period: int) -> list[float | None]:
 
 
 def compute_ema(closes: list[float], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``ema``."""
     result: list[float | None] = []
     smoothing = 2 / (period + 1)
     ema: float | None = None
@@ -119,6 +129,7 @@ def compute_ema(closes: list[float], period: int) -> list[float | None]:
 
 
 def compute_wma(closes: list[float], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``wma``."""
     result: list[float | None] = []
     denominator = (period * (period + 1)) / 2
     for index in range(len(closes)):
@@ -133,6 +144,7 @@ def compute_wma(closes: list[float], period: int) -> list[float | None]:
 
 
 def compute_rsi(closes: list[float], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``rsi``."""
     if not closes:
         return []
     result: list[float | None] = [None]
@@ -161,6 +173,7 @@ def compute_rsi(closes: list[float], period: int) -> list[float | None]:
 
 
 def compute_atr(bars: list[OhlcvBar], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``atr``."""
     result: list[float | None] = []
     atr: float | None = None
     for index in range(len(bars)):
@@ -199,6 +212,7 @@ def compute_atr(bars: list[OhlcvBar], period: int) -> list[float | None]:
 
 
 def compute_cci(bars: list[OhlcvBar], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``cci``."""
     typical = [(bar.high + bar.low + bar.close) / 3 for bar in bars]
     result: list[float | None] = []
     for index in range(len(typical)):
@@ -216,6 +230,7 @@ def compute_cci(bars: list[OhlcvBar], period: int) -> list[float | None]:
 
 
 def compute_stoch_k(bars: list[OhlcvBar], k_period: int) -> list[float | None]:
+    """Calcula serie/indicador ``stoch_k``."""
     result: list[float | None] = []
     for index in range(len(bars)):
         if index + 1 < k_period:
@@ -233,6 +248,7 @@ def compute_stoch_k(bars: list[OhlcvBar], k_period: int) -> list[float | None]:
 
 
 def compute_macd_line(closes: list[float], fast: int, slow: int) -> list[float | None]:
+    """Calcula serie/indicador ``macd_line``."""
     fast_ema = compute_ema(closes, fast)
     slow_ema = compute_ema(closes, slow)
     result: list[float | None] = []
@@ -291,6 +307,7 @@ def compute_bollinger(
     period: int,
     std_dev: float,
 ) -> tuple[list[float | None], list[float | None], list[float | None]]:
+    """Calcula serie/indicador ``bollinger``."""
     mid = compute_sma(closes, period)
     upper: list[float | None] = []
     lower: list[float | None] = []
@@ -564,6 +581,7 @@ def compute_vwap(bars: list[OhlcvBar]) -> list[float | None]:
 
 
 def compute_obv(bars: list[OhlcvBar]) -> list[float | None]:
+    """Calcula serie/indicador ``obv``."""
     result: list[float | None] = []
     obv = 0.0
     for index, bar in enumerate(bars):
@@ -580,6 +598,7 @@ def compute_obv(bars: list[OhlcvBar]) -> list[float | None]:
 
 
 def compute_roc(closes: list[float], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``roc``."""
     result: list[float | None] = []
     for index, close in enumerate(closes):
         if index < period:
@@ -594,6 +613,7 @@ def compute_roc(closes: list[float], period: int) -> list[float | None]:
 
 
 def compute_mfi(bars: list[OhlcvBar], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``mfi``."""
     result: list[float | None] = []
     typical = [(b.high + b.low + b.close) / 3.0 for b in bars]
     raw_mf = [typical[i] * float(bars[i].volume) for i in range(len(bars))]
@@ -621,6 +641,7 @@ def compute_aroon(
     bars: list[OhlcvBar],
     period: int,
 ) -> tuple[list[float | None], list[float | None]]:
+    """Calcula serie/indicador ``aroon``."""
     up: list[float | None] = []
     down: list[float | None] = []
     for index in range(len(bars)):
@@ -682,6 +703,7 @@ def compute_alligator(
 
 
 def compute_bears_power(bars: list[OhlcvBar], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``bears_power``."""
     ema = compute_ema([b.close for b in bars], period)
     return [
         None if ema[i] is None else bars[i].low - ema[i]  # type: ignore[operator]
@@ -690,6 +712,7 @@ def compute_bears_power(bars: list[OhlcvBar], period: int) -> list[float | None]
 
 
 def compute_bulls_power(bars: list[OhlcvBar], period: int) -> list[float | None]:
+    """Calcula serie/indicador ``bulls_power``."""
     ema = compute_ema([b.close for b in bars], period)
     return [
         None if ema[i] is None else bars[i].high - ema[i]  # type: ignore[operator]
@@ -702,6 +725,7 @@ def compute_psar(
     step: float = 0.02,
     max_af: float = 0.2,
 ) -> list[float | None]:
+    """Calcula serie/indicador ``psar``."""
     n = len(bars)
     if n == 0:
         return []
@@ -781,6 +805,7 @@ def compute_ichimoku(
     list[float | None],
     list[float | None],
 ]:
+    """Calcula serie/indicador ``ichimoku``."""
     n = len(bars)
     tenkan: list[float | None] = [_midpoint_hl(bars, tenkan_period, i) for i in range(n)]
     kijun: list[float | None] = [_midpoint_hl(bars, kijun_period, i) for i in range(n)]
@@ -803,6 +828,7 @@ def compute_ichimoku(
 
 
 def compute_spec(bars: list[OhlcvBar], spec: IndicatorSpecInput) -> ComputedSpecResult:
+    """Calcula serie/indicador ``spec``."""
     definition_id = spec.definition_id
     parameters = dict(spec.parameters)
     spec_key = instance_spec_key(definition_id, parameters)
@@ -1088,4 +1114,5 @@ def compute_spec(bars: list[OhlcvBar], spec: IndicatorSpecInput) -> ComputedSpec
 
 
 def compute_specs(bars: list[OhlcvBar], specs: list[IndicatorSpecInput]) -> list[ComputedSpecResult]:
+    """Calcula serie/indicador ``specs``."""
     return [compute_spec(bars, spec) for spec in specs]

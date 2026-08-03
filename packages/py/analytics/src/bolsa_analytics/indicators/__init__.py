@@ -1,3 +1,5 @@
+"""Indicadores técnicos (compute + legacy)."""
+
 from bolsa_analytics.indicators.compute import (
     ComputedLine,
     ComputedSpecResult,

@@ -65,6 +65,7 @@ def build_fundamental_gate(
     operator: str = "all",
     use_sector_bands: bool = False,
 ) -> dict[str, Any] | None:
+    """Construye ``fundamental_gate``."""
     conditions: list[dict[str, Any]] = []
     if max_trailing_pe is not None and max_trailing_pe > 0:
         conditions.append(
@@ -151,6 +152,7 @@ def _fundamental_gate(definition: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def definition_has_fundamental_gate(definition: dict[str, Any]) -> bool:
+    """Función pública ``definition_has_fundamental_gate``."""
     gate = _fundamental_gate(definition)
     if gate is None:
         return False
@@ -160,6 +162,7 @@ def definition_has_fundamental_gate(definition: dict[str, Any]) -> bool:
 
 
 def fundamental_gate_max_age_days(definition: dict[str, Any]) -> int:
+    """Función pública ``fundamental_gate_max_age_days``."""
     gate = _fundamental_gate(definition)
     if gate is None:
         return 30
@@ -210,6 +213,7 @@ def evaluate_fundamental_condition(
     *,
     fundamentals: dict[str, Any],
 ) -> bool:
+    """Evalúa ``fundamental_condition``."""
     metric = str(condition.get("metric") or "")
     if metric not in ALLOWED_METRICS:
         return False
@@ -228,6 +232,7 @@ def passes_fundamental_gate(
     definition: dict[str, Any],
     fundamentals: dict[str, Any] | None,
 ) -> tuple[bool, str | None]:
+    """Función pública ``passes_fundamental_gate``."""
     gate = _fundamental_gate(definition)
     if gate is None:
         return True, None

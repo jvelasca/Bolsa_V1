@@ -35,6 +35,7 @@ class WarmupInsufficientError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class WarmupSpec:
+    """Especificación / input: Warmup Spec."""
     family: str
     description: str
     # Parámetros típicos de referencia (no grid completo).
@@ -125,6 +126,7 @@ WARMUP_MATRIX: tuple[WarmupSpec, ...] = (
 
 
 def min_bars_for(family: str, params: dict[str, int] | None = None) -> int:
+    """Función pública ``min_bars_for``."""
     spec = next((s for s in WARMUP_MATRIX if s.family == family), None)
     if spec is None:
         raise KeyError(f"familia warm-up desconocida: {family}")
@@ -154,6 +156,7 @@ def family_from_engine(engine: str | None) -> str | None:
 
 
 def max_warmup_bars(family: str, param_rows: Iterable[Mapping[str, int]]) -> int:
+    """Función pública ``max_warmup_bars``."""
     rows = list(param_rows)
     if not rows:
         return min_bars_for(family)
@@ -214,6 +217,7 @@ def check_manifest_warmup(data: Mapping[str, object]) -> list[str]:
 
 
 def warmup_audit_rows() -> list[dict[str, object]]:
+    """Función pública ``warmup_audit_rows``."""
     rows: list[dict[str, object]] = []
     for spec in WARMUP_MATRIX:
         mb = spec.min_bars(dict(spec.default_params))

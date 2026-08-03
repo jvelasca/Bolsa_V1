@@ -16,6 +16,7 @@ ProgressCallback = Callable[[int, int, float | None], None]
 
 @dataclass(frozen=True, slots=True)
 class RsiGridTrial:
+    """Trial de grid: Rsi Grid Trial."""
     period: int
     oversold: float
     overbought: float
@@ -108,6 +109,7 @@ def estimate_rsi_grid_trial_total(
     *,
     max_trials: int = 25,
 ) -> int:
+    """Estima ``rsi_grid_trial_total``."""
     count = 0
     for _period in periods:
         for oversold in oversold_levels:
@@ -130,6 +132,7 @@ def run_rsi_mean_reversion_grid(
     max_trials: int = 25,
     on_progress: ProgressCallback | None = None,
 ) -> list[RsiGridTrial]:
+    """Ejecuta ``rsi_mean_reversion_grid``."""
     if not bars:
         raise ValueError("bars must not be empty")
 

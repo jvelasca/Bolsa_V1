@@ -36,6 +36,8 @@ def hash_indicator_specs(specs: list[dict[str, Any]]) -> str:
 
 
 class FeatureCacheKey:
+    """Caché / clave: Feature Cache Key."""
+
     @staticmethod
     def make(
         instrument_id: str,
@@ -53,6 +55,7 @@ class FeatureCacheKey:
 
 
 class FeatureCache(Protocol):
+    """Caché / clave: Feature Cache."""
     hits: int
     misses: int
 
@@ -63,6 +66,7 @@ class FeatureCache(Protocol):
 
 @dataclass
 class InMemoryFeatureCache:
+    """Caché / clave: In Memory Feature Cache."""
     max_entries: int = DEFAULT_CACHE_MAX_ENTRIES
     ttl_seconds: float = DEFAULT_CACHE_TTL_SECONDS
     _entries: dict[str, tuple[float, Any]] = field(default_factory=dict)
@@ -111,6 +115,7 @@ def preset_feature_cache_make_key(
     last_close: float,
     indicator_specs_hash: str = "preset",
 ) -> str:
+    """Helper: ``preset_feature_cache_make_key``."""
     return FeatureCacheKey.make(
         instrument_id,
         timeframe,
@@ -131,6 +136,7 @@ def get_or_build_preset_features(
     timestamps: list[str],
     closes: list[float],
 ) -> PresetFeatureSeries:
+    """Función pública ``get_or_build_preset_features``."""
     return cache.get_or_build(key, lambda: build_preset_features(timestamps, closes))
 
 
@@ -138,9 +144,11 @@ _global_feature_cache: FeatureCache = InMemoryFeatureCache()
 
 
 def get_preset_feature_cache() -> FeatureCache:
+    """Función pública ``get_preset_feature_cache``."""
     return _global_feature_cache
 
 
 def set_global_feature_cache(cache: FeatureCache) -> None:
+    """Función pública ``set_global_feature_cache``."""
     global _global_feature_cache
     _global_feature_cache = cache

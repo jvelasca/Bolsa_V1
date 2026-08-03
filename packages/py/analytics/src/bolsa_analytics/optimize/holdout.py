@@ -17,6 +17,7 @@ OOS_PCT_MAX = 0.4
 
 @dataclass(frozen=True, slots=True)
 class HoldoutSplit:
+    """Partición / fold: Holdout Split."""
     is_bars: list[BacktestBarInput]
     oos_bars: list[BacktestBarInput]
     oos_pct: float

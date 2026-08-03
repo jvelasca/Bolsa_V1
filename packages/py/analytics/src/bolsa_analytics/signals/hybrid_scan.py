@@ -23,6 +23,7 @@ from bolsa_analytics.signals.technical_rating_v1 import (
 
 @dataclass(frozen=True, slots=True)
 class DataQualityScanContext:
+    """Contexto / candidato de scan: Data Quality Scan Context."""
     bar_count: int
     last_bar_timestamp: str
     expected_last_bar_date: str | None
@@ -35,6 +36,7 @@ class DataQualityScanContext:
 
 @dataclass(frozen=True, slots=True)
 class HybridScanCandidate:
+    """Contexto / candidato de scan: Hybrid Scan Candidate."""
     instrument_id: str
     symbol: str
     name: str
@@ -54,6 +56,7 @@ def _hybrid_config(definition: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def is_hybrid_definition(definition: dict[str, Any]) -> bool:
+    """Función pública ``is_hybrid_definition``."""
     return definition.get("kind") == "hybrid" and _hybrid_config(definition) is not None
 
 
@@ -63,6 +66,7 @@ def passes_hybrid_gate(
     bars: list[StrategyBarInput],
     indicator_context: dict[str, list[float | None]],
 ) -> bool:
+    """Función pública ``passes_hybrid_gate``."""
     hybrid = _hybrid_config(definition)
     if hybrid is None:
         return False
@@ -83,6 +87,7 @@ def passes_hybrid_gate(
 
 
 def hybrid_min_data_quality(definition: dict[str, Any]) -> float:
+    """Función pública ``hybrid_min_data_quality``."""
     hybrid = _hybrid_config(definition) or {}
     return float(hybrid.get("minDataQuality") or 0)
 
@@ -101,6 +106,7 @@ def evaluate_hybrid_candidate(
     fundamentals: dict[str, Any] | None = None,
     data_quality_context: DataQualityScanContext | None = None,
 ) -> HybridScanCandidate | None:
+    """Evalúa ``hybrid_candidate``."""
     hybrid = _hybrid_config(definition)
     if hybrid is None:
         return None
@@ -183,11 +189,13 @@ def build_indicator_context_for_definition(
     ohlcv_bars: list[OhlcvBar],
     definition: dict[str, Any],
 ) -> dict[str, list[float | None]]:
+    """Construye ``indicator_context_for_definition``."""
     specs = list(definition.get("indicatorSpecs") or [])
     return build_indicator_context(ohlcv_bars, specs)
 
 
 def hybrid_scorer_version(definition: dict[str, Any]) -> str:
+    """Función pública ``hybrid_scorer_version``."""
     hybrid = _hybrid_config(definition) or {}
     ai_scorer = hybrid.get("aiScorer") or {}
     return str(ai_scorer.get("version") or TECHNICAL_RATING_V1_VERSION)

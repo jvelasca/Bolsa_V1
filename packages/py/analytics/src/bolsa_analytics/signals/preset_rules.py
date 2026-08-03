@@ -27,6 +27,7 @@ __all__ = [
 ]
 
 def definition_has_rules(definition: dict[str, Any]) -> bool:
+    """Función pública ``definition_has_rules``."""
     return rule_group_has_rules(definition.get("entries")) or rule_group_has_rules(
         definition.get("exits")
     )

@@ -133,6 +133,7 @@ def build_indicator_context(
     bars: list[OhlcvBar],
     indicator_specs: list[dict[str, Any]],
 ) -> dict[str, list[float | None]]:
+    """Construye ``indicator_context``."""
     if not indicator_specs:
         return {}
     closes = [bar.close for bar in bars]
@@ -192,6 +193,7 @@ def evaluate_rule(
     context: dict[str, list[float | None]],
     closes: list[float],
 ) -> SignalKind | None:
+    """Evalúa ``rule``."""
     rule_type = rule.get("type")
     signal_kind = rule.get("signalKind")
     if signal_kind not in ("entry_long", "entry_short", "exit"):
@@ -454,6 +456,7 @@ def evaluate_rule_group(
     context: dict[str, list[float | None]],
     closes: list[float],
 ) -> SignalKind | None:
+    """Evalúa ``rule_group``."""
     rules = group.get("rules") or []
     if not rules:
         return None
@@ -482,6 +485,7 @@ def rule_group_passes_at_index(
     context: dict[str, list[float | None]],
     closes: list[float],
 ) -> bool:
+    """Función pública ``rule_group_passes_at_index``."""
     rules = group.get("rules") or []
     if not rules:
         return True
@@ -519,6 +523,7 @@ def evaluate_rules_bar(
     closes: list[float],
     side: Literal["entries", "exits"],
 ) -> SignalKind | None:
+    """Evalúa ``rules_bar``."""
     group = definition.get(side) or {}
     return evaluate_rule_group(group, index=index, context=context, closes=closes)
 
@@ -533,6 +538,7 @@ def evaluate_rules_signals(
     assume_long: bool = False,
     context: dict[str, list[float | None]] | None = None,
 ) -> list[SignalEvent]:
+    """Evalúa ``rules_signals``."""
     if len(timestamps) != len(closes):
         raise ValueError("timestamps and closes length mismatch")
 

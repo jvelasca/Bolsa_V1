@@ -26,6 +26,7 @@ CPCV_EMBARGO_MAX = 20
 
 @dataclass(frozen=True, slots=True)
 class CpcvPath:
+    """Partición / fold: Cpcv Path."""
     index: int
     test_group_indices: tuple[int, ...]
     train_bars: list[BacktestBarInput]
@@ -46,12 +47,14 @@ def normalize_cpcv_groups(n_groups: int | None) -> int | None:
 
 
 def normalize_cpcv_gap(bars: int | None, *, default: int, upper: int) -> int:
+    """Normaliza ``cpcv_gap``."""
     if bars is None:
         return default
     return max(0, min(upper, int(bars)))
 
 
 def estimate_cpcv_path_count(n_groups: int, n_test_groups: int = CPCV_TEST_GROUPS) -> int:
+    """Estima ``cpcv_path_count``."""
     resolved = normalize_cpcv_groups(n_groups)
     if resolved is None:
         return 0

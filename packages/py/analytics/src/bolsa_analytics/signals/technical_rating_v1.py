@@ -22,6 +22,7 @@ MODEL_ID = "technical_rating_v1"
 
 @dataclass(frozen=True, slots=True)
 class TechnicalRatingBreakdown:
+    """Desglose / score: Technical Rating Breakdown."""
     trend: float
     momentum: float
     volatility: float
@@ -139,6 +140,7 @@ def _score_mean_reversion(closes: list[float], bars: list[OhlcvBar], index: int)
 
 
 def compute_technical_rating_v1(bars: list[OhlcvBar]) -> TechnicalRatingBreakdown | None:
+    """Calcula serie/indicador ``technical_rating_v1``."""
     if len(bars) < 50:
         return None
 
@@ -171,6 +173,7 @@ def compute_technical_rating_v1(bars: list[OhlcvBar]) -> TechnicalRatingBreakdow
 
 
 def compute_technical_rating_at_index(bars: list[OhlcvBar], index: int) -> TechnicalRatingBreakdown | None:
+    """Calcula serie/indicador ``technical_rating_at_index``."""
     if index + 1 < 50:
         return None
     slice_bars = bars[: index + 1]
@@ -204,6 +207,7 @@ def compute_technical_rating_series_v1(
     *,
     warmup: int = 50,
 ) -> list[float | None]:
+    """Calcula serie/indicador ``technical_rating_series_v1``."""
     out: list[float | None] = []
     for index in range(len(bars)):
         if index + 1 < warmup:

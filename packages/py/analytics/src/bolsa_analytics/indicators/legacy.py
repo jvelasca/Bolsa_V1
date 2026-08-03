@@ -1,9 +1,12 @@
+"""Indicadores legacy (SMA/EMA/RSI) usados por grids H0."""
+
 from dataclasses import dataclass
 from typing import Literal
 
 
 def sma(values: list[float], period: int) -> list[float | None]:
 
+    """Indicador legacy ``sma``."""
     result: list[float | None] = []
 
     for i in range(len(values)):
@@ -26,6 +29,7 @@ def sma(values: list[float], period: int) -> list[float | None]:
 
 def ema(values: list[float], period: int) -> list[float | None]:
 
+    """Indicador legacy ``ema``."""
     result: list[float | None] = []
 
     k = 2 / (period + 1)
@@ -66,6 +70,7 @@ def ema(values: list[float], period: int) -> list[float | None]:
 
 def rsi(values: list[float], period: int = 14) -> list[float | None]:
 
+    """Indicador legacy ``rsi``."""
     if len(values) < period + 1:
 
         return [None] * len(values)
@@ -132,6 +137,7 @@ def rsi(values: list[float], period: int = 14) -> list[float | None]:
 
 class IndicatorPoint:
 
+    """Serie / evento: Indicator Point."""
     timestamp: str
 
     sma20: float | None
@@ -150,6 +156,7 @@ class IndicatorPoint:
 
 class IndicatorSignals:
 
+    """Tipo analytics: Indicator Signals."""
     rsi_zone: Literal["overbought", "oversold", "neutral"]
 
     sma_cross: Literal["bullish", "bearish"] | None
@@ -160,6 +167,7 @@ class IndicatorSignals:
 
 def build_indicator_series(timestamps: list[str], closes: list[float]) -> list[IndicatorPoint]:
 
+    """Construye ``indicator_series``."""
     sma20 = sma(closes, 20)
 
     sma50 = sma(closes, 50)
@@ -196,6 +204,7 @@ def build_indicator_series(timestamps: list[str], closes: list[float]) -> list[I
 
 def latest_indicator_signals(points: list[IndicatorPoint]) -> IndicatorSignals:
 
+    """Función pública ``latest_indicator_signals``."""
     if len(points) < 2:
 
         return IndicatorSignals(rsi_zone="neutral", sma_cross=None)

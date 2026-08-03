@@ -14,6 +14,7 @@ MIN_USABLE_BARS = 50
 
 @dataclass(frozen=True, slots=True)
 class DataQualityBreakdown:
+    """Desglose / score: Data Quality Breakdown."""
     freshness: float
     bar_depth: float
     sync: float
@@ -143,6 +144,7 @@ def compute_data_quality_v1(
     has_fundamental_gate: bool = False,
     fundamentals_ok: bool = True,
 ) -> DataQualityBreakdown:
+    """Calcula serie/indicador ``data_quality_v1``."""
     last_bar = _parse_date(last_bar_timestamp)
     expected = _parse_date(expected_last_bar_date)
     gap_count = count_recent_weekday_gaps(recent_timestamps or [])
@@ -175,6 +177,7 @@ def compute_data_quality_v1(
 
 
 def compute_global_score(setup_score: float, data_quality_score: float) -> float:
+    """Calcula serie/indicador ``global_score``."""
     return round(_clamp(0.7 * setup_score + 0.3 * data_quality_score), 2)
 
 
@@ -184,6 +187,7 @@ def compute_bar_data_quality_at_index(
     *,
     gap_lookback: int = 90,
 ) -> float | None:
+    """Calcula serie/indicador ``bar_data_quality_at_index``."""
     if index < 0:
         return None
     timestamps = [bar.timestamp for bar in bars[: index + 1][-gap_lookback:]]
@@ -197,6 +201,7 @@ def compute_bar_data_quality_series_v1(
     *,
     gap_lookback: int = 90,
 ) -> list[float | None]:
+    """Calcula serie/indicador ``bar_data_quality_series_v1``."""
     return [
         compute_bar_data_quality_at_index(bars, index, gap_lookback=gap_lookback)
         for index in range(len(bars))
