@@ -1,6 +1,6 @@
 /**
- * Panel Operativa (Trading) — Recomendación / Info / Configuración.
- * Antes: rail Coach plano. ADR-019: puente LAB + libro DEMO + mandato.
+ * Panel Operativa (Trading) — Recomendación (Pulso+TOP) / Info / Configuración.
+ * Universo ranking = pestañas abiertas = lista «En estudio».
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -22,6 +22,16 @@ import {
 import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel';
 import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
 import { TradingOperativaSection } from '@/features/trading/trading-operativa-section';
+import {
+  OperativaPulseBlock,
+  OperativaPulseSummary,
+} from '@/features/trading/operativa-pulse';
+import {
+  computeIndiceOperativo,
+  rankIndiceOperativo,
+  type OperativaScoreRow,
+} from '@/features/trading/operativa-index';
+import { useInstrumentsHubScores } from '@/features/instruments/use-instruments-hub-scores';
 import { getDiaDExperimentTop1 } from '@/features/backtests/dia-d-experiment-top';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { effectiveDiaD, isDiaDInPast, todayIsoDate } from '@/features/backtests/backtest-period';
@@ -58,6 +68,43 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   );
   const diaD = loadBacktestRunContext().diaD;
   const canVerify = isDiaDInPast(diaD);
+
+  const studyIds = useMemo(() => {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const tab of charts) {
+      if (!tab.instrumentId || seen.has(tab.instrumentId)) continue;
+      seen.add(tab.instrumentId);
+      ids.push(tab.instrumentId);
+    }
+    return ids;
+  }, [charts]);
+
+  const { faByInstrument, taByInstrument, scoresLoading } = useInstrumentsHubScores(studyIds);
+
+  const scoreRows: OperativaScoreRow[] = useMemo(
+    () =>
+      studyIds.map((id) => {
+        const ta = taByInstrument.get(id);
+        const fa = faByInstrument.get(id);
+        return {
+          instrumentId: id,
+          io: computeIndiceOperativo({
+            compositeDisplay100: ta?.compositeDisplay100,
+            distress: fa?.distress,
+          }),
+          ta: ta?.technicalDisplay100 ?? null,
+          fa: fa?.scoreDisplay100 ?? null,
+          distress: fa?.distress,
+        };
+      }),
+    [studyIds, taByInstrument, faByInstrument],
+  );
+
+  const rankResult = useMemo(
+    () => (instrumentId ? rankIndiceOperativo(scoreRows, instrumentId) : null),
+    [scoreRows, instrumentId],
+  );
 
   useEffect(() => {
     if (!effectiveAccountId) return;
@@ -129,12 +176,17 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     navigate(diaDVerifyHref(instrumentId));
   }
 
+  const pulseSummary = (
+    <OperativaPulseSummary
+      io={rankResult?.io ?? null}
+      rank={rankResult?.rank ?? null}
+      total={rankResult?.total ?? studyIds.length}
+    />
+  );
+
   return (
     <div
-      className={cn(
-        'flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-2 text-[11px]',
-        className,
-      )}
+      className={cn('flex h-full min-h-0 flex-col gap-2 overflow-hidden p-2 text-[11px]', className)}
       data-testid="trading-operativa-panel"
       aria-label={`Operativa · ${symbol}`}
     >
@@ -142,7 +194,20 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         {symbol} · {timeframe}
       </p>
 
-      <TradingOperativaSection sectionId="recommendation" title="Recomendación">
+      <TradingOperativaSection
+        sectionId="recommendation"
+        title="Recomendación"
+        summary={pulseSummary}
+      >
+        <OperativaPulseBlock
+          io={rankResult?.io ?? null}
+          ta={rankResult?.ta ?? null}
+          fa={rankResult?.fa ?? null}
+          rank={rankResult?.rank ?? null}
+          total={rankResult?.total ?? studyIds.length}
+          loading={scoresLoading}
+        />
+
         {topQuery.isLoading ? (
           <p className="text-muted-foreground">Cargando TOP…</p>
         ) : slot1 ? (
@@ -204,7 +269,15 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         </div>
       </TradingOperativaSection>
 
-      <TradingOperativaSection sectionId="info" title="Info">
+      <TradingOperativaSection
+        sectionId="info"
+        title="Info"
+        summary={
+          <span className="text-[10px] text-muted-foreground">
+            Mandatos {churn.openCount}
+          </span>
+        }
+      >
         <div data-testid="operativa-mandate-review" className="space-y-1">
           <p className="font-medium text-foreground">Mandatos (cuenta)</p>
           <p className="text-muted-foreground">
@@ -212,13 +285,13 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
             {churn.closedCount > 0 ? ` · cerrados: ${churn.closedCount}` : ''}
           </p>
           {openTenures.length > 0 ? (
-            <ul className="max-h-20 space-y-0.5 overflow-y-auto text-[10px] text-muted-foreground">
-              {openTenures.slice(0, 5).map((t) => (
+            <ul className="space-y-0.5 text-[10px] text-muted-foreground">
+              {openTenures.slice(0, 8).map((t) => (
                 <li key={t.id}>
                   {(t.strategyLabelSnapshot ?? t.instrumentId.slice(0, 6)) + ' · vigente'}
                 </li>
               ))}
-              {openTenures.length > 5 ? <li>+{openTenures.length - 5} más</li> : null}
+              {openTenures.length > 8 ? <li>+{openTenures.length - 8} más</li> : null}
             </ul>
           ) : (
             <p className="text-[10px] text-muted-foreground">

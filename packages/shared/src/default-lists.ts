@@ -17,7 +17,7 @@ export const VIRTUAL_LIST_IDS: readonly VirtualListId[] = [
 export const VIRTUAL_LIST_LABELS: Record<VirtualListId, string> = {
   [VIRTUAL_LIST_PORTFOLIO]: 'Cartera',
   [VIRTUAL_LIST_PENDING_ORDERS]: 'Órdenes pendientes',
-  [VIRTUAL_LIST_VISUALIZATION]: 'Visualización',
+  [VIRTUAL_LIST_VISUALIZATION]: 'En estudio',
 };
 
 /** ID estable de la lista de catálogo IBEX 35 en API (coincide con `DEFAULT_LIST_CONFIG.id`). */

@@ -538,8 +538,8 @@ export function ListValuesPanel() {
 
         {activeVirtual === VIRTUAL_LIST_VISUALIZATION && !isLoading && visualizationListItems.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            Busca un valor para añadirlo a visualización. Los instrumentos se guardan en el espacio
-            de trabajo y se recuperan al volver.
+            Busca un valor o ábrelo en el gráfico para añadirlo a «En estudio». Los instrumentos
+            se guardan en el espacio de trabajo y se recuperan al volver.
           </p>
         )}
 

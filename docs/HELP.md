@@ -46,7 +46,7 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 | Plataforma IA | `ai-platform-tracker.ts` | AI_PLATFORM_SOLUTION |
 | Gráficos | `chart-platform-tracker.ts` | charts |
 
-**Panel Operativa (Trading):** dock lateral colapsable/redimensionable junto al gráfico. Secciones: **Recomendación** (TOP #1, adopción, mandato, CTAs LAB), **Info** (churn mandatos / Learning), **Configuración** (Libro DEMO). Toggle en barra superior (icono panel derecho).
+**Panel Operativa (Trading):** dock lateral colapsable/redimensionable. Secciones con scroll y altura ajustable: **Recomendación** (Índice Operativo IO · TA · FA + «El n de N en estudio» + TOP #1), **Info**, **Configuración**. Lista virtual **En estudio** = pestañas de gráfico abiertas. Chips TA/FA de la barra del gráfico siguen configurables con ⋯.
 
 **Gráfico Trading — TOP#1:**
 - Barra general (**Indicadores**): switch **Finalista #1 · todos**.

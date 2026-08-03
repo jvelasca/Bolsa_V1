@@ -17,6 +17,14 @@ const MAX_OPERATIONS_HEIGHT_PCT = 50;
 const MIN_OPERATIVA_WIDTH_PCT = 16;
 const MAX_OPERATIVA_WIDTH_PCT = 42;
 
+const MIN_OPERATIVA_SECTION_HEIGHT_PX = 72;
+const MAX_OPERATIVA_SECTION_HEIGHT_PX = 420;
+const DEFAULT_OPERATIVA_SECTION_HEIGHTS: Record<OperativaSectionId, number> = {
+  recommendation: 260,
+  info: 140,
+  config: 180,
+};
+
 export type OperativaSectionId = 'recommendation' | 'info' | 'config';
 
 interface TradingLayoutState {
@@ -31,6 +39,7 @@ interface TradingLayoutState {
   operationsHeightPct: number;
   operativaWidthPct: number;
   operativaSections: Record<OperativaSectionId, boolean>;
+  operativaSectionHeights: Record<OperativaSectionId, number>;
   toggleLists: () => void;
   ensureListsOpen: () => void;
   toggleCharts: () => void;
@@ -45,6 +54,7 @@ interface TradingLayoutState {
   setOperationsHeightPct: (pct: number) => void;
   setOperativaWidthPct: (pct: number) => void;
   toggleOperativaSection: (id: OperativaSectionId) => void;
+  setOperativaSectionHeight: (id: OperativaSectionId, heightPx: number) => void;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -71,6 +81,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
       operationsHeightPct: DEFAULT_OPERATIONS_HEIGHT_PCT,
       operativaWidthPct: DEFAULT_OPERATIVA_WIDTH_PCT,
       operativaSections: { ...DEFAULT_OPERATIVA_SECTIONS },
+      operativaSectionHeights: { ...DEFAULT_OPERATIVA_SECTION_HEIGHTS },
 
       toggleLists: () => {
         const open = !get().listsOpen;
@@ -168,6 +179,7 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           operationsHeightPct: DEFAULT_OPERATIONS_HEIGHT_PCT,
           operativaWidthPct: DEFAULT_OPERATIVA_WIDTH_PCT,
           operativaSections: { ...DEFAULT_OPERATIVA_SECTIONS },
+          operativaSectionHeights: { ...DEFAULT_OPERATIVA_SECTION_HEIGHTS },
         }),
 
       setListsWidthPct: (pct) =>
@@ -193,6 +205,17 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           },
         });
       },
+
+      setOperativaSectionHeight: (id, heightPx) => {
+        const heights = get().operativaSectionHeights ?? DEFAULT_OPERATIVA_SECTION_HEIGHTS;
+        set({
+          operativaSectionHeights: {
+            ...DEFAULT_OPERATIVA_SECTION_HEIGHTS,
+            ...heights,
+            [id]: clamp(heightPx, MIN_OPERATIVA_SECTION_HEIGHT_PX, MAX_OPERATIVA_SECTION_HEIGHT_PX),
+          },
+        });
+      },
     }),
     {
       name: 'bolsa-trading-layout-v1',
@@ -210,6 +233,10 @@ export const useTradingLayoutStore = create<TradingLayoutState>()(
           operativaSections: {
             ...DEFAULT_OPERATIVA_SECTIONS,
             ...(p.operativaSections ?? {}),
+          },
+          operativaSectionHeights: {
+            ...DEFAULT_OPERATIVA_SECTION_HEIGHTS,
+            ...(p.operativaSectionHeights ?? {}),
           },
         };
       },
