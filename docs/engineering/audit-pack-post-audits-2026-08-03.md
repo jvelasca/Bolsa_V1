@@ -1,7 +1,7 @@
 # Paquete de auditoría — post-auditorías Q0–Q3 + freeze (2026-08-03)
 
 > **Propósito:** documento **único** para pasar auditorías del cierre post-etapa (tras [stage-audit LAB/DÍA D/Mandato](./stage-audit-lab-dia-d-mandate-2026-08-02.md)).  
-> **AsOf:** 2026-08-03 · `HELP_CONTENT_AS_OF` · `main` incluye PRs #2–#5.  
+> **AsOf:** 2026-08-03 · `HELP_CONTENT_AS_OF` · `main` incluye PRs #2–#10 (Q0–Q3, freeze, audit pack, docstrings lotes 1–4).  
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1` (privado)
 
 ---
@@ -83,11 +83,11 @@ El stage-audit §6 decía «CORE-R cola multi-dispositivo (sigue localStorage)»
 
 | Check | Resultado |
 |-------|-----------|
-| `pnpm test:operativa` | OK (74 vitest + 33 pytest) |
-| `pnpm test:operativa:smoke` | PASS (health, FA asOf, Evidence, CORE-R, persist) |
-| `pnpm test:coach:smoke` | PASS (CORE-P multi-perfil) |
-| `pnpm audit:ibex35:missing` | `con_TOP=35/35` · `sin_TOP=0` · `TOP_sin_runId=0` |
-| CI PRs #3–#5 | Mergeados a `main` |
+| `pnpm test:operativa` | OK (74 vitest + 33 pytest) · re-check mañana OK |
+| `pnpm test:operativa:smoke` | PASS (health, FA asOf, Evidence, CORE-R, persist) · re-check mañana PASS |
+| `pnpm test:coach:smoke` | PASS (CORE-P multi-perfil) · re-check mañana PASS |
+| `pnpm audit:ibex35:missing` | `con_TOP=35/35` · `sin_TOP=0` · `TOP_sin_runId=0` · re-check mañana OK |
+| CI PRs #2–#10 | Mergeados a `main` (incl. docstrings lotes 1–4) |
 
 Comandos de repetición:
 
