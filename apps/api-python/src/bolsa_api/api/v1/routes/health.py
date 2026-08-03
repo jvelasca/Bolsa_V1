@@ -1,3 +1,5 @@
+"""API: health check (DB + componentes best-effort Yahoo/XTB)."""
+
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
@@ -10,16 +12,22 @@ router = APIRouter()
 
 
 class DatabaseHealthDto(BaseModel):
+    """Estado de conectividad PostgreSQL."""
+
     status: str
     message: str
 
 
 class ComponentHealthDto(BaseModel):
+    """Estado de un componente opcional (sin probe de red agresivo)."""
+
     status: str
     message: str
 
 
 class HealthResponseDto(BaseModel):
+    """Payload ``GET /api/health``."""
+
     status: str
     service: str = "bolsa-api-python"
     timestamp: str

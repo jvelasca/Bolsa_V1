@@ -1,3 +1,9 @@
+"""Motor de backtest H0 (barra a barra, presets / rules).
+
+Costes v1 fijos en bps; v2 opcional vía ``CostModelV2Config`` (gated).
+Convención anualización: 252 sesiones/año.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -30,6 +36,8 @@ _PERIODS_PER_YEAR = 252.0
 
 @dataclass(frozen=True, slots=True)
 class BacktestBarInput:
+    """Barra OHLCV mínima para el motor (timestamp ISO + close obligatorio)."""
+
     timestamp: str
     close: float
     open: float | None = None
@@ -53,6 +61,8 @@ class BacktestCostModel:
 
 @dataclass(frozen=True, slots=True)
 class BacktestTradeResult:
+    """Fill simulado (buy/sell) con equity tras la operación."""
+
     type: Literal["buy", "sell"]
     timestamp: str
     price: float
@@ -64,12 +74,16 @@ class BacktestTradeResult:
 
 @dataclass(frozen=True, slots=True)
 class BacktestEquityPoint:
+    """Punto de la curva de equity al cierre de barra."""
+
     timestamp: str
     equity: float
 
 
 @dataclass(frozen=True, slots=True)
 class BacktestEngineResult:
+    """Resultado completo del motor (métricas + trades + equity curve)."""
+
     initial_cash: float
     final_equity: float
     total_return_pct: float
@@ -237,6 +251,10 @@ def run_backtest(
     cost_v2: CostModelV2Config | None = None,
     strategy_definition: dict[str, Any] | None = None,
 ) -> BacktestEngineResult:
+    """Ejecuta un backtest H0 sobre ``bars`` con preset o ``strategy_definition``.
+
+    Si ``cost_v2`` está enabled, ajusta slippage/spread por barra; si no, usa bps fijos.
+    """
     if not bars:
         raise ValueError("No hay barras OHLCV para el backtest")
     if initial_cash <= 0:

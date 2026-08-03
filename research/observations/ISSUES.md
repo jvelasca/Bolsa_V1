@@ -61,6 +61,20 @@ No abren Fase 2 ni entidades nuevas.
 
 ---
 
+### code-docstrings-coverage · **forward-only**
+
+| Campo | Valor |
+|-------|--------|
+| Estado | Open · lote 1 iniciado 2026-08-03 |
+| Severidad | Baja (mantenibilidad / auditoría de código) |
+| Doc | `docs/engineering/code-documentation-standard-2026-08-03.md` |
+| Medición | `python scripts/research/docstring_coverage_report.py` |
+
+**Hecho:** política + script de cobertura · lote 1 (alerts/CORE-R/mandates/health schemas+routes · backtest · cost v2).  
+**Pendiente:** lotes 2–4 (resto schemas/routes · application · indicadores). No reescribe histórico solo por docs.
+
+---
+
 ## Closed
 
 ### CORE-P profile-coach-lab-binding · 2026-08-01

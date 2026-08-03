@@ -126,6 +126,7 @@ Fuente: [research/observations/ISSUES.md](../../research/observations/ISSUES.md)
 | CORE-R | Entregado v1.12 · **vigilancia** uso real |
 | CORE-A | v0 · bloqueado a Belief |
 | CORE-B | v0.2 · parked (no Lab UI P3–P9) |
+| Docstrings código | ~80% defs públicas sin docstring al AsOf — **no bloquea** producto; política + lote 1 en [code-documentation-standard](./code-documentation-standard-2026-08-03.md); medir con `python scripts/research/docstring_coverage_report.py` |
 
 ---
 
