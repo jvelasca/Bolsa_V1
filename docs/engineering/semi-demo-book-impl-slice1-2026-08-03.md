@@ -64,11 +64,12 @@ Migración: `python packages/py/infrastructure/scripts/apply_supervised_f3_accou
 - [ ] Modo SEMI · N=10 · size 10 %  
 - [ ] Finalistas → Proponer → aparece en cola F3  
 - [ ] Alarma Radar → F3 (SEMI) / solo toast (MANUAL)  
-- [ ] Confirm+ejecutar → posición + tenure Mandato  
-- [ ] AUTO no clickable / no ejecuta  
-- [ ] Qty propuesta ≈ 10 % cash / precio  
-- [ ] Geo: orden cola con badge país  
-- [ ] Cola F3 sobrevive refresh / cambio de dispositivo (tras migración)  
+- [x] Confirm+ejecutar → posición + tenure Mandato  
+- [x] Coach rail: tenures abiertos + Learning (5b)  
+- [ ] AUTO no clickable / no ejecuta (UI)  
+- [x] Qty propuesta ≈ 10 % cash / precio (unit)  
+- [x] Geo: orden cola con badge país (unit)  
+- [x] Cola F3 BD roundtrip (`test:semi:smoke`)  
 
 ## Retomar
 

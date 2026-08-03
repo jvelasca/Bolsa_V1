@@ -4,36 +4,16 @@
 
 ## Hecho
 
-### Slice 1 (PR #23 · main)
-- Libro DEMO MANUAL/SEMI · sizing · F3 lote · Radar/Finalistas gates.
-
-### Slice 1.1 geo (PR #24 · main)
-- Ranker óptimo → país→EU→mundo · control en Libro DEMO.
-
-### Slice 1.2 — cola F3 BD + country en propose (esta rama)
-- Tabla `supervised_f3_account_state` · GET/PUT `/api/accounts/{id}/supervised-f3-queue`.
-- Hydrate/push (patrón CORE-R) · `SupervisedF3QueueHost` en PlatformShell.
-- `Recommendation.country` desde instrumento en propose.
-- Smoke automatizado: vitest prefs/geo/finalists/queue (16 tests OK 2026-08-03).
-
-## Verificación
-
-```bash
-pnpm test:semi
-pnpm test:semi:smoke   # API :8000 + migración
-```
+- Slice 1–1.2 en **main** (libro · geo · cola BD · country).
+- **5a cerrado:** Confirm+ejecutar → tenure `propose_accepted` + link trade.
+- **5b:** Coach rail — abiertos cuenta + botón Learning/Outcomes.
+- Verificación: `pnpm test:semi` · `pnpm test:semi:smoke` (API OK 2026-08-03).
 
 ## Pendiente
 
-1. Smoke UI manual (checklist en impl brief).  
-2. AUTO / Belief pesos — **no** hasta descongelar.
-
-## Ops
-
-```bash
-python packages/py/infrastructure/scripts/apply_supervised_f3_account_state_migration.py
-```
+1. Smoke UI manual (checklist impl brief).  
+2. AUTO / Belief (**5c**) — **no** hasta descongelar.
 
 ## Rama
 
-`stage/semi-f3-queue-bd-2026-08-03` (PR #25)
+`stage/semi-mandate-5ab-2026-08-03`

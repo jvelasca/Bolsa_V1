@@ -294,6 +294,21 @@ export function summarizeMandateChurn(
   return { totalChanges, byActor, openCount, closedCount };
 }
 
+/** Tenures abiertos de una cuenta (revisión 5b en Coach rail). */
+export function listOpenMandateTenures(accountId: string | null | undefined): MandateTenure[] {
+  if (!accountId) return [];
+  const store = readMandateTenureStore();
+  const out: MandateTenure[] = [];
+  for (const [key, rows] of Object.entries(store.byKey)) {
+    const [, acc] = key.split('::');
+    if (acc !== accountId) continue;
+    for (const row of rows) {
+      if (row.effectiveTo == null) out.push(row);
+    }
+  }
+  return out.sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+}
+
 export function emptyMandateTradeLinkStore(): MandateTradeLinkStore {
   return { engine: MANDATE_TRADE_LINKS_ENGINE, links: [] };
 }
