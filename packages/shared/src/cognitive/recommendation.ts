@@ -20,6 +20,8 @@ export interface RecommendationV1 {
   decisionId: string;
   instrumentId: string;
   symbol?: string;
+  /** ISO país del instrumento (preferencia geo SEMI). */
+  country?: string | null;
   accountId?: string | null;
   action: DecisionAction;
   /** Unidades sugeridas (paper/sizing base). */

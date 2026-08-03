@@ -1,6 +1,6 @@
 # Brief — Modos operativos DEMO (MANUAL / SEMI / AUTO)
 
-> **AsOf:** 2026-08-03 · **Estado:** decisiones de producto **cerradas** (§ Decisiones) · SEMI slice 1 en **main** (PR #23) · slice 1.1 geo ranker en curso.  
+> **AsOf:** 2026-08-03 · **Estado:** decisiones **cerradas** · SEMI slice 1+1.1 en **main** · slice 1.2 cola F3→BD en curso.  
 > **Padre:** [research-lifecycle.md](./research-lifecycle.md) § caminos A–E · [account-premises-demo-vs-paper-2026-07-31.md](./account-premises-demo-vs-paper-2026-07-31.md) · ADR-019/020/010.  
 > **Freeze:** Belief→Coach · `CORE_R_CRON` off · Camino D / `PAPER_D_EXECUTE` · Strategy Studio / F5 · SCI─X─►TRD.
 
@@ -89,7 +89,7 @@ Hoy la cola Supervised F3 vive en **sessionStorage del navegador** (Zustand pers
 - En el **mismo** navegador/sesión de pruebas SEMI → funciona.
 
 **Decisión slice 1:** sessionStorage **OK** para pruebas en un puesto.  
-**Decisión slice 1.1 (si molesta):** persistir cola en BD ligada a `accountId` (multi-dispositivo / no perder Confirm).
+**Decisión slice 1.2:** persistir cola en BD ligada a `accountId` (multi-dispositivo / no perder Confirm) — tabla `supervised_f3_account_state` + hydrate/push.
 
 ### 7. Confirm lote vs por valor — **default agente**
 

@@ -1288,3 +1288,20 @@ class CoreRAccountStateRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
     )
+
+
+class SupervisedF3AccountStateRow(Base):
+    """SEMI Confirm F3 — blob cola supervisada por cuenta."""
+
+    __tablename__ = "supervised_f3_account_state"
+
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        ForeignKey("investment_accounts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    queue_json: Mapped[list] = mapped_column("queue_json", JSONB, default=list)
+    active_id: Mapped[str | None] = mapped_column("active_id", String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
+    )

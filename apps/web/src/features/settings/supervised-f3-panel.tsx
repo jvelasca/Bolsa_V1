@@ -245,6 +245,7 @@ export function SupervisedF3Panel() {
           ...item,
           instrumentId: item.payload.instrumentId,
           optimalScore: optimalScoreFromPayload(item.payload),
+          country: item.payload.country ?? null,
           tieBreak: item.enqueuedAt,
         })),
         {
@@ -431,7 +432,9 @@ export function SupervisedF3Panel() {
                 const origin = resolveSupervisedQueueOrigin(item);
                 const checked = selectedIds.has(item.id);
                 const country =
-                  countryByInstrumentId.get(item.payload.instrumentId) ?? null;
+                  item.payload.country ??
+                  countryByInstrumentId.get(item.payload.instrumentId) ??
+                  null;
                 return (
                   <li key={item.id} className="flex items-center gap-1.5">
                     <input

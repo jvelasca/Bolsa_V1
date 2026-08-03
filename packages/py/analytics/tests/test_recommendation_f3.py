@@ -30,12 +30,37 @@ def test_recommendation_from_package_and_intent():
         suggested_price=100,
         account_id="acc-1",
         symbol="AAPL",
+        country="US",
     )
     assert rec.artifact_type == "ART-RECOMMENDATION"
     assert rec.status == "awaiting_human"
     assert rec.notional == 1000
+    assert rec.country == "US"
+    assert rec.to_dict()["country"] == "US"
     intent = intent_from_recommendation(rec, account_id="acc-1")
     assert intent.artifact_type == "ART-ORDER-INTENT"
     assert intent.side == "buy"
     assert intent.source == "human_supervised"
     assert intent.status == "authorized"
+
+
+def test_recommendation_country_optional():
+    package = DecisionPackageTa(
+        decision_id=f"DEC-{uuid4().hex[:8]}",
+        instrument_id="inst-2",
+        timestamp=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        action="wait",
+        overall_confidence=0.4,
+        metrics=DecisionMetrics(0.4, 0.4, 0.4, 0.4, 0.4),
+        score_ta=0.0,
+        evidence_breakdown=(),
+        fact_set_ref="FS-2",
+    )
+    rec = recommendation_from_decision_package(
+        package,
+        suggested_quantity=1,
+        symbol="SAN.MC",
+        country="ES",
+    )
+    assert rec.to_dict()["country"] == "ES"
+    assert rec.to_dict()["symbol"] == "SAN.MC"

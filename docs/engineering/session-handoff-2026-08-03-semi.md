@@ -7,18 +7,33 @@
 ### Slice 1 (PR #23 · main)
 - Libro DEMO MANUAL/SEMI · sizing · F3 lote · Radar/Finalistas gates.
 
-### Slice 1.1 — geo ranker (esta rama)
-- `demo-book-geo-rank`: óptimo primero, luego país→EU→mundo (suave).
-- F3 cola ordenada + badge país; Libro DEMO selector preferencia geo.
-- Home inferido de `account.currency` (EUR→ES).
+### Slice 1.1 geo (PR #24 · main)
+- Ranker óptimo → país→EU→mundo · control en Libro DEMO.
+
+### Slice 1.2 — cola F3 BD + country en propose (esta rama)
+- Tabla `supervised_f3_account_state` · GET/PUT `/api/accounts/{id}/supervised-f3-queue`.
+- Hydrate/push (patrón CORE-R) · `SupervisedF3QueueHost` en PlatformShell.
+- `Recommendation.country` desde instrumento en propose.
+- Smoke automatizado: vitest prefs/geo/finalists/queue (16 tests OK 2026-08-03).
+
+## Verificación
+
+```bash
+pnpm test:semi
+pnpm test:semi:smoke   # API :8000 + migración
+```
 
 ## Pendiente
 
-1. Smoke UI checklist slice 1 (+ comprobar orden geo en F3).  
-2. Cola F3 → BD si sessionStorage duele.  
-3. AUTO / Belief pesos — **no** hasta descongelar.  
-4. Opcional: enriquecer payload propose con `country` (evitar mapa instrumentos).
+1. Smoke UI manual (checklist en impl brief).  
+2. AUTO / Belief pesos — **no** hasta descongelar.
+
+## Ops
+
+```bash
+python packages/py/infrastructure/scripts/apply_supervised_f3_account_state_migration.py
+```
 
 ## Rama
 
-`stage/semi-demo-geo-rank-2026-08-03`
+`stage/semi-f3-queue-bd-2026-08-03` (PR #25)

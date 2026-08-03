@@ -32,6 +32,7 @@ class Recommendation:
     artifact_type: str = "ART-RECOMMENDATION"
     schema_version: str = "1.0.0"
     symbol: str | None = None
+    country: str | None = None
     account_id: str | None = None
     suggested_price: float | None = None
     notional: float | None = None
@@ -51,6 +52,7 @@ class Recommendation:
             "decisionId": self.decision_id,
             "instrumentId": self.instrument_id,
             "symbol": self.symbol,
+            "country": self.country,
             "accountId": self.account_id,
             "action": self.action,
             "suggestedQuantity": self.suggested_quantity,
@@ -76,6 +78,7 @@ def recommendation_from_decision_package(
     suggested_price: float | None = None,
     account_id: str | None = None,
     symbol: str | None = None,
+    country: str | None = None,
     status: RecommendationStatus = "awaiting_human",
     edge_report_ref: str | None = None,
 ) -> Recommendation:
@@ -101,6 +104,7 @@ def recommendation_from_decision_package(
         status=status,
         created_at=now,
         symbol=symbol,
+        country=country,
         account_id=account_id,
         suggested_price=suggested_price,
         notional=notional,

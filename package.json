@@ -46,6 +46,8 @@
     "audit:fa:coverage": "python scripts/research/audit_fa_coverage.py",
     "test:operativa": "node scripts/research/verify_operativa_battery.mjs",
     "test:operativa:smoke": "python scripts/research/verify_dia_d_api_smoke.py",
+    "test:semi": "node scripts/research/verify_semi_demo_battery.mjs",
+    "test:semi:smoke": "python scripts/research/verify_semi_demo_api_smoke.py",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
     "prepare": "husky"

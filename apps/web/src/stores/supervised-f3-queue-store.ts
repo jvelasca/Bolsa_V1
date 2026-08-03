@@ -8,9 +8,10 @@
  * `openHelpAiPlatform({ panel: 'supervised-f3' })` abre Ayuda → Plataforma IA
  * y hace scroll al panel Confirm (escuchado por `app-help-menu.tsx`).
  *
- * No persiste en servidor; Amendment-2: Recommendation awaiting_human en cliente.
+ * Persistencia: sessionStorage (cache) + BD `supervised_f3_account_state`
+ * vía `supervised-f3-sync.ts` (hydrate/push por cuenta Activa).
  *
- * @see docs/engineering/backtesting-funnel-handoff-2026-07-29.md
+ * @see docs/engineering/semi-demo-book-impl-slice1-2026-08-03.md
  * @see PAPER_PATH_SUPERVISED
  */
 

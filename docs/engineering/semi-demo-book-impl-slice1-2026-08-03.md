@@ -15,7 +15,7 @@
 | Sizing | ~10 % cash DEMO por op (editable) |
 | Diversif. | Óptimo primero; preferencia país→EU→mundo (suave) |
 | Aprender | 5a audit+tenure ahora · 5c pesos cuando descongele Belief |
-| Cola F3 | sessionStorage OK v1 · BD si duele |
+| Cola F3 | sessionStorage OK v1 · **BD** por `accountId` (slice 1.2) |
 | Confirm | Lote + checks por valor |
 | Capital | Cash DEMO (sin risk budget paralelo) |
 
@@ -28,9 +28,19 @@
 5. **Copy** Camino C = «SEMI · Confirm DEMO»  
 6. Docs: este brief + index + HELP + handoff corto
 
-## Fuera de slice 1
+## Fuera de slice 1–1.2
 
-AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI completa H/M slots · cron
+AUTO execute · country hard veto · auto WeightRules · dual UI completa H/M slots · Belief
+
+## Verificación automatizada
+
+```bash
+pnpm test:semi          # battery web + py + smoke API opcional
+pnpm test:semi:smoke    # solo API live (SEMI_API_REQUIRED=1 para forzar)
+```
+
+Scripts: `scripts/research/verify_semi_demo_battery.mjs` · `verify_semi_demo_api_smoke.py`  
+Migración: `python packages/py/infrastructure/scripts/apply_supervised_f3_account_state_migration.py`
 
 ## Slice 1.1 (geo)
 
@@ -38,8 +48,18 @@ AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI comp
 - [x] Orden cola F3: óptimo → geo  
 - [x] Control preferencia en Libro DEMO  
 
+## Slice 1.2 (cola BD + country)
+
+- [x] Tabla + GET/PUT supervised-f3-queue  
+- [x] Hydrate/push cliente  
+- [x] `Recommendation.country` en propose  
+- [x] Aplicar migración local  
+- [x] Battery `pnpm test:semi` + smoke API  
+
 ## Checklist prueba DEMO
 
+- [x] Unit: prefs · geo · Finalistas path · queue store · operativa contract  
+- [x] Battery `pnpm test:semi` (registrada)  
 - [ ] Cuenta DEMO activa con cash ≥ 2k  
 - [ ] Modo SEMI · N=10 · size 10 %  
 - [ ] Finalistas → Proponer → aparece en cola F3  
@@ -47,6 +67,8 @@ AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI comp
 - [ ] Confirm+ejecutar → posición + tenure Mandato  
 - [ ] AUTO no clickable / no ejecuta  
 - [ ] Qty propuesta ≈ 10 % cash / precio  
+- [ ] Geo: orden cola con badge país  
+- [ ] Cola F3 sobrevive refresh / cambio de dispositivo (tras migración)  
 
 ## Retomar
 
