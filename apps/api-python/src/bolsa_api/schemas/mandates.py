@@ -1,4 +1,7 @@
-"""Pydantic DTOs — mandato operativo (ADR-020 M1b)."""
+"""Pydantic DTOs — mandato operativo (ADR-020 M1b).
+
+Tenures y links de trades por cuenta; hydrate/push multi-dispositivo.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +9,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class MandateTenureDto(BaseModel):
+    """Tramo de mandato (estrategia×instrumento×cuenta) abierto o cerrado."""
+
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
     id: str
@@ -24,6 +29,8 @@ class MandateTenureDto(BaseModel):
 
 
 class MandateTradeLinkDto(BaseModel):
+    """Vínculo fill/transacción → tenure (flujo enlazado, no MTM)."""
+
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
     transaction_id: str = Field(alias="transactionId")
@@ -35,6 +42,8 @@ class MandateTradeLinkDto(BaseModel):
 
 
 class MandateBundleDto(BaseModel):
+    """Bundle tenures + links de una cuenta."""
+
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
     tenures: list[MandateTenureDto]
@@ -42,12 +51,16 @@ class MandateBundleDto(BaseModel):
 
 
 class MandateBundleResponseDto(BaseModel):
+    """Respuesta GET envuelta en ``data``."""
+
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
     data: MandateBundleDto
 
 
 class SyncMandateBundleDto(BaseModel):
+    """Payload PUT de sincronización cliente → BD."""
+
     model_config = ConfigDict(populate_by_name=True)
 
     tenures: list[MandateTenureDto] = Field(default_factory=list)

@@ -14,6 +14,8 @@ from statistics import median
 
 @dataclass(frozen=True, slots=True)
 class CostModelV1:
+    """Costes fijos en bps (modelo histórico / Lab por defecto)."""
+
     commission_bps: int = 10
     slippage_bps: int = 5
     spread_bps: int = 2
@@ -34,6 +36,7 @@ class CostModelV2Config:
 
 
 def effective_slippage_bps(cfg: CostModelV2Config, *, volume_ratio: float | None) -> int:
+    """Slippage base + extra si el ratio de volumen marca iliquidez."""
     if not cfg.enabled or volume_ratio is None:
         return cfg.slippage_bps_base
     if volume_ratio < cfg.volume_ratio_illiquid:
@@ -42,12 +45,14 @@ def effective_slippage_bps(cfg: CostModelV2Config, *, volume_ratio: float | None
 
 
 def effective_spread_bps(cfg: CostModelV2Config, *, wide_book: bool = False) -> int:
+    """Spread tip o wide según libro / iliquidez (solo si v2 enabled)."""
     if not cfg.enabled:
         return cfg.spread_bps_tip
     return cfg.spread_bps_wide if wide_book else cfg.spread_bps_tip
 
 
 def median_volume(volumes: Sequence[float]) -> float | None:
+    """Mediana de volúmenes > 0; ``None`` si no hay datos útiles."""
     vals = [float(v) for v in volumes if v is not None and float(v) > 0]
     if not vals:
         return None
@@ -55,6 +60,7 @@ def median_volume(volumes: Sequence[float]) -> float | None:
 
 
 def volume_ratio(volume: float, med: float | None) -> float | None:
+    """``volume / mediana``; ``None`` si no hay mediana válida."""
     if med is None or med <= 0:
         return None
     return float(volume) / med

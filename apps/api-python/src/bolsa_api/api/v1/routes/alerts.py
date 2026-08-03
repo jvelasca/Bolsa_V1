@@ -1,3 +1,5 @@
+"""API: alertas de precio (CRUD + evaluate)."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query

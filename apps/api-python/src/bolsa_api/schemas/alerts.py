@@ -1,7 +1,15 @@
+"""DTOs HTTP de alertas de precio (API v1).
+
+Aliases camelCase para el cliente web. Persistencia vía use-cases en
+``bolsa_application.alerts``.
+"""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class PriceAlertDto(BaseModel):
+    """Alerta de precio persistida (activa o disparada)."""
+
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
     id: str
@@ -18,14 +26,20 @@ class PriceAlertDto(BaseModel):
 
 
 class PriceAlertsResponseDto(BaseModel):
+    """Lista de alertas."""
+
     data: list[PriceAlertDto]
 
 
 class PriceAlertResponseDto(BaseModel):
+    """Una alerta envuelta en ``data``."""
+
     data: PriceAlertDto
 
 
 class CreatePriceAlertRequestDto(BaseModel):
+    """Alta de alerta de precio."""
+
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
     instrument_id: str = Field(alias="instrumentId")
@@ -36,4 +50,6 @@ class CreatePriceAlertRequestDto(BaseModel):
 
 
 class EvaluateAlertsResponseDto(BaseModel):
+    """Resultado de evaluar alertas activas contra el mercado."""
+
     data: list[PriceAlertDto]
