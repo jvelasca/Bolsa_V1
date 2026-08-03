@@ -214,6 +214,7 @@ npx vitest run src/features/trading/dia-d-verify-continuity.test.ts `
 - Walk-forward multi-ventana automático.  
 - `PAPER_D_EXECUTE` / broker live.  
 - CORE-R cola multi-dispositivo (sigue localStorage).  
+  · **Errata 2026-08-03:** CORE-R v1.9+ usa BD; ver [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md) §1.  
 - Belief UI / Lab Discovery P3–P9 ampliados.
 
 ---
@@ -233,13 +234,14 @@ Tras merge de esta etapa: reiniciar API, aplicar migración mandato, smoke §5.
 
 ## 8. Índice de docs vivos (esta etapa)
 
-1. Este archivo (auditoría).  
-2. [adr/019](../adr/019-dual-universes-lab-vs-trading.md) · [adr/020](../adr/020-operating-mandate-tenure.md) · [adr/021](../adr/021-dia-d-reconciliation.md).  
-3. [backtesting-dia-d-premises](./backtesting-dia-d-premises-2026-07-31.md).  
-4. [dual-universes design](./dual-universes-lab-trading-design-2026-08-02.md).  
-5. [HELP.md](../HELP.md) · [UI_PREFS_LOCALSTORAGE.md](../UI_PREFS_LOCALSTORAGE.md).  
-6. [operativa-test-plan](./operativa-test-plan-2026-07-31.md).  
-7. [session-handoff-2026-08-01](./session-handoff-2026-08-01.md) (racha previa; complementar con este cierre).
+1. Este archivo (auditoría etapa LAB/DÍA D/Mandato).  
+2. **Post-Q3:** [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md) (paquete único para auditorías posteriores).  
+3. [adr/019](../adr/019-dual-universes-lab-vs-trading.md) · [adr/020](../adr/020-operating-mandate-tenure.md) · [adr/021](../adr/021-dia-d-reconciliation.md).  
+4. [backtesting-dia-d-premises](./backtesting-dia-d-premises-2026-07-31.md).  
+5. [dual-universes design](./dual-universes-lab-trading-design-2026-08-02.md).  
+6. [HELP.md](../HELP.md) · [UI_PREFS_LOCALSTORAGE.md](../UI_PREFS_LOCALSTORAGE.md).  
+7. [operativa-test-plan](./operativa-test-plan-2026-07-31.md).  
+8. [session-handoff-2026-08-01](./session-handoff-2026-08-01.md) (racha previa; complementar con este cierre).
 
 ---
 

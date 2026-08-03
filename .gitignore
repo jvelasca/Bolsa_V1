@@ -6,7 +6,6 @@ dist/
 .env.*.local
 *.log
 logs/**
-!logs/README.md
 !logs/**/.gitkeep
 .DS_Store
 coverage/
