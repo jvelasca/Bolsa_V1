@@ -38,6 +38,7 @@ import { CreateAccountWizardDialog } from '@/features/accounts/create-account-wi
 import { BacktestsPage } from '@/features/backtests/backtests-page';
 
 import { CoreRSchedulerHost } from '@/features/backtests/core-r-scheduler-host';
+import { SupervisedF3QueueHost } from '@/features/trading/supervised-f3-queue-host';
 import { isFillHubRoute, isTradingRoute } from '@/lib/routes';
 import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
 import { useUiStore } from '@/stores/ui-store';
@@ -64,6 +65,7 @@ export function PlatformShell() {
       <VisualizationWorkspaceSync />
       <WorkspaceRemoteSync />
       <CoreRSchedulerHost />
+      <SupervisedF3QueueHost />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {trading ? (

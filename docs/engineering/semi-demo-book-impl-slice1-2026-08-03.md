@@ -15,7 +15,7 @@
 | Sizing | ~10 % cash DEMO por op (editable) |
 | Diversif. | Óptimo primero; preferencia país→EU→mundo (suave) |
 | Aprender | 5a audit+tenure ahora · 5c pesos cuando descongele Belief |
-| Cola F3 | sessionStorage OK v1 · BD si duele |
+| Cola F3 | sessionStorage OK v1 · **BD** por `accountId` (slice 1.2) |
 | Confirm | Lote + checks por valor |
 | Capital | Cash DEMO (sin risk budget paralelo) |
 
@@ -38,8 +38,16 @@ AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI comp
 - [x] Orden cola F3: óptimo → geo  
 - [x] Control preferencia en Libro DEMO  
 
+## Slice 1.2 (cola BD + country)
+
+- [x] Tabla + GET/PUT supervised-f3-queue  
+- [x] Hydrate/push cliente  
+- [x] `Recommendation.country` en propose  
+- [ ] Aplicar migración en entorno local/CI  
+
 ## Checklist prueba DEMO
 
+- [x] Unit: prefs · geo · Finalistas path · queue store (vitest 2026-08-03)  
 - [ ] Cuenta DEMO activa con cash ≥ 2k  
 - [ ] Modo SEMI · N=10 · size 10 %  
 - [ ] Finalistas → Proponer → aparece en cola F3  
@@ -47,6 +55,8 @@ AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI comp
 - [ ] Confirm+ejecutar → posición + tenure Mandato  
 - [ ] AUTO no clickable / no ejecuta  
 - [ ] Qty propuesta ≈ 10 % cash / precio  
+- [ ] Geo: orden cola con badge país  
+- [ ] Cola F3 sobrevive refresh / cambio de dispositivo (tras migración)  
 
 ## Retomar
 

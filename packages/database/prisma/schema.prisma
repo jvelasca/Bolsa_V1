@@ -1079,6 +1079,7 @@ model InvestmentAccount {
   mandateTenures    MandateTenure[]
   mandateTradeLinks MandateTradeLink[]
   coreRState        CoreRAccountState?
+  supervisedF3State SupervisedF3AccountState?
 
   @@index([isDefault])
   @@index([userId])
@@ -1099,6 +1100,18 @@ model CoreRAccountState {
   account InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   @@map("core_r_account_state")
+}
+
+/// SEMI · Confirm F3 — cola supervisada por cuenta (blob JSON; sessionStorage = cache).
+model SupervisedF3AccountState {
+  accountId String   @id @map("account_id")
+  queueJson Json     @default("[]") @map("queue_json")
+  activeId  String?  @map("active_id")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  account InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("supervised_f3_account_state")
 }
 
 /// Cartera lógica dentro de una cuenta (enlazada a portfolios legacy para posiciones).

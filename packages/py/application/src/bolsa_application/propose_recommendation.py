@@ -190,12 +190,16 @@ class ProposeRecommendationFromTa:
 
         resolved_symbol = symbol
         yahoo_symbol: str | None = None
+        resolved_country: str | None = None
         if self._instruments is not None:
             inst = await self._instruments.get_by_id(instrument_id)
             if inst is not None:
                 if resolved_symbol is None:
                     resolved_symbol = getattr(inst, "symbol", None) or getattr(inst, "ticker", None)
                 yahoo_symbol = getattr(inst, "yahoo_symbol", None) or resolved_symbol
+                raw_country = getattr(inst, "country", None)
+                if isinstance(raw_country, str) and raw_country.strip():
+                    resolved_country = raw_country.strip().upper()[:2]
         if yahoo_symbol is None:
             yahoo_symbol = resolved_symbol
 
@@ -361,6 +365,7 @@ class ProposeRecommendationFromTa:
             suggested_price=price,
             account_id=account_id,
             symbol=resolved_symbol,
+            country=resolved_country,
             status="awaiting_human",
             edge_report_ref=edge_ref,
         )

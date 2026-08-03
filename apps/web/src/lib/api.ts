@@ -831,6 +831,23 @@ export const api = {
       { method: 'PUT', body: JSON.stringify(body) },
     ),
 
+  getAccountSupervisedF3: (accountId: string) =>
+    request<{ data: import('@bolsa/shared').SupervisedF3BundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/supervised-f3-queue`,
+    ),
+
+  syncAccountSupervisedF3: (
+    accountId: string,
+    body: {
+      items: Array<Record<string, unknown>>;
+      activeId?: string | null;
+    },
+  ) =>
+    request<{ data: import('@bolsa/shared').SupervisedF3BundleDto }>(
+      `/api/accounts/${encodeURIComponent(accountId)}/supervised-f3-queue`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
   /** Ops: tick CORE-R servidor (informe BD + PnL DEMO). */
   runCoreRCronTick: (force = false, includePnl = true) => {
     const q = new URLSearchParams();
