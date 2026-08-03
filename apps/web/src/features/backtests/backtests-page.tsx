@@ -609,7 +609,10 @@ export function BacktestsPage() {
     instrumentsFetched: instrumentsQuery.isFetched,
     accountProfileReady: !effectiveAccountId || accountProfileQuery.isFetched,
     strategiesReady:
-      !assistantPrefs.universe.includeMineStrategies || strategiesQuery.isFetched,
+      !(
+        assistantPrefs.universe.includeMineStrategies ||
+        assistantPrefs.universe.includeOptimizedStrategies
+      ) || strategiesQuery.isFetched,
   });
   const playContextKeyRef = useRef<string | null>(null);
 
@@ -1326,8 +1329,10 @@ export function BacktestsPage() {
       const err =
         matrixFilter === 'finalists'
           ? 'No hay finalistas en este valor. Guarda un TOP desde Coach o cambia de filtro.'
-          : matrixFilter === 'saved'
+          : matrixFilter === 'mine'
             ? 'No hay estrategias en Mis estrategias (o ninguna seleccionada).'
+            : matrixFilter === 'optimized'
+              ? 'No hay Optimizadas seleccionadas en este filtro.'
             : matrixFilter === 'preset'
               ? 'No hay genéricas seleccionadas en este filtro.'
               : 'No hay estrategias para probar en este filtro.';
@@ -1467,12 +1472,13 @@ export function BacktestsPage() {
       label: item.label,
       subtitle: 'Lab · Mejor',
       // Identidad explore/coach = tipo Coach original (evita colapsar 2 proxies SMA en 1).
-      // Identidad explore/coach = tipo Coach original (evita colapsar 2 proxies SMA en 1).
       // El preset ejecutable va en la def; buildCoachTopSlots/sanitize lo usan al grabar TOP.
       presetKey: (item.strategyType ?? item.presetKey ?? undefined) as
         | BacktestStrategyType
         | undefined,
       strategyDefinitionId: item.strategyId,
+      origin: 'preset',
+      savedBucket: 'optimized' as const,
       status: 'idle' as const,
     }));
 
@@ -1523,28 +1529,43 @@ export function BacktestsPage() {
     }
   }
 
-  /** Asistente / revalidar: genéricas ∪ Finalistas del valor (± Mis estrategias). */
+  /** Asistente / revalidar: genéricas ∪ Finalistas (± Optimizadas ± Mis). */
   async function runExploreValue(): Promise<{ okCount: number; error?: string }> {
     setCoachPass('initial');
+    const includeOptimized = assistantPrefs.universe.includeOptimizedStrategies;
     const includeMine = assistantPrefs.universe.includeMineStrategies;
     const includeFinalists = assistantPrefs.universe.includeFinalistsInBattery;
-    const savedIds = matrixRowsForUi
-      .filter((r) => r.kind === 'saved')
+    const optimizedIds = matrixRowsForUi
+      .filter((r) => r.kind === 'saved' && r.savedBucket === 'optimized')
+      .map((r) => r.rowId);
+    const mineIds = matrixRowsForUi
+      .filter((r) => r.kind === 'saved' && r.savedBucket === 'mine')
       .map((r) => r.rowId);
     const finalistIds = finalistMatrixRowIds(instrumentTop?.slots ?? []);
     const targets = mergeUniverseTargetIds({
       presetIds: exploreBatteryRowIds(),
       finalistRowIds: finalistIds,
       includeFinalists,
-      savedRowIds: savedIds,
+      optimizedRowIds: optimizedIds,
+      includeOptimized,
+      mineRowIds: mineIds,
       includeMine,
       max: STRATEGY_MATRIX_MAX_SELECTED,
     });
-    if ((includeMine && savedIds.length > 0) || (includeFinalists && finalistIds.length > 0)) {
+    if (
+      (includeOptimized && optimizedIds.length > 0) ||
+      (includeMine && mineIds.length > 0) ||
+      (includeFinalists && finalistIds.length > 0)
+    ) {
       setMatrixSelectedIds(new Set(targets));
     }
     return runCoachBattery(targets, {
-      lockFilter: includeMine || (includeFinalists && finalistIds.length > 0) ? 'all' : 'preset',
+      lockFilter:
+        includeOptimized ||
+        includeMine ||
+        (includeFinalists && finalistIds.length > 0)
+          ? 'all'
+          : 'preset',
     });
   }
 
@@ -2663,13 +2684,19 @@ export function BacktestsPage() {
     const lastBarDate = instrumentLastBarDate(
       instruments.find((i) => i.id === forInstrumentId),
     );
-    // Lote de frescura = genéricas (± mine). No mete Finalistas actuales:
+    // Lote de frescura = genéricas (± optimizadas ± mine). No mete Finalistas actuales:
     // al guardar TOP cambiarían y nunca habría skip_fresh.
     const lote = mergeUniverseTargetIds({
       presetIds: exploreBatteryRowIds(),
       finalistRowIds: [],
       includeFinalists: false,
-      savedRowIds: matrixRowsForUi.filter((r) => r.kind === 'saved').map((r) => r.rowId),
+      optimizedRowIds: matrixRowsForUi
+        .filter((r) => r.kind === 'saved' && r.savedBucket === 'optimized')
+        .map((r) => r.rowId),
+      includeOptimized: assistantPrefs.universe.includeOptimizedStrategies,
+      mineRowIds: matrixRowsForUi
+        .filter((r) => r.kind === 'saved' && r.savedBucket === 'mine')
+        .map((r) => r.rowId),
       includeMine: assistantPrefs.universe.includeMineStrategies,
       max: STRATEGY_MATRIX_MAX_SELECTED,
     });

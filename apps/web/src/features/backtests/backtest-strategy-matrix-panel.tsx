@@ -1,9 +1,9 @@
 /**
  * Matriz de estrategias (panel izquierdo Probar).
  *
- * - Filtros: carrusel Todas / Genéricas / Mis / Finalistas con contadores.
+ * - Filtros: carrusel Todas / Genéricas / Optimizadas / Mis / Finalistas + (…) favoritos.
+ * - (…) de columnas vive en la cabecera sticky de la tabla (no junto a Biblioteca).
  * - CTA **Probar + coach**: lote = selección del filtro, o todas las filas visibles.
- * - No fuerza Genéricas: Finalistas / Mis / Todas respetan el filtro activo.
  *
  * @see docs/engineering/research-lifecycle.md § Hub UX Probar
  */
@@ -22,6 +22,7 @@ import { IconButton } from '@/components/ui/icon-button';
 import { OpaqueMenuLabel, OpaqueMenuPanel } from '@/components/ui/opaque-menu-panel';
 import { cn } from '@/lib/utils';
 import {
+  STRATEGY_MATRIX_FILTER_LABELS,
   STRATEGY_MATRIX_MAX_SELECTED,
   filterStrategyMatrixRows,
   formatPct,
@@ -30,6 +31,12 @@ import {
   type StrategyMatrixRunProgress,
 } from '@/features/backtests/backtest-strategy-matrix';
 import { StrategyFilterCarousel } from '@/features/backtests/strategy-filter-carousel';
+import { StrategyMatrixFilterCarouselMenu } from '@/features/backtests/strategy-matrix-filter-carousel-menu';
+import {
+  loadStrategyMatrixFilterCarouselPrefs,
+  orderedVisibleStrategyMatrixFilters,
+  type StrategyMatrixFilterCarouselPrefs,
+} from '@/features/backtests/strategy-matrix-filter-carousel-prefs';
 import {
   loadBacktestZonePrefs,
   patchStrategyMatrixTablePrefs,
@@ -199,6 +206,9 @@ export function BacktestStrategyMatrixPanel({
   const listResizeRef = useRef({ y: 0, height: initial.listHeightPx });
   /** Ancla para Shift+clic (estilo lista Windows). */
   const selectionAnchorRef = useRef<string | null>(null);
+  const [carouselPrefs, setCarouselPrefs] = useState<StrategyMatrixFilterCarouselPrefs>(() =>
+    loadStrategyMatrixFilterCarouselPrefs(),
+  );
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -226,15 +236,66 @@ export function BacktestStrategyMatrixPanel({
 
   const filterCounts = useMemo(() => {
     let preset = 0;
-    let saved = 0;
+    let optimized = 0;
+    let mine = 0;
     let finalists = 0;
     for (const row of rows) {
       if (row.kind === 'preset') preset += 1;
-      if (row.kind === 'saved') saved += 1;
+      if (row.kind === 'saved' && row.savedBucket === 'optimized') optimized += 1;
+      if (row.kind === 'saved' && row.savedBucket === 'mine') mine += 1;
       if (row.topRank != null) finalists += 1;
     }
-    return { all: rows.length, preset, saved, finalists };
+    return { all: rows.length, preset, optimized, mine, finalists };
   }, [rows]);
+
+  const carouselChips = useMemo(() => {
+    const chipMeta: Record<
+      StrategyMatrixFilter,
+      { count: number; title: string; disabled?: boolean }
+    > = {
+      all: {
+        count: filterCounts.all,
+        title: 'Catálogo + Optimizadas + Mis estrategias',
+        disabled: running,
+      },
+      preset: {
+        count: filterCounts.preset,
+        title: 'Plantillas del catálogo',
+        disabled: running,
+      },
+      optimized: {
+        count: filterCounts.optimized,
+        title: 'Clones y ajustes Lab sobre genéricas',
+        disabled: running,
+      },
+      mine: {
+        count: filterCounts.mine,
+        title: 'Autoría propia (manual, prompt IA, asistida, import)',
+        disabled: running,
+      },
+      finalists: {
+        count: filterCounts.finalists,
+        disabled: running || Boolean(finalistsFilterDisabled),
+        title: finalistsFilterDisabled
+          ? 'Sin TOP para este valor (Coach → Guardar TOP-3 o Lab)'
+          : 'Solo finalistas del valor actual',
+      },
+    };
+    return orderedVisibleStrategyMatrixFilters(carouselPrefs).map((id) => ({
+      id,
+      label:
+        id === 'finalists' ? finalistsFilterLabel : STRATEGY_MATRIX_FILTER_LABELS[id],
+      count: chipMeta[id].count,
+      title: chipMeta[id].title,
+      disabled: chipMeta[id].disabled,
+    }));
+  }, [
+    carouselPrefs,
+    filterCounts,
+    finalistsFilterDisabled,
+    finalistsFilterLabel,
+    running,
+  ]);
 
   const selectedCount = selectedIds.size;
   const canRunCoach = !coachDisabled && !disabled && !running;
@@ -540,7 +601,10 @@ export function BacktestStrategyMatrixPanel({
         title="Configurar columnas y favoritos"
         active={menuOpen}
         onClick={() => setMenuOpen((v) => !v)}
-        className={menuOpen ? 'bg-accent text-foreground' : undefined}
+        className={cn(
+          'h-6 w-6',
+          menuOpen ? 'bg-accent text-foreground' : undefined,
+        )}
       />
       {menuOpen && (
         <OpaqueMenuPanel className="absolute right-0 top-full z-30 mt-1 min-w-[200px] p-2">
@@ -626,7 +690,6 @@ export function BacktestStrategyMatrixPanel({
                 Biblioteca
               </button>
             ) : null}
-            {columnsMenu}
           </div>
         </div>
         <StrategyFilterCarousel
@@ -636,38 +699,18 @@ export function BacktestStrategyMatrixPanel({
             handleFilterChange(id as StrategyMatrixFilter);
           }}
           ariaLabel="Filtro de la matriz de estrategias"
-          chips={[
-            {
-              id: 'all',
-              label: 'Todas',
-              count: filterCounts.all,
-              title: 'Catálogo + Mis estrategias',
-              disabled: running,
-            },
-            {
-              id: 'preset',
-              label: 'Genéricas',
-              count: filterCounts.preset,
-              title: 'Plantillas del catálogo',
-              disabled: running,
-            },
-            {
-              id: 'saved',
-              label: 'Mis estrategias',
-              count: filterCounts.saved,
-              title: 'Biblioteca guardada',
-              disabled: running,
-            },
-            {
-              id: 'finalists',
-              label: finalistsFilterLabel,
-              count: filterCounts.finalists,
-              disabled: running || Boolean(finalistsFilterDisabled),
-              title: finalistsFilterDisabled
-                ? 'Sin TOP para este valor (Coach → Guardar TOP-3 o Lab)'
-                : 'Solo finalistas del valor actual',
-            },
-          ]}
+          chips={carouselChips}
+          trailing={
+            <StrategyMatrixFilterCarouselMenu
+              prefs={carouselPrefs}
+              onPrefsChange={setCarouselPrefs}
+              activeFilter={filter}
+              onActiveHidden={(next) => {
+                if (running) return;
+                handleFilterChange(next);
+              }}
+            />
+          }
         />
       </div>
 
@@ -707,6 +750,7 @@ export function BacktestStrategyMatrixPanel({
               const isSorted = sortState?.columnId === column.id;
               const sortable = !isStrategyMatrixActionColumn(column.id);
               const draggable = !isStrategyMatrixActionColumn(column.id);
+              const isActions = column.id === 'actions';
 
               return (
                 <div
@@ -744,6 +788,12 @@ export function BacktestStrategyMatrixPanel({
                   )}
                   title={STRATEGY_MATRIX_COLUMN_TIPS[column.id]}
                 >
+                  {isActions ? (
+                    <div className="flex h-full items-center justify-end gap-0.5 px-0.5">
+                      {columnsMenu}
+                    </div>
+                  ) : (
+                    <>
                   <div
                     className={cn(
                       'flex h-full min-w-0 items-center gap-0.5 px-1.5 text-[10px] font-medium text-muted-foreground',
@@ -787,6 +837,8 @@ export function BacktestStrategyMatrixPanel({
                       }
                     />
                   ) : null}
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -795,8 +847,10 @@ export function BacktestStrategyMatrixPanel({
 
         {visible.length === 0 ? (
           <p className="px-2 py-3 text-center text-[11px] text-muted-foreground">
-            {filter === 'saved'
-              ? 'No hay estrategias en Mis estrategias. Clona una genérica o importa desde el gráfico.'
+            {filter === 'mine'
+              ? 'No hay estrategias en Mis estrategias. Crea desde prompt o importa desde el gráfico.'
+              : filter === 'optimized'
+                ? 'No hay Optimizadas. Clona una genérica o adopta desde Lab.'
               : filter === 'finalists'
                 ? 'Sin finalistas para este valor. En Coach: Guardar TOP-3 (o adopta en Lab).'
                 : 'Sin estrategias en este filtro.'}

@@ -30,7 +30,7 @@ export type StrategyMatrixTablePrefs = {
   columnLayout: StrategyMatrixColumnLayoutItem[];
   sort: StrategyMatrixSortState | null;
   favoriteColumnIds: StrategyMatrixColumnId[];
-  /** Filtro Todas / Genéricas / Mis estrategias (persistente). */
+  /** Filtro Todas / Genéricas / Optimizadas / Mis / Finalistas (persistente). */
   filter: StrategyMatrixFilter;
   /** Cuántas pendientes marca el check de cabecera / Marcar genéricas. */
   selectBatchSize: number;
@@ -69,7 +69,16 @@ export function clampListHeightPx(value: number): number {
 }
 
 function normalizeStrategyFilter(raw: unknown): StrategyMatrixFilter {
-  if (raw === 'preset' || raw === 'saved' || raw === 'all' || raw === 'finalists') return raw;
+  if (raw === 'saved') return 'mine';
+  if (
+    raw === 'preset' ||
+    raw === 'optimized' ||
+    raw === 'mine' ||
+    raw === 'all' ||
+    raw === 'finalists'
+  ) {
+    return raw;
+  }
   return 'all';
 }
 

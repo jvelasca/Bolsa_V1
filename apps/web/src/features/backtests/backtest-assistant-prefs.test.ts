@@ -40,6 +40,7 @@ describe('assistant prefs', () => {
     expect(n.universe.reuseLoteIfUnchanged).toBe(true);
     expect(n.universe.skipFreshIfUnchanged).toBe(true);
     expect(n.universe.includeMineStrategies).toBe(false);
+    expect(n.universe.includeOptimizedStrategies).toBe(false);
     expect(n.universe.includeFinalistsInBattery).toBe(true);
     expect(n.coach.futureWeight).toBe(0.55);
     expect(n.coach.labEvenIfWeak).toBe(true);
@@ -49,5 +50,24 @@ describe('assistant prefs', () => {
     expect(n.coach.requireAckBeforeLab).toBe(false);
     expect(n.coach.saveSemifinalSkipLab).toBe(true);
     expect(n.fullCycleOnPlay).toBe(false);
+  });
+
+  it('migrates legacy includeMineStrategies true → both Optimized and Mine', () => {
+    const n = normalizeAssistantPrefs({
+      universe: { includeMineStrategies: true },
+    });
+    expect(n.universe.includeMineStrategies).toBe(true);
+    expect(n.universe.includeOptimizedStrategies).toBe(true);
+  });
+
+  it('keeps independent Optimized / Mine flags when both present', () => {
+    const n = normalizeAssistantPrefs({
+      universe: {
+        includeMineStrategies: true,
+        includeOptimizedStrategies: false,
+      },
+    });
+    expect(n.universe.includeMineStrategies).toBe(true);
+    expect(n.universe.includeOptimizedStrategies).toBe(false);
   });
 });

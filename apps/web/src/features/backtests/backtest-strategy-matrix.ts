@@ -4,14 +4,41 @@ import {
   STRATEGY_PRESET_KEYS,
   type BacktestStrategyType,
   type StrategyDefinitionSummaryDto,
+  type StrategyOrigin,
 } from '@bolsa/shared';
 import { api } from '@/lib/api';
 import type { ResolvedBacktestWindow } from '@/features/backtests/backtest-period';
 import { periodReturnsFromEquity } from '@/features/backtests/backtest-period-returns';
+import {
+  librarySavedBucket,
+  type LibrarySavedBucket,
+} from '@/features/backtests/library-strategy-buckets';
 
 export const STRATEGY_MATRIX_MAX_SELECTED = 40;
 
-export type StrategyMatrixFilter = 'all' | 'preset' | 'saved' | 'finalists';
+/** Filtros del carrusel de la matriz (L0: Optimizadas ≠ Mis estrategias). */
+export type StrategyMatrixFilter =
+  | 'all'
+  | 'preset'
+  | 'optimized'
+  | 'mine'
+  | 'finalists';
+
+export const STRATEGY_MATRIX_FILTER_IDS: readonly StrategyMatrixFilter[] = [
+  'all',
+  'preset',
+  'optimized',
+  'mine',
+  'finalists',
+] as const;
+
+export const STRATEGY_MATRIX_FILTER_LABELS: Record<StrategyMatrixFilter, string> = {
+  all: 'Todas',
+  preset: 'Genéricas',
+  optimized: 'Optimizadas',
+  mine: 'Mis estrategias',
+  finalists: 'Finalistas',
+};
 
 export type StrategyMatrixRowStatus = 'idle' | 'pending' | 'running' | 'ok' | 'error' | 'skipped';
 
@@ -22,6 +49,10 @@ export type StrategyMatrixRow = {
   subtitle: string;
   presetKey?: BacktestStrategyType;
   strategyDefinitionId?: string;
+  /** Origen BD (solo filas saved) — clasifica Optimizadas vs Mis. */
+  origin?: StrategyOrigin | string;
+  /** Cajón L0 para filas saved. */
+  savedBucket?: LibrarySavedBucket;
   /** Rank 1–3 si forma parte del InstrumentStrategyTop del valor. */
   topRank?: 1 | 2 | 3;
   status: StrategyMatrixRowStatus;
@@ -71,16 +102,27 @@ export function buildStrategyMatrixRows(
   });
 
   const savedRows: StrategyMatrixRow[] = saved.map((s) => {
+    const bucket = librarySavedBucket(s);
     const presetLabel = s.presetKey
       ? (BACKTEST_STRATEGIES[s.presetKey]?.label ?? s.presetKey)
       : null;
+    const subtitle =
+      bucket === 'optimized'
+        ? presetLabel
+          ? `Optimizada · ${presetLabel}`
+          : 'Optimizada'
+        : presetLabel
+          ? `Mía · ${presetLabel}`
+          : 'Mis estrategias';
     return {
       rowId: `saved:${s.id}`,
       kind: 'saved',
       label: s.name,
-      subtitle: presetLabel ? `Mía · ${presetLabel}` : 'Mis estrategias',
+      subtitle,
       presetKey: s.presetKey ?? undefined,
       strategyDefinitionId: s.id,
+      origin: s.origin,
+      savedBucket: bucket,
       status: 'idle',
     };
   });
@@ -137,7 +179,12 @@ export function filterStrategyMatrixRows(
   filter: StrategyMatrixFilter,
 ): StrategyMatrixRow[] {
   if (filter === 'preset') return rows.filter((r) => r.kind === 'preset');
-  if (filter === 'saved') return rows.filter((r) => r.kind === 'saved');
+  if (filter === 'optimized') {
+    return rows.filter((r) => r.kind === 'saved' && r.savedBucket === 'optimized');
+  }
+  if (filter === 'mine') {
+    return rows.filter((r) => r.kind === 'saved' && r.savedBucket === 'mine');
+  }
   if (filter === 'finalists') return rows.filter((r) => r.topRank != null);
   return rows;
 }
