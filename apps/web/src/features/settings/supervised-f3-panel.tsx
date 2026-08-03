@@ -41,6 +41,7 @@ import {
   optimalScoreFromPayload,
   rankByOptimalThenGeo,
 } from '@/features/trading/demo-book-geo-rank';
+import { recordSemiConfirmMandate } from '@/features/trading/semi-confirm-mandate';
 import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
 
 type ProposePayload = SupervisedProposePayload;
@@ -327,10 +328,27 @@ export function SupervisedF3Panel() {
       const intent = res.data.intent;
       const trade = res.data.trade;
       const sid = res.data.decisionSession?.sessionId;
+      let mandateNote = '';
+      if (
+        pending &&
+        effectiveAccountId &&
+        (intent.status === 'executed' || intent.status === 'authorized')
+      ) {
+        const m = recordSemiConfirmMandate({
+          accountId: effectiveAccountId,
+          payload: pending,
+          intentStatus: intent.status,
+          trade,
+        });
+        if (m.mandateTenureId) {
+          mandateNote = ` · mandato=${m.mandateTenureId.slice(0, 8)}${m.linked ? '+link' : ''}`;
+        }
+      }
       setLog(
         `Intent ${intent.intentId} · ${intent.status}` +
           (trade ? ` · trade=${trade.status}${trade.reason ? ` (${trade.reason})` : ''}` : '') +
-          (sid ? ` · session=${sid}` : ''),
+          (sid ? ` · session=${sid}` : '') +
+          mandateNote,
       );
       if (intent.status === 'executed' || intent.status === 'authorized') {
         if (activeId) {
@@ -365,10 +383,18 @@ export function SupervisedF3Panel() {
           sessionId: item.payload.decisionSession?.sessionId,
         });
         const st = res.data.intent.status;
-        results.push(`${item.symbol ?? item.payload.instrumentId.slice(0, 6)}:${st}`);
+        let tag = `${item.symbol ?? item.payload.instrumentId.slice(0, 6)}:${st}`;
         if (st === 'executed' || st === 'authorized') {
+          const m = recordSemiConfirmMandate({
+            accountId: effectiveAccountId,
+            payload: item.payload,
+            intentStatus: st,
+            trade: res.data.trade,
+          });
+          if (m.mandateTenureId) tag += '+M';
           removeFromQueue(item.id);
         }
+        results.push(tag);
       }
       return results;
     },

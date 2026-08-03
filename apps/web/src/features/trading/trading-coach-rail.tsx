@@ -28,11 +28,14 @@ import { effectiveDiaD, isDiaDInPast, todayIsoDate } from '@/features/backtests/
 import { loadBacktestRunContext } from '@/features/backtests/backtest-run-context';
 import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
 import { cn } from '@/lib/utils';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import {
   getMandateStoreSnapshot,
+  listOpenMandateTenures,
   subscribeMandateStore,
+  summarizeMandateChurn,
 } from '@/features/platform/operating-mandate';
+import { ensureMandateHydrated } from '@/features/platform/operating-mandate-sync';
 
 function formatAdoption(state: StrategyAdoptionState): string {
   return STRATEGY_ADOPTION_LABELS[state];
@@ -48,9 +51,27 @@ export function TradingCoachRail({ className }: { className?: string }) {
   const symbol = active?.label ?? '—';
   const timeframe = (active?.timeframe as string) || '1d';
   const { effectiveAccountId } = useActiveAccount();
-  useSyncExternalStore(subscribeMandateStore, getMandateStoreSnapshot, () => 0);
+  const mandateRev = useSyncExternalStore(
+    subscribeMandateStore,
+    getMandateStoreSnapshot,
+    () => 0,
+  );
   const diaD = loadBacktestRunContext().diaD;
   const canVerify = isDiaDInPast(diaD);
+
+  useEffect(() => {
+    if (!effectiveAccountId) return;
+    void ensureMandateHydrated(effectiveAccountId);
+  }, [effectiveAccountId]);
+
+  const openTenures = useMemo(
+    () => listOpenMandateTenures(effectiveAccountId),
+    [effectiveAccountId, mandateRev],
+  );
+  const churn = useMemo(
+    () => summarizeMandateChurn({ accountId: effectiveAccountId }),
+    [effectiveAccountId, mandateRev],
+  );
 
   const topQuery = useQuery({
     queryKey: ['instrument-strategy-top', instrumentId, timeframe],
@@ -155,6 +176,46 @@ export function TradingCoachRail({ className }: { className?: string }) {
       </p>
 
       <DemoBookModePanel compact className="mt-1" />
+
+      <div
+        className="rounded-md border border-border/80 bg-muted/20 p-2 space-y-1"
+        data-testid="coach-rail-mandate-review"
+      >
+        <p className="font-medium text-foreground">Mandatos (cuenta)</p>
+        <p className="text-muted-foreground">
+          Abiertos: {churn.openCount}
+          {churn.closedCount > 0 ? ` · cerrados: ${churn.closedCount}` : ''}
+        </p>
+        {openTenures.length > 0 ? (
+          <ul className="max-h-20 space-y-0.5 overflow-y-auto text-[10px] text-muted-foreground">
+            {openTenures.slice(0, 5).map((t) => (
+              <li key={t.id}>
+                {(t.strategyLabelSnapshot ?? t.instrumentId.slice(0, 6)) + ' · vigente'}
+              </li>
+            ))}
+            {openTenures.length > 5 ? (
+              <li>+{openTenures.length - 5} más</li>
+            ) : null}
+          </ul>
+        ) : (
+          <p className="text-[10px] text-muted-foreground">
+            Sin tenure abierto. SEMI Confirm o Adoptar Finalista.
+          </p>
+        )}
+        <button
+          type="button"
+          className="w-full rounded border border-border px-1.5 py-1 text-[10px] text-primary hover:bg-accent"
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent('bolsa:open-help', {
+                detail: { section: 'value-analysis' },
+              }),
+            );
+          }}
+        >
+          Learning / Outcomes
+        </button>
+      </div>
 
       <MandateTimelinePanel
         instrumentId={instrumentId}
