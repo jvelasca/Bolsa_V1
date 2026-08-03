@@ -12,6 +12,13 @@
 | **`CORE_R_CRON_ENABLED`** | **Sigue `false`** | Cola ya funciona con app abierta + BD multi-dispositivo. Cron servidor = ops cuando haga falta tick 24/7; coste de ruido/false enqueues no justificado aún. |
 | **`COST_MODEL_V2_ENABLED`** | **Sigue `false`** | Cambia economía de backtests / rankings. Activar solo en Lab A/B controlado, no como default silencioso. |
 
+### Futuro — Belief (apuntalado, no ahora)
+
+Brief de producto listo para cuando toque reabrir (2026-08-03, **sin implementar**):
+
+- [belief-coach-brief-draft-2026-08-03.md](./belief-coach-brief-draft-2026-08-03.md) — contrato anti-soberbia B1–B8 + criterios de reapertura  
+- Decisión 2026-08-03: **seguir probando el Lab entregado**; no implementar Belief hasta ratificar el brief y uso real del embudo.
+
 ## Qué sí hacer ahora
 
 1. **Usar** lo entregado: Play ciclo · Lista AUTO · Finalistas · Monitor CORE-R · Lab Health · mass compare · warm-up gate.  

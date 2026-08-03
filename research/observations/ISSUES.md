@@ -42,7 +42,8 @@ No abren Fase 2 ni entidades nuevas.
 **Hecho (v0):** toggle Narración LLM en rail; OFF = solo ★ local + auditor heurístico; tests «LLM no corona TOP»; hint UI de pasada previa (`dualAudit`) sin modular score.
 
 **Pendiente:** aprendizaje outcomes / Belief → Coach.  
-**Freeze 2026-08-03:** **no** abrir Belief Fase 2 sin brief de producto (decision freeze).
+**Freeze 2026-08-03:** **no** abrir Belief Fase 2 sin brief de producto (decision freeze).  
+**Brief futuro (apuntalado):** [belief-coach-brief-draft-2026-08-03.md](../../docs/engineering/belief-coach-brief-draft-2026-08-03.md) — B1–B8; implementar solo tras ratificar + uso real del embudo.
 
 ---
 
