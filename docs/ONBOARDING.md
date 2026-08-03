@@ -2,6 +2,9 @@
 
 Para cualquier informático que retome el proyecto sin contexto previo.
 
+**Premisas de proyecto** (documentar todo, UI, cuentas, DÍA D, freeze): [PROJECT_PREMISES.md](./PROJECT_PREMISES.md).  
+**Auditoría:** [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).
+
 ## 1. Prerrequisitos
 
 | Herramienta | Versión | Para qué |

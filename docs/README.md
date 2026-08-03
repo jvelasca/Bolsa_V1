@@ -6,6 +6,7 @@
 
 | Documento | Contenido |
 |-----------|-----------|
+| [PROJECT_PREMISES.md](./PROJECT_PREMISES.md) | **Premisas de proyecto** (documentar todo · índice de premisas · repo público) |
 | [AI_PLATFORM_SOLUTION.md](./AI_PLATFORM_SOLUTION.md) | Dictamen IA + estado F1/F2 · UI: Ayuda → Plataforma IA |
 | [HELP.md](./HELP.md) | Mapa Ayuda ↔ trackers ↔ docs (`HELP_CONTENT_AS_OF`) |
 | [rfc/README.md](./rfc/README.md) | Constitución RFC-000…007 · fases código |
@@ -80,6 +81,8 @@ pnpm dev
 ## Convenciones
 
 - Código/commits: identificadores en inglés; UI y docs en español.
+- **Documentar todo** (producto en `docs/` + docstrings/JSDoc forward-only) — [PROJECT_PREMISES.md](./PROJECT_PREMISES.md) §1 · [code-documentation-standard](./engineering/code-documentation-standard-2026-08-03.md).
 - Decisiones relevantes → ADR en `docs/adr/`.
 - BD = fuente de verdad; Yahoo/XTB solo actualizan.
 - API por defecto: **Python :8000**.
+- Repo GitHub: **público** (`jvelasca/Bolsa_V1`) para auditorías.

@@ -6,7 +6,9 @@
 > **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho.  
 > **Decisión freeze:** [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · `CORE_R_CRON` / `COST_MODEL_V2` off.  
 > **Auditoría (paquete único post-Q3):** [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
+> **Premisas de proyecto:** [PROJECT_PREMISES.md](./PROJECT_PREMISES.md) — **documentar todo** (docs + docstrings/JSDoc).  
 > **Docstrings (código):** [engineering/code-documentation-standard-2026-08-03.md](./engineering/code-documentation-standard-2026-08-03.md) — lotes 1–4 hechos; forward-only al tocar código nuevo.  
+> **Repo:** público en GitHub (`jvelasca/Bolsa_V1`) para auditorías externas.  
 > **Universos:** [LAB vs TRADING](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [Mandato](./adr/020-operating-mandate-tenure.md) · [Reconciliación DÍA D](./adr/021-dia-d-reconciliation.md).  
 > Configuración → **BD** (estado PostgreSQL, purga de huérfanos y demos cerradas).  
 > **Espacios de trabajo:** chip superior → gestor (nuevo blanco / duplicar / renombrar); arranque = último activo.  

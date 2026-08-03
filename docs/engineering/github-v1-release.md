@@ -1,7 +1,7 @@
 # GitHub V1 — checklist de release
 
 > Empaquetar el árbol actual como **v1.0.0** en GitHub.  
-> Cuenta gh: `jvelasca` · propuesta de repo: **`Bolsa_V1`** (privado, alineado con `Bolsa_V2_2`).  
+> Cuenta gh: `jvelasca` · repo: **`Bolsa_V1`** (**público** desde 2026-08-03 para auditorías; release inicial fue private).  
 > Credenciales y gestión diaria: [`github-credentials-and-ops.md`](./github-credentials-and-ops.md).
 
 ## Preflight (local)
@@ -20,7 +20,7 @@ pnpm test:fa
 - [x] `CHANGELOG.md` · versión producto 1.0.0
 - [x] `git init -b main`
 - [x] Primer commit
-- [x] `gh repo create` + push `main` → https://github.com/jvelasca/Bolsa_V1 (private)
+- [x] `gh repo create` + push `main` → https://github.com/jvelasca/Bolsa_V1 (creado private; **público** 2026-08-03)
 - [x] Tag `v1.0.0` + release notes → https://github.com/jvelasca/Bolsa_V1/releases/tag/v1.0.0
 
 ## Comandos (cuando el usuario confirme)
