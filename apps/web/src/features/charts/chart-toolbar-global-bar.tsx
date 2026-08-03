@@ -10,6 +10,7 @@ import { PanelRight, Settings2 } from 'lucide-react';
 import { ChartAnalysisScoreButtons } from '@/features/charts/chart-analysis-score-buttons';
 import { ChartDataStatusBadge } from '@/features/charts/chart-data-status-badge';
 import { ChartIndicatorsBar } from '@/features/charts/chart-indicators-bar';
+import { ChartFinalistTop1Switch } from '@/features/charts/chart-finalist-top1-switch';
 import { ChartNewChartTemplatePinButton } from '@/features/charts/chart-new-chart-template-pin-button';
 import { ChartQuickTradeButtons } from '@/features/charts/chart-quick-trade-buttons';
 import {
@@ -54,6 +55,13 @@ interface ChartToolbarGlobalBarProps {
   dataSyncing?: boolean;
   canTrade?: boolean;
   onOpenIndicatorsCatalog: () => void;
+  /** Switch Finalista TOP #1 → indicadores en el gráfico. */
+  finalistTop1?: {
+    checked: boolean;
+    disabled?: boolean;
+    title?: string;
+    onCheckedChange: (next: boolean) => void;
+  };
   onToggleChartInspector: () => void;
   onQuickBuy: () => void;
   onQuickSell: () => void;
@@ -74,6 +82,7 @@ export function ChartToolbarGlobalBar({
   dataSyncing,
   canTrade,
   onOpenIndicatorsCatalog,
+  finalistTop1,
   onToggleChartInspector,
   onQuickBuy,
   onQuickSell,
@@ -105,6 +114,15 @@ export function ChartToolbarGlobalBar({
             chartIndicatorCount={chartIndicatorCount}
             className={CHART_TOOLBAR_EMBEDDED_CLASS}
           />
+          {finalistTop1 ? (
+            <ChartFinalistTop1Switch
+              checked={finalistTop1.checked}
+              disabled={finalistTop1.disabled}
+              title={finalistTop1.title}
+              onCheckedChange={finalistTop1.onCheckedChange}
+              className={CHART_TOOLBAR_EMBEDDED_CLASS}
+            />
+          ) : null}
           <ChartNewChartTemplatePinButton className="shrink-0" />
         </div>,
       ),

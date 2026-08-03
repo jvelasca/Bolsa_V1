@@ -40,6 +40,8 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 |---------------|--------------|------|
 | **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [roadmap post-auditorías](./engineering/improvement-roadmap-post-audits-2026-08-02.md), [estabilidad temporal](./engineering/stability-campaign-protocol-2026-08-02.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [universos LAB/TRADING](./engineering/dual-universes-lab-trading-design-2026-08-02.md), [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020 Mandato](./adr/020-operating-mandate-tenure.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
 | **Trading** | rail Coach + Libro DEMO + Mandato + alarmas → F3 | [demo-operating-modes](./engineering/demo-operating-modes-brief-2026-08-03.md) · [SEMI slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [ADR-020](./adr/020-operating-mandate-tenure.md) |
+
+**Gráfico Trading — TOP#1:** en la barra global (junto a Indicadores), el switch **TOP#1** pinta/quita los indicadores del Finalista #1 del valor y timeframe del gráfico (`origin: finalist-top1`). No ejecuta mandato; OFF no toca indicadores manuales.
 | Análisis del valor | `value-analysis-tracker.ts` | FA status / FIE |
 | Datos de mercado | `data-market-tracker.ts` | data capture |
 | Watchlist / listas | `watchlist-lists-tracker.ts` | lists-universes |

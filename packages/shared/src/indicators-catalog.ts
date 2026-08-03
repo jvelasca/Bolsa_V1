@@ -45,6 +45,12 @@ export interface ChartIndicatorInstance {
   definitionId: string;
   parameters: Record<string, number | boolean | string>;
   visible: boolean;
+  /**
+   * Origen de la instancia en el gráfico.
+   * `finalist-top1` = overlay del Finalista TOP #1 (switch barra Indicadores).
+   * Ausente / `manual` = añadido por el usuario o plantilla.
+   */
+  origin?: 'manual' | 'finalist-top1';
   /** Zoom vertical del panel secundario (1 = 100%). */
   scaleZoom?: number;
   /** Reparto vertical entre paneles inferiores visibles (% relativo, suma ≈ 100). */

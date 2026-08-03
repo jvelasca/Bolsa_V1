@@ -7,6 +7,7 @@ import {
   VIRTUAL_LIST_LABELS,
   resolveChartToolbarForTab,
   normalizeChartToolbarGlobalConfig,
+  strategyTop1ToChartIndicators,
 } from '@bolsa/shared';
 import { api } from '@/lib/api';
 import { instrumentForQuickTrade } from '@/features/charts/chart-quick-trade-buttons';
@@ -68,6 +69,10 @@ export function ChartWorkspacePage() {
   const tool = useUiStore((s) => s.chartDrawTool);
   const openIndicatorsCatalog = useUiStore((s) => s.openIndicatorsCatalog);
   const applyIndicatorTemplate = useWorkspaceStore((s) => s.applyIndicatorTemplate);
+  const setShowFinalistTop1Indicators = useWorkspaceStore(
+    (s) => s.setShowFinalistTop1Indicators,
+  );
+  const syncFinalistTop1Indicators = useWorkspaceStore((s) => s.syncFinalistTop1Indicators);
 
   const applyIndicatorGroup = useCallback(
     (templateId: string) => {
@@ -143,6 +148,97 @@ export function ChartWorkspacePage() {
     enabled: Boolean(instrumentId),
     staleTime: 60_000,
   });
+
+  const strategyTopQuery = useQuery({
+    queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+    queryFn: () => api.getInstrumentStrategyTop(instrumentId!, timeframe),
+    enabled: Boolean(instrumentId),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const top1Slot = useMemo(() => {
+    const slots = strategyTopQuery.data?.data?.slots ?? [];
+    return slots.find((s) => s.rank === 1) ?? null;
+  }, [strategyTopQuery.data?.data?.slots]);
+
+  const strategyDefQuery = useQuery({
+    queryKey: ['strategy-definition', top1Slot?.strategyDefinitionId],
+    queryFn: () => api.getStrategy(top1Slot!.strategyDefinitionId!),
+    enabled: Boolean(top1Slot?.strategyDefinitionId),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const top1Chart = useMemo(
+    () =>
+      strategyTop1ToChartIndicators({
+        slot: top1Slot,
+        definition: strategyDefQuery.data?.data
+          ? {
+              indicatorSpecs: strategyDefQuery.data.data.definition?.indicatorSpecs ?? [],
+              presetKey:
+                strategyDefQuery.data.data.definition?.presetKey ??
+                strategyDefQuery.data.data.presetKey,
+            }
+          : null,
+      }),
+    [top1Slot, strategyDefQuery.data?.data],
+  );
+
+  const top1Available = top1Chart.specs.length > 0;
+  const showTop1 = Boolean(activeTab?.showFinalistTop1Indicators);
+  const top1SpecKey = useMemo(
+    () =>
+      top1Chart.specs
+        .map((s) => `${s.definitionId}:${JSON.stringify(s.parameters ?? {})}`)
+        .join('|'),
+    [top1Chart.specs],
+  );
+
+  useEffect(() => {
+    if (!activeTab?.id) return;
+    if (!showTop1) return;
+    syncFinalistTop1Indicators(top1Chart.specs, activeTab.id);
+    requestChartReflow();
+  }, [
+    activeTab?.id,
+    showTop1,
+    top1SpecKey,
+    top1Chart.specs,
+    syncFinalistTop1Indicators,
+    instrumentId,
+    timeframe,
+  ]);
+
+  const onFinalistTop1Change = useCallback(
+    (next: boolean) => {
+      if (!activeTab?.id) return;
+      setShowFinalistTop1Indicators(next, next ? top1Chart.specs : undefined, activeTab.id);
+      requestChartReflow();
+    },
+    [activeTab?.id, setShowFinalistTop1Indicators, top1Chart.specs],
+  );
+
+  const finalistTop1Title = useMemo(() => {
+    if (!instrumentId) {
+      return 'Selecciona un instrumento para ver el Finalista TOP #1';
+    }
+    if (strategyTopQuery.isLoading || strategyDefQuery.isLoading) {
+      return 'Cargando Finalista TOP #1…';
+    }
+    if (!top1Available) {
+      return 'Sin Finalista TOP #1 con indicadores para este valor y timeframe';
+    }
+    const label = top1Chart.label ? ` (${top1Chart.label})` : '';
+    return `Mostrar indicadores del Finalista TOP #1${label} · mismo timeframe del gráfico`;
+  }, [
+    instrumentId,
+    strategyTopQuery.isLoading,
+    strategyDefQuery.isLoading,
+    top1Available,
+    top1Chart.label,
+  ]);
 
   const onTimeframeChange = useCallback(
     (next: ChartTimeframe) => {
@@ -337,6 +433,12 @@ export function ChartWorkspacePage() {
         canTrade={Boolean(instrumentQuery.data?.data)}
         onOpenIndicatorsCatalog={openIndicatorsCatalog}
         onToggleChartInspector={toggleChartInspector}
+        finalistTop1={{
+          checked: showTop1,
+          disabled: !top1Available && !showTop1,
+          title: finalistTop1Title,
+          onCheckedChange: onFinalistTop1Change,
+        }}
         onQuickBuy={() => {
           const data = instrumentQuery.data?.data;
           if (data) openOrderDialog(instrumentForQuickTrade(data, bars));

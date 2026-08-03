@@ -176,6 +176,11 @@ export interface ChartTabState {
   sourceListId?: string;
   /** Plantilla de indicadores aplicada a este gráfico (independiente de estrategias). */
   activeIndicatorTemplateId?: string | null;
+  /**
+   * Switch barra Indicadores: pintar indicadores del Finalista TOP #1
+   * (mismo TF que el gráfico). Las instancias llevan `origin: 'finalist-top1'`.
+   */
+  showFinalistTop1Indicators?: boolean;
   /** Personalización de la barra de herramientas de este gráfico. */
   toolbar?: ChartToolbarChartOverrides;
   /** Alto del panel de precio (% del stack precio + indicadores inferiores). */
