@@ -67,14 +67,6 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const timeframe = (active?.timeframe as string) || '1d';
   const { effectiveAccountId } = useActiveAccount();
   const bookPrefs = useDemoBookPrefs();
-  const configTitle = (
-    <>
-      Configuración{' '}
-      <span className="font-medium normal-case tracking-normal text-muted-foreground">
-        (operativa {bookPrefs.mode})
-      </span>
-    </>
-  );
   const mandateRev = useSyncExternalStore(
     subscribeMandateStore,
     getMandateStoreSnapshot,
@@ -328,7 +320,15 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         </div>
       </TradingOperativaSection>
 
-      <TradingOperativaSection sectionId="config" title={configTitle}>
+      <TradingOperativaSection
+        sectionId="config"
+        title="Configuración"
+        summary={
+          <span className="text-[10px] text-muted-foreground">
+            Operativa: {bookPrefs.mode}
+          </span>
+        }
+      >
         <DemoBookModePanel compact />
       </TradingOperativaSection>
     </div>

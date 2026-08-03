@@ -7,7 +7,7 @@
 
 - Operativa **full-height** hasta status bar; Operaciones cede el ancho derecho.
 - IO v1 + «El n de N en estudio»; lista **En estudio** ≡ pestañas abiertas.
-- Cabecera `Configuración (operativa {mode})`; título bloque = cuenta activa.
+- Cabecera Configuración → summary `Operativa: {mode}`; título bloque = cuenta activa.
 - TOP#1 switches (todos / este) + nav teclado listas (commits previos misma rama).
 
 ## Retomar

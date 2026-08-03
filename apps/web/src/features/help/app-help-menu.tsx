@@ -361,8 +361,8 @@ function TradingContent() {
             <strong className="text-foreground">Info</strong> — mandato / Learning.
           </li>
           <li>
-            <strong className="text-foreground">Configuración (operativa manual|semi|auto)</strong>{' '}
-            — el modo se ve en la cabecera sin desplegar; el bloque usa el{' '}
+            <strong className="text-foreground">Configuración</strong> — a la derecha
+            «Operativa: manual|semi|auto» (sin desplegar); el bloque usa el{' '}
             <strong className="text-foreground">nombre de la cuenta activa</strong> (MANUAL/SEMI,
             % cash, máx. posiciones, geo). AUTO sigue congelado.
           </li>

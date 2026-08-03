@@ -52,7 +52,7 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 
 - **Recomendación** — Índice Operativo (IO) · gauges TA/FA · «El n de N en estudio» · TOP #1 / adopción.
 - **Info** — mandato / Learning.
-- **Configuración (operativa manual|semi|auto)** — modo visible en cabecera; bloque titulado con el **nombre de la cuenta activa** (MANUAL/SEMI · % cash · máx. posiciones · geo).
+- **Configuración** — resumen a la derecha `Operativa: manual|semi|auto`; bloque titulado con el **nombre de la cuenta activa** (MANUAL/SEMI · % cash · máx. posiciones · geo).
 
 Lista virtual **En estudio** = pestañas de gráfico abiertas (mismo conjunto). Chips TA/FA de la barra del gráfico siguen configurables con ⋯. Detalle: [trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md).
 

@@ -12,7 +12,7 @@ Rediseño del rail Coach → panel **Operativa** en la mesa TRADING:
 2. Tres secciones colapsables con scroll y altura redimensionable: **Recomendación** · **Info** · **Configuración**.
 3. **Índice Operativo (IO) v1** en Recomendación (gauges TA / FA / IO + ranking «El n de N en estudio»).
 4. Lista virtual **En estudio** = conjunto de pestañas de gráfico abiertas (misma identidad).
-5. Cabecera **Configuración (operativa manual|semi|auto)** visible sin desplegar; título del bloque = **nombre de la cuenta activa**.
+5. Resumen cabecera **Configuración** a la derecha: `Operativa: manual|semi|auto`; título del bloque = **nombre de la cuenta activa**.
 
 ## Layout
 
@@ -52,7 +52,7 @@ Helpers puros: `operativa-index.ts` (+ tests). UI: `operativa-pulse.tsx`. Datos:
 
 | UI | Detalle |
 |----|---------|
-| Cabecera sección | `Configuración (operativa {mode})` |
+| Cabecera sección | summary derecha: `Operativa: {mode}` |
 | Título bloque | Nombre cuenta activa (`useActiveAccount`) |
 | Prefs | `bolsa-demo-book-prefs-v1` · `useDemoBookPrefs` (reactivo misma pestaña) |
 | Modos | MANUAL / SEMI / AUTO (AUTO UI disabled — freeze Camino D) |
