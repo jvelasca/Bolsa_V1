@@ -48,7 +48,7 @@ export function StrategyPromptAssistantPanel({
 
   onApplyToScan,
 
-  description = 'Describe la estrategia en lenguaje natural — te explico qué interpreté antes de guardar.',
+  description = 'Describe tu estrategia. Se guarda en Mis estrategias (Prompt IA), no como genérica optimizada.',
 
 }: StrategyPromptAssistantPanelProps) {
 
@@ -120,7 +120,7 @@ export function StrategyPromptAssistantPanel({
 
           <Sparkles className="h-4 w-4 text-primary" />
 
-          Asistente IA
+          Asistente · Mis estrategias
 
           <AiInfoButton surface="strategy_draft" />
 
@@ -270,21 +270,22 @@ export function StrategyPromptAssistantPanel({
 
                 disabled={!strategyName.trim() || saveMutation.isPending}
 
-                onClick={() =>
-
+                onClick={() => {
+                  const base = draft.definition as StrategyDefinitionV1;
                   saveMutation.mutate({
-
                     name: strategyName.trim(),
-
-                    definition: draft.definition as StrategyDefinitionV1,
-
-                  })
-
-                }
+                    definition: {
+                      ...base,
+                      name: strategyName.trim(),
+                      origin: 'ai_generated',
+                      sourcePrompt: prompt.trim() || base.sourcePrompt,
+                    },
+                  });
+                }}
 
               >
 
-                {saveMutation.isPending ? 'Guardando…' : 'Guardar estrategia'}
+                {saveMutation.isPending ? 'Guardando…' : 'Guardar en Mis estrategias'}
 
               </Button>
 

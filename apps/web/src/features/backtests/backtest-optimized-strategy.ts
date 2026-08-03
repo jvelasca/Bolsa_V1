@@ -82,7 +82,7 @@ export function strategyDefinitionFromOptimizedSma(opts: {
     risk: {},
     indicatorSpecs: [leftSpec, rightSpec],
     execution: { ...DEFAULT_EXECUTION_MODEL },
-    origin: 'manual',
+    origin: 'preset',
   };
 }
 
@@ -137,7 +137,7 @@ export function strategyDefinitionFromOptimizedRsi(opts: {
     risk: {},
     indicatorSpecs: [rsiSpec],
     execution: { ...DEFAULT_EXECUTION_MODEL },
-    origin: 'manual',
+    origin: 'preset',
   };
 }
 
@@ -199,7 +199,7 @@ export function strategyDefinitionFromOptimizedMacd(opts: {
     risk: {},
     indicatorSpecs: [mainSpec, signalSpec],
     execution: { ...DEFAULT_EXECUTION_MODEL },
-    origin: 'manual',
+    origin: 'preset',
   };
 }
 

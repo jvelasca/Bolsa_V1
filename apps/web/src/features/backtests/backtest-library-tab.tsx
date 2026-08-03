@@ -22,7 +22,14 @@ import { PAPER_PATH_LAB } from '@/features/settings/paper-paths-copy';
 import type { StrategyDefinitionSummaryDto } from '@bolsa/shared';
 import { useEffect, useMemo, useRef } from 'react';
 
-export type StrategiesListFilter = 'all' | 'generics' | 'mine' | 'finalists';
+import {
+  countLibraryBuckets,
+  LIBRARY_FILTER_LABELS,
+  LIBRARY_FILTER_TITLES,
+  type StrategiesListFilter,
+} from '@/features/backtests/library-strategy-buckets';
+
+export type { StrategiesListFilter } from '@/features/backtests/library-strategy-buckets';
 
 type StrategyOption = [BacktestStrategyType, { label: string; description: string }];
 
@@ -114,27 +121,33 @@ export function BacktestLibraryTab({
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }, [focusPresetKey, strategiesListFilter]);
 
+  const buckets = useMemo(() => countLibraryBuckets(strategies), [strategies]);
+
   const description =
     strategiesListFilter === 'generics'
       ? `${strategyOptions.length} genéricas del catálogo`
       : strategiesListFilter === 'finalists'
         ? `${filteredStrategies.length} finalistas${instrumentSymbol ? ` · ${instrumentSymbol}` : ''}`
-        : strategiesListFilter === 'mine'
+        : strategiesListFilter === 'optimized'
           ? isMineStrategiesFilterActive(mineFilters)
-            ? `${filteredStrategies.length} de ${strategies.length} en Mis estrategias`
-            : `${strategies.length} en Mis estrategias`
-          : `${strategyOptions.length} genéricas + ${
-              isMineStrategiesFilterActive(mineFilters)
-                ? `${filteredStrategies.length}/${strategies.length}`
-                : strategies.length
-            } mías`;
+            ? `${filteredStrategies.length} de ${buckets.optimized} optimizadas`
+            : `${buckets.optimized} genéricas optimizadas (Lab / clones)`
+          : strategiesListFilter === 'mine'
+            ? isMineStrategiesFilterActive(mineFilters)
+              ? `${filteredStrategies.length} de ${buckets.mine} en Mis estrategias`
+              : `${buckets.mine} mis estrategias (autoría)`
+            : `${strategyOptions.length} genéricas + ${buckets.optimized} optimizadas + ${
+                isMineStrategiesFilterActive(mineFilters)
+                  ? `${filteredStrategies.length}/${strategies.length}`
+                  : strategies.length
+              } guardadas`;
 
   return (
     <div className="mx-auto min-h-0 w-full max-w-[1100px] flex-1 space-y-4 overflow-auto px-1">
       <div>
         <h3 className="text-lg font-semibold tracking-tight">Biblioteca</h3>
         <p className="text-sm text-muted-foreground">
-          Genéricas, Mis estrategias y Finalistas
+          Genéricas · Optimizadas · Mis estrategias · Finalistas
           {instrumentSymbol ? ` · ${instrumentSymbol}` : ''}.{' '}
           <span className="text-xs">{PAPER_PATH_LAB.libraryHint}</span>
         </p>
@@ -158,34 +171,41 @@ export function BacktestLibraryTab({
             chips={[
               {
                 id: 'all',
-                label: 'Todas',
+                label: LIBRARY_FILTER_LABELS.all,
                 count: strategyOptions.length + strategies.length,
-                title: 'Catálogo + Mis estrategias',
+                title: LIBRARY_FILTER_TITLES.all,
               },
               {
                 id: 'generics',
-                label: 'Genéricas',
+                label: LIBRARY_FILTER_LABELS.generics,
                 count: strategyOptions.length,
-                title: 'Plantillas del catálogo',
+                title: LIBRARY_FILTER_TITLES.generics,
+              },
+              {
+                id: 'optimized',
+                label: LIBRARY_FILTER_LABELS.optimized,
+                count: buckets.optimized,
+                title: LIBRARY_FILTER_TITLES.optimized,
               },
               {
                 id: 'mine',
-                label: 'Mis estrategias',
-                count: strategies.length,
-                title: 'Biblioteca guardada',
+                label: LIBRARY_FILTER_LABELS.mine,
+                count: buckets.mine,
+                title: LIBRARY_FILTER_TITLES.mine,
               },
               {
                 id: 'finalists',
-                label: instrumentSymbol ? `Finalistas · ${instrumentSymbol}` : 'Finalistas',
+                label: instrumentSymbol ? `Finalistas · ${instrumentSymbol}` : LIBRARY_FILTER_LABELS.finalists,
                 count: topStrategyIds.size,
                 disabled: !instrumentId,
                 title: instrumentId
-                  ? 'TOP del valor seleccionado en Probar'
+                  ? LIBRARY_FILTER_TITLES.finalists
                   : 'Elige un valor en Probar estrategia',
               },
             ]}
           />
           {(strategiesListFilter === 'mine' ||
+            strategiesListFilter === 'optimized' ||
             strategiesListFilter === 'all' ||
             strategiesListFilter === 'finalists') &&
             strategies.length > 0 && (
@@ -400,7 +420,10 @@ export function BacktestLibraryTab({
         onToggle={(e) => onCloneOpenChange((e.target as HTMLDetailsElement).open)}
       >
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium marker:content-none [&::-webkit-details-marker]:hidden">
-          Clonar genérica
+          Clonar genérica → Optimizadas
+          <span className="ml-2 font-normal text-muted-foreground">
+            · copia editable del catálogo (origin preset)
+          </span>
           <span className="ml-2 font-normal text-muted-foreground">
             · guarda una plantilla en Mis estrategias (reutilizable)
           </span>
@@ -432,7 +455,7 @@ export function BacktestLibraryTab({
             </select>
           </label>
           <Button disabled={!newStrategyName.trim() || createPending} onClick={onCreate}>
-            {createPending ? 'Guardando…' : 'Guardar estrategia'}
+            {createPending ? 'Guardando…' : 'Guardar en Optimizadas'}
           </Button>
           {createError != null && (
             <p className="text-sm text-destructive">
@@ -446,13 +469,15 @@ export function BacktestLibraryTab({
 
       <details className="rounded-lg border border-border/80 bg-muted/10">
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium marker:content-none [&::-webkit-details-marker]:hidden">
-          Crear con IA
+          Crear mi estrategia con IA
           <span className="ml-2 font-normal text-muted-foreground">
-            · borrador desde prompt (opcional)
+            · prompt → Mis estrategias (autoría)
           </span>
         </summary>
         <div className="border-t border-border/60 px-2 py-2">
-          <BacktestAiAssistantPanel />
+          <BacktestAiAssistantPanel
+            description="Describe tu estrategia en lenguaje natural. Se guarda en Mis estrategias (Prompt IA), no en Optimizadas."
+          />
         </div>
       </details>
     </div>

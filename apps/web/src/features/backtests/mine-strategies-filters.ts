@@ -26,9 +26,9 @@ export type MineStrategyFilterable = {
 export const MINE_STRATEGY_ORIGIN_LABELS: Record<StrategyOrigin, string> = {
   manual: 'Manual',
   assisted: 'Asistida',
-  ai_generated: 'IA',
+  ai_generated: 'Prompt IA',
   imported: 'Importada',
-  preset: 'Preset',
+  preset: 'Optimizada',
 };
 
 export function defaultMineStrategiesFilters(): MineStrategiesFilterState {

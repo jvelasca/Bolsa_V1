@@ -193,6 +193,7 @@ import {
   parseLibraryFilterParam,
   parseLibraryNavFromSearch,
 } from '@/features/backtests/library-nav';
+import { filterStrategiesByLibraryBucket } from '@/features/backtests/library-strategy-buckets';
 import { BacktestHistoryTab } from '@/features/backtests/backtest-history-tab';
 import {
   STRATEGY_MATRIX_MAX_SELECTED,
@@ -710,7 +711,7 @@ export function BacktestsPage() {
     onSuccess: () => {
       setNewStrategyName('');
       setCloneOpen(false);
-      openLibrary({ library: 'mine' });
+      openLibrary({ library: 'optimized' });
       void queryClient.invalidateQueries({ queryKey: ['strategies'] });
     },
   });
@@ -898,7 +899,7 @@ export function BacktestsPage() {
     const base =
       strategiesListFilter === 'finalists'
         ? strategies.filter((s) => topStrategyIds.has(s.id))
-        : strategies;
+        : filterStrategiesByLibraryBucket(strategies, strategiesListFilter);
     return filterMineStrategies(base, mineFilters, {
       currentInstrumentId: instrumentId,
       symbolById: instrumentSymbolById,
@@ -3739,7 +3740,7 @@ export function BacktestsPage() {
                       <fieldset className="space-y-2">
                         <legend
                           className="text-[11px] font-medium"
-                          title="Genérica = plantilla del catálogo. Mis estrategias = una que creaste, importaste o adoptaste."
+                          title="Genérica = catálogo. Optimizadas = Lab/clones. Mis estrategias = autoría (prompt/manual)."
                         >
                           Estrategia para «Probar lista»
                         </legend>
@@ -3758,7 +3759,7 @@ export function BacktestsPage() {
                             onChange={() => setRunSource('saved')}
                             disabled={strategies.length === 0}
                           />
-                          Mis estrategias
+                          Mis estrategias / Optimizadas
                         </label>
                       </fieldset>
 
@@ -3788,7 +3789,7 @@ export function BacktestsPage() {
                         </>
                       ) : (
                         <label className="block text-[11px] font-medium">
-                          Estrategia (Mis estrategias)
+                          Estrategia (guardada)
                           <select
                             value={savedStrategyId}
                             onChange={(e) => setSavedStrategyId(e.target.value)}
