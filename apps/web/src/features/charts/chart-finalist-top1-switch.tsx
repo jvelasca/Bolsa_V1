@@ -25,7 +25,7 @@ export function ChartFinalistTop1Switch({
 }: Props) {
   return (
     <div
-      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'gap-1.5', className)}
+      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'shrink-0 gap-1.5', className)}
       title={
         title ??
         'Mostrar en el gráfico los indicadores del Finalista TOP #1 (mismo timeframe)'
@@ -40,8 +40,9 @@ export function ChartFinalistTop1Switch({
         onClick={() => onCheckedChange(!checked)}
         className={cn(
           CHART_BAR_ZONE_LABEL_BTN_CLASS,
-          'inline-flex items-center gap-1.5 pr-1.5 disabled:cursor-not-allowed disabled:opacity-40',
-          checked && 'border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
+          'inline-flex shrink-0 items-center gap-1.5 rounded border border-border/80 bg-background/80 px-1.5 py-0.5 disabled:cursor-not-allowed disabled:opacity-50',
+          checked &&
+            'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
         )}
       >
         <span
@@ -60,10 +61,8 @@ export function ChartFinalistTop1Switch({
             )}
           />
         </span>
-        <span className="chart-indicators-label-text text-[10px] font-semibold uppercase tracking-wide">
-          TOP#1
-        </span>
-        <span className="chart-indicators-label-short text-[10px] font-semibold">T1</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide">Finalista</span>
+        <span className="text-[10px] font-bold tabular-nums">#1</span>
       </button>
     </div>
   );

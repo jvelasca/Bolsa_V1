@@ -1,23 +1,39 @@
+/**
+ * Zona Indicadores (catálogo) + switch Finalista TOP #1 del valor/TF del gráfico.
+ */
+
 import { BarChart3 } from 'lucide-react';
 import {
   CHART_BAR_ZONE_LABEL_BTN_CLASS,
   CHART_BAR_ZONE_ROW_CLASS,
 } from '@/features/charts/chart-bar-zone-styles';
+import { ChartFinalistTop1Switch } from '@/features/charts/chart-finalist-top1-switch';
 import { cn } from '@/lib/utils';
+
+export type ChartFinalistTop1Control = {
+  checked: boolean;
+  disabled?: boolean;
+  title?: string;
+  onCheckedChange: (next: boolean) => void;
+};
 
 export function ChartIndicatorsBar({
   onOpenCatalog,
   chartIndicatorCount = 0,
+  finalistTop1,
   className,
 }: {
   onOpenCatalog: () => void;
   chartIndicatorCount?: number;
+  /** Switch overlay Finalista TOP #1 (mismo TF del gráfico). */
+  finalistTop1?: ChartFinalistTop1Control;
   className?: string;
 }) {
   return (
     <div
-      className={cn(CHART_BAR_ZONE_ROW_CLASS, className)}
-      title="Catálogo de indicadores, presets y grupos"
+      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'shrink-0 gap-2', className)}
+      title="Catálogo de indicadores y overlay del Finalista TOP #1"
+      data-testid="chart-indicators-zone"
     >
       <button
         type="button"
@@ -37,6 +53,15 @@ export function ChartIndicatorsBar({
           </span>
         )}
       </button>
+      {finalistTop1 ? (
+        <ChartFinalistTop1Switch
+          checked={finalistTop1.checked}
+          disabled={finalistTop1.disabled}
+          title={finalistTop1.title}
+          onCheckedChange={finalistTop1.onCheckedChange}
+          className="shrink-0"
+        />
+      ) : null}
     </div>
   );
 }

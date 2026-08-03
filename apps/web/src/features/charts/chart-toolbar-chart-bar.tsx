@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 
 import { ChartIndicatorTemplateZone } from '@/features/charts/chart-indicator-template-zone';
+import { ChartFinalistTop1Switch } from '@/features/charts/chart-finalist-top1-switch';
+import type { ChartFinalistTop1Control } from '@/features/charts/chart-indicators-bar';
 import { ChartCursorZone } from '@/features/charts/chart-cursor-zone';
 import {
   inspectorNavigateKey,
@@ -69,6 +71,8 @@ interface ChartToolbarChartBarProps {
   indicatorTemplates: IndicatorTemplate[];
   activeIndicatorTemplateId?: string | null;
   onApplyIndicatorTemplate: (templateId: string) => boolean;
+  /** Switch Finalista TOP #1 en la zona de indicadores del gráfico en uso. */
+  finalistTop1?: ChartFinalistTop1Control;
   instrument?: InstrumentDto;
   instrumentId?: string;
   symbol: string;
@@ -145,6 +149,7 @@ export function ChartToolbarChartBar({
   indicatorTemplates,
   activeIndicatorTemplateId,
   onApplyIndicatorTemplate,
+  finalistTop1,
   instrument,
   instrumentId,
   symbol,
@@ -213,16 +218,29 @@ export function ChartToolbarChartBar({
     );
   }
 
-  if (showIndicatorTemplateZone) {
+  if (showIndicatorTemplateZone || finalistTop1) {
     dataZones.push(
       zoneBlock(
-        <ChartIndicatorTemplateZone
-          templates={indicatorTemplates}
-          activeTemplateId={activeIndicatorTemplateId}
-          onApplyTemplate={onApplyIndicatorTemplate}
-          className={CHART_TOOLBAR_EMBEDDED_CLASS}
-        />,
-        'chart-toolbar-data-zone',
+        <div className="flex shrink-0 items-center gap-2">
+          {showIndicatorTemplateZone ? (
+            <ChartIndicatorTemplateZone
+              templates={indicatorTemplates}
+              activeTemplateId={activeIndicatorTemplateId}
+              onApplyTemplate={onApplyIndicatorTemplate}
+              className={CHART_TOOLBAR_EMBEDDED_CLASS}
+            />
+          ) : null}
+          {finalistTop1 ? (
+            <ChartFinalistTop1Switch
+              checked={finalistTop1.checked}
+              disabled={finalistTop1.disabled}
+              title={finalistTop1.title}
+              onCheckedChange={finalistTop1.onCheckedChange}
+              className={CHART_TOOLBAR_EMBEDDED_CLASS}
+            />
+          ) : null}
+        </div>,
+        'chart-toolbar-data-zone shrink-0',
       ),
     );
   }

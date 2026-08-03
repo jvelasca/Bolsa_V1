@@ -2,7 +2,11 @@
 
 ## Qué
 
-Switch **TOP#1** en la barra global del gráfico Trading (junto a Indicadores). ON aplica los indicadores del Finalista TOP #1 del instrumento + TF del gráfico; OFF quita solo instancias `origin: 'finalist-top1'`.
+Switch **Finalista #1** en Trading:
+1. Zona **Indicadores** (barra superior del workspace), junto al catálogo.
+2. Barra del **gráfico en uso**, junto a Plantillas.
+
+ON aplica los indicadores del Finalista TOP #1 del instrumento + TF del gráfico; OFF quita solo instancias `origin: 'finalist-top1'`.
 
 ## Resolución de specs
 

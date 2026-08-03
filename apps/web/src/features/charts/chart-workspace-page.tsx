@@ -464,6 +464,12 @@ export function ChartWorkspacePage() {
         indicatorTemplates={indicatorTemplates}
         activeIndicatorTemplateId={chartTab.activeIndicatorTemplateId}
         onApplyIndicatorTemplate={applyIndicatorGroup}
+        finalistTop1={{
+          checked: showTop1,
+          disabled: !top1Available && !showTop1,
+          title: finalistTop1Title,
+          onCheckedChange: onFinalistTop1Change,
+        }}
         instrument={instrumentQuery.data?.data}
         instrumentId={instrumentId}
         symbol={activeTab.label}
