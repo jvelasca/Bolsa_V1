@@ -28,9 +28,19 @@
 5. **Copy** Camino C = «SEMI · Confirm DEMO»  
 6. Docs: este brief + index + HELP + handoff corto
 
-## Fuera de slice 1
+## Fuera de slice 1–1.2
 
-AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI completa H/M slots · cron
+AUTO execute · country hard veto · auto WeightRules · dual UI completa H/M slots · Belief
+
+## Verificación automatizada
+
+```bash
+pnpm test:semi          # battery web + py + smoke API opcional
+pnpm test:semi:smoke    # solo API live (SEMI_API_REQUIRED=1 para forzar)
+```
+
+Scripts: `scripts/research/verify_semi_demo_battery.mjs` · `verify_semi_demo_api_smoke.py`  
+Migración: `python packages/py/infrastructure/scripts/apply_supervised_f3_account_state_migration.py`
 
 ## Slice 1.1 (geo)
 
@@ -43,11 +53,13 @@ AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI comp
 - [x] Tabla + GET/PUT supervised-f3-queue  
 - [x] Hydrate/push cliente  
 - [x] `Recommendation.country` en propose  
-- [ ] Aplicar migración en entorno local/CI  
+- [x] Aplicar migración local  
+- [x] Battery `pnpm test:semi` + smoke API  
 
 ## Checklist prueba DEMO
 
-- [x] Unit: prefs · geo · Finalistas path · queue store (vitest 2026-08-03)  
+- [x] Unit: prefs · geo · Finalistas path · queue store · operativa contract  
+- [x] Battery `pnpm test:semi` (registrada)  
 - [ ] Cuenta DEMO activa con cash ≥ 2k  
 - [ ] Modo SEMI · N=10 · size 10 %  
 - [ ] Finalistas → Proponer → aparece en cola F3  

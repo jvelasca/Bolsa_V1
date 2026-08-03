@@ -16,9 +16,16 @@
 - `Recommendation.country` desde instrumento en propose.
 - Smoke automatizado: vitest prefs/geo/finalists/queue (16 tests OK 2026-08-03).
 
+## Verificación
+
+```bash
+pnpm test:semi
+pnpm test:semi:smoke   # API :8000 + migración
+```
+
 ## Pendiente
 
-1. Smoke UI manual (checklist abajo) tras aplicar migración.  
+1. Smoke UI manual (checklist en impl brief).  
 2. AUTO / Belief pesos — **no** hasta descongelar.
 
 ## Ops
@@ -29,4 +36,4 @@ python packages/py/infrastructure/scripts/apply_supervised_f3_account_state_migr
 
 ## Rama
 
-`stage/semi-f3-queue-bd-2026-08-03`
+`stage/semi-f3-queue-bd-2026-08-03` (PR #25)

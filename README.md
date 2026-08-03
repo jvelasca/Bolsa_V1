@@ -53,6 +53,8 @@ Documentación completa del cutover: [`docs/CUTOVER_PYTHON.md`](./docs/CUTOVER_P
 | `pnpm test:py:install` | Instalar paquetes Python editables |
 | `pnpm test:operativa` | **DÍA D + CORE-R** (web + py + smoke API opcional) |
 | `pnpm test:operativa:smoke` | Smoke API live (FA asOf, Evidence, CORE-R) |
+| `pnpm test:semi` | **SEMI DEMO** libro + F3 + geo + cola BD (web + py + smoke) |
+| `pnpm test:semi:smoke` | Smoke API live cola F3 + propose country |
 | `pnpm test:fa` | Batería FA / FIE |
 | `pnpm test:coach` | Embudo / Lista AUTO / CORE-P (+ smoke API opcional) |
 | `pnpm test:coach:smoke` | Smoke API CORE-P multi-perfil (SKIP si API down) |
