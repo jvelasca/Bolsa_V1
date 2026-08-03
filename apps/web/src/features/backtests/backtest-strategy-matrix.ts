@@ -74,11 +74,14 @@ export function buildStrategyMatrixRows(
     const presetLabel = s.presetKey
       ? (BACKTEST_STRATEGIES[s.presetKey]?.label ?? s.presetKey)
       : null;
+    const tf = s.timeframe?.trim() || '';
+    const baseSubtitle = presetLabel ? `Mía · ${presetLabel}` : 'Mis estrategias';
+    const subtitle = tf ? `${baseSubtitle} · ${tf}` : baseSubtitle;
     return {
       rowId: `saved:${s.id}`,
       kind: 'saved',
       label: s.name,
-      subtitle: presetLabel ? `Mía · ${presetLabel}` : 'Mis estrategias',
+      subtitle,
       presetKey: s.presetKey ?? undefined,
       strategyDefinitionId: s.id,
       status: 'idle',
