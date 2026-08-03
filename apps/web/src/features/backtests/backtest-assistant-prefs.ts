@@ -18,7 +18,9 @@ export type AssistantUniversePrefs = {
   selectAllGenerics: boolean;
   runCoachOnEnter: boolean;
   autoAdvanceWhenDone: boolean;
-  /** Añadir Mis estrategias al Universo / Probar + coach del asistente. */
+  /** Añadir Optimizadas (Lab/clones) al Universo / Probar + coach. */
+  includeOptimizedStrategies: boolean;
+  /** Añadir Mis estrategias (autoría) al Universo / Probar + coach. */
   includeMineStrategies: boolean;
   /**
    * En ciclo Play: genéricas ∪ Finalistas del valor actual (TOP slots).
@@ -117,6 +119,7 @@ export function defaultAssistantPrefs(): AssistantPrefs {
       selectAllGenerics: true,
       runCoachOnEnter: true,
       autoAdvanceWhenDone: true,
+      includeOptimizedStrategies: false,
       includeMineStrategies: false,
       includeFinalistsInBattery: true,
       reuseLoteIfUnchanged: true,
@@ -182,6 +185,13 @@ export function normalizeAssistantPrefs(raw: unknown): AssistantPrefs {
       selectAllGenerics: asBool(o.universe?.selectAllGenerics, d.universe.selectAllGenerics),
       runCoachOnEnter: asBool(o.universe?.runCoachOnEnter, d.universe.runCoachOnEnter),
       autoAdvanceWhenDone: asBool(o.universe?.autoAdvanceWhenDone, d.universe.autoAdvanceWhenDone),
+      // Legacy: un solo check «Optimizadas y Mis» → ambos ON si estaba activo.
+      includeOptimizedStrategies: asBool(
+        o.universe?.includeOptimizedStrategies ??
+          (o.universe as { includeMineStrategies?: boolean } | undefined)
+            ?.includeMineStrategies,
+        d.universe.includeOptimizedStrategies,
+      ),
       includeMineStrategies: asBool(
         o.universe?.includeMineStrategies,
         d.universe.includeMineStrategies,

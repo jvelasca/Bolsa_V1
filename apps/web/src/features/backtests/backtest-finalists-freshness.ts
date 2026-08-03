@@ -380,7 +380,7 @@ export function isFinalistsFreshnessContextReady(opts: {
   instrumentsFetched: boolean;
   /** false mientras carga el perfil de la cuenta activa. */
   accountProfileReady: boolean;
-  /** false mientras cargan Mis estrategias si el pref includeMine está ON. */
+  /** false mientras cargan estrategias guardadas si Optimizadas o Mis están ON. */
   strategiesReady: boolean;
 }): boolean {
   return opts.instrumentsFetched && opts.accountProfileReady && opts.strategiesReady;

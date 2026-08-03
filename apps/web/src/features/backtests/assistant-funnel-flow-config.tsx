@@ -138,8 +138,15 @@ export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
           onChange={(v) => patchUniverse({ includeFinalistsInBattery: v })}
         />
         <FlowCheck
+          checked={prefs.universe.includeOptimizedStrategies}
+          label="Incluir Optimizadas"
+          hint="Clones / Lab sobre genéricas (origin preset)."
+          onChange={(v) => patchUniverse({ includeOptimizedStrategies: v })}
+        />
+        <FlowCheck
           checked={prefs.universe.includeMineStrategies}
-          label="Incluir Optimizadas y Mis estrategias"
+          label="Incluir Mis estrategias"
+          hint="Autoría propia (manual, prompt IA, asistida, import)."
           onChange={(v) => patchUniverse({ includeMineStrategies: v })}
         />
         <FlowCheck

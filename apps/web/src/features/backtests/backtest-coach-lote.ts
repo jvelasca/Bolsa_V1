@@ -43,14 +43,22 @@ export function canReuseCoachLote(opts: {
   return { reuse: true, reason: 'ok' };
 }
 
-/** Universo: genéricas ± Finalistas del valor ± Mis estrategias, tope matriz. */
+/** Universo: genéricas ± Finalistas ± Optimizadas ± Mis estrategias, tope matriz. */
 export function mergeUniverseTargetIds(opts: {
   presetIds: readonly string[];
   /** `saved:<strategyDefinitionId>` de Finalistas del instrumento. */
   finalistRowIds?: readonly string[];
   includeFinalists?: boolean;
-  savedRowIds: readonly string[];
-  includeMine: boolean;
+  /** RowIds Optimizadas (origin preset / Lab). */
+  optimizedRowIds?: readonly string[];
+  includeOptimized?: boolean;
+  /** RowIds Mis estrategias (autoría). */
+  mineRowIds?: readonly string[];
+  includeMine?: boolean;
+  /**
+   * Legacy: todas las saved. Si no hay `mineRowIds`, `includeMine` usa esta lista.
+   */
+  savedRowIds?: readonly string[];
   max?: number;
 }): string[] {
   const max = opts.max ?? STRATEGY_MATRIX_MAX_SELECTED;
@@ -65,8 +73,11 @@ export function mergeUniverseTargetIds(opts: {
   if (opts.includeFinalists) {
     for (const id of opts.finalistRowIds ?? []) push(id);
   }
+  if (opts.includeOptimized) {
+    for (const id of opts.optimizedRowIds ?? []) push(id);
+  }
   if (opts.includeMine) {
-    for (const id of opts.savedRowIds) push(id);
+    for (const id of opts.mineRowIds ?? opts.savedRowIds ?? []) push(id);
   }
   return out;
 }

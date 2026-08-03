@@ -122,6 +122,18 @@ describe('mergeUniverseTargetIds', () => {
     });
     expect(merged).toEqual(['preset:a', 'saved:1']);
   });
+
+  it('splits Optimizadas and Mis when both enabled', () => {
+    expect(
+      mergeUniverseTargetIds({
+        presetIds: ['preset:a'],
+        optimizedRowIds: ['saved:opt'],
+        includeOptimized: true,
+        mineRowIds: ['saved:mine'],
+        includeMine: true,
+      }),
+    ).toEqual(['preset:a', 'saved:opt', 'saved:mine']);
+  });
 });
 
 describe('finalistMatrixRowIds', () => {
