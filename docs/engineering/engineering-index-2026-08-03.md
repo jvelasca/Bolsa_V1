@@ -1,0 +1,95 @@
+# Engineering Index — índice maestro de docs
+
+> **AsOf:** 2026-08-03  
+> **Propósito:** un **padre único** para la documentación de ingeniería (respuesta a auditoría externa A0 H1).  
+> **Regla:** todo doc nuevo de ingeniería declara exactamente **un padre** (este índice o un hijo directo). No añadir más raíces en paralelo.  
+> **Repo:** https://github.com/jvelasca/Bolsa_V1
+
+---
+
+## 0. Cómo leer (cuatro públicos)
+
+| Público | Empieza aquí | No necesita |
+|---------|--------------|-------------|
+| **Usuario** | [HELP.md](../HELP.md) · Ayuda (?) en app | ADRs / RFCs |
+| **Desarrollador** | [ONBOARDING.md](../ONBOARDING.md) · [DEV_STARTUP.md](../DEV_STARTUP.md) · este índice §1–2 | RFCs completos |
+| **Arquitecto** | [ARCHITECTURE.md](../ARCHITECTURE.md) · [adr/](../adr/) · [rfc/](../rfc/) · §3 | Notebooks de campaña |
+| **Investigador / auditor** | [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md) · freeze · lifecycle | Detalle UI de charts |
+
+Índice general de todos los docs: [README.md](../README.md) (catálogo). **Este Engineering Index es el mapa de navegación**, no duplica el catálogo.
+
+---
+
+## 1. Árbol canónico (un padre)
+
+```text
+Engineering Index  (este doc)
+├── Architecture
+│   ├── ARCHITECTURE.md
+│   ├── PROJECT_PREMISES.md
+│   ├── adr/*  (decisiones)
+│   ├── rfc/*  (constitución)
+│   └── bounded-contexts-2026-08-03.md
+├── Research
+│   ├── research-lifecycle.md
+│   ├── backtesting-dia-d-premises-*.md
+│   ├── improvement-roadmap-*.md
+│   └── belief-coach-brief-draft-*.md  (futuro)
+├── Product / Ops
+│   ├── HELP.md  (sync Ayuda)
+│   ├── stage-audit-*.md
+│   ├── post-audit-decision-freeze-*.md
+│   ├── dual-universes / mandato / reconciliación ADRs
+│   └── operativa-test-plan-*.md
+├── Audit (entrada externa)
+│   ├── audit-pack-post-audits-*.md     ← START externos
+│   ├── audit1-response-*.md
+│   ├── audit2-response-*.md
+│   └── audit-ext-round2-triage-*.md    ← round 2 (A0 / N4 / deep)
+└── Historical
+    ├── session-handoff-*.md
+    ├── backups/
+    └── research/observations/*
+```
+
+**Anti-patrón:** un doc con tres “padres” (p. ej. enlazado como raíz desde README + HELP + lifecycle sin declarar jerarquía). Enlazar **sí**; ser raíz **no**.
+
+---
+
+## 2. Producto vs docs (no confundir)
+
+| Capa | Qué es | Riesgo si diverge |
+|------|--------|-------------------|
+| **Producto (código)** | FastAPI + React + motor BT | Fuente de verdad de comportamiento |
+| **Docs** | Premisas, ADRs, freeze, HELP | Explican y **congelan política**; no ejecutan |
+
+Si código y ADR divergen: **ADR o freeze gana en política**; el código se alinea o se abre enmienda. No “arreglar” en silencio.
+
+---
+
+## 3. CORE — taxonomía única (A0 H5)
+
+| Código | Nombre canónico | Dominio | Depende de | No puede depender de |
+|--------|-----------------|---------|------------|----------------------|
+| **CORE-P** | Profile / Policy | Trading | InvestorProfile, TradingPolicy | Coach LLM, Belief |
+| **CORE-R** | Recommendation monitor | Trading ops | Finalistas, BD `core_r_*` | Research Belief, Lab re-opt en vivo |
+| **CORE-A** | Assistant / Coach soft | Research UX | Ranking determinista, narración | Reordenar TOP, Belief (freeze) |
+| **CORE-B** | Behaviour / Lab board | Research Lab | Jobs hold-out/WF | DEMO ledger, paper_auto |
+
+Crecer en vertical bajo **CORE**, no inventar CORE-X sin fila aquí + issue.
+
+---
+
+## 4. Dependencias entre bounded contexts
+
+Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
+
+**Regla de oro (A0 conclusión):** toda dependencia **nueva** entre módulos se justifica en PR (una frase) o se rechaza.
+
+---
+
+## 5. Auditorías externas
+
+1. Entrada: [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md)  
+2. Round 2 triage: [audit-ext-round2-triage-2026-08-03.md](./audit-ext-round2-triage-2026-08-03.md)  
+3. Freeze: [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md)

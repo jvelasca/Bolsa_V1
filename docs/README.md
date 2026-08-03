@@ -39,6 +39,9 @@
 | [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md) | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual) |
 | [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
 | [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md) | **Paquete auditoría** post-Q0–Q3 + freeze + evidencia smoke |
+| [engineering/engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md) | **Engineering Index** — padre único docs ingeniería (A0 H1) |
+| [engineering/bounded-contexts-2026-08-03.md](./engineering/bounded-contexts-2026-08-03.md) | **Bounded contexts** — dependencias permitidas / prohibidas |
+| [engineering/audit-ext-round2-triage-2026-08-03.md](./engineering/audit-ext-round2-triage-2026-08-03.md) | **Triage round 2** externas A0 · N4 · Deep (errata stack) |
 | [engineering/audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md) | **Respuesta auditoría 1** — gaps reales A/B (ingesta + FIE) vs stack Bolsa_V1 |
 | [engineering/audit2-response-backtests-lab-2026-08-03.md](./engineering/audit2-response-backtests-lab-2026-08-03.md) | **Respuesta auditoría 2** — Lab backtests UI (abort/schema/DD/telemetría) |
 | [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) | **Roadmap mejoras** post-auditorías (Q0–Q3 · horizonte TOP) |

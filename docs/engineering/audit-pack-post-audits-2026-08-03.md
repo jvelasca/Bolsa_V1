@@ -1,8 +1,9 @@
 # Paquete de auditoría — post-auditorías Q0–Q3 + freeze (2026-08-03)
 
 > **Propósito:** documento **único** para pasar auditorías del cierre post-etapa (tras [stage-audit LAB/DÍA D/Mandato](./stage-audit-lab-dia-d-mandate-2026-08-02.md)).  
-> **AsOf:** 2026-08-03 · `HELP_CONTENT_AS_OF` · `main` incluye PRs #2–#11 · repo **público** (`jvelasca/Bolsa_V1`) para 3 auditorías externas.  
+> **AsOf:** 2026-08-03 · `HELP_CONTENT_AS_OF` · `main` · repo **público** (`jvelasca/Bolsa_V1`) para auditorías externas.  
 > **Premisas:** [PROJECT_PREMISES.md](../PROJECT_PREMISES.md) (documentar todo + docstrings).  
+> **Índice docs ingeniería:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md).  
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`
 
 ---
@@ -19,6 +20,7 @@
 | **Freeze producto** | ¿C4 / Belief / flags ops? | **No abrir** — [decision freeze](./post-audit-decision-freeze-2026-08-03.md) |
 | **Auditoría 1 (ingesta+FIE)** | ¿Gaps A/B del informe externo? | Ver [audit1-response](./audit1-response-ingest-fie-2026-08-03.md) — CB Yahoo + cuarentena + health Redis + test FIE parcial |
 | **Auditoría 2 (Lab UI)** | ¿Workers / Zod / abort / DD? | Ver [audit2-response](./audit2-response-backtests-lab-2026-08-03.md) — abort LLM + schema + underwater DD + elapsedMs |
+| **Round 2 externas (A0·N4·Deep)** | ¿Complejidad docs / radiografía freeze / deep code? | Ver [audit-ext-round2-triage](./audit-ext-round2-triage-2026-08-03.md) — Index + bounded contexts; Deep = errata de stack |
 
 **Cómo auditar en 30–45 min**
 
@@ -27,7 +29,8 @@
 3. Tests offline: `pnpm test:operativa` · `pnpm test:coach` (sin API).  
 4. Stack: Docker + `pnpm dev` → `pnpm test:operativa:smoke` · `pnpm test:coach:smoke`.  
 5. Ops: `pnpm audit:ibex35:missing` → esperar `con_TOP=35/35`.  
-6. Estabilidad: observation [2026-08-03-stability-delta-ibex.md](../../research/observations/2026-08-03-stability-delta-ibex.md).
+6. Estabilidad: observation [2026-08-03-stability-delta-ibex.md](../../research/observations/2026-08-03-stability-delta-ibex.md).  
+7. Si el informe cita tRPC / Next / `packages/engine`: leer [round2 triage](./audit-ext-round2-triage-2026-08-03.md) §3 primero.
 
 ---
 
