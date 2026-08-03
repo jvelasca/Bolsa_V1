@@ -61,21 +61,21 @@ No abren Fase 2 ni entidades nuevas.
 
 ---
 
-### code-docstrings-coverage · **forward-only**
+## Closed
+
+### code-docstrings-coverage · 2026-08-03
 
 | Campo | Valor |
 |-------|--------|
-| Estado | Open · lote 1 iniciado 2026-08-03 |
+| Estado | Closed · lotes 1–4 · forward-only vigente |
 | Severidad | Baja (mantenibilidad / auditoría de código) |
 | Doc | `docs/engineering/code-documentation-standard-2026-08-03.md` |
 | Medición | `python scripts/research/docstring_coverage_report.py` |
 
-**Hecho:** política + script · **lotes 1–3** (API schemas/routes · `bolsa_application` módulos + clases públicas).  
-**Pendiente:** lote 4 (indicadores / signals analytics). No reescribe histórico solo por docs.
+**Hecho:** política + script · **lotes 1–4** (API · application · analytics Lab: indicators/signals/optimize).  
+**Vigilancia:** solo forward-only al tocar código nuevo; no reescribe histórico solo por docs.
 
 ---
-
-## Closed
 
 ### CORE-P profile-coach-lab-binding · 2026-08-01
 

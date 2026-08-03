@@ -12,6 +12,7 @@ MIN_BARS = 40
 
 @dataclass(frozen=True, slots=True)
 class UptrendPatternScore:
+    """Desglose / score: Uptrend Pattern Score."""
     score: float
     higher_highs: int
     higher_lows: int
@@ -37,6 +38,7 @@ def _pivot_indices(values: list[float], *, kind: str, window: int = 3) -> list[i
 
 
 def score_uptrend_pattern_v1(bars: list[OhlcvBar]) -> UptrendPatternScore | None:
+    """Función pública ``score_uptrend_pattern_v1``."""
     if len(bars) < MIN_BARS:
         return None
 

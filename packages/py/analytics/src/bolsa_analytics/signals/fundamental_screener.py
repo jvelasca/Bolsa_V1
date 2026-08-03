@@ -81,6 +81,7 @@ def assemble_screener_result(
     persisted_list_id: str | None,
     max_results: int,
 ) -> dict[str, Any]:
+    """Función pública ``assemble_screener_result``."""
     capped = hits[: max(1, min(max_results, 500))]
     return {
         "screenerVersion": FUNDAMENTAL_SCREENER_VERSION,

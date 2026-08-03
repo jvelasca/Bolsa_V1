@@ -17,6 +17,7 @@ ProgressCallback = Callable[[int, int, float | None], None]
 
 @dataclass(frozen=True, slots=True)
 class SmaGridTrial:
+    """Trial de grid: Sma Grid Trial."""
     fast_period: int
     slow_period: int
     total_return_pct: float
@@ -110,6 +111,7 @@ def estimate_sma_grid_trial_total(
     *,
     max_trials: int = 200,
 ) -> int:
+    """Estima ``sma_grid_trial_total``."""
     count = 0
     for fast in fast_periods:
         for slow in slow_periods:
@@ -130,6 +132,7 @@ def run_sma_grid_search(
     max_trials: int = 200,
     on_progress: ProgressCallback | None = None,
 ) -> list[SmaGridTrial]:
+    """Ejecuta ``sma_grid_search``."""
     if not bars:
         raise ValueError("bars must not be empty")
 
@@ -186,6 +189,7 @@ def run_baseline_preset_backtest(
     bars: list[BacktestBarInput],
     initial_cash: float = 10000.0,
 ) -> SmaGridTrial:
+    """Ejecuta ``baseline_preset_backtest``."""
     result = run_backtest(bars, "sma_crossover", initial_cash)
     metrics = {**result.is_metrics}
     score = float(metrics["totalReturnPct"]) - float(metrics["maxDrawdownPct"]) * 0.25

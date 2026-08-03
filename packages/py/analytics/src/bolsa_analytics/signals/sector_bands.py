@@ -166,6 +166,7 @@ def apply_sector_bands_to_conditions(
 
 
 def default_sector_band_conditions() -> list[dict[str, Any]]:
+    """Función pública ``default_sector_band_conditions``."""
     out: list[dict[str, Any]] = []
     for metric, rule in SECTOR_BAND_DEFAULT.items():
         if rule == "skip" or not isinstance(rule, dict):

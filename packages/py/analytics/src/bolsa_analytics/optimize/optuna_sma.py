@@ -25,6 +25,7 @@ def run_optuna_sma_search(
     timeframe: str = "1d",
     on_progress: ProgressCallback | None = None,
 ) -> list[SmaGridTrial]:
+    """Ejecuta ``optuna_sma_search``."""
     if not bars:
         raise ValueError("bars must not be empty")
     if not fast_periods or not slow_periods:

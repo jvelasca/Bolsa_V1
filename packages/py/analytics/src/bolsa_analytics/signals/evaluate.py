@@ -13,6 +13,7 @@ SignalKind = Literal["entry_long", "entry_short", "exit"]
 
 @dataclass(frozen=True, slots=True)
 class PresetFeatureSeries:
+    """Serie / evento: Preset Feature Series."""
     sma20: list[float | None]
     sma50: list[float | None]
     rsi14: list[float | None]
@@ -36,6 +37,7 @@ def build_preset_features(
     timestamps: list[str],
     closes: list[float],
 ) -> PresetFeatureSeries:
+    """Construye ``preset_features``."""
     indicators = build_indicator_series(timestamps, closes)
     return PresetFeatureSeries(
         sma20=[point.sma20 for point in indicators],

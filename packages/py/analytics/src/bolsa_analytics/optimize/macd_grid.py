@@ -16,6 +16,7 @@ ProgressCallback = Callable[[int, int, float | None], None]
 
 @dataclass(frozen=True, slots=True)
 class MacdGridTrial:
+    """Trial de grid: Macd Grid Trial."""
     fast_period: int
     slow_period: int
     signal_period: int
@@ -149,6 +150,7 @@ def estimate_macd_grid_trial_total(
     *,
     max_trials: int = 25,
 ) -> int:
+    """Estima ``macd_grid_trial_total``."""
     count = sum(1 for fast, slow, _signal in triples if fast < slow)
     return max(1, min(count, max_trials))
 
@@ -161,6 +163,7 @@ def run_macd_signal_cross_grid(
     max_trials: int = 25,
     on_progress: ProgressCallback | None = None,
 ) -> list[MacdGridTrial]:
+    """Ejecuta ``macd_signal_cross_grid``."""
     if not bars:
         raise ValueError("bars must not be empty")
 

@@ -15,6 +15,7 @@ WF_FOLDS_MAX = 5
 
 @dataclass(frozen=True, slots=True)
 class WalkForwardFold:
+    """Partición / fold: Walk Forward Fold."""
     index: int
     train_bars: list[BacktestBarInput]
     test_bars: list[BacktestBarInput]

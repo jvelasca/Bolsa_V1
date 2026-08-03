@@ -20,6 +20,7 @@ def vectorbt_available() -> bool:
 
 
 def optuna_available() -> bool:
+    """Helper: ``optuna_available``."""
     try:
         import optuna  # noqa: F401
 
@@ -29,6 +30,7 @@ def optuna_available() -> bool:
 
 
 def resolve_optimize_engine(requested: str | None) -> OptimizeEngineName:
+    """Resuelve ``optimize_engine``."""
     normalized = (requested or "auto").strip().lower()
     if normalized == "auto":
         if vectorbt_available():
@@ -50,6 +52,7 @@ def resolve_optimize_engine(requested: str | None) -> OptimizeEngineName:
 
 
 def engine_result_label(engine: OptimizeEngineName) -> str:
+    """Función pública ``engine_result_label``."""
     return {
         "h0": "sma_grid_h0",
         "vectorbt": "vectorbt_sma_grid",

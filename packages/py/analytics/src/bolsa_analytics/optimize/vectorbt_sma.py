@@ -51,6 +51,7 @@ def run_vectorbt_sma_grid(
     timeframe: str = "1d",
     on_progress: ProgressCallback | None = None,
 ) -> list[SmaGridTrial]:
+    """Ejecuta ``vectorbt_sma_grid``."""
     if not bars:
         raise ValueError("bars must not be empty")
 
