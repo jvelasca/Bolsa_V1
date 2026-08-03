@@ -1,8 +1,9 @@
 # Paquete de auditoría — post-auditorías Q0–Q3 + freeze (2026-08-03)
 
 > **Propósito:** documento **único** para pasar auditorías del cierre post-etapa (tras [stage-audit LAB/DÍA D/Mandato](./stage-audit-lab-dia-d-mandate-2026-08-02.md)).  
-> **AsOf:** 2026-08-03 · `HELP_CONTENT_AS_OF` · `main` incluye PRs #2–#10 (Q0–Q3, freeze, audit pack, docstrings lotes 1–4).  
-> **Repo:** `https://github.com/jvelasca/Bolsa_V1` (privado)
+> **AsOf:** 2026-08-03 · `HELP_CONTENT_AS_OF` · `main` incluye PRs #2–#11 · repo **público** (`jvelasca/Bolsa_V1`) para 3 auditorías externas.  
+> **Premisas:** [PROJECT_PREMISES.md](../PROJECT_PREMISES.md) (documentar todo + docstrings).  
+> **Repo:** `https://github.com/jvelasca/Bolsa_V1`
 
 ---
 

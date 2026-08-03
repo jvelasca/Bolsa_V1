@@ -1,6 +1,7 @@
 # Estándar de documentación de código (2026-08-03)
 
-> **Qué cubre:** docstrings / comentarios en código.  
+> **Premisa de proyecto:** [PROJECT_PREMISES.md](../PROJECT_PREMISES.md) §1 — *documentar todo* (producto **y** código).  
+> **Qué cubre este doc:** docstrings / JSDoc en código.  
 > **Qué no cubre:** docs de producto y auditoría (viven en `docs/` — ver [audit-pack](./audit-pack-post-audits-2026-08-03.md)).  
 > **AsOf:** 2026-08-03 · Medición inicial: ~82% defs públicas Python sin docstring (analytics + application + api).
 

@@ -6,7 +6,7 @@
 | | |
 |--|--|
 | Cuenta GitHub | `jvelasca` (CLI `gh` ya autenticada en este PC) |
-| Repo propuesto | `https://github.com/jvelasca/Bolsa_V1` (**privado**) |
+| Repo | `https://github.com/jvelasca/Bolsa_V1` (**público** · 2026-08-03 · auditorías externas) |
 | Tag release | `v1.0.0` |
 | Checklist push | [`github-v1-release.md`](./github-v1-release.md) |
 | Changelog | [`../../CHANGELOG.md`](../../CHANGELOG.md) |
@@ -47,7 +47,7 @@ Contenido de la plantilla (referencia):
 # Cuenta
 GITHUB_USER=jvelasca
 GITHUB_REPO=Bolsa_V1
-GITHUB_VISIBILITY=private
+GITHUB_VISIBILITY=public
 
 # Auth: usa UNA de estas vías (preferida = gh CLI, sin pegar token aquí)
 # A) Ya hecho en este PC:  gh auth login
@@ -118,7 +118,8 @@ git status   # verificar: NO aparece .env ni .secrets/
 
 git commit -m "release: Bolsa V1.0.0 — embudo, DÍA D, CORE-P/R, FA"
 
-gh repo create Bolsa_V1 --private --source=. --remote=origin --push
+gh repo create Bolsa_V1 --public --source=. --remote=origin --push
+# (histórico: el repo se creó private; 2026-08-03 → público para auditorías)
 
 git tag -a v1.0.0 -m "Bolsa V1.0.0"
 git push origin v1.0.0
@@ -141,7 +142,7 @@ gh pr create
 
 | Uso | Scopes |
 |-----|--------|
-| Push repo privado + releases | `repo` |
+| Push repo + releases | `repo` (también con repo público) |
 | GitHub Actions (si tocas workflows) | `workflow` |
 | Solo lectura | `repo` read o fine-grained Contents: Read |
 
@@ -169,7 +170,7 @@ Plantilla pública: [`.env.example`](../../.env.example).
 - [ ] `git status` no lista `.env` ni `.secrets/`
 - [ ] No hay `ghp_` / `gho_` / `github_pat_` en diffs
 - [ ] `gh auth status` OK si vas a `gh repo create` / `gh release`
-- [ ] Repo **private** salvo que decidas lo contrario
+- [ ] Repo **público** (auditorías 2026-08-03); no subir `.env` / `.secrets/`
 
 ---
 
