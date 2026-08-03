@@ -32,6 +32,12 @@
 
 AUTO execute · cola BD · country hard veto · auto WeightRules · dual UI completa H/M slots · cron
 
+## Slice 1.1 (geo)
+
+- [x] `demo-book-geo-rank` + tests  
+- [x] Orden cola F3: óptimo → geo  
+- [x] Control preferencia en Libro DEMO  
+
 ## Checklist prueba DEMO
 
 - [ ] Cuenta DEMO activa con cash ≥ 2k  

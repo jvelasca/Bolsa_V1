@@ -12,6 +12,7 @@ import {
   DEMO_BOOK_SIZE_PCT_MIN,
   loadDemoBookPrefs,
   patchDemoBookPrefs,
+  type DemoBookCountryPrefer,
   type DemoBookMode,
   type DemoBookPrefs,
 } from '@/features/trading/demo-book-prefs';
@@ -20,6 +21,12 @@ const MODE_LABEL: Record<DemoBookMode, string> = {
   manual: 'Manual',
   semi: 'Semi',
   auto: 'Auto',
+};
+
+const GEO_LABEL: Record<DemoBookCountryPrefer, string> = {
+  home_first: 'País primero',
+  europe_first: 'Europa primero',
+  global_ok: 'Sin preferencia',
 };
 
 type Props = {
@@ -117,9 +124,26 @@ export function DemoBookModePanel({ className, compact }: Props) {
             title="Por defecto ~10% del efectivo disponible"
           />
         </label>
+        <label className={cn('flex flex-col gap-0.5', compact ? '' : 'col-span-2')}>
+          <span className="text-muted-foreground">Preferencia geo</span>
+          <select
+            value={prefs.countryPrefer}
+            onChange={(e) =>
+              update({ countryPrefer: e.target.value as DemoBookCountryPrefer })
+            }
+            className="rounded border border-border bg-background px-1.5 py-1 text-foreground"
+            title="Suave: no bloquea óptimos de otras zonas"
+          >
+            {(Object.keys(GEO_LABEL) as DemoBookCountryPrefer[]).map((k) => (
+              <option key={k} value={k}>
+                {GEO_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <p className="text-[10px] leading-snug text-muted-foreground">
-        SEMI = Confirm humano (F3). Preferencia país→EU→mundo en ranker (suave).
+        SEMI = Confirm humano (F3). Geo ordena la cola (óptimo → preferencia); no veta.
       </p>
     </div>
   );

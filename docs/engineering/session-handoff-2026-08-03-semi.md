@@ -1,23 +1,24 @@
-# Handoff — SEMI libro DEMO slice 1 (2026-08-03)
+# Handoff — SEMI libro DEMO (2026-08-03)
 
-> **Retomar aquí.** Padre: [demo-operating-modes-brief-2026-08-03.md](./demo-operating-modes-brief-2026-08-03.md) · [semi-demo-book-impl-slice1-2026-08-03.md](./semi-demo-book-impl-slice1-2026-08-03.md).
+> **Retomar aquí.** Padres: [demo-operating-modes-brief](./demo-operating-modes-brief-2026-08-03.md) · [semi-demo-book-impl-slice1](./semi-demo-book-impl-slice1-2026-08-03.md).
 
-## Hecho (GO)
+## Hecho
 
-- Decisiones producto cerradas (modo, N, 10 % cash, H≠M en Confirm, diversif. suave, aprender por fases).
-- Prefs `demo-book-prefs` + panel **Libro DEMO** en rail Coach.
-- Alarmas Radar respetan MANUAL vs SEMI + sizing/tope posiciones.
-- F3: cola con checks · lote Confirm+ejecutar · qty≈% cash · execute solo SEMI.
-- Copy Camino C = «SEMI · Confirm DEMO».
-- Docs indexados (README · HELP · Engineering Index).
+### Slice 1 (PR #23 · main)
+- Libro DEMO MANUAL/SEMI · sizing · F3 lote · Radar/Finalistas gates.
 
-## Pendiente inmediato
+### Slice 1.1 — geo ranker (esta rama)
+- `demo-book-geo-rank`: óptimo primero, luego país→EU→mundo (suave).
+- F3 cola ordenada + badge país; Libro DEMO selector preferencia geo.
+- Home inferido de `account.currency` (EUR→ES).
 
-1. Smoke UI checklist en impl brief.  
-2. Ranker país→EU→mundo (preferencia; no bloquea).  
-3. Cola F3 → BD si sessionStorage duele.  
-4. AUTO / Belief pesos — **no** hasta descongelar.
+## Pendiente
+
+1. Smoke UI checklist slice 1 (+ comprobar orden geo en F3).  
+2. Cola F3 → BD si sessionStorage duele.  
+3. AUTO / Belief pesos — **no** hasta descongelar.  
+4. Opcional: enriquecer payload propose con `country` (evitar mapa instrumentos).
 
 ## Rama
 
-`stage/semi-demo-book-slice1-2026-08-03` (abrir PR al estabilizar smoke).
+`stage/semi-demo-geo-rank-2026-08-03`

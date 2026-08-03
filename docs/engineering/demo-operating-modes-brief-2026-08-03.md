@@ -1,6 +1,6 @@
 # Brief — Modos operativos DEMO (MANUAL / SEMI / AUTO)
 
-> **AsOf:** 2026-08-03 · **Estado:** decisiones de producto **cerradas** (§ Decisiones) · implementación SEMI slice 1 **pendiente de go**.  
+> **AsOf:** 2026-08-03 · **Estado:** decisiones de producto **cerradas** (§ Decisiones) · SEMI slice 1 en **main** (PR #23) · slice 1.1 geo ranker en curso.  
 > **Padre:** [research-lifecycle.md](./research-lifecycle.md) § caminos A–E · [account-premises-demo-vs-paper-2026-07-31.md](./account-premises-demo-vs-paper-2026-07-31.md) · ADR-019/020/010.  
 > **Freeze:** Belief→Coach · `CORE_R_CRON` off · Camino D / `PAPER_D_EXECUTE` · Strategy Studio / F5 · SCI─X─►TRD.
 
