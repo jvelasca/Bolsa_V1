@@ -21,6 +21,7 @@ import {
   type StrategyAdoptionState,
 } from '@/features/platform/strategy-adoption';
 import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel';
+import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
 import { getDiaDExperimentTop1 } from '@/features/backtests/dia-d-experiment-top';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { effectiveDiaD, isDiaDInPast, todayIsoDate } from '@/features/backtests/backtest-period';
@@ -152,6 +153,8 @@ export function TradingCoachRail({ className }: { className?: string }) {
         Adopción:{' '}
         <span className="font-medium text-foreground">{formatAdoption(adoption)}</span>
       </p>
+
+      <DemoBookModePanel compact className="mt-1" />
 
       <MandateTimelinePanel
         instrumentId={instrumentId}

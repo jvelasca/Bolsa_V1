@@ -28,6 +28,11 @@ import {
 } from '@/stores/tracker-alarm-inbox-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
+import {
+  demoBookAllowsEnqueueConfirm,
+  loadDemoBookPrefs,
+  suggestQuantityFromCash,
+} from '@/features/trading/demo-book-prefs';
 
 function kindLabel(kind: string): string {
   return (SIGNAL_KIND_LABELS as Record<string, string>)[kind] ?? kind;
@@ -89,7 +94,7 @@ function AlarmRow({
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="outline"
             className="h-6 gap-0.5 px-1.5 text-[10px]"
             disabled={proposePending}
             title={PAPER_PATH_SUPERVISED.blurb}
@@ -146,11 +151,33 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
   const proposeMutation = useMutation({
     mutationFn: async (item: TrackerAlarmInboxItem) => {
       if (!effectiveAccountId) throw new Error('Sin cuenta DEMO activa');
+      const book = loadDemoBookPrefs();
+      if (!demoBookAllowsEnqueueConfirm(book.mode)) {
+        throw new Error(
+          'Libro en MANUAL: solo aviso. Cambia a SEMI en el rail Coach para Proponer F3.',
+        );
+      }
+      const summary = (await api.getAccountSummary(effectiveAccountId)).data;
+      const priceHint = item.price != null && item.price > 0 ? item.price : null;
+      let suggestedQuantity = 1;
+      if (priceHint != null && summary.cash > 0) {
+        const q = suggestQuantityFromCash({
+          cash: summary.cash,
+          price: priceHint,
+          sizePctOfCash: book.defaultSizePctOfCash,
+        });
+        if (q > 0) suggestedQuantity = q;
+      }
+      if (summary.positionsCount >= book.maxOpenPositions) {
+        throw new Error(
+          `Tope de posiciones (${book.maxOpenPositions}). Cierra alguna o sube el máximo en Libro DEMO.`,
+        );
+      }
       const res = await api.proposeRecommendation({
         instrumentId: item.instrumentId,
         symbol: item.symbol,
         accountId: effectiveAccountId,
-        suggestedQuantity: 1,
+        suggestedQuantity,
         includeFundamentals: true,
         includeMacro: true,
         includeEvidence: true,

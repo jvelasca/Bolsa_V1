@@ -6,7 +6,7 @@ describe('finalist supervised path', () => {
   it('labels Camino C distinct from paper A and auto D', () => {
     expect(FINALIST_SUPERVISED_SOURCE).toBe('finalists');
     expect(PAPER_PATH_SUPERVISED.cta).toMatch(/Proponer/i);
-    expect(PAPER_PATH_SUPERVISED.finalistsHint).toMatch(/Camino C|Supervisado|F3/i);
+    expect(PAPER_PATH_SUPERVISED.finalistsHint).toMatch(/Camino C|Supervisado|F3|SEMI/i);
     expect(PAPER_PATH_SUPERVISED.finalistsHint.toLowerCase()).not.toContain('desplegar en paper');
     expect(PAPER_PATH_SUPERVISED.blurb.toLowerCase()).toMatch(/no es auto/);
   });
