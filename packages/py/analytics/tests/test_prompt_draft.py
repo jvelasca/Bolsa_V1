@@ -114,3 +114,21 @@ def test_draft_includes_feedback() -> None:
     assert len(result.feedback.get("scanSteps") or []) >= 2
     assert result.feedback.get("engineLabel")
 
+
+def test_draft_daily_intent_beats_parenthetical_weekly() -> None:
+    """«periodo DIARIO» + «pivote (Semanal)» no debe forzar 1wk."""
+    result = draft_strategy_from_prompt(
+        "Operativa diaria periodo DIARIO con Ichimoku y Punto pivote (Semanal) "
+        "y Curso > Punto pivote (Mensual) y RSI"
+    )
+    assert result.timeframe == "1d"
+    assert result.definition["timeframe"] == "1d"
+
+
+def test_draft_parenthetical_weekly_alone_defaults_daily() -> None:
+    """Solo etiquetas entre paréntesis no cambian el TF por defecto."""
+    result = draft_strategy_from_prompt(
+        "Cruce SMA con pivote (Semanal) y pivote (Mensual)"
+    )
+    assert result.timeframe == "1d"
+

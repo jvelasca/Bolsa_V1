@@ -151,7 +151,11 @@ class RunAndSaveBacktest:
             date_to=date_to,
         )
         if len(bars) < 50:
-            raise ValueError("Se necesitan al menos 50 barras. Sincroniza el instrumento primero.")
+            raise ValueError(
+                f"Se necesitan al menos 50 barras en {tf.value} "
+                f"(hay {len(bars)}). Sincroniza el instrumento en ese timeframe "
+                f"o cambia el TF de la estrategia (p. ej. a 1d)."
+            )
 
         fingerprints = [
             BarFingerprint(timestamp=bar.timestamp, close=bar.close) for bar in bars

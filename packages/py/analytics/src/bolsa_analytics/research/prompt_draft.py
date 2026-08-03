@@ -65,6 +65,30 @@ _TIMEFRAME_MAP: list[tuple[str, str]] = [
     (r"\b(1\s*d|1d|diari[oa]|daily|d[ií]a)\b", "1d"),
 ]
 
+# Intención operativa explícita (gana sobre menciones incidentales tipo «pivote (Semanal)»).
+_STRONG_DAILY_TF: tuple[str, ...] = (
+    r"periodo\s+diari",
+    r"operativ\w*\s+diari",
+    r"\ben\s+diario\b",
+    r"timeframe\s*[:=]?\s*(?:1d|diari)",
+    r"barras?\s+diari",
+    r"velas?\s+diari",
+)
+_STRONG_WEEKLY_TF: tuple[str, ...] = (
+    r"periodo\s+semanal",
+    r"operativ\w*\s+semanal",
+    r"\ben\s+semanal\b",
+    r"timeframe\s*[:=]?\s*(?:1wk|semanal|weekly)",
+    r"barras?\s+semanal",
+    r"velas?\s+semanal",
+)
+
+# Condiciones multi-TF entre paréntesis no definen el TF de la estrategia.
+_PAREN_TF_LABEL = re.compile(
+    r"\(\s*(?:diario|semanal|mensual|weekly|daily|monthly|1d|1wk)\s*\)",
+    flags=re.IGNORECASE,
+)
+
 _MIN_SCORE_PATTERN = re.compile(
     r"(?:rating|score|puntuaci[oó]n)\s*(?:>=|≥|m[ií]n(?:imo)?|m[aá]ximo)?\s*(\d{2})",
     flags=re.IGNORECASE,
@@ -104,13 +128,46 @@ def _score_patterns(text: str, patterns: tuple[str, ...]) -> int:
     return score
 
 
+def _intraday_note(text: str) -> str | None:
+    if re.search(r"\b(1\s*h|1h|4\s*h|4h|horari[oa]|hourly)\b", text, flags=re.IGNORECASE):
+        return "intraday detectado; kernel usa timeframe diario (1d)"
+    return None
+
+
 def _detect_timeframe(text: str) -> tuple[str, str | None]:
+    """Detecta TF operativo 1d/1wk.
+
+    Prioridad:
+    1. Frases fuertes («periodo diario», «operativa semanal»…).
+    2. Menciones sueltas, ignorando etiquetas entre paréntesis («pivote (Semanal)»).
+    3. Default 1d.
+    """
+    stripped = _PAREN_TF_LABEL.sub(" ", text)
+    daily_strong = _score_patterns(stripped, _STRONG_DAILY_TF) > 0
+    weekly_strong = _score_patterns(stripped, _STRONG_WEEKLY_TF) > 0
+    if daily_strong and not weekly_strong:
+        return "1d", _intraday_note(text)
+    if weekly_strong and not daily_strong:
+        return "1wk", None
+    if daily_strong and weekly_strong:
+        # Conflicto de intención operativa → diario (más común en Probar).
+        return "1d", _intraday_note(text)
+
+    has_weekly = bool(
+        re.search(r"\b(1\s*wk|semanal|weekly|1\s*semana)\b", stripped, flags=re.IGNORECASE)
+    )
+    has_daily = bool(
+        re.search(r"\b(1\s*d|1d|diari[oa]|daily|d[ií]a)\b", stripped, flags=re.IGNORECASE)
+    )
+    if has_weekly and not has_daily:
+        return "1wk", None
+    if has_daily:
+        return "1d", _intraday_note(text)
+
+    # Fallback: primer match débil en texto sin paréntesis TF.
     for pattern, timeframe in _TIMEFRAME_MAP:
-        if re.search(pattern, text, flags=re.IGNORECASE):
-            intraday_note = None
-            if re.search(r"\b(1\s*h|1h|4\s*h|4h|horari[oa]|hourly)\b", text, flags=re.IGNORECASE):
-                intraday_note = "intraday detectado; kernel usa timeframe diario (1d)"
-            return timeframe, intraday_note
+        if re.search(pattern, stripped, flags=re.IGNORECASE):
+            return timeframe, _intraday_note(text) if timeframe == "1d" else None
     return "1d", None
 
 
