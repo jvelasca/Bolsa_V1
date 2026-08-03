@@ -3,7 +3,7 @@
  *
  * Operativa:
  * 1. Esperar a que termine «Probar + coach» (TOP ★ no se muestra a mitad).
- * 2. **Abrir Lab · #1** = prefill Lab; **Pasar las N al Lab** = tablero 3 zonas + jobs.
+ * 2. **Pasar las N al Lab** (CTA principal) = tablero 3 zonas + jobs; **Abrir Lab · #1** = prefill Lab.
  * 3. **Guardar TOP-3** = semifinal (sin Lab). Tras Lab: **Guardar Finalistas** (lab_validated).
  * 4. Batería / vs B&H = evidencia secundaria (colapsable).
  *
@@ -1133,23 +1133,10 @@ export function BacktestExploreRanking({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                {onOptimizeCandidate && firstLabRec && !postLab && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="h-7 text-[11px]"
-                    disabled={running}
-                    onClick={() => onOptimizeCandidate(firstLabRec.row)}
-                    title="Abre Lab con la #1 ★ precargada. Tú lanzas la búsqueda allí."
-                  >
-                    Abrir Lab · #1
-                  </Button>
-                )}
                 {onOptimizeSemifinal && labRecCount > 0 && !postLab && (
                   <Button
                     type="button"
                     size="sm"
-                    variant="outline"
                     className="h-7 text-[11px]"
                     disabled={running}
                     onClick={() =>
@@ -1165,6 +1152,19 @@ export function BacktestExploreRanking({
                     title={`Pasa hasta ${labRecCount} candidatas al Lab (3 columnas). Encola jobs hold-out/WF y deja config editable por zona.`}
                   >
                     {labRecCount === 1 ? 'Pasar al Lab' : `Pasar las ${labRecCount} al Lab`}
+                  </Button>
+                )}
+                {onOptimizeCandidate && firstLabRec && !postLab && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    disabled={running}
+                    onClick={() => onOptimizeCandidate(firstLabRec.row)}
+                    title="Abre Lab con la #1 ★ precargada. Tú lanzas la búsqueda allí."
+                  >
+                    Abrir Lab · #1
                   </Button>
                 )}
               </div>

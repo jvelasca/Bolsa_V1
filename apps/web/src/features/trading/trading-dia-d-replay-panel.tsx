@@ -1,7 +1,7 @@
 /**
  * Panel Trading MODO DÍA D — Auto D→hoy + película + Semi/Manual gate + informe.
  *
- * - Película: embebida (máx. ~48vh) o **pantalla completa** (`session.fullBleedMovie`).
+ * - Película + informe lateral colapsable/redimensionable; abajo equity + operaciones.
  * - Evidence: band heurística + Narrar IA + **Guardar** (archivo local ± Fase 2).
  * - Archivo v0.10: lista / preview / export·import JSON / quitar (mismo símbolo).
  * - Gate Semi/Manual: accept-only rewrite (`dia-d-gate-equity.ts`).
@@ -23,11 +23,13 @@ import type {
 import { api, ApiError } from '@/lib/api';
 import { BacktestMovieHud } from '@/features/backtests/backtest-movie-hud';
 import { BacktestReplayChart } from '@/features/backtests/backtest-replay-chart';
+import { BacktestEquityChart } from '@/features/backtests/backtest-equity-chart';
 import { equityCurveFromDetail } from '@/features/backtests/backtest-export';
 import { computeMovieTradeStats } from '@/features/backtests/backtest-movie-stats';
 import { useBacktestHudPrefs } from '@/features/backtests/use-backtest-hud-prefs';
 import { loadBacktestRunContext } from '@/features/backtests/backtest-run-context';
 import { formatDateDdMmYyyy } from '@/features/backtests/backtest-date-format';
+import { pxToPct } from '@/features/backtests/backtest-split-layout';
 import {
   computeGatedSessionMetrics,
   detailWithGatedFills,
@@ -57,12 +59,23 @@ import {
   parseDiaDEvidenceImportText,
 } from '@/features/trading/dia-d-evidence-archive-io';
 import {
+  clampEquityWidthPct,
+  clampMovieHeightPct,
+  clampReportWidthPct,
+  loadDiaDVerifyLayout,
+  saveDiaDVerifyLayout,
+  type DiaDVerifyLayoutPrefs,
+} from '@/features/trading/dia-d-verify-layout';
+import {
   DIA_D_MODE_LABELS,
   useDiaDTradingSessionStore,
 } from '@/stores/dia-d-trading-session-store';
 import { useDiaDEvidenceArchiveStore } from '@/stores/dia-d-evidence-archive-store';
+import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
 import { formatPct, formatPrice } from '@/features/charts/chart-utils';
+import { useMediaQuery } from '@/lib/use-media-query';
 import { cn } from '@/lib/utils';
 
 function equityAtOrBefore(
@@ -111,7 +124,8 @@ export function TradingDiaDReplayPanel() {
   const [replayAtEnd, setReplayAtEnd] = useState(false);
   const [pendingTrade, setPendingTrade] = useState<BacktestTradeDto | null>(null);
   const [resumeNonce, setResumeNonce] = useState(0);
-  const [reportOpen, setReportOpen] = useState(true);
+  const [layout, setLayout] = useState<DiaDVerifyLayoutPrefs>(() => loadDiaDVerifyLayout());
+  const [focusTimestamp, setFocusTimestamp] = useState<string | null>(null);
   const [iaNarrative, setIaNarrative] = useState<DiaDSessionEvidenceV1['paragraphs'] | null>(
     null,
   );
@@ -119,6 +133,34 @@ export function TradingDiaDReplayPanel() {
   const [previewArchiveId, setPreviewArchiveId] = useState<string | null>(null);
   const [archiveImportMsg, setArchiveImportMsg] = useState<string | null>(null);
   const archiveFileRef = useRef<HTMLInputElement>(null);
+  const movieRowRef = useRef<HTMLDivElement>(null);
+  const bottomRowRef = useRef<HTMLDivElement>(null);
+  const pendingReportW = useRef(layout.reportWidthPct);
+  const pendingMovieH = useRef(layout.movieHeightPct);
+  const pendingEquityW = useRef(layout.equityWidthPct);
+  const isWide = useMediaQuery('(min-width: 900px)');
+  const isWideBottom = useMediaQuery('(min-width: 720px)');
+
+  const persistLayout = useCallback((patch: Partial<DiaDVerifyLayoutPrefs>) => {
+    setLayout((prev) => {
+      const next = { ...prev, ...patch };
+      saveDiaDVerifyLayout(next);
+      return next;
+    });
+  }, []);
+
+  const reportOpen = layout.reportOpen;
+  const setReportOpen = useCallback(
+    (updater: boolean | ((v: boolean) => boolean)) => {
+      setLayout((prev) => {
+        const nextOpen = typeof updater === 'function' ? updater(prev.reportOpen) : updater;
+        const next = { ...prev, reportOpen: nextOpen };
+        saveDiaDVerifyLayout(next);
+        return next;
+      });
+    },
+    [],
+  );
 
   const runCtx = loadBacktestRunContext();
 
@@ -676,171 +718,8 @@ export function TradingDiaDReplayPanel() {
   const report = detail ?? autoDetail;
   const fullBleed = Boolean(session.fullBleedMovie);
 
-  return (
-    <div
-      className={cn(
-        'flex flex-col border-b border-border/70 bg-card',
-        fullBleed
-          ? 'min-h-0 flex-1'
-          : 'max-h-[min(48vh,520px)] min-h-[240px] shrink-0',
-      )}
-      data-testid={fullBleed ? 'dia-d-replay-full-bleed' : 'dia-d-replay-embedded'}
-    >
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/50 px-3 py-1.5 text-[11px]">
-        <span className="font-semibold text-foreground">Película D→hoy</span>
-        <span className="text-muted-foreground">
-          {session.symbol} · #{session.rank} {session.strategyLabel} · {session.diaD} →{' '}
-          {session.endDate} · {DIA_D_MODE_LABELS[session.mode]}
-        </span>
-        {report ? (
-          <span className="tabular-nums text-muted-foreground">
-            Ret. {formatPct(report.totalReturnPct)} · DD {formatPct(report.maxDrawdownPct)} ·{' '}
-            {report.tradeCount} ops · fin {formatPrice(report.finalEquity)}
-            {session.mode !== 'auto' && autoDetail ? (
-              <span className="text-muted-foreground/80">
-                {' '}
-                (Auto {formatPct(autoDetail.totalReturnPct)})
-              </span>
-            ) : null}
-          </span>
-        ) : null}
-        {session.mode === 'manual' ? (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            Manual: ▶ / pasos · pausa en señales → Aceptar/Rechazar (reescribe equity)
-          </span>
-        ) : null}
-        {session.mode === 'semi' ? (
-          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-900 dark:text-amber-100">
-            Semi: pausa en señales · Aceptar/Rechazar reescribe fills y equity
-          </span>
-        ) : null}
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px]"
-          onClick={() => setReportOpen((v) => !v)}
-        >
-          {reportOpen ? 'Ocultar informe' : 'Informe'}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px]"
-          onClick={() => setFullBleedMovie(!fullBleed)}
-          title={fullBleed ? 'Salir pantalla completa' : 'Pantalla completa'}
-        >
-          {fullBleed ? '⛶ Salir' : '⛶ Completa'}
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="ml-auto h-6 px-2 text-[10px]"
-          disabled={busy}
-          onClick={() => {
-            setAutoRunId(null);
-            runMutation.reset();
-          }}
-        >
-          Re-ejecutar
-        </Button>
-      </div>
-
-      {pendingTrade ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px]">
-          <span className="font-semibold text-amber-950 dark:text-amber-50">
-            Propuesta {session.mode === 'manual' ? 'Manual' : 'Semi'}
-          </span>
-          <span className="tabular-nums">
-            {pendingTrade.type.toUpperCase()} · {formatDateDdMmYyyy(pendingTrade.timestamp)} ·{' '}
-            {formatPrice(pendingTrade.price)}
-            {pendingTrade.reason ? ` · ${pendingTrade.reason}` : ''}
-          </span>
-          <Button
-            type="button"
-            size="sm"
-            className="h-6 px-2 text-[10px]"
-            onClick={() => decideGate('accept')}
-          >
-            Aceptar
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-[10px]"
-            onClick={() => decideGate('reject')}
-          >
-            Rechazar
-          </Button>
-        </div>
-      ) : null}
-
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2">
-          {busy ? (
-            <p className="text-[11px] text-muted-foreground">Simulando Auto D→hoy…</p>
-          ) : null}
-          {err ? (
-            <p className="text-[11px] text-destructive" role="alert">
-              {err}
-            </p>
-          ) : null}
-          {!busy && !err && detail && bars.length > 0 ? (
-            <BacktestReplayChart
-              key={detail.id}
-              detail={detail}
-              bars={bars}
-              initialShowAll={false}
-              height="fill"
-              pauseOnTrade={pauseOnTrade}
-              pauseTrades={pauseTrades}
-              resumeNonce={resumeNonce}
-              onPausedAtTrade={(trade) => setPendingTrade(trade)}
-              onReplayCursorChange={handleReplayCursorChange}
-              cursorFavorites={hudPrefs.prefs.cursorFavorites}
-              onToggleCursorFavorite={hudPrefs.toggleCursorFavorite}
-              cursorPanelPos={hudPrefs.prefs.cursorPanelPos}
-              onCursorPanelPosChange={hudPrefs.setCursorPanelPos}
-              movieHud={
-                movieStats ? (
-                  <BacktestMovieHud
-                    inline
-                    cursorTimestamp={replayCursor}
-                    barIndex={replayBarIndex}
-                    barTotal={replayBarTotal || detail.barCount}
-                    playing={replayPlaying}
-                    atEnd={replayAtEnd}
-                    balance={
-                      liveEquity ??
-                      (replayAtEnd || replayCursor == null
-                        ? detail.finalEquity
-                        : detail.initialCash)
-                    }
-                    returnPct={
-                      liveReturnPct ??
-                      (replayAtEnd || replayCursor == null ? detail.totalReturnPct : 0)
-                    }
-                    stats={movieStats}
-                    totalOps={detail.tradeCount}
-                    markPrice={markPrice}
-                    favorites={hudPrefs.prefs.temporalFavorites}
-                    onToggleFavorite={hudPrefs.toggleTemporalFavorite}
-                  />
-                ) : null
-              }
-            />
-          ) : null}
-          {!busy && !err && detail && bars.length === 0 && !ohlcvQuery.isLoading ? (
-            <p className="text-[11px] text-muted-foreground">Sin barras OHLCV para la película.</p>
-          ) : null}
-        </div>
-
-        {reportOpen && report ? (
-          <aside className="scroll-area flex w-[min(100%,220px)] shrink-0 flex-col gap-2 overflow-y-auto border-l border-border/60 p-2 text-[10px]">
-            <p className="text-[11px] font-semibold text-foreground">Informe sesión</p>
+  const sessionReportBody = report ? (
+    <>
             <dl className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 tabular-nums">
               <dt className="text-muted-foreground">Modo</dt>
               <dd>{DIA_D_MODE_LABELS[session.mode]}</dd>
@@ -924,7 +803,7 @@ export function TradingDiaDReplayPanel() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="secondary"
+                  variant="outline"
                   className="h-6 w-full px-2 text-[10px]"
                   disabled={saveEvidenceMutation.isPending}
                   onClick={() => saveEvidenceMutation.mutate()}
@@ -1080,18 +959,382 @@ export function TradingDiaDReplayPanel() {
                 {session.mode === 'auto' ? 'Modo Auto: sin gate.' : 'Sin decisiones aún.'}
               </p>
             )}
-            <ul className="max-h-28 space-y-0.5 overflow-auto border-t border-border/50 pt-1.5 text-muted-foreground">
-              {report.trades.slice(0, 12).map((t) => (
-                <li key={t.id} className="tabular-nums">
-                  {t.type} · {formatDateDdMmYyyy(t.timestamp)} · {formatPrice(t.price)}
-                </li>
-              ))}
-              {report.trades.length > 12 ? (
-                <li>… +{report.trades.length - 12} ops</li>
-              ) : null}
-            </ul>
-          </aside>
+    </>
+  ) : null;
+
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col border-b border-border/70 bg-card"
+      data-testid={fullBleed ? 'dia-d-replay-full-bleed' : 'dia-d-replay-embedded'}
+    >
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border/50 px-3 py-1.5 text-[11px]">
+        <span className="font-semibold text-foreground">Película D→hoy</span>
+        <span className="text-muted-foreground">
+          {session.symbol} · #{session.rank} {session.strategyLabel} · {session.diaD} →{' '}
+          {session.endDate} · {DIA_D_MODE_LABELS[session.mode]}
+        </span>
+        {report ? (
+          <span className="tabular-nums text-muted-foreground">
+            Ret. {formatPct(report.totalReturnPct)} · DD {formatPct(report.maxDrawdownPct)} ·{' '}
+            {report.tradeCount} ops · fin {formatPrice(report.finalEquity)}
+            {session.mode !== 'auto' && autoDetail ? (
+              <span className="text-muted-foreground/80">
+                {' '}
+                (Auto {formatPct(autoDetail.totalReturnPct)})
+              </span>
+            ) : null}
+          </span>
         ) : null}
+        {session.mode === 'manual' ? (
+          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            Manual: ▶ / pasos · pausa en señales → Aceptar/Rechazar (reescribe equity)
+          </span>
+        ) : null}
+        {session.mode === 'semi' ? (
+          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-900 dark:text-amber-100">
+            Semi: pausa en señales · Aceptar/Rechazar reescribe fills y equity
+          </span>
+        ) : null}
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-6 gap-1 px-2 text-[10px]"
+          onClick={() => setReportOpen((v) => !v)}
+          title={reportOpen ? 'Colapsar informe' : 'Mostrar informe'}
+          aria-expanded={reportOpen}
+          aria-controls="dia-d-session-report-panel"
+        >
+          {reportOpen ? (
+            <PanelRightClose className="size-3.5" aria-hidden />
+          ) : (
+            <PanelRightOpen className="size-3.5" aria-hidden />
+          )}
+          {reportOpen ? 'Colapsar informe' : 'Informe'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2 text-[10px]"
+          onClick={() => setFullBleedMovie(!fullBleed)}
+          title={fullBleed ? 'Salir pantalla completa' : 'Pantalla completa'}
+        >
+          {fullBleed ? '⛶ Salir' : '⛶ Completa'}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="ml-auto h-6 px-2 text-[10px]"
+          disabled={busy}
+          onClick={() => {
+            setAutoRunId(null);
+            runMutation.reset();
+          }}
+        >
+          Re-ejecutar
+        </Button>
+      </div>
+
+      {pendingTrade ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px]">
+          <span className="font-semibold text-amber-950 dark:text-amber-50">
+            Propuesta {session.mode === 'manual' ? 'Manual' : 'Semi'}
+          </span>
+          <span className="tabular-nums">
+            {pendingTrade.type.toUpperCase()} · {formatDateDdMmYyyy(pendingTrade.timestamp)} ·{' '}
+            {formatPrice(pendingTrade.price)}
+            {pendingTrade.reason ? ` · ${pendingTrade.reason}` : ''}
+          </span>
+          <Button type="button" size="sm" className="h-6 px-2 text-[10px]" onClick={() => decideGate('accept')}>
+            Aceptar
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => decideGate('reject')}>
+            Rechazar
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          ref={movieRowRef}
+          className={cn('flex min-h-[180px] overflow-hidden', isWide ? 'flex-row' : 'flex-col')}
+          style={{ flex: `0 0 ${layout.movieHeightPct}%` }}
+        >
+          <div className="min-h-0 min-w-0 flex-1 overflow-hidden p-2">
+            {busy ? <p className="text-[11px] text-muted-foreground">Simulando Auto D→hoy…</p> : null}
+            {err ? (
+              <p className="text-[11px] text-destructive" role="alert">
+                {err}
+              </p>
+            ) : null}
+            {!busy && !err && detail && bars.length > 0 ? (
+              <BacktestReplayChart
+                key={detail.id}
+                detail={detail}
+                bars={bars}
+                initialShowAll={false}
+                height="fill"
+                pauseOnTrade={pauseOnTrade}
+                pauseTrades={pauseTrades}
+                resumeNonce={resumeNonce}
+                onPausedAtTrade={(trade) => setPendingTrade(trade)}
+                onReplayCursorChange={handleReplayCursorChange}
+                cursorFavorites={hudPrefs.prefs.cursorFavorites}
+                onToggleCursorFavorite={hudPrefs.toggleCursorFavorite}
+                cursorPanelPos={hudPrefs.prefs.cursorPanelPos}
+                onCursorPanelPosChange={hudPrefs.setCursorPanelPos}
+                movieHud={
+                  movieStats ? (
+                    <BacktestMovieHud
+                      inline
+                      cursorTimestamp={replayCursor}
+                      barIndex={replayBarIndex}
+                      barTotal={replayBarTotal || detail.barCount}
+                      playing={replayPlaying}
+                      atEnd={replayAtEnd}
+                      balance={
+                        liveEquity ??
+                        (replayAtEnd || replayCursor == null ? detail.finalEquity : detail.initialCash)
+                      }
+                      returnPct={
+                        liveReturnPct ??
+                        (replayAtEnd || replayCursor == null ? detail.totalReturnPct : 0)
+                      }
+                      stats={movieStats}
+                      totalOps={detail.tradeCount}
+                      markPrice={markPrice}
+                      favorites={hudPrefs.prefs.temporalFavorites}
+                      onToggleFavorite={hudPrefs.toggleTemporalFavorite}
+                    />
+                  ) : null
+                }
+              />
+            ) : null}
+            {!busy && !err && detail && bars.length === 0 && !ohlcvQuery.isLoading ? (
+              <p className="text-[11px] text-muted-foreground">Sin barras OHLCV para la película.</p>
+            ) : null}
+          </div>
+
+          {isWide && report ? (
+            reportOpen ? (
+              <>
+                <PanelResizeHandle
+                  label="Redimensionar informe de sesión"
+                  orientation="vertical"
+                  onDrag={(dx) => {
+                    const row = movieRowRef.current;
+                    if (!row) return;
+                    const next = clampReportWidthPct(
+                      pendingReportW.current - pxToPct(dx, row.clientWidth),
+                    );
+                    pendingReportW.current = next;
+                    setLayout((prev) => ({ ...prev, reportWidthPct: next }));
+                  }}
+                  onDragEnd={() => persistLayout({ reportWidthPct: pendingReportW.current })}
+                  className="mx-0.5"
+                />
+                <aside
+                  id="dia-d-session-report-panel"
+                  className="scroll-area flex shrink-0 flex-col overflow-hidden border-l border-border/60 text-[10px]"
+                  style={{ width: `${layout.reportWidthPct}%` }}
+                  data-testid="dia-d-session-report"
+                >
+                  <div className="flex shrink-0 items-center gap-1 border-b border-border/50 bg-muted/25 px-2 py-1">
+                    <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-foreground">
+                      Informe sesión
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 shrink-0 gap-1 px-1.5 text-[10px]"
+                      title="Colapsar informe"
+                      aria-label="Colapsar informe"
+                      onClick={() => setReportOpen(false)}
+                    >
+                      <PanelRightClose className="size-3.5" aria-hidden />
+                      <span className="hidden sm:inline">Colapsar</span>
+                    </Button>
+                  </div>
+                  <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+                    {sessionReportBody}
+                  </div>
+                </aside>
+              </>
+            ) : (
+              <div className="flex w-9 shrink-0 flex-col items-center border-l border-border/60 bg-muted/20 py-1">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="h-auto w-8 flex-col gap-1 px-1 py-2 text-[9px] leading-tight"
+                  title="Mostrar informe"
+                  aria-label="Mostrar informe"
+                  aria-expanded={false}
+                  aria-controls="dia-d-session-report-panel"
+                  onClick={() => setReportOpen(true)}
+                >
+                  <PanelRightOpen className="size-3.5" aria-hidden />
+                  <span
+                    className="max-h-24 overflow-hidden text-center"
+                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+                  >
+                    Informe
+                  </span>
+                </Button>
+              </div>
+            )
+          ) : null}
+        </div>
+
+        {!isWide && report ? (
+          <details
+            className="shrink-0 border-t border-border/60"
+            open={reportOpen}
+            onToggle={(e) => setReportOpen(e.currentTarget.open)}
+          >
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-muted/30 px-3 py-1.5 text-[11px] font-semibold marker:content-none [&::-webkit-details-marker]:hidden">
+              <span>Informe sesión</span>
+              <span className="text-[10px] font-normal text-muted-foreground">
+                {reportOpen ? 'Colapsar' : 'Expandir'}
+              </span>
+            </summary>
+            <div
+              id="dia-d-session-report-panel"
+              className="max-h-[36vh] overflow-y-auto p-2 text-[10px]"
+              data-testid="dia-d-session-report"
+            >
+              {sessionReportBody}
+            </div>
+          </details>
+        ) : null}
+
+        <PanelResizeHandle
+          label="Redimensionar película y evolución del dinero"
+          orientation="horizontal"
+          onDrag={(dy) => {
+            const shell = movieRowRef.current?.parentElement;
+            if (!shell) return;
+            const next = clampMovieHeightPct(pendingMovieH.current + pxToPct(dy, shell.clientHeight));
+            pendingMovieH.current = next;
+            setLayout((prev) => ({ ...prev, movieHeightPct: next }));
+          }}
+          onDragEnd={() => persistLayout({ movieHeightPct: pendingMovieH.current })}
+        />
+
+        <div
+          ref={bottomRowRef}
+          className={cn('flex min-h-[160px] overflow-hidden border-t border-border/50', isWideBottom ? 'flex-row' : 'flex-col')}
+          style={{ flex: '1 1 auto' }}
+        >
+          <section
+            className="flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden p-2"
+            style={
+              isWideBottom
+                ? { width: `${layout.equityWidthPct}%` }
+                : { height: `${Math.max(35, Math.min(65, layout.equityWidthPct))}%` }
+            }
+          >
+            <h3 className="shrink-0 text-[11px] font-medium text-foreground">Evolución del dinero</h3>
+            {equityCurve.length > 0 && detail ? (
+              <div className="min-h-0 flex-1">
+                <BacktestEquityChart
+                  points={equityCurve}
+                  trades={detail.trades}
+                  initialCash={detail.initialCash}
+                  focusTimestamp={focusTimestamp}
+                  untilTimestamp={replayCursor}
+                  height="fill"
+                />
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">Sin curva de patrimonio.</p>
+            )}
+          </section>
+
+          <PanelResizeHandle
+            label="Redimensionar patrimonio y operaciones"
+            orientation={isWideBottom ? 'vertical' : 'horizontal'}
+            onDrag={(delta) => {
+              const row = bottomRowRef.current;
+              if (!row) return;
+              const size = isWideBottom ? row.clientWidth : row.clientHeight;
+              const next = clampEquityWidthPct(pendingEquityW.current + pxToPct(delta, size));
+              pendingEquityW.current = next;
+              setLayout((prev) => ({ ...prev, equityWidthPct: next }));
+            }}
+            onDragEnd={() => persistLayout({ equityWidthPct: pendingEquityW.current })}
+            className={isWideBottom ? 'mx-0.5' : undefined}
+          />
+
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-hidden p-2 text-[11px]">
+            <div className="flex shrink-0 items-center justify-between gap-2">
+              <h3 className="font-medium text-foreground">Operaciones</h3>
+              <span className="tabular-nums text-muted-foreground">
+                {detail?.tradeCount ?? 0}
+                {replayCursor ? ` · hasta ${formatDateDdMmYyyy(replayCursor)}` : ''}
+              </span>
+            </div>
+            <div className="scroll-area min-h-0 flex-1 overflow-auto rounded border border-border/60">
+              <table className="w-full text-left text-[10px]">
+                <thead className="sticky top-0 bg-card text-muted-foreground">
+                  <tr>
+                    <th className="px-1.5 py-1 font-medium">Fecha</th>
+                    <th className="px-1.5 py-1 font-medium">Tipo</th>
+                    <th className="px-1.5 py-1 font-medium">Precio</th>
+                    <th className="px-1.5 py-1 font-medium">Motivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(detail?.trades ?? []).map((t) => {
+                    const revealed = !replayCursor || t.timestamp <= replayCursor;
+                    const focused = focusTimestamp === t.timestamp;
+                    return (
+                      <tr
+                        key={t.id}
+                        className={cn(
+                          'cursor-pointer border-t border-border/40 tabular-nums',
+                          !revealed && 'opacity-40',
+                          focused && 'bg-amber-500/15',
+                        )}
+                        onClick={() => setFocusTimestamp(t.timestamp)}
+                        onDoubleClick={() => setFocusTimestamp(t.timestamp)}
+                      >
+                        <td className="px-1.5 py-0.5">{formatDateDdMmYyyy(t.timestamp)}</td>
+                        <td
+                          className={cn(
+                            'px-1.5 py-0.5 font-medium uppercase',
+                            t.type === 'buy' ? 'text-emerald-600' : 'text-red-600',
+                          )}
+                        >
+                          {t.type}
+                        </td>
+                        <td className="px-1.5 py-0.5">{formatPrice(t.price)}</td>
+                        <td
+                          className="max-w-[10rem] truncate px-1.5 py-0.5 text-muted-foreground"
+                          title={
+                            typeof t.reason === 'string'
+                              ? t.reason
+                              : t.reason?.summary ?? undefined
+                          }
+                        >
+                          {typeof t.reason === 'string'
+                            ? t.reason
+                            : t.reason?.summary ?? '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {!detail?.trades?.length ? (
+                <p className="p-2 text-muted-foreground">Sin operaciones en este tramo.</p>
+              ) : null}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

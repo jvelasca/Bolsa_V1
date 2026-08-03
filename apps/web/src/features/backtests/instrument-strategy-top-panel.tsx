@@ -575,7 +575,7 @@ export function InstrumentStrategyTopPanel({
         </p>
       ) : diaDActive ? (
         <p
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] text-amber-950 dark:text-amber-50"
+          className="rounded-md border-2 border-red-600 bg-red-600 px-2 py-1.5 text-[11px] font-medium text-white shadow-sm"
           role="status"
         >
           DÍA D activo: Play guardará un TOP experimento (F-D) sin pisar Finalistas operativos.
@@ -591,9 +591,13 @@ export function InstrumentStrategyTopPanel({
         </p>
       ) : null}
       {diaDActive ? (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-950 dark:text-amber-50">
+        <p
+          className="rounded-md border-2 border-red-700 bg-red-700 px-2 py-1.5 text-[11px] font-medium leading-snug text-white shadow-sm"
+          role="status"
+          data-testid="dia-d-funnel-banner"
+        >
           Embudo as-of · DÍA D {effectiveDiaD(diaD)}. La #1 puede abrir{' '}
-          <strong>Verificar D→hoy</strong> en LAB (Cartera LAB · Manual / Semi / Auto).
+          <strong className="font-bold">Verificar D→hoy</strong> en LAB (Cartera LAB · Manual / Semi / Auto).
         </p>
       ) : null}
       {onOpenChecklist && top.evidenceLevel === 'lab_validated' ? (
