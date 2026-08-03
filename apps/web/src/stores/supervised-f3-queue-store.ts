@@ -38,6 +38,9 @@ export type SupervisedProposePayload = RecommendationV1 & {
   policyGate?: { status?: string; mode?: string; message?: string } | null;
   lastClose?: number | null;
   source?: string;
+  /** Estrategia / señal de origen (Finalistas / Radar) para tenure Mandato. */
+  strategyOrSignalRef?: string | null;
+  strategyLabel?: string | null;
   decisionSession?: import('@bolsa/shared').DecisionSessionV1;
   weightContext?: import('@bolsa/shared').WeightContextV1;
   combinedScore?: number;

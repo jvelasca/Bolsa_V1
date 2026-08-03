@@ -19,6 +19,10 @@ function strategyRefFromPayload(payload: SupervisedProposePayload): {
   strategyDefinitionId: string | null;
   strategyLabel: string | null;
 } {
+  const direct =
+    typeof payload.strategyOrSignalRef === 'string' && payload.strategyOrSignalRef
+      ? payload.strategyOrSignalRef
+      : null;
   const pkg = payload.decisionPackage as Record<string, unknown> | undefined;
   const fromPkg =
     (typeof pkg?.strategyOrSignalRef === 'string' && pkg.strategyOrSignalRef) ||
@@ -28,8 +32,9 @@ function strategyRefFromPayload(payload: SupervisedProposePayload): {
     typeof payload.edgeReportRef === 'string' && payload.edgeReportRef
       ? payload.edgeReportRef
       : null;
-  const id = fromPkg || fromEdge || null;
+  const id = direct || fromPkg || fromEdge || null;
   const label =
+    (typeof payload.strategyLabel === 'string' && payload.strategyLabel) ||
     (typeof pkg?.strategyLabel === 'string' && pkg.strategyLabel) ||
     payload.symbol ||
     id?.slice(0, 12) ||

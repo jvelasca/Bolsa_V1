@@ -36,6 +36,7 @@ export async function proposeFinalistSupervised(opts: {
   symbol: string;
   accountId: string;
   strategyDefinitionId: string;
+  strategyLabel?: string | null;
   /** Precio hint opcional (p. ej. last close del run) para sizing. */
   priceHint?: number | null;
 }): Promise<SupervisedProposePayload> {
@@ -77,6 +78,8 @@ export async function proposeFinalistSupervised(opts: {
   const payload = {
     ...(res.data as SupervisedProposePayload),
     source: FINALIST_SUPERVISED_SOURCE,
+    strategyOrSignalRef: opts.strategyDefinitionId,
+    strategyLabel: opts.strategyLabel ?? opts.symbol,
   } satisfies SupervisedProposePayload;
 
   // Si no había priceHint, recalcular qty con lastClose del propose.

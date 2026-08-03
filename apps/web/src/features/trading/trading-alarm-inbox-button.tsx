@@ -191,6 +191,8 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
         payload: {
           ...(res.data as SupervisedProposePayload),
           source: 'alarm',
+          strategyOrSignalRef: item.strategyDefinitionId ?? null,
+          strategyLabel: item.symbol,
         } satisfies SupervisedProposePayload,
       };
     },
