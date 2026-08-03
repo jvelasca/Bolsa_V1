@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 
 import { Search } from 'lucide-react';
 
@@ -53,6 +53,7 @@ import { ListColumnHeader } from '@/features/trading/lists-tab/list-column-heade
 import { ListColumnLayoutProvider, useListColumnLayoutContext } from '@/features/trading/lists-tab/list-column-layout-context';
 import { PendingOrderListItem } from '@/features/trading/lists-tab/pending-order-list-item';
 import { ListCarousel } from '@/features/trading/lists-tab/list-carousel';
+import { useListInstrumentKeyboardNav } from '@/features/trading/lists-tab/use-list-instrument-keyboard-nav';
 
 export function ListValuesPanel() {
   const navigate = useNavigate();
@@ -253,12 +254,21 @@ export function ListValuesPanel() {
     };
   }, [allInstruments, debouncedQuery.length, query, remoteSearchQuery.data]);
 
-  function focusInstrument(instrumentId: string, symbol: string) {
-    const listId = selectedListId ?? listConfig.apiListId ?? listConfig.id;
-    focusInstrumentFromList(listId, instrumentId, symbol);
-    ensureChartRoute(navigate);
-    requestChartReflow();
-  }
+  const focusInstrument = useCallback(
+    (instrumentId: string, symbol: string) => {
+      const listId = selectedListId ?? listConfig.apiListId ?? listConfig.id;
+      focusInstrumentFromList(listId, instrumentId, symbol);
+      ensureChartRoute(navigate);
+      requestChartReflow();
+    },
+    [
+      selectedListId,
+      listConfig.apiListId,
+      listConfig.id,
+      focusInstrumentFromList,
+      navigate,
+    ],
+  );
 
   function visualizeFromSearch(
     instrument: (typeof allInstruments)[number],
@@ -543,39 +553,24 @@ export function ListValuesPanel() {
           />
         )}
 
-        {activeVirtual === VIRTUAL_LIST_PORTFOLIO &&
-          positions.map((pos) => {
-            const item = positionToListItem(pos, allInstruments);
-            const pnl =
-              pos.unrealizedPnl != null
-                ? `${formatPrice(pos.unrealizedPnl)}${
-                    pos.unrealizedPnlPct != null ? ` (${formatPct(pos.unrealizedPnlPct)})` : ''
-                  }`
-                : null;
-            const subtitle = `${pos.quantity} uds · coste ${formatPrice(pos.avgCost)}${
-              pnl ? ` · P&L ${pnl}` : ''
-            }`;
-            return (
-              <ListItemAccordion
-                key={pos.id}
-                item={item}
-                subtitle={subtitle}
-                isChartActive={activeInstrumentId === item.id}
-                isListSource={isListSourceRow(item.id)}
-                onOpenChart={() => focusInstrument(item.id, item.symbol)}
-              />
-            );
-          })}
+        {activeVirtual === VIRTUAL_LIST_PORTFOLIO && (
+          <PortfolioKeyboardList
+            items={portfolioListItems}
+            activeInstrumentId={activeInstrumentId}
+            isListSource={isListSourceRow}
+            onOpenChart={focusInstrument}
+            positions={positions}
+            allInstruments={allInstruments}
+          />
+        )}
 
-        {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS &&
-          pendingBuyOrders.map((order) => (
-            <PendingOrderListItem
-              key={order.id}
-              order={order}
-              isChartActive={activeInstrumentId === order.instrumentId}
-              onOpenChart={() => focusInstrument(order.instrumentId, order.symbol)}
-            />
-          ))}
+        {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS && (
+          <PendingOrdersKeyboardList
+            orders={pendingBuyOrders}
+            activeInstrumentId={activeInstrumentId}
+            onOpenChart={focusInstrument}
+          />
+        )}
 
         {!activeVirtual && (
           <SortedApiList
@@ -604,6 +599,7 @@ function SortedApiList({
 }) {
   const { sortState } = useListColumnLayoutContext();
   const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
+  useListInstrumentKeyboardNav(sorted, activeInstrumentId, onOpenChart);
   return (
     <>
       {sorted.map((item) => (
@@ -634,6 +630,7 @@ function SortedVisualizationList({
 }) {
   const { sortState } = useListColumnLayoutContext();
   const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
+  useListInstrumentKeyboardNav(sorted, activeInstrumentId, onOpenChart);
   return (
     <>
       {sorted.map((item) => {
@@ -652,6 +649,90 @@ function SortedVisualizationList({
           />
         );
       })}
+    </>
+  );
+}
+
+function PortfolioKeyboardList({
+  items,
+  activeInstrumentId,
+  isListSource,
+  onOpenChart,
+  positions,
+  allInstruments,
+}: {
+  items: import('@bolsa/shared').InstrumentWithMetaDto[];
+  activeInstrumentId: string | undefined;
+  isListSource: (instrumentId: string) => boolean;
+  onOpenChart: (instrumentId: string, symbol: string) => void;
+  positions: Array<{
+    id: string;
+    quantity: number;
+    avgCost: number;
+    unrealizedPnl?: number | null;
+    unrealizedPnlPct?: number | null;
+  }>;
+  allInstruments: import('@bolsa/shared').InstrumentWithMetaDto[];
+}) {
+  useListInstrumentKeyboardNav(items, activeInstrumentId, onOpenChart, items.length > 0);
+  if (items.length === 0) return null;
+  return (
+    <>
+      {positions.map((pos) => {
+        const item = positionToListItem(pos, allInstruments);
+        const pnl =
+          pos.unrealizedPnl != null
+            ? `${formatPrice(pos.unrealizedPnl)}${
+                pos.unrealizedPnlPct != null ? ` (${formatPct(pos.unrealizedPnlPct)})` : ''
+              }`
+            : null;
+        const subtitle = `${pos.quantity} uds · coste ${formatPrice(pos.avgCost)}${
+          pnl ? ` · P&L ${pnl}` : ''
+        }`;
+        return (
+          <ListItemAccordion
+            key={pos.id}
+            item={item}
+            subtitle={subtitle}
+            isChartActive={activeInstrumentId === item.id}
+            isListSource={isListSource(item.id)}
+            onOpenChart={() => onOpenChart(item.id, item.symbol)}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function PendingOrdersKeyboardList({
+  orders,
+  activeInstrumentId,
+  onOpenChart,
+}: {
+  orders: ReturnType<typeof usePendingOrders>['pendingOrders'];
+  activeInstrumentId: string | undefined;
+  onOpenChart: (instrumentId: string, symbol: string) => void;
+}) {
+  const navItems = useMemo(
+    () =>
+      orders.map((order) => ({
+        id: order.instrumentId,
+        symbol: order.symbol,
+      })),
+    [orders],
+  );
+  useListInstrumentKeyboardNav(navItems, activeInstrumentId, onOpenChart, navItems.length > 0);
+  if (orders.length === 0) return null;
+  return (
+    <>
+      {orders.map((order) => (
+        <PendingOrderListItem
+          key={order.id}
+          order={order}
+          isChartActive={activeInstrumentId === order.instrumentId}
+          onOpenChart={() => onOpenChart(order.instrumentId, order.symbol)}
+        />
+      ))}
     </>
   );
 }
