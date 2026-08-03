@@ -215,3 +215,22 @@ def test_score_fund_all_unknown():
     assert result.score == 0.0
     assert result.coverage == 0.0
     assert result.confidence == "LOW"
+
+
+def test_score_fund_partial_coverage_medium():
+    """Solo value+quality conocidos → coverage intermedia / MEDIUM + warnings."""
+    fs = build_fundamental_fact_set(
+        "x",
+        FundamentalInputs(
+            trailing_pe=10.0,
+            forward_pe=9.0,
+            roe=0.22,
+            operating_margin=0.18,
+            # sin growth / solvency → pilares incompletos
+        ),
+    )
+    result = score_fund_from_facts(fs)
+    assert 0.5 <= result.coverage < 0.8
+    assert result.confidence == "MEDIUM"
+    assert any("growth" in w.lower() for w in result.warnings)
+    assert any("risk" in w.lower() or "solvency" in w.lower() for w in result.warnings)

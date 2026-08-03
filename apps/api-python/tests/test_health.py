@@ -21,3 +21,6 @@ async def test_health_returns_json(app) -> None:
     assert body["service"] == "bolsa-api-python"
     assert body["stack"] == "python-fastapi"
     assert "database" in body
+    assert "yahoo" in body["components"]
+    assert "redis" in body["components"]
+    assert "circuit" in body["components"]["yahoo"].get("details", {})

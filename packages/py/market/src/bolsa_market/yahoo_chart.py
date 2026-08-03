@@ -1,3 +1,5 @@
+"""Parseo de payloads Yahoo chart → barras OHLCV (con cuarentena por integridad)."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -5,8 +7,11 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from pydantic import ValidationError
+
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_market.ingest import OhlcvBarIngest
+from bolsa_market.ohlcv_quarantine import get_ohlcv_quarantine_stats
 from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
 
 YAHOO_INTERVAL_BY_TIMEFRAME: dict[TimeFrame, tuple[str, int]] = {
@@ -57,17 +62,25 @@ def parse_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> list[Ohlc
             continue
         bar_date = datetime.fromtimestamp(ts, tz=UTC).date()
         adj = adjclose[i] if adjclose and i < len(adjclose) and adjclose[i] is not None else None
-        bars.append(
-            OhlcvBarIngest(
-                timestamp=bar_date,
-                open=Decimal(str(o)),
-                high=Decimal(str(h)),
-                low=Decimal(str(lo)),
-                close=Decimal(str(c)),
-                volume=int(v or 0),
-                adj_close=Decimal(str(adj)) if adj is not None else None,
-            ),
-        )
+        try:
+            bars.append(
+                OhlcvBarIngest(
+                    timestamp=bar_date,
+                    open=Decimal(str(o)),
+                    high=Decimal(str(h)),
+                    low=Decimal(str(lo)),
+                    close=Decimal(str(c)),
+                    volume=int(v or 0),
+                    adj_close=Decimal(str(adj)) if adj is not None else None,
+                ),
+            )
+        except (ValidationError, ValueError, ArithmeticError):
+            get_ohlcv_quarantine_stats().record(
+                kind="daily",
+                reason="ohlc_invalid",
+                symbol=yahoo_symbol,
+            )
+            continue
 
     if not bars:
         raise RuntimeError(f"Yahoo no devolvió barras diarias para {yahoo_symbol}")
@@ -104,6 +117,11 @@ def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> 
         fo, fh, flo, fc = float(o), float(h), float(lo), float(c)
         vol = int(v or 0)
         if not _intraday_ohlc_ok(fo, fh, flo, fc, vol):
+            get_ohlcv_quarantine_stats().record(
+                kind="intraday",
+                reason="ohlc_invalid",
+                symbol=yahoo_symbol,
+            )
             continue
         moment = datetime.fromtimestamp(ts, tz=UTC)
         bars.append(
