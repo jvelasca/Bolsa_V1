@@ -54,7 +54,7 @@ export const STRATEGY_MATRIX_COLUMN_TIPS: Record<StrategyMatrixColumnId, string>
   tradeCount: 'Número de operaciones (entradas/salidas) cerradas en la simulación.',
   library: 'Abrir esta estrategia en Biblioteca (ver definición, renombrar, duplicar, eliminar).',
   remove: 'Eliminar una estrategia guardada (Mis estrategias). No aplica a genéricas del catálogo.',
-  actions: 'Abrir el detalle completo de la última prueba OK de esta fila (lo más importante).',
+  actions: 'Ver detalle del run OK · el (…) de cabecera configura columnas y favoritos.',
 };
 
 /** Columnas de acción: no ordenables; «Ver» (actions) fija el menú (…). */

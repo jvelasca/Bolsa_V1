@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { IconButton } from '@/components/ui/icon-button';
 import { cn } from '@/lib/utils';
@@ -18,11 +18,13 @@ type Props = {
   /** aria-label del grupo */
   ariaLabel?: string;
   className?: string;
+  /** Slot tras el chevron derecho (p. ej. menú … de favoritos). */
+  trailing?: ReactNode;
 };
 
 /**
  * Carrusel horizontal de filtros de estrategias (mismo patrón visual que
- * el carrusel de listas en Trading: chips pill + chevrons + scroll).
+ * el carrusel de listas en Trading: chips pill + chevrons + scroll + …).
  *
  * Cada chip muestra `label (count)`.
  */
@@ -32,6 +34,7 @@ export function StrategyFilterCarousel({
   onChange,
   ariaLabel = 'Filtro de estrategias',
   className,
+  trailing,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +84,7 @@ export function StrategyFilterCarousel({
         className="shrink-0 opacity-70"
         onClick={() => scrollBy(140)}
       />
+      {trailing}
     </div>
   );
 }

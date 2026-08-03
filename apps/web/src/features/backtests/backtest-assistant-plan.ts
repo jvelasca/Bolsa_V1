@@ -34,6 +34,9 @@ export function buildAssistantStepPlan(
   if (step === 'universe') {
     bullets.push('Paso 1/4 — Universo: elegir valor y lanzar exploración AT');
     if (prefs.universe.selectAllGenerics) bullets.push('Marcar todas las genéricas en la matriz');
+    if (prefs.universe.includeOptimizedStrategies) {
+      bullets.push('Incluir Optimizadas en el lote (tope matriz)');
+    }
     if (prefs.universe.includeMineStrategies) {
       bullets.push('Incluir Mis estrategias en el lote (tope matriz)');
     }

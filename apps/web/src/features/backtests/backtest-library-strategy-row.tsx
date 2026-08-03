@@ -76,6 +76,24 @@ export function BacktestLibraryStrategyRow({
     },
   });
 
+  const timeframeMutation = useMutation({
+    mutationFn: async (timeframe: '1d' | '1wk') => {
+      const response = await api.getStrategy(strategy.id);
+      const detail = response.data;
+      return api.updateStrategy(strategy.id, {
+        definition: { ...detail.definition, timeframe },
+      });
+    },
+    onSuccess: () => {
+      setError(null);
+      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      void queryClient.invalidateQueries({ queryKey: ['strategy', strategy.id] });
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : 'No se pudo cambiar el timeframe');
+    },
+  });
+
   const duplicateMutation = useMutation({
     mutationFn: async () => {
       const response = await api.getStrategy(strategy.id);
@@ -111,7 +129,8 @@ export function BacktestLibraryStrategyRow({
   const busy =
     renameMutation.isPending ||
     duplicateMutation.isPending ||
-    deleteMutation.isPending;
+    deleteMutation.isPending ||
+    timeframeMutation.isPending;
 
   function handleDelete() {
     if (
@@ -279,6 +298,29 @@ export function BacktestLibraryStrategyRow({
                   ? ` · preset ${detail.definition.presetKey}`
                   : ''}
               </p>
+              <label className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">Timeframe:</span>
+                <select
+                  className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
+                  value={
+                    detail.definition.timeframe === '1wk' || strategy.timeframe === '1wk'
+                      ? '1wk'
+                      : '1d'
+                  }
+                  disabled={busy || timeframeMutation.isPending}
+                  onChange={(e) => {
+                    const next = e.target.value === '1wk' ? '1wk' : '1d';
+                    timeframeMutation.mutate(next);
+                  }}
+                  aria-label="Timeframe de la estrategia"
+                >
+                  <option value="1d">Diario (1d)</option>
+                  <option value="1wk">Semanal (1wk)</option>
+                </select>
+                {timeframeMutation.isPending ? (
+                  <span className="text-[10px]">Guardando…</span>
+                ) : null}
+              </label>
               <p>
                 <span className="font-medium text-foreground">Actualizado:</span>{' '}
                 {new Date(detail.updatedAt).toLocaleString('es-ES')}

@@ -27,7 +27,7 @@ describe('backtest-strategy-matrix', () => {
     expect(rows.some((r) => r.rowId === 'saved:s1' && r.label === 'Mi SMA')).toBe(true);
   });
 
-  it('filters by kind', () => {
+  it('filters by kind and L0 bucket', () => {
     const rows = buildStrategyMatrixRows([
       {
         id: 's1',
@@ -38,8 +38,19 @@ describe('backtest-strategy-matrix', () => {
         updatedAt: '2026-01-01',
         createdAt: '2026-01-01',
       },
+      {
+        id: 's2',
+        name: 'Lab clone',
+        origin: 'preset',
+        presetKey: 'sma_crossover',
+        timeframe: '1d',
+        kind: 'indicator_signals',
+        updatedAt: '2026-01-01',
+        createdAt: '2026-01-01',
+      },
     ]);
-    expect(filterStrategyMatrixRows(rows, 'saved')).toHaveLength(1);
+    expect(filterStrategyMatrixRows(rows, 'mine')).toHaveLength(1);
+    expect(filterStrategyMatrixRows(rows, 'optimized')).toHaveLength(1);
     expect(filterStrategyMatrixRows(rows, 'preset').every((r) => r.kind === 'preset')).toBe(true);
   });
 
