@@ -154,6 +154,8 @@ export type StrategyMatrixRunProgress = {
   skipped: number;
   pending: number;
   runningLabels: string[];
+  /** Telemetría ligera (Auditoría 2) — ms desde el arranque de la batería. */
+  elapsedMs?: number;
 };
 
 export type StrategyMatrixRunParams = {
@@ -181,6 +183,7 @@ function buildProgress(
   byId: Map<string, StrategyMatrixRow>,
   done: number,
   total: number,
+  elapsedMs?: number,
 ): StrategyMatrixRunProgress {
   let ok = 0;
   let error = 0;
@@ -196,7 +199,7 @@ function buildProgress(
     else if (row.status === 'pending') pending += 1;
     else if (row.status === 'running') runningLabels.push(row.label);
   }
-  return { done, total, ok, error, skipped, pending, runningLabels };
+  return { done, total, ok, error, skipped, pending, runningLabels, elapsedMs };
 }
 
 /**
@@ -232,10 +235,11 @@ export async function runStrategyMatrixBattery(
 
   const total = selected.length;
   let done = 0;
+  const startedAt = performance.now();
   const emit = () => {
     params.onProgress?.(
       params.rows.map((r) => byId.get(r.rowId) ?? r),
-      buildProgress(selectedIds, byId, done, total),
+      buildProgress(selectedIds, byId, done, total, Math.round(performance.now() - startedAt)),
     );
   };
   emit();

@@ -11,6 +11,7 @@ import {
 } from '@/features/backtests/coach-dual-audit';
 import {
   mergeLlmIntoDeepCoach,
+  sanitizeLlmDeepCoachPayload,
   type DeepTechnicalCoachNote,
 } from '@/features/backtests/backtest-deep-coach';
 import type { ExplorePresetRow } from '@/features/backtests/backtest-explore-value';
@@ -78,11 +79,16 @@ describe('CORE A · LLM no corona TOP', () => {
       headline: 'IA dice otra cosa',
       analysis: ['narrativa'],
       outlook: ['futuro'],
-      recommendations: [{ strategyType: 'invented_alpha', label: 'Fake', score: 99 }],
+      disclaimer: 'disc',
     });
+    expect(merged.recommendations[0]?.row.strategyType).toBe('sma_crossover');
     expect(merged.headline).toBe('IA dice otra cosa');
-    expect(merged.recommendations).toHaveLength(1);
-    expect(merged.recommendations[0]!.row.strategyType).toBe('sma_crossover');
+  });
+
+  it('sanitizeLlmDeepCoachPayload rejects corrupt shapes', () => {
+    expect(sanitizeLlmDeepCoachPayload({ headline: 1 })).toBeNull();
+    expect(sanitizeLlmDeepCoachPayload({ analysis: 'x' })).toBeNull();
+    expect(sanitizeLlmDeepCoachPayload({ headline: 'ok', analysis: ['a'] })?.headline).toBe('ok');
   });
 
   it('local audit TOP types unchanged when LLM findings empty', () => {

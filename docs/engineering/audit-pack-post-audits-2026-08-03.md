@@ -18,6 +18,7 @@
 | **IBEX Finalistas** | ¿Cobertura TOP? | **35/35**, `TOP_sin_runId=0` |
 | **Freeze producto** | ¿C4 / Belief / flags ops? | **No abrir** — [decision freeze](./post-audit-decision-freeze-2026-08-03.md) |
 | **Auditoría 1 (ingesta+FIE)** | ¿Gaps A/B del informe externo? | Ver [audit1-response](./audit1-response-ingest-fie-2026-08-03.md) — CB Yahoo + cuarentena + health Redis + test FIE parcial |
+| **Auditoría 2 (Lab UI)** | ¿Workers / Zod / abort / DD? | Ver [audit2-response](./audit2-response-backtests-lab-2026-08-03.md) — abort LLM + schema + underwater DD + elapsedMs |
 
 **Cómo auditar en 30–45 min**
 

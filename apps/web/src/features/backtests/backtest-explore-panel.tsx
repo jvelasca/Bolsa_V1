@@ -30,6 +30,7 @@ import {
   buildDeepTechnicalCoachNote,
   buildCoachFacts,
   mergeLlmIntoDeepCoach,
+  sanitizeLlmDeepCoachPayload,
   type DeepTechnicalCoachNote,
 } from '@/features/backtests/backtest-deep-coach';
 import {
@@ -777,24 +778,41 @@ export function BacktestExploreRanking({
     pauseIfAckNeeded,
   ]);
 
-  const llmMutation = useMutation({
-    mutationFn: async () => {
+  const llmAbortRef = useRef<AbortController | null>(null);
+
+  const llmMutation = useMutation({    mutationFn: async () => {
+      llmAbortRef.current?.abort();
+      const ac = new AbortController();
+      llmAbortRef.current = ac;
       const base = {
         context: localDeep.contextLabel,
         battery: batteryText(rows),
         localSummary: localSummaryText(localDeep),
         facts: coachFacts as unknown as Record<string, unknown>,
       };
-      const [narrate, adversary] = await Promise.all([
-        api.analyzeBacktestCoach({ ...base, mode: 'narrate' }),
-        api.analyzeBacktestCoach({ ...base, mode: 'adversary' }),
-      ]);
-      return { narrate, adversary };
+      try {
+        const [narrate, adversary] = await Promise.all([
+          api.analyzeBacktestCoach({ ...base, mode: 'narrate' }, { signal: ac.signal }),
+          api.analyzeBacktestCoach({ ...base, mode: 'adversary' }, { signal: ac.signal }),
+        ]);
+        return { narrate, adversary, aborted: ac.signal.aborted };
+      } catch (error) {
+        if (ac.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+          return { narrate: null, adversary: null, aborted: true };
+        }
+        throw error;
+      }
     },
-    onSuccess: ({ narrate, adversary }) => {
-      const payload = narrate.data.payload;
+    onSuccess: (result) => {
+      if (!result || result.aborted || !result.narrate || !result.adversary) return;
+      const { narrate, adversary } = result;
+      const rawPayload = narrate.data.payload;
+      const payload = sanitizeLlmDeepCoachPayload(rawPayload);
       const llmFindings = auditFindingsFromLlmPayload(payload, 'llm');
-      const adversaryFindings = auditFindingsFromLlmPayload(adversary.data.payload, 'llm_c');
+      const adversaryFindings = auditFindingsFromLlmPayload(
+        sanitizeLlmDeepCoachPayload(adversary.data.payload),
+        'llm_c',
+      );
       const audited = buildAuditedDeepTechnicalCoachNote(rows, coachCtx, llmFindings, {
         adversaryFindings,
         coachPass: postLab ? 'post_lab' : 'initial',
@@ -818,6 +836,17 @@ export function BacktestExploreRanking({
       );
     },
   });
+
+  useEffect(() => {
+    if (!running) return;
+    llmAbortRef.current?.abort();
+  }, [running]);
+
+  useEffect(() => {
+    return () => {
+      llmAbortRef.current?.abort();
+    };
+  }, []);
 
   const loteFingerprint = rows
     .filter((r) => r.status === 'ok')
