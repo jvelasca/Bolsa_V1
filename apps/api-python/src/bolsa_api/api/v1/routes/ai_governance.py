@@ -585,6 +585,19 @@ async def analyze_backtest_coach(body: BacktestCoachAnalyzeRequest) -> dict[str,
                 "model": None,
             }
         }
+    from bolsa_ai.schemas import validate_backtest_coach_payload
+
+    payload_errors = validate_backtest_coach_payload(completion.payload)
+    if payload_errors:
+        return {
+            "data": {
+                "engine": "heuristic",
+                "payload": None,
+                "provider": completion.provider,
+                "model": completion.model_name,
+                "validationErrors": payload_errors,
+            }
+        }
     return {
         "data": {
             "engine": f"{completion.provider}_structured_v1",

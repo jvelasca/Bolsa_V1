@@ -903,6 +903,9 @@ export function BacktestStrategyMatrixPanel({
             {progress.runningLabels.length
               ? ` · Ahora: ${progress.runningLabels.join(', ')}`
               : ''}
+            {typeof progress.elapsedMs === 'number'
+              ? ` · ${progress.elapsedMs < 1000 ? `${progress.elapsedMs} ms` : `${(progress.elapsedMs / 1000).toFixed(1)} s`}`
+              : ''}
           </p>
           <p className="text-[10px] leading-snug text-amber-700 dark:text-amber-400">
             Parar en cualquier momento: las pruebas no finalizadas no se guardan como resultado

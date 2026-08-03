@@ -1007,6 +1007,78 @@ export type LlmDeepCoachPayload = {
   };
 };
 
+const LLM_AUDIT_ACTIONS = new Set(['veto', 'downgrade', 'confirm', 'note']);
+
+/** Valida/sanea payload LLM del coach; null si estructura corrupta (Auditoría 2). */
+export function sanitizeLlmDeepCoachPayload(raw: unknown): LlmDeepCoachPayload | null {
+  if (raw == null) return null;
+  if (typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const o = raw as Record<string, unknown>;
+  const out: LlmDeepCoachPayload = {};
+
+  if ('headline' in o) {
+    if (o.headline != null && typeof o.headline !== 'string') return null;
+    if (typeof o.headline === 'string') out.headline = o.headline;
+  }
+  if ('regimeNarrative' in o) {
+    if (o.regimeNarrative != null && typeof o.regimeNarrative !== 'string') return null;
+    if (typeof o.regimeNarrative === 'string') out.regimeNarrative = o.regimeNarrative;
+  }
+  if ('disclaimer' in o) {
+    if (o.disclaimer != null && typeof o.disclaimer !== 'string') return null;
+    if (typeof o.disclaimer === 'string') out.disclaimer = o.disclaimer;
+  }
+  for (const key of ['analysis', 'outlook'] as const) {
+    if (!(key in o) || o[key] == null) continue;
+    if (!Array.isArray(o[key]) || !o[key].every((x) => typeof x === 'string')) return null;
+    out[key] = o[key] as string[];
+  }
+  if ('recommendations' in o && o.recommendations != null) {
+    if (!Array.isArray(o.recommendations)) return null;
+    const recs: NonNullable<LlmDeepCoachPayload['recommendations']> = [];
+    for (const item of o.recommendations) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      const r = item as Record<string, unknown>;
+      if (r.score != null && typeof r.score !== 'number') return null;
+      if (r.reasons != null && (!Array.isArray(r.reasons) || !r.reasons.every((x) => typeof x === 'string'))) {
+        return null;
+      }
+      recs.push({
+        label: typeof r.label === 'string' ? r.label : undefined,
+        strategyType: typeof r.strategyType === 'string' ? r.strategyType : undefined,
+        score: typeof r.score === 'number' ? r.score : undefined,
+        reasons: Array.isArray(r.reasons) ? (r.reasons as string[]) : undefined,
+      });
+    }
+    out.recommendations = recs;
+  }
+  if ('audit' in o && o.audit != null) {
+    if (typeof o.audit !== 'object' || Array.isArray(o.audit)) return null;
+    const audit = o.audit as Record<string, unknown>;
+    if (audit.findings != null) {
+      if (!Array.isArray(audit.findings)) return null;
+      const findings: NonNullable<NonNullable<LlmDeepCoachPayload['audit']>['findings']> = [];
+      for (const f of audit.findings) {
+        if (!f || typeof f !== 'object' || Array.isArray(f)) return null;
+        const row = f as Record<string, unknown>;
+        if (row.action != null && (typeof row.action !== 'string' || !LLM_AUDIT_ACTIONS.has(row.action))) {
+          return null;
+        }
+        findings.push({
+          strategyType: typeof row.strategyType === 'string' ? row.strategyType : undefined,
+          action: typeof row.action === 'string' ? row.action : undefined,
+          code: typeof row.code === 'string' ? row.code : undefined,
+          reason: typeof row.reason === 'string' ? row.reason : undefined,
+        });
+      }
+      out.audit = { findings };
+    } else {
+      out.audit = {};
+    }
+  }
+  return out;
+}
+
 /**
  * Fusiona narrativa LLM. Si hay `llmFindings` / audit en payload, el caller debe
  * reconstruir el TOP con `buildAuditedDeepTechnicalCoachNote(..., llmFindings)`.

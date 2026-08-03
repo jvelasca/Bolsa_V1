@@ -128,13 +128,16 @@ export const api = {
 
   /** Coach profundo de batería (AT + perfil/TF). LLM vía proxy; heuristic si no hay provider.
    * mode=adversary → auditor C (solo findings tipados). */
-  analyzeBacktestCoach: (body: {
-    context: string;
-    battery: string;
-    localSummary?: string;
-    facts?: Record<string, unknown> | null;
-    mode?: 'narrate' | 'adversary';
-  }) =>
+  analyzeBacktestCoach: (
+    body: {
+      context: string;
+      battery: string;
+      localSummary?: string;
+      facts?: Record<string, unknown> | null;
+      mode?: 'narrate' | 'adversary';
+    },
+    init?: { signal?: AbortSignal },
+  ) =>
     request<{
       data: {
         engine: string;
@@ -161,10 +164,12 @@ export const api = {
         } | null;
         provider: string | null;
         model: string | null;
+        validationErrors?: string[];
       };
     }>('/api/ai/backtest-coach/analyze', {
       method: 'POST',
       body: JSON.stringify(body),
+      signal: init?.signal,
     }),
 
   /** F1b — copiloto FA (Ollama o heurística). Solo interpreta el card; no recalcula. */

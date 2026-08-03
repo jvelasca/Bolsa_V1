@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  AreaSeries,
   ColorType,
   createChart,
   CrosshairMode,
@@ -60,6 +61,21 @@ function toOrderedLineData(
   });
 }
 
+/** Drawdown underwater % desde peak (≤ 0). */
+export function toUnderwaterDrawdownData(
+  ordered: Array<{ time: Time; value: number }>,
+  initialCash: number,
+): Array<{ time: Time; value: number }> {
+  let peak = initialCash;
+  const out: Array<{ time: Time; value: number }> = [];
+  for (const point of ordered) {
+    peak = Math.max(peak, point.value);
+    const ddPct = peak > 0 ? ((point.value - peak) / peak) * 100 : 0;
+    out.push({ time: point.time, value: ddPct });
+  }
+  return out;
+}
+
 export function BacktestEquityChart({
   points,
   trades = [],
@@ -75,6 +91,7 @@ export function BacktestEquityChart({
   const chartRef = useRef<IChartApi | null>(null);
   const lineRef = useRef<ISeriesApi<'Line'> | null>(null);
   const baselineRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const ddRef = useRef<ISeriesApi<'Area'> | null>(null);
   const [measuredHeight, setMeasuredHeight] = useState(200);
   const chartHeight = fillParent ? measuredHeight : height;
   const scaleZoomRef = useRef(1);
@@ -153,9 +170,28 @@ export function BacktestEquityChart({
       crosshairMarkerVisible: false,
     });
 
+    const dd = chart.addSeries(AreaSeries, {
+      topColor: 'rgba(239, 68, 68, 0.28)',
+      bottomColor: 'rgba(239, 68, 68, 0.02)',
+      lineColor: '#f87171',
+      lineWidth: 1,
+      priceScaleId: 'dd',
+      priceLineVisible: false,
+      lastValueVisible: true,
+      crosshairMarkerVisible: false,
+    });
+    chart.priceScale('right').applyOptions({
+      scaleMargins: { top: 0.08, bottom: 0.32 },
+    });
+    chart.priceScale('dd').applyOptions({
+      scaleMargins: { top: 0.72, bottom: 0.02 },
+      borderVisible: false,
+    });
+
     chartRef.current = chart;
     lineRef.current = line;
     baselineRef.current = baseline;
+    ddRef.current = dd;
 
     const cancelWheel = attachChartScaleInteraction({
       hitTarget: container,
@@ -175,6 +211,7 @@ export function BacktestEquityChart({
       chartRef.current = null;
       lineRef.current = null;
       baselineRef.current = null;
+      ddRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- remount on data identity only
   }, [points.length]);
@@ -189,7 +226,8 @@ export function BacktestEquityChart({
     const chart = chartRef.current;
     const line = lineRef.current;
     const baseline = baselineRef.current;
-    if (!chart || !line || !baseline || points.length === 0) return;
+    const dd = ddRef.current;
+    if (!chart || !line || !baseline || !dd || points.length === 0) return;
 
     const visiblePoints =
       untilTimestamp == null
@@ -198,11 +236,13 @@ export function BacktestEquityChart({
     if (visiblePoints.length === 0) {
       line.setData([]);
       baseline.setData([]);
+      dd.setData([]);
       return;
     }
 
     const lineData = toOrderedLineData(visiblePoints);
     line.setData(lineData.map(({ time, value }) => ({ time, value })));
+    dd.setData(toUnderwaterDrawdownData(lineData, initialCash));
 
     const firstTime = lineData[0]?.time;
     const lastTime = lineData[lineData.length - 1]?.time;
