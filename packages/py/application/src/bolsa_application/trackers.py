@@ -1,3 +1,5 @@
+"""Use-cases de trackers de producto."""
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -85,6 +87,7 @@ def tracker_to_scan_payload(tracker: TrackerDefinitionRecord) -> dict[str, Any]:
 
 
 class ListTrackerDefinitions:
+    """Lista Tracker Definitions."""
     def __init__(self, repository: TrackerDefinitionRepository) -> None:
         self._repository = repository
 
@@ -93,6 +96,7 @@ class ListTrackerDefinitions:
 
 
 class ListTrackerDefinitionsForList:
+    """Lista Tracker Definitions For List."""
     def __init__(self, repository: TrackerDefinitionRepository) -> None:
         self._repository = repository
 
@@ -101,6 +105,7 @@ class ListTrackerDefinitionsForList:
 
 
 class GetTrackerDefinition:
+    """Obtiene Tracker Definition."""
     def __init__(self, repository: TrackerDefinitionRepository) -> None:
         self._repository = repository
 
@@ -109,6 +114,7 @@ class GetTrackerDefinition:
 
 
 class CreateTrackerDefinition:
+    """Crea Tracker Definition."""
     def __init__(
         self,
         repository: TrackerDefinitionRepository,
@@ -180,6 +186,7 @@ class CreateTrackerDefinition:
 
 
 class UpdateTrackerDefinition:
+    """Actualiza Tracker Definition."""
     def __init__(
         self,
         repository: TrackerDefinitionRepository,
@@ -282,6 +289,7 @@ class UpdateTrackerDefinition:
 
 
 class DeleteTrackerDefinition:
+    """Elimina Tracker Definition."""
     def __init__(self, repository: TrackerDefinitionRepository) -> None:
         self._repository = repository
 
@@ -291,11 +299,13 @@ class DeleteTrackerDefinition:
 
 @dataclass(frozen=True, slots=True)
 class TrackerScanOutcome:
+    """Use-case / tipo: Tracker Scan Outcome."""
     scan: ScanRunResult
     alarm_route: dict[str, Any] | None = None
 
 
 class RunTrackerScan:
+    """Ejecuta Tracker Scan."""
     def __init__(
         self,
         repository: TrackerDefinitionRepository,
@@ -337,6 +347,7 @@ class RunTrackerScan:
 
 
 class EnqueueTrackerScanJob:
+    """Encola Tracker Scan Job."""
     def __init__(
         self,
         repository: TrackerDefinitionRepository,

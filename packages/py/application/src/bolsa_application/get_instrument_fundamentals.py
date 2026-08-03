@@ -41,6 +41,7 @@ def _close_as_of(bars: list[Any] | None) -> float | None:
 
 
 class GetInstrumentFundamentals:
+    """Obtiene Instrument Fundamentals."""
     def __init__(
         self,
         repository: InstrumentRepository,

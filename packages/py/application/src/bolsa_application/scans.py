@@ -1,3 +1,5 @@
+"""Use-case RunScan y modelos de resultado."""
+
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -55,12 +57,14 @@ from bolsa_market.market_calendar import expected_last_daily_bar
 
 @dataclass(frozen=True, slots=True)
 class ScanSkippedInstrument:
+    """Use-case / tipo: Scan Skipped Instrument."""
     instrument_id: str
     reason: str
 
 
 @dataclass(frozen=True, slots=True)
 class ScanHit:
+    """DTO fila: Scan Hit."""
     instrument_id: str
     symbol: str
     name: str
@@ -74,6 +78,7 @@ class ScanHit:
 
 @dataclass(frozen=True, slots=True)
 class ScanRunResult:
+    """Resultado de Scan Run."""
     scan_id: str
     scanned_count: int
     hit_count: int
@@ -157,6 +162,7 @@ def scan_run_result_to_dict(result: ScanRunResult) -> dict[str, Any]:
 
 
 class RunScan:
+    """Ejecuta Scan."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

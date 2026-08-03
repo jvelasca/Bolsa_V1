@@ -9,6 +9,7 @@ from bolsa_domain.entities.cognitive_artifacts import ModelArtifactRecord, Predi
 
 
 class PredictionStore(Protocol):
+    """Puerto / almacén de Prediction."""
     async def upsert_model(self, record: ModelArtifactRecord) -> ModelArtifactRecord: ...
 
     async def list_models(self, *, limit: int = 50) -> list[ModelArtifactRecord]: ...

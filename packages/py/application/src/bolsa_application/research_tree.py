@@ -113,6 +113,7 @@ def consolidation_tree_edge_specs(
 
 
 class CreateResearchTreeEdge:
+    """Crea Research Tree Edge."""
     def __init__(self, repository: _TreeRepo) -> None:
         self._repository = repository
 
@@ -146,6 +147,7 @@ class CreateResearchTreeEdge:
 
 
 class ListResearchTreeEdges:
+    """Lista Research Tree Edges."""
     def __init__(self, repository: _TreeRepo) -> None:
         self._repository = repository
 
@@ -176,6 +178,7 @@ class ListResearchTreeEdges:
 
 
 class SoftDeleteResearchTreeEdge:
+    """Use-case / tipo: Soft Delete Research Tree Edge."""
     def __init__(self, repository: _TreeRepo) -> None:
         self._repository = repository
 

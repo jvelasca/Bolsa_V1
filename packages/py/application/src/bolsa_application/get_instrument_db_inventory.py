@@ -23,6 +23,7 @@ from bolsa_infrastructure.database.models import (
 
 @dataclass(frozen=True, slots=True)
 class OhlcvLayerInventory:
+    """Use-case / tipo: Ohlcv Layer Inventory."""
     timeframe: str
     source: str
     bar_count: int
@@ -32,6 +33,7 @@ class OhlcvLayerInventory:
 
 @dataclass(frozen=True, slots=True)
 class SyncLogInventoryEntry:
+    """Sincroniza Log Inventory Entry."""
     provider: str
     status: str
     bars_added: int
@@ -41,6 +43,7 @@ class SyncLogInventoryEntry:
 
 @dataclass(frozen=True, slots=True)
 class AppDataInventory:
+    """Use-case / tipo: App Data Inventory."""
     positions: int
     transactions: int
     backtest_runs: int
@@ -52,6 +55,7 @@ class AppDataInventory:
 
 @dataclass(frozen=True, slots=True)
 class InstrumentRecordInventory:
+    """Use-case / tipo: Instrument Record Inventory."""
     id: str
     symbol: str
     yahoo_symbol: str
@@ -70,6 +74,7 @@ class InstrumentRecordInventory:
 
 @dataclass(frozen=True, slots=True)
 class InstrumentDbInventory:
+    """Use-case / tipo: Instrument Db Inventory."""
     instrument: InstrumentRecordInventory
     ohlcv_layers: tuple[OhlcvLayerInventory, ...]
     recent_sync_logs: tuple[SyncLogInventoryEntry, ...]
@@ -87,6 +92,7 @@ DERIVED_DATA_NOTES: tuple[str, ...] = (
 
 
 class GetInstrumentDbInventory:
+    """Obtiene Instrument Db Inventory."""
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 

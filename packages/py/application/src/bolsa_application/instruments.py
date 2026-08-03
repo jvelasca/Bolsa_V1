@@ -1,3 +1,5 @@
+"""Use-cases de catálogo de instrumentos."""
+
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository, InstrumentWithMeta
 
 

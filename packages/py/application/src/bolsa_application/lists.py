@@ -1,8 +1,11 @@
+"""Use-cases de listas / universos."""
+
 from bolsa_application.market_indices import SyncSubscribedCatalogIndices
 from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
 
 
 class ListInstrumentLists:
+    """Lista Instrument Lists."""
 
     def __init__(
 
@@ -39,6 +42,7 @@ class ListInstrumentLists:
 
 
 class GetInstrumentList:
+    """Obtiene Instrument List."""
 
     def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
 
@@ -55,6 +59,7 @@ class GetInstrumentList:
 
 
 class CreateInstrumentList:
+    """Crea Instrument List."""
     def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
         self._list_repo = list_repo
 
@@ -77,6 +82,7 @@ class CreateInstrumentList:
 
 
 class UpdateInstrumentList:
+    """Actualiza Instrument List."""
 
     def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
 
@@ -111,6 +117,7 @@ class UpdateInstrumentList:
 
 
 class DeleteInstrumentList:
+    """Elimina Instrument List."""
 
     def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
 
@@ -131,6 +138,7 @@ class DeleteInstrumentList:
 
 
 class GetListQuotes:
+    """Obtiene List Quotes."""
 
     def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
 

@@ -35,7 +35,7 @@ Al tocar o crear código, añadir:
 |------|--------|-------------------|
 | **1** | Schemas/routes auditoría (CORE-R, Mandato, Research, Alerts, Health) + motores Lab (backtest, warm-up, cost v2) | Módulo + símbolos públicos clave · **Hecho 2026-08-03** |
 | **2** | Resto `bolsa_api/schemas` + routes trading/listas/Lab | Módulo en cada archivo · **Hecho 2026-08-03** |
-| **3** | `bolsa_application` use-cases sin docstring | Clase/execute públicos |
+| **3** | `bolsa_application` use-cases | Módulo + clases públicas · **Hecho 2026-08-03** |
 | **4** | Indicadores / signals analytics | Familias SMA/RSI/MACD primero |
 
 ## Medición

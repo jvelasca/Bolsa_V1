@@ -16,6 +16,7 @@ from bolsa_analytics.knowledge.core_r_review_evidence import (
 
 
 class ExplainCoreRReviewEvidence:
+    """Explica / narra Core R Review Evidence."""
     async def execute(self, payload: dict[str, Any]) -> dict[str, Any]:
         evidence = build_core_r_review_evidence(payload)
         heuristic_payload = {

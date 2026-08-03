@@ -23,6 +23,7 @@ from bolsa_infrastructure.database.models import (
 
 @dataclass(frozen=True, slots=True)
 class ListMembershipRef:
+    """Lista Membership Ref."""
     list_id: str
     list_name: str
     source: str
@@ -30,6 +31,7 @@ class ListMembershipRef:
 
 @dataclass(frozen=True, slots=True)
 class NamedRef:
+    """Use-case / tipo: Named Ref."""
     id: str
     name: str
     detail: str | None = None
@@ -37,6 +39,7 @@ class NamedRef:
 
 @dataclass(frozen=True, slots=True)
 class InstrumentRemovalPreview:
+    """Use-case / tipo: Instrument Removal Preview."""
     instrument_id: str
     symbol: str
     name: str
@@ -61,6 +64,7 @@ class InstrumentRemovalPreview:
 
 
 class GetInstrumentRemovalPreview:
+    """Obtiene Instrument Removal Preview."""
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 

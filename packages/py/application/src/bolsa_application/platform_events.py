@@ -1,8 +1,11 @@
+"""Use-case: listar eventos de plataforma."""
+
 from bolsa_domain.entities.platform_event import PlatformEventRecord
 from bolsa_domain.repositories.platform_event_repository import PlatformEventRepository
 
 
 class ListPlatformEvents:
+    """Lista Platform Events."""
     def __init__(self, repository: PlatformEventRepository) -> None:
         self._repository = repository
 

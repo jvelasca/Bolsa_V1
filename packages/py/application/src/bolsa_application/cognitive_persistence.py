@@ -25,6 +25,7 @@ from bolsa_domain.entities.cognitive_artifacts import (
 
 
 class CognitiveStore(Protocol):
+    """Puerto / almacén de Cognitive."""
     async def append_decision_memory(self, record: DecisionMemoryRecord) -> DecisionMemoryRecord: ...
     async def list_decision_memory(
         self,
@@ -196,6 +197,7 @@ def record_to_edge_report(record: EdgeReportRecord) -> EdgeReport:
 
 
 class PersistDecisionMemory:
+    """Persiste Decision Memory."""
     def __init__(self, store: CognitiveStore) -> None:
         self._store = store
 
@@ -230,6 +232,7 @@ class PersistDecisionMemory:
 
 
 class PersistTrial:
+    """Persiste Trial."""
     def __init__(self, store: CognitiveStore) -> None:
         self._store = store
 
@@ -272,6 +275,7 @@ class PersistTrial:
 
 
 class PersistEdgeReport:
+    """Persiste Edge Report."""
     def __init__(self, store: CognitiveStore) -> None:
         self._store = store
 

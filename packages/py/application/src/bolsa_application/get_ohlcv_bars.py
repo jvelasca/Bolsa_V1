@@ -1,3 +1,5 @@
+"""Use-case: barras OHLCV."""
+
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
 from bolsa_domain.ohlcv_time import is_cache_stale
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
@@ -7,6 +9,7 @@ from bolsa_market.yahoo_chart import YahooMarketDataProvider
 
 
 class GetOhlcvBars:
+    """Obtiene Ohlcv Bars."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

@@ -23,6 +23,7 @@ from bolsa_infrastructure.database.repositories.account_repository import (
 
 @dataclass(frozen=True, slots=True)
 class ClosedSimulatedAccountRow:
+    """Cierra Simulated Account Row."""
     id: str
     name: str
     currency: str
@@ -36,18 +37,21 @@ class ClosedSimulatedAccountRow:
 
 @dataclass(frozen=True, slots=True)
 class ListClosedSimulatedAccountsResult:
+    """Lista Closed Simulated Accounts Result."""
     accounts: tuple[ClosedSimulatedAccountRow, ...]
     total_ledger_entries: int
 
 
 @dataclass(frozen=True, slots=True)
 class PurgeClosedAccountSkip:
+    """Purga Closed Account Skip."""
     account_id: str
     name: str
     reasons: tuple[str, ...]
 
 
 class ListClosedSimulatedAccounts:
+    """Lista Closed Simulated Accounts."""
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 

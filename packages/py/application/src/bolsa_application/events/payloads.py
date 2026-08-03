@@ -1,3 +1,5 @@
+"""Payloads tipados de eventos de plataforma."""
+
 from typing import Any
 
 from bolsa_analytics.signals.strategy import SignalEventV1

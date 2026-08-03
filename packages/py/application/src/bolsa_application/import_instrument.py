@@ -43,12 +43,14 @@ def infer_market_meta(yahoo_symbol: str, exchange: str, currency: str) -> tuple[
 
 @dataclass(frozen=True, slots=True)
 class ImportInstrumentResult:
+    """Importa Instrument Result."""
     instrument: InstrumentWithMeta
     created: bool
     sync: SyncResult | None
 
 
 class ImportInstrument:
+    """Importa Instrument."""
     def __init__(
         self,
         repo: SqlAlchemyInstrumentRepository,

@@ -1,3 +1,5 @@
+"""Bus in-process de eventos de plataforma."""
+
 import logging
 from typing import Any, Protocol
 
@@ -8,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class PlatformEventHandler(Protocol):
+    """Use-case / tipo: Platform Event Handler."""
     async def handle(self, event: PlatformEventRecord) -> None: ...
 
 

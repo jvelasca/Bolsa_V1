@@ -24,6 +24,7 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
 
 
 class RunCoreRServerCron:
+    """Ejecuta Core R Server Cron."""
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self._repo = SqlAlchemyCoreRRepository(session)

@@ -44,6 +44,7 @@ def resolve_sync_date_range(
 
 
 class SyncInstrumentDailyBars:
+    """Sincroniza Instrument Daily Bars."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

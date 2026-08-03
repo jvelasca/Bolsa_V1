@@ -18,6 +18,7 @@ from bolsa_infrastructure.database.repositories.list_repository import SqlAlchem
 
 @dataclass(frozen=True, slots=True)
 class RemoveFromListResult:
+    """Elimina From List Result."""
     list_id: str
     instrument_id: str
     removed_from_list: bool
@@ -122,6 +123,7 @@ class RemoveInstrumentFromList:
 
 @dataclass(frozen=True, slots=True)
 class OrphanInstrumentRow:
+    """DTO fila: Orphan Instrument Row."""
     id: str
     symbol: str
     name: str
@@ -130,6 +132,7 @@ class OrphanInstrumentRow:
 
 @dataclass(frozen=True, slots=True)
 class ListOrphanInstrumentsResult:
+    """Lista Orphan Instruments Result."""
     orphans: tuple[OrphanInstrumentRow, ...]
     total_ohlcv_bars: int
 

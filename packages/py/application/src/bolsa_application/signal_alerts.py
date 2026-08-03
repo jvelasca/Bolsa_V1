@@ -1,3 +1,5 @@
+"""Use-cases de alertas por señal."""
+
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -28,6 +30,7 @@ from bolsa_infrastructure.database.repositories.signal_alert_repository import (
 
 @dataclass(frozen=True, slots=True)
 class TriggeredSignalAlert:
+    """Use-case / tipo: Triggered Signal Alert."""
     subscription: SignalAlertSubscriptionRecord
     signal: SignalEventV1
     dispatches: list[AlertChannelDispatchResult]
@@ -35,11 +38,13 @@ class TriggeredSignalAlert:
 
 @dataclass(frozen=True, slots=True)
 class EvaluateSignalAlertsResult:
+    """Evalúa Signal Alerts Result."""
     triggered: list[TriggeredSignalAlert]
     dispatches: list[AlertChannelDispatchResult]
 
 
 class ListSignalAlertSubscriptions:
+    """Lista Signal Alert Subscriptions."""
     def __init__(self, repo: SqlAlchemySignalAlertRepository) -> None:
         self._repo = repo
 
@@ -48,6 +53,7 @@ class ListSignalAlertSubscriptions:
 
 
 class CreateSignalAlertSubscription:
+    """Crea Signal Alert Subscription."""
     def __init__(
         self,
         repo: SqlAlchemySignalAlertRepository,
@@ -107,6 +113,7 @@ class CreateSignalAlertSubscription:
 
 
 class DeleteSignalAlertSubscription:
+    """Elimina Signal Alert Subscription."""
     def __init__(self, repo: SqlAlchemySignalAlertRepository) -> None:
         self._repo = repo
 
@@ -117,6 +124,7 @@ class DeleteSignalAlertSubscription:
 
 
 class ResetSignalAlertDedupe:
+    """Use-case / tipo: Reset Signal Alert Dedupe."""
     def __init__(self, repo: SqlAlchemySignalAlertRepository) -> None:
         self._repo = repo
 
@@ -128,6 +136,7 @@ class ResetSignalAlertDedupe:
 
 
 class EvaluateSignalAlertSubscriptions:
+    """Evalúa Signal Alert Subscriptions."""
     def __init__(
         self,
         subscription_repo: SqlAlchemySignalAlertRepository,

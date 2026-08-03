@@ -16,6 +16,7 @@ from bolsa_analytics.knowledge.dia_d_session_evidence import (
 
 
 class ExplainDiaDSessionEvidence:
+    """Explica / narra Dia D Session Evidence."""
     async def execute(self, payload: dict[str, Any]) -> dict[str, Any]:
         evidence = build_dia_d_session_evidence(payload)
         heuristic_payload = {

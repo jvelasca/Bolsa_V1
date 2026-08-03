@@ -20,6 +20,7 @@ Recommendation = Literal["aligned", "review", "unavailable", "no_db_reference"]
 
 @dataclass(frozen=True, slots=True)
 class InstrumentXtbValidation:
+    """Use-case / tipo: Instrument Xtb Validation."""
     available: bool
     message: str
     db_last_close: float | None

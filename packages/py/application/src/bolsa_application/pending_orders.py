@@ -1,3 +1,5 @@
+"""Use-cases de órdenes pendientes."""
+
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -7,6 +9,7 @@ from bolsa_infrastructure.database.repositories.pending_order_repository import 
 
 
 class ListPendingOrders:
+    """Lista Pending Orders."""
     def __init__(
         self,
         repo: SqlAlchemyPendingOrderRepository,
@@ -21,6 +24,7 @@ class ListPendingOrders:
 
 
 class CreatePendingOrder:
+    """Crea Pending Order."""
     def __init__(
         self,
         repo: SqlAlchemyPendingOrderRepository,
@@ -55,6 +59,7 @@ class CreatePendingOrder:
 
 
 class DeletePendingOrder:
+    """Elimina Pending Order."""
     def __init__(
         self,
         repo: SqlAlchemyPendingOrderRepository,

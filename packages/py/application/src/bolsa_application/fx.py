@@ -1,3 +1,5 @@
+"""Use-cases de tipos de cambio (FX)."""
+
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
@@ -6,6 +8,7 @@ from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_
 
 @dataclass(frozen=True, slots=True)
 class FxRate:
+    """Use-case / tipo: Fx Rate."""
     from_currency: str
     to_currency: str
     rate: float
@@ -15,6 +18,7 @@ class FxRate:
 
 
 class GetFxRate:
+    """Obtiene Fx Rate."""
     async def execute(self, from_currency: str, to_currency: str) -> FxRate:
         base = from_currency.strip().upper()
         quote = to_currency.strip().upper()

@@ -1,3 +1,5 @@
+"""Use-cases de estado de mercado y live quote."""
+
 from __future__ import annotations
 
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository, InstrumentWithMeta
@@ -14,6 +16,7 @@ _XTB_QUOTE_CONCURRENCY = 8
 
 
 class GetMarketStatus:
+    """Obtiene Market Status."""
     def __init__(self, xtb_bridge_url: str | None) -> None:
         self._xtb_bridge_url = xtb_bridge_url
 
@@ -134,6 +137,7 @@ class GetInstrumentLiveQuotes:
 
 
 class GetInstrumentLiveQuote:
+    """Obtiene Instrument Live Quote."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

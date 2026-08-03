@@ -1,3 +1,5 @@
+"""Puente paper / broker D (gated)."""
+
 from bolsa_application.paper_lab_evidence import (
     LAB_EVIDENCE_SETTINGS_KEY,
     lab_evidence_snapshot_from_blocks,

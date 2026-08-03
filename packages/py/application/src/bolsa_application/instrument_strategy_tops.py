@@ -32,6 +32,7 @@ def assert_lab_validated_slots_have_run_id(
 
 
 class GetInstrumentStrategyTop:
+    """Obtiene Instrument Strategy Top."""
     def __init__(self, repo: SqlAlchemyInstrumentStrategyTopRepository) -> None:
         self._repo = repo
 
@@ -42,6 +43,7 @@ class GetInstrumentStrategyTop:
 
 
 class UpsertInstrumentStrategyTop:
+    """Crea o actualiza Instrument Strategy Top."""
     def __init__(self, repo: SqlAlchemyInstrumentStrategyTopRepository) -> None:
         self._repo = repo
 
@@ -77,6 +79,7 @@ class UpsertInstrumentStrategyTop:
 
 
 class DeleteInstrumentStrategyTop:
+    """Elimina Instrument Strategy Top."""
     def __init__(self, repo: SqlAlchemyInstrumentStrategyTopRepository) -> None:
         self._repo = repo
 

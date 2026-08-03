@@ -1,3 +1,5 @@
+"""Use-cases de sync scheduler / cola stale."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -30,6 +32,7 @@ def is_post_market_window(now: datetime | None = None) -> bool:
 
 
 class GetSyncSettings:
+    """Obtiene Sync Settings."""
     def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
         self._repo = repo
 
@@ -38,6 +41,7 @@ class GetSyncSettings:
 
 
 class UpdateSyncSettings:
+    """Actualiza Sync Settings."""
     def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
         self._repo = repo
 
@@ -46,6 +50,7 @@ class UpdateSyncSettings:
 
 
 class ListSyncQueue:
+    """Lista Sync Queue."""
     def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
         self._repo = repo
 
@@ -55,6 +60,7 @@ class ListSyncQueue:
 
 @dataclass(frozen=True, slots=True)
 class EnqueueStaleResult:
+    """Encola Stale Result."""
     scanned: int
     enqueued: int
 
@@ -120,6 +126,7 @@ class EnqueueStaleInstruments:
 
 @dataclass(frozen=True, slots=True)
 class ProcessQueueResult:
+    """Procesa Queue Result."""
     processed: bool
     instrument_id: str | None = None
     status: str | None = None
@@ -127,6 +134,7 @@ class ProcessQueueResult:
 
 
 class ProcessNextSyncQueueItem:
+    """Procesa Next Sync Queue Item."""
     def __init__(
         self,
         scheduler_repo: SqlAlchemySyncSchedulerRepository,

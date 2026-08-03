@@ -1,3 +1,5 @@
+"""Use-cases de alertas de precio."""
+
 from dataclasses import dataclass
 from typing import Literal
 
@@ -15,10 +17,12 @@ from bolsa_infrastructure.database.repositories.instrument_repository import (
 
 @dataclass(frozen=True, slots=True)
 class EvaluateAlertsResult:
+    """Evalúa Alerts Result."""
     triggered: list[PriceAlertRecord]
 
 
 class ListPriceAlerts:
+    """Lista Price Alerts."""
     def __init__(self, repo: SqlAlchemyAlertRepository) -> None:
         self._repo = repo
 
@@ -27,6 +31,7 @@ class ListPriceAlerts:
 
 
 class CreatePriceAlert:
+    """Crea Price Alert."""
     def __init__(self, repo: SqlAlchemyAlertRepository) -> None:
         self._repo = repo
 
@@ -53,6 +58,7 @@ class CreatePriceAlert:
 
 
 class DeletePriceAlert:
+    """Elimina Price Alert."""
     def __init__(self, repo: SqlAlchemyAlertRepository) -> None:
         self._repo = repo
 
@@ -63,6 +69,7 @@ class DeletePriceAlert:
 
 
 class ReactivatePriceAlert:
+    """Use-case / tipo: Reactivate Price Alert."""
     def __init__(self, repo: SqlAlchemyAlertRepository) -> None:
         self._repo = repo
 
@@ -79,6 +86,7 @@ class ReactivatePriceAlert:
 
 
 class EvaluatePriceAlerts:
+    """Evalúa Price Alerts."""
     def __init__(
         self,
         alert_repo: SqlAlchemyAlertRepository,

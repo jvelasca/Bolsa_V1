@@ -1,3 +1,5 @@
+"""Use-case: detalle de instrumento."""
+
 from dataclasses import dataclass
 
 from bolsa_domain.entities.instrument import Instrument
@@ -9,12 +11,14 @@ from bolsa_domain.value_objects.price_summary import PriceSummary
 
 @dataclass(frozen=True, slots=True)
 class InstrumentDetail:
+    """Use-case / tipo: Instrument Detail."""
     instrument: Instrument
     last_sync: SyncLogDetail | None
     price_summary: PriceSummary | None
 
 
 class GetInstrumentDetail:
+    """Obtiene Instrument Detail."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

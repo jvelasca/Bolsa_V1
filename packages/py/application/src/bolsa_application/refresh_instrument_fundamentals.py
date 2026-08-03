@@ -17,6 +17,7 @@ from bolsa_market.yahoo_client import get_yahoo_finance_client
 
 @dataclass(frozen=True, slots=True)
 class FundamentalsRefreshResult:
+    """Resultado de Fundamentals Refresh."""
     refreshed_count: int
     skipped_count: int
     failed_count: int

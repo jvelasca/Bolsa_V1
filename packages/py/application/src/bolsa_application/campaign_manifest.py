@@ -18,6 +18,7 @@ CAMPAIGN_MANIFEST_SCHEMA = "campaign_manifest_v0"
 
 @dataclass
 class CampaignCosts:
+    """Use-case / tipo: Campaign Costs."""
     commission_bps: int = 10
     slippage_bps: int = 5
     spread_bps: int = 2
@@ -25,6 +26,7 @@ class CampaignCosts:
 
 @dataclass
 class CampaignManifestV0:
+    """Use-case / tipo: Campaign Manifest 0."""
     campaign_id: str
     universe: str
     timeframe: str = "1d"

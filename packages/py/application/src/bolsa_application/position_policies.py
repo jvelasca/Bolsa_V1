@@ -1,3 +1,5 @@
+"""Use-cases de políticas de posición."""
+
 from typing import Any
 
 from bolsa_domain.entities.position_policy import PositionPolicyRecord
@@ -50,6 +52,7 @@ def _validate_mode_refs(
 
 
 class ListPositionPolicies:
+    """Lista Position Policies."""
     def __init__(self, repository: PositionPolicyRepository) -> None:
         self._repository = repository
 
@@ -58,6 +61,7 @@ class ListPositionPolicies:
 
 
 class GetPositionPolicy:
+    """Obtiene Position Policy."""
     def __init__(self, repository: PositionPolicyRepository) -> None:
         self._repository = repository
 
@@ -66,6 +70,7 @@ class GetPositionPolicy:
 
 
 class GetPositionPolicyForHolding:
+    """Obtiene Position Policy For Holding."""
     def __init__(self, repository: PositionPolicyRepository) -> None:
         self._repository = repository
 
@@ -74,6 +79,7 @@ class GetPositionPolicyForHolding:
 
 
 class CreatePositionPolicy:
+    """Crea Position Policy."""
     def __init__(
         self,
         repository: PositionPolicyRepository,
@@ -146,6 +152,7 @@ class CreatePositionPolicy:
 
 
 class UpdatePositionPolicy:
+    """Actualiza Position Policy."""
     def __init__(
         self,
         repository: PositionPolicyRepository,
@@ -213,6 +220,7 @@ class UpdatePositionPolicy:
 
 
 class DeletePositionPolicy:
+    """Elimina Position Policy."""
     def __init__(self, repository: PositionPolicyRepository) -> None:
         self._repository = repository
 

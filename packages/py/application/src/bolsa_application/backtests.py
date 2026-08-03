@@ -1,3 +1,5 @@
+"""Use-cases de backtests (listar, obtener, run+save)."""
+
 from dataclasses import dataclass
 from typing import Any
 
@@ -23,6 +25,7 @@ from bolsa_infrastructure.ids import new_id
 
 
 class ListBacktestRuns:
+    """Lista Backtest Runs."""
     def __init__(self, repository: BacktestRepository) -> None:
         self._repository = repository
 
@@ -42,6 +45,7 @@ class PruneBacktestRuns:
 
 
 class GetBacktestRun:
+    """Obtiene Backtest Run."""
     def __init__(self, repository: BacktestRepository) -> None:
         self._repository = repository
 
@@ -51,12 +55,14 @@ class GetBacktestRun:
 
 @dataclass(frozen=True, slots=True)
 class RunAndSaveBacktestResult:
+    """Ejecuta And Save Backtest Result."""
     run: BacktestRunDetail
     trial_id: str
     metrics: dict[str, Any]
 
 
 class RunAndSaveBacktest:
+    """Ejecuta And Save Backtest."""
     def __init__(
         self,
         instrument_repository: InstrumentRepository,

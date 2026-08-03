@@ -13,6 +13,7 @@ from bolsa_application.get_instrument_fundamentals import GetInstrumentFundament
 
 
 class ExplainInstrumentFundamentals:
+    """Explica / narra Instrument Fundamentals."""
     def __init__(self, fundamentals: GetInstrumentFundamentals) -> None:
         self._fundamentals = fundamentals
 
