@@ -40,6 +40,8 @@ Engineering Index  (este doc)
 │   ├── stage-audit-*.md
 │   ├── post-audit-decision-freeze-*.md
 │   ├── dual-universes / mandato / reconciliación ADRs
+│   ├── demo-operating-modes-brief-*.md   (MANUAL/SEMI/AUTO)
+│   ├── semi-demo-book-impl-slice1-*.md   (GO SEMI)
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)
 │   ├── audit-pack-post-audits-*.md     ← START externos

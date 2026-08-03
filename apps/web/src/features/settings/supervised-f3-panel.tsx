@@ -11,7 +11,7 @@
  */
 
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type {
   AssessmentV1,
   EvidenceAssessmentV1,
@@ -30,6 +30,12 @@ import {
   type SupervisedProposePayload,
   useSupervisedF3QueueStore,
 } from '@/stores/supervised-f3-queue-store';
+import {
+  demoBookAllowsExecute,
+  loadDemoBookPrefs,
+  suggestQuantityFromCash,
+} from '@/features/trading/demo-book-prefs';
+import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
 
 type ProposePayload = SupervisedProposePayload;
 
@@ -135,6 +141,8 @@ export function SupervisedF3Panel() {
   const [includeNews, setIncludeNews] = useState(true);
   const [pending, setPending] = useState<ProposePayload | null>(null);
   const [log, setLog] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bookMode, setBookMode] = useState(() => loadDemoBookPrefs().mode);
 
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
   const activeId = useSupervisedF3QueueStore((s) => s.activeId);
@@ -144,6 +152,28 @@ export function SupervisedF3Panel() {
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const activeItem = queueItems.find((i) => i.id === activeId) ?? null;
   const activeOrigin = activeItem ? resolveSupervisedQueueOrigin(activeItem) : null;
+  const canExecute = demoBookAllowsExecute(bookMode);
+
+  const summaryQuery = useQuery({
+    queryKey: ['account-summary', effectiveAccountId],
+    queryFn: () => api.getAccountSummary(effectiveAccountId!),
+    enabled: Boolean(effectiveAccountId),
+    staleTime: 15_000,
+  });
+  const cash = summaryQuery.data?.data?.cash ?? 0;
+
+  useEffect(() => {
+    function refreshMode() {
+      setBookMode(loadDemoBookPrefs().mode);
+    }
+    refreshMode();
+    window.addEventListener('storage', refreshMode);
+    const id = window.setInterval(refreshMode, 2000);
+    return () => {
+      window.removeEventListener('storage', refreshMode);
+      window.clearInterval(id);
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeId) return;
@@ -151,11 +181,31 @@ export function SupervisedF3Panel() {
     if (item) {
       setPending(item.payload);
       setInstrumentId(item.payload.instrumentId);
-      if (item.payload.suggestedPrice != null) {
-        setPrice(String(item.payload.suggestedPrice));
+      const px =
+        item.payload.suggestedPrice ??
+        item.payload.lastClose ??
+        null;
+      if (px != null) setPrice(String(px));
+      const book = loadDemoBookPrefs();
+      if (px != null && cash > 0) {
+        const q = suggestQuantityFromCash({
+          cash,
+          price: Number(px),
+          sizePctOfCash: book.defaultSizePctOfCash,
+        });
+        if (q > 0) setQuantity(String(q));
+        else if (item.payload.suggestedQuantity)
+          setQuantity(String(item.payload.suggestedQuantity));
+      } else if (item.payload.suggestedQuantity) {
+        setQuantity(String(item.payload.suggestedQuantity));
       }
     }
-  }, [activeId, queueItems]);
+  }, [activeId, queueItems, cash]);
+
+  const selectedCount = useMemo(
+    () => queueItems.filter((i) => selectedIds.has(i.id)).length,
+    [queueItems, selectedIds],
+  );
 
   const instrumentsQuery = useQuery({
     queryKey: ['instruments-brief'],
@@ -204,11 +254,24 @@ export function SupervisedF3Panel() {
   const confirm = useMutation({
     mutationFn: async (execute: boolean) => {
       if (!pending || !effectiveAccountId) throw new Error('Falta recommendation o cuenta');
+      if (execute && !demoBookAllowsExecute(loadDemoBookPrefs().mode)) {
+        throw new Error('Libro no está en SEMI: no se puede ejecutar. Cambia el modo en el rail Coach.');
+      }
+      const qty = Number(quantity);
+      const parsedPrice = price.trim() ? Number(price) : null;
+      const recommendation: ProposePayload = {
+        ...pending,
+        suggestedQuantity: Number.isFinite(qty) && qty > 0 ? qty : pending.suggestedQuantity,
+        suggestedPrice:
+          parsedPrice != null && Number.isFinite(parsedPrice)
+            ? parsedPrice
+            : pending.suggestedPrice,
+      };
       return api.confirmOrderIntent({
-        recommendation: pending,
+        recommendation,
         accountId: effectiveAccountId,
         execute,
-        sessionId: pending.decisionSession?.sessionId,
+        sessionId: recommendation.decisionSession?.sessionId,
       });
     },
     onSuccess: (res) => {
@@ -221,9 +284,48 @@ export function SupervisedF3Panel() {
           (sid ? ` · session=${sid}` : ''),
       );
       if (intent.status === 'executed' || intent.status === 'authorized') {
-        if (activeId) removeFromQueue(activeId);
+        if (activeId) {
+          removeFromQueue(activeId);
+          setSelectedIds((prev) => {
+            const next = new Set(prev);
+            next.delete(activeId);
+            return next;
+          });
+        }
         setPending(null);
       }
+    },
+    onError: (e: Error) => setLog(e.message),
+  });
+
+  const confirmSelected = useMutation({
+    mutationFn: async () => {
+      if (!effectiveAccountId) throw new Error('Sin cuenta DEMO');
+      if (!demoBookAllowsExecute(loadDemoBookPrefs().mode)) {
+        throw new Error('Libro no está en SEMI');
+      }
+      const targets = queueItems.filter((i) => selectedIds.has(i.id));
+      if (targets.length === 0) throw new Error('No hay propuestas marcadas');
+      const results: string[] = [];
+      for (const item of targets) {
+        const res = await api.confirmOrderIntent({
+          recommendation: item.payload,
+          accountId: effectiveAccountId,
+          execute: true,
+          sessionId: item.payload.decisionSession?.sessionId,
+        });
+        const st = res.data.intent.status;
+        results.push(`${item.symbol ?? item.payload.instrumentId.slice(0, 6)}:${st}`);
+        if (st === 'executed' || st === 'authorized') {
+          removeFromQueue(item.id);
+        }
+      }
+      return results;
+    },
+    onSuccess: (results) => {
+      setSelectedIds(new Set());
+      setLog(`Lote SEMI · ${results.join(' · ')}`);
+      void summaryQuery.refetch();
     },
     onError: (e: Error) => setLog(e.message),
   });
@@ -237,11 +339,12 @@ export function SupervisedF3Panel() {
   return (
     <Card id="supervised-f3-panel">
       <CardHeader>
-        <CardTitle>Supervisado F3</CardTitle>
+        <CardTitle>{PAPER_PATH_SUPERVISED.shortTitle}</CardTitle>
         <CardDescription>
-          Assessment(s) → DecisionRuntime → Recommendation. Cola: Scan, Finalistas, Gráfico o
-          manual. Gate propose = pasivo.
+          SEMI · Assessment(s) → Recommendation → Confirm. Cola: Finalistas, Radar, Scan, Gráfico.
           {account ? ` Cuenta: ${account.name}.` : ' Selecciona una cuenta activa.'}
+          {` Modo libro: ${bookMode.toUpperCase()}.`}
+          {cash > 0 ? ` Cash: ${cash.toLocaleString('es-ES', { maximumFractionDigits: 0 })}.` : ''}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -250,24 +353,48 @@ export function SupervisedF3Panel() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium">
                 Cola supervisada ({queueItems.length})
+                {selectedCount > 0 ? ` · ${selectedCount} marcadas` : ''}
               </span>
-              <button
-                type="button"
-                className="text-[10px] text-muted-foreground hover:underline"
-                onClick={() => clearQueue()}
-              >
-                Vaciar
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="text-[10px] text-muted-foreground hover:underline"
+                  onClick={() => setSelectedIds(new Set(queueItems.map((i) => i.id)))}
+                >
+                  Marcar todas
+                </button>
+                <button
+                  type="button"
+                  className="text-[10px] text-muted-foreground hover:underline"
+                  onClick={() => clearQueue()}
+                >
+                  Vaciar
+                </button>
+              </div>
             </div>
-            <ul className="max-h-28 space-y-1 overflow-y-auto text-[11px]">
+            <ul className="max-h-36 space-y-1 overflow-y-auto text-[11px]">
               {queueItems.map((item) => {
                 const origin = resolveSupervisedQueueOrigin(item);
+                const checked = selectedIds.has(item.id);
                 return (
-                  <li key={item.id}>
+                  <li key={item.id} className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(item.id)) next.delete(item.id);
+                          else next.add(item.id);
+                          return next;
+                        });
+                      }}
+                      aria-label={`Marcar ${item.symbol ?? item.payload.instrumentId}`}
+                    />
                     <button
                       type="button"
                       className={cn(
-                        'w-full rounded px-2 py-1 text-left hover:bg-accent',
+                        'min-w-0 flex-1 rounded px-2 py-1 text-left hover:bg-accent',
                         item.id === activeId && 'bg-accent',
                       )}
                       onClick={() => setActive(item.id)}
@@ -286,14 +413,46 @@ export function SupervisedF3Panel() {
                 );
               })}
             </ul>
+            <button
+              type="button"
+              className="w-full rounded-md border border-primary/40 px-2 py-1.5 text-[11px] text-primary hover:bg-accent disabled:opacity-50"
+              disabled={
+                selectedCount === 0 ||
+                confirmSelected.isPending ||
+                !canExecute ||
+                !effectiveAccountId
+              }
+              title={
+                canExecute
+                  ? 'Ejecuta en DEMO las propuestas marcadas (SEMI)'
+                  : 'Pasa el libro a SEMI para ejecutar'
+              }
+              onClick={() => confirmSelected.mutate()}
+            >
+              {confirmSelected.isPending
+                ? 'Ejecutando lote…'
+                : `Confirmar seleccionadas + ejecutar (${selectedCount})`}
+            </button>
           </div>
         ) : null}
 
         {activeOrigin === 'finalists' && pending ? (
           <p className="rounded-md border border-primary/35 bg-primary/5 px-3 py-2 text-[11px] leading-snug text-foreground">
-            Desde Finalistas (Camino C): siguiente paso humano —{' '}
-            <strong>Confirmar Intent</strong> o <strong>Confirmar + ejecutar</strong>. No es
-            «Desplegar en demo» ni auto.
+            <strong>H · Finalistas</strong> (Camino C / SEMI). Si el momento Radar discrepa,
+            elige en Confirm (aceptar, ajustar qty o rechazar). Siguiente: Confirmar + ejecutar.
+          </p>
+        ) : null}
+        {activeOrigin === 'alarm' && pending ? (
+          <p className="rounded-md border border-amber-500/35 bg-amber-500/5 px-3 py-2 text-[11px] leading-snug text-foreground">
+            <strong>M · Momento (Radar)</strong>. Contrasta con Finalistas del valor si los hay.
+            Tú decides en Confirm.
+          </p>
+        ) : null}
+
+        {!canExecute ? (
+          <p className="rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground">
+            Libro en <strong>{bookMode.toUpperCase()}</strong>: puedes proponer e inspeccionar, pero
+            la ejecución DEMO solo en <strong>SEMI</strong> (rail Coach → Libro DEMO).
           </p>
         ) : null}
 
@@ -385,7 +544,13 @@ export function SupervisedF3Panel() {
           <button
             type="button"
             className="rounded-md border border-primary/40 px-3 py-1.5 text-primary hover:bg-accent disabled:opacity-50"
-            disabled={!pending || confirm.isPending || pending.action === 'wait'}
+            disabled={
+              !pending ||
+              confirm.isPending ||
+              pending.action === 'wait' ||
+              !canExecute
+            }
+            title={canExecute ? 'Ejecutar en DEMO (SEMI)' : 'Cambia a SEMI en Libro DEMO'}
             onClick={() => confirm.mutate(true)}
           >
             Confirmar + ejecutar
@@ -500,11 +665,13 @@ export function SupervisedF3Panel() {
                   type="button"
                   className="text-[10px] text-primary underline-offset-2 hover:underline"
                   onClick={() => {
+                    const sessionId = pending.decisionSession?.sessionId;
+                    if (!sessionId) return;
                     window.dispatchEvent(
                       new CustomEvent('bolsa:open-help', {
                         detail: {
                           section: 'value-analysis',
-                          sessionId: pending.decisionSession.sessionId,
+                          sessionId,
                         },
                       }),
                     );

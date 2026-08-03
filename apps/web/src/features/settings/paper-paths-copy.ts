@@ -28,17 +28,18 @@ export const PAPER_PATH_LAB = {
 } as const;
 
 /**
- * Camino C — propose con FA + perfil de cuenta → cola Supervisado F3.
- * Humano confirma. Entrada desde Finalistas, chart o scan.
+ * Camino C — propose con FA + perfil de cuenta → cola Supervisado F3 (SEMI).
+ * Humano confirma. Entrada desde Finalistas, chart, scan o alarmas Radar.
+ * Producto: modo libro SEMI · canal Confirm DEMO.
  */
 export const PAPER_PATH_SUPERVISED = {
   id: 'supervised_f3' as const,
-  shortTitle: 'Finalistas → Supervisado',
+  shortTitle: 'SEMI · Confirm DEMO',
   cta: 'Proponer',
   blurb:
-    'Propose con FA + perfil de la cuenta activa → cola Supervisado F3. Humano confirma. No es auto ni Desplegar en demo.',
+    'SEMI: propose (FA + perfil + momento) → cola Confirm F3 → humano ejecuta en DEMO. No es AUTO ni Desplegar checklist (A).',
   finalistsHint:
-    'Proponer = Camino C (FA+perfil → F3 → Confirm humano). Checklist = Camino A (demo). Distintos; ninguno es broker Paper.',
+    'Proponer = SEMI / Camino C (→ F3 → Confirm). Checklist = Camino A (demo). Distintos; ninguno es broker Paper ni AUTO.',
 } as const;
 
 /**
