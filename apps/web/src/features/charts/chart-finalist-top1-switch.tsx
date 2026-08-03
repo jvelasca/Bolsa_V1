@@ -1,5 +1,5 @@
 /**
- * Switch Finalista TOP #1 — scope por gráfico o política «todos» del workspace.
+ * Switch Finalista TOP #1 — misma tipografía/altura que Indicadores y chips de barra.
  */
 
 import { cn } from '@/lib/utils';
@@ -31,7 +31,7 @@ export function ChartFinalistTop1Switch({
   const isAll = scope === 'all';
   return (
     <div
-      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'shrink-0 gap-1.5', className)}
+      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'shrink-0', className)}
       title={
         title ??
         (isAll
@@ -48,31 +48,30 @@ export function ChartFinalistTop1Switch({
         onClick={() => onCheckedChange(!checked)}
         className={cn(
           CHART_BAR_ZONE_LABEL_BTN_CLASS,
-          'inline-flex shrink-0 items-center gap-1.5 rounded border border-border/80 bg-background/80 px-1.5 py-0.5 disabled:cursor-not-allowed disabled:opacity-50',
-          checked &&
-            'border-emerald-500/60 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300',
+          'inline-flex items-center gap-1.5 pr-1.5 disabled:cursor-not-allowed disabled:opacity-50',
+          checked && 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-300',
         )}
       >
         <span
           className={cn(
-            'relative inline-flex h-3.5 w-6 shrink-0 items-center rounded-full border transition-colors',
+            'relative inline-flex h-3 w-5 shrink-0 items-center rounded-full border transition-colors',
             checked
-              ? 'border-emerald-500 bg-emerald-500/80'
+              ? 'border-emerald-500/80 bg-emerald-500/80'
               : 'border-border bg-muted',
           )}
           aria-hidden
         >
           <span
             className={cn(
-              'absolute h-2.5 w-2.5 rounded-full bg-background shadow transition-transform',
-              checked ? 'translate-x-3' : 'translate-x-0.5',
+              'absolute h-2 w-2 rounded-full bg-background shadow transition-transform',
+              checked ? 'translate-x-2.5' : 'translate-x-0.5',
             )}
           />
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wide">Finalista</span>
-        <span className="text-[10px] font-bold tabular-nums">#1</span>
+        <span className="chart-indicators-label-text">Finalista #1</span>
+        <span className="chart-indicators-label-short">Fin. #1</span>
         {isAll ? (
-          <span className="rounded bg-muted px-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
             todos
           </span>
         ) : null}

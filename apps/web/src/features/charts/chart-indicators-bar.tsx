@@ -33,7 +33,7 @@ export function ChartIndicatorsBar({
 }) {
   return (
     <div
-      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'shrink-0 gap-2', className)}
+      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'shrink-0', className)}
       title="Catálogo de indicadores y overlay del Finalista TOP #1"
       data-testid="chart-indicators-zone"
     >
@@ -62,7 +62,6 @@ export function ChartIndicatorsBar({
           title={finalistTop1.title}
           scope={finalistTop1.scope ?? 'all'}
           onCheckedChange={finalistTop1.onCheckedChange}
-          className="shrink-0"
         />
       ) : null}
     </div>
