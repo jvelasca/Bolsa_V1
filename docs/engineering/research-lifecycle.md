@@ -353,6 +353,17 @@ No confundir con wizard multi-instrumento Fase C.
 | **≠ D** | No es auto-paper; no pisa `active`. Ver `ISSUES.md` · CORE-R |
 | **Ops** | `pnpm test:operativa` |
 
+#### Biblioteca — cajones L0 (2026-08-03)
+
+| Cajón | Contenido |
+|-------|-----------|
+| **Genéricas** | Presets catálogo |
+| **Optimizadas** | Clones / Lab · `origin: preset` (legacy: `manual`+`presetKey`) |
+| **Mis estrategias** | Autoría · manual / asistida / prompt IA / import |
+| **Finalistas** | TOP valor×TF |
+
+Filtros: `library-strategy-buckets.ts` · deep-link `?library=optimized|mine|generics`. Brief: [strategy-library-authoring-brief-2026-08-03.md](./strategy-library-authoring-brief-2026-08-03.md).
+
 #### Biblioteca — alcance S3 + historial (2026-07-28)
 
 | Pieza | Rol |

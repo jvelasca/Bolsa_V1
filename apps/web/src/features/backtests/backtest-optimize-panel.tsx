@@ -2140,9 +2140,11 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                     variant="outline"
                     disabled={saveStrategyMutation.isPending || savedRowId === bestVsAnchor.best.id}
                     onClick={() => void handleSave(bestVsAnchor.best, false)}
-                    title="Guarda el Mejor en Mis estrategias (no toca Finalistas)"
+                    title="Guarda el Mejor en Optimizadas (clone Lab · origin preset; no toca Finalistas)"
                   >
-                    {savedRowId === bestVsAnchor.best.id ? 'Ya en Mis estrategias' : 'Guardar en Mis estrategias'}
+                    {savedRowId === bestVsAnchor.best.id
+                      ? 'Ya en Optimizadas'
+                      : 'Guardar en Optimizadas'}
                   </Button>
                 </div>
               </>

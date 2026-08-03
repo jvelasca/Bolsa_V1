@@ -6,6 +6,7 @@
 > **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho.  
 > **Decisión freeze:** [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · `CORE_R_CRON` / `COST_MODEL_V2` off.  
 > **Futuro Belief→Coach (brief, no código):** [engineering/belief-coach-brief-draft-2026-08-03.md](./engineering/belief-coach-brief-draft-2026-08-03.md).  
+> **Biblioteca estrategias L0/L1:** [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) — Genéricas · Optimizadas · Mis estrategias (prompt).  
 > **Auditoría (paquete único post-Q3):** [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
 > **Engineering Index / round 2 externas:** [engineering/engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md) · [audit-ext-round2-triage](./engineering/audit-ext-round2-triage-2026-08-03.md).  
 > **Respuesta auditoría 1 (ingesta+FIE):** [engineering/audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md).  

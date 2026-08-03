@@ -44,7 +44,7 @@ export const STRATEGY_MATRIX_COLUMN_LABELS: Record<StrategyMatrixColumnId, strin
 
 export const STRATEGY_MATRIX_COLUMN_TIPS: Record<StrategyMatrixColumnId, string> = {
   label: 'Nombre de la estrategia (genérica o guardada). Arrastra la cabecera para reordenar columnas.',
-  kind: 'Genérica = plantilla del catálogo. Mis estrategias = definición tuya (reutilizable o, más adelante, ajuste a un valor).',
+  kind: 'Genérica = plantilla del catálogo. Optimizadas = Lab/clones (origin preset). Mis estrategias = autoría (prompt/manual/asistida).',
   category: 'Familia de reglas (tendencia, momentum, reversión…).',
   status: 'Estado de la última prueba en esta sesión: cola, en curso, OK, error o cancelado.',
   returnPct: 'Rentabilidad total de la estrategia en el periodo (después de comisiones/slippage).',

@@ -139,7 +139,7 @@ export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
         />
         <FlowCheck
           checked={prefs.universe.includeMineStrategies}
-          label="Incluir Mis estrategias"
+          label="Incluir Optimizadas y Mis estrategias"
           onChange={(v) => patchUniverse({ includeMineStrategies: v })}
         />
         <FlowCheck

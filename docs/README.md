@@ -47,6 +47,7 @@
 | [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) | **Roadmap mejoras** post-auditorías (Q0–Q3 · horizonte TOP) |
 | [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) | **Freeze** post-Q3: C4 no · Belief no · flags ops off |
 | [engineering/belief-coach-brief-draft-2026-08-03.md](./engineering/belief-coach-brief-draft-2026-08-03.md) | **Futuro** Belief→Coach — brief B1–B8 (congelado; sin implementar) |
+| [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) | **Biblioteca L0/L1** — Genéricas / Optimizadas / Mis estrategias + prompt |
 | [engineering/dev-logs.md](./engineering/dev-logs.md) | Logs locales `logs/` (no producto; sin README en carpeta) |
 | [engineering/code-documentation-standard-2026-08-03.md](./engineering/code-documentation-standard-2026-08-03.md) | **Docstrings** — política forward-only + lotes de cobertura |
 | [DEV_STARTUP.md](./DEV_STARTUP.md) | F5 / `pnpm dev` · puertos · doctor |

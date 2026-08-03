@@ -1,11 +1,15 @@
 /**
  * Deep-links Biblioteca (Backtesting → Estrategias).
  *
- * /backtests?tab=strategies&library=mine&strategyId=<id>
- * Opcional: q= búsqueda · preset= genérica a resaltar
+ * /backtests?tab=strategies&library=mine|optimized|generics&strategyId=<id>
  */
 
-export type LibraryFilterParam = 'all' | 'generics' | 'mine' | 'finalists';
+import {
+  normalizeStrategiesListFilter,
+  type StrategiesListFilter,
+} from '@/features/backtests/library-strategy-buckets';
+
+export type LibraryFilterParam = StrategiesListFilter;
 
 export type LibraryNavTarget = {
   library: LibraryFilterParam;
@@ -17,8 +21,17 @@ export type LibraryNavTarget = {
 export function parseLibraryFilterParam(
   raw: string | null | undefined,
 ): LibraryFilterParam | null {
-  if (raw === 'all' || raw === 'generics' || raw === 'mine' || raw === 'finalists') {
-    return raw;
+  if (raw == null || raw === '') return null;
+  const n = normalizeStrategiesListFilter(raw);
+  // normalize maps unknown → all; only accept exact known tokens
+  if (
+    raw === 'all' ||
+    raw === 'generics' ||
+    raw === 'optimized' ||
+    raw === 'mine' ||
+    raw === 'finalists'
+  ) {
+    return n;
   }
   return null;
 }
@@ -34,8 +47,15 @@ export function backtestLibraryHref(target: LibraryNavTarget): string {
   return `/backtests?${params.toString()}`;
 }
 
-export function libraryHrefForSavedStrategy(strategyId: string): string {
-  return backtestLibraryHref({ library: 'mine', strategyId });
+export function libraryHrefForSavedStrategy(
+  strategyId: string,
+  library: 'mine' | 'optimized' = 'mine',
+): string {
+  return backtestLibraryHref({ library, strategyId });
+}
+
+export function libraryHrefForOptimizedStrategy(strategyId: string): string {
+  return backtestLibraryHref({ library: 'optimized', strategyId });
 }
 
 export function libraryHrefForPreset(presetKey: string): string {

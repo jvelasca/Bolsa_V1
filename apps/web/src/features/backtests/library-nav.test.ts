@@ -25,7 +25,9 @@ describe('library-nav', () => {
 
   it('parses filter and search', () => {
     expect(parseLibraryFilterParam('mine')).toBe('mine');
+    expect(parseLibraryFilterParam('optimized')).toBe('optimized');
     expect(parseLibraryFilterParam('x')).toBeNull();
+    expect(libraryHrefForSavedStrategy('x', 'optimized')).toContain('library=optimized');
     const sp = new URLSearchParams(
       'tab=strategies&library=mine&strategyId=s1&q=tef',
     );
