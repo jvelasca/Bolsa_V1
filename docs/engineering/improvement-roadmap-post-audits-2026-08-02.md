@@ -212,8 +212,10 @@ Abrir **solo** si Q0–Q1 hechos y hay demanda explícita:
 
 **No hecho a propósito:** C4, Belief Fase 2, OTel, DuckDB, Monte Carlo, Strategy Studio.
 
-**Higiene ISSUES (2026-08-03):** Open = CORE-R vigilancia · CORE-A bloqueado Belief · CORE-B parked; Closed incluye CORE-P, frescura Lista AUTO, IBEX TOP 35/35, warm-up Q1.6, MACD signal.
+**Higiene ISSUES (2026-08-03):** Open = CORE-R vigilancia · CORE-A bloqueado Belief · CORE-B parked; Closed incluye CORE-P, frescura Lista AUTO, IBEX TOP 35/35, warm-up Q1.6, MACD signal, **code-docstrings lotes 1–4**.
 
 **Decisión freeze (2026-08-03):** [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief no · flags ops off. Usar producto entregado; no abrir Fase H.
 
 **Paquete auditoría:** [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md) (checklist + evidencia smoke + índice).
+
+**Vigilancia ops (2026-08-03 mañana):** `pnpm test:operativa` OK · smokes API PASS · `pnpm audit:ibex35:missing` → `con_TOP=35/35`.

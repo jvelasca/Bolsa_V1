@@ -17,7 +17,8 @@
 1. **Usar** lo entregado: Play ciclo · Lista AUTO · Finalistas · Monitor CORE-R · Lab Health · mass compare · warm-up gate.  
 2. **Vigilar** CORE-R en uso real (`pnpm test:operativa` tras cambios).  
 3. **Re-auditar** IBEX TOP si cambia el universo (`pnpm audit:ibex35:missing`).  
-4. **Revisar esta ficha** solo si aparece: necesidad real de cron 24/7, experimento de costes v2, o brief Belief.
+4. **Revisar esta ficha** solo si aparece: necesidad real de cron 24/7, experimento de costes v2, o brief Belief.  
+5. **Docstrings:** lotes 1–4 cerrados — solo forward-only al tocar código ([estándar](./code-documentation-standard-2026-08-03.md)).
 
 ## Qué no hacer
 
