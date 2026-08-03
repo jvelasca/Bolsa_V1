@@ -1,3 +1,5 @@
+"""DTOs HTTP de eventos de plataforma."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

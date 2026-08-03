@@ -1,3 +1,5 @@
+"""DTOs HTTP de instrumentos / catálogo."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from bolsa_api.schemas.market import SyncResultDto

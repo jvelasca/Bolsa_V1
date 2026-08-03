@@ -1,3 +1,5 @@
+"""API: cómputo de indicadores."""
+
 from fastapi import APIRouter, HTTPException
 
 from bolsa_analytics.indicators.compute import IndicatorSpecInput, OhlcvBar, compute_specs

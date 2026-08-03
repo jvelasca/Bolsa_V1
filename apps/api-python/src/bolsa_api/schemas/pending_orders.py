@@ -1,3 +1,5 @@
+"""DTOs HTTP de órdenes pendientes."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

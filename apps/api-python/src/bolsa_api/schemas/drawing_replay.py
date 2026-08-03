@@ -1,3 +1,5 @@
+"""DTOs HTTP de replay de dibujos sobre OHLCV."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from bolsa_api.schemas.indicators_compute import OhlcvBarInputDto

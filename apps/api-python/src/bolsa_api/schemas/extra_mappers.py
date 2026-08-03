@@ -1,3 +1,5 @@
+"""Mappers auxiliares dominio ↔ DTO (extras)."""
+
 from bolsa_api.schemas.backtests import (
     BacktestEquityPointDto,
     BacktestRunDetailDto,

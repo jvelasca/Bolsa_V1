@@ -1,3 +1,5 @@
+"""API: escáneres y jobs en cola."""
+
 import logging
 from typing import Annotated, Any
 

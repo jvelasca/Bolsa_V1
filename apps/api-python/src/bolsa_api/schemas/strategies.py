@@ -1,3 +1,5 @@
+"""DTOs HTTP de definiciones de estrategia."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

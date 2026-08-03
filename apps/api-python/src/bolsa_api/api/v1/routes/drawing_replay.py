@@ -1,3 +1,5 @@
+"""API: replay de dibujos sobre series OHLCV."""
+
 from fastapi import APIRouter, HTTPException
 
 from bolsa_analytics.drawing_replay import OhlcvBar, evaluate_drawing_replay

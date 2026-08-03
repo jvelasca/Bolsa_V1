@@ -1,3 +1,5 @@
+"""DTOs HTTP de mercado (OHLCV / quotes)."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

@@ -1,3 +1,5 @@
+"""DTOs HTTP de escáneres / jobs."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from bolsa_api.schemas.signals_evaluate import SignalEventV1Dto

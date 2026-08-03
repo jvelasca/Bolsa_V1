@@ -1,3 +1,5 @@
+"""API: cuentas DEMO/trading (CRUD + resumen)."""
+
 from datetime import datetime
 from typing import Annotated
 

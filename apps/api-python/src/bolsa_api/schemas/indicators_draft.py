@@ -1,3 +1,5 @@
+"""DTOs HTTP de borradores de indicadores."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

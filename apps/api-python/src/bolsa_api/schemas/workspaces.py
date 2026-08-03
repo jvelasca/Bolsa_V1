@@ -1,3 +1,5 @@
+"""DTOs HTTP de espacios de trabajo."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

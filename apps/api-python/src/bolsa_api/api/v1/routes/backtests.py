@@ -1,3 +1,5 @@
+"""API: backtests, optimize y runs del Lab."""
+
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query

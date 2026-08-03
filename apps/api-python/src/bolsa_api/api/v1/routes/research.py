@@ -1,3 +1,5 @@
+"""API: research Lab Health / trials / Observatory."""
+
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query

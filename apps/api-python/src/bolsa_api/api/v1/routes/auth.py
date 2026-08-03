@@ -1,3 +1,5 @@
+"""API: autenticación / estado de sesión."""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
