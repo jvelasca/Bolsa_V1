@@ -2,8 +2,9 @@
  * Matriz de estrategias (panel izquierdo Probar).
  *
  * - Filtros: carrusel Todas / Genéricas / Optimizadas / Mis / Finalistas + (…) favoritos.
+ * - Chips en verde = filtro activo y/o cajón con filas seleccionadas para Probar + coach.
+ * - Cabecera: marcar el filtro actual añade a la selección (no borra otros cajones).
  * - (…) de columnas vive en la cabecera sticky de la tabla (no junto a Biblioteca).
- * - CTA **Probar + coach**: lote = selección del filtro, o todas las filas visibles.
  *
  * @see docs/engineering/research-lifecycle.md § Hub UX Probar
  */
@@ -26,6 +27,7 @@ import {
   STRATEGY_MATRIX_MAX_SELECTED,
   filterStrategyMatrixRows,
   formatPct,
+  strategyMatrixFiltersWithSelection,
   type StrategyMatrixFilter,
   type StrategyMatrixRow,
   type StrategyMatrixRunProgress,
@@ -248,6 +250,30 @@ export function BacktestStrategyMatrixPanel({
     return { all: rows.length, preset, optimized, mine, finalists };
   }, [rows]);
 
+  const selectionByFilter = useMemo(
+    () => strategyMatrixFiltersWithSelection(rows, selectedIds),
+    [rows, selectedIds],
+  );
+
+  const selectedCountByFilter = useMemo(() => {
+    const counts: Record<StrategyMatrixFilter, number> = {
+      all: 0,
+      preset: 0,
+      optimized: 0,
+      mine: 0,
+      finalists: 0,
+    };
+    for (const row of rows) {
+      if (!selectedIds.has(row.rowId)) continue;
+      counts.all += 1;
+      if (row.kind === 'preset') counts.preset += 1;
+      if (row.kind === 'saved' && row.savedBucket === 'optimized') counts.optimized += 1;
+      if (row.kind === 'saved' && row.savedBucket === 'mine') counts.mine += 1;
+      if (row.topRank != null) counts.finalists += 1;
+    }
+    return counts;
+  }, [rows, selectedIds]);
+
   const carouselChips = useMemo(() => {
     const chipMeta: Record<
       StrategyMatrixFilter,
@@ -288,6 +314,8 @@ export function BacktestStrategyMatrixPanel({
       count: chipMeta[id].count,
       title: chipMeta[id].title,
       disabled: chipMeta[id].disabled,
+      hasSelection: selectionByFilter.has(id),
+      selectedCount: selectedCountByFilter[id],
     }));
   }, [
     carouselPrefs,
@@ -295,6 +323,8 @@ export function BacktestStrategyMatrixPanel({
     finalistsFilterDisabled,
     finalistsFilterLabel,
     running,
+    selectionByFilter,
+    selectedCountByFilter,
   ]);
 
   const selectedCount = selectedIds.size;
@@ -323,7 +353,8 @@ export function BacktestStrategyMatrixPanel({
       selectionAnchorRef.current = null;
       return;
     }
-    onApplySelection('replace', listRowIds);
+    // Añade el filtro actual sin borrar selecciones de otros cajones (Genéricas + Mis…).
+    onApplySelection('add', listRowIds);
     selectionAnchorRef.current = listRowIds[0] ?? null;
   }
 
