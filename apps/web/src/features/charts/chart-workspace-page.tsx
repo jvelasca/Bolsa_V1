@@ -19,6 +19,7 @@ import { isShapeDrawTool } from '@/features/charts/chart-draw-tool-utils';
 import { ChartInspectorPanel } from '@/features/charts/chart-inspector-panel';
 import { ChartToolbarGlobalBar } from '@/features/charts/chart-toolbar-global-bar';
 import { ChartToolbarChartBar } from '@/features/charts/chart-toolbar-chart-bar';
+import { ChartFinalistTop1EmptyBanner } from '@/features/charts/chart-finalist-top1-switch';
 import { OhlcvChart } from '@/features/charts/ohlcv-chart';
 import { ChartIndicatorStack } from '@/features/charts/chart-indicator-stack';
 import { subPanelInstancesAll, overlayManagementInstances } from '@/features/charts/indicator-compute';
@@ -191,7 +192,9 @@ export function ChartWorkspacePage() {
   );
 
   const top1Available = top1Chart.specs.length > 0;
+  const top1Loading = strategyTopQuery.isLoading || strategyDefQuery.isLoading;
   const showTop1 = Boolean(activeTab?.showFinalistTop1Indicators);
+  const showTop1EmptyBanner = showTop1 && !top1Loading && !top1Available;
   const top1SpecKey = useMemo(
     () =>
       top1Chart.specs
@@ -490,7 +493,6 @@ export function ChartWorkspacePage() {
         onApplyIndicatorTemplate={applyIndicatorGroup}
         finalistTop1={{
           checked: showTop1,
-          disabled: !top1Available && !showTop1,
           title: finalistTop1Title,
           scope: 'chart',
           onCheckedChange: onFinalistTop1Change,
@@ -535,41 +537,48 @@ export function ChartWorkspacePage() {
             onSubPanelWeightsChange={handleSubPanelWeights}
             mainChart={
               <>
-                <OhlcvChart
-                  key={`${activeTab.id}-${timeframe}-${seriesType}`}
-                  fillContainer
-                  chartSyncId={chartTab.id}
-                  seriesType={seriesType}
-                  seriesTypeParams={activeTab.seriesTypeParams}
-                  isLoading={chartInitialLoading}
-                  instrumentId={instrumentId}
-                  symbol={activeTab.label}
-                  onOpenSyncDialog={() => openInstrumentSyncDialog(instrumentId!, activeTab.label)}
-                  bars={bars}
-                  indicators={indicators}
-                  indicatorInstances={activeTab.indicatorInstances}
-                  config={chartConfig}
-                  onPriceScaleZoomChange={setPriceScaleZoom}
-                  onVolumeScaleZoomChange={(scaleZoom) => {
-                    const volume = chartTab.indicatorInstances.find(
-                      (item) => item.definitionId === 'volume',
-                    );
-                    if (volume) setSubIndicatorScaleZoom(volume.instanceId, scaleZoom);
-                  }}
-                  drawings={activeTab.drawings}
-                  drawTool={tool}
-                  chartTimeframe={timeframe}
-                  selectedDrawingId={selectedId}
-                  onAddDrawing={(drawing) => addDrawing(drawing, activeTab.id)}
-                  onUpdateDrawing={(drawingId, patch) => updateDrawing(drawingId, patch, activeTab.id)}
-                  onSelectDrawing={setSelectedId}
-                  onDrawingAdded={handleDrawingAdded}
-                  onDrawingDragEnd={flushDrawingSave}
-                  onOpenDrawingEditor={(drawingId) => setDrawingEditorOpen(drawingId)}
-                  onConfigureIndicator={(instanceId) => openIndicatorConfig(chartTab.id, instanceId)}
-                  drawingsLayerHidden={activeTab.drawingsLayerHidden}
-                  drawingsLayerLocked={activeTab.drawingsLayerLocked}
-                />
+                <div className="relative h-full min-h-0 w-full">
+                  <OhlcvChart
+                    key={`${activeTab.id}-${timeframe}-${seriesType}`}
+                    fillContainer
+                    chartSyncId={chartTab.id}
+                    seriesType={seriesType}
+                    seriesTypeParams={activeTab.seriesTypeParams}
+                    isLoading={chartInitialLoading}
+                    instrumentId={instrumentId}
+                    symbol={activeTab.label}
+                    onOpenSyncDialog={() => openInstrumentSyncDialog(instrumentId!, activeTab.label)}
+                    bars={bars}
+                    indicators={indicators}
+                    indicatorInstances={activeTab.indicatorInstances}
+                    config={chartConfig}
+                    onPriceScaleZoomChange={setPriceScaleZoom}
+                    onVolumeScaleZoomChange={(scaleZoom) => {
+                      const volume = chartTab.indicatorInstances.find(
+                        (item) => item.definitionId === 'volume',
+                      );
+                      if (volume) setSubIndicatorScaleZoom(volume.instanceId, scaleZoom);
+                    }}
+                    drawings={activeTab.drawings}
+                    drawTool={tool}
+                    chartTimeframe={timeframe}
+                    selectedDrawingId={selectedId}
+                    onAddDrawing={(drawing) => addDrawing(drawing, activeTab.id)}
+                    onUpdateDrawing={(drawingId, patch) =>
+                      updateDrawing(drawingId, patch, activeTab.id)
+                    }
+                    onSelectDrawing={setSelectedId}
+                    onDrawingAdded={handleDrawingAdded}
+                    onDrawingDragEnd={flushDrawingSave}
+                    onOpenDrawingEditor={(drawingId) => setDrawingEditorOpen(drawingId)}
+                    onConfigureIndicator={(instanceId) =>
+                      openIndicatorConfig(chartTab.id, instanceId)
+                    }
+                    drawingsLayerHidden={activeTab.drawingsLayerHidden}
+                    drawingsLayerLocked={activeTab.drawingsLayerLocked}
+                  />
+                  {showTop1EmptyBanner ? <ChartFinalistTop1EmptyBanner /> : null}
+                </div>
                 {editorDrawing && (
                   <ChartDrawingEditPopover
                     chartId={activeTab.id}

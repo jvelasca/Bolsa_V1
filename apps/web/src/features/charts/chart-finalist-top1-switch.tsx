@@ -1,5 +1,6 @@
 /**
  * Switch Finalista TOP #1 — misma tipografía/altura que Indicadores y chips de barra.
+ * Scope: «todos» (workspace) vs «este» (gráfico activo).
  */
 
 import { cn } from '@/lib/utils';
@@ -70,12 +71,26 @@ export function ChartFinalistTop1Switch({
         </span>
         <span className="chart-indicators-label-text">Finalista #1</span>
         <span className="chart-indicators-label-short">Fin. #1</span>
-        {isAll ? (
-          <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
-            todos
-          </span>
-        ) : null}
+        <span className="rounded-full bg-muted px-1.5 py-0 text-[10px] font-semibold tabular-nums text-muted-foreground">
+          {isAll ? 'todos' : 'este'}
+        </span>
       </button>
+    </div>
+  );
+}
+
+/** Cartel en el gráfico cuando el overlay TOP #1 está ON pero no hay specs. */
+export function ChartFinalistTop1EmptyBanner({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'pointer-events-none absolute left-2 top-2 z-20 rounded border border-amber-500/40 bg-background/90 px-2 py-1 text-[11px] font-medium leading-none text-amber-800 shadow-sm dark:text-amber-300',
+        className,
+      )}
+      role="status"
+      data-testid="chart-finalist-top1-empty-banner"
+    >
+      No hay indicador finalista
     </div>
   );
 }
