@@ -47,6 +47,7 @@ const webTests = [
   'src/features/trading/supervised-f3-sync.test.ts',
   'src/features/trading/semi-demo-operativa.test.ts',
   'src/features/trading/semi-confirm-mandate.test.ts',
+  'src/features/trading/semi-hm-conflict.test.ts',
   'src/features/backtests/finalist-propose-supervised.test.ts',
   'src/stores/supervised-f3-queue-store.test.ts',
   'src/features/settings/paper-paths-copy.test.ts',

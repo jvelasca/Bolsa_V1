@@ -18,6 +18,7 @@
 | **Estabilidad IBEX** | ¿Ranking RSI estable entre ventanas? | **No** (13 same / 22 changed) → Gate C4 **cerrado** |
 | **IBEX Finalistas** | ¿Cobertura TOP? | **35/35**, `TOP_sin_runId=0` |
 | **Freeze producto** | ¿C4 / Belief / flags ops? | **No abrir** — [decision freeze](./post-audit-decision-freeze-2026-08-03.md) |
+| **DEMO SEMI** | ¿Libro operativo Confirm F3? | Sí — MANUAL/SEMI · geo · cola BD · tenure 5a/5b · H≠M · [handoff](./session-handoff-2026-08-03-semi.md) · `pnpm test:semi` |
 | **Auditoría 1 (ingesta+FIE)** | ¿Gaps A/B del informe externo? | Ver [audit1-response](./audit1-response-ingest-fie-2026-08-03.md) — CB Yahoo + cuarentena + health Redis + test FIE parcial |
 | **Auditoría 2 (Lab UI)** | ¿Workers / Zod / abort / DD? | Ver [audit2-response](./audit2-response-backtests-lab-2026-08-03.md) — abort LLM + schema + underwater DD + elapsedMs |
 | **Round 2 externas (A0·N4·Deep)** | ¿Complejidad docs / radiografía freeze / deep code? | Ver [audit-ext-round2-triage](./audit-ext-round2-triage-2026-08-03.md) — Index + bounded contexts; Deep = errata de stack |
@@ -26,8 +27,8 @@
 
 1. Leer este doc §0–§2 y el freeze.  
 2. Etapa base: [stage-audit](./stage-audit-lab-dia-d-mandate-2026-08-02.md) §0–§3.  
-3. Tests offline: `pnpm test:operativa` · `pnpm test:coach` (sin API).  
-4. Stack: Docker + `pnpm dev` → `pnpm test:operativa:smoke` · `pnpm test:coach:smoke`.  
+3. Tests offline: `pnpm test:operativa` · `pnpm test:coach` · `pnpm test:semi` (sin API).  
+4. Stack: Docker + `pnpm dev` → `pnpm test:operativa:smoke` · `pnpm test:coach:smoke` · `pnpm test:semi:smoke`.  
 5. Ops: `pnpm audit:ibex35:missing` → esperar `con_TOP=35/35`.  
 6. Estabilidad: observation [2026-08-03-stability-delta-ibex.md](../../research/observations/2026-08-03-stability-delta-ibex.md).  
 7. Si el informe cita tRPC / Next / `packages/engine`: leer [round2 triage](./audit-ext-round2-triage-2026-08-03.md) §3 primero.
@@ -155,7 +156,8 @@ Fuente: [research/observations/ISSUES.md](../../research/observations/ISSUES.md)
 1. Abrir http://localhost:5173 · universo LAB.  
 2. Lista **IBEX 35** → **Play ciclo** → mayoría **Omitido** (frescura v1.3).  
 3. Monitor → cola CORE-R (sin overwrite TOP).  
-4. Ayuda → Backtesting: sync date **2026-08-03**, CORE-R v1.12.
+4. Ayuda → Backtesting: sync date **2026-08-03**, CORE-R v1.12.  
+5. **SEMI (opcional):** Libro DEMO SEMI → Finalistas Proponer + alarma → F3 H≠M → Confirm → tenure en Coach.  
 
 ---
 

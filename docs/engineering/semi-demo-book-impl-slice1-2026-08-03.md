@@ -56,6 +56,9 @@ Migración: `python packages/py/infrastructure/scripts/apply_supervised_f3_accou
 - [x] Aplicar migración local  
 - [x] Battery `pnpm test:semi` + smoke API  
 
+- [x] H≠M emparejado en Confirm (Finalistas + Radar mismo valor)  
+- [x] `strategyOrSignalRef` → tenure Mandato  
+
 ## Checklist prueba DEMO
 
 - [x] Unit: prefs · geo · Finalistas path · queue store · operativa contract  

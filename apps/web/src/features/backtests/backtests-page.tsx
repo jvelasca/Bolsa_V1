@@ -1994,6 +1994,7 @@ export function BacktestsPage() {
         symbol,
         accountId: effectiveAccountId,
         strategyDefinitionId: slot.strategyDefinitionId,
+        strategyLabel: slot.label,
       });
     },
     onSuccess: (payload, slot) => {

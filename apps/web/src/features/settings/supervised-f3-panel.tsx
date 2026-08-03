@@ -42,6 +42,10 @@ import {
   rankByOptimalThenGeo,
 } from '@/features/trading/demo-book-geo-rank';
 import { recordSemiConfirmMandate } from '@/features/trading/semi-confirm-mandate';
+import {
+  conflictForActive,
+  findHmConflicts,
+} from '@/features/trading/semi-hm-conflict';
 import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
 
 type ProposePayload = SupervisedProposePayload;
@@ -261,6 +265,15 @@ export function SupervisedF3Panel() {
   const instrumentsForSelect = useMemo(
     () => (instrumentsQuery.data ?? []).slice(0, 40),
     [instrumentsQuery.data],
+  );
+
+  const hmConflicts = useMemo(
+    () => findHmConflicts(queueItems),
+    [queueItems],
+  );
+  const activeHm = useMemo(
+    () => conflictForActive(hmConflicts, activeId),
+    [hmConflicts, activeId],
   );
 
   useEffect(() => {
@@ -524,13 +537,39 @@ export function SupervisedF3Panel() {
           </div>
         ) : null}
 
-        {activeOrigin === 'finalists' && pending ? (
+        {activeHm && pending ? (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 space-y-2 text-[11px]">
+            <p className="leading-snug text-foreground">
+              <strong>H ≠ M</strong> en {activeHm.symbol ?? activeHm.instrumentId.slice(0, 8)}:{' '}
+              Finalistas <strong>{activeHm.h.payload.action}</strong> vs Radar{' '}
+              <strong>{activeHm.m.payload.action}</strong>. Elige cuál Confirm.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded border border-primary/40 px-2 py-1 text-primary hover:bg-accent"
+                onClick={() => setActive(activeHm.h.id)}
+              >
+                Elegir H · Finalistas
+              </button>
+              <button
+                type="button"
+                className="rounded border border-amber-500/40 px-2 py-1 text-amber-800 hover:bg-accent dark:text-amber-300"
+                onClick={() => setActive(activeHm.m.id)}
+              >
+                Elegir M · Radar
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {activeOrigin === 'finalists' && pending && !activeHm ? (
           <p className="rounded-md border border-primary/35 bg-primary/5 px-3 py-2 text-[11px] leading-snug text-foreground">
             <strong>H · Finalistas</strong> (Camino C / SEMI). Si el momento Radar discrepa,
             elige en Confirm (aceptar, ajustar qty o rechazar). Siguiente: Confirmar + ejecutar.
           </p>
         ) : null}
-        {activeOrigin === 'alarm' && pending ? (
+        {activeOrigin === 'alarm' && pending && !activeHm ? (
           <p className="rounded-md border border-amber-500/35 bg-amber-500/5 px-3 py-2 text-[11px] leading-snug text-foreground">
             <strong>M · Momento (Radar)</strong>. Contrasta con Finalistas del valor si los hay.
             Tú decides en Confirm.
