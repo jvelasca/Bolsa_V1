@@ -73,6 +73,10 @@ export function ChartWorkspacePage() {
     (s) => s.setShowFinalistTop1Indicators,
   );
   const syncFinalistTop1Indicators = useWorkspaceStore((s) => s.syncFinalistTop1Indicators);
+  const setFinalistTop1DefaultForAll = useWorkspaceStore((s) => s.setFinalistTop1DefaultForAll);
+  const finalistTop1DefaultOn = useWorkspaceStore((s) =>
+    Boolean(s.workspace.preferences.finalistTop1DefaultOn),
+  );
 
   const applyIndicatorGroup = useCallback(
     (templateId: string) => {
@@ -220,6 +224,23 @@ export function ChartWorkspacePage() {
     [activeTab?.id, setShowFinalistTop1Indicators, top1Chart.specs],
   );
 
+  const onFinalistTop1AllChange = useCallback(
+    (next: boolean) => {
+      setFinalistTop1DefaultForAll(next);
+      if (next && activeTab?.id) {
+        // Specs del gráfico activo ya; el resto se rellena al enfocar cada pestaña.
+        setShowFinalistTop1Indicators(true, top1Chart.specs, activeTab.id);
+      }
+      requestChartReflow();
+    },
+    [
+      setFinalistTop1DefaultForAll,
+      setShowFinalistTop1Indicators,
+      activeTab?.id,
+      top1Chart.specs,
+    ],
+  );
+
   const finalistTop1Title = useMemo(() => {
     if (!instrumentId) {
       return 'Selecciona un instrumento para ver el Finalista TOP #1';
@@ -231,7 +252,7 @@ export function ChartWorkspacePage() {
       return 'Sin Finalista TOP #1 con indicadores para este valor y timeframe';
     }
     const label = top1Chart.label ? ` (${top1Chart.label})` : '';
-    return `Mostrar indicadores del Finalista TOP #1${label} · mismo timeframe del gráfico`;
+    return `Este gráfico: indicadores del Finalista TOP #1${label} · mismo timeframe`;
   }, [
     instrumentId,
     strategyTopQuery.isLoading,
@@ -239,6 +260,9 @@ export function ChartWorkspacePage() {
     top1Available,
     top1Chart.label,
   ]);
+
+  const finalistTop1AllTitle =
+    'Todos los gráficos: activa Finalista TOP #1 en las pestañas abiertas y en las que abras después. Luego puedes apagarlo en un valor concreto.';
 
   const onTimeframeChange = useCallback(
     (next: ChartTimeframe) => {
@@ -434,10 +458,10 @@ export function ChartWorkspacePage() {
         onOpenIndicatorsCatalog={openIndicatorsCatalog}
         onToggleChartInspector={toggleChartInspector}
         finalistTop1={{
-          checked: showTop1,
-          disabled: !top1Available && !showTop1,
-          title: finalistTop1Title,
-          onCheckedChange: onFinalistTop1Change,
+          checked: finalistTop1DefaultOn,
+          title: finalistTop1AllTitle,
+          scope: 'all',
+          onCheckedChange: onFinalistTop1AllChange,
         }}
         onQuickBuy={() => {
           const data = instrumentQuery.data?.data;
@@ -468,6 +492,7 @@ export function ChartWorkspacePage() {
           checked: showTop1,
           disabled: !top1Available && !showTop1,
           title: finalistTop1Title,
+          scope: 'chart',
           onCheckedChange: onFinalistTop1Change,
         }}
         instrument={instrumentQuery.data?.data}

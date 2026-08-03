@@ -235,6 +235,7 @@ export function ChartToolbarChartBar({
               checked={finalistTop1.checked}
               disabled={finalistTop1.disabled}
               title={finalistTop1.title}
+              scope={finalistTop1.scope ?? 'chart'}
               onCheckedChange={finalistTop1.onCheckedChange}
               className={CHART_TOOLBAR_EMBEDDED_CLASS}
             />

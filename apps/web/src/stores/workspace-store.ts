@@ -551,6 +551,15 @@ function createChartTabForInstrument(
   const templateTab = resolveNewChartTemplateTab(workspace);
   if (templateTab) {
     tab = applyChartNewTabSeed(tab, extractChartNewTabSeed(templateTab), cloneChartConfig);
+    if (workspace.preferences.finalistTop1DefaultOn) {
+      tab = {
+        ...tab,
+        showFinalistTop1Indicators: true,
+        indicatorInstances: tab.indicatorInstances.filter(
+          (instance) => instance.origin !== 'finalist-top1',
+        ),
+      };
+    }
     return tab;
   }
 
@@ -564,6 +573,15 @@ function createChartTabForInstrument(
       );
       tab = mapTabIndicators(tab, instances, template.id);
     }
+  }
+  if (workspace.preferences.finalistTop1DefaultOn) {
+    tab = {
+      ...tab,
+      showFinalistTop1Indicators: true,
+      indicatorInstances: tab.indicatorInstances.filter(
+        (instance) => instance.origin !== 'finalist-top1',
+      ),
+    };
   }
   return tab;
 }
@@ -600,6 +618,7 @@ function normalizeChartTab(raw: Partial<ChartTabState>, fallback?: ChartInstance
     drawings: sanitizeChartDrawings(raw.drawings),
     sourceListId: raw.sourceListId,
     activeIndicatorTemplateId: raw.activeIndicatorTemplateId ?? null,
+    showFinalistTop1Indicators: Boolean(raw.showFinalistTop1Indicators),
     toolbar: normalizeChartToolbarChartOverrides(raw.toolbar),
     pricePanelHeightPct: resolvePricePanelHeightPct(raw.pricePanelHeightPct),
   };
@@ -856,12 +875,19 @@ interface WorkspaceState {
    * Activa/desactiva el overlay Finalista TOP #1 en el gráfico.
    * Si `enabled` y se pasan `specs`, sincroniza instancias `origin: 'finalist-top1'`.
    * Si `enabled===false`, limpia solo esas instancias (no toca manuales).
+   * No cambia `preferences.finalistTop1DefaultOn` (opt-in/out por gráfico).
    */
   setShowFinalistTop1Indicators: (
     enabled: boolean,
     specs?: Array<{ definitionId: string; parameters: Record<string, number | boolean | string> }>,
     chartId?: string,
   ) => void;
+  /**
+   * Política workspace: ON → default para gráficos nuevos + activa en todas las pestañas abiertas.
+   * OFF → quita el default y limpia el overlay en todos los gráficos.
+   * Cada gráfico puede desactivarse después con `setShowFinalistTop1Indicators(false, …)`.
+   */
+  setFinalistTop1DefaultForAll: (enabled: boolean) => void;
   /** Re-aplica specs TOP #1 sin cambiar el flag (p. ej. al cambiar instrumento/TF con switch ON). */
   syncFinalistTop1Indicators: (
     specs: Array<{ definitionId: string; parameters: Record<string, number | boolean | string> }>,
@@ -1804,6 +1830,45 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const tab = get().workspace.charts.find((item) => item.id === targetId);
         if (!tab?.showFinalistTop1Indicators) return;
         get().setShowFinalistTop1Indicators(true, specs, targetId);
+      },
+      setFinalistTop1DefaultForAll: (enabled) => {
+        set((state) => {
+          const prevDefault = Boolean(state.workspace.preferences.finalistTop1DefaultOn);
+          const chartsUnchanged =
+            prevDefault === enabled &&
+            state.workspace.charts.every((tab) => Boolean(tab.showFinalistTop1Indicators) === enabled);
+          if (chartsUnchanged) return state;
+
+          const charts = state.workspace.charts.map((tab) => {
+            if (enabled) {
+              if (tab.showFinalistTop1Indicators) return tab;
+              return { ...tab, showFinalistTop1Indicators: true };
+            }
+            if (!tab.showFinalistTop1Indicators) {
+              const hasTop = tab.indicatorInstances.some((inst) => inst.origin === 'finalist-top1');
+              if (!hasTop) return tab;
+            }
+            const indicatorInstances = tab.indicatorInstances.filter(
+              (inst) => inst.origin !== 'finalist-top1',
+            );
+            return {
+              ...mapTabIndicators(tab, indicatorInstances, tab.activeIndicatorTemplateId),
+              showFinalistTop1Indicators: false,
+            };
+          });
+
+          return {
+            workspace: finalizeChartWorkspace({
+              ...state.workspace,
+              preferences: {
+                ...state.workspace.preferences,
+                finalistTop1DefaultOn: enabled,
+              },
+              charts,
+            }),
+            isDirty: true,
+          };
+        });
       },
       toggleIndicatorOnChart: (definitionId, parameters, chartId) => {
         const definition = findIndicatorDefinition(definitionId);

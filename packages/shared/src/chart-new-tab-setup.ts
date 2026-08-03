@@ -74,7 +74,9 @@ export function extractChartNewTabSeed(tab: ChartTabState): ChartNewTabSeed {
       colors: { ...tab.chart.colors },
       display: { ...tab.chart.display },
     },
-    indicatorInstances: tab.indicatorInstances.map((instance) => ({
+    indicatorInstances: tab.indicatorInstances
+      .filter((instance) => instance.origin !== 'finalist-top1')
+      .map((instance) => ({
       ...instance,
       parameters: { ...instance.parameters },
     })),

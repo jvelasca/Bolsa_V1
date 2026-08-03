@@ -1,5 +1,5 @@
 /**
- * Switch barra Indicadores: overlay Finalista TOP #1 del valor/TF del gráfico.
+ * Switch Finalista TOP #1 — scope por gráfico o política «todos» del workspace.
  */
 
 import { cn } from '@/lib/utils';
@@ -8,10 +8,14 @@ import {
   CHART_BAR_ZONE_ROW_CLASS,
 } from '@/features/charts/chart-bar-zone-styles';
 
+export type ChartFinalistTop1Scope = 'chart' | 'all';
+
 type Props = {
   checked: boolean;
   disabled?: boolean;
   title?: string;
+  /** `all` = política workspace (barra general); `chart` = solo este gráfico. */
+  scope?: ChartFinalistTop1Scope;
   onCheckedChange: (next: boolean) => void;
   className?: string;
 };
@@ -20,17 +24,21 @@ export function ChartFinalistTop1Switch({
   checked,
   disabled,
   title,
+  scope = 'chart',
   onCheckedChange,
   className,
 }: Props) {
+  const isAll = scope === 'all';
   return (
     <div
       className={cn(CHART_BAR_ZONE_ROW_CLASS, 'shrink-0 gap-1.5', className)}
       title={
         title ??
-        'Mostrar en el gráfico los indicadores del Finalista TOP #1 (mismo timeframe)'
+        (isAll
+          ? 'Activar Finalista TOP #1 en todos los gráficos abiertos y en los que abras después. Cada gráfico se puede apagar solo.'
+          : 'Mostrar en este gráfico los indicadores del Finalista TOP #1 (mismo timeframe)')
       }
-      data-testid="chart-finalist-top1-switch"
+      data-testid={isAll ? 'chart-finalist-top1-all-switch' : 'chart-finalist-top1-switch'}
     >
       <button
         type="button"
@@ -63,6 +71,11 @@ export function ChartFinalistTop1Switch({
         </span>
         <span className="text-[10px] font-semibold uppercase tracking-wide">Finalista</span>
         <span className="text-[10px] font-bold tabular-nums">#1</span>
+        {isAll ? (
+          <span className="rounded bg-muted px-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+            todos
+          </span>
+        ) : null}
       </button>
     </div>
   );

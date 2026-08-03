@@ -179,6 +179,7 @@ export interface ChartTabState {
   /**
    * Switch barra Indicadores: pintar indicadores del Finalista TOP #1
    * (mismo TF que el gráfico). Las instancias llevan `origin: 'finalist-top1'`.
+   * Independiente del default workspace (`preferences.finalistTop1DefaultOn`).
    */
   showFinalistTop1Indicators?: boolean;
   /** Personalización de la barra de herramientas de este gráfico. */
@@ -221,6 +222,11 @@ export interface WorkspaceDocument {
     openOnStartup: boolean;
     /** Pestaña plantilla para gráficos nuevos; `null` = defaults del workspace. */
     newChartTemplateChartId?: string | null;
+    /**
+     * Si true, los gráficos nuevos (y el switch «todos» de la barra general)
+     * activan el overlay Finalista TOP #1. Cada gráfico puede desactivarlo solo.
+     */
+    finalistTop1DefaultOn?: boolean;
     /** @deprecated Usar `newChartTemplateChartId`. */
     newChartConfigSource?: NewChartConfigSource;
   };

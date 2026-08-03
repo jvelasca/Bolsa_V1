@@ -8,12 +8,14 @@ import {
   CHART_BAR_ZONE_ROW_CLASS,
 } from '@/features/charts/chart-bar-zone-styles';
 import { ChartFinalistTop1Switch } from '@/features/charts/chart-finalist-top1-switch';
+import type { ChartFinalistTop1Scope } from '@/features/charts/chart-finalist-top1-switch';
 import { cn } from '@/lib/utils';
 
 export type ChartFinalistTop1Control = {
   checked: boolean;
   disabled?: boolean;
   title?: string;
+  scope?: ChartFinalistTop1Scope;
   onCheckedChange: (next: boolean) => void;
 };
 
@@ -25,7 +27,7 @@ export function ChartIndicatorsBar({
 }: {
   onOpenCatalog: () => void;
   chartIndicatorCount?: number;
-  /** Switch overlay Finalista TOP #1 (mismo TF del gráfico). */
+  /** Switch overlay Finalista TOP #1 (política «todos» o por gráfico). */
   finalistTop1?: ChartFinalistTop1Control;
   className?: string;
 }) {
@@ -58,6 +60,7 @@ export function ChartIndicatorsBar({
           checked={finalistTop1.checked}
           disabled={finalistTop1.disabled}
           title={finalistTop1.title}
+          scope={finalistTop1.scope ?? 'all'}
           onCheckedChange={finalistTop1.onCheckedChange}
           className="shrink-0"
         />
