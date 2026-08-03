@@ -1,3 +1,5 @@
+"""API: definiciones de estrategia."""
+
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException

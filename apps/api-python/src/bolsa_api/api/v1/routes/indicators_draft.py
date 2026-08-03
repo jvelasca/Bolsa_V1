@@ -1,3 +1,5 @@
+"""API: borradores de indicadores."""
+
 
 from fastapi import APIRouter, HTTPException
 

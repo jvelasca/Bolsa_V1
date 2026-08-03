@@ -1,3 +1,5 @@
+"""DTOs HTTP de políticas de ejecución."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

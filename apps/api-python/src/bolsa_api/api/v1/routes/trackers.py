@@ -1,3 +1,5 @@
+"""API: trackers de producto (Ayuda/Config)."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query

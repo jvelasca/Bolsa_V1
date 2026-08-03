@@ -1,3 +1,5 @@
+"""DTOs HTTP de cartera / posiciones."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

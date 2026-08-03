@@ -1,3 +1,5 @@
+"""DTOs HTTP de trackers (Ayuda / Config)."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

@@ -1,3 +1,5 @@
+"""DTOs HTTP de listas / universos (watchlists)."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from bolsa_api.schemas.instruments import InstrumentWithMetaDto

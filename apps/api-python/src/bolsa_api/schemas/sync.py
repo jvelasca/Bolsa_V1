@@ -1,3 +1,5 @@
+"""DTOs HTTP de sync Yahoo/XTB / cola."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

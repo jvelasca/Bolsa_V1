@@ -1,3 +1,5 @@
+"""DTOs HTTP de cómputo de indicadores."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

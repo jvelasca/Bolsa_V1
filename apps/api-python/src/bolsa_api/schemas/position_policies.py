@@ -1,3 +1,5 @@
+"""DTOs HTTP de políticas de posición."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

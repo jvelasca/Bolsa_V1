@@ -1,3 +1,5 @@
+"""API: estado BD y purgas administrativas."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query

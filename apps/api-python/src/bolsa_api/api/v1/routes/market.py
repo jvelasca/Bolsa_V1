@@ -1,3 +1,5 @@
+"""API: datos de mercado (OHLCV, búsqueda)."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query

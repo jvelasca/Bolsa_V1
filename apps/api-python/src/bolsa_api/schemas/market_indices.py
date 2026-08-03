@@ -1,3 +1,5 @@
+"""DTOs HTTP de índices y constitutivos."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

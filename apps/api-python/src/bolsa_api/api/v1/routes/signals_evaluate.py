@@ -1,3 +1,5 @@
+"""API: evaluación de señales / presets."""
+
 from fastapi import APIRouter, HTTPException
 
 from bolsa_analytics.signals.strategy import StrategyBarInput, evaluate_strategy

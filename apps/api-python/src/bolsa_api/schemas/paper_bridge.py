@@ -1,3 +1,5 @@
+"""DTOs HTTP del puente paper (broker futuro / D)."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

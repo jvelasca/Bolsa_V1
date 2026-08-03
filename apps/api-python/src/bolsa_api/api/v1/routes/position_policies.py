@@ -1,3 +1,5 @@
+"""API: políticas de posición."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query

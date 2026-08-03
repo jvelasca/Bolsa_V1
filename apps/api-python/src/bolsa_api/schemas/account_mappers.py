@@ -1,3 +1,5 @@
+"""Mappers cuenta ↔ DTO HTTP (accounts API)."""
+
 from bolsa_api.schemas.accounts import (
     AccountSettingsDto,
     AccountSummaryDto,

@@ -1,3 +1,5 @@
+"""DTOs HTTP de research / Lab Health / trials."""
+
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field

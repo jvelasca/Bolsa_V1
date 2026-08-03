@@ -1,3 +1,5 @@
+"""Mappers principales dominio ↔ DTO HTTP."""
+
 from bolsa_analytics.indicators import IndicatorPoint, IndicatorSignals
 from bolsa_api.schemas.instruments import (
     IndicatorPointDto,

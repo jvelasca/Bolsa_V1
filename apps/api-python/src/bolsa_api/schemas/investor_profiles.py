@@ -1,3 +1,5 @@
+"""DTOs HTTP de perfiles inversor (CORE-P)."""
+
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field

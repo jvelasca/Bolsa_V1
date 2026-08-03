@@ -1,3 +1,5 @@
+"""DTOs HTTP de cuentas de trading/DEMO."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

@@ -1,3 +1,5 @@
+"""DTOs HTTP de operaciones de BD (estado, purga)."""
+
 from pydantic import BaseModel, ConfigDict, Field
 
 

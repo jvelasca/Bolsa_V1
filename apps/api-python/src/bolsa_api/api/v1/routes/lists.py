@@ -1,3 +1,5 @@
+"""API: listas / universos (IBEX, watchlists)."""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
