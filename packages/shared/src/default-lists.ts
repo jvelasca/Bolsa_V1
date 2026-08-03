@@ -1,6 +1,12 @@
-/** IDs de listas integradas en el panel (no persistidas en API). */
+/**
+ * IDs de listas virtuales del panel Watchlist (no persistidas en API).
+ *
+ * `VIRTUAL_LIST_VISUALIZATION` («En estudio») = instrumentos con pestaña de gráfico abierta.
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ */
 export const VIRTUAL_LIST_PORTFOLIO = '__builtin:portfolio__' as const;
 export const VIRTUAL_LIST_PENDING_ORDERS = '__builtin:pending-orders__' as const;
+/** Lista «En estudio» (id legacy `visualization`). */
 export const VIRTUAL_LIST_VISUALIZATION = '__builtin:visualization__' as const;
 
 export type VirtualListId =
@@ -23,7 +29,7 @@ export const VIRTUAL_LIST_LABELS: Record<VirtualListId, string> = {
 /** ID estable de la lista de catálogo IBEX 35 en API (coincide con `DEFAULT_LIST_CONFIG.id`). */
 export const CATALOG_IBEX_LIST_ID = 'ibex35';
 
-/** Carrusel por defecto: cartera + pendientes + visualización (IBEX se añade al cargar catálogo API). */
+/** Carrusel por defecto: Cartera + Órdenes pendientes + En estudio (IBEX se añade al cargar catálogo API). */
 export const DEFAULT_VIRTUAL_CAROUSEL_IDS: readonly VirtualListId[] = [
   VIRTUAL_LIST_PORTFOLIO,
   VIRTUAL_LIST_PENDING_ORDERS,

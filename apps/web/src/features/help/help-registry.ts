@@ -92,12 +92,22 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: 'docs/adr/019-dual-universes-lab-vs-trading.md',
         role: 'adr',
-        note: 'LAB ≠ TRADING · rail Coach',
+        note: 'LAB ≠ TRADING · panel Operativa',
       },
       {
         path: 'docs/adr/020-operating-mandate-tenure.md',
         role: 'adr',
         note: 'Mandato operativo · tenure · trades enlazados',
+      },
+      {
+        path: 'docs/engineering/trading-operativa-panel-2026-08-04.md',
+        role: 'doc',
+        note: 'Operativa full-height · IO · En estudio · modos',
+      },
+      {
+        path: 'docs/engineering/chart-top1-indicator-switch-2026-08-03.md',
+        role: 'doc',
+        note: 'Finalista #1 · todos / este',
       },
       {
         path: 'apps/web/src/features/trading/trading-operativa-panel.tsx',

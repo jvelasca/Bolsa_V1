@@ -1,6 +1,10 @@
 /**
  * Panel Operativa (Trading) — Recomendación (Pulso+TOP) / Info / Configuración.
- * Universo ranking = pestañas abiertas = lista «En estudio».
+ *
+ * Universo ranking IO = pestañas abiertas = lista «En estudio».
+ * Layout: columna full-height a la derecha de watchlist+gráfico+operaciones.
+ *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -21,6 +25,7 @@ import {
 } from '@/features/platform/strategy-adoption';
 import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel';
 import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
+import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
 import { TradingOperativaSection } from '@/features/trading/trading-operativa-section';
 import {
   OperativaPulseBlock,
@@ -61,6 +66,15 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const symbol = active?.label ?? '—';
   const timeframe = (active?.timeframe as string) || '1d';
   const { effectiveAccountId } = useActiveAccount();
+  const bookPrefs = useDemoBookPrefs();
+  const configTitle = (
+    <>
+      Configuración{' '}
+      <span className="font-medium normal-case tracking-normal text-muted-foreground">
+        (operativa {bookPrefs.mode})
+      </span>
+    </>
+  );
   const mandateRev = useSyncExternalStore(
     subscribeMandateStore,
     getMandateStoreSnapshot,
@@ -314,7 +328,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         </div>
       </TradingOperativaSection>
 
-      <TradingOperativaSection sectionId="config" title="Configuración">
+      <TradingOperativaSection sectionId="config" title={configTitle}>
         <DemoBookModePanel compact />
       </TradingOperativaSection>
     </div>

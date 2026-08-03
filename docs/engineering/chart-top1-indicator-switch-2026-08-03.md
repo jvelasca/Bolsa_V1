@@ -28,3 +28,8 @@ Las pestañas inactivas solo marcan el flag; al enfocarlas se sincronizan los ov
 ## Fuera de alcance
 
 AUTO / Belief / mandato / execute. Plantilla de indicadores apaga el flag de **ese** gráfico (opt-out), no la política «todos».
+
+## Relacionado
+
+- [trading-operativa-panel-2026-08-04.md](./trading-operativa-panel-2026-08-04.md) — panel Operativa / En estudio / IO
+- [HELP.md](../HELP.md) — sync Ayuda

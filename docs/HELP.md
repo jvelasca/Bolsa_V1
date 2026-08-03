@@ -1,13 +1,15 @@
 # Ayuda en la app — coordinación con trackers y docs
 
-> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-03**  
-> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.12**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2** · Lab Health Q0 · warm-up Q1.6) + Trading (rail Coach · ADR-019 · **Mandato ADR-020 M1b BD**).  
+> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-04**  
+> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.12**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2** · Lab Health Q0 · warm-up Q1.6) + Trading (**panel Operativa** · En estudio · IO · ADR-019 · **Mandato ADR-020 M1b BD**).  
 > **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
 > **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho.  
 > **Decisión freeze:** [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · `CORE_R_CRON` / `COST_MODEL_V2` off.  
 > **Futuro Belief→Coach (brief, no código):** [engineering/belief-coach-brief-draft-2026-08-03.md](./engineering/belief-coach-brief-draft-2026-08-03.md).  
 > **Biblioteca estrategias L0/L1:** [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) — Genéricas · Optimizadas · Mis estrategias (prompt).  
 > **DEMO operativa SEMI:** [engineering/demo-operating-modes-brief-2026-08-03.md](./engineering/demo-operating-modes-brief-2026-08-03.md) · [impl slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) — MANUAL/SEMI · Confirm F3 · sizing 10%.  
+> **Panel Operativa (mesa Trading):** [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md) — IO · En estudio · layout full-height.  
+> **Chart TOP#1:** [engineering/chart-top1-indicator-switch-2026-08-03.md](./engineering/chart-top1-indicator-switch-2026-08-03.md).  
 > **Auditoría (paquete único post-Q3):** [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
 > **Engineering Index / round 2 externas:** [engineering/engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md) · [audit-ext-round2-triage](./engineering/audit-ext-round2-triage-2026-08-03.md).  
 > **Respuesta auditoría 1 (ingesta+FIE):** [engineering/audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md).  
@@ -18,7 +20,7 @@
 > **Universos:** [LAB vs TRADING](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [Mandato](./adr/020-operating-mandate-tenure.md) · [Reconciliación DÍA D](./adr/021-dia-d-reconciliation.md).  
 > Configuración → **BD** (estado PostgreSQL, purga de huérfanos y demos cerradas).  
 > **Espacios de trabajo:** chip superior → gestor (nuevo blanco / duplicar / renombrar); arranque = último activo.  
-> Handoff: [engineering/session-handoff-2026-08-03-semi.md](./engineering/session-handoff-2026-08-03-semi.md) (SEMI libro DEMO) · [2026-08-01](./engineering/session-handoff-2026-08-01.md) (cierre racha) · previo [07-31](./engineering/session-handoff-2026-07-31.md) · DÍA D: [engineering/backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md) · Plan prueba: [engineering/operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md) · Lista AUTO: [engineering/list-auto-ops-2026-07-29.md](./engineering/list-auto-ops-2026-07-29.md).  
+> Handoff: [engineering/session-handoff-2026-08-04-operativa.md](./engineering/session-handoff-2026-08-04-operativa.md) · [SEMI](./engineering/session-handoff-2026-08-03-semi.md) · [2026-08-01](./engineering/session-handoff-2026-08-01.md) · DÍA D: [engineering/backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md) · Plan prueba: [engineering/operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md) · Lista AUTO: [engineering/list-auto-ops-2026-07-29.md](./engineering/list-auto-ops-2026-07-29.md).  
 > (`apps/web/src/features/help/help-content-as-of.ts`)
 
 La UI **Ayuda (?)** muestra guías y tableros de seguimiento.  
@@ -39,19 +41,26 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 | Sección Ayuda | Tracker / UI | Docs |
 |---------------|--------------|------|
 | **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [roadmap post-auditorías](./engineering/improvement-roadmap-post-audits-2026-08-02.md), [estabilidad temporal](./engineering/stability-campaign-protocol-2026-08-02.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [universos LAB/TRADING](./engineering/dual-universes-lab-trading-design-2026-08-02.md), [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020 Mandato](./adr/020-operating-mandate-tenure.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
-| **Trading** | panel **Operativa** (Recomendación / Info / Configuración) + Libro DEMO + Mandato + alarmas → F3 | [demo-operating-modes](./engineering/demo-operating-modes-brief-2026-08-03.md) · [SEMI slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [ADR-020](./adr/020-operating-mandate-tenure.md) |
+| **Trading** | panel **Operativa** (IO · En estudio · modos) + Mandato + alarmas → F3 | [operativa panel](./engineering/trading-operativa-panel-2026-08-04.md) · [TOP#1 chart](./engineering/chart-top1-indicator-switch-2026-08-03.md) · [demo-operating-modes](./engineering/demo-operating-modes-brief-2026-08-03.md) · [SEMI slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [ADR-020](./adr/020-operating-mandate-tenure.md) |
 | Análisis del valor | `value-analysis-tracker.ts` | FA status / FIE |
 | Datos de mercado | `data-market-tracker.ts` | data capture |
 | Watchlist / listas | `watchlist-lists-tracker.ts` | lists-universes |
 | Plataforma IA | `ai-platform-tracker.ts` | AI_PLATFORM_SOLUTION |
 | Gráficos | `chart-platform-tracker.ts` | charts |
 
-**Panel Operativa (Trading):** dock lateral colapsable/redimensionable. Secciones con scroll y altura ajustable: **Recomendación** (Índice Operativo IO · TA · FA + «El n de N en estudio» + TOP #1), **Info**, **Configuración**. Lista virtual **En estudio** = pestañas de gráfico abiertas. Chips TA/FA de la barra del gráfico siguen configurables con ⋯.
+**Panel Operativa (Trading):** columna lateral a **altura completa** (hasta la barra de estado); Operaciones solo a su izquierda (bajo watchlist + gráfico). Secciones con scroll y altura ajustable:
+
+- **Recomendación** — Índice Operativo (IO) · gauges TA/FA · «El n de N en estudio» · TOP #1 / adopción.
+- **Info** — mandato / Learning.
+- **Configuración (operativa manual|semi|auto)** — modo visible en cabecera; bloque titulado con el **nombre de la cuenta activa** (MANUAL/SEMI · % cash · máx. posiciones · geo).
+
+Lista virtual **En estudio** = pestañas de gráfico abiertas (mismo conjunto). Chips TA/FA de la barra del gráfico siguen configurables con ⋯. Detalle: [trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md).
 
 **Gráfico Trading — TOP#1:**
 - Barra general (**Indicadores**): switch **Finalista #1 · todos**.
 - Barra del gráfico en uso: switch **Finalista #1 · este**.
 - Sin TOP: cartel «No hay indicador finalista». OFF quita solo `origin: finalist-top1`.
+- Detalle: [chart-top1-indicator-switch-2026-08-03.md](./engineering/chart-top1-indicator-switch-2026-08-03.md).
 
 (El resto de filas del mapa histórico se mantienen en los trackers; este archivo prioriza Backtesting operativo.)
 
@@ -83,7 +92,7 @@ Playbook **vigente** en TRADING por instrumento×cuenta, con historial de period
 | Paso | Dónde | Qué |
 |------|--------|-----|
 | 1 | Backtesting → Finalistas | **Checklist** / Adoptar → estado `adoptada` |
-| 2 | Trading → rail Coach | Timeline **Mandato operativo** (tramo vigente + cerrados + flujo enlazado) |
+| 2 | Trading → panel Operativa · Info | Timeline **Mandato operativo** (tramo vigente + cerrados + flujo enlazado) |
 | 3 | Trading → orden DEMO | El fill se **enlaza** al mandato vigente |
 | 4 | Cambiar Finalista | Nuevo Adoptar → cierra tramo anterior (motivo *Cambio*) |
 | 5 | Otro dispositivo | Tras migrate M1b: hydrate desde `GET /api/accounts/{id}/mandates` |
@@ -116,7 +125,7 @@ Informe lateral: retorno/DD/ops del **gate** (+ referencia Auto) y bloque **Evid
 
 ## Estabilidad Lab en embudo (Q3.2)
 
-Tras Lab → **Guardar Finalistas**, el resumen Hold-out / WF / CPCV (mismo vocabulario que el checklist) queda en `coachFacts.labEvidence` y se muestra en Finalistas y en el rail Coach. No es campaña multi-ventana ledger (eso sigue en Observatory / protocolo Q1.3).
+Tras Lab → **Guardar Finalistas**, el resumen Hold-out / WF / CPCV (mismo vocabulario que el checklist) queda en `coachFacts.labEvidence` y se muestra en Finalistas y en el panel **Operativa** (Recomendación). No es campaña multi-ventana ledger (eso sigue en Observatory / protocolo Q1.3).
 
 ## CORE-R / Monitor Finalistas (usuario · v1.12)
 

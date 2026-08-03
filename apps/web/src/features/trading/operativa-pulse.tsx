@@ -1,5 +1,8 @@
 /**
- * Bloque visual Índice Operativo + TA/FA + ranking en estudio.
+ * Bloque visual Índice Operativo + gauges TA/FA + ranking «El n de N en estudio».
+ * Se muestra en Operativa → Recomendación (detalle) y resumen en cabecera colapsada.
+ *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
 import { cn } from '@/lib/utils';

@@ -1,5 +1,8 @@
 /**
- * Sección colapsable del panel Operativa: cabecera + cuerpo con scroll + altura redimensionable.
+ * Sección colapsable del panel Operativa: cabecera (+ summary / modo) + cuerpo con scroll
+ * + asa de altura redimensionable (persistida en `operativaSectionHeights`).
+ *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -24,7 +27,7 @@ export function TradingOperativaSection({
   className,
 }: {
   sectionId: OperativaSectionId;
-  title: string;
+  title: ReactNode;
   /** Resumen visible en cabecera (también con la sección colapsada). */
   summary?: ReactNode;
   children: ReactNode;
@@ -120,7 +123,7 @@ export function TradingOperativaSection({
           <div
             role="separator"
             aria-orientation="horizontal"
-            aria-label={`Redimensionar ${title}`}
+            aria-label="Redimensionar sección"
             title="Arrastra para cambiar altura"
             onPointerDown={onResizePointerDown}
             className="h-1.5 shrink-0 cursor-row-resize border-t border-border/50 bg-muted/30 hover:bg-primary/20"

@@ -26,7 +26,7 @@ Infra sirve a ambos; no es dueña del significado de Belief ni de Position.
 | Universo UI | Alineado con | Contiene (producto) | **No** contiene |
 |-------------|--------------|---------------------|-----------------|
 | **LAB** (Backtesting) | Scientific + experiments H0 | Embudo, Ver, Verificar D→hoy, Cartera LAB, CORE-R study | Ledger DEMO / Paper como PnL “mío” |
-| **TRADING** | Trading Domain | Cuenta activa, órdenes, rail Coach (vista), caminos A/B/C/D | Película DÍA D / mesa Verificar (to-be) |
+| **TRADING** | Trading Domain | Cuenta activa, órdenes, panel Operativa, caminos A/B/C/D | Película DÍA D / mesa Verificar (to-be) |
 
 Canónico: [diseño dual](./engineering/dual-universes-lab-trading-design-2026-08-02.md).
 
@@ -130,7 +130,10 @@ Detalle de plataforma: ADR-010, docs operativos — **no** mezclar en schemas de
 | **F-hoy / F-D** | Finalistas operativos vs TOP experimento as-of D ([ADR-021](./adr/021-dia-d-reconciliation.md)) | Un solo TOP que se pisa al cambiar DÍA D |
 | **Historial de mandato** | Tramos cerrados + vigente (`MandateTenure`) | Snapshot de adopción sin fechas |
 | **Verificar (D→hoy)** | Sesión LAB fase C con #1 congelada | Operar en Trading / MODO DÍA D (as-is deprecado) |
-| **Coach en vivo** | Rail en Trading con estado Lab del mismo instrumento | Reabrir embudo dentro del desk |
+| **Panel Operativa** | Columna Trading (Recomendación / Info / Configuración) a altura completa | Embudo LAB Coach; rail Coach legado |
+| **En estudio** | Lista virtual = pestañas de gráfico abiertas | Watchlist persistida / catálogo |
+| **Índice Operativo (IO)** | Score 0–100 (Composite + suelo distress) + ranking entre En estudio | Ranking Finalistas LAB |
+| **Coach en vivo** | *(legado)* contenido absorbido por **Panel Operativa** | Reabrir embudo dentro del desk |
 
 Canónico cuentas: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md).  
 Canónico universos: [ADR-019](./adr/019-dual-universes-lab-vs-trading.md).  

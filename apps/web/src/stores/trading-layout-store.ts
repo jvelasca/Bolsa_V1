@@ -1,6 +1,10 @@
 /**
- * Visibilidad y tamaño de los paneles acoplables (Watchlist | Gráfico+Operativa | Operaciones).
+ * Visibilidad y tamaño de los paneles acoplables
+ * (Watchlist | Gráfico | Operaciones) + Operativa a altura completa.
  * Persistido solo en localStorage (`bolsa-trading-layout-v1`) — por dispositivo.
+ *
+ * @see docs/UI_PREFS_LOCALSTORAGE.md
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
 import type { TradingDockLayoutPrefs } from '@bolsa/shared';

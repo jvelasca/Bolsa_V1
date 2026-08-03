@@ -27,14 +27,18 @@ function pxToPct(px: number, total: number) {
 }
 
 /**
- * Mesa TRADING (ADR-019): Watchlist | Gráfico + Operativa | Operaciones.
+ * Mesa TRADING (ADR-019):
+ * columna izq. = Watchlist | Gráfico + Operaciones;
+ * columna der. = Operativa a altura completa (hasta TradingStatusBar).
  * Verificar D→hoy vive en LAB / Backtesting.
+ *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 export function TradingLayout({ children }: { children: ReactNode }) {
   useChartListMembershipSync();
   useChartVisualizationSync();
   const containerRef = useRef<HTMLDivElement>(null);
-  const chartRowRef = useRef<HTMLDivElement>(null);
+  const leftColumnRef = useRef<HTMLDivElement>(null);
   const layout = useTradingLayoutStore();
 
   const [liveListsPct, setLiveListsPct] = useState(layout.listsWidthPct);
@@ -60,7 +64,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   }, [layout.operativaWidthPct]);
 
   const adjustLists = useCallback((deltaPx: number) => {
-    const width = containerRef.current?.getBoundingClientRect().width ?? 0;
+    const width = leftColumnRef.current?.getBoundingClientRect().width ?? 0;
     if (width <= 0) return;
     const next = clamp(
       pendingLists.current + pxToPct(deltaPx, width),
@@ -72,7 +76,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   }, []);
 
   const adjustOps = useCallback((deltaPx: number) => {
-    const height = containerRef.current?.getBoundingClientRect().height ?? 0;
+    const height = leftColumnRef.current?.getBoundingClientRect().height ?? 0;
     if (height <= 0) return;
     const next = clamp(
       pendingOps.current - pxToPct(deltaPx, height),
@@ -84,7 +88,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   }, []);
 
   const adjustOperativa = useCallback((deltaPx: number) => {
-    const width = chartRowRef.current?.getBoundingClientRect().width ?? 0;
+    const width = containerRef.current?.getBoundingClientRect().width ?? 0;
     if (width <= 0) return;
     // Drag handle is to the left of Operativa: dragging right grows Operativa.
     const next = clamp(
@@ -137,118 +141,117 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   const showOperativa = layout.operativaOpen;
 
   return (
-    <div ref={containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        {showLists && (
-          <>
+    <div ref={containerRef} className="flex min-h-0 flex-1 overflow-hidden">
+      <div ref={leftColumnRef} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          {showLists && (
+            <>
+              <DockZone
+                title="Watchlist"
+                open
+                maximized={layout.listsMaximized}
+                onClose={layout.toggleLists}
+                onToggleMaximize={layout.maximizeLists}
+                className={splitTop ? 'shrink-0' : 'shrink-0 border-r'}
+                style={
+                  splitTop
+                    ? {
+                        width: `${clamp(liveListsPct, MIN_LISTS_WIDTH_PCT, MAX_LISTS_WIDTH_PCT)}%`,
+                        minWidth: 'min(240px, 40vw)',
+                      }
+                    : { flex: 1, minWidth: 'min(240px, 40vw)' }
+                }
+              >
+                <WatchlistPanel />
+              </DockZone>
+              {splitTop && (
+                <PanelResizeHandle
+                  label="Redimensionar panel listas"
+                  onDrag={adjustLists}
+                  onDragEnd={() => layout.setListsWidthPct(pendingLists.current)}
+                />
+              )}
+            </>
+          )}
+
+          {showCharts && (
             <DockZone
-              title="Watchlist"
+              title="Gráfico"
               open
-              maximized={layout.listsMaximized}
-              onClose={layout.toggleLists}
-              onToggleMaximize={layout.maximizeLists}
-              className={splitTop ? 'shrink-0' : 'shrink-0 border-r'}
-              style={
-                splitTop
-                  ? {
-                      width: `${clamp(liveListsPct, MIN_LISTS_WIDTH_PCT, MAX_LISTS_WIDTH_PCT)}%`,
-                      minWidth: 'min(240px, 40vw)',
-                    }
-                  : { flex: 1, minWidth: 'min(240px, 40vw)' }
-              }
+              maximized={layout.chartsMaximized}
+              onClose={layout.toggleCharts}
+              onToggleMaximize={layout.maximizeCharts}
+              closable={false}
+              maximizable={false}
+              className="min-w-0 flex-1"
             >
-              <WatchlistPanel />
+              <ChartsZone>{children}</ChartsZone>
             </DockZone>
-            {splitTop && (
-              <PanelResizeHandle
-                label="Redimensionar panel listas"
-                onDrag={adjustLists}
-                onDragEnd={() => layout.setListsWidthPct(pendingLists.current)}
-              />
-            )}
-          </>
-        )}
+          )}
 
-        {showCharts && (
-          <DockZone
-            title="Gráfico"
-            open
-            maximized={layout.chartsMaximized}
-            onClose={layout.toggleCharts}
-            onToggleMaximize={layout.maximizeCharts}
-            closable={false}
-            maximizable={false}
-            className="min-w-0 flex-1"
-          >
-            <div ref={chartRowRef} className="flex h-full min-h-0">
-              <div className="min-w-0 flex-1">
-                <ChartsZone>{children}</ChartsZone>
-              </div>
-              {showOperativa ? (
-                <>
-                  <PanelResizeHandle
-                    label="Redimensionar panel operativa"
-                    className="hidden md:flex"
-                    onDrag={adjustOperativa}
-                    onDragEnd={() => layout.setOperativaWidthPct(pendingOperativa.current)}
-                  />
-                  <DockZone
-                    title="Operativa"
-                    open
-                    maximized={false}
-                    onClose={layout.toggleOperativa}
-                    onToggleMaximize={() => {}}
-                    maximizable={false}
-                    className="hidden shrink-0 border-l border-border md:flex md:flex-col"
-                    style={{
-                      width: `${clamp(
-                        liveOperativaPct,
-                        MIN_OPERATIVA_WIDTH_PCT,
-                        MAX_OPERATIVA_WIDTH_PCT,
-                      )}%`,
-                      minWidth: 180,
-                      maxWidth: 420,
-                    }}
-                  >
-                    <TradingOperativaPanel />
-                  </DockZone>
-                </>
-              ) : null}
+          {!showLists && !showCharts && (
+            <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+              Abre la watchlist desde la barra superior.
             </div>
-          </DockZone>
-        )}
+          )}
+        </div>
 
-        {!showLists && !showCharts && (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Abre la watchlist desde la barra superior.
-          </div>
+        {layout.operationsOpen && (
+          <>
+            <PanelResizeHandle
+              label="Redimensionar panel operaciones"
+              orientation="horizontal"
+              onDrag={adjustOps}
+              onDragEnd={() => layout.setOperationsHeightPct(pendingOps.current)}
+            />
+            <DockZone
+              title="Operaciones"
+              open
+              maximized={false}
+              onClose={layout.toggleOperations}
+              onToggleMaximize={layout.maximizeOperations}
+              className="shrink-0"
+              style={{
+                height: `${clamp(liveOpsPct, MIN_OPERATIONS_HEIGHT_PCT, MAX_OPERATIONS_HEIGHT_PCT)}%`,
+                minHeight: 96,
+              }}
+            >
+              <OperationsPanel />
+            </DockZone>
+          </>
         )}
       </div>
 
-      {layout.operationsOpen && (
+      {showOperativa ? (
         <>
           <PanelResizeHandle
-            label="Redimensionar panel operaciones"
-            orientation="horizontal"
-            onDrag={adjustOps}
-            onDragEnd={() => layout.setOperationsHeightPct(pendingOps.current)}
+            label="Redimensionar panel operativa"
+            className="hidden md:flex"
+            onDrag={adjustOperativa}
+            onDragEnd={() => layout.setOperativaWidthPct(pendingOperativa.current)}
           />
           <DockZone
-            title="Operaciones"
+            title="Operativa"
             open
             maximized={false}
-            onClose={layout.toggleOperations}
-            onToggleMaximize={layout.maximizeOperations}
-            className="shrink-0"
+            onClose={layout.toggleOperativa}
+            onToggleMaximize={() => {}}
+            maximizable={false}
+            className="hidden h-full shrink-0 border-l border-border md:flex md:flex-col"
             style={{
-              height: `${clamp(liveOpsPct, MIN_OPERATIONS_HEIGHT_PCT, MAX_OPERATIONS_HEIGHT_PCT)}%`,
-              minHeight: 96,
+              width: `${clamp(
+                liveOperativaPct,
+                MIN_OPERATIVA_WIDTH_PCT,
+                MAX_OPERATIVA_WIDTH_PCT,
+              )}%`,
+              minWidth: 180,
+              maxWidth: 420,
             }}
           >
-            <OperationsPanel />
+            <TradingOperativaPanel />
           </DockZone>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

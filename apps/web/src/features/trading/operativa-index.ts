@@ -1,6 +1,11 @@
 /**
  * Índice Operativo (IO) v1 — ranking entre valores «en estudio».
- * Base: Composite 0–100. Universo = pestañas abiertas (= lista En estudio).
+ *
+ * - Base: Composite display 0–100.
+ * - Distress FA → suelo IO ≤ 40.
+ * - Universo ranking = pestañas de gráfico abiertas (= lista En estudio).
+ *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
 export type OperativaScoreRow = {

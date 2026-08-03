@@ -39,6 +39,9 @@ function sameIdSet(a: Set<string>, b: Set<string>): boolean {
  * Lista virtual «En estudio» = instrumentos con pestaña de gráfico abierta.
  * Escrituras al store solo cuando cambia el conjunto de pestañas o el foco.
  * No carga el catálogo completo (las pestañas ya llevan symbol/label).
+ *
+ * Premisa: en estudio ⇔ pestaña activa (mismo conjunto que ranking IO).
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 export function useChartVisualizationSync() {
   const charts = useWorkspaceStore((state) => state.workspace.charts);

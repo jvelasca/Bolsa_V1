@@ -42,6 +42,8 @@ Engineering Index  (este doc)
 │   ├── dual-universes / mandato / reconciliación ADRs
 │   ├── demo-operating-modes-brief-*.md   (MANUAL/SEMI/AUTO)
 │   ├── semi-demo-book-impl-slice1-*.md   (GO SEMI)
+│   ├── trading-operativa-panel-2026-08-04.md  (Operativa · IO · En estudio)
+│   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)
 │   ├── audit-pack-post-audits-*.md     ← START externos

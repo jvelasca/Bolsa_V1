@@ -1,10 +1,12 @@
 /**
- * Preferencias del «libro operativo» DEMO — MANUAL / SEMI (/ AUTO reserved).
+ * Preferencias del libro operativo de la cuenta activa DEMO — MANUAL / SEMI (/ AUTO reserved).
  *
  * Slice 1: localStorage. Canal de ejecución SEMI = Camino C (F3 Confirm).
+ * UI: panel Operativa → Configuración (cabecera muestra el modo; título = nombre de cuenta).
  *
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
  * @see docs/engineering/semi-demo-book-impl-slice1-2026-08-03.md
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
 export const DEMO_BOOK_PREFS_KEY = 'bolsa-demo-book-prefs-v1';
@@ -88,12 +90,47 @@ export function loadDemoBookPrefs(): DemoBookPrefs {
 export function saveDemoBookPrefs(prefs: DemoBookPrefs): void {
   const n = normalizeDemoBookPrefs(prefs);
   localStorage.setItem(DEMO_BOOK_PREFS_KEY, JSON.stringify(n));
+  notifyDemoBookPrefs();
 }
 
 export function patchDemoBookPrefs(patch: Partial<DemoBookPrefs>): DemoBookPrefs {
   const next = normalizeDemoBookPrefs({ ...loadDemoBookPrefs(), ...patch });
   saveDemoBookPrefs(next);
   return next;
+}
+
+const demoBookPrefsListeners = new Set<() => void>();
+
+function notifyDemoBookPrefs() {
+  for (const listener of demoBookPrefsListeners) listener();
+}
+
+function onDemoBookPrefsStorage(e: StorageEvent) {
+  if (e.key === DEMO_BOOK_PREFS_KEY || e.key === null) {
+    notifyDemoBookPrefs();
+  }
+}
+
+/** Suscripción misma-pestaña; también reacciona a `storage` entre pestañas. */
+export function subscribeDemoBookPrefs(listener: () => void): () => void {
+  demoBookPrefsListeners.add(listener);
+  if (demoBookPrefsListeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onDemoBookPrefsStorage);
+  }
+  return () => {
+    demoBookPrefsListeners.delete(listener);
+    if (demoBookPrefsListeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onDemoBookPrefsStorage);
+    }
+  };
+}
+
+export function getDemoBookPrefsSnapshot(): DemoBookPrefs {
+  return loadDemoBookPrefs();
+}
+
+export function getDemoBookPrefsServerSnapshot(): DemoBookPrefs {
+  return defaultDemoBookPrefs();
 }
 
 /** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO reserved. */

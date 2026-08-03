@@ -343,12 +343,34 @@ function TradingContent() {
         activa DEMO</strong>.
       </p>
       <section>
-        <h3 className="mb-2 font-semibold text-foreground">Coach en vivo (rail)</h3>
+        <h3 className="mb-2 font-semibold text-foreground">Panel Operativa</h3>
         <p>
-          En Trading, el rail derecho muestra TOP / adopción del valor abierto y enlaces{' '}
-          <strong className="text-foreground">Abrir estudio (LAB)</strong> y{' '}
-          <strong className="text-foreground">Verificar D→hoy</strong> (si hay DÍA D en el pasado).
-          La verificación ya no vive en la mesa Trading (ADR-019).
+          Columna derecha a <strong className="text-foreground">altura completa</strong> (hasta la
+          barra de estado). Operaciones queda a la izquierda, bajo watchlist y gráfico. Tres
+          secciones con scroll y altura ajustable:
+        </p>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>
+            <strong className="text-foreground">Recomendación</strong> — Índice Operativo (IO),
+            gauges TA/FA, ranking «El n de N en estudio», TOP #1 / adopción, enlaces{' '}
+            <strong className="text-foreground">Abrir estudio (LAB)</strong> y{' '}
+            <strong className="text-foreground">Verificar D→hoy</strong> (si hay DÍA D en el
+            pasado).
+          </li>
+          <li>
+            <strong className="text-foreground">Info</strong> — mandato / Learning.
+          </li>
+          <li>
+            <strong className="text-foreground">Configuración (operativa manual|semi|auto)</strong>{' '}
+            — el modo se ve en la cabecera sin desplegar; el bloque usa el{' '}
+            <strong className="text-foreground">nombre de la cuenta activa</strong> (MANUAL/SEMI,
+            % cash, máx. posiciones, geo). AUTO sigue congelado.
+          </li>
+        </ul>
+        <p className="mt-2">
+          Lista virtual <strong className="text-foreground">En estudio</strong> = pestañas de
+          gráfico abiertas (mismo conjunto). La verificación ya no vive en la mesa Trading
+          (ADR-019).
         </p>
       </section>
       <section>
@@ -357,13 +379,13 @@ function TradingContent() {
           Cuando <strong className="text-foreground">Adoptas</strong> un Finalista (Checklist /
           Camino A), se abre un <strong className="text-foreground">mandato vigente</strong> para
           ese instrumento×cuenta: qué estrategia gobierna la operativa y desde cuándo. Si adoptas
-          otra, el tramo anterior se cierra y queda en el historial (actor usuario / Coach /
+          otra, el tramo anterior se cierra y queda en el historial (actor usuario / Operativa /
           CORE-R).
         </p>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
-            Timeline en el rail Coach: tramos, motivo del cambio y resumen de churn (usuario vs
-            Coach).
+            Timeline en Operativa → Info: tramos, motivo del cambio y resumen de churn (usuario vs
+            sistema).
           </li>
           <li>
             Los trades DEMO (orden mercado / pendientes) se <strong className="text-foreground">
@@ -376,7 +398,8 @@ function TradingContent() {
           </li>
         </ul>
         <p className="mt-2">
-          Docs: <code className="text-[0.85em]">docs/adr/020-operating-mandate-tenure.md</code>.
+          Docs: <code className="text-[0.85em]">docs/adr/020-operating-mandate-tenure.md</code> ·{' '}
+          <code className="text-[0.85em]">docs/engineering/trading-operativa-panel-2026-08-04.md</code>.
         </p>
       </section>
       <section>
@@ -410,6 +433,11 @@ function TradingContent() {
           </li>
           <li>
             Indicadores técnicos desde el catálogo; dibujos y plantillas en el inspector.
+          </li>
+          <li>
+            <strong className="text-foreground">Finalista #1</strong>: switch «todos» en la barra
+            general (Indicadores) y «este» en la barra del gráfico en uso. OFF quita solo overlays
+            con origen finalist-top1.
           </li>
           <li>
             <strong>Gate bar-a-bar</strong> (estrategias híbridas): superponer la línea de paso de
