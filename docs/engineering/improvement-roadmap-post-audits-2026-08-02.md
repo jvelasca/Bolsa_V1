@@ -215,3 +215,5 @@ Abrir **solo** si Q0–Q1 hechos y hay demanda explícita:
 **Higiene ISSUES (2026-08-03):** Open = CORE-R vigilancia · CORE-A bloqueado Belief · CORE-B parked; Closed incluye CORE-P, frescura Lista AUTO, IBEX TOP 35/35, warm-up Q1.6, MACD signal.
 
 **Decisión freeze (2026-08-03):** [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief no · flags ops off. Usar producto entregado; no abrir Fase H.
+
+**Paquete auditoría:** [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md) (checklist + evidencia smoke + índice).

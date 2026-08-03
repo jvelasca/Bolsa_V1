@@ -4,7 +4,8 @@ Registro **ligero** de issues del laboratorio. No son tickets de producto ni ADR
 No abren Fase 2 ni entidades nuevas.
 
 **Higiene 2026-08-03:** Open = vigilancia / bloqueados; Closed = entregado o ops resuelto.  
-**Decisión freeze:** [post-audit-decision-freeze-2026-08-03.md](../../docs/engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · flags ops off.
+**Decisión freeze:** [post-audit-decision-freeze-2026-08-03.md](../../docs/engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · flags ops off.  
+**Auditoría:** [audit-pack-post-audits-2026-08-03.md](../../docs/engineering/audit-pack-post-audits-2026-08-03.md).
 
 ## Open
 

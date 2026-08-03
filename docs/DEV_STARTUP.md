@@ -57,7 +57,7 @@ pnpm dev             # mismo que F5 Dev (terminal)
 3. Si PostgreSQL down: `pnpm db:ensure`
 4. F5 de nuevo con **«Bolsa: F5 Dev (recomendado)»**
 
-Logs: `logs/dev/` y `logs/agent/` (JSONL doctor/health).
+Logs: ver [engineering/dev-logs.md](./engineering/dev-logs.md) (`logs/dev/`, `logs/agent/`, `logs/startup/`). No hay README dentro de `logs/` — la doc vive en `docs/`.
 
 ## Informe de arranque (agente)
 
