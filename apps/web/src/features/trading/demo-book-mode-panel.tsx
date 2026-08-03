@@ -6,6 +6,7 @@
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
+import { cn } from '@/lib/utils';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import {
   DEMO_BOOK_MAX_OPEN_MAX,
