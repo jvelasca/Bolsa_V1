@@ -9,11 +9,11 @@ from __future__ import annotations
 import os
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     """Estado del circuito Yahoo."""
 
     CLOSED = "closed"
