@@ -34,7 +34,13 @@ import {
   demoBookAllowsExecute,
   loadDemoBookPrefs,
   suggestQuantityFromCash,
+  type DemoBookCountryPrefer,
 } from '@/features/trading/demo-book-prefs';
+import {
+  inferHomeCountry,
+  optimalScoreFromPayload,
+  rankByOptimalThenGeo,
+} from '@/features/trading/demo-book-geo-rank';
 import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
 
 type ProposePayload = SupervisedProposePayload;
@@ -143,6 +149,9 @@ export function SupervisedF3Panel() {
   const [log, setLog] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [bookMode, setBookMode] = useState(() => loadDemoBookPrefs().mode);
+  const [countryPrefer, setCountryPrefer] = useState<DemoBookCountryPrefer>(
+    () => loadDemoBookPrefs().countryPrefer,
+  );
 
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
   const activeId = useSupervisedF3QueueStore((s) => s.activeId);
@@ -163,14 +172,16 @@ export function SupervisedF3Panel() {
   const cash = summaryQuery.data?.data?.cash ?? 0;
 
   useEffect(() => {
-    function refreshMode() {
-      setBookMode(loadDemoBookPrefs().mode);
+    function refreshBookPrefs() {
+      const p = loadDemoBookPrefs();
+      setBookMode(p.mode);
+      setCountryPrefer(p.countryPrefer);
     }
-    refreshMode();
-    window.addEventListener('storage', refreshMode);
-    const id = window.setInterval(refreshMode, 2000);
+    refreshBookPrefs();
+    window.addEventListener('storage', refreshBookPrefs);
+    const id = window.setInterval(refreshBookPrefs, 2000);
     return () => {
-      window.removeEventListener('storage', refreshMode);
+      window.removeEventListener('storage', refreshBookPrefs);
       window.clearInterval(id);
     };
   }, []);
@@ -209,15 +220,52 @@ export function SupervisedF3Panel() {
 
   const instrumentsQuery = useQuery({
     queryKey: ['instruments-brief'],
-    queryFn: async () => (await api.getInstruments()).data.slice(0, 40),
+    queryFn: async () => (await api.getInstruments()).data,
     staleTime: 60_000,
   });
 
-  useEffect(() => {
-    if (!instrumentId && instrumentsQuery.data?.[0]?.id) {
-      setInstrumentId(instrumentsQuery.data[0].id);
+  const countryByInstrumentId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const inst of instrumentsQuery.data ?? []) {
+      if (inst.country) m.set(inst.id, inst.country);
     }
-  }, [instrumentId, instrumentsQuery.data]);
+    return m;
+  }, [instrumentsQuery.data]);
+
+  const homeCountry = useMemo(
+    () => inferHomeCountry({ accountCurrency: account?.currency }),
+    [account?.currency],
+  );
+
+  /** Cola mostrada: óptimo primero, luego preferencia geo (suave; no filtra). */
+  const rankedQueueItems = useMemo(
+    () =>
+      rankByOptimalThenGeo(
+        queueItems.map((item) => ({
+          ...item,
+          instrumentId: item.payload.instrumentId,
+          optimalScore: optimalScoreFromPayload(item.payload),
+          tieBreak: item.enqueuedAt,
+        })),
+        {
+          prefer: countryPrefer,
+          homeCountry,
+          countryByInstrumentId,
+        },
+      ),
+    [queueItems, countryPrefer, homeCountry, countryByInstrumentId],
+  );
+
+  const instrumentsForSelect = useMemo(
+    () => (instrumentsQuery.data ?? []).slice(0, 40),
+    [instrumentsQuery.data],
+  );
+
+  useEffect(() => {
+    if (!instrumentId && instrumentsForSelect[0]?.id) {
+      setInstrumentId(instrumentsForSelect[0].id);
+    }
+  }, [instrumentId, instrumentsForSelect]);
 
   const propose = useMutation({
     mutationFn: async () => {
@@ -304,7 +352,8 @@ export function SupervisedF3Panel() {
       if (!demoBookAllowsExecute(loadDemoBookPrefs().mode)) {
         throw new Error('Libro no está en SEMI');
       }
-      const targets = queueItems.filter((i) => selectedIds.has(i.id));
+      const selected = new Set(selectedIds);
+      const targets = rankedQueueItems.filter((i) => selected.has(i.id));
       if (targets.length === 0) throw new Error('No hay propuestas marcadas');
       const results: string[] = [];
       for (const item of targets) {
@@ -348,18 +397,20 @@ export function SupervisedF3Panel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {queueItems.length > 0 ? (
+        {rankedQueueItems.length > 0 ? (
           <div className="rounded-md border border-border px-3 py-2 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium">
-                Cola supervisada ({queueItems.length})
+                Cola supervisada ({rankedQueueItems.length})
                 {selectedCount > 0 ? ` · ${selectedCount} marcadas` : ''}
               </span>
               <div className="flex gap-2">
                 <button
                   type="button"
                   className="text-[10px] text-muted-foreground hover:underline"
-                  onClick={() => setSelectedIds(new Set(queueItems.map((i) => i.id)))}
+                  onClick={() =>
+                    setSelectedIds(new Set(rankedQueueItems.map((i) => i.id)))
+                  }
                 >
                   Marcar todas
                 </button>
@@ -372,10 +423,15 @@ export function SupervisedF3Panel() {
                 </button>
               </div>
             </div>
+            <p className="text-[10px] text-muted-foreground">
+              Orden: óptimo → geo ({countryPrefer.replace('_', ' ')} · home {homeCountry})
+            </p>
             <ul className="max-h-36 space-y-1 overflow-y-auto text-[11px]">
-              {queueItems.map((item) => {
+              {rankedQueueItems.map((item) => {
                 const origin = resolveSupervisedQueueOrigin(item);
                 const checked = selectedIds.has(item.id);
+                const country =
+                  countryByInstrumentId.get(item.payload.instrumentId) ?? null;
                 return (
                   <li key={item.id} className="flex items-center gap-1.5">
                     <input
@@ -402,6 +458,9 @@ export function SupervisedF3Panel() {
                       <span className="font-medium text-foreground">
                         {item.symbol ?? item.payload.instrumentId.slice(0, 8)}
                       </span>
+                      {country ? (
+                        <span className="text-muted-foreground"> · {country}</span>
+                      ) : null}
                       {' · '}
                       {item.payload.action}
                       {' · '}
@@ -464,7 +523,7 @@ export function SupervisedF3Panel() {
               value={instrumentId}
               onChange={(e) => setInstrumentId(e.target.value)}
             >
-              {(instrumentsQuery.data ?? []).map((inst) => (
+              {instrumentsForSelect.map((inst) => (
                 <option key={inst.id} value={inst.id}>
                   {inst.symbol}
                   {inst.name ? ` — ${inst.name}` : ''}
