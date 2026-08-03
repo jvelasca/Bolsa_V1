@@ -87,9 +87,37 @@ export function loadDemoBookPrefs(): DemoBookPrefs {
   }
 }
 
+function prefsEqual(a: DemoBookPrefs, b: DemoBookPrefs): boolean {
+  return (
+    a.mode === b.mode &&
+    a.maxOpenPositions === b.maxOpenPositions &&
+    a.defaultSizePctOfCash === b.defaultSizePctOfCash &&
+    a.countryPrefer === b.countryPrefer
+  );
+}
+
+/** Snapshot estable para `useSyncExternalStore` (misma ref si no cambia el valor). */
+let cachedClientSnapshot: DemoBookPrefs | null = null;
+
+const SERVER_SNAPSHOT: DemoBookPrefs = {
+  mode: 'semi',
+  maxOpenPositions: 10,
+  defaultSizePctOfCash: 10,
+  countryPrefer: 'home_first',
+};
+
+function rememberSnapshot(next: DemoBookPrefs): DemoBookPrefs {
+  if (cachedClientSnapshot && prefsEqual(cachedClientSnapshot, next)) {
+    return cachedClientSnapshot;
+  }
+  cachedClientSnapshot = next;
+  return next;
+}
+
 export function saveDemoBookPrefs(prefs: DemoBookPrefs): void {
   const n = normalizeDemoBookPrefs(prefs);
   localStorage.setItem(DEMO_BOOK_PREFS_KEY, JSON.stringify(n));
+  rememberSnapshot(n);
   notifyDemoBookPrefs();
 }
 
@@ -107,6 +135,9 @@ function notifyDemoBookPrefs() {
 
 function onDemoBookPrefsStorage(e: StorageEvent) {
   if (e.key === DEMO_BOOK_PREFS_KEY || e.key === null) {
+    // Otra pestaña: invalidar caché y releer.
+    cachedClientSnapshot = null;
+    rememberSnapshot(loadDemoBookPrefs());
     notifyDemoBookPrefs();
   }
 }
@@ -125,12 +156,16 @@ export function subscribeDemoBookPrefs(listener: () => void): () => void {
   };
 }
 
+/**
+ * Snapshot client para `useSyncExternalStore`.
+ * Debe devolver la misma referencia si el valor no cambió (si no → bucle de renders).
+ */
 export function getDemoBookPrefsSnapshot(): DemoBookPrefs {
-  return loadDemoBookPrefs();
+  return rememberSnapshot(loadDemoBookPrefs());
 }
 
 export function getDemoBookPrefsServerSnapshot(): DemoBookPrefs {
-  return defaultDemoBookPrefs();
+  return SERVER_SNAPSHOT;
 }
 
 /** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO reserved. */
