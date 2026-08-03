@@ -30,6 +30,7 @@ import {
   List,
   Microscope,
   PanelBottom,
+  PanelRight,
   Radar,
   RotateCcw,
   Settings,
@@ -417,10 +418,21 @@ export function AppTopBar() {
             >
               <PanelBottom className="h-4 w-4" />
             </button>
+            <button
+              type="button"
+              title={layout.operativaOpen ? 'Ocultar operativa' : 'Mostrar operativa'}
+              onClick={layout.toggleOperativa}
+              className={cn(
+                'rounded p-1.5 hover:bg-accent',
+                layout.operativaOpen && 'bg-accent text-primary',
+              )}
+            >
+              <PanelRight className="h-4 w-4" />
+            </button>
             <div className="mx-0.5 h-4 w-px bg-border/80" aria-hidden />
             <button
               type="button"
-              title="Restablecer paneles (watchlist / operaciones)"
+              title="Restablecer paneles (watchlist / operaciones / operativa)"
               onClick={layout.resetLayout}
               className="rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
             >

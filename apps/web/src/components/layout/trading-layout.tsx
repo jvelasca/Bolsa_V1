@@ -5,6 +5,8 @@ import {
   MIN_LISTS_WIDTH_PCT,
   MIN_OPERATIONS_HEIGHT_PCT,
   MAX_OPERATIONS_HEIGHT_PCT,
+  MIN_OPERATIVA_WIDTH_PCT,
+  MAX_OPERATIVA_WIDTH_PCT,
   useTradingLayoutStore,
 } from '@/stores/trading-layout-store';
 import { DockZone } from '@/components/layout/dock-zone';
@@ -12,7 +14,7 @@ import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
 import { WatchlistPanel } from '@/features/trading/lists-tab/watchlist-panel';
 import { ChartsZone } from '@/features/trading/charts-zone';
 import { OperationsPanel } from '@/features/trading/operations-panel';
-import { TradingCoachRail } from '@/features/trading/trading-coach-rail';
+import { TradingOperativaPanel } from '@/features/trading/trading-operativa-panel';
 import { useChartListMembershipSync } from '@/features/trading/lists-tab/use-chart-list-membership-sync';
 import { useChartVisualizationSync } from '@/features/trading/lists-tab/use-chart-visualization-sync';
 
@@ -25,19 +27,22 @@ function pxToPct(px: number, total: number) {
 }
 
 /**
- * Mesa TRADING (ADR-019): sin película Verificar D→hoy (vive en LAB / Backtesting).
- * Rail Coach = puente al estudio LAB del instrumento activo.
+ * Mesa TRADING (ADR-019): Watchlist | Gráfico + Operativa | Operaciones.
+ * Verificar D→hoy vive en LAB / Backtesting.
  */
 export function TradingLayout({ children }: { children: ReactNode }) {
   useChartListMembershipSync();
   useChartVisualizationSync();
   const containerRef = useRef<HTMLDivElement>(null);
+  const chartRowRef = useRef<HTMLDivElement>(null);
   const layout = useTradingLayoutStore();
 
   const [liveListsPct, setLiveListsPct] = useState(layout.listsWidthPct);
   const [liveOpsPct, setLiveOpsPct] = useState(layout.operationsHeightPct);
+  const [liveOperativaPct, setLiveOperativaPct] = useState(layout.operativaWidthPct);
   const pendingLists = useRef(layout.listsWidthPct);
   const pendingOps = useRef(layout.operationsHeightPct);
+  const pendingOperativa = useRef(layout.operativaWidthPct);
 
   useEffect(() => {
     setLiveListsPct(layout.listsWidthPct);
@@ -48,6 +53,11 @@ export function TradingLayout({ children }: { children: ReactNode }) {
     setLiveOpsPct(layout.operationsHeightPct);
     pendingOps.current = layout.operationsHeightPct;
   }, [layout.operationsHeightPct]);
+
+  useEffect(() => {
+    setLiveOperativaPct(layout.operativaWidthPct);
+    pendingOperativa.current = layout.operativaWidthPct;
+  }, [layout.operativaWidthPct]);
 
   const adjustLists = useCallback((deltaPx: number) => {
     const width = containerRef.current?.getBoundingClientRect().width ?? 0;
@@ -71,6 +81,19 @@ export function TradingLayout({ children }: { children: ReactNode }) {
     );
     pendingOps.current = next;
     setLiveOpsPct(next);
+  }, []);
+
+  const adjustOperativa = useCallback((deltaPx: number) => {
+    const width = chartRowRef.current?.getBoundingClientRect().width ?? 0;
+    if (width <= 0) return;
+    // Drag handle is to the left of Operativa: dragging right grows Operativa.
+    const next = clamp(
+      pendingOperativa.current - pxToPct(deltaPx, width),
+      MIN_OPERATIVA_WIDTH_PCT,
+      MAX_OPERATIVA_WIDTH_PCT,
+    );
+    pendingOperativa.current = next;
+    setLiveOperativaPct(next);
   }, []);
 
   if (layout.listsMaximized && layout.listsOpen) {
@@ -111,6 +134,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
     layout.listsOpen && (layout.listsMaximized || !layout.chartsMaximized);
   const showCharts = true;
   const splitTop = showLists && showCharts && !layout.listsMaximized && !layout.chartsMaximized;
+  const showOperativa = layout.operativaOpen;
 
   return (
     <div ref={containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -156,11 +180,40 @@ export function TradingLayout({ children }: { children: ReactNode }) {
             maximizable={false}
             className="min-w-0 flex-1"
           >
-            <div className="flex h-full min-h-0">
+            <div ref={chartRowRef} className="flex h-full min-h-0">
               <div className="min-w-0 flex-1">
                 <ChartsZone>{children}</ChartsZone>
               </div>
-              <TradingCoachRail className="hidden md:flex" />
+              {showOperativa ? (
+                <>
+                  <PanelResizeHandle
+                    label="Redimensionar panel operativa"
+                    className="hidden md:flex"
+                    onDrag={adjustOperativa}
+                    onDragEnd={() => layout.setOperativaWidthPct(pendingOperativa.current)}
+                  />
+                  <DockZone
+                    title="Operativa"
+                    open
+                    maximized={false}
+                    onClose={layout.toggleOperativa}
+                    onToggleMaximize={() => {}}
+                    maximizable={false}
+                    className="hidden shrink-0 border-l border-border md:flex md:flex-col"
+                    style={{
+                      width: `${clamp(
+                        liveOperativaPct,
+                        MIN_OPERATIVA_WIDTH_PCT,
+                        MAX_OPERATIVA_WIDTH_PCT,
+                      )}%`,
+                      minWidth: 180,
+                      maxWidth: 420,
+                    }}
+                  >
+                    <TradingOperativaPanel />
+                  </DockZone>
+                </>
+              ) : null}
             </div>
           </DockZone>
         )}

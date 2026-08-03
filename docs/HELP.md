@@ -39,23 +39,25 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 | Sección Ayuda | Tracker / UI | Docs |
 |---------------|--------------|------|
 | **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [roadmap post-auditorías](./engineering/improvement-roadmap-post-audits-2026-08-02.md), [estabilidad temporal](./engineering/stability-campaign-protocol-2026-08-02.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [universos LAB/TRADING](./engineering/dual-universes-lab-trading-design-2026-08-02.md), [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020 Mandato](./adr/020-operating-mandate-tenure.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
-| **Trading** | rail Coach + Libro DEMO + Mandato + alarmas → F3 | [demo-operating-modes](./engineering/demo-operating-modes-brief-2026-08-03.md) · [SEMI slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [ADR-020](./adr/020-operating-mandate-tenure.md) |
-
-**Gráfico Trading — TOP#1:**
-- Barra general (**Indicadores**): switch **Finalista #1 · todos** — activa en todos los gráficos abiertos y en los nuevos; política del workspace.
-- Barra del gráfico en uso: switch **Finalista #1** — solo ese valor; puedes apagarlo aunque «todos» siga ON.
-- OFF (individual o todos) quita solo instancias `origin: finalist-top1` (no toca indicadores manuales).
+| **Trading** | panel **Operativa** (Recomendación / Info / Configuración) + Libro DEMO + Mandato + alarmas → F3 | [demo-operating-modes](./engineering/demo-operating-modes-brief-2026-08-03.md) · [SEMI slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [ADR-020](./adr/020-operating-mandate-tenure.md) |
 | Análisis del valor | `value-analysis-tracker.ts` | FA status / FIE |
 | Datos de mercado | `data-market-tracker.ts` | data capture |
 | Watchlist / listas | `watchlist-lists-tracker.ts` | lists-universes |
 | Plataforma IA | `ai-platform-tracker.ts` | AI_PLATFORM_SOLUTION |
 | Gráficos | `chart-platform-tracker.ts` | charts |
 
+**Panel Operativa (Trading):** dock lateral colapsable/redimensionable junto al gráfico. Secciones: **Recomendación** (TOP #1, adopción, mandato, CTAs LAB), **Info** (churn mandatos / Learning), **Configuración** (Libro DEMO). Toggle en barra superior (icono panel derecho).
+
+**Gráfico Trading — TOP#1:**
+- Barra general (**Indicadores**): switch **Finalista #1 · todos**.
+- Barra del gráfico en uso: switch **Finalista #1 · este**.
+- Sin TOP: cartel «No hay indicador finalista». OFF quita solo `origin: finalist-top1`.
+
 (El resto de filas del mapa histórico se mantienen en los trackers; este archivo prioriza Backtesting operativo.)
 
 ## Backtesting DÍA D (usuario · sync 2026-08-02 · U2)
 
-**LAB (ADR-019):** **Verificar D→hoy** en Backtesting · Análisis técnico (Cartera LAB). Trading = inversión diaria + rail Coach. Detalle: [diseño dual](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [premisas](./engineering/backtesting-dia-d-premises-2026-07-31.md).
+**LAB (ADR-019):** **Verificar D→hoy** en Backtesting · Análisis técnico (Cartera LAB). Trading = inversión diaria + panel **Operativa**. Detalle: [diseño dual](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [premisas](./engineering/backtesting-dia-d-premises-2026-07-31.md).
 
 Guía en Ayuda → Backtesting (`BACKTESTING_DIA_D_GUIDE`). Plan: [operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md).
 

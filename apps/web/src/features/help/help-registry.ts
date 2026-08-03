@@ -100,7 +100,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
         note: 'Mandato operativo · tenure · trades enlazados',
       },
       {
-        path: 'apps/web/src/features/trading/trading-coach-rail.tsx',
+        path: 'apps/web/src/features/trading/trading-operativa-panel.tsx',
         role: 'code',
       },
       {
