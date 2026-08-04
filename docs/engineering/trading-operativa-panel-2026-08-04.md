@@ -44,7 +44,7 @@ Sync: `use-chart-visualization-sync.ts` solo **amplía** el store (nunca `replac
 ### Selección masiva (Valores)
 
 - Check de cabecera alineado con filas; **Ctrl/Cmd** toggle · **Mayús** rango.
-- Barra inferior horizontal: **A Estudio** · **Quitar de Estudio** · **Abrir gráficos** · Limpiar.
+- Barra inferior del panel Valores (siempre visible al seleccionar): **Pasar a Estudio** · **Quitar de Estudio** · **Abrir gráficos** · Limpiar.
 
 ### Gate SEMI / AUTO
 

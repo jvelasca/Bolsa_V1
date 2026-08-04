@@ -657,9 +657,9 @@ export function ListValuesPanel() {
 
         {activeVirtual === VIRTUAL_LIST_VISUALIZATION && !isLoading && visualizationListItems.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            Busca un valor, ábrelo en el gráfico o selecciona filas de otra lista y pulsa «A
-            Estudio». SEMI/AUTO exigen pertenencia a Estudio. Los miembros se guardan en el espacio
-            de trabajo.
+            Busca un valor, ábrelo en el gráfico o selecciona filas de otra lista y pulsa
+            «Pasar a Estudio». SEMI/AUTO exigen pertenencia a Estudio. Los miembros se guardan en
+            el espacio de trabajo.
           </p>
         )}
 
@@ -707,56 +707,57 @@ export function ListValuesPanel() {
           />
         )}
         </div>
-
-        {selectionEnabled && selectedInstrumentIds.size > 0 ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-t border-border bg-muted/25 px-2 py-1.5 text-[11px]">
-            <span className="mr-1 tabular-nums text-muted-foreground">
-              {selectedInstrumentIds.size} seleccionado
-              {selectedInstrumentIds.size === 1 ? '' : 's'}
-            </span>
-            <button
-              type="button"
-              className="rounded border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary hover:bg-primary/15"
-              onClick={addSelectedToEstudio}
-              title="Añadir selección a la lista Estudio"
-            >
-              A Estudio
-            </button>
-            {selectedInEstudioCount > 0 ? (
-              <button
-                type="button"
-                className="rounded border border-border px-2 py-1 font-medium text-foreground hover:bg-accent"
-                onClick={removeSelectedFromEstudio}
-                title="Quitar de Estudio"
-              >
-                Quitar de Estudio
-                {selectedInEstudioCount < selectedInstrumentIds.size
-                  ? ` (${selectedInEstudioCount})`
-                  : ''}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-1 font-medium text-foreground hover:bg-accent"
-              onClick={openSelectedCharts}
-              title="Abrir gráficos de la selección"
-            >
-              Abrir gráficos
-            </button>
-            <button
-              type="button"
-              className="ml-auto rounded px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-              onClick={() => {
-                setSelectedInstrumentIds(new Set());
-                selectionAnchorIndexRef.current = null;
-              }}
-            >
-              Limpiar
-            </button>
-          </div>
-        ) : null}
         </div>
       </ListColumnLayoutProvider>
+
+      {selectionEnabled && selectedInstrumentIds.size > 0 ? (
+        <div
+          className="z-20 flex shrink-0 flex-wrap items-center gap-1.5 border-t border-border bg-card px-2 py-2 text-[11px] shadow-[0_-4px_12px_rgba(0,0,0,0.06)]"
+          data-testid="list-selection-actions"
+          role="toolbar"
+          aria-label="Acciones sobre la selección"
+        >
+          <span className="mr-1 tabular-nums text-muted-foreground">
+            {selectedInstrumentIds.size} seleccionado
+            {selectedInstrumentIds.size === 1 ? '' : 's'}
+          </span>
+          <button
+            type="button"
+            className="rounded border border-primary/50 bg-primary/15 px-2.5 py-1.5 font-semibold text-primary hover:bg-primary/20"
+            onClick={addSelectedToEstudio}
+            title="Pasar la selección a la lista Estudio"
+          >
+            Pasar a Estudio
+          </button>
+          <button
+            type="button"
+            className="rounded border border-border px-2.5 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={removeSelectedFromEstudio}
+            disabled={selectedInEstudioCount === 0}
+            title="Quitar la selección de la lista Estudio"
+          >
+            Quitar de Estudio
+          </button>
+          <button
+            type="button"
+            className="rounded border border-border px-2.5 py-1.5 font-medium text-foreground hover:bg-accent"
+            onClick={openSelectedCharts}
+            title="Abrir gráficos de la selección"
+          >
+            Abrir gráficos
+          </button>
+          <button
+            type="button"
+            className="ml-auto rounded px-2.5 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={() => {
+              setSelectedInstrumentIds(new Set());
+              selectionAnchorIndexRef.current = null;
+            }}
+          >
+            Limpiar
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
