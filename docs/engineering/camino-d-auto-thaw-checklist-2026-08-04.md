@@ -57,9 +57,9 @@ Secuencia producto acordada: **SEMI primero** (ya cerrado) → **auditoría de l
 
 | Fase | Entrega | Depende |
 |------|---------|---------|
-| **A0** | Telemetría acierto dictamen (D6 diseño) — dash mínimo | Canales cerrado |
+| **A0** | Telemetría acierto dictamen (D6) — dash Asesor | **En curso / hecho en código** · `GET …/telemetry` |
 | **A1** | Libro UI modo AUTO (disabled hasta flags) + copy riesgos | A0 o paralelo |
-| **A2** | Camino D: Alarma → propose→execute **detrás** `PAPER_D_EXECUTE` | P6–P8 diseño |
+| **A2** | Camino D detrás `PAPER_D_EXECUTE` **vía Risk Engine** | OR-RE + P6–P8 |
 | **A3** | Kill switch + confirmación doble | A2 |
 | **A4** | ADR thaw + freeze amend + ayuda HELP | Evidencia P1–P5 |
 | **A5** | Opt-in DEMO controlado (1 cuenta) | A4 |
@@ -86,7 +86,7 @@ Cualquier “vamos con AUTO” en chat = **entrar en esta checklist**, no thaw a
 | Menú usuario → correo Alarmas | Hecho (localStorage; multiusuario después) |
 | Freeze Camino D intacto | Sí |
 | Auditorías institucionales 1+2 (CTO/OR) | [Triage](./audit-ext-institutional-pre-auto-triage-2026-08-04.md) — A0 + OR-lite; catálogo §5 aparcado |
-| A0 métricas dictamen | Pendiente (siguiente código) |
+| A0 métricas dictamen | **API+UI** `…/telemetry` · medir P1/P3/P4 en Asesor Opiniones |
 
 ### OR-lite (antes de A2 execute)
 
@@ -98,3 +98,4 @@ Extraído del triage institucional — no sustituye P1–P10:
 | OR-P2 | Decimal en path paper crítico (pre-live) |
 | OR-T4/T6 | Idempotencia + DecisionSession en execute (detrás flag) |
 | OR-P7 | Kill switch &lt;1s (ya P7) |
+| OR-RE | **Risk Engine façade** — toda propuesta AUTO pasa por `check()` (Gate + mandato + maxOpen + deny reasons); sin atajo Lab→Broker ([triage §9.2](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)) |

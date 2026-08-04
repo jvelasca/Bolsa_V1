@@ -39,6 +39,11 @@ import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+function pctLabel(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return '—';
+  return `${(v * 100).toFixed(0)}%`;
+}
+
 type ChannelFilter = 'todas' | 'alarma' | 'aviso';
 
 export function AsesorOpinionesPanel({ className }: { className?: string }) {
@@ -105,6 +110,15 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
 
   const opinionsQuery = useInstrumentDailyOpinions(studyIds, hints, {
     enabled: studyIds.length > 0 && !scoresLoading,
+  });
+  const telemetryQuery = useQuery({
+    queryKey: ['instrument-daily-opinions-telemetry', studyIds],
+    queryFn: () =>
+      api.getInstrumentDailyOpinionTelemetry({
+        lookbackDays: 90,
+        instrumentIds: studyIds.length > 0 ? studyIds : undefined,
+      }),
+    staleTime: 60_000,
   });
   const byId = useMemo(
     () => opinionByInstrumentId(opinionsQuery.data),
@@ -178,6 +192,28 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {telemetryQuery.data?.data ? (
+            <div
+              className="rounded-md border border-border/80 bg-muted/15 px-3 py-2 text-xs"
+              data-testid="asesor-opinion-telemetry"
+              title={telemetryQuery.data.data.caveats.join(' · ')}
+            >
+              <p className="font-medium text-foreground">Telemetría A0 (90d · Estudio)</p>
+              <p className="mt-1 tabular-nums text-muted-foreground">
+                {telemetryQuery.data.data.daysWithOpinions} días ·{' '}
+                {telemetryQuery.data.data.alarmaBuyCount} BUY-alarma · prec.5d{' '}
+                {pctLabel(telemetryQuery.data.data.buyPrecision5d)} · recall≈{' '}
+                {pctLabel(telemetryQuery.data.data.buyRecall5d)} · n=
+                {telemetryQuery.data.data.matureBuySample}
+              </p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                Thaw P3≥70% / P4≥55% — sin flip AUTO. Proxy Outcomes {telemetryQuery.data.data.criteriaVersion}.
+              </p>
+            </div>
+          ) : telemetryQuery.isError ? (
+            <p className="text-xs text-muted-foreground">Telemetría A0 no disponible.</p>
+          ) : null}
+
           <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Canal">
             {(
               [

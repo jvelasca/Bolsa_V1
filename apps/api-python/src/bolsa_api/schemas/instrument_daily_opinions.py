@@ -137,3 +137,34 @@ class EstudioEodOpinionBatchResponseDto(BaseModel):
     email_notify: EstudioEodOpinionEmailNotifyDto | None = Field(
         default=None, alias="emailNotify"
     )
+
+
+class OpinionTelemetryDto(BaseModel):
+    """A0 — acierto dictamen (proxy 5d)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
+    schema_version: str = Field(alias="schemaVersion")
+    as_of: str = Field(alias="asOf")
+    lookback_days: int = Field(alias="lookbackDays")
+    days_with_opinions: int = Field(alias="daysWithOpinions")
+    opinion_rows: int = Field(alias="opinionRows")
+    alarma_count: int = Field(alias="alarmaCount")
+    alarma_buy_count: int = Field(alias="alarmaBuyCount")
+    mature_buy_sample: int = Field(alias="matureBuySample")
+    buy_precision_5d: float | None = Field(default=None, alias="buyPrecision5d")
+    buy_hits: int = Field(alias="buyHits")
+    buy_misses: int = Field(alias="buyMisses")
+    buy_neutrals: int = Field(alias="buyNeutrals")
+    buy_recall_5d: float | None = Field(default=None, alias="buyRecall5d")
+    recall_move_sample: int = Field(alias="recallMoveSample")
+    recall_caught: int = Field(alias="recallCaught")
+    criteria_version: str = Field(alias="criteriaVersion")
+    forward_bars: int = Field(alias="forwardBars")
+    neutral_band_pct: float = Field(alias="neutralBandPct")
+    caveats: list[str] = Field(default_factory=list)
+
+
+class OpinionTelemetryResponseDto(BaseModel):
+    data: OpinionTelemetryDto
+

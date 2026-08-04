@@ -14,10 +14,13 @@ from bolsa_api.schemas.instrument_daily_opinions import (
     EstudioEodOpinionEmailNotifyDto,
     InstrumentDailyOpinionDto,
     InstrumentDailyOpinionsListResponseDto,
+    OpinionTelemetryDto,
+    OpinionTelemetryResponseDto,
     QueryInstrumentDailyOpinionsDto,
     RunEstudioEodOpinionBatchDto,
 )
 from bolsa_application.daily_opinion_service import DailyOpinionService, OpinionHint
+from bolsa_application.daily_opinion_telemetry import DailyOpinionTelemetryService
 from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
@@ -161,6 +164,29 @@ async def list_instrument_daily_opinions(
         ensure_days=ensure_days,
     )
     return InstrumentDailyOpinionsListResponseDto(data=[_to_dto(r) for r in rows])
+
+
+@router.get(
+    "/instrument-daily-opinions/telemetry",
+    response_model=OpinionTelemetryResponseDto,
+)
+async def get_opinion_telemetry(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    lookback_days: Annotated[int, Query(alias="lookbackDays", ge=7, le=366)] = 90,
+    instrument_ids: Annotated[list[str] | None, Query(alias="instrumentIds")] = None,
+) -> OpinionTelemetryResponseDto:
+    """A0 — precisión/recall proxy del dictamen (sin execute AUTO)."""
+    ids = None
+    if instrument_ids:
+        ids = [i.strip() for i in instrument_ids if isinstance(i, str) and i.strip()]
+        if not ids:
+            ids = None
+    service = DailyOpinionTelemetryService(
+        SqlAlchemyInstrumentDailyOpinionRepository(session),
+        SqlAlchemyOhlcvRepository(session),
+    )
+    tel = await service.compute(lookback_days=lookback_days, instrument_ids=ids)
+    return OpinionTelemetryResponseDto(data=OpinionTelemetryDto.model_validate(tel.to_dict()))
 
 
 @router.post(

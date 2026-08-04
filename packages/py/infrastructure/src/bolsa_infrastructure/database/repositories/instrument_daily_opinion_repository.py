@@ -126,6 +126,39 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_map(r) for r in rows]
 
+    async def list_range(
+        self,
+        *,
+        date_from: date,
+        date_to: date,
+        instrument_ids: list[str] | None = None,
+        source: str | None = None,
+        limit: int = 5_000,
+    ) -> list[InstrumentDailyOpinionRecord]:
+        """Rango para telemetría A0 (todas las sources salvo filtro)."""
+        filters = [
+            InstrumentDailyOpinionRow.as_of_bar_date >= date_from,
+            InstrumentDailyOpinionRow.as_of_bar_date <= date_to,
+        ]
+        if instrument_ids:
+            ids = [i for i in instrument_ids if i]
+            if not ids:
+                return []
+            filters.append(InstrumentDailyOpinionRow.instrument_id.in_(ids))
+        if source:
+            filters.append(InstrumentDailyOpinionRow.source == source)
+        stmt = (
+            select(InstrumentDailyOpinionRow)
+            .where(*filters)
+            .order_by(
+                InstrumentDailyOpinionRow.as_of_bar_date.asc(),
+                InstrumentDailyOpinionRow.instrument_id.asc(),
+            )
+            .limit(max(1, min(int(limit), 20_000)))
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_map(r) for r in rows]
+
     async def upsert(self, payload: dict[str, Any]) -> InstrumentDailyOpinionRecord:
         instrument_id = str(payload["instrument_id"])
         as_of: date = payload["as_of_bar_date"]

@@ -876,6 +876,41 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  getInstrumentDailyOpinionTelemetry: (opts?: {
+    lookbackDays?: number;
+    instrumentIds?: string[];
+  }) => {
+    const params = new URLSearchParams();
+    if (opts?.lookbackDays != null) params.set('lookbackDays', String(opts.lookbackDays));
+    for (const id of opts?.instrumentIds ?? []) {
+      if (id) params.append('instrumentIds', id);
+    }
+    const q = params.toString();
+    return request<{
+      data: {
+        schemaVersion: string;
+        asOf: string;
+        lookbackDays: number;
+        daysWithOpinions: number;
+        opinionRows: number;
+        alarmaCount: number;
+        alarmaBuyCount: number;
+        matureBuySample: number;
+        buyPrecision5d: number | null;
+        buyHits: number;
+        buyMisses: number;
+        buyNeutrals: number;
+        buyRecall5d: number | null;
+        recallMoveSample: number;
+        recallCaught: number;
+        criteriaVersion: string;
+        forwardBars: number;
+        neutralBandPct: number;
+        caveats: string[];
+      };
+    }>(`/api/instrument-daily-opinions/telemetry${q ? `?${q}` : ''}`);
+  },
+
   getAccountMandates: (accountId: string, instrumentId?: string) => {
     const q = instrumentId
       ? `?instrumentId=${encodeURIComponent(instrumentId)}`

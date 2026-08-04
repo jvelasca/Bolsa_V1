@@ -94,11 +94,11 @@ Catálogo completo: §5.
 | Orden | Épico | Incluye | No incluye |
 |-------|-------|---------|------------|
 | **0** | Cierre Canales (hecho) | Toast, prefs email, pack §8 | — |
-| **1** | **A0 telemetría dictamen** | Precisión/recall proxy, conteos días, SEMI ops count | Flip `PAPER_D_EXECUTE` |
-| **2** | **OR-lite** (Operational Readiness) | Kill switch diseño, límites DEMO, idempotencia execute **detrás flag**, APP_PASSWORD en demos, Decimal en paper path crítico | Broker live, shadow live |
-| **3** | **Repro+** | dataset SHA + feature_flags en manifest; trial payload_hash (sin chain completa) | Blockchain ledger |
-| **4** | Observabilidad / CI | Heartbeat workers, gitleaks, ErrorBoundary | OTel full, chaos farm |
-| **5** | Institutional backlog §5 | Hash-chain, Decision Replay, Monte Carlo, Safety Case… | Hasta demanda explícita |
+| **1** | **A0 telemetría dictamen** | Precisión/recall proxy, conteos días | Flip `PAPER_D_EXECUTE` |
+| **2** | **OR-lite + OR-RE** | Kill switch, Decimal paper, idempotencia, **Risk Engine façade** (Gate/mandato/maxOpen unificados) | Broker live directo |
+| **3** | **Repro+** | dataset SHA + feature_flags + trial payload_hash | Blockchain ledger |
+| **4** | Observabilidad / CI | Heartbeat, gitleaks, ErrorBoundary | OTel/Prometheus full |
+| **5** | Institutional + stats avanzadas | Hash-chain, SPA/WFO, Monte Carlo, Safety Case… | Hasta demanda explícita |
 
 **Regla:** cualquier ítem §5 que no esté en 1–4 requiere frase de producto («implementa X»).
 
@@ -154,4 +154,67 @@ Gracias. El nivel CTO / institutional es el correcto **como horizonte**. Contras
 - La línea de valor real coincide con la vuestra: **Operational Readiness + reproducibilidad + trazabilidad de decisión** antes de dinero real.  
 - Bolsa_V1 **no** abrirá Camino D por presión de checklist; A0 métricas + OR-lite + freeze amend siguen siendo el camino.
 
-*Fin triage institucional pre-AUTO.*
+---
+
+## 9. Cierre Aud 1 — 15 riesgos + Risk Engine + 4 pilares (2026-08-04)
+
+> Valoración **antes** de A0. No diluye el PASS Canales; **reordena** lo imprescindible pre-€ real.
+
+### 9.1 Los 15 riesgos → prioridad Bolsa
+
+| # | Tema auditor | Estado repo | Acción |
+|---|--------------|-------------|--------|
+| 1 | Versionado algoritmo (hashes en trial) | Manifest parcial (git/engine/costs) | **Repro+** (épico 3) — hashes formales |
+| 2 | Dataset fingerprint 100% | Metadata + bar fingerprint parcial | **Repro+** · no bloquea A0 |
+| 3 | Trazabilidad git/python/lock en ledger | `git_commit` en manifest | Extender dirty/py/lock en Repro+ |
+| 4 | Execution simulator (delay/partial) | Paper paths básicos | **Backlog OR** pre-broker live |
+| 5 | Motor órdenes estados | Pending orders parcial | Diseño Camino D · no inventar OMS completo ahora |
+| 6 | Portfolio Engine correlaciones | maxOpen + mandato; sin correlaciones | **Risk Engine** (ver 9.2) · portfolio domain P3 |
+| 7 | Market regime id | No | Backlog científico |
+| 8 | Drift PSI/KL | No | Post-meses DEMO |
+| 9 | Tests estadísticos (SPA/WFO) | Warm-up + stability IBEX | Lab; **no** gate Camino D DEMO |
+| 10 | Stress test botón | No | OR / disaster sim backlog |
+| 11 | Decision Trace | reasons + Confirm origen | Ampliar en DecisionSession (OR-T6) |
+| 12 | Lab quality indices | Lab Health | Extender P3 |
+| 13 | Prometheus | No | Épico 4 |
+| 14 | Secrets Vault / JWT TTL | Auth SHA256 demo | Multiusuario + OR-S1; Vault pre-prod |
+| 15 | Capa AUTO desacoplada Lab→Risk→Broker | SEMI Confirm; Camino D freeze | **Obligatorio** antes execute · = Risk Engine + checklist |
+
+### 9.2 Risk Engine independiente — **imprescindible pre-€**
+
+El auditor eleva esto por encima del resto. **De acuerdo**, con matiz:
+
+| Ya existe (disperso) | Falta |
+|----------------------|-------|
+| `TradingPolicy` / Gate long-only | Fachada única **Risk Engine** que Camino D **debe** llamar |
+| Libro DEMO maxOpen / size% | Max pérdida diaria / DD / horario / liquidez / broker up |
+| Mandato tenure | Duplicidad orden + stop obligatorio |
+| SEMI Confirm humano | Kill switch &lt;1s + shadow mode |
+
+**Decisión:** no construir el Risk Engine completo **antes** de A0 (necesitamos métricas). Sí:
+
+1. A0 telemetría (medir dictamen).  
+2. **OR-RE:** documentar + esqueleto `RiskEngine.check(proposal) → ALLOW|DENY+reasons` reutilizando Gate/mandato/maxOpen; Camino D **solo** pasa por ahí.  
+3. Ampliar checks (DD diario, kill switch) en OR-lite / A3.  
+4. **Prohibido:** Research/dictamen → Broker sin Risk Engine.
+
+### 9.3 Cuatro pilares → mapeo épicos
+
+| Pilar auditor | Épico Bolsa |
+|---------------|-------------|
+| Reproducibilidad absoluta | **3 Repro+** |
+| Validación estadística avanzada | Lab backlog (9, 10) · **no** bloquea DEMO AUTO |
+| Motor riesgo + ejecución desacoplado | **2 OR-lite + OR-RE** · checklist thaw |
+| Observabilidad continua | **4** Prometheus/heartbeats |
+
+### 9.4 Orden actualizado (producto)
+
+| # | Épico | Nota |
+|---|-------|------|
+| 1 | **A0** telemetría dictamen | Ahora |
+| 2 | **OR-lite + OR-RE** (Risk Engine façade) | Antes de A2 execute |
+| 3 | **Repro+** hashes/fingerprint | Paralelo OK tras A0 |
+| 4 | Observabilidad CI | |
+| 5 | Catálogo §5 + stats avanzadas | Demanda explícita |
+
+*Fin §9.*
