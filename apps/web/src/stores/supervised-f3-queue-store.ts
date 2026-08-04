@@ -46,7 +46,13 @@ export type SupervisedProposePayload = RecommendationV1 & {
   combinedScore?: number;
 };
 
-export type SupervisedQueueOrigin = 'scan' | 'finalists' | 'chart' | 'manual' | 'alarm';
+export type SupervisedQueueOrigin =
+  | 'scan'
+  | 'finalists'
+  | 'chart'
+  | 'manual'
+  | 'alarm'
+  | 'operativa';
 
 export type SupervisedEnqueueMeta = {
   scanId?: string;
@@ -85,6 +91,7 @@ export function resolveSupervisedQueueOrigin(
   if (item.scanId?.startsWith('finalists:')) return 'finalists';
   if (item.payload.source === 'chart') return 'chart';
   if (item.payload.source === 'alarm') return 'alarm';
+  if (item.payload.source === 'operativa') return 'operativa';
   if (item.scanId) return 'scan';
   return 'manual';
 }
@@ -99,6 +106,8 @@ export function supervisedQueueOriginLabel(origin: SupervisedQueueOrigin): strin
       return 'Gráfico';
     case 'alarm':
       return 'Alarma Radar';
+    case 'operativa':
+      return 'Operativa';
     default:
       return 'Manual';
   }

@@ -72,6 +72,11 @@ export function OperativaDictamenBlock({
         {opinion.strategyStars != null ? ` (TOP ${opinion.strategyStars})` : ''}
         {opinion.distress ? ' · FA distress' : ''}
       </p>
+      {opinion.reasons.length > 0 ? (
+        <p className="mt-0.5 truncate text-[10px] opacity-75" title={opinion.reasons.join(', ')}>
+          {opinion.reasons.slice(0, 3).join(' · ')}
+        </p>
+      ) : null}
     </div>
   );
 }

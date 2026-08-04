@@ -78,3 +78,11 @@ Helpers: `operativa-index.ts` · UI: `operativa-pulse.tsx` · datos: `useInstrum
 ## Fuera de alcance
 
 AUTO execute · Belief→Coach 5c · cambiar fórmula IO más allá de Composite+distress.
+
+## Update 2026-08-04c — mesa SEMI vital
+
+- Dictamen del valor activo con `positionOpen` real (portfolio).
+- Banner «Fuera de Estudio» + Añadir cuando SEMI/AUTO lo exigen.
+- CTAs **Proponer F3 → Confirm** y **Cola Confirm (n)** en Recomendación (Camino C).
+- Chart IA propose reutiliza los mismos gates SEMI/Estudio/sizing (`propose-instrument-supervised.ts`).
+- Camino D AUTO execute **sigue freeze**.

@@ -7,7 +7,7 @@
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import { useWorkspaceStore } from '@/stores/workspace-store';
@@ -25,7 +25,12 @@ import {
 } from '@/features/platform/strategy-adoption';
 import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel';
 import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
+import {
+  demoBookAllowsEnqueueConfirm,
+  demoBookRequiresEstudioMembership,
+} from '@/features/trading/demo-book-prefs';
 import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
+import { proposeInstrumentSupervised } from '@/features/trading/propose-instrument-supervised';
 import { TradingOperativaSection } from '@/features/trading/trading-operativa-section';
 import { useVisualizationStore } from '@/stores/visualization-store';
 import {
@@ -45,6 +50,11 @@ import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { effectiveDiaD, isDiaDInPast, todayIsoDate } from '@/features/backtests/backtest-period';
 import { loadBacktestRunContext } from '@/features/backtests/backtest-run-context';
 import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
+import { useAlertsStore } from '@/stores/alerts-store';
+import {
+  openHelpAiPlatform,
+  useSupervisedF3QueueStore,
+} from '@/stores/supervised-f3-queue-store';
 import { cn } from '@/lib/utils';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { InstrumentDailyOpinionHintV1 } from '@bolsa/shared';
@@ -71,6 +81,10 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const timeframe = (active?.timeframe as string) || '1d';
   const { effectiveAccountId } = useActiveAccount();
   const bookPrefs = useDemoBookPrefs();
+  const pushToast = useAlertsStore((s) => s.pushToast);
+  const enqueueSupervised = useSupervisedF3QueueStore((s) => s.enqueue);
+  const setActiveSupervised = useSupervisedF3QueueStore((s) => s.setActive);
+  const confirmQueueCount = useSupervisedF3QueueStore((s) => s.items.length);
   const mandateRev = useSyncExternalStore(
     subscribeMandateStore,
     getMandateStoreSnapshot,
@@ -80,10 +94,28 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const canVerify = isDiaDInPast(diaD);
 
   const studyEntries = useVisualizationStore((s) => s.entries);
+  const studyContains = useVisualizationStore((s) => s.contains);
+  const replaceStudyEntries = useVisualizationStore((s) => s.replaceEntries);
   const studyIds = useMemo(
     () => studyEntries.map((entry) => entry.instrumentId),
     [studyEntries],
   );
+  const inEstudio = instrumentId ? studyContains(instrumentId) : false;
+  const requiresEstudio = demoBookRequiresEstudioMembership(bookPrefs.mode);
+  const canEnqueueConfirm = demoBookAllowsEnqueueConfirm(bookPrefs.mode);
+
+  const portfolioQuery = useQuery({
+    queryKey: ['portfolio', 'operativa'],
+    queryFn: api.getPortfolio,
+    staleTime: 30_000,
+  });
+  const positionOpen = useMemo(() => {
+    if (!instrumentId) return false;
+    const positions = portfolioQuery.data?.data.positions ?? [];
+    return positions.some(
+      (p) => p.instrumentId === instrumentId && Math.abs(Number(p.quantity ?? 0)) > 0,
+    );
+  }, [instrumentId, portfolioQuery.data]);
 
   const { faByInstrument, taByInstrument, scoresLoading } = useInstrumentsHubScores(studyIds);
 
@@ -123,12 +155,12 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         faScore: fa?.scoreDisplay100 ?? null,
         taScore: ta?.technicalDisplay100 ?? null,
         distress: Boolean(fa?.distress),
-        positionOpen: false,
+        positionOpen,
         allowTrading: true,
         hasEodBar: true,
       },
     ];
-  }, [instrumentId, faByInstrument, taByInstrument, scoreRows]);
+  }, [instrumentId, faByInstrument, taByInstrument, scoreRows, positionOpen]);
 
   const opinionsQuery = useInstrumentDailyOpinions(
     instrumentId ? [instrumentId] : [],
@@ -161,6 +193,36 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
 
   const top = topQuery.data?.data ?? null;
   const slot1 = top?.slots?.slice().sort((a, b) => a.rank - b.rank)[0] ?? null;
+
+  const proposeMutation = useMutation({
+    mutationFn: async () => {
+      if (!instrumentId) throw new Error('Sin instrumento');
+      if (!effectiveAccountId) throw new Error('Sin cuenta DEMO activa');
+      const topSlot =
+        topQuery.data?.data?.slots?.slice().sort((a, b) => a.rank - b.rank)[0] ?? null;
+      return proposeInstrumentSupervised({
+        instrumentId,
+        symbol,
+        accountId: effectiveAccountId,
+        source: 'operativa',
+        strategyDefinitionId: topSlot?.strategyDefinitionId ?? null,
+        strategyLabel: topSlot?.label ?? symbol,
+      });
+    },
+    onSuccess: (payload) => {
+      const id = enqueueSupervised(payload, {
+        symbol: payload.symbol ?? symbol,
+        origin: 'operativa',
+      });
+      setActiveSupervised(id);
+      pushToast(`Operativa · ${payload.symbol ?? symbol}: ${payload.action} → Confirm`);
+      openHelpAiPlatform({ panel: 'supervised-f3' });
+    },
+    onError: (e: Error) => {
+      pushToast(`Operativa · ${symbol}: ${e.message}`);
+    },
+  });
+
   const labEvidence = readLabEvidenceFromCoachFacts(
     top?.coachFacts as Record<string, unknown> | null | undefined,
   );
@@ -223,7 +285,43 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     >
       <p className="shrink-0 px-0.5 text-[10px] font-medium text-muted-foreground">
         {symbol} · {timeframe}
+        {positionOpen ? ' · en cartera' : ''}
       </p>
+
+      {requiresEstudio && !inEstudio ? (
+        <div
+          className="shrink-0 rounded-md border border-amber-600/40 bg-amber-500/10 px-2 py-1.5 text-[10px]"
+          data-testid="operativa-fuera-estudio"
+        >
+          <p className="font-medium text-amber-950 dark:text-amber-50">
+            Fuera de Estudio — {bookPrefs.mode.toUpperCase()} exige membresía
+          </p>
+          <button
+            type="button"
+            className="mt-1 rounded border border-amber-700/40 bg-background/60 px-1.5 py-0.5 font-medium text-foreground hover:bg-accent"
+            onClick={() => {
+              if (!instrumentId) return;
+              const now = new Date().toISOString();
+              const entries = useVisualizationStore.getState().entries;
+              if (entries.some((e) => e.instrumentId === instrumentId)) return;
+              replaceStudyEntries([
+                {
+                  instrumentId,
+                  symbol,
+                  name: symbol,
+                  firstViewedAt: now,
+                  lastViewedAt: now,
+                  viewCount: 1,
+                },
+                ...entries,
+              ]);
+              pushToast(`${symbol} → Estudio`);
+            }}
+          >
+            Añadir a Estudio
+          </button>
+        </div>
+      ) : null}
 
       <TradingOperativaSection
         sectionId="recommendation"
@@ -283,6 +381,39 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         />
 
         <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            data-testid="operativa-proponer-f3"
+            className="rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1 text-left font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
+            disabled={
+              proposeMutation.isPending ||
+              !effectiveAccountId ||
+              (requiresEstudio && !inEstudio) ||
+              !canEnqueueConfirm
+            }
+            title={
+              !canEnqueueConfirm
+                ? 'Cambia a SEMI en Configuración para Proponer F3'
+                : requiresEstudio && !inEstudio
+                  ? 'Añade el valor a Estudio primero'
+                  : 'Propose → cola Confirm (Camino C)'
+            }
+            onClick={() => proposeMutation.mutate()}
+          >
+            {proposeMutation.isPending
+              ? 'Proponiendo…'
+              : !canEnqueueConfirm
+                ? 'Proponer F3 (pasa a SEMI)'
+                : 'Proponer F3 → Confirm'}
+          </button>
+          <button
+            type="button"
+            data-testid="operativa-cola-confirm"
+            className="rounded-md border border-border px-2 py-1 text-left font-medium text-foreground hover:bg-accent"
+            onClick={() => openHelpAiPlatform({ panel: 'supervised-f3' })}
+          >
+            Cola Confirm{confirmQueueCount > 0 ? ` (${confirmQueueCount})` : ''}
+          </button>
           <Link
             to={instrumentTopBacktestsHref(instrumentId, timeframe)}
             className="rounded-md border border-sky-600/30 bg-sky-500/10 px-2 py-1 font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"
@@ -311,6 +442,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         summary={
           <span className="text-[10px] text-muted-foreground">
             Mandatos {churn.openCount}
+            {confirmQueueCount > 0 ? ` · Confirm ${confirmQueueCount}` : ''}
           </span>
         }
       >
@@ -356,6 +488,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         summary={
           <span className="text-[10px] text-muted-foreground">
             Operativa: {bookPrefs.mode}
+            {confirmQueueCount > 0 ? ` · cola ${confirmQueueCount}` : ''}
           </span>
         }
       >
