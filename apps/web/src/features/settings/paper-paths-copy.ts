@@ -74,17 +74,18 @@ export const PAPER_PATH_RADAR = {
 } as const;
 
 /**
- * Camino D — plan completo (Composite × FA whitelist) sobre cuenta DEMO.
- * Propose + execute opcional (PAPER_D_EXECUTE + política paper_auto).
+ * Camino D — plan completo (Composite × FA whitelist) / Libro AUTO Estudio.
+ * Propose + execute opcional (PAPER_D_EXECUTE + Risk Engine + política paper_auto).
+ * Producto Libro: modo AUTO visible en Operativa (A1) pero deshabilitado hasta thaw.
  */
 export const PAPER_PATH_D = {
   id: 'paper_d_full_auto' as const,
   shortTitle: 'Plan D (demo)',
   cta: 'Proponer plan D',
   blurb:
-    'Composite × FA whitelist → propose; pipeline semanal; execute opcional en cuenta DEMO vía Router (modo técnico paper_auto).',
+    'Composite × FA whitelist → propose; pipeline semanal; execute opcional en cuenta DEMO vía Risk Engine (modo técnico paper_auto). Libro AUTO = misma disciplina sin Confirm.',
   warnLine:
-    'Execute: PAPER_D_EXECUTE=1. ≠ radar B ≠ Supervisado C. No es cuenta tipo Paper/broker.',
+    'Execute: PAPER_D_EXECUTE=1 + checklist thaw. Libro AUTO pill = prep (A1), no activa fills. ≠ radar B ≠ Supervisado C. No es cuenta tipo Paper/broker.',
 } as const;
 
 /**

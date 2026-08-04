@@ -57,8 +57,8 @@ Secuencia producto acordada: **SEMI primero** (ya cerrado) → **auditoría de l
 
 | Fase | Entrega | Depende |
 |------|---------|---------|
-| **A0** | Telemetría acierto dictamen (D6) — dash Asesor | **En curso / hecho en código** · `GET …/telemetry` |
-| **A1** | Libro UI modo AUTO (disabled hasta flags) + copy riesgos | A0 o paralelo |
+| **A0** | Telemetría acierto dictamen (D6) — dash Asesor | **Hecho** · `GET …/telemetry` |
+| **A1** | Libro UI modo AUTO (disabled hasta flags) + copy riesgos | **Hecho** · `DemoBookModePanel` + `demo-book-auto-copy` |
 | **A2** | Camino D detrás `PAPER_D_EXECUTE` **vía Risk Engine** | OR-RE + P6–P8 |
 | **A3** | Kill switch + confirmación doble | A2 |
 | **A4** | ADR thaw + freeze amend + ayuda HELP | Evidencia P1–P5 |
@@ -87,6 +87,7 @@ Cualquier “vamos con AUTO” en chat = **entrar en esta checklist**, no thaw a
 | Freeze Camino D intacto | Sí |
 | Auditorías institucionales 1+2 (CTO/OR) | [Triage](./audit-ext-institutional-pre-auto-triage-2026-08-04.md) — A0 + OR-lite; catálogo §5 aparcado |
 | A0 métricas dictamen | **API+UI** `…/telemetry` · medir P1/P3/P4 en Asesor Opiniones |
+| A1 Libro AUTO UI | **Hecho** — pill «Auto · prep» + riesgos; `DEMO_BOOK_AUTO_UI_ENABLED=false`; coerce auto→semi |
 
 ### OR-lite (antes de A2 execute)
 

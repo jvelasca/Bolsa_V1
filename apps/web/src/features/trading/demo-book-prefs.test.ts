@@ -27,9 +27,15 @@ describe('demo-book-prefs', () => {
     expect(n.defaultSizePctOfCash).toBe(1);
   });
 
+  it('A1: coerces stored auto → semi while AUTO UI disabled', () => {
+    const n = normalizeDemoBookPrefs({ mode: 'auto' });
+    expect(n.mode).toBe('semi');
+  });
+
   it('gates enqueue / execute by mode', () => {
     expect(demoBookAllowsEnqueueConfirm('manual')).toBe(false);
     expect(demoBookAllowsEnqueueConfirm('semi')).toBe(true);
+    expect(demoBookAllowsEnqueueConfirm('auto')).toBe(true);
     expect(demoBookAllowsExecute('manual')).toBe(false);
     expect(demoBookAllowsExecute('semi')).toBe(true);
     expect(demoBookAllowsExecute('auto')).toBe(false);

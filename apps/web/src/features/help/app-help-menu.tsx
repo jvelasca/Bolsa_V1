@@ -364,7 +364,10 @@ function TradingContent() {
             <strong className="text-foreground">Configuración</strong> — a la derecha
             «Operativa: manual|semi|auto» (sin desplegar); el bloque usa el{' '}
             <strong className="text-foreground">nombre de la cuenta activa</strong> (MANUAL/SEMI,
-            % cash, máx. posiciones, geo). AUTO sigue congelado.
+            % cash, máx. posiciones, geo).{' '}
+            <strong className="text-foreground">AUTO</strong> se muestra como «prep» con riesgos
+            (Camino D / Risk Engine / kill switch); pill deshabilitada hasta checklist thaw +{' '}
+            <code className="text-[10px]">PAPER_D_EXECUTE</code>. Usa SEMI + Confirm.
           </li>
         </ul>
         <p className="mt-2">

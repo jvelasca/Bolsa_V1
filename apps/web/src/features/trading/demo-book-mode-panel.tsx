@@ -1,13 +1,20 @@
 /**
  * Controles del libro operativo de la cuenta activa: MANUAL/SEMI + N posiciones + % sizing.
- * Slice 1 — AUTO deshabilitado (Camino D freeze).
+ * A1 — AUTO visible con copy de riesgos; pill deshabilitada (Camino D freeze).
  * Título UI = nombre de la cuenta activa (no «Libro DEMO»).
  *
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A1
  */
 
 import { cn } from '@/lib/utils';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
+import {
+  DEMO_BOOK_AUTO_FOOTER,
+  DEMO_BOOK_AUTO_RISK_LINES,
+  DEMO_BOOK_AUTO_TOOLTIP,
+  DEMO_BOOK_AUTO_UI_ENABLED,
+} from '@/features/trading/demo-book-auto-copy';
 import {
   DEMO_BOOK_MAX_OPEN_MAX,
   DEMO_BOOK_MAX_OPEN_MIN,
@@ -64,33 +71,54 @@ export function DemoBookModePanel({ className, compact }: Props) {
       </p>
       <div className="flex flex-wrap gap-1">
         {(['manual', 'semi', 'auto'] as const).map((mode) => {
-          const disabled = mode === 'auto';
+          const disabled = mode === 'auto' && !DEMO_BOOK_AUTO_UI_ENABLED;
           const active = prefs.mode === mode;
           return (
             <button
               key={mode}
               type="button"
               disabled={disabled}
+              aria-disabled={disabled}
               title={
                 disabled
-                  ? 'AUTO congelado (Camino D). Usa SEMI + Confirm.'
+                  ? DEMO_BOOK_AUTO_TOOLTIP
                   : mode === 'manual'
                     ? 'Solo avisos · sin Confirm automático'
                     : 'Propuestas → Confirm F3 → DEMO'
               }
-              onClick={() => update({ mode })}
+              onClick={() => {
+                if (mode === 'auto' && !DEMO_BOOK_AUTO_UI_ENABLED) return;
+                update({ mode });
+              }}
               className={cn(
                 'rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
                 active
                   ? 'border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
                   : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground',
+                disabled && 'border-dashed',
               )}
             >
               {MODE_LABEL[mode]}
+              {disabled ? (
+                <span className="ml-1 font-normal opacity-70">· prep</span>
+              ) : null}
             </button>
           );
         })}
       </div>
+      {!DEMO_BOOK_AUTO_UI_ENABLED ? (
+        <div
+          className="space-y-1 border-t border-border/60 pt-1.5 text-[10px] leading-snug text-muted-foreground"
+          data-testid="demo-book-auto-risk"
+        >
+          <p className="font-medium text-foreground/80">AUTO (Camino D) — riesgos</p>
+          <ul className="list-disc space-y-0.5 pl-3.5">
+            {DEMO_BOOK_AUTO_RISK_LINES.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className={cn('grid gap-1.5', compact ? 'grid-cols-1' : 'grid-cols-2')}>
         <label className="flex flex-col gap-0.5">
           <span className="text-muted-foreground">Máx. posiciones</span>
@@ -137,9 +165,7 @@ export function DemoBookModePanel({ className, compact }: Props) {
           </select>
         </label>
       </div>
-      <p className="text-[10px] leading-snug text-muted-foreground">
-        SEMI = Confirm humano (F3). Geo ordena la cola (óptimo → preferencia); no veta.
-      </p>
+      <p className="text-[10px] leading-snug text-muted-foreground">{DEMO_BOOK_AUTO_FOOTER}</p>
     </div>
   );
 }
