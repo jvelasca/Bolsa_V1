@@ -98,5 +98,5 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 2. Round 2 triage: [audit-ext-round2-triage-2026-08-03.md](./audit-ext-round2-triage-2026-08-03.md)  
 3. Freeze: [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md)  
 4. **Round 3 (pausa motor Estudio):** [audit-brief-estudio-motor-operativo-2026-08-04.md](./audit-brief-estudio-motor-operativo-2026-08-04.md)  
-5. **Round 3 triage (ratificado O3-C):** [audit-ext-round3-triage-estudio-motor-2026-08-04.md](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [ADR-022](../adr/022-estudio-daily-opinion-motor.md)  
+5. **Round 3 triage (ratificado O3-C · D1 cerrado):** [audit-ext-round3-triage-estudio-motor-2026-08-04.md](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) §11 · [ADR-022](../adr/022-estudio-daily-opinion-motor.md)  
 6. Diseño interno: [estudio-daily-opinion-alarms-design-2026-08-04.md](./estudio-daily-opinion-alarms-design-2026-08-04.md)

@@ -1,6 +1,6 @@
 # Diseño — Estudio diario → Opinión → Avisos/Alarmas → Acción (pausa pre-AUTO)
 
-> **AsOf:** 2026-08-04 · **Estado:** **O3-C RATIFICADO** (round 3) — implementación D1 pendiente de OK producto.  
+> **AsOf:** 2026-08-04 · **Estado:** **O3-C RATIFICADO** · **D1 CERRADO** (código + Evolución). Siguiente: Operativa → Asesor.  
 > **Triage:** [audit-ext-round3-triage-estudio-motor-2026-08-04.md](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [ADR-022](../adr/022-estudio-daily-opinion-motor.md).  
 > **Auditorías externas (round 3):** brief → [audit-brief-estudio-motor-operativo-2026-08-04.md](./audit-brief-estudio-motor-operativo-2026-08-04.md).  
 > **Padres:** [demo-operating-modes-brief-2026-08-03](./demo-operating-modes-brief-2026-08-03.md) · [trading-operativa-panel-2026-08-04](./trading-operativa-panel-2026-08-04.md) · [research-lifecycle](./research-lifecycle.md) · ADR-010/019/020 · RFC-008.  

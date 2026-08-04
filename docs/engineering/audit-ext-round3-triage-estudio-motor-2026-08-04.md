@@ -5,7 +5,7 @@
 > **Diseño previo:** [estudio-daily-opinion-alarms-design-2026-08-04.md](./estudio-daily-opinion-alarms-design-2026-08-04.md)  
 > **Padre:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md)  
 > **ADR de decisión:** [ADR-022](../adr/022-estudio-daily-opinion-motor.md)  
-> **AsOf:** 2026-08-04 · **Estado:** **RATIFICADO** (producto) · **código D1 aún no empezado** (esperar OK explícito del usuario para implementar).
+> **AsOf:** 2026-08-04 · **Estado:** **RATIFICADO** · **D1 CERRADO** · siguiente **Operativa** → **Asesor** (Camino D AUTO execute freeze).
 
 ---
 
@@ -164,11 +164,15 @@ Del informe 2 §5.1 (N4), adoptados:
 | Paso | Qué | Estado |
 |------|-----|--------|
 | R0 | Este triage + ADR-022 | **Hecho** |
-| R1 | Usuario OK explícito «implementar D1» | Pendiente |
-| D1 | Tabla + service on-demand + API + UI mínima Estudio/Operativa | Bloqueado a R1 |
-| D1b | Tests invariante | Con D1 |
-| D2 | Batch EOD flag-off + canales | Tras D1 estable ~2 semanas uso |
-| D3+ | Métricas / thaw path | Según checklist |
+| R1 | Usuario OK explícito «implementar D1» | **Hecho** (2026-08-04) |
+| D1 | Tabla + service on-demand + API + UI mínima Estudio/Operativa | **Cerrado** (`3b5d954`+) |
+| D1b | Tests invariante | **Hecho** (pytest stance) |
+| D1c | Evolución: historial + sparkline ★ dictamen | **Hecho** (`f385a39`) |
+| D1d | Operativa: solo dictamen del valor (lista global → Asesor) | **Hecho** (`bc3fd95`) |
+| **Op** | **Operativa vital** (mesa TRADING / SEMI / mandato / pulso) — clave de app | **Siguiente** |
+| **Asesor** | Research → Asesor + bandeja «opiniones de hoy» (datos ya en motor) | Tras Op |
+| D2 | Batch EOD flag-off + canales | Tras uso estable ~2 semanas |
+| D3+ | Métricas / thaw Camino D AUTO execute | Checklist thaw estricto — **sigue freeze** |
 
 ---
 
@@ -227,8 +231,26 @@ Confirmaciones B+C: diseño **listo**. Código D1 **solo** con frase explícita 
 | freeze + motor / thaw | Hecho |
 | audit-pack round 3 | Hecho |
 | diseño opinion O3-C ratificado | Hecho |
-| docs/README enlace ADR-022 | Pendiente menor (al abrir D1 o ya) |
+| docs/README enlace ADR-022 | **Hecho** |
 
 ---
 
 *Fin cierre confirmaciones. Esperando OK producto para código D1.*
+
+---
+
+## 11. Cierre D1 (2026-08-04) — secuencia producto
+
+**D1 motor O3-C cerrado en código.** Artefacto `InstrumentDailyOpinion` on-demand + caché; Evolución con serie; Operativa con dictamen del activo.
+
+### Secuencia acordada (producto)
+
+| # | Foco | Incluye | No incluye |
+|---|------|---------|------------|
+| 1 | ~~D1 motor~~ | Dictamen, API, Evolución, invariantes | — |
+| 2 | **Operativa** (vital) | Mesa TRADING, SEMI/Confirm, mandato, pulso IO+TOP+dictamen del valor | **Camino D AUTO execute** (sigue freeze) |
+| 3 | **Asesor** | Renombrar/integrar Research; bandeja opiniones Estudio; UI de datos **ya** calculables en background | Cron EOD batch (D2); thaw AUTO |
+
+**Nota AUTO:** «parte AUTO» = madurar **Operativa** como superficie de operación (hacia SEMI y, más tarde, AUTO). **No** activar `PAPER_D_EXECUTE` / Camino D hasta checklist thaw del freeze.
+
+**Nota Asesor:** los inputs (IO, FA, TOP, dictámenes, narrative) ya existen vía APIs D1; Asesor es **presentación + orquestación**, no un segundo motor.

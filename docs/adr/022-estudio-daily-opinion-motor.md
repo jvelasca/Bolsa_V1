@@ -15,7 +15,7 @@ Bolsa_V1 tiene Lab (TOP, CORE-R), Estudio, IO, SEMI Confirm (Camino C) y Gate lo
 
 1. Adoptar **O3-C**: UI en 3 pasos **Vigilar → Opinar → Actuar**; motor interno alineado con RFC-008.  
 2. Introducir artefacto de dominio **`InstrumentDailyOpinion`** (persistido).  
-3. **D1:** cálculo **on-demand** + caché por vela EOD; **sin** cron/job desatendido.  
+3. **D1:** cálculo **on-demand** + caché por vela EOD; **sin** cron/job desatendido. **Estado 2026-08-04: D1 implementado y cerrado** (ver triage §11).  
 4. Batch EOD solo con flag `ESTUDIO_EOD_OPINION_ENABLED=false` por defecto (fase posterior).  
 5. UI: el Dictamen es la proyección principal; IO/TOP/Radar/F3 no compiten como “verdades” de bandeja.  
 6. ★ Dictamen ≠ ★ Estrategia (TOP).  
@@ -55,4 +55,5 @@ Usuario abre Estudio / Opinar
 
 - Diseño: [estudio-daily-opinion-alarms-design-2026-08-04](../engineering/estudio-daily-opinion-alarms-design-2026-08-04.md)  
 - Freeze: [post-audit-decision-freeze-2026-08-03](../engineering/post-audit-decision-freeze-2026-08-03.md)  
+- Cierre D1 + secuencia Op → Asesor: [triage §11](../engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md)  
 - RFC-008, ADR-010, ADR-019, ADR-020
