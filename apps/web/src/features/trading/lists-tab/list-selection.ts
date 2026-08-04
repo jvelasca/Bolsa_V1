@@ -1,5 +1,8 @@
 /**
- * Selección multi-fila estilo Windows (Ctrl/Cmd toggle · Shift rango).
+ * Selección multi-fila estilo Windows (columna de checks):
+ * - Clic en check → marca/desmarca esa fila (estado explícito del input).
+ * - Ctrl/Cmd + Mayús → rango sumado; Mayús → rango sustitutivo.
+ * - Ctrl no es necesario para sumar dos checks sueltos: cada check mantiene el resto.
  */
 
 export type ListSelectModifiers = {
@@ -15,8 +18,10 @@ export function applyInstrumentSelection(opts: {
   orderedIds: string[];
   modifiers: ListSelectModifiers;
   anchorIndex: number | null;
+  /** Valor `checked` del input (onChange). Permite despulsar con claridad. */
+  checked: boolean;
 }): { next: Set<string>; anchorIndex: number } {
-  const { prev, instrumentId, index, orderedIds, modifiers } = opts;
+  const { prev, instrumentId, index, orderedIds, modifiers, checked } = opts;
   const additive = Boolean(modifiers.ctrlKey || modifiers.metaKey);
   const range = Boolean(modifiers.shiftKey);
 
@@ -32,16 +37,8 @@ export function applyInstrumentSelection(opts: {
     return { next: new Set(slice), anchorIndex: opts.anchorIndex };
   }
 
-  if (additive) {
-    const next = new Set(prev);
-    if (next.has(instrumentId)) next.delete(instrumentId);
-    else next.add(instrumentId);
-    return { next, anchorIndex: index };
-  }
-
-  // Clic en check sin modificadores: toggle de esa fila (no limpia el resto).
   const next = new Set(prev);
-  if (next.has(instrumentId)) next.delete(instrumentId);
-  else next.add(instrumentId);
+  if (checked) next.add(instrumentId);
+  else next.delete(instrumentId);
   return { next, anchorIndex: index };
 }

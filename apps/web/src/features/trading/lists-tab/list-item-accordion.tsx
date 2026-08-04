@@ -43,7 +43,12 @@ interface ListItemAccordionProps {
   /** Texto secundario bajo el símbolo (p. ej. posición en cartera). */
   subtitle?: string;
   selected?: boolean;
-  onToggleSelect?: (event: React.MouseEvent) => void;
+  onToggleSelect?: (detail: {
+    checked: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    shiftKey: boolean;
+  }) => void;
 }
 
 export function ListItemAccordion({
@@ -57,6 +62,7 @@ export function ListItemAccordion({
 }: ListItemAccordionProps) {
   const membershipRef = useRef<HTMLButtonElement>(null);
   const [membershipOpen, setMembershipOpen] = useState(false);
+  const selectModsRef = useRef({ ctrlKey: false, metaKey: false, shiftKey: false });
   const { visibleColumns, dataGridTemplateColumns, rowActionsWidth } = useListColumnLayoutContext();
 
   const expanded = useTradingUiStore((s) => s.expandedInstrumentIds[item.id] ?? false);
@@ -136,14 +142,21 @@ export function ListItemAccordion({
                 className="h-3.5 w-3.5 accent-primary"
                 checked={selected}
                 aria-label={`Seleccionar ${item.symbol}`}
-                title="Clic · Ctrl+clic · Mayús+clic (rango)"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  onToggleSelect(event);
+                title="Clic para marcar/desmarcar · Mayús = rango · Ctrl+Mayús = sumar rango"
+                onMouseDown={(event) => {
+                  selectModsRef.current = {
+                    ctrlKey: event.ctrlKey,
+                    metaKey: event.metaKey,
+                    shiftKey: event.shiftKey,
+                  };
                 }}
-                onChange={() => {
-                  /* handled in onClick for modifier keys */
+                onClick={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  event.stopPropagation();
+                  onToggleSelect?.({
+                    checked: event.target.checked,
+                    ...selectModsRef.current,
+                  });
                 }}
               />
             </div>

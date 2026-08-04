@@ -42,7 +42,7 @@ import { sortExternalSearchHits, rankCatalogInstrument } from '@/lib/search-rank
 import { instrumentMatchesSearchQuery } from '@bolsa/shared';
 import { formatPct, formatPrice } from '@/features/charts/chart-utils';
 import { sortInstrumentList } from '@/lib/list-utils';
-
+import { applyInstrumentSelection } from '@/features/trading/lists-tab/list-selection';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { useActiveAccountQueryKey } from '@/stores/active-account-store';
 import { usePendingOrders } from '@/features/trading/use-pending-orders';
@@ -54,7 +54,6 @@ import { ListColumnLayoutProvider, useListColumnLayoutContext } from '@/features
 import { PendingOrderListItem } from '@/features/trading/lists-tab/pending-order-list-item';
 import { ListCarousel } from '@/features/trading/lists-tab/list-carousel';
 import { useListInstrumentKeyboardNav } from '@/features/trading/lists-tab/use-list-instrument-keyboard-nav';
-import { applyInstrumentSelection } from '@/features/trading/lists-tab/list-selection';
 
 export function ListValuesPanel() {
   const navigate = useNavigate();
@@ -256,10 +255,12 @@ export function ListValuesPanel() {
     listInstruments,
   ]);
 
-  const selectableIds = useMemo(
-    () => selectableItems.map((item) => item.id),
-    [selectableItems],
-  );
+  const selectableIds = useMemo(() => {
+    const sortState = selectedListId
+      ? listConfig.sortByListId?.[selectedListId]
+      : undefined;
+    return sortInstrumentList(selectableItems, sortState).map((item) => item.id);
+  }, [selectableItems, selectedListId, listConfig.sortByListId]);
 
   const selectAllChecked =
     selectableIds.length > 0 && selectableIds.every((id) => selectedInstrumentIds.has(id));
@@ -279,7 +280,15 @@ export function ListValuesPanel() {
     });
   }
 
-  function handleSelectClick(instrumentId: string, event: React.MouseEvent) {
+  function handleSelectClick(
+    instrumentId: string,
+    detail: {
+      checked: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      shiftKey: boolean;
+    },
+  ) {
     const index = selectableIds.indexOf(instrumentId);
     if (index < 0) return;
     setSelectedInstrumentIds((prev) => {
@@ -289,11 +298,12 @@ export function ListValuesPanel() {
         index,
         orderedIds: selectableIds,
         modifiers: {
-          ctrlKey: event.ctrlKey,
-          metaKey: event.metaKey,
-          shiftKey: event.shiftKey,
+          ctrlKey: detail.ctrlKey,
+          metaKey: detail.metaKey,
+          shiftKey: detail.shiftKey,
         },
         anchorIndex: selectionAnchorIndexRef.current,
+        checked: detail.checked,
       });
       selectionAnchorIndexRef.current = result.anchorIndex;
       return result.next;
@@ -775,7 +785,15 @@ function SortedApiList({
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
   selectedIds: Set<string>;
-  onToggleSelect: (instrumentId: string, event: React.MouseEvent) => void;
+  onToggleSelect: (
+    instrumentId: string,
+    detail: {
+      checked: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      shiftKey: boolean;
+    },
+  ) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
   const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
@@ -790,7 +808,7 @@ function SortedApiList({
           isListSource={isListSource(item.id)}
           onOpenChart={() => onOpenChart(item.id, item.symbol)}
           selected={selectedIds.has(item.id)}
-          onToggleSelect={(event) => onToggleSelect(item.id, event)}
+          onToggleSelect={(detail) => onToggleSelect(item.id, detail)}
         />
       ))}
     </>
@@ -812,7 +830,15 @@ function SortedVisualizationList({
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
   selectedIds: Set<string>;
-  onToggleSelect: (instrumentId: string, event: React.MouseEvent) => void;
+  onToggleSelect: (
+    instrumentId: string,
+    detail: {
+      checked: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      shiftKey: boolean;
+    },
+  ) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
   const charts = useWorkspaceStore((s) => s.workspace.charts);
@@ -841,7 +867,7 @@ function SortedVisualizationList({
             isListSource={isListSource(item.id)}
             onOpenChart={() => onOpenChart(item.id, item.symbol)}
             selected={selectedIds.has(item.id)}
-            onToggleSelect={(event) => onToggleSelect(item.id, event)}
+            onToggleSelect={(detail) => onToggleSelect(item.id, detail)}
           />
         );
       })}
@@ -872,7 +898,15 @@ function PortfolioKeyboardList({
   }>;
   allInstruments: import('@bolsa/shared').InstrumentWithMetaDto[];
   selectedIds: Set<string>;
-  onToggleSelect: (instrumentId: string, event: React.MouseEvent) => void;
+  onToggleSelect: (
+    instrumentId: string,
+    detail: {
+      checked: boolean;
+      ctrlKey: boolean;
+      metaKey: boolean;
+      shiftKey: boolean;
+    },
+  ) => void;
 }) {
   useListInstrumentKeyboardNav(items, activeInstrumentId, onOpenChart, items.length > 0);
   if (items.length === 0) return null;
@@ -898,7 +932,7 @@ function PortfolioKeyboardList({
             isListSource={isListSource(item.id)}
             onOpenChart={() => onOpenChart(item.id, item.symbol)}
             selected={selectedIds.has(item.id)}
-            onToggleSelect={(event) => onToggleSelect(item.id, event)}
+            onToggleSelect={(detail) => onToggleSelect(item.id, detail)}
           />
         );
       })}
