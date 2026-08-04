@@ -169,8 +169,8 @@ Del informe 2 §5.1 (N4), adoptados:
 | D1b | Tests invariante | **Hecho** (pytest stance) |
 | D1c | Evolución: historial + sparkline ★ dictamen | **Hecho** (`f385a39`) |
 | D1d | Operativa: solo dictamen del valor (lista global → Asesor) | **Hecho** (`bc3fd95`) |
-| **Op** | **Operativa vital** (mesa TRADING / SEMI / mandato / pulso) — clave de app | **En curso** (slice SEMI desk 2026-08-04c: Proponer F3, cola Confirm, positionOpen, gates chart) |
-| **Asesor** | Research → Asesor + bandeja «opiniones de hoy» (datos ya en motor) | Tras Op |
+| **Op** | **Operativa vital** (mesa TRADING / SEMI / mandato / pulso) — clave de app | **Cerrado** (SEMI desk + Outcomes 2026-08-04) |
+| **Asesor** | Research → Asesor + bandeja «opiniones de hoy» (datos ya en motor) | **En curso** (`/research?tab=opiniones`) |
 | D2 | Batch EOD flag-off + canales | Tras uso estable ~2 semanas |
 | D3+ | Métricas / thaw Camino D AUTO execute | Checklist thaw estricto — **sigue freeze** |
 

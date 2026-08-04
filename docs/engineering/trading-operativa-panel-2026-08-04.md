@@ -85,4 +85,5 @@ AUTO execute · Belief→Coach 5c · cambiar fórmula IO más allá de Composite
 - Banner «Fuera de Estudio» + Añadir cuando SEMI/AUTO lo exigen.
 - CTAs **Proponer F3 → Confirm** y **Cola Confirm (n)** en Recomendación (Camino C).
 - Chart IA propose reutiliza los mismos gates SEMI/Estudio/sizing (`propose-instrument-supervised.ts`).
+- Info → **Learning / Outcomes** in-panel (DecisionSession summary + cerrar outcome).
 - Camino D AUTO execute **sigue freeze**.

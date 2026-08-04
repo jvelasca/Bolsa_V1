@@ -38,6 +38,7 @@ import {
   OperativaPulseSummary,
 } from '@/features/trading/operativa-pulse';
 import { OperativaDictamenBlock } from '@/features/trading/operativa-dictamen';
+import { OperativaOutcomesBlock } from '@/features/trading/operativa-outcomes';
 import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
 import {
   computeIndiceOperativo,
@@ -466,19 +467,11 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
               Sin tenure abierto. SEMI Confirm o Adoptar Finalista.
             </p>
           )}
-          <button
-            type="button"
-            className="w-full rounded border border-border px-1.5 py-1 text-[10px] text-primary hover:bg-accent"
-            onClick={() => {
-              window.dispatchEvent(
-                new CustomEvent('bolsa:open-help', {
-                  detail: { section: 'value-analysis' },
-                }),
-              );
-            }}
-          >
-            Learning / Outcomes
-          </button>
+          <OperativaOutcomesBlock
+            instrumentId={instrumentId}
+            accountId={effectiveAccountId}
+            symbol={symbol}
+          />
         </div>
       </TradingOperativaSection>
 

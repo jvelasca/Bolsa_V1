@@ -266,6 +266,7 @@ const BACKTESTING_MENU: MenuItem[] = [
 const RESEARCH_MENU: MenuItem[] = [
   { label: 'Resumen', href: '/research?tab=dashboard' },
   { label: 'Historial', href: '/research?tab=history' },
+  { label: 'Opiniones', href: '/research?tab=opiniones' },
 ];
 
 export function AppTopBar() {
@@ -376,7 +377,7 @@ export function AppTopBar() {
           ) : null}
         </div>
         <DropdownMenu
-          label="Research"
+          label="Asesor"
           icon={Microscope}
           items={RESEARCH_MENU}
           align="left"
