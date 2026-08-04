@@ -118,7 +118,7 @@ class GetDailyOpsReport:
 
         channels = {"alarma": 0, "aviso": 0, "none": 0}
         opinion_rows: list[dict[str, Any]] = []
-        notes: list[str] = ["R1: preview en app. Email digest = R3 (flag off)."]
+        notes: list[str] = ["R1–R3: preview web + digest HTML (flag/prefs). PDF = R4."]
         ids = [i for i in (instrument_ids or []) if i]
         if ids and self._opinion_repo is not None:
             op_recs = await self._opinion_repo.list_for_instruments(ids, day, source="on_demand")

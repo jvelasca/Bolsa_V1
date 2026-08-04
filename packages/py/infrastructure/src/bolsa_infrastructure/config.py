@@ -123,6 +123,10 @@ class Settings(BaseSettings):
     estudio_opinion_email_to: str | None = Field(
         default=None, validation_alias="ESTUDIO_OPINION_EMAIL_TO"
     )
+    # R3 — digest operativo diario HTML tras eod-batch (off-by-default).
+    daily_ops_digest_email_enabled: bool = Field(
+        default=False, validation_alias="DAILY_OPS_DIGEST_EMAIL_ENABLED"
+    )
 
     @field_validator("database_url")
     @classmethod

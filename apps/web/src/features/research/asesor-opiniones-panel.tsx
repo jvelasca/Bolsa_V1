@@ -55,6 +55,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const pushToast = useAlertsStore((s) => s.pushToast);
   const notifyEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
   const notifyEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
+  const dailyDigestEnabled = useNotificationPrefsStore((s) => s.dailyDigestEnabled);
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
 
@@ -399,19 +400,29 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                   .runInstrumentDailyOpinionEodBatch({
                     instrumentIds: studyIds,
                     force: true,
+                    accountId: effectiveAccountId,
                     notifyEmail: notifyEmail.trim() || null,
                     notifyEmailEnabled,
+                    notifyDigestEnabled: dailyDigestEnabled,
                   })
                   .then((res) => {
                     void opinionsQuery.refetch();
                     const n = res.count ?? 0;
                     const email = res.emailNotify;
+                    const digest = res.digestNotify;
                     let msg = `EOD batch · ${n} dictamen${n === 1 ? '' : 'es'}`;
                     if (email) {
                       if (email.sent) {
                         msg += ` · email ${email.alarmaCount} alarma(s)`;
                       } else if (email.skippedReason) {
                         msg += ` · email skip (${email.skippedReason})`;
+                      }
+                    }
+                    if (digest) {
+                      if (digest.sent) {
+                        msg += ' · digest enviado';
+                      } else if (digest.skippedReason) {
+                        msg += ` · digest skip (${digest.skippedReason})`;
                       }
                     }
                     pushToast(msg);

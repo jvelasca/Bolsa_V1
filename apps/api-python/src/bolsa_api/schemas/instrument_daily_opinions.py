@@ -100,6 +100,14 @@ class RunEstudioEodOpinionBatchDto(BaseModel):
         alias="notifyEmailEnabled",
         description="Si se pasa, sustituye ESTUDIO_OPINION_EMAIL_ENABLED para esta corrida.",
     )
+    notify_digest_enabled: bool | None = Field(
+        default=None,
+        alias="notifyDigestEnabled",
+        description=(
+            "R3 — si true, intenta email HTML resumen operativo (requiere accountId + SMTP). "
+            "Sustituye DAILY_OPS_DIGEST_EMAIL_ENABLED para esta corrida."
+        ),
+    )
 
     @field_validator("instrument_ids")
     @classmethod
@@ -127,6 +135,17 @@ class EstudioEodOpinionEmailNotifyDto(BaseModel):
     skipped_reason: str | None = Field(default=None, alias="skippedReason")
 
 
+class EstudioEodDigestNotifyDto(BaseModel):
+    """R3 — resultado envío digest operativo tras eod-batch."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
+    digest_enabled: bool = Field(alias="digestEnabled")
+    sent: bool
+    skipped_reason: str | None = Field(default=None, alias="skippedReason")
+    as_of: str | None = Field(default=None, alias="asOf")
+
+
 class EstudioEodOpinionBatchResponseDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
@@ -136,6 +155,9 @@ class EstudioEodOpinionBatchResponseDto(BaseModel):
     data: list[InstrumentDailyOpinionDto]
     email_notify: EstudioEodOpinionEmailNotifyDto | None = Field(
         default=None, alias="emailNotify"
+    )
+    digest_notify: EstudioEodDigestNotifyDto | None = Field(
+        default=None, alias="digestNotify"
     )
 
 

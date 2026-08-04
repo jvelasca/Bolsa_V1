@@ -4,7 +4,7 @@
  * @see docs/engineering/daily-ops-report-brief-2026-08-04.md
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import type { DailyOpsReportV1, DailyOpsWeekDayV1 } from '@bolsa/shared';
@@ -12,8 +12,13 @@ import { api } from '@/lib/api';
 import { formatPrice } from '@/features/charts/chart-utils';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { loadDemoBookPrefs } from '@/features/trading/demo-book-prefs';
+import {
+  isValidEmailLoose,
+  notificationEmailReady,
+} from '@/features/config/notification-prefs';
 import { useVisualizationStore } from '@/stores/visualization-store';
 import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
+import { useAlertsStore } from '@/stores/alerts-store';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -122,7 +127,21 @@ export function AsesorDailyOpsPanel() {
   const asOf = todayIso();
   const book = loadDemoBookPrefs();
   const digestEnabled = useNotificationPrefsStore((s) => s.dailyDigestEnabled);
+  const alarmaEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
+  const alarmaEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
+  const alarmaToastEnabled = useNotificationPrefsStore((s) => s.alarmaToastEnabled);
   const setPrefs = useNotificationPrefsStore((s) => s.setPrefs);
+  const pushToast = useAlertsStore((s) => s.pushToast);
+  const [sending, setSending] = useState(false);
+
+  const emailReady = notificationEmailReady({
+    alarmaToastEnabled,
+    alarmaEmailEnabled,
+    alarmaEmail,
+    dailyDigestEnabled: digestEnabled,
+  });
+  const canSendDigest =
+    Boolean(effectiveAccountId) && digestEnabled && isValidEmailLoose(alarmaEmail);
 
   const reportQuery = useQuery({
     queryKey: ['daily-ops-report', effectiveAccountId, asOf, studyIds.join(',')],
@@ -304,22 +323,67 @@ export function AsesorDailyOpsPanel() {
           <section className="rounded-xl border border-dashed border-border bg-muted/20 p-4 lg:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-foreground">Envío al cierre (R2/R3)</p>
+                <p className="text-sm font-medium text-foreground">Envío al cierre (R3)</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Suscríbete al resumen diario por email cuando el mercado de tus valores esté
-                  cerrado. Reutiliza el correo de Notificaciones. Envío automático = fase R3.
+                  HTML por email tras eod-batch (mismo correo de Alarmas). Requiere SMTP en el
+                  servidor. También puedes enviar ahora una copia de prueba.
                 </p>
               </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={digestEnabled}
-                  onChange={(e) => setPrefs({ dailyDigestEnabled: e.target.checked })}
-                  className="h-3.5 w-3.5 accent-primary"
-                />
-                Quiero el resumen diario
-              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={digestEnabled}
+                    onChange={(e) => setPrefs({ dailyDigestEnabled: e.target.checked })}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  Quiero el resumen diario
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  className="h-7 text-[11px]"
+                  disabled={!canSendDigest || sending}
+                  title={
+                    !digestEnabled
+                      ? 'Activa la suscripción'
+                      : !isValidEmailLoose(alarmaEmail)
+                        ? 'Configura un correo en Notificaciones'
+                        : 'POST …/daily-ops-report/email'
+                  }
+                  onClick={() => {
+                    if (!effectiveAccountId) return;
+                    setSending(true);
+                    void api
+                      .sendDailyOpsDigestEmail(effectiveAccountId, {
+                        asOf,
+                        instrumentIds: studyIds,
+                        notifyEmail: alarmaEmail.trim() || null,
+                        notifyDigestEnabled: true,
+                      })
+                      .then((res) => {
+                        const d = res.data;
+                        if (d.sent) {
+                          pushToast(`Digest enviado · ${d.asOf ?? asOf}`);
+                        } else {
+                          pushToast(`Digest skip (${d.skippedReason ?? 'desconocido'})`);
+                        }
+                      })
+                      .catch((e: Error) => pushToast(`Digest · ${e.message}`))
+                      .finally(() => setSending(false));
+                  }}
+                >
+                  {sending ? 'Enviando…' : 'Enviar ahora'}
+                </Button>
+              </div>
             </div>
+            {!emailReady && digestEnabled ? (
+              <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
+                Activa email de Alarmas y un correo válido en Configuración → Notificaciones
+                (mismo buzón para el digest).
+              </p>
+            ) : null}
             {report.notes.length > 0 ? (
               <ul className="mt-2 list-disc pl-4 text-[10px] text-muted-foreground">
                 {report.notes.map((n) => (

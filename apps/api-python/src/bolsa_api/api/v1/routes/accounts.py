@@ -40,8 +40,11 @@ from bolsa_api.schemas.accounts import (
     AccountSummaryResponseDto,
     CashMovementResponseDto,
     CreateInvestmentAccountDto,
+    DailyOpsDigestNotifyDto,
+    DailyOpsDigestNotifyResponseDto,
     DepositCashDto,
     LedgerResponseDto,
+    SendDailyOpsDigestDto,
     TaxReportResponseDto,
     UpdateAccountSettingsDto,
     UpdateInvestmentAccountDto,
@@ -275,6 +278,53 @@ async def get_daily_ops_report(
             "notes": bundle.notes,
         }
     }
+
+
+@router.post(
+    "/accounts/{account_id}/daily-ops-report/email",
+    response_model=DailyOpsDigestNotifyResponseDto,
+)
+async def send_daily_ops_digest_email(
+    account_id: str,
+    body: SendDailyOpsDigestDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> DailyOpsDigestNotifyResponseDto:
+    """R3 — envío manual HTML del resumen operativo (SMTP + prefs)."""
+    from datetime import date as date_cls
+
+    from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
+    from bolsa_infrastructure.config import get_settings
+
+    day: date_cls | None = None
+    if body.as_of:
+        try:
+            day = date_cls.fromisoformat(body.as_of.strip()[:10])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="asOf inválido (YYYY-MM-DD)") from exc
+    ids = [i.strip() for i in (body.instrument_ids or []) if isinstance(i, str) and i.strip()]
+    try:
+        bundle = await get_daily_ops_report_use_case(session).execute(
+            account_id,
+            as_of=day,
+            instrument_ids=ids or None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    meta = await maybe_notify_daily_ops_digest(
+        get_settings(),
+        bundle,
+        email_to=body.notify_email,
+        digest_enabled=body.notify_digest_enabled,
+    )
+    return DailyOpsDigestNotifyResponseDto(
+        data=DailyOpsDigestNotifyDto(
+            digest_enabled=bool(meta["digest_enabled"]),
+            sent=bool(meta["sent"]),
+            skipped_reason=meta.get("skipped_reason"),
+            as_of=meta.get("as_of"),
+        )
+    )
 
 
 @router.post(

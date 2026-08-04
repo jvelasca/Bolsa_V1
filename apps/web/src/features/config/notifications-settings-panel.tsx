@@ -108,8 +108,10 @@ export function NotificationsSettingsPanel() {
             <span>
               <span className="font-medium">Resumen operativo diario</span>
               <p className="mt-1 text-xs text-muted-foreground">
-                Suscripción al digest del día (Asesor → Diario). Preview ya en app; envío email al
-                cierre = R3 (aún no automático). Usa el mismo correo de Alarmas.
+                Suscripción al digest del día (Asesor → Diario). Tras eod-batch o «Enviar ahora»
+                manda HTML al mismo correo. Requiere SMTP servidor (
+                <code className="text-[10px]">DAILY_OPS_DIGEST_EMAIL_ENABLED</code> opcional;
+                la pref UI tiene prioridad en corridas manuales).
               </p>
             </span>
           </label>

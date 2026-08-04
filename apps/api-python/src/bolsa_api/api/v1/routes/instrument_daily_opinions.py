@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.schemas.instrument_daily_opinions import (
+    EstudioEodDigestNotifyDto,
     EstudioEodOpinionBatchResponseDto,
     EstudioEodOpinionEmailNotifyDto,
     InstrumentDailyOpinionDto,
@@ -21,6 +22,7 @@ from bolsa_api.schemas.instrument_daily_opinions import (
 )
 from bolsa_application.daily_opinion_service import DailyOpinionService, OpinionHint
 from bolsa_application.daily_opinion_telemetry import DailyOpinionTelemetryService
+from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
 from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
@@ -225,6 +227,31 @@ async def run_estudio_eod_opinion_batch(
         email_to=body.notify_email,
         email_enabled=body.notify_email_enabled,
     )
+
+    digest_meta: dict | None = None
+    want_digest = body.notify_digest_enabled is not None or bool(
+        settings.daily_ops_digest_email_enabled
+    )
+    if want_digest:
+        digest_bundle = None
+        if body.account_id:
+            from bolsa_api.api.dependencies import get_daily_ops_report_use_case
+
+            try:
+                digest_bundle = await get_daily_ops_report_use_case(session).execute(
+                    body.account_id,
+                    as_of=_parse_as_of(body.as_of_bar_date),
+                    instrument_ids=list(body.instrument_ids),
+                )
+            except ValueError:
+                digest_bundle = None
+        digest_meta = await maybe_notify_daily_ops_digest(
+            settings,
+            digest_bundle,
+            email_to=body.notify_email,
+            digest_enabled=body.notify_digest_enabled,
+        )
+
     return EstudioEodOpinionBatchResponseDto(
         enabled=enabled,
         forced=bool(body.force) or not enabled,
@@ -235,5 +262,15 @@ async def run_estudio_eod_opinion_batch(
             alarma_count=int(email_meta["alarma_count"]),
             sent=bool(email_meta["sent"]),
             skipped_reason=email_meta.get("skipped_reason"),
+        ),
+        digest_notify=(
+            EstudioEodDigestNotifyDto(
+                digest_enabled=bool(digest_meta["digest_enabled"]),
+                sent=bool(digest_meta["sent"]),
+                skipped_reason=digest_meta.get("skipped_reason"),
+                as_of=digest_meta.get("as_of"),
+            )
+            if digest_meta is not None
+            else None
         ),
     )

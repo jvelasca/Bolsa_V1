@@ -885,6 +885,7 @@ export const api = {
     force?: boolean;
     notifyEmail?: string | null;
     notifyEmailEnabled?: boolean | null;
+    notifyDigestEnabled?: boolean | null;
   }) =>
     request<{
       enabled: boolean;
@@ -897,7 +898,35 @@ export const api = {
         sent: boolean;
         skippedReason?: string | null;
       } | null;
+      digestNotify?: {
+        digestEnabled: boolean;
+        sent: boolean;
+        skippedReason?: string | null;
+        asOf?: string | null;
+      } | null;
     }>('/api/instrument-daily-opinions/eod-batch', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** R3 — envío manual digest HTML (Asesor → Diario). */
+  sendDailyOpsDigestEmail: (
+    accountId: string,
+    body: {
+      asOf?: string | null;
+      instrumentIds?: string[];
+      notifyEmail?: string | null;
+      notifyDigestEnabled?: boolean;
+    },
+  ) =>
+    request<{
+      data: {
+        digestEnabled: boolean;
+        sent: boolean;
+        skippedReason?: string | null;
+        asOf?: string | null;
+      };
+    }>(`/api/accounts/${accountId}/daily-ops-report/email`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
