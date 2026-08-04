@@ -144,4 +144,13 @@ Listo para revisión humana / auditoría externa con el pack. **No PASS** para t
 
 Siguiente: A0 telemetría dictamen · no merge de execute AUTO.
 
+---
+
+## 9. Auditorías institucionales (post pack)
+
+Triage CTO / seguridad / OR: [audit-ext-institutional-pre-auto-triage-2026-08-04.md](./audit-ext-institutional-pre-auto-triage-2026-08-04.md).
+
+- RCE `eval` / Depends-JWT-por-ruta: **no sostenidos** en código actual.  
+- Prioridad: A0 → OR-lite → Repro+ · catálogo institutional aparcado (§5 del triage).
+
 

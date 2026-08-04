@@ -27,7 +27,8 @@ Brief de producto listo para cuando toque reabrir (2026-08-03, **sin implementar
 3. **Re-auditar** IBEX TOP si cambia el universo (`pnpm audit:ibex35:missing`).  
 4. **Motor Estudio:** D1 + Operativa + Asesor + **Canales cerrados** — siguiente: **auditar pack** y **prep thaw AUTO** ([checklist](./camino-d-auto-thaw-checklist-2026-08-04.md)); Camino D execute sigue freeze.  
 5. **Revisar esta ficha** solo si aparece: necesidad real de cron 24/7, experimento de costes v2, brief Belief, o thaw AUTO con evidencia (checklist completa).  
-6. **Docstrings:** lotes 1–4 cerrados — solo forward-only al tocar código ([estándar](./code-documentation-standard-2026-08-03.md)).
+6. **Docstrings:** lotes 1–4 cerrados — solo forward-only al tocar código ([estándar](./code-documentation-standard-2026-08-03.md)).  
+7. **Auditorías institucionales 2026-08-04 (CTO/OR):** triage [audit-ext-institutional-pre-auto-triage](./audit-ext-institutional-pre-auto-triage-2026-08-04.md) — **no** abrir blockchain ledger / Monte Carlo / OTel / chaos como gate de Camino D; sí A0 + OR-lite.
 
 ## Qué no hacer
 

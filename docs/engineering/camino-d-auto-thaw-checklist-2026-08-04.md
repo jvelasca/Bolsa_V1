@@ -85,4 +85,16 @@ Cualquier “vamos con AUTO” en chat = **entrar en esta checklist**, no thaw a
 | Pack Estudio/Asesor/Canales + notificaciones UI | Listo para revisar |
 | Menú usuario → correo Alarmas | Hecho (localStorage; multiusuario después) |
 | Freeze Camino D intacto | Sí |
+| Auditorías institucionales 1+2 (CTO/OR) | [Triage](./audit-ext-institutional-pre-auto-triage-2026-08-04.md) — A0 + OR-lite; catálogo §5 aparcado |
 | A0 métricas dictamen | Pendiente (siguiente código) |
+
+### OR-lite (antes de A2 execute)
+
+Extraído del triage institucional — no sustituye P1–P10:
+
+| ID | Ítem |
+|----|------|
+| OR-S1 | `APP_PASSWORD` obligatorio en demos compartidas |
+| OR-P2 | Decimal en path paper crítico (pre-live) |
+| OR-T4/T6 | Idempotencia + DecisionSession en execute (detrás flag) |
+| OR-P7 | Kill switch &lt;1s (ya P7) |
