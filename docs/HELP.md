@@ -1,10 +1,12 @@
 # Ayuda en la app — coordinación con trackers y docs
 
 > **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-04**  
-> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.12**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2** · Lab Health Q0 · warm-up Q1.6) + Trading (**panel Operativa** · En estudio · IO · ADR-019 · **Mandato ADR-020 M1b BD**).  
+> Ayuda «Datos de mercado» + Watchlist + «Análisis del valor» + **Backtesting** (Play ciclo, Lista AUTO **v1.3**, Finalistas A/C, Monitor + **CORE-R v1.12**, **DÍA D** Verify en LAB + **Reconciliación ADR-021** + contrafactual + continuidad lookback, Lab **CORE-B v0.2** · Lab Health Q0 · warm-up Q1.6) + Trading (**panel Operativa** · En estudio · IO · ADR-019 · **Mandato ADR-020 M1b BD** · **SEMI Confirm** · **AUTO prep A1–A5** sin execute) + **Asesor** (Opiniones · Alarmas · telemetría A0).  
 > **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
 > **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho.  
-> **Decisión freeze:** [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · `CORE_R_CRON` / `COST_MODEL_V2` off.  
+> **Decisión freeze:** [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · `CORE_R_CRON` / `COST_MODEL_V2` off · **Camino D execute off** (prep A0–A5).  
+> **Motor Estudio / Canales:** [ADR-022](./adr/022-estudio-daily-opinion-motor.md) · [pack Canales](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md).  
+> **Prep AUTO (flag off):** [pack A0–A5](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) · [checklist thaw](./engineering/camino-d-auto-thaw-checklist-2026-08-04.md) · [ADR-023 Proposed](./adr/023-camino-d-thaw.md) · [Risk Engine](./engineering/risk-engine-or-re-2026-08-04.md).  
 > **Futuro Belief→Coach (brief, no código):** [engineering/belief-coach-brief-draft-2026-08-03.md](./engineering/belief-coach-brief-draft-2026-08-03.md).  
 > **Biblioteca estrategias L0/L1:** [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) — Genéricas · Optimizadas · Mis estrategias (prompt).  
 > **DEMO operativa SEMI:** [engineering/demo-operating-modes-brief-2026-08-03.md](./engineering/demo-operating-modes-brief-2026-08-03.md) · [impl slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) — MANUAL/SEMI · Confirm F3 · sizing 10%.  
@@ -15,8 +17,8 @@
 > **Respuesta auditoría 1 (ingesta+FIE):** [engineering/audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md).  
 > **Respuesta auditoría 2 (Lab backtests):** [engineering/audit2-response-backtests-lab-2026-08-03.md](./engineering/audit2-response-backtests-lab-2026-08-03.md).  
 > **Premisas de proyecto:** [PROJECT_PREMISES.md](./PROJECT_PREMISES.md) — **documentar todo** (docs + docstrings/JSDoc).  
-> **Docstrings (código):** [engineering/code-documentation-standard-2026-08-03.md](./engineering/code-documentation-standard-2026-08-03.md) — lotes 1–4 hechos; forward-only al tocar código nuevo.  
-> **Repo:** público en GitHub (`jvelasca/Bolsa_V1`) para auditorías externas.  
+> **Docstrings (código):** [engineering/code-documentation-standard-2026-08-03.md](./engineering/code-documentation-standard-2026-08-03.md) — lotes 1–4 hechos; lote 5 prep AUTO forward-only.  
+> **Repo:** público en GitHub (`jvelasca/Bolsa_V1`) para auditorías externas · PR stage [#29](https://github.com/jvelasca/Bolsa_V1/pull/29).  
 > **Universos:** [LAB vs TRADING](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md) · [Mandato](./adr/020-operating-mandate-tenure.md) · [Reconciliación DÍA D](./adr/021-dia-d-reconciliation.md).  
 > Configuración → **BD** (estado PostgreSQL, purga de huérfanos y demos cerradas).  
 > **Espacios de trabajo:** chip superior → gestor (nuevo blanco / duplicar / renombrar); arranque = último activo.  
@@ -41,7 +43,8 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 | Sección Ayuda | Tracker / UI | Docs |
 |---------------|--------------|------|
 | **Backtesting** | `backtesting-tracker.ts` + Monitor (`strategy-monitor-panel.tsx`) | [research-lifecycle.md](./engineering/research-lifecycle.md), [roadmap post-auditorías](./engineering/improvement-roadmap-post-audits-2026-08-02.md), [estabilidad temporal](./engineering/stability-campaign-protocol-2026-08-02.md), [DÍA D](./engineering/backtesting-dia-d-premises-2026-07-31.md), [universos LAB/TRADING](./engineering/dual-universes-lab-trading-design-2026-08-02.md), [ADR-019](./adr/019-dual-universes-lab-vs-trading.md), [ADR-020 Mandato](./adr/020-operating-mandate-tenure.md), [operativa test](./engineering/operativa-test-plan-2026-07-31.md), [handoff 2026-08-01](./engineering/session-handoff-2026-08-01.md), [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md), [ADR-009](./adr/009-backtesting-research-platform-h0.md), [ADR-018](./adr/018-fase2-evidence-store-v0.md) |
-| **Trading** | panel **Operativa** (IO · En estudio · modos) + Mandato + alarmas → F3 | [operativa panel](./engineering/trading-operativa-panel-2026-08-04.md) · [TOP#1 chart](./engineering/chart-top1-indicator-switch-2026-08-03.md) · [demo-operating-modes](./engineering/demo-operating-modes-brief-2026-08-03.md) · [SEMI slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [ADR-020](./adr/020-operating-mandate-tenure.md) |
+| **Trading** | panel **Operativa** (IO · En estudio · modos · kill switch · armado AUTO prep) + Mandato + alarmas → F3 | [operativa panel](./engineering/trading-operativa-panel-2026-08-04.md) · [TOP#1 chart](./engineering/chart-top1-indicator-switch-2026-08-03.md) · [demo-operating-modes](./engineering/demo-operating-modes-brief-2026-08-03.md) · [SEMI slice 1](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) · [prep AUTO A0–A5](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) · [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [ADR-020](./adr/020-operating-mandate-tenure.md) · [ADR-023 Proposed](./adr/023-camino-d-thaw.md) |
+| **Asesor** | Opiniones Estudio · Alarmas/Avisos · telemetría A0 · Canales | [asesor-ui](./engineering/asesor-ui-2026-08-04.md) · [pack Canales](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) · [ADR-022](./adr/022-estudio-daily-opinion-motor.md) |
 | Análisis del valor | `value-analysis-tracker.ts` | FA status / FIE |
 | Datos de mercado | `data-market-tracker.ts` | data capture |
 | Watchlist / listas | `watchlist-lists-tracker.ts` | lists-universes |
@@ -53,6 +56,18 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 - **Recomendación** — Índice Operativo (IO) · gauges TA/FA · «El n de N en Estudio» · TOP #1 / adopción.
 - **Info** — mandato / Learning.
 - **Configuración** — resumen a la derecha `Operativa: manual|semi|auto`; bloque titulado con el **nombre de la cuenta activa** (MANUAL/SEMI · % cash · máx. posiciones · geo).
+  - **AUTO · prep** (pill disabled): riesgos Camino D · **Kill switch** (API runtime) · **Armar AUTO** doble confirm (`ACTIVAR AUTO`, solo localStorage) · `PAPER_D_EXECUTE` off.
+  - Execute AUTO **no** liberado — [checklist thaw](./engineering/camino-d-auto-thaw-checklist-2026-08-04.md) · [pack A0–A5](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md).
+
+### SEMI (usar ahora)
+
+1. Cuenta DEMO activa · modo **SEMI** · valor en lista **Estudio**.  
+2. Alarma / Proponer F3 → cola Confirm → humano ejecuta.  
+3. Asesor → Opiniones: telemetría proxy (días / precisión / recall) alimenta P1–P4 del thaw.
+
+### AUTO (solo prep)
+
+No seleccionar. No poner `PAPER_D_EXECUTE=1` en demo compartida. ADR-023 sigue **Proposed** hasta evidencia.
 
 Lista virtual **Estudio** = universo operativo (membresía explícita; abrir gráfico añade, cerrar pestaña no quita). Selección masiva en Valores → **A Estudio**. SEMI/AUTO exigen pertenencia; MANUAL no. Chips TA/FA de la barra del gráfico siguen configurables con ⋯. Detalle: [trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md).
 

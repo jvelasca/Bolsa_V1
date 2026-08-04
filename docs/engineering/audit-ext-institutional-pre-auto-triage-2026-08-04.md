@@ -102,7 +102,7 @@ Catálogo completo: §5.
 
 **Regla:** cualquier ítem §5 que no esté en 1–4 requiere frase de producto («implementa X»).
 
-**Estado 2026-08-04 (cierre código):** A0 + OR-RE v0 + OR-lite (S1/P2) + Repro+ + Obs/CI mínimos → [or-lite-repro-obs](./or-lite-repro-obs-2026-08-04.md). Camino D / `PAPER_D_EXECUTE` **sigue off**.
+**Estado 2026-08-04 (cierre código):** A0 + OR-RE v0 + OR-lite (S1/P2) + Repro+ + Obs/CI + **A1–A5 prep** → [audit-pack-pre-auto-a0-a5](./audit-pack-pre-auto-a0-a5-2026-08-04.md). Camino D / `PAPER_D_EXECUTE` **sigue off**. SEMI operativo.
 
 ---
 

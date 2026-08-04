@@ -105,6 +105,26 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
         note: 'Operativa full-height · IO · En estudio · modos',
       },
       {
+        path: 'docs/engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md',
+        role: 'doc',
+        note: 'Prep AUTO A0–A5 · flag off · SEMI OK',
+      },
+      {
+        path: 'docs/adr/023-camino-d-thaw.md',
+        role: 'adr',
+        note: 'Thaw Camino D · Proposed · evidencia ☐',
+      },
+      {
+        path: 'docs/engineering/risk-engine-or-re-2026-08-04.md',
+        role: 'doc',
+        note: 'Risk Engine check_opening · kill switch',
+      },
+      {
+        path: 'apps/web/src/features/trading/demo-book-mode-panel.tsx',
+        role: 'code',
+        note: 'MANUAL/SEMI/AUTO prep · kill · armado',
+      },
+      {
         path: 'docs/engineering/chart-top1-indicator-switch-2026-08-03.md',
         role: 'doc',
         note: 'Finalista #1 · todos / este',

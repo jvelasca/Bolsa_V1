@@ -3,6 +3,12 @@
 Propose: Composite × universo (dry-run).
 Execute: requiere ``PAPER_D_EXECUTE=1``, ``execute=true``, ``executionPolicyId``
 modo ``paper_auto``. Distinto de radar (B) y Supervisado (C).
+
+A5: si ``PAPER_D_ACCOUNT_ID`` está definido, el account de la política debe coincidir.
+A2: hits con signal id estable por día×política×instrumento (idempotencia Router).
+
+@see docs/engineering/camino-d-a2-a5-prep-2026-08-04.md
+@see docs/adr/023-camino-d-thaw.md
 """
 
 from __future__ import annotations

@@ -2,8 +2,9 @@
 
 > **Padre:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) → Product / Ops  
 > **Ayuda:** [HELP.md](../HELP.md) · menú in-app «Trading y gráficos»  
-> **Freeze:** Belief→Coach Fase 2/5c · `CORE_R_CRON` · `COST_MODEL_V2` · Camino D AUTO · Strategy Studio / F5  
-> **Update 2026-08-04b:** Estudio = membresía explícita (no ≡ pestañas); selección masiva; gate SEMI/AUTO.
+> **Freeze:** Belief→Coach Fase 2/5c · `CORE_R_CRON` · `COST_MODEL_V2` · Camino D AUTO **execute** · Strategy Studio / F5  
+> **Update 2026-08-04b:** Estudio = membresía explícita (no ≡ pestañas); selección masiva; gate SEMI/AUTO.  
+> **Update 2026-08-04c:** AUTO prep A1–A5 (pill disabled · kill switch · armado local) — [pack](./audit-pack-pre-auto-a0-a5-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed.
 
 ## Qué
 
@@ -51,6 +52,8 @@ Sync: `use-chart-visualization-sync.ts` solo **amplía** el store (nunca `replac
 - `demoBookRequiresEstudioMembership(mode)` → true en SEMI y AUTO.
 - Propose F3 (Finalistas / alarmas) falla si el instrumento no está en Estudio.
 - **MANUAL** no exige Estudio.
+- **AUTO UI:** pill disabled (`DEMO_BOOK_AUTO_UI_ENABLED=false`); kill switch + armado local en el mismo panel (`demo-book-mode-panel.tsx`).
+- Execute AUTO: `PAPER_D_EXECUTE` off — [pack A0–A5](./audit-pack-pre-auto-a0-a5-2026-08-04.md).
 
 ## Índice Operativo (IO) v1
 
@@ -71,6 +74,7 @@ Helpers: `operativa-index.ts` · UI: `operativa-pulse.tsx` · datos: `useInstrum
 | Panel | `trading-operativa-panel.tsx`, `trading-operativa-section.tsx` |
 | IO | `operativa-index.ts`, `operativa-pulse.tsx` |
 | Prefs / gate | `demo-book-prefs.ts`, `use-demo-book-prefs.ts` |
+| AUTO prep UI | `demo-book-mode-panel.tsx`, `demo-book-auto-copy.ts`, `demo-book-auto-arm.ts` |
 | Sync Estudio | `lists-tab/use-chart-visualization-sync.ts` |
 | Selección | `list-values-panel.tsx`, `list-column-header.tsx`, `list-item-accordion.tsx` |
 | Label | `packages/shared/src/default-lists.ts` |

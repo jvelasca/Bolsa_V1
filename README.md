@@ -4,8 +4,8 @@ Plataforma personal de gestión bursátil: IBEX, Europa y acciones (sin CFD).
 
 **Stack actual:** React + Vite (frontend) · **FastAPI Python** (API por defecto) · PostgreSQL.
 
-**Producto (v1.0.0 · sync docs 2026-08-03):** Embudo + Lista AUTO · Finalistas · **DÍA D** · **CORE-R v1.12** · **CORE-P** · FA/FIE · DEMO only (paper broker futuro).  
-Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · GitHub: [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) · Auditoría: [`docs/engineering/audit-pack-post-audits-2026-08-03.md`](./docs/engineering/audit-pack-post-audits-2026-08-03.md) · BETA1: [`docs/engineering/beta1-simulation-runbook.md`](./docs/engineering/beta1-simulation-runbook.md).
+**Producto (v1.0.0 · sync docs 2026-08-04):** Embudo + Lista AUTO · Finalistas · **DÍA D** · **CORE-R v1.12** · **CORE-P** · FA/FIE · DEMO only · **Operativa SEMI** · Estudio/Asesor/Canales · **prep AUTO A0–A5** (`PAPER_D_EXECUTE` off).  
+Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · GitHub: [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) · PR stage: [#29](https://github.com/jvelasca/Bolsa_V1/pull/29) · Auditoría Lab: [`docs/engineering/audit-pack-post-audits-2026-08-03.md`](./docs/engineering/audit-pack-post-audits-2026-08-03.md) · Canales: [`audit-pack-estudio-asesor-canales`](./docs/engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) · Prep AUTO: [`audit-pack-pre-auto-a0-a5`](./docs/engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) · HELP: [`docs/HELP.md`](./docs/HELP.md).
 
 ## Requisitos
 

@@ -38,6 +38,7 @@ Al tocar o crear código, añadir:
 | **2** | Resto `bolsa_api/schemas` + routes trading/listas/Lab | Módulo en cada archivo · **Hecho 2026-08-03** |
 | **3** | `bolsa_application` use-cases | Módulo + clases públicas · **Hecho 2026-08-03** |
 | **4** | `indicators/` · `signals/` · `optimize/` (+ warmup/backtest/cost v2 surface) | Módulo + símbolos públicos top-level · **Hecho 2026-08-03** |
+| **5** | Prep AUTO A0–A5 · Risk Engine · risk_runtime · idempotency · routes `/risk` · Libro AUTO UI | Módulo + públicos nuevos · **Hecho 2026-08-04** · pack [audit-pack-pre-auto-a0-a5](./audit-pack-pre-auto-a0-a5-2026-08-04.md) |
 
 ## Medición
 

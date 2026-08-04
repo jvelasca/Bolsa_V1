@@ -1,4 +1,12 @@
-"""Router de ejecución (scan hits → acciones)."""
+"""Router de ejecución (scan hits → acciones).
+
+Modos: inform/alert · ``paper_auto`` (fill DEMO vía Risk Engine) · ``live_auto`` dry-run.
+A2: ``check_opening`` con kill switch efectivo + book maxOpen; DecisionSession en
+DENY pre-Gate y en fill; claim de idempotencia AUTO antes del trade.
+
+@see docs/engineering/risk-engine-or-re-2026-08-04.md
+@see docs/engineering/camino-d-a2-a5-prep-2026-08-04.md
+"""
 
 from dataclasses import dataclass, field
 from typing import Any, Literal

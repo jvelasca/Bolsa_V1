@@ -153,4 +153,18 @@ Triage CTO / seguridad / OR: [audit-ext-institutional-pre-auto-triage-2026-08-04
 - RCE `eval` / Depends-JWT-por-ruta: **no sostenidos** en código actual.  
 - Prioridad: A0 → OR-lite → Repro+ · catálogo institutional aparcado (§5 del triage).
 
+---
+
+## 10. Cierre prep A0–A5 (2026-08-04)
+
+Tras Canales + institucional: código prep Camino D cerrado detrás de flags.
+
+| Artefacto | Rol |
+|-----------|-----|
+| [audit-pack-pre-auto-a0-a5](./audit-pack-pre-auto-a0-a5-2026-08-04.md) | Pack auditoría único prep AUTO |
+| [camino-d-a2-a5-prep](./camino-d-a2-a5-prep-2026-08-04.md) | Detalle flags / API / UI |
+| [ADR-023](../adr/023-camino-d-thaw.md) | Thaw **Proposed** (evidencia ☐) |
+
+**Veredicto actualizado:** Canales **PASS condicional** · prep A0–A5 **PASS código** · thaw execute **NO**. Operativa diaria = **SEMI**.
+
 

@@ -378,6 +378,23 @@ function TradingContent() {
           Selección masiva → «A Estudio». SEMI/AUTO exigen pertenencia; MANUAL no. La
           verificación ya no vive en la mesa Trading (ADR-019).
         </p>
+        <h4 className="mb-1 mt-3 font-semibold text-foreground">SEMI vs AUTO (2026-08-04)</h4>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong className="text-foreground">SEMI</strong> — camino operativo diario: Alarma /
+            Proponer F3 → Confirm humano → fill DEMO.
+          </li>
+          <li>
+            <strong className="text-foreground">AUTO</strong> — solo prep: pill disabled, kill
+            switch y armado local (<code className="text-[10px]">ACTIVAR AUTO</code>). Execute
+            requiere checklist thaw + ADR-023 Accepted +{' '}
+            <code className="text-[10px]">PAPER_D_EXECUTE=1</code> (default off).
+          </li>
+          <li>
+            <strong className="text-foreground">Asesor → Opiniones</strong> — telemetría A0
+            (días / precisión / recall proxy) para medir P1–P4 antes de thaw.
+          </li>
+        </ul>
       </section>
       <section>
         <h3 className="mb-2 font-semibold text-foreground">Mandato operativo (ADR-020)</h3>

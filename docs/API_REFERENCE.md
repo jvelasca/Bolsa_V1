@@ -12,7 +12,20 @@ Rutas públicas sin token: `/api/health`, `/api/auth/login`, `/api/auth/status`,
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/api/health` | Estado servicio + ping BD |
+| GET | `/api/health` | Estado servicio + BD + componentes (`database`, `yahoo`, `xtb`, `redis`, `auth`, `worker_arq`, `risk`) |
+
+`components.risk` expone kill switch efectivo (`env` / runtime / Redis) y si `PAPER_D_EXECUTE` está on (solo lectura; default off).
+
+---
+
+## Risk (OR-P7 / A3)
+
+| Método | Ruta | Body | Descripción |
+|--------|------|------|-------------|
+| GET | `/api/risk/kill-switch` | — | Estado kill switch (env + memoria + Redis) + `paperDExecuteEnv` |
+| POST | `/api/risk/kill-switch` | `{ enabled: boolean }` | Activa/desactiva runtime (&lt;1s vía Risk Engine); no reinicia proceso |
+
+Bloquea aperturas **automáticas** (`paper_auto` / futuro AUTO). No sustituye Confirm SEMI.
 
 ---
 
