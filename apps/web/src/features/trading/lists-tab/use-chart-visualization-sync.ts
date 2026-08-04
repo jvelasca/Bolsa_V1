@@ -1,10 +1,14 @@
+/**
+ * Sync ligero: abrir/enfocar pestaña de gráfico → añade a lista Estudio si falta.
+ * Cerrar pestaña NO saca de Estudio (membresía explícita).
+ *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ */
+
 import { useEffect, useMemo, useRef } from 'react';
 import type { InstrumentWithMetaDto } from '@bolsa/shared';
 
-import {
-  useVisualizationStore,
-  type VisualizationSessionEntry,
-} from '@/stores/visualization-store';
+import { useVisualizationStore } from '@/stores/visualization-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 
 function instrumentFromTab(instrumentId: string, label: string): InstrumentWithMetaDto {
@@ -27,21 +31,9 @@ function instrumentFromTab(instrumentId: string, label: string): InstrumentWithM
   };
 }
 
-function sameIdSet(a: Set<string>, b: Set<string>): boolean {
-  if (a.size !== b.size) return false;
-  for (const id of a) {
-    if (!b.has(id)) return false;
-  }
-  return true;
-}
-
 /**
- * Lista virtual «En estudio» = instrumentos con pestaña de gráfico abierta.
- * Escrituras al store solo cuando cambia el conjunto de pestañas o el foco.
- * No carga el catálogo completo (las pestañas ya llevan symbol/label).
- *
- * Premisa: en estudio ⇔ pestaña activa (mismo conjunto que ranking IO).
- * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ * Lista virtual «Estudio»: membresía explícita (store + workspace).
+ * Abrir gráfico suma; quitar solo vía lista / membresía / bulk.
  */
 export function useChartVisualizationSync() {
   const charts = useWorkspaceStore((state) => state.workspace.charts);
@@ -59,74 +51,33 @@ export function useChartVisualizationSync() {
     [charts],
   );
 
-  const openKey = useMemo(
-    () => openTabs.map((tab) => `${tab.id}:${tab.instrumentId}`).join('|'),
+  const openInstrumentKey = useMemo(
+    () =>
+      [...new Set(openTabs.map((tab) => tab.instrumentId))]
+        .sort()
+        .join('|'),
     [openTabs],
   );
 
-  const lastOpenKeyRef = useRef<string | null>(null);
+  const lastSeedKeyRef = useRef<string | null>(null);
   const lastBumpKeyRef = useRef<string | null>(null);
 
-  // Conjunto = pestañas abiertas (sin setState si no hay cambios de IDs).
+  // Sembrar / ampliar Estudio con pestañas abiertas (nunca sustituir el conjunto).
   useEffect(() => {
-    const openIds = new Set(openTabs.map((tab) => tab.instrumentId));
-    const store = useVisualizationStore.getState();
-    const currentIds = new Set(store.entries.map((entry) => entry.instrumentId));
+    if (lastSeedKeyRef.current === openInstrumentKey) return;
+    lastSeedKeyRef.current = openInstrumentKey;
 
-    if (lastOpenKeyRef.current === openKey && sameIdSet(openIds, currentIds)) {
-      return;
-    }
-    lastOpenKeyRef.current = openKey;
-
-    if (sameIdSet(openIds, currentIds)) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    // Una entrada por instrumento (puede haber habido pestañas duplicadas legacy).
-    const byInstrument = new Map<string, (typeof openTabs)[number]>();
     for (const tab of openTabs) {
-      if (!byInstrument.has(tab.instrumentId)) {
-        byInstrument.set(tab.instrumentId, tab);
-      }
-      if (tab.id === activeChartId) {
-        byInstrument.set(tab.instrumentId, tab);
+      const live = useVisualizationStore.getState();
+      if (!live.contains(tab.instrumentId)) {
+        live.addInstrument(instrumentFromTab(tab.instrumentId, tab.label), {
+          source: 'list',
+        });
       }
     }
-    const next: VisualizationSessionEntry[] = [...byInstrument.values()].map((tab) => {
-      const existing = store.entries.find((entry) => entry.instrumentId === tab.instrumentId);
-      const instrument = instrumentFromTab(tab.instrumentId, tab.label);
-      if (existing) {
-        return {
-          ...existing,
-          symbol: instrument.symbol,
-          name: instrument.name,
-        };
-      }
-      return {
-        instrumentId: tab.instrumentId,
-        symbol: instrument.symbol,
-        name: instrument.name,
-        firstViewedAt: now,
-        lastViewedAt: now,
-        viewCount: 1,
-      };
-    });
+  }, [openInstrumentKey, openTabs]);
 
-    const prevFingerprint = store.entries
-      .map((entry) => `${entry.instrumentId}:${entry.symbol}:${entry.name}`)
-      .join('|');
-    const nextFingerprint = next
-      .map((entry) => `${entry.instrumentId}:${entry.symbol}:${entry.name}`)
-      .join('|');
-    if (prevFingerprint === nextFingerprint) {
-      return;
-    }
-
-    store.replaceEntries(next);
-  }, [openKey, openTabs, activeChartId]);
-
-  // Bump «visto N×» solo al cambiar de pestaña activa (una vez por foco).
+  // Bump «visto N×» al cambiar de pestaña activa (solo si ya está en Estudio).
   useEffect(() => {
     if (!activeChartId) return;
     const tab = openTabs.find((item) => item.id === activeChartId);
@@ -137,7 +88,12 @@ export function useChartVisualizationSync() {
     lastBumpKeyRef.current = bumpKey;
 
     const store = useVisualizationStore.getState();
-    if (!store.contains(tab.instrumentId)) return;
+    if (!store.contains(tab.instrumentId)) {
+      store.addInstrument(instrumentFromTab(tab.instrumentId, tab.label), {
+        source: 'list',
+      });
+      return;
+    }
 
     store.addInstrument(instrumentFromTab(tab.instrumentId, tab.label), {
       source: 'list',

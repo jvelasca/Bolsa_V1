@@ -100,7 +100,7 @@ export function OperativaPulseBlock({
   const progress =
     rank != null && total > 0 ? estudioRankProgressPct(rank, total) : 0;
   const rankLabel =
-    rank != null && total > 0 ? formatEstudioRankLabel(rank, total) : 'Sin ranking en estudio';
+    rank != null && total > 0 ? formatEstudioRankLabel(rank, total) : 'Sin ranking en Estudio';
 
   return (
     <div
@@ -131,7 +131,7 @@ export function OperativaPulseBlock({
           />
         </div>
         <p className="text-center text-[9px] text-muted-foreground">
-          Índice Operativo · posición entre valores en estudio
+          Índice Operativo · posición entre valores en Estudio
         </p>
       </div>
     </div>

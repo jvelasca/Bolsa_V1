@@ -12,8 +12,8 @@
  * **ADR-021** Reconciliación DÍA D (F-hoy · F-D · V · SAME/DRIFT · contrafactual).
  * Continuidad Verify (lookback + carry) · higiene `strategyType` Finalistas.
  * Post-auditorías Q0–Q3 + Q1.6 warm-up + estabilidad IBEX (Gate C4 cerrado).
- * **2026-08-04** — Panel **Operativa** (full-height · IO · En estudio · modos en cabecera)
- * + Chart TOP#1 switches · lista En estudio ≡ pestañas.
+ * **2026-08-04** — Panel **Operativa** + lista **Estudio** (membresía · bulk · gate SEMI/AUTO)
+ * + Chart TOP#1 switches.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *

@@ -30,9 +30,12 @@ import { useWorkspaceStore } from '@/stores/workspace-store';
 import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
 import {
   demoBookAllowsEnqueueConfirm,
+  demoBookRequiresEstudioMembership,
+  ESTUDIO_MEMBERSHIP_REQUIRED_MSG,
   loadDemoBookPrefs,
   suggestQuantityFromCash,
 } from '@/features/trading/demo-book-prefs';
+import { useVisualizationStore } from '@/stores/visualization-store';
 
 function kindLabel(kind: string): string {
   return (SIGNAL_KIND_LABELS as Record<string, string>)[kind] ?? kind;
@@ -154,8 +157,14 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
       const book = loadDemoBookPrefs();
       if (!demoBookAllowsEnqueueConfirm(book.mode)) {
         throw new Error(
-          'Libro en MANUAL: solo aviso. Cambia a SEMI en el rail Coach para Proponer F3.',
+          'Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.',
         );
+      }
+      if (
+        demoBookRequiresEstudioMembership(book.mode) &&
+        !useVisualizationStore.getState().contains(item.instrumentId)
+      ) {
+        throw new Error(ESTUDIO_MEMBERSHIP_REQUIRED_MSG);
       }
       const summary = (await api.getAccountSummary(effectiveAccountId)).data;
       const priceHint = item.price != null && item.price > 0 ? item.price : null;

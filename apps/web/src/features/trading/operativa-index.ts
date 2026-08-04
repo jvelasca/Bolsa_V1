@@ -1,9 +1,9 @@
 /**
- * Índice Operativo (IO) v1 — ranking entre valores «en estudio».
+ * Índice Operativo (IO) v1 — ranking entre valores de la lista «Estudio».
  *
  * - Base: Composite display 0–100.
  * - Distress FA → suelo IO ≤ 40.
- * - Universo ranking = pestañas de gráfico abiertas (= lista En estudio).
+ * - Universo ranking = membresía explícita de Estudio (no solo pestañas abiertas).
  *
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
@@ -70,7 +70,7 @@ export function rankIndiceOperativo(
 }
 
 export function formatEstudioRankLabel(rank: number, total: number): string {
-  return `El ${rank} de ${total} en estudio`;
+  return `El ${rank} de ${total} en Estudio`;
 }
 
 /** Progreso visual: #1 → barra llena; último → casi vacía. */

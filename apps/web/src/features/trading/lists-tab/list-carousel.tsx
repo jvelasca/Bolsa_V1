@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import type { InstrumentListSummaryDto } from '@bolsa/shared';
 
-import { CATALOG_IBEX_LIST_ID, isVirtualListId } from '@bolsa/shared';
+import { CATALOG_IBEX_LIST_ID, isEstudioListNameCollision, isVirtualListId } from '@bolsa/shared';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -75,6 +75,8 @@ function resolveCarouselLists(
     if (isVirtualListId(id) || hidden.has(id)) continue;
 
     const list = apiLists.find((entry) => entry.id === id);
+    // Oculta listas API homónimas de la virtual Estudio (evita chip duplicado).
+    if (list && isEstudioListNameCollision(list.name)) continue;
 
     if (list && !seen.has(list.id)) {
 

@@ -1,7 +1,7 @@
 /**
  * Panel Operativa (Trading) — Recomendación (Pulso+TOP) / Info / Configuración.
  *
- * Universo ranking IO = pestañas abiertas = lista «En estudio».
+ * Universo ranking IO = lista virtual «Estudio» (membresía explícita).
  * Layout: columna full-height a la derecha de watchlist+gráfico+operaciones.
  *
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
@@ -27,6 +27,7 @@ import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel'
 import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
 import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
 import { TradingOperativaSection } from '@/features/trading/trading-operativa-section';
+import { useVisualizationStore } from '@/stores/visualization-store';
 import {
   OperativaPulseBlock,
   OperativaPulseSummary,
@@ -75,16 +76,11 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const diaD = loadBacktestRunContext().diaD;
   const canVerify = isDiaDInPast(diaD);
 
-  const studyIds = useMemo(() => {
-    const ids: string[] = [];
-    const seen = new Set<string>();
-    for (const tab of charts) {
-      if (!tab.instrumentId || seen.has(tab.instrumentId)) continue;
-      seen.add(tab.instrumentId);
-      ids.push(tab.instrumentId);
-    }
-    return ids;
-  }, [charts]);
+  const studyEntries = useVisualizationStore((s) => s.entries);
+  const studyIds = useMemo(
+    () => studyEntries.map((entry) => entry.instrumentId),
+    [studyEntries],
+  );
 
   const { faByInstrument, taByInstrument, scoresLoading } = useInstrumentsHubScores(studyIds);
 

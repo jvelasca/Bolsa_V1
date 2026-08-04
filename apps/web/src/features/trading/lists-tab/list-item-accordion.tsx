@@ -42,6 +42,8 @@ interface ListItemAccordionProps {
   onOpenChart: () => void;
   /** Texto secundario bajo el símbolo (p. ej. posición en cartera). */
   subtitle?: string;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 export function ListItemAccordion({
@@ -50,6 +52,8 @@ export function ListItemAccordion({
   isListSource = false,
   onOpenChart,
   subtitle,
+  selected = false,
+  onToggleSelect,
 }: ListItemAccordionProps) {
   const membershipRef = useRef<HTMLButtonElement>(null);
   const [membershipOpen, setMembershipOpen] = useState(false);
@@ -118,7 +122,23 @@ export function ListItemAccordion({
     >
 
       <div className="flex items-center gap-0 px-1 py-1">
-        <div className="shrink-0" style={{ width: LIST_ROW_EXPAND_WIDTH_PX }}>
+        <div
+          className="flex shrink-0 items-center justify-center gap-0.5"
+          style={{ width: onToggleSelect ? 52 : LIST_ROW_EXPAND_WIDTH_PX }}
+        >
+          {onToggleSelect ? (
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary"
+              checked={selected}
+              aria-label={`Seleccionar ${item.symbol}`}
+              onChange={(event) => {
+                event.stopPropagation();
+                onToggleSelect();
+              }}
+              onClick={(event) => event.stopPropagation()}
+            />
+          ) : null}
           <IconButton
             icon={expanded ? ChevronDown : ChevronRight}
             title={expanded ? 'Contraer' : 'Expandir'}

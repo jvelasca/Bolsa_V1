@@ -3,6 +3,7 @@ import {
   defaultDemoBookPrefs,
   demoBookAllowsEnqueueConfirm,
   demoBookAllowsExecute,
+  demoBookRequiresEstudioMembership,
   normalizeDemoBookPrefs,
   suggestQuantityFromCash,
 } from '@/features/trading/demo-book-prefs';
@@ -32,6 +33,12 @@ describe('demo-book-prefs', () => {
     expect(demoBookAllowsExecute('manual')).toBe(false);
     expect(demoBookAllowsExecute('semi')).toBe(true);
     expect(demoBookAllowsExecute('auto')).toBe(false);
+  });
+
+  it('SEMI/AUTO require Estudio membership; MANUAL does not', () => {
+    expect(demoBookRequiresEstudioMembership('manual')).toBe(false);
+    expect(demoBookRequiresEstudioMembership('semi')).toBe(true);
+    expect(demoBookRequiresEstudioMembership('auto')).toBe(true);
   });
 
   it('suggests quantity ≈ 10% cash / price', () => {

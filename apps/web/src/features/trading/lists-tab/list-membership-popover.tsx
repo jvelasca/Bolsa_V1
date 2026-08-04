@@ -40,6 +40,8 @@ export function ListMembershipPopover({
   const queryClient = useQueryClient();
   const { pendingOrders } = usePendingOrders();
   const visualizationEntries = useVisualizationStore((state) => state.entries);
+  const addToVisualization = useVisualizationStore((state) => state.addInstrument);
+  const removeFromVisualization = useVisualizationStore((state) => state.removeInstrument);
   const { removeFromList, dialog, loadingPreview } = useListInstrumentRemoval();
 
   const accountScope = useActiveAccountQueryKey();
@@ -124,8 +126,8 @@ export function ListMembershipPopover({
         id: VIRTUAL_LIST_VISUALIZATION,
         name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
         checked: visualizationEntries.some((entry) => entry.instrumentId === instrument.id),
-        locked: true,
-        hint: 'pestaña abierta',
+        locked: false,
+        hint: 'universo',
       },
       {
         id: VIRTUAL_LIST_PORTFOLIO,
@@ -173,6 +175,14 @@ export function ListMembershipPopover({
 
   function handleToggle(row: MembershipRow) {
     if (row.locked) return;
+    if (row.id === VIRTUAL_LIST_VISUALIZATION) {
+      if (row.checked) {
+        removeFromVisualization(instrument.id);
+      } else {
+        addToVisualization(instrument, { source: 'list' });
+      }
+      return;
+    }
     if (isVirtualListId(row.id)) return;
     updateMutation.mutate({ listId: row.id, include: !row.checked });
   }

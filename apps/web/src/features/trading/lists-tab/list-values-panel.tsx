@@ -72,6 +72,10 @@ export function ListValuesPanel() {
   const { pendingOrders } = usePendingOrders();
   const visualizationEntries = useVisualizationStore((s) => s.entries);
   const addToVisualization = useVisualizationStore((s) => s.addInstrument);
+  const removeFromVisualization = useVisualizationStore((s) => s.removeInstrument);
+  const [selectedInstrumentIds, setSelectedInstrumentIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const activeInstrumentId = charts.find((tab) => tab.id === activeChartId)?.instrumentId;
   const chartListContext = useWorkspaceStore((s) => s.workspace.chartListContext);
@@ -119,6 +123,10 @@ export function ListValuesPanel() {
     [listConfig.apiListId, apiLists],
   );
   const activeVirtual = resolveVirtualListId(selectedListId);
+
+  useEffect(() => {
+    setSelectedInstrumentIds(new Set());
+  }, [selectedListId]);
 
   // Full catalog with meta is expensive; skip while browsing a normal list (quotes cover the table).
   const needsFullCatalog =
@@ -232,6 +240,74 @@ export function ListValuesPanel() {
     () => positions.map((pos) => positionToListItem(pos, allInstruments)),
     [positions, allInstruments],
   );
+
+  const selectableItems = useMemo(() => {
+    if (activeVirtual === VIRTUAL_LIST_PENDING_ORDERS) return [];
+    if (activeVirtual === VIRTUAL_LIST_VISUALIZATION) return visualizationListItems;
+    if (activeVirtual === VIRTUAL_LIST_PORTFOLIO) return portfolioListItems;
+    return listInstruments;
+  }, [
+    activeVirtual,
+    visualizationListItems,
+    portfolioListItems,
+    listInstruments,
+  ]);
+
+  const selectableIds = useMemo(
+    () => selectableItems.map((item) => item.id),
+    [selectableItems],
+  );
+
+  const selectAllChecked =
+    selectableIds.length > 0 && selectableIds.every((id) => selectedInstrumentIds.has(id));
+  const selectAllIndeterminate =
+    selectableIds.some((id) => selectedInstrumentIds.has(id)) && !selectAllChecked;
+  const selectionEnabled = activeVirtual !== VIRTUAL_LIST_PENDING_ORDERS;
+
+  function toggleSelectAll() {
+    setSelectedInstrumentIds((prev) => {
+      if (selectableIds.length === 0) return prev;
+      if (selectableIds.every((id) => prev.has(id))) {
+        return new Set();
+      }
+      return new Set(selectableIds);
+    });
+  }
+
+  function toggleSelectOne(instrumentId: string) {
+    setSelectedInstrumentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(instrumentId)) next.delete(instrumentId);
+      else next.add(instrumentId);
+      return next;
+    });
+  }
+
+  function addSelectedToEstudio() {
+    const byId = new Map(selectableItems.map((item) => [item.id, item]));
+    let added = 0;
+    for (const id of selectedInstrumentIds) {
+      const item = byId.get(id);
+      if (!item) continue;
+      addToVisualization(item, { source: 'list' });
+      added += 1;
+    }
+    if (added > 0) {
+      updateListConfig({
+        apiListId: VIRTUAL_LIST_VISUALIZATION,
+        name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
+        source: 'virtual',
+      });
+      setSelectedInstrumentIds(new Set());
+    }
+  }
+
+  function removeSelectedFromEstudio() {
+    for (const id of selectedInstrumentIds) {
+      removeFromVisualization(id);
+    }
+    setSelectedInstrumentIds(new Set());
+  }
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -520,7 +596,46 @@ export function ListValuesPanel() {
             !isLoading &&
             (portfolioListItems.length > 0 ||
               listInstruments.length > 0 ||
-              visualizationListItems.length > 0) && <ListColumnHeader />}
+              visualizationListItems.length > 0) && (
+              <ListColumnHeader
+                selectAllChecked={selectionEnabled ? selectAllChecked : undefined}
+                selectAllIndeterminate={selectionEnabled ? selectAllIndeterminate : undefined}
+                onSelectAllToggle={selectionEnabled ? toggleSelectAll : undefined}
+              />
+            )}
+
+        {selectionEnabled && selectedInstrumentIds.size > 0 && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-2 py-1.5 text-[11px]">
+            <span className="text-muted-foreground">
+              {selectedInstrumentIds.size} seleccionado
+              {selectedInstrumentIds.size === 1 ? '' : 's'}
+            </span>
+            {activeVirtual === VIRTUAL_LIST_VISUALIZATION ? (
+              <button
+                type="button"
+                className="rounded border border-border px-2 py-0.5 font-medium text-foreground hover:bg-accent"
+                onClick={removeSelectedFromEstudio}
+              >
+                Quitar de Estudio
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="rounded border border-primary/40 bg-primary/10 px-2 py-0.5 font-medium text-primary hover:bg-primary/15"
+                onClick={addSelectedToEstudio}
+              >
+                A Estudio
+              </button>
+            )}
+            <button
+              type="button"
+              className="ml-auto text-muted-foreground hover:text-foreground"
+              onClick={() => setSelectedInstrumentIds(new Set())}
+            >
+              Limpiar
+            </button>
+          </div>
+        )}
 
         {activeVirtual === VIRTUAL_LIST_PORTFOLIO && !isLoading && positions.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
@@ -538,8 +653,9 @@ export function ListValuesPanel() {
 
         {activeVirtual === VIRTUAL_LIST_VISUALIZATION && !isLoading && visualizationListItems.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            Busca un valor o ábrelo en el gráfico para añadirlo a «En estudio». Los instrumentos
-            se guardan en el espacio de trabajo y se recuperan al volver.
+            Busca un valor, ábrelo en el gráfico o selecciona filas de otra lista y pulsa «A
+            Estudio». SEMI/AUTO exigen pertenencia a Estudio. Los miembros se guardan en el espacio
+            de trabajo.
           </p>
         )}
 
@@ -550,6 +666,8 @@ export function ListValuesPanel() {
             activeInstrumentId={activeInstrumentId}
             isListSource={isListSourceRow}
             onOpenChart={focusInstrument}
+            selectedIds={selectedInstrumentIds}
+            onToggleSelect={toggleSelectOne}
           />
         )}
 
@@ -561,6 +679,8 @@ export function ListValuesPanel() {
             onOpenChart={focusInstrument}
             positions={positions}
             allInstruments={allInstruments}
+            selectedIds={selectedInstrumentIds}
+            onToggleSelect={toggleSelectOne}
           />
         )}
 
@@ -578,6 +698,8 @@ export function ListValuesPanel() {
             activeInstrumentId={activeInstrumentId}
             isListSource={isListSourceRow}
             onOpenChart={focusInstrument}
+            selectedIds={selectedInstrumentIds}
+            onToggleSelect={toggleSelectOne}
           />
         )}
         </div>
@@ -591,11 +713,15 @@ function SortedApiList({
   activeInstrumentId,
   isListSource,
   onOpenChart,
+  selectedIds,
+  onToggleSelect,
 }: {
   items: import('@bolsa/shared').InstrumentWithMetaDto[];
   activeInstrumentId: string | undefined;
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (instrumentId: string) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
   const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
@@ -609,6 +735,8 @@ function SortedApiList({
           isChartActive={activeInstrumentId === item.id}
           isListSource={isListSource(item.id)}
           onOpenChart={() => onOpenChart(item.id, item.symbol)}
+          selected={selectedIds.has(item.id)}
+          onToggleSelect={() => onToggleSelect(item.id)}
         />
       ))}
     </>
@@ -621,23 +749,35 @@ function SortedVisualizationList({
   activeInstrumentId,
   isListSource,
   onOpenChart,
+  selectedIds,
+  onToggleSelect,
 }: {
   items: import('@bolsa/shared').InstrumentWithMetaDto[];
   entries: ReturnType<typeof useVisualizationStore.getState>['entries'];
   activeInstrumentId: string | undefined;
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
+  selectedIds: Set<string>;
+  onToggleSelect: (instrumentId: string) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
+  const charts = useWorkspaceStore((s) => s.workspace.charts);
+  const openIds = useMemo(
+    () => new Set(charts.map((tab) => tab.instrumentId).filter(Boolean) as string[]),
+    [charts],
+  );
   const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
   useListInstrumentKeyboardNav(sorted, activeInstrumentId, onOpenChart);
   return (
     <>
       {sorted.map((item) => {
         const entry = entries.find((e) => e.instrumentId === item.id);
+        const open = openIds.has(item.id);
         const subtitle = entry
-          ? `pestaña abierta · visto ${entry.viewCount}× · ${new Date(entry.lastViewedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`
-          : 'pestaña abierta';
+          ? `${open ? 'gráfico abierto' : 'en Estudio'} · visto ${entry.viewCount}× · ${new Date(entry.lastViewedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`
+          : open
+            ? 'gráfico abierto'
+            : 'en Estudio';
         return (
           <ListItemAccordion
             key={item.id}
@@ -646,6 +786,8 @@ function SortedVisualizationList({
             isChartActive={activeInstrumentId === item.id}
             isListSource={isListSource(item.id)}
             onOpenChart={() => onOpenChart(item.id, item.symbol)}
+            selected={selectedIds.has(item.id)}
+            onToggleSelect={() => onToggleSelect(item.id)}
           />
         );
       })}
@@ -660,6 +802,8 @@ function PortfolioKeyboardList({
   onOpenChart,
   positions,
   allInstruments,
+  selectedIds,
+  onToggleSelect,
 }: {
   items: import('@bolsa/shared').InstrumentWithMetaDto[];
   activeInstrumentId: string | undefined;
@@ -673,6 +817,8 @@ function PortfolioKeyboardList({
     unrealizedPnlPct?: number | null;
   }>;
   allInstruments: import('@bolsa/shared').InstrumentWithMetaDto[];
+  selectedIds: Set<string>;
+  onToggleSelect: (instrumentId: string) => void;
 }) {
   useListInstrumentKeyboardNav(items, activeInstrumentId, onOpenChart, items.length > 0);
   if (items.length === 0) return null;
@@ -697,6 +843,8 @@ function PortfolioKeyboardList({
             isChartActive={activeInstrumentId === item.id}
             isListSource={isListSource(item.id)}
             onOpenChart={() => onOpenChart(item.id, item.symbol)}
+            selected={selectedIds.has(item.id)}
+            onToggleSelect={() => onToggleSelect(item.id)}
           />
         );
       })}

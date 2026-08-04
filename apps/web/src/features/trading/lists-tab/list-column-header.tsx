@@ -24,9 +24,11 @@ import { useWorkspaceStore } from '@/stores/workspace-store';
 
 
 interface ListColumnHeaderProps {
-
   className?: string;
-
+  /** Check de cabecera (selección masiva), estilo matriz Backtesting. */
+  selectAllChecked?: boolean;
+  selectAllIndeterminate?: boolean;
+  onSelectAllToggle?: () => void;
 }
 
 
@@ -160,7 +162,12 @@ function RowActionsResizeHandle({
 
 /** Cabecera interactiva: arrastrar para reordenar, borde para redimensionar. */
 
-export function ListColumnHeader({ className }: ListColumnHeaderProps) {
+export function ListColumnHeader({
+  className,
+  selectAllChecked,
+  selectAllIndeterminate,
+  onSelectAllToggle,
+}: ListColumnHeaderProps) {
 
   const listConfig = useWorkspaceStore((state) => state.workspace.list);
   const updateListConfig = useWorkspaceStore((state) => state.updateListConfig);
@@ -209,6 +216,14 @@ export function ListColumnHeader({ className }: ListColumnHeaderProps) {
 
 
 
+  const selectEnabled = typeof onSelectAllToggle === 'function';
+  const headerSelectRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!headerSelectRef.current) return;
+    headerSelectRef.current.indeterminate = Boolean(selectAllIndeterminate);
+  }, [selectAllIndeterminate]);
+
   return (
 
     <div
@@ -223,15 +238,24 @@ export function ListColumnHeader({ className }: ListColumnHeaderProps) {
 
     >
 
-      <span
-
-        className="shrink-0"
-
-        style={{ width: LIST_ROW_EXPAND_WIDTH_PX }}
-
-        aria-hidden
-
-      />
+      <div
+        className="flex shrink-0 items-center justify-center gap-0.5"
+        style={{ width: selectEnabled ? 52 : LIST_ROW_EXPAND_WIDTH_PX }}
+      >
+        {selectEnabled ? (
+          <input
+            ref={headerSelectRef}
+            type="checkbox"
+            className="h-3.5 w-3.5 accent-primary"
+            checked={Boolean(selectAllChecked)}
+            aria-label="Seleccionar todos los valores de la lista"
+            title="Seleccionar todos"
+            onChange={onSelectAllToggle}
+          />
+        ) : (
+          <span className="block w-full" aria-hidden />
+        )}
+      </div>
 
       <div
 

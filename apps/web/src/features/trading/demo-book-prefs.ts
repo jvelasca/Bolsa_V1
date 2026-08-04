@@ -178,6 +178,18 @@ export function demoBookAllowsExecute(mode: DemoBookMode): boolean {
 }
 
 /**
+ * SEMI/AUTO exigen que el instrumento esté en la lista Estudio.
+ * MANUAL no lo exige (puedes operar sin meterlo en el universo).
+ */
+export function demoBookRequiresEstudioMembership(mode: DemoBookMode): boolean {
+  return mode === 'semi' || mode === 'auto';
+}
+
+export const ESTUDIO_MEMBERSHIP_REQUIRED_MSG =
+  'SEMI/AUTO requieren el valor en la lista Estudio. Añádelo desde Listas (selección → A Estudio) o abriendo el gráfico.';
+
+
+/**
  * Cantidad entera sugerida: floor((cash * pct/100) / price).
  * Mínimo 1 si hay presupuesto ≥ precio; 0 si no alcanza.
  */

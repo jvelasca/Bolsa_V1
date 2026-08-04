@@ -131,8 +131,9 @@ Detalle de plataforma: ADR-010, docs operativos — **no** mezclar en schemas de
 | **Historial de mandato** | Tramos cerrados + vigente (`MandateTenure`) | Snapshot de adopción sin fechas |
 | **Verificar (D→hoy)** | Sesión LAB fase C con #1 congelada | Operar en Trading / MODO DÍA D (as-is deprecado) |
 | **Panel Operativa** | Columna Trading (Recomendación / Info / Configuración) a altura completa | Embudo LAB Coach; rail Coach legado |
-| **En estudio** | Lista virtual = pestañas de gráfico abiertas | Watchlist persistida / catálogo |
-| **Índice Operativo (IO)** | Score 0–100 (Composite + suelo distress) + ranking entre En estudio | Ranking Finalistas LAB |
+| **En estudio** | *(legacy)* ver **Estudio** | — |
+| **Estudio** | Lista virtual = universo operativo TRADING (membresía explícita) | Watchlist persistida / catálogo; ≠ solo pestañas |
+| **Índice Operativo (IO)** | Score 0–100 (Composite + suelo distress) + ranking entre Estudio | Ranking Finalistas LAB |
 | **Coach en vivo** | *(legado)* contenido absorbido por **Panel Operativa** | Reabrir embudo dentro del desk |
 
 Canónico cuentas: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md).  

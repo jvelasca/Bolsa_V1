@@ -171,7 +171,7 @@ export function ListHubPanel() {
 
     if (list.id === VIRTUAL_LIST_VISUALIZATION) {
       if (visualizationEntries.length === 0) {
-        window.alert('No hay valores en estudio.');
+        window.alert('No hay valores en Estudio.');
         return;
       }
       exportInstrumentsCsv(

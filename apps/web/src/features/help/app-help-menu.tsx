@@ -352,7 +352,7 @@ function TradingContent() {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
             <strong className="text-foreground">Recomendación</strong> — Índice Operativo (IO),
-            gauges TA/FA, ranking «El n de N en estudio», TOP #1 / adopción, enlaces{' '}
+            gauges TA/FA, ranking «El n de N en Estudio», TOP #1 / adopción, enlaces{' '}
             <strong className="text-foreground">Abrir estudio (LAB)</strong> y{' '}
             <strong className="text-foreground">Verificar D→hoy</strong> (si hay DÍA D en el
             pasado).
@@ -368,9 +368,10 @@ function TradingContent() {
           </li>
         </ul>
         <p className="mt-2">
-          Lista virtual <strong className="text-foreground">En estudio</strong> = pestañas de
-          gráfico abiertas (mismo conjunto). La verificación ya no vive en la mesa Trading
-          (ADR-019).
+          Lista virtual <strong className="text-foreground">Estudio</strong> = universo
+          operativo (membresía explícita). Abrir gráfico añade; cerrar pestaña no quita.
+          Selección masiva → «A Estudio». SEMI/AUTO exigen pertenencia; MANUAL no. La
+          verificación ya no vive en la mesa Trading (ADR-019).
         </p>
       </section>
       <section>
