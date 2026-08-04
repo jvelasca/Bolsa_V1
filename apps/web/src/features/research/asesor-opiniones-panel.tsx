@@ -1,13 +1,18 @@
 /**
- * Bandeja Opiniones de hoy — Estudio → Asesor (no Operativa por valor).
+ * Bandeja Opiniones de hoy — Estudio → Asesor.
+ * Canales AVISO | ALARMA (§5.2) derivados del dictamen; SEMI propone desde Alarma.
  */
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import {
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
+  OPINION_CHANNEL_LEVEL_LABELS,
+  buildOpinionChannelItems,
+  mapOpinionToChannel,
   type InstrumentDailyOpinionHintV1,
+  type OpinionChannelItemV1,
 } from '@bolsa/shared';
 import { api } from '@/lib/api';
 import {
@@ -16,12 +21,33 @@ import {
 } from '@/features/trading/use-instrument-daily-opinions';
 import { useInstrumentsHubScores } from '@/features/instruments/use-instruments-hub-scores';
 import { computeIndiceOperativo } from '@/features/trading/operativa-index';
+import { proposeInstrumentSupervised } from '@/features/trading/propose-instrument-supervised';
+import {
+  demoBookAllowsEnqueueConfirm,
+} from '@/features/trading/demo-book-prefs';
+import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
+import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { useVisualizationStore } from '@/stores/visualization-store';
+import { useAlertsStore } from '@/stores/alerts-store';
+import {
+  openHelpAiPlatform,
+  useSupervisedF3QueueStore,
+} from '@/stores/supervised-f3-queue-store';
 import { cn } from '@/lib/utils';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
+type ChannelFilter = 'todas' | 'alarma' | 'aviso';
+
 export function AsesorOpinionesPanel({ className }: { className?: string }) {
+  const [filter, setFilter] = useState<ChannelFilter>('todas');
+  const bookPrefs = useDemoBookPrefs();
+  const canEnqueue = demoBookAllowsEnqueueConfirm(bookPrefs.mode);
+  const { effectiveAccountId } = useActiveAccount();
+  const pushToast = useAlertsStore((s) => s.pushToast);
+  const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
+  const setActive = useSupervisedF3QueueStore((s) => s.setActive);
+
   const studyEntries = useVisualizationStore((s) => s.entries);
   const studyIds = useMemo(
     () => studyEntries.map((e) => e.instrumentId),
@@ -80,33 +106,61 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
     [opinionsQuery.data],
   );
 
-  const rows = useMemo(() => {
-    return studyIds
+  const channelItems = useMemo(() => {
+    const rows = studyIds
       .map((id) => {
-        const op = byId.get(id);
-        if (!op) return null;
-        return { id, op, symbol: symbolById.get(id) ?? id.slice(0, 8) };
+        const opinion = byId.get(id);
+        if (!opinion) return null;
+        return { opinion, symbol: symbolById.get(id) ?? id.slice(0, 8) };
       })
       .filter(Boolean) as Array<{
-      id: string;
+      opinion: NonNullable<ReturnType<typeof byId.get>>;
       symbol: string;
-      op: NonNullable<ReturnType<typeof byId.get>>;
     }>;
+    return buildOpinionChannelItems(rows);
   }, [studyIds, byId, symbolById]);
 
-  const sorted = useMemo(() => {
-    const order = (stance: string) => {
-      if (stance === 'buy') return 0;
-      if (stance === 'sell_exit' || stance === 'reduce') return 1;
-      if (stance === 'review_strategy' || stance === 'no_trade') return 2;
-      return 3;
-    };
-    return [...rows].sort(
-      (a, b) =>
-        order(a.op.stance) - order(b.op.stance) ||
-        b.op.dictamenStars - a.op.dictamenStars,
-    );
-  }, [rows]);
+  const silentCount = useMemo(() => {
+    let n = 0;
+    for (const id of studyIds) {
+      const op = byId.get(id);
+      if (!op) continue;
+      if (mapOpinionToChannel(op) === 'silent') n += 1;
+    }
+    return n;
+  }, [studyIds, byId]);
+
+  const filtered = useMemo(() => {
+    if (filter === 'todas') return channelItems;
+    return channelItems.filter((i) => i.level === filter);
+  }, [channelItems, filter]);
+
+  const alarmaCount = channelItems.filter((i) => i.level === 'alarma').length;
+  const avisoCount = channelItems.filter((i) => i.level === 'aviso').length;
+
+  const proposeMutation = useMutation({
+    mutationFn: async (item: OpinionChannelItemV1) => {
+      if (!effectiveAccountId) throw new Error('Sin cuenta DEMO activa');
+      return proposeInstrumentSupervised({
+        instrumentId: item.instrumentId,
+        symbol: item.symbol,
+        accountId: effectiveAccountId,
+        source: 'asesor_alarma',
+      });
+    },
+    onSuccess: (payload, item) => {
+      const id = enqueue(payload, {
+        symbol: payload.symbol ?? item.symbol,
+        origin: 'asesor',
+      });
+      setActive(id);
+      pushToast(`Alarma · ${item.symbol}: ${payload.action} → Confirm`);
+      openHelpAiPlatform({ panel: 'supervised-f3' });
+    },
+    onError: (e: Error) => {
+      pushToast(`Alarma · ${e.message}`);
+    },
+  });
 
   return (
     <div className={cn('space-y-4', className)} data-testid="asesor-opiniones">
@@ -114,11 +168,37 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Opiniones de hoy</CardTitle>
           <CardDescription>
-            Dictámenes del universo Estudio (on-demand). ★ dictamen ≠ ★ TOP. La acción sigue en
-            Operativa → Confirm (SEMI).
+            Dictamen Estudio → canal AVISO (info) / ALARMA (accionable en SEMI). ★ dictamen ≠ ★ TOP.
+            Sin cron EOD aún.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Canal">
+            {(
+              [
+                ['todas', `Todas (${channelItems.length})`],
+                ['alarma', `Alarmas (${alarmaCount})`],
+                ['aviso', `Avisos (${avisoCount})`],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={filter === id}
+                className={cn(
+                  'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                  filter === id
+                    ? 'border-primary/50 bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:bg-accent',
+                )}
+                onClick={() => setFilter(id)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           {studyIds.length === 0 ? (
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>Estudio vacío. Añade valores desde Trading (Listas → Pasar a Estudio).</p>
@@ -133,44 +213,77 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
             <p className="text-sm text-muted-foreground">Calculando dictámenes…</p>
           ) : opinionsQuery.isError ? (
             <p className="text-sm text-destructive">No se pudieron cargar las opiniones.</p>
-          ) : sorted.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin dictámenes en caché aún.</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {channelItems.length === 0
+                ? `Sin avisos ni alarmas (${silentCount} en silencio · hold/no_trade).`
+                : 'Nada en este filtro.'}
+            </p>
           ) : (
             <ul className="divide-y divide-border rounded-md border border-border">
-              {sorted.map(({ id, symbol, op }) => (
+              {filtered.map((item) => (
                 <li
-                  key={id}
+                  key={item.opinionId}
                   className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm"
+                  data-testid={`asesor-channel-${item.level}`}
                 >
                   <div className="min-w-0">
-                    <Link
-                      to="/"
-                      className="font-medium text-foreground hover:underline"
-                      title="Abrir Trading"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        to="/"
+                        className="font-medium text-foreground hover:underline"
+                        title="Abrir Trading"
+                      >
+                        {item.symbol}
+                      </Link>
+                      <span
+                        className={cn(
+                          'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                          item.level === 'alarma'
+                            ? 'bg-rose-500/15 text-rose-800 dark:text-rose-200'
+                            : 'bg-amber-500/15 text-amber-900 dark:text-amber-100',
+                        )}
+                      >
+                        {OPINION_CHANNEL_LEVEL_LABELS[item.level]}
+                      </span>
+                    </div>
+                    <p
+                      className="truncate text-xs text-muted-foreground"
+                      title={item.reasons.join(', ')}
                     >
-                      {symbol}
-                    </Link>
-                    <p className="truncate text-xs text-muted-foreground" title={op.reasons.join(', ')}>
-                      {op.reasons.slice(0, 3).join(' · ') || '—'}
+                      {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[item.stance]}
+                      {item.reasons.length
+                        ? ` · ${item.reasons.slice(0, 2).join(' · ')}`
+                        : ''}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3 tabular-nums text-xs">
-                    <span
-                      className={cn(
-                        'font-medium',
-                        op.stance === 'buy' && 'text-emerald-700 dark:text-emerald-300',
-                        (op.stance === 'sell_exit' || op.stance === 'reduce') &&
-                          'text-rose-700 dark:text-rose-300',
-                      )}
-                    >
-                      {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[op.stance]}
-                    </span>
-                    <span>★{op.dictamenStars}</span>
-                    {op.strategyStars != null ? (
-                      <span className="text-muted-foreground">TOP {op.strategyStars}</span>
+                  <div className="flex shrink-0 items-center gap-2 tabular-nums text-xs">
+                    <span>★{item.dictamenStars}</span>
+                    {item.strategyStars != null ? (
+                      <span className="text-muted-foreground">TOP {item.strategyStars}</span>
                     ) : null}
-                    {op.ioScore != null ? (
-                      <span className="text-muted-foreground">IO {Math.round(op.ioScore)}</span>
+                    {item.ioScore != null ? (
+                      <span className="text-muted-foreground">IO {Math.round(item.ioScore)}</span>
+                    ) : null}
+                    {item.actionable ? (
+                      <button
+                        type="button"
+                        className={cn(
+                          buttonVariants({ variant: 'outline', size: 'sm' }),
+                          'h-7 text-[10px]',
+                        )}
+                        disabled={
+                          proposeMutation.isPending || !canEnqueue || !effectiveAccountId
+                        }
+                        title={
+                          !canEnqueue
+                            ? 'Pasa a SEMI en Operativa → Configuración'
+                            : 'Proponer F3 → Confirm'
+                        }
+                        onClick={() => proposeMutation.mutate(item)}
+                      >
+                        {!canEnqueue ? 'SEMI para actuar' : 'Proponer F3'}
+                      </button>
                     ) : null}
                   </div>
                 </li>
@@ -178,8 +291,8 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
             </ul>
           )}
           <p className="text-xs text-muted-foreground">
-            {studyIds.length} en Estudio
-            {sorted.length > 0 ? ` · ${sorted.length} con dictamen` : ''}
+            {studyIds.length} Estudio · {alarmaCount} alarmas · {avisoCount} avisos
+            {silentCount > 0 ? ` · ${silentCount} silencio` : ''}
             {opinionsQuery.data?.[0]?.asOfBarDate
               ? ` · asOf ${opinionsQuery.data[0].asOfBarDate}`
               : ''}
