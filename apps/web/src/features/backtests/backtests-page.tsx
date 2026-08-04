@@ -1085,7 +1085,7 @@ export function BacktestsPage() {
     if (!opts?.preserveListAutoFocus) {
       setResultFocus('detail');
     }
-    setTab('run');
+    // Un solo patch URL: setTab + patch en paralelo pisaban instrumentId (stale).
     if (!opts?.skipUrl) {
       patchSearchParams((params) => {
         if (id) params.set('instrumentId', id);
@@ -1096,6 +1096,8 @@ export function BacktestsPage() {
           params.set('focus', 'detail');
         }
       });
+    } else {
+      setTab('run');
     }
   }
 
@@ -1686,9 +1688,13 @@ export function BacktestsPage() {
   ) {
     // Keep-alive fuera de /backtests: no pisar la URL de Trading/otros hubs.
     if (!pathname.startsWith('/backtests')) return;
-    const next = new URLSearchParams(searchParams);
-    mutate(next);
-    setSearchParams(next, { replace: opts?.replace });
+    // Updater funcional: evita carrera entre setTab + selectInstrument (mismo
+    // searchParams stale → instrumentId se queda en el valor anterior, p.ej. AENA).
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      mutate(next);
+      return next;
+    }, { replace: opts?.replace });
   }
 
   /** Abre Biblioteca con filtro / foco (entra en historial ←→). */
@@ -2110,6 +2116,9 @@ export function BacktestsPage() {
 
   useEffect(() => {
     if (!onBacktestsRoute) return;
+    // Durante Lista AUTO el valor lo marca la campaña; no dejar que un ?instrumentId=
+    // viejo (p.ej. AENA) revierta el estado entre tickers.
+    if (listAutoRef.current && !listAutoRef.current.aborted) return;
     const fromUrl = searchParams.get('instrumentId');
     if (fromUrl && fromUrl !== instrumentId) {
       setInstrumentId(fromUrl);
