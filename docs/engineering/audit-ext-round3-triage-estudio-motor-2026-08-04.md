@@ -171,7 +171,7 @@ Del informe 2 §5.1 (N4), adoptados:
 | D1d | Operativa: solo dictamen del valor (lista global → Asesor) | **Hecho** (`bc3fd95`) |
 | **Op** | **Operativa vital** (mesa TRADING / SEMI / mandato / pulso) — clave de app | **Cerrado** (SEMI desk + Outcomes 2026-08-04) |
 | **Asesor** | Research → Asesor + bandeja «opiniones de hoy» (datos ya en motor) | **Cerrado** (`e898b95` · tab Opiniones) |
-| D2 | Batch EOD flag-off + canales | **Canales AVISO/ALARMA on-demand** hechos · batch EOD sigue flag-off / ~2 sem |
+| D2 | Batch EOD flag-off + canales | **Canales** + **scaffold EOD** (`ESTUDIO_EOD_OPINION_ENABLED=false`, API force) · cron noop |
 | D3+ | Métricas / thaw Camino D AUTO execute | Checklist thaw estricto — **sigue freeze** |
 
 ---

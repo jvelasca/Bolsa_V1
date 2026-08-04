@@ -297,6 +297,25 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
               ? ` · asOf ${opinionsQuery.data[0].asOfBarDate}`
               : ''}
           </p>
+          {studyIds.length > 0 ? (
+            <button
+              type="button"
+              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'h-7 text-[10px]')}
+              disabled={opinionsQuery.isFetching}
+              title="POST eod-batch con force=true (flag ESTUDIO_EOD_OPINION_ENABLED sigue off)"
+              onClick={() => {
+                void api
+                  .runInstrumentDailyOpinionEodBatch({
+                    instrumentIds: studyIds,
+                    force: true,
+                  })
+                  .then(() => opinionsQuery.refetch())
+                  .catch((e: Error) => pushToast(`EOD batch · ${e.message}`));
+              }}
+            >
+              Recalcular EOD (manual / force)
+            </button>
+          ) : null}
         </CardContent>
       </Card>
     </div>

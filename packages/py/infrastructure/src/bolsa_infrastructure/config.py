@@ -104,6 +104,13 @@ class Settings(BaseSettings):
     cost_model_v2_volume_ratio_illiquid: float = Field(
         default=0.35, validation_alias="COST_MODEL_V2_VOLUME_RATIO_ILLIQUID"
     )
+    # D2 — batch EOD dictámenes Estudio. Off-by-default (ADR-022 / triage).
+    estudio_eod_opinion_enabled: bool = Field(
+        default=False, validation_alias="ESTUDIO_EOD_OPINION_ENABLED"
+    )
+    estudio_eod_opinion_interval_seconds: float = Field(
+        default=3600.0, validation_alias="ESTUDIO_EOD_OPINION_INTERVAL_SECONDS"
+    )
 
     @field_validator("database_url")
     @classmethod

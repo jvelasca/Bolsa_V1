@@ -23,6 +23,7 @@ from bolsa_api.api.v1.router import api_v1_router
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
 from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
 from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluator
+from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_opinion_worker
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
 from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
 from bolsa_api.background.optimization_worker import start_optimization_worker
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tracker_schedule_task = start_tracker_schedule_worker(app.state.session_factory)
     fa_weekly_task = start_fa_weekly_worker(app.state.session_factory)
     core_r_cron_task = start_core_r_cron_worker(app.state.session_factory)
+    estudio_eod_task = start_estudio_eod_opinion_worker(app.state.session_factory)
     auto_sync_task = start_auto_sync_worker(app.state.session_factory)
     index_subscribe_task = start_index_subscribe_worker(app.state.session_factory)
     scan_worker_task: asyncio.Task[None] | None = None
@@ -84,6 +86,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             fa_weekly_task.cancel()
         if core_r_cron_task is not None:
             core_r_cron_task.cancel()
+        if estudio_eod_task is not None:
+            estudio_eod_task.cancel()
         evaluator_task.cancel()
         tasks = [index_subscribe_task, auto_sync_task, signal_alert_task, evaluator_task]
         if tracker_schedule_task is not None:
@@ -92,6 +96,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             tasks.append(fa_weekly_task)
         if core_r_cron_task is not None:
             tasks.append(core_r_cron_task)
+        if estudio_eod_task is not None:
+            tasks.append(estudio_eod_task)
         if scan_worker_task is not None:
             tasks.insert(0, scan_worker_task)
         if optimization_worker_task is not None:

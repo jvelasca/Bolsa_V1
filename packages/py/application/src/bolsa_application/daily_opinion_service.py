@@ -25,6 +25,7 @@ from bolsa_infrastructure.database.repositories.ohlcv_repository import (
 )
 
 SOURCE_ON_DEMAND = "on_demand"
+SOURCE_EOD_BATCH = "eod_batch"
 EOD_STALE_MAX_DAYS = 5
 
 
@@ -90,16 +91,18 @@ class DailyOpinionService:
         hints: list[OpinionHint] | None = None,
         timeframe: str = "1d",
         now: datetime | None = None,
+        source: str = SOURCE_ON_DEMAND,
     ) -> list[InstrumentDailyOpinionRecord]:
         as_of = as_of_bar_date or datetime.now(UTC).date()
         ids = list(dict.fromkeys(i for i in instrument_ids if i))
         if not ids:
             return []
+        src = source if source in (SOURCE_ON_DEMAND, SOURCE_EOD_BATCH, "manual") else SOURCE_ON_DEMAND
 
         hint_by_id = {h.instrument_id: h for h in (hints or [])}
         cached: dict[str, InstrumentDailyOpinionRecord] = {}
         if not force_refresh:
-            for row in await self._opinions.list_for_instruments(ids, as_of, SOURCE_ON_DEMAND):
+            for row in await self._opinions.list_for_instruments(ids, as_of, src):
                 cached[row.instrument_id] = row
 
         out: list[InstrumentDailyOpinionRecord] = []
@@ -115,10 +118,28 @@ class DailyOpinionService:
                 hint=hint,
                 timeframe=timeframe,
                 now=now,
+                source=src,
             )
             out.append(row)
         return out
 
+    async def run_eod_batch(
+        self,
+        *,
+        instrument_ids: list[str],
+        as_of_bar_date: date | None = None,
+        account_id: str | None = None,
+        force: bool = True,
+    ) -> list[InstrumentDailyOpinionRecord]:
+        """Batch post-cierre (source=eod_batch). Siempre force_refresh salvo force=False."""
+        return await self.query(
+            instrument_ids=instrument_ids,
+            as_of_bar_date=as_of_bar_date,
+            account_id=account_id,
+            force_refresh=force,
+            hints=[],
+            source=SOURCE_EOD_BATCH,
+        )
     async def history(
         self,
         instrument_id: str,
@@ -171,6 +192,7 @@ class DailyOpinionService:
                         hint=day_hint,
                         timeframe=timeframe,
                         now=stance_now,
+                        source=SOURCE_ON_DEMAND,
                     )
                 cursor += timedelta(days=1)
 
@@ -211,9 +233,11 @@ class DailyOpinionService:
         hint: OpinionHint,
         timeframe: str,
         now: datetime | None,
+        source: str = SOURCE_ON_DEMAND,
     ) -> InstrumentDailyOpinionRecord:
         computed_at = datetime.now(UTC)
         stance_now = now or computed_at
+        src = source if source in (SOURCE_ON_DEMAND, SOURCE_EOD_BATCH, "manual") else SOURCE_ON_DEMAND
         has_eod = await self._resolve_has_eod(instrument_id, as_of, hint)
         top = await self._tops.get(instrument_id, timeframe)
         has_top = top is not None and bool(top.slots)
@@ -269,9 +293,9 @@ class DailyOpinionService:
             "gate_status": gate,
             "top_id": top.id if top else None,
             "top_version": top.version if top else None,
-            "source": SOURCE_ON_DEMAND,
+            "source": src,
             "engine_version": ENGINE_VERSION,
-            "idempotency_key": make_idempotency_key(instrument_id, as_of, SOURCE_ON_DEMAND),
+            "idempotency_key": make_idempotency_key(instrument_id, as_of, src),
             "computed_at": computed_at,
         }
         return await self._opinions.upsert(payload)

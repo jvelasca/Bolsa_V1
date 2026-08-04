@@ -47,6 +47,7 @@ import { useUiStore } from '@/stores/ui-store';
 import { useTradingLayoutStore } from '@/stores/trading-layout-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { useScreenerNavBadge } from '@/features/screeners/use-screener-nav-badge';
+import { useAsesorAlarmaBadge } from '@/features/research/use-asesor-alarma-badge';
 import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
 import { isTradingRoute } from '@/lib/routes';
 
@@ -285,6 +286,7 @@ export function AppTopBar() {
 
   const layout = useTradingLayoutStore();
   const screenerNavBadge = useScreenerNavBadge();
+  const asesorAlarmaBadge = useAsesorAlarmaBadge();
   const listAutoActive = useListAutoActivityStore((s) => s.active);
   const listAutoSummary = useListAutoActivityStore((s) => s.summary);
 
@@ -376,14 +378,25 @@ export function AppTopBar() {
             </span>
           ) : null}
         </div>
-        <DropdownMenu
-          label="Asesor"
-          icon={Microscope}
-          items={RESEARCH_MENU}
-          align="left"
-          navStyle
-          active={isResearchRoute}
-        />
+        <div className="relative">
+          <DropdownMenu
+            label="Asesor"
+            icon={Microscope}
+            items={RESEARCH_MENU}
+            align="left"
+            navStyle
+            active={isResearchRoute}
+          />
+          {asesorAlarmaBadge > 0 ? (
+            <span
+              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold leading-none text-white"
+              title={`${asesorAlarmaBadge} alarma${asesorAlarmaBadge === 1 ? '' : 's'} de dictamen`}
+              aria-label={`${asesorAlarmaBadge} alarmas de dictamen`}
+            >
+              {asesorAlarmaBadge > 9 ? '9+' : asesorAlarmaBadge}
+            </span>
+          ) : null}
+        </div>
         <NavLink
           to="/screeners"
           className={({ isActive }) =>

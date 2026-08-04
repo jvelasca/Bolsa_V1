@@ -78,3 +78,32 @@ class QueryInstrumentDailyOpinionsDto(BaseModel):
 
 class InstrumentDailyOpinionsListResponseDto(BaseModel):
     data: list[InstrumentDailyOpinionDto]
+
+
+class RunEstudioEodOpinionBatchDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    instrument_ids: list[str] = Field(alias="instrumentIds", min_length=1, max_length=200)
+    as_of_bar_date: str | None = Field(default=None, alias="asOfBarDate")
+    account_id: str | None = Field(default=None, alias="accountId")
+    force: bool = Field(
+        default=False,
+        description="Si ESTUDIO_EOD_OPINION_ENABLED=false, force=true permite corrida manual.",
+    )
+
+    @field_validator("instrument_ids")
+    @classmethod
+    def _non_empty_ids(cls, value: list[str]) -> list[str]:
+        cleaned = [i.strip() for i in value if isinstance(i, str) and i.strip()]
+        if not cleaned:
+            raise ValueError("instrumentIds must not be empty")
+        return cleaned
+
+
+class EstudioEodOpinionBatchResponseDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
+    enabled: bool
+    forced: bool
+    count: int
+    data: list[InstrumentDailyOpinionDto]

@@ -852,6 +852,22 @@ export const api = {
     );
   },
 
+  runInstrumentDailyOpinionEodBatch: (body: {
+    instrumentIds: string[];
+    asOfBarDate?: string | null;
+    accountId?: string | null;
+    force?: boolean;
+  }) =>
+    request<{
+      enabled: boolean;
+      forced: boolean;
+      count: number;
+      data: import('@bolsa/shared').InstrumentDailyOpinionV1[];
+    }>('/api/instrument-daily-opinions/eod-batch', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   getAccountMandates: (accountId: string, instrumentId?: string) => {
     const q = instrumentId
       ? `?instrumentId=${encodeURIComponent(instrumentId)}`

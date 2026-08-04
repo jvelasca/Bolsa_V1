@@ -10,11 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.schemas.instrument_daily_opinions import (
+    EstudioEodOpinionBatchResponseDto,
     InstrumentDailyOpinionDto,
     InstrumentDailyOpinionsListResponseDto,
     QueryInstrumentDailyOpinionsDto,
+    RunEstudioEodOpinionBatchDto,
 )
 from bolsa_application.daily_opinion_service import DailyOpinionService, OpinionHint
+from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
     InstrumentDailyOpinionRecord,
     SqlAlchemyInstrumentDailyOpinionRepository,
@@ -156,3 +159,41 @@ async def list_instrument_daily_opinions(
         ensure_days=ensure_days,
     )
     return InstrumentDailyOpinionsListResponseDto(data=[_to_dto(r) for r in rows])
+
+
+@router.post(
+    "/instrument-daily-opinions/eod-batch",
+    response_model=EstudioEodOpinionBatchResponseDto,
+)
+async def run_estudio_eod_opinion_batch(
+    body: RunEstudioEodOpinionBatchDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> EstudioEodOpinionBatchResponseDto:
+    """Batch EOD (source=eod_batch). Flag off-by-default; `force` permite dry-run manual."""
+    settings = get_settings()
+    enabled = bool(settings.estudio_eod_opinion_enabled)
+    if not enabled and not body.force:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "ESTUDIO_EOD_OPINION_ENABLED=false. "
+                "Pasa force=true para una corrida manual (sin cron)."
+            ),
+        )
+    service = DailyOpinionService(
+        SqlAlchemyInstrumentDailyOpinionRepository(session),
+        SqlAlchemyInstrumentStrategyTopRepository(session),
+        SqlAlchemyOhlcvRepository(session),
+    )
+    rows = await service.run_eod_batch(
+        instrument_ids=body.instrument_ids,
+        as_of_bar_date=_parse_as_of(body.as_of_bar_date),
+        account_id=body.account_id,
+        force=True,
+    )
+    return EstudioEodOpinionBatchResponseDto(
+        enabled=enabled,
+        forced=bool(body.force) or not enabled,
+        count=len(rows),
+        data=[_to_dto(r) for r in rows],
+    )
