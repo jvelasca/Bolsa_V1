@@ -22,7 +22,7 @@ import { api } from '@/lib/api';
 import { formatPct, formatPrice } from '@/features/charts/chart-utils';
 import { useExpandedInstrumentLiveQuote } from '@/features/trading/lists-tab/use-expanded-instrument-live-quote';
 import { getListCellDisplay } from '@/lib/list-utils';
-import { listColumnContentClass, LIST_ROW_EXPAND_WIDTH_PX } from '@/lib/list-column-layout';
+import { listColumnContentClass, LIST_ROW_EXPAND_WIDTH_PX, LIST_ROW_SELECT_WIDTH_PX, listRowLeftGutterWidthPx } from '@/lib/list-column-layout';
 import { useListColumnLayoutContext } from '@/features/trading/lists-tab/list-column-layout-context';
 import { ListMembershipPopover } from '@/features/trading/lists-tab/list-membership-popover';
 import { ListSyncStatusCell } from '@/features/trading/lists-tab/list-sync-status-cell';
@@ -43,7 +43,7 @@ interface ListItemAccordionProps {
   /** Texto secundario bajo el símbolo (p. ej. posición en cartera). */
   subtitle?: string;
   selected?: boolean;
-  onToggleSelect?: () => void;
+  onToggleSelect?: (event: React.MouseEvent) => void;
 }
 
 export function ListItemAccordion({
@@ -123,27 +123,41 @@ export function ListItemAccordion({
 
       <div className="flex items-center gap-0 px-1 py-1">
         <div
-          className="flex shrink-0 items-center justify-center gap-0.5"
-          style={{ width: onToggleSelect ? 52 : LIST_ROW_EXPAND_WIDTH_PX }}
+          className="flex shrink-0 items-center"
+          style={{ width: listRowLeftGutterWidthPx(Boolean(onToggleSelect)) }}
         >
           {onToggleSelect ? (
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5 accent-primary"
-              checked={selected}
-              aria-label={`Seleccionar ${item.symbol}`}
-              onChange={(event) => {
-                event.stopPropagation();
-                onToggleSelect();
-              }}
-              onClick={(event) => event.stopPropagation()}
-            />
+            <div
+              className="flex shrink-0 items-center justify-center"
+              style={{ width: LIST_ROW_SELECT_WIDTH_PX }}
+            >
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 accent-primary"
+                checked={selected}
+                aria-label={`Seleccionar ${item.symbol}`}
+                title="Clic · Ctrl+clic · Mayús+clic (rango)"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onToggleSelect(event);
+                }}
+                onChange={() => {
+                  /* handled in onClick for modifier keys */
+                }}
+              />
+            </div>
           ) : null}
-          <IconButton
-            icon={expanded ? ChevronDown : ChevronRight}
-            title={expanded ? 'Contraer' : 'Expandir'}
-            onClick={() => toggleExpanded(item.id)}
-          />
+          <div
+            className="flex shrink-0 items-center justify-center"
+            style={{ width: LIST_ROW_EXPAND_WIDTH_PX }}
+          >
+            <IconButton
+              icon={expanded ? ChevronDown : ChevronRight}
+              title={expanded ? 'Contraer' : 'Expandir'}
+              onClick={() => toggleExpanded(item.id)}
+            />
+          </div>
         </div>
 
         <div

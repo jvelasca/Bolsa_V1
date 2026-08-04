@@ -43,8 +43,8 @@ Sync: `use-chart-visualization-sync.ts` solo **amplía** el store (nunca `replac
 
 ### Selección masiva (Valores)
 
-- Check de cabecera (estilo matriz Backtesting) + check por fila.
-- Barra: **A Estudio** (desde otras listas) / **Quitar de Estudio** (si ya estás en Estudio).
+- Check de cabecera alineado con filas; **Ctrl/Cmd** toggle · **Mayús** rango.
+- Barra inferior horizontal: **A Estudio** · **Quitar de Estudio** · **Abrir gráficos** · Limpiar.
 
 ### Gate SEMI / AUTO
 

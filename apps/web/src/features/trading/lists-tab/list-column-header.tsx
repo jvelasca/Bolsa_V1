@@ -11,9 +11,11 @@ import { cn } from '@/lib/utils';
 import {
   LIST_HEADER_GRIP_INSET_PX,
   LIST_ROW_EXPAND_WIDTH_PX,
+  LIST_ROW_SELECT_WIDTH_PX,
   isCenteredListColumn,
   isNumericListColumn,
   listColumnContentClass,
+  listRowLeftGutterWidthPx,
   patchListFavoriteColumn,
   resolveListFavoriteColumnIds,
 } from '@/lib/list-column-layout';
@@ -239,22 +241,30 @@ export function ListColumnHeader({
     >
 
       <div
-        className="flex shrink-0 items-center justify-center gap-0.5"
-        style={{ width: selectEnabled ? 52 : LIST_ROW_EXPAND_WIDTH_PX }}
+        className="flex shrink-0 items-center"
+        style={{ width: listRowLeftGutterWidthPx(selectEnabled) }}
       >
         {selectEnabled ? (
-          <input
-            ref={headerSelectRef}
-            type="checkbox"
-            className="h-3.5 w-3.5 accent-primary"
-            checked={Boolean(selectAllChecked)}
-            aria-label="Seleccionar todos los valores de la lista"
-            title="Seleccionar todos"
-            onChange={onSelectAllToggle}
-          />
-        ) : (
-          <span className="block w-full" aria-hidden />
-        )}
+          <div
+            className="flex shrink-0 items-center justify-center"
+            style={{ width: LIST_ROW_SELECT_WIDTH_PX }}
+          >
+            <input
+              ref={headerSelectRef}
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary"
+              checked={Boolean(selectAllChecked)}
+              aria-label="Seleccionar todos los valores de la lista"
+              title="Seleccionar todos"
+              onChange={onSelectAllToggle}
+            />
+          </div>
+        ) : null}
+        <div
+          className="shrink-0"
+          style={{ width: LIST_ROW_EXPAND_WIDTH_PX }}
+          aria-hidden
+        />
       </div>
 
       <div

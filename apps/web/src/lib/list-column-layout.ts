@@ -9,7 +9,16 @@ import {
 } from '@bolsa/shared';
 
 export const LIST_ROW_EXPAND_WIDTH_PX = 28;
+/** Ancho fijo de la columna de check (cabecera y filas alineadas). */
+export const LIST_ROW_SELECT_WIDTH_PX = 18;
 export const DEFAULT_LIST_ROW_ACTIONS_WIDTH_PX = resolveListRowActionsWidth(undefined);
+
+/** Gutter izquierdo: check opcional + expand/chevron. */
+export function listRowLeftGutterWidthPx(selectEnabled: boolean): number {
+  return selectEnabled
+    ? LIST_ROW_SELECT_WIDTH_PX + LIST_ROW_EXPAND_WIDTH_PX
+    : LIST_ROW_EXPAND_WIDTH_PX;
+}
 /** Espacio reservado para el grip de reordenar en cabecera (alinea texto con filas). */
 export const LIST_HEADER_GRIP_INSET_PX = 14;
 

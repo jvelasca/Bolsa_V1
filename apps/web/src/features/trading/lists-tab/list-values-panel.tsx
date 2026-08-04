@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 
 import { Search } from 'lucide-react';
 
@@ -54,6 +54,7 @@ import { ListColumnLayoutProvider, useListColumnLayoutContext } from '@/features
 import { PendingOrderListItem } from '@/features/trading/lists-tab/pending-order-list-item';
 import { ListCarousel } from '@/features/trading/lists-tab/list-carousel';
 import { useListInstrumentKeyboardNav } from '@/features/trading/lists-tab/use-list-instrument-keyboard-nav';
+import { applyInstrumentSelection } from '@/features/trading/lists-tab/list-selection';
 
 export function ListValuesPanel() {
   const navigate = useNavigate();
@@ -76,6 +77,7 @@ export function ListValuesPanel() {
   const [selectedInstrumentIds, setSelectedInstrumentIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const selectionAnchorIndexRef = useRef<number | null>(null);
 
   const activeInstrumentId = charts.find((tab) => tab.id === activeChartId)?.instrumentId;
   const chartListContext = useWorkspaceStore((s) => s.workspace.chartListContext);
@@ -126,6 +128,7 @@ export function ListValuesPanel() {
 
   useEffect(() => {
     setSelectedInstrumentIds(new Set());
+    selectionAnchorIndexRef.current = null;
   }, [selectedListId]);
 
   // Full catalog with meta is expensive; skip while browsing a normal list (quotes cover the table).
@@ -268,18 +271,32 @@ export function ListValuesPanel() {
     setSelectedInstrumentIds((prev) => {
       if (selectableIds.length === 0) return prev;
       if (selectableIds.every((id) => prev.has(id))) {
+        selectionAnchorIndexRef.current = null;
         return new Set();
       }
+      selectionAnchorIndexRef.current = 0;
       return new Set(selectableIds);
     });
   }
 
-  function toggleSelectOne(instrumentId: string) {
+  function handleSelectClick(instrumentId: string, event: React.MouseEvent) {
+    const index = selectableIds.indexOf(instrumentId);
+    if (index < 0) return;
     setSelectedInstrumentIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(instrumentId)) next.delete(instrumentId);
-      else next.add(instrumentId);
-      return next;
+      const result = applyInstrumentSelection({
+        prev,
+        instrumentId,
+        index,
+        orderedIds: selectableIds,
+        modifiers: {
+          ctrlKey: event.ctrlKey,
+          metaKey: event.metaKey,
+          shiftKey: event.shiftKey,
+        },
+        anchorIndex: selectionAnchorIndexRef.current,
+      });
+      selectionAnchorIndexRef.current = result.anchorIndex;
+      return result.next;
     });
   }
 
@@ -299,6 +316,7 @@ export function ListValuesPanel() {
         source: 'virtual',
       });
       setSelectedInstrumentIds(new Set());
+      selectionAnchorIndexRef.current = null;
     }
   }
 
@@ -307,7 +325,16 @@ export function ListValuesPanel() {
       removeFromVisualization(id);
     }
     setSelectedInstrumentIds(new Set());
+    selectionAnchorIndexRef.current = null;
   }
+
+  const selectedInEstudioCount = useMemo(() => {
+    let n = 0;
+    for (const id of selectedInstrumentIds) {
+      if (visualizationEntries.some((entry) => entry.instrumentId === id)) n += 1;
+    }
+    return n;
+  }, [selectedInstrumentIds, visualizationEntries]);
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -345,6 +372,15 @@ export function ListValuesPanel() {
       navigate,
     ],
   );
+
+  function openSelectedCharts() {
+    const byId = new Map(selectableItems.map((item) => [item.id, item]));
+    for (const id of selectedInstrumentIds) {
+      const item = byId.get(id);
+      if (!item) continue;
+      focusInstrument(item.id, item.symbol);
+    }
+  }
 
   function visualizeFromSearch(
     instrument: (typeof allInstruments)[number],
@@ -588,6 +624,7 @@ export function ListValuesPanel() {
       </div>
 
       <ListColumnLayoutProvider listId={selectedListId}>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="scroll-area min-h-0 flex-1 overflow-auto">
           {isLoading && <p className="p-2 text-xs text-muted-foreground">Cargando…</p>}
           {isError && <p className="p-2 text-xs text-destructive">Error al cargar lista</p>}
@@ -603,39 +640,6 @@ export function ListValuesPanel() {
                 onSelectAllToggle={selectionEnabled ? toggleSelectAll : undefined}
               />
             )}
-
-        {selectionEnabled && selectedInstrumentIds.size > 0 && (
-          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-2 py-1.5 text-[11px]">
-            <span className="text-muted-foreground">
-              {selectedInstrumentIds.size} seleccionado
-              {selectedInstrumentIds.size === 1 ? '' : 's'}
-            </span>
-            {activeVirtual === VIRTUAL_LIST_VISUALIZATION ? (
-              <button
-                type="button"
-                className="rounded border border-border px-2 py-0.5 font-medium text-foreground hover:bg-accent"
-                onClick={removeSelectedFromEstudio}
-              >
-                Quitar de Estudio
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="rounded border border-primary/40 bg-primary/10 px-2 py-0.5 font-medium text-primary hover:bg-primary/15"
-                onClick={addSelectedToEstudio}
-              >
-                A Estudio
-              </button>
-            )}
-            <button
-              type="button"
-              className="ml-auto text-muted-foreground hover:text-foreground"
-              onClick={() => setSelectedInstrumentIds(new Set())}
-            >
-              Limpiar
-            </button>
-          </div>
-        )}
 
         {activeVirtual === VIRTUAL_LIST_PORTFOLIO && !isLoading && positions.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
@@ -667,7 +671,7 @@ export function ListValuesPanel() {
             isListSource={isListSourceRow}
             onOpenChart={focusInstrument}
             selectedIds={selectedInstrumentIds}
-            onToggleSelect={toggleSelectOne}
+            onToggleSelect={handleSelectClick}
           />
         )}
 
@@ -680,7 +684,7 @@ export function ListValuesPanel() {
             positions={positions}
             allInstruments={allInstruments}
             selectedIds={selectedInstrumentIds}
-            onToggleSelect={toggleSelectOne}
+            onToggleSelect={handleSelectClick}
           />
         )}
 
@@ -699,9 +703,58 @@ export function ListValuesPanel() {
             isListSource={isListSourceRow}
             onOpenChart={focusInstrument}
             selectedIds={selectedInstrumentIds}
-            onToggleSelect={toggleSelectOne}
+            onToggleSelect={handleSelectClick}
           />
         )}
+        </div>
+
+        {selectionEnabled && selectedInstrumentIds.size > 0 ? (
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 border-t border-border bg-muted/25 px-2 py-1.5 text-[11px]">
+            <span className="mr-1 tabular-nums text-muted-foreground">
+              {selectedInstrumentIds.size} seleccionado
+              {selectedInstrumentIds.size === 1 ? '' : 's'}
+            </span>
+            <button
+              type="button"
+              className="rounded border border-primary/40 bg-primary/10 px-2 py-1 font-medium text-primary hover:bg-primary/15"
+              onClick={addSelectedToEstudio}
+              title="Añadir selección a la lista Estudio"
+            >
+              A Estudio
+            </button>
+            {selectedInEstudioCount > 0 ? (
+              <button
+                type="button"
+                className="rounded border border-border px-2 py-1 font-medium text-foreground hover:bg-accent"
+                onClick={removeSelectedFromEstudio}
+                title="Quitar de Estudio"
+              >
+                Quitar de Estudio
+                {selectedInEstudioCount < selectedInstrumentIds.size
+                  ? ` (${selectedInEstudioCount})`
+                  : ''}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rounded border border-border px-2 py-1 font-medium text-foreground hover:bg-accent"
+              onClick={openSelectedCharts}
+              title="Abrir gráficos de la selección"
+            >
+              Abrir gráficos
+            </button>
+            <button
+              type="button"
+              className="ml-auto rounded px-2 py-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              onClick={() => {
+                setSelectedInstrumentIds(new Set());
+                selectionAnchorIndexRef.current = null;
+              }}
+            >
+              Limpiar
+            </button>
+          </div>
+        ) : null}
         </div>
       </ListColumnLayoutProvider>
     </div>
@@ -721,7 +774,7 @@ function SortedApiList({
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
   selectedIds: Set<string>;
-  onToggleSelect: (instrumentId: string) => void;
+  onToggleSelect: (instrumentId: string, event: React.MouseEvent) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
   const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
@@ -736,7 +789,7 @@ function SortedApiList({
           isListSource={isListSource(item.id)}
           onOpenChart={() => onOpenChart(item.id, item.symbol)}
           selected={selectedIds.has(item.id)}
-          onToggleSelect={() => onToggleSelect(item.id)}
+          onToggleSelect={(event) => onToggleSelect(item.id, event)}
         />
       ))}
     </>
@@ -758,7 +811,7 @@ function SortedVisualizationList({
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
   selectedIds: Set<string>;
-  onToggleSelect: (instrumentId: string) => void;
+  onToggleSelect: (instrumentId: string, event: React.MouseEvent) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
   const charts = useWorkspaceStore((s) => s.workspace.charts);
@@ -787,7 +840,7 @@ function SortedVisualizationList({
             isListSource={isListSource(item.id)}
             onOpenChart={() => onOpenChart(item.id, item.symbol)}
             selected={selectedIds.has(item.id)}
-            onToggleSelect={() => onToggleSelect(item.id)}
+            onToggleSelect={(event) => onToggleSelect(item.id, event)}
           />
         );
       })}
@@ -818,7 +871,7 @@ function PortfolioKeyboardList({
   }>;
   allInstruments: import('@bolsa/shared').InstrumentWithMetaDto[];
   selectedIds: Set<string>;
-  onToggleSelect: (instrumentId: string) => void;
+  onToggleSelect: (instrumentId: string, event: React.MouseEvent) => void;
 }) {
   useListInstrumentKeyboardNav(items, activeInstrumentId, onOpenChart, items.length > 0);
   if (items.length === 0) return null;
@@ -844,7 +897,7 @@ function PortfolioKeyboardList({
             isListSource={isListSource(item.id)}
             onOpenChart={() => onOpenChart(item.id, item.symbol)}
             selected={selectedIds.has(item.id)}
-            onToggleSelect={() => onToggleSelect(item.id)}
+            onToggleSelect={(event) => onToggleSelect(item.id, event)}
           />
         );
       })}
