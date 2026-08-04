@@ -98,4 +98,4 @@ Extraído del triage institucional — no sustituye P1–P10:
 | OR-P2 | Decimal en path paper crítico (pre-live) |
 | OR-T4/T6 | Idempotencia + DecisionSession en execute (detrás flag) |
 | OR-P7 | Kill switch &lt;1s (ya P7) |
-| OR-RE | **Risk Engine façade** — toda propuesta AUTO pasa por `check()` (Gate + mandato + maxOpen + deny reasons); sin atajo Lab→Broker ([triage §9.2](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)) |
+| OR-RE | **Risk Engine façade** — `check_opening` en `risk_engine.py`; ExecutionRouter paper/live_dry_run; `RISK_KILL_SWITCH`; book maxOpen opcional. Camino D **debe** usarlo. | **v0 hecho** |

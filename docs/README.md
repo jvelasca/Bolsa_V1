@@ -42,6 +42,7 @@
 | [engineering/audit-pack-estudio-asesor-canales-2026-08-04.md](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) | **Pack auditoría** Estudio→Operativa→Asesor→Canales (+ notif.) previo a AUTO |
 | [engineering/camino-d-auto-thaw-checklist-2026-08-04.md](./engineering/camino-d-auto-thaw-checklist-2026-08-04.md) | **Checklist thaw** Camino D / AUTO — sin flip `PAPER_D_EXECUTE` |
 | [engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md](./engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md) | **Triage institucional** Aud 1+2 (CTO/OR) — A0 + OR-lite; catálogo aparcado |
+| [engineering/risk-engine-or-re-2026-08-04.md](./engineering/risk-engine-or-re-2026-08-04.md) | **Risk Engine OR-RE v0** — `check_opening` · kill switch · Gate |
 | [engineering/asesor-ui-2026-08-04.md](./engineering/asesor-ui-2026-08-04.md) | Asesor (ex-Research) · Opiniones · canales · prefs notificaciones |
 | [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
 | [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md) | **Paquete auditoría** post-Q0–Q3 + freeze + evidencia smoke |

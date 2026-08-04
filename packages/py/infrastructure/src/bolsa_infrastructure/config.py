@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     cost_model_v2_volume_ratio_illiquid: float = Field(
         default=0.35, validation_alias="COST_MODEL_V2_VOLUME_RATIO_ILLIQUID"
     )
+    # OR-RE — kill switch global aperturas automáticas (Risk Engine).
+    risk_kill_switch: bool = Field(
+        default=False, validation_alias="RISK_KILL_SWITCH"
+    )
     # D2 — batch EOD dictámenes Estudio. Off-by-default (ADR-022 / triage).
     estudio_eod_opinion_enabled: bool = Field(
         default=False, validation_alias="ESTUDIO_EOD_OPINION_ENABLED"

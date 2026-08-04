@@ -193,9 +193,9 @@ El auditor eleva esto por encima del resto. **De acuerdo**, con matiz:
 
 **Decisión:** no construir el Risk Engine completo **antes** de A0 (necesitamos métricas). Sí:
 
-1. A0 telemetría (medir dictamen).  
-2. **OR-RE:** documentar + esqueleto `RiskEngine.check(proposal) → ALLOW|DENY+reasons` reutilizando Gate/mandato/maxOpen; Camino D **solo** pasa por ahí.  
-3. Ampliar checks (DD diario, kill switch) en OR-lite / A3.  
+1. A0 telemetría (medir dictamen). **Hecho.**  
+2. **OR-RE v0:** `bolsa_application.risk_engine.check_opening` → ALLOW|DENY; envuelve Gate; kill switch + book maxOpen; **ExecutionRouter** ya llama.  
+3. Ampliar checks (DD diario UI, mandato pre-trade, stop obligatorio) en OR-lite / A3.  
 4. **Prohibido:** Research/dictamen → Broker sin Risk Engine.
 
 ### 9.3 Cuatro pilares → mapeo épicos

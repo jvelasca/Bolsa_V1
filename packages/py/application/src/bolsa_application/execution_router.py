@@ -10,10 +10,8 @@ from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry
 from bolsa_application.events.payloads import signal_event_payload
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.investor_profiles import InvestorProfileStore
-from bolsa_application.trading_policy_guard import (
-    CognitiveGuardResult,
-    enforce_cognitive_policy_for_opening,
-)
+from bolsa_application.risk_engine import check_opening
+from bolsa_application.trading_policy_guard import CognitiveGuardResult
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
@@ -22,6 +20,7 @@ from bolsa_infrastructure.alerts.alert_channels import (
     AlertChannelDispatchResult,
     SignalAlertChannelDispatcher,
 )
+from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -428,7 +427,7 @@ class ExecutionRouter:
                 )
             except Exception:  # noqa: BLE001
                 pass
-            guard = enforce_cognitive_policy_for_opening(
+            guard_decision = check_opening(
                 profile=profile,
                 instrument_id=signal.instrument_id,
                 symbol=symbol,
@@ -443,24 +442,28 @@ class ExecutionRouter:
                 account_daily_drawdown_pct=dds.daily_pct,
                 account_weekly_drawdown_pct=dds.weekly_pct,
                 account_max_drawdown_pct=dds.max_pct,
+                kill_switch=bool(get_settings().risk_kill_switch),
             )
-            await self._persist_gate_memory(
-                guard,
-                account_id=policy.account_id,
-                symbol=symbol,
-                execution_status="gate_pending_trade",
-                lineage={
-                    "signalId": signal.id,
-                    "strategyDefinitionId": signal.strategy_definition_id,
-                    "policyId": policy.id,
-                    "policyMode": policy.mode,
-                    "dataVersion": signal.data_version,
-                    "scanId": None if hit is None else hit.get("scanId"),
-                    "featureSetHash": signal.indicator_snapshot_hash,
-                    "drawdowns": dds.to_dict(),
-                },
-            )
-            if not guard.allowed:
+            guard = guard_decision.guard
+            if guard is not None:
+                await self._persist_gate_memory(
+                    guard,
+                    account_id=policy.account_id,
+                    symbol=symbol,
+                    execution_status="gate_pending_trade",
+                    lineage={
+                        "signalId": signal.id,
+                        "strategyDefinitionId": signal.strategy_definition_id,
+                        "policyId": policy.id,
+                        "policyMode": policy.mode,
+                        "dataVersion": signal.data_version,
+                        "scanId": None if hit is None else hit.get("scanId"),
+                        "featureSetHash": signal.indicator_snapshot_hash,
+                        "drawdowns": dds.to_dict(),
+                        "riskEngine": guard_decision.to_dict(),
+                    },
+                )
+            if not guard_decision.allowed:
                 if self._event_bus is not None:
                     await self._event_bus.publish(
                         "execution.order_vetoed",
@@ -470,7 +473,8 @@ class ExecutionRouter:
                             "accountId": policy.account_id,
                             "tradeType": trade_type,
                             "quantity": quantity,
-                            "cognitiveGate": guard.to_dict(),
+                            "cognitiveGate": guard_decision.to_dict(),
+                            "riskEngine": guard_decision.to_dict(),
                         },
                         correlation_id=signal.id or None,
                     )
@@ -478,7 +482,7 @@ class ExecutionRouter:
                     instrument_id=signal.instrument_id,
                     signal_kind=str(signal.kind),
                     status="skipped",
-                    reason=f"TradingPolicy Gate: {'; '.join(guard.reasons)}",
+                    reason=f"Risk Engine: {'; '.join(guard_decision.reasons)}",
                 )
 
         try:
@@ -627,7 +631,7 @@ class ExecutionRouter:
         except Exception:  # noqa: BLE001
             pass
 
-        guard = enforce_cognitive_policy_for_opening(
+        guard_decision = check_opening(
             profile=profile,
             instrument_id=signal.instrument_id,
             symbol=str(hit.get("symbol") or signal.instrument_id),
@@ -643,28 +647,32 @@ class ExecutionRouter:
             account_daily_drawdown_pct=dds.daily_pct,
             account_weekly_drawdown_pct=dds.weekly_pct,
             account_max_drawdown_pct=dds.max_pct,
+            kill_switch=bool(get_settings().risk_kill_switch),
         )
-        await self._persist_gate_memory(
-            guard,
-            account_id=policy.account_id,
-            symbol=str(hit.get("symbol") or signal.instrument_id),
-            execution_status="live_dry_run",
-            lineage={
-                "signalId": signal.id,
-                "strategyDefinitionId": signal.strategy_definition_id,
-                "policyId": policy.id,
-                "policyMode": policy.mode,
-                "dataVersion": signal.data_version,
-                "scanId": hit.get("scanId"),
-                "featureSetHash": signal.indicator_snapshot_hash,
-                "drawdowns": dds.to_dict(),
-                "edgeReportId": None if edge_report is None else edge_report.edge_report_id,
-                "broker": "none",
-                "dryRun": True,
-            },
-        )
+        guard = guard_decision.guard
+        if guard is not None:
+            await self._persist_gate_memory(
+                guard,
+                account_id=policy.account_id,
+                symbol=str(hit.get("symbol") or signal.instrument_id),
+                execution_status="live_dry_run",
+                lineage={
+                    "signalId": signal.id,
+                    "strategyDefinitionId": signal.strategy_definition_id,
+                    "policyId": policy.id,
+                    "policyMode": policy.mode,
+                    "dataVersion": signal.data_version,
+                    "scanId": hit.get("scanId"),
+                    "featureSetHash": signal.indicator_snapshot_hash,
+                    "drawdowns": dds.to_dict(),
+                    "edgeReportId": None if edge_report is None else edge_report.edge_report_id,
+                    "broker": "none",
+                    "dryRun": True,
+                    "riskEngine": guard_decision.to_dict(),
+                },
+            )
 
-        if not guard.allowed:
+        if not guard_decision.allowed:
             if self._event_bus is not None:
                 await self._event_bus.publish(
                     "execution.live_dry_run_vetoed",
@@ -672,7 +680,8 @@ class ExecutionRouter:
                         **signal_event_payload(signal),
                         "policyId": policy.id,
                         "accountId": policy.account_id,
-                        "cognitiveGate": guard.to_dict(),
+                        "cognitiveGate": guard_decision.to_dict(),
+                        "riskEngine": guard_decision.to_dict(),
                     },
                     correlation_id=signal.id or None,
                 )
@@ -680,7 +689,7 @@ class ExecutionRouter:
                 instrument_id=signal.instrument_id,
                 signal_kind=str(signal.kind),
                 status="live_dry_run_veto",
-                reason=f"live dry-run VETO: {'; '.join(guard.reasons)}",
+                reason=f"Risk Engine VETO: {'; '.join(guard_decision.reasons)}",
             )
 
         if self._event_bus is not None:
@@ -690,7 +699,8 @@ class ExecutionRouter:
                     **signal_event_payload(signal),
                     "policyId": policy.id,
                     "accountId": policy.account_id,
-                    "cognitiveGate": guard.to_dict(),
+                    "cognitiveGate": guard_decision.to_dict(),
+                    "riskEngine": guard_decision.to_dict(),
                     "broker": "none",
                 },
                 correlation_id=signal.id or None,
