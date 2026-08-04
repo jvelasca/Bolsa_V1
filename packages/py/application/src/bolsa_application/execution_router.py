@@ -7,10 +7,18 @@ from bolsa_analytics.cognitive.market_events import MarketEventCalendar
 from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry_to_record
+from bolsa_application.auto_execute_idempotency import (
+    as_of_from_iso,
+    make_auto_execute_idempotency_key,
+)
 from bolsa_application.events.payloads import signal_event_payload
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.risk_engine import check_opening
+from bolsa_application.risk_runtime import (
+    claim_auto_execute_idempotency,
+    effective_kill_switch,
+)
 from bolsa_application.trading_policy_guard import CognitiveGuardResult
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
@@ -20,7 +28,6 @@ from bolsa_infrastructure.alerts.alert_channels import (
     AlertChannelDispatchResult,
     SignalAlertChannelDispatcher,
 )
-from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -30,6 +37,19 @@ from bolsa_infrastructure.database.repositories.backtest_repository import (
 from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     SignalAlertSubscriptionRecord,
 )
+
+
+def _book_max_open_positions(policy: ExecutionPolicyRecord) -> int | None:
+    """A2: tope Libro desde definition de la política (opcional)."""
+    d = policy.definition or {}
+    raw = d.get("bookMaxOpenPositions", d.get("maxOpenPositions"))
+    if raw is None:
+        return None
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -190,6 +210,50 @@ class ExecutionRouter:
                 decision_session_to_record(session)
             )
         except Exception:  # noqa: BLE001 — no tumbar paper_auto por fallo de audit
+            return
+
+    async def _persist_risk_session(
+        self,
+        *,
+        kind: Literal["paper_auto", "live_dry_run"],
+        instrument_id: str,
+        account_id: str | None,
+        symbol: str | None,
+        risk_decision: Any,
+        execution_status: str,
+        lineage: dict[str, Any] | None = None,
+        decision_id: str | None = None,
+    ) -> None:
+        """OR-T6: DecisionSession también en DENY pre-Gate (kill switch / maxOpen) y fills."""
+        if self._cognitive_store is None:
+            return
+        try:
+            from bolsa_analytics.cognitive.decision_session import build_auto_session
+            from bolsa_application.cognitive_persistence import decision_session_to_record
+
+            session = build_auto_session(
+                kind=kind,
+                instrument_id=instrument_id,
+                account_id=account_id,
+                symbol=symbol,
+                policy_gate={
+                    "riskEngine": (
+                        risk_decision.to_dict()
+                        if hasattr(risk_decision, "to_dict")
+                        else risk_decision
+                    )
+                },
+                execution={
+                    "status": execution_status,
+                    "mode": kind,
+                },
+                lineage=lineage,
+                decision_id=decision_id,
+            )
+            await self._cognitive_store.append_decision_session(
+                decision_session_to_record(session)
+            )
+        except Exception:  # noqa: BLE001
             return
 
     async def execute(self, policy_id: str, hits: list[dict[str, Any]]) -> ExecutionRouteResult:
@@ -442,26 +506,38 @@ class ExecutionRouter:
                 account_daily_drawdown_pct=dds.daily_pct,
                 account_weekly_drawdown_pct=dds.weekly_pct,
                 account_max_drawdown_pct=dds.max_pct,
-                kill_switch=bool(get_settings().risk_kill_switch),
+                kill_switch=await effective_kill_switch(),
+                book_max_open_positions=_book_max_open_positions(policy),
             )
             guard = guard_decision.guard
+            lineage_base = {
+                "signalId": signal.id,
+                "strategyDefinitionId": signal.strategy_definition_id,
+                "policyId": policy.id,
+                "policyMode": policy.mode,
+                "dataVersion": signal.data_version,
+                "scanId": None if hit is None else hit.get("scanId"),
+                "featureSetHash": signal.indicator_snapshot_hash,
+                "drawdowns": dds.to_dict(),
+                "riskEngine": guard_decision.to_dict(),
+            }
             if guard is not None:
                 await self._persist_gate_memory(
                     guard,
                     account_id=policy.account_id,
                     symbol=symbol,
                     execution_status="gate_pending_trade",
-                    lineage={
-                        "signalId": signal.id,
-                        "strategyDefinitionId": signal.strategy_definition_id,
-                        "policyId": policy.id,
-                        "policyMode": policy.mode,
-                        "dataVersion": signal.data_version,
-                        "scanId": None if hit is None else hit.get("scanId"),
-                        "featureSetHash": signal.indicator_snapshot_hash,
-                        "drawdowns": dds.to_dict(),
-                        "riskEngine": guard_decision.to_dict(),
-                    },
+                    lineage=lineage_base,
+                )
+            elif not guard_decision.allowed:
+                await self._persist_risk_session(
+                    kind="paper_auto",
+                    instrument_id=signal.instrument_id,
+                    account_id=policy.account_id,
+                    symbol=symbol,
+                    risk_decision=guard_decision,
+                    execution_status="vetoed",
+                    lineage=lineage_base,
                 )
             if not guard_decision.allowed:
                 if self._event_bus is not None:
@@ -483,6 +559,31 @@ class ExecutionRouter:
                     signal_kind=str(signal.kind),
                     status="skipped",
                     reason=f"Risk Engine: {'; '.join(guard_decision.reasons)}",
+                )
+
+            # OR-T4: claim idempotency before fill (mismo día×política×kind).
+            idem_key = make_auto_execute_idempotency_key(
+                signal.instrument_id,
+                as_of_from_iso(getattr(signal, "timestamp", None)),
+                policy.id,
+                str(signal.kind),
+            )
+            claimed = await claim_auto_execute_idempotency(idem_key)
+            if not claimed:
+                await self._persist_risk_session(
+                    kind="paper_auto",
+                    instrument_id=signal.instrument_id,
+                    account_id=policy.account_id,
+                    symbol=symbol,
+                    risk_decision=guard_decision,
+                    execution_status="idempotent_skip",
+                    lineage={**lineage_base, "idempotencyKey": idem_key},
+                )
+                return ExecutionActionResult(
+                    instrument_id=signal.instrument_id,
+                    signal_kind=str(signal.kind),
+                    status="skipped",
+                    reason=f"Idempotencia AUTO: ya ejecutado ({idem_key})",
                 )
 
         try:
@@ -526,6 +627,22 @@ class ExecutionRouter:
                 },
                 correlation_id=result.transaction.id,
             )
+
+        await self._persist_risk_session(
+            kind="paper_auto",
+            instrument_id=signal.instrument_id,
+            account_id=policy.account_id,
+            symbol=str(signal.instrument_id),
+            risk_decision={"verdict": "ALLOW", "reasons": ["fill"]},
+            execution_status="accepted",
+            lineage={
+                "signalId": signal.id,
+                "policyId": policy.id,
+                "policyMode": policy.mode,
+                "transactionId": result.transaction.id,
+            },
+            decision_id=result.transaction.id,
+        )
 
         return ExecutionActionResult(
             instrument_id=signal.instrument_id,
@@ -647,29 +764,41 @@ class ExecutionRouter:
             account_daily_drawdown_pct=dds.daily_pct,
             account_weekly_drawdown_pct=dds.weekly_pct,
             account_max_drawdown_pct=dds.max_pct,
-            kill_switch=bool(get_settings().risk_kill_switch),
+            kill_switch=await effective_kill_switch(),
+            book_max_open_positions=_book_max_open_positions(policy),
         )
         guard = guard_decision.guard
+        lineage_live = {
+            "signalId": signal.id,
+            "strategyDefinitionId": signal.strategy_definition_id,
+            "policyId": policy.id,
+            "policyMode": policy.mode,
+            "dataVersion": signal.data_version,
+            "scanId": hit.get("scanId"),
+            "featureSetHash": signal.indicator_snapshot_hash,
+            "drawdowns": dds.to_dict(),
+            "edgeReportId": None if edge_report is None else edge_report.edge_report_id,
+            "broker": "none",
+            "dryRun": True,
+            "riskEngine": guard_decision.to_dict(),
+        }
         if guard is not None:
             await self._persist_gate_memory(
                 guard,
                 account_id=policy.account_id,
                 symbol=str(hit.get("symbol") or signal.instrument_id),
                 execution_status="live_dry_run",
-                lineage={
-                    "signalId": signal.id,
-                    "strategyDefinitionId": signal.strategy_definition_id,
-                    "policyId": policy.id,
-                    "policyMode": policy.mode,
-                    "dataVersion": signal.data_version,
-                    "scanId": hit.get("scanId"),
-                    "featureSetHash": signal.indicator_snapshot_hash,
-                    "drawdowns": dds.to_dict(),
-                    "edgeReportId": None if edge_report is None else edge_report.edge_report_id,
-                    "broker": "none",
-                    "dryRun": True,
-                    "riskEngine": guard_decision.to_dict(),
-                },
+                lineage=lineage_live,
+            )
+        elif not guard_decision.allowed:
+            await self._persist_risk_session(
+                kind="live_dry_run",
+                instrument_id=signal.instrument_id,
+                account_id=policy.account_id,
+                symbol=str(hit.get("symbol") or signal.instrument_id),
+                risk_decision=guard_decision,
+                execution_status="vetoed",
+                lineage=lineage_live,
             )
 
         if not guard_decision.allowed:

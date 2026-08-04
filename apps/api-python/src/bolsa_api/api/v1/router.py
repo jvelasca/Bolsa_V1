@@ -30,6 +30,7 @@ from bolsa_api.api.v1.routes import (
     position_policies,
     predictions,
     research,
+    risk,
     scans,
     signal_alerts,
     signals_evaluate,
@@ -56,6 +57,7 @@ api_v1_router.include_router(indicators_draft.router, tags=["indicators"])
 api_v1_router.include_router(signals_evaluate.router, tags=["signals"])
 api_v1_router.include_router(scans.router, tags=["scans"])
 api_v1_router.include_router(paper_d.router, tags=["paper-d"])
+api_v1_router.include_router(risk.router, tags=["risk"])
 api_v1_router.include_router(signal_alerts.router, tags=["signal-alerts"])
 api_v1_router.include_router(drawing_replay.router, tags=["drawings"])
 api_v1_router.include_router(lists.router, tags=["lists"])

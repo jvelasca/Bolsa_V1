@@ -251,7 +251,7 @@ Confirmaciones B+C: diseño **listo**. Código D1 **solo** con frase explícita 
 | 2 | **Operativa** (vital) | Mesa TRADING, SEMI/Confirm, mandato, pulso IO+TOP+dictamen del valor | **Camino D AUTO execute** (sigue freeze) |
 | 3 | ~~**Asesor**~~ | Renombrar/integrar Research; bandeja opiniones Estudio; UI de datos **ya** calculables | Cron EOD batch real (flag off); thaw AUTO |
 | 4 | ~~**Canales**~~ | Toast Alarmas + email prefs UI + mapa leyenda + EOD force | SMS; thaw AUTO |
-| 5 | **AUTO** (prep) | ~~A0~~ · ~~OR-lite/OR-RE/Repro+/Obs~~ · ~~**A1** Libro AUTO UI~~ | Flip `PAPER_D_EXECUTE` sin evidencia; Lab→Broker sin Risk · **siguiente: A2 detrás flag** |
+| 5 | **AUTO** (prep) | ~~A0~~ · ~~OR-lite/OR-RE/Repro+/Obs~~ · ~~A1~~ · ~~**A2–A5 prep**~~ ([doc](./camino-d-a2-a5-prep-2026-08-04.md)) | Flip `PAPER_D_EXECUTE` sin evidencia P1–P5; ADR-023 Accepted sin filas |
 
 **Nota AUTO:** entrar por [camino-d-auto-thaw-checklist](./camino-d-auto-thaw-checklist-2026-08-04.md). Auditar primero: [audit-pack-estudio-asesor-canales](./audit-pack-estudio-asesor-canales-2026-08-04.md).
 

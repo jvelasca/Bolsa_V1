@@ -168,6 +168,30 @@ async def _worker_heartbeat_component() -> ComponentHealthDto:
     )
 
 
+async def _risk_component() -> ComponentHealthDto:
+    """A3: estado kill switch + PAPER_D_EXECUTE (siempre default off en prod)."""
+    from bolsa_application.paper_d_propose import paper_d_execute_allowed
+    from bolsa_application.risk_runtime import kill_switch_status
+
+    st = await kill_switch_status()
+    paper_on = paper_d_execute_allowed()
+    details = {**st, "paperDExecuteEnv": paper_on}
+    if st.get("effective"):
+        return ComponentHealthDto(
+            status="degraded",
+            message="Kill switch ACTIVE — aperturas automáticas bloqueadas",
+            details=details,
+        )
+    return ComponentHealthDto(
+        status="ok",
+        message=(
+            "Kill switch off"
+            + ("; PAPER_D_EXECUTE on (opt-in)" if paper_on else "; PAPER_D_EXECUTE off")
+        ),
+        details=details,
+    )
+
+
 @router.get("/health", response_model=HealthResponseDto)
 async def health_check(request: Request) -> HealthResponseDto:
     engine = request.app.state.engine
@@ -182,6 +206,7 @@ async def health_check(request: Request) -> HealthResponseDto:
         "redis": await _redis_component(),
         "auth": _auth_component(),
         "worker_arq": await _worker_heartbeat_component(),
+        "risk": await _risk_component(),
     }
     # DB error → degraded; Redis/Yahoo/auth/worker degraded no tumba el health global a error.
     degraded = (not db_ok) or any(c.status == "error" for c in components.values())

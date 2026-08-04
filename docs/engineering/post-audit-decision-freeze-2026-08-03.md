@@ -29,6 +29,7 @@ Brief de producto listo para cuando toque reabrir (2026-08-03, **sin implementar
 5. **Revisar esta ficha** solo si aparece: necesidad real de cron 24/7, experimento de costes v2, brief Belief, o thaw AUTO con evidencia (checklist completa).  
 6. **Docstrings:** lotes 1–4 cerrados — solo forward-only al tocar código ([estándar](./code-documentation-standard-2026-08-03.md)).  
 7. **Auditorías institucionales 2026-08-04 (CTO/OR):** triage [audit-ext-institutional-pre-auto-triage](./audit-ext-institutional-pre-auto-triage-2026-08-04.md) — **no** abrir blockchain ledger / Monte Carlo / OTel / chaos como gate de Camino D; sí A0 + OR-lite.
+8. **Prep A2–A5 (2026-08-04):** código detrás de flags ([camino-d-a2-a5-prep](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed). **No** es thaw: `PAPER_D_EXECUTE` sigue off; evidencia P1–P5 pendiente.
 
 ## Qué no hacer
 

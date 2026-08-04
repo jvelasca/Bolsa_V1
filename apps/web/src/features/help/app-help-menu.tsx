@@ -367,7 +367,9 @@ function TradingContent() {
             % cash, máx. posiciones, geo).{' '}
             <strong className="text-foreground">AUTO</strong> se muestra como «prep» con riesgos
             (Camino D / Risk Engine / kill switch); pill deshabilitada hasta checklist thaw +{' '}
-            <code className="text-[10px]">PAPER_D_EXECUTE</code>. Usa SEMI + Confirm.
+            <code className="text-[10px]">PAPER_D_EXECUTE</code>. Kill switch en el mismo bloque
+            (API runtime). Armado local con doble confirmación (frase{' '}
+            <code className="text-[10px]">ACTIVAR AUTO</code>) no habilita execute. Usa SEMI + Confirm.
           </li>
         </ul>
         <p className="mt-2">

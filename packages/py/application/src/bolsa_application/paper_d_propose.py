@@ -38,18 +38,33 @@ def paper_d_execute_allowed() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
+def paper_d_allowed_account_id() -> str | None:
+    """A5: si ``PAPER_D_ACCOUNT_ID`` está set, execute solo esa cuenta DEMO."""
+    raw = (os.getenv("PAPER_D_ACCOUNT_ID") or "").strip()
+    return raw or None
+
+
 def build_paper_d_hits(
     eligible: list[dict[str, Any]],
     *,
     strategy_definition_id: str | None,
     prices: dict[str, float],
     plan_id: str,
+    as_of: str | None = None,
+    policy_id: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Construye hits estilo scan para ``entry_long``. Returns (hits, skipped)."""
+    """Construye hits estilo scan para ``entry_long``. Returns (hits, skipped).
+
+    Signal id estable por día×instrumento (OR-T4); ``scanId`` = plan único.
+    """
+    from bolsa_application.auto_execute_idempotency import as_of_from_iso
+
     ts = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    day = as_of or as_of_from_iso(ts)
     hits: list[dict[str, Any]] = []
     skipped: list[dict[str, Any]] = []
     strat = strategy_definition_id or "paper_d_unbound"
+    pol = policy_id or "paper_d"
     for cand in eligible:
         iid = str(cand["instrumentId"])
         price = prices.get(iid)
@@ -68,7 +83,7 @@ def build_paper_d_hits(
                 "symbol": cand.get("ticker") or iid,
                 "scanId": plan_id,
                 "signal": {
-                    "id": f"pd-{plan_id}-{iid[:8]}",
+                    "id": f"pd-{day}-{pol[:8]}-{iid[:8]}",
                     "instrumentId": iid,
                     "timestamp": ts,
                     "kind": "entry_long",
@@ -258,6 +273,13 @@ class ProposePaperDPlan:
                 raise ValueError("Política de ejecución deshabilitada")
             if getattr(policy, "mode", None) != "paper_auto":
                 raise ValueError("Paper D execute requiere mode=paper_auto")
+            allowed_acct = paper_d_allowed_account_id()
+            policy_acct = getattr(policy, "account_id", None)
+            if allowed_acct and policy_acct and str(policy_acct) != allowed_acct:
+                raise ValueError(
+                    f"A5 opt-in: PAPER_D_ACCOUNT_ID={allowed_acct} "
+                    f"no coincide con policy.accountId={policy_acct}"
+                )
             kinds = set((policy.definition or {}).get("signalKinds") or [])
             if "entry_long" not in kinds:
                 raise ValueError("La política debe permitir signalKind entry_long")
@@ -268,6 +290,7 @@ class ProposePaperDPlan:
                 strategy_definition_id=getattr(policy, "strategy_definition_id", None),
                 prices=prices,
                 plan_id=plan_id,
+                policy_id=policy_id,
             )
             if price_skips:
                 notes.append(f"Sin precio: {len(price_skips)} elegible(s) omitidos")

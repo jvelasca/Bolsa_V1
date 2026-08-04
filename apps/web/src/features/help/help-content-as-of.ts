@@ -13,7 +13,7 @@
  * Continuidad Verify (lookback + carry) · higiene `strategyType` Finalistas.
  * Post-auditorías Q0–Q3 + Q1.6 warm-up + estabilidad IBEX (Gate C4 cerrado).
  * **2026-08-04** — Panel **Operativa** + lista **Estudio** (membresía · bulk · gate SEMI/AUTO)
- * + Chart TOP#1 switches · **A1** Libro AUTO prep (pill disabled + risk copy).
+ * + Chart TOP#1 switches · **A1–A5 prep** Libro AUTO / kill switch / ADR-023 Proposed.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *

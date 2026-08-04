@@ -111,7 +111,33 @@ export const api = {
       service: string;
       timestamp: string;
       database?: { status: string; message: string };
+      components?: Record<
+        string,
+        { status: string; message: string; details?: Record<string, unknown> }
+      >;
     }>('/api/health'),
+
+  getRiskKillSwitch: () =>
+    request<{
+      effective: boolean;
+      env: boolean;
+      runtimeMemory: boolean;
+      redis: boolean | null;
+      paperDExecuteEnv: boolean;
+    }>('/api/risk/kill-switch'),
+
+  setRiskKillSwitch: (enabled: boolean) =>
+    request<{
+      effective: boolean;
+      env: boolean;
+      runtimeMemory: boolean;
+      redis: boolean | null;
+      paperDExecuteEnv: boolean;
+      updated?: { enabled: boolean; memory: boolean; redis: boolean };
+    }>('/api/risk/kill-switch', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
 
   getAiStatus: () =>
     request<{

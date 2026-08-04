@@ -41,6 +41,8 @@
 | [engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md) | Triage round 3 (A0·N4·Deep) — O3-C ratificado · secuencia Op→Asesor→Canales |
 | [engineering/audit-pack-estudio-asesor-canales-2026-08-04.md](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) | **Pack auditoría** Estudio→Operativa→Asesor→Canales (+ notif.) previo a AUTO |
 | [engineering/camino-d-auto-thaw-checklist-2026-08-04.md](./engineering/camino-d-auto-thaw-checklist-2026-08-04.md) | **Checklist thaw** Camino D / AUTO — sin flip `PAPER_D_EXECUTE` |
+| [engineering/camino-d-a2-a5-prep-2026-08-04.md](./engineering/camino-d-a2-a5-prep-2026-08-04.md) | Prep A2–A5 (Risk/idempotencia/kill/ADR-023) · flag off |
+| [adr/023-camino-d-thaw.md](./adr/023-camino-d-thaw.md) | ADR thaw Camino D — **Proposed** (evidencia pendiente) |
 | [engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md](./engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md) | **Triage institucional** Aud 1+2 (CTO/OR) — A0 + OR-lite; catálogo aparcado |
 | [engineering/risk-engine-or-re-2026-08-04.md](./engineering/risk-engine-or-re-2026-08-04.md) | **Risk Engine OR-RE v0** — `check_opening` · kill switch · Gate |
 | [engineering/asesor-ui-2026-08-04.md](./engineering/asesor-ui-2026-08-04.md) | Asesor (ex-Research) · Opiniones · canales · prefs notificaciones |
