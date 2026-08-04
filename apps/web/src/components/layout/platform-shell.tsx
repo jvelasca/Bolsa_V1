@@ -19,6 +19,7 @@ import { InstrumentSyncDialog } from '@/features/instruments/instrument-sync-dia
 
 import { PendingOrdersMonitor } from '@/features/trading/pending-orders-monitor';
 import { TrackerAlarmInboxPoller } from '@/features/trading/tracker-alarm-inbox-poller';
+import { EstudioOpinionAlarmPoller } from '@/features/research/estudio-opinion-alarm-poller';
 
 import { InstrumentInfoDialog } from '@/features/trading/instrument-info-dialog';
 import { OrderDialog } from '@/features/trading/order-dialog';
@@ -127,6 +128,7 @@ export function PlatformShell() {
       <AlertsMonitor />
       <DrawingAlertsMonitor />
       <TrackerAlarmInboxPoller />
+      <EstudioOpinionAlarmPoller />
       <PendingOrdersMonitor />
 
       <AlertToasts />

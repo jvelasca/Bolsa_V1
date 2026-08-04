@@ -171,7 +171,7 @@ Del informe 2 §5.1 (N4), adoptados:
 | D1d | Operativa: solo dictamen del valor (lista global → Asesor) | **Hecho** (`bc3fd95`) |
 | **Op** | **Operativa vital** (mesa TRADING / SEMI / mandato / pulso) — clave de app | **Cerrado** (SEMI desk + Outcomes 2026-08-04) |
 | **Asesor** | Research → Asesor + bandeja «opiniones de hoy» (datos ya en motor) | **Cerrado** (`e898b95` · tab Opiniones) |
-| D2 | Batch EOD flag-off + canales | **Canales** + **scaffold EOD** (`ESTUDIO_EOD_OPINION_ENABLED=false`, API force) · cron noop |
+| D2 | Batch EOD flag-off + canales | **Canales** + toast Alarmas + email scaffold off + EOD API force · cron noop |
 | D3+ | Métricas / thaw Camino D AUTO execute | Checklist thaw estricto — **sigue freeze** |
 
 ---
@@ -249,7 +249,8 @@ Confirmaciones B+C: diseño **listo**. Código D1 **solo** con frase explícita 
 |---|------|---------|------------|
 | 1 | ~~D1 motor~~ | Dictamen, API, Evolución, invariantes | — |
 | 2 | **Operativa** (vital) | Mesa TRADING, SEMI/Confirm, mandato, pulso IO+TOP+dictamen del valor | **Camino D AUTO execute** (sigue freeze) |
-| 3 | **Asesor** | Renombrar/integrar Research; bandeja opiniones Estudio; UI de datos **ya** calculables en background | Cron EOD batch (D2); thaw AUTO |
+| 3 | ~~**Asesor**~~ | Renombrar/integrar Research; bandeja opiniones Estudio; UI de datos **ya** calculables | Cron EOD batch real (flag off); thaw AUTO |
+| 4 | **Canales** (en curso) | Toast Alarmas + email scaffold off tras eod-batch | Prefs UI email; SMS; thaw AUTO |
 
 **Nota AUTO:** «parte AUTO» = madurar **Operativa** como superficie de operación (hacia SEMI y, más tarde, AUTO). **No** activar `PAPER_D_EXECUTE` / Camino D hasta checklist thaw del freeze.
 

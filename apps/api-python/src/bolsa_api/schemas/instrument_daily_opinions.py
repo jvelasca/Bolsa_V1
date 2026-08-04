@@ -100,6 +100,15 @@ class RunEstudioEodOpinionBatchDto(BaseModel):
         return cleaned
 
 
+class EstudioEodOpinionEmailNotifyDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+
+    email_enabled: bool = Field(alias="emailEnabled")
+    alarma_count: int = Field(alias="alarmaCount")
+    sent: bool
+    skipped_reason: str | None = Field(default=None, alias="skippedReason")
+
+
 class EstudioEodOpinionBatchResponseDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
@@ -107,3 +116,6 @@ class EstudioEodOpinionBatchResponseDto(BaseModel):
     forced: bool
     count: int
     data: list[InstrumentDailyOpinionDto]
+    email_notify: EstudioEodOpinionEmailNotifyDto | None = Field(
+        default=None, alias="emailNotify"
+    )

@@ -11,12 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.schemas.instrument_daily_opinions import (
     EstudioEodOpinionBatchResponseDto,
+    EstudioEodOpinionEmailNotifyDto,
     InstrumentDailyOpinionDto,
     InstrumentDailyOpinionsListResponseDto,
     QueryInstrumentDailyOpinionsDto,
     RunEstudioEodOpinionBatchDto,
 )
 from bolsa_application.daily_opinion_service import DailyOpinionService, OpinionHint
+from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
     InstrumentDailyOpinionRecord,
@@ -191,9 +193,16 @@ async def run_estudio_eod_opinion_batch(
         account_id=body.account_id,
         force=True,
     )
+    email_meta = await maybe_notify_estudio_alarmas(settings, rows)
     return EstudioEodOpinionBatchResponseDto(
         enabled=enabled,
         forced=bool(body.force) or not enabled,
         count=len(rows),
         data=[_to_dto(r) for r in rows],
+        email_notify=EstudioEodOpinionEmailNotifyDto(
+            email_enabled=bool(email_meta["email_enabled"]),
+            alarma_count=int(email_meta["alarma_count"]),
+            sent=bool(email_meta["sent"]),
+            skipped_reason=email_meta.get("skipped_reason"),
+        ),
     )

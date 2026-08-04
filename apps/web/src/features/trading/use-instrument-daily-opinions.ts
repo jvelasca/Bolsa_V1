@@ -13,7 +13,11 @@ import { api } from '@/lib/api';
 export function useInstrumentDailyOpinions(
   instrumentIds: string[],
   hints: InstrumentDailyOpinionHintV1[] = [],
-  options?: { enabled?: boolean; forceRefresh?: boolean },
+  options?: {
+    enabled?: boolean;
+    forceRefresh?: boolean;
+    refetchInterval?: number | false;
+  },
 ) {
   const ids = [...new Set(instrumentIds.filter(Boolean))].sort();
   const enabled = (options?.enabled ?? true) && ids.length > 0;
@@ -36,6 +40,7 @@ export function useInstrumentDailyOpinions(
     ],
     enabled,
     staleTime: 60_000,
+    refetchInterval: options?.refetchInterval,
     queryFn: async (): Promise<InstrumentDailyOpinionV1[]> => {
       const res = await api.queryInstrumentDailyOpinions({
         instrumentIds: ids,

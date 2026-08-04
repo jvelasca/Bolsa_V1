@@ -863,6 +863,12 @@ export const api = {
       forced: boolean;
       count: number;
       data: import('@bolsa/shared').InstrumentDailyOpinionV1[];
+      emailNotify?: {
+        emailEnabled: boolean;
+        alarmaCount: number;
+        sent: boolean;
+        skippedReason?: string | null;
+      } | null;
     }>('/api/instrument-daily-opinions/eod-batch', {
       method: 'POST',
       body: JSON.stringify(body),

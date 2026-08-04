@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
     smtp_user: str | None = Field(default=None, validation_alias="SMTP_USER")
     smtp_password: str | None = Field(default=None, validation_alias="SMTP_PASSWORD")
+    smtp_from: str | None = Field(default=None, validation_alias="SMTP_FROM")
     tracker_schedule_enabled: bool = Field(default=True, validation_alias="TRACKER_SCHEDULE_ENABLED")
     tracker_schedule_interval_seconds: float = Field(
         default=60.0,
@@ -110,6 +111,13 @@ class Settings(BaseSettings):
     )
     estudio_eod_opinion_interval_seconds: float = Field(
         default=3600.0, validation_alias="ESTUDIO_EOD_OPINION_INTERVAL_SECONDS"
+    )
+    # D2 — email Alarmas Estudio (off-by-default; requiere SMTP_* + EMAIL_TO).
+    estudio_opinion_email_enabled: bool = Field(
+        default=False, validation_alias="ESTUDIO_OPINION_EMAIL_ENABLED"
+    )
+    estudio_opinion_email_to: str | None = Field(
+        default=None, validation_alias="ESTUDIO_OPINION_EMAIL_TO"
     )
 
     @field_validator("database_url")

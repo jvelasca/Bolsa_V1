@@ -1,7 +1,7 @@
 /**
  * Mapa Dictamen → AVISO | ALARMA (O3-C / diseño §5.2).
  * Atributo de canal del dictamen — no es un segundo inbox mental.
- * Batch EOD / email: fase D2; aquí solo clasificación on-demand.
+ * Batch EOD / email: D2 scaffold (`ESTUDIO_OPINION_EMAIL_*`); toast UI en PlatformShell.
  */
 
 import type { InstrumentDailyOpinionStance, InstrumentDailyOpinionV1 } from './instrument-daily-opinion.js';

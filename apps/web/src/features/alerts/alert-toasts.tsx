@@ -1,5 +1,6 @@
 import { Bell, X } from 'lucide-react';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { openHelpBacktesting } from '@/features/backtests/core-r-status';
 import {
   useAlertsStore,
@@ -13,6 +14,7 @@ const AUTO_DISMISS_MS = 12_000;
 export function AlertToasts() {
   const toasts = useAlertsStore((s) => s.toasts);
   const dismissToast = useAlertsStore((s) => s.dismissToast);
+  const navigate = useNavigate();
 
   return (
     <div className="pointer-events-none fixed bottom-10 right-4 z-50 flex w-80 flex-col gap-2">
@@ -21,24 +23,34 @@ export function AlertToasts() {
           key={toast.id}
           toast={toast}
           onDismiss={() => dismissToast(toast.id)}
+          onAction={(action) => runToastAction(action, navigate)}
         />
       ))}
     </div>
   );
 }
 
-function runToastAction(action: AlertToastAction): void {
+function runToastAction(
+  action: AlertToastAction,
+  navigate: ReturnType<typeof useNavigate>,
+): void {
   if (action.type === 'open_help_backtesting_monitor') {
     openHelpBacktesting({ panel: 'monitor' });
+    return;
+  }
+  if (action.type === 'open_asesor_opiniones') {
+    navigate('/research?tab=opiniones');
   }
 }
 
 function AlertToastItem({
   toast,
   onDismiss,
+  onAction,
 }: {
   toast: AlertToast;
   onDismiss: () => void;
+  onAction: (action: AlertToastAction) => void;
 }) {
   useEffect(() => {
     const timer = window.setTimeout(onDismiss, AUTO_DISMISS_MS);
@@ -46,7 +58,9 @@ function AlertToastItem({
   }, [onDismiss]);
 
   const action = toast.action;
-  const actionLabel = action?.label ?? 'Abrir Monitor';
+  const actionLabel =
+    action?.label ??
+    (action?.type === 'open_asesor_opiniones' ? 'Ver Opiniones' : 'Abrir Monitor');
 
   return (
     <div
@@ -63,7 +77,7 @@ function AlertToastItem({
             type="button"
             className="text-xs font-medium text-primary hover:underline"
             onClick={() => {
-              runToastAction(action);
+              onAction(action);
               onDismiss();
             }}
           >
