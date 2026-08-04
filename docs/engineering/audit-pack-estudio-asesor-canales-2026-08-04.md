@@ -14,11 +14,12 @@
 | **D1 motor** | ¿`InstrumentDailyOpinion` on-demand + caché + API + invariantes? | **Cerrado** |
 | **Operativa** | ¿Mesa SEMI: dictamen del valor, Proponer F3, Outcomes, mandato? | **Cerrado** |
 | **Asesor** | ¿Label + tab Opiniones + badge alarmas? | **Cerrado** |
-| **Canales** | ¿Mapa AVISO/ALARMA + bandeja + toast + email scaffold off + EOD force? | **Cerrado** |
+| **Canales** | ¿Mapa AVISO/ALARMA + bandeja + toast + prefs email UI + EOD force? | **Cerrado** |
+| **Notificaciones** | ¿Menú usuario → correo Alarmas (pre-multiusuario)? | **Cerrado** |
 | **Cron EOD real** | ¿Worker con universo servidor? | **No** — flag off, noop |
 | **AUTO / Camino D** | ¿Execute sin Confirm? | **Freeze** — ver checklist thaw |
 
-**Veredicto para auditorías:** la cadena Estudio→dictamen→canal→SEMI Confirm está **listable y auditable**. No hay luz verde de producto para `PAPER_D_EXECUTE` hasta cumplir umbrales del triage §2.3 / checklist thaw.
+**Veredicto para auditorías:** la cadena Estudio→dictamen→canal→SEMI Confirm (+ prefs notificación) está **listable y auditable**. No hay luz verde de producto para `PAPER_D_EXECUTE` hasta cumplir umbrales del triage §2.3 / checklist thaw.
 
 ---
 
@@ -28,15 +29,17 @@
 2. ADR: [022](../adr/022-estudio-daily-opinion-motor.md).  
 3. Tests offline:  
    - `pnpm exec pytest packages/py/application/tests/test_daily_opinion_stance.py -q`  
-   - `pnpm exec pytest packages/py/infrastructure/tests/test_estudio_opinion_email.py -q`  
+   - `pnpm exec pytest packages/py/infrastructure/tests/test_estudio_opinion_email*.py -q`  
+   - Vitest: `notification-prefs.test.ts`  
    - `pnpm test:semi` (si el entorno lo tiene).  
 4. Smoke UI (Docker + `pnpm dev`):  
    - Estudio con ≥1 valor → Operativa muestra dictamen del **activo** (no lista global).  
    - Asesor → Opiniones: filtros Todas / Alarmas / Avisos · **Mapa canales**.  
    - SEMI: Alarma → **Proponer F3** → cola Confirm (origen Asesor).  
-   - Toast: cambiar dictamen / EOD force y comprobar toast alarma (sin spam al primer load).  
-   - EOD force: toast con `emailNotify.skippedReason` si email off.  
-5. Freeze: confirmar `PAPER_D_EXECUTE` / `ESTUDIO_EOD_OPINION_ENABLED` / `ESTUDIO_OPINION_EMAIL_ENABLED` en off.
+   - Icono **usuario** → Notificaciones: correo + toast on/off.  
+   - Toast: Alarmas nuevas (respeta pref toast); sin spam al primer load.  
+   - EOD force: pasa `notifyEmail` desde prefs; toast con `emailNotify.skippedReason` si SMTP off.  
+5. Freeze: confirmar `PAPER_D_EXECUTE` / `ESTUDIO_EOD_OPINION_ENABLED` en off. SMTP opcional en demo.
 
 ---
 
@@ -51,7 +54,8 @@
 | Operativa | `trading-operativa-panel.tsx` · `operativa-dictamen.tsx` · `propose-instrument-supervised.ts` |
 | Asesor | `research-page.tsx` · `asesor-opiniones-panel.tsx` · `use-asesor-alarma-badge.ts` |
 | Toast Alarmas | `estudio-opinion-alarm-poller.tsx` · `alert-toasts.tsx` |
-| Email scaffold | `estudio_opinion_email.py` · settings `ESTUDIO_OPINION_EMAIL_*` + `SMTP_*` |
+| Prefs notificación | `notification-prefs.ts` · `notifications-settings-panel.tsx` · menú Sesión |
+| Email scaffold | `estudio_opinion_email.py` · eod-batch `notifyEmail*` · SMTP servidor |
 | EOD | `eod-batch` + `estudio_eod_opinion_worker.py` (noop) |
 
 ---
@@ -71,11 +75,12 @@
 
 ## 4. Fuera de alcance (no fallar la auditoría por esto)
 
-- Prefs UI editables email / mapa stance→canal  
+- Multiusuario / perfiles con buzón en servidor  
 - SMS / push nativo  
 - Worker EOD con lista Estudio servidor  
 - Métricas acierto dictamen vs N días (D6 diseño) — **prerrequisito thaw**, no de este cierre  
-- Belief→Coach · Strategy Studio · `COST_MODEL_V2` · `CORE_R_CRON`
+- Belief→Coach · Strategy Studio · `COST_MODEL_V2` · `CORE_R_CRON`  
+- Flip `PAPER_D_EXECUTE`
 
 ---
 
@@ -103,14 +108,15 @@
 
 | Check | Resultado |
 |-------|-----------|
-| pytest stance + email map | **14 passed** |
-| Paths §2 existen (motor, API, Asesor, poller, email) | **OK** |
+| pytest stance + email map + notify prefs | **OK** (suite email) |
+| Paths §2 existen (motor, API, Asesor, poller, prefs UI) | **OK** |
 | Canales: filtros + Proponer F3 + mapa leyenda | **OK** |
-| Toast poller montado PlatformShell | **OK** |
-| Email default off + skip reasons | **OK** |
+| Menú usuario → Notificaciones (correo + toast) | **OK** |
+| Toast poller respeta pref + selector Zustand estable | **OK** |
+| eod-batch `notifyEmail*` + SMTP skip reasons | **OK** |
 | EOD worker noop / flag off | **OK** |
 | `PAPER_D_EXECUTE` / Camino D | **Freeze** — no código thaw execute |
 | Telemetría precisión dictamen (D6) | **Falta** — bloqueante P3–P4 thaw |
 
-**Veredicto interno:** cadena SEMI auditable → **listo para auditoría externa / revisión humana**. Entrada AUTO = fase **A0 telemetría**, no flip de execute.
+**Veredicto interno:** cadena SEMI + notificaciones **lista para auditoría previa a AUTO**. Entrada AUTO = fase **A0 telemetría** ([checklist](./camino-d-auto-thaw-checklist-2026-08-04.md)), no flip de execute.
 

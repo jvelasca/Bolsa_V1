@@ -193,7 +193,12 @@ async def run_estudio_eod_opinion_batch(
         account_id=body.account_id,
         force=True,
     )
-    email_meta = await maybe_notify_estudio_alarmas(settings, rows)
+    email_meta = await maybe_notify_estudio_alarmas(
+        settings,
+        rows,
+        email_to=body.notify_email,
+        email_enabled=body.notify_email_enabled,
+    )
     return EstudioEodOpinionBatchResponseDto(
         enabled=enabled,
         forced=bool(body.force) or not enabled,

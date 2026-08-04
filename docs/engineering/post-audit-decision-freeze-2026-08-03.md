@@ -11,7 +11,7 @@
 | **Belief → Coach (CORE-A)** | **Congelado** | v0 Coach LLM ya es honesto (no corona TOP). Belief Fase 2 es diseño + UI + outcomes; no es un flip. Reabrir solo con brief de producto. |
 | **`CORE_R_CRON_ENABLED`** | **Sigue `false`** | Cola ya funciona con app abierta + BD multi-dispositivo. Cron servidor = ops cuando haga falta tick 24/7; coste de ruido/false enqueues no justificado aún. |
 | **`COST_MODEL_V2_ENABLED`** | **Sigue `false`** | Cambia economía de backtests / rankings. Activar solo en Lab A/B controlado, no como default silencioso. |
-| **Motor Estudio / Dictamen** | **D1–D2 canales cerrados** · cron EOD off · Camino D freeze | [triage §11](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [audit pack](./audit-pack-estudio-asesor-canales-2026-08-04.md) · [thaw AUTO](./camino-d-auto-thaw-checklist-2026-08-04.md) |
+| **Motor Estudio / Dictamen** | **D1–Canales + prefs notif. cerrados** · cron EOD off · Camino D freeze | [triage §11](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [audit pack](./audit-pack-estudio-asesor-canales-2026-08-04.md) · [thaw AUTO](./camino-d-auto-thaw-checklist-2026-08-04.md) |
 
 ### Futuro — Belief (apuntalado, no ahora)
 

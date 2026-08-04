@@ -171,7 +171,7 @@ Del informe 2 §5.1 (N4), adoptados:
 | D1d | Operativa: solo dictamen del valor (lista global → Asesor) | **Hecho** (`bc3fd95`) |
 | **Op** | **Operativa vital** (mesa TRADING / SEMI / mandato / pulso) — clave de app | **Cerrado** (SEMI desk + Outcomes 2026-08-04) |
 | **Asesor** | Research → Asesor + bandeja «opiniones de hoy» (datos ya en motor) | **Cerrado** (`e898b95` · tab Opiniones) |
-| D2 | Batch EOD flag-off + canales | **Cerrado** — toast + email scaffold + mapa leyenda + EOD force (`e1a5510`+) |
+| D2 | Batch EOD flag-off + canales | **Cerrado** — toast + prefs email UI + mapa + EOD force |
 | D3+ | Métricas / thaw Camino D AUTO execute | [Checklist thaw](./camino-d-auto-thaw-checklist-2026-08-04.md) — **sigue freeze** |
 
 ---
@@ -250,7 +250,7 @@ Confirmaciones B+C: diseño **listo**. Código D1 **solo** con frase explícita 
 | 1 | ~~D1 motor~~ | Dictamen, API, Evolución, invariantes | — |
 | 2 | **Operativa** (vital) | Mesa TRADING, SEMI/Confirm, mandato, pulso IO+TOP+dictamen del valor | **Camino D AUTO execute** (sigue freeze) |
 | 3 | ~~**Asesor**~~ | Renombrar/integrar Research; bandeja opiniones Estudio; UI de datos **ya** calculables | Cron EOD batch real (flag off); thaw AUTO |
-| 4 | ~~**Canales**~~ | Toast Alarmas + email scaffold off + mapa leyenda + EOD force | Prefs UI email editables; SMS; thaw AUTO |
+| 4 | ~~**Canales**~~ | Toast Alarmas + email prefs UI + mapa leyenda + EOD force | SMS; thaw AUTO |
 | 5 | **AUTO** (prep) | Telemetría + checklist thaw Camino D | Flip `PAPER_D_EXECUTE` sin evidencia |
 
 **Nota AUTO:** entrar por [camino-d-auto-thaw-checklist](./camino-d-auto-thaw-checklist-2026-08-04.md). Auditar primero: [audit-pack-estudio-asesor-canales](./audit-pack-estudio-asesor-canales-2026-08-04.md).

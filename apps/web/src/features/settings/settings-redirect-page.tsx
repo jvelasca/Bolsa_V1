@@ -7,6 +7,7 @@ const HASH_TO_TAB: Record<string, PlatformConfigTab> = {
   'investor-profile': 'investor-profile',
   profile: 'investor-profile',
   commissions: 'commissions',
+  notifications: 'notifications',
   'data-capture': 'other',
   'auto-sync': 'other',
   'chart-platform': 'other',

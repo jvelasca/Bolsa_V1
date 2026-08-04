@@ -70,10 +70,19 @@ Secuencia producto acordada: **SEMI primero** (ya cerrado) → **auditoría de l
 
 ## 4. Decisión inmediata (2026-08-04)
 
-Tras cerrar Canales y el [audit pack](./audit-pack-estudio-asesor-canales-2026-08-04.md):
+Tras cerrar Canales + prefs notificación y el [audit pack](./audit-pack-estudio-asesor-canales-2026-08-04.md):
 
-1. **Auditar** la cadena (pack §1).  
+1. **Auditar** la cadena (pack §1) — **gate previo a AUTO**.  
 2. Empezar **A0 telemetría** (sin execute).  
 3. **No** poner `PAPER_D_EXECUTE=1` en demo compartida.
 
 Cualquier “vamos con AUTO” en chat = **entrar en esta checklist**, no thaw automático.
+
+### Gate auditoría previa (2026-08-04)
+
+| Ítem | Estado |
+|------|--------|
+| Pack Estudio/Asesor/Canales + notificaciones UI | Listo para revisar |
+| Menú usuario → correo Alarmas | Hecho (localStorage; multiusuario después) |
+| Freeze Camino D intacto | Sí |
+| A0 métricas dictamen | Pendiente (siguiente código) |

@@ -857,6 +857,8 @@ export const api = {
     asOfBarDate?: string | null;
     accountId?: string | null;
     force?: boolean;
+    notifyEmail?: string | null;
+    notifyEmailEnabled?: boolean | null;
   }) =>
     request<{
       enabled: boolean;

@@ -90,6 +90,16 @@ class RunEstudioEodOpinionBatchDto(BaseModel):
         default=False,
         description="Si ESTUDIO_EOD_OPINION_ENABLED=false, force=true permite corrida manual.",
     )
+    notify_email: str | None = Field(
+        default=None,
+        alias="notifyEmail",
+        description="Destinatario Alarmas (prefs UI). Si null, usa ESTUDIO_OPINION_EMAIL_TO.",
+    )
+    notify_email_enabled: bool | None = Field(
+        default=None,
+        alias="notifyEmailEnabled",
+        description="Si se pasa, sustituye ESTUDIO_OPINION_EMAIL_ENABLED para esta corrida.",
+    )
 
     @field_validator("instrument_ids")
     @classmethod
@@ -98,6 +108,14 @@ class RunEstudioEodOpinionBatchDto(BaseModel):
         if not cleaned:
             raise ValueError("instrumentIds must not be empty")
         return cleaned
+
+    @field_validator("notify_email")
+    @classmethod
+    def _strip_email(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
 
 
 class EstudioEodOpinionEmailNotifyDto(BaseModel):

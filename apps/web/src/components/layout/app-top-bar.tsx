@@ -290,7 +290,17 @@ export function AppTopBar() {
   const listAutoActive = useListAutoActivityStore((s) => s.active);
   const listAutoSummary = useListAutoActivityStore((s) => s.summary);
 
-  const sessionMenu: MenuItem[] = [{ label: 'Cerrar sesión', action: clearSession }];
+  const sessionMenu: MenuItem[] = [
+    {
+      label: 'Notificaciones…',
+      action: () => openPlatformConfig('notifications'),
+    },
+    {
+      label: 'Configuración…',
+      action: () => openPlatformConfig('general'),
+    },
+    { label: 'Cerrar sesión', action: clearSession },
+  ];
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2">

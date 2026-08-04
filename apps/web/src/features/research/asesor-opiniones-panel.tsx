@@ -30,6 +30,7 @@ import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { useVisualizationStore } from '@/stores/visualization-store';
 import { useAlertsStore } from '@/stores/alerts-store';
+import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
 import {
   openHelpAiPlatform,
   useSupervisedF3QueueStore,
@@ -47,6 +48,8 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const canEnqueue = demoBookAllowsEnqueueConfirm(bookPrefs.mode);
   const { effectiveAccountId } = useActiveAccount();
   const pushToast = useAlertsStore((s) => s.pushToast);
+  const notifyEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
+  const notifyEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
 
@@ -245,7 +248,8 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                 </tbody>
               </table>
               <p className="border-t border-border px-2 py-1.5 text-[10px] text-muted-foreground">
-                Mapa fijo §5.2 (`opinion-channel-map`). Prefs UI editables = fase posterior; SMS aparcado.
+                Mapa fijo §5.2 (`opinion-channel-map`). Correo de Alarmas: menú usuario → Notificaciones.
+                SMS aparcado.
               </p>
             </div>
           ) : null}
@@ -359,6 +363,8 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                   .runInstrumentDailyOpinionEodBatch({
                     instrumentIds: studyIds,
                     force: true,
+                    notifyEmail: notifyEmail.trim() || null,
+                    notifyEmailEnabled,
                   })
                   .then((res) => {
                     void opinionsQuery.refetch();

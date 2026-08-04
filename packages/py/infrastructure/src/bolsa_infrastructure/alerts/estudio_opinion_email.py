@@ -106,10 +106,25 @@ async def maybe_notify_estudio_alarmas(
     rows: list[Any],
     *,
     symbol_by_id: dict[str, str] | None = None,
+    email_to: str | None = None,
+    email_enabled: bool | None = None,
 ) -> dict[str, Any]:
-    """Si flag+SMTP+destinatario OK, envía email de alarmas. Nunca lanza hacia el caller."""
+    """Envía email de alarmas si SMTP + destinatario + enable OK.
+
+    ``email_enabled`` / ``email_to`` del cliente (prefs UI) tienen prioridad sobre
+    ``ESTUDIO_OPINION_EMAIL_*`` cuando se pasan explícitamente.
+    """
+    # Prefs UI (email_enabled is not None): destinatario solo del cliente.
+    # Sin prefs: flags ESTUDIO_OPINION_EMAIL_* del servidor.
+    if email_enabled is not None:
+        enabled = bool(email_enabled)
+        recipient = (email_to or "").strip()
+    else:
+        enabled = bool(settings.estudio_opinion_email_enabled)
+        recipient = (settings.estudio_opinion_email_to or "").strip()
+
     result: dict[str, Any] = {
-        "email_enabled": bool(settings.estudio_opinion_email_enabled),
+        "email_enabled": enabled,
         "alarma_count": 0,
         "sent": False,
         "skipped_reason": None,
@@ -117,15 +132,14 @@ async def maybe_notify_estudio_alarmas(
     alarmas = filter_alarma_opinions(rows)
     result["alarma_count"] = len(alarmas)
 
-    if not settings.estudio_opinion_email_enabled:
-        result["skipped_reason"] = "ESTUDIO_OPINION_EMAIL_ENABLED=false"
+    if not enabled:
+        result["skipped_reason"] = "email_disabled"
         return result
     if not alarmas:
         result["skipped_reason"] = "sin_alarmas"
         return result
-    recipient = (settings.estudio_opinion_email_to or "").strip()
     if not recipient:
-        result["skipped_reason"] = "ESTUDIO_OPINION_EMAIL_TO vacío"
+        result["skipped_reason"] = "email_to vacío"
         return result
     if not smtp_ready(settings):
         result["skipped_reason"] = "SMTP incompleto (SMTP_HOST / SMTP_FROM)"

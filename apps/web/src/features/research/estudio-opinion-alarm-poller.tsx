@@ -11,6 +11,7 @@ import {
 import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
 import { useVisualizationStore } from '@/stores/visualization-store';
 import { useAlertsStore } from '@/stores/alerts-store';
+import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
 
 const SEEN_KEY = 'bolsa-estudio-alarma-seen-v1';
 const POLL_MS = 60_000;
@@ -47,15 +48,17 @@ export function EstudioOpinionAlarmPoller() {
     [entries],
   );
   const pushToast = useAlertsStore((s) => s.pushToast);
+  const alarmaToastEnabled = useNotificationPrefsStore((s) => s.alarmaToastEnabled);
   const seenRef = useRef<Set<string> | null>(null);
   const primedRef = useRef(false);
 
   const opinionsQuery = useInstrumentDailyOpinions(studyIds, [], {
-    enabled: studyIds.length > 0,
-    refetchInterval: POLL_MS,
+    enabled: studyIds.length > 0 && alarmaToastEnabled,
+    refetchInterval: alarmaToastEnabled ? POLL_MS : false,
   });
 
   useEffect(() => {
+    if (!alarmaToastEnabled) return;
     if (seenRef.current == null) seenRef.current = loadSeen();
     const data = opinionsQuery.data;
     if (!data?.length) return;
@@ -97,7 +100,7 @@ export function EstudioOpinionAlarmPoller() {
     pushToast(`Asesor · ${fresh.length} alarma${fresh.length === 1 ? '' : 's'}: ${head}${more}`, {
       action: { type: 'open_asesor_opiniones', label: 'Ver Opiniones' },
     });
-  }, [opinionsQuery.data, entries, pushToast]);
+  }, [alarmaToastEnabled, opinionsQuery.data, entries, pushToast]);
 
   return null;
 }
