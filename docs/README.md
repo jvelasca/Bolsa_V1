@@ -50,6 +50,9 @@
 | [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) | **Biblioteca L0/L1** — Genéricas / Optimizadas / Mis estrategias + prompt |
 | [engineering/demo-operating-modes-brief-2026-08-03.md](./engineering/demo-operating-modes-brief-2026-08-03.md) | **DEMO MANUAL/SEMI/AUTO** — decisiones producto (libro operativo) |
 | [engineering/semi-demo-book-impl-slice1-2026-08-03.md](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) | **SEMI slice 1** — impl + checklist prueba (GO 2026-08-03) |
+| [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md) | **Panel Operativa** — layout full-height · IO · En estudio · modos |
+| [engineering/chart-top1-indicator-switch-2026-08-03.md](./engineering/chart-top1-indicator-switch-2026-08-03.md) | **Finalista #1** en gráfico — todos / este |
+| [engineering/session-handoff-2026-08-04-operativa.md](./engineering/session-handoff-2026-08-04-operativa.md) | **Handoff** Operativa / IO (2026-08-04) |
 | [engineering/session-handoff-2026-08-03-semi.md](./engineering/session-handoff-2026-08-03-semi.md) | **Handoff SEMI** — retomar sin olvidar |
 | [engineering/dev-logs.md](./engineering/dev-logs.md) | Logs locales `logs/` (no producto; sin README en carpeta) |
 | [engineering/code-documentation-standard-2026-08-03.md](./engineering/code-documentation-standard-2026-08-03.md) | **Docstrings** — política forward-only + lotes de cobertura |

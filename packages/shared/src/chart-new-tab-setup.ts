@@ -74,10 +74,12 @@ export function extractChartNewTabSeed(tab: ChartTabState): ChartNewTabSeed {
       colors: { ...tab.chart.colors },
       display: { ...tab.chart.display },
     },
-    indicatorInstances: tab.indicatorInstances.map((instance) => ({
-      ...instance,
-      parameters: { ...instance.parameters },
-    })),
+    indicatorInstances: tab.indicatorInstances
+      .filter((instance) => instance.origin !== 'finalist-top1')
+      .map((instance) => ({
+        ...instance,
+        parameters: { ...instance.parameters },
+      })),
     activeIndicatorTemplateId: tab.activeIndicatorTemplateId ?? null,
     toolbar: tab.toolbar ? normalizeChartToolbarChartOverrides(tab.toolbar) : undefined,
     pricePanelHeightPct: tab.pricePanelHeightPct,

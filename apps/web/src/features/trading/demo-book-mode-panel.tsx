@@ -1,21 +1,24 @@
 /**
- * Controles del libro DEMO: modo MANUAL/SEMI + N posiciones + % sizing.
+ * Controles del libro operativo de la cuenta activa: MANUAL/SEMI + N posiciones + % sizing.
  * Slice 1 — AUTO deshabilitado (Camino D freeze).
+ * Título UI = nombre de la cuenta activa (no «Libro DEMO»).
+ *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
-import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useActiveAccount } from '@/features/accounts/use-active-account';
 import {
   DEMO_BOOK_MAX_OPEN_MAX,
   DEMO_BOOK_MAX_OPEN_MIN,
   DEMO_BOOK_SIZE_PCT_MAX,
   DEMO_BOOK_SIZE_PCT_MIN,
-  loadDemoBookPrefs,
   patchDemoBookPrefs,
   type DemoBookCountryPrefer,
   type DemoBookMode,
   type DemoBookPrefs,
 } from '@/features/trading/demo-book-prefs';
+import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
 
 const MODE_LABEL: Record<DemoBookMode, string> = {
   manual: 'Manual',
@@ -35,20 +38,12 @@ type Props = {
 };
 
 export function DemoBookModePanel({ className, compact }: Props) {
-  const [prefs, setPrefs] = useState<DemoBookPrefs>(() => loadDemoBookPrefs());
-
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === 'bolsa-demo-book-prefs-v1') {
-        setPrefs(loadDemoBookPrefs());
-      }
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
+  const { account } = useActiveAccount();
+  const prefs = useDemoBookPrefs();
+  const accountTitle = account?.name?.trim() || 'Sin cuenta activa';
 
   function update(patch: Partial<DemoBookPrefs>) {
-    setPrefs(patchDemoBookPrefs(patch));
+    patchDemoBookPrefs(patch);
   }
 
   return (
@@ -59,8 +54,8 @@ export function DemoBookModePanel({ className, compact }: Props) {
       )}
       data-testid="demo-book-mode-panel"
     >
-      <p className="font-medium text-foreground">
-        Libro DEMO
+      <p className="font-medium text-foreground" title={accountTitle}>
+        <span className="line-clamp-2">{accountTitle}</span>
         {!compact ? (
           <span className="ml-1 font-normal text-muted-foreground">
             · operativa

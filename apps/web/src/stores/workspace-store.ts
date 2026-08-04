@@ -126,6 +126,7 @@ import {
   findIndicatorDefinition,
   findInstanceBySpec,
   hasDuplicateInstance,
+  instanceSpecKey,
   dataParametersKey,
   isChartTimeframe,
   mergeDisplayFromInstances,
@@ -550,6 +551,15 @@ function createChartTabForInstrument(
   const templateTab = resolveNewChartTemplateTab(workspace);
   if (templateTab) {
     tab = applyChartNewTabSeed(tab, extractChartNewTabSeed(templateTab), cloneChartConfig);
+    if (workspace.preferences.finalistTop1DefaultOn) {
+      tab = {
+        ...tab,
+        showFinalistTop1Indicators: true,
+        indicatorInstances: tab.indicatorInstances.filter(
+          (instance) => instance.origin !== 'finalist-top1',
+        ),
+      };
+    }
     return tab;
   }
 
@@ -563,6 +573,15 @@ function createChartTabForInstrument(
       );
       tab = mapTabIndicators(tab, instances, template.id);
     }
+  }
+  if (workspace.preferences.finalistTop1DefaultOn) {
+    tab = {
+      ...tab,
+      showFinalistTop1Indicators: true,
+      indicatorInstances: tab.indicatorInstances.filter(
+        (instance) => instance.origin !== 'finalist-top1',
+      ),
+    };
   }
   return tab;
 }
@@ -599,6 +618,7 @@ function normalizeChartTab(raw: Partial<ChartTabState>, fallback?: ChartInstance
     drawings: sanitizeChartDrawings(raw.drawings),
     sourceListId: raw.sourceListId,
     activeIndicatorTemplateId: raw.activeIndicatorTemplateId ?? null,
+    showFinalistTop1Indicators: Boolean(raw.showFinalistTop1Indicators),
     toolbar: normalizeChartToolbarChartOverrides(raw.toolbar),
     pricePanelHeightPct: resolvePricePanelHeightPct(raw.pricePanelHeightPct),
   };
@@ -851,6 +871,28 @@ interface WorkspaceState {
     parameters?: ChartIndicatorInstance['parameters'],
     chartId?: string,
   ) => boolean;
+  /**
+   * Activa/desactiva el overlay Finalista TOP #1 en el gráfico.
+   * Si `enabled` y se pasan `specs`, sincroniza instancias `origin: 'finalist-top1'`.
+   * Si `enabled===false`, limpia solo esas instancias (no toca manuales).
+   * No cambia `preferences.finalistTop1DefaultOn` (opt-in/out por gráfico).
+   */
+  setShowFinalistTop1Indicators: (
+    enabled: boolean,
+    specs?: Array<{ definitionId: string; parameters: Record<string, number | boolean | string> }>,
+    chartId?: string,
+  ) => void;
+  /**
+   * Política workspace: ON → default para gráficos nuevos + activa en todas las pestañas abiertas.
+   * OFF → quita el default y limpia el overlay en todos los gráficos.
+   * Cada gráfico puede desactivarse después con `setShowFinalistTop1Indicators(false, …)`.
+   */
+  setFinalistTop1DefaultForAll: (enabled: boolean) => void;
+  /** Re-aplica specs TOP #1 sin cambiar el flag (p. ej. al cambiar instrumento/TF con switch ON). */
+  syncFinalistTop1Indicators: (
+    specs: Array<{ definitionId: string; parameters: Record<string, number | boolean | string> }>,
+    chartId?: string,
+  ) => void;
   updateIndicatorInstance: (
     instanceId: string,
     patch: Partial<Pick<ChartIndicatorInstance, 'parameters' | 'visible' | 'scaleZoom' | 'showLastValue' | 'lineWidth'>>,
@@ -1703,6 +1745,130 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           isDirty: true,
         }));
         return true;
+      },
+      setShowFinalistTop1Indicators: (enabled, specs, chartId) => {
+        const targetId = chartId ?? get().workspace.activeChartId;
+        if (!targetId) return;
+        set((state) => {
+          const tab = state.workspace.charts.find((item) => item.id === targetId);
+          if (!tab) return state;
+
+          const desired = specs ?? [];
+          const desiredKeys = new Set<string>();
+          const toAdd: ChartIndicatorInstance[] = [];
+          for (const spec of desired) {
+            const definition = findIndicatorDefinition(spec.definitionId);
+            if (!definition) continue;
+            const params = normalizeParameters(definition, spec.parameters ?? {});
+            const key = instanceSpecKey(definition.id, params);
+            desiredKeys.add(key);
+            toAdd.push({
+              instanceId: newIndicatorInstanceId(spec.definitionId, params),
+              definitionId: spec.definitionId,
+              parameters: params,
+              visible: true,
+              origin: 'finalist-top1',
+            });
+          }
+
+          const existingTop = tab.indicatorInstances.filter(
+            (inst) => inst.origin === 'finalist-top1',
+          );
+          const existingKeys = new Set(
+            existingTop.map((inst) => instanceSpecKey(inst.definitionId, inst.parameters)),
+          );
+          const sameSpecs =
+            desiredKeys.size === existingKeys.size &&
+            [...desiredKeys].every((k) => existingKeys.has(k));
+          if (tab.showFinalistTop1Indicators === enabled && (!enabled || sameSpecs)) {
+            return state;
+          }
+
+          let indicatorInstances = tab.indicatorInstances.filter(
+            (inst) => inst.origin !== 'finalist-top1',
+          );
+          if (enabled) {
+            for (const instance of toAdd) {
+              if (
+                hasDuplicateInstance(
+                  indicatorInstances,
+                  instance.definitionId,
+                  instance.parameters,
+                )
+              ) {
+                continue;
+              }
+              indicatorInstances = assignSubPanelWeightOnAdd(
+                [...indicatorInstances, instance],
+                instance.instanceId,
+              );
+            }
+          }
+          return {
+            workspace: finalizeChartWorkspace({
+              ...state.workspace,
+              charts: state.workspace.charts.map((item) =>
+                item.id !== targetId
+                  ? item
+                  : {
+                      ...mapTabIndicators(
+                        item,
+                        indicatorInstances,
+                        item.activeIndicatorTemplateId,
+                      ),
+                      showFinalistTop1Indicators: enabled,
+                    },
+              ),
+            }),
+            isDirty: true,
+          };
+        });
+      },
+      syncFinalistTop1Indicators: (specs, chartId) => {
+        const targetId = chartId ?? get().workspace.activeChartId;
+        if (!targetId) return;
+        const tab = get().workspace.charts.find((item) => item.id === targetId);
+        if (!tab?.showFinalistTop1Indicators) return;
+        get().setShowFinalistTop1Indicators(true, specs, targetId);
+      },
+      setFinalistTop1DefaultForAll: (enabled) => {
+        set((state) => {
+          const prevDefault = Boolean(state.workspace.preferences.finalistTop1DefaultOn);
+          const chartsUnchanged =
+            prevDefault === enabled &&
+            state.workspace.charts.every((tab) => Boolean(tab.showFinalistTop1Indicators) === enabled);
+          if (chartsUnchanged) return state;
+
+          const charts = state.workspace.charts.map((tab) => {
+            if (enabled) {
+              if (tab.showFinalistTop1Indicators) return tab;
+              return { ...tab, showFinalistTop1Indicators: true };
+            }
+            if (!tab.showFinalistTop1Indicators) {
+              const hasTop = tab.indicatorInstances.some((inst) => inst.origin === 'finalist-top1');
+              if (!hasTop) return tab;
+            }
+            const indicatorInstances = tab.indicatorInstances.filter(
+              (inst) => inst.origin !== 'finalist-top1',
+            );
+            return {
+              ...mapTabIndicators(tab, indicatorInstances, tab.activeIndicatorTemplateId),
+              showFinalistTop1Indicators: false,
+            };
+          });
+
+          return {
+            workspace: finalizeChartWorkspace({
+              ...state.workspace,
+              preferences: {
+                ...state.workspace.preferences,
+                finalistTop1DefaultOn: enabled,
+              },
+              charts,
+            }),
+            isDirty: true,
+          };
+        });
       },
       toggleIndicatorOnChart: (definitionId, parameters, chartId) => {
         const definition = findIndicatorDefinition(definitionId);
@@ -2615,7 +2781,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               charts: state.workspace.charts.map((tab) =>
                 tab.id !== targetId
                   ? tab
-                  : mapTabIndicators(tab, instances, template.id),
+                  : {
+                      ...mapTabIndicators(tab, instances, template.id),
+                      showFinalistTop1Indicators: false,
+                    },
               ),
             }),
             isDirty: !state.workspace.preferences.autoSave,

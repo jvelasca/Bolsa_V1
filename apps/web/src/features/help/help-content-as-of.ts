@@ -12,15 +12,19 @@
  * **ADR-021** Reconciliación DÍA D (F-hoy · F-D · V · SAME/DRIFT · contrafactual).
  * Continuidad Verify (lookback + carry) · higiene `strategyType` Finalistas.
  * Post-auditorías Q0–Q3 + Q1.6 warm-up + estabilidad IBEX (Gate C4 cerrado).
+ * **2026-08-04** — Panel **Operativa** (full-height · IO · En estudio · modos en cabecera)
+ * + Chart TOP#1 switches · lista En estudio ≡ pestañas.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
  * Track FA / FIE (2026-08-01): valoración cerrada en código
  * F0–F2.8 + F3 Composite + F4 Screener + Paper D + cron FA→D ·
  * Beneish→distress · Tarjeta densificada · CAPM rf/ERP visibles.
- * Fase actual: **cierre etapa** LAB/DÍA D/Mandato (smoke UI + auditoría).
  *
  * Docs:
+ * - `docs/engineering/trading-operativa-panel-2026-08-04.md`
+ * - `docs/engineering/chart-top1-indicator-switch-2026-08-03.md`
+ * - `docs/engineering/session-handoff-2026-08-04-operativa.md`
  * - `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  * - `docs/adr/019-dual-universes-lab-vs-trading.md`
  * - `docs/adr/020-operating-mandate-tenure.md`
@@ -35,9 +39,10 @@
  *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  * @see docs/engineering/dual-universes-lab-trading-design-2026-08-02.md
  * @see docs/adr/020-operating-mandate-tenure.md
- * @see docs/engineering/session-handoff-2026-08-01.md
+ * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = '2026-08-03' as const;
+export const HELP_CONTENT_AS_OF = '2026-08-04' as const;

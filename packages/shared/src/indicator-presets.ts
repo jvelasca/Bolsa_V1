@@ -233,11 +233,18 @@ export function instanceDisplayName(
   instance: ChartIndicatorInstance,
   presets?: IndicatorPreset[],
 ): string {
+  let base: string;
   if (instance.presetId && presets) {
     const preset = findIndicatorPreset(presets, instance.presetId);
-    if (preset) return preset.name;
+    if (preset) base = preset.name;
+    else base = instanceLabel(instance);
+  } else {
+    base = instanceLabel(instance);
   }
-  return instanceLabel(instance);
+  if (instance.origin === 'finalist-top1') {
+    return `TOP 1: ${base}`;
+  }
+  return base;
 }
 
 export function presetFromInstance(

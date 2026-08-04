@@ -1,10 +1,12 @@
 /**
- * Preferencias del «libro operativo» DEMO — MANUAL / SEMI (/ AUTO reserved).
+ * Preferencias del libro operativo de la cuenta activa DEMO — MANUAL / SEMI (/ AUTO reserved).
  *
  * Slice 1: localStorage. Canal de ejecución SEMI = Camino C (F3 Confirm).
+ * UI: panel Operativa → Configuración (cabecera muestra el modo; título = nombre de cuenta).
  *
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
  * @see docs/engineering/semi-demo-book-impl-slice1-2026-08-03.md
+ * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
 export const DEMO_BOOK_PREFS_KEY = 'bolsa-demo-book-prefs-v1';
@@ -85,15 +87,85 @@ export function loadDemoBookPrefs(): DemoBookPrefs {
   }
 }
 
+function prefsEqual(a: DemoBookPrefs, b: DemoBookPrefs): boolean {
+  return (
+    a.mode === b.mode &&
+    a.maxOpenPositions === b.maxOpenPositions &&
+    a.defaultSizePctOfCash === b.defaultSizePctOfCash &&
+    a.countryPrefer === b.countryPrefer
+  );
+}
+
+/** Snapshot estable para `useSyncExternalStore` (misma ref si no cambia el valor). */
+let cachedClientSnapshot: DemoBookPrefs | null = null;
+
+const SERVER_SNAPSHOT: DemoBookPrefs = {
+  mode: 'semi',
+  maxOpenPositions: 10,
+  defaultSizePctOfCash: 10,
+  countryPrefer: 'home_first',
+};
+
+function rememberSnapshot(next: DemoBookPrefs): DemoBookPrefs {
+  if (cachedClientSnapshot && prefsEqual(cachedClientSnapshot, next)) {
+    return cachedClientSnapshot;
+  }
+  cachedClientSnapshot = next;
+  return next;
+}
+
 export function saveDemoBookPrefs(prefs: DemoBookPrefs): void {
   const n = normalizeDemoBookPrefs(prefs);
   localStorage.setItem(DEMO_BOOK_PREFS_KEY, JSON.stringify(n));
+  rememberSnapshot(n);
+  notifyDemoBookPrefs();
 }
 
 export function patchDemoBookPrefs(patch: Partial<DemoBookPrefs>): DemoBookPrefs {
   const next = normalizeDemoBookPrefs({ ...loadDemoBookPrefs(), ...patch });
   saveDemoBookPrefs(next);
   return next;
+}
+
+const demoBookPrefsListeners = new Set<() => void>();
+
+function notifyDemoBookPrefs() {
+  for (const listener of demoBookPrefsListeners) listener();
+}
+
+function onDemoBookPrefsStorage(e: StorageEvent) {
+  if (e.key === DEMO_BOOK_PREFS_KEY || e.key === null) {
+    // Otra pestaña: invalidar caché y releer.
+    cachedClientSnapshot = null;
+    rememberSnapshot(loadDemoBookPrefs());
+    notifyDemoBookPrefs();
+  }
+}
+
+/** Suscripción misma-pestaña; también reacciona a `storage` entre pestañas. */
+export function subscribeDemoBookPrefs(listener: () => void): () => void {
+  demoBookPrefsListeners.add(listener);
+  if (demoBookPrefsListeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onDemoBookPrefsStorage);
+  }
+  return () => {
+    demoBookPrefsListeners.delete(listener);
+    if (demoBookPrefsListeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onDemoBookPrefsStorage);
+    }
+  };
+}
+
+/**
+ * Snapshot client para `useSyncExternalStore`.
+ * Debe devolver la misma referencia si el valor no cambió (si no → bucle de renders).
+ */
+export function getDemoBookPrefsSnapshot(): DemoBookPrefs {
+  return rememberSnapshot(loadDemoBookPrefs());
+}
+
+export function getDemoBookPrefsServerSnapshot(): DemoBookPrefs {
+  return SERVER_SNAPSHOT;
 }
 
 /** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO reserved. */

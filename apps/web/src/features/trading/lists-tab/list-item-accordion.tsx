@@ -104,7 +104,7 @@ export function ListItemAccordion({
   return (
 
     <div
-
+      data-instrument-id={item.id}
       className={cn(
 
         'border-b border-border/60',

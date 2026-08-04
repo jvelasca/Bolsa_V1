@@ -7,6 +7,7 @@ import {
   VIRTUAL_LIST_LABELS,
   resolveChartToolbarForTab,
   normalizeChartToolbarGlobalConfig,
+  strategyTop1ToChartIndicators,
 } from '@bolsa/shared';
 import { api } from '@/lib/api';
 import { instrumentForQuickTrade } from '@/features/charts/chart-quick-trade-buttons';
@@ -18,6 +19,7 @@ import { isShapeDrawTool } from '@/features/charts/chart-draw-tool-utils';
 import { ChartInspectorPanel } from '@/features/charts/chart-inspector-panel';
 import { ChartToolbarGlobalBar } from '@/features/charts/chart-toolbar-global-bar';
 import { ChartToolbarChartBar } from '@/features/charts/chart-toolbar-chart-bar';
+import { ChartFinalistTop1EmptyBanner } from '@/features/charts/chart-finalist-top1-switch';
 import { OhlcvChart } from '@/features/charts/ohlcv-chart';
 import { ChartIndicatorStack } from '@/features/charts/chart-indicator-stack';
 import { subPanelInstancesAll, overlayManagementInstances } from '@/features/charts/indicator-compute';
@@ -68,6 +70,14 @@ export function ChartWorkspacePage() {
   const tool = useUiStore((s) => s.chartDrawTool);
   const openIndicatorsCatalog = useUiStore((s) => s.openIndicatorsCatalog);
   const applyIndicatorTemplate = useWorkspaceStore((s) => s.applyIndicatorTemplate);
+  const setShowFinalistTop1Indicators = useWorkspaceStore(
+    (s) => s.setShowFinalistTop1Indicators,
+  );
+  const syncFinalistTop1Indicators = useWorkspaceStore((s) => s.syncFinalistTop1Indicators);
+  const setFinalistTop1DefaultForAll = useWorkspaceStore((s) => s.setFinalistTop1DefaultForAll);
+  const finalistTop1DefaultOn = useWorkspaceStore((s) =>
+    Boolean(s.workspace.preferences.finalistTop1DefaultOn),
+  );
 
   const applyIndicatorGroup = useCallback(
     (templateId: string) => {
@@ -143,6 +153,119 @@ export function ChartWorkspacePage() {
     enabled: Boolean(instrumentId),
     staleTime: 60_000,
   });
+
+  const strategyTopQuery = useQuery({
+    queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+    queryFn: () => api.getInstrumentStrategyTop(instrumentId!, timeframe),
+    enabled: Boolean(instrumentId),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const top1Slot = useMemo(() => {
+    const slots = strategyTopQuery.data?.data?.slots ?? [];
+    return slots.find((s) => s.rank === 1) ?? null;
+  }, [strategyTopQuery.data?.data?.slots]);
+
+  const strategyDefQuery = useQuery({
+    queryKey: ['strategy-definition', top1Slot?.strategyDefinitionId],
+    queryFn: () => api.getStrategy(top1Slot!.strategyDefinitionId!),
+    enabled: Boolean(top1Slot?.strategyDefinitionId),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const top1Chart = useMemo(
+    () =>
+      strategyTop1ToChartIndicators({
+        slot: top1Slot,
+        definition: strategyDefQuery.data?.data
+          ? {
+              indicatorSpecs: strategyDefQuery.data.data.definition?.indicatorSpecs ?? [],
+              presetKey:
+                strategyDefQuery.data.data.definition?.presetKey ??
+                strategyDefQuery.data.data.presetKey,
+            }
+          : null,
+      }),
+    [top1Slot, strategyDefQuery.data?.data],
+  );
+
+  const top1Available = top1Chart.specs.length > 0;
+  const top1Loading = strategyTopQuery.isLoading || strategyDefQuery.isLoading;
+  const showTop1 = Boolean(activeTab?.showFinalistTop1Indicators);
+  const showTop1EmptyBanner = showTop1 && !top1Loading && !top1Available;
+  const top1SpecKey = useMemo(
+    () =>
+      top1Chart.specs
+        .map((s) => `${s.definitionId}:${JSON.stringify(s.parameters ?? {})}`)
+        .join('|'),
+    [top1Chart.specs],
+  );
+
+  useEffect(() => {
+    if (!activeTab?.id) return;
+    if (!showTop1) return;
+    syncFinalistTop1Indicators(top1Chart.specs, activeTab.id);
+    requestChartReflow();
+  }, [
+    activeTab?.id,
+    showTop1,
+    top1SpecKey,
+    top1Chart.specs,
+    syncFinalistTop1Indicators,
+    instrumentId,
+    timeframe,
+  ]);
+
+  const onFinalistTop1Change = useCallback(
+    (next: boolean) => {
+      if (!activeTab?.id) return;
+      setShowFinalistTop1Indicators(next, next ? top1Chart.specs : undefined, activeTab.id);
+      requestChartReflow();
+    },
+    [activeTab?.id, setShowFinalistTop1Indicators, top1Chart.specs],
+  );
+
+  const onFinalistTop1AllChange = useCallback(
+    (next: boolean) => {
+      setFinalistTop1DefaultForAll(next);
+      if (next && activeTab?.id) {
+        // Specs del gráfico activo ya; el resto se rellena al enfocar cada pestaña.
+        setShowFinalistTop1Indicators(true, top1Chart.specs, activeTab.id);
+      }
+      requestChartReflow();
+    },
+    [
+      setFinalistTop1DefaultForAll,
+      setShowFinalistTop1Indicators,
+      activeTab?.id,
+      top1Chart.specs,
+    ],
+  );
+
+  const finalistTop1Title = useMemo(() => {
+    if (!instrumentId) {
+      return 'Selecciona un instrumento para ver el Finalista TOP #1';
+    }
+    if (strategyTopQuery.isLoading || strategyDefQuery.isLoading) {
+      return 'Cargando Finalista TOP #1…';
+    }
+    if (!top1Available) {
+      return 'Sin Finalista TOP #1 con indicadores para este valor y timeframe';
+    }
+    const label = top1Chart.label ? ` (${top1Chart.label})` : '';
+    return `Este gráfico: indicadores del Finalista TOP #1${label} · mismo timeframe`;
+  }, [
+    instrumentId,
+    strategyTopQuery.isLoading,
+    strategyDefQuery.isLoading,
+    top1Available,
+    top1Chart.label,
+  ]);
+
+  const finalistTop1AllTitle =
+    'Todos los gráficos: activa Finalista TOP #1 en las pestañas abiertas y en las que abras después. Luego puedes apagarlo en un valor concreto.';
 
   const onTimeframeChange = useCallback(
     (next: ChartTimeframe) => {
@@ -337,6 +460,12 @@ export function ChartWorkspacePage() {
         canTrade={Boolean(instrumentQuery.data?.data)}
         onOpenIndicatorsCatalog={openIndicatorsCatalog}
         onToggleChartInspector={toggleChartInspector}
+        finalistTop1={{
+          checked: finalistTop1DefaultOn,
+          title: finalistTop1AllTitle,
+          scope: 'all',
+          onCheckedChange: onFinalistTop1AllChange,
+        }}
         onQuickBuy={() => {
           const data = instrumentQuery.data?.data;
           if (data) openOrderDialog(instrumentForQuickTrade(data, bars));
@@ -362,6 +491,12 @@ export function ChartWorkspacePage() {
         indicatorTemplates={indicatorTemplates}
         activeIndicatorTemplateId={chartTab.activeIndicatorTemplateId}
         onApplyIndicatorTemplate={applyIndicatorGroup}
+        finalistTop1={{
+          checked: showTop1,
+          title: finalistTop1Title,
+          scope: 'chart',
+          onCheckedChange: onFinalistTop1Change,
+        }}
         instrument={instrumentQuery.data?.data}
         instrumentId={instrumentId}
         symbol={activeTab.label}
@@ -402,41 +537,48 @@ export function ChartWorkspacePage() {
             onSubPanelWeightsChange={handleSubPanelWeights}
             mainChart={
               <>
-                <OhlcvChart
-                  key={`${activeTab.id}-${timeframe}-${seriesType}`}
-                  fillContainer
-                  chartSyncId={chartTab.id}
-                  seriesType={seriesType}
-                  seriesTypeParams={activeTab.seriesTypeParams}
-                  isLoading={chartInitialLoading}
-                  instrumentId={instrumentId}
-                  symbol={activeTab.label}
-                  onOpenSyncDialog={() => openInstrumentSyncDialog(instrumentId!, activeTab.label)}
-                  bars={bars}
-                  indicators={indicators}
-                  indicatorInstances={activeTab.indicatorInstances}
-                  config={chartConfig}
-                  onPriceScaleZoomChange={setPriceScaleZoom}
-                  onVolumeScaleZoomChange={(scaleZoom) => {
-                    const volume = chartTab.indicatorInstances.find(
-                      (item) => item.definitionId === 'volume',
-                    );
-                    if (volume) setSubIndicatorScaleZoom(volume.instanceId, scaleZoom);
-                  }}
-                  drawings={activeTab.drawings}
-                  drawTool={tool}
-                  chartTimeframe={timeframe}
-                  selectedDrawingId={selectedId}
-                  onAddDrawing={(drawing) => addDrawing(drawing, activeTab.id)}
-                  onUpdateDrawing={(drawingId, patch) => updateDrawing(drawingId, patch, activeTab.id)}
-                  onSelectDrawing={setSelectedId}
-                  onDrawingAdded={handleDrawingAdded}
-                  onDrawingDragEnd={flushDrawingSave}
-                  onOpenDrawingEditor={(drawingId) => setDrawingEditorOpen(drawingId)}
-                  onConfigureIndicator={(instanceId) => openIndicatorConfig(chartTab.id, instanceId)}
-                  drawingsLayerHidden={activeTab.drawingsLayerHidden}
-                  drawingsLayerLocked={activeTab.drawingsLayerLocked}
-                />
+                <div className="relative h-full min-h-0 w-full">
+                  <OhlcvChart
+                    key={`${activeTab.id}-${timeframe}-${seriesType}`}
+                    fillContainer
+                    chartSyncId={chartTab.id}
+                    seriesType={seriesType}
+                    seriesTypeParams={activeTab.seriesTypeParams}
+                    isLoading={chartInitialLoading}
+                    instrumentId={instrumentId}
+                    symbol={activeTab.label}
+                    onOpenSyncDialog={() => openInstrumentSyncDialog(instrumentId!, activeTab.label)}
+                    bars={bars}
+                    indicators={indicators}
+                    indicatorInstances={activeTab.indicatorInstances}
+                    config={chartConfig}
+                    onPriceScaleZoomChange={setPriceScaleZoom}
+                    onVolumeScaleZoomChange={(scaleZoom) => {
+                      const volume = chartTab.indicatorInstances.find(
+                        (item) => item.definitionId === 'volume',
+                      );
+                      if (volume) setSubIndicatorScaleZoom(volume.instanceId, scaleZoom);
+                    }}
+                    drawings={activeTab.drawings}
+                    drawTool={tool}
+                    chartTimeframe={timeframe}
+                    selectedDrawingId={selectedId}
+                    onAddDrawing={(drawing) => addDrawing(drawing, activeTab.id)}
+                    onUpdateDrawing={(drawingId, patch) =>
+                      updateDrawing(drawingId, patch, activeTab.id)
+                    }
+                    onSelectDrawing={setSelectedId}
+                    onDrawingAdded={handleDrawingAdded}
+                    onDrawingDragEnd={flushDrawingSave}
+                    onOpenDrawingEditor={(drawingId) => setDrawingEditorOpen(drawingId)}
+                    onConfigureIndicator={(instanceId) =>
+                      openIndicatorConfig(chartTab.id, instanceId)
+                    }
+                    drawingsLayerHidden={activeTab.drawingsLayerHidden}
+                    drawingsLayerLocked={activeTab.drawingsLayerLocked}
+                  />
+                  {showTop1EmptyBanner ? <ChartFinalistTop1EmptyBanner /> : null}
+                </div>
                 {editorDrawing && (
                   <ChartDrawingEditPopover
                     chartId={activeTab.id}

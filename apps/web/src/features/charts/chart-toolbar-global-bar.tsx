@@ -9,7 +9,10 @@ import { PanelRight, Settings2 } from 'lucide-react';
 
 import { ChartAnalysisScoreButtons } from '@/features/charts/chart-analysis-score-buttons';
 import { ChartDataStatusBadge } from '@/features/charts/chart-data-status-badge';
-import { ChartIndicatorsBar } from '@/features/charts/chart-indicators-bar';
+import {
+  ChartIndicatorsBar,
+  type ChartFinalistTop1Control,
+} from '@/features/charts/chart-indicators-bar';
 import { ChartNewChartTemplatePinButton } from '@/features/charts/chart-new-chart-template-pin-button';
 import { ChartQuickTradeButtons } from '@/features/charts/chart-quick-trade-buttons';
 import {
@@ -54,6 +57,8 @@ interface ChartToolbarGlobalBarProps {
   dataSyncing?: boolean;
   canTrade?: boolean;
   onOpenIndicatorsCatalog: () => void;
+  /** Switch Finalista TOP #1 → indicadores en el gráfico (zona Indicadores). */
+  finalistTop1?: ChartFinalistTop1Control;
   onToggleChartInspector: () => void;
   onQuickBuy: () => void;
   onQuickSell: () => void;
@@ -74,6 +79,7 @@ export function ChartToolbarGlobalBar({
   dataSyncing,
   canTrade,
   onOpenIndicatorsCatalog,
+  finalistTop1,
   onToggleChartInspector,
   onQuickBuy,
   onQuickSell,
@@ -99,10 +105,11 @@ export function ChartToolbarGlobalBar({
   if (visibility.indicators) {
     mainZones.push(
       zoneBlock(
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <ChartIndicatorsBar
             onOpenCatalog={onOpenIndicatorsCatalog}
             chartIndicatorCount={chartIndicatorCount}
+            finalistTop1={finalistTop1}
             className={CHART_TOOLBAR_EMBEDDED_CLASS}
           />
           <ChartNewChartTemplatePinButton className="shrink-0" />
