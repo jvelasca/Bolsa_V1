@@ -21,7 +21,9 @@
 
 Entrada auditoría: [audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
 Índice ingeniería (docs): [engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md).  
-Round 2 externas: [audit-ext-round2-triage-2026-08-03.md](./engineering/audit-ext-round2-triage-2026-08-03.md).
+Round 2 externas: [audit-ext-round2-triage-2026-08-03.md](./engineering/audit-ext-round2-triage-2026-08-03.md).  
+**Round 3 — motor Estudio (ratificado O3-C):** [audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [ADR-022](./adr/022-estudio-daily-opinion-motor.md).  
+Brief de entrada (histórico): [audit-brief-estudio-motor-operativo-2026-08-04.md](./engineering/audit-brief-estudio-motor-operativo-2026-08-04.md).  
 Respuesta auditoría 1 (gaps A/B): [audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md).
 
 ---

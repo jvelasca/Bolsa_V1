@@ -15,6 +15,7 @@ from bolsa_api.api.v1.routes import (
     indicators_compute,
     indicators_draft,
     instrument_strategy_tops,
+    instrument_narratives,
     instruments,
     investor_profiles,
     lists,
@@ -47,6 +48,7 @@ api_v1_router.include_router(database.router, tags=["database"])
 api_v1_router.include_router(auth.router, tags=["auth"])
 api_v1_router.include_router(instruments.router, tags=["instruments"])
 api_v1_router.include_router(instrument_strategy_tops.router, tags=["instrument-strategy-tops"])
+api_v1_router.include_router(instrument_narratives.router, tags=["instrument-narratives"])
 api_v1_router.include_router(indicators_compute.router, tags=["indicators"])
 api_v1_router.include_router(indicators_draft.router, tags=["indicators"])
 api_v1_router.include_router(signals_evaluate.router, tags=["signals"])

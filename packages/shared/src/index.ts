@@ -48,6 +48,7 @@ export * from './ai-indicator-draft-api.js';
 export * from './chart-strategy-bridge.js';
 export * from './strategy-top1-chart-indicators.js';
 export * from './instrument-strategy-top.js';
+export * from './instrument-narrative.js';
 export * from './operating-mandate.js';
 export * from './core-r-api.js';
 export * from './supervised-f3-api.js';

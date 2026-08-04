@@ -795,6 +795,32 @@ export const api = {
       `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top?timeframe=${encodeURIComponent(timeframe)}`,
     ),
 
+  getInstrumentNarrative: (
+    instrumentId: string,
+    scope: import('@bolsa/shared').InstrumentNarrativeScope = 'estudio',
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentNarrativeV1 | null }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative?scope=${encodeURIComponent(scope)}`,
+    ),
+
+  upsertInstrumentNarrative: (
+    instrumentId: string,
+    body: import('@bolsa/shared').UpsertInstrumentNarrativeRequestV1,
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentNarrativeV1 }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  deleteInstrumentNarrative: (
+    instrumentId: string,
+    scope: import('@bolsa/shared').InstrumentNarrativeScope = 'estudio',
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentNarrativeV1 | null }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative?scope=${encodeURIComponent(scope)}`,
+      { method: 'DELETE' },
+    ),
+
   getAccountMandates: (accountId: string, instrumentId?: string) => {
     const q = instrumentId
       ? `?instrumentId=${encodeURIComponent(instrumentId)}`

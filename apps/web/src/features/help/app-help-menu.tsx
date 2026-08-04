@@ -6,7 +6,7 @@
  * Sync: `HELP_CONTENT_AS_OF`.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, CircleHelp } from 'lucide-react';
+import { CircleHelp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -750,14 +750,13 @@ export function AppHelpMenu() {
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
-          className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+          className="flex items-center rounded-md p-1.5 text-sm hover:bg-accent"
           aria-expanded={menuOpen}
           aria-haspopup="menu"
+          aria-label="Ayuda"
           title="Ayuda"
         >
           <CircleHelp className="h-4 w-4" />
-          <span className="hidden sm:inline">Ayuda</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </button>
         {menuOpen && (
           <div

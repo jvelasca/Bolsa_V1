@@ -1214,6 +1214,24 @@ class InstrumentStrategyTopRow(Base):
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
 
+class InstrumentNarrativeRow(Base):
+    """Resumen corto de evolución por instrumento (scope estudio/global/trading)."""
+
+    __tablename__ = "instrument_narratives"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id",
+        ForeignKey("instruments.id", ondelete="CASCADE"),
+    )
+    scope: Mapped[str] = mapped_column(String, default="estudio")
+    body: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String, default="user")
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
+
+
 class MandateTenureRow(Base):
     """ADR-020 — tenure de mandato operativo por cuenta×instrumento."""
 

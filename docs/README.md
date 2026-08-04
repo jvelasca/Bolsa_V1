@@ -37,6 +37,8 @@
 | [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md) | **LAB ≠ TRADING** (universos UI; Cartera LAB) |
 | [adr/020-operating-mandate-tenure.md](./adr/020-operating-mandate-tenure.md) | **Mandato operativo** — tenure estrategia×instrumento (TRADING · M1b BD) |
 | [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md) | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual) |
+| [adr/022-estudio-daily-opinion-motor.md](./adr/022-estudio-daily-opinion-motor.md) | **Motor opinión diaria Estudio** — O3-C · Dictamen · on-demand D1 · AUTO congelado |
+| [engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md) | Triage round 3 (A0·N4·Deep) — O3-C ratificado |
 | [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
 | [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md) | **Paquete auditoría** post-Q0–Q3 + freeze + evidencia smoke |
 | [engineering/engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md) | **Engineering Index** — padre único docs ingeniería (A0 H1) |

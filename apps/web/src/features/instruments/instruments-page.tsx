@@ -1,8 +1,9 @@
 /**
- * Hub Instrumentos (I0–I3) — catálogo + listas + cartera + FA/TA + Seguimiento.
+ * Hub Instrumentos (I0–I5) — catálogo + listas + cartera + Estudio + IO + Seguimiento.
  * Tabla configurable: anchos · orden · visibilidad · favoritas (persistente).
  *
  * @see docs/engineering/instruments-hub-2026-07-31.md
+ * @see docs/engineering/instruments-hub-narrative-2026-08-04.md
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -32,6 +33,13 @@ import {
 } from '@/features/backtests/instrument-strategy-top-panel';
 import { openHitInTrading } from '@/features/screeners/open-hit-in-trading';
 import { filterAndSortInstrumentsHub } from '@/features/instruments/instruments-hub-model';
+import {
+  InstrumentsHubFilterBar,
+  toggleFavoriteBuiltinFilter,
+  toggleFavoriteListId,
+} from '@/features/instruments/instruments-hub-filter-bar';
+import { computeIndiceOperativo } from '@/features/trading/operativa-index';
+import { useVisualizationStore } from '@/stores/visualization-store';
 import {
   pickListChips,
   type HubListMembership,
@@ -395,7 +403,6 @@ function InstrumentRowActions({ instrument }: { instrument: InstrumentWithMetaDt
 
 export function InstrumentsPage() {
   const [query, setQuery] = useState('');
-  const [onlyInPortfolio, setOnlyInPortfolio] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragId, setDragId] = useState<InstrumentsHubColumnId | null>(null);
   const [dropTargetId, setDropTargetId] = useState<InstrumentsHubColumnId | null>(null);
@@ -407,6 +414,12 @@ export function InstrumentsPage() {
   const sortState = useInstrumentsHubPreferencesStore((s) => s.sort);
   const favoriteColumnIds = useInstrumentsHubPreferencesStore((s) => s.favoriteColumnIds);
   const autoFitColumns = useInstrumentsHubPreferencesStore((s) => s.autoFitColumns);
+  const scopeFilter = useInstrumentsHubPreferencesStore((s) => s.scopeFilter);
+  const scopeListId = useInstrumentsHubPreferencesStore((s) => s.scopeListId);
+  const favoriteBuiltinFilters = useInstrumentsHubPreferencesStore(
+    (s) => s.favoriteBuiltinFilters,
+  );
+  const favoriteListIds = useInstrumentsHubPreferencesStore((s) => s.favoriteListIds);
   const listWidthPct = useInstrumentsHubPreferencesStore((s) => s.wideSplit.listWidthPct);
   const stackHeightPct = useInstrumentsHubPreferencesStore((s) => s.stackSplit.stackHeightPct);
   const wideDetailOpen = useInstrumentsHubPreferencesStore((s) => s.wideSplit.detailPanelOpen);
@@ -416,6 +429,12 @@ export function InstrumentsPage() {
   const setSort = useInstrumentsHubPreferencesStore((s) => s.setSort);
   const setFavoriteColumnIds = useInstrumentsHubPreferencesStore((s) => s.setFavoriteColumnIds);
   const setAutoFitColumns = useInstrumentsHubPreferencesStore((s) => s.setAutoFitColumns);
+  const setScopeFilter = useInstrumentsHubPreferencesStore((s) => s.setScopeFilter);
+  const setScopeListId = useInstrumentsHubPreferencesStore((s) => s.setScopeListId);
+  const setFavoriteBuiltinFilters = useInstrumentsHubPreferencesStore(
+    (s) => s.setFavoriteBuiltinFilters,
+  );
+  const setFavoriteListIds = useInstrumentsHubPreferencesStore((s) => s.setFavoriteListIds);
   const setListWidthPct = useInstrumentsHubPreferencesStore((s) => s.setListWidthPct);
   const setStackHeightPct = useInstrumentsHubPreferencesStore((s) => s.setStackHeightPct);
   const setDetailPanelOpen = useInstrumentsHubPreferencesStore((s) => s.setDetailPanelOpen);
@@ -442,9 +461,16 @@ export function InstrumentsPage() {
   const {
     membershipsByInstrument,
     positionsByInstrument,
+    apiLists,
     listsLoading,
     portfolioLoading,
   } = useInstrumentsHubEnrichment();
+
+  const estudioEntries = useVisualizationStore((s) => s.entries);
+  const estudioIds = useMemo(
+    () => new Set(estudioEntries.map((e) => e.instrumentId)),
+    [estudioEntries],
+  );
 
   const instrumentIds = useMemo(() => instruments.map((i) => i.id), [instruments]);
   const { faByInstrument, taByInstrument, scoresLoading } =
@@ -455,12 +481,29 @@ export function InstrumentsPage() {
 
   const activateTracking = useActivateInstrumentTracking();
 
+  const ioByInstrument = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const id of instrumentIds) {
+      const fa = faByInstrument.get(id);
+      const ta = taByInstrument.get(id);
+      map.set(
+        id,
+        computeIndiceOperativo({
+          compositeDisplay100: ta?.compositeDisplay100,
+          distress: fa?.distress,
+        }),
+      );
+    }
+    return map;
+  }, [instrumentIds, faByInstrument, taByInstrument]);
+
   const enrichment = useMemo(
     () => ({
       membershipsByInstrument,
       positionsByInstrument,
       faByInstrument,
       taByInstrument,
+      ioByInstrument,
       trackersByInstrument,
     }),
     [
@@ -468,6 +511,7 @@ export function InstrumentsPage() {
       positionsByInstrument,
       faByInstrument,
       taByInstrument,
+      ioByInstrument,
       trackersByInstrument,
     ],
   );
@@ -482,10 +526,21 @@ export function InstrumentsPage() {
         query,
         sortKey,
         sortDir,
-        onlyInPortfolio,
+        scopeFilter,
+        listId: scopeListId,
+        estudioIds,
         enrichment,
       }),
-    [instruments, query, sortKey, sortDir, onlyInPortfolio, enrichment],
+    [
+      instruments,
+      query,
+      sortKey,
+      sortDir,
+      scopeFilter,
+      scopeListId,
+      estudioIds,
+      enrichment,
+    ],
   );
 
   const selectedInstrument = useMemo(
@@ -508,6 +563,7 @@ export function InstrumentsPage() {
       portfolio: [INSTRUMENTS_HUB_COLUMN_LABELS.portfolio],
       scoreFa: [INSTRUMENTS_HUB_COLUMN_LABELS.scoreFa],
       scoreTa: [INSTRUMENTS_HUB_COLUMN_LABELS.scoreTa],
+      scoreIo: [INSTRUMENTS_HUB_COLUMN_LABELS.scoreIo],
       tracking: [INSTRUMENTS_HUB_COLUMN_LABELS.tracking],
       lastBar: [INSTRUMENTS_HUB_COLUMN_LABELS.lastBar],
       data: [INSTRUMENTS_HUB_COLUMN_LABELS.data],
@@ -541,6 +597,8 @@ export function InstrumentsPage() {
       if (fa != null) samples.scoreFa!.push(String(Math.round(fa)));
       const ta = taByInstrument.get(instrument.id)?.technicalDisplay100;
       if (ta != null) samples.scoreTa!.push(String(Math.round(ta)));
+      const io = ioByInstrument.get(instrument.id);
+      if (io != null) samples.scoreIo!.push(String(Math.round(io)));
       const trackers = trackersByInstrument.get(instrument.id) ?? [];
       if (trackers.length > 0) {
         const { visible, overflow } = pickTrackerChips(trackers, 3);
@@ -569,6 +627,7 @@ export function InstrumentsPage() {
     positionsByInstrument,
     faByInstrument,
     taByInstrument,
+    ioByInstrument,
     trackersByInstrument,
   ]);
 
@@ -611,6 +670,7 @@ export function InstrumentsPage() {
     const position = positionsByInstrument.get(instrument.id) ?? null;
     const fa = faByInstrument.get(instrument.id);
     const ta = taByInstrument.get(instrument.id);
+    const io = ioByInstrument.get(instrument.id);
     const trackers = trackersByInstrument.get(instrument.id) ?? [];
 
     switch (columnId) {
@@ -670,6 +730,19 @@ export function InstrumentsPage() {
         );
       case 'portfolio':
         return <PortfolioCell position={position} loading={portfolioLoading} />;
+      case 'scoreIo':
+        return (
+          <ScoreCell
+            value={io}
+            loading={scoresLoading}
+            warn={fa?.distress}
+            title={
+              io != null
+                ? `Recomendación (IO)${fa?.distress ? ' · FA distress ≤40' : ''} · mismo criterio que Operativa`
+                : 'Recomendación (Índice Operativo)'
+            }
+          />
+        );
       case 'scoreFa':
         return (
           <ScoreCell
@@ -758,8 +831,8 @@ export function InstrumentsPage() {
         ) : null}
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-3">
-        <div className="relative min-w-[14rem] max-w-md flex-1">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] max-w-sm flex-1">
           <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             type="search"
@@ -771,15 +844,49 @@ export function InstrumentsPage() {
             aria-label="Buscar instrumentos"
           />
         </div>
-        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
-          <input
-            type="checkbox"
-            className="rounded border-border"
-            checked={onlyInPortfolio}
-            onChange={(e) => setOnlyInPortfolio(e.target.checked)}
-          />
-          Solo cartera DEMO
-        </label>
+        <InstrumentsHubFilterBar
+          scopeFilter={scopeFilter}
+          scopeListId={scopeListId}
+          favoriteBuiltinFilters={favoriteBuiltinFilters}
+          favoriteListIds={favoriteListIds}
+          apiLists={apiLists}
+          estudioCount={estudioIds.size}
+          onSelectBuiltin={(id) => {
+            setScopeFilter(id);
+            setScopeListId(null);
+            if (id === 'estudio') {
+              setSort({ columnId: 'scoreIo', direction: 'desc' });
+            }
+          }}
+          onSelectList={(listId) => {
+            setScopeListId(listId);
+            setScopeFilter('list');
+          }}
+          onToggleBuiltinFavorite={(id) => {
+            const next = toggleFavoriteBuiltinFilter(favoriteBuiltinFilters, id);
+            setFavoriteBuiltinFilters(
+              next.length > 0 || favoriteListIds.length > 0
+                ? next
+                : favoriteBuiltinFilters,
+            );
+            if (
+              scopeFilter === id &&
+              !next.includes(id) &&
+              next.includes('all')
+            ) {
+              setScopeFilter('all');
+              setScopeListId(null);
+            }
+          }}
+          onToggleListFavorite={(listId) => {
+            const next = toggleFavoriteListId(favoriteListIds, listId);
+            setFavoriteListIds(next);
+            if (scopeFilter === 'list' && scopeListId === listId && !next.includes(listId)) {
+              setScopeFilter('all');
+              setScopeListId(null);
+            }
+          }}
+        />
       </div>
 
       {instrumentsQuery.isLoading && (
@@ -814,9 +921,13 @@ export function InstrumentsPage() {
         <p className="text-sm text-muted-foreground">
           {instruments.length === 0
             ? 'Catálogo vacío. Importa valores desde Trading → Listas.'
-            : onlyInPortfolio
-              ? 'Ninguna posición abierta en la cuenta DEMO activa.'
-              : 'Ningún instrumento coincide con la búsqueda.'}
+            : scopeFilter === 'portfolio'
+              ? 'Ninguna posición abierta en la cuenta activa.'
+              : scopeFilter === 'estudio'
+                ? 'Estudio vacío. Añade valores desde Trading (abrir gráfico o Pasar a Estudio).'
+                : scopeFilter === 'list'
+                  ? 'Ningún instrumento en la lista seleccionada.'
+                  : 'Ningún instrumento coincide con la búsqueda.'}
         </p>
       ) : null}
 

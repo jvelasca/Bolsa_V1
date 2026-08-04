@@ -24,10 +24,16 @@ function tradingSublabel(accountType: InvestmentAccountDto['type'] | undefined):
 export function UniverseChip({
   force,
   className,
+  density = 'full',
 }: {
   /** Override detection from route (e.g. verify session on /backtests). */
   force?: ProductUniverse;
   className?: string;
+  /**
+   * `icon` = solo icono (barra superior; el contexto LAB/TRADING ya se ve en la nav).
+   * `full` = etiqueta + subetiqueta (banners / hubs ambiguos).
+   */
+  density?: 'full' | 'icon';
 }) {
   const { pathname } = useLocation();
   const session = useDiaDTradingSessionStore((s) => s.session);
@@ -44,29 +50,36 @@ export function UniverseChip({
         ? 'verificación'
         : PRODUCT_UNIVERSE_SUBLABEL.lab
       : tradingSublabel(account?.type);
+  const label = PRODUCT_UNIVERSE_LABEL[universe];
+  const title =
+    universe === 'lab'
+      ? `Universo LAB · ${sub} — investigación y simulaciones (no escribe DEMO)`
+      : `Universo TRADING · ${sub} — inversión diaria en la cuenta activa`;
 
   return (
     <span
       className={cn(
-        'inline-flex max-w-[160px] items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide',
+        'inline-flex items-center gap-1 rounded-md border font-semibold tracking-wide',
+        density === 'icon'
+          ? 'px-1.5 py-1'
+          : 'max-w-[160px] px-1.5 py-0.5 text-[10px]',
         universe === 'lab'
           ? 'border-sky-600/35 bg-sky-500/10 text-sky-950 dark:text-sky-50'
           : 'border-emerald-600/35 bg-emerald-500/10 text-emerald-950 dark:text-emerald-50',
         className,
       )}
-      title={
-        universe === 'lab'
-          ? 'Universo LAB — investigación y simulaciones (no escribe DEMO)'
-          : 'Universo TRADING — inversión diaria en la cuenta activa'
-      }
+      title={title}
+      aria-label={title}
       data-testid="universe-chip"
       data-universe={universe}
     >
       <Icon className="h-3 w-3 shrink-0" aria-hidden />
-      <span className="truncate">
-        {PRODUCT_UNIVERSE_LABEL[universe]}
-        <span className="font-normal opacity-80"> · {sub}</span>
-      </span>
+      {density === 'full' ? (
+        <span className="truncate text-[10px]">
+          {label}
+          <span className="font-normal opacity-80"> · {sub}</span>
+        </span>
+      ) : null}
     </span>
   );
 }

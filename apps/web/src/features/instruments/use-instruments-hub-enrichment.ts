@@ -67,6 +67,7 @@ export function useInstrumentsHubEnrichment() {
   return {
     membershipsByInstrument: membershipsByInstrument as Map<string, HubListMembership[]>,
     positionsByInstrument: positionsByInstrument as Map<string, PositionDto>,
+    apiLists,
     listsLoading: listsQuery.isLoading || (listIds.length > 0 && !listsReady),
     portfolioLoading: portfolioQuery.isLoading && !portfolioReady,
     accountScope,

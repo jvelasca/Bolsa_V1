@@ -2,7 +2,8 @@
  * Barra superior de la plataforma (nav + cluster derecha).
  *
  * Izquierda: marca · historial ←→ · separador · nav (Overview…) · paneles Trading.
- * Derecha (L→R): chip del espacio · Ayuda · Config · menú sesión.
+ * Derecha (L→R): chip universo (compacto) · espacio · Ayuda · Config · menú sesión.
+ * Tras Restablecer paneles (o solo en otras rutas): icono «abrir en otra pestaña».
  *
  * @see docs/WORKSPACE_PERSISTENCE.md §0
  * @see docs/UI_PLATFORM.md — Barra superior / espacios
@@ -34,6 +35,7 @@ import {
   Radar,
   RotateCcw,
   Settings,
+  SquareArrowOutUpRight,
   User,
   Wallet,
 } from 'lucide-react';
@@ -114,6 +116,26 @@ interface MenuItem {
   checked?: boolean;
   disabled?: boolean;
   hint?: string;
+}
+
+/** Duplica la URL actual en otra pestaña (p. ej. segundo monitor). */
+function OpenAppInNewTabButton({ className }: { className?: string }) {
+  return (
+    <button
+      type="button"
+      title="Abrir esta vista en otra pestaña (segundo monitor)"
+      aria-label="Abrir en otra pestaña"
+      onClick={() => {
+        window.open(window.location.href, '_blank', 'noopener,noreferrer');
+      }}
+      className={cn(
+        'rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground',
+        className,
+      )}
+    >
+      <SquareArrowOutUpRight className="h-3.5 w-3.5" />
+    </button>
+  );
 }
 
 function DropdownMenu({
@@ -438,12 +460,20 @@ export function AppTopBar() {
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
+            <span className="w-1.5 shrink-0" aria-hidden />
+            <div className="h-4 w-px bg-border/80" aria-hidden />
+            <OpenAppInNewTabButton />
           </div>
         </>
-      ) : null}
+      ) : (
+        <>
+          <div className="mx-2 hidden h-5 w-px bg-border sm:block" aria-hidden />
+          <OpenAppInNewTabButton className="border border-border/70 bg-background/40" />
+        </>
+      )}
 
       <div className="ml-auto flex items-center gap-1">
-        <UniverseChip />
+        <UniverseChip density="icon" />
         <button
           type="button"
           onClick={openWorkspacePicker}

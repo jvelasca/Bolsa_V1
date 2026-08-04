@@ -97,6 +97,7 @@ model Instrument {
   dataSnapshots DataSnapshot[]
   positionPolicies PositionPolicy[]
   strategyTops InstrumentStrategyTop[]
+  narratives   InstrumentNarrative[]
   mandateTenures MandateTenure[]
   mandateTradeLinks MandateTradeLink[]
 
@@ -806,6 +807,26 @@ model BacktestTrade {
 
   @@index([backtestRunId, timestamp])
   @@map("backtest_trades")
+}
+
+/// Resumen corto de evolución por instrumento (usuario / IA / sistema). Scope ≠ maestro.
+model InstrumentNarrative {
+  id           String   @id @default(cuid())
+  instrumentId String   @map("instrument_id")
+  /// estudio | global | trading
+  scope        String   @default("estudio")
+  body         String   @db.Text
+  /// user | ai | system
+  source       String   @default("user")
+  version      Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, scope])
+  @@index([instrumentId, updatedAt(sort: Desc)])
+  @@map("instrument_narratives")
 }
 
 /// TOP-3 estrategias AT por instrumento (semifinal embudo coach → lab → paper).

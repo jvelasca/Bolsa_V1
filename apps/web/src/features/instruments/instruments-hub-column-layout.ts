@@ -11,6 +11,7 @@ export type InstrumentsHubColumnId =
   | 'changePct'
   | 'lists'
   | 'portfolio'
+  | 'scoreIo'
   | 'scoreFa'
   | 'scoreTa'
   | 'tracking'
@@ -38,6 +39,7 @@ export const INSTRUMENTS_HUB_COLUMN_LABELS: Record<InstrumentsHubColumnId, strin
   changePct: 'Δ%',
   lists: 'Listas',
   portfolio: 'Cartera',
+  scoreIo: 'Recom.',
   scoreFa: 'FA',
   scoreTa: 'TA',
   tracking: 'Seguim.',
@@ -60,6 +62,7 @@ export const DEFAULT_INSTRUMENTS_HUB_COLUMN_LAYOUT: InstrumentsHubColumnLayoutIt
   { id: 'changePct', width: 72, visible: true },
   { id: 'lists', width: 128, visible: true },
   { id: 'portfolio', width: 100, visible: true },
+  { id: 'scoreIo', width: 64, visible: true },
   { id: 'scoreFa', width: 52, visible: true },
   { id: 'scoreTa', width: 52, visible: true },
   { id: 'tracking', width: 140, visible: true },
@@ -73,6 +76,7 @@ export const DEFAULT_INSTRUMENTS_HUB_FAVORITE_COLUMN_IDS: InstrumentsHubColumnId
   'symbol',
   'price',
   'changePct',
+  'scoreIo',
   'scoreFa',
   'scoreTa',
   'tracking',
@@ -85,7 +89,6 @@ export function normalizeInstrumentsHubColumnLayout(
   const defaults = DEFAULT_INSTRUMENTS_HUB_COLUMN_LAYOUT.map((c) => ({ ...c }));
   if (!stored?.length) return defaults;
 
-  const byId = new Map(stored.map((column) => [column.id, column]));
   const ordered: InstrumentsHubColumnLayoutItem[] = [];
   const seen = new Set<InstrumentsHubColumnId>();
 
@@ -102,7 +105,18 @@ export function normalizeInstrumentsHubColumnLayout(
 
   for (const def of defaults) {
     if (seen.has(def.id)) continue;
-    ordered.push({ ...def });
+    // Insertar columnas nuevas junto a su vecino por defecto (p. ej. Recom. tras Cartera).
+    const defIndex = defaults.findIndex((d) => d.id === def.id);
+    const prevId = defIndex > 0 ? defaults[defIndex - 1]!.id : null;
+    const insertAt = prevId
+      ? ordered.findIndex((c) => c.id === prevId) + 1
+      : 0;
+    if (insertAt > 0 && insertAt <= ordered.length) {
+      ordered.splice(insertAt, 0, { ...def });
+    } else {
+      ordered.push({ ...def });
+    }
+    seen.add(def.id);
   }
   return ordered;
 }
@@ -183,6 +197,7 @@ export function isNumericInstrumentsHubColumn(columnId: InstrumentsHubColumnId):
     columnId === 'changePct' ||
     columnId === 'lists' ||
     columnId === 'portfolio' ||
+    columnId === 'scoreIo' ||
     columnId === 'scoreFa' ||
     columnId === 'scoreTa' ||
     columnId === 'tracking' ||
@@ -228,6 +243,7 @@ export function instrumentsHubSortKeyFromColumn(
   | 'changePct'
   | 'listCount'
   | 'unrealizedPnl'
+  | 'scoreIo'
   | 'scoreFa'
   | 'scoreTa'
   | 'trackerCount'
@@ -245,6 +261,8 @@ export function instrumentsHubSortKeyFromColumn(
       return 'listCount';
     case 'portfolio':
       return 'unrealizedPnl';
+    case 'scoreIo':
+      return 'scoreIo';
     case 'scoreFa':
       return 'scoreFa';
     case 'scoreTa':
@@ -380,7 +398,7 @@ export function fitInstrumentsHubColumnsToContent(
     const floor =
       column.id === 'actions'
         ? 120
-        : column.id === 'scoreFa' || column.id === 'scoreTa'
+        : column.id === 'scoreFa' || column.id === 'scoreTa' || column.id === 'scoreIo'
           ? 52
           : MIN_WIDTH;
     const width = clampInstrumentsHubColumnWidth(Math.max(floor, headerW, contentW));

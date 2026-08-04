@@ -12,11 +12,17 @@ import { formatPct, formatPrice } from '@/features/charts/chart-utils';
 import { OhlcvChart } from '@/features/charts/ohlcv-chart';
 import { InstrumentStrategyTopPanel } from '@/features/backtests/instrument-strategy-top-panel';
 import { InstrumentAnalysisSummary } from '@/features/trading/instrument-analysis-summary';
+import { InstrumentNarrativeEditor } from '@/features/instruments/instrument-narrative-editor';
 import { IconButton } from '@/components/ui/icon-button';
 import { KeyValueList, KeyValueRow } from '@/components/ui/key-value-list';
 import { cn } from '@/lib/utils';
 
-export type InstrumentsHubDetailSectionId = 'resumen' | 'grafico' | 'analisis' | 'coach';
+export type InstrumentsHubDetailSectionId =
+  | 'resumen'
+  | 'grafico'
+  | 'analisis'
+  | 'evolucion'
+  | 'coach';
 
 export const INSTRUMENTS_HUB_DETAIL_SECTIONS: Array<{
   id: InstrumentsHubDetailSectionId;
@@ -25,6 +31,7 @@ export const INSTRUMENTS_HUB_DETAIL_SECTIONS: Array<{
   { id: 'resumen', label: 'Resumen' },
   { id: 'grafico', label: 'Gráfico' },
   { id: 'analisis', label: 'Análisis' },
+  { id: 'evolucion', label: 'Evolución' },
   { id: 'coach', label: 'Coach' },
 ];
 
@@ -35,6 +42,7 @@ export const DEFAULT_INSTRUMENTS_HUB_DETAIL_SECTIONS: Record<
   resumen: true,
   grafico: true,
   analisis: false,
+  evolucion: true,
   coach: false,
 };
 
@@ -198,6 +206,14 @@ export function InstrumentsHubDetailPanel({
               instrumentId={instrument.id}
               symbol={instrument.symbol}
             />
+          </DetailSection>
+
+          <DetailSection
+            title="Evolución"
+            open={sectionsOpen.evolucion}
+            onToggle={() => onToggleSection('evolucion')}
+          >
+            <InstrumentNarrativeEditor instrumentId={instrument.id} />
           </DetailSection>
 
           <DetailSection
