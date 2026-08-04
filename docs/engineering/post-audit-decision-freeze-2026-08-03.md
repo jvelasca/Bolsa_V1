@@ -11,7 +11,7 @@
 | **Belief → Coach (CORE-A)** | **Congelado** | v0 Coach LLM ya es honesto (no corona TOP). Belief Fase 2 es diseño + UI + outcomes; no es un flip. Reabrir solo con brief de producto. |
 | **`CORE_R_CRON_ENABLED`** | **Sigue `false`** | Cola ya funciona con app abierta + BD multi-dispositivo. Cron servidor = ops cuando haga falta tick 24/7; coste de ruido/false enqueues no justificado aún. |
 | **`COST_MODEL_V2_ENABLED`** | **Sigue `false`** | Cambia economía de backtests / rankings. Activar solo en Lab A/B controlado, no como default silencioso. |
-| **Motor Estudio / Dictamen** | **D1 cerrado** (on-demand + UI) · **D2/cron EOD off** · Camino D freeze | Round 3: [triage §11](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [ADR-022](../adr/022-estudio-daily-opinion-motor.md). Siguiente: Operativa vital → Asesor (Research). |
+| **Motor Estudio / Dictamen** | **D1–D2 canales cerrados** · cron EOD off · Camino D freeze | [triage §11](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [audit pack](./audit-pack-estudio-asesor-canales-2026-08-04.md) · [thaw AUTO](./camino-d-auto-thaw-checklist-2026-08-04.md) |
 
 ### Futuro — Belief (apuntalado, no ahora)
 
@@ -25,8 +25,8 @@ Brief de producto listo para cuando toque reabrir (2026-08-03, **sin implementar
 1. **Usar** lo entregado: Play ciclo · Lista AUTO · Finalistas · Monitor CORE-R · Lab Health · mass compare · warm-up gate · SEMI Confirm.  
 2. **Vigilar** CORE-R en uso real (`pnpm test:operativa` tras cambios).  
 3. **Re-auditar** IBEX TOP si cambia el universo (`pnpm audit:ibex35:missing`).  
-4. **Motor Estudio:** **D1 cerrado** — siguiente foco **Operativa** (vital), luego **Asesor** (Research + bandeja); Camino D AUTO execute sigue freeze ([triage §11](./audit-ext-round3-triage-estudio-motor-2026-08-04.md)).  
-5. **Revisar esta ficha** solo si aparece: necesidad real de cron 24/7, experimento de costes v2, brief Belief, o thaw AUTO con evidencia.  
+4. **Motor Estudio:** D1 + Operativa + Asesor + **Canales cerrados** — siguiente: **auditar pack** y **prep thaw AUTO** ([checklist](./camino-d-auto-thaw-checklist-2026-08-04.md)); Camino D execute sigue freeze.  
+5. **Revisar esta ficha** solo si aparece: necesidad real de cron 24/7, experimento de costes v2, brief Belief, o thaw AUTO con evidencia (checklist completa).  
 6. **Docstrings:** lotes 1–4 cerrados — solo forward-only al tocar código ([estándar](./code-documentation-standard-2026-08-03.md)).
 
 ## Qué no hacer

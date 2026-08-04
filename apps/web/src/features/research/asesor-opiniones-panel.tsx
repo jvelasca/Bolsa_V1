@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import {
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   OPINION_CHANNEL_LEVEL_LABELS,
+  OPINION_CHANNEL_MAP_LEGEND,
   buildOpinionChannelItems,
   mapOpinionToChannel,
   type InstrumentDailyOpinionHintV1,
@@ -41,6 +42,7 @@ type ChannelFilter = 'todas' | 'alarma' | 'aviso';
 
 export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const [filter, setFilter] = useState<ChannelFilter>('todas');
+  const [showMap, setShowMap] = useState(false);
   const bookPrefs = useDemoBookPrefs();
   const canEnqueue = demoBookAllowsEnqueueConfirm(bookPrefs.mode);
   const { effectiveAccountId } = useActiveAccount();
@@ -169,7 +171,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
           <CardTitle className="text-base">Opiniones de hoy</CardTitle>
           <CardDescription>
             Dictamen Estudio → canal AVISO (info) / ALARMA (accionable en SEMI). ★ dictamen ≠ ★ TOP.
-            Sin cron EOD aún.
+            Toast alarma en app · email tras EOD solo si flag SMTP.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -197,7 +199,56 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                 {label}
               </button>
             ))}
+            <button
+              type="button"
+              className={cn(
+                'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                showMap
+                  ? 'border-primary/50 bg-primary/10 text-primary'
+                  : 'border-border text-muted-foreground hover:bg-accent',
+              )}
+              aria-expanded={showMap}
+              onClick={() => setShowMap((v) => !v)}
+            >
+              Mapa canales
+            </button>
           </div>
+
+          {showMap ? (
+            <div
+              className="overflow-x-auto rounded-md border border-border text-xs"
+              data-testid="asesor-channel-map-legend"
+            >
+              <table className="w-full min-w-[28rem] text-left">
+                <thead className="bg-muted/40 text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-1.5 font-medium">Stance</th>
+                    <th className="px-2 py-1.5 font-medium">★</th>
+                    <th className="px-2 py-1.5 font-medium">Canal</th>
+                    <th className="px-2 py-1.5 font-medium">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {OPINION_CHANNEL_MAP_LEGEND.map((row) => (
+                    <tr
+                      key={`${row.stance}-${row.stars}-${row.level}`}
+                      className="border-t border-border/70"
+                    >
+                      <td className="px-2 py-1">
+                        {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[row.stance]}
+                      </td>
+                      <td className="px-2 py-1 tabular-nums">{row.stars}</td>
+                      <td className="px-2 py-1">{OPINION_CHANNEL_LEVEL_LABELS[row.level]}</td>
+                      <td className="px-2 py-1 text-muted-foreground">{row.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="border-t border-border px-2 py-1.5 text-[10px] text-muted-foreground">
+                Mapa fijo §5.2 (`opinion-channel-map`). Prefs UI editables = fase posterior; SMS aparcado.
+              </p>
+            </div>
+          ) : null}
 
           {studyIds.length === 0 ? (
             <div className="space-y-2 text-sm text-muted-foreground">
@@ -309,7 +360,20 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                     instrumentIds: studyIds,
                     force: true,
                   })
-                  .then(() => opinionsQuery.refetch())
+                  .then((res) => {
+                    void opinionsQuery.refetch();
+                    const n = res.count ?? 0;
+                    const email = res.emailNotify;
+                    let msg = `EOD batch · ${n} dictamen${n === 1 ? '' : 'es'}`;
+                    if (email) {
+                      if (email.sent) {
+                        msg += ` · email ${email.alarmaCount} alarma(s)`;
+                      } else if (email.skippedReason) {
+                        msg += ` · email skip (${email.skippedReason})`;
+                      }
+                    }
+                    pushToast(msg);
+                  })
                   .catch((e: Error) => pushToast(`EOD batch · ${e.message}`));
               }}
             >

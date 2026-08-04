@@ -15,6 +15,26 @@ export const OPINION_CHANNEL_LEVEL_LABELS: Record<OpinionChannelLevel, string> =
   alarma: 'Alarma',
 };
 
+/** Filas legibles del mapa producto §5.2 (UI leyenda; no editable en v1). */
+export const OPINION_CHANNEL_MAP_LEGEND: ReadonlyArray<{
+  stance: InstrumentDailyOpinionStance;
+  stars: string;
+  level: OpinionChannelLevel;
+  note: string;
+}> = [
+  { stance: 'buy', stars: '≥4', level: 'alarma', note: 'SEMI → Confirm' },
+  { stance: 'buy', stars: '2–3', level: 'aviso', note: 'Info' },
+  { stance: 'buy', stars: '1', level: 'silent', note: '—' },
+  { stance: 'sell_exit', stars: '≥3', level: 'alarma', note: 'SEMI → Confirm' },
+  { stance: 'sell_exit', stars: '≤2', level: 'aviso', note: 'Info' },
+  { stance: 'reduce', stars: '≥3', level: 'alarma', note: 'SEMI → Confirm' },
+  { stance: 'reduce', stars: '≤2', level: 'aviso', note: 'Info' },
+  { stance: 'overbought', stars: 'cualquiera', level: 'aviso', note: 'Info' },
+  { stance: 'review_strategy', stars: 'cualquiera', level: 'aviso', note: 'Lab' },
+  { stance: 'hold_watch', stars: 'cualquiera', level: 'silent', note: '—' },
+  { stance: 'no_trade', stars: 'cualquiera', level: 'silent', note: '—' },
+];
+
 /** Regla producto por defecto (§5.2). */
 export function mapOpinionToChannel(input: {
   stance: InstrumentDailyOpinionStance;

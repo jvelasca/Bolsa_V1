@@ -171,8 +171,8 @@ Del informe 2 §5.1 (N4), adoptados:
 | D1d | Operativa: solo dictamen del valor (lista global → Asesor) | **Hecho** (`bc3fd95`) |
 | **Op** | **Operativa vital** (mesa TRADING / SEMI / mandato / pulso) — clave de app | **Cerrado** (SEMI desk + Outcomes 2026-08-04) |
 | **Asesor** | Research → Asesor + bandeja «opiniones de hoy» (datos ya en motor) | **Cerrado** (`e898b95` · tab Opiniones) |
-| D2 | Batch EOD flag-off + canales | **Canales** + toast Alarmas + email scaffold off + EOD API force · cron noop |
-| D3+ | Métricas / thaw Camino D AUTO execute | Checklist thaw estricto — **sigue freeze** |
+| D2 | Batch EOD flag-off + canales | **Cerrado** — toast + email scaffold + mapa leyenda + EOD force (`e1a5510`+) |
+| D3+ | Métricas / thaw Camino D AUTO execute | [Checklist thaw](./camino-d-auto-thaw-checklist-2026-08-04.md) — **sigue freeze** |
 
 ---
 
@@ -250,8 +250,9 @@ Confirmaciones B+C: diseño **listo**. Código D1 **solo** con frase explícita 
 | 1 | ~~D1 motor~~ | Dictamen, API, Evolución, invariantes | — |
 | 2 | **Operativa** (vital) | Mesa TRADING, SEMI/Confirm, mandato, pulso IO+TOP+dictamen del valor | **Camino D AUTO execute** (sigue freeze) |
 | 3 | ~~**Asesor**~~ | Renombrar/integrar Research; bandeja opiniones Estudio; UI de datos **ya** calculables | Cron EOD batch real (flag off); thaw AUTO |
-| 4 | **Canales** (en curso) | Toast Alarmas + email scaffold off tras eod-batch | Prefs UI email; SMS; thaw AUTO |
+| 4 | ~~**Canales**~~ | Toast Alarmas + email scaffold off + mapa leyenda + EOD force | Prefs UI email editables; SMS; thaw AUTO |
+| 5 | **AUTO** (prep) | Telemetría + checklist thaw Camino D | Flip `PAPER_D_EXECUTE` sin evidencia |
 
-**Nota AUTO:** «parte AUTO» = madurar **Operativa** como superficie de operación (hacia SEMI y, más tarde, AUTO). **No** activar `PAPER_D_EXECUTE` / Camino D hasta checklist thaw del freeze.
+**Nota AUTO:** entrar por [camino-d-auto-thaw-checklist](./camino-d-auto-thaw-checklist-2026-08-04.md). Auditar primero: [audit-pack-estudio-asesor-canales](./audit-pack-estudio-asesor-canales-2026-08-04.md).
 
 **Nota Asesor:** los inputs (IO, FA, TOP, dictámenes, narrative) ya existen vía APIs D1; Asesor es **presentación + orquestación**, no un segundo motor.
