@@ -6,7 +6,7 @@
 
 import type { AccountSummaryDto, LedgerEntryDto } from './accounts.js';
 import type { InstrumentDailyOpinionV1 } from './instrument-daily-opinion.js';
-import type { OpinionChannel } from './opinion-channel-map.js';
+import type { OpinionChannelLevel } from './opinion-channel-map.js';
 
 export const DAILY_OPS_REPORT_SCHEMA = 'daily_ops_report_v1' as const;
 
@@ -29,7 +29,7 @@ export type DailyOpsChannelSummaryV1 = {
 export type DailyOpsOpinionRowV1 = {
   instrumentId: string;
   symbol?: string | null;
-  channel: OpinionChannel;
+  channel: OpinionChannelLevel;
   stance: string;
   dictamenStars: number;
   reasons: string[];
