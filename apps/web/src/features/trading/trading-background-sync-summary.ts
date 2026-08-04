@@ -60,9 +60,15 @@ export function summarizeBackgroundSync(opts: {
     .join(' · ');
   if (processing.length > 0 || pending.length > 0) {
     const n = processing.length + pending.length;
-    const sym = current?.symbol ? ` · ${current.symbol}` : '';
+    const sym = current?.symbol ? current.symbol.slice(0, 6) : '';
     return {
-      label: processing.length > 0 ? `Velas · sync${sym}` : `Velas · cola ${n}`,
+      // Labels cortos + truncado en slot fijo (barra no redimensiona).
+      label:
+        processing.length > 0
+          ? sym
+            ? `Velas · ${sym}`
+            : 'Velas · sync'
+          : `Velas · ${n}`,
       detail: [
         baseDetail,
         processing.length ? `${processing.length} procesando` : null,
@@ -79,13 +85,13 @@ export function summarizeBackgroundSync(opts: {
   }
   if (failed.length > 0) {
     return {
-      label: `Velas · ${failed.length} err`,
+      label: `Velas · ${Math.min(failed.length, 99)} err`,
       detail: `${baseDetail}\n${failed.length} ítem(s) fallidos pendientes de reintento`,
       tone: 'warn',
     };
   }
   return {
-    label: 'Velas · al día',
+    label: 'Velas · ok',
     detail: `${baseDetail}\nCola vacía: sin valores pendientes de actualizar.`,
     tone: 'idle',
   };

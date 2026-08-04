@@ -71,6 +71,8 @@ No seleccionar. No poner `PAPER_D_EXECUTE=1` en demo compartida. ADR-023 sigue *
 
 Lista virtual **Estudio** = universo operativo (membresía explícita; abrir gráfico añade, cerrar pestaña no quita). Selección masiva en Valores → **A Estudio**. SEMI/AUTO exigen pertenencia; MANUAL no. Chips TA/FA de la barra del gráfico siguen configurables con ⋯. Detalle: [trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md).
 
+**Barra de estado (inferior Trading):** izquierda = conexión · cuenta Activa · métricas; derecha (ancho fijo) = **Colas** (Velas · CORE-R · F3 · Lista AUTO) + **Alarmas Radar** (badge nº). No redimensiona al cambiar conteos.
+
 **Gráfico Trading — TOP#1:**
 - Barra general (**Indicadores**): switch **Finalista #1 · todos**.
 - Barra del gráfico en uso: switch **Finalista #1 · este**.

@@ -245,7 +245,13 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn('relative shrink-0', className)}>
+    <div
+      className={cn(
+        'relative flex h-6 w-9 shrink-0 items-center justify-center',
+        className,
+      )}
+      data-testid="trading-status-alarms"
+    >
       <IconButton
         icon={Bell}
         title={
@@ -256,14 +262,19 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
         onClick={() => setOpen((v) => !v)}
         className={cn(unread > 0 && 'text-amber-700 dark:text-amber-300')}
       />
-      {unread > 0 ? (
-        <span
-          className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[8px] font-semibold text-white"
-          aria-hidden
-        >
-          {unread > 9 ? '9+' : unread}
-        </span>
-      ) : null}
+      {/* Slot badge siempre reservado (2 dígitos) → no redimensiona la barra */}
+      <span
+        className={cn(
+          'pointer-events-none absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[1.1rem] items-center justify-center rounded-full px-0.5 text-[8px] font-semibold tabular-nums',
+          unread > 0
+            ? 'bg-amber-500 text-white'
+            : 'bg-transparent text-transparent',
+        )}
+        aria-hidden={unread <= 0}
+        aria-label={unread > 0 ? `${unread} alarmas sin leer` : undefined}
+      >
+        {unread > 99 ? '99+' : unread > 0 ? unread : '0'}
+      </span>
 
       {open ? (
         <>
@@ -276,16 +287,22 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
           <div
             role="dialog"
             aria-label="Inbox alarmas Radar"
-            className="absolute bottom-8 right-0 z-[91] w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-md border border-border bg-card shadow-lg"
+            className="absolute bottom-8 right-0 z-[91] flex w-[min(20rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-md border border-border bg-card shadow-lg"
           >
             <div className="flex items-center justify-between gap-2 border-b border-border px-2.5 py-2">
-              <div>
-                <p className="text-[11px] font-semibold text-foreground">Alarmas Radar</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-foreground">
+                  Alarmas Radar
+                  <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
+                    ({accountItems.length}
+                    {unread > 0 ? ` · ${unread} nuevas` : ''})
+                  </span>
+                </p>
                 <p className="text-[9px] text-muted-foreground">
                   DEMO activa · scan / on_bar_close · F3 = Supervisado
                 </p>
               </div>
-              <div className="flex gap-1">
+              <div className="flex shrink-0 gap-1">
                 {unread > 0 && effectiveAccountId ? (
                   <Button
                     type="button"
@@ -319,7 +336,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
                 Sin alarmas. Scan manual o programado (on_bar_close) con política inform/alert.
               </p>
             ) : (
-              <ul className="max-h-64 overflow-y-auto">
+              <ul className="max-h-64 min-h-[4.5rem] overflow-y-auto">
                 {accountItems.slice(0, 30).map((item) => (
                   <AlarmRow
                     key={item.id}

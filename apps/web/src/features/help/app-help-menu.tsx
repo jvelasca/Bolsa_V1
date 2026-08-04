@@ -395,6 +395,13 @@ function TradingContent() {
             (días / precisión / recall proxy) para medir P1–P4 antes de thaw.
           </li>
         </ul>
+        <h4 className="mb-1 mt-3 font-semibold text-foreground">Barra de estado (inferior)</h4>
+        <p>
+          Izquierda: conexión · cuenta Activa · métricas. Derecha (ancho fijo):{' '}
+          <strong className="text-foreground">Colas</strong> (Velas · CORE-R · F3 · Lista AUTO) y{' '}
+          <strong className="text-foreground">Alarmas Radar</strong> (badge nº sin leer). El rail
+          no salta al cambiar conteos.
+        </p>
       </section>
       <section>
         <h3 className="mb-2 font-semibold text-foreground">Mandato operativo (ADR-020)</h3>
