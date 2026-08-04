@@ -193,7 +193,7 @@ def build_daily_ops_digest_html(bundle: Any) -> str:
 
             <p style="margin:24px 0 0;font-size:12px;color:#64748b">
               Abre <strong>Asesor → Diario</strong> en la plataforma para el detalle interactivo.
-              Digest R3 · PDF opcional = R4.
+              Digest R3 · PDF adjunto R4 (opt-in).
             </p>
           </td>
         </tr>
@@ -209,9 +209,16 @@ def send_daily_ops_digest_email_sync(
     *,
     recipient: str,
     bundle: Any,
-) -> None:
+    attach_pdf: bool = False,
+) -> bool:
+    """Envía digest. Devuelve True si adjuntó PDF."""
     if not smtp_ready(settings):
         raise RuntimeError("SMTP no configurado (SMTP_HOST / SMTP_FROM)")
+
+    from bolsa_infrastructure.alerts.daily_ops_digest_pdf import (
+        build_daily_ops_digest_pdf,
+        digest_pdf_filename,
+    )
 
     plain = build_daily_ops_digest_text(bundle)
     html_body = build_daily_ops_digest_html(bundle)
@@ -225,11 +232,23 @@ def send_daily_ops_digest_email_sync(
     message.set_content(plain)
     message.add_alternative(html_body, subtype="html")
 
+    pdf_attached = False
+    if attach_pdf:
+        pdf_bytes = build_daily_ops_digest_pdf(bundle)
+        message.add_attachment(
+            pdf_bytes,
+            maintype="application",
+            subtype="pdf",
+            filename=digest_pdf_filename(bundle),
+        )
+        pdf_attached = True
+
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
         if settings.smtp_user and settings.smtp_password:
             smtp.starttls()
             smtp.login(settings.smtp_user, settings.smtp_password)
         smtp.send_message(message)
+    return pdf_attached
 
 
 async def maybe_notify_daily_ops_digest(
@@ -238,11 +257,12 @@ async def maybe_notify_daily_ops_digest(
     *,
     email_to: str | None = None,
     digest_enabled: bool | None = None,
+    attach_pdf: bool | None = None,
 ) -> dict[str, Any]:
-    """Envía digest HTML si prefs + SMTP OK.
+    """Envía digest HTML (+ PDF R4 opcional) si prefs + SMTP OK.
 
-    ``digest_enabled`` / ``email_to`` del cliente tienen prioridad sobre
-    ``DAILY_OPS_DIGEST_EMAIL_ENABLED`` / ``ESTUDIO_OPINION_EMAIL_TO``.
+    ``digest_enabled`` / ``email_to`` / ``attach_pdf`` del cliente tienen prioridad
+    sobre flags ``DAILY_OPS_DIGEST_*``.
     """
     if digest_enabled is not None:
         enabled = bool(digest_enabled)
@@ -250,6 +270,11 @@ async def maybe_notify_daily_ops_digest(
     else:
         enabled = bool(getattr(settings, "daily_ops_digest_email_enabled", False))
         recipient = (email_to or getattr(settings, "estudio_opinion_email_to", None) or "").strip()
+
+    if attach_pdf is not None:
+        want_pdf = bool(attach_pdf)
+    else:
+        want_pdf = bool(getattr(settings, "daily_ops_digest_pdf_enabled", False))
 
     as_of: str | None = None
     if bundle is not None:
@@ -264,6 +289,7 @@ async def maybe_notify_daily_ops_digest(
         "sent": False,
         "skipped_reason": None,
         "as_of": as_of,
+        "pdf_attached": False,
     }
 
     if not enabled:
@@ -281,13 +307,15 @@ async def maybe_notify_daily_ops_digest(
         return result
 
     try:
-        await asyncio.to_thread(
+        pdf_attached = await asyncio.to_thread(
             send_daily_ops_digest_email_sync,
             settings,
             recipient=recipient,
             bundle=bundle,
+            attach_pdf=want_pdf,
         )
         result["sent"] = True
+        result["pdf_attached"] = bool(pdf_attached)
     except Exception as exc:
         logger.warning("Daily ops digest falló to=%s: %s", recipient, exc)
         result["skipped_reason"] = str(exc)

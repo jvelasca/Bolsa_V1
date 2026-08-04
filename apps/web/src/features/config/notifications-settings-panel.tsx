@@ -17,6 +17,7 @@ export function NotificationsSettingsPanel() {
   const alarmaEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
   const alarmaEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
   const dailyDigestEnabled = useNotificationPrefsStore((s) => s.dailyDigestEnabled);
+  const dailyDigestPdfEnabled = useNotificationPrefsStore((s) => s.dailyDigestPdfEnabled);
   const setPrefs = useNotificationPrefsStore((s) => s.setPrefs);
 
   const emailOk = isValidEmailLoose(alarmaEmail);
@@ -25,6 +26,7 @@ export function NotificationsSettingsPanel() {
     alarmaEmailEnabled,
     alarmaEmail,
     dailyDigestEnabled,
+    dailyDigestPdfEnabled,
   });
 
   return (
@@ -109,9 +111,25 @@ export function NotificationsSettingsPanel() {
               <span className="font-medium">Resumen operativo diario</span>
               <p className="mt-1 text-xs text-muted-foreground">
                 Suscripción al digest del día (Asesor → Diario). Tras eod-batch o «Enviar ahora»
-                manda HTML al mismo correo. Requiere SMTP servidor (
-                <code className="text-[10px]">DAILY_OPS_DIGEST_EMAIL_ENABLED</code> opcional;
-                la pref UI tiene prioridad en corridas manuales).
+                manda HTML al mismo correo. Requiere SMTP servidor.
+              </p>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className={cn(checkboxClassName, 'mt-0.5')}
+              checked={dailyDigestPdfEnabled}
+              disabled={!dailyDigestEnabled}
+              onChange={(e) => setPrefs({ dailyDigestPdfEnabled: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Adjuntar PDF al digest</span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                R4 — PDF ligero (Helvetica) junto al HTML. También puedes descargarlo en Diario sin
+                email. Flag servidor opcional:{' '}
+                <code className="text-[10px]">DAILY_OPS_DIGEST_PDF_ENABLED</code>.
               </p>
             </span>
           </label>

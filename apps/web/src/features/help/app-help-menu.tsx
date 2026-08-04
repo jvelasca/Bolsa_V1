@@ -392,8 +392,8 @@ function TradingContent() {
           </li>
           <li>
             <strong className="text-foreground">Asesor → Diario</strong> — resumen operativo del
-            día (cuenta · trades · F3 · Alarmas/Avisos · semana). Preview en app; email HTML al
-            cierre (R3) o «Enviar ahora».
+            día (cuenta · trades · F3 · Alarmas/Avisos · semana). Preview en app; email HTML
+            (+ PDF opt-in R4) o descarga PDF.
           </li>
           <li>
             <strong className="text-foreground">Asesor → Opiniones</strong> — telemetría A0

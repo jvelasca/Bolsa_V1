@@ -886,6 +886,7 @@ export const api = {
     notifyEmail?: string | null;
     notifyEmailEnabled?: boolean | null;
     notifyDigestEnabled?: boolean | null;
+    attachPdf?: boolean | null;
   }) =>
     request<{
       enabled: boolean;
@@ -903,6 +904,7 @@ export const api = {
         sent: boolean;
         skippedReason?: string | null;
         asOf?: string | null;
+        pdfAttached?: boolean;
       } | null;
     }>('/api/instrument-daily-opinions/eod-batch', {
       method: 'POST',
@@ -917,6 +919,7 @@ export const api = {
       instrumentIds?: string[];
       notifyEmail?: string | null;
       notifyDigestEnabled?: boolean;
+      attachPdf?: boolean | null;
     },
   ) =>
     request<{
@@ -925,11 +928,36 @@ export const api = {
         sent: boolean;
         skippedReason?: string | null;
         asOf?: string | null;
+        pdfAttached?: boolean;
       };
     }>(`/api/accounts/${accountId}/daily-ops-report/email`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  /** R4 — descarga PDF del resumen operativo. */
+  downloadDailyOpsDigestPdf: async (
+    accountId: string,
+    opts?: { asOf?: string; instrumentIds?: string[] },
+  ): Promise<Blob> => {
+    const q = new URLSearchParams();
+    if (opts?.asOf) q.set('asOf', opts.asOf);
+    if (opts?.instrumentIds?.length) q.set('instrumentIds', opts.instrumentIds.join(','));
+    const qs = q.toString();
+    const headers: HeadersInit = {};
+    const token = getAuthToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const account = getActiveAccountId();
+    if (account) headers['X-Account-Id'] = account;
+    const res = await fetch(
+      `${API_URL}/api/accounts/${accountId}/daily-ops-report.pdf${qs ? `?${qs}` : ''}`,
+      { headers },
+    );
+    if (!res.ok) {
+      throw new ApiError(`PDF digest · HTTP ${res.status}`, res.status);
+    }
+    return res.blob();
+  },
 
   getInstrumentDailyOpinionTelemetry: (opts?: {
     lookbackDays?: number;

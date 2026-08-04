@@ -280,6 +280,52 @@ async def get_daily_ops_report(
     }
 
 
+@router.get("/accounts/{account_id}/daily-ops-report.pdf")
+async def download_daily_ops_digest_pdf(
+    account_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    as_of: Annotated[
+        str | None,
+        Query(alias="asOf", description="YYYY-MM-DD"),
+    ] = None,
+    instrument_ids: Annotated[
+        str | None,
+        Query(alias="instrumentIds", description="IDs Estudio separados por coma"),
+    ] = None,
+) -> Response:
+    """R4 — descarga PDF del resumen operativo (sin email)."""
+    from datetime import date as date_cls
+
+    from bolsa_infrastructure.alerts.daily_ops_digest_pdf import (
+        build_daily_ops_digest_pdf,
+        digest_pdf_filename,
+    )
+
+    day: date_cls | None = None
+    if as_of:
+        try:
+            day = date_cls.fromisoformat(as_of.strip()[:10])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="asOf inválido (YYYY-MM-DD)") from exc
+    ids = [x.strip() for x in (instrument_ids or "").split(",") if x.strip()]
+    try:
+        bundle = await get_daily_ops_report_use_case(session).execute(
+            account_id,
+            as_of=day,
+            instrument_ids=ids or None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    pdf = build_daily_ops_digest_pdf(bundle)
+    filename = digest_pdf_filename(bundle)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post(
     "/accounts/{account_id}/daily-ops-report/email",
     response_model=DailyOpsDigestNotifyResponseDto,
@@ -316,6 +362,7 @@ async def send_daily_ops_digest_email(
         bundle,
         email_to=body.notify_email,
         digest_enabled=body.notify_digest_enabled,
+        attach_pdf=body.attach_pdf,
     )
     return DailyOpsDigestNotifyResponseDto(
         data=DailyOpsDigestNotifyDto(
@@ -323,6 +370,7 @@ async def send_daily_ops_digest_email(
             sent=bool(meta["sent"]),
             skipped_reason=meta.get("skipped_reason"),
             as_of=meta.get("as_of"),
+            pdf_attached=bool(meta.get("pdf_attached")),
         )
     )
 

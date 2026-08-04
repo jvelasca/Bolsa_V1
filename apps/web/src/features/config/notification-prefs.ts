@@ -16,10 +16,12 @@ export type NotificationPrefs = {
   /** Destinatario (un solo operador hasta multiusuario). */
   alarmaEmail: string;
   /**
-   * R2 — suscripción al resumen operativo diario (mismo correo).
-   * Envío EOD = R3 (flag off); hoy solo preferencia local.
+   * R2/R3 — suscripción al resumen operativo diario (mismo correo).
+   * Envío tras eod-batch o «Enviar ahora».
    */
   dailyDigestEnabled: boolean;
+  /** R4 — adjuntar PDF al digest email (opt-in). */
+  dailyDigestPdfEnabled: boolean;
 };
 
 export function defaultNotificationPrefs(): NotificationPrefs {
@@ -28,6 +30,7 @@ export function defaultNotificationPrefs(): NotificationPrefs {
     alarmaEmailEnabled: false,
     alarmaEmail: '',
     dailyDigestEnabled: false,
+    dailyDigestPdfEnabled: false,
   };
 }
 
@@ -51,6 +54,10 @@ export function normalizeNotificationPrefs(raw: unknown): NotificationPrefs {
     alarmaEmail: email,
     dailyDigestEnabled:
       typeof o.dailyDigestEnabled === 'boolean' ? o.dailyDigestEnabled : d.dailyDigestEnabled,
+    dailyDigestPdfEnabled:
+      typeof o.dailyDigestPdfEnabled === 'boolean'
+        ? o.dailyDigestPdfEnabled
+        : d.dailyDigestPdfEnabled,
   };
 }
 

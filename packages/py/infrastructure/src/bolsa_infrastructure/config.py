@@ -127,6 +127,10 @@ class Settings(BaseSettings):
     daily_ops_digest_email_enabled: bool = Field(
         default=False, validation_alias="DAILY_OPS_DIGEST_EMAIL_ENABLED"
     )
+    # R4 — adjuntar PDF al digest (off-by-default; requiere digest email).
+    daily_ops_digest_pdf_enabled: bool = Field(
+        default=False, validation_alias="DAILY_OPS_DIGEST_PDF_ENABLED"
+    )
 
     @field_validator("database_url")
     @classmethod

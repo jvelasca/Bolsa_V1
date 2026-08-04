@@ -271,7 +271,7 @@ class CashMovementResponseDto(BaseModel):
 
 
 class SendDailyOpsDigestDto(BaseModel):
-    """R3 — envío manual del digest HTML (Asesor → Diario)."""
+    """R3/R4 — envío manual del digest HTML (+ PDF opcional)."""
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -279,6 +279,7 @@ class SendDailyOpsDigestDto(BaseModel):
     instrument_ids: list[str] | None = Field(default=None, alias="instrumentIds")
     notify_email: str | None = Field(default=None, alias="notifyEmail")
     notify_digest_enabled: bool = Field(default=True, alias="notifyDigestEnabled")
+    attach_pdf: bool | None = Field(default=None, alias="attachPdf")
 
 
 class DailyOpsDigestNotifyDto(BaseModel):
@@ -288,6 +289,7 @@ class DailyOpsDigestNotifyDto(BaseModel):
     sent: bool
     skipped_reason: str | None = Field(default=None, alias="skippedReason")
     as_of: str | None = Field(default=None, alias="asOf")
+    pdf_attached: bool = Field(default=False, alias="pdfAttached")
 
 
 class DailyOpsDigestNotifyResponseDto(BaseModel):

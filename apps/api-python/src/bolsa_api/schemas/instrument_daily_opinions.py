@@ -108,6 +108,11 @@ class RunEstudioEodOpinionBatchDto(BaseModel):
             "Sustituye DAILY_OPS_DIGEST_EMAIL_ENABLED para esta corrida."
         ),
     )
+    attach_pdf: bool | None = Field(
+        default=None,
+        alias="attachPdf",
+        description="R4 — adjuntar PDF al digest. Sustituye DAILY_OPS_DIGEST_PDF_ENABLED.",
+    )
 
     @field_validator("instrument_ids")
     @classmethod
@@ -136,7 +141,7 @@ class EstudioEodOpinionEmailNotifyDto(BaseModel):
 
 
 class EstudioEodDigestNotifyDto(BaseModel):
-    """R3 — resultado envío digest operativo tras eod-batch."""
+    """R3/R4 — resultado envío digest operativo tras eod-batch."""
 
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
 
@@ -144,6 +149,7 @@ class EstudioEodDigestNotifyDto(BaseModel):
     sent: bool
     skipped_reason: str | None = Field(default=None, alias="skippedReason")
     as_of: str | None = Field(default=None, alias="asOf")
+    pdf_attached: bool = Field(default=False, alias="pdfAttached")
 
 
 class EstudioEodOpinionBatchResponseDto(BaseModel):

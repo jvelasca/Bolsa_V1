@@ -56,6 +56,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const notifyEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
   const notifyEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
   const dailyDigestEnabled = useNotificationPrefsStore((s) => s.dailyDigestEnabled);
+  const dailyDigestPdfEnabled = useNotificationPrefsStore((s) => s.dailyDigestPdfEnabled);
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
 
@@ -404,6 +405,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                     notifyEmail: notifyEmail.trim() || null,
                     notifyEmailEnabled,
                     notifyDigestEnabled: dailyDigestEnabled,
+                    attachPdf: dailyDigestEnabled ? dailyDigestPdfEnabled : false,
                   })
                   .then((res) => {
                     void opinionsQuery.refetch();
@@ -420,7 +422,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                     }
                     if (digest) {
                       if (digest.sent) {
-                        msg += ' · digest enviado';
+                        msg += digest.pdfAttached ? ' · digest+PDF enviado' : ' · digest enviado';
                       } else if (digest.skippedReason) {
                         msg += ` · digest skip (${digest.skippedReason})`;
                       }

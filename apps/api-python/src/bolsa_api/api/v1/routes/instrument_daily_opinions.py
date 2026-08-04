@@ -250,6 +250,7 @@ async def run_estudio_eod_opinion_batch(
             digest_bundle,
             email_to=body.notify_email,
             digest_enabled=body.notify_digest_enabled,
+            attach_pdf=body.attach_pdf,
         )
 
     return EstudioEodOpinionBatchResponseDto(
@@ -269,6 +270,7 @@ async def run_estudio_eod_opinion_batch(
                 sent=bool(digest_meta["sent"]),
                 skipped_reason=digest_meta.get("skipped_reason"),
                 as_of=digest_meta.get("as_of"),
+                pdf_attached=bool(digest_meta.get("pdf_attached")),
             )
             if digest_meta is not None
             else None

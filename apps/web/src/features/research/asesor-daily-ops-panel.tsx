@@ -127,18 +127,21 @@ export function AsesorDailyOpsPanel() {
   const asOf = todayIso();
   const book = loadDemoBookPrefs();
   const digestEnabled = useNotificationPrefsStore((s) => s.dailyDigestEnabled);
+  const digestPdfEnabled = useNotificationPrefsStore((s) => s.dailyDigestPdfEnabled);
   const alarmaEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
   const alarmaEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
   const alarmaToastEnabled = useNotificationPrefsStore((s) => s.alarmaToastEnabled);
   const setPrefs = useNotificationPrefsStore((s) => s.setPrefs);
   const pushToast = useAlertsStore((s) => s.pushToast);
   const [sending, setSending] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const emailReady = notificationEmailReady({
     alarmaToastEnabled,
     alarmaEmailEnabled,
     alarmaEmail,
     dailyDigestEnabled: digestEnabled,
+    dailyDigestPdfEnabled: digestPdfEnabled,
   });
   const canSendDigest =
     Boolean(effectiveAccountId) && digestEnabled && isValidEmailLoose(alarmaEmail);
@@ -323,10 +326,10 @@ export function AsesorDailyOpsPanel() {
           <section className="rounded-xl border border-dashed border-border bg-muted/20 p-4 lg:col-span-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-medium text-foreground">Envío al cierre (R3)</p>
+                <p className="text-sm font-medium text-foreground">Envío al cierre (R3/R4)</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  HTML por email tras eod-batch (mismo correo de Alarmas). Requiere SMTP en el
-                  servidor. También puedes enviar ahora una copia de prueba.
+                  HTML por email tras eod-batch (mismo correo de Alarmas). PDF adjunto opcional.
+                  Requiere SMTP. También puedes enviar o descargar ahora.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -339,6 +342,45 @@ export function AsesorDailyOpsPanel() {
                   />
                   Quiero el resumen diario
                 </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={digestPdfEnabled}
+                    disabled={!digestEnabled}
+                    onChange={(e) => setPrefs({ dailyDigestPdfEnabled: e.target.checked })}
+                    className="h-3.5 w-3.5 accent-primary"
+                  />
+                  Adjuntar PDF
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-[11px]"
+                  disabled={!effectiveAccountId || downloadingPdf}
+                  onClick={() => {
+                    if (!effectiveAccountId) return;
+                    setDownloadingPdf(true);
+                    void api
+                      .downloadDailyOpsDigestPdf(effectiveAccountId, {
+                        asOf,
+                        instrumentIds: studyIds,
+                      })
+                      .then((blob) => {
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `bolsa-resumen-operativo-${asOf}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        pushToast('PDF descargado');
+                      })
+                      .catch((e: Error) => pushToast(`PDF · ${e.message}`))
+                      .finally(() => setDownloadingPdf(false));
+                  }}
+                >
+                  {downloadingPdf ? 'PDF…' : 'Descargar PDF'}
+                </Button>
                 <Button
                   type="button"
                   size="sm"
@@ -361,11 +403,16 @@ export function AsesorDailyOpsPanel() {
                         instrumentIds: studyIds,
                         notifyEmail: alarmaEmail.trim() || null,
                         notifyDigestEnabled: true,
+                        attachPdf: digestPdfEnabled,
                       })
                       .then((res) => {
                         const d = res.data;
                         if (d.sent) {
-                          pushToast(`Digest enviado · ${d.asOf ?? asOf}`);
+                          pushToast(
+                            d.pdfAttached
+                              ? `Digest+PDF enviado · ${d.asOf ?? asOf}`
+                              : `Digest enviado · ${d.asOf ?? asOf}`,
+                          );
                         } else {
                           pushToast(`Digest skip (${d.skippedReason ?? 'desconocido'})`);
                         }
