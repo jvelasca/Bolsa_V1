@@ -120,3 +120,28 @@
 
 **Veredicto interno:** cadena SEMI + notificaciones **lista para auditoría previa a AUTO**. Entrada AUTO = fase **A0 telemetría** ([checklist](./camino-d-auto-thaw-checklist-2026-08-04.md)), no flip de execute.
 
+---
+
+## 8. Resultado auditoría ejecutada (2026-08-04)
+
+> Branch: `stage/estudio-membership-operativa-2026-08-04` @ `df3b581`+ · PR [#29](https://github.com/jvelasca/Bolsa_V1/pull/29)
+
+| Check | Resultado |
+|-------|-----------|
+| `pytest` stance + email map + notify prefs | **17 passed** |
+| Vitest notification-prefs + propose SEMI + IO + H≠M | **8 passed** |
+| Flags default off (`ESTUDIO_EOD_*`, email env, Camino D freeze docs) | **OK** |
+| Paths críticos presentes (motor, API, Asesor, poller, prefs UI) | **OK** |
+| Selector Zustand estable (poller + badge) | **OK** (fix loops) |
+| Smoke UI manual (toast/email/SEMI Confirm) | **Pendiente operador** (checklist §1.4) |
+| Telemetría precisión/recall (P3–P4 thaw) | **No** — bloquea flip AUTO |
+| `PAPER_D_EXECUTE` | **Freeze** |
+
+### Veredicto
+
+**PASS condicional para cierre Canales / gate pre-AUTO.**  
+Listo para revisión humana / auditoría externa con el pack. **No PASS** para thaw Camino D (falta A0 métricas + P1–P10).
+
+Siguiente: A0 telemetría dictamen · no merge de execute AUTO.
+
+

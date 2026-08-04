@@ -20,8 +20,9 @@ Bolsa_V1 tiene Lab (TOP, CORE-R), Estudio, IO, SEMI Confirm (Camino C) y Gate lo
 5. UI: el Dictamen es la proyección principal; IO/TOP/Radar/F3 no compiten como “verdades” de bandeja.  
 6. ★ Dictamen ≠ ★ Estrategia (TOP).  
 7. Long-only vía `TradingPolicy.allowShorting` (default false) + reglas de stance.  
-8. AUTO: freeze hasta checklist de thaw del triage round 3.  
-9. Implementación: `packages/py/application` + Prisma + routes FastAPI + React consumer — **no** analytics puro ni workers inventados.
+8. AUTO: freeze hasta checklist de thaw ([camino-d-auto-thaw-checklist](../engineering/camino-d-auto-thaw-checklist-2026-08-04.md)).  
+9. Implementación: `packages/py/application` + Prisma + routes FastAPI + React consumer — **no** analytics puro ni workers inventados.  
+10. **Estado post-D2 (2026-08-04):** Operativa SEMI · Asesor Opiniones · canales AVISO/ALARMA · toast + prefs email UI · EOD force flag-off. Pack auditoría: [audit-pack-estudio-asesor-canales](../engineering/audit-pack-estudio-asesor-canales-2026-08-04.md).
 
 ## Consequences
 

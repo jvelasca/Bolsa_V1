@@ -35,6 +35,7 @@
 |--------|----------------|
 | Dock Trading | `bolsa-trading-layout-v1` (listas/ops/operativa open · anchos · alturas de sección Operativa) |
 | Libro operativo DEMO (MANUAL/SEMI) | `bolsa-demo-book-prefs-v1` |
+| Notificaciones Alarmas (toast/email) | `bolsa-notification-prefs-v1` |
 | Anchos columnas listas | `bolsa-list-chrome-layout-v1` |
 | Screeners | `bolsa-screener-preferences` |
 | Backtesting splits / HUD / zona | `bolsa-backtest-layout-*`, `bolsa-backtest-hud-prefs-v1`, … |
