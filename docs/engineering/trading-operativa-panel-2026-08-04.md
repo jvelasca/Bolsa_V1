@@ -37,7 +37,7 @@ TradingStatusBar (fuera de TradingLayout)
 | Check membresía / «A Estudio» (bulk) | Añade o quita membresía |
 | Ranking IO | Universo = IDs en `visualization-store` |
 | Nombre UI | **Estudio** (id legacy `__builtin:visualization__`) |
-| Carrusel | Oculta listas API homónimas (`Estudio` / `En estudio`) para evitar chip duplicado |
+- Preferencia: **Estudio** si el valor es miembro (universo operativo), para no saltar a catálogo (p. ej. IBEX) al cambiar de gráfico (`resolveValidSourceListIdForTab`).
 
 Sync: `use-chart-visualization-sync.ts` solo **amplía** el store (nunca `replaceEntries` desde pestañas).
 

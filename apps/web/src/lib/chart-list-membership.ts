@@ -93,11 +93,22 @@ export function findBestListForInstrument(
   return containing[0]?.id ?? null;
 }
 
+/**
+ * Resuelve la lista “fuente” de una pestaña al enfocarla.
+ * Preferencia: **Estudio** si el valor es miembro (universo operativo),
+ * para no saltar a catálogo (p. ej. IBEX) al cambiar de gráfico.
+ */
 export function resolveValidSourceListIdForTab(
   workspace: WorkspaceDocument,
   tab: ChartTabState,
   membership: ChartListMembershipSnapshot,
 ): string | null {
+  if (!tab.instrumentId) return null;
+
+  if (membership.virtual.visualization.has(tab.instrumentId)) {
+    return VIRTUAL_LIST_VISUALIZATION;
+  }
+
   for (const listId of collectCandidateListIds(workspace, tab)) {
     if (isInstrumentInList(listId, tab.instrumentId, membership)) return listId;
   }
