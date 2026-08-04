@@ -15,6 +15,11 @@ export type NotificationPrefs = {
   alarmaEmailEnabled: boolean;
   /** Destinatario (un solo operador hasta multiusuario). */
   alarmaEmail: string;
+  /**
+   * R2 — suscripción al resumen operativo diario (mismo correo).
+   * Envío EOD = R3 (flag off); hoy solo preferencia local.
+   */
+  dailyDigestEnabled: boolean;
 };
 
 export function defaultNotificationPrefs(): NotificationPrefs {
@@ -22,6 +27,7 @@ export function defaultNotificationPrefs(): NotificationPrefs {
     alarmaToastEnabled: true,
     alarmaEmailEnabled: false,
     alarmaEmail: '',
+    dailyDigestEnabled: false,
   };
 }
 
@@ -43,6 +49,8 @@ export function normalizeNotificationPrefs(raw: unknown): NotificationPrefs {
     alarmaEmailEnabled:
       typeof o.alarmaEmailEnabled === 'boolean' ? o.alarmaEmailEnabled : d.alarmaEmailEnabled,
     alarmaEmail: email,
+    dailyDigestEnabled:
+      typeof o.dailyDigestEnabled === 'boolean' ? o.dailyDigestEnabled : d.dailyDigestEnabled,
   };
 }
 

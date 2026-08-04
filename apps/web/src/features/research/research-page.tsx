@@ -7,15 +7,17 @@ import { formatPct } from '@/features/charts/chart-utils';
 import { ResearchLabEvidenceSummary } from '@/features/research/research-lab-evidence-summary';
 import { ResearchTrialResultBlock } from '@/features/research/research-trial-result-block';
 import { AsesorOpinionesPanel } from '@/features/research/asesor-opiniones-panel';
+import { AsesorDailyOpsPanel } from '@/features/research/asesor-daily-ops-panel';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-type HubTab = 'dashboard' | 'history' | 'opiniones';
+type HubTab = 'dashboard' | 'diario' | 'history' | 'opiniones';
 
 function parseTab(raw: string | null): HubTab {
   if (raw === 'history') return 'history';
   if (raw === 'opiniones') return 'opiniones';
+  if (raw === 'diario') return 'diario';
   return 'dashboard';
 }
 
@@ -160,6 +162,9 @@ export function ResearchPage() {
         <HubTabButton active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>
           Resumen
         </HubTabButton>
+        <HubTabButton active={tab === 'diario'} onClick={() => setTab('diario')}>
+          Diario
+        </HubTabButton>
         <HubTabButton active={tab === 'history'} onClick={() => setTab('history')}>
           Historial
         </HubTabButton>
@@ -167,6 +172,8 @@ export function ResearchPage() {
           Opiniones
         </HubTabButton>
       </div>
+
+      {tab === 'diario' && <AsesorDailyOpsPanel />}
 
       {tab === 'opiniones' && <AsesorOpinionesPanel />}
 

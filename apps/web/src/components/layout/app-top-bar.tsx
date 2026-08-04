@@ -266,6 +266,7 @@ const BACKTESTING_MENU: MenuItem[] = [
 
 const RESEARCH_MENU: MenuItem[] = [
   { label: 'Resumen', href: '/research?tab=dashboard' },
+  { label: 'Diario', href: '/research?tab=diario' },
   { label: 'Historial', href: '/research?tab=history' },
   { label: 'Opiniones', href: '/research?tab=opiniones' },
 ];

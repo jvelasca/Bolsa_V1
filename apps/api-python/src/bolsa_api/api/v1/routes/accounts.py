@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bolsa_api.api.dependencies import (
     get_close_account_use_case,
     get_create_account_use_case,
+    get_daily_ops_report_use_case,
     get_db_session,
     get_delete_account_use_case,
     get_deposit_cash_use_case,
@@ -218,6 +219,62 @@ async def get_account_summary(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AccountSummaryResponseDto(data=to_account_summary_dto(summary))
+
+
+@router.get("/accounts/{account_id}/daily-ops-report")
+async def get_daily_ops_report(
+    account_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    as_of: Annotated[
+        str | None,
+        Query(alias="asOf", description="YYYY-MM-DD"),
+    ] = None,
+    instrument_ids: Annotated[
+        str | None,
+        Query(alias="instrumentIds", description="IDs Estudio separados por coma"),
+    ] = None,
+) -> dict:
+    """R1 — resumen operativo del día (preview web; email = R3)."""
+    from datetime import date as date_cls
+
+    day: date_cls | None = None
+    if as_of:
+        try:
+            day = date_cls.fromisoformat(as_of.strip()[:10])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="asOf inválido (YYYY-MM-DD)") from exc
+    ids = [x.strip() for x in (instrument_ids or "").split(",") if x.strip()]
+    try:
+        bundle = await get_daily_ops_report_use_case(session).execute(
+            account_id,
+            as_of=day,
+            instrument_ids=ids or None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    from bolsa_application.daily_ops_report import DAILY_OPS_REPORT_SCHEMA
+
+    return {
+        "data": {
+            "schemaVersion": DAILY_OPS_REPORT_SCHEMA,
+            "asOf": bundle.as_of.isoformat(),
+            "generatedAt": bundle.generated_at,
+            "accountId": bundle.account_id,
+            "summary": to_account_summary_dto(bundle.summary).model_dump(by_alias=True),
+            "ledgerToday": [
+                to_ledger_entry_dto(e).model_dump(by_alias=True) for e in bundle.ledger_today
+            ],
+            "tradesToday": [
+                to_ledger_entry_dto(e).model_dump(by_alias=True) for e in bundle.trades_today
+            ],
+            "week": bundle.week,
+            "f3PendingCount": bundle.f3_pending_count,
+            "channels": bundle.channels,
+            "opinions": bundle.opinions,
+            "notes": bundle.notes,
+        }
+    }
 
 
 @router.post(

@@ -16,6 +16,7 @@ export function NotificationsSettingsPanel() {
   const alarmaToastEnabled = useNotificationPrefsStore((s) => s.alarmaToastEnabled);
   const alarmaEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
   const alarmaEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
+  const dailyDigestEnabled = useNotificationPrefsStore((s) => s.dailyDigestEnabled);
   const setPrefs = useNotificationPrefsStore((s) => s.setPrefs);
 
   const emailOk = isValidEmailLoose(alarmaEmail);
@@ -23,6 +24,7 @@ export function NotificationsSettingsPanel() {
     alarmaToastEnabled,
     alarmaEmailEnabled,
     alarmaEmail,
+    dailyDigestEnabled,
   });
 
   return (
@@ -94,6 +96,22 @@ export function NotificationsSettingsPanel() {
                   : 'Activa el email y escribe un correo válido.'}
               </span>
             )}
+          </label>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className={cn(checkboxClassName, 'mt-0.5')}
+              checked={dailyDigestEnabled}
+              onChange={(e) => setPrefs({ dailyDigestEnabled: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Resumen operativo diario</span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Suscripción al digest del día (Asesor → Diario). Preview ya en app; envío email al
+                cierre = R3 (aún no automático). Usa el mismo correo de Alarmas.
+              </p>
+            </span>
           </label>
 
           <p className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">

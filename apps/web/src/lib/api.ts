@@ -1175,6 +1175,20 @@ export const api = {
       `/api/accounts/${accountId}/summary`,
     ),
 
+  /** R1 — resumen operativo diario (Asesor → Diario). */
+  getDailyOpsReport: (
+    accountId: string,
+    opts?: { asOf?: string; instrumentIds?: string[] },
+  ) => {
+    const q = new URLSearchParams();
+    if (opts?.asOf) q.set('asOf', opts.asOf);
+    if (opts?.instrumentIds?.length) q.set('instrumentIds', opts.instrumentIds.join(','));
+    const qs = q.toString();
+    return request<import('@bolsa/shared').DailyOpsReportResponseV1>(
+      `/api/accounts/${accountId}/daily-ops-report${qs ? `?${qs}` : ''}`,
+    );
+  },
+
   getAccountSummaries: (type?: string) =>
     request<{ data: import('@bolsa/shared').AccountSummaryDto[] }>(
       type

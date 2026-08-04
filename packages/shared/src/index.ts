@@ -50,6 +50,7 @@ export * from './strategy-top1-chart-indicators.js';
 export * from './instrument-strategy-top.js';
 export * from './instrument-narrative.js';
 export * from './instrument-daily-opinion.js';
+export * from './daily-ops-report.js';
 export * from './opinion-channel-map.js';
 export * from './operating-mandate.js';
 export * from './core-r-api.js';

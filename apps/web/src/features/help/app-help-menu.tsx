@@ -391,6 +391,11 @@ function TradingContent() {
             <code className="text-[10px]">PAPER_D_EXECUTE=1</code> (default off).
           </li>
           <li>
+            <strong className="text-foreground">Asesor → Diario</strong> — resumen operativo del
+            día (cuenta · trades · F3 · Alarmas/Avisos · semana). Preview en app; email al cierre =
+            R3.
+          </li>
+          <li>
             <strong className="text-foreground">Asesor → Opiniones</strong> — telemetría A0
             (días / precisión / recall proxy) para medir P1–P4 antes de thaw.
           </li>

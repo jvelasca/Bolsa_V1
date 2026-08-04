@@ -112,6 +112,7 @@ Aplica a `/api/portfolio`, `/api/portfolio/trade`, `/api/portfolio/transactions`
 | POST | `/api/accounts/{id}/close` | Cerrar cuenta (conserva historial) |
 | DELETE | `/api/accounts/{id}` | Eliminar cuenta demo cerrada (hard delete) |
 | GET | `/api/accounts/{id}/summary` | Resumen (dispara custodia anual si procede) |
+| GET | `/api/accounts/{id}/daily-ops-report?asOf=&instrumentIds=` | Resumen operativo diario (R1 preview Asesor → Diario) |
 | GET | `/api/accounts/{id}/ledger?limit=&offset=` | Libro mayor |
 | GET | `/api/accounts/{id}/tax-report?year=` | Informe plusvalías |
 | POST | `/api/accounts/{id}/deposits` | Depósito externo (simulado) |

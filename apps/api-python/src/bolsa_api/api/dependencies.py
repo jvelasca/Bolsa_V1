@@ -293,6 +293,24 @@ def get_list_ledger_use_case(session: AsyncSession) -> ListLedgerEntries:
     return ListLedgerEntries(get_ledger_repository(session))
 
 
+def get_daily_ops_report_use_case(session: AsyncSession):
+    """R1 — resumen operativo diario."""
+    from bolsa_application.daily_ops_report import GetDailyOpsReport
+    from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
+        SqlAlchemyInstrumentDailyOpinionRepository,
+    )
+    from bolsa_infrastructure.database.repositories.supervised_f3_repository import (
+        SqlAlchemySupervisedF3Repository,
+    )
+
+    return GetDailyOpsReport(
+        get_get_account_summary_use_case(session),
+        get_list_ledger_use_case(session),
+        SqlAlchemySupervisedF3Repository(session),
+        SqlAlchemyInstrumentDailyOpinionRepository(session),
+    )
+
+
 def get_portfolio_summary_use_case(session: AsyncSession) -> GetPortfolioSummary:
     return GetPortfolioSummary(get_account_repository(session), get_portfolio_repository(session))
 

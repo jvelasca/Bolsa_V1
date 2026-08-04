@@ -16,16 +16,19 @@ describe('notification-prefs', () => {
     expect(d.alarmaToastEnabled).toBe(true);
     expect(d.alarmaEmailEnabled).toBe(false);
     expect(d.alarmaEmail).toBe('');
+    expect(d.dailyDigestEnabled).toBe(false);
   });
 
   it('normalizes partial raw', () => {
     const n = normalizeNotificationPrefs({
       alarmaEmailEnabled: true,
       alarmaEmail: '  a@b.com ',
+      dailyDigestEnabled: true,
     });
     expect(n.alarmaToastEnabled).toBe(true);
     expect(n.alarmaEmailEnabled).toBe(true);
     expect(n.alarmaEmail).toBe('a@b.com');
+    expect(n.dailyDigestEnabled).toBe(true);
   });
 
   it('validates email loosely', () => {
@@ -35,11 +38,13 @@ describe('notification-prefs', () => {
       alarmaToastEnabled: true,
       alarmaEmailEnabled: true,
       alarmaEmail: 'a@b.com',
+      dailyDigestEnabled: false,
     })).toBe(true);
     expect(notificationEmailReady({
       alarmaToastEnabled: true,
       alarmaEmailEnabled: true,
       alarmaEmail: 'bad',
+      dailyDigestEnabled: false,
     })).toBe(false);
   });
 });
