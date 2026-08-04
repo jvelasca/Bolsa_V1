@@ -821,6 +821,24 @@ export const api = {
       { method: 'DELETE' },
     ),
 
+  queryInstrumentDailyOpinions: (
+    body: import('@bolsa/shared').QueryInstrumentDailyOpinionsRequestV1,
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentDailyOpinionV1[] }>(
+      '/api/instrument-daily-opinions/query',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getInstrumentDailyOpinion: (instrumentId: string, asOfBarDate?: string, forceRefresh = false) => {
+    const params = new URLSearchParams();
+    if (asOfBarDate) params.set('asOfBarDate', asOfBarDate);
+    if (forceRefresh) params.set('forceRefresh', 'true');
+    const q = params.toString();
+    return request<{ data: import('@bolsa/shared').InstrumentDailyOpinionV1[] }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/daily-opinion${q ? `?${q}` : ''}`,
+    );
+  },
+
   getAccountMandates: (accountId: string, instrumentId?: string) => {
     const q = instrumentId
       ? `?instrumentId=${encodeURIComponent(instrumentId)}`

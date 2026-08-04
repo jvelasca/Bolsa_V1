@@ -1214,6 +1214,37 @@ class InstrumentStrategyTopRow(Base):
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
 
+class InstrumentDailyOpinionRow(Base):
+    """Dictamen diario Estudio (O3-C / ADR-022)."""
+
+    __tablename__ = "instrument_daily_opinions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id",
+        ForeignKey("instruments.id", ondelete="CASCADE"),
+    )
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    as_of_bar_date: Mapped[date] = mapped_column("as_of_bar_date", Date)
+    stance: Mapped[str] = mapped_column(String)
+    dictamen_stars: Mapped[int] = mapped_column("dictamen_stars", Integer)
+    strategy_stars: Mapped[int | None] = mapped_column("strategy_stars", Integer, nullable=True)
+    io_score: Mapped[float | None] = mapped_column("io_score", Float, nullable=True)
+    fa_score: Mapped[float | None] = mapped_column("fa_score", Float, nullable=True)
+    ta_score: Mapped[float | None] = mapped_column("ta_score", Float, nullable=True)
+    distress: Mapped[bool] = mapped_column(Boolean, default=False)
+    reasons: Mapped[list] = mapped_column(JSONB, default=list)
+    gate_status: Mapped[str | None] = mapped_column("gate_status", String, nullable=True)
+    top_id: Mapped[str | None] = mapped_column("top_id", String, nullable=True)
+    top_version: Mapped[int | None] = mapped_column("top_version", Integer, nullable=True)
+    source: Mapped[str] = mapped_column(String, default="on_demand")
+    engine_version: Mapped[str] = mapped_column("engine_version", String, default="opinion_v1")
+    idempotency_key: Mapped[str] = mapped_column("idempotency_key", String, unique=True)
+    computed_at: Mapped[datetime] = mapped_column("computed_at", DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
+
+
 class InstrumentNarrativeRow(Base):
     """Resumen corto de evolución por instrumento (scope estudio/global/trading)."""
 

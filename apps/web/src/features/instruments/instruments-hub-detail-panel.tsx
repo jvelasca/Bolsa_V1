@@ -6,7 +6,11 @@ import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ChevronDown, PanelRightClose, X } from 'lucide-react';
-import { DEFAULT_CHART_CONFIG, type InstrumentWithMetaDto } from '@bolsa/shared';
+import {
+  DEFAULT_CHART_CONFIG,
+  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
+  type InstrumentWithMetaDto,
+} from '@bolsa/shared';
 import { api } from '@/lib/api';
 import { formatPct, formatPrice } from '@/features/charts/chart-utils';
 import { OhlcvChart } from '@/features/charts/ohlcv-chart';
@@ -16,6 +20,7 @@ import { InstrumentNarrativeEditor } from '@/features/instruments/instrument-nar
 import { IconButton } from '@/components/ui/icon-button';
 import { KeyValueList, KeyValueRow } from '@/components/ui/key-value-list';
 import { cn } from '@/lib/utils';
+import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
 
 export type InstrumentsHubDetailSectionId =
   | 'resumen'
@@ -110,6 +115,20 @@ export function InstrumentsHubDetailPanel({
     staleTime: 60_000,
   });
 
+  const opinionQuery = useInstrumentDailyOpinions(
+    [instrument.id],
+    [
+      {
+        instrumentId: instrument.id,
+        hasEodBar: Boolean(instrument.meta.lastBarDate),
+        allowTrading: true,
+        positionOpen: false,
+      },
+    ],
+    { enabled: sectionsOpen.resumen },
+  );
+  const opinion = opinionQuery.data?.[0];
+
   return (
     <div className={cn('flex h-full min-h-0 flex-col overflow-hidden', className)}>
       <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-3 py-2">
@@ -171,6 +190,13 @@ export function InstrumentsHubDetailPanel({
               <KeyValueRow label="Barras">{instrument.meta.barCount}</KeyValueRow>
               <KeyValueRow label="Últ. vela">
                 {instrument.meta.lastBarDate ?? '—'}
+              </KeyValueRow>
+              <KeyValueRow label="Dictamen">
+                {opinionQuery.isLoading
+                  ? '…'
+                  : opinion
+                    ? `${INSTRUMENT_DAILY_OPINION_STANCE_LABELS[opinion.stance]} · ★${opinion.dictamenStars}`
+                    : '—'}
               </KeyValueRow>
             </KeyValueList>
           </DetailSection>

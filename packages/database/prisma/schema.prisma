@@ -98,6 +98,7 @@ model Instrument {
   positionPolicies PositionPolicy[]
   strategyTops InstrumentStrategyTop[]
   narratives   InstrumentNarrative[]
+  dailyOpinions InstrumentDailyOpinion[]
   mandateTenures MandateTenure[]
   mandateTradeLinks MandateTradeLink[]
 
@@ -807,6 +808,38 @@ model BacktestTrade {
 
   @@index([backtestRunId, timestamp])
   @@map("backtest_trades")
+}
+
+/// Dictamen diario Estudio (O3-C / ADR-022) — stance + ★ dictamen.
+model InstrumentDailyOpinion {
+  id             String   @id @default(cuid())
+  instrumentId   String   @map("instrument_id")
+  accountId      String?  @map("account_id")
+  asOfBarDate    DateTime @map("as_of_bar_date") @db.Date
+  stance         String
+  dictamenStars  Int      @map("dictamen_stars")
+  strategyStars  Int?     @map("strategy_stars")
+  ioScore        Float?   @map("io_score")
+  faScore        Float?   @map("fa_score")
+  taScore        Float?   @map("ta_score")
+  distress       Boolean  @default(false)
+  reasons        Json     @default("[]")
+  gateStatus     String?  @map("gate_status")
+  topId          String?  @map("top_id")
+  topVersion     Int?     @map("top_version")
+  source         String   @default("on_demand")
+  engineVersion  String   @default("opinion_v1") @map("engine_version")
+  idempotencyKey String   @unique @map("idempotency_key")
+  computedAt     DateTime @map("computed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([instrumentId, asOfBarDate, source])
+  @@index([instrumentId, asOfBarDate])
+  @@index([stance, asOfBarDate])
+  @@map("instrument_daily_opinions")
 }
 
 /// Resumen corto de evolución por instrumento (usuario / IA / sistema). Scope ≠ maestro.
