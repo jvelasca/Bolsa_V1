@@ -116,7 +116,7 @@ export function InstrumentNarrativeEditor({
           setDirty(true);
         }}
         rows={8}
-        placeholder="Resumen corto de la evolución (máx. 20 líneas). Útil para ti y como contexto a la IA."
+        placeholder="Tu tesis / giro del valor (máx. 20 líneas). Complementa el resumen diario del dictamen de arriba."
         className="w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 text-[11px] leading-relaxed outline-none ring-primary focus:ring-1"
         aria-label="Narrativa de evolución"
       />

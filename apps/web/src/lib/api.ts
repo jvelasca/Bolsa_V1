@@ -839,6 +839,19 @@ export const api = {
     );
   },
 
+  listInstrumentDailyOpinions: (
+    instrumentId: string,
+    options?: { days?: number; ensureDays?: number },
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.days != null) params.set('days', String(options.days));
+    if (options?.ensureDays != null) params.set('ensureDays', String(options.ensureDays));
+    const q = params.toString();
+    return request<{ data: import('@bolsa/shared').InstrumentDailyOpinionV1[] }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/daily-opinions${q ? `?${q}` : ''}`,
+    );
+  },
+
   getAccountMandates: (accountId: string, instrumentId?: string) => {
     const q = instrumentId
       ? `?instrumentId=${encodeURIComponent(instrumentId)}`

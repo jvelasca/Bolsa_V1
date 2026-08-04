@@ -105,6 +105,27 @@ class SqlAlchemyInstrumentDailyOpinionRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_map(r) for r in rows]
 
+    async def list_history(
+        self,
+        instrument_id: str,
+        *,
+        date_from: date,
+        date_to: date,
+        source: str = "on_demand",
+    ) -> list[InstrumentDailyOpinionRecord]:
+        stmt = (
+            select(InstrumentDailyOpinionRow)
+            .where(
+                InstrumentDailyOpinionRow.instrument_id == instrument_id,
+                InstrumentDailyOpinionRow.source == source,
+                InstrumentDailyOpinionRow.as_of_bar_date >= date_from,
+                InstrumentDailyOpinionRow.as_of_bar_date <= date_to,
+            )
+            .order_by(InstrumentDailyOpinionRow.as_of_bar_date.asc())
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_map(r) for r in rows]
+
     async def upsert(self, payload: dict[str, Any]) -> InstrumentDailyOpinionRecord:
         instrument_id = str(payload["instrument_id"])
         as_of: date = payload["as_of_bar_date"]

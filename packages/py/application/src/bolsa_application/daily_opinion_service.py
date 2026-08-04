@@ -119,6 +119,68 @@ class DailyOpinionService:
             out.append(row)
         return out
 
+    async def history(
+        self,
+        instrument_id: str,
+        *,
+        days: int = 30,
+        ensure_days: int = 0,
+        account_id: str | None = None,
+        hint: OpinionHint | None = None,
+        timeframe: str = "1d",
+    ) -> list[InstrumentDailyOpinionRecord]:
+        """Historial de dictámenes; opcionalmente rellena días laborables faltantes."""
+        days = max(1, min(int(days), 90))
+        ensure_days = max(0, min(int(ensure_days), 21))
+        as_of_end = datetime.now(UTC).date()
+        date_from = as_of_end - timedelta(days=days - 1)
+
+        if ensure_days > 0:
+            base_hint = hint or OpinionHint(instrument_id=instrument_id)
+            # No forzar has_eod del cliente: cada día se valida por barra ≤ asOf.
+            day_hint = OpinionHint(
+                instrument_id=instrument_id,
+                io_score=base_hint.io_score,
+                fa_score=base_hint.fa_score,
+                ta_score=base_hint.ta_score,
+                distress=base_hint.distress,
+                position_open=base_hint.position_open,
+                allow_trading=base_hint.allow_trading,
+                has_eod_bar=None,
+            )
+            ensure_from = as_of_end - timedelta(days=ensure_days - 1)
+            existing = {
+                r.as_of_bar_date
+                for r in await self._opinions.list_history(
+                    instrument_id,
+                    date_from=ensure_from,
+                    date_to=as_of_end,
+                    source=SOURCE_ON_DEMAND,
+                )
+            }
+            cursor = ensure_from
+            while cursor <= as_of_end:
+                if cursor.weekday() < 5 and cursor not in existing:
+                    stance_now = datetime(
+                        cursor.year, cursor.month, cursor.day, 18, 0, tzinfo=UTC
+                    )
+                    await self._compute_and_upsert(
+                        instrument_id=instrument_id,
+                        as_of=cursor,
+                        account_id=account_id,
+                        hint=day_hint,
+                        timeframe=timeframe,
+                        now=stance_now,
+                    )
+                cursor += timedelta(days=1)
+
+        return await self._opinions.list_history(
+            instrument_id,
+            date_from=date_from,
+            date_to=as_of_end,
+            source=SOURCE_ON_DEMAND,
+        )
+
     async def _resolve_has_eod(
         self,
         instrument_id: str,
@@ -127,8 +189,15 @@ class DailyOpinionService:
     ) -> bool:
         if hint.has_eod_bar is not None:
             return bool(hint.has_eod_bar)
-        raw = await self._ohlcv.get_latest_bar_date(instrument_id, timeframe=TimeFrame.D1)
-        bar_date = _parse_bar_date(raw)
+        bars = await self._ohlcv.get_bars(
+            instrument_id,
+            timeframe=TimeFrame.D1,
+            limit=1,
+            date_to=as_of.isoformat(),
+        )
+        if not bars:
+            return False
+        bar_date = _parse_bar_date(bars[-1].timestamp)
         if bar_date is None:
             return False
         return (as_of - bar_date) <= timedelta(days=EOD_STALE_MAX_DAYS)
@@ -143,7 +212,8 @@ class DailyOpinionService:
         timeframe: str,
         now: datetime | None,
     ) -> InstrumentDailyOpinionRecord:
-        ref = now or datetime.now(UTC)
+        computed_at = datetime.now(UTC)
+        stance_now = now or computed_at
         has_eod = await self._resolve_has_eod(instrument_id, as_of, hint)
         top = await self._tops.get(instrument_id, timeframe)
         has_top = top is not None and bool(top.slots)
@@ -161,7 +231,7 @@ class DailyOpinionService:
                 fa_distress=bool(hint.distress),
                 position_open=bool(hint.position_open),
             ),
-            now=ref,
+            now=stance_now,
         )
 
         # Invariante: sell/reduce solo con largo (defensa en profundidad)
@@ -202,6 +272,6 @@ class DailyOpinionService:
             "source": SOURCE_ON_DEMAND,
             "engine_version": ENGINE_VERSION,
             "idempotency_key": make_idempotency_key(instrument_id, as_of, SOURCE_ON_DEMAND),
-            "computed_at": ref,
+            "computed_at": computed_at,
         }
         return await self._opinions.upsert(payload)

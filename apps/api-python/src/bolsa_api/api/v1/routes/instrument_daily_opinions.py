@@ -132,3 +132,27 @@ async def get_instrument_daily_opinion(
         hints=[],
     )
     return InstrumentDailyOpinionsListResponseDto(data=[_to_dto(r) for r in rows])
+
+
+@router.get(
+    "/instruments/{instrument_id}/daily-opinions",
+    response_model=InstrumentDailyOpinionsListResponseDto,
+)
+async def list_instrument_daily_opinions(
+    instrument_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    days: Annotated[int, Query(ge=1, le=90)] = 30,
+    ensure_days: Annotated[int, Query(alias="ensureDays", ge=0, le=21)] = 0,
+) -> InstrumentDailyOpinionsListResponseDto:
+    """Historial de dictámenes (ascendente). `ensureDays` rellena laborables faltantes."""
+    service = DailyOpinionService(
+        SqlAlchemyInstrumentDailyOpinionRepository(session),
+        SqlAlchemyInstrumentStrategyTopRepository(session),
+        SqlAlchemyOhlcvRepository(session),
+    )
+    rows = await service.history(
+        instrument_id,
+        days=days,
+        ensure_days=ensure_days,
+    )
+    return InstrumentDailyOpinionsListResponseDto(data=[_to_dto(r) for r in rows])

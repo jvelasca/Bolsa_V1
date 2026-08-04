@@ -17,6 +17,7 @@ import { OhlcvChart } from '@/features/charts/ohlcv-chart';
 import { InstrumentStrategyTopPanel } from '@/features/backtests/instrument-strategy-top-panel';
 import { InstrumentAnalysisSummary } from '@/features/trading/instrument-analysis-summary';
 import { InstrumentNarrativeEditor } from '@/features/instruments/instrument-narrative-editor';
+import { InstrumentDictamenEvolution } from '@/features/instruments/instrument-dictamen-evolution';
 import { IconButton } from '@/components/ui/icon-button';
 import { KeyValueList, KeyValueRow } from '@/components/ui/key-value-list';
 import { cn } from '@/lib/utils';
@@ -239,7 +240,15 @@ export function InstrumentsHubDetailPanel({
             open={sectionsOpen.evolucion}
             onToggle={() => onToggleSection('evolucion')}
           >
-            <InstrumentNarrativeEditor instrumentId={instrument.id} />
+            <div className="space-y-3">
+              <InstrumentDictamenEvolution instrumentId={instrument.id} />
+              <div className="border-t border-border/50 pt-2">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Nota humana
+                </p>
+                <InstrumentNarrativeEditor instrumentId={instrument.id} />
+              </div>
+            </div>
           </DetailSection>
 
           <DetailSection
