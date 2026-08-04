@@ -33,10 +33,7 @@ import {
   OperativaPulseSummary,
 } from '@/features/trading/operativa-pulse';
 import { OperativaDictamenBlock } from '@/features/trading/operativa-dictamen';
-import {
-  opinionByInstrumentId,
-  useInstrumentDailyOpinions,
-} from '@/features/trading/use-instrument-daily-opinions';
+import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
 import {
   computeIndiceOperativo,
   rankIndiceOperativo,
@@ -51,9 +48,6 @@ import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store
 import { cn } from '@/lib/utils';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { InstrumentDailyOpinionHintV1 } from '@bolsa/shared';
-import {
-  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
-} from '@bolsa/shared';
 import {
   getMandateStoreSnapshot,
   listOpenMandateTenures,
@@ -117,34 +111,31 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     [scoreRows, instrumentId],
   );
 
-  const opinionHints: InstrumentDailyOpinionHintV1[] = useMemo(
-    () =>
-      studyIds.map((id) => {
-        const fa = faByInstrument.get(id);
-        const ta = taByInstrument.get(id);
-        const row = scoreRows.find((r) => r.instrumentId === id);
-        return {
-          instrumentId: id,
-          ioScore: row?.io ?? null,
-          faScore: fa?.scoreDisplay100 ?? null,
-          taScore: ta?.technicalDisplay100 ?? null,
-          distress: Boolean(fa?.distress),
-          positionOpen: false,
-          allowTrading: true,
-          hasEodBar: true,
-        };
-      }),
-    [studyIds, faByInstrument, taByInstrument, scoreRows],
-  );
+  const opinionHints: InstrumentDailyOpinionHintV1[] = useMemo(() => {
+    if (!instrumentId) return [];
+    const fa = faByInstrument.get(instrumentId);
+    const ta = taByInstrument.get(instrumentId);
+    const row = scoreRows.find((r) => r.instrumentId === instrumentId);
+    return [
+      {
+        instrumentId,
+        ioScore: row?.io ?? null,
+        faScore: fa?.scoreDisplay100 ?? null,
+        taScore: ta?.technicalDisplay100 ?? null,
+        distress: Boolean(fa?.distress),
+        positionOpen: false,
+        allowTrading: true,
+        hasEodBar: true,
+      },
+    ];
+  }, [instrumentId, faByInstrument, taByInstrument, scoreRows]);
 
-  const opinionsQuery = useInstrumentDailyOpinions(studyIds, opinionHints, {
-    enabled: studyIds.length > 0 && !scoresLoading,
-  });
-  const opinionMap = useMemo(
-    () => opinionByInstrumentId(opinionsQuery.data),
-    [opinionsQuery.data],
+  const opinionsQuery = useInstrumentDailyOpinions(
+    instrumentId ? [instrumentId] : [],
+    opinionHints,
+    { enabled: Boolean(instrumentId) && !scoresLoading },
   );
-  const activeOpinion = instrumentId ? opinionMap.get(instrumentId) : undefined;
+  const activeOpinion = opinionsQuery.data?.[0];
 
   useEffect(() => {
     if (!effectiveAccountId) return;
@@ -252,40 +243,6 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           opinion={activeOpinion}
           loading={opinionsQuery.isLoading || scoresLoading}
         />
-
-        {studyIds.length > 0 && (opinionsQuery.data?.length ?? 0) > 0 ? (
-          <div
-            className="rounded-md border border-border/60 bg-background/40 px-2 py-1.5"
-            data-testid="operativa-opiniones-hoy"
-          >
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Opiniones de hoy
-            </p>
-            <ul className="max-h-28 space-y-0.5 overflow-y-auto">
-              {studyIds.slice(0, 12).map((id) => {
-                const op = opinionMap.get(id);
-                if (!op) return null;
-                const entry = studyEntries.find((e) => e.instrumentId === id);
-                const sym = entry?.symbol ?? id.slice(0, 8);
-                return (
-                  <li
-                    key={id}
-                    className={cn(
-                      'flex items-center justify-between gap-2 tabular-nums',
-                      id === instrumentId && 'font-semibold text-foreground',
-                    )}
-                  >
-                    <span className="truncate">{sym}</span>
-                    <span className="shrink-0 text-muted-foreground">
-                      {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[op.stance]} · ★
-                      {op.dictamenStars}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ) : null}
 
         {topQuery.isLoading ? (
           <p className="text-muted-foreground">Cargando TOP…</p>
