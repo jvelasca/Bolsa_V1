@@ -90,12 +90,14 @@ Cualquier “vamos con AUTO” en chat = **entrar en esta checklist**, no thaw a
 
 ### OR-lite (antes de A2 execute)
 
-Extraído del triage institucional — no sustituye P1–P10:
+Extraído del triage institucional — no sustituye P1–P10. Detalle: [or-lite-repro-obs](./or-lite-repro-obs-2026-08-04.md).
 
-| ID | Ítem |
-|----|------|
-| OR-S1 | `APP_PASSWORD` obligatorio en demos compartidas |
-| OR-P2 | Decimal en path paper crítico (pre-live) |
-| OR-T4/T6 | Idempotencia + DecisionSession en execute (detrás flag) |
-| OR-P7 | Kill switch &lt;1s (ya P7) |
-| OR-RE | **Risk Engine façade** — `check_opening` en `risk_engine.py`; ExecutionRouter paper/live_dry_run; `RISK_KILL_SWITCH`; book maxOpen opcional. Camino D **debe** usarlo. | **v0 hecho** |
+| ID | Ítem | Estado |
+|----|------|--------|
+| OR-S1 | `APP_PASSWORD` obligatorio en demos compartidas | **Hecho** — docs + health `auth` |
+| OR-P2 | Decimal en path paper crítico (pre-live) | **Hecho** — fees / execute_trade / ExecuteTrade |
+| OR-T4/T6 | Idempotencia + DecisionSession en execute (detrás flag) | Parcial (Gate + Risk Engine); AUTO pendiente |
+| OR-P7 | Kill switch &lt;1s (ya P7) | Via `RISK_KILL_SWITCH` + OR-RE |
+| OR-RE | Risk Engine façade | **v0 hecho** |
+| Repro+ | dataset fingerprint + feature_flags + payload_hash | **Hecho** — `campaign_manifest.py` |
+| Obs/CI | ErrorBoundary + gitleaks + worker heartbeat | **Hecho** |

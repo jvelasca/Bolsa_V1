@@ -28,7 +28,7 @@
     "db:push": "pnpm --filter @bolsa/database db:push",
     "db:seed": "pnpm --filter @bolsa/database db:seed",
     "db:studio": "pnpm --filter @bolsa/database db:studio",
-    "test:py": "python -m pytest packages/py/market/tests packages/py/application/tests packages/py/analytics/tests apps/api-python/tests -q",
+    "test:py": "python -m pytest packages/py/domain/tests packages/py/market/tests packages/py/application/tests packages/py/analytics/tests apps/api-python/tests -q",
     "test:py:install": "pip install -e packages/py/domain -e packages/py/analytics -e packages/py/market -e packages/py/infrastructure -e packages/py/application -e \"apps/api-python[dev]\"",
     "test:optimize": "node scripts/research/verify_optimize_battery.mjs",
     "test:coach": "node scripts/research/verify_coach_battery.mjs",

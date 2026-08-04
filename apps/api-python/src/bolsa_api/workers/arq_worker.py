@@ -74,10 +74,20 @@ async def on_startup(ctx: dict[str, Any]) -> None:
     engine: AsyncEngine = create_engine(settings)
     ctx["engine"] = engine
     ctx["session_factory"] = create_session_factory(engine)
+    from bolsa_infrastructure.queue.worker_heartbeat import touch_arq_heartbeat
+
+    await touch_arq_heartbeat()
     logger.info(
         "Worker Arq research jobs iniciado (scan + optimize, max_jobs=%s)",
         settings.scan_arq_max_jobs,
     )
+
+
+async def after_job_end(ctx: dict[str, Any]) -> None:
+    """OR-Obs: refresca heartbeat tras cada job."""
+    from bolsa_infrastructure.queue.worker_heartbeat import touch_arq_heartbeat
+
+    await touch_arq_heartbeat()
 
 
 async def on_shutdown(ctx: dict[str, Any]) -> None:
@@ -94,6 +104,7 @@ def run() -> None:
         redis_settings=redis_settings_from_url(settings.redis_url),
         on_startup=on_startup,
         on_shutdown=on_shutdown,
+        after_job_end=after_job_end,
         max_jobs=settings.scan_arq_max_jobs,
         job_timeout=settings.scan_arq_job_timeout_seconds,
     )

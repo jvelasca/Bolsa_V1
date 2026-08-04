@@ -102,6 +102,8 @@ Catálogo completo: §5.
 
 **Regla:** cualquier ítem §5 que no esté en 1–4 requiere frase de producto («implementa X»).
 
+**Estado 2026-08-04 (cierre código):** A0 + OR-RE v0 + OR-lite (S1/P2) + Repro+ + Obs/CI mínimos → [or-lite-repro-obs](./or-lite-repro-obs-2026-08-04.md). Camino D / `PAPER_D_EXECUTE` **sigue off**.
+
 ---
 
 ## 5. Catálogo institucional (referencia · aparcado)
@@ -211,10 +213,10 @@ El auditor eleva esto por encima del resto. **De acuerdo**, con matiz:
 
 | # | Épico | Nota |
 |---|-------|------|
-| 1 | **A0** telemetría dictamen | Ahora |
-| 2 | **OR-lite + OR-RE** (Risk Engine façade) | Antes de A2 execute |
-| 3 | **Repro+** hashes/fingerprint | Paralelo OK tras A0 |
-| 4 | Observabilidad CI | |
+| 1 | **A0** telemetría dictamen | **Hecho** |
+| 2 | **OR-lite + OR-RE** (Risk Engine façade) | **Hecho** (S1/P2 + RE v0); T4/T6 parcial |
+| 3 | **Repro+** hashes/fingerprint | **Hecho** |
+| 4 | Observabilidad CI | **Hecho** (mínimo: ErrorBoundary, gitleaks, heartbeat) |
 | 5 | Catálogo §5 + stats avanzadas | Demanda explícita |
 
 *Fin §9.*

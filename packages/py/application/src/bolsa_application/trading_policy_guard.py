@@ -157,7 +157,9 @@ def enforce_cognitive_policy_for_opening(
             notes=("DecisionPackage stub — Policy Gate only",),
         )
 
-    notional = abs(quantity * price)
+    from decimal import Decimal
+
+    notional = float(abs(Decimal(str(quantity)) * Decimal(str(price))))
     equity_v = equity if equity and equity > 0 else max(notional, 1.0)
     concentration = (notional / equity_v) * 100.0
     risk_pct = concentration * 0.5

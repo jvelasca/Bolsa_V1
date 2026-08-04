@@ -116,6 +116,58 @@ async def _redis_component() -> ComponentHealthDto:
         )
 
 
+def _auth_component() -> ComponentHealthDto:
+    """OR-S1: APP_PASSWORD requerido en demos compartidas / no-dev."""
+    settings = get_settings()
+    pwd = (settings.app_password or "").strip()
+    env = (settings.environment or "development").strip().lower()
+    if pwd:
+        return ComponentHealthDto(
+            status="ok",
+            message="APP_PASSWORD configured",
+            details={"environment": env},
+        )
+    if env in {"development", "dev", "test", "local"}:
+        return ComponentHealthDto(
+            status="configured",
+            message="APP_PASSWORD empty (OK local). OR-S1: set for shared demos.",
+            details={"environment": env},
+        )
+    return ComponentHealthDto(
+        status="degraded",
+        message="APP_PASSWORD empty outside development — set for shared demos (OR-S1)",
+        details={"environment": env},
+    )
+
+
+async def _worker_heartbeat_component() -> ComponentHealthDto:
+    """OR-Obs: último heartbeat Arq en Redis (TTL ~180s)."""
+    from bolsa_infrastructure.queue.worker_heartbeat import (
+        WORKER_ARQ_HEARTBEAT_KEY,
+        WORKER_HEARTBEAT_TTL_SEC,
+        read_arq_heartbeat,
+    )
+
+    settings = get_settings()
+    if not (settings.redis_url or "").strip():
+        return ComponentHealthDto(
+            status="disabled",
+            message="REDIS_URL not set — worker heartbeat unavailable",
+        )
+    ts = await read_arq_heartbeat()
+    if not ts:
+        return ComponentHealthDto(
+            status="degraded",
+            message="No Arq worker heartbeat (worker down or never started)",
+            details={"key": WORKER_ARQ_HEARTBEAT_KEY, "ttlSec": WORKER_HEARTBEAT_TTL_SEC},
+        )
+    return ComponentHealthDto(
+        status="ok",
+        message=f"Arq worker heartbeat at {ts}",
+        details={"key": WORKER_ARQ_HEARTBEAT_KEY, "at": ts, "ttlSec": WORKER_HEARTBEAT_TTL_SEC},
+    )
+
+
 @router.get("/health", response_model=HealthResponseDto)
 async def health_check(request: Request) -> HealthResponseDto:
     engine = request.app.state.engine
@@ -128,8 +180,10 @@ async def health_check(request: Request) -> HealthResponseDto:
         "yahoo": _yahoo_component(),
         "xtb": _xtb_component(),
         "redis": await _redis_component(),
+        "auth": _auth_component(),
+        "worker_arq": await _worker_heartbeat_component(),
     }
-    # DB error → degraded; Redis/Yahoo degraded no tumba el health global a error.
+    # DB error → degraded; Redis/Yahoo/auth/worker degraded no tumba el health global a error.
     degraded = (not db_ok) or any(c.status == "error" for c in components.values())
     return HealthResponseDto(
         status="degraded" if degraded else "ok",
