@@ -3,7 +3,7 @@
  * Montado en PlatformShell (junto al Radar inbox poller).
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   mapOpinionToChannel,
@@ -40,8 +40,12 @@ function fingerprint(instrumentId: string, asOf: string, stance: string, stars: 
 }
 
 export function EstudioOpinionAlarmPoller() {
-  const studyIds = useVisualizationStore((s) => s.entries.map((e) => e.instrumentId));
+  // Selector estable: no devolver .map() desde Zustand (rompe Object.is → loop).
   const entries = useVisualizationStore((s) => s.entries);
+  const studyIds = useMemo(
+    () => entries.map((e) => e.instrumentId),
+    [entries],
+  );
   const pushToast = useAlertsStore((s) => s.pushToast);
   const seenRef = useRef<Set<string> | null>(null);
   const primedRef = useRef(false);
