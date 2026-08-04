@@ -8,8 +8,11 @@ import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-da
 import { useVisualizationStore } from '@/stores/visualization-store';
 
 export function useAsesorAlarmaBadge(): number {
-  const studyIds = useVisualizationStore((s) =>
-    s.entries.map((e) => e.instrumentId),
+  // Selector estable: no devolver .map() desde Zustand (rompe Object.is → loop).
+  const entries = useVisualizationStore((s) => s.entries);
+  const studyIds = useMemo(
+    () => entries.map((e) => e.instrumentId),
+    [entries],
   );
 
   const opinionsQuery = useInstrumentDailyOpinions(studyIds, [], {
