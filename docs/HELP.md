@@ -144,25 +144,34 @@ Informe lateral: retorno/DD/ops del **gate** (+ referencia Auto) y bloque **Evid
 
 Tras Lab → **Guardar Finalistas**, el resumen Hold-out / WF / CPCV (mismo vocabulario que el checklist) queda en `coachFacts.labEvidence` y se muestra en Finalistas y en el panel **Operativa** (Recomendación). No es campaña multi-ventana ledger (eso sigue en Observatory / protocolo Q1.3).
 
-## CORE-R / Monitor Finalistas (usuario · v1.12)
+## CORE-R / Monitor Finalistas (usuario · v1.13)
 
 Guía en Ayuda → Backtesting (`BACKTESTING_CORE_R_GUIDE`). Detalle: [list-auto-ops § CORE-R](./engineering/list-auto-ops-2026-07-29.md).
 
 | Paso | Qué |
 |------|-----|
-| 1 | Monitor (Probar o Ayuda) → elige lista con TOP |
+| 1 | Monitor (Probar o Ayuda) → elige lista con TOP (hoy: API p. ej. IBEX o «Estudio personal» si la creaste) |
 | 2 | **Encolar revisiones** (informe Lista AUTO + PnL DEMO ≤ −5%/−10%) |
 | 3 | Deep-links Lab / Finalistas / Checklist → **Hecho** |
-| 4 | Opcional: **Narrar cola** · **Auto-sync app abierta** (cron shell) |
-| 5 | Chip **CORE-R N** · toast «Abrir Monitor» (shell o cron servidor / otro device) |
-| 6 | **Hecho todos** cierra las abiertas de la lista actual |
+| 4 | «Valorar cambio» + modo **SEMI** → **Adoptar** (abre mandato TOP#1; no auto en AUTO) |
+| 5 | Opcional: **Narrar cola** · **Auto-sync** (cron shell; cadencia; hoy prefiere «Estudio personal» si existe) |
+| 6 | Chip **CORE-R N** · toast «Abrir Monitor» (shell o cron servidor / otro device) |
+| 7 | **Hecho todos** cierra las abiertas de la lista actual |
 
 No pisa TOP · no auto-paper D. Cola: localStorage = cache; BD = SoT multi-dispositivo.  
 Flags ops (off por defecto — ver [github-credentials-and-ops §9](./engineering/github-credentials-and-ops.md)): `CORE_R_CRON_ENABLED`, `COST_MODEL_V2_ENABLED`.
 
-## Lista AUTO frescura (v1.3)
+### To-be — una sola «Estudio» (ADR-024 · pendiente implementar)
 
-Tras reinicio, un 2º Play sobre la misma lista debe **Omitir** si periodo/costes/perfil no cambiaron y la última barra no aporta señal nueva (`1d` ≤5 días → `bar_hysteresis`). «Reevaluar resto» fuerza. Detalle: [list-auto-ops](./engineering/list-auto-ops-2026-07-29.md).
+Producto acordado (2026-08-06): **Estudio** = único universo supervisable (lista API); desaparece el tip «Estudio personal»; interruptor **Supervisión ON** arma Lab + CORE-R; el gráfico no mete valores; quitar = unsubscribe. Humano confirma operar/cambio de mandato (SEMI). Detalle: [estudio-supervision-model-2026-08-06.md](./engineering/estudio-supervision-model-2026-08-06.md) · [ADR-024](./adr/024-estudio-supervision-universe.md).
+
+## Lista AUTO frescura (v1.3) + tandas
+
+Lista AUTO procesa **toda** la lista en tandas de ~40 (ya no recorta a 40). Confirmación al lanzar si N>40; preferencia «No preguntar tandas» (N>200 siempre confirma). Tope duro 500.
+
+Tras reinicio, un 2º Play sobre la misma lista debe **Omitir** si periodo/costes/perfil no cambiaron y la última barra no aporta señal nueva (`1d` ≤5 días → `bar_hysteresis`). «Reevaluar resto» fuerza (solo LAB).
+
+**Reanalizar ≠ cambiar Trading:** CORE-R propone en Monitor; el mandato (ADR-020) solo cambia si lo aceptas (SEMI) o lo cambias a mano. AUTO execute no auto-adopta. Detalle: [list-auto-ops §5.2](./engineering/list-auto-ops-2026-07-29.md).
 
 ## Batería offline (antes de smoke UI)
 

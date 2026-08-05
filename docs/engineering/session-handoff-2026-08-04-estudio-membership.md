@@ -1,7 +1,8 @@
 # Handoff — Estudio membresía / bulk / gate SEMI (2026-08-04)
 
 > Rama: `stage/estudio-membership-operativa-2026-08-04`  
-> Padre: [trading-operativa-panel-2026-08-04.md](./trading-operativa-panel-2026-08-04.md)
+> Padre: [trading-operativa-panel-2026-08-04.md](./trading-operativa-panel-2026-08-04.md)  
+> **Sucesor to-be (no implementado aquí):** [ADR-024](../adr/024-estudio-supervision-universe.md) · [estudio-supervision-model-2026-08-06.md](./estudio-supervision-model-2026-08-06.md) · [handoff 2026-08-06](./session-handoff-2026-08-06-estudio-supervision.md)
 
 ## Hecho
 
