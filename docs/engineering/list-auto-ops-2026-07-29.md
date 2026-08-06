@@ -143,9 +143,7 @@ Acciones = deep-links (Lab / Finalistas / Checklist / F3). Botón **Reevaluar re
 
 **Multi-dispositivo (v1.9–v1.12):** cola/informe/scheduler en BD (`core_r_account_state`) = SoT; localStorage = cache. Hydrate/push vía `core-r-sync.ts`. Cron servidor opcional (`CORE_R_CRON_ENABLED`).
 
-**Estudio personal + cadencia (v1.13, as-is):** al activar Auto-sync, `listId` prefiere la lista API «Estudio personal» (si existe); cadencia editable (15…1440 min).
-
-> **To-be (ADR-024 · 2026-08-06):** una sola lista producto **Estudio** (API) + interruptor **Supervisión ON**; deprecar «Estudio personal». Ver [estudio-supervision-model-2026-08-06.md](./estudio-supervision-model-2026-08-06.md).
+**Estudio canónica + Supervisión (ADR-024):** Auto-sync / Supervisión ON prefieren lista API `estudio`. Cadencia editable (15…1440 min). «Estudio personal» se fusiona al cargar Listas. Ver [estudio-supervision-model-2026-08-06.md](./estudio-supervision-model-2026-08-06.md).
 
 **Adoptar mandato SEMI (v1.13):** en cola, juicio «Valorar cambio» + TOP#1 → CTA **Adoptar** (modo SEMI) · tenure ADR-020 (`actor=core_r`, `propose_accepted`). AUTO execute no auto-adopta.
 

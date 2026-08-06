@@ -3,8 +3,9 @@
  *
  * Montado en Ayuda → Backtesting y en el hub Probar (`embedded`).
  * Une TOP + DEMO/paper + cola F3 vía `strategy-monitor.ts` (soft cap 40).
- * CORE-R v1–v1.8: informe Lista AUTO + PnL live DEMO → cola humana;
- * Narrar cola; cron shell; chip barra; toast Abrir Monitor; **Hecho todos**.
+ * CORE-R v1–v1.13: informe Lista AUTO + PnL live DEMO → cola humana;
+ * Narrar cola; cron shell (Estudio canónica ADR-024); Adoptar mandato SEMI;
+ * chip barra; toast Abrir Monitor; **Hecho todos**.
  * Enlaces: Finalistas · Checklist (`openAnalysis=1`) · Supervisado F3.
  *
  * Precondición de auto-paper D. **No** ejecuta, despliega ni unifica A/B/C.
@@ -18,6 +19,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueries, useQuery } from '@tanstack/react-query';
+import {
+  ESTUDIO_LIST_NAME,
+  resolveEstudioListId,
+  type InstrumentStrategyTopV1,
+} from '@bolsa/shared';
 import { formatPaperLabEvidence } from '@/features/accounts/paper-lab-evidence';
 import {
   buildStrategyMonitorRow,
@@ -32,6 +38,11 @@ import {
 } from '@/features/platform/strategy-adoption';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import {
+  adoptMandateFromCoreR,
+  canAdoptCoreRMandate,
+  coreRAdoptDenyMessage,
+} from '@/features/backtests/core-r-adopt-mandate';
+import {
   buildCoreRPaperPnlReviewRow,
   coreRAccountReturnPct,
   coreRNeedsAction,
@@ -45,7 +56,10 @@ import {
 } from '@/features/backtests/core-r-judgment';
 import {
   CORE_R_SCHEDULER_EVENT,
+  CORE_R_SCHEDULER_INTERVAL_PRESETS,
+  clampCoreRSchedulerInterval,
   loadCoreRSchedulerPrefs,
+  resolveCoreRSchedulerListId,
   saveCoreRSchedulerPrefs,
   type CoreRSchedulerPrefs,
   type CoreRSchedulerTickDetail,
@@ -53,11 +67,13 @@ import {
 import { runCoreRSchedulerTick } from '@/features/backtests/core-r-scheduler-tick';
 import { instrumentTopBacktestsHref } from '@/features/backtests/instrument-strategy-top-panel';
 import { PAPER_PATH_MONITOR } from '@/features/settings/paper-paths-copy';
+import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import {
   primaryCoreRAction,
   useCoreRReviewQueueStore,
+  type CoreRReviewQueueItem,
 } from '@/stores/core-r-review-queue-store';
 import {
   openHelpAiPlatform,
@@ -105,6 +121,7 @@ export function StrategyMonitorPanel({
   embedded = false,
 }: StrategyMonitorPanelProps) {
   const { effectiveAccountId } = useActiveAccount();
+  const bookPrefs = useDemoBookPrefs();
   const [listId, setListId] = useState(initialListId ?? '');
   const [timeframe] = useState('1d');
   const queueItems = useSupervisedF3QueueStore((s) => s.items);
@@ -135,6 +152,7 @@ export function StrategyMonitorPanel({
     staleTime: 60_000,
   });
   const lists = listsQuery.data?.data ?? [];
+  const estudioListId = useMemo(() => resolveEstudioListId(lists), [lists]);
 
   const effectiveListId = listId || lists[0]?.id || '';
 
@@ -185,6 +203,14 @@ export function StrategyMonitorPanel({
   });
 
   const accounts = Array.isArray(accountsQuery.data) ? accountsQuery.data : [];
+  const topByInstrumentId = useMemo(() => {
+    const map = new Map<string, InstrumentStrategyTopV1>();
+    monitorInstruments.forEach((inst, i) => {
+      const top = topQueries[i]?.data?.data;
+      if (top) map.set(inst.id, top);
+    });
+    return map;
+  }, [monitorInstruments, topQueries]);
   const rows = useMemo(() => {
     return monitorInstruments.map((inst, i) =>
       buildStrategyMonitorRow({
@@ -325,14 +351,75 @@ export function StrategyMonitorPanel({
   }, [schedPrefs.enabled, schedPrefs.scope, effectiveListId]);
 
   const onToggleScheduler = (enabled: boolean) => {
+    const prev = loadCoreRSchedulerPrefs();
+    const boundListId = enabled
+      ? resolveCoreRSchedulerListId({
+          estudioListId,
+          monitorListId: effectiveListId || null,
+          previousListId: prev.listId,
+        })
+      : prev.listId;
     const next: CoreRSchedulerPrefs = {
-      ...loadCoreRSchedulerPrefs(),
+      ...prev,
       enabled,
-      listId: effectiveListId || loadCoreRSchedulerPrefs().listId,
+      listId: boundListId,
       scope: 'shell',
     };
     saveCoreRSchedulerPrefs(next);
     setSchedPrefs(next);
+    if (enabled && boundListId && boundListId !== effectiveListId) {
+      setListId(boundListId);
+      setCoreRSyncMsg(
+        estudioListId && boundListId === estudioListId
+          ? `Auto-sync · lista «${ESTUDIO_LIST_NAME}».`
+          : `Auto-sync · lista fijada.`,
+      );
+    }
+  };
+
+  const onSchedulerIntervalChange = (minutes: number) => {
+    const next: CoreRSchedulerPrefs = {
+      ...loadCoreRSchedulerPrefs(),
+      intervalMinutes: clampCoreRSchedulerInterval(minutes),
+    };
+    saveCoreRSchedulerPrefs(next);
+    setSchedPrefs(next);
+  };
+
+  const onAdoptCoreRMandate = async (item: CoreRReviewQueueItem) => {
+    if (!effectiveAccountId) {
+      setCoreRSyncMsg(coreRAdoptDenyMessage('no_account'));
+      return;
+    }
+    let top = topByInstrumentId.get(item.instrumentId) ?? null;
+    if (!top) {
+      try {
+        const res = await api.getInstrumentStrategyTop(
+          item.instrumentId,
+          item.timeframe || timeframe,
+        );
+        top = res.data ?? null;
+      } catch {
+        setCoreRSyncMsg(coreRAdoptDenyMessage('no_slot'));
+        return;
+      }
+    }
+    const res = adoptMandateFromCoreR({
+      instrumentId: item.instrumentId,
+      accountId: effectiveAccountId,
+      verdict: item.verdict,
+      timeframe: item.timeframe || timeframe,
+      top,
+      mode: bookPrefs.mode,
+    });
+    if (!res.ok) {
+      setCoreRSyncMsg(coreRAdoptDenyMessage(res.reason));
+      return;
+    }
+    dismissCoreR(item.id);
+    setCoreRSyncMsg(
+      `Mandato adoptado · ${item.symbol} · ${res.slot.label} (SEMI · CORE-R).`,
+    );
   };
 
   const onNarrateCoreRQueue = async () => {
@@ -385,7 +472,7 @@ export function StrategyMonitorPanel({
           )}
         >
           {embedded
-            ? 'Solo lectura · no despliega ni ejecuta. Checklist = paper (A); F3 = Supervisado (C).'
+            ? 'Solo lectura · no despliega ni ejecuta. Checklist = paper (A); F3 = Supervisado (C). CORE-R propone; no cambia mandato hasta aceptar.'
             : PAPER_PATH_MONITOR.warnLine}
         </p>
 
@@ -455,15 +542,55 @@ export function StrategyMonitorPanel({
                 </Button>
               </div>
             </div>
-            <label className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-              <input
-                type="checkbox"
-                className="rounded border-border"
-                checked={schedPrefs.enabled}
-                onChange={(e) => onToggleScheduler(e.target.checked)}
-              />
-              Auto-sync app abierta ({schedPrefs.intervalMinutes} min
-              {schedPrefs.listId ? ` · lista fijada` : ''})
+            <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  className="rounded border-border"
+                  checked={schedPrefs.enabled}
+                  onChange={(e) => onToggleScheduler(e.target.checked)}
+                />
+                Auto-sync app abierta
+              </label>
+              <label className="flex items-center gap-1">
+                cada
+                <select
+                  className="rounded border border-border bg-background px-1 py-0.5 text-[10px] text-foreground"
+                  value={schedPrefs.intervalMinutes}
+                  onChange={(e) =>
+                    onSchedulerIntervalChange(Number(e.target.value))
+                  }
+                  title="Cadencia del cron shell CORE-R"
+                >
+                  {!CORE_R_SCHEDULER_INTERVAL_PRESETS.includes(
+                    schedPrefs.intervalMinutes as (typeof CORE_R_SCHEDULER_INTERVAL_PRESETS)[number],
+                  ) ? (
+                    <option value={schedPrefs.intervalMinutes}>
+                      {schedPrefs.intervalMinutes} min
+                    </option>
+                  ) : null}
+                  {CORE_R_SCHEDULER_INTERVAL_PRESETS.map((m) => (
+                    <option key={m} value={m}>
+                      {m >= 1440 ? '24 h' : `${m} min`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span>
+                {schedPrefs.listId
+                  ? estudioListId && schedPrefs.listId === estudioListId
+                    ? `· ${ESTUDIO_LIST_NAME}`
+                    : '· lista fijada'
+                  : null}
+                {!estudioListId ? (
+                  <span
+                    className="ml-1 text-muted-foreground/80"
+                    title={`La lista API «${ESTUDIO_LIST_NAME}» se crea al cargar Listas.`}
+                  >
+                    (sin {ESTUDIO_LIST_NAME})
+                  </span>
+                ) : null}
+              </span>
               {schedPrefs.lastTickAt ? (
                 <span title={schedPrefs.lastTickAt}>
                   · último{' '}
@@ -473,13 +600,14 @@ export function StrategyMonitorPanel({
                   })}
                 </span>
               ) : null}
-            </label>
+            </div>
             {coreRSyncMsg ? (
               <p className="text-[10px] text-muted-foreground">{coreRSyncMsg}</p>
             ) : (
               <p className="text-[10px] text-muted-foreground">
                 Encola juicios Lista AUTO y degradación PnL DEMO (−5% Lab /
-                −10% cambio). No ejecuta ni pisa TOP.
+                −10% cambio). Prefiere «{ESTUDIO_LIST_NAME}» al activar. No
+                ejecuta ni pisa TOP.
               </p>
             )}
             {coreRNarrative && coreRNarrative.paragraphs.length > 0 ? (
@@ -529,6 +657,13 @@ export function StrategyMonitorPanel({
               <ul className="max-h-36 space-y-1.5 overflow-y-auto">
                 {coreROpen.map((item) => {
                   const primary = primaryCoreRAction(item.actions);
+                  const top = topByInstrumentId.get(item.instrumentId) ?? null;
+                  const showAdopt = canAdoptCoreRMandate({
+                    verdict: item.verdict,
+                    mode: bookPrefs.mode,
+                    accountId: effectiveAccountId,
+                    top,
+                  });
                   return (
                     <li
                       key={item.id}
@@ -549,6 +684,18 @@ export function StrategyMonitorPanel({
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-1">
+                        {showAdopt ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="default"
+                            className="h-6 text-[10px]"
+                            title="Aceptar propuesta CORE-R · abre mandato TRADING (SEMI)"
+                            onClick={() => void onAdoptCoreRMandate(item)}
+                          >
+                            Adoptar
+                          </Button>
+                        ) : null}
                         {primary?.href ? (
                           <Link
                             to={primary.href}

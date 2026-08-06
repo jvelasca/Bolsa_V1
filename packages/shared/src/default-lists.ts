@@ -1,13 +1,16 @@
 /**
- * IDs de listas virtuales del panel Watchlist (no persistidas en API).
+ * IDs de listas virtuales del panel Watchlist y lista API canónica «Estudio».
  *
- * `VIRTUAL_LIST_VISUALIZATION` («Estudio») = universo operativo TRADING (membresía explícita).
- * Abrir gráfico añade; cerrar pestaña no quita. SEMI/AUTO exigen pertenencia.
- * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ * `VIRTUAL_LIST_VISUALIZATION` («Estudio» en carrusel) = fachada UI; membresía SoT = API
+ * `ESTUDIO_LIST_ID` (ADR-024). SEMI/AUTO e IO leen el cache local hidratado desde API.
+ * Abrir gráfico NO añade (ADR-024).
+ *
+ * @see docs/adr/024-estudio-supervision-universe.md
+ * @see docs/engineering/estudio-supervision-model-2026-08-06.md
  */
 export const VIRTUAL_LIST_PORTFOLIO = '__builtin:portfolio__' as const;
 export const VIRTUAL_LIST_PENDING_ORDERS = '__builtin:pending-orders__' as const;
-/** Lista «Estudio» (id legacy `visualization`). */
+/** Lista «Estudio» en carrusel (id legacy `visualization`); SoT = `ESTUDIO_LIST_ID`. */
 export const VIRTUAL_LIST_VISUALIZATION = '__builtin:visualization__' as const;
 
 export type VirtualListId =
@@ -30,6 +33,10 @@ export const VIRTUAL_LIST_LABELS: Record<VirtualListId, string> = {
 /** ID estable de la lista de catálogo IBEX 35 en API (coincide con `DEFAULT_LIST_CONFIG.id`). */
 export const CATALOG_IBEX_LIST_ID = 'ibex35';
 
+/** Lista API canónica de supervisión (ADR-024). */
+export const ESTUDIO_LIST_ID = 'estudio';
+export const ESTUDIO_LIST_NAME = 'Estudio';
+
 /** Carrusel por defecto: Cartera + Órdenes pendientes + Estudio (IBEX se añade al cargar catálogo API). */
 export const DEFAULT_VIRTUAL_CAROUSEL_IDS: readonly VirtualListId[] = [
   VIRTUAL_LIST_PORTFOLIO,
@@ -41,8 +48,53 @@ export function isVirtualListId(id: string): id is VirtualListId {
   return (VIRTUAL_LIST_IDS as readonly string[]).includes(id);
 }
 
-/** Evita chip duplicado si hay una lista API llamada igual que la virtual Estudio. */
-export function isEstudioListNameCollision(name: string): boolean {
+export function isEstudioListId(id: string): boolean {
+  return id === ESTUDIO_LIST_ID || id === VIRTUAL_LIST_VISUALIZATION;
+}
+
+/** Match case-insensitive del nombre canónico «Estudio». */
+export function isEstudioListName(name: string): boolean {
   const n = name.trim().toLowerCase();
   return n === 'estudio' || n === 'en estudio';
+}
+
+/**
+ * Evita chip duplicado en carrusel: oculta listas API llamadas «Estudio»
+ * (la UI de watchlist usa el chip virtual; Lab/CORE-R resuelven `ESTUDIO_LIST_ID`).
+ */
+export function isEstudioListNameCollision(name: string): boolean {
+  return isEstudioListName(name);
+}
+
+/**
+ * @deprecated ADR-024 — usar {@link ESTUDIO_LIST_NAME} / {@link resolveEstudioListId}.
+ * Se mantiene para migración / tests legacy.
+ */
+export const ESTUDIO_PERSONAL_LIST_NAME = 'Estudio personal';
+
+/** @deprecated ADR-024 */
+export function isEstudioPersonalListName(name: string): boolean {
+  return name.trim().toLowerCase() === ESTUDIO_PERSONAL_LIST_NAME.toLowerCase();
+}
+
+/**
+ * Resuelve el id de la lista API «Estudio» (canónica).
+ * Preferencia: id estable → nombre «Estudio» → legacy «Estudio personal».
+ */
+export function resolveEstudioListId(
+  lists: ReadonlyArray<{ id: string; name: string }>,
+): string | null {
+  const byId = lists.find((l) => l.id === ESTUDIO_LIST_ID);
+  if (byId) return byId.id;
+  const byName = lists.find((l) => isEstudioListName(l.name));
+  if (byName) return byName.id;
+  const personal = lists.find((l) => isEstudioPersonalListName(l.name));
+  return personal?.id ?? null;
+}
+
+/** @deprecated ADR-024 — preferir {@link resolveEstudioListId}. */
+export function resolveEstudioPersonalListId(
+  lists: ReadonlyArray<{ id: string; name: string }>,
+): string | null {
+  return resolveEstudioListId(lists);
 }

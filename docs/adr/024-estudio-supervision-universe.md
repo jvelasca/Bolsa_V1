@@ -1,10 +1,10 @@
 # ADR-024 — Universo único «Estudio» (supervisión)
 
-- **Estado:** Accepted (to-be) — 2026-08-06
+- **Estado:** Accepted — 2026-08-06 (implementación stage 2026-08-06)
 - **Tipo:** decisión de producto / lifecycle de supervisión
 - **Padres:** [ADR-019](./019-dual-universes-lab-vs-trading.md) · [ADR-020](./020-operating-mandate-tenure.md) · panel Operativa ([trading-operativa-panel-2026-08-04.md](../engineering/trading-operativa-panel-2026-08-04.md))
 - **Diseño detallado:** [estudio-supervision-model-2026-08-06.md](../engineering/estudio-supervision-model-2026-08-06.md)
-- **Implementación:** pendiente (mañana / siguiente stage). El as-is sigue con Estudio virtual + tip «Estudio personal» para CORE-R.
+- **Implementación:** lista API `estudio` + Supervisión ON + sin auto-add gráfico + unsubscribe al quitar.
 
 ---
 

@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useNavigate } from 'react-router-dom';
 
-import type { ExternalInstrumentSearchHitDto } from '@bolsa/shared';
+import type { ExternalInstrumentSearchHitDto, PositionDto } from '@bolsa/shared';
 import {
   isVirtualListId,
   looksLikeIsinQuery,
@@ -71,8 +71,6 @@ export function ListValuesPanel() {
   const charts = useWorkspaceStore((s) => s.workspace.charts);
   const { pendingOrders } = usePendingOrders();
   const visualizationEntries = useVisualizationStore((s) => s.entries);
-  const addToVisualization = useVisualizationStore((s) => s.addInstrument);
-  const removeFromVisualization = useVisualizationStore((s) => s.removeInstrument);
   const [selectedInstrumentIds, setSelectedInstrumentIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -310,16 +308,16 @@ export function ListValuesPanel() {
     });
   }
 
-  function addSelectedToEstudio() {
+  async function addSelectedToEstudio() {
     const byId = new Map(selectableItems.map((item) => [item.id, item]));
-    let added = 0;
-    for (const id of selectedInstrumentIds) {
-      const item = byId.get(id);
-      if (!item) continue;
-      addToVisualization(item, { source: 'list' });
-      added += 1;
-    }
+    const batch = [...selectedInstrumentIds]
+      .map((id) => byId.get(id))
+      .filter((item): item is (typeof selectableItems)[number] => Boolean(item));
+    const { addToEstudioMembership } = await import('@/features/trading/estudio-membership');
+    const added = await addToEstudioMembership(batch);
     if (added > 0) {
+      void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      void queryClient.invalidateQueries({ queryKey: ['list'] });
       updateListConfig({
         apiListId: VIRTUAL_LIST_VISUALIZATION,
         name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
@@ -330,10 +328,18 @@ export function ListValuesPanel() {
     }
   }
 
-  function removeSelectedFromEstudio() {
-    for (const id of selectedInstrumentIds) {
-      removeFromVisualization(id);
-    }
+  async function removeSelectedFromEstudio() {
+    const ids = [...selectedInstrumentIds];
+    const { removeFromEstudioMembership } = await import(
+      '@/features/trading/estudio-membership'
+    );
+    const { unsubscribeInstrumentFromSupervision } = await import(
+      '@/features/trading/estudio-supervision'
+    );
+    await removeFromEstudioMembership(ids);
+    unsubscribeInstrumentFromSupervision(ids);
+    void queryClient.invalidateQueries({ queryKey: ['lists'] });
+    void queryClient.invalidateQueries({ queryKey: ['list'] });
     setSelectedInstrumentIds(new Set());
     selectionAnchorIndexRef.current = null;
   }
@@ -889,13 +895,7 @@ function PortfolioKeyboardList({
   activeInstrumentId: string | undefined;
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
-  positions: Array<{
-    id: string;
-    quantity: number;
-    avgCost: number;
-    unrealizedPnl?: number | null;
-    unrealizedPnlPct?: number | null;
-  }>;
+  positions: PositionDto[];
   allInstruments: import('@bolsa/shared').InstrumentWithMetaDto[];
   selectedIds: Set<string>;
   onToggleSelect: (

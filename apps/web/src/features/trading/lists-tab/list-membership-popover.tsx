@@ -40,8 +40,6 @@ export function ListMembershipPopover({
   const queryClient = useQueryClient();
   const { pendingOrders } = usePendingOrders();
   const visualizationEntries = useVisualizationStore((state) => state.entries);
-  const addToVisualization = useVisualizationStore((state) => state.addInstrument);
-  const removeFromVisualization = useVisualizationStore((state) => state.removeInstrument);
   const { removeFromList, dialog, loadingPreview } = useListInstrumentRemoval();
 
   const accountScope = useActiveAccountQueryKey();
@@ -173,14 +171,23 @@ export function ListMembershipPopover({
     detailsQueries.some((query) => query.isLoading) ||
     portfolioQuery.isLoading;
 
-  function handleToggle(row: MembershipRow) {
+  async function handleToggle(row: MembershipRow) {
     if (row.locked) return;
     if (row.id === VIRTUAL_LIST_VISUALIZATION) {
+      const { addToEstudioMembership, removeFromEstudioMembership } = await import(
+        '@/features/trading/estudio-membership'
+      );
       if (row.checked) {
-        removeFromVisualization(instrument.id);
+        await removeFromEstudioMembership([instrument.id]);
+        const { unsubscribeInstrumentFromSupervision } = await import(
+          '@/features/trading/estudio-supervision'
+        );
+        unsubscribeInstrumentFromSupervision([instrument.id]);
       } else {
-        addToVisualization(instrument, { source: 'list' });
+        await addToEstudioMembership([instrument]);
       }
+      void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      void queryClient.invalidateQueries({ queryKey: ['list'] });
       return;
     }
     if (isVirtualListId(row.id)) return;

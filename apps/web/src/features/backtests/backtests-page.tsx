@@ -84,10 +84,14 @@ import {
   type AssistantPrefs,
 } from '@/features/backtests/backtest-assistant-prefs';
 import {
+  LIST_AUTO_BATCH_SIZE,
+  LIST_AUTO_HARD_MAX,
   LIST_AUTO_MAX_INSTRUMENTS,
   confirmListAutoOverCap,
   createListAutoCampaign,
   filterListAutoIdsWithoutFinalists,
+  listAutoBatchCount,
+  listAutoBatchProgressLabel,
   listAutoOverCapWarning,
   advanceListAutoAfterSettle,
   listAutoDoneStatus,
@@ -234,7 +238,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/lib/use-media-query';
-import { useActiveChartTab } from '@/stores/workspace-store';
 import {
   DEFAULT_PERIOD_PRESET,
   PERIOD_PRESET_OPTIONS,
@@ -338,7 +341,7 @@ export function BacktestsPage() {
   const [newStrategyName, setNewStrategyName] = useState('');
   const [newStrategyPreset, setNewStrategyPreset] = useState<BacktestStrategyType>('sma_crossover');
   const [replayDrawings, setReplayDrawings] = useState<ChartDrawing[] | null>(null);
-  const [drawingLoadHint, setDrawingLoadHint] = useState<string | null>(null);
+  const [, setDrawingLoadHint] = useState<string | null>(null);
   const [focusTimestamp, setFocusTimestamp] = useState<string | null>(null);
   const [batchRows, setBatchRows] = useState<BatchRankRow[]>([]);
   const [batchRunning, setBatchRunning] = useState(false);
@@ -387,7 +390,7 @@ export function BacktestsPage() {
   );
   const [cloneOpen, setCloneOpen] = useState(false);
   const [semifinalEnqueuePending, setSemifinalEnqueuePending] = useState(false);
-  const [semifinalJobsQueued, setSemifinalJobsQueued] = useState(false);
+  const [, setSemifinalJobsQueued] = useState(false);
   const [assistantPrefs, setAssistantPrefs] = useState<AssistantPrefs>(() => loadAssistantPrefs());
   const [assistantProgress, setAssistantProgress] = useState<AssistantSessionProgress>(() =>
     emptyAssistantProgress(),
@@ -424,6 +427,10 @@ export function BacktestsPage() {
   );
   /** Campaña lista AUTO (ref = fuente de verdad; UI = progreso). */
   const listAutoRef = useRef<ListAutoCampaign | null>(null);
+  /** ADR-024: Supervisión ON pide arrancar Lista AUTO sobre Estudio. */
+  const supervisionStartPendingRef = useRef<string | null>(null);
+  /** ADR-024: ids quitados de Estudio — saltar en campaña en curso. */
+  const listAutoExcludedIdsRef = useRef<Set<string>>(new Set());
   const listAutoPendingStartRef = useRef<number | null>(null);
   const [listAutoUi, setListAutoUi] = useState<{
     index: number;
@@ -454,7 +461,6 @@ export function BacktestsPage() {
   const batchAbortRef = useRef<AbortController | null>(null);
   const exploreAbortRef = useRef<AbortController | null>(null);
 
-  const activeChartTab = useActiveChartTab();
   const isWide = useMediaQuery('(min-width: 1024px)');
 
   const pruneHistory = useCallback(
@@ -2209,8 +2215,12 @@ export function BacktestsPage() {
           return;
         }
       }
-      if (!confirmListAutoOverCap(queueIds.length)) {
-        setAssistantStatus('Lista AUTO cancelada (soft-cap).');
+      if (
+        !confirmListAutoOverCap(queueIds.length, {
+          skipConfirm: assistantPrefs.listAutoSkipOverCapConfirm,
+        })
+      ) {
+        setAssistantStatus('Lista AUTO cancelada (confirmación tandas).');
         return;
       }
       const campaign = createListAutoCampaign({
@@ -2266,14 +2276,22 @@ export function BacktestsPage() {
       setListAutoBoard(board);
       setResultFocus('list_auto');
       const startSym = resolveSym(campaign.instrumentIds[startIndex]!);
+      const n = campaign.instrumentIds.length;
+      const batches = listAutoBatchCount(n);
+      const tandaHint =
+        n > LIST_AUTO_BATCH_SIZE
+          ? ` · ${batches} tandas de ~${LIST_AUTO_BATCH_SIZE}`
+          : '';
+      const hardHint =
+        (listDetail!.instrumentIds.length > LIST_AUTO_HARD_MAX ||
+          queueIds.length > LIST_AUTO_HARD_MAX) &&
+        n === LIST_AUTO_HARD_MAX
+          ? ` (tope ${LIST_AUTO_HARD_MAX})`
+          : '';
       setAssistantStatus(
         cont
-          ? `Lista AUTO: continúa desde #${startIndex + 1} ${startSym} (tras Stop) · ${campaign.instrumentIds.length} valor(es)…`
-          : `Lista AUTO: ${campaign.instrumentIds.length} valor(es)` +
-              (listDetail!.instrumentIds.length > LIST_AUTO_MAX_INSTRUMENTS
-                ? ` (máx. ${LIST_AUTO_MAX_INSTRUMENTS})`
-                : '') +
-              '…',
+          ? `Lista AUTO: continúa desde #${startIndex + 1} ${startSym} (tras Stop) · ${n} valor(es)${tandaHint}…`
+          : `Lista AUTO: ${n} valor(es)${tandaHint}${hardHint}…`,
       );
       queueListAutoTicker(startIndex);
       return;
@@ -2308,6 +2326,68 @@ export function BacktestsPage() {
     setListAutoBoard((prev) => (prev ? enrichListAutoBoardLabels(prev, instrumentLabels) : prev));
   }, [instrumentLabels]);
 
+  // ADR-024: Supervisión ON/OFF desde Operativa → Lista AUTO + exclusiones.
+  useEffect(() => {
+    const onSupervision = (ev: Event) => {
+      const detail = (ev as CustomEvent<{ enabled: boolean; listId: string }>).detail;
+      if (!detail) return;
+      if (detail.enabled) {
+        listAutoExcludedIdsRef.current.clear();
+        supervisionStartPendingRef.current = detail.listId;
+        setUniverseMode('list');
+        setListId(detail.listId);
+        setAssistantPrefs((prev) => {
+          if (prev.fullCycleOnPlay) return prev;
+          const next = { ...prev, fullCycleOnPlay: true };
+          saveAssistantPrefs(next);
+          return next;
+        });
+        setAssistantStatus(`Supervisión ON · preparando Lista AUTO («${detail.listId}»)…`);
+        setResultFocus('list_auto');
+      } else {
+        supervisionStartPendingRef.current = null;
+        const campaign = listAutoRef.current;
+        if (campaign && !campaign.aborted && !campaign.paused) {
+          pauseListAutoCampaign(campaign);
+          setListAutoBoard((b) => (b ? markListAutoBoardPaused(b, true) : b));
+          setAssistantStatus('Supervisión OFF · Lista AUTO en pausa.');
+        }
+      }
+    };
+    const onUnsubscribe = (ev: Event) => {
+      const ids = (ev as CustomEvent<{ instrumentIds: string[] }>).detail?.instrumentIds ?? [];
+      for (const id of ids) listAutoExcludedIdsRef.current.add(id);
+      const campaign = listAutoRef.current;
+      if (!campaign || campaign.aborted) return;
+      const cur = campaign.instrumentIds[campaign.index];
+      if (cur && ids.includes(cur) && !campaign.paused) {
+        // El valor en curso sale de Estudio: avanzar al siguiente al settle; forzar skip ya.
+        setAssistantStatus('Estudio: valor quitado · se omite en la campaña.');
+      }
+    };
+    window.addEventListener('bolsa-estudio-supervision-changed', onSupervision);
+    window.addEventListener('bolsa-estudio-unsubscribe', onUnsubscribe);
+    return () => {
+      window.removeEventListener('bolsa-estudio-supervision-changed', onSupervision);
+      window.removeEventListener('bolsa-estudio-unsubscribe', onUnsubscribe);
+    };
+  }, []);
+
+  useEffect(() => {
+    const pending = supervisionStartPendingRef.current;
+    if (!pending) return;
+    if (universeMode !== 'list' || listId !== pending) return;
+    if (!listDetail?.instrumentIds?.length || listDetail.id !== pending) return;
+    if (listAutoRef.current && !listAutoRef.current.aborted) {
+      supervisionStartPendingRef.current = null;
+      return;
+    }
+    supervisionStartPendingRef.current = null;
+    void playAssistantSequence();
+    // playAssistantSequence cierra sobre estado actual; deps acotadas a list ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- arranque puntual Supervisión
+  }, [universeMode, listId, listDetail?.id, listDetail?.instrumentIds?.length]);
+
   /** Prepara un ticker de la campaña y encola el arranque del ciclo (tras setState). */
   function queueListAutoTicker(index: number) {
     const campaign = listAutoRef.current;
@@ -2324,6 +2404,18 @@ export function BacktestsPage() {
       clearPersistedListAutoPause();
       setAssistantStatus(listAutoDoneStatus(total));
       setResultFocus('list_auto');
+      return;
+    }
+
+    let nextIndex = index;
+    while (
+      nextIndex < campaign.instrumentIds.length &&
+      listAutoExcludedIdsRef.current.has(campaign.instrumentIds[nextIndex]!)
+    ) {
+      nextIndex += 1;
+    }
+    if (nextIndex !== index) {
+      queueListAutoTicker(nextIndex);
       return;
     }
 
@@ -3715,13 +3807,29 @@ export function BacktestsPage() {
                             listas grandes).
                           </span>
                         </label>
+                        <label className="flex items-start gap-2 text-[10px] leading-snug text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={assistantPrefs.listAutoSkipOverCapConfirm}
+                            onChange={(e) =>
+                              updateAssistantPrefs({
+                                ...assistantPrefs,
+                                listAutoSkipOverCapConfirm: e.target.checked,
+                              })
+                            }
+                          />
+                          <span>
+                            No preguntar al superar ~{LIST_AUTO_BATCH_SIZE} (tandas encadenadas; N
+                            &gt; 200 siempre confirma).
+                          </span>
+                        </label>
                         <p className="text-[10px] leading-snug text-muted-foreground">
-                          {Math.min(
-                            LIST_AUTO_MAX_INSTRUMENTS,
-                            listDetail?.instrumentIds.length ?? 0,
-                          )}{' '}
-                          valor
+                          {listDetail?.instrumentIds.length ?? 0} valor
                           {(listDetail?.instrumentIds.length ?? 0) === 1 ? '' : 'es'} en cola
+                          {(listDetail?.instrumentIds.length ?? 0) > LIST_AUTO_BATCH_SIZE
+                            ? ` · ${listAutoBatchCount(listDetail?.instrumentIds.length ?? 0)} tandas`
+                            : ''}
                           {listAutoSkipWithFinalists ? ' (antes del filtro)' : ''}. Pulsa Play — no
                           elijas estrategia.
                         </p>
@@ -3735,6 +3843,10 @@ export function BacktestsPage() {
                             </p>
                           ) : null;
                         })()}
+                        <p className="text-[10px] leading-snug text-muted-foreground">
+                          Reanalizar aquí (LAB) no cambia Trading: el mandato solo cambia si aceptas
+                          una propuesta CORE-R en Monitor (o lo cambias a mano).
+                        </p>
                       </>
                     )}
                     {listAutoBoard ? (
@@ -3761,7 +3873,13 @@ export function BacktestsPage() {
                       />
                     ) : listAutoUi ? (
                       <p className="text-[11px] font-medium text-foreground" aria-live="polite">
-                        {listAutoProgressLabel(listAutoUi)} en curso… ↻ cancela.
+                        {(() => {
+                          const tanda = listAutoBatchProgressLabel({
+                            index: listAutoUi.index,
+                            total: listAutoUi.total,
+                          });
+                          return `${listAutoProgressLabel(listAutoUi)}${tanda ? ` · ${tanda}` : ''} en curso… ↻ cancela.`;
+                        })()}
                       </p>
                     ) : null}
                   </div>
@@ -3861,7 +3979,7 @@ export function BacktestsPage() {
                       ) : (
                         <Button
                           className="w-full"
-                          variant="secondary"
+                          variant="outline"
                           onClick={() => void runListBatch()}
                           disabled={
                             batchRunning ||

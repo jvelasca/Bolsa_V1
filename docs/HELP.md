@@ -150,20 +150,20 @@ Guía en Ayuda → Backtesting (`BACKTESTING_CORE_R_GUIDE`). Detalle: [list-auto
 
 | Paso | Qué |
 |------|-----|
-| 1 | Monitor (Probar o Ayuda) → elige lista con TOP (hoy: API p. ej. IBEX o «Estudio personal» si la creaste) |
-| 2 | **Encolar revisiones** (informe Lista AUTO + PnL DEMO ≤ −5%/−10%) |
-| 3 | Deep-links Lab / Finalistas / Checklist → **Hecho** |
+| 1 | Operativa → **Pasar a Estudio** los valores a supervisar (lista API canónica) |
+| 2 | Operativa → Configuración → **Supervisión ON** (Lista AUTO + CORE-R sobre Estudio) · o Monitor → Auto-sync |
+| 3 | Monitor → cola de revisiones · deep-links Lab / Finalistas / Checklist → **Hecho** |
 | 4 | «Valorar cambio» + modo **SEMI** → **Adoptar** (abre mandato TOP#1; no auto en AUTO) |
-| 5 | Opcional: **Narrar cola** · **Auto-sync** (cron shell; cadencia; hoy prefiere «Estudio personal» si existe) |
-| 6 | Chip **CORE-R N** · toast «Abrir Monitor» (shell o cron servidor / otro device) |
-| 7 | **Hecho todos** cierra las abiertas de la lista actual |
+| 5 | Opcional: **Narrar cola** · cadencia editable · chip **CORE-R N** · toast «Abrir Monitor» |
+| 6 | **Hecho todos** cierra las abiertas de la lista actual |
+| 7 | **Quitar de Estudio** = deja de supervisar ese valor (no cierra mandato solo) |
 
 No pisa TOP · no auto-paper D. Cola: localStorage = cache; BD = SoT multi-dispositivo.  
 Flags ops (off por defecto — ver [github-credentials-and-ops §9](./engineering/github-credentials-and-ops.md)): `CORE_R_CRON_ENABLED`, `COST_MODEL_V2_ENABLED`.
 
-### To-be — una sola «Estudio» (ADR-024 · pendiente implementar)
+### Estudio = supervisión (ADR-024)
 
-Producto acordado (2026-08-06): **Estudio** = único universo supervisable (lista API); desaparece el tip «Estudio personal»; interruptor **Supervisión ON** arma Lab + CORE-R; el gráfico no mete valores; quitar = unsubscribe. Humano confirma operar/cambio de mandato (SEMI). Detalle: [estudio-supervision-model-2026-08-06.md](./engineering/estudio-supervision-model-2026-08-06.md) · [ADR-024](./adr/024-estudio-supervision-universe.md).
+**Estudio** = único universo supervisable (lista API `estudio`). **Supervisión ON** arma Lab + CORE-R. El gráfico no mete valores. Quitar = unsubscribe. SEMI confirma operar/cambio de mandato. Detalle: [estudio-supervision-model-2026-08-06.md](./engineering/estudio-supervision-model-2026-08-06.md) · [ADR-024](./adr/024-estudio-supervision-universe.md).
 
 ## Lista AUTO frescura (v1.3) + tandas
 

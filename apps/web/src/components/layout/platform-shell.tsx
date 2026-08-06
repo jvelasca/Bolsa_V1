@@ -31,6 +31,7 @@ import { WorkspaceBootstrap } from '@/features/workspace/workspace-bootstrap';
 import { WorkspaceUiBridgeRegister } from '@/features/workspace/workspace-ui-bridge-register';
 import { WorkspaceRemoteSync } from '@/features/workspace/workspace-remote-sync';
 import { VisualizationWorkspaceSync } from '@/features/workspace/visualization-workspace-sync';
+import { EstudioApiSync } from '@/features/trading/estudio-api-sync';
 import { WorkspacePickerDialog } from '@/features/workspace/workspace-picker-dialog';
 
 import { PlatformConfigDialog } from '@/features/config/platform-config-dialog';
@@ -64,6 +65,7 @@ export function PlatformShell() {
       <WorkspaceUiBridgeRegister />
       <WorkspaceAutoSave />
       <VisualizationWorkspaceSync />
+      <EstudioApiSync />
       <WorkspaceRemoteSync />
       <CoreRSchedulerHost />
       <SupervisedF3QueueHost />

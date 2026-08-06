@@ -25,6 +25,7 @@ import {
 } from '@/features/platform/strategy-adoption';
 import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel';
 import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
+import { EstudioSupervisionPanel } from '@/features/trading/estudio-supervision-panel';
 import {
   demoBookAllowsEnqueueConfirm,
   demoBookRequiresEstudioMembership,
@@ -485,7 +486,10 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           </span>
         }
       >
-        <DemoBookModePanel compact />
+        <div className="space-y-2">
+          <EstudioSupervisionPanel compact />
+          <DemoBookModePanel compact />
+        </div>
       </TradingOperativaSection>
     </div>
   );

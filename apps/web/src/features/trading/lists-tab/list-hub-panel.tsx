@@ -2,6 +2,7 @@ import { useMemo, useState, Fragment } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InstrumentListSummaryDto } from '@bolsa/shared';
 import {
+  isEstudioListNameCollision,
   isVirtualListId,
   VIRTUAL_LIST_LABELS,
   VIRTUAL_LIST_PENDING_ORDERS,
@@ -360,11 +361,29 @@ export function ListHubPanel() {
           <Button
             type="button"
             size="sm"
-            disabled={!newName.trim() || newInstrumentIds.size === 0 || createMutation.isPending}
-            onClick={() => createMutation.mutate()}
+            disabled={
+              !newName.trim() ||
+              newInstrumentIds.size === 0 ||
+              createMutation.isPending ||
+              isEstudioListNameCollision(newName)
+            }
+            onClick={() => {
+              if (isEstudioListNameCollision(newName)) {
+                setError(
+                  'El nombre «Estudio» está reservado para la lista canónica de supervisión.',
+                );
+                return;
+              }
+              createMutation.mutate();
+            }}
           >
             {createMutation.isPending ? 'Creando…' : 'Crear lista'}
           </Button>
+          {isEstudioListNameCollision(newName) ? (
+            <p className="text-[10px] text-destructive">
+              «Estudio» está reservado para la lista canónica de supervisión.
+            </p>
+          ) : null}
         </section>
       )}
 

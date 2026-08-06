@@ -3,23 +3,19 @@
 > Rama docs: `stage/estudio-membership-operativa-2026-08-04` (o la que lleve el commit de docs)  
 > **Padre:** [estudio-supervision-model-2026-08-06.md](./estudio-supervision-model-2026-08-06.md) · [ADR-024](../adr/024-estudio-supervision-universe.md)
 
-## Acordado (no implementado)
+## Implementado (2026-08-06)
 
-- Una sola lista **Estudio** (API) = universo supervisable.
-- Deprecar concepto **Estudio personal**.
-- Interruptor **Supervisión ON/OFF** arma Lista AUTO + CORE-R.
-- Análisis automático; **SEMI** confirma operar / cambiar mandato.
-- Gráfico **no** añade a Estudio.
-- Quitar = unsubscribe (campaña/colas); no auto-cierra mandato.
+- Lista API canónica `estudio` (`ensure_estudio_list`, merge «Estudio personal»).
+- Membresía UI → API + cache `visualization-store`.
+- Sin auto-add al abrir gráfico.
+- **Supervisión ON** en Operativa → Configuración (CORE-R + Lista AUTO).
+- Quitar de Estudio → dismiss CORE-R/F3 + excluir campaña.
+- HELP / tracker / tests actualizados.
 
-## Hecho hoy
+## Smoke
 
-- ADR-024 Accepted (to-be).
-- Diseño engineering + enlaces HELP / list-auto-ops / índice.
-- Implementación de código: **mañana**.
-
-## Arranque mañana
-
-1. ADR-024 + diseño §4–5.
-2. Persistencia lista API Estudio + migración store.
-3. Luego: no auto-add · Supervisión ON · unsubscribe remove · tests.
+1. GET `/api/lists` → existe id `estudio`.
+2. IBEX → seleccionar → Pasar a Estudio → aparece en chip Estudio.
+3. Abrir gráfico de otro valor → **no** entra en Estudio.
+4. Operativa → Supervisión ON → Lista AUTO sobre Estudio (o confirmación tandas).
+5. Quitar de Estudio → sale de cola CORE-R / F3.

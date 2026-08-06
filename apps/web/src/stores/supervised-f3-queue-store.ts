@@ -79,6 +79,8 @@ interface SupervisedF3QueueState {
     meta?: Omit<SupervisedEnqueueMeta, 'symbol'>,
   ) => number;
   remove: (id: string) => void;
+  /** ADR-024: quitar de Estudio → saca propuestas abiertas de ese instrumento. */
+  removeForInstrument: (instrumentId: string) => number;
   clear: () => void;
   setActive: (id: string | null) => void;
   activeItem: () => SupervisedQueueItem | null;
@@ -166,6 +168,23 @@ export const useSupervisedF3QueueStore = create<SupervisedF3QueueState>()(
             s.activeId === id ? (items[0]?.id ?? null) : s.activeId;
           return { items, activeId };
         }),
+      removeForInstrument: (instrumentId) => {
+        if (!instrumentId) return 0;
+        let n = 0;
+        set((s) => {
+          const items = s.items.filter((i) => {
+            if (i.payload.instrumentId !== instrumentId) return true;
+            n += 1;
+            return false;
+          });
+          const activeStill = items.some((i) => i.id === s.activeId);
+          return {
+            items,
+            activeId: activeStill ? s.activeId : (items[0]?.id ?? null),
+          };
+        });
+        return n;
+      },
       clear: () => set({ items: [], activeId: null }),
       setActive: (id) => set({ activeId: id }),
       activeItem: () => {
