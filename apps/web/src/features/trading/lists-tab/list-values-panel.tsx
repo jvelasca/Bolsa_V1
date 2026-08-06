@@ -54,6 +54,7 @@ import { ListColumnLayoutProvider, useListColumnLayoutContext } from '@/features
 import { PendingOrderListItem } from '@/features/trading/lists-tab/pending-order-list-item';
 import { ListCarousel } from '@/features/trading/lists-tab/list-carousel';
 import { useListInstrumentKeyboardNav } from '@/features/trading/lists-tab/use-list-instrument-keyboard-nav';
+import { EstudioListSupervisionBanner } from '@/features/trading/estudio-supervision-panel';
 
 export function ListValuesPanel() {
   const navigate = useNavigate();
@@ -308,7 +309,10 @@ export function ListValuesPanel() {
     });
   }
 
+  const viewingEstudio = activeVirtual === VIRTUAL_LIST_VISUALIZATION;
+
   async function addSelectedToEstudio() {
+    if (viewingEstudio) return;
     const byId = new Map(selectableItems.map((item) => [item.id, item]));
     const batch = [...selectedInstrumentIds]
       .map((id) => byId.get(id))
@@ -390,19 +394,24 @@ export function ListValuesPanel() {
   );
 
   function openSelectedCharts() {
+    if (selectedListId) setManualListSelection(selectedListId);
     const byId = new Map(selectableItems.map((item) => [item.id, item]));
     for (const id of selectedInstrumentIds) {
       const item = byId.get(id);
       if (!item) continue;
       focusInstrument(item.id, item.symbol);
     }
+    requestChartReflow();
   }
 
-  function visualizeFromSearch(
+  async function visualizeFromSearch(
     instrument: (typeof allInstruments)[number],
-    options?: { searchQuery?: string; source?: 'search' | 'import' },
+    _options?: { searchQuery?: string; source?: 'search' | 'import' },
   ) {
-    addToVisualization(instrument, options);
+    const { addToEstudioMembership } = await import('@/features/trading/estudio-membership');
+    await addToEstudioMembership([instrument]);
+    void queryClient.invalidateQueries({ queryKey: ['lists'] });
+    void queryClient.invalidateQueries({ queryKey: ['list'] });
     updateListConfig({
       apiListId: VIRTUAL_LIST_VISUALIZATION,
       name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
@@ -641,6 +650,9 @@ export function ListValuesPanel() {
 
       <ListColumnLayoutProvider listId={selectedListId}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {viewingEstudio && !isLoading && visualizationListItems.length > 0 ? (
+          <EstudioListSupervisionBanner />
+        ) : null}
         <div className="scroll-area min-h-0 flex-1 overflow-auto">
           {isLoading && <p className="p-2 text-xs text-muted-foreground">Cargando…</p>}
           {isError && <p className="p-2 text-xs text-destructive">Error al cargar lista</p>}
@@ -671,15 +683,15 @@ export function ListValuesPanel() {
             </p>
           )}
 
-        {activeVirtual === VIRTUAL_LIST_VISUALIZATION && !isLoading && visualizationListItems.length === 0 && (
+        {viewingEstudio && !isLoading && visualizationListItems.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            Busca un valor, ábrelo en el gráfico o selecciona filas de otra lista y pulsa
-            «Pasar a Estudio». SEMI/AUTO exigen pertenencia a Estudio. Los miembros se guardan en
-            el espacio de trabajo.
+            Selecciona valores en IBEX u otra lista y pulsa «Pasar a Estudio», o búscalos arriba.
+            Aquí viven los valores supervisables. Activa Supervisión ON (banner o Operativa →
+            Configuración) para Lab + CORE-R. Por valor: «Dejar de supervisar».
           </p>
         )}
 
-        {activeVirtual === VIRTUAL_LIST_VISUALIZATION && !isLoading && visualizationListItems.length > 0 && (
+        {viewingEstudio && !isLoading && visualizationListItems.length > 0 && (
           <SortedVisualizationList
             items={visualizationListItems}
             entries={visualizationEntries}
@@ -737,22 +749,32 @@ export function ListValuesPanel() {
             {selectedInstrumentIds.size} seleccionado
             {selectedInstrumentIds.size === 1 ? '' : 's'}
           </span>
+          {!viewingEstudio ? (
+            <button
+              type="button"
+              className="rounded border border-primary/50 bg-primary/15 px-2.5 py-1.5 font-semibold text-primary hover:bg-primary/20"
+              onClick={() => void addSelectedToEstudio()}
+              title="Pasar la selección a la lista Estudio (supervisión)"
+            >
+              Pasar a Estudio
+            </button>
+          ) : null}
           <button
             type="button"
-            className="rounded border border-primary/50 bg-primary/15 px-2.5 py-1.5 font-semibold text-primary hover:bg-primary/20"
-            onClick={addSelectedToEstudio}
-            title="Pasar la selección a la lista Estudio"
-          >
-            Pasar a Estudio
-          </button>
-          <button
-            type="button"
-            className="rounded border border-border px-2.5 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
-            onClick={removeSelectedFromEstudio}
+            className={
+              viewingEstudio
+                ? 'rounded border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 font-semibold text-destructive hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-40'
+                : 'rounded border border-border px-2.5 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40'
+            }
+            onClick={() => void removeSelectedFromEstudio()}
             disabled={selectedInEstudioCount === 0}
-            title="Quitar la selección de la lista Estudio"
+            title={
+              viewingEstudio
+                ? 'Quitar de Estudio = deja de supervisar estos valores (no cierra mandato solo)'
+                : 'Quitar la selección de la lista Estudio'
+            }
           >
-            Quitar de Estudio
+            {viewingEstudio ? 'Dejar de supervisar' : 'Quitar de Estudio'}
           </button>
           <button
             type="button"

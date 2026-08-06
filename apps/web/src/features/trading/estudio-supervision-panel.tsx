@@ -1,5 +1,8 @@
 /**
- * Interruptor Supervisión ON (Operativa → Configuración). ADR-024.
+ * Interruptor Supervisión ON (Operativa → Configuración / banner lista Estudio). ADR-024.
+ *
+ * Supervisión es global sobre toda la lista Estudio (no hay interruptor por valor).
+ * Por instrumento: estar en Estudio = elegible; «Dejar de supervisar» = quitar de la lista.
  */
 
 import { useEffect, useState } from 'react';
@@ -9,32 +12,83 @@ import {
   clampCoreRSchedulerInterval,
 } from '@/features/backtests/core-r-scheduler';
 import {
+  ESTUDIO_SUPERVISION_EVENT,
   loadEstudioSupervisionPrefs,
   setEstudioSupervisionEnabled,
   type EstudioSupervisionPrefs,
 } from '@/features/trading/estudio-supervision';
 
-export function EstudioSupervisionPanel({ compact = false }: { compact?: boolean }) {
+function useEstudioSupervisionPrefsState() {
   const [prefs, setPrefs] = useState<EstudioSupervisionPrefs>(() =>
     loadEstudioSupervisionPrefs(),
   );
 
   useEffect(() => {
     setPrefs(loadEstudioSupervisionPrefs());
+    const onChange = () => setPrefs(loadEstudioSupervisionPrefs());
+    window.addEventListener(ESTUDIO_SUPERVISION_EVENT, onChange);
+    return () => window.removeEventListener(ESTUDIO_SUPERVISION_EVENT, onChange);
   }, []);
 
   const onToggle = (enabled: boolean) => {
-    const next = setEstudioSupervisionEnabled(enabled, {
-      intervalMinutes: prefs.intervalMinutes,
-    });
-    setPrefs(next);
+    setPrefs(
+      setEstudioSupervisionEnabled(enabled, {
+        intervalMinutes: prefs.intervalMinutes,
+      }),
+    );
   };
 
   const onInterval = (minutes: number) => {
-    const intervalMinutes = clampCoreRSchedulerInterval(minutes);
-    const next = setEstudioSupervisionEnabled(prefs.enabled, { intervalMinutes });
-    setPrefs(next);
+    setPrefs(
+      setEstudioSupervisionEnabled(prefs.enabled, {
+        intervalMinutes: clampCoreRSchedulerInterval(minutes),
+      }),
+    );
   };
+
+  return { prefs, onToggle, onInterval };
+}
+
+/** Banner compacto encima de la lista Estudio (watchlist). */
+export function EstudioListSupervisionBanner() {
+  const { prefs, onToggle, onInterval } = useEstudioSupervisionPrefsState();
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-2 py-1.5 text-[10px]"
+      data-testid="estudio-list-supervision-banner"
+    >
+      <label className="flex cursor-pointer items-center gap-1.5 font-semibold text-foreground">
+        <input
+          type="checkbox"
+          className="rounded border-border"
+          checked={prefs.enabled}
+          onChange={(e) => onToggle(e.target.checked)}
+        />
+        Supervisión {prefs.enabled ? 'ON' : 'OFF'}
+      </label>
+      <select
+        className="rounded border border-border bg-background px-1 py-0.5"
+        value={prefs.intervalMinutes}
+        disabled={!prefs.enabled}
+        onChange={(e) => onInterval(Number(e.target.value))}
+        title="Cadencia Lab / CORE-R"
+      >
+        {CORE_R_SCHEDULER_INTERVAL_PRESETS.map((m) => (
+          <option key={m} value={m}>
+            {m >= 1440 ? '24 h' : `${m} min`}
+          </option>
+        ))}
+      </select>
+      <span className="min-w-0 flex-1 text-muted-foreground">
+        Global sobre «{ESTUDIO_LIST_NAME}». Por valor: selección → «Dejar de supervisar».
+      </span>
+    </div>
+  );
+}
+
+export function EstudioSupervisionPanel({ compact = false }: { compact?: boolean }) {
+  const { prefs, onToggle, onInterval } = useEstudioSupervisionPrefsState();
 
   return (
     <div
@@ -75,9 +129,9 @@ export function EstudioSupervisionPanel({ compact = false }: { compact?: boolean
         </select>
       </div>
       <p className="text-[10px] leading-snug text-muted-foreground">
-        Sobre lista «{ESTUDIO_LIST_NAME}»: Lab (Lista AUTO) + reevaluación CORE-R.
-        SEMI confirma operar y cambiar mandato. Quitar de Estudio para la supervisión
-        de ese valor.
+        Global sobre «{ESTUDIO_LIST_NAME}»: Lab (Lista AUTO) + CORE-R. No hay interruptor por
+        valor — quita el instrumento de Estudio para dejar de supervisarlo. SEMI confirma
+        operar y cambiar mandato.
       </p>
     </div>
   );

@@ -40,7 +40,6 @@ import {
   type ChartCursorBarField,
   DEFAULT_CHART_TOOLBAR_GLOBAL_CONFIG,
   visibleListColumns,
-  newChartDrawingId,
   createBlankDrawingTemplate,
   normalizeDrawingTemplates,
   DEFAULT_DRAWING_TEMPLATES,
@@ -1267,17 +1266,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             dockLayout: payload.dockLayout,
             isDefault: prepared.preferences.openOnStartup,
           });
+          // No pisar cambios locales concurrentes (p. ej. Abrir gráficos durante el PUT).
+          const live = get().workspace;
+          const savedChartFp = prepared.charts.map((c) => c.id).join('|');
+          const liveChartFp = live.charts.map((c) => c.id).join('|');
+          const concurrentCharts = savedChartFp !== liveChartFp;
           set({
             workspace: {
-              ...prepared,
+              ...live,
               name: response.data.name,
-              updatedAt: response.data.updatedAt ?? prepared.updatedAt,
+              updatedAt: response.data.updatedAt ?? live.updatedAt,
             },
-            chartPersistBackup: chartPersistBackupFrom(prepared),
+            chartPersistBackup: chartPersistBackupFrom(live),
             activeWorkspaceId: response.data.id,
-            isDirty: false,
+            isDirty: concurrentCharts,
             isSaving: false,
           });
+          if (concurrentCharts) saveQueued = true;
           await get().refreshSummaries();
         } catch (err) {
           set({ isSaving: false });
@@ -1529,11 +1534,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           activeTabId = activeChartId ?? '';
           return {
             workspace,
-            isDirty: !state.workspace.preferences.autoSave,
+            // Siempre dirty: con autoSave no marcar dirty permitía que un sync/PUT
+            // concurrente borrara pestañas recién abiertas.
+            isDirty: true,
           };
         });
 
         flushDrawingAutoSave(get, true);
+        if (get().workspace.preferences.autoSave) {
+          requestWorkspaceAutoSave(get);
+        }
         return activeTabId;
       },
       setDrawingEditorOpen: (drawingId) => {

@@ -53,10 +53,35 @@ export async function hydrateEstudioMembershipFromApi(): Promise<void> {
 
   const now = new Date().toISOString();
   const byLocal = new Map(local.map((e) => [e.instrumentId, e]));
+  let quotesById = new Map<string, { symbol: string; name: string }>();
+  if (apiIds.length > 0) {
+    try {
+      const quotes = await api.getInstrumentQuotes(apiIds);
+      quotesById = new Map(
+        quotes.data.map((q) => [q.id, { symbol: q.symbol, name: q.name }]),
+      );
+    } catch {
+      // stubs below
+    }
+  }
   const next: VisualizationPersistedEntry[] = apiIds.map((id) => {
     const prev = byLocal.get(id);
-    if (prev) return prev;
-    return entryFromMeta({ instrumentId: id, symbol: id.slice(0, 8), name: id.slice(0, 8) }, now);
+    if (prev) {
+      const q = quotesById.get(id);
+      if (q && (prev.symbol === id.slice(0, 8) || prev.symbol === id)) {
+        return { ...prev, symbol: q.symbol, name: q.name };
+      }
+      return prev;
+    }
+    const q = quotesById.get(id);
+    return entryFromMeta(
+      {
+        instrumentId: id,
+        symbol: q?.symbol ?? id.slice(0, 8),
+        name: q?.name ?? id.slice(0, 8),
+      },
+      now,
+    );
   });
   store.replaceEntries(next);
 }
