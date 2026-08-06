@@ -138,7 +138,10 @@ class GetInstrumentFundamentals:
 
         chips: list[dict[str, Any]] = []
         for instrument_id in ids:
-            card = await self.execute(instrument_id, as_of=as_of)
+            try:
+                card = await self.execute(instrument_id, as_of=as_of)
+            except Exception:
+                continue
             if card is None:
                 continue
             chips.append(card_to_chip(card))

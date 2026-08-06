@@ -5,11 +5,11 @@
 import { useMemo } from 'react';
 import { mapOpinionToChannel } from '@bolsa/shared';
 import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 
 export function useAsesorAlarmaBadge(): number {
   // Selector estable: no devolver .map() desde Zustand (rompe Object.is → loop).
-  const entries = useVisualizationStore((s) => s.entries);
+  const entries = useEstudioMembershipStore((s) => s.members);
   const studyIds = useMemo(
     () => entries.map((e) => e.instrumentId),
     [entries],

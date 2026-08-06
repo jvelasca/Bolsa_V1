@@ -165,6 +165,12 @@ export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
           hint="Lista AUTO: no re-analiza el valor si la huella no cambió."
           onChange={(v) => patchUniverse({ skipFreshIfUnchanged: v })}
         />
+        <FlowCheck
+          checked={prefs.listAutoSkipOverCapConfirm}
+          label="No preguntar tandas (>40)"
+          hint="Lista AUTO: arranca sin diálogo si N ≤ 200. N > 200 siempre confirma."
+          onChange={(v) => onPrefsChange({ ...prefs, listAutoSkipOverCapConfirm: v })}
+        />
       </StageCard>
 
       <Arrow note="análisis ★ + dual-audit" />

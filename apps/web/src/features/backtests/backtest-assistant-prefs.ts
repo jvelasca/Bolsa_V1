@@ -101,6 +101,11 @@ export type AssistantPrefs = {
    * en lugar de un solo paso. Default ON.
    */
   fullCycleOnPlay: boolean;
+  /**
+   * Lista AUTO: no preguntar al superar una tanda (~40) si N ≤ 200.
+   * N > 200 siempre confirma (anti-colgado). Default OFF.
+   */
+  listAutoSkipOverCapConfirm: boolean;
 };
 
 export function defaultEnabledSteps(): Record<AssistantStepId, boolean> {
@@ -145,6 +150,7 @@ export function defaultAssistantPrefs(): AssistantPrefs {
       saveSemifinalSkipLab: false,
     },
     fullCycleOnPlay: true,
+    listAutoSkipOverCapConfirm: false,
   };
 }
 
@@ -247,6 +253,10 @@ export function normalizeAssistantPrefs(raw: unknown): AssistantPrefs {
       ),
     },
     fullCycleOnPlay: asBool(o.fullCycleOnPlay, d.fullCycleOnPlay),
+    listAutoSkipOverCapConfirm: asBool(
+      o.listAutoSkipOverCapConfirm,
+      d.listAutoSkipOverCapConfirm,
+    ),
   };
 }
 

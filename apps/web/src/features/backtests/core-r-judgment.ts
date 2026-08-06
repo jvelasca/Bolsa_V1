@@ -324,12 +324,12 @@ export function judgeCoreR(input: CoreRJudgeInput): CoreRJudgment {
   }
 
   const oosHit = coreROosDegradation(input.oos);
-  if (oosHit && settleReason !== 'skip_fresh') {
+  if (oosHit) {
     return mk(oosHit.level, oosHit.reason);
   }
 
   const pnlHit = coreRPaperPnlDegradation(input.paperPnl);
-  if (pnlHit && settleReason !== 'skip_fresh') {
+  if (pnlHit) {
     return mk(pnlHit.level, pnlHit.reason);
   }
 

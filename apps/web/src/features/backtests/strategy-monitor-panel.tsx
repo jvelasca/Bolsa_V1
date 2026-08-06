@@ -192,36 +192,42 @@ export function StrategyMonitorPanel({
     return sliceMonitorInstruments(rows);
   }, [listDetailQuery.data?.data?.instrumentIds, instrumentsQuery.data?.data]);
 
-  const topQueries = useQueries({
-    queries: monitorInstruments.map((inst) => ({
-      queryKey: ['instrument-strategy-top', inst.id, timeframe],
-      queryFn: () => api.getInstrumentStrategyTop(inst.id, timeframe),
-      enabled: Boolean(inst.id),
-      staleTime: 30_000,
-      retry: false,
-    })),
+  const monitorIdsKey = useMemo(
+    () => monitorInstruments.map((i) => i.id).join(','),
+    [monitorInstruments],
+  );
+
+  const topsBatchQuery = useQuery({
+    queryKey: ['instrument-strategy-tops-batch', 'monitor', timeframe, monitorIdsKey],
+    queryFn: () =>
+      api.queryInstrumentStrategyTops({
+        instrumentIds: monitorInstruments.map((i) => i.id),
+        timeframe,
+      }),
+    enabled: monitorInstruments.length > 0,
+    staleTime: 30_000,
+    retry: false,
   });
 
   const accounts = Array.isArray(accountsQuery.data) ? accountsQuery.data : [];
   const topByInstrumentId = useMemo(() => {
     const map = new Map<string, InstrumentStrategyTopV1>();
-    monitorInstruments.forEach((inst, i) => {
-      const top = topQueries[i]?.data?.data;
-      if (top) map.set(inst.id, top);
-    });
+    for (const top of topsBatchQuery.data?.data ?? []) {
+      map.set(top.instrumentId, top);
+    }
     return map;
-  }, [monitorInstruments, topQueries]);
+  }, [topsBatchQuery.data?.data]);
   const rows = useMemo(() => {
-    return monitorInstruments.map((inst, i) =>
+    return monitorInstruments.map((inst) =>
       buildStrategyMonitorRow({
         instrument: inst,
         timeframe,
-        top: topQueries[i]?.data?.data ?? null,
+        top: topByInstrumentId.get(inst.id) ?? null,
         accounts,
         queue: queueItems,
       }),
     );
-  }, [monitorInstruments, topQueries, accounts, queueItems, timeframe]);
+  }, [monitorInstruments, topByInstrumentId, accounts, queueItems, timeframe]);
 
   const paperAccountIds = useMemo(() => {
     const ids: string[] = [];
@@ -263,7 +269,7 @@ export function StrategyMonitorPanel({
 
   const withTop = rows.filter((r) => r.top && r.top.slots.length > 0);
   const withoutTop = rows.length - withTop.length;
-  const loadingTops = topQueries.some((q) => q.isLoading || q.isFetching);
+  const loadingTops = topsBatchQuery.isLoading || topsBatchQuery.isFetching;
   const listCount = listDetailQuery.data?.data?.instrumentIds.length ?? 0;
   const listLoaded = Boolean(effectiveListId) && !listDetailQuery.isLoading;
   const listEmpty = listLoaded && listCount === 0;

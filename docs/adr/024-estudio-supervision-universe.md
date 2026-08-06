@@ -4,7 +4,9 @@
 - **Tipo:** decisión de producto / lifecycle de supervisión
 - **Padres:** [ADR-019](./019-dual-universes-lab-vs-trading.md) · [ADR-020](./020-operating-mandate-tenure.md) · panel Operativa ([trading-operativa-panel-2026-08-04.md](../engineering/trading-operativa-panel-2026-08-04.md))
 - **Diseño detallado:** [estudio-supervision-model-2026-08-06.md](../engineering/estudio-supervision-model-2026-08-06.md)
-- **Implementación:** lista API `estudio` + Supervisión ON + sin auto-add gráfico + unsubscribe al quitar.
+- **Implementación:** lista API `estudio` + Supervisión ON + sin auto-add gráfico a Estudio + unsubscribe al quitar.  
+  Lista virtual **Visualizados** (`__builtin:visualization__`) = espejo de pestañas abiertas (separada de Estudio).  
+  UX listas: [visualizados-list-ux-2026-08-06.md](../engineering/visualizados-list-ux-2026-08-06.md).
 
 ---
 
@@ -59,6 +61,27 @@ Al quitar un instrumento de Estudio:
 - Excluir de campaña Lista AUTO pendiente / saltar si es el actual.
 - Dismiss items abiertos CORE-R y propuestas F3 de supervisión de ese instrumento.
 - **No** borrar Finalistas/TOP ni cerrar posiciones/mandato automáticamente; avisar si hay mandato activo.
+- Copy UI: **«Eliminar de la lista»** (no «Dejar de supervisar» — evita confusión con Supervisión ON).
+
+### 2.6 Cadencias en 3 capas (no un solo timer)
+
+Un intervalo único no optimiza operativa: vigilar PnL ≠ rediscubrir estrategia.
+
+| Capa | Pregunta | Motor | Cadencia típica (default · vela 1d al cierre) |
+|------|----------|-------|---------------------------|
+| **Vigilia** | ¿Mandato / PnL paper se degrada? | CORE-R Auto-sync | **1 día** (no cada hora) |
+| **Frescura** | ¿Finalistas siguen válidos tras el cierre? | Lista AUTO + `skip_fresh` | **1 día** |
+| **Redescubrimiento** | ¿Buscar otra estrategia? | Lista AUTO `forceRescan` + presupuesto | 30 días · 5 valores/tick |
+
+Por valor se registran sellos de proceso: Finalistas `lastSearchAt` / freshness stamp, tablero Lista AUTO `lastSearchAt`, cola CORE-R `enqueuedAt` — para reportes y omitir lo ya fresco.
+
+**UI lista Estudio:** columna **Sincro** = solo velas OHLCV. Columnas **Procesos** / **Últ. Lab** / **Últ. CORE-R** se activan en el **(···) de columnas de la tabla** (layout por `listId`, independiente de IBEX etc.; off por defecto). Cadencias solo en (···) de Supervisión. Bajo el **nombre**: resumen corto de procesos (`al día` / `toca V·F`…) + barra al actualizar. Desplegable de fila: precio compacto + bloque Operativa (capas). Botones separados **Actualizar** (vigilia+frescura+velas) y **Redescubrir** (embudo `forceRescan`, confirm costoso) — funcionan también con Supervisión OFF. Detalle UI: [estudio-process-status-ui-2026-08-06.md](../engineering/estudio-process-status-ui-2026-08-06.md).
+
+- **Supervisión ON** = master arm; las capas solo corren si ON.
+- UI: check ON/OFF + botón **(···)** para las tres cadencias (no el select al lado del check).
+- Rediscover rota por la lista (`rediscoverCursor`) para no tumbar el browser.
+- **Manual / SEMI / AUTO** = modo de la **cuenta** (barra de estado → Cuentas · Config · Operativa), no del panel Operativa por valor.
+- SEMI sin cambio: confirmar operar / cambiar mandato.
 
 ## 3. Consecuencias
 

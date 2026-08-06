@@ -3,6 +3,7 @@
  * v1.6–v1.7: toast si encola; acción **Abrir Monitor**.
  * v1.9 Q3.4: hydrate cola/informe/scheduler desde BD (multi-dispositivo).
  * v1.12: poll remoto → toast si cron servidor / otro device encoló.
+ * Arranque: primer tick diferido (idle / ~4s) para no competir con listas.
  * No pisa TOP · no auto-paper D.
  */
 
@@ -23,6 +24,8 @@ import { useAlertsStore } from '@/stores/alerts-store';
 import { useActiveAccountStore } from '@/stores/active-account-store';
 
 const POLL_MS = 60_000;
+/** Primer tick shell: tras paint / idle; la cadencia real es ≥5 min. */
+const BOOT_DEFER_MS = 4_000;
 
 export function CoreRSchedulerHost() {
   const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
@@ -33,22 +36,45 @@ export function CoreRSchedulerHost() {
 
   useEffect(() => {
     if (!activeAccountId) return;
-    void ensureCoreRHydrated(activeAccountId);
+    // Hydrate también diferido: no bloquea el paint de Trading/listas.
+    const t = window.setTimeout(() => {
+      void ensureCoreRHydrated(activeAccountId);
+    }, 1_500);
+    return () => window.clearTimeout(t);
   }, [activeAccountId]);
 
   useEffect(() => {
     let cancelled = false;
+    let intervalId: number | undefined;
+    let bootTimer: number | undefined;
+    let idleHandle: number | undefined;
+
     const tick = () => {
       if (cancelled) return;
       const prefs = loadCoreRSchedulerPrefs();
       if (!prefs.enabled || prefs.scope !== 'shell') return;
       void runCoreRSchedulerTick({ scopeFilter: 'shell' });
     };
-    tick();
-    const id = window.setInterval(tick, POLL_MS);
+
+    const start = () => {
+      if (cancelled) return;
+      tick();
+      intervalId = window.setInterval(tick, POLL_MS);
+    };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      idleHandle = window.requestIdleCallback(start, { timeout: BOOT_DEFER_MS });
+    } else {
+      bootTimer = window.setTimeout(start, BOOT_DEFER_MS);
+    }
+
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      if (idleHandle != null && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleHandle);
+      }
+      if (bootTimer != null) window.clearTimeout(bootTimer);
+      if (intervalId != null) window.clearInterval(intervalId);
     };
   }, []);
 

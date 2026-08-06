@@ -35,7 +35,7 @@ import {
   loadDemoBookPrefs,
   suggestQuantityFromCash,
 } from '@/features/trading/demo-book-prefs';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 
 function kindLabel(kind: string): string {
   return (SIGNAL_KIND_LABELS as Record<string, string>)[kind] ?? kind;
@@ -162,7 +162,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
       }
       if (
         demoBookRequiresEstudioMembership(book.mode) &&
-        !useVisualizationStore.getState().contains(item.instrumentId)
+        !useEstudioMembershipStore.getState().contains(item.instrumentId)
       ) {
         throw new Error(ESTUDIO_MEMBERSHIP_REQUIRED_MSG);
       }

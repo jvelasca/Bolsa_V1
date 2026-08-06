@@ -25,7 +25,7 @@ import {
   suggestQuantityFromCash,
 } from '@/features/trading/demo-book-prefs';
 import type { SupervisedProposePayload } from '@/stores/supervised-f3-queue-store';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 
 /** Valor de `payload.source` / origen de cola para Finalistas. */
 export const FINALIST_SUPERVISED_SOURCE = 'finalists' as const;
@@ -50,7 +50,7 @@ export async function proposeFinalistSupervised(opts: {
     );
   }
   if (demoBookRequiresEstudioMembership(book.mode)) {
-    if (!useVisualizationStore.getState().contains(opts.instrumentId)) {
+    if (!useEstudioMembershipStore.getState().contains(opts.instrumentId)) {
       throw new Error(ESTUDIO_MEMBERSHIP_REQUIRED_MSG);
     }
   }

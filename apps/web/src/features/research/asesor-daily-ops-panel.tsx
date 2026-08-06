@@ -16,10 +16,10 @@ import {
   isValidEmailLoose,
   notificationEmailReady,
 } from '@/features/config/notification-prefs';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
 import { useAlertsStore } from '@/stores/alerts-store';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 function todayIso(): string {
@@ -122,7 +122,7 @@ function Kpi({
 
 export function AsesorDailyOpsPanel() {
   const { account, effectiveAccountId } = useActiveAccount();
-  const entries = useVisualizationStore((s) => s.entries);
+  const entries = useEstudioMembershipStore((s) => s.members);
   const studyIds = useMemo(() => entries.map((e) => e.instrumentId), [entries]);
   const asOf = todayIso();
   const book = loadDemoBookPrefs();
@@ -157,6 +157,17 @@ export function AsesorDailyOpsPanel() {
     refetchInterval: 60_000,
   });
 
+  const healthQuery = useQuery({
+    queryKey: ['api-health', 'smtp'],
+    queryFn: api.getHealth,
+    staleTime: 60_000,
+  });
+  const smtpStatus = healthQuery.data?.components?.smtp?.status;
+  /** null = aún no sabemos (health cargando / sin dato). */
+  const smtpReady =
+    smtpStatus == null ? null : smtpStatus === 'configured' || smtpStatus === 'ok';
+  const smtpMessage = healthQuery.data?.components?.smtp?.message;
+
   const report: DailyOpsReportV1 | undefined = reportQuery.data?.data;
   const pnl = report?.summary.totalUnrealizedPnl;
   const pnlTone = pnl == null ? 'neutral' : pnl >= 0 ? 'pos' : 'neg';
@@ -185,17 +196,21 @@ export function AsesorDailyOpsPanel() {
               </p>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <Button asChild size="sm" variant="secondary" className="h-7 text-[11px]">
-                <Link to="/trading">Abrir Operativa</Link>
-              </Button>
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="h-7 border-white/30 bg-transparent text-[11px] text-white hover:bg-white/10"
+              <Link
+                to="/trading"
+                className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-7 text-[11px]')}
               >
-                <Link to="/research?tab=opiniones">Opiniones</Link>
-              </Button>
+                Abrir Operativa
+              </Link>
+              <Link
+                to="/research?tab=opiniones"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'sm' }),
+                  'h-7 border-white/30 bg-transparent text-[11px] text-white hover:bg-white/10',
+                )}
+              >
+                Opiniones
+              </Link>
             </div>
           </div>
           {report ? (
@@ -329,7 +344,7 @@ export function AsesorDailyOpsPanel() {
                 <p className="text-sm font-medium text-foreground">Envío al cierre (R3/R4)</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   HTML por email tras eod-batch (mismo correo de Alarmas). PDF adjunto opcional.
-                  Requiere SMTP. También puedes enviar o descargar ahora.
+                  Requiere SMTP en el servidor. También puedes enviar o descargar ahora.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -384,18 +399,28 @@ export function AsesorDailyOpsPanel() {
                 <Button
                   type="button"
                   size="sm"
-                  variant="secondary"
+                  variant="outline"
                   className="h-7 text-[11px]"
-                  disabled={!canSendDigest || sending}
+                  disabled={!canSendDigest || sending || smtpReady === false}
                   title={
                     !digestEnabled
                       ? 'Activa la suscripción'
                       : !isValidEmailLoose(alarmaEmail)
                         ? 'Configura un correo en Notificaciones'
-                        : 'POST …/daily-ops-report/email'
+                        : smtpReady === false
+                          ? smtpMessage ??
+                            'SMTP incompleto en el servidor (.env: SMTP_HOST + SMTP_FROM)'
+                          : 'POST …/daily-ops-report/email'
                   }
                   onClick={() => {
                     if (!effectiveAccountId) return;
+                    if (smtpReady === false) {
+                      pushToast(
+                        smtpMessage ??
+                          'SMTP incompleto en el servidor. Añade SMTP_HOST y SMTP_FROM al .env y reinicia la API.',
+                      );
+                      return;
+                    }
                     setSending(true);
                     void api
                       .sendDailyOpsDigestEmail(effectiveAccountId, {
@@ -414,7 +439,12 @@ export function AsesorDailyOpsPanel() {
                               : `Digest enviado · ${d.asOf ?? asOf}`,
                           );
                         } else {
-                          pushToast(`Digest skip (${d.skippedReason ?? 'desconocido'})`);
+                          const reason = d.skippedReason ?? 'desconocido';
+                          pushToast(
+                            reason.includes('SMTP')
+                              ? `Digest · ${reason}. Revisa .env (SMTP_HOST / SMTP_FROM) y reinicia la API.`
+                              : `Digest skip (${reason})`,
+                          );
                         }
                       })
                       .catch((e: Error) => pushToast(`Digest · ${e.message}`))
@@ -425,6 +455,12 @@ export function AsesorDailyOpsPanel() {
                 </Button>
               </div>
             </div>
+            {smtpReady === false ? (
+              <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
+                {smtpMessage ??
+                  'SMTP incompleto en el servidor. En `.env`: SMTP_HOST, SMTP_FROM (y opcional SMTP_USER / SMTP_PASSWORD / SMTP_PORT). Luego reinicia la API.'}
+              </p>
+            ) : null}
             {!emailReady && digestEnabled ? (
               <p className="mt-2 text-[10px] text-amber-700 dark:text-amber-300">
                 Activa email de Alarmas y un correo válido en Configuración → Notificaciones

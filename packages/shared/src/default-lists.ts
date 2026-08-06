@@ -1,16 +1,17 @@
 /**
  * IDs de listas virtuales del panel Watchlist y lista API canónica «Estudio».
  *
- * `VIRTUAL_LIST_VISUALIZATION` («Estudio» en carrusel) = fachada UI; membresía SoT = API
- * `ESTUDIO_LIST_ID` (ADR-024). SEMI/AUTO e IO leen el cache local hidratado desde API.
- * Abrir gráfico NO añade (ADR-024).
+ * - `VIRTUAL_LIST_VISUALIZATION` («Visualizados») = espejo de pestañas abiertas (local).
+ * - `ESTUDIO_LIST_ID` («Estudio») = universo supervisable API (ADR-024).
+ * Abrir gráfico → Visualizados; NO añade a Estudio. Foco UI: Cartera → Estudio → resto.
  *
  * @see docs/adr/024-estudio-supervision-universe.md
+ * @see docs/engineering/visualizados-list-ux-2026-08-06.md
  * @see docs/engineering/estudio-supervision-model-2026-08-06.md
  */
 export const VIRTUAL_LIST_PORTFOLIO = '__builtin:portfolio__' as const;
 export const VIRTUAL_LIST_PENDING_ORDERS = '__builtin:pending-orders__' as const;
-/** Lista «Estudio» en carrusel (id legacy `visualization`); SoT = `ESTUDIO_LIST_ID`. */
+/** Lista virtual «Visualizados» (pestañas abiertas / buscador). No es Estudio. */
 export const VIRTUAL_LIST_VISUALIZATION = '__builtin:visualization__' as const;
 
 export type VirtualListId =
@@ -27,7 +28,7 @@ export const VIRTUAL_LIST_IDS: readonly VirtualListId[] = [
 export const VIRTUAL_LIST_LABELS: Record<VirtualListId, string> = {
   [VIRTUAL_LIST_PORTFOLIO]: 'Cartera',
   [VIRTUAL_LIST_PENDING_ORDERS]: 'Órdenes pendientes',
-  [VIRTUAL_LIST_VISUALIZATION]: 'Estudio',
+  [VIRTUAL_LIST_VISUALIZATION]: 'Visualizados',
 };
 
 /** ID estable de la lista de catálogo IBEX 35 en API (coincide con `DEFAULT_LIST_CONFIG.id`). */
@@ -37,7 +38,7 @@ export const CATALOG_IBEX_LIST_ID = 'ibex35';
 export const ESTUDIO_LIST_ID = 'estudio';
 export const ESTUDIO_LIST_NAME = 'Estudio';
 
-/** Carrusel por defecto: Cartera + Órdenes pendientes + Estudio (IBEX se añade al cargar catálogo API). */
+/** Carrusel por defecto: Cartera + Órdenes + Visualizados (Estudio/IBEX se pinan desde API). */
 export const DEFAULT_VIRTUAL_CAROUSEL_IDS: readonly VirtualListId[] = [
   VIRTUAL_LIST_PORTFOLIO,
   VIRTUAL_LIST_PENDING_ORDERS,
@@ -49,7 +50,7 @@ export function isVirtualListId(id: string): id is VirtualListId {
 }
 
 export function isEstudioListId(id: string): boolean {
-  return id === ESTUDIO_LIST_ID || id === VIRTUAL_LIST_VISUALIZATION;
+  return id === ESTUDIO_LIST_ID;
 }
 
 /** Match case-insensitive del nombre canónico «Estudio». */

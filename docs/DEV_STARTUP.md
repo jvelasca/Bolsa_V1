@@ -29,6 +29,20 @@ En Windows, sin reload uvicorn usaría `ProactorEventLoop` (incompatible con psy
 
 **URLs:** Web http://localhost:5173 · API http://localhost:8000/api/health
 
+Cursor abre el navegador al ver `Web lista -> http://localhost:5173` (`serverReadyAction` en `.vscode/launch.json`). Si aparece *Failed to open… (0x2)*, es un fallo al lanzar el navegador por defecto (no de la app); el stack sigue OK. Revisa el navegador predeterminado de Windows o abre la URL a mano.
+
+### Arranque rápido (warm F5)
+
+| Fase | Antes (típ.) | Ahora |
+|------|--------------|-------|
+| PostgreSQL ping+migrate | ~0.1–0.2 s | igual (cache fingerprint) |
+| Liberar puertos Windows | ~3 s (PowerShell) | ~0.1–0.3 s (`netstat`) |
+| Import API + health | ~3 s | igual (sin `--reload`) |
+| UI listas tras paint | N× `GET /lists/{id}` + N× strategy-top | `GET /lists/memberships` + batch tops |
+| CORE-R shell al abrir | tick inmediato | diferido idle / ~4 s (cadencia sigue en minutos) |
+
+Informe: `pnpm startup:report` · `logs/agent/startup.json`.
+
 ## No uses (obsoleto / confuso)
 
 | Antes | Problema |

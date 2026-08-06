@@ -1,15 +1,19 @@
 /**
- * Tests — Lista AUTO campaña (avance, pausa, stop, labels).
+ * Tests — Lista AUTO campaña (avance, pausa, stop, labels, tandas).
  */
 
 import { describe, expect, it } from 'vitest';
 import {
+  LIST_AUTO_BATCH_SIZE,
+  LIST_AUTO_HARD_MAX,
   LIST_AUTO_MAX_INSTRUMENTS,
   advanceListAutoAfterSettle,
   confirmListAutoOverCap,
   createListAutoCampaign,
   filterListAutoIdsWithoutFinalists,
   isListAutoComplete,
+  listAutoBatchCount,
+  listAutoBatchProgressLabel,
   listAutoDoneStatus,
   listAutoOverCapWarning,
   listAutoPausedStatus,
@@ -26,35 +30,99 @@ import {
 } from '@/features/backtests/backtest-list-auto';
 
 describe('sliceListAutoInstrumentIds', () => {
-  it('caps at soft max', () => {
+  it('keeps full list within hard max (no longer truncates at 40)', () => {
     const ids = Array.from({ length: 50 }, (_, i) => `id-${i}`);
-    expect(sliceListAutoInstrumentIds(ids)).toHaveLength(LIST_AUTO_MAX_INSTRUMENTS);
+    expect(sliceListAutoInstrumentIds(ids)).toHaveLength(50);
     expect(sliceListAutoInstrumentIds(ids, 5)).toHaveLength(5);
+  });
+
+  it('applies hard max', () => {
+    const ids = Array.from({ length: LIST_AUTO_HARD_MAX + 10 }, (_, i) => `id-${i}`);
+    expect(sliceListAutoInstrumentIds(ids)).toHaveLength(LIST_AUTO_HARD_MAX);
+  });
+});
+
+describe('listAutoBatchCount / progress', () => {
+  it('computes tandas', () => {
+    expect(listAutoBatchCount(35)).toBe(1);
+    expect(listAutoBatchCount(40)).toBe(1);
+    expect(listAutoBatchCount(41)).toBe(2);
+    expect(listAutoBatchCount(100)).toBe(3);
+    expect(LIST_AUTO_MAX_INSTRUMENTS).toBe(LIST_AUTO_BATCH_SIZE);
+  });
+
+  it('labels tanda only when over one batch', () => {
+    expect(listAutoBatchProgressLabel({ index: 0, total: 35 })).toBeNull();
+    expect(listAutoBatchProgressLabel({ index: 0, total: 50 })).toBe('Tanda 1/2');
+    expect(listAutoBatchProgressLabel({ index: 40, total: 50 })).toBe('Tanda 2/2');
   });
 });
 
 describe('confirmListAutoOverCap', () => {
-  it('skips dialog when under cap', () => {
+  it('skips dialog when under batch size', () => {
     let called = false;
     expect(
-      confirmListAutoOverCap(10, 40, () => {
-        called = true;
-        return false;
+      confirmListAutoOverCap(10, {
+        confirmFn: () => {
+          called = true;
+          return false;
+        },
       }),
     ).toBe(true);
     expect(called).toBe(false);
   });
 
-  it('asks and respects cancel when over cap', () => {
-    expect(confirmListAutoOverCap(500, 40, () => false)).toBe(false);
-    expect(confirmListAutoOverCap(500, 40, () => true)).toBe(true);
+  it('asks and respects cancel when over batch', () => {
+    expect(confirmListAutoOverCap(50, { confirmFn: () => false })).toBe(false);
+    expect(confirmListAutoOverCap(50, { confirmFn: () => true })).toBe(true);
+  });
+
+  it('skipConfirm bypasses dialog for N ≤ 200', () => {
+    let called = false;
+    expect(
+      confirmListAutoOverCap(80, {
+        skipConfirm: true,
+        confirmFn: () => {
+          called = true;
+          return false;
+        },
+      }),
+    ).toBe(true);
+    expect(called).toBe(false);
+  });
+
+  it('always confirms when N > 200 even with skipConfirm', () => {
+    let called = false;
+    expect(
+      confirmListAutoOverCap(250, {
+        skipConfirm: true,
+        confirmFn: () => {
+          called = true;
+          return true;
+        },
+      }),
+    ).toBe(true);
+    expect(called).toBe(true);
+  });
+
+  it('hard max confirm mentions safety cap', () => {
+    const msg = confirmListAutoOverCap(600, {
+      confirmFn: (m) => {
+        expect(m).toMatch(/tope de seguridad/);
+        expect(m).toMatch(/500/);
+        return false;
+      },
+    });
+    expect(msg).toBe(false);
   });
 });
 
 describe('listAutoOverCapWarning', () => {
-  it('returns null under cap and message over cap', () => {
+  it('returns null under batch and message with tandas over batch', () => {
     expect(listAutoOverCapWarning(35)).toBeNull();
     expect(listAutoOverCapWarning(500)).toMatch(/500/);
+    expect(listAutoOverCapWarning(500)).toMatch(/tandas/i);
+    expect(listAutoOverCapWarning(500)).not.toMatch(/primeros/);
   });
 });
 
@@ -69,6 +137,19 @@ describe('filterListAutoIdsWithoutFinalists', () => {
 });
 
 describe('createListAutoCampaign / advance', () => {
+  it('creates full queue (50) and advances until complete', () => {
+    const ids = Array.from({ length: 50 }, (_, i) => `id-${i}`);
+    const c = createListAutoCampaign({
+      listId: 'L1',
+      instrumentIds: ids,
+    });
+    expect(c.instrumentIds).toHaveLength(50);
+    expect(c.paused).toBe(false);
+    expect(isListAutoComplete(c)).toBe(false);
+    expect(advanceListAutoAfterSettle(c)).toBe('next');
+    expect(c.index).toBe(1);
+  });
+
   it('creates capped queue and advances until complete', () => {
     const c = createListAutoCampaign({
       listId: 'L1',
@@ -142,6 +223,7 @@ describe('labels', () => {
     expect(listAutoDoneStatus(2)).toMatch(/Lista AUTO ✓ 2/);
     expect(listAutoPausedStatus({ index: 2, total: 35, symbol: 'GRF' })).toMatch(/pausa/i);
     expect(listAutoPlayTitle({ fullCycleOnPlay: true, listMode: true })).toMatch(/lista AUTO/i);
+    expect(listAutoPlayTitle({ fullCycleOnPlay: true, listMode: true })).toMatch(/tandas/i);
     expect(listAutoPlayTitle({ fullCycleOnPlay: true, listMode: false })).toMatch(
       /ciclo completo/i,
     );
@@ -150,6 +232,7 @@ describe('labels', () => {
   it('list auto copy does not ask to pick a strategy', () => {
     expect(listAutoUniverseHint()).toMatch(/No hace falta seleccionar/i);
     expect(listAutoUniverseHint()).toMatch(/Pausa|frescura/i);
+    expect(listAutoUniverseHint()).toMatch(/mandato|CORE-R/i);
     expect(listModeWizardTitle(true)).toMatch(/sin elegir estrategia/i);
     expect(listModeWizardTitle(false)).toMatch(/ciclo completo/i);
   });

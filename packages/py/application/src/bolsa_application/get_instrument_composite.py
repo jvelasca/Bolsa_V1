@@ -200,12 +200,16 @@ class GetInstrumentComposite:
                 break
         chips: list[dict[str, Any]] = []
         for instrument_id in ids:
-            card = await self.execute(
-                instrument_id,
-                horizon=horizon,
-                regime=regime,
-                as_of=as_of,
-            )
+            # Un fallo puntual no debe tumbar el batch (500 → cuelga la UI).
+            try:
+                card = await self.execute(
+                    instrument_id,
+                    horizon=horizon,
+                    regime=regime,
+                    as_of=as_of,
+                )
+            except Exception:
+                continue
             if card is None:
                 continue
             chips.append(composite_to_chip(card))

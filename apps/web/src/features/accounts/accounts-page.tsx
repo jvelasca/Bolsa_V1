@@ -298,6 +298,16 @@ export function AccountsPage() {
               key={selectedAccount.id}
               account={selectedAccount}
               onDelete={() => setSelectedId(null)}
+              initialTab={(() => {
+                const t = searchParams.get('tab');
+                return t === 'config' ||
+                  t === 'resumen' ||
+                  t === 'posiciones' ||
+                  t === 'movimientos'
+                  ? t
+                  : undefined;
+              })()}
+              focus={searchParams.get('focus')}
             />
           ) : (
             <div className="flex min-h-[320px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">

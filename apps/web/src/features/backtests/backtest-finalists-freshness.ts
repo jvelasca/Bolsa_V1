@@ -193,15 +193,26 @@ function localFreshnessKey(instrumentId: string, timeframe: string): string {
   return `${instrumentId}|${timeframe || '1d'}`;
 }
 
+/** Mapa completo instrumentId|TF → entry (para columna Procesos / timestamps). */
+export function loadLocalFinalistsFreshnessMap(): Record<string, LocalFreshnessEntry> {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(FINALISTS_FRESHNESS_STORAGE_KEY);
+    if (!raw) return {};
+    const map = JSON.parse(raw) as Record<string, LocalFreshnessEntry>;
+    return map && typeof map === 'object' ? map : {};
+  } catch {
+    return {};
+  }
+}
+
 export function readLocalFreshnessFingerprint(
   instrumentId: string,
   timeframe: string,
 ): LocalFreshnessEntry | null {
   if (typeof localStorage === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(FINALISTS_FRESHNESS_STORAGE_KEY);
-    if (!raw) return null;
-    const map = JSON.parse(raw) as Record<string, LocalFreshnessEntry>;
+    const map = loadLocalFinalistsFreshnessMap();
     const entry = map[localFreshnessKey(instrumentId, timeframe)];
     if (!entry || typeof entry.fingerprint !== 'string' || !entry.fingerprint) return null;
     return {

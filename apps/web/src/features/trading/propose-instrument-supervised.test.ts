@@ -10,8 +10,8 @@ vi.mock('@/lib/api', () => ({
   },
 }));
 
-vi.mock('@/stores/visualization-store', () => ({
-  useVisualizationStore: {
+vi.mock('@/stores/estudio-membership-store', () => ({
+  useEstudioMembershipStore: {
     getState: vi.fn(() => ({ contains: () => true })),
   },
 }));

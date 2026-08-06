@@ -159,6 +159,24 @@ class SqlAlchemyListRepository:
 
         return [self._summary(row, item_count) for row, item_count in result.all()]
 
+    async def list_memberships(self) -> dict[str, list[str]]:
+        """Mapa list_id → instrumentIds (una query; orden de membresía)."""
+        stmt = (
+            select(
+                InstrumentListItemRow.list_id,
+                InstrumentListItemRow.instrument_id,
+            )
+            .order_by(
+                InstrumentListItemRow.list_id.asc(),
+                InstrumentListItemRow.sort_order.asc(),
+            )
+        )
+        result = await self._session.execute(stmt)
+        out: dict[str, list[str]] = {}
+        for list_id, instrument_id in result.all():
+            out.setdefault(list_id, []).append(instrument_id)
+        return out
+
     async def get_by_id(self, list_id: str) -> InstrumentListDetail | None:
 
         stmt = (

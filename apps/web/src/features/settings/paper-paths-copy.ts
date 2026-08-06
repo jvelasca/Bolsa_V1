@@ -50,7 +50,7 @@ export const PAPER_PATH_MONITOR = {
   id: 'strategy_monitor' as const,
   shortTitle: 'Monitor Finalistas',
   blurb:
-    'Estado TOP por valor: evidencia, DEMO/paper (retorno %), Proponer F3 y cola CORE-R. Solo lectura.',
+    'Estado TOP por valor: evidencia, DEMO/paper (retorno %), Proponer F3 y cola CORE-R. Solo lectura. No cambia mandato hasta aceptar.',
   warnLine:
     'Vista de estado · precondición de D. Encolar/Narrar/auto-sync no ejecutan ni pisan TOP. Propose D vive en Screeners.',
 } as const;

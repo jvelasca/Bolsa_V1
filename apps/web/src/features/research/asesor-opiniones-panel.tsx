@@ -28,7 +28,7 @@ import {
 } from '@/features/trading/demo-book-prefs';
 import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 import { useAlertsStore } from '@/stores/alerts-store';
 import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
 import {
@@ -60,7 +60,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
 
-  const studyEntries = useVisualizationStore((s) => s.entries);
+  const studyEntries = useEstudioMembershipStore((s) => s.members);
   const studyIds = useMemo(
     () => studyEntries.map((e) => e.instrumentId),
     [studyEntries],

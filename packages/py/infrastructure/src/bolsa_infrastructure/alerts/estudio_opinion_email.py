@@ -57,6 +57,56 @@ def smtp_ready(settings: Settings) -> bool:
     return bool(settings.smtp_host and settings.smtp_from)
 
 
+def smtp_auth_ready(settings: Settings) -> bool:
+    """Puerto 587/465 exige usuario+password en la práctica (Gmail, Outlook, etc.)."""
+    user = (settings.smtp_user or "").strip()
+    password = (settings.smtp_password or "").strip()
+    return bool(user and password)
+
+
+def _send_smtp_message(settings: Settings, message: EmailMessage) -> None:
+    """Conecta SMTP con STARTTLS + login cuando hay credenciales."""
+    host = (settings.smtp_host or "").strip()
+    if not host:
+        raise RuntimeError("SMTP_HOST vacío")
+    if (settings.smtp_user or "").strip() and not (settings.smtp_password or "").strip():
+        raise RuntimeError(
+            "SMTP_PASSWORD vacío: el servidor de correo exige contraseña de aplicación "
+            "(no la del usuario final). En Gmail: Cuenta → Seguridad → Contraseñas de apps."
+        )
+
+    port = int(settings.smtp_port or 587)
+    with smtplib.SMTP(host, port, timeout=30) as smtp:
+        smtp.ehlo()
+        if port != 25:
+            smtp.starttls()
+            smtp.ehlo()
+        if smtp_auth_ready(settings):
+            try:
+                smtp.login(
+                    (settings.smtp_user or "").strip(),
+                    (settings.smtp_password or "").strip(),
+                )
+            except smtplib.SMTPAuthenticationError as exc:
+                raise RuntimeError(
+                    "SMTP rechazó usuario/contraseña. Usa una App Password (Gmail/Outlook), "
+                    "no la contraseña normal de la cuenta. Revisa SMTP_USER / SMTP_PASSWORD "
+                    "en .env y reinicia la API."
+                ) from exc
+        try:
+            smtp.send_message(message)
+        except smtplib.SMTPSenderRefused as exc:
+            raise RuntimeError(
+                f"SMTP rechazó el remitente ({settings.smtp_from}). "
+                "SMTP_FROM debe coincidir con la cuenta autenticada."
+            ) from exc
+        except smtplib.SMTPRecipientsRefused as exc:
+            raise RuntimeError("SMTP rechazó el destinatario.") from exc
+        except smtplib.SMTPException as exc:
+            detail = " ".join(str(x) for x in getattr(exc, "args", ()) if x) or str(exc)
+            raise RuntimeError(f"SMTP falló: {detail}") from exc
+
+
 def send_estudio_alarma_email_sync(
     settings: Settings,
     *,
@@ -94,11 +144,7 @@ def send_estudio_alarma_email_sync(
     message["To"] = recipient
     message.set_content("\n".join(lines))
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
-        if settings.smtp_user and settings.smtp_password:
-            smtp.starttls()
-            smtp.login(settings.smtp_user, settings.smtp_password)
-        smtp.send_message(message)
+    _send_smtp_message(settings, message)
 
 
 async def maybe_notify_estudio_alarmas(

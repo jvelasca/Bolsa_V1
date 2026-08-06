@@ -2,8 +2,8 @@
 
 > **Padre:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) → Product / Ops  
 > **ADR:** [024-estudio-supervision-universe.md](../adr/024-estudio-supervision-universe.md)  
-> **Estado:** to-be acordado; implementación **pendiente** (no mezclar con as-is de membresía 2026-08-04).  
-> **Handoff as-is:** [session-handoff-2026-08-04-estudio-membership.md](./session-handoff-2026-08-04-estudio-membership.md)
+> **Estado:** implementado (membresía + Supervisión ON + cadencias 3 capas, 2026-08-06).  
+> **Handoff:** [session-handoff-2026-08-06-estudio-supervision.md](./session-handoff-2026-08-06-estudio-supervision.md)
 
 ---
 
@@ -72,12 +72,20 @@ Quitar de Estudio ──► excluir campaña + dismiss colas
 - Desactivar alta en `use-chart-visualization-sync.ts` (opcional: log de vistas sin membresía).
 - Mantener bulk «A Estudio» / «Quitar» en Listas e Instrumentos.
 
-### 4.3 Interruptor Supervisión
+### 4.3 Interruptor Supervisión + cadencias 3 capas
 
-- Preferencia persistida: `supervisionEnabled` + cadencia.
-- ON → Lista AUTO sobre `estudioListId` + CORE-R Auto-sync mismo id.
-- OFF → pausa campaña + Auto-sync off.
-- UI única en Operativa o Monitor (un control, no dos mundos).
+- Prefs (`bolsa-estudio-supervision-v1`, schema v2): `enabled` + 3 cadencias + presupuesto.
+- Defaults **vela 1d al cierre**: vigilia 1d · frescura 1d · redisc. 30d (no vigilia cada hora).
+- ON → arma CORE-R + frescura inicial; `EstudioSupervisionHost` programa media/lenta.
+- OFF → pausa campaña + Auto-sync off; no borra membresía/Finalistas.
+- UI: check ON/OFF + (···) con título/hint por capa (contraste alto); banner sin texto largo.
+- Sellos por valor: Finalistas `lastSearchAt` / freshness · Lista AUTO board · CORE-R `enqueuedAt`.
+- UI: Supervisión global solo en banner Estudio.
+  Sincro ≠ Procesos; columnas en (···) cabecera Valores (`columnLayoutsByListId` por lista);
+  cadencias en (···) Supervisión; bajo el nombre = resumen procesos; desplegable fila = precio + Operativa.
+- **Actualizar** / **Redescubrir** (botones separados; OFF ok). Copy remove: «Eliminar de la lista».
+- Manual/SEMI/AUTO → barra de estado + Cuentas (no panel Operativa por valor).
+- UI procesos: [estudio-process-status-ui-2026-08-06.md](./estudio-process-status-ui-2026-08-06.md).
 
 ### 4.4 Remove = unsubscribe
 
@@ -94,11 +102,12 @@ Quitar de Estudio ──► excluir campaña + dismiss colas
 ## 5. Fases
 
 1. ADR-024 + este doc (**hecho** 2026-08-06).
-2. Estudio API canónica + migración + deprecar Estudio personal.
-3. Quitar auto-add gráfico + copy.
-4. Supervisión ON cableada a Lista AUTO + CORE-R.
-5. Unsubscribe en remove.
-6. Tests: membresía, scheduler `listId`, remove mid-campaign, no auto-add.
+2. Estudio API canónica + migración + deprecar Estudio personal (**hecho**).
+3. Quitar auto-add gráfico + copy (**hecho**).
+4. Supervisión ON cableada a Lista AUTO + CORE-R (**hecho**).
+5. Unsubscribe en remove (**hecho**).
+6. Cadencias 3 capas + host + UI (···) (**hecho** 2026-08-06).
+7. Tests: prefs/migración/due/slice rediscover (**hecho**); E2E smoke manual.
 
 ## 6. Fuera de alcance
 
@@ -111,11 +120,11 @@ Quitar de Estudio ──► excluir campaña + dismiss colas
 Usuario: *IBEX/buscador → A Estudio → Supervisión ON → revisa cola SEMI*.  
 Una sola «Estudio»; cero «Estudio personal»; gráfico no mete valores; quitar para la supervisión de ese valor.
 
-## 8. Retomar mañana
+## 8. Retomar (agente siguiente)
 
 Checklist de arranque:
 
-1. Leer ADR-024 + este doc.
-2. Branch de implementación (desde `stage/estudio-membership-operativa-2026-08-04` o main según merge).
-3. Empezar por §4.1 (persistencia) antes del interruptor UI.
+1. Leer ADR-024 + este doc + [estudio-process-status-ui-2026-08-06.md](./estudio-process-status-ui-2026-08-06.md).
+2. Handoff UI: [session-handoff-2026-08-06-estudio-process-ui.md](./session-handoff-2026-08-06-estudio-process-ui.md).
+3. Smoke: Actualizar vs Redescubrir · badge OPERATIVA en barra · subtítulo `toca V`.
 4. No tocar Camino D / `PAPER_D_EXECUTE`.

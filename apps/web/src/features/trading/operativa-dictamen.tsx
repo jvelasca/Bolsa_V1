@@ -61,19 +61,23 @@ export function OperativaDictamenBlock({
       data-testid="operativa-dictamen"
       title={`Dictamen ★${opinion.dictamenStars} · Estrategia ★${opinion.strategyStars ?? '—'} · ${opinion.reasons.join(', ')}`}
     >
+      <p className="text-[9px] font-medium uppercase tracking-wide opacity-70">
+        Postura sugerida hoy
+      </p>
       <p className="font-semibold tracking-tight">
-        Dictamen · {label}{' '}
+        {label}{' '}
         <span className="tabular-nums font-medium opacity-90">
           {starsLabel(opinion.dictamenStars)}
         </span>
       </p>
-      <p className="text-[10px] opacity-80">
-        ★ dictamen ≠ ★ TOP
-        {opinion.strategyStars != null ? ` (TOP ${opinion.strategyStars})` : ''}
-        {opinion.distress ? ' · FA distress' : ''}
+      <p className="text-[10px] leading-snug opacity-85">
+        Lectura rápida del pulso (no es una orden). Las ★ de aquí miden la
+        postura del día; las ★ del TOP Lab miden la calidad de la estrategia
+        {opinion.strategyStars != null ? ` (TOP ${opinion.strategyStars})` : ''}.
+        {opinion.distress ? ' · Atención: alerta fundamental.' : ''}
       </p>
       {opinion.reasons.length > 0 ? (
-        <p className="mt-0.5 truncate text-[10px] opacity-75" title={opinion.reasons.join(', ')}>
+        <p className="mt-0.5 text-[10px] opacity-75" title={opinion.reasons.join(', ')}>
           {opinion.reasons.slice(0, 3).join(' · ')}
         </p>
       ) : null}

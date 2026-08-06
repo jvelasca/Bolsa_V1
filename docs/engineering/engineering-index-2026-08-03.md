@@ -42,8 +42,10 @@ Engineering Index  (este doc)
 │   ├── dual-universes / mandato / reconciliación ADRs
 │   ├── demo-operating-modes-brief-*.md   (MANUAL/SEMI/AUTO)
 │   ├── semi-demo-book-impl-slice1-*.md   (GO SEMI)
-│   ├── trading-operativa-panel-2026-08-04.md  (Operativa · IO · En estudio)
-│   ├── estudio-supervision-model-2026-08-06.md  (to-be · ADR-024 · Supervisión ON)
+│   ├── trading-operativa-panel-2026-08-04.md  (Operativa · IO · modos en barra)
+│   ├── estudio-supervision-model-2026-08-06.md  (ADR-024 · Supervisión ON · 3 cadencias)
+│   ├── estudio-process-status-ui-2026-08-06.md  (iconos · Actualizar/Redescubrir · OPERATIVA)
+│   ├── session-handoff-2026-08-06-estudio-process-ui.md
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)

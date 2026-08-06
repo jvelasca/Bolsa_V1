@@ -24,6 +24,8 @@ import { periodReturnsFromEquity } from '@/features/backtests/backtest-period-re
 import {
   createListAutoCampaign,
   isListAutoComplete,
+  LIST_AUTO_BATCH_SIZE,
+  LIST_AUTO_HARD_MAX,
   LIST_AUTO_MAX_INSTRUMENTS,
   advanceListAutoAfterSettle,
   shouldStartListAuto,
@@ -255,11 +257,17 @@ export function runIbex35OperativaAudit(opts?: {
     });
   }
 
-  if (symbols.length > LIST_AUTO_MAX_INSTRUMENTS) {
+  if (symbols.length > LIST_AUTO_HARD_MAX) {
     findings.push({
       code: 'list_auto_over_cap',
       severity: 'warn',
-      message: `Lista ${symbols.length} > soft cap ${LIST_AUTO_MAX_INSTRUMENTS}; Lista AUTO recorta.`,
+      message: `Lista ${symbols.length} > tope duro ${LIST_AUTO_HARD_MAX}; Lista AUTO recorta.`,
+    });
+  } else if (symbols.length > LIST_AUTO_BATCH_SIZE) {
+    findings.push({
+      code: 'list_auto_multi_batch',
+      severity: 'ok',
+      message: `Lista ${symbols.length} · ${Math.ceil(symbols.length / LIST_AUTO_BATCH_SIZE)} tandas de ~${LIST_AUTO_BATCH_SIZE} (sin truncar).`,
     });
   }
 
@@ -369,11 +377,12 @@ export function runIbex35OperativaAudit(opts?: {
     listId: 'ibex35',
     instrumentIds: symbols.map((s) => `id-${s}`),
   });
-  if (campaign.instrumentIds.length !== Math.min(symbols.length, LIST_AUTO_MAX_INSTRUMENTS)) {
+  const expectedQueue = Math.min(symbols.length, LIST_AUTO_HARD_MAX);
+  if (campaign.instrumentIds.length !== expectedQueue) {
     findings.push({
       code: 'list_auto_slice_bug',
       severity: 'critical',
-      message: `Campaña recortó mal: ${campaign.instrumentIds.length} vs min(${symbols.length},${LIST_AUTO_MAX_INSTRUMENTS})`,
+      message: `Campaña recortó mal: ${campaign.instrumentIds.length} vs min(${symbols.length},${LIST_AUTO_HARD_MAX})`,
     });
   }
 
@@ -384,7 +393,7 @@ export function runIbex35OperativaAudit(opts?: {
     const adv = advanceListAutoAfterSettle(campaign);
     steps += 1;
     if (adv === 'done' || adv === 'aborted') break;
-    if (steps > LIST_AUTO_MAX_INSTRUMENTS + 5) {
+    if (steps > expectedQueue + 5) {
       findings.push({
         code: 'list_auto_infinite',
         severity: 'critical',

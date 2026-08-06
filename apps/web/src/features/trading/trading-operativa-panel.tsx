@@ -1,8 +1,8 @@
 /**
- * Panel Operativa (Trading) — Recomendación (Pulso+TOP) / Info / Configuración.
+ * Panel Operativa (Trading) — Recomendación (Pulso+TOP) / Info (por activo).
  *
- * Universo ranking IO = lista virtual «Estudio» (membresía explícita).
- * Layout: columna full-height a la derecha de watchlist+gráfico+operaciones.
+ * Manual/SEMI/AUTO = cuenta entera → barra de estado / Cuentas (no aquí).
+ * Supervisión Lab lista Estudio = banner Estudio.
  *
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
@@ -24,8 +24,6 @@ import {
   type StrategyAdoptionState,
 } from '@/features/platform/strategy-adoption';
 import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel';
-import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
-import { EstudioSupervisionPanel } from '@/features/trading/estudio-supervision-panel';
 import {
   demoBookAllowsEnqueueConfirm,
   demoBookRequiresEstudioMembership,
@@ -33,7 +31,7 @@ import {
 import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
 import { proposeInstrumentSupervised } from '@/features/trading/propose-instrument-supervised';
 import { TradingOperativaSection } from '@/features/trading/trading-operativa-section';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 import {
   OperativaPulseBlock,
   OperativaPulseSummary,
@@ -95,9 +93,9 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const diaD = loadBacktestRunContext().diaD;
   const canVerify = isDiaDInPast(diaD);
 
-  const studyEntries = useVisualizationStore((s) => s.entries);
-  const studyContains = useVisualizationStore((s) => s.contains);
-  const replaceStudyEntries = useVisualizationStore((s) => s.replaceEntries);
+  const studyEntries = useEstudioMembershipStore((s) => s.members);
+  const studyContains = useEstudioMembershipStore((s) => s.contains);
+  const upsertStudyMembers = useEstudioMembershipStore((s) => s.upsertMembers);
   const studyIds = useMemo(
     () => studyEntries.map((entry) => entry.instrumentId),
     [studyEntries],
@@ -303,21 +301,26 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
             className="mt-1 rounded border border-amber-700/40 bg-background/60 px-1.5 py-0.5 font-medium text-foreground hover:bg-accent"
             onClick={() => {
               if (!instrumentId) return;
-              const now = new Date().toISOString();
-              const entries = useVisualizationStore.getState().entries;
-              if (entries.some((e) => e.instrumentId === instrumentId)) return;
-              replaceStudyEntries([
-                {
-                  instrumentId,
-                  symbol,
-                  name: symbol,
-                  firstViewedAt: now,
-                  lastViewedAt: now,
-                  viewCount: 1,
-                },
-                ...entries,
-              ]);
-              pushToast(`${symbol} → Estudio`);
+              void import('@/features/trading/estudio-membership').then(async ({ addToEstudioMembership }) => {
+                const added = await addToEstudioMembership([
+                  {
+                    id: instrumentId,
+                    symbol,
+                    yahooSymbol: symbol,
+                    name: symbol,
+                    exchange: '—',
+                    country: '—',
+                    currency: 'EUR',
+                    sector: null,
+                    isActive: true,
+                    meta: { barCount: 0, lastSync: null, lastClose: null, changePct: null },
+                  },
+                ]);
+                if (added > 0) {
+                  upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
+                  pushToast(`${symbol} → Estudio`);
+                }
+              });
             }}
           >
             Añadir a Estudio
@@ -443,31 +446,74 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         title="Info"
         summary={
           <span className="text-[10px] text-muted-foreground">
-            Mandatos {churn.openCount}
+            Activas {churn.openCount}
             {confirmQueueCount > 0 ? ` · Confirm ${confirmQueueCount}` : ''}
           </span>
         }
       >
-        <div data-testid="operativa-mandate-review" className="space-y-1">
-          <p className="font-medium text-foreground">Mandatos (cuenta)</p>
-          <p className="text-muted-foreground">
-            Abiertos: {churn.openCount}
-            {churn.closedCount > 0 ? ` · cerrados: ${churn.closedCount}` : ''}
-          </p>
-          {openTenures.length > 0 ? (
-            <ul className="space-y-0.5 text-[10px] text-muted-foreground">
-              {openTenures.slice(0, 8).map((t) => (
-                <li key={t.id}>
-                  {(t.strategyLabelSnapshot ?? t.instrumentId.slice(0, 6)) + ' · vigente'}
-                </li>
-              ))}
-              {openTenures.length > 8 ? <li>+{openTenures.length - 8} más</li> : null}
-            </ul>
-          ) : (
-            <p className="text-[10px] text-muted-foreground">
-              Sin tenure abierto. SEMI Confirm o Adoptar Finalista.
+        <div data-testid="operativa-mandate-review" className="space-y-2">
+          <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
+            <p className="font-semibold text-foreground">
+              Estrategia activa{' '}
+              <span className="font-normal text-muted-foreground">(mandato)</span>
             </p>
-          )}
+            <p className="text-[10px] leading-snug text-muted-foreground">
+              Un <span className="font-medium text-foreground/90">mandato</span> es el
+              plan que estás siguiendo en un valor con esta cuenta: qué estrategia
+              usas ahora. No es una orden de compra/venta; es el compromiso vigente
+              hasta que lo cambies o lo cierres.
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              En esta cuenta:{' '}
+              <span className="font-medium text-foreground">
+                {churn.openCount} activa{churn.openCount === 1 ? '' : 's'}
+              </span>
+              {churn.closedCount > 0
+                ? ` · ${churn.closedCount} cerrada${churn.closedCount === 1 ? '' : 's'}`
+                : ''}
+            </p>
+            {openTenures.length > 0 ? (
+              <ul className="space-y-0.5 text-[10px] text-muted-foreground">
+                {openTenures.slice(0, 8).map((t) => (
+                  <li key={t.id} className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+                      aria-hidden
+                    />
+                    <span className="min-w-0 truncate">
+                      {t.strategyLabelSnapshot ?? t.instrumentId.slice(0, 8)}
+                      <span className="text-foreground/70"> · en vigor</span>
+                    </span>
+                  </li>
+                ))}
+                {openTenures.length > 8 ? (
+                  <li>+{openTenures.length - 8} más</li>
+                ) : null}
+              </ul>
+            ) : (
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Ninguna estrategia activa aún. En SEMI, confirma una propuesta
+                (Confirm) o adopta un Finalista del Lab para abrir el mandato.
+              </p>
+            )}
+            <details className="group pt-0.5">
+              <summary className="cursor-pointer select-none text-[10px] font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden">
+                <span className="underline-offset-2 group-open:underline">
+                  Más detalle (avanzado)
+                </span>
+              </summary>
+              <div className="mt-1 space-y-1 border-t border-border/40 pt-1 text-[10px] leading-snug text-muted-foreground">
+                <p>
+                  Técnico: tenure por instrumento×cuenta (ADR-020). Cambiar de
+                  estrategia cierra el tenure anterior y abre uno nuevo (churn).
+                </p>
+                <p>
+                  Learning / Outcomes abajo mide si las decisiones Confirm de este
+                  valor salieron bien a posteriori — no es el dictamen del día.
+                </p>
+              </div>
+            </details>
+          </div>
           <OperativaOutcomesBlock
             instrumentId={instrumentId}
             accountId={effectiveAccountId}
@@ -476,21 +522,6 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         </div>
       </TradingOperativaSection>
 
-      <TradingOperativaSection
-        sectionId="config"
-        title="Configuración"
-        summary={
-          <span className="text-[10px] text-muted-foreground">
-            Operativa: {bookPrefs.mode}
-            {confirmQueueCount > 0 ? ` · cola ${confirmQueueCount}` : ''}
-          </span>
-        }
-      >
-        <div className="space-y-2">
-          <EstudioSupervisionPanel compact />
-          <DemoBookModePanel compact />
-        </div>
-      </TradingOperativaSection>
     </div>
   );
 }

@@ -1,6 +1,27 @@
+/**
+ * Panel Valores (watchlist): carrusel de listas, filas, selección masiva.
+ *
+ * - **Visualizados**: espejo de pestañas; Por IO; columnas recomendación; Quitar cierra tabs.
+ * - **Estudio**: banner Supervisión + Actualizar / Redescubrir.
+ * - Foco buscar/pestaña: Cartera → Estudio → resto + scroll bajo cabecera sticky.
+ *
+ * @see docs/engineering/visualizados-list-ux-2026-08-06.md
+ * @see docs/engineering/estudio-process-status-ui-2026-08-06.md
+ * @see docs/adr/024-estudio-supervision-universe.md
+ */
+
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 
-import { Search } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowDownWideNarrow,
+  Eraser,
+  LineChart,
+  ListMinus,
+  ListPlus,
+  RefreshCw,
+  Search,
+} from 'lucide-react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -8,6 +29,7 @@ import { useNavigate } from 'react-router-dom';
 
 import type { ExternalInstrumentSearchHitDto, PositionDto } from '@bolsa/shared';
 import {
+  ESTUDIO_LIST_ID,
   isVirtualListId,
   looksLikeIsinQuery,
   normalizeIsin,
@@ -38,6 +60,8 @@ import {
   getManualListSelection,
   setManualListSelection,
 } from '@/lib/list-selection-guard';
+import { resolvePreferredListIdForInstrument } from '@/lib/chart-list-membership';
+import { scrollListInstrumentToTop } from '@/lib/scroll-list-instrument-into-view';
 import { sortExternalSearchHits, rankCatalogInstrument } from '@/lib/search-ranking';
 import { instrumentMatchesSearchQuery } from '@bolsa/shared';
 import { formatPct, formatPrice } from '@/features/charts/chart-utils';
@@ -47,14 +71,32 @@ import { useWorkspaceStore } from '@/stores/workspace-store';
 import { useActiveAccountQueryKey } from '@/stores/active-account-store';
 import { usePendingOrders } from '@/features/trading/use-pending-orders';
 import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 
 import { ListItemAccordion } from '@/features/trading/lists-tab/list-item-accordion';
 import { ListColumnHeader } from '@/features/trading/lists-tab/list-column-header';
 import { ListColumnLayoutProvider, useListColumnLayoutContext } from '@/features/trading/lists-tab/list-column-layout-context';
+import {
+  ListRecommendationScoresProvider,
+  useListRecommendationScoresMap,
+} from '@/features/trading/lists-tab/list-recommendation-scores-context';
+import { sortInstrumentListWithRecommendation } from '@/lib/list-sort-with-recommendation';
 import { PendingOrderListItem } from '@/features/trading/lists-tab/pending-order-list-item';
 import { ListCarousel } from '@/features/trading/lists-tab/list-carousel';
 import { useListInstrumentKeyboardNav } from '@/features/trading/lists-tab/use-list-instrument-keyboard-nav';
-import { EstudioListSupervisionBanner } from '@/features/trading/estudio-supervision-panel';
+import {
+  EstudioListSupervisionBanner,
+  type EstudioBannerProgress,
+} from '@/features/trading/estudio-supervision-panel';
+import {
+  emitEstudioLaneTick,
+} from '@/features/trading/estudio-supervision';
+import {
+  emitEstudioProcessRunning,
+  laneFromListAutoMode,
+} from '@/features/trading/estudio-process-status';
+import { touchEstudioLaneStamps } from '@/features/trading/estudio-lane-stamps';
+import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
 
 export function ListValuesPanel() {
   const navigate = useNavigate();
@@ -63,8 +105,12 @@ export function ListValuesPanel() {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [importingYahoo, setImportingYahoo] = useState<string | null>(null);
+  const [sortingByIo, setSortingByIo] = useState(false);
+  const listScrollRef = useRef<HTMLDivElement>(null);
 
   const focusInstrumentFromList = useWorkspaceStore((s) => s.focusInstrumentFromList);
+  const focusInstrumentsFromList = useWorkspaceStore((s) => s.focusInstrumentsFromList);
+  const chartListMembership = useWorkspaceStore((s) => s.chartListMembership);
   const listConfig = useWorkspaceStore((s) => s.workspace.list);
   const updateListConfig = useWorkspaceStore((s) => s.updateListConfig);
   const save = useWorkspaceStore((s) => s.save);
@@ -72,6 +118,7 @@ export function ListValuesPanel() {
   const charts = useWorkspaceStore((s) => s.workspace.charts);
   const { pendingOrders } = usePendingOrders();
   const visualizationEntries = useVisualizationStore((s) => s.entries);
+  const estudioMemberIds = useEstudioMembershipStore((s) => s.members);
   const [selectedInstrumentIds, setSelectedInstrumentIds] = useState<Set<string>>(
     () => new Set(),
   );
@@ -108,14 +155,26 @@ export function ListValuesPanel() {
     [pendingOrders],
   );
 
+  /** Visualizados = pestañas abiertas (SoT charts), no el store/dump legacy. */
+  const openChartInstrumentIds = useMemo(() => {
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const tab of charts) {
+      if (!tab.instrumentId || seen.has(tab.instrumentId)) continue;
+      seen.add(tab.instrumentId);
+      ids.push(tab.instrumentId);
+    }
+    return ids;
+  }, [charts]);
+
   const virtualLists = useMemo(
     () =>
       buildVirtualListSummaries(
         positions.length,
         pendingBuyOrders.length,
-        visualizationEntries.length,
+        openChartInstrumentIds.length,
       ),
-    [positions.length, pendingBuyOrders.length, visualizationEntries.length],
+    [positions.length, pendingBuyOrders.length, openChartInstrumentIds.length],
   );
 
   const selectedListId = useMemo(
@@ -204,16 +263,11 @@ export function ListValuesPanel() {
     staleTime: 15_000,
   });
 
-  const visualizationInstrumentIds = useMemo(
-    () => visualizationEntries.map((entry) => entry.instrumentId),
-    [visualizationEntries],
-  );
-
   const visualizationQuotesQuery = useQuery({
-    queryKey: ['visualization-quotes', visualizationInstrumentIds],
-    queryFn: () => api.getInstrumentQuotes(visualizationInstrumentIds),
+    queryKey: ['visualization-quotes', openChartInstrumentIds],
+    queryFn: () => api.getInstrumentQuotes(openChartInstrumentIds),
     enabled:
-      activeVirtual === VIRTUAL_LIST_VISUALIZATION && visualizationInstrumentIds.length > 0,
+      activeVirtual === VIRTUAL_LIST_VISUALIZATION && openChartInstrumentIds.length > 0,
     staleTime: 15_000,
   });
 
@@ -227,15 +281,33 @@ export function ListValuesPanel() {
 
   const listInstruments = activeVirtual ? [] : (quotesQuery.data?.data ?? []);
 
-  const visualizationListItems = useMemo(
-    () =>
-      visualizationEntries.map((entry) => {
-        const quoted = visualizationQuotesById.get(entry.instrumentId);
-        if (quoted) return quoted;
-        return visualizationEntryToListItem(entry, allInstruments);
-      }),
-    [visualizationEntries, visualizationQuotesById, allInstruments],
-  );
+  const visualizationListItems = useMemo(() => {
+    const byId = new Map(visualizationEntries.map((e) => [e.instrumentId, e]));
+    return openChartInstrumentIds.map((instrumentId) => {
+      const quoted = visualizationQuotesById.get(instrumentId);
+      if (quoted) return quoted;
+      const tab = charts.find((t) => t.instrumentId === instrumentId);
+      const entry = byId.get(instrumentId);
+      if (entry) return visualizationEntryToListItem(entry, allInstruments);
+      return visualizationEntryToListItem(
+        {
+          instrumentId,
+          symbol: tab?.label ?? instrumentId,
+          name: tab?.label ?? instrumentId,
+          firstViewedAt: new Date(0).toISOString(),
+          lastViewedAt: new Date(0).toISOString(),
+          viewCount: 1,
+        },
+        allInstruments,
+      );
+    });
+  }, [
+    openChartInstrumentIds,
+    visualizationQuotesById,
+    visualizationEntries,
+    charts,
+    allInstruments,
+  ]);
 
   const portfolioListItems = useMemo(
     () => positions.map((pos) => positionToListItem(pos, allInstruments)),
@@ -255,11 +327,15 @@ export function ListValuesPanel() {
   ]);
 
   const selectableIds = useMemo(() => {
+    // Visualizados: el orden de pestañas es la verdad (el sort de columna las realinea).
+    if (activeVirtual === VIRTUAL_LIST_VISUALIZATION) {
+      return selectableItems.map((item) => item.id);
+    }
     const sortState = selectedListId
       ? listConfig.sortByListId?.[selectedListId]
       : undefined;
     return sortInstrumentList(selectableItems, sortState).map((item) => item.id);
-  }, [selectableItems, selectedListId, listConfig.sortByListId]);
+  }, [selectableItems, selectedListId, listConfig.sortByListId, activeVirtual]);
 
   const selectAllChecked =
     selectableIds.length > 0 && selectableIds.every((id) => selectedInstrumentIds.has(id));
@@ -309,7 +385,121 @@ export function ListValuesPanel() {
     });
   }
 
-  const viewingEstudio = activeVirtual === VIRTUAL_LIST_VISUALIZATION;
+  const viewingVisualizados = activeVirtual === VIRTUAL_LIST_VISUALIZATION;
+  const viewingEstudio = selectedListId === ESTUDIO_LIST_ID;
+  const [updatingSelected, setUpdatingSelected] = useState(false);
+  const [estudioProgress, setEstudioProgress] = useState<EstudioBannerProgress | null>(
+    null,
+  );
+
+  /**
+   * Fuerza sync de la selección en Estudio.
+   * - `rediscover: false` — velas + vigilia CORE-R + frescura Lab (`skip_fresh` posible).
+   * - `rediscover: true` — embudo completo (`forceRescan`); confirma coste al usuario.
+   */
+  async function updateSelectedInstruments(opts: { rediscover: boolean }) {
+    const ids = [...selectedInstrumentIds];
+    if (ids.length === 0) return;
+    if (opts.rediscover) {
+      const ok = window.confirm(
+        `Redescubrir en ${ids.length} valor${ids.length === 1 ? '' : 'es'}: embudo completo y búsqueda de nuevas estrategias (proceso costoso; puede tardar). ¿Continuar?`,
+      );
+      if (!ok) return;
+    }
+    setUpdatingSelected(true);
+    const lane = laneFromListAutoMode(opts.rediscover);
+    const symbolOf = (id: string) =>
+      selectableItems.find((it) => it.id === id)?.symbol ?? id.slice(0, 8);
+    const phase = opts.rediscover ? 'Redescubrir' : 'Actualizar';
+    const publishKeepAlive = (index: number, detail: string) => {
+      useListAutoActivityStore.getState().publish({
+        active: true,
+        paused: false,
+        listId: ESTUDIO_LIST_ID,
+        listName: 'Estudio',
+        index,
+        total: ids.length,
+        symbol: symbolOf(ids[index] ?? ids[0] ?? ''),
+        detail,
+      });
+    };
+    try {
+      setEstudioProgress({
+        current: 0,
+        total: ids.length,
+        label: `${phase} · sync…`,
+      });
+      publishKeepAlive(0, `${phase} selección · velas…`);
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i]!;
+        const sym = symbolOf(id);
+        setEstudioProgress({
+          current: i + 1,
+          total: ids.length,
+          label: `${phase} · ${sym}`,
+        });
+        publishKeepAlive(i, `${phase} · ${sym}`);
+        emitEstudioProcessRunning({ instrumentId: id, lane: 'freshness' });
+        try {
+          await api.syncInstrument(id, 5);
+        } catch {
+          // seguir con el resto
+        }
+      }
+      touchEstudioLaneStamps(
+        ids,
+        opts.rediscover ? 'rediscover' : 'freshness',
+      );
+      setEstudioProgress({
+        current: ids.length,
+        total: ids.length,
+        label: `${phase} · vigilia…`,
+      });
+      // Vigilia = CORE-R (mandato/PnL); «Actualizar» también la dispara para no dejar el 1º icono vacío.
+      emitEstudioProcessRunning({
+        instrumentId: ids[0] ?? null,
+        lane: 'vigilance',
+      });
+      try {
+        const { runCoreRSchedulerTick } = await import(
+          '@/features/backtests/core-r-scheduler-tick'
+        );
+        await runCoreRSchedulerTick({ force: true, includePnl: true });
+      } catch {
+        // best-effort
+      }
+      // Sello local aunque CORE-R no encole (juicio OK / sin listId).
+      touchEstudioLaneStamps(ids, 'vigilance');
+      setEstudioProgress({
+        current: ids.length,
+        total: ids.length,
+        label: `${phase} · Lab…`,
+      });
+      emitEstudioProcessRunning({ instrumentId: ids[0] ?? null, lane });
+      emitEstudioLaneTick({
+        listId: ESTUDIO_LIST_ID,
+        lane: opts.rediscover ? 'rediscover' : 'freshness',
+        forceRescan: opts.rediscover,
+        skipConfirm: true,
+        instrumentIds: ids,
+        at: new Date().toISOString(),
+      });
+      void queryClient.invalidateQueries({ queryKey: ['list'] });
+      void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      emitEstudioProcessRunning({ instrumentId: null, lane: null });
+    } finally {
+      setUpdatingSelected(false);
+      setEstudioProgress(null);
+      const snap = useListAutoActivityStore.getState();
+      if (
+        snap.active &&
+        snap.listId === ESTUDIO_LIST_ID &&
+        (snap.detail?.startsWith('Actualizar') || snap.detail?.startsWith('Redescubrir'))
+      ) {
+        snap.clear();
+      }
+    }
+  }
 
   async function addSelectedToEstudio() {
     if (viewingEstudio) return;
@@ -321,19 +511,57 @@ export function ListValuesPanel() {
     const added = await addToEstudioMembership(batch);
     if (added > 0) {
       void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      void queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
       void queryClient.invalidateQueries({ queryKey: ['list'] });
+      void queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
       updateListConfig({
-        apiListId: VIRTUAL_LIST_VISUALIZATION,
-        name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
-        source: 'virtual',
+        apiListId: ESTUDIO_LIST_ID,
+        name: 'Estudio',
+        source: 'api',
       });
       setSelectedInstrumentIds(new Set());
       selectionAnchorIndexRef.current = null;
     }
   }
 
-  async function removeSelectedFromEstudio() {
+  async function removeSelectedFromCurrentList() {
     const ids = [...selectedInstrumentIds];
+    if (viewingVisualizados) {
+      // Un solo update: evita que el autosave reinyecte pestañas a medias.
+      const { closeOpenChartsForInstruments } = await import(
+        '@/lib/close-chart-on-list-removal'
+      );
+      closeOpenChartsForInstruments(ids);
+      const { reconcileVisualizadosToOpenCharts } = await import(
+        '@/features/trading/lists-tab/use-chart-visualization-sync'
+      );
+      reconcileVisualizadosToOpenCharts();
+      setSelectedInstrumentIds(new Set());
+      selectionAnchorIndexRef.current = null;
+      return;
+    }
+    if (!viewingEstudio) {
+      // Quitar de Estudio aunque estemos en otra lista (selección parcialmente en Estudio).
+      const inEstudio = ids.filter((id) =>
+        useEstudioMembershipStore.getState().contains(id),
+      );
+      if (inEstudio.length === 0) return;
+      const { removeFromEstudioMembership } = await import(
+        '@/features/trading/estudio-membership'
+      );
+      const { unsubscribeInstrumentFromSupervision } = await import(
+        '@/features/trading/estudio-supervision'
+      );
+      await removeFromEstudioMembership(inEstudio);
+      unsubscribeInstrumentFromSupervision(inEstudio);
+      void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      void queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
+      void queryClient.invalidateQueries({ queryKey: ['list'] });
+      void queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
+      setSelectedInstrumentIds(new Set());
+      selectionAnchorIndexRef.current = null;
+      return;
+    }
     const { removeFromEstudioMembership } = await import(
       '@/features/trading/estudio-membership'
     );
@@ -343,18 +571,21 @@ export function ListValuesPanel() {
     await removeFromEstudioMembership(ids);
     unsubscribeInstrumentFromSupervision(ids);
     void queryClient.invalidateQueries({ queryKey: ['lists'] });
+    void queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
     void queryClient.invalidateQueries({ queryKey: ['list'] });
+    void queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
     setSelectedInstrumentIds(new Set());
     selectionAnchorIndexRef.current = null;
   }
 
   const selectedInEstudioCount = useMemo(() => {
+    const set = new Set(estudioMemberIds.map((m) => m.instrumentId));
     let n = 0;
     for (const id of selectedInstrumentIds) {
-      if (visualizationEntries.some((entry) => entry.instrumentId === id)) n += 1;
+      if (set.has(id)) n += 1;
     }
     return n;
-  }, [selectedInstrumentIds, visualizationEntries]);
+  }, [selectedInstrumentIds, estudioMemberIds]);
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -394,30 +625,100 @@ export function ListValuesPanel() {
   );
 
   function openSelectedCharts() {
-    if (selectedListId) setManualListSelection(selectedListId);
+    const listId = selectedListId ?? listConfig.apiListId ?? listConfig.id;
     const byId = new Map(selectableItems.map((item) => [item.id, item]));
-    for (const id of selectedInstrumentIds) {
-      const item = byId.get(id);
-      if (!item) continue;
-      focusInstrument(item.id, item.symbol);
-    }
+    const items = [...selectedInstrumentIds]
+      .map((id) => byId.get(id))
+      .filter((item): item is (typeof selectableItems)[number] => Boolean(item))
+      .map((item) => ({ instrumentId: item.id, label: item.symbol }));
+    if (items.length === 0) return;
+    focusInstrumentsFromList(listId, items);
+    const nextActiveId = useWorkspaceStore.getState().workspace.activeChartId;
+    if (listId) setManualListSelection(listId, nextActiveId);
+    ensureChartRoute(navigate);
     requestChartReflow();
+  }
+
+  async function reorderSelectedChartsByIo() {
+    const ids = [...selectedInstrumentIds];
+    if (ids.length < 2) return;
+    setSortingByIo(true);
+    try {
+      const { orderInstrumentIdsByIo } = await import(
+        '@/features/trading/lists-tab/sort-visualizados-by-io'
+      );
+      const {
+        collectCachedFaScores,
+        collectCachedTaScores,
+        fetchIoByInstrumentIds,
+      } = await import('@/features/trading/lists-tab/fetch-io-scores-for-sort');
+
+      const ioByInstrument = await fetchIoByInstrumentIds(
+        ids,
+        {
+          queryFundamentals: (instrumentIds) =>
+            api.queryInstrumentFundamentals({ instrumentIds }),
+          queryComposite: (instrumentIds) =>
+            api.queryInstrumentComposite({
+              instrumentIds,
+              horizon: 'swing',
+              regime: 'neutral',
+            }),
+        },
+        {
+          fa: collectCachedFaScores(queryClient),
+          ta: collectCachedTaScores(queryClient),
+        },
+      );
+
+      const scored = ids.filter((id) => ioByInstrument.get(id) != null).length;
+      if (scored === 0) {
+        window.alert(
+          'No hay Índice Operativo (IO) disponible para la selección. Espera a que Operativa cargue scores o sincroniza fundamentals.',
+        );
+        return;
+      }
+
+      const symbolById = new Map(
+        selectableItems
+          .filter((item) => selectedInstrumentIds.has(item.id))
+          .map((item) => [item.id, item.symbol] as const),
+      );
+      const ordered = orderInstrumentIdsByIo(ids, ioByInstrument, symbolById);
+      useWorkspaceStore.getState().reorderChartTabsByInstrumentIds(ordered);
+      requestChartReflow();
+    } catch (err) {
+      window.alert(
+        err instanceof ApiError
+          ? err.message
+          : 'No se pudieron ordenar las pestañas por Índice Operativo.',
+      );
+    } finally {
+      setSortingByIo(false);
+    }
   }
 
   async function visualizeFromSearch(
     instrument: (typeof allInstruments)[number],
-    _options?: { searchQuery?: string; source?: 'search' | 'import' },
+    options?: { searchQuery?: string; source?: 'search' | 'import' },
   ) {
-    const { addToEstudioMembership } = await import('@/features/trading/estudio-membership');
-    await addToEstudioMembership([instrument]);
-    void queryClient.invalidateQueries({ queryKey: ['lists'] });
-    void queryClient.invalidateQueries({ queryKey: ['list'] });
-    updateListConfig({
-      apiListId: VIRTUAL_LIST_VISUALIZATION,
-      name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
-      source: 'virtual',
+    // Abrir pestaña (Visualizados = espejo). Lista visible: Cartera → Estudio → resto.
+    useVisualizationStore.getState().addInstrument(instrument, {
+      searchQuery: options?.searchQuery,
+      source: options?.source ?? 'search',
     });
-    focusInstrument(instrument.id, instrument.symbol);
+    const preferredListId =
+      (chartListMembership
+        ? resolvePreferredListIdForInstrument(instrument.id, chartListMembership)
+        : null) ?? VIRTUAL_LIST_VISUALIZATION;
+    updateListConfig(listConfigForSelection(preferredListId, apiLists));
+    focusInstrumentFromList(preferredListId, instrument.id, instrument.symbol);
+    ensureChartRoute(navigate);
+    requestChartReflow();
+    const { reconcileVisualizadosToOpenCharts } = await import(
+      '@/features/trading/lists-tab/use-chart-visualization-sync'
+    );
+    reconcileVisualizadosToOpenCharts();
     setQuery('');
   }
 
@@ -571,6 +872,15 @@ export function ListValuesPanel() {
     (activeVirtual === VIRTUAL_LIST_PORTFOLIO && portfolioQuery.isError) ||
     (!activeVirtual && quotesQuery.isError);
 
+  // Al enfocar valor (pestaña / búsqueda): dejarlo arriba del viewport sin reordenar.
+  useEffect(() => {
+    if (!activeInstrumentId || isLoading) return;
+    const timer = window.setTimeout(() => {
+      scrollListInstrumentToTop(listScrollRef.current, activeInstrumentId);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeInstrumentId, selectedListId, isLoading, selectableItems.length]);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <form onSubmit={handleSearchSubmit} className="shrink-0 border-b border-border p-2">
@@ -649,11 +959,14 @@ export function ListValuesPanel() {
       </div>
 
       <ListColumnLayoutProvider listId={selectedListId}>
+        <ListRecommendationScoresProvider
+          instrumentIds={selectableItems.map((item) => item.id)}
+        >
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {viewingEstudio && !isLoading && visualizationListItems.length > 0 ? (
-          <EstudioListSupervisionBanner />
+        {viewingEstudio && !isLoading && listInstruments.length > 0 ? (
+          <EstudioListSupervisionBanner progress={estudioProgress} />
         ) : null}
-        <div className="scroll-area min-h-0 flex-1 overflow-auto">
+        <div ref={listScrollRef} className="scroll-area min-h-0 flex-1 overflow-auto">
           {isLoading && <p className="p-2 text-xs text-muted-foreground">Cargando…</p>}
           {isError && <p className="p-2 text-xs text-destructive">Error al cargar lista</p>}
 
@@ -683,18 +996,24 @@ export function ListValuesPanel() {
             </p>
           )}
 
-        {viewingEstudio && !isLoading && visualizationListItems.length === 0 && (
+        {viewingVisualizados && !isLoading && visualizationListItems.length === 0 && (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            Selecciona valores en IBEX u otra lista y pulsa «Pasar a Estudio», o búscalos arriba.
-            Aquí viven los valores supervisables. Activa Supervisión ON (banner o Operativa →
-            Configuración) para Lab + CORE-R. Por valor: «Dejar de supervisar».
+            Aquí solo aparecen los valores con pestaña de gráfico abierta. Busca arriba o
+            abre un valor; al cerrar la pestaña sale de Visualizados. Desde aquí puedes
+            «Pasar a Estudio».
           </p>
         )}
 
-        {viewingEstudio && !isLoading && visualizationListItems.length > 0 && (
+        {viewingEstudio && !isLoading && listInstruments.length === 0 && (
+          <p className="p-4 text-center text-xs text-muted-foreground">
+            Selecciona valores en Visualizados, IBEX u otra lista y pulsa «Pasar a Estudio».
+            Aquí viven los valores supervisables. Activa Supervisión ON en el banner.
+          </p>
+        )}
+
+        {viewingVisualizados && !isLoading && visualizationListItems.length > 0 && (
           <SortedVisualizationList
             items={visualizationListItems}
-            entries={visualizationEntries}
             activeInstrumentId={activeInstrumentId}
             isListSource={isListSourceRow}
             onOpenChart={focusInstrument}
@@ -736,6 +1055,7 @@ export function ListValuesPanel() {
         )}
         </div>
         </div>
+        </ListRecommendationScoresProvider>
       </ListColumnLayoutProvider>
 
       {selectionEnabled && selectedInstrumentIds.size > 0 ? (
@@ -752,46 +1072,102 @@ export function ListValuesPanel() {
           {!viewingEstudio ? (
             <button
               type="button"
-              className="rounded border border-primary/50 bg-primary/15 px-2.5 py-1.5 font-semibold text-primary hover:bg-primary/20"
+              className="inline-flex items-center gap-1 rounded border border-primary/50 bg-primary/15 px-2 py-1.5 font-semibold text-primary hover:bg-primary/20"
               onClick={() => void addSelectedToEstudio()}
-              title="Pasar la selección a la lista Estudio (supervisión)"
+              title="Pasar la selección a Estudio (supervisión)"
             >
-              Pasar a Estudio
+              <ListPlus className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+              A Estudio
             </button>
           ) : null}
           <button
             type="button"
             className={
-              viewingEstudio
-                ? 'rounded border border-destructive/40 bg-destructive/10 px-2.5 py-1.5 font-semibold text-destructive hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-40'
-                : 'rounded border border-border px-2.5 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40'
+              viewingEstudio || viewingVisualizados
+                ? 'inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 font-semibold text-destructive hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-40'
+                : 'inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40'
             }
-            onClick={() => void removeSelectedFromEstudio()}
-            disabled={selectedInEstudioCount === 0}
+            onClick={() => void removeSelectedFromCurrentList()}
+            disabled={
+              viewingVisualizados
+                ? selectedInstrumentIds.size === 0
+                : viewingEstudio
+                  ? selectedInstrumentIds.size === 0
+                  : selectedInEstudioCount === 0
+            }
             title={
-              viewingEstudio
-                ? 'Quitar de Estudio = deja de supervisar estos valores (no cierra mandato solo)'
-                : 'Quitar la selección de la lista Estudio'
+              viewingVisualizados
+                ? 'Cierra las pestañas de la selección (salen de Visualizados)'
+                : viewingEstudio
+                  ? 'Elimina de Estudio (sale de la cola de supervisión)'
+                  : 'Quita la selección de Estudio'
             }
           >
-            {viewingEstudio ? 'Dejar de supervisar' : 'Quitar de Estudio'}
+            <ListMinus className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+            {viewingVisualizados
+              ? 'Quitar'
+              : viewingEstudio
+                ? 'Eliminar'
+                : 'Quitar'}
           </button>
+          {viewingVisualizados ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={selectedInstrumentIds.size < 2 || sortingByIo}
+              onClick={() => void reorderSelectedChartsByIo()}
+              title="Ordena pestañas por Índice Operativo (IO 0–100): mayor IO a la izquierda (#1 en Estudio = mejor IO). Usa caché de Operativa; si falta, carga en trozos pequeños."
+            >
+              <ArrowDownWideNarrow className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+              {sortingByIo ? 'IO…' : 'Por IO'}
+            </button>
+          ) : null}
+          {/* En Visualizados sobra: esa lista ya es el espejo de pestañas abiertas. */}
+          {!viewingVisualizados ? (
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent"
+              onClick={openSelectedCharts}
+              title="Abrir gráficos de la selección"
+            >
+              <LineChart className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+              Abrir gráficos
+            </button>
+          ) : null}
+          {viewingEstudio ? (
+            <>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded border border-border px-2.5 py-1.5 font-semibold text-foreground hover:bg-accent disabled:opacity-50"
+                disabled={updatingSelected}
+                title="Adelanta vigilia + frescura (velas + Lab). Funciona con Supervisión OFF."
+                onClick={() => void updateSelectedInstruments({ rediscover: false })}
+              >
+                <RefreshCw className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                {updatingSelected ? 'Actualizando…' : 'Actualizar'}
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded border border-amber-500/50 bg-amber-500/10 px-2.5 py-1.5 font-semibold text-amber-800 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-200"
+                disabled={updatingSelected}
+                title="Costoso: embudo completo y búsqueda de nuevas estrategias TOP. Pide confirmación."
+                onClick={() => void updateSelectedInstruments({ rediscover: true })}
+              >
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                Redescubrir
+              </button>
+            </>
+          ) : null}
           <button
             type="button"
-            className="rounded border border-border px-2.5 py-1.5 font-medium text-foreground hover:bg-accent"
-            onClick={openSelectedCharts}
-            title="Abrir gráficos de la selección"
-          >
-            Abrir gráficos
-          </button>
-          <button
-            type="button"
-            className="ml-auto rounded px-2.5 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="ml-auto inline-flex items-center gap-1 rounded px-2.5 py-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
             onClick={() => {
               setSelectedInstrumentIds(new Set());
               selectionAnchorIndexRef.current = null;
             }}
+            title="Quitar la selección"
           >
+            <Eraser className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
             Limpiar
           </button>
         </div>
@@ -824,7 +1200,11 @@ function SortedApiList({
   ) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
-  const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
+  const scores = useListRecommendationScoresMap();
+  const sorted = useMemo(
+    () => sortInstrumentListWithRecommendation(items, sortState, scores),
+    [items, sortState, scores],
+  );
   useListInstrumentKeyboardNav(sorted, activeInstrumentId, onOpenChart);
   return (
     <>
@@ -845,7 +1225,6 @@ function SortedApiList({
 
 function SortedVisualizationList({
   items,
-  entries,
   activeInstrumentId,
   isListSource,
   onOpenChart,
@@ -853,7 +1232,6 @@ function SortedVisualizationList({
   onToggleSelect,
 }: {
   items: import('@bolsa/shared').InstrumentWithMetaDto[];
-  entries: ReturnType<typeof useVisualizationStore.getState>['entries'];
   activeInstrumentId: string | undefined;
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
@@ -869,36 +1247,48 @@ function SortedVisualizationList({
   ) => void;
 }) {
   const { sortState } = useListColumnLayoutContext();
-  const charts = useWorkspaceStore((s) => s.workspace.charts);
-  const openIds = useMemo(
-    () => new Set(charts.map((tab) => tab.instrumentId).filter(Boolean) as string[]),
-    [charts],
+  const scores = useListRecommendationScoresMap();
+  const sorted = useMemo(
+    () => sortInstrumentListWithRecommendation(items, sortState, scores),
+    [items, sortState, scores],
   );
-  const sorted = useMemo(() => sortInstrumentList(items, sortState), [items, sortState]);
+
+  // Con sort activo: alinear pestañas (izq = arriba). Sin sort: orden de pestañas.
+  useEffect(() => {
+    if (!sortState || sorted.length === 0) return;
+    const orderedIds = sorted.map((item) => item.id);
+    const charts = useWorkspaceStore.getState().workspace.charts;
+    const openIds = [
+      ...new Set(
+        charts
+          .filter((tab) => Boolean(tab.instrumentId))
+          .map((tab) => tab.instrumentId as string),
+      ),
+    ];
+    if (
+      openIds.length === orderedIds.length &&
+      openIds.every((id, index) => id === orderedIds[index])
+    ) {
+      return;
+    }
+    useWorkspaceStore.getState().reorderChartTabsByInstrumentIds(orderedIds);
+  }, [sortState, sorted]);
+
   useListInstrumentKeyboardNav(sorted, activeInstrumentId, onOpenChart);
   return (
     <>
-      {sorted.map((item) => {
-        const entry = entries.find((e) => e.instrumentId === item.id);
-        const open = openIds.has(item.id);
-        const subtitle = entry
-          ? `${open ? 'gráfico abierto' : 'en Estudio'} · visto ${entry.viewCount}× · ${new Date(entry.lastViewedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`
-          : open
-            ? 'gráfico abierto'
-            : 'en Estudio';
-        return (
-          <ListItemAccordion
-            key={item.id}
-            item={item}
-            subtitle={subtitle}
-            isChartActive={activeInstrumentId === item.id}
-            isListSource={isListSource(item.id)}
-            onOpenChart={() => onOpenChart(item.id, item.symbol)}
-            selected={selectedIds.has(item.id)}
-            onToggleSelect={(detail) => onToggleSelect(item.id, detail)}
-          />
-        );
-      })}
+      {sorted.map((item) => (
+        <ListItemAccordion
+          key={item.id}
+          item={item}
+          processSubtitle
+          isChartActive={activeInstrumentId === item.id}
+          isListSource={isListSource(item.id)}
+          onOpenChart={() => onOpenChart(item.id, item.symbol)}
+          selected={selectedIds.has(item.id)}
+          onToggleSelect={(detail) => onToggleSelect(item.id, detail)}
+        />
+      ))}
     </>
   );
 }

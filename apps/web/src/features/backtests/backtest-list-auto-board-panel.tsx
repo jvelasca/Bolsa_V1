@@ -250,7 +250,7 @@ export function BacktestListAutoBoardPanel({
               variant="outline"
               className="h-7 gap-1 text-[11px]"
               onClick={campaignControls.onForceRescanRemaining}
-              title="CORE-R: ignora frescura (Omitido) en el resto · fuerza reevaluación"
+              title="LAB: ignora frescura (Omitido) en el resto. No cambia el mandato de Trading hasta aceptar CORE-R en Monitor."
             >
               Reevaluar resto
             </Button>
@@ -366,7 +366,8 @@ export function BacktestListAutoBoardPanel({
       {!compact && (
         <p className="text-[10px] leading-snug text-muted-foreground">
           CORE-R: juicio tras cada settle (Mantener / Lab / Valorar cambio). No pisa Finalistas.
-          Omitido = frescos. Reevaluar resto ignora frescura. Stop → Play continúa. ↻ = desde cero.
+          Omitido = frescos. Reevaluar resto = LAB (no cambia Trading). Stop → Play continúa. ↻ =
+          desde cero.
         </p>
       )}
     </div>

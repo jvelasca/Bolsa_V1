@@ -98,7 +98,7 @@ export function InstrumentDetailPage() {
         quantity,
         price: lastPrice,
       }),
-    onSuccess: async (res, vars) => {
+    onSuccess: async (res) => {
       const txId = res?.data?.transaction?.id;
       if (txId && effectiveAccountId && id) {
         linkTradeToMandate({

@@ -1651,6 +1651,10 @@ export const api = {
   getLists: () =>
     request<{ data: import('@bolsa/shared').InstrumentListSummaryDto[] }>('/api/lists'),
 
+  /** Batch listId → instrumentIds (evita N× getList en el shell). */
+  getListMemberships: () =>
+    request<{ data: Record<string, string[]> }>('/api/lists/memberships'),
+
   getList: (id: string) =>
     request<{ data: import('@bolsa/shared').InstrumentListDetailDto }>(`/api/lists/${id}`),
 

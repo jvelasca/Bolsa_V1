@@ -95,7 +95,6 @@ export function BacktestResultView({
   barsError,
   equityCurve,
   focusTimestamp,
-  focusedTrade,
   onSelectTrade,
   onJumpToTrade,
   displayTrialId,

@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import type { InstrumentListSummaryDto } from '@bolsa/shared';
+import { isEstudioListNameCollision } from '@bolsa/shared';
 import { checkboxClassName } from '@/components/ui/dialog';
 import { OpaqueMenuLabel, OpaqueMenuPanel } from '@/components/ui/opaque-menu-panel';
 import { cn } from '@/lib/utils';
@@ -132,13 +133,19 @@ export function InstrumentsHubFilterBar({
   );
   const favoriteListSet = useMemo(() => new Set(favoriteListIds), [favoriteListIds]);
 
+  /** Listas API elegibles: oculta homónimas de la virtual Estudio (evita chip duplicado). */
+  const selectableApiLists = useMemo(
+    () => apiLists.filter((l) => !isEstudioListNameCollision(l.name)),
+    [apiLists],
+  );
+
   const visibleBuiltins = useMemo(
     () => INSTRUMENTS_HUB_BUILTIN_FILTERS.filter((f) => favoriteBuiltinSet.has(f.id)),
     [favoriteBuiltinSet],
   );
 
   const visibleLists = useMemo(() => {
-    const byId = new Map(apiLists.map((l) => [l.id, l]));
+    const byId = new Map(selectableApiLists.map((l) => [l.id, l]));
     const pinned = favoriteListIds
       .map((id) => byId.get(id))
       .filter((l): l is InstrumentListSummaryDto => Boolean(l));
@@ -152,7 +159,7 @@ export function InstrumentsHubFilterBar({
       return [...pinned, byId.get(scopeListId)!];
     }
     return pinned;
-  }, [apiLists, favoriteListIds, favoriteListSet, scopeFilter, scopeListId]);
+  }, [selectableApiLists, favoriteListIds, favoriteListSet, scopeFilter, scopeListId]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -230,10 +237,10 @@ export function InstrumentsHubFilterBar({
             </div>
             <OpaqueMenuLabel>Listas</OpaqueMenuLabel>
             <div className="scroll-area max-h-48 overflow-auto">
-              {apiLists.length === 0 ? (
+              {selectableApiLists.length === 0 ? (
                 <p className="px-2 py-1.5 text-[10px] text-muted-foreground">Sin listas API</p>
               ) : (
-                apiLists.map((list) => (
+                selectableApiLists.map((list) => (
                   <label
                     key={list.id}
                     className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-accent/50"

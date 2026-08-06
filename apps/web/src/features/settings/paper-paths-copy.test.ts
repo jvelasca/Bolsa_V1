@@ -36,6 +36,7 @@ describe('paper-paths-copy', () => {
 
   it('Monitor copy mentions CORE-R / no TOP overwrite stance', () => {
     expect(PAPER_PATH_MONITOR.blurb).toMatch(/CORE-R|retorno/i);
+    expect(PAPER_PATH_MONITOR.blurb).toMatch(/mandato/i);
     expect(PAPER_PATH_MONITOR.warnLine).toMatch(/no ejecutan|no ejecuta/i);
     expect(PAPER_PATH_MONITOR.warnLine).toMatch(/TOP|Encolar/i);
   });

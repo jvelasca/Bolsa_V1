@@ -1,29 +1,21 @@
 /**
  * Membresía Estudio — SoT = lista API canónica (ADR-024).
- * El visualization-store actúa como cache local para IO / gate SEMI / carrusel.
+ * Cache local: `estudio-membership-store` (no Visualizados).
  */
 
-import type { InstrumentWithMetaDto, VisualizationPersistedEntry } from '@bolsa/shared';
+import type { InstrumentWithMetaDto } from '@bolsa/shared';
 import { ESTUDIO_LIST_ID } from '@bolsa/shared';
 import { api } from '@/lib/api';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import {
+  useEstudioMembershipStore,
+  type EstudioMemberEntry,
+} from '@/stores/estudio-membership-store';
 
 export type EstudioMemberMeta = {
   instrumentId: string;
   symbol: string;
   name: string;
 };
-
-function entryFromMeta(meta: EstudioMemberMeta, now: string): VisualizationPersistedEntry {
-  return {
-    instrumentId: meta.instrumentId,
-    symbol: meta.symbol,
-    name: meta.name,
-    firstViewedAt: now,
-    lastViewedAt: now,
-    viewCount: 1,
-  };
-}
 
 /** Lee instrumentIds actuales de la lista API Estudio (crea/asegura vía GET lists). */
 export async function fetchEstudioInstrumentIds(): Promise<string[]> {
@@ -33,11 +25,10 @@ export async function fetchEstudioInstrumentIds(): Promise<string[]> {
 }
 
 /**
- * Hidrata el store desde API. Si API vacía y hay entradas locales, las sube (migración).
+ * Hidrata el cache Estudio desde API.
+ * No toca Visualizados (pestañas / búsqueda).
  */
 export async function hydrateEstudioMembershipFromApi(): Promise<void> {
-  const store = useVisualizationStore.getState();
-  const local = store.entries;
   let apiIds: string[];
   try {
     apiIds = await fetchEstudioInstrumentIds();
@@ -45,14 +36,6 @@ export async function hydrateEstudioMembershipFromApi(): Promise<void> {
     return;
   }
 
-  if (apiIds.length === 0 && local.length > 0) {
-    const ids = local.map((e) => e.instrumentId);
-    await api.updateList(ESTUDIO_LIST_ID, { instrumentIds: ids });
-    apiIds = ids;
-  }
-
-  const now = new Date().toISOString();
-  const byLocal = new Map(local.map((e) => [e.instrumentId, e]));
   let quotesById = new Map<string, { symbol: string; name: string }>();
   if (apiIds.length > 0) {
     try {
@@ -64,26 +47,19 @@ export async function hydrateEstudioMembershipFromApi(): Promise<void> {
       // stubs below
     }
   }
-  const next: VisualizationPersistedEntry[] = apiIds.map((id) => {
-    const prev = byLocal.get(id);
-    if (prev) {
-      const q = quotesById.get(id);
-      if (q && (prev.symbol === id.slice(0, 8) || prev.symbol === id)) {
-        return { ...prev, symbol: q.symbol, name: q.name };
-      }
-      return prev;
-    }
+
+  const prev = useEstudioMembershipStore.getState().members;
+  const byPrev = new Map(prev.map((m) => [m.instrumentId, m]));
+  const next: EstudioMemberEntry[] = apiIds.map((id) => {
     const q = quotesById.get(id);
-    return entryFromMeta(
-      {
-        instrumentId: id,
-        symbol: q?.symbol ?? id.slice(0, 8),
-        name: q?.name ?? id.slice(0, 8),
-      },
-      now,
-    );
+    const old = byPrev.get(id);
+    return {
+      instrumentId: id,
+      symbol: q?.symbol ?? old?.symbol ?? id.slice(0, 8),
+      name: q?.name ?? old?.name ?? id.slice(0, 8),
+    };
   });
-  store.replaceEntries(next);
+  useEstudioMembershipStore.getState().replaceMembers(next);
 }
 
 /** Añade instrumentos a Estudio (API + cache). */
@@ -91,15 +67,15 @@ export async function addToEstudioMembership(
   instruments: ReadonlyArray<InstrumentWithMetaDto | EstudioMemberMeta>,
 ): Promise<number> {
   if (instruments.length === 0) return 0;
-  const store = useVisualizationStore.getState();
   const current = await fetchEstudioInstrumentIds();
   const set = new Set(current);
   let added = 0;
-  const metas: EstudioMemberMeta[] = [];
+  const metas: EstudioMemberEntry[] = [];
   for (const raw of instruments) {
-    const id = 'id' in raw && typeof (raw as InstrumentWithMetaDto).id === 'string'
-      ? (raw as InstrumentWithMetaDto).id
-      : (raw as EstudioMemberMeta).instrumentId;
+    const id =
+      'id' in raw && typeof (raw as InstrumentWithMetaDto).id === 'string'
+        ? (raw as InstrumentWithMetaDto).id
+        : (raw as EstudioMemberMeta).instrumentId;
     const symbol =
       'symbol' in raw ? String(raw.symbol) : (raw as EstudioMemberMeta).symbol;
     const name = 'name' in raw ? String(raw.name) : (raw as EstudioMemberMeta).name;
@@ -110,21 +86,7 @@ export async function addToEstudioMembership(
   }
   if (added === 0) return 0;
   await api.updateList(ESTUDIO_LIST_ID, { instrumentIds: [...set] });
-  for (const m of metas) {
-    const asDto = {
-      id: m.instrumentId,
-      symbol: m.symbol,
-      yahooSymbol: m.symbol,
-      name: m.name,
-      exchange: '—',
-      country: '—',
-      currency: 'EUR',
-      sector: null,
-      isActive: true,
-      meta: { barCount: 0, lastSync: null, lastClose: null, changePct: null },
-    } satisfies InstrumentWithMetaDto;
-    store.addInstrument(asDto, { source: 'list' });
-  }
+  useEstudioMembershipStore.getState().upsertMembers(metas);
   return added;
 }
 
@@ -133,16 +95,15 @@ export async function removeFromEstudioMembership(
   instrumentIds: ReadonlyArray<string>,
 ): Promise<number> {
   if (instrumentIds.length === 0) return 0;
-  const store = useVisualizationStore.getState();
   const current = await fetchEstudioInstrumentIds();
   const removeSet = new Set(instrumentIds);
   const next = current.filter((id) => !removeSet.has(id));
   const removed = current.length - next.length;
   if (removed === 0) {
-    for (const id of instrumentIds) store.removeInstrument(id);
+    useEstudioMembershipStore.getState().removeIds(instrumentIds);
     return 0;
   }
   await api.updateList(ESTUDIO_LIST_ID, { instrumentIds: next });
-  for (const id of instrumentIds) store.removeInstrument(id);
+  useEstudioMembershipStore.getState().removeIds(instrumentIds);
   return removed;
 }

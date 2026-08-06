@@ -23,11 +23,22 @@ export function listRowLeftGutterWidthPx(selectEnabled: boolean): number {
 export const LIST_HEADER_GRIP_INSET_PX = 14;
 
 export function isNumericListColumn(columnId: ListColumnId): boolean {
-  return columnId === 'lastClose' || columnId === 'changePct';
+  return (
+    columnId === 'lastClose' ||
+    columnId === 'changePct' ||
+    columnId === 'ioScore' ||
+    columnId === 'taScore' ||
+    columnId === 'faScore' ||
+    columnId === 'dictamenStars'
+  );
 }
 
 export function isCenteredListColumn(columnId: ListColumnId): boolean {
-  return columnId === 'syncStatus';
+  return (
+    columnId === 'syncStatus' ||
+    columnId === 'processStatus' ||
+    columnId === 'dictamenStars'
+  );
 }
 
 export function listColumnContentClass(
@@ -144,8 +155,16 @@ export function toggleColumnInLayout(
 }
 
 export function columnAlignClass(columnId: ListColumnId): string {
-  if (columnId === 'syncStatus') return 'text-center';
-  if (columnId === 'symbol' || columnId === 'name') return 'text-left';
+  if (
+    columnId === 'syncStatus' ||
+    columnId === 'processStatus' ||
+    columnId === 'dictamenStars'
+  ) {
+    return 'text-center';
+  }
+  if (columnId === 'symbol' || columnId === 'name' || columnId === 'recStance') {
+    return 'text-left';
+  }
   return 'text-right';
 }
 
@@ -157,7 +176,11 @@ export function listColumnCellClass(columnId: ListColumnId): string {
     case 'name':
       return 'px-2 pr-3';
     case 'syncStatus':
+    case 'processStatus':
       return 'px-1 text-center';
+    case 'lastLabAt':
+    case 'lastCoreRAt':
+      return 'px-1.5';
     default:
       return 'px-2';
   }

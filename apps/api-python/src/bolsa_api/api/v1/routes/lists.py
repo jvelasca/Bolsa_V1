@@ -1,5 +1,8 @@
 """API: listas / universos (IBEX, watchlists)."""
 
+from __future__ import annotations
+
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,6 +24,7 @@ from bolsa_api.schemas.lifecycle_mappers import to_remove_from_list_result_dto
 from bolsa_api.schemas.lists import (
     CreateListRequestDto,
     InstrumentListDetailDto,
+    InstrumentListMembershipsResponseDto,
     InstrumentListResponseDto,
     InstrumentListsResponseDto,
     InstrumentListSummaryDto,
@@ -38,6 +42,7 @@ from bolsa_application.lists import (
     DeleteInstrumentList,
     GetInstrumentList,
     GetListQuotes,
+    ListInstrumentListMemberships,
     ListInstrumentLists,
     UpdateInstrumentList,
 )
@@ -50,6 +55,19 @@ from bolsa_infrastructure.database.repositories.list_repository import (
 )
 
 router = APIRouter()
+
+# Sync de índices en GET /lists es caro; TTL evita rehacerlo en cada refetch del shell.
+_LISTS_CATALOG_SYNC_TTL_S = 60.0
+_lists_catalog_sync_mono = 0.0
+
+
+def _should_sync_catalog_on_list() -> bool:
+    global _lists_catalog_sync_mono
+    now = time.monotonic()
+    if now - _lists_catalog_sync_mono >= _LISTS_CATALOG_SYNC_TTL_S:
+        _lists_catalog_sync_mono = now
+        return True
+    return False
 
 
 def _to_summary_dto(item: InstrumentListSummary) -> InstrumentListSummaryDto:
@@ -108,16 +126,31 @@ async def list_lists(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InstrumentListsResponseDto:
     repo = get_list_repository(session)
-    sync = SyncSubscribedCatalogIndices(
-        SubscribeMarketIndex(
+    sync_catalog = _should_sync_catalog_on_list()
+    sync = None
+    if sync_catalog:
+        sync = SyncSubscribedCatalogIndices(
+            SubscribeMarketIndex(
+                repo,
+                get_instrument_repository(session),
+                get_import_instrument_use_case(session),
+            ),
             repo,
-            get_instrument_repository(session),
-            get_import_instrument_use_case(session),
-        ),
-        repo,
+        )
+    items = await ListInstrumentLists(repo, sync_indices=sync).execute(
+        sync_catalog=sync_catalog,
     )
-    items = await ListInstrumentLists(repo, sync_indices=sync).execute()
     return InstrumentListsResponseDto(data=[_to_summary_dto(item) for item in items])
+
+
+@router.get("/lists/memberships", response_model=InstrumentListMembershipsResponseDto)
+async def list_memberships(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> InstrumentListMembershipsResponseDto:
+    """Batch: id → instrumentIds para el sync de membresía del shell (evita N+1)."""
+    repo = get_list_repository(session)
+    data = await ListInstrumentListMemberships(repo).execute()
+    return InstrumentListMembershipsResponseDto(data=data)
 
 
 @router.get("/lists/{list_id}", response_model=InstrumentListResponseDto)
@@ -193,7 +226,9 @@ async def update_list(
             instrument_ids=body.instrument_ids,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        detail = str(exc)
+        status = 404 if "not found" in detail.lower() else 400
+        raise HTTPException(status_code=status, detail=detail) from exc
     return InstrumentListResponseDto(data=_to_detail_dto(detail))
 
 

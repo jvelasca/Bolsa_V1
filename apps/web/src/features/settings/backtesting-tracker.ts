@@ -114,7 +114,7 @@ export const BACKTESTING_CORE_R_GUIDE = {
     'Abre Lab / Finalistas / Checklist desde la cola; marca «Hecho» al cerrar.',
     'SEMI + «Valorar cambio»: «Adoptar» abre mandato TOP#1 (ADR-020). AUTO no auto-adopta.',
     'Opcional: «Narrar cola» (heurística; LLM si hay Ollama).',
-    'Opcional: «Auto-sync» / Supervisión ON (cadencia; prefiere «Estudio») · chip · toast · «Hecho todos».',
+    'Opcional: «Auto-sync» / Supervisión ON (3 cadencias en ···; prefiere «Estudio») · chip · toast · «Hecho todos».',
   ],
   notes: [
     'Sandbox DÍA D ≠ DEMO live. CORE-R lee DEMO/paper vinculadas al TOP (prefer simulated).',

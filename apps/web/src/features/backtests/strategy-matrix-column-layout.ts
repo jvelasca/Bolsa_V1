@@ -101,7 +101,6 @@ export function normalizeStrategyMatrixLayout(
   const defaults = DEFAULT_STRATEGY_MATRIX_COLUMN_LAYOUT.map((c) => ({ ...c }));
   if (!stored?.length) return defaults;
 
-  const byId = new Map(stored.map((column) => [column.id, column]));
   const ordered: StrategyMatrixColumnLayoutItem[] = [];
   const seen = new Set<StrategyMatrixColumnId>();
 

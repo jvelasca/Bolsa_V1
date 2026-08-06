@@ -16,6 +16,13 @@
  * + Chart TOP#1 switches · **A1–A5 prep** Libro AUTO / kill switch / ADR-023 Proposed.
  * Pack auditoría: `docs/engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md`.
  * HELP.md sync Trading SEMI vs AUTO · Asesor Diario R1 · telemetría.
+ * **2026-08-06** — **ADR-024** Estudio canónica + Supervisión ON + cadencias 3 capas
+ * (vigilia / frescura / rediscubrimiento) · «Eliminar de la lista».
+ * **2026-08-06b** — UI procesos (subtítulo V·F·R · Actualizar/Redescubrir) ·
+ * Manual/SEMI/AUTO en barra de estado → Cuentas (fuera del panel Operativa por valor).
+ * **2026-08-06c** — Actualizar/Redescubrir solo barra inferior · chips cadencia V·F·R en banner.
+ * **2026-08-06d** — Visualizados = pestañas · Por IO · columnas recomendación ·
+ * foco Cartera→Estudio→resto + scroll bajo cabecera sticky.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -24,6 +31,12 @@
  * Beneish→distress · Tarjeta densificada · CAPM rf/ERP visibles.
  *
  * Docs:
+ * - `docs/adr/024-estudio-supervision-universe.md`
+ * - `docs/engineering/estudio-supervision-model-2026-08-06.md`
+ * - `docs/engineering/estudio-process-status-ui-2026-08-06.md`
+ * - `docs/engineering/session-handoff-2026-08-06-estudio-process-ui.md`
+ * - `docs/engineering/visualizados-list-ux-2026-08-06.md`
+ * - `docs/engineering/session-handoff-2026-08-06-visualizados-list-ux.md`
  * - `docs/engineering/trading-operativa-panel-2026-08-04.md`
  * - `docs/engineering/chart-top1-indicator-switch-2026-08-03.md`
  * - `docs/engineering/session-handoff-2026-08-04-operativa.md`
@@ -41,10 +54,13 @@
  *
  * Verificar: `pnpm test:fa` · `pnpm test:operativa` · `pnpm test:coach`
  *
+ * @see docs/adr/024-estudio-supervision-universe.md
+ * @see docs/engineering/estudio-process-status-ui-2026-08-06.md
+ * @see docs/engineering/session-handoff-2026-08-06-estudio-process-ui.md
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  * @see docs/engineering/dual-universes-lab-trading-design-2026-08-02.md
  * @see docs/adr/020-operating-mandate-tenure.md
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = '2026-08-04' as const;
+export const HELP_CONTENT_AS_OF = '2026-08-06' as const;

@@ -22,10 +22,11 @@ const MIN_OPERATIVA_WIDTH_PCT = 16;
 const MAX_OPERATIVA_WIDTH_PCT = 42;
 
 const MIN_OPERATIVA_SECTION_HEIGHT_PX = 72;
-const MAX_OPERATIVA_SECTION_HEIGHT_PX = 420;
+/** Tope alto: panel Operativa a altura completa; el scroll solo si el contenido supera el alto elegido. */
+const MAX_OPERATIVA_SECTION_HEIGHT_PX = 900;
 const DEFAULT_OPERATIVA_SECTION_HEIGHTS: Record<OperativaSectionId, number> = {
-  recommendation: 260,
-  info: 140,
+  recommendation: 320,
+  info: 200,
   config: 180,
 };
 
@@ -256,6 +257,8 @@ export {
   MIN_OPERATIVA_WIDTH_PCT,
   MAX_OPERATIVA_WIDTH_PCT,
   DEFAULT_OPERATIVA_WIDTH_PCT,
+  MIN_OPERATIVA_SECTION_HEIGHT_PX,
+  MAX_OPERATIVA_SECTION_HEIGHT_PX,
 };
 
 /** Snapshot del dock local (p. ej. depuración). No se aplica desde el servidor. */

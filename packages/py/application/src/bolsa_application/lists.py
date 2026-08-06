@@ -32,17 +32,30 @@ class ListInstrumentLists:
         self._list_repo = list_repo
         self._sync_indices = sync_indices
 
-    async def execute(self) -> list:
+    async def execute(self, *, sync_catalog: bool = True) -> list:
         # Índices suscritos: import faltantes + membresía exacta (join/leave; no borra Instrument).
-        if self._sync_indices is not None:
-            await self._sync_indices.execute(sync_bars=False)
-        else:
-            await self._list_repo.sync_ibex_catalog_list_if_present()
+        # En hot path (TTL) se omite: ver list_lists — evita re-sync en cada GET /lists.
+        if sync_catalog:
+            if self._sync_indices is not None:
+                await self._sync_indices.execute(sync_bars=False)
+            else:
+                await self._list_repo.sync_ibex_catalog_list_if_present()
 
         # ADR-024: universo supervisable canónico (fusiona «Estudio personal» legacy).
         await self._list_repo.ensure_estudio_list()
 
         return await self._list_repo.list_all()
+
+
+class ListInstrumentListMemberships:
+    """Mapa de membresías de todas las listas (batch; evita N× GET /lists/{id})."""
+
+    def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
+        self._list_repo = list_repo
+
+    async def execute(self) -> dict[str, list[str]]:
+        await self._list_repo.ensure_estudio_list()
+        return await self._list_repo.list_memberships()
 
 
 class GetInstrumentList:

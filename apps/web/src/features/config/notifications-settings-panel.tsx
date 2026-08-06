@@ -37,8 +37,10 @@ export function NotificationsSettingsPanel() {
           <CardDescription>
             Correo y toasts para Alarmas del Estudio (Asesor). Un operador por navegador hasta
             multiusuario. El envío de email requiere SMTP en el servidor (
-            <code className="text-[10px]">SMTP_HOST</code> /{' '}
-            <code className="text-[10px]">SMTP_FROM</code>).
+            <code className="text-[10px]">SMTP_HOST</code> +{' '}
+            <code className="text-[10px]">SMTP_FROM</code> en{' '}
+            <code className="text-[10px]">.env</code>, luego reiniciar la API). Sin eso, «Enviar
+            ahora» y el digest EOD responderán «SMTP incompleto».
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 text-sm">

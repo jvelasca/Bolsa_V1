@@ -29,7 +29,23 @@ export type ListColumnId =
   | 'lastClose'
   | 'changePct'
   | 'isin'
-  | 'syncStatus';
+  | 'syncStatus'
+  /** Capas Lab/CORE-R/redescubrir (3 iconos). Off por defecto. */
+  | 'processStatus'
+  /** Última pasada Lab / Finalistas. Off por defecto. */
+  | 'lastLabAt'
+  /** Último juicio / encolado CORE-R. Off por defecto. */
+  | 'lastCoreRAt'
+  /** Índice Operativo 0–100 (recomendación). Off por defecto. */
+  | 'ioScore'
+  /** Pierna técnica 0–100. Off por defecto. */
+  | 'taScore'
+  /** Pierna fundamental 0–100. Off por defecto. */
+  | 'faScore'
+  /** ★ dictamen diario. Off por defecto. */
+  | 'dictamenStars'
+  /** Postura del dictamen (buy / vigilar…). Off por defecto. */
+  | 'recStance';
 
 export interface ChartGridConfig {
   showVertical: boolean;
@@ -320,6 +336,14 @@ export const LIST_COLUMN_LABELS: Record<ListColumnId, string> = {
   changePct: '% día',
   isin: 'ISIN',
   syncStatus: 'Sincro',
+  processStatus: 'Procesos',
+  lastLabAt: 'Últ. Lab',
+  lastCoreRAt: 'Últ. CORE-R',
+  ioScore: 'IO',
+  taScore: 'TA',
+  faScore: 'FA',
+  dictamenStars: '★ Dict.',
+  recStance: 'Postura',
 };
 
 export const ALL_LIST_COLUMNS: ListColumnId[] = [
@@ -329,6 +353,30 @@ export const ALL_LIST_COLUMNS: ListColumnId[] = [
   'changePct',
   'isin',
   'syncStatus',
+  'processStatus',
+  'lastLabAt',
+  'lastCoreRAt',
+  'ioScore',
+  'taScore',
+  'faScore',
+  'dictamenStars',
+  'recStance',
+];
+
+/** Columnas de supervisión: visibles solo si el usuario las enciende. */
+export const ESTUDIO_OPTIONAL_LIST_COLUMNS: ListColumnId[] = [
+  'processStatus',
+  'lastLabAt',
+  'lastCoreRAt',
+];
+
+/** Columnas de recomendación (IO / dictamen). Off por defecto; activables en (…). */
+export const RECOMMENDATION_OPTIONAL_LIST_COLUMNS: ListColumnId[] = [
+  'ioScore',
+  'taScore',
+  'faScore',
+  'dictamenStars',
+  'recStance',
 ];
 
 export const MIN_LIST_COLUMN_WIDTH = 40;
@@ -341,6 +389,14 @@ export const DEFAULT_LIST_COLUMN_WIDTHS: Record<ListColumnId, number> = {
   changePct: 56,
   isin: 96,
   syncStatus: 40,
+  processStatus: 72,
+  lastLabAt: 72,
+  lastCoreRAt: 72,
+  ioScore: 40,
+  taScore: 40,
+  faScore: 40,
+  dictamenStars: 48,
+  recStance: 64,
 };
 
 export function clampListColumnWidth(width: number): number {
@@ -416,7 +472,20 @@ export function normalizeColumnLayout(
 
   for (const id of ALL_LIST_COLUMNS) {
     const remaining = byId.get(id);
-    if (remaining) ordered.push(remaining);
+    if (remaining) {
+      ordered.push(remaining);
+      byId.delete(id);
+    }
+  }
+
+  // Columnas nuevas del producto (p. ej. IO/★) que aún no están en el layout guardado.
+  for (const id of ALL_LIST_COLUMNS) {
+    if (ordered.some((column) => column.id === id)) continue;
+    ordered.push({
+      id,
+      width: DEFAULT_LIST_COLUMN_WIDTHS[id],
+      visible: false,
+    });
   }
 
   if (!ordered.some((column) => column.visible)) {

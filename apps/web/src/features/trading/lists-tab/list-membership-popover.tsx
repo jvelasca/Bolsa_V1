@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InstrumentWithMetaDto } from '@bolsa/shared';
 import {
   isVirtualListId,
@@ -14,8 +14,8 @@ import { useActiveAccountQueryKey } from '@/stores/active-account-store';
 import { checkboxClassName } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { usePendingOrders } from '@/features/trading/use-pending-orders';
-import { useVisualizationStore } from '@/stores/visualization-store';
 import { useListInstrumentRemoval } from '@/features/trading/lists-tab/use-list-instrument-removal';
+import { useWorkspaceStore } from '@/stores/workspace-store';
 
 interface ListMembershipPopoverProps {
   instrument: InstrumentWithMetaDto;
@@ -39,7 +39,11 @@ export function ListMembershipPopover({
   const popoverRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { pendingOrders } = usePendingOrders();
-  const visualizationEntries = useVisualizationStore((state) => state.entries);
+  const charts = useWorkspaceStore((state) => state.workspace.charts);
+  const inVisualizados = useMemo(
+    () => charts.some((tab) => tab.instrumentId === instrument.id),
+    [charts, instrument.id],
+  );
   const { removeFromList, dialog, loadingPreview } = useListInstrumentRemoval();
 
   const accountScope = useActiveAccountQueryKey();
@@ -55,25 +59,21 @@ export function ListMembershipPopover({
   });
 
   const apiLists = listsQuery.data?.data ?? [];
-  const listIds = apiLists.map((list) => list.id);
 
-  const detailsQueries = useQueries({
-    queries: listIds.map((id) => ({
-      queryKey: ['list', id],
-      queryFn: () => api.getList(id),
-      enabled: listIds.length > 0,
-    })),
+  const membershipsQuery = useQuery({
+    queryKey: ['lists', 'memberships'],
+    queryFn: api.getListMemberships,
+    staleTime: 30_000,
   });
 
   const membershipByListId = useMemo(() => {
     const map: Record<string, boolean> = {};
-    for (const query of detailsQueries) {
-      const detail = query.data?.data;
-      if (!detail) continue;
-      map[detail.id] = detail.instrumentIds.includes(instrument.id);
+    const memberships = membershipsQuery.data?.data ?? {};
+    for (const list of apiLists) {
+      map[list.id] = (memberships[list.id] ?? []).includes(instrument.id);
     }
     return map;
-  }, [detailsQueries, instrument.id]);
+  }, [apiLists, membershipsQuery.data?.data, instrument.id]);
 
   const [position, setPosition] = useState({ top: 0, left: 0 });
 
@@ -105,14 +105,14 @@ export function ListMembershipPopover({
         await removeFromList(listId, instrument.id);
         return;
       }
-      const detail = detailsQueries.find((query) => query.data?.data.id === listId)?.data?.data;
-      if (!detail) return;
-      const ids = new Set(detail.instrumentIds);
+      const current = membershipsQuery.data?.data?.[listId] ?? [];
+      const ids = new Set(current);
       ids.add(instrument.id);
       await api.updateList(listId, { instrumentIds: [...ids] });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['lists'] });
+      await queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
       await queryClient.invalidateQueries({ queryKey: ['list'] });
       await queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
     },
@@ -123,9 +123,9 @@ export function ListMembershipPopover({
       {
         id: VIRTUAL_LIST_VISUALIZATION,
         name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
-        checked: visualizationEntries.some((entry) => entry.instrumentId === instrument.id),
+        checked: inVisualizados,
         locked: false,
-        hint: 'universo',
+        hint: 'pestañas',
       },
       {
         id: VIRTUAL_LIST_PORTFOLIO,
@@ -163,31 +163,32 @@ export function ListMembershipPopover({
     membershipByListId,
     pendingOrders,
     portfolioQuery.data,
-    visualizationEntries,
+    inVisualizados,
   ]);
 
   const loading =
     listsQuery.isLoading ||
-    detailsQueries.some((query) => query.isLoading) ||
+    membershipsQuery.isLoading ||
     portfolioQuery.isLoading;
 
   async function handleToggle(row: MembershipRow) {
     if (row.locked) return;
     if (row.id === VIRTUAL_LIST_VISUALIZATION) {
-      const { addToEstudioMembership, removeFromEstudioMembership } = await import(
-        '@/features/trading/estudio-membership'
+      const { reconcileVisualizadosToOpenCharts } = await import(
+        '@/features/trading/lists-tab/use-chart-visualization-sync'
       );
       if (row.checked) {
-        await removeFromEstudioMembership([instrument.id]);
-        const { unsubscribeInstrumentFromSupervision } = await import(
-          '@/features/trading/estudio-supervision'
+        const { closeOpenChartsForInstrument } = await import(
+          '@/lib/close-chart-on-list-removal'
         );
-        unsubscribeInstrumentFromSupervision([instrument.id]);
+        closeOpenChartsForInstrument(instrument.id);
+        reconcileVisualizadosToOpenCharts();
       } else {
-        await addToEstudioMembership([instrument]);
+        // Abrir pestaña = entra en Visualizados (SoT = charts).
+        const { useWorkspaceStore } = await import('@/stores/workspace-store');
+        useWorkspaceStore.getState().openChartTab(instrument.id, instrument.symbol);
+        reconcileVisualizadosToOpenCharts();
       }
-      void queryClient.invalidateQueries({ queryKey: ['lists'] });
-      void queryClient.invalidateQueries({ queryKey: ['list'] });
       return;
     }
     if (isVirtualListId(row.id)) return;

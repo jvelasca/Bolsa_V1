@@ -39,7 +39,7 @@ import {
   toggleFavoriteListId,
 } from '@/features/instruments/instruments-hub-filter-bar';
 import { computeIndiceOperativo } from '@/features/trading/operativa-index';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 import {
   pickListChips,
   type HubListMembership,
@@ -466,7 +466,7 @@ export function InstrumentsPage() {
     portfolioLoading,
   } = useInstrumentsHubEnrichment();
 
-  const estudioEntries = useVisualizationStore((s) => s.entries);
+  const estudioEntries = useEstudioMembershipStore((s) => s.members);
   const estudioIds = useMemo(
     () => new Set(estudioEntries.map((e) => e.instrumentId)),
     [estudioEntries],

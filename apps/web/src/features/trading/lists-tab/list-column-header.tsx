@@ -416,16 +416,20 @@ export function ListColumnHeader({
         <div ref={menuRef} className="flex h-full items-center justify-end pr-0.5">
           <button
             type="button"
-            title="Configurar columnas de Valores"
+            title="Columnas visibles de esta lista (independiente por lista)"
             className="rounded p-1 hover:bg-accent"
             onClick={() => setMenuOpen((value) => !value)}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-[180px] rounded-md border border-border bg-card py-1 shadow-lg">
-              <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
-                Columnas (Valores)
+            <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-md border border-border bg-card py-1 shadow-lg">
+              <p className="px-2 py-1 text-[10px] font-medium text-foreground">
+                Columnas (esta lista)
+              </p>
+              <p className="px-2 pb-1 text-[9px] leading-snug text-muted-foreground">
+                Layout propio por lista. Sincro = velas; Procesos = Lab. IO/TA/FA/★/Postura
+                = recomendación (activar con el check).
               </p>
               {layout.map((column) => (
                 <label

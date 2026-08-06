@@ -16,7 +16,7 @@ import {
 describe('Estudio list helpers (ADR-024)', () => {
   it('matches canonical id and name', () => {
     expect(isEstudioListId(ESTUDIO_LIST_ID)).toBe(true);
-    expect(isEstudioListId('__builtin:visualization__')).toBe(true);
+    expect(isEstudioListId('__builtin:visualization__')).toBe(false);
     expect(isEstudioListName(ESTUDIO_LIST_NAME)).toBe(true);
     expect(isEstudioListName('  ESTUDIO ')).toBe(true);
     expect(isEstudioPersonalListName('Estudio personal')).toBe(true);

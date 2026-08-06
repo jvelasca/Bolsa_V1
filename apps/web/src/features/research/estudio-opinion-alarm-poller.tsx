@@ -9,7 +9,7 @@ import {
   mapOpinionToChannel,
 } from '@bolsa/shared';
 import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 import { useAlertsStore } from '@/stores/alerts-store';
 import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
 
@@ -42,7 +42,7 @@ function fingerprint(instrumentId: string, asOf: string, stance: string, stars: 
 
 export function EstudioOpinionAlarmPoller() {
   // Selector estable: no devolver .map() desde Zustand (rompe Object.is → loop).
-  const entries = useVisualizationStore((s) => s.entries);
+  const entries = useEstudioMembershipStore((s) => s.members);
   const studyIds = useMemo(
     () => entries.map((e) => e.instrumentId),
     [entries],

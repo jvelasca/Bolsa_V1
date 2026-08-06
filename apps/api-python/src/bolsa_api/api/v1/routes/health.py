@@ -1,10 +1,11 @@
-"""API: health check (DB + Yahoo circuit + Redis best-effort + XTB)."""
+"""API: health check (DB + Yahoo circuit + Redis best-effort + XTB + SMTP)."""
 
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
+from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.session import check_database
 
@@ -192,6 +193,31 @@ async def _risk_component() -> ComponentHealthDto:
     )
 
 
+def _smtp_component() -> ComponentHealthDto:
+    """SMTP para Alarmas / digest R3 — sin probe de red; solo config mínima."""
+    settings = get_settings()
+    ready = smtp_ready(settings)
+    missing: list[str] = []
+    if not (settings.smtp_host or "").strip():
+        missing.append("SMTP_HOST")
+    if not (settings.smtp_from or "").strip():
+        missing.append("SMTP_FROM")
+    return ComponentHealthDto(
+        status="configured" if ready else "not-setup",
+        message=(
+            "SMTP listo para Alarmas / digest diario"
+            if ready
+            else f"SMTP incompleto — define en .env: {', '.join(missing) or 'SMTP_HOST / SMTP_FROM'}"
+        ),
+        details={
+            "ready": ready,
+            "port": settings.smtp_port,
+            "hasUser": bool((settings.smtp_user or "").strip()),
+            "missing": missing,
+        },
+    )
+
+
 @router.get("/health", response_model=HealthResponseDto)
 async def health_check(request: Request) -> HealthResponseDto:
     engine = request.app.state.engine
@@ -207,6 +233,7 @@ async def health_check(request: Request) -> HealthResponseDto:
         "auth": _auth_component(),
         "worker_arq": await _worker_heartbeat_component(),
         "risk": await _risk_component(),
+        "smtp": _smtp_component(),
     }
     # DB error → degraded; Redis/Yahoo/auth/worker degraded no tumba el health global a error.
     degraded = (not db_ok) or any(c.status == "error" for c in components.values())

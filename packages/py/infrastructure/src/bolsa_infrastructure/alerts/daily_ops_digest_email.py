@@ -12,11 +12,10 @@ from __future__ import annotations
 import asyncio
 import html
 import logging
-import smtplib
 from email.message import EmailMessage
 from typing import Any
 
-from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
+from bolsa_infrastructure.alerts.estudio_opinion_email import _send_smtp_message, smtp_ready
 from bolsa_infrastructure.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -243,11 +242,7 @@ def send_daily_ops_digest_email_sync(
         )
         pdf_attached = True
 
-    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=30) as smtp:
-        if settings.smtp_user and settings.smtp_password:
-            smtp.starttls()
-            smtp.login(settings.smtp_user, settings.smtp_password)
-        smtp.send_message(message)
+    _send_smtp_message(settings, message)
     return pdf_attached
 
 

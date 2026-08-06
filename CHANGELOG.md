@@ -2,6 +2,28 @@
 
 All notable releases of Bolsa V1.
 
+## [Unreleased] — stage 2026-08-06
+
+### Listas / Visualizados
+- **Visualizados** = espejo de pestañas abiertas (separado de **Estudio** API)
+- Quitar selección cierra tabs (sin resucitar por autosave) · **Por IO** ordena por Índice Operativo
+- Columnas opcionales IO/TA/FA/★/Postura · sort por columna (tabs siguen el orden)
+- Foco buscar/pestaña: lista **Cartera → Estudio → resto** + scroll bajo cabecera sticky
+- Docs: `visualizados-list-ux-2026-08-06.md` · handoff `session-handoff-2026-08-06-visualizados-list-ux.md`
+
+### Arranque (perf)
+- Windows: liberar puertos con `netstat` (sin PowerShell Get-NetTCPConnection)
+- `GET /api/lists/memberships` batch · sync catálogo con TTL 60s en `GET /lists`
+- Monitor / CORE-R: batch `instrument-strategy-tops/query` (menos N+1 al pintar Trading)
+- CORE-R shell: primer tick + hydrate diferidos (~1.5–4 s / idle) tras el paint
+
+### Estudio / Operativa (ADR-024 + UI procesos)
+- Universo **Estudio** API · Supervisión ON · cadencias Vigilia / Frescura / Redescubrimiento
+- UI: subtítulo procesos bajo el nombre · botones **Actualizar** / **Redescubrir** (barra inferior) · chips cadencia V·F·R en banner · sellos locales
+- Manual/SEMI/AUTO en barra de estado (`OPERATIVA: …`) → Cuentas · Config (fuera del panel por valor)
+- Docs: `docs/engineering/estudio-process-status-ui-2026-08-06.md` · handoff `session-handoff-2026-08-06-estudio-process-ui.md` · HELP sync
+- GitHub: [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) · PR stage [#29](https://github.com/jvelasca/Bolsa_V1/pull/29)
+
 ## [1.0.0] — 2026-08-01
 
 Primera release empaquetada (**BETA1 → GitHub V1**). DEMO / paper; sin broker live.

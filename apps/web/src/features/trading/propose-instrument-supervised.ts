@@ -12,7 +12,7 @@ import {
   suggestQuantityFromCash,
 } from '@/features/trading/demo-book-prefs';
 import type { SupervisedProposePayload } from '@/stores/supervised-f3-queue-store';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 
 export async function proposeInstrumentSupervised(opts: {
   instrumentId: string;
@@ -31,7 +31,7 @@ export async function proposeInstrumentSupervised(opts: {
     );
   }
   if (demoBookRequiresEstudioMembership(book.mode)) {
-    if (!useVisualizationStore.getState().contains(opts.instrumentId)) {
+    if (!useEstudioMembershipStore.getState().contains(opts.instrumentId)) {
       throw new Error(ESTUDIO_MEMBERSHIP_REQUIRED_MSG);
     }
   }

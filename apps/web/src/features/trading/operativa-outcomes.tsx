@@ -94,15 +94,21 @@ export function OperativaOutcomesBlock({
       className={cn('space-y-1.5 border-t border-border/50 pt-1.5', className)}
       data-testid="operativa-outcomes"
     >
-      <p className="font-medium text-foreground">Learning · {symbol}</p>
+      <div className="space-y-0.5">
+        <p className="font-medium text-foreground">Resultados · {symbol}</p>
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          Historial de decisiones Confirm de este valor (aprendizaje). No es el
+          dictamen del día de arriba.
+        </p>
+      </div>
 
       {learningQuery.isLoading ? (
-        <p className="text-[10px] text-muted-foreground">Cargando outcomes…</p>
+        <p className="text-[10px] text-muted-foreground">Cargando resultados…</p>
       ) : learning ? (
         <p className="text-[10px] text-muted-foreground" data-testid="operativa-learning-strip">
           Cerradas {learning.sampleClosed}
           {learning.matureScored != null ? ` · maduras ${learning.matureScored}` : ''}
-          {' · hit '}
+          {' · acierto '}
           {hitRateLabel(learning.matureHitRate ?? learning.hitRate)}
           {learning.hits != null && learning.misses != null
             ? ` · H/M ${learning.hits}/${learning.misses}`
@@ -142,7 +148,7 @@ export function OperativaOutcomesBlock({
         </ul>
       ) : sessionsQuery.isLoading ? null : (
         <p className="text-[10px] text-muted-foreground">
-          Sin DecisionSessions de este valor. SEMI Confirm genera sesión.
+          Aún no hay sesiones de este valor. En SEMI, cada Confirm crea una.
         </p>
       )}
 

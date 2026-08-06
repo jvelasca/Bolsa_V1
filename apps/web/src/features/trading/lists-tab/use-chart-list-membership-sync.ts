@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 import {
@@ -14,6 +14,8 @@ import { useWorkspaceStore } from '@/stores/workspace-store';
 /**
  * Mantiene la membresía lista↔instrumento al día y reconcilia
  * sourceListId / chartListContext cuando cambian las listas.
+ *
+ * Usa GET /api/lists/memberships (1 request) en lugar de N× GET /lists/{id}.
  */
 export function useChartListMembershipSync() {
   const accountScope = useActiveAccountQueryKey();
@@ -27,17 +29,14 @@ export function useChartListMembershipSync() {
     staleTime: 30_000,
   });
 
-  const apiLists = listsQuery.data?.data ?? [];
-  const listIds = useMemo(() => apiLists.map((list) => list.id), [apiLists]);
-
-  const detailsQueries = useQueries({
-    queries: listIds.map((id) => ({
-      queryKey: ['list', id],
-      queryFn: () => api.getList(id),
-      enabled: listIds.length > 0,
-      staleTime: 30_000,
-    })),
+  const membershipsQuery = useQuery({
+    queryKey: ['lists', 'memberships'],
+    queryFn: api.getListMemberships,
+    staleTime: 30_000,
   });
+
+  const apiLists = listsQuery.data?.data ?? [];
+  const memberships = membershipsQuery.data?.data ?? null;
 
   const portfolioQuery = useQuery({
     queryKey: ['portfolio', accountScope],
@@ -45,18 +44,13 @@ export function useChartListMembershipSync() {
     staleTime: 15_000,
   });
 
-  const listDetailsSignature = useMemo(
-    () =>
-      detailsQueries
-        .map((query) => {
-          const detail = query.data?.data;
-          if (!detail) return '';
-          return `${detail.id}:${detail.instrumentIds.join(',')}`;
-        })
-        .join('|'),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- firma estable desde datos de query
-    [detailsQueries.map((query) => query.dataUpdatedAt).join('|'), listIds.join('|')],
-  );
+  const membershipsSignature = useMemo(() => {
+    if (!memberships) return '';
+    return Object.keys(memberships)
+      .sort()
+      .map((id) => `${id}:${(memberships[id] ?? []).join(',')}`)
+      .join('|');
+  }, [memberships]);
 
   const pendingSignature = useMemo(
     () => pendingOrders.map((order) => `${order.id}:${order.instrumentId}`).join('|'),
@@ -77,14 +71,12 @@ export function useChartListMembershipSync() {
   );
 
   const membership = useMemo((): ChartListMembershipSnapshot | null => {
-    if (listsQuery.isLoading) return null;
-    if (listIds.length > 0 && detailsQueries.some((query) => query.isLoading)) return null;
+    if (listsQuery.isLoading || membershipsQuery.isLoading) return null;
+    if (!memberships) return null;
 
     const api: Record<string, ReadonlySet<string>> = {};
-    for (const query of detailsQueries) {
-      const detail = query.data?.data;
-      if (!detail) continue;
-      api[detail.id] = new Set(detail.instrumentIds);
+    for (const [listId, ids] of Object.entries(memberships)) {
+      api[listId] = new Set(ids);
     }
 
     return {
@@ -100,9 +92,10 @@ export function useChartListMembershipSync() {
     };
   }, [
     apiLists,
-    listDetailsSignature,
-    listIds.length,
     listsQuery.isLoading,
+    memberships,
+    membershipsQuery.isLoading,
+    membershipsSignature,
     pendingSignature,
     portfolioSignature,
     visualizationSignature,

@@ -358,25 +358,29 @@ function TradingContent() {
             pasado).
           </li>
           <li>
-            <strong className="text-foreground">Info</strong> — mandato / Learning.
-          </li>
-          <li>
-            <strong className="text-foreground">Configuración</strong> — a la derecha
-            «Operativa: manual|semi|auto» (sin desplegar); el bloque usa el{' '}
-            <strong className="text-foreground">nombre de la cuenta activa</strong> (MANUAL/SEMI,
-            % cash, máx. posiciones, geo).{' '}
-            <strong className="text-foreground">AUTO</strong> se muestra como «prep» con riesgos
-            (Camino D / Risk Engine / kill switch); pill deshabilitada hasta checklist thaw +{' '}
-            <code className="text-[10px]">PAPER_D_EXECUTE</code>. Kill switch en el mismo bloque
-            (API runtime). Armado local con doble confirmación (frase{' '}
-            <code className="text-[10px]">ACTIVAR AUTO</code>) no habilita execute. Usa SEMI + Confirm.
+            <strong className="text-foreground">Info</strong> — mandato / Learning / Outcomes.
           </li>
         </ul>
         <p className="mt-2">
-          Lista virtual <strong className="text-foreground">Estudio</strong> = universo
-          operativo (membresía explícita). Abrir gráfico añade; cerrar pestaña no quita.
-          Selección masiva → «A Estudio». SEMI/AUTO exigen pertenencia; MANUAL no. La
-          verificación ya no vive en la mesa Trading (ADR-019).
+          <strong className="text-foreground">Manual / SEMI / AUTO</strong> es de la{' '}
+          <strong className="text-foreground">cuenta entera</strong> (no del valor). Barra
+          inferior: badge <strong className="text-foreground">OPERATIVA: Semi</strong> → clic abre
+          Cuentas · Config · Operativa (sizing, kill switch, armado AUTO prep).{' '}
+          <strong className="text-foreground">AUTO</strong> sigue en prep (
+          <code className="text-[10px]">PAPER_D_EXECUTE</code> off). Usa SEMI + Confirm.
+        </p>
+        <p className="mt-2">
+          Lista virtual <strong className="text-foreground">Visualizados</strong> = pestañas de
+          gráfico abiertas (scratch; no supervisión). Selección: <strong className="text-foreground">A Estudio</strong> ·{' '}
+          <strong className="text-foreground">Quitar</strong> (cierra pestañas) ·{' '}
+          <strong className="text-foreground">Por IO</strong> (mejor Índice Operativo a la
+          izquierda). Columnas (⋯): IO · TA · FA · ★ Dict. · Postura. Al buscar o cambiar de
+          pestaña: prioriza lista <strong className="text-foreground">Cartera → Estudio → resto</strong>{' '}
+          y hace scroll del valor al tope. Lista API{' '}
+          <strong className="text-foreground">Estudio</strong> = universo supervisable
+          (membresía explícita). Abrir/cerrar gráfico <em>no</em> cambia Estudio. En Estudio:
+          Actualizar / Redescubrir · Supervisión ON + chips V·F·R. SEMI/AUTO exigen
+          pertenencia; MANUAL no. ADR-024.
         </p>
         <h4 className="mb-1 mt-3 font-semibold text-foreground">SEMI vs AUTO (2026-08-04)</h4>
         <ul className="list-disc space-y-1 pl-5">
@@ -402,10 +406,11 @@ function TradingContent() {
         </ul>
         <h4 className="mb-1 mt-3 font-semibold text-foreground">Barra de estado (inferior)</h4>
         <p>
-          Izquierda: conexión · cuenta Activa · métricas. Derecha (ancho fijo):{' '}
-          <strong className="text-foreground">Colas</strong> (Velas · CORE-R · F3 · Lista AUTO) y{' '}
-          <strong className="text-foreground">Alarmas Radar</strong> (badge nº sin leer). El rail
-          no salta al cambiar conteos.
+          Izquierda: conexión · cuenta Activa ·{' '}
+          <strong className="text-foreground">OPERATIVA: …</strong> · métricas. Derecha (ancho
+          fijo): <strong className="text-foreground">Colas</strong> (Velas · CORE-R · F3 · Lista
+          AUTO) y <strong className="text-foreground">Alarmas Radar</strong> (badge nº sin leer).
+          El rail no salta al cambiar conteos.
         </p>
       </section>
       <section>
@@ -434,7 +439,10 @@ function TradingContent() {
         </ul>
         <p className="mt-2">
           Docs: <code className="text-[0.85em]">docs/adr/020-operating-mandate-tenure.md</code> ·{' '}
-          <code className="text-[0.85em]">docs/engineering/trading-operativa-panel-2026-08-04.md</code>.
+          <code className="text-[0.85em]">docs/adr/024-estudio-supervision-universe.md</code> ·{' '}
+          <code className="text-[0.85em]">docs/engineering/trading-operativa-panel-2026-08-04.md</code>{' '}
+          ·{' '}
+          <code className="text-[0.85em]">docs/engineering/estudio-process-status-ui-2026-08-06.md</code>.
         </p>
       </section>
       <section>

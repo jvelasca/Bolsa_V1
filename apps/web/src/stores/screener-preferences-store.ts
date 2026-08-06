@@ -33,6 +33,7 @@ export type ScreenerPanelId =
   | 'trackers'
   | 'fa-screener'
   | 'paper-d'
+  | 'fa-weekly'
   | 'saved-strategies'
   | 'ai-assistant'
   | 'execution'
@@ -48,6 +49,7 @@ export const DEFAULT_SCREENER_PANELS: Record<ScreenerPanelId, boolean> = {
   trackers: true,
   'fa-screener': true,
   'paper-d': true,
+  'fa-weekly': false,
   'saved-strategies': false,
   'ai-assistant': false,
   execution: false,

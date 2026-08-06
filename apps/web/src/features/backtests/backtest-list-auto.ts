@@ -3,7 +3,8 @@
  *
  * Entrada: Universo modo **Lista** + Play con `fullCycleOnPlay` ON.
  * Átomo: mismo embudo Coach→Lab→Coach²→Finalistas (`backtest-assistant-full-cycle.ts`).
- * Soft cap: {@link LIST_AUTO_MAX_INSTRUMENTS} (alineado con Fase C «Probar lista»).
+ * Tamaño de tanda: {@link LIST_AUTO_BATCH_SIZE} (antes soft-cap que truncaba).
+ * Tope duro de seguridad: {@link LIST_AUTO_HARD_MAX}.
  *
  * Controles de campaña:
  * - **Pausa:** el ticker en curso termina; no se arranca el siguiente hasta Reanudar.
@@ -23,8 +24,20 @@
  * @see docs/engineering/research-lifecycle.md § Lista AUTO
  */
 
-/** Soft cap IBEX-sized; compartido con Probar lista / Monitor. */
-export const LIST_AUTO_MAX_INSTRUMENTS = 40;
+/** Tamaño de tanda Lista AUTO / soft cap Probar lista · Monitor. */
+export const LIST_AUTO_BATCH_SIZE = 40;
+
+/**
+ * Alias histórico: tamaño de tanda (ya no trunca la campaña a 40).
+ * Probar lista / Monitor siguen usándolo como soft cap de lote.
+ */
+export const LIST_AUTO_MAX_INSTRUMENTS = LIST_AUTO_BATCH_SIZE;
+
+/** Tope duro anti-colgado del browser (solo primeros N). */
+export const LIST_AUTO_HARD_MAX = 500;
+
+/** Confirmación extra aunque `listAutoSkipOverCapConfirm` esté ON. */
+export const LIST_AUTO_EXTRA_CONFIRM_AT = 200;
 
 /** Motivo de cierre de un ciclo 1-valor dentro de la campaña. */
 export type FullCycleSettleReason =
@@ -46,42 +59,105 @@ export type ListAutoCampaign = {
   forceRescan: boolean;
 };
 
-/** Recorta la cola al soft cap. */
+/** Nº de tandas para N valores. */
+export function listAutoBatchCount(
+  total: number,
+  batchSize: number = LIST_AUTO_BATCH_SIZE,
+): number {
+  if (total <= 0 || batchSize <= 0) return 0;
+  return Math.ceil(total / batchSize);
+}
+
+/** Etiqueta «Tanda i/K» (vacía si cabe en una tanda). */
+export function listAutoBatchProgressLabel(opts: {
+  index: number;
+  total: number;
+  batchSize?: number;
+}): string | null {
+  const batchSize = opts.batchSize ?? LIST_AUTO_BATCH_SIZE;
+  if (opts.total <= batchSize) return null;
+  const batches = listAutoBatchCount(opts.total, batchSize);
+  const batch = Math.min(batches, Math.floor(Math.max(0, opts.index) / batchSize) + 1);
+  return `Tanda ${batch}/${batches}`;
+}
+
+/**
+ * Recorta la cola al tope duro de seguridad (default {@link LIST_AUTO_HARD_MAX}).
+ * Ya no usa 40 como tope de campaña.
+ */
 export function sliceListAutoInstrumentIds(
   ids: string[],
-  max: number = LIST_AUTO_MAX_INSTRUMENTS,
+  max: number = LIST_AUTO_HARD_MAX,
 ): string[] {
   return ids.slice(0, Math.max(0, max));
 }
 
+export type ConfirmListAutoOverCapOpts = {
+  batchSize?: number;
+  hardMax?: number;
+  extraConfirmAt?: number;
+  /** Preferencia: no preguntar si N ≤ extraConfirmAt. */
+  skipConfirm?: boolean;
+  confirmFn?: (message: string) => boolean;
+};
+
 /**
- * Consentimiento explícito cuando la lista supera el soft cap (S&P 500, FTSE…).
- * Sin diálogo si `total <= max`. `confirmFn` inyectable en tests.
+ * Consentimiento cuando la lista supera una tanda (o el tope duro).
+ * Sin diálogo si `total <= batchSize`. Si `skipConfirm` y N ≤ extraConfirmAt → OK.
+ * N > extraConfirmAt siempre pide confirmación (aunque skip).
  */
 export function confirmListAutoOverCap(
   total: number,
-  max: number = LIST_AUTO_MAX_INSTRUMENTS,
-  confirmFn: (message: string) => boolean = (msg) => window.confirm(msg),
+  opts: ConfirmListAutoOverCapOpts = {},
 ): boolean {
-  if (total <= max) return true;
-  return confirmFn(
-    `La lista tiene ${total} valores. Lista AUTO usará como máximo ${max} (los primeros de la lista).\n\n` +
-      `No lanza ${total} embudos. ¿Continuar?`,
-  );
+  const batchSize = opts.batchSize ?? LIST_AUTO_BATCH_SIZE;
+  const hardMax = opts.hardMax ?? LIST_AUTO_HARD_MAX;
+  const extraConfirmAt = opts.extraConfirmAt ?? LIST_AUTO_EXTRA_CONFIRM_AT;
+  const confirmFn = opts.confirmFn ?? ((msg) => window.confirm(msg));
+
+  if (total <= 0) return false;
+
+  if (total > hardMax) {
+    return confirmFn(
+      `La lista tiene ${total} valores (tope de seguridad ${hardMax}). ` +
+        `Solo se analizarán los primeros ${hardMax}. Tiempo estimado muy alto.\n\n¿Continuar?`,
+    );
+  }
+
+  if (total <= batchSize) return true;
+
+  const batches = listAutoBatchCount(total, batchSize);
+  const base =
+    `La lista tiene ${total} valores en ${batches} tandas de ~${batchSize}. ` +
+    `Tiempo estimado alto. Se analizarán todos (no se recorta a ${batchSize}).`;
+
+  if (total > extraConfirmAt) {
+    return confirmFn(
+      `${base}\n\nAdvertencia: más de ${extraConfirmAt} valores puede saturar el navegador.\n\n¿Continuar?`,
+    );
+  }
+
+  if (opts.skipConfirm) return true;
+
+  return confirmFn(`${base}\n\n¿Continuar?`);
 }
 
-/** Aviso UI cuando la cola se truncará. */
+/** Aviso UI cuando hará falta más de una tanda. */
 export function listAutoOverCapWarning(
   total: number,
-  max: number = LIST_AUTO_MAX_INSTRUMENTS,
+  batchSize: number = LIST_AUTO_BATCH_SIZE,
 ): string | null {
-  if (total <= max) return null;
-  return `La lista tiene ${total} valores · Play usará los primeros ${max} (confirmación al lanzar).`;
+  if (total <= batchSize) return null;
+  const batches = listAutoBatchCount(total, batchSize);
+  return (
+    `La lista tiene ${total} valores · Play en ${batches} tandas de ~${batchSize}` +
+    ` (confirmación al lanzar, salvo preferencia «No preguntar tandas»).`
+  );
 }
 
 /** True si el ticker ya tiene Finalistas (TOP con slots). */
 export function instrumentHasFinalistSlots(top: {
-  slots?: { rank?: number }[] | null;
+  slots?: unknown[] | null;
 } | null | undefined): boolean {
   return (top?.slots?.length ?? 0) > 0;
 }
@@ -107,7 +183,7 @@ export async function filterListAutoIdsWithoutFinalists(
   return results.filter((id): id is string => Boolean(id));
 }
 
-/** Crea campaña con cola ya acotada; `index` inicia en 0. */
+/** Crea campaña con cola acotada al tope duro; `index` inicia en 0. */
 export function createListAutoCampaign(opts: {
   listId: string;
   instrumentIds: string[];
@@ -116,7 +192,10 @@ export function createListAutoCampaign(opts: {
 }): ListAutoCampaign {
   return {
     listId: opts.listId,
-    instrumentIds: sliceListAutoInstrumentIds(opts.instrumentIds, opts.max),
+    instrumentIds: sliceListAutoInstrumentIds(
+      opts.instrumentIds,
+      opts.max ?? LIST_AUTO_HARD_MAX,
+    ),
     index: 0,
     aborted: false,
     paused: false,
@@ -199,13 +278,18 @@ export function formatListAutoStatusBarSummary(opts: {
     total: Math.max(1, opts.total),
     symbol: opts.symbol.trim() || '…',
   });
-  if (opts.paused) return `${base} · pausa`;
+  const tanda = listAutoBatchProgressLabel({
+    index: Math.max(0, opts.index),
+    total: Math.max(1, opts.total),
+  });
+  const withTanda = tanda ? `${base} · ${tanda}` : base;
+  if (opts.paused) return `${withTanda} · pausa`;
   const phase = shortenListAutoPhase(opts.detail);
   const listBit =
     opts.listName && opts.listName.trim() && opts.listName.trim() !== 'IBEX 35'
       ? ` · ${opts.listName.trim()}`
       : '';
-  return phase ? `${base} · ${phase}${listBit}` : `${base}${listBit}`;
+  return phase ? `${withTanda} · ${phase}${listBit}` : `${withTanda}${listBit}`;
 }
 
 /** Extrae fase corta del mensaje del rail (evita repetir «Lista AUTO…»). */
@@ -240,7 +324,7 @@ export function listAutoPlayTitle(opts: {
 }): string {
   if (!opts.fullCycleOnPlay) return 'Play: ejecutar siguiente paso';
   if (opts.listMode) {
-    return `Play: lista AUTO (ciclo completo × cada valor, máx. ${LIST_AUTO_MAX_INSTRUMENTS})`;
+    return `Play: lista AUTO (ciclo completo × cada valor · tandas de ${LIST_AUTO_BATCH_SIZE})`;
   }
   return 'Play: ciclo completo (Coach → Lab → Coach² → Finalistas)';
 }
@@ -253,7 +337,8 @@ export function listAutoUniverseHint(): string {
   return (
     'Play lanza el embudo completo por cada valor: todas las genéricas ∪ Finalistas de ese ticker. ' +
     'No hace falta seleccionar una estrategia. Clic en un miembro o fila del tablero → pestaña Valor. ' +
-    'Pausa / Stop gestionan la campaña; si los datos no cambiaron, se omite el valor (frescura).'
+    'Pausa / Stop gestionan la campaña; si los datos no cambiaron, se omite el valor (frescura). ' +
+    'Reanalizar (LAB) ≠ cambiar mandato en Trading (CORE-R propone; tú aceptas).'
   );
 }
 

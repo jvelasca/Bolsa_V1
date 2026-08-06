@@ -1,6 +1,6 @@
 /**
- * Hidrata membresía Estudio (visualization-store) desde lista API canónica.
- * Montar una vez en PlatformShell.
+ * Hidrata membresía Estudio (estudio-membership-store) desde lista API canónica.
+ * Montar una vez en PlatformShell. No toca Visualizados.
  */
 
 import { useEffect, useRef } from 'react';

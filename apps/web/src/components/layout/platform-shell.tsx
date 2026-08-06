@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 
 import { TradingLayout } from '@/components/layout/trading-layout';
@@ -32,6 +33,12 @@ import { WorkspaceUiBridgeRegister } from '@/features/workspace/workspace-ui-bri
 import { WorkspaceRemoteSync } from '@/features/workspace/workspace-remote-sync';
 import { VisualizationWorkspaceSync } from '@/features/workspace/visualization-workspace-sync';
 import { EstudioApiSync } from '@/features/trading/estudio-api-sync';
+import {
+  ESTUDIO_SUPERVISION_EVENT,
+  loadEstudioSupervisionPrefs,
+} from '@/features/trading/estudio-supervision';
+import { EstudioSupervisionHost } from '@/features/trading/estudio-supervision-host';
+import { wireEstudioProcessRunningEvents } from '@/stores/estudio-process-running-store';
 import { WorkspacePickerDialog } from '@/features/workspace/workspace-picker-dialog';
 
 import { PlatformConfigDialog } from '@/features/config/platform-config-dialog';
@@ -46,6 +53,22 @@ import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
 import { useUiStore } from '@/stores/ui-store';
 import { cn } from '@/lib/utils';
 
+function useEstudioSupervisionArmed(): boolean {
+  const [armed, setArmed] = useState(() => loadEstudioSupervisionPrefs().enabled);
+  useEffect(() => {
+    const sync = () => setArmed(loadEstudioSupervisionPrefs().enabled);
+    sync();
+    window.addEventListener(ESTUDIO_SUPERVISION_EVENT, sync);
+    return () => window.removeEventListener(ESTUDIO_SUPERVISION_EVENT, sync);
+  }, []);
+  return armed;
+}
+
+function EstudioProcessRunningWire() {
+  useEffect(() => wireEstudioProcessRunningEvents(), []);
+  return null;
+}
+
 export function PlatformShell() {
   const { pathname } = useLocation();
 
@@ -53,7 +76,9 @@ export function PlatformShell() {
   const fillHub = isFillHubRoute(pathname);
   const onBacktests = pathname.startsWith('/backtests');
   const listAutoActive = useListAutoActivityStore((s) => s.active);
-  const mountBacktests = onBacktests || listAutoActive;
+  const supervisionArmed = useEstudioSupervisionArmed();
+  // Supervisión ON mantiene Lab montado para ticks de frescura / rediscubrimiento.
+  const mountBacktests = onBacktests || listAutoActive || supervisionArmed;
 
   const indicatorsCatalogOpen = useUiStore((s) => s.indicatorsCatalogOpen);
   const closeIndicatorsCatalog = useUiStore((s) => s.closeIndicatorsCatalog);
@@ -68,6 +93,8 @@ export function PlatformShell() {
       <EstudioApiSync />
       <WorkspaceRemoteSync />
       <CoreRSchedulerHost />
+      <EstudioSupervisionHost />
+      <EstudioProcessRunningWire />
       <SupervisedF3QueueHost />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

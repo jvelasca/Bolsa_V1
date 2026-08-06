@@ -1,4 +1,13 @@
+/**
+ * Membresía lista↔instrumento para contexto de gráfico y foco de watchlist.
+ *
+ * Prioridad al elegir lista visible: **Cartera → Estudio → resto**.
+ *
+ * @see docs/engineering/visualizados-list-ux-2026-08-06.md
+ */
+
 import {
+  ESTUDIO_LIST_ID,
   isVirtualListId,
   VIRTUAL_LIST_PENDING_ORDERS,
   VIRTUAL_LIST_PORTFOLIO,
@@ -62,30 +71,46 @@ function collectCandidateListIds(
   return candidates;
 }
 
-export function resolveVirtualListForInstrument(
+/**
+ * Prioridad al mostrar un valor en varias listas:
+ * 1) Cartera · 2) Estudio · 3) resto (candidatos, Visualizados, personal, índice…).
+ */
+export function resolvePreferredListIdForInstrument(
   instrumentId: string,
   membership: ChartListMembershipSnapshot,
+  preferredCandidates: ReadonlyArray<string> = [],
 ): string | null {
-  if (membership.virtual.visualization.has(instrumentId)) {
-    return VIRTUAL_LIST_VISUALIZATION;
-  }
+  if (!instrumentId) return null;
+
   if (membership.virtual.portfolio.has(instrumentId)) {
     return VIRTUAL_LIST_PORTFOLIO;
+  }
+  if (membership.api[ESTUDIO_LIST_ID]?.has(instrumentId)) {
+    return ESTUDIO_LIST_ID;
+  }
+
+  for (const listId of preferredCandidates) {
+    if (
+      listId === VIRTUAL_LIST_PORTFOLIO ||
+      listId === ESTUDIO_LIST_ID ||
+      listId === VIRTUAL_LIST_VISUALIZATION ||
+      listId === VIRTUAL_LIST_PENDING_ORDERS
+    ) {
+      continue;
+    }
+    if (isInstrumentInList(listId, instrumentId, membership)) return listId;
+  }
+
+  if (membership.virtual.visualization.has(instrumentId)) {
+    return VIRTUAL_LIST_VISUALIZATION;
   }
   if (membership.virtual.pendingOrders.has(instrumentId)) {
     return VIRTUAL_LIST_PENDING_ORDERS;
   }
-  return null;
-}
 
-export function findBestListForInstrument(
-  instrumentId: string,
-  membership: ChartListMembershipSnapshot,
-): string | null {
-  const virtual = resolveVirtualListForInstrument(instrumentId, membership);
-  if (virtual) return virtual;
-
-  const containing = membership.listMeta.filter((list) => membership.api[list.id]?.has(instrumentId));
+  const containing = membership.listMeta.filter((list) =>
+    membership.api[list.id]?.has(instrumentId),
+  );
   const custom = containing.find((list) => list.source === 'custom');
   if (custom) return custom.id;
   const catalog = containing.find((list) => list.source === 'catalog');
@@ -93,10 +118,24 @@ export function findBestListForInstrument(
   return containing[0]?.id ?? null;
 }
 
+/** @deprecated Prefer {@link resolvePreferredListIdForInstrument}. */
+export function resolveVirtualListForInstrument(
+  instrumentId: string,
+  membership: ChartListMembershipSnapshot,
+): string | null {
+  return resolvePreferredListIdForInstrument(instrumentId, membership);
+}
+
+export function findBestListForInstrument(
+  instrumentId: string,
+  membership: ChartListMembershipSnapshot,
+): string | null {
+  return resolvePreferredListIdForInstrument(instrumentId, membership);
+}
+
 /**
- * Resuelve la lista “fuente” de una pestaña al enfocarla.
- * Preferencia: **Estudio** si el valor es miembro (universo operativo),
- * para no saltar a catálogo (p. ej. IBEX) al cambiar de gráfico.
+ * Resuelve la lista “fuente” de una pestaña al enfocarla / buscarla.
+ * Prioridad: Cartera → Estudio → resto.
  */
 export function resolveValidSourceListIdForTab(
   workspace: WorkspaceDocument,
@@ -104,15 +143,11 @@ export function resolveValidSourceListIdForTab(
   membership: ChartListMembershipSnapshot,
 ): string | null {
   if (!tab.instrumentId) return null;
-
-  if (membership.virtual.visualization.has(tab.instrumentId)) {
-    return VIRTUAL_LIST_VISUALIZATION;
-  }
-
-  for (const listId of collectCandidateListIds(workspace, tab)) {
-    if (isInstrumentInList(listId, tab.instrumentId, membership)) return listId;
-  }
-  return resolveVirtualListForInstrument(tab.instrumentId, membership);
+  return resolvePreferredListIdForInstrument(
+    tab.instrumentId,
+    membership,
+    collectCandidateListIds(workspace, tab),
+  );
 }
 
 export function resolveChartListContext(

@@ -115,19 +115,26 @@ export function ListHubPanel() {
   const positions = portfolioQuery.data?.data.positions ?? [];
   const pendingBuyCount = pendingOrders.filter((order) => order.side === 'buy').length;
   const visualizationEntries = useVisualizationStore((state) => state.entries);
+  const charts = useWorkspaceStore((state) => state.workspace.charts);
+  const openChartVisualizationCount = useMemo(() => {
+    const seen = new Set<string>();
+    for (const tab of charts) {
+      if (tab.instrumentId) seen.add(tab.instrumentId);
+    }
+    return seen.size;
+  }, [charts]);
 
   const virtualLists = useMemo(
     () =>
       buildVirtualListSummaries(
         positions.length,
         pendingBuyCount,
-        visualizationEntries.length,
+        openChartVisualizationCount,
       ),
-    [positions.length, pendingBuyCount, visualizationEntries.length],
+    [positions.length, pendingBuyCount, openChartVisualizationCount],
   );
 
   const activeListId = resolveSelectedListId(listConfig.apiListId, apiLists);
-  const charts = useWorkspaceStore((state) => state.workspace.charts);
   const activeChartId = useWorkspaceStore((state) => state.workspace.activeChartId);
   const chartListMembership = useWorkspaceStore((state) => state.chartListMembership);
   const activeChartTab = charts.find((tab) => tab.id === activeChartId);
@@ -171,12 +178,30 @@ export function ListHubPanel() {
     }
 
     if (list.id === VIRTUAL_LIST_VISUALIZATION) {
-      if (visualizationEntries.length === 0) {
-        window.alert('No hay valores en Estudio.');
+      const openTabs = charts.filter((tab) => Boolean(tab.instrumentId));
+      const seen = new Set<string>();
+      const openEntries = openTabs.flatMap((tab) => {
+        const id = tab.instrumentId as string;
+        if (seen.has(id)) return [];
+        seen.add(id);
+        const fromStore = visualizationEntries.find((e) => e.instrumentId === id);
+        return [
+          fromStore ?? {
+            instrumentId: id,
+            symbol: tab.label,
+            name: tab.label,
+            firstViewedAt: new Date(0).toISOString(),
+            lastViewedAt: new Date(0).toISOString(),
+            viewCount: 1,
+          },
+        ];
+      });
+      if (openEntries.length === 0) {
+        window.alert('No hay valores en Visualizados (ninguna pestaña abierta).');
         return;
       }
       exportInstrumentsCsv(
-        visualizationEntries.map((entry) => visualizationEntryToListItem(entry, catalog)),
+        openEntries.map((entry) => visualizationEntryToListItem(entry, catalog)),
         columns,
         list.name,
       );

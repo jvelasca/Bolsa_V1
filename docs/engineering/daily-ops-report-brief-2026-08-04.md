@@ -28,6 +28,8 @@ Informe del **día operativo** para gestionar SEMI: estado de cuenta, ops hechas
 ## R4 — PDF
 
 - Generador stdlib Helvetica (`daily_ops_digest_pdf.py`) — sin reportlab.
+- Presentación: cabecera, resumen ejecutivo, KPIs, **tabla de operativa del día**,
+  barras de actividad semanal, sparkline de balance, canales Estudio.
 - Adjunto si `attachPdf` / `dailyDigestPdfEnabled` / `DAILY_OPS_DIGEST_PDF_ENABLED`.
 - Descarga: `GET /api/accounts/{id}/daily-ops-report.pdf?asOf=&instrumentIds=`.
 - Respuesta email incluye `pdfAttached`.
@@ -51,4 +53,4 @@ Tras `eod-batch` · o botones **Enviar ahora** / **Descargar PDF** en Diario.
 
 ## Fuera de alcance
 
-PDF tipográfico (brand fonts) · multiusuario buzón servidor · AUTO execute.
+Brand fonts externas · multiusuario buzón servidor · AUTO execute.

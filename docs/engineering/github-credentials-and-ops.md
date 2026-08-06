@@ -204,4 +204,5 @@ Plantilla pública: [`.env.example`](../../.env.example).
 
 ---
 
-*Última actualización: 2026-08-04 · Flags Camino D / Risk / Estudio documentados.*
+*Última actualización: 2026-08-06 · Flags Camino D / Risk / Estudio documentados.*  
+*UI supervisión Estudio (no flags): [ADR-024](../adr/024-estudio-supervision-universe.md) · [handoff procesos](./session-handoff-2026-08-06-estudio-process-ui.md) · repo [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1).*

@@ -13,7 +13,7 @@
       "internalConsoleOptions": "neverOpen",
       "autoAttachChildProcesses": false,
       "serverReadyAction": {
-        "pattern": "Web lista -> (https?://\\S+)|Local:\\s+(https?://\\S+)",
+        "pattern": "Web lista -> (https?://\\S+)",
         "uriFormat": "%s",
         "action": "openExternally"
       }

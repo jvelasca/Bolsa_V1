@@ -268,12 +268,11 @@ function mergeListConfig(
           : patch.carouselHiddenListIds ?? base.carouselHiddenListIds,
     carouselInitialized: preferredCarouselReady || fallbackCarouselReady,
     rowActionsWidth: patch.rowActionsWidth ?? base.rowActionsWidth,
+    // Visualizados = pestañas abiertas; permitir [] para podar dump legacy (Estudio 100+).
     visualizationEntries:
-      (patch.visualizationEntries?.length ?? 0) > 0
+      patch.visualizationEntries !== undefined
         ? patch.visualizationEntries
-        : (base.visualizationEntries?.length ?? 0) > 0
-          ? base.visualizationEntries
-          : patch.visualizationEntries ?? base.visualizationEntries,
+        : (base.visualizationEntries ?? []),
     columnLayout:
       patch.columnLayout?.length && !listConfigHasColumnLayouts(patch as ListPanelConfig)
         ? patch.columnLayout
@@ -403,11 +402,19 @@ export function mergeWorkspaceChartState(
     byInstrument.set(tab.instrumentId, mergeChartTabState(tab, other));
   }
 
-  // La lista de pestañas abiertas la marca el documento más reciente (no reabrir cerradas).
-  const charts = newerDoc.charts.map((tab) => {
+  // Pestañas del doc más reciente + las del más antiguo que falten (evita que un
+  // pull/PUT remoto con menos tabs borre las abiertas en este dispositivo).
+  const chartsFromNewer = newerDoc.charts.map((tab) => {
     const merged = byInstrument.get(tab.instrumentId);
     return merged ?? tab;
   });
+  const newerInstrumentIds = new Set(
+    chartsFromNewer.map((tab) => tab.instrumentId).filter(Boolean),
+  );
+  const extrasFromOlder = olderDoc.charts.filter(
+    (tab) => tab.instrumentId && !newerInstrumentIds.has(tab.instrumentId),
+  );
+  const charts = [...chartsFromNewer, ...extrasFromOlder];
 
   const activeChartId = charts.some((tab) => tab.id === newerDoc.activeChartId)
     ? newerDoc.activeChartId

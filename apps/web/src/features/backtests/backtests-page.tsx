@@ -429,6 +429,15 @@ export function BacktestsPage() {
   const listAutoRef = useRef<ListAutoCampaign | null>(null);
   /** ADR-024: Supervisión ON pide arrancar Lista AUTO sobre Estudio. */
   const supervisionStartPendingRef = useRef<string | null>(null);
+  /**
+   * ADR-024 capas: overrides del próximo Play (frescura / rediscubrimiento).
+   * Se consumen una vez en `playAssistantSequence`.
+   */
+  const listAutoStartOverridesRef = useRef<{
+    forceRescan?: boolean;
+    skipConfirm?: boolean;
+    instrumentIds?: string[] | null;
+  } | null>(null);
   /** ADR-024: ids quitados de Estudio — saltar en campaña en curso. */
   const listAutoExcludedIdsRef = useRef<Set<string>>(new Set());
   const listAutoPendingStartRef = useRef<number | null>(null);
@@ -2202,12 +2211,20 @@ export function BacktestsPage() {
         setAssistantStatus('Lista AUTO ya en curso. Usa ↻ para cancelar.');
         return;
       }
-      const instrumentIds = listDetail!.instrumentIds;
+      const overrides = listAutoStartOverridesRef.current;
+      listAutoStartOverridesRef.current = null;
 
-      let queueIds = instrumentIds;
-      if (listAutoSkipWithFinalists) {
+      const instrumentIds = listDetail!.instrumentIds;
+      const overrideIds = overrides?.instrumentIds?.filter(Boolean) ?? null;
+
+      let queueIds = overrideIds?.length ? overrideIds : instrumentIds;
+      // Excluir valores quitados de Estudio durante supervisión.
+      if (listAutoExcludedIdsRef.current.size > 0) {
+        queueIds = queueIds.filter((id) => !listAutoExcludedIdsRef.current.has(id));
+      }
+      if (listAutoSkipWithFinalists && !overrideIds?.length) {
         setAssistantStatus('Lista AUTO: filtrando valores sin Finalistas…');
-        queueIds = await filterListAutoIdsWithoutFinalists(instrumentIds, (id) =>
+        queueIds = await filterListAutoIdsWithoutFinalists(queueIds, (id) =>
           api.getInstrumentStrategyTop(id, runTimeframe),
         );
         if (queueIds.length === 0) {
@@ -2217,7 +2234,8 @@ export function BacktestsPage() {
       }
       if (
         !confirmListAutoOverCap(queueIds.length, {
-          skipConfirm: assistantPrefs.listAutoSkipOverCapConfirm,
+          skipConfirm:
+            overrides?.skipConfirm === true || assistantPrefs.listAutoSkipOverCapConfirm,
         })
       ) {
         setAssistantStatus('Lista AUTO cancelada (confirmación tandas).');
@@ -2226,6 +2244,7 @@ export function BacktestsPage() {
       const campaign = createListAutoCampaign({
         listId,
         instrumentIds: queueIds,
+        forceRescan: Boolean(overrides?.forceRescan),
       });
       if (campaign.instrumentIds.length === 0) {
         setAssistantStatus('La lista no tiene valores.');
@@ -2326,26 +2345,41 @@ export function BacktestsPage() {
     setListAutoBoard((prev) => (prev ? enrichListAutoBoardLabels(prev, instrumentLabels) : prev));
   }, [instrumentLabels]);
 
-  // ADR-024: Supervisión ON/OFF desde Operativa → Lista AUTO + exclusiones.
+  // ADR-024: Supervisión ON/OFF + ticks capas media/lenta → Lista AUTO + exclusiones.
   useEffect(() => {
+    const armListAutoForList = (listIdTarget: string, status: string) => {
+      supervisionStartPendingRef.current = listIdTarget;
+      setUniverseMode('list');
+      setListId(listIdTarget);
+      setAssistantPrefs((prev) => {
+        if (prev.fullCycleOnPlay) return prev;
+        const next = { ...prev, fullCycleOnPlay: true };
+        saveAssistantPrefs(next);
+        return next;
+      });
+      setAssistantStatus(status);
+      setResultFocus('list_auto');
+      // Fuerza el efecto de arranque aunque ya estemos en la misma lista.
+      setListAutoStartToken((n) => n + 1);
+    };
+
     const onSupervision = (ev: Event) => {
       const detail = (ev as CustomEvent<{ enabled: boolean; listId: string }>).detail;
       if (!detail) return;
       if (detail.enabled) {
         listAutoExcludedIdsRef.current.clear();
-        supervisionStartPendingRef.current = detail.listId;
-        setUniverseMode('list');
-        setListId(detail.listId);
-        setAssistantPrefs((prev) => {
-          if (prev.fullCycleOnPlay) return prev;
-          const next = { ...prev, fullCycleOnPlay: true };
-          saveAssistantPrefs(next);
-          return next;
-        });
-        setAssistantStatus(`Supervisión ON · preparando Lista AUTO («${detail.listId}»)…`);
-        setResultFocus('list_auto');
+        listAutoStartOverridesRef.current = {
+          forceRescan: false,
+          skipConfirm: true,
+          instrumentIds: null,
+        };
+        armListAutoForList(
+          detail.listId,
+          `Supervisión ON · frescura inicial («${detail.listId}»)…`,
+        );
       } else {
         supervisionStartPendingRef.current = null;
+        listAutoStartOverridesRef.current = null;
         const campaign = listAutoRef.current;
         if (campaign && !campaign.aborted && !campaign.paused) {
           pauseListAutoCampaign(campaign);
@@ -2354,6 +2388,36 @@ export function BacktestsPage() {
         }
       }
     };
+
+    const onLaneTick = (ev: Event) => {
+      const detail = (
+        ev as CustomEvent<{
+          listId: string;
+          lane: 'freshness' | 'rediscover';
+          forceRescan: boolean;
+          skipConfirm: boolean;
+          instrumentIds: string[] | null;
+        }>
+      ).detail;
+      if (!detail?.listId) return;
+      if (listAutoRef.current && !listAutoRef.current.aborted) {
+        setAssistantStatus(
+          `Supervisión · tick ${detail.lane} diferido (campaña en curso).`,
+        );
+        return;
+      }
+      listAutoStartOverridesRef.current = {
+        forceRescan: detail.forceRescan,
+        skipConfirm: detail.skipConfirm,
+        instrumentIds: detail.instrumentIds,
+      };
+      const label =
+        detail.lane === 'rediscover'
+          ? `Supervisión · rediscubrimiento (${detail.instrumentIds?.length ?? 0} valores)…`
+          : `Supervisión · frescura Lab («${detail.listId}»)…`;
+      armListAutoForList(detail.listId, label);
+    };
+
     const onUnsubscribe = (ev: Event) => {
       const ids = (ev as CustomEvent<{ instrumentIds: string[] }>).detail?.instrumentIds ?? [];
       for (const id of ids) listAutoExcludedIdsRef.current.add(id);
@@ -2361,14 +2425,15 @@ export function BacktestsPage() {
       if (!campaign || campaign.aborted) return;
       const cur = campaign.instrumentIds[campaign.index];
       if (cur && ids.includes(cur) && !campaign.paused) {
-        // El valor en curso sale de Estudio: avanzar al siguiente al settle; forzar skip ya.
         setAssistantStatus('Estudio: valor quitado · se omite en la campaña.');
       }
     };
     window.addEventListener('bolsa-estudio-supervision-changed', onSupervision);
+    window.addEventListener('bolsa-estudio-lane-tick', onLaneTick);
     window.addEventListener('bolsa-estudio-unsubscribe', onUnsubscribe);
     return () => {
       window.removeEventListener('bolsa-estudio-supervision-changed', onSupervision);
+      window.removeEventListener('bolsa-estudio-lane-tick', onLaneTick);
       window.removeEventListener('bolsa-estudio-unsubscribe', onUnsubscribe);
     };
   }, []);
@@ -2385,8 +2450,14 @@ export function BacktestsPage() {
     supervisionStartPendingRef.current = null;
     void playAssistantSequence();
     // playAssistantSequence cierra sobre estado actual; deps acotadas a list ready.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- arranque puntual Supervisión
-  }, [universeMode, listId, listDetail?.id, listDetail?.instrumentIds?.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- arranque puntual Supervisión / lane ticks
+  }, [
+    universeMode,
+    listId,
+    listDetail?.id,
+    listDetail?.instrumentIds?.length,
+    listAutoStartToken,
+  ]);
 
   /** Prepara un ticker de la campaña y encola el arranque del ciclo (tras setState). */
   function queueListAutoTicker(index: number) {
@@ -2422,6 +2493,12 @@ export function BacktestsPage() {
     const id = campaign.instrumentIds[index]!;
     campaign.index = index;
     const symbol = symbolForInstrument(id);
+    void import('@/features/trading/estudio-process-status').then((m) => {
+      m.emitEstudioProcessRunning({
+        instrumentId: id,
+        lane: m.laneFromListAutoMode(campaign.forceRescan),
+      });
+    });
     setListAutoUi({ index, total: campaign.instrumentIds.length, symbol });
     setListAutoBoard((b) => (b ? markListAutoBoardRunning(b, index) : b));
     setAssistantProgress(emptyAssistantProgress());
@@ -2462,6 +2539,22 @@ export function BacktestsPage() {
 
   /** Fin de un ciclo (1 valor): avanza lista AUTO o cierra. */
   function settleFullCycle(reason: FullCycleSettleReason, statusMessage?: string) {
+    const settledCampaign = listAutoRef.current;
+    const settledId =
+      settledCampaign && !settledCampaign.aborted
+        ? settledCampaign.instrumentIds[settledCampaign.index]
+        : null;
+    if (settledId) {
+      void import('@/features/trading/estudio-lane-stamps').then((m) => {
+        m.touchEstudioLaneStamp(
+          settledId,
+          settledCampaign?.forceRescan ? 'rediscover' : 'freshness',
+        );
+      });
+    }
+    void import('@/features/trading/estudio-process-status').then((m) => {
+      m.emitEstudioProcessRunning({ instrumentId: null, lane: null });
+    });
     if (statusMessage) setAssistantStatus(statusMessage);
     setAwaitingAck(false);
     setAwaitingAckStage(null);

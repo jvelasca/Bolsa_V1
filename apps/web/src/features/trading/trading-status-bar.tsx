@@ -1,11 +1,16 @@
 /**
- * Barra de estado Trading: cuenta Activa + métricas (izq.) · rail fijo Colas/Alarmas (der.).
+ * Barra de estado Trading: cuenta Activa + operativa + métricas (izq.) · Colas/Alarmas (der.).
  *
- * Derecha no redimensiona: slots Velas · CORE-R · F3 · Lista AUTO + badge alarmas 2 dígitos.
+ * Badge `OPERATIVA: Manual|Semi|Auto` = modo de la cuenta entera (no por valor).
+ * Clic en nombre o badge → `/accounts?selected=…&tab=config&focus=operativa`.
+ *
+ * @see docs/engineering/estudio-process-status-ui-2026-08-06.md §6
+ * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
  */
 
 import { Settings2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { resolveApiBaseUrl } from '@/lib/api-base-url';
@@ -20,6 +25,14 @@ import {
 } from '@/features/accounts/use-active-account';
 import { TradingAppThreads } from '@/features/trading/trading-app-threads';
 import { TradingAlarmInboxButton } from '@/features/trading/trading-alarm-inbox-button';
+import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
+import type { DemoBookMode } from '@/features/trading/demo-book-prefs';
+
+const OPERATIVA_MODE_LABEL: Record<DemoBookMode, string> = {
+  manual: 'Manual',
+  semi: 'Semi',
+  auto: 'Auto',
+};
 
 type StatusItemId = 'equity' | 'cash' | 'marketValue' | 'pnl' | 'positions';
 
@@ -71,7 +84,11 @@ export function TradingStatusBar() {
   const [configOpen, setConfigOpen] = useState(false);
   const [visibleItems, setVisibleItems] = useState<StatusItemId[]>(DEFAULT_ITEMS);
   const { account, effectiveAccountId } = useActiveAccount();
+  const bookPrefs = useDemoBookPrefs();
   const endpointLabel = useMemo(() => connectionLabel(), []);
+  const accountsHref = account
+    ? `/accounts?selected=${encodeURIComponent(account.id)}&tab=config&focus=operativa`
+    : '/accounts';
 
   const healthQuery = useQuery({
     queryKey: ['health'],
@@ -122,15 +139,32 @@ export function TradingStatusBar() {
             <span className="shrink-0 uppercase tracking-wide text-muted-foreground/70">Activa</span>
             {account ? (
               <>
-                <span
-                  className="max-w-[10rem] truncate font-medium text-foreground sm:max-w-[14rem]"
-                  title={`${account.name} · ${accountTypeShortLabel(account.type)} · ${account.currency}`}
+                <Link
+                  to={accountsHref}
+                  className="max-w-[10rem] truncate font-medium text-foreground hover:underline sm:max-w-[14rem]"
+                  title={`${account.name} · ${accountTypeShortLabel(account.type)} · ${account.currency}\nClic → Cuentas`}
                 >
                   {account.name}
-                </span>
+                </Link>
                 <span className="shrink-0 rounded border border-border/80 px-1 text-[9px] uppercase tracking-wide text-muted-foreground">
                   {accountTypeShortLabel(account.type)}
                 </span>
+                <Link
+                  to={accountsHref}
+                  className={cn(
+                    'shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold tracking-wide hover:bg-accent',
+                    bookPrefs.mode === 'auto'
+                      ? 'border-amber-500/60 bg-amber-500/10 text-amber-800 dark:text-amber-200'
+                      : bookPrefs.mode === 'semi'
+                        ? 'border-sky-500/60 bg-sky-500/10 text-sky-800 dark:text-sky-200'
+                        : 'border-border bg-muted/40 text-foreground',
+                  )}
+                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nAfecta a todos los valores. Clic → cambiar en Cuentas`}
+                  data-testid="status-bar-operativa-mode"
+                >
+                  <span className="text-muted-foreground">OPERATIVA:</span>{' '}
+                  <span className="text-foreground">{OPERATIVA_MODE_LABEL[bookPrefs.mode]}</span>
+                </Link>
                 <span className="hidden shrink-0 text-muted-foreground/60 sm:inline">
                   {account.currency}
                 </span>

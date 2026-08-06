@@ -12,6 +12,7 @@ describe('assistant prefs', () => {
     expect(d.lab.autoAdvanceWhenActiveTop).toBe(true);
     expect(d.coach.futureWeight).toBe(0.42);
     expect(d.fullCycleOnPlay).toBe(true);
+    expect(d.listAutoSkipOverCapConfirm).toBe(false);
     expect(d.universe.includeFinalistsInBattery).toBe(true);
     expect(d.coach.labEvenIfWeak).toBe(false);
     expect(d.coach.llmNarrate).toBe(true);
@@ -34,6 +35,7 @@ describe('assistant prefs', () => {
         saveSemifinalSkipLab: true,
       },
       fullCycleOnPlay: false,
+      listAutoSkipOverCapConfirm: true,
     });
     expect(n.universe.runCoachOnEnter).toBe(false);
     expect(n.universe.selectAllGenerics).toBe(true);
@@ -50,6 +52,7 @@ describe('assistant prefs', () => {
     expect(n.coach.requireAckBeforeLab).toBe(false);
     expect(n.coach.saveSemifinalSkipLab).toBe(true);
     expect(n.fullCycleOnPlay).toBe(false);
+    expect(n.listAutoSkipOverCapConfirm).toBe(true);
   });
 
   it('migrates legacy includeMineStrategies true → both Optimized and Mine', () => {
