@@ -43,27 +43,27 @@ Documentación completa del cutover: [`docs/CUTOVER_PYTHON.md`](./docs/CUTOVER_P
 
 ## Scripts
 
-| Comando | Descripción |
-|---------|-------------|
-| `pnpm dev` | API Python + Web (recomendado) |
-| `pnpm dev:web` | Solo frontend |
-| `pnpm dev:log` | Igual que dev con logs en `logs/dev/` |
-| `pnpm test` | Tests unitarios frontend |
-| `pnpm test:py` | Tests Python (API, analytics, market) |
-| `pnpm test:py:install` | Instalar paquetes Python editables |
-| `pnpm test:operativa` | **DÍA D + CORE-R** (web + py + smoke API opcional) |
-| `pnpm test:operativa:smoke` | Smoke API live (FA asOf, Evidence, CORE-R) |
-| `pnpm test:semi` | **SEMI DEMO** libro + F3 + geo + cola BD (web + py + smoke) |
-| `pnpm test:semi:smoke` | Smoke API live cola F3 + propose country |
-| `pnpm test:fa` | Batería FA / FIE |
-| `pnpm test:coach` | Embudo / Lista AUTO / CORE-P (+ smoke API opcional) |
-| `pnpm test:coach:smoke` | Smoke API CORE-P multi-perfil (SKIP si API down) |
-| `pnpm test:coach:api` | ASGI multi-perfil (DB) + smoke live |
-| `pnpm health` | Health check API (:8000) + Web |
-| `pnpm db:ensure` | Docker + PostgreSQL + seed IBEX |
-| `pnpm setup` | Setup completo del proyecto |
-| `pnpm build` | Build monorepo |
-| `node scripts/dev-api-python.mjs` | Solo API Python |
+| Comando                           | Descripción                                                 |
+| --------------------------------- | ----------------------------------------------------------- |
+| `pnpm dev`                        | API Python + Web (recomendado)                              |
+| `pnpm dev:web`                    | Solo frontend                                               |
+| `pnpm dev:log`                    | Igual que dev con logs en `logs/dev/`                       |
+| `pnpm test`                       | Tests unitarios frontend                                    |
+| `pnpm test:py`                    | Tests Python (API, analytics, market)                       |
+| `pnpm test:py:install`            | Instalar paquetes Python editables                          |
+| `pnpm test:operativa`             | **DÍA D + CORE-R** (web + py + smoke API opcional)          |
+| `pnpm test:operativa:smoke`       | Smoke API live (FA asOf, Evidence, CORE-R)                  |
+| `pnpm test:semi`                  | **SEMI DEMO** libro + F3 + geo + cola BD (web + py + smoke) |
+| `pnpm test:semi:smoke`            | Smoke API live cola F3 + propose country                    |
+| `pnpm test:fa`                    | Batería FA / FIE                                            |
+| `pnpm test:coach`                 | Embudo / Lista AUTO / CORE-P (+ smoke API opcional)         |
+| `pnpm test:coach:smoke`           | Smoke API CORE-P multi-perfil (SKIP si API down)            |
+| `pnpm test:coach:api`             | ASGI multi-perfil (DB) + smoke live                         |
+| `pnpm health`                     | Health check API (:8000) + Web                              |
+| `pnpm db:ensure`                  | Docker + PostgreSQL + seed IBEX                             |
+| `pnpm setup`                      | Setup completo del proyecto                                 |
+| `pnpm build`                      | Build monorepo                                              |
+| `node scripts/dev-api-python.mjs` | Solo API Python                                             |
 
 ## Auth (opcional)
 
@@ -71,10 +71,10 @@ En `.env` raíz:
 
 ```env
 # APP_PASSWORD=mi-clave   # descomenta para exigir login
-APP_AUTH_SECRET=bolsa-dev-secret
+# APP_AUTH_SECRET=<token aleatorio>  # obligatorio (y nunca 'bolsa-dev-secret') si APP_PASSWORD está definido
 ```
 
-Sin `APP_PASSWORD` la app entra directamente (modo desarrollo).
+Sin `APP_PASSWORD` la app entra directamente (modo desarrollo), y `APP_AUTH_SECRET` puede quedar vacío. Si activas `APP_PASSWORD`, define `APP_AUTH_SECRET` con un valor aleatorio (p. ej. `python -c "import secrets; print(secrets.token_urlsafe(48))"`); el arranque falla si lo dejas vacío o igual a `bolsa-dev-secret`.
 
 ## Docker (PostgreSQL)
 
@@ -105,21 +105,21 @@ docs/             → arquitectura, cutover, ADRs, engineering
 
 ## Documentación
 
-| Documento | Contenido |
-|-----------|-----------|
-| [`docs/HELP.md`](./docs/HELP.md) | Mapa Ayuda ↔ trackers (`HELP_CONTENT_AS_OF`) |
-| [`docs/engineering/session-handoff-2026-08-01.md`](./docs/engineering/session-handoff-2026-08-01.md) | **Handoff** cierre racha · smoke UI humano |
-| [`docs/engineering/session-handoff-2026-07-31.md`](./docs/engineering/session-handoff-2026-07-31.md) | Handoff cierre DÍA D + CORE-R |
-| [`docs/engineering/operativa-test-plan-2026-07-31.md`](./docs/engineering/operativa-test-plan-2026-07-31.md) | Plan smoke UI DÍA D + CORE-R |
-| [`docs/engineering/backtesting-dia-d-premises-2026-07-31.md`](./docs/engineering/backtesting-dia-d-premises-2026-07-31.md) | Premisas DÍA D |
-| [`docs/engineering/research-lifecycle.md`](./docs/engineering/research-lifecycle.md) | Flujo BT → Finalistas → Monitor |
-| [`docs/ONBOARDING.md`](./docs/ONBOARDING.md) | Guía para nuevos desarrolladores |
-| [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md) | Endpoints HTTP |
-| [`docs/UI_PLATFORM.md`](./docs/UI_PLATFORM.md) | Shell ProRealTime |
-| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) | Capas y diagrama |
-| [`docs/adr/008-investment-accounts-and-ledger.md`](./docs/adr/008-investment-accounts-and-ledger.md) | Cuentas + ledger |
-| [`docs/LEGACY.md`](./docs/LEGACY.md) | Stack TS archivado (git history) |
-| [`docs/README.md`](./docs/README.md) | Índice completo |
+| Documento                                                                                                                  | Contenido                                    |
+| -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| [`docs/HELP.md`](./docs/HELP.md)                                                                                           | Mapa Ayuda ↔ trackers (`HELP_CONTENT_AS_OF`) |
+| [`docs/engineering/session-handoff-2026-08-01.md`](./docs/engineering/session-handoff-2026-08-01.md)                       | **Handoff** cierre racha · smoke UI humano   |
+| [`docs/engineering/session-handoff-2026-07-31.md`](./docs/engineering/session-handoff-2026-07-31.md)                       | Handoff cierre DÍA D + CORE-R                |
+| [`docs/engineering/operativa-test-plan-2026-07-31.md`](./docs/engineering/operativa-test-plan-2026-07-31.md)               | Plan smoke UI DÍA D + CORE-R                 |
+| [`docs/engineering/backtesting-dia-d-premises-2026-07-31.md`](./docs/engineering/backtesting-dia-d-premises-2026-07-31.md) | Premisas DÍA D                               |
+| [`docs/engineering/research-lifecycle.md`](./docs/engineering/research-lifecycle.md)                                       | Flujo BT → Finalistas → Monitor              |
+| [`docs/ONBOARDING.md`](./docs/ONBOARDING.md)                                                                               | Guía para nuevos desarrolladores             |
+| [`docs/API_REFERENCE.md`](./docs/API_REFERENCE.md)                                                                         | Endpoints HTTP                               |
+| [`docs/UI_PLATFORM.md`](./docs/UI_PLATFORM.md)                                                                             | Shell ProRealTime                            |
+| [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)                                                                           | Capas y diagrama                             |
+| [`docs/adr/008-investment-accounts-and-ledger.md`](./docs/adr/008-investment-accounts-and-ledger.md)                       | Cuentas + ledger                             |
+| [`docs/LEGACY.md`](./docs/LEGACY.md)                                                                                       | Stack TS archivado (git history)             |
+| [`docs/README.md`](./docs/README.md)                                                                                       | Índice completo                              |
 
 ## Rutas frontend
 
@@ -127,10 +127,10 @@ docs/             → arquitectura, cutover, ADRs, engineering
 
 ## Roadmap
 
-- **Cuentas + ledger + comisiones + fiscal** ✓  
-- **Backtesting embudo + Lista AUTO + Finalistas A/C** ✓  
-- **DÍA D v0.11 + CORE-R v1.8** ✓ 2026-07-31 / 2026-08-01  
-- **FA / FIE** ✓ código (Composite **v1.1** · CAPM Tarjeta v0 · cobertura Yahoo); **smoke UI / checklist APP** pendiente  
-- **CORE-B Lab** ✓ v0.2 (meseta + familia por horizonte)  
-- **Congelado:** auto-paper D execute · Lab UI P3–P9 / Belief · CORE-R multi-dispositivo  
-- **Deuda:** Alembic baseline, transferencias, dividendos, OpenAPI client  
+- **Cuentas + ledger + comisiones + fiscal** ✓
+- **Backtesting embudo + Lista AUTO + Finalistas A/C** ✓
+- **DÍA D v0.11 + CORE-R v1.8** ✓ 2026-07-31 / 2026-08-01
+- **FA / FIE** ✓ código (Composite **v1.1** · CAPM Tarjeta v0 · cobertura Yahoo); **smoke UI / checklist APP** pendiente
+- **CORE-B Lab** ✓ v0.2 (meseta + familia por horizonte)
+- **Congelado:** auto-paper D execute · Lab UI P3–P9 / Belief · CORE-R multi-dispositivo
+- **Deuda:** Alembic baseline, transferencias, dividendos, OpenAPI client
