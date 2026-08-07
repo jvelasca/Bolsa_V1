@@ -25,6 +25,16 @@ function cellValue(item: InstrumentWithMetaDto, column: ListColumnId): string {
       return item.isin ?? '';
     case 'syncStatus':
       return item.meta.lastSync?.status ?? (item.meta.barCount > 0 ? 'success' : 'pending');
+    case 'processStatus':
+      return 'process';
+    case 'lastLabAt':
+    case 'lastCoreRAt':
+    case 'ioScore':
+    case 'taScore':
+    case 'faScore':
+    case 'dictamenStars':
+    case 'recStance':
+      return '';
     default:
       return '';
   }
@@ -85,6 +95,17 @@ export function getListCellDisplay(
             : 'pending';
       return { text: label, className: 'sr-only' };
     }
+    case 'processStatus':
+      return { text: 'procesos', className: 'sr-only' };
+    case 'lastLabAt':
+    case 'lastCoreRAt':
+      return { text: '—', className: 'text-[10px] tabular-nums text-muted-foreground' };
+    case 'ioScore':
+    case 'taScore':
+    case 'faScore':
+    case 'dictamenStars':
+    case 'recStance':
+      return { text: '—', className: 'text-[10px] tabular-nums text-muted-foreground' };
     default:
       return { text: '—' };
   }
@@ -104,6 +125,18 @@ function sortValue(item: InstrumentWithMetaDto, column: ListColumnId): string | 
       return (item.isin ?? '').toLowerCase();
     case 'syncStatus':
       return item.meta.lastSync?.status ?? '';
+    case 'processStatus':
+      return 0;
+    case 'lastLabAt':
+    case 'lastCoreRAt':
+      return '';
+    case 'ioScore':
+    case 'taScore':
+    case 'faScore':
+    case 'dictamenStars':
+      return -Infinity;
+    case 'recStance':
+      return '';
     default:
       return '';
   }

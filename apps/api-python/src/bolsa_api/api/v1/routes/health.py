@@ -1,10 +1,11 @@
-"""API: health check (DB + Yahoo circuit + Redis best-effort + XTB)."""
+"""API: health check (DB + Yahoo circuit + Redis best-effort + XTB + SMTP)."""
 
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
+from bolsa_infrastructure.alerts.estudio_opinion_email import smtp_ready
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.session import check_database
 
@@ -116,6 +117,107 @@ async def _redis_component() -> ComponentHealthDto:
         )
 
 
+def _auth_component() -> ComponentHealthDto:
+    """OR-S1: APP_PASSWORD requerido en demos compartidas / no-dev."""
+    settings = get_settings()
+    pwd = (settings.app_password or "").strip()
+    env = (settings.environment or "development").strip().lower()
+    if pwd:
+        return ComponentHealthDto(
+            status="ok",
+            message="APP_PASSWORD configured",
+            details={"environment": env},
+        )
+    if env in {"development", "dev", "test", "local"}:
+        return ComponentHealthDto(
+            status="configured",
+            message="APP_PASSWORD empty (OK local). OR-S1: set for shared demos.",
+            details={"environment": env},
+        )
+    return ComponentHealthDto(
+        status="degraded",
+        message="APP_PASSWORD empty outside development — set for shared demos (OR-S1)",
+        details={"environment": env},
+    )
+
+
+async def _worker_heartbeat_component() -> ComponentHealthDto:
+    """OR-Obs: último heartbeat Arq en Redis (TTL ~180s)."""
+    from bolsa_infrastructure.queue.worker_heartbeat import (
+        WORKER_ARQ_HEARTBEAT_KEY,
+        WORKER_HEARTBEAT_TTL_SEC,
+        read_arq_heartbeat,
+    )
+
+    settings = get_settings()
+    if not (settings.redis_url or "").strip():
+        return ComponentHealthDto(
+            status="disabled",
+            message="REDIS_URL not set — worker heartbeat unavailable",
+        )
+    ts = await read_arq_heartbeat()
+    if not ts:
+        return ComponentHealthDto(
+            status="degraded",
+            message="No Arq worker heartbeat (worker down or never started)",
+            details={"key": WORKER_ARQ_HEARTBEAT_KEY, "ttlSec": WORKER_HEARTBEAT_TTL_SEC},
+        )
+    return ComponentHealthDto(
+        status="ok",
+        message=f"Arq worker heartbeat at {ts}",
+        details={"key": WORKER_ARQ_HEARTBEAT_KEY, "at": ts, "ttlSec": WORKER_HEARTBEAT_TTL_SEC},
+    )
+
+
+async def _risk_component() -> ComponentHealthDto:
+    """A3: estado kill switch + PAPER_D_EXECUTE (siempre default off en prod)."""
+    from bolsa_application.paper_d_propose import paper_d_execute_allowed
+    from bolsa_application.risk_runtime import kill_switch_status
+
+    st = await kill_switch_status()
+    paper_on = paper_d_execute_allowed()
+    details = {**st, "paperDExecuteEnv": paper_on}
+    if st.get("effective"):
+        return ComponentHealthDto(
+            status="degraded",
+            message="Kill switch ACTIVE — aperturas automáticas bloqueadas",
+            details=details,
+        )
+    return ComponentHealthDto(
+        status="ok",
+        message=(
+            "Kill switch off"
+            + ("; PAPER_D_EXECUTE on (opt-in)" if paper_on else "; PAPER_D_EXECUTE off")
+        ),
+        details=details,
+    )
+
+
+def _smtp_component() -> ComponentHealthDto:
+    """SMTP para Alarmas / digest R3 — sin probe de red; solo config mínima."""
+    settings = get_settings()
+    ready = smtp_ready(settings)
+    missing: list[str] = []
+    if not (settings.smtp_host or "").strip():
+        missing.append("SMTP_HOST")
+    if not (settings.smtp_from or "").strip():
+        missing.append("SMTP_FROM")
+    return ComponentHealthDto(
+        status="configured" if ready else "not-setup",
+        message=(
+            "SMTP listo para Alarmas / digest diario"
+            if ready
+            else f"SMTP incompleto — define en .env: {', '.join(missing) or 'SMTP_HOST / SMTP_FROM'}"
+        ),
+        details={
+            "ready": ready,
+            "port": settings.smtp_port,
+            "hasUser": bool((settings.smtp_user or "").strip()),
+            "missing": missing,
+        },
+    )
+
+
 @router.get("/health", response_model=HealthResponseDto)
 async def health_check(request: Request) -> HealthResponseDto:
     engine = request.app.state.engine
@@ -128,8 +230,12 @@ async def health_check(request: Request) -> HealthResponseDto:
         "yahoo": _yahoo_component(),
         "xtb": _xtb_component(),
         "redis": await _redis_component(),
+        "auth": _auth_component(),
+        "worker_arq": await _worker_heartbeat_component(),
+        "risk": await _risk_component(),
+        "smtp": _smtp_component(),
     }
-    # DB error → degraded; Redis/Yahoo degraded no tumba el health global a error.
+    # DB error → degraded; Redis/Yahoo/auth/worker degraded no tumba el health global a error.
     degraded = (not db_ok) or any(c.status == "error" for c in components.values())
     return HealthResponseDto(
         status="degraded" if degraded else "ok",

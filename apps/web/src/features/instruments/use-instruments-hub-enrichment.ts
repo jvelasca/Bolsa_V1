@@ -1,10 +1,10 @@
 /**
  * Carga listas + portfolio para el hub Instrumentos (I1).
- * Reutiliza query keys de Trading: ['lists'], ['list', id], ['portfolio', accountScope].
+ * Reutiliza query keys: ['lists'], ['lists','memberships'], ['portfolio', accountScope].
  */
 
 import { useMemo } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { PositionDto } from '@bolsa/shared';
 import { api } from '@/lib/api';
 import { useActiveAccountQueryKey } from '@/stores/active-account-store';
@@ -23,17 +23,13 @@ export function useInstrumentsHubEnrichment() {
     staleTime: 30_000,
   });
 
-  const apiLists = listsQuery.data?.data ?? [];
-  const listIds = apiLists.map((l) => l.id);
-
-  const detailQueries = useQueries({
-    queries: listIds.map((id) => ({
-      queryKey: ['list', id],
-      queryFn: () => api.getList(id),
-      enabled: listIds.length > 0,
-      staleTime: 30_000,
-    })),
+  const membershipsQuery = useQuery({
+    queryKey: ['lists', 'memberships'],
+    queryFn: api.getListMemberships,
+    staleTime: 30_000,
   });
+
+  const apiLists = listsQuery.data?.data ?? [];
 
   const portfolioQuery = useQuery({
     queryKey: ['portfolio', accountScope],
@@ -42,18 +38,15 @@ export function useInstrumentsHubEnrichment() {
   });
 
   const membershipsByInstrument = useMemo(() => {
-    const details = detailQueries
-      .map((q) => q.data?.data)
-      .filter((d): d is NonNullable<typeof d> => Boolean(d));
-    return invertListMemberships(
-      details.map((d) => ({
-        id: d.id,
-        name: d.name,
-        source: d.source,
-        instrumentIds: d.instrumentIds,
-      })),
-    );
-  }, [detailQueries]);
+    const memberships = membershipsQuery.data?.data ?? {};
+    const details = apiLists.map((list) => ({
+      id: list.id,
+      name: list.name,
+      source: list.source,
+      instrumentIds: memberships[list.id] ?? [],
+    }));
+    return invertListMemberships(details);
+  }, [apiLists, membershipsQuery.data?.data]);
 
   const positionsByInstrument = useMemo(
     () => indexPositionsByInstrument(portfolioQuery.data?.data.positions ?? []),
@@ -61,13 +54,16 @@ export function useInstrumentsHubEnrichment() {
   );
 
   const listsReady =
-    listIds.length === 0 || detailQueries.every((q) => q.isSuccess || q.isError);
+    apiLists.length === 0 ||
+    membershipsQuery.isSuccess ||
+    membershipsQuery.isError;
   const portfolioReady = portfolioQuery.isSuccess || portfolioQuery.isError;
 
   return {
     membershipsByInstrument: membershipsByInstrument as Map<string, HubListMembership[]>,
     positionsByInstrument: positionsByInstrument as Map<string, PositionDto>,
-    listsLoading: listsQuery.isLoading || (listIds.length > 0 && !listsReady),
+    apiLists,
+    listsLoading: listsQuery.isLoading || membershipsQuery.isLoading || !listsReady,
     portfolioLoading: portfolioQuery.isLoading && !portfolioReady,
     accountScope,
   };

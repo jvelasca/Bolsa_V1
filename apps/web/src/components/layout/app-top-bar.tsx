@@ -2,7 +2,8 @@
  * Barra superior de la plataforma (nav + cluster derecha).
  *
  * Izquierda: marca · historial ←→ · separador · nav (Overview…) · paneles Trading.
- * Derecha (L→R): chip del espacio · Ayuda · Config · menú sesión.
+ * Derecha (L→R): chip universo (compacto) · espacio · Ayuda · Config · menú sesión.
+ * Tras Restablecer paneles (o solo en otras rutas): icono «abrir en otra pestaña».
  *
  * @see docs/WORKSPACE_PERSISTENCE.md §0
  * @see docs/UI_PLATFORM.md — Barra superior / espacios
@@ -34,6 +35,7 @@ import {
   Radar,
   RotateCcw,
   Settings,
+  SquareArrowOutUpRight,
   User,
   Wallet,
 } from 'lucide-react';
@@ -45,6 +47,7 @@ import { useUiStore } from '@/stores/ui-store';
 import { useTradingLayoutStore } from '@/stores/trading-layout-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 import { useScreenerNavBadge } from '@/features/screeners/use-screener-nav-badge';
+import { useAsesorAlarmaBadge } from '@/features/research/use-asesor-alarma-badge';
 import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
 import { isTradingRoute } from '@/lib/routes';
 
@@ -114,6 +117,26 @@ interface MenuItem {
   checked?: boolean;
   disabled?: boolean;
   hint?: string;
+}
+
+/** Duplica la URL actual en otra pestaña (p. ej. segundo monitor). */
+function OpenAppInNewTabButton({ className }: { className?: string }) {
+  return (
+    <button
+      type="button"
+      title="Abrir esta vista en otra pestaña (segundo monitor)"
+      aria-label="Abrir en otra pestaña"
+      onClick={() => {
+        window.open(window.location.href, '_blank', 'noopener,noreferrer');
+      }}
+      className={cn(
+        'rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground',
+        className,
+      )}
+    >
+      <SquareArrowOutUpRight className="h-3.5 w-3.5" />
+    </button>
+  );
 }
 
 function DropdownMenu({
@@ -243,7 +266,9 @@ const BACKTESTING_MENU: MenuItem[] = [
 
 const RESEARCH_MENU: MenuItem[] = [
   { label: 'Resumen', href: '/research?tab=dashboard' },
+  { label: 'Diario', href: '/research?tab=diario' },
   { label: 'Historial', href: '/research?tab=history' },
+  { label: 'Opiniones', href: '/research?tab=opiniones' },
 ];
 
 export function AppTopBar() {
@@ -262,10 +287,21 @@ export function AppTopBar() {
 
   const layout = useTradingLayoutStore();
   const screenerNavBadge = useScreenerNavBadge();
+  const asesorAlarmaBadge = useAsesorAlarmaBadge();
   const listAutoActive = useListAutoActivityStore((s) => s.active);
   const listAutoSummary = useListAutoActivityStore((s) => s.summary);
 
-  const sessionMenu: MenuItem[] = [{ label: 'Cerrar sesión', action: clearSession }];
+  const sessionMenu: MenuItem[] = [
+    {
+      label: 'Notificaciones…',
+      action: () => openPlatformConfig('notifications'),
+    },
+    {
+      label: 'Configuración…',
+      action: () => openPlatformConfig('general'),
+    },
+    { label: 'Cerrar sesión', action: clearSession },
+  ];
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2">
@@ -353,14 +389,25 @@ export function AppTopBar() {
             </span>
           ) : null}
         </div>
-        <DropdownMenu
-          label="Research"
-          icon={Microscope}
-          items={RESEARCH_MENU}
-          align="left"
-          navStyle
-          active={isResearchRoute}
-        />
+        <div className="relative">
+          <DropdownMenu
+            label="Asesor"
+            icon={Microscope}
+            items={RESEARCH_MENU}
+            align="left"
+            navStyle
+            active={isResearchRoute}
+          />
+          {asesorAlarmaBadge > 0 ? (
+            <span
+              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold leading-none text-white"
+              title={`${asesorAlarmaBadge} alarma${asesorAlarmaBadge === 1 ? '' : 's'} de dictamen`}
+              aria-label={`${asesorAlarmaBadge} alarmas de dictamen`}
+            >
+              {asesorAlarmaBadge > 9 ? '9+' : asesorAlarmaBadge}
+            </span>
+          ) : null}
+        </div>
         <NavLink
           to="/screeners"
           className={({ isActive }) =>
@@ -438,12 +485,20 @@ export function AppTopBar() {
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
+            <span className="w-1.5 shrink-0" aria-hidden />
+            <div className="h-4 w-px bg-border/80" aria-hidden />
+            <OpenAppInNewTabButton />
           </div>
         </>
-      ) : null}
+      ) : (
+        <>
+          <div className="mx-2 hidden h-5 w-px bg-border sm:block" aria-hidden />
+          <OpenAppInNewTabButton className="border border-border/70 bg-background/40" />
+        </>
+      )}
 
       <div className="ml-auto flex items-center gap-1">
-        <UniverseChip />
+        <UniverseChip density="icon" />
         <button
           type="button"
           onClick={openWorkspacePicker}

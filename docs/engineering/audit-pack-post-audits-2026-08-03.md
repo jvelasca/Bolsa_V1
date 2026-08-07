@@ -22,6 +22,8 @@
 | **Auditoría 1 (ingesta+FIE)** | ¿Gaps A/B del informe externo? | Ver [audit1-response](./audit1-response-ingest-fie-2026-08-03.md) — CB Yahoo + cuarentena + health Redis + test FIE parcial |
 | **Auditoría 2 (Lab UI)** | ¿Workers / Zod / abort / DD? | Ver [audit2-response](./audit2-response-backtests-lab-2026-08-03.md) — abort LLM + schema + underwater DD + elapsedMs |
 | **Round 2 externas (A0·N4·Deep)** | ¿Complejidad docs / radiografía freeze / deep code? | Ver [audit-ext-round2-triage](./audit-ext-round2-triage-2026-08-03.md) — Index + bounded contexts; Deep = errata de stack |
+| **Round 3 — motor Estudio** | ¿O1/O2/O3 · dictamen EOD · AVISO/ALARMA · thaw AUTO? | **RATIFICADO O3-C** — [triage](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [ADR-022](../adr/022-estudio-daily-opinion-motor.md) · **D1–Canales cerrados** — auditar [pack 2026-08-04](./audit-pack-estudio-asesor-canales-2026-08-04.md) · thaw [checklist](./camino-d-auto-thaw-checklist-2026-08-04.md) |
+| **Prep pre-AUTO A0–A5** | ¿Código detrás de flags sin flip execute? | **PASS prep** — [pack A0–A5](./audit-pack-pre-auto-a0-a5-2026-08-04.md) · [ADR-023 Proposed](../adr/023-camino-d-thaw.md) · SEMI OK · `PAPER_D_EXECUTE` off |
 
 **Cómo auditar en 30–45 min**
 
@@ -31,7 +33,9 @@
 4. Stack: Docker + `pnpm dev` → `pnpm test:operativa:smoke` · `pnpm test:coach:smoke` · `pnpm test:semi:smoke`.  
 5. Ops: `pnpm audit:ibex35:missing` → esperar `con_TOP=35/35`.  
 6. Estabilidad: observation [2026-08-03-stability-delta-ibex.md](../../research/observations/2026-08-03-stability-delta-ibex.md).  
-7. Si el informe cita tRPC / Next / `packages/engine`: leer [round2 triage](./audit-ext-round2-triage-2026-08-03.md) §3 primero.
+7. Si el informe cita tRPC / Next / `packages/engine`: leer [round2 triage](./audit-ext-round2-triage-2026-08-03.md) §3 primero.  
+8. **Si la ronda es motor Estudio / opiniones / AUTO:** empezar por [audit-brief-estudio-motor-operativo-2026-08-04](./audit-brief-estudio-motor-operativo-2026-08-04.md) (no implementar hasta triage de respuestas A0·N4·Deep).  
+9. **Si la ronda es prep Camino D / Risk / kill switch:** [audit-pack-pre-auto-a0-a5-2026-08-04](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — no confundir PASS prep con thaw execute.
 
 ---
 

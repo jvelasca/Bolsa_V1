@@ -6,14 +6,18 @@ import { api } from '@/lib/api';
 import { formatPct } from '@/features/charts/chart-utils';
 import { ResearchLabEvidenceSummary } from '@/features/research/research-lab-evidence-summary';
 import { ResearchTrialResultBlock } from '@/features/research/research-trial-result-block';
+import { AsesorOpinionesPanel } from '@/features/research/asesor-opiniones-panel';
+import { AsesorDailyOpsPanel } from '@/features/research/asesor-daily-ops-panel';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-type HubTab = 'dashboard' | 'history';
+type HubTab = 'dashboard' | 'diario' | 'history' | 'opiniones';
 
 function parseTab(raw: string | null): HubTab {
   if (raw === 'history') return 'history';
+  if (raw === 'opiniones') return 'opiniones';
+  if (raw === 'diario') return 'diario';
   return 'dashboard';
 }
 
@@ -146,10 +150,11 @@ export function ResearchPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Research</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Asesor</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Observatorio del laboratorio — ledger <code className="text-xs">research_trials</code> (solo
-          lectura). Sin Belief ni Discovery Score.
+          Observatorio del laboratorio y dictámenes del Estudio. Ruta{' '}
+          <code className="text-xs">/research</code> (API sin cambios). Sin Belief ni Discovery
+          Score.
         </p>
       </div>
 
@@ -157,10 +162,20 @@ export function ResearchPage() {
         <HubTabButton active={tab === 'dashboard'} onClick={() => setTab('dashboard')}>
           Resumen
         </HubTabButton>
+        <HubTabButton active={tab === 'diario'} onClick={() => setTab('diario')}>
+          Diario
+        </HubTabButton>
         <HubTabButton active={tab === 'history'} onClick={() => setTab('history')}>
           Historial
         </HubTabButton>
+        <HubTabButton active={tab === 'opiniones'} onClick={() => setTab('opiniones')}>
+          Opiniones
+        </HubTabButton>
       </div>
+
+      {tab === 'diario' && <AsesorDailyOpsPanel />}
+
+      {tab === 'opiniones' && <AsesorOpinionesPanel />}
 
       {tab === 'dashboard' && (
         <div className="space-y-4">

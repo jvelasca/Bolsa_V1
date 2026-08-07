@@ -38,6 +38,12 @@ class InstrumentListsResponseDto(BaseModel):
     data: list[InstrumentListSummaryDto]
 
 
+class InstrumentListMembershipsResponseDto(BaseModel):
+    """listId → instrumentIds[] (una respuesta para el sync de membresía del shell)."""
+
+    data: dict[str, list[str]]
+
+
 class InstrumentListResponseDto(BaseModel):
     data: InstrumentListDetailDto
 

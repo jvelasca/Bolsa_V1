@@ -200,7 +200,8 @@ class SqlAlchemyPortfolioRepository:
             raise ValueError("Instrumento no encontrado")
 
         portfolio = await self._resolve_portfolio(legacy_portfolio_id)
-        total = Decimal(str(quantity * price))
+        # OR-P2: no multiplicar en float antes de Decimal.
+        total = Decimal(str(quantity)) * Decimal(str(price))
         fees = Decimal(str(max(fee_amount, 0)))
 
         portfolio_row = await self._session.get(PortfolioRow, portfolio.id)

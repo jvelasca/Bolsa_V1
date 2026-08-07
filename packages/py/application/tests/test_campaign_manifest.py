@@ -16,6 +16,7 @@ def test_build_campaign_manifest_v0() -> None:
         presets=["sma_crossover"],
         cpu_cost_units=12.5,
         git_commit="abc123",
+        feature_flags={"COST_MODEL_V2_ENABLED": False},
     )
     assert m.schema_version == CAMPAIGN_MANIFEST_SCHEMA
     ref = m.to_manifest_ref()
@@ -23,6 +24,33 @@ def test_build_campaign_manifest_v0() -> None:
     assert ref["barCount"] == 500
     assert ref["cpuCostUnits"] == 12.5
     assert ref["gitCommit"] == "abc123"
+    assert ref["datasetFingerprint"]
+    assert ref["featureFlags"]["COST_MODEL_V2_ENABLED"] is False
+    assert ref["payloadHash"]
+    assert len(ref["payloadHash"]) == 64
+
+
+def test_dataset_fingerprint_stable() -> None:
+    from bolsa_application.campaign_manifest import compute_dataset_fingerprint
+
+    a = compute_dataset_fingerprint(
+        universe="ibex35",
+        timeframe="1d",
+        dataset_start="2020-01-01",
+        dataset_end="2020-12-31",
+        bar_count=250,
+        instrument_ids=["SAN", "TEF"],
+    )
+    b = compute_dataset_fingerprint(
+        universe="ibex35",
+        timeframe="1d",
+        dataset_start="2020-01-01",
+        dataset_end="2020-12-31",
+        bar_count=250,
+        instrument_ids=["TEF", "SAN"],
+    )
+    assert a == b
+    assert len(a) == 64
 
 
 def test_validate_campaign_manifest_requires_fields() -> None:

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { InstrumentListSummaryDto } from '@bolsa/shared';
+import { isEstudioListNameCollision } from '@bolsa/shared';
 import { MoreHorizontal } from 'lucide-react';
 import { checkboxClassName } from '@/components/ui/dialog';
 import { isListPinnedInCarousel, patchToggleCarouselList } from '@/lib/list-carousel-config';
@@ -19,7 +20,11 @@ export function ListCarouselMenu({
   const menuRef = useRef<HTMLDivElement>(null);
 
   const allLists = useMemo(
-    () => [...virtualLists, ...apiLists],
+    () => [
+      ...virtualLists,
+      // Homónimas de Estudio virtual: no pinneables (evita chip duplicado).
+      ...apiLists.filter((list) => !isEstudioListNameCollision(list.name)),
+    ],
     [apiLists, virtualLists],
   );
 

@@ -6,17 +6,29 @@ import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { ChevronDown, PanelRightClose, X } from 'lucide-react';
-import { DEFAULT_CHART_CONFIG, type InstrumentWithMetaDto } from '@bolsa/shared';
+import {
+  DEFAULT_CHART_CONFIG,
+  INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
+  type InstrumentWithMetaDto,
+} from '@bolsa/shared';
 import { api } from '@/lib/api';
 import { formatPct, formatPrice } from '@/features/charts/chart-utils';
 import { OhlcvChart } from '@/features/charts/ohlcv-chart';
 import { InstrumentStrategyTopPanel } from '@/features/backtests/instrument-strategy-top-panel';
 import { InstrumentAnalysisSummary } from '@/features/trading/instrument-analysis-summary';
+import { InstrumentNarrativeEditor } from '@/features/instruments/instrument-narrative-editor';
+import { InstrumentDictamenEvolution } from '@/features/instruments/instrument-dictamen-evolution';
 import { IconButton } from '@/components/ui/icon-button';
 import { KeyValueList, KeyValueRow } from '@/components/ui/key-value-list';
 import { cn } from '@/lib/utils';
+import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
 
-export type InstrumentsHubDetailSectionId = 'resumen' | 'grafico' | 'analisis' | 'coach';
+export type InstrumentsHubDetailSectionId =
+  | 'resumen'
+  | 'grafico'
+  | 'analisis'
+  | 'evolucion'
+  | 'coach';
 
 export const INSTRUMENTS_HUB_DETAIL_SECTIONS: Array<{
   id: InstrumentsHubDetailSectionId;
@@ -25,6 +37,7 @@ export const INSTRUMENTS_HUB_DETAIL_SECTIONS: Array<{
   { id: 'resumen', label: 'Resumen' },
   { id: 'grafico', label: 'Gráfico' },
   { id: 'analisis', label: 'Análisis' },
+  { id: 'evolucion', label: 'Evolución' },
   { id: 'coach', label: 'Coach' },
 ];
 
@@ -35,6 +48,7 @@ export const DEFAULT_INSTRUMENTS_HUB_DETAIL_SECTIONS: Record<
   resumen: true,
   grafico: true,
   analisis: false,
+  evolucion: true,
   coach: false,
 };
 
@@ -102,6 +116,20 @@ export function InstrumentsHubDetailPanel({
     staleTime: 60_000,
   });
 
+  const opinionQuery = useInstrumentDailyOpinions(
+    [instrument.id],
+    [
+      {
+        instrumentId: instrument.id,
+        hasEodBar: Boolean(instrument.meta.lastBarDate),
+        allowTrading: true,
+        positionOpen: false,
+      },
+    ],
+    { enabled: sectionsOpen.resumen },
+  );
+  const opinion = opinionQuery.data?.[0];
+
   return (
     <div className={cn('flex h-full min-h-0 flex-col overflow-hidden', className)}>
       <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-3 py-2">
@@ -164,6 +192,13 @@ export function InstrumentsHubDetailPanel({
               <KeyValueRow label="Últ. vela">
                 {instrument.meta.lastBarDate ?? '—'}
               </KeyValueRow>
+              <KeyValueRow label="Dictamen">
+                {opinionQuery.isLoading
+                  ? '…'
+                  : opinion
+                    ? `${INSTRUMENT_DAILY_OPINION_STANCE_LABELS[opinion.stance]} · ★${opinion.dictamenStars}`
+                    : '—'}
+              </KeyValueRow>
             </KeyValueList>
           </DetailSection>
 
@@ -198,6 +233,22 @@ export function InstrumentsHubDetailPanel({
               instrumentId={instrument.id}
               symbol={instrument.symbol}
             />
+          </DetailSection>
+
+          <DetailSection
+            title="Evolución"
+            open={sectionsOpen.evolucion}
+            onToggle={() => onToggleSection('evolucion')}
+          >
+            <div className="space-y-3">
+              <InstrumentDictamenEvolution instrumentId={instrument.id} />
+              <div className="border-t border-border/50 pt-2">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Nota humana
+                </p>
+                <InstrumentNarrativeEditor instrumentId={instrument.id} />
+              </div>
+            </div>
           </DetailSection>
 
           <DetailSection

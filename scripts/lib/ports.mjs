@@ -2,6 +2,8 @@ import { execSync } from 'node:child_process';
 
 /**
  * PIDs en LISTEN sobre un puerto TCP (puede haber varios en Windows).
+ * En Windows usa solo `netstat` (rápido). PowerShell Get-NetTCPConnection
+ * añadía ~1s por puerto y dominaba el arranque F5 (~3s).
  * @param {number} port
  * @returns {number[]}
  */
@@ -10,25 +12,17 @@ export function getListenerPids(port) {
 
   if (process.platform === 'win32') {
     try {
-      const out = execSync(
-        `powershell -NoProfile -Command "(Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue).OwningProcess"`,
-        { encoding: 'utf8' },
-      );
+      const out = execSync(`netstat -ano -p tcp`, { encoding: 'utf8' });
+      const needle = `:${port}`;
       for (const line of out.split(/\r?\n/)) {
-        const pid = Number(line.trim());
-        if (Number.isFinite(pid) && pid > 0) pids.add(pid);
-      }
-    } catch {
-      // Sin listeners o PowerShell no disponible.
-    }
-
-    try {
-      const out = execSync(`netstat -ano -p tcp | findstr :${port}`, { encoding: 'utf8' });
-      for (const line of out.split('\n')) {
         if (!line.includes('LISTENING')) continue;
         const parts = line.trim().split(/\s+/);
         const local = parts[1] ?? '';
-        if (!local.endsWith(`:${port}`)) continue;
+        // :5173 o 0.0.0.0:5173 / [::]:5173
+        if (!local.endsWith(needle)) continue;
+        // Evitar falsos positivos (:51730)
+        const idx = local.lastIndexOf(':');
+        if (idx < 0 || Number(local.slice(idx + 1)) !== port) continue;
         const pid = Number(parts[parts.length - 1]);
         if (Number.isFinite(pid) && pid > 0) pids.add(pid);
       }
@@ -70,11 +64,15 @@ function killPid(pid) {
         execSync(`taskkill /PID ${pid} /F /T`, { stdio: 'ignore' });
         return true;
       } catch {
-        execSync(
-          `powershell -NoProfile -Command "Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue"`,
-          { stdio: 'ignore' },
-        );
-        return true;
+        try {
+          execSync(
+            `powershell -NoProfile -Command "Stop-Process -Id ${pid} -Force -ErrorAction SilentlyContinue"`,
+            { stdio: 'ignore' },
+          );
+          return true;
+        } catch {
+          return false;
+        }
       }
     }
 

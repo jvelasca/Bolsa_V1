@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { InstrumentRemovalPreviewDto } from '@bolsa/shared';
+import { ESTUDIO_LIST_ID, type InstrumentRemovalPreviewDto } from '@bolsa/shared';
 import { api, ApiError } from '@/lib/api';
 import { closeOpenChartsForInstrument } from '@/lib/close-chart-on-list-removal';
 import { InstrumentRemovalConfirmDialog } from '@/features/trading/lists-tab/instrument-removal-confirm-dialog';
+import { unsubscribeInstrumentFromSupervision } from '@/features/trading/estudio-supervision';
+import { useVisualizationStore } from '@/stores/visualization-store';
 
 interface PendingRemoval {
   listId: string;
@@ -30,6 +32,12 @@ export function useListInstrumentRemoval() {
     await queryClient.invalidateQueries({ queryKey: ['database-orphans'] });
   }, [queryClient]);
 
+  const afterEstudioRemove = useCallback((listId: string, instrumentId: string) => {
+    if (listId !== ESTUDIO_LIST_ID) return;
+    useVisualizationStore.getState().removeInstrument(instrumentId);
+    unsubscribeInstrumentFromSupervision([instrumentId]);
+  }, []);
+
   const close = useCallback(() => {
     if (acting) return;
     setPending(null);
@@ -45,6 +53,7 @@ export function useListInstrumentRemoval() {
         if (!preview.wouldBeOrphan) {
           await api.removeInstrumentFromList(listId, instrumentId, { purgeIfOrphan: false });
           closeOpenChartsForInstrument(instrumentId);
+          afterEstudioRemove(listId, instrumentId);
           await invalidateLists();
           return;
         }
@@ -56,7 +65,7 @@ export function useListInstrumentRemoval() {
         setLoadingPreview(false);
       }
     },
-    [invalidateLists],
+    [afterEstudioRemove, invalidateLists],
   );
 
   const execute = useCallback(
@@ -69,6 +78,7 @@ export function useListInstrumentRemoval() {
           purgeIfOrphan,
         });
         closeOpenChartsForInstrument(pending.instrumentId);
+        afterEstudioRemove(pending.listId, pending.instrumentId);
         await invalidateLists();
         setPending(null);
       } catch (err) {
@@ -77,7 +87,7 @@ export function useListInstrumentRemoval() {
         setActing(false);
       }
     },
-    [invalidateLists, pending],
+    [afterEstudioRemove, invalidateLists, pending],
   );
 
   const dialog = (

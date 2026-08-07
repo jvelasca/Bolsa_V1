@@ -35,15 +35,19 @@ describe('backtesting-tracker help guides', () => {
   });
 
   it('CORE-R guide covers enqueue, narrate, shell cron', () => {
-    const blob = [...BACKTESTING_CORE_R_GUIDE.steps, ...BACKTESTING_CORE_R_GUIDE.notes].join(
-      ' ',
-    );
+    const blob = [
+      BACKTESTING_CORE_R_GUIDE.body,
+      ...BACKTESTING_CORE_R_GUIDE.steps,
+      ...BACKTESTING_CORE_R_GUIDE.notes,
+    ].join(' ');
     expect(blob).toMatch(/Encolar/i);
     expect(blob).toMatch(/Narrar/i);
     expect(blob).toMatch(/Auto-sync|app abierta|shell/i);
     expect(blob).toMatch(/Hecho todos|Abrir Monitor|toast|chip|barra/i);
     expect(blob).toMatch(/no auto-paper|No es auto-paper/i);
     expect(blob).toMatch(/localStorage/i);
+    expect(blob).toMatch(/mandato|auto-adopta/i);
+    expect(blob).toMatch(/Estudio|Adoptar|Supervisión/i);
   });
 
   it('summary bullets mention DÍA D and Monitor CORE-R', () => {
@@ -61,7 +65,7 @@ describe('backtesting-tracker help guides', () => {
     expect(dia?.title).toMatch(/v0\.11/);
     expect(dia?.plain).toMatch(/efímero|LAB|hub|verificación/i);
     expect(cr?.status).toBe('listo');
-    expect(cr?.plain).toMatch(/v1\.12|Hecho todos|toast/i);
+    expect(cr?.plain).toMatch(/ADR-024|Estudio|Adoptar|Supervisión|Hecho todos|toast/i);
     expect(lab?.status).toBe('listo');
     expect(lab?.plain).toMatch(/meseta|horizonte|CORE-B/i);
     expect(fresh?.plain).toMatch(/v1\.3|bar_hysteresis|histéresis/i);

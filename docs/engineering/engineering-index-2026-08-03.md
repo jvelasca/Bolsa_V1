@@ -42,7 +42,10 @@ Engineering Index  (este doc)
 │   ├── dual-universes / mandato / reconciliación ADRs
 │   ├── demo-operating-modes-brief-*.md   (MANUAL/SEMI/AUTO)
 │   ├── semi-demo-book-impl-slice1-*.md   (GO SEMI)
-│   ├── trading-operativa-panel-2026-08-04.md  (Operativa · IO · En estudio)
+│   ├── trading-operativa-panel-2026-08-04.md  (Operativa · IO · modos en barra)
+│   ├── estudio-supervision-model-2026-08-06.md  (ADR-024 · Supervisión ON · 3 cadencias)
+│   ├── estudio-process-status-ui-2026-08-06.md  (iconos · Actualizar/Redescubrir · OPERATIVA)
+│   ├── session-handoff-2026-08-06-estudio-process-ui.md
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)
@@ -96,4 +99,16 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 
 1. Entrada: [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md)  
 2. Round 2 triage: [audit-ext-round2-triage-2026-08-03.md](./audit-ext-round2-triage-2026-08-03.md)  
-3. Freeze: [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md)
+3. Freeze: [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md)  
+4. **Round 3 (pausa motor Estudio):** [audit-brief-estudio-motor-operativo-2026-08-04.md](./audit-brief-estudio-motor-operativo-2026-08-04.md)  
+5. **Round 3 triage (ratificado O3-C · D1–Canales cerrados):** [audit-ext-round3-triage-estudio-motor-2026-08-04.md](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) §11 · [ADR-022](../adr/022-estudio-daily-opinion-motor.md)  
+6. Diseño interno: [estudio-daily-opinion-alarms-design-2026-08-04.md](./estudio-daily-opinion-alarms-design-2026-08-04.md)  
+7. **Asesor UI:** [asesor-ui-2026-08-04.md](./asesor-ui-2026-08-04.md) (ex-Research · tab Opiniones)  
+8. **Pack cierre Estudio/Asesor/Canales:** [audit-pack-estudio-asesor-canales-2026-08-04.md](./audit-pack-estudio-asesor-canales-2026-08-04.md)  
+9. **Thaw AUTO (prep, flag off):** [camino-d-auto-thaw-checklist-2026-08-04.md](./camino-d-auto-thaw-checklist-2026-08-04.md)  
+10. **Triage institucional pre-AUTO (Aud 1+2):** [audit-ext-institutional-pre-auto-triage-2026-08-04.md](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)  
+11. **Risk Engine OR-RE v0:** [risk-engine-or-re-2026-08-04.md](./risk-engine-or-re-2026-08-04.md)  
+12. **OR-lite + Repro+ + Obs/CI:** [or-lite-repro-obs-2026-08-04.md](./or-lite-repro-obs-2026-08-04.md)  
+13. **Prep A2–A5 (flag off):** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed  
+14. **Pack auditoría prep AUTO:** [audit-pack-pre-auto-a0-a5-2026-08-04.md](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — SEMI OK · execute AUTO **no**  
+15. **Resumen operativo diario (R1–R4):** [daily-ops-report-brief-2026-08-04.md](./daily-ops-report-brief-2026-08-04.md) — Diario · HTML email · PDF opt-in

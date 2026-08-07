@@ -55,17 +55,19 @@ async function fetchPnlExtraRows(listId: string): Promise<CoreRReportRow[]> {
       }),
     );
 
-    const tops = await Promise.all(
-      instruments.map((inst) =>
-        api.getInstrumentStrategyTop(inst.id, '1d').catch(() => null),
-      ),
+    const topIds = instruments.map((inst) => inst.id);
+    const topsRes = await api
+      .queryInstrumentStrategyTops({ instrumentIds: topIds, timeframe: '1d' })
+      .catch(() => null);
+    const topById = new Map(
+      (topsRes?.data ?? []).map((t) => [t.instrumentId, t] as const),
     );
 
-    const rows = instruments.map((inst, i) =>
+    const rows = instruments.map((inst) =>
       buildStrategyMonitorRow({
         instrument: inst,
         timeframe: '1d',
-        top: tops[i]?.data ?? null,
+        top: topById.get(inst.id) ?? null,
         accounts,
         queue: [],
       }),
@@ -137,6 +139,17 @@ export async function runCoreRSchedulerTick(opts?: {
   const added = useCoreRReviewQueueStore
     .getState()
     .syncFromReport(prefs.listId, report, extras);
+  // Sello de vigilia aunque no se encole nada (juicio OK / sin acción).
+  try {
+    const { touchEstudioLaneStamps } = await import(
+      '@/features/trading/estudio-lane-stamps'
+    );
+    const detail = await api.getList(prefs.listId).catch(() => null);
+    const ids = detail?.data?.instrumentIds ?? [];
+    if (ids.length > 0) touchEstudioLaneStamps(ids, 'vigilance');
+  } catch {
+    // best-effort
+  }
   const marked = markCoreRSchedulerTick(prefs);
   if (added > 0) {
     saveCoreRSchedulerPrefs({

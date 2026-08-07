@@ -1,63 +1,84 @@
-# Panel Operativa Trading — layout, IO y En estudio (2026-08-04)
+# Panel Operativa Trading — layout, IO y Estudio (2026-08-04)
 
 > **Padre:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) → Product / Ops  
 > **Ayuda:** [HELP.md](../HELP.md) · menú in-app «Trading y gráficos»  
-> **Freeze:** Belief→Coach Fase 2/5c · `CORE_R_CRON` · `COST_MODEL_V2` · Camino D AUTO · Strategy Studio / F5
+> **ADR Estudio:** [024-estudio-supervision-universe.md](../adr/024-estudio-supervision-universe.md)  
+> **Freeze:** Belief→Coach Fase 2/5c · `CORE_R_CRON` · `COST_MODEL_V2` · Camino D AUTO **execute** · Strategy Studio / F5  
+> **Update 2026-08-04b:** Estudio = membresía explícita (no ≡ pestañas); selección masiva; gate SEMI/AUTO.  
+> **Update 2026-08-04c:** AUTO prep A1–A5 (pill disabled · kill switch · armado local) — [pack](./audit-pack-pre-auto-a0-a5-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed.  
+> **Update 2026-08-06:** ADR-024 · sin auto-add gráfico · Supervisión en banner · modos Manual/SEMI/AUTO → barra de estado / Cuentas · UI procesos [estudio-process-status-ui-2026-08-06.md](./estudio-process-status-ui-2026-08-06.md).
 
 ## Qué
 
 Rediseño del rail Coach → panel **Operativa** en la mesa TRADING:
 
 1. **Columna a altura completa** (hasta la barra de estado). Operaciones solo bajo watchlist + gráfico.
-2. Tres secciones colapsables con scroll y altura redimensionable: **Recomendación** · **Info** · **Configuración**.
-3. **Índice Operativo (IO) v1** en Recomendación (gauges TA / FA / IO + ranking «El n de N en estudio»).
-4. Lista virtual **En estudio** = conjunto de pestañas de gráfico abiertas (misma identidad).
-5. Resumen cabecera **Configuración** a la derecha: `Operativa: manual|semi|auto`; título del bloque = **nombre de la cuenta activa**.
+2. Secciones colapsables: **Recomendación** · **Info** (estrategia activa / mandato + resultados).  
+   ~~Cuenta / modos~~ → ya no viven aquí (ver § Modo de cuenta).
+3. **Índice Operativo (IO) v1** en Recomendación (gauges TA / FA / IO + ranking «El n de N en Estudio» · copy básico/avanzado).
+4. Altura de sección: hasta **900px** (`MAX_OPERATIVA_SECTION_HEIGHT_PX`); asa inferior más usable.
+5. Lista **Estudio** = universo supervisable API (`estudio`). Supervisión ON/cadencias = **banner** de la lista (no este panel).
 
 ## Layout
 
 ```text
 ┌ Watchlist │ Gráfico ─┐┌ Operativa (full height) ┐
-├ Operaciones ─────────┤│ Recomendación / Info /  │
-└──────────────────────┘│ Configuración           │
-                        └─────────────────────────┘
-TradingStatusBar (fuera de TradingLayout)
+├ Operaciones ─────────┤│ Recomendación / Info    │
+└──────────────────────┘└─────────────────────────┘
+TradingStatusBar: Activa · OPERATIVA: Semi · métricas · Colas/Alarmas
 ```
 
-- Store: `bolsa-trading-layout-v1` (`operativaOpen`, `operativaWidthPct`, `operativaSections`, `operativaSectionHeights`, …).
+- Store: `bolsa-trading-layout-v1` (`operativaOpen`, `operativaWidthPct`, `operativaSections`, …).
 - Código: `trading-layout.tsx`, `trading-layout-store.ts`.
 
-## En estudio ≡ pestañas
+## Modo de cuenta (Manual / SEMI / AUTO)
+
+Afecta a **toda la cuenta**, no al valor del gráfico:
+
+| Dónde | Qué |
+|-------|-----|
+| Barra de estado | Badge `OPERATIVA: Manual|Semi|Auto` |
+| Clic badge / nombre cuenta | `/accounts?selected=…&tab=config&focus=operativa` |
+| Cuentas → Config | Bloque **Operativa** + `DemoBookModePanel` |
+
+Prefs: `demo-book-prefs.ts` / `use-demo-book-prefs.ts`.
+
+## Estudio — membresía (ADR-024)
 
 | Acción | Efecto |
 |--------|--------|
-| Abrir pestaña de gráfico | Entra en lista **En estudio** |
-| Cerrar pestaña | Sale de **En estudio** |
-| Ranking IO | Universo = IDs únicos de pestañas abiertas |
+| Abrir / enfocar gráfico | **No** cambia membresía |
+| Cerrar pestaña | **No** saca de Estudio |
+| «Pasar a Estudio» / check | Añade membresía API |
+| «Eliminar de la lista» | Unsubscribe (colas/campaña); no cierra mandato solo |
+| Ranking IO | Universo = miembros Estudio |
+| Nombre UI | **Estudio** (API id `estudio`) |
 
-Sync: `use-chart-visualization-sync.ts` → `visualization-store` · label `VIRTUAL_LIST_VISUALIZATION` = «En estudio» (`default-lists.ts`).
+### Selección masiva (Valores · Estudio)
+
+- Check cabecera; **Ctrl/Cmd** toggle · **Mayús** rango.
+- Barra inferior: **Pasar a Estudio** · **Eliminar de la lista** · **Abrir gráficos** · **Actualizar** · **Redescubrir** · Limpiar.
+- **Actualizar** = velas + vigilia + frescura (puede `skip_fresh`).
+- **Redescubrir** = embudo completo (confirm costoso).
+
+### Gate SEMI / AUTO
+
+- `demoBookRequiresEstudioMembership(mode)` → true en SEMI y AUTO.
+- Propose F3 falla si el instrumento no está en Estudio.
+- **MANUAL** no exige Estudio.
+- **AUTO UI:** pill disabled; kill switch + armado local en `DemoBookModePanel` (Cuentas).
+- Execute AUTO: `PAPER_D_EXECUTE` off — [pack A0–A5](./audit-pack-pre-auto-a0-a5-2026-08-04.md).
 
 ## Índice Operativo (IO) v1
 
 | Pieza | Regla |
 |-------|--------|
-| Base | Composite display 0–100 (`technicalDisplay100` / composite chip) |
+| Base | Composite display 0–100 |
 | Distress FA | Suelo IO ≤ 40 |
-| Ranking | IO desc entre IDs en estudio; empate por `instrumentId` |
-| Copy | `El {rank} de {total} en estudio` |
+| Ranking | IO desc entre IDs en Estudio |
+| Copy | `El {rank} de {total} en Estudio` |
 
-Helpers puros: `operativa-index.ts` (+ tests). UI: `operativa-pulse.tsx`. Datos: `useInstrumentsHubScores(studyIds)`.
-
-## Configuración / modos
-
-| UI | Detalle |
-|----|---------|
-| Cabecera sección | summary derecha: `Operativa: {mode}` |
-| Título bloque | Nombre cuenta activa (`useActiveAccount`) |
-| Prefs | `bolsa-demo-book-prefs-v1` · `useDemoBookPrefs` (reactivo misma pestaña) |
-| Modos | MANUAL / SEMI / AUTO (AUTO UI disabled — freeze Camino D) |
-
-Docs producto modos: [demo-operating-modes-brief-2026-08-03.md](./demo-operating-modes-brief-2026-08-03.md) · [semi-demo-book-impl-slice1-2026-08-03.md](./semi-demo-book-impl-slice1-2026-08-03.md).
+Helpers: `operativa-index.ts` · UI: `operativa-pulse.tsx` · datos: `useInstrumentsHubScores(studyIds)`.
 
 ## Archivos clave
 
@@ -66,10 +87,22 @@ Docs producto modos: [demo-operating-modes-brief-2026-08-03.md](./demo-operating
 | Layout | `apps/web/src/components/layout/trading-layout.tsx` |
 | Panel | `trading-operativa-panel.tsx`, `trading-operativa-section.tsx` |
 | IO | `operativa-index.ts`, `operativa-pulse.tsx` |
-| Prefs libro | `demo-book-prefs.ts`, `use-demo-book-prefs.ts`, `demo-book-mode-panel.tsx` |
-| Sync estudio | `lists-tab/use-chart-visualization-sync.ts` |
-| TOP#1 gráfico | [chart-top1-indicator-switch-2026-08-03.md](./chart-top1-indicator-switch-2026-08-03.md) (misma rama) |
+| Prefs / gate | `demo-book-prefs.ts`, `use-demo-book-prefs.ts` |
+| Modo UI | `demo-book-mode-panel.tsx` (Cuentas) · `trading-status-bar.tsx` |
+| Supervisión | `estudio-supervision-panel.tsx`, `estudio-supervision.ts` |
+| Procesos UI | `estudio-process-status.ts`, `list-name-process-subtitle.tsx` |
+| Selección / Actualizar | `list-values-panel.tsx`, `list-item-accordion.tsx` |
+| Label | `packages/shared/src/default-lists.ts` |
 
 ## Fuera de alcance
 
-AUTO execute · Belief→Coach 5c · cambiar fórmula IO más allá de Composite+distress · persistir «en estudio» sin pestaña.
+AUTO execute · Belief→Coach 5c · cambiar fórmula IO más allá de Composite+distress.
+
+## Update 2026-08-04c — mesa SEMI vital
+
+- Dictamen del valor activo con `positionOpen` real (portfolio).
+- Banner «Fuera de Estudio» + Añadir cuando SEMI/AUTO lo exigen.
+- CTAs **Proponer F3 → Confirm** y **Cola Confirm (n)** en Recomendación (Camino C).
+- Chart IA propose reutiliza los mismos gates SEMI/Estudio/sizing (`propose-instrument-supervised.ts`).
+- Info → **Learning / Outcomes** in-panel (DecisionSession summary + cerrar outcome).
+- Camino D AUTO execute **sigue freeze**.

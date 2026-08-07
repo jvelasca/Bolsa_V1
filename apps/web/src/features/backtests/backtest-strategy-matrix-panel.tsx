@@ -999,30 +999,32 @@ export function BacktestStrategyMatrixPanel({
         </div>
       ) : (
         <div className="space-y-1">
-          <Button
-            className="w-full"
-            size="sm"
-            onClick={() => onRunCoach()}
-            disabled={!canRunCoach}
-            title="Simula las del filtro actual (o la selección) y abre el Coach. Reutiliza lote si no cambió."
-          >
-            Probar + coach ({coachCount})
-          </Button>
-          <Button
-            className="w-full"
-            size="sm"
-            variant="outline"
-            onClick={() => onRunCoach({ forceResim: true })}
-            disabled={!canRunCoach}
-            title="Ignora la reutilización del lote y vuelve a simular todas las del filtro/selección."
-          >
-            Forzar re-sim
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button
+              className="min-w-0 flex-1"
+              size="sm"
+              onClick={() => onRunCoach()}
+              disabled={!canRunCoach}
+              title="Simula las del filtro actual (o la selección) y abre el Coach. Reutiliza lote si no cambió."
+            >
+              Probar + coach ({coachCount})
+            </Button>
+            <Button
+              className="min-w-0 flex-1"
+              size="sm"
+              variant="outline"
+              onClick={() => onRunCoach({ forceResim: true })}
+              disabled={!canRunCoach}
+              title="Ignora la reutilización del lote y vuelve a simular todas las del filtro/selección."
+            >
+              Forzar re-sim
+            </Button>
+          </div>
           <p className="text-[10px] leading-snug text-muted-foreground">
             Ejecuta el filtro activo
             {coachCount > 0 ? ` (${coachCount})` : ''}: si hay filas marcadas, solo esas;
-            si no, todas las visibles. «Forzar re-sim» ignora el lote cacheado. Periodo/capital en
-            Opciones avanzadas.
+            si no, todas las visibles. «Forzar re-sim» ignora el lote cacheado (útil con
+            reutilización ON). Periodo/capital en Opciones avanzadas.
           </p>
         </div>
       )}

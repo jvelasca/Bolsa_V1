@@ -156,34 +156,42 @@ def calculate_trade_fees(
     is_fx_conversion: bool = False,
     currency: str = "EUR",
 ) -> TradeFeeBreakdown:
+    """Comisiones sobre notional. Internamente Decimal para evitar float*float."""
+    from decimal import ROUND_HALF_UP, Decimal
+
+    n = Decimal(str(notional))
     profile = settings.commission
     tax = settings.tax
 
-    commission = 0.0
+    commission = Decimal("0")
     if profile.stock_commission_pct > 0 or profile.stock_commission_min > 0:
-        commission = (notional * profile.stock_commission_pct) / 100.0
-        commission = max(commission, profile.stock_commission_min)
+        commission = (n * Decimal(str(profile.stock_commission_pct))) / Decimal("100")
+        commission = max(commission, Decimal(str(profile.stock_commission_min)))
         if profile.stock_commission_max is not None:
-            commission = min(commission, profile.stock_commission_max)
+            commission = min(commission, Decimal(str(profile.stock_commission_max)))
 
-    vat = (commission * profile.vat_on_commission_pct) / 100.0
+    vat = (commission * Decimal(str(profile.vat_on_commission_pct))) / Decimal("100")
     stamp = (
-        (notional * tax.stamp_duty_buy_pct) / 100.0
+        (n * Decimal(str(tax.stamp_duty_buy_pct))) / Decimal("100")
         if side == "buy" and tax.stamp_duty_buy_pct > 0
-        else 0.0
+        else Decimal("0")
     )
     fx = (
-        (notional * profile.fx_conversion_pct) / 100.0
+        (n * Decimal(str(profile.fx_conversion_pct))) / Decimal("100")
         if is_fx_conversion and profile.fx_conversion_pct > 0
-        else 0.0
+        else Decimal("0")
     )
     total = commission + vat + stamp + fx
+
+    def _f(x: Decimal) -> float:
+        return float(x.quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+
     return TradeFeeBreakdown(
-        commission=commission,
-        vat_on_commission=vat,
-        stamp_duty=stamp,
-        fx_conversion=fx,
-        total=total,
+        commission=_f(commission),
+        vat_on_commission=_f(vat),
+        stamp_duty=_f(stamp),
+        fx_conversion=_f(fx),
+        total=_f(total),
         currency=currency,
     )
 

@@ -3,7 +3,7 @@
  * Resumen no técnico primero; pantallas, seguimiento de plataforma y detalle después.
  * El detalle vivo está en docs (no duplicar aquí el lifecycle completo).
  *
- * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.12 + CORE-B v0.2 + ADR-019 universos (2026-08-03).
+ * Sync embudo 5 etapas + soft-ACK + Lista AUTO frescura v1.3 + DÍA D v0.11 + CORE-R v1.13 + CORE-B v0.2 + ADR-019 universos (2026-08-03).
  *
  * @see docs/HELP.md
  * @see docs/engineering/research-lifecycle.md
@@ -66,7 +66,7 @@ export const BACKTESTING_YOU_ARE_HERE = {
     'Abre Backtesting (/backtests) → pestaña Probar estrategia.',
     'Elige un valor con histórico (periodo/capital en Opciones avanzadas; se recuerda tras reinicio).',
     'Pulsa Play (ciclo completo ON) → mapa 5 etapas hasta Finalistas (solo guarda TOP con mejora Lab).',
-    'Lista IBEX/S&P: modo Lista + Play = Lista AUTO. Pref «Omitir si Finalistas frescos» ON. ≠ «Probar lista».',
+    'Lista IBEX/S&P/Estudio: modo Lista + Play = Lista AUTO (tandas ~40). Pref «Omitir si Finalistas frescos» ON. ≠ «Probar lista».',
     'En Lista valores, ojea el resumen por ticker; clic abre Valor/Detalle.',
     'Mientras corre: ve a Trading — footer con progreso. Tras reinicio, un 2º Play debe Omitir (histéresis: 1 barra diaria no fuerza re-embudo).',
     'Desde Finalistas: Checklist → demo activa (A), Rastreador → Screeners (B), o Proponer → Supervisado F3 (C).',
@@ -106,14 +106,15 @@ export const BACKTESTING_DIA_D_GUIDE = {
 export const BACKTESTING_CORE_R_GUIDE = {
   title: 'CORE-R / Monitor — cola de revisión',
   body:
-    'Tras Lista AUTO (o con DEMO vinculada al TOP), el Monitor encola juicios a revisar. No pisa Finalistas ni despliega paper.',
+    'Tras Lista AUTO (o con DEMO vinculada al TOP), el Monitor encola juicios a revisar. No pisa Finalistas ni despliega paper. No cambia el mandato de Trading hasta que aceptes la propuesta (SEMI) o lo cambies a mano.',
   steps: [
     'Abre Monitor: hub Probar (desplegable) o Ayuda → Backtesting (panel debajo de DÍA D).',
-    'Elige la lista (p. ej. IBEX). Filas con TOP muestran demo/paper + retorno % si hay cuenta vinculada.',
+    'Elige la lista (ideal: «Estudio» canónica, o IBEX). Filas con TOP muestran demo/paper + retorno % si hay cuenta vinculada.',
     'Pulsa «Encolar revisiones»: mezcla informe Lista AUTO + PnL DEMO ≤ −5% (Lab) / ≤ −10% (cambio).',
     'Abre Lab / Finalistas / Checklist desde la cola; marca «Hecho» al cerrar.',
+    'SEMI + «Valorar cambio»: «Adoptar» abre mandato TOP#1 (ADR-020). AUTO no auto-adopta.',
     'Opcional: «Narrar cola» (heurística; LLM si hay Ollama).',
-    'Opcional: «Auto-sync app abierta» · chip · toast Abrir Monitor · «Hecho todos» en cola.',
+    'Opcional: «Auto-sync» / Supervisión ON (3 cadencias en ···; prefiere «Estudio») · chip · toast · «Hecho todos».',
   ],
   notes: [
     'Sandbox DÍA D ≠ DEMO live. CORE-R lee DEMO/paper vinculadas al TOP (prefer simulated).',
@@ -122,8 +123,9 @@ export const BACKTESTING_CORE_R_GUIDE = {
     'Chip barra / toast «Abrir Monitor» → Ayuda · Monitor. También /backtests?tab=run&focus=monitor',
     'Hecho todos cierra abiertas de la lista actual (no borra; clearDone limpia done).',
     'Toast solo si added > 0 (sin ruido en ticks vacíos).',
+    'Reanálisis LAB ≠ cambio de mandato TRADING. AUTO execute no auto-adopta.',
     'No es auto-paper D. No overwrite de TOP active.',
-    'Ops: pnpm test:operativa · ISSUES.md · CORE-R · list-auto-ops § CORE-R',
+    'Ops: pnpm test:operativa · ISSUES.md · CORE-R · list-auto-ops § CORE-R / §5.2',
   ],
 } as const;
 
@@ -201,7 +203,7 @@ export const BACKTESTING_TRACKING = [
     title: 'Lista AUTO (ciclo × N)',
     status: 'listo' as const,
     plain:
-      'Lista + Play: embudo × ticker (máx. 40). Keep-alive + barra Trading. Frescura v1.3 omite tras reinicio / pocas barras. ≠ Fase C.',
+      'Lista + Play: embudo × ticker (tandas de 40; sin truncar; tope 500). Keep-alive + barra Trading. Frescura v1.3. ≠ Fase C.',
   },
   {
     id: 'list-auto-freshness',
@@ -256,7 +258,7 @@ export const BACKTESTING_TRACKING = [
     title: 'CORE-R cola revisión (Monitor)',
     status: 'listo' as const,
     plain:
-      'v1.12: + toast remoto multi-dispositivo (señal lastRemoteEnqueue*). Sin overwrite TOP ni auto-paper D.',
+      'ADR-024: Estudio canónica + Supervisión ON + Adoptar SEMI · BD SoT. Sin overwrite TOP ni auto-paper D.',
   },
   {
     id: 'lab-ui',

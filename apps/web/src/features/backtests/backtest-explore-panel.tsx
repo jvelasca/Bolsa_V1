@@ -227,9 +227,7 @@ export function BacktestExploreRanking({
   autoAckOnCycle = true,
   pauseIfAckNeeded = false,
   onAwaitingAckChange,
-  requireAckBeforeLab = true,
   autoSaveSemifinal = false,
-  cycleCoach1Active = false,
   labImprovedCountHint = 0,
   hasExistingTopForSave,
   onCoachGateChange,
@@ -684,7 +682,7 @@ export function BacktestExploreRanking({
     const recsWithRun = note.recommendations.filter((r) => Boolean(r.row.runId));
     if (
       shouldWaitBeforeFinalistsAutoSave({
-        running,
+        running: Boolean(running),
         okCount,
         recommendationCount: note.recommendations.length,
         postLabRecsWithRunId: recsWithRun.length,
@@ -945,7 +943,7 @@ export function BacktestExploreRanking({
               }
               onClick={() => {
                 setSaveMsg(null);
-                saveTopMutation.mutate();
+                saveTopMutation.mutate({});
               }}
               title={
                 postLab

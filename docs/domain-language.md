@@ -130,9 +130,15 @@ Detalle de plataforma: ADR-010, docs operativos — **no** mezclar en schemas de
 | **F-hoy / F-D** | Finalistas operativos vs TOP experimento as-of D ([ADR-021](./adr/021-dia-d-reconciliation.md)) | Un solo TOP que se pisa al cambiar DÍA D |
 | **Historial de mandato** | Tramos cerrados + vigente (`MandateTenure`) | Snapshot de adopción sin fechas |
 | **Verificar (D→hoy)** | Sesión LAB fase C con #1 congelada | Operar en Trading / MODO DÍA D (as-is deprecado) |
-| **Panel Operativa** | Columna Trading (Recomendación / Info / Configuración) a altura completa | Embudo LAB Coach; rail Coach legado |
-| **En estudio** | Lista virtual = pestañas de gráfico abiertas | Watchlist persistida / catálogo |
-| **Índice Operativo (IO)** | Score 0–100 (Composite + suelo distress) + ranking entre En estudio | Ranking Finalistas LAB |
+| **Panel Operativa** | Columna Trading (Recomendación / Info) por activo; Supervisión = banner Estudio; modos cuenta = barra estado | Embudo LAB Coach; rail Coach legado |
+| **En estudio** | *(legacy)* ver **Estudio** | — |
+| **Estudio** | Lista API canónica (`estudio`) = universo supervisable TRADING (membresía explícita) | Catálogo IBEX/S&P; ≠ pestañas de gráfico |
+| **Supervisión ON** | Arma Lista AUTO + CORE-R sobre miembros Estudio (3 cadencias) | Solo pertenecer a Estudio sin armado |
+| **Vigilia / Frescura / Redescubrimiento** | Capas V·F·R (CORE-R · skip_fresh · forceRescan) | Un solo timer genérico |
+| **Actualizar (Estudio)** | Adelanta velas + vigilia + frescura (puede omitir embudo) | Redescubrir (embudo completo) |
+| **Redescubrir (Estudio)** | Embudo `forceRescan` + confirm costoso | Actualizar / skip_fresh |
+| **OPERATIVA: Manual\|Semi\|Auto** | Modo de la cuenta entera (barra estado → Cuentas) | Modo por ticker |
+| **Índice Operativo (IO)** | Score 0–100 (Composite + suelo distress) + ranking entre Estudio | Ranking Finalistas LAB |
 | **Coach en vivo** | *(legado)* contenido absorbido por **Panel Operativa** | Reabrir embudo dentro del desk |
 
 Canónico cuentas: [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md).  

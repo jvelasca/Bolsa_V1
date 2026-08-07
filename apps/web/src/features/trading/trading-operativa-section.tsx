@@ -8,14 +8,16 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import {
+  MAX_OPERATIVA_SECTION_HEIGHT_PX,
+  MIN_OPERATIVA_SECTION_HEIGHT_PX,
   type OperativaSectionId,
   useTradingLayoutStore,
 } from '@/stores/trading-layout-store';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_HEIGHTS: Record<OperativaSectionId, number> = {
-  recommendation: 260,
-  info: 140,
+  recommendation: 320,
+  info: 200,
   config: 180,
 };
 
@@ -61,7 +63,10 @@ export function TradingOperativaSection({
       const onMove = (moveEvent: PointerEvent) => {
         const delta = moveEvent.clientY - lastY;
         lastY = moveEvent.clientY;
-        const next = Math.min(420, Math.max(72, pendingRef.current + delta));
+        const next = Math.min(
+          MAX_OPERATIVA_SECTION_HEIGHT_PX,
+          Math.max(MIN_OPERATIVA_SECTION_HEIGHT_PX, pendingRef.current + delta),
+        );
         pendingRef.current = next;
         setLiveHeight(next);
       };
@@ -124,10 +129,15 @@ export function TradingOperativaSection({
             role="separator"
             aria-orientation="horizontal"
             aria-label="Redimensionar sección"
-            title="Arrastra para cambiar altura"
+            title="Arrastra para ampliar o reducir la sección"
             onPointerDown={onResizePointerDown}
-            className="h-1.5 shrink-0 cursor-row-resize border-t border-border/50 bg-muted/30 hover:bg-primary/20"
-          />
+            className="group flex h-2.5 shrink-0 cursor-row-resize items-center justify-center border-t border-border/50 bg-muted/25 hover:bg-primary/20"
+          >
+            <span
+              className="h-0.5 w-8 rounded-full bg-muted-foreground/35 group-hover:bg-primary/70"
+              aria-hidden
+            />
+          </div>
         </>
       ) : null}
     </section>

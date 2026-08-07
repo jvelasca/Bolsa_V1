@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BACKTEST_HISTORY_MAX_DEFAULT,
   MATRIX_LIST_HEIGHT_DEFAULT,
+  MATRIX_LIST_HEIGHT_MAX,
+  MATRIX_LIST_HEIGHT_MIN,
   MATRIX_SELECT_BATCH_DEFAULT,
   clampHistoryMaxKept,
   clampListHeightPx,
@@ -31,10 +33,10 @@ describe('clampSelectBatchSize', () => {
 });
 
 describe('clampListHeightPx', () => {
-  it('defaults and clamps to [160, 560]', () => {
+  it('defaults and clamps to [MIN, MAX]', () => {
     expect(clampListHeightPx(Number.NaN)).toBe(MATRIX_LIST_HEIGHT_DEFAULT);
-    expect(clampListHeightPx(50)).toBe(160);
+    expect(clampListHeightPx(1)).toBe(MATRIX_LIST_HEIGHT_MIN);
     expect(clampListHeightPx(280)).toBe(280);
-    expect(clampListHeightPx(900)).toBe(560);
+    expect(clampListHeightPx(2000)).toBe(MATRIX_LIST_HEIGHT_MAX);
   });
 });

@@ -66,7 +66,10 @@ type ListSyncStatusCellProps = {
   className?: string;
 };
 
-/** Icono de sincronismo en listas: frescura de diarias (calendario) + detalle al hover. */
+/**
+ * Icono Sincro: solo histórico de velas diarias (OHLCV).
+ * Capas Lab/CORE-R → columna «Procesos» (`ListProcessStatusCell`).
+ */
 export function ListSyncStatusCell({ item, className }: ListSyncStatusCellProps) {
   const state = resolveVisualState(item);
   const title = buildTooltip(item, state);

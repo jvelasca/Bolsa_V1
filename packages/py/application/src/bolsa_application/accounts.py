@@ -473,7 +473,9 @@ class ExecuteTrade:
     ) -> TradeResult:
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
         settings = scope.account.settings or settings_from_dict(None)
-        notional = quantity * price
+        from decimal import Decimal
+
+        notional = float(Decimal(str(quantity)) * Decimal(str(price)))
         fees = calculate_trade_fees(
             notional,
             trade_type,  # type: ignore[arg-type]

@@ -8,10 +8,15 @@ export interface AlertToast {
   action?: AlertToastAction | null;
 }
 
-export type AlertToastAction = {
-  type: 'open_help_backtesting_monitor';
-  label?: string;
-};
+export type AlertToastAction =
+  | {
+      type: 'open_help_backtesting_monitor';
+      label?: string;
+    }
+  | {
+      type: 'open_asesor_opiniones';
+      label?: string;
+    };
 
 interface AlertsState {
   toasts: AlertToast[];

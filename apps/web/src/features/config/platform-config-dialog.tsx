@@ -10,6 +10,7 @@ import {
 } from '@/features/accounts/use-active-account';
 import { SyncSettingsPanel } from '@/features/sync/sync-settings-panel';
 import { DatabaseConfigPanel } from '@/features/config/database-config-panel';
+import { NotificationsSettingsPanel } from '@/features/config/notifications-settings-panel';
 import { useTradePreferencesStore } from '@/stores/trade-preferences-store';
 import { cn } from '@/lib/utils';
 import { useUiStore, type PlatformConfigTab } from '@/stores/ui-store';
@@ -17,11 +18,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { POLICY_TEMPLATE_LABELS } from '@bolsa/shared';
 import { api } from '@/lib/api';
 
-/** Solo pestañas con UI real. Placeholders (notificaciones / sonidos / atajos) ocultos. */
+/** Pestañas con UI real (notificaciones ya no es placeholder). */
 const TABS: { id: PlatformConfigTab; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'investor-profile', label: 'Perfil inversor' },
   { id: 'commissions', label: 'Comisiones y fiscal' },
+  { id: 'notifications', label: 'Notificaciones' },
   { id: 'confirmations', label: 'Confirmaciones' },
   { id: 'bd', label: 'BD' },
   { id: 'other', label: 'Sync / proveedores' },
@@ -283,6 +285,8 @@ function ConfigTabPanel({ tab }: { tab: PlatformConfigTab }) {
       return <CommissionsTabPanel />;
     case 'confirmations':
       return <ConfirmationsTabPanel />;
+    case 'notifications':
+      return <NotificationsSettingsPanel />;
     case 'bd':
       return <DatabaseConfigPanel />;
     case 'other':
@@ -307,7 +311,6 @@ function ConfigTabPanel({ tab }: { tab: PlatformConfigTab }) {
           </Card>
         </div>
       );
-    case 'notifications':
     case 'sounds':
     case 'shortcuts':
       // Tabs reservados (aún sin UI); redirigidos vía safeTab en el diálogo

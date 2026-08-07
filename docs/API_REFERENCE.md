@@ -12,7 +12,20 @@ Rutas públicas sin token: `/api/health`, `/api/auth/login`, `/api/auth/status`,
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET | `/api/health` | Estado servicio + ping BD |
+| GET | `/api/health` | Estado servicio + BD + componentes (`database`, `yahoo`, `xtb`, `redis`, `auth`, `worker_arq`, `risk`) |
+
+`components.risk` expone kill switch efectivo (`env` / runtime / Redis) y si `PAPER_D_EXECUTE` está on (solo lectura; default off).
+
+---
+
+## Risk (OR-P7 / A3)
+
+| Método | Ruta | Body | Descripción |
+|--------|------|------|-------------|
+| GET | `/api/risk/kill-switch` | — | Estado kill switch (env + memoria + Redis) + `paperDExecuteEnv` |
+| POST | `/api/risk/kill-switch` | `{ enabled: boolean }` | Activa/desactiva runtime (&lt;1s vía Risk Engine); no reinicia proceso |
+
+Bloquea aperturas **automáticas** (`paper_auto` / futuro AUTO). No sustituye Confirm SEMI.
 
 ---
 
@@ -99,6 +112,9 @@ Aplica a `/api/portfolio`, `/api/portfolio/trade`, `/api/portfolio/transactions`
 | POST | `/api/accounts/{id}/close` | Cerrar cuenta (conserva historial) |
 | DELETE | `/api/accounts/{id}` | Eliminar cuenta demo cerrada (hard delete) |
 | GET | `/api/accounts/{id}/summary` | Resumen (dispara custodia anual si procede) |
+| GET | `/api/accounts/{id}/daily-ops-report?asOf=&instrumentIds=` | Resumen operativo diario (R1 preview Asesor → Diario) |
+| GET | `/api/accounts/{id}/daily-ops-report.pdf?asOf=&instrumentIds=` | R4 — descarga PDF del resumen |
+| POST | `/api/accounts/{id}/daily-ops-report/email` | R3/R4 — envío HTML digest (+ `attachPdf`) |
 | GET | `/api/accounts/{id}/ledger?limit=&offset=` | Libro mayor |
 | GET | `/api/accounts/{id}/tax-report?year=` | Informe plusvalías |
 | POST | `/api/accounts/{id}/deposits` | Depósito externo (simulado) |

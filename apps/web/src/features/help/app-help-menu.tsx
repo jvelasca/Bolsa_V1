@@ -6,7 +6,7 @@
  * Sync: `HELP_CONTENT_AS_OF`.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, CircleHelp } from 'lucide-react';
+import { CircleHelp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Dialog } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
@@ -352,25 +352,65 @@ function TradingContent() {
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
             <strong className="text-foreground">Recomendación</strong> — Índice Operativo (IO),
-            gauges TA/FA, ranking «El n de N en estudio», TOP #1 / adopción, enlaces{' '}
+            gauges TA/FA, ranking «El n de N en Estudio», TOP #1 / adopción, enlaces{' '}
             <strong className="text-foreground">Abrir estudio (LAB)</strong> y{' '}
             <strong className="text-foreground">Verificar D→hoy</strong> (si hay DÍA D en el
             pasado).
           </li>
           <li>
-            <strong className="text-foreground">Info</strong> — mandato / Learning.
-          </li>
-          <li>
-            <strong className="text-foreground">Configuración</strong> — a la derecha
-            «Operativa: manual|semi|auto» (sin desplegar); el bloque usa el{' '}
-            <strong className="text-foreground">nombre de la cuenta activa</strong> (MANUAL/SEMI,
-            % cash, máx. posiciones, geo). AUTO sigue congelado.
+            <strong className="text-foreground">Info</strong> — mandato / Learning / Outcomes.
           </li>
         </ul>
         <p className="mt-2">
-          Lista virtual <strong className="text-foreground">En estudio</strong> = pestañas de
-          gráfico abiertas (mismo conjunto). La verificación ya no vive en la mesa Trading
-          (ADR-019).
+          <strong className="text-foreground">Manual / SEMI / AUTO</strong> es de la{' '}
+          <strong className="text-foreground">cuenta entera</strong> (no del valor). Barra
+          inferior: badge <strong className="text-foreground">OPERATIVA: Semi</strong> → clic abre
+          Cuentas · Config · Operativa (sizing, kill switch, armado AUTO prep).{' '}
+          <strong className="text-foreground">AUTO</strong> sigue en prep (
+          <code className="text-[10px]">PAPER_D_EXECUTE</code> off). Usa SEMI + Confirm.
+        </p>
+        <p className="mt-2">
+          Lista virtual <strong className="text-foreground">Visualizados</strong> = pestañas de
+          gráfico abiertas (scratch; no supervisión). Selección: <strong className="text-foreground">A Estudio</strong> ·{' '}
+          <strong className="text-foreground">Quitar</strong> (cierra pestañas) ·{' '}
+          <strong className="text-foreground">Por IO</strong> (mejor Índice Operativo a la
+          izquierda). Columnas (⋯): IO · TA · FA · ★ Dict. · Postura. Al buscar o cambiar de
+          pestaña: prioriza lista <strong className="text-foreground">Cartera → Estudio → resto</strong>{' '}
+          y hace scroll del valor al tope. Lista API{' '}
+          <strong className="text-foreground">Estudio</strong> = universo supervisable
+          (membresía explícita). Abrir/cerrar gráfico <em>no</em> cambia Estudio. En Estudio:
+          Actualizar / Redescubrir · Supervisión ON + chips V·F·R. SEMI/AUTO exigen
+          pertenencia; MANUAL no. ADR-024.
+        </p>
+        <h4 className="mb-1 mt-3 font-semibold text-foreground">SEMI vs AUTO (2026-08-04)</h4>
+        <ul className="list-disc space-y-1 pl-5">
+          <li>
+            <strong className="text-foreground">SEMI</strong> — camino operativo diario: Alarma /
+            Proponer F3 → Confirm humano → fill DEMO.
+          </li>
+          <li>
+            <strong className="text-foreground">AUTO</strong> — solo prep: pill disabled, kill
+            switch y armado local (<code className="text-[10px]">ACTIVAR AUTO</code>). Execute
+            requiere checklist thaw + ADR-023 Accepted +{' '}
+            <code className="text-[10px]">PAPER_D_EXECUTE=1</code> (default off).
+          </li>
+          <li>
+            <strong className="text-foreground">Asesor → Diario</strong> — resumen operativo del
+            día (cuenta · trades · F3 · Alarmas/Avisos · semana). Preview en app; email HTML
+            (+ PDF opt-in R4) o descarga PDF.
+          </li>
+          <li>
+            <strong className="text-foreground">Asesor → Opiniones</strong> — telemetría A0
+            (días / precisión / recall proxy) para medir P1–P4 antes de thaw.
+          </li>
+        </ul>
+        <h4 className="mb-1 mt-3 font-semibold text-foreground">Barra de estado (inferior)</h4>
+        <p>
+          Izquierda: conexión · cuenta Activa ·{' '}
+          <strong className="text-foreground">OPERATIVA: …</strong> · métricas. Derecha (ancho
+          fijo): <strong className="text-foreground">Colas</strong> (Velas · CORE-R · F3 · Lista
+          AUTO) y <strong className="text-foreground">Alarmas Radar</strong> (badge nº sin leer).
+          El rail no salta al cambiar conteos.
         </p>
       </section>
       <section>
@@ -399,7 +439,10 @@ function TradingContent() {
         </ul>
         <p className="mt-2">
           Docs: <code className="text-[0.85em]">docs/adr/020-operating-mandate-tenure.md</code> ·{' '}
-          <code className="text-[0.85em]">docs/engineering/trading-operativa-panel-2026-08-04.md</code>.
+          <code className="text-[0.85em]">docs/adr/024-estudio-supervision-universe.md</code> ·{' '}
+          <code className="text-[0.85em]">docs/engineering/trading-operativa-panel-2026-08-04.md</code>{' '}
+          ·{' '}
+          <code className="text-[0.85em]">docs/engineering/estudio-process-status-ui-2026-08-06.md</code>.
         </p>
       </section>
       <section>
@@ -749,14 +792,13 @@ export function AppHelpMenu() {
         <button
           type="button"
           onClick={() => setMenuOpen((v) => !v)}
-          className="flex items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+          className="flex items-center rounded-md p-1.5 text-sm hover:bg-accent"
           aria-expanded={menuOpen}
           aria-haspopup="menu"
+          aria-label="Ayuda"
           title="Ayuda"
         >
           <CircleHelp className="h-4 w-4" />
-          <span className="hidden sm:inline">Ayuda</span>
-          <ChevronDown className="h-3.5 w-3.5 opacity-60" />
         </button>
         {menuOpen && (
           <div

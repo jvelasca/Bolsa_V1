@@ -1,0 +1,55 @@
+name: Frontend CI
+
+on:
+  push:
+    paths:
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - 'eslint.config.js'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'apps/web/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'turbo.json'
+      - 'eslint.config.js'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @bolsa/web typecheck
+
+      - name: Lint
+        # El lint queda en verde (0 errores); los warnings de react-hooks
+        # (deuda legacy) se auditan en la refactor F4·8 y no bloquean.
+        run: pnpm --filter @bolsa/web lint
+
+      - name: Test
+        run: pnpm --filter @bolsa/web test
+
+      - name: Build
+        run: pnpm --filter @bolsa/web build

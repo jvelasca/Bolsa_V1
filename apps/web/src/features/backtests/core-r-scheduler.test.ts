@@ -5,9 +5,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CORE_R_SCHEDULER_KEY,
+  clampCoreRSchedulerInterval,
   coreRSchedulerDue,
   loadCoreRSchedulerPrefs,
   markCoreRSchedulerTick,
+  resolveCoreRSchedulerListId,
   saveCoreRSchedulerPrefs,
 } from '@/features/backtests/core-r-scheduler';
 
@@ -61,6 +63,37 @@ describe('core-r-scheduler', () => {
     expect(next.lastTickAt).toBeTruthy();
     expect(loadCoreRSchedulerPrefs().listId).toBe('list-ibex');
     expect(loadCoreRSchedulerPrefs().lastTickAt).toBe(next.lastTickAt);
+  });
+
+  it('prefers Estudio canónica when resolving listId', () => {
+    expect(
+      resolveCoreRSchedulerListId({
+        estudioListId: 'estudio',
+        monitorListId: 'ibex35',
+        previousListId: 'old',
+      }),
+    ).toBe('estudio');
+    expect(
+      resolveCoreRSchedulerListId({
+        estudioListId: null,
+        estudioPersonalListId: 'est-1',
+        monitorListId: 'ibex35',
+        previousListId: 'old',
+      }),
+    ).toBe('est-1');
+    expect(
+      resolveCoreRSchedulerListId({
+        estudioListId: null,
+        monitorListId: 'ibex35',
+        previousListId: 'old',
+      }),
+    ).toBe('ibex35');
+  });
+
+  it('clamps interval minutes', () => {
+    expect(clampCoreRSchedulerInterval(1)).toBe(5);
+    expect(clampCoreRSchedulerInterval(90)).toBe(90);
+    expect(clampCoreRSchedulerInterval(10_000)).toBe(1440);
   });
 });
 

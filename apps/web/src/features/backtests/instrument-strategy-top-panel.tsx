@@ -193,7 +193,7 @@ function SlotRow({
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="outline"
             className="h-7 text-[11px]"
             disabled={proposePending}
             title={PAPER_PATH_SUPERVISED.blurb}

@@ -4,7 +4,6 @@ import {
   buildTrackerFromFinalistSlot,
   buildTrackerNameFromFinalist,
   kernelTimeframeFromTop,
-  screenersHrefAfterTrackerCreate,
 } from '@/features/backtests/promote-finalist-to-tracker';
 
 const slot1: InstrumentStrategyTopSlotV1 = {

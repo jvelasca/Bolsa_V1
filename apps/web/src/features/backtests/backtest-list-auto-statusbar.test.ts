@@ -26,6 +26,17 @@ describe('formatListAutoStatusBarSummary', () => {
       }),
     ).toBe('Lista AUTO 1/19 · BKT · pausa');
   });
+
+  it('includes tanda when over one batch', () => {
+    expect(
+      formatListAutoStatusBarSummary({
+        index: 41,
+        total: 80,
+        symbol: 'SAN',
+        paused: true,
+      }),
+    ).toMatch(/Tanda 2\/2/);
+  });
 });
 
 describe('shortenListAutoPhase', () => {

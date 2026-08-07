@@ -7,6 +7,8 @@ import { PlatformShell } from '@/components/layout/platform-shell';
 
 import { AuthGate } from '@/features/auth/auth-gate';
 
+import { AppErrorBoundary } from '@/components/layout/app-error-boundary';
+
 import { ChartWorkspacePage } from '@/features/charts/chart-workspace-page';
 
 import { OverviewPage } from '@/features/dashboard/dashboard-page';
@@ -48,7 +50,11 @@ const router = createBrowserRouter([
 
       <AuthGate>
 
-        <PlatformShell />
+        <AppErrorBoundary>
+
+          <PlatformShell />
+
+        </AppErrorBoundary>
 
       </AuthGate>
 

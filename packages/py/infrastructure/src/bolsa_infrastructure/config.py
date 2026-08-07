@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,17 +11,24 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    database_url: str = Field(
-        default="postgresql+psycopg://bolsa:bolsa_dev@localhost:5432/bolsa_v1",
-        validation_alias="DATABASE_URL",
-    )
+    # F2·6: credentials de BD no van hardcodeadas en el código. Si no llega
+    # `DATABASE_URL`, se compone desde DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME
+    # (mismos defaults de docker-compose.yml). En local el .env provee DATABASE_URL.
+    database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
+    db_host: str = Field(default="localhost", validation_alias="DB_HOST")
+    db_port: int = Field(default=5432, validation_alias="DB_PORT")
+    db_user: str = Field(default="bolsa", validation_alias="DB_USER")
+    db_password: str = Field(default="", validation_alias="DB_PASSWORD")
+    db_name: str = Field(default="bolsa_v1", validation_alias="DB_NAME")
     redis_url: str = "redis://localhost:6379/0"
     cors_origin: str = "http://localhost:5173"
     api_host: str = "0.0.0.0"
     api_port: int = Field(default=8000, validation_alias="API_PYTHON_PORT")
     xtb_bridge_url: str | None = Field(default=None, validation_alias="XTB_BRIDGE_URL")
     app_password: str | None = Field(default=None, validation_alias="APP_PASSWORD")
-    app_auth_secret: str = Field(default="bolsa-dev-secret", validation_alias="APP_AUTH_SECRET")
+    # F2·6: sin secreto hardcodeado. Vacío por defecto; si se activa APP_PASSWORD
+    # se exige un APP_AUTH_SECRET real (ver validator más abajo).
+    app_auth_secret: str = Field(default="", validation_alias="APP_AUTH_SECRET")
     environment: str = "development"
     scan_queue_backend: str = Field(default="postgres", validation_alias="SCAN_QUEUE_BACKEND")
     alert_webhook_timeout_seconds: float = Field(
@@ -41,6 +48,7 @@ class Settings(BaseSettings):
     smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
     smtp_user: str | None = Field(default=None, validation_alias="SMTP_USER")
     smtp_password: str | None = Field(default=None, validation_alias="SMTP_PASSWORD")
+    smtp_from: str | None = Field(default=None, validation_alias="SMTP_FROM")
     tracker_schedule_enabled: bool = Field(default=True, validation_alias="TRACKER_SCHEDULE_ENABLED")
     tracker_schedule_interval_seconds: float = Field(
         default=60.0,
@@ -104,15 +112,67 @@ class Settings(BaseSettings):
     cost_model_v2_volume_ratio_illiquid: float = Field(
         default=0.35, validation_alias="COST_MODEL_V2_VOLUME_RATIO_ILLIQUID"
     )
+    # OR-RE — kill switch global aperturas automáticas (Risk Engine).
+    risk_kill_switch: bool = Field(
+        default=False, validation_alias="RISK_KILL_SWITCH"
+    )
+    # D2 — batch EOD dictámenes Estudio. Off-by-default (ADR-022 / triage).
+    estudio_eod_opinion_enabled: bool = Field(
+        default=False, validation_alias="ESTUDIO_EOD_OPINION_ENABLED"
+    )
+    estudio_eod_opinion_interval_seconds: float = Field(
+        default=3600.0, validation_alias="ESTUDIO_EOD_OPINION_INTERVAL_SECONDS"
+    )
+    # D2 — email Alarmas Estudio (off-by-default; requiere SMTP_* + EMAIL_TO).
+    estudio_opinion_email_enabled: bool = Field(
+        default=False, validation_alias="ESTUDIO_OPINION_EMAIL_ENABLED"
+    )
+    estudio_opinion_email_to: str | None = Field(
+        default=None, validation_alias="ESTUDIO_OPINION_EMAIL_TO"
+    )
+    # R3 — digest operativo diario HTML tras eod-batch (off-by-default).
+    daily_ops_digest_email_enabled: bool = Field(
+        default=False, validation_alias="DAILY_OPS_DIGEST_EMAIL_ENABLED"
+    )
+    # R4 — adjuntar PDF al digest (off-by-default; requiere digest email).
+    daily_ops_digest_pdf_enabled: bool = Field(
+        default=False, validation_alias="DAILY_OPS_DIGEST_PDF_ENABLED"
+    )
+
+    @model_validator(mode="after")
+    def compose_database_url(self) -> "Settings":
+        # Si no se indicó DATABASE_URL en el entorno, se compone desde DB_*.
+        # DB_PASSWORD vacío => sin credenciales si PostgreSQL local no las exige
+        # (default de docker-compose usa user=bolsa y password bolsa_dev vía env).
+        if not self.database_url:
+            cred = f"{self.db_user}:{self.db_password}@" if self.db_password else f"{self.db_user}@"
+            self.database_url = (
+                f"postgresql+psycopg://{cred}{self.db_host}:{self.db_port}/{self.db_name}"
+            )
+        if self.database_url.startswith("postgresql://"):
+            self.database_url = self.database_url.replace(
+                "postgresql://", "postgresql+psycopg://", 1
+            )
+        # F2·6: si se activa contraseña de acceso (APP_PASSWORD), el secreto de
+        # firma NO puede ser vacío ni el valor de desarrollo aún conocido.
+        if self.app_password:
+            secret = (self.app_auth_secret or "").strip()
+            if not secret:
+                raise ValueError(
+                    "APP_PASSWORD activa requiere APP_AUTH_SECRET (secreto de firma) no vacío"
+                )
+            if secret == "bolsa-dev-secret":
+                raise ValueError(
+                    "APP_AUTH_SECRET no puedes ser 'bolsa-dev-secret' con APP_PASSWORD: usa un secreto aleatorio"
+                )
+        return self
 
     @field_validator("database_url")
     @classmethod
-    def normalize_database_url(cls, value: str) -> str:
+    def normalize_database_url(cls, value: str | None) -> str | None:
         # Prisma suele añadir ?schema=public — psycopg no lo acepta en la URL
-        if "?" in value:
+        if value and "?" in value:
             value = value.split("?", 1)[0]
-        if value.startswith("postgresql://"):
-            return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
 
 

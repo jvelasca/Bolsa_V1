@@ -33,6 +33,15 @@ pnpm dev          # API :8000 + Web :5173
 
 Abrir http://localhost:5173. Si queda en "Cargando…", ver `pnpm health` y [docker.md](./docker.md).
 
+### Acceso (OR-S1)
+
+| Entorno | `APP_PASSWORD` |
+|---------|----------------|
+| Local solo | Vacío OK (sin login) |
+| **Demo compartida / staging / prod** | **Obligatorio** — sin él, `GET /api/health` → `components.auth` = `degraded` si `ENVIRONMENT` no es `development`/`local`/`test` |
+
+También define `APP_AUTH_SECRET` (no uses el default en demos). Ver `.env.example`.
+
 ## 3. Mapa mental del monorepo
 
 ```

@@ -194,9 +194,15 @@ Plantilla pública: [`.env.example`](../../.env.example).
 | `COST_MODEL_V2_ENABLED` | `false` | Costes Lab v2 (iliquidez / volumen) en `run_backtest` |
 | `COST_MODEL_V2_ILLIQUID_EXTRA_BPS` | `8` | Extra bps si ratio volumen bajo |
 | `COST_MODEL_V2_VOLUME_RATIO_ILLIQUID` | `0.35` | Umbral ratio volumen |
+| `PAPER_D_EXECUTE` | off (unset) | Camino D / Paper D **execute**; solo tras checklist thaw + ADR-023 |
+| `PAPER_D_ACCOUNT_ID` | unset | A5: restringe execute a una cuenta DEMO |
+| `RISK_KILL_SWITCH` | `false` | Veto duro aperturas auto; UI también `POST /api/risk/kill-switch` |
+| `ESTUDIO_EOD_OPINION_ENABLED` | `false` | Batch EOD dictámenes (noop si off) |
+| `APP_PASSWORD` | vacío local | OR-S1: obligatorio en demos compartidas |
 
-**No activar en prod/demo sin decisión explícita.** Documentación producto: HELP → CORE-R; roadmap Q3.4/Q3.5.
+**No activar en prod/demo sin decisión explícita.** Documentación: HELP · [pack prep AUTO](./audit-pack-pre-auto-a0-a5-2026-08-04.md) · [checklist thaw](./camino-d-auto-thaw-checklist-2026-08-04.md).
 
 ---
 
-*Última actualización: 2026-08-03 · Flags CORE-R / cost v2 documentados.*
+*Última actualización: 2026-08-06 · Flags Camino D / Risk / Estudio documentados.*  
+*UI supervisión Estudio (no flags): [ADR-024](../adr/024-estudio-supervision-universe.md) · [handoff procesos](./session-handoff-2026-08-06-estudio-process-ui.md) · repo [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1).*

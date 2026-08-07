@@ -13,7 +13,7 @@
 | Entrada | Universo **Lista** + Play (ciclo ON) | Botón secundario en `<details>` |
 | Unidad | Embudo completo × cada valor | 1 estrategia × N valores → ranking |
 | Estrategia | **No se elige** (genéricas ∪ Finalistas del ticker) | Obligatoria (1 preset o Mis estrategias) |
-| Cap | 40 (+ confirm si N>40; filtro opcional «solo sin Finalistas») | 40 |
+| Cap | Tanda 40 (confirma si N>40; pref «No preguntar tandas»; tope duro 500) · filtro opcional «solo sin Finalistas» | 40 |
 | Browse | Universo Lista muestra resumen TOP/★/AUTO; clic → Valor | Ranking clic → Valor + run |
 
 ## 2. Flujo
@@ -133,7 +133,7 @@ Acciones = deep-links (Lab / Finalistas / Checklist / F3). Botón **Reevaluar re
 
 **Narrar cola (v1.3):** `POST /api/ai/core-r/review-evidence` · heurística siempre · LLM via Proxy First. Monitor → **Narrar cola**.
 
-**Cron shell (v1.4):** `CoreRSchedulerHost` en PlatformShell · `scope=shell` + `listId` · ticks con app abierta. Cola localStorage (no multi-dispositivo).
+**Cron shell (v1.4):** `CoreRSchedulerHost` en PlatformShell · `scope=shell` + `listId` · ticks con app abierta.
 
 **Chip barra (v1.5):** «CORE-R N» en hilos de la barra Trading si hay cola abierta → Ayuda · Monitor (`openHelpBacktesting`). Hub: `/backtests?tab=run&focus=monitor`.
 
@@ -141,9 +141,31 @@ Acciones = deep-links (Lab / Finalistas / Checklist / F3). Botón **Reevaluar re
 
 **Hecho todos (v1.8):** `dismissOpen(listId)` en Monitor — cierra abiertas de la lista actual (no borra; `clearDone` limpia done).
 
-**No:** cron multi-dispositivo · auto-paper D · overwrite `active`.
+**Multi-dispositivo (v1.9–v1.12):** cola/informe/scheduler en BD (`core_r_account_state`) = SoT; localStorage = cache. Hydrate/push vía `core-r-sync.ts`. Cron servidor opcional (`CORE_R_CRON_ENABLED`).
+
+**Estudio canónica + Supervisión (ADR-024):** Auto-sync / Supervisión ON prefieren lista API `estudio`. Cadencias 3 capas en (···): vigilia CORE-R (min) · frescura Lista AUTO + `skip_fresh` (días) · rediscubrimiento `forceRescan` con presupuesto rotatorio. «Estudio personal» se fusiona al cargar Listas. Ver [estudio-supervision-model-2026-08-06.md](./estudio-supervision-model-2026-08-06.md).
+
+**Adoptar mandato SEMI (v1.13):** en cola, juicio «Valorar cambio» + TOP#1 → CTA **Adoptar** (modo SEMI) · tenure ADR-020 (`actor=core_r`, `propose_accepted`). AUTO execute no auto-adopta.
+
+**No:** auto-paper D · overwrite `active` · auto-adopción de mandato.
 
 **Ops:** `pnpm test:operativa` (web+py+smoke opcional).
+
+## 5.2 LAB reanálisis vs TRADING cambio de mandato
+
+| | Reanálisis (LAB) | Cambio operativo (TRADING) |
+|--|------------------|----------------------------|
+| Pregunta | ¿Sigue siendo buena la Finalista / hay mejor candidata? | ¿Cerrar el mandato actual y abrir otro? |
+| Herramientas | Lista AUTO · Reevaluar resto · cron CORE-R · Play | Mandato ADR-020 · aceptar propuesta en Monitor · cambio manual |
+| Quién decide | Embudo / frescura (automático o forzado) | Humano (SEMI Confirm) — **AUTO execute no auto-adopta** |
+
+| Modo TRADING | Reanálisis | Cambio de estrategia |
+|--------------|------------|----------------------|
+| Manual | A voluntad (Play lista / Monitor) | Usuario cambia mandato |
+| SEMI | CORE-R + cola; chip en barra | Usuario confirma propuesta |
+| AUTO (execute) | Igual (juicio/cola) | **No** auto-adopta; solo opera el mandato vigente |
+
+CORE-R **propone** (Mantener / Revisar Lab / Valorar cambio). No pisa TOP ni cambia mandato solo ([§5.1](#51-core-r-v0-reevaluación-manual)).
 
 ## 6. Código clave
 
@@ -160,8 +182,10 @@ Acciones = deep-links (Lab / Finalistas / Checklist / F3). Botón **Reevaluar re
 | CORE-R scheduler lite | `core-r-scheduler.ts` · `core-r-scheduler-tick.ts` · `core-r-scheduler-host.tsx` |
 | CORE-R chip barra | `core-r-status.ts` · `trading-app-threads.tsx` |
 | CORE-R cola Monitor | `stores/core-r-review-queue-store.ts` · `strategy-monitor-panel.tsx` |
+| CORE-R Adoptar SEMI | `core-r-adopt-mandate.ts` |
+| Estudio personal (nombre) | `@bolsa/shared` `ESTUDIO_PERSONAL_LIST_NAME` · `resolveEstudioPersonalListId` |
 | Orquestación | `backtests-page.tsx` |
-| Prefs | `backtest-assistant-prefs.ts` · rail «Omitir si Finalistas frescos» |
+| Prefs | `backtest-assistant-prefs.ts` · «Omitir si Finalistas frescos» · «No preguntar tandas» |
 | Stamp al guardar TOP | `backtest-explore-panel.tsx` |
 | Ayuda usuario | `backtesting-tracker.ts` · `HELP_CONTENT_AS_OF` |
 
@@ -203,7 +227,7 @@ python scripts/research/verify_finalists_freshness_smoke.py --list-id ibex35
 | Track | Estado |
 |-------|--------|
 | Lista AUTO UX + frescura + pausa persistente | **Hecho** (esta nota) |
-| CORE-R reevaluación continua + IA | v0–v1.8 **hecho** (cola · OOS · PnL · narración · cron · chip · toast→Monitor · Hecho todos) · multi-dispositivo pendiente |
+| CORE-R reevaluación continua + IA | v0–v1.13 **hecho** (cola · OOS · PnL · narración · cron shell · chip · toast→Monitor · Hecho todos · BD SoT · Estudio personal · Adoptar SEMI) |
 | CORE-P deep-dive perfil | **Hecho** (familias + mismatch + soft-bias + E2E `test:coach:smoke`) |
 | Mapa IA Config/Ayuda | **Hecho** (Ayuda → Plataforma IA) |
 | Auto-paper D | Congelado |

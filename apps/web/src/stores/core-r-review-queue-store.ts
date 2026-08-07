@@ -55,6 +55,8 @@ type CoreRReviewQueueState = {
   dismiss: (id: string) => void;
   /** Marca open→done (opcionalmente filtrado por listId). Returns # cerrados. */
   dismissOpen: (listId?: string) => number;
+  /** ADR-024: quitar de Estudio → cierra abiertas de ese instrumento. */
+  dismissOpenForInstrument: (instrumentId: string) => number;
   clearDone: () => void;
   clearList: (listId: string) => void;
   openForList: (listId: string) => CoreRReviewQueueItem[];
@@ -133,6 +135,18 @@ export const useCoreRReviewQueueStore = create<CoreRReviewQueueState>()(
           items: s.items.map((i) => {
             if (i.status !== 'open') return i;
             if (listId && i.listId !== listId) return i;
+            n += 1;
+            return { ...i, status: 'done' as const };
+          }),
+        }));
+        return n;
+      },
+      dismissOpenForInstrument: (instrumentId) => {
+        let n = 0;
+        if (!instrumentId) return 0;
+        set((s) => ({
+          items: s.items.map((i) => {
+            if (i.status !== 'open' || i.instrumentId !== instrumentId) return i;
             n += 1;
             return { ...i, status: 'done' as const };
           }),

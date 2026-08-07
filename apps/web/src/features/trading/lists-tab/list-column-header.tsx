@@ -11,9 +11,11 @@ import { cn } from '@/lib/utils';
 import {
   LIST_HEADER_GRIP_INSET_PX,
   LIST_ROW_EXPAND_WIDTH_PX,
+  LIST_ROW_SELECT_WIDTH_PX,
   isCenteredListColumn,
   isNumericListColumn,
   listColumnContentClass,
+  listRowLeftGutterWidthPx,
   patchListFavoriteColumn,
   resolveListFavoriteColumnIds,
 } from '@/lib/list-column-layout';
@@ -24,9 +26,11 @@ import { useWorkspaceStore } from '@/stores/workspace-store';
 
 
 interface ListColumnHeaderProps {
-
   className?: string;
-
+  /** Check de cabecera (selección masiva), estilo matriz Backtesting. */
+  selectAllChecked?: boolean;
+  selectAllIndeterminate?: boolean;
+  onSelectAllToggle?: () => void;
 }
 
 
@@ -160,7 +164,12 @@ function RowActionsResizeHandle({
 
 /** Cabecera interactiva: arrastrar para reordenar, borde para redimensionar. */
 
-export function ListColumnHeader({ className }: ListColumnHeaderProps) {
+export function ListColumnHeader({
+  className,
+  selectAllChecked,
+  selectAllIndeterminate,
+  onSelectAllToggle,
+}: ListColumnHeaderProps) {
 
   const listConfig = useWorkspaceStore((state) => state.workspace.list);
   const updateListConfig = useWorkspaceStore((state) => state.updateListConfig);
@@ -209,6 +218,14 @@ export function ListColumnHeader({ className }: ListColumnHeaderProps) {
 
 
 
+  const selectEnabled = typeof onSelectAllToggle === 'function';
+  const headerSelectRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!headerSelectRef.current) return;
+    headerSelectRef.current.indeterminate = Boolean(selectAllIndeterminate);
+  }, [selectAllIndeterminate]);
+
   return (
 
     <div
@@ -223,15 +240,32 @@ export function ListColumnHeader({ className }: ListColumnHeaderProps) {
 
     >
 
-      <span
-
-        className="shrink-0"
-
-        style={{ width: LIST_ROW_EXPAND_WIDTH_PX }}
-
-        aria-hidden
-
-      />
+      <div
+        className="flex shrink-0 items-center"
+        style={{ width: listRowLeftGutterWidthPx(selectEnabled) }}
+      >
+        {selectEnabled ? (
+          <div
+            className="flex shrink-0 items-center justify-center"
+            style={{ width: LIST_ROW_SELECT_WIDTH_PX }}
+          >
+            <input
+              ref={headerSelectRef}
+              type="checkbox"
+              className="h-3.5 w-3.5 accent-primary"
+              checked={Boolean(selectAllChecked)}
+              aria-label="Seleccionar todos los valores de la lista"
+              title="Seleccionar todos"
+              onChange={onSelectAllToggle}
+            />
+          </div>
+        ) : null}
+        <div
+          className="shrink-0"
+          style={{ width: LIST_ROW_EXPAND_WIDTH_PX }}
+          aria-hidden
+        />
+      </div>
 
       <div
 
@@ -382,16 +416,20 @@ export function ListColumnHeader({ className }: ListColumnHeaderProps) {
         <div ref={menuRef} className="flex h-full items-center justify-end pr-0.5">
           <button
             type="button"
-            title="Configurar columnas de Valores"
+            title="Columnas visibles de esta lista (independiente por lista)"
             className="rounded p-1 hover:bg-accent"
             onClick={() => setMenuOpen((value) => !value)}
           >
             <MoreHorizontal className="h-3.5 w-3.5" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-[180px] rounded-md border border-border bg-card py-1 shadow-lg">
-              <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
-                Columnas (Valores)
+            <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-md border border-border bg-card py-1 shadow-lg">
+              <p className="px-2 py-1 text-[10px] font-medium text-foreground">
+                Columnas (esta lista)
+              </p>
+              <p className="px-2 pb-1 text-[9px] leading-snug text-muted-foreground">
+                Layout propio por lista. Sincro = velas; Procesos = Lab. IO/TA/FA/★/Postura
+                = recomendación (activar con el check).
               </p>
               {layout.map((column) => (
                 <label

@@ -1,6 +1,6 @@
 /**
  * Botón IA en la barra del gráfico: propose del valor activo → cola F3 → Ayuda Plataforma IA.
- * Mismo camino que «Encolar F3» en resultados de screener.
+ * Gates SEMI / Estudio / sizing (misma disciplina que Operativa y Alarm).
  * Incluye botón informativo «IA» (qué hace / qué no).
  */
 
@@ -10,11 +10,10 @@ import { BrainCircuit, Loader2 } from 'lucide-react';
 import { useActiveAccount } from '@/features/accounts/use-active-account';
 import { IconButton } from '@/components/ui/icon-button';
 import { AiInfoButton } from '@/features/ai/ai-info-button';
-import { api } from '@/lib/api';
+import { proposeInstrumentSupervised } from '@/features/trading/propose-instrument-supervised';
 import { useAlertsStore } from '@/stores/alerts-store';
 import {
   openHelpAiPlatform,
-  type SupervisedProposePayload,
   useSupervisedF3QueueStore,
 } from '@/stores/supervised-f3-queue-store';
 import { cn } from '@/lib/utils';
@@ -36,17 +35,13 @@ export function ChartInstrumentAiButton({
   const study = useMutation({
     mutationFn: async () => {
       if (!instrumentId) throw new Error('Sin instrumento');
-      const res = await api.proposeRecommendation({
+      if (!effectiveAccountId) throw new Error('Sin cuenta DEMO activa');
+      return proposeInstrumentSupervised({
         instrumentId,
         symbol,
-        accountId: effectiveAccountId ?? undefined,
-        suggestedQuantity: 1,
-        includeFundamentals: true,
-        includeMacro: true,
-        includeEvidence: true,
-        includeNews: true,
+        accountId: effectiveAccountId,
+        source: 'chart',
       });
-      return { ...(res.data as SupervisedProposePayload), source: 'chart' };
     },
     onSuccess: (payload) => {
       const id = enqueue(payload, {

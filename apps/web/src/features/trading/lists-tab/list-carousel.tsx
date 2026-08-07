@@ -2,7 +2,13 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import type { InstrumentListSummaryDto } from '@bolsa/shared';
 
-import { CATALOG_IBEX_LIST_ID, isVirtualListId } from '@bolsa/shared';
+import {
+  CATALOG_IBEX_LIST_ID,
+  ESTUDIO_LIST_ID,
+  ESTUDIO_LIST_NAME,
+  isVirtualListId,
+  resolveEstudioListId,
+} from '@bolsa/shared';
 
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -68,7 +74,15 @@ function resolveCarouselLists(
 
   }
 
-
+  // Estudio API siempre visible (universo supervisión); no depende de pines.
+  const estudioId = resolveEstudioListId(apiLists);
+  if (estudioId && !hidden.has(estudioId) && !seen.has(estudioId)) {
+    const estudio = apiLists.find((entry) => entry.id === estudioId);
+    if (estudio) {
+      seen.add(estudio.id);
+      items.push(estudio);
+    }
+  }
 
   for (const id of pinnedApiIds) {
 
@@ -191,10 +205,22 @@ export function ListCarousel({
       apiLists.find((list) => list.id === CATALOG_IBEX_LIST_ID) ??
       apiLists.find((list) => list.name === 'IBEX 35') ??
       apiLists.find((list) => list.source === 'catalog');
+    const estudioId = resolveEstudioListId(apiLists) ?? ESTUDIO_LIST_ID;
+    const estudio = apiLists.find((list) => list.id === estudioId);
+    const ids: string[] = [];
+    const names: string[] = [];
+    if (estudio) {
+      ids.push(estudio.id);
+      names.push(estudio.name || ESTUDIO_LIST_NAME);
+    }
+    if (ibex && ibex.id !== estudio?.id) {
+      ids.push(ibex.id);
+      names.push(ibex.name);
+    }
 
     updateListConfig({
-      carouselListIds: ibex ? [ibex.id] : [],
-      carouselPinnedListNames: ibex ? [ibex.name] : [],
+      carouselListIds: ids,
+      carouselPinnedListNames: names,
       carouselInitialized: true,
     });
   }, [

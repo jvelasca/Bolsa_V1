@@ -1,5 +1,16 @@
+/**
+ * Barra de estado Trading: cuenta Activa + operativa + métricas (izq.) · Colas/Alarmas (der.).
+ *
+ * Badge `OPERATIVA: Manual|Semi|Auto` = modo de la cuenta entera (no por valor).
+ * Clic en nombre o badge → `/accounts?selected=…&tab=config&focus=operativa`.
+ *
+ * @see docs/engineering/estudio-process-status-ui-2026-08-06.md §6
+ * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
+ */
+
 import { Settings2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { resolveApiBaseUrl } from '@/lib/api-base-url';
@@ -14,6 +25,14 @@ import {
 } from '@/features/accounts/use-active-account';
 import { TradingAppThreads } from '@/features/trading/trading-app-threads';
 import { TradingAlarmInboxButton } from '@/features/trading/trading-alarm-inbox-button';
+import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
+import type { DemoBookMode } from '@/features/trading/demo-book-prefs';
+
+const OPERATIVA_MODE_LABEL: Record<DemoBookMode, string> = {
+  manual: 'Manual',
+  semi: 'Semi',
+  auto: 'Auto',
+};
 
 type StatusItemId = 'equity' | 'cash' | 'marketValue' | 'pnl' | 'positions';
 
@@ -65,7 +84,11 @@ export function TradingStatusBar() {
   const [configOpen, setConfigOpen] = useState(false);
   const [visibleItems, setVisibleItems] = useState<StatusItemId[]>(DEFAULT_ITEMS);
   const { account, effectiveAccountId } = useActiveAccount();
+  const bookPrefs = useDemoBookPrefs();
   const endpointLabel = useMemo(() => connectionLabel(), []);
+  const accountsHref = account
+    ? `/accounts?selected=${encodeURIComponent(account.id)}&tab=config&focus=operativa`
+    : '/accounts';
 
   const healthQuery = useQuery({
     queryKey: ['health'],
@@ -95,70 +118,92 @@ export function TradingStatusBar() {
   return (
     <>
       <footer className="scroll-area flex h-7 shrink-0 items-center gap-1.5 overflow-x-auto border-t border-border bg-card/90 px-2 text-[10px] text-muted-foreground">
-        {/* Sistema / conexión */}
-        <span
-          className="flex shrink-0 items-center gap-1.5 whitespace-nowrap"
-          title={apiOk ? 'API conectada' : 'API no responde'}
-        >
+        {/* Izquierda: sistema + cuenta + métricas (puede truncar/scroll) */}
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
           <span
-            className={cn(
-              'inline-block h-1.5 w-1.5 rounded-full',
-              apiOk ? 'bg-emerald-500' : healthQuery.isLoading ? 'bg-amber-400' : 'bg-red-500',
-            )}
-          />
-          <span className="tabular-nums text-muted-foreground/90">{endpointLabel}</span>
-        </span>
-
-        <StatusSeparator />
-
-        {/* Cuenta Activa: nombre claro + selector + resumen */}
-        <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-          <span className="shrink-0 uppercase tracking-wide text-muted-foreground/70">Activa</span>
-          {account ? (
-            <>
-              <span
-                className="max-w-[10rem] truncate font-medium text-foreground sm:max-w-[14rem]"
-                title={`${account.name} · ${accountTypeShortLabel(account.type)} · ${account.currency}`}
-              >
-                {account.name}
-              </span>
-              <span className="shrink-0 rounded border border-border/80 px-1 text-[9px] uppercase tracking-wide text-muted-foreground">
-                {accountTypeShortLabel(account.type)}
-              </span>
-              <span className="hidden shrink-0 text-muted-foreground/60 sm:inline">
-                {account.currency}
-              </span>
-            </>
-          ) : (
-            <span className="text-muted-foreground">Sin cuenta</span>
-          )}
-          <AccountScopeSelector compact hideLabel className="ml-0.5" />
-        </div>
-
-        <StatusSeparator />
-
-        {visibleItems.map((id) => (
-          <span key={id} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
-            <span className="text-muted-foreground/80">
-              <span className="trading-status-label-full">{STATUS_LABELS[id]}:</span>
-              <span className="trading-status-label-short">{STATUS_LABELS_SHORT[id]}:</span>
-            </span>
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap"
+            title={apiOk ? 'API conectada' : 'API no responde'}
+          >
             <span
               className={cn(
-                'font-medium tabular-nums text-foreground',
-                id === 'pnl' &&
-                  summary &&
-                  (summary.totalUnrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'),
+                'inline-block h-1.5 w-1.5 rounded-full',
+                apiOk ? 'bg-emerald-500' : healthQuery.isLoading ? 'bg-amber-400' : 'bg-red-500',
               )}
-            >
-              {values[id]}
-            </span>
+            />
+            <span className="tabular-nums text-muted-foreground/90">{endpointLabel}</span>
           </span>
-        ))}
 
-        <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          <TradingAlarmInboxButton />
+          <StatusSeparator />
+
+          <div className="flex min-w-0 shrink-0 items-center gap-1.5">
+            <span className="shrink-0 uppercase tracking-wide text-muted-foreground/70">Activa</span>
+            {account ? (
+              <>
+                <Link
+                  to={accountsHref}
+                  className="max-w-[10rem] truncate font-medium text-foreground hover:underline sm:max-w-[14rem]"
+                  title={`${account.name} · ${accountTypeShortLabel(account.type)} · ${account.currency}\nClic → Cuentas`}
+                >
+                  {account.name}
+                </Link>
+                <span className="shrink-0 rounded border border-border/80 px-1 text-[9px] uppercase tracking-wide text-muted-foreground">
+                  {accountTypeShortLabel(account.type)}
+                </span>
+                <Link
+                  to={accountsHref}
+                  className={cn(
+                    'shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold tracking-wide hover:bg-accent',
+                    bookPrefs.mode === 'auto'
+                      ? 'border-amber-500/60 bg-amber-500/10 text-amber-800 dark:text-amber-200'
+                      : bookPrefs.mode === 'semi'
+                        ? 'border-sky-500/60 bg-sky-500/10 text-sky-800 dark:text-sky-200'
+                        : 'border-border bg-muted/40 text-foreground',
+                  )}
+                  title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nAfecta a todos los valores. Clic → cambiar en Cuentas`}
+                  data-testid="status-bar-operativa-mode"
+                >
+                  <span className="text-muted-foreground">OPERATIVA:</span>{' '}
+                  <span className="text-foreground">{OPERATIVA_MODE_LABEL[bookPrefs.mode]}</span>
+                </Link>
+                <span className="hidden shrink-0 text-muted-foreground/60 sm:inline">
+                  {account.currency}
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground">Sin cuenta</span>
+            )}
+            <AccountScopeSelector compact hideLabel className="ml-0.5" />
+          </div>
+
+          <StatusSeparator />
+
+          {visibleItems.map((id) => (
+            <span key={id} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+              <span className="text-muted-foreground/80">
+                <span className="trading-status-label-full">{STATUS_LABELS[id]}:</span>
+                <span className="trading-status-label-short">{STATUS_LABELS_SHORT[id]}:</span>
+              </span>
+              <span
+                className={cn(
+                  'font-medium tabular-nums text-foreground',
+                  id === 'pnl' &&
+                    summary &&
+                    (summary.totalUnrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'),
+                )}
+              >
+                {values[id]}
+              </span>
+            </span>
+          ))}
+        </div>
+
+        {/* Derecha: rail fijo Colas + Alarmas + ajustes (no redimensiona con conteos) */}
+        <div
+          className="ml-1 flex shrink-0 items-center gap-1 border-l border-border/70 pl-1.5"
+          data-testid="trading-status-rail"
+        >
           <TradingAppThreads />
+          <TradingAlarmInboxButton />
           <IconButton
             icon={Settings2}
             title="Configurar barra de estado"
@@ -171,7 +216,7 @@ export function TradingStatusBar() {
         open={configOpen}
         onClose={() => setConfigOpen(false)}
         title="Barra de estado"
-        description="Indicadores del resumen de la cuenta Activa (la que usa toda la app)."
+        description="Indicadores del resumen de la cuenta Activa (izquierda). Derecha: colas fijas + alarmas Radar."
         className="max-w-md"
       >
         <div className="space-y-2">
@@ -190,6 +235,10 @@ export function TradingStatusBar() {
               {STATUS_LABELS[id]}
             </label>
           ))}
+          <p className="pt-2 text-[11px] leading-snug text-muted-foreground">
+            La zona derecha reserva espacio fijo para Colas (Velas · CORE-R · F3 · Lista AUTO) y el
+            panel de Alarmas Radar (nº sin leer), para que la barra no salte al cambiar conteos.
+          </p>
         </div>
       </Dialog>
     </>

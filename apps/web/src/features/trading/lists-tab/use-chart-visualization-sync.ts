@@ -1,5 +1,13 @@
+/**
+ * **Visualizados** = instrumentos con pestaña de gráfico abierta ahora.
+ * SoT = `workspace.charts` (add + prune; no dump legacy ni Estudio).
+ * Cerrar pestaña → sale. ADR-024: no toca Estudio API.
+ *
+ * @see docs/engineering/visualizados-list-ux-2026-08-06.md
+ * @see docs/adr/024-estudio-supervision-universe.md
+ */
+
 import { useEffect, useMemo, useRef } from 'react';
-import type { InstrumentWithMetaDto } from '@bolsa/shared';
 
 import {
   useVisualizationStore,
@@ -7,140 +15,107 @@ import {
 } from '@/stores/visualization-store';
 import { useWorkspaceStore } from '@/stores/workspace-store';
 
-function instrumentFromTab(instrumentId: string, label: string): InstrumentWithMetaDto {
-  return {
-    id: instrumentId,
-    symbol: label,
-    yahooSymbol: label,
-    name: label,
-    exchange: '—',
-    country: '—',
-    currency: 'EUR',
-    sector: null,
-    isActive: true,
-    meta: {
-      barCount: 0,
-      lastSync: null,
-      lastClose: null,
-      changePct: null,
-    },
-  };
-}
-
-function sameIdSet(a: Set<string>, b: Set<string>): boolean {
-  if (a.size !== b.size) return false;
-  for (const id of a) {
-    if (!b.has(id)) return false;
-  }
-  return true;
+function entriesKey(entries: ReadonlyArray<{ instrumentId: string }>): string {
+  return [...new Set(entries.map((e) => e.instrumentId))].sort().join('|');
 }
 
 /**
- * Lista virtual «En estudio» = instrumentos con pestaña de gráfico abierta.
- * Escrituras al store solo cuando cambia el conjunto de pestañas o el foco.
- * No carga el catálogo completo (las pestañas ya llevan symbol/label).
- *
- * Premisa: en estudio ⇔ pestaña activa (mismo conjunto que ranking IO).
- * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ * Reconcilia el store al conjunto exacto de pestañas abiertas (add + prune).
  */
-export function useChartVisualizationSync() {
-  const charts = useWorkspaceStore((state) => state.workspace.charts);
-  const activeChartId = useWorkspaceStore((state) => state.workspace.activeChartId);
+export function reconcileVisualizadosToOpenCharts(): void {
+  const charts = useWorkspaceStore.getState().workspace.charts;
+  const openTabs = charts.filter((tab) => Boolean(tab.instrumentId));
+  const now = new Date().toISOString();
+  const store = useVisualizationStore.getState();
+  const prevById = new Map(store.entries.map((e) => [e.instrumentId, e]));
 
-  const openTabs = useMemo(
-    () =>
-      charts
-        .filter((tab) => Boolean(tab.instrumentId))
-        .map((tab) => ({
-          id: tab.id,
-          instrumentId: tab.instrumentId as string,
-          label: tab.label,
-        })),
-    [charts],
-  );
-
-  const openKey = useMemo(
-    () => openTabs.map((tab) => `${tab.id}:${tab.instrumentId}`).join('|'),
-    [openTabs],
-  );
-
-  const lastOpenKeyRef = useRef<string | null>(null);
-  const lastBumpKeyRef = useRef<string | null>(null);
-
-  // Conjunto = pestañas abiertas (sin setState si no hay cambios de IDs).
-  useEffect(() => {
-    const openIds = new Set(openTabs.map((tab) => tab.instrumentId));
-    const store = useVisualizationStore.getState();
-    const currentIds = new Set(store.entries.map((entry) => entry.instrumentId));
-
-    if (lastOpenKeyRef.current === openKey && sameIdSet(openIds, currentIds)) {
-      return;
-    }
-    lastOpenKeyRef.current = openKey;
-
-    if (sameIdSet(openIds, currentIds)) {
-      return;
-    }
-
-    const now = new Date().toISOString();
-    // Una entrada por instrumento (puede haber habido pestañas duplicadas legacy).
-    const byInstrument = new Map<string, (typeof openTabs)[number]>();
-    for (const tab of openTabs) {
-      if (!byInstrument.has(tab.instrumentId)) {
-        byInstrument.set(tab.instrumentId, tab);
-      }
-      if (tab.id === activeChartId) {
-        byInstrument.set(tab.instrumentId, tab);
-      }
-    }
-    const next: VisualizationSessionEntry[] = [...byInstrument.values()].map((tab) => {
-      const existing = store.entries.find((entry) => entry.instrumentId === tab.instrumentId);
-      const instrument = instrumentFromTab(tab.instrumentId, tab.label);
-      if (existing) {
-        return {
-          ...existing,
-          symbol: instrument.symbol,
-          name: instrument.name,
-        };
-      }
-      return {
-        instrumentId: tab.instrumentId,
-        symbol: instrument.symbol,
-        name: instrument.name,
+  const seen = new Set<string>();
+  const next: VisualizationSessionEntry[] = [];
+  for (const tab of openTabs) {
+    const id = tab.instrumentId as string;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const prev = prevById.get(id);
+    if (prev) {
+      next.push({
+        ...prev,
+        symbol: tab.label || prev.symbol,
+        name: prev.name && prev.name !== prev.symbol ? prev.name : tab.label || prev.name,
+        lastViewedAt: now,
+      });
+    } else {
+      next.push({
+        instrumentId: id,
+        symbol: tab.label,
+        name: tab.label,
         firstViewedAt: now,
         lastViewedAt: now,
         viewCount: 1,
-      };
-    });
-
-    const prevFingerprint = store.entries
-      .map((entry) => `${entry.instrumentId}:${entry.symbol}:${entry.name}`)
-      .join('|');
-    const nextFingerprint = next
-      .map((entry) => `${entry.instrumentId}:${entry.symbol}:${entry.name}`)
-      .join('|');
-    if (prevFingerprint === nextFingerprint) {
-      return;
+      });
     }
+  }
 
-    store.replaceEntries(next);
-  }, [openKey, openTabs, activeChartId]);
+  if (entriesKey(store.entries) === entriesKey(next)) {
+    // Solo refrescar labels si cambió el texto de pestaña
+    const labelsMatch = next.every((n) => {
+      const p = prevById.get(n.instrumentId);
+      return p && p.symbol === n.symbol;
+    });
+    if (labelsMatch && store.entries.length === next.length) return;
+  }
+  store.replaceEntries(next);
+}
 
-  // Bump «visto N×» solo al cambiar de pestaña activa (una vez por foco).
+export function useChartVisualizationSync() {
+  const charts = useWorkspaceStore((state) => state.workspace.charts);
+  const activeChartId = useWorkspaceStore((state) => state.workspace.activeChartId);
+  const hydrated = useWorkspaceStore((state) => state.hydrated);
+
+  const openInstrumentKey = useMemo(
+    () =>
+      [...new Set(charts.filter((t) => t.instrumentId).map((t) => t.instrumentId as string))]
+        .sort()
+        .join('|'),
+    [charts],
+  );
+
+  const lastKeyRef = useRef<string | null>(null);
+  const lastBumpKeyRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!activeChartId) return;
-    const tab = openTabs.find((item) => item.id === activeChartId);
-    if (!tab) return;
+    if (!hydrated) return;
+    if (lastKeyRef.current === openInstrumentKey) return;
+    lastKeyRef.current = openInstrumentKey;
+    reconcileVisualizadosToOpenCharts();
+  }, [hydrated, openInstrumentKey]);
+
+  useEffect(() => {
+    if (!hydrated || !activeChartId) return;
+    const tab = charts.find((item) => item.id === activeChartId);
+    if (!tab?.instrumentId) return;
 
     const bumpKey = `${activeChartId}:${tab.instrumentId}`;
     if (lastBumpKeyRef.current === bumpKey) return;
     lastBumpKeyRef.current = bumpKey;
 
     const store = useVisualizationStore.getState();
-    if (!store.contains(tab.instrumentId)) return;
-
-    store.addInstrument(instrumentFromTab(tab.instrumentId, tab.label), {
-      source: 'list',
-    });
-  }, [activeChartId, openTabs]);
+    if (!store.contains(tab.instrumentId)) {
+      reconcileVisualizadosToOpenCharts();
+      return;
+    }
+    // Bump viewCount al enfocar pestaña ya abierta
+    const now = new Date().toISOString();
+    store.replaceEntries(
+      store.entries.map((e) =>
+        e.instrumentId === tab.instrumentId
+          ? {
+              ...e,
+              symbol: tab.label || e.symbol,
+              lastViewedAt: now,
+              viewCount: e.viewCount + 1,
+            }
+          : e,
+      ),
+    );
+  }, [activeChartId, charts, hydrated]);
 }

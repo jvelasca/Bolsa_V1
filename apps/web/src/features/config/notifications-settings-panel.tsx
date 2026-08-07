@@ -1,0 +1,147 @@
+/**
+ * Panel Configuración → Notificaciones (correo Alarmas Estudio, toast).
+ * Pre-multiusuario: un destinatario local; SMTP sigue en el servidor.
+ */
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { checkboxClassName } from '@/components/ui/dialog';
+import {
+  isValidEmailLoose,
+  notificationEmailReady,
+} from '@/features/config/notification-prefs';
+import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
+import { cn } from '@/lib/utils';
+
+export function NotificationsSettingsPanel() {
+  const alarmaToastEnabled = useNotificationPrefsStore((s) => s.alarmaToastEnabled);
+  const alarmaEmailEnabled = useNotificationPrefsStore((s) => s.alarmaEmailEnabled);
+  const alarmaEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
+  const dailyDigestEnabled = useNotificationPrefsStore((s) => s.dailyDigestEnabled);
+  const dailyDigestPdfEnabled = useNotificationPrefsStore((s) => s.dailyDigestPdfEnabled);
+  const setPrefs = useNotificationPrefsStore((s) => s.setPrefs);
+
+  const emailOk = isValidEmailLoose(alarmaEmail);
+  const ready = notificationEmailReady({
+    alarmaToastEnabled,
+    alarmaEmailEnabled,
+    alarmaEmail,
+    dailyDigestEnabled,
+    dailyDigestPdfEnabled,
+  });
+
+  return (
+    <div className="space-y-4" data-testid="notifications-settings">
+      <Card>
+        <CardHeader>
+          <CardTitle>Notificaciones</CardTitle>
+          <CardDescription>
+            Correo y toasts para Alarmas del Estudio (Asesor). Un operador por navegador hasta
+            multiusuario. El envío de email requiere SMTP en el servidor (
+            <code className="text-[10px]">SMTP_HOST</code> +{' '}
+            <code className="text-[10px]">SMTP_FROM</code> en{' '}
+            <code className="text-[10px]">.env</code>, luego reiniciar la API). Sin eso, «Enviar
+            ahora» y el digest EOD responderán «SMTP incompleto».
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5 text-sm">
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className={cn(checkboxClassName, 'mt-0.5')}
+              checked={alarmaToastEnabled}
+              onChange={(e) => setPrefs({ alarmaToastEnabled: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Toast in-app de Alarmas</span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Avisa cuando aparece una Alarma nueva en el Estudio (sin spamear al abrir la app).
+              </p>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className={cn(checkboxClassName, 'mt-0.5')}
+              checked={alarmaEmailEnabled}
+              onChange={(e) => setPrefs({ alarmaEmailEnabled: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Email de Alarmas</span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Tras recalcular EOD (manual o cron), envía resumen de Alarmas al correo indicado.
+              </p>
+            </span>
+          </label>
+
+          <label className="flex max-w-md flex-col gap-1.5">
+            <span className="font-medium">Correo electrónico</span>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="tu@correo.com"
+              value={alarmaEmail}
+              disabled={!alarmaEmailEnabled}
+              onChange={(e) => setPrefs({ alarmaEmail: e.target.value })}
+              className={cn(
+                'rounded-md border bg-background px-3 py-2 text-sm',
+                alarmaEmailEnabled && alarmaEmail && !emailOk
+                  ? 'border-destructive'
+                  : 'border-border',
+                !alarmaEmailEnabled && 'opacity-60',
+              )}
+            />
+            {alarmaEmailEnabled && alarmaEmail && !emailOk ? (
+              <span className="text-xs text-destructive">Revisa el formato del correo.</span>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                {ready
+                  ? 'Listo: se enviará si el servidor tiene SMTP configurado.'
+                  : 'Activa el email y escribe un correo válido.'}
+              </span>
+            )}
+          </label>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className={cn(checkboxClassName, 'mt-0.5')}
+              checked={dailyDigestEnabled}
+              onChange={(e) => setPrefs({ dailyDigestEnabled: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Resumen operativo diario</span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Suscripción al digest del día (Asesor → Diario). Tras eod-batch o «Enviar ahora»
+                manda HTML al mismo correo. Requiere SMTP servidor.
+              </p>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              className={cn(checkboxClassName, 'mt-0.5')}
+              checked={dailyDigestPdfEnabled}
+              disabled={!dailyDigestEnabled}
+              onChange={(e) => setPrefs({ dailyDigestPdfEnabled: e.target.checked })}
+            />
+            <span>
+              <span className="font-medium">Adjuntar PDF al digest</span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                R4 — PDF ligero (Helvetica) junto al HTML. También puedes descargarlo en Diario sin
+                email. Flag servidor opcional:{' '}
+                <code className="text-[10px]">DAILY_OPS_DIGEST_PDF_ENABLED</code>.
+              </p>
+            </span>
+          </label>
+
+          <p className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            Multiusuario: este buzón pasará al perfil de usuario. Hoy es preferencia local del
+            navegador (no sustituye cuentas DEMO / inversión).
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

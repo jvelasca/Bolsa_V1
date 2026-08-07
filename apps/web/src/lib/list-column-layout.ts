@@ -9,16 +9,36 @@ import {
 } from '@bolsa/shared';
 
 export const LIST_ROW_EXPAND_WIDTH_PX = 28;
+/** Ancho fijo de la columna de check (cabecera y filas alineadas). */
+export const LIST_ROW_SELECT_WIDTH_PX = 18;
 export const DEFAULT_LIST_ROW_ACTIONS_WIDTH_PX = resolveListRowActionsWidth(undefined);
+
+/** Gutter izquierdo: check opcional + expand/chevron. */
+export function listRowLeftGutterWidthPx(selectEnabled: boolean): number {
+  return selectEnabled
+    ? LIST_ROW_SELECT_WIDTH_PX + LIST_ROW_EXPAND_WIDTH_PX
+    : LIST_ROW_EXPAND_WIDTH_PX;
+}
 /** Espacio reservado para el grip de reordenar en cabecera (alinea texto con filas). */
 export const LIST_HEADER_GRIP_INSET_PX = 14;
 
 export function isNumericListColumn(columnId: ListColumnId): boolean {
-  return columnId === 'lastClose' || columnId === 'changePct';
+  return (
+    columnId === 'lastClose' ||
+    columnId === 'changePct' ||
+    columnId === 'ioScore' ||
+    columnId === 'taScore' ||
+    columnId === 'faScore' ||
+    columnId === 'dictamenStars'
+  );
 }
 
 export function isCenteredListColumn(columnId: ListColumnId): boolean {
-  return columnId === 'syncStatus';
+  return (
+    columnId === 'syncStatus' ||
+    columnId === 'processStatus' ||
+    columnId === 'dictamenStars'
+  );
 }
 
 export function listColumnContentClass(
@@ -135,8 +155,16 @@ export function toggleColumnInLayout(
 }
 
 export function columnAlignClass(columnId: ListColumnId): string {
-  if (columnId === 'syncStatus') return 'text-center';
-  if (columnId === 'symbol' || columnId === 'name') return 'text-left';
+  if (
+    columnId === 'syncStatus' ||
+    columnId === 'processStatus' ||
+    columnId === 'dictamenStars'
+  ) {
+    return 'text-center';
+  }
+  if (columnId === 'symbol' || columnId === 'name' || columnId === 'recStance') {
+    return 'text-left';
+  }
   return 'text-right';
 }
 
@@ -148,7 +176,11 @@ export function listColumnCellClass(columnId: ListColumnId): string {
     case 'name':
       return 'px-2 pr-3';
     case 'syncStatus':
+    case 'processStatus':
       return 'px-1 text-center';
+    case 'lastLabAt':
+    case 'lastCoreRAt':
+      return 'px-1.5';
     default:
       return 'px-2';
   }

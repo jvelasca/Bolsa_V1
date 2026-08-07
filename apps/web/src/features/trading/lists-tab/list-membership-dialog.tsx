@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { InstrumentRemovalPreviewDto, InstrumentWithMetaDto } from '@bolsa/shared';
 import { Dialog, checkboxClassName } from '@/components/ui/dialog';
 import { api, ApiError } from '@/lib/api';
@@ -18,24 +18,25 @@ export function ListMembershipDialog() {
     enabled: Boolean(instrument),
   });
 
-  const listIds = listsQuery.data?.data.map((list) => list.id) ?? [];
-  const detailsQueries = useQueries({
-    queries: listIds.map((id) => ({
-      queryKey: ['list', id],
-      queryFn: () => api.getList(id),
-      enabled: Boolean(instrument) && listIds.length > 0,
-    })),
+  const apiLists = listsQuery.data?.data ?? [];
+  const listIds = apiLists.map((list) => list.id);
+
+  const membershipsQuery = useQuery({
+    queryKey: ['lists', 'memberships'],
+    queryFn: api.getListMemberships,
+    enabled: Boolean(instrument),
+    staleTime: 30_000,
   });
 
   const initialMembership = useMemo(() => {
     const map: Record<string, boolean> = {};
-    for (const query of detailsQueries) {
-      const detail = query.data?.data;
-      if (!detail || !instrument) continue;
-      map[detail.id] = detail.instrumentIds.includes(instrument.id);
+    if (!instrument) return map;
+    const memberships = membershipsQuery.data?.data ?? {};
+    for (const list of apiLists) {
+      map[list.id] = (memberships[list.id] ?? []).includes(instrument.id);
     }
     return map;
-  }, [detailsQueries, instrument]);
+  }, [apiLists, membershipsQuery.data?.data, instrument]);
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [orphanPreview, setOrphanPreview] = useState<InstrumentRemovalPreviewDto | null>(null);
@@ -49,6 +50,7 @@ export function ListMembershipDialog() {
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ['lists'] });
+    await queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
     await queryClient.invalidateQueries({ queryKey: ['list'] });
     await queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
     await queryClient.invalidateQueries({ queryKey: ['database-summary'] });
@@ -61,9 +63,8 @@ export function ListMembershipDialog() {
       await api.removeInstrumentFromList(listId, instrument.id, { purgeIfOrphan: false });
     }
     for (const listId of adds) {
-      const detail = detailsQueries.find((q) => q.data?.data.id === listId)?.data?.data;
-      if (!detail) continue;
-      const ids = new Set(detail.instrumentIds);
+      const current = membershipsQuery.data?.data?.[listId] ?? [];
+      const ids = new Set(current);
       ids.add(instrument.id);
       await api.updateList(listId, { instrumentIds: [...ids] });
     }
@@ -140,7 +141,7 @@ export function ListMembershipDialog() {
 
   if (!instrument) return null;
 
-  const loading = listsQuery.isLoading || detailsQueries.some((q) => q.isLoading);
+  const loading = listsQuery.isLoading || membershipsQuery.isLoading;
 
   return (
     <>

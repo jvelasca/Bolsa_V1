@@ -37,6 +37,24 @@
 | [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md) | **LAB ≠ TRADING** (universos UI; Cartera LAB) |
 | [adr/020-operating-mandate-tenure.md](./adr/020-operating-mandate-tenure.md) | **Mandato operativo** — tenure estrategia×instrumento (TRADING · M1b BD) |
 | [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md) | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual) |
+| [adr/022-estudio-daily-opinion-motor.md](./adr/022-estudio-daily-opinion-motor.md) | **Motor opinión diaria Estudio** — O3-C · D1–Canales cerrados · notificaciones UI · AUTO execute congelado |
+| [adr/024-estudio-supervision-universe.md](./adr/024-estudio-supervision-universe.md) | **Universo único Estudio** — Supervisión ON · 3 capas · sin auto-add gráfico |
+| [engineering/estudio-supervision-model-2026-08-06.md](./engineering/estudio-supervision-model-2026-08-06.md) | **Modelo supervisión** — cadencias vigilia/frescura/redesc. · unsubscribe |
+| [engineering/estudio-process-status-ui-2026-08-06.md](./engineering/estudio-process-status-ui-2026-08-06.md) | **UI procesos** — iconos · subtítulo · Actualizar / Redescubrir · OPERATIVA en barra |
+| [engineering/session-handoff-2026-08-06-estudio-supervision.md](./engineering/session-handoff-2026-08-06-estudio-supervision.md) | Handoff membresía + Supervisión ON |
+| [engineering/session-handoff-2026-08-06-estudio-process-ui.md](./engineering/session-handoff-2026-08-06-estudio-process-ui.md) | **Handoff** UI procesos + modos en barra (retomar agente) |
+| [engineering/visualizados-list-ux-2026-08-06.md](./engineering/visualizados-list-ux-2026-08-06.md) | **Visualizados** — pestañas · Por IO · columnas recomendación · foco lista |
+| [engineering/session-handoff-2026-08-06-visualizados-list-ux.md](./engineering/session-handoff-2026-08-06-visualizados-list-ux.md) | **Handoff** Visualizados / listas UX (retomar agente) |
+| [engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md) | Triage round 3 (A0·N4·Deep) — O3-C ratificado · secuencia Op→Asesor→Canales |
+| [engineering/audit-pack-estudio-asesor-canales-2026-08-04.md](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) | **Pack auditoría** Estudio→Operativa→Asesor→Canales (+ notif.) previo a AUTO |
+| [engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) | Pack auditoría prep AUTO A0–A5 (flag off) |
+| [engineering/camino-d-auto-thaw-checklist-2026-08-04.md](./engineering/camino-d-auto-thaw-checklist-2026-08-04.md) | **Checklist thaw** Camino D / AUTO — sin flip `PAPER_D_EXECUTE` |
+| [engineering/camino-d-a2-a5-prep-2026-08-04.md](./engineering/camino-d-a2-a5-prep-2026-08-04.md) | Prep A2–A5 (Risk/idempotencia/kill/ADR-023) · flag off |
+| [adr/023-camino-d-thaw.md](./adr/023-camino-d-thaw.md) | ADR thaw Camino D — **Proposed** (evidencia pendiente) |
+| [engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md](./engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md) | **Triage institucional** Aud 1+2 (CTO/OR) — A0 + OR-lite; catálogo aparcado |
+| [engineering/risk-engine-or-re-2026-08-04.md](./engineering/risk-engine-or-re-2026-08-04.md) | **Risk Engine OR-RE v0** — `check_opening` · kill switch · Gate |
+| [engineering/asesor-ui-2026-08-04.md](./engineering/asesor-ui-2026-08-04.md) | Asesor (ex-Research) · Diario · Opiniones · canales · prefs notificaciones |
+| [engineering/daily-ops-report-brief-2026-08-04.md](./engineering/daily-ops-report-brief-2026-08-04.md) | Resumen operativo diario R1–R4 (web · HTML · PDF) |
 | [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
 | [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md) | **Paquete auditoría** post-Q0–Q3 + freeze + evidencia smoke |
 | [engineering/engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md) | **Engineering Index** — padre único docs ingeniería (A0 H1) |
@@ -50,7 +68,7 @@
 | [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) | **Biblioteca L0/L1** — Genéricas / Optimizadas / Mis estrategias + prompt |
 | [engineering/demo-operating-modes-brief-2026-08-03.md](./engineering/demo-operating-modes-brief-2026-08-03.md) | **DEMO MANUAL/SEMI/AUTO** — decisiones producto (libro operativo) |
 | [engineering/semi-demo-book-impl-slice1-2026-08-03.md](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) | **SEMI slice 1** — impl + checklist prueba (GO 2026-08-03) |
-| [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md) | **Panel Operativa** — layout full-height · IO · En estudio · modos |
+| [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md) | **Panel Operativa** — IO · Recomendación/Info · modos en barra/Cuentas |
 | [engineering/chart-top1-indicator-switch-2026-08-03.md](./engineering/chart-top1-indicator-switch-2026-08-03.md) | **Finalista #1** en gráfico — todos / este |
 | [engineering/session-handoff-2026-08-04-operativa.md](./engineering/session-handoff-2026-08-04-operativa.md) | **Handoff** Operativa / IO (2026-08-04) |
 | [engineering/session-handoff-2026-08-03-semi.md](./engineering/session-handoff-2026-08-03-semi.md) | **Handoff SEMI** — retomar sin olvidar |

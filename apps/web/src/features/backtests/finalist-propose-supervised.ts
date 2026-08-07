@@ -19,10 +19,13 @@
 import { api } from '@/lib/api';
 import {
   demoBookAllowsEnqueueConfirm,
+  demoBookRequiresEstudioMembership,
+  ESTUDIO_MEMBERSHIP_REQUIRED_MSG,
   loadDemoBookPrefs,
   suggestQuantityFromCash,
 } from '@/features/trading/demo-book-prefs';
 import type { SupervisedProposePayload } from '@/stores/supervised-f3-queue-store';
+import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
 
 /** Valor de `payload.source` / origen de cola para Finalistas. */
 export const FINALIST_SUPERVISED_SOURCE = 'finalists' as const;
@@ -43,8 +46,13 @@ export async function proposeFinalistSupervised(opts: {
   const book = loadDemoBookPrefs();
   if (!demoBookAllowsEnqueueConfirm(book.mode)) {
     throw new Error(
-      'Libro en MANUAL: solo aviso. Cambia a SEMI en el rail Coach para Proponer F3.',
+      'Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.',
     );
+  }
+  if (demoBookRequiresEstudioMembership(book.mode)) {
+    if (!useEstudioMembershipStore.getState().contains(opts.instrumentId)) {
+      throw new Error(ESTUDIO_MEMBERSHIP_REQUIRED_MSG);
+    }
   }
   const summary = (await api.getAccountSummary(opts.accountId)).data;
   if (summary.positionsCount >= book.maxOpenPositions) {

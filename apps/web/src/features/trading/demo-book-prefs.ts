@@ -1,13 +1,18 @@
 /**
  * Preferencias del libro operativo de la cuenta activa DEMO — MANUAL / SEMI (/ AUTO reserved).
  *
- * Slice 1: localStorage. Canal de ejecución SEMI = Camino C (F3 Confirm).
+ * Slice 1 + A1: localStorage. Canal de ejecución SEMI = Camino C (F3 Confirm).
+ * AUTO no es seleccionable en UI (`DEMO_BOOK_AUTO_UI_ENABLED`); si llega `mode: auto`
+ * en storage se coacciona a SEMI hasta thaw.
  * UI: panel Operativa → Configuración (cabecera muestra el modo; título = nombre de cuenta).
  *
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
  * @see docs/engineering/semi-demo-book-impl-slice1-2026-08-03.md
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A1
  */
+
+import { DEMO_BOOK_AUTO_UI_ENABLED } from '@/features/trading/demo-book-auto-copy';
 
 export const DEMO_BOOK_PREFS_KEY = 'bolsa-demo-book-prefs-v1';
 
@@ -17,7 +22,7 @@ export type DemoBookMode = 'manual' | 'semi' | 'auto';
 export type DemoBookCountryPrefer = 'home_first' | 'europe_first' | 'global_ok';
 
 export type DemoBookPrefs = {
-  /** MANUAL = aviso · SEMI = Confirm F3 · AUTO reserved (UI disabled slice 1). */
+  /** MANUAL = aviso · SEMI = Confirm F3 · AUTO reserved (A1: UI disabled). */
   mode: DemoBookMode;
   /** Máximo de posiciones abiertas en la cuenta DEMO. */
   maxOpenPositions: number;
@@ -49,8 +54,11 @@ export function normalizeDemoBookPrefs(raw: unknown): DemoBookPrefs {
   const d = defaultDemoBookPrefs();
   if (!raw || typeof raw !== 'object') return d;
   const o = raw as Partial<DemoBookPrefs>;
-  const mode: DemoBookMode =
+  const modeRaw: DemoBookMode =
     o.mode === 'manual' || o.mode === 'semi' || o.mode === 'auto' ? o.mode : d.mode;
+  // A1: no persistir AUTO seleccionable hasta DEMO_BOOK_AUTO_UI_ENABLED.
+  const mode: DemoBookMode =
+    modeRaw === 'auto' && !DEMO_BOOK_AUTO_UI_ENABLED ? 'semi' : modeRaw;
   const countryPrefer: DemoBookCountryPrefer =
     o.countryPrefer === 'home_first' ||
     o.countryPrefer === 'europe_first' ||
@@ -168,14 +176,27 @@ export function getDemoBookPrefsServerSnapshot(): DemoBookPrefs {
   return SERVER_SNAPSHOT;
 }
 
-/** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO reserved. */
+/** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO reserved (execute nunca hasta thaw). */
 export function demoBookAllowsEnqueueConfirm(mode: DemoBookMode): boolean {
   return mode === 'semi' || mode === 'auto';
 }
 
+/** Solo SEMI ejecuta Confirm hoy. AUTO → false aunque el modo exista en tipos. */
 export function demoBookAllowsExecute(mode: DemoBookMode): boolean {
   return mode === 'semi';
 }
+
+/**
+ * SEMI/AUTO exigen que el instrumento esté en la lista Estudio.
+ * MANUAL no lo exige (puedes operar sin meterlo en el universo).
+ */
+export function demoBookRequiresEstudioMembership(mode: DemoBookMode): boolean {
+  return mode === 'semi' || mode === 'auto';
+}
+
+export const ESTUDIO_MEMBERSHIP_REQUIRED_MSG =
+  'SEMI/AUTO requieren el valor en la lista Estudio. Añádelo desde Listas (selección → A Estudio) o abriendo el gráfico.';
+
 
 /**
  * Cantidad entera sugerida: floor((cash * pct/100) / price).

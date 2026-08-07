@@ -1,6 +1,17 @@
+/**
+ * Detalle de una cuenta en el hub Cuentas (resumen · posiciones · movimientos · config).
+ *
+ * Pestaña Config incluye bloque **Operativa** (`DemoBookModePanel`: Manual/SEMI/AUTO)
+ * para la cuenta activa. Deep-link desde barra de estado Trading:
+ * `/accounts?selected=<id>&tab=config&focus=operativa`.
+ *
+ * @see docs/engineering/estudio-process-status-ui-2026-08-06.md §6
+ * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
+ */
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { InvestmentAccountDto, LedgerEntryDto } from '@bolsa/shared';
 import { formatLedgerEntryLabel, ledgerEntryHint } from '@bolsa/shared';
@@ -12,6 +23,7 @@ import { formatPaperLabEvidence } from '@/features/accounts/paper-lab-evidence';
 import { PAPER_PATH_LAB } from '@/features/settings/paper-paths-copy';
 import { useActivateAccount } from '@/features/accounts/use-active-account';
 import { formatPrice } from '@/features/charts/chart-utils';
+import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useActiveAccountStore } from '@/stores/active-account-store';
@@ -21,14 +33,30 @@ type DetailTab = 'resumen' | 'posiciones' | 'movimientos' | 'config';
 type AccountDetailPanelProps = {
   account: InvestmentAccountDto;
   onDelete: () => void;
+  /** Deep-link desde barra de estado (`?tab=config`). */
+  initialTab?: DetailTab;
+  /** Resalta bloque Operativa (`?focus=operativa`). */
+  focus?: string | null;
 };
 
-export function AccountDetailPanel({ account, onDelete }: AccountDetailPanelProps) {
+function parseDetailTab(raw: string | null | undefined): DetailTab | null {
+  if (raw === 'resumen' || raw === 'posiciones' || raw === 'movimientos' || raw === 'config') {
+    return raw;
+  }
+  return null;
+}
+
+export function AccountDetailPanel({
+  account,
+  onDelete,
+  initialTab,
+  focus,
+}: AccountDetailPanelProps) {
   const queryClient = useQueryClient();
   const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
   const activateAccount = useActivateAccount();
   const isWorkingAccount = activeAccountId === account.id;
-  const [tab, setTab] = useState<DetailTab>('resumen');
+  const [tab, setTab] = useState<DetailTab>(() => parseDetailTab(initialTab) ?? 'resumen');
   const [editName, setEditName] = useState(account.name);
   const [editDescription, setEditDescription] = useState(account.description ?? '');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -37,6 +65,7 @@ export function AccountDetailPanel({ account, onDelete }: AccountDetailPanelProp
   const [cashTab, setCashTab] = useState<'deposit' | 'withdraw'>('deposit');
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const operativaRef = useRef<HTMLDivElement>(null);
 
   const isClosed = account.status === 'closed';
   const isSimulated = account.type === 'simulated';
@@ -48,6 +77,19 @@ export function AccountDetailPanel({ account, onDelete }: AccountDetailPanelProp
     setError(null);
     setMessage(null);
   }, [account.id, account.name, account.description]);
+
+  useEffect(() => {
+    const next = parseDetailTab(initialTab);
+    if (next) setTab(next);
+  }, [initialTab, account.id]);
+
+  useEffect(() => {
+    if (tab !== 'config' || focus !== 'operativa') return;
+    const t = window.setTimeout(() => {
+      operativaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [tab, focus, account.id]);
 
   const summaryQuery = useQuery({
     queryKey: ['account-summary', account.id],
@@ -366,6 +408,30 @@ export function AccountDetailPanel({ account, onDelete }: AccountDetailPanelProp
                   )
                 )}
               </p>
+            </div>
+            <div
+              ref={operativaRef}
+              id="account-operativa"
+              data-testid="account-operativa-block"
+              className={cn(
+                'rounded-md border border-border p-3',
+                focus === 'operativa' && 'ring-2 ring-primary/40',
+              )}
+            >
+              <p className="mb-1 text-sm font-medium text-foreground">Operativa</p>
+              <p className="mb-2 text-xs text-muted-foreground">
+                Manual / SEMI / AUTO aplica a toda la cuenta (todos los valores). Se configura
+                aquí, no en el panel Operativa de cada instrumento.
+              </p>
+              {isWorkingAccount && !isClosed ? (
+                <DemoBookModePanel />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {isClosed
+                    ? 'Cuenta cerrada: no se puede cambiar la operativa.'
+                    : 'Activa esta cuenta («Usar ahora») para cambiar Manual / SEMI / AUTO.'}
+                </p>
+              )}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="flex flex-col gap-1 text-sm">

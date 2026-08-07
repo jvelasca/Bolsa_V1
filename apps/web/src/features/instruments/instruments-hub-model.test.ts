@@ -107,6 +107,35 @@ describe('instruments-hub-model', () => {
     ).toBe(true);
   });
 
+  it('filters Estudio and sorts by scoreIo', () => {
+    const ioByInstrument = new Map<string, number | null>([
+      ['1', 55],
+      ['2', 80],
+      ['3', 40],
+    ]);
+    const rows = filterAndSortInstrumentsHub(catalog, {
+      scopeFilter: 'estudio',
+      estudioIds: new Set(['1', '3']),
+      sortKey: 'scoreIo',
+      sortDir: 'desc',
+      enrichment: { ioByInstrument },
+    });
+    expect(rows.map((r) => r.symbol)).toEqual(['SAN', 'IBE']);
+  });
+
+  it('filters by list id', () => {
+    const membershipsByInstrument = new Map([
+      ['1', [{ listId: 'l1', listName: 'IBEX', source: 'catalog' as const }]],
+      ['2', [{ listId: 'l2', listName: 'Watch', source: 'custom' as const }]],
+    ]);
+    const rows = filterAndSortInstrumentsHub(catalog, {
+      scopeFilter: 'list',
+      listId: 'l1',
+      enrichment: { membershipsByInstrument },
+    });
+    expect(rows.map((r) => r.symbol)).toEqual(['SAN']);
+  });
+
   it('toggles sort direction on same key', () => {
     expect(toggleInstrumentsHubSort('symbol', 'asc', 'symbol')).toEqual({
       sortKey: 'symbol',

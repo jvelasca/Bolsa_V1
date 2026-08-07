@@ -111,7 +111,33 @@ export const api = {
       service: string;
       timestamp: string;
       database?: { status: string; message: string };
+      components?: Record<
+        string,
+        { status: string; message: string; details?: Record<string, unknown> }
+      >;
     }>('/api/health'),
+
+  getRiskKillSwitch: () =>
+    request<{
+      effective: boolean;
+      env: boolean;
+      runtimeMemory: boolean;
+      redis: boolean | null;
+      paperDExecuteEnv: boolean;
+    }>('/api/risk/kill-switch'),
+
+  setRiskKillSwitch: (enabled: boolean) =>
+    request<{
+      effective: boolean;
+      env: boolean;
+      runtimeMemory: boolean;
+      redis: boolean | null;
+      paperDExecuteEnv: boolean;
+      updated?: { enabled: boolean; memory: boolean; redis: boolean };
+    }>('/api/risk/kill-switch', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
 
   getAiStatus: () =>
     request<{
@@ -795,6 +821,179 @@ export const api = {
       `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top?timeframe=${encodeURIComponent(timeframe)}`,
     ),
 
+  getInstrumentNarrative: (
+    instrumentId: string,
+    scope: import('@bolsa/shared').InstrumentNarrativeScope = 'estudio',
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentNarrativeV1 | null }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative?scope=${encodeURIComponent(scope)}`,
+    ),
+
+  upsertInstrumentNarrative: (
+    instrumentId: string,
+    body: import('@bolsa/shared').UpsertInstrumentNarrativeRequestV1,
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentNarrativeV1 }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative`,
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+
+  deleteInstrumentNarrative: (
+    instrumentId: string,
+    scope: import('@bolsa/shared').InstrumentNarrativeScope = 'estudio',
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentNarrativeV1 | null }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative?scope=${encodeURIComponent(scope)}`,
+      { method: 'DELETE' },
+    ),
+
+  queryInstrumentDailyOpinions: (
+    body: import('@bolsa/shared').QueryInstrumentDailyOpinionsRequestV1,
+  ) =>
+    request<{ data: import('@bolsa/shared').InstrumentDailyOpinionV1[] }>(
+      '/api/instrument-daily-opinions/query',
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  getInstrumentDailyOpinion: (instrumentId: string, asOfBarDate?: string, forceRefresh = false) => {
+    const params = new URLSearchParams();
+    if (asOfBarDate) params.set('asOfBarDate', asOfBarDate);
+    if (forceRefresh) params.set('forceRefresh', 'true');
+    const q = params.toString();
+    return request<{ data: import('@bolsa/shared').InstrumentDailyOpinionV1[] }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/daily-opinion${q ? `?${q}` : ''}`,
+    );
+  },
+
+  listInstrumentDailyOpinions: (
+    instrumentId: string,
+    options?: { days?: number; ensureDays?: number },
+  ) => {
+    const params = new URLSearchParams();
+    if (options?.days != null) params.set('days', String(options.days));
+    if (options?.ensureDays != null) params.set('ensureDays', String(options.ensureDays));
+    const q = params.toString();
+    return request<{ data: import('@bolsa/shared').InstrumentDailyOpinionV1[] }>(
+      `/api/instruments/${encodeURIComponent(instrumentId)}/daily-opinions${q ? `?${q}` : ''}`,
+    );
+  },
+
+  runInstrumentDailyOpinionEodBatch: (body: {
+    instrumentIds: string[];
+    asOfBarDate?: string | null;
+    accountId?: string | null;
+    force?: boolean;
+    notifyEmail?: string | null;
+    notifyEmailEnabled?: boolean | null;
+    notifyDigestEnabled?: boolean | null;
+    attachPdf?: boolean | null;
+  }) =>
+    request<{
+      enabled: boolean;
+      forced: boolean;
+      count: number;
+      data: import('@bolsa/shared').InstrumentDailyOpinionV1[];
+      emailNotify?: {
+        emailEnabled: boolean;
+        alarmaCount: number;
+        sent: boolean;
+        skippedReason?: string | null;
+      } | null;
+      digestNotify?: {
+        digestEnabled: boolean;
+        sent: boolean;
+        skippedReason?: string | null;
+        asOf?: string | null;
+        pdfAttached?: boolean;
+      } | null;
+    }>('/api/instrument-daily-opinions/eod-batch', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** R3 — envío manual digest HTML (Asesor → Diario). */
+  sendDailyOpsDigestEmail: (
+    accountId: string,
+    body: {
+      asOf?: string | null;
+      instrumentIds?: string[];
+      notifyEmail?: string | null;
+      notifyDigestEnabled?: boolean;
+      attachPdf?: boolean | null;
+    },
+  ) =>
+    request<{
+      data: {
+        digestEnabled: boolean;
+        sent: boolean;
+        skippedReason?: string | null;
+        asOf?: string | null;
+        pdfAttached?: boolean;
+      };
+    }>(`/api/accounts/${accountId}/daily-ops-report/email`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** R4 — descarga PDF del resumen operativo. */
+  downloadDailyOpsDigestPdf: async (
+    accountId: string,
+    opts?: { asOf?: string; instrumentIds?: string[] },
+  ): Promise<Blob> => {
+    const q = new URLSearchParams();
+    if (opts?.asOf) q.set('asOf', opts.asOf);
+    if (opts?.instrumentIds?.length) q.set('instrumentIds', opts.instrumentIds.join(','));
+    const qs = q.toString();
+    const headers: HeadersInit = {};
+    const token = getAuthToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const account = getActiveAccountId();
+    if (account) headers['X-Account-Id'] = account;
+    const res = await fetch(
+      `${API_URL}/api/accounts/${accountId}/daily-ops-report.pdf${qs ? `?${qs}` : ''}`,
+      { headers },
+    );
+    if (!res.ok) {
+      throw new ApiError(`PDF digest · HTTP ${res.status}`, res.status);
+    }
+    return res.blob();
+  },
+
+  getInstrumentDailyOpinionTelemetry: (opts?: {
+    lookbackDays?: number;
+    instrumentIds?: string[];
+  }) => {
+    const params = new URLSearchParams();
+    if (opts?.lookbackDays != null) params.set('lookbackDays', String(opts.lookbackDays));
+    for (const id of opts?.instrumentIds ?? []) {
+      if (id) params.append('instrumentIds', id);
+    }
+    const q = params.toString();
+    return request<{
+      data: {
+        schemaVersion: string;
+        asOf: string;
+        lookbackDays: number;
+        daysWithOpinions: number;
+        opinionRows: number;
+        alarmaCount: number;
+        alarmaBuyCount: number;
+        matureBuySample: number;
+        buyPrecision5d: number | null;
+        buyHits: number;
+        buyMisses: number;
+        buyNeutrals: number;
+        buyRecall5d: number | null;
+        recallMoveSample: number;
+        recallCaught: number;
+        criteriaVersion: string;
+        forwardBars: number;
+        neutralBandPct: number;
+        caveats: string[];
+      };
+    }>(`/api/instrument-daily-opinions/telemetry${q ? `?${q}` : ''}`);
+  },
+
   getAccountMandates: (accountId: string, instrumentId?: string) => {
     const q = instrumentId
       ? `?instrumentId=${encodeURIComponent(instrumentId)}`
@@ -1032,6 +1231,20 @@ export const api = {
     request<{ data: import('@bolsa/shared').AccountSummaryDto }>(
       `/api/accounts/${accountId}/summary`,
     ),
+
+  /** R1 — resumen operativo diario (Asesor → Diario). */
+  getDailyOpsReport: (
+    accountId: string,
+    opts?: { asOf?: string; instrumentIds?: string[] },
+  ) => {
+    const q = new URLSearchParams();
+    if (opts?.asOf) q.set('asOf', opts.asOf);
+    if (opts?.instrumentIds?.length) q.set('instrumentIds', opts.instrumentIds.join(','));
+    const qs = q.toString();
+    return request<import('@bolsa/shared').DailyOpsReportResponseV1>(
+      `/api/accounts/${accountId}/daily-ops-report${qs ? `?${qs}` : ''}`,
+    );
+  },
 
   getAccountSummaries: (type?: string) =>
     request<{ data: import('@bolsa/shared').AccountSummaryDto[] }>(
@@ -1437,6 +1650,10 @@ export const api = {
 
   getLists: () =>
     request<{ data: import('@bolsa/shared').InstrumentListSummaryDto[] }>('/api/lists'),
+
+  /** Batch listId → instrumentIds (evita N× getList en el shell). */
+  getListMemberships: () =>
+    request<{ data: Record<string, string[]> }>('/api/lists/memberships'),
 
   getList: (id: string) =>
     request<{ data: import('@bolsa/shared').InstrumentListDetailDto }>(`/api/lists/${id}`),

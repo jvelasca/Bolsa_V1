@@ -46,3 +46,37 @@ data/filings/
 .env.*
 !.env.example
 !apps/web/.env.example
+
+# Cachés de herramientas (generadas en local, no versionar)
+.eslintcache
+.prettiercache
+.nyc_output/
+eslint-output/
+
+# Logs de gestores de paquete (más allá de *.log)
+pnpm-debug.log*
+npm-debug.log*
+yarn-error.log*
+yarn-debug.log*
+
+# Fusiones / conflictos
+*.orig
+*.rej
+
+# Base de datos local / volcados (Backup/restore manual)
+*.dump
+*.sql.gz
+*.sql.bak
+pgdata/
+.postgres/
+.postgres-data/
+
+# Artefactos de test / reportería
+test-results/
+playwright-report/
+blob-report/
+allure-results/
+
+# Sistema operativo (Windows junto a .DS_Store)
+Thumbs.db
+desktop.ini

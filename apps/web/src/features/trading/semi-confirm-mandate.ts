@@ -69,14 +69,15 @@ export function recordSemiConfirmMandate(opts: {
   });
   let linked = false;
   const txId = opts.trade?.transactionId;
+  const mandateTenureId = rec.mandateTenureId ?? null;
   if (txId) {
     const link = linkTradeToMandate({
       transactionId: txId,
       instrumentId: opts.payload.instrumentId,
       accountId: opts.accountId,
-      mandateTenureId: rec.mandateTenureId,
+      mandateTenureId,
     });
     linked = Boolean(link);
   }
-  return { mandateTenureId: rec.mandateTenureId, linked };
+  return { mandateTenureId, linked };
 }

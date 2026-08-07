@@ -167,7 +167,8 @@ export function getOpenMandateTenure(
 ): MandateTenure | null {
   const rows = listMandateTenures(instrumentId, accountId);
   for (let i = rows.length - 1; i >= 0; i -= 1) {
-    if (rows[i].effectiveTo == null) return rows[i];
+    const row = rows[i];
+    if (row != null && row.effectiveTo == null) return row;
   }
   return null;
 }
@@ -201,14 +202,16 @@ export function applyMandateChange(input: {
   const openIdx = rows.findIndex((r) => r.effectiveTo == null);
   if (openIdx >= 0) {
     const prev = rows[openIdx];
-    const sameStrategy =
-      input.open &&
-      (prev.strategyDefinitionId ?? null) === (input.open.strategyDefinitionId ?? null);
-    if (sameStrategy && input.open) {
-      return { closed: null, opened: prev };
+    if (prev) {
+      const sameStrategy =
+        input.open &&
+        (prev.strategyDefinitionId ?? null) === (input.open.strategyDefinitionId ?? null);
+      if (sameStrategy && input.open) {
+        return { closed: null, opened: prev };
+      }
+      closed = { ...prev, effectiveTo: at };
+      rows[openIdx] = closed;
     }
-    closed = { ...prev, effectiveTo: at };
-    rows[openIdx] = closed;
   }
 
   let opened: MandateTenure | null = null;

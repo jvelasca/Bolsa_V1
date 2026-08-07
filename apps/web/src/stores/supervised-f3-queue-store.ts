@@ -46,7 +46,14 @@ export type SupervisedProposePayload = RecommendationV1 & {
   combinedScore?: number;
 };
 
-export type SupervisedQueueOrigin = 'scan' | 'finalists' | 'chart' | 'manual' | 'alarm';
+export type SupervisedQueueOrigin =
+  | 'scan'
+  | 'finalists'
+  | 'chart'
+  | 'manual'
+  | 'alarm'
+  | 'operativa'
+  | 'asesor';
 
 export type SupervisedEnqueueMeta = {
   scanId?: string;
@@ -72,6 +79,8 @@ interface SupervisedF3QueueState {
     meta?: Omit<SupervisedEnqueueMeta, 'symbol'>,
   ) => number;
   remove: (id: string) => void;
+  /** ADR-024: quitar de Estudio → saca propuestas abiertas de ese instrumento. */
+  removeForInstrument: (instrumentId: string) => number;
   clear: () => void;
   setActive: (id: string | null) => void;
   activeItem: () => SupervisedQueueItem | null;
@@ -85,6 +94,8 @@ export function resolveSupervisedQueueOrigin(
   if (item.scanId?.startsWith('finalists:')) return 'finalists';
   if (item.payload.source === 'chart') return 'chart';
   if (item.payload.source === 'alarm') return 'alarm';
+  if (item.payload.source === 'operativa') return 'operativa';
+  if (item.payload.source === 'asesor_alarma') return 'asesor';
   if (item.scanId) return 'scan';
   return 'manual';
 }
@@ -99,6 +110,10 @@ export function supervisedQueueOriginLabel(origin: SupervisedQueueOrigin): strin
       return 'Gráfico';
     case 'alarm':
       return 'Alarma Radar';
+    case 'operativa':
+      return 'Operativa';
+    case 'asesor':
+      return 'Asesor';
     default:
       return 'Manual';
   }
@@ -153,6 +168,23 @@ export const useSupervisedF3QueueStore = create<SupervisedF3QueueState>()(
             s.activeId === id ? (items[0]?.id ?? null) : s.activeId;
           return { items, activeId };
         }),
+      removeForInstrument: (instrumentId) => {
+        if (!instrumentId) return 0;
+        let n = 0;
+        set((s) => {
+          const items = s.items.filter((i) => {
+            if (i.payload.instrumentId !== instrumentId) return true;
+            n += 1;
+            return false;
+          });
+          const activeStill = items.some((i) => i.id === s.activeId);
+          return {
+            items,
+            activeId: activeStill ? s.activeId : (items[0]?.id ?? null),
+          };
+        });
+        return n;
+      },
       clear: () => set({ items: [], activeId: null }),
       setActive: (id) => set({ activeId: id }),
       activeItem: () => {

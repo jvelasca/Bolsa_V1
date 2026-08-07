@@ -52,6 +52,34 @@ async def test_composite_without_ohlcv():
 
 
 @pytest.mark.asyncio
+async def test_execute_chips_swallows_per_instrument_errors():
+    instrument = SimpleNamespace(id="inst-1", symbol="ACME")
+    fund = {
+        "marketCap": 8e10,
+        "trailingPe": 12.0,
+        "roe": 0.18,
+        "operatingMargin": 0.14,
+        "debtToEquity": 0.4,
+        "currentRatio": 1.5,
+        "fcfYield": 0.03,
+        "altmanZ": 3.0,
+        "fetchedAt": "2026-07-29T12:00:00Z",
+        "sourceVersion": "yahoo_quote_summary_v3",
+    }
+    uc = GetInstrumentComposite(_FakeInstruments(instrument, fund), ohlcv=None)
+
+    async def boom(instrument_id: str, **kwargs):
+        if instrument_id == "bad":
+            raise RuntimeError("boom")
+        return await GetInstrumentComposite.execute(uc, instrument_id, **kwargs)
+
+    uc.execute = boom  # type: ignore[method-assign]
+    chips = await uc.execute_chips(["bad", "inst-1"])
+    assert len(chips) == 1
+    assert chips[0]["instrumentId"] == "inst-1"
+
+
+@pytest.mark.asyncio
 async def test_composite_as_of_blocks_lookahead_fund():
     instrument = SimpleNamespace(id="inst-1", symbol="ACME")
     fund = {

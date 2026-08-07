@@ -18,7 +18,11 @@ def _configure_event_loop() -> None:
     # Legacy policy (pytest/scripts). Uvicorn 0.36+ ignores this and picks Proactor
     # unless we pass loop= — see uvicorn.run(..., loop=...) below.
     if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 def _uvicorn_loop() -> str:

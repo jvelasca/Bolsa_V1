@@ -74,6 +74,13 @@ class SqlAlchemyListRepository:
 
     CATALOG_IBEX_LIST_ID = "ibex35"
 
+    # Lista canónica de supervisión (ADR-024). Membresía editable; no borrar.
+    ESTUDIO_LIST_ID = "estudio"
+
+    ESTUDIO_LIST_NAME = "Estudio"
+
+    ESTUDIO_PERSONAL_LEGACY_NAME = "Estudio personal"
+
     def __init__(self, session: AsyncSession) -> None:
 
         self._session = session
@@ -151,6 +158,24 @@ class SqlAlchemyListRepository:
         result = await self._session.execute(stmt)
 
         return [self._summary(row, item_count) for row, item_count in result.all()]
+
+    async def list_memberships(self) -> dict[str, list[str]]:
+        """Mapa list_id → instrumentIds (una query; orden de membresía)."""
+        stmt = (
+            select(
+                InstrumentListItemRow.list_id,
+                InstrumentListItemRow.instrument_id,
+            )
+            .order_by(
+                InstrumentListItemRow.list_id.asc(),
+                InstrumentListItemRow.sort_order.asc(),
+            )
+        )
+        result = await self._session.execute(stmt)
+        out: dict[str, list[str]] = {}
+        for list_id, instrument_id in result.all():
+            out.setdefault(list_id, []).append(instrument_id)
+        return out
 
     async def get_by_id(self, list_id: str) -> InstrumentListDetail | None:
 
@@ -338,6 +363,11 @@ class SqlAlchemyListRepository:
 
         """Elimina lista personal o desuscribe índice (catalog)."""
 
+        if list_id == self.ESTUDIO_LIST_ID:
+            raise ValueError(
+                "La lista «Estudio» es canónica de supervisión y no se puede eliminar."
+            )
+
         detail = await self.get_by_id(list_id)
 
         if detail is None:
@@ -349,6 +379,61 @@ class SqlAlchemyListRepository:
         result = await self._session.execute(stmt)
 
         return result.rowcount > 0
+
+    async def _find_by_name_ci(self, name: str) -> InstrumentListDetail | None:
+        target = name.strip().casefold()
+        stmt = select(InstrumentListRow)
+        result = await self._session.execute(stmt)
+        for row in result.scalars().all():
+            if (row.name or "").strip().casefold() == target:
+                return await self.get_by_id(row.id)
+        return None
+
+    async def ensure_estudio_list(self) -> InstrumentListDetail:
+        """
+        Asegura la lista API canónica «Estudio» (id estable).
+        Si existe «Estudio personal», fusiona instrumentos y elimina la lista legacy.
+        """
+        existing = await self.get_by_id(self.ESTUDIO_LIST_ID)
+        if existing is None:
+            by_name = await self._find_by_name_ci(self.ESTUDIO_LIST_NAME)
+            if by_name is not None and by_name.id != self.ESTUDIO_LIST_ID:
+                # Renombrar fila legacy homónima no canónica → absorbida vía recreate
+                existing = await self.create(
+                    name=self.ESTUDIO_LIST_NAME,
+                    source="custom",
+                    instrument_ids=list(by_name.instrument_ids),
+                    list_id=self.ESTUDIO_LIST_ID,
+                    kind="supervision_universe",
+                )
+                await self.delete(by_name.id)
+            else:
+                existing = await self.create(
+                    name=self.ESTUDIO_LIST_NAME,
+                    source="custom",
+                    instrument_ids=[],
+                    list_id=self.ESTUDIO_LIST_ID,
+                    kind="supervision_universe",
+                )
+        elif (existing.name or "").strip() != self.ESTUDIO_LIST_NAME:
+            existing = await self.update(
+                self.ESTUDIO_LIST_ID, name=self.ESTUDIO_LIST_NAME
+            ) or existing
+
+        personal = await self._find_by_name_ci(self.ESTUDIO_PERSONAL_LEGACY_NAME)
+        if personal is not None and personal.id != self.ESTUDIO_LIST_ID:
+            merged = list(
+                dict.fromkeys([*existing.instrument_ids, *personal.instrument_ids])
+            )
+            if merged != list(existing.instrument_ids):
+                existing = await self.update(
+                    self.ESTUDIO_LIST_ID, instrument_ids=merged
+                ) or existing
+            # delete() bloquea solo id canónico; personal sí se puede borrar
+            await self.delete(personal.id)
+
+        assert existing is not None
+        return existing
 
     async def sync_ibex_catalog_list_if_present(self) -> InstrumentListDetail | None:
 

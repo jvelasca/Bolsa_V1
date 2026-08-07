@@ -13,7 +13,7 @@ import { instrumentMatchesSearchQuery, type InstrumentWithMetaDto } from '@bolsa
 import { LayoutList, Search, Shapes } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { LIST_AUTO_MAX_INSTRUMENTS } from '@/features/backtests/backtest-list-auto';
+import { LIST_AUTO_BATCH_SIZE } from '@/features/backtests/backtest-list-auto';
 import {
   listMemberStatusClass,
   type ListMemberBacktestStatus,
@@ -274,8 +274,8 @@ export function BacktestUniversePicker({
           {listInstrumentCount != null && (
             <p className="text-[10px] font-normal text-muted-foreground">
               {listInstrumentCount} valor(es)
-              {listInstrumentCount > LIST_AUTO_MAX_INSTRUMENTS
-                ? ` · Play pedirá confirmación y usará los primeros ${LIST_AUTO_MAX_INSTRUMENTS}`
+              {listInstrumentCount > LIST_AUTO_BATCH_SIZE
+                ? ` · Play pedirá confirmación · ${Math.ceil(listInstrumentCount / LIST_AUTO_BATCH_SIZE)} tandas de ~${LIST_AUTO_BATCH_SIZE} (todos los valores)`
                 : ''}
               {statusCounts.total > 0
                 ? ` · ${statusCounts.withTop} con Finalistas · ${statusCounts.pending} pendientes`

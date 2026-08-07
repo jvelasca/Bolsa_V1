@@ -38,27 +38,31 @@ Instrumentos (hub / tabla)
 | **I2** | Score FA + TA/Composite ordenables | ✅ |
 | **I3** | Columna Seguimiento (hasta 3 slots) + CTA Radar / activar | ✅ |
 | **I4** | Ruta `/seguimiento` solo si I3 no basta | opcional |
+| **I5** | Chips Estudio/Cartera/Lista + Recom. (IO) + narrativa Evolución | ✅ |
 
 ---
 
-## 3. UI I0–I3
+## 3. UI I0–I5
 
 - Cabecera + contador filtrado.
 - Buscador: símbolo, nombre, yahoo, ISIN, sector, **nombre de lista**.
-- Filtro **Solo cartera DEMO** (cuenta activa).
-- Split **lista | detalle** (responsive ≥lg horizontal; móvil apilado) con `PanelResizeHandle`; clic fila → despliega el panel de detalle (colapsable a rail). Dentro: secciones verticales Resumen / Gráfico / Análisis / Coach (acordeón, persistente). Scroll vertical propio en el panel detalle. Preferencias en `localStorage` (`bolsa-instruments-hub-prefs-v2`): columnas + split **wide** / **stack** por separado + secciones abiertas — alineado con la premisa global [UI_PREFS_LOCALSTORAGE.md](../UI_PREFS_LOCALSTORAGE.md).
+- Filtros rápidos: chips favoritos **Todos · Estudio · Cartera · listas ancladas** + menú **(…)** (misma estética que el carrusel de Listas).
+- Split **lista | detalle** (responsive ≥lg horizontal; móvil apilado) con `PanelResizeHandle`; clic fila → despliega el panel de detalle (colapsable a rail). Dentro: secciones verticales Resumen / Gráfico / Análisis / **Evolución** / Coach (acordeón, persistente). Scroll vertical propio en el panel detalle. Preferencias en `localStorage` (`bolsa-instruments-hub-prefs-v2`): columnas + split **wide** / **stack** por separado + secciones abiertas — alineado con la premisa global [UI_PREFS_LOCALSTORAGE.md](../UI_PREFS_LOCALSTORAGE.md).
 - Columnas: anchos fijos alineados cabecera↔fila; **Ajustar al contenido** mide cabeceras + celdas.
-- Columnas: Activo · Precio · Δ% · Listas · Cartera · FA · TA · Seguim. · **Últ. vela** · Datos · Coach · Acciones.
+- Columnas: Activo · Precio · Δ% · Listas · Cartera · **Recom.** · FA · TA · Seguim. · **Últ. vela** · Datos · Coach · Acciones.
+- **Recom.:** Índice Operativo (mismo criterio que Operativa). Al activar Estudio → sort Recom. desc.
 - **Últ. vela:** `meta.lastBarDate` (+ hora de sync si la vela es solo fecha).
 - FA = Score_FUND 0–100; TA = pierna técnica Composite 0–100.
 - **Seguimiento:** chips / Activar Finalistas→Radar (sin editor de schedule en hub).
+- **Evolución:** narrativa ≤20 líneas en `instrument_narratives` — [instruments-hub-narrative-2026-08-04](./instruments-hub-narrative-2026-08-04.md).
 
 Datos:
-- I1: `getLists` + `getList` (invert) · `getPortfolio`
-- I2: `POST …/fundamentals/query` (chunks 80) · `POST …/composite/query` (chunks 40, horizon swing)
+- I1: `getLists` + `getList` (invert) · `getPortfolio` · Estudio = `visualization-store`
+- I2: `POST …/fundamentals/query` (chunks 80) · `POST …/composite/query` (chunks 40, horizon swing) · IO cliente
 - I3: `getTrackers` + `getTracker(id)` + `getExecutionPolicies` · cobertura pin ∪ lista (I1)
+- I5: `GET/PUT/DELETE …/instruments/{id}/narrative`
 
-Código: `instruments-page.tsx` · `instruments-hub-model.ts` · `instruments-hub-enrichment.ts` · `instruments-hub-scores.ts` · `instruments-hub-trackers.ts` · `use-instruments-hub-*.ts` · `use-activate-instrument-tracking.ts`.
+Código: `instruments-page.tsx` · `instruments-hub-model.ts` · `instruments-hub-enrichment.ts` · `instruments-hub-scores.ts` · `instruments-hub-trackers.ts` · `instrument-narrative-editor.tsx` · `use-instruments-hub-*.ts` · `use-activate-instrument-tracking.ts`.
 
 **No** se edita schedule/política en el hub (dueño = Screeners / Radar).
 
@@ -67,5 +71,6 @@ Código: `instruments-page.tsx` · `instruments-hub-model.ts` · `instruments-hu
 ## 4. Relacionados
 
 - Unificación Radar: `research-radar-unification-2026-07-31.md`
+- Narrativa / IO hub: `instruments-hub-narrative-2026-08-04.md`
 - Trackers: `docs/HYBRID_TRACKERS.md` · ADR-010
 - Listas: `lists-universes-design-2026-07-30.md`

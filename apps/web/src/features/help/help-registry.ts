@@ -102,7 +102,62 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: 'docs/engineering/trading-operativa-panel-2026-08-04.md',
         role: 'doc',
-        note: 'Operativa full-height · IO · En estudio · modos',
+        note: 'Operativa full-height · IO · modos en barra/Cuentas',
+      },
+      {
+        path: 'docs/adr/024-estudio-supervision-universe.md',
+        role: 'adr',
+        note: 'Universo Estudio · Supervisión ON · 3 capas',
+      },
+      {
+        path: 'docs/engineering/estudio-supervision-model-2026-08-06.md',
+        role: 'doc',
+        note: 'Modelo supervisión · cadencias · unsubscribe',
+      },
+      {
+        path: 'docs/engineering/estudio-process-status-ui-2026-08-06.md',
+        role: 'doc',
+        note: 'Iconos V·F·R · Actualizar/Redescubrir · OPERATIVA barra',
+      },
+      {
+        path: 'docs/engineering/session-handoff-2026-08-06-estudio-process-ui.md',
+        role: 'doc',
+        note: 'Handoff UI procesos (retomar agente)',
+      },
+      {
+        path: 'docs/engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md',
+        role: 'doc',
+        note: 'Prep AUTO A0–A5 · flag off · SEMI OK',
+      },
+      {
+        path: 'docs/adr/023-camino-d-thaw.md',
+        role: 'adr',
+        note: 'Thaw Camino D · Proposed · evidencia ☐',
+      },
+      {
+        path: 'docs/engineering/risk-engine-or-re-2026-08-04.md',
+        role: 'doc',
+        note: 'Risk Engine check_opening · kill switch',
+      },
+      {
+        path: 'apps/web/src/features/trading/demo-book-mode-panel.tsx',
+        role: 'code',
+        note: 'MANUAL/SEMI/AUTO prep · kill · armado (Cuentas)',
+      },
+      {
+        path: 'apps/web/src/features/trading/trading-status-bar.tsx',
+        role: 'code',
+        note: 'Badge OPERATIVA · enlace Cuentas',
+      },
+      {
+        path: 'apps/web/src/features/trading/estudio-supervision-panel.tsx',
+        role: 'code',
+        note: 'Banner Supervisión · chips cadencia V·F·R',
+      },
+      {
+        path: 'apps/web/src/features/trading/estudio-process-status.ts',
+        role: 'code',
+        note: 'Estados capas · summarize subtítulo',
       },
       {
         path: 'docs/engineering/chart-top1-indicator-switch-2026-08-03.md',
@@ -142,6 +197,31 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
     label: 'Watchlist (Listas / Valores)',
     kind: 'tracking',
     sources: [
+      {
+        path: 'docs/adr/024-estudio-supervision-universe.md',
+        role: 'adr',
+        note: 'Estudio API · Supervisión · Eliminar de la lista',
+      },
+      {
+        path: 'docs/engineering/visualizados-list-ux-2026-08-06.md',
+        role: 'doc',
+        note: 'Visualizados = pestañas · Por IO · columnas · foco lista',
+      },
+      {
+        path: 'docs/engineering/session-handoff-2026-08-06-visualizados-list-ux.md',
+        role: 'doc',
+        note: 'Handoff agente Visualizados / listas UX',
+      },
+      {
+        path: 'docs/engineering/estudio-process-status-ui-2026-08-06.md',
+        role: 'doc',
+        note: 'Actualizar / Redescubrir · subtítulo procesos',
+      },
+      {
+        path: 'apps/web/src/features/trading/lists-tab/list-values-panel.tsx',
+        role: 'code',
+        note: 'Valores · Visualizados · Por IO · foco Cartera→Estudio',
+      },
       {
         path: 'apps/web/src/features/settings/watchlist-lists-tracker.ts',
         role: 'tracker',
@@ -255,7 +335,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       },
       {
         path: 'docs/engineering/session-handoff-2026-08-01.md',
-        role: 'handoff',
+        role: 'doc',
         note: 'Cierre racha · frescura v1.3 · CORE-B v0.2 · CAPM Tarjeta · smoke UI siguiente',
       },
       {

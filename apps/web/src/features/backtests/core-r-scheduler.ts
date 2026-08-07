@@ -5,17 +5,25 @@
  * v1.4 shell: ticks mientras la app está abierta (`CoreRSchedulerHost`).
  * v1.6: toast al encolar (host escucha `CORE_R_SCHEDULER_EVENT`).
  * v1.12: `lastRemoteEnqueue*` para toast multi-dispositivo tras cron/BD.
- * No lanza Lista AUTO ni pisa TOP.
+ * v1.13: Auto-sync prefería «Estudio personal».
+ * ADR-024: prefiere lista API canónica «Estudio» (`estudioListId`).
+ * No lanza Lista AUTO ni pisa TOP (eso lo arma Supervisión ON).
  */
 
 export const CORE_R_SCHEDULER_KEY = 'bolsa-core-r-scheduler-v1';
+
+/** Presets de cadencia (minutos) en UI Monitor. */
+export const CORE_R_SCHEDULER_INTERVAL_PRESETS = [15, 30, 60, 120, 240, 1440] as const;
 
 export type CoreRSchedulerPrefs = {
   enabled: boolean;
   /** Minutos entre ticks (mín. 5). */
   intervalMinutes: number;
   lastTickAt: string | null;
-  /** Lista a re-encolar (la fija el Monitor al activar). */
+  /**
+   * Lista a re-encolar.
+   * Al activar Auto-sync: «Estudio» canónica si existe; si no, lista del Monitor.
+   */
   listId: string | null;
   /**
    * `monitor` = solo mientras el panel Monitor está montado (legacy).
@@ -100,6 +108,31 @@ export function coreRSchedulerDue(prefs: CoreRSchedulerPrefs, nowMs = Date.now()
   const last = Date.parse(prefs.lastTickAt);
   if (!Number.isFinite(last)) return true;
   return nowMs - last >= prefs.intervalMinutes * 60_000;
+}
+
+/** Normaliza minutos al rango válido del scheduler. */
+export function clampCoreRSchedulerInterval(minutes: number): number {
+  if (!Number.isFinite(minutes)) return 60;
+  return Math.min(24 * 60, Math.max(5, Math.round(minutes)));
+}
+
+/**
+ * Lista a fijar al activar Auto-sync: Estudio canónica > Monitor > prefs previas.
+ */
+export function resolveCoreRSchedulerListId(opts: {
+  estudioListId?: string | null;
+  /** @deprecated usar estudioListId */
+  estudioPersonalListId?: string | null;
+  monitorListId?: string | null;
+  previousListId?: string | null;
+}): string | null {
+  return (
+    opts.estudioListId ||
+    opts.estudioPersonalListId ||
+    opts.monitorListId ||
+    opts.previousListId ||
+    null
+  );
 }
 
 export const CORE_R_SCHEDULER_EVENT = 'bolsa-core-r-scheduler-tick';
