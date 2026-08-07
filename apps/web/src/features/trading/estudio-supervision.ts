@@ -217,12 +217,28 @@ export function emitEstudioUnsubscribe(instrumentIds: string[]): void {
   }
 }
 
+/** Último tick pendiente si BacktestsPage aún no estaba montado (keep-alive). */
+let pendingEstudioLaneTick: EstudioLaneTickDetail | null = null;
+
 export function emitEstudioLaneTick(detail: EstudioLaneTickDetail): void {
+  pendingEstudioLaneTick = detail;
   try {
     window.dispatchEvent(new CustomEvent(ESTUDIO_LANE_TICK_EVENT, { detail }));
   } catch {
     // SSR / tests
   }
+}
+
+/** Consume tick encolado (p. ej. al montar BacktestsPage tras Actualizar/alta). */
+export function takePendingEstudioLaneTick(): EstudioLaneTickDetail | null {
+  const next = pendingEstudioLaneTick;
+  pendingEstudioLaneTick = null;
+  return next;
+}
+
+/** Marca el tick como entregado (listener vivo recibió el evento). */
+export function clearPendingEstudioLaneTick(): void {
+  pendingEstudioLaneTick = null;
 }
 
 function laneDue(lastAt: string | null, intervalMinutes: number, nowMs: number): boolean {

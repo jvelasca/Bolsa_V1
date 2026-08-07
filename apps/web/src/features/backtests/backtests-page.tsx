@@ -107,6 +107,14 @@ import {
   type FullCycleSettleReason,
   type ListAutoCampaign,
 } from '@/features/backtests/backtest-list-auto';
+import {
+  LIST_AUTO_SOFT_PAUSE_EVENT,
+  LIST_AUTO_SOFT_RESUME_EVENT,
+} from '@/features/trading/estudio-update-control';
+import {
+  clearPendingEstudioLaneTick,
+  takePendingEstudioLaneTick,
+} from '@/features/trading/estudio-supervision';
 import { summarizeListMemberBacktest } from '@/features/backtests/backtest-list-member-status';
 import { summarizeListMemberFa } from '@/features/backtests/backtest-list-member-fa';
 import { instrumentTopIsDurable, universeEmptyStatus } from '@/features/backtests/backtest-assistant-full-cycle';
@@ -1223,8 +1231,21 @@ export function BacktestsPage() {
     const active = campaignLive || boardLive || Boolean(listAutoUi);
 
     if (!active) {
-      if (useListAutoActivityStore.getState().active) {
-        useListAutoActivityStore.getState().clear();
+      const snap = useListAutoActivityStore.getState();
+      if (snap.active) {
+        const detail = snap.detail ?? '';
+        // No borrar Actualizar/alta en curso o en pausa (banner Estudio / keep-alive).
+        const estudioUpdateBusy =
+          snap.listId === 'estudio' &&
+          (snap.paused ||
+            detail.startsWith('Actualizar') ||
+            detail.startsWith('Alta Estudio') ||
+            detail.startsWith('Redescubrir') ||
+            detail.startsWith('Termina ') ||
+            detail.startsWith('Pausa ·'));
+        if (!estudioUpdateBusy) {
+          snap.clear();
+        }
       }
       return;
     }
@@ -2389,16 +2410,14 @@ export function BacktestsPage() {
       }
     };
 
-    const onLaneTick = (ev: Event) => {
-      const detail = (
-        ev as CustomEvent<{
-          listId: string;
-          lane: 'freshness' | 'rediscover';
-          forceRescan: boolean;
-          skipConfirm: boolean;
-          instrumentIds: string[] | null;
-        }>
-      ).detail;
+    const handleLaneTickDetail = (detail: {
+      listId: string;
+      lane: 'freshness' | 'rediscover';
+      forceRescan: boolean;
+      skipConfirm: boolean;
+      instrumentIds: string[] | null;
+    }) => {
+      clearPendingEstudioLaneTick();
       if (!detail?.listId) return;
       if (listAutoRef.current && !listAutoRef.current.aborted) {
         setAssistantStatus(
@@ -2418,6 +2437,20 @@ export function BacktestsPage() {
       armListAutoForList(detail.listId, label);
     };
 
+    const onLaneTick = (ev: Event) => {
+      const detail = (
+        ev as CustomEvent<{
+          listId: string;
+          lane: 'freshness' | 'rediscover';
+          forceRescan: boolean;
+          skipConfirm: boolean;
+          instrumentIds: string[] | null;
+        }>
+      ).detail;
+      if (!detail) return;
+      handleLaneTickDetail(detail);
+    };
+
     const onUnsubscribe = (ev: Event) => {
       const ids = (ev as CustomEvent<{ instrumentIds: string[] }>).detail?.instrumentIds ?? [];
       for (const id of ids) listAutoExcludedIdsRef.current.add(id);
@@ -2431,6 +2464,9 @@ export function BacktestsPage() {
     window.addEventListener('bolsa-estudio-supervision-changed', onSupervision);
     window.addEventListener('bolsa-estudio-lane-tick', onLaneTick);
     window.addEventListener('bolsa-estudio-unsubscribe', onUnsubscribe);
+    // Si Actualizar/alta emitió el tick antes de montar keep-alive, drenarlo ahora.
+    const pending = takePendingEstudioLaneTick();
+    if (pending) handleLaneTickDetail(pending);
     return () => {
       window.removeEventListener('bolsa-estudio-supervision-changed', onSupervision);
       window.removeEventListener('bolsa-estudio-lane-tick', onLaneTick);
@@ -2776,6 +2812,18 @@ export function BacktestsPage() {
     );
     queueListAutoTicker(campaign.index);
   }
+
+  // Banner Estudio (Trading): pausa/reanuda suave de Lista AUTO sin estar en /backtests.
+  useEffect(() => {
+    const onPause = () => pauseListAuto();
+    const onResume = () => resumeListAuto();
+    window.addEventListener(LIST_AUTO_SOFT_PAUSE_EVENT, onPause);
+    window.addEventListener(LIST_AUTO_SOFT_RESUME_EVENT, onResume);
+    return () => {
+      window.removeEventListener(LIST_AUTO_SOFT_PAUSE_EVENT, onPause);
+      window.removeEventListener(LIST_AUTO_SOFT_RESUME_EVENT, onResume);
+    };
+  });
 
   function stopListAuto() {
     const campaign = listAutoRef.current;

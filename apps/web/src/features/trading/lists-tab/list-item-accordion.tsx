@@ -291,7 +291,9 @@ export function ListItemAccordion({
                   key={column.id}
                   type="button"
                   className={cn(
-                    'min-w-0 truncate text-left text-[10px]',
+                    // Sin `truncate`/`nowrap` en el botón: la 2ª línea (procesos / subtítulo)
+                    // debe poder apilarse; el ellipsis va en los spans hijos.
+                    'min-w-0 overflow-hidden text-left text-[10px]',
                     listColumnContentClass(column.id, 'data'),
                     cell.className,
                   )}

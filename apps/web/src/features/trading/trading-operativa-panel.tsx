@@ -301,8 +301,11 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
             className="mt-1 rounded border border-amber-700/40 bg-background/60 px-1.5 py-0.5 font-medium text-foreground hover:bg-accent"
             onClick={() => {
               if (!instrumentId) return;
-              void import('@/features/trading/estudio-membership').then(async ({ addToEstudioMembership }) => {
-                const added = await addToEstudioMembership([
+              void (async () => {
+                const { addToEstudioMembership } = await import(
+                  '@/features/trading/estudio-membership'
+                );
+                const { added, ids } = await addToEstudioMembership([
                   {
                     id: instrumentId,
                     symbol,
@@ -316,11 +319,20 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
                     meta: { barCount: 0, lastSync: null, lastClose: null, changePct: null },
                   },
                 ]);
-                if (added > 0) {
-                  upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
-                  pushToast(`${symbol} → Estudio`);
-                }
-              });
+                if (added <= 0) return;
+                upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
+                pushToast(`${symbol} → Estudio · actualizando…`);
+                const { runEstudioInstrumentsUpdate } = await import(
+                  '@/features/trading/estudio-instruments-update'
+                );
+                await runEstudioInstrumentsUpdate({
+                  instrumentIds: ids,
+                  rediscover: false,
+                  phaseLabel: 'Alta Estudio',
+                  symbolOf: () => symbol,
+                });
+                pushToast(`${symbol} → Estudio · datos al día`);
+              })();
             }}
           >
             Añadir a Estudio

@@ -62,15 +62,22 @@ export async function hydrateEstudioMembershipFromApi(): Promise<void> {
   useEstudioMembershipStore.getState().replaceMembers(next);
 }
 
+export type AddToEstudioResult = {
+  /** Cuántos se añadieron de verdad (no estaban ya). */
+  added: number;
+  /** Ids nuevos (para Actualizar ligero al alta). */
+  ids: string[];
+};
+
 /** Añade instrumentos a Estudio (API + cache). */
 export async function addToEstudioMembership(
   instruments: ReadonlyArray<InstrumentWithMetaDto | EstudioMemberMeta>,
-): Promise<number> {
-  if (instruments.length === 0) return 0;
+): Promise<AddToEstudioResult> {
+  if (instruments.length === 0) return { added: 0, ids: [] };
   const current = await fetchEstudioInstrumentIds();
   const set = new Set(current);
-  let added = 0;
   const metas: EstudioMemberEntry[] = [];
+  const ids: string[] = [];
   for (const raw of instruments) {
     const id =
       'id' in raw && typeof (raw as InstrumentWithMetaDto).id === 'string'
@@ -82,12 +89,12 @@ export async function addToEstudioMembership(
     if (!id || set.has(id)) continue;
     set.add(id);
     metas.push({ instrumentId: id, symbol, name });
-    added += 1;
+    ids.push(id);
   }
-  if (added === 0) return 0;
+  if (ids.length === 0) return { added: 0, ids: [] };
   await api.updateList(ESTUDIO_LIST_ID, { instrumentIds: [...set] });
   useEstudioMembershipStore.getState().upsertMembers(metas);
-  return added;
+  return { added: ids.length, ids };
 }
 
 /** Quita instrumentos de Estudio (API + cache). */

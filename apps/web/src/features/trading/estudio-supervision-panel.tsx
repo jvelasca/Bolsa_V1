@@ -11,7 +11,14 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, FlaskConical, MoreHorizontal, RefreshCcw } from 'lucide-react';
+import {
+  Activity,
+  FlaskConical,
+  MoreHorizontal,
+  Pause,
+  Play,
+  RefreshCcw,
+} from 'lucide-react';
 import { OpaqueMenuPanel } from '@/components/ui/opaque-menu-panel';
 import {
   ESTUDIO_FRESHNESS_PRESETS,
@@ -28,6 +35,13 @@ import {
   ESTUDIO_LANE_PURPOSE,
   type EstudioProcessLaneId,
 } from '@/features/trading/estudio-process-status';
+import {
+  hasEstudioUpdatePauseCheckpoint,
+  isEstudioUpdateSoftStopRequested,
+  requestEstudioBannerSoftPause,
+  requestListAutoSoftResume,
+} from '@/features/trading/estudio-update-control';
+import { resumeEstudioInstrumentsUpdate } from '@/features/trading/estudio-instruments-update';
 import { ESTUDIO_LIST_ID } from '@bolsa/shared';
 import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
 import { cn } from '@/lib/utils';
@@ -312,8 +326,36 @@ export function EstudioListSupervisionBanner({
   const listAutoDetail = useListAutoActivityStore((s) => s.detail);
   const listAutoPaused = useListAutoActivityStore((s) => s.paused);
 
+  const softStopPending =
+    isEstudioUpdateSoftStopRequested() ||
+    Boolean(listAutoDetail?.startsWith('Termina '));
+  const updatePaused =
+    listAutoPaused &&
+    (hasEstudioUpdatePauseCheckpoint() ||
+      Boolean(listAutoDetail?.startsWith('Pausa ·')));
+  const stoppingOrPaused = listAutoPaused || softStopPending;
+
   const activity = useMemo((): EstudioBannerProgress | null => {
-    if (progress && progress.total > 0) return progress;
+    // Pausa / «Termina…» tienen prioridad sobre el progreso local (que el padre limpia).
+    if (
+      listAutoActive &&
+      listAutoListId === ESTUDIO_LIST_ID &&
+      listAutoTotal > 0 &&
+      (softStopPending || updatePaused || listAutoPaused)
+    ) {
+      return {
+        current: Math.min(listAutoIndex + 1, listAutoTotal),
+        total: listAutoTotal,
+        label:
+          listAutoDetail?.slice(0, 52) ||
+          (softStopPending
+            ? `Termina ${listAutoSymbol || '…'} y para…`
+            : `Pausa · ${listAutoSymbol || '…'}`),
+      };
+    }
+    if (progress && progress.total > 0) {
+      return progress;
+    }
     if (
       listAutoActive &&
       listAutoListId === ESTUDIO_LIST_ID &&
@@ -322,9 +364,7 @@ export function EstudioListSupervisionBanner({
       return {
         current: Math.min(listAutoIndex + 1, listAutoTotal),
         total: listAutoTotal,
-        label: listAutoPaused
-          ? `Pausa · ${listAutoSymbol || '…'}`
-          : listAutoDetail?.slice(0, 40) || listAutoSymbol || 'Procesando…',
+        label: listAutoDetail?.slice(0, 40) || listAutoSymbol || 'Procesando…',
       };
     }
     return null;
@@ -337,12 +377,19 @@ export function EstudioListSupervisionBanner({
     listAutoSymbol,
     listAutoDetail,
     listAutoPaused,
+    softStopPending,
+    updatePaused,
   ]);
 
   const pct =
     activity && activity.total > 0
       ? Math.min(100, Math.round((activity.current / activity.total) * 100))
       : 0;
+
+  const canSoftPause = Boolean(activity) && !stoppingOrPaused;
+  /** ▶ solo cuando ya paró (no mientras «Termina…»). */
+  const canResume =
+    Boolean(activity) && listAutoPaused && !softStopPending;
 
   return (
     <div
@@ -369,25 +416,59 @@ export function EstudioListSupervisionBanner({
       />
       {activity ? (
         <div
-          className="ml-auto flex min-w-[9rem] max-w-[16rem] flex-col gap-0.5"
+          className="ml-auto flex min-w-[10rem] max-w-[18rem] items-center gap-1.5"
           data-testid="estudio-banner-progress"
-          title={`${activity.label} · ${activity.current}/${activity.total}`}
         >
-          <div className="flex items-center justify-between gap-2 text-[10px] text-foreground/85">
-            <span className="min-w-0 truncate font-medium">{activity.label}</span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-              {activity.current}/{activity.total}
-            </span>
+          <div
+            className="flex min-w-0 flex-1 flex-col gap-0.5"
+            title={`${activity.label} · ${activity.current}/${activity.total}`}
+          >
+            <div className="flex items-center justify-between gap-2 text-[10px] text-foreground/85">
+              <span className="min-w-0 truncate font-medium">{activity.label}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {activity.current}/{activity.total}
+              </span>
+            </div>
+            <div className="h-1 overflow-hidden rounded-sm bg-border/80">
+              <div
+                className={cn(
+                  'h-full rounded-sm transition-[width] duration-300',
+                  stoppingOrPaused ? 'bg-amber-500' : 'bg-sky-500',
+                )}
+                style={{ width: `${Math.max(pct, activity.current > 0 ? 8 : 0)}%` }}
+              />
+            </div>
           </div>
-          <div className="h-1 overflow-hidden rounded-sm bg-border/80">
-            <div
-              className={cn(
-                'h-full rounded-sm transition-[width] duration-300',
-                listAutoPaused ? 'bg-amber-500' : 'bg-sky-500',
-              )}
-              style={{ width: `${Math.max(pct, activity.current > 0 ? 8 : 0)}%` }}
-            />
-          </div>
+          {canSoftPause ? (
+            <button
+              type="button"
+              className="shrink-0 rounded border border-border/70 bg-background/70 p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              title="Pausa: termina el valor en curso y no sigue"
+              aria-label="Pausa suave: termina el valor en curso y para"
+              data-testid="estudio-banner-soft-pause"
+              onClick={() => requestEstudioBannerSoftPause()}
+            >
+              <Pause className="h-3 w-3" />
+            </button>
+          ) : null}
+          {canResume ? (
+            <button
+              type="button"
+              className="shrink-0 rounded border border-primary/40 bg-primary/10 p-0.5 text-primary hover:bg-primary/20"
+              title="Reanudar: continúa desde donde se pausó"
+              aria-label="Reanudar"
+              data-testid="estudio-banner-soft-resume"
+              onClick={() => {
+                if (hasEstudioUpdatePauseCheckpoint()) {
+                  void resumeEstudioInstrumentsUpdate();
+                  return;
+                }
+                requestListAutoSoftResume();
+              }}
+            >
+              <Play className="h-3 w-3 fill-current" />
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

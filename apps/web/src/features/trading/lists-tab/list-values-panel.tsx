@@ -89,14 +89,9 @@ import {
   type EstudioBannerProgress,
 } from '@/features/trading/estudio-supervision-panel';
 import {
-  emitEstudioLaneTick,
-} from '@/features/trading/estudio-supervision';
-import {
-  emitEstudioProcessRunning,
-  laneFromListAutoMode,
-} from '@/features/trading/estudio-process-status';
-import { touchEstudioLaneStamps } from '@/features/trading/estudio-lane-stamps';
-import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
+  collectEstudioIdsNeedingUpdate,
+  runEstudioInstrumentsUpdate,
+} from '@/features/trading/estudio-instruments-update';
 
 export function ListValuesPanel() {
   const navigate = useNavigate();
@@ -391,6 +386,7 @@ export function ListValuesPanel() {
   const [estudioProgress, setEstudioProgress] = useState<EstudioBannerProgress | null>(
     null,
   );
+  const estudioAutoKickRef = useRef<string | null>(null);
 
   /**
    * Fuerza sync de la selección en Estudio.
@@ -407,97 +403,19 @@ export function ListValuesPanel() {
       if (!ok) return;
     }
     setUpdatingSelected(true);
-    const lane = laneFromListAutoMode(opts.rediscover);
-    const symbolOf = (id: string) =>
-      selectableItems.find((it) => it.id === id)?.symbol ?? id.slice(0, 8);
-    const phase = opts.rediscover ? 'Redescubrir' : 'Actualizar';
-    const publishKeepAlive = (index: number, detail: string) => {
-      useListAutoActivityStore.getState().publish({
-        active: true,
-        paused: false,
-        listId: ESTUDIO_LIST_ID,
-        listName: 'Estudio',
-        index,
-        total: ids.length,
-        symbol: symbolOf(ids[index] ?? ids[0] ?? ''),
-        detail,
-      });
-    };
     try {
-      setEstudioProgress({
-        current: 0,
-        total: ids.length,
-        label: `${phase} · sync…`,
-      });
-      publishKeepAlive(0, `${phase} selección · velas…`);
-      for (let i = 0; i < ids.length; i++) {
-        const id = ids[i]!;
-        const sym = symbolOf(id);
-        setEstudioProgress({
-          current: i + 1,
-          total: ids.length,
-          label: `${phase} · ${sym}`,
-        });
-        publishKeepAlive(i, `${phase} · ${sym}`);
-        emitEstudioProcessRunning({ instrumentId: id, lane: 'freshness' });
-        try {
-          await api.syncInstrument(id, 5);
-        } catch {
-          // seguir con el resto
-        }
-      }
-      touchEstudioLaneStamps(
-        ids,
-        opts.rediscover ? 'rediscover' : 'freshness',
-      );
-      setEstudioProgress({
-        current: ids.length,
-        total: ids.length,
-        label: `${phase} · vigilia…`,
-      });
-      // Vigilia = CORE-R (mandato/PnL); «Actualizar» también la dispara para no dejar el 1º icono vacío.
-      emitEstudioProcessRunning({
-        instrumentId: ids[0] ?? null,
-        lane: 'vigilance',
-      });
-      try {
-        const { runCoreRSchedulerTick } = await import(
-          '@/features/backtests/core-r-scheduler-tick'
-        );
-        await runCoreRSchedulerTick({ force: true, includePnl: true });
-      } catch {
-        // best-effort
-      }
-      // Sello local aunque CORE-R no encole (juicio OK / sin listId).
-      touchEstudioLaneStamps(ids, 'vigilance');
-      setEstudioProgress({
-        current: ids.length,
-        total: ids.length,
-        label: `${phase} · Lab…`,
-      });
-      emitEstudioProcessRunning({ instrumentId: ids[0] ?? null, lane });
-      emitEstudioLaneTick({
-        listId: ESTUDIO_LIST_ID,
-        lane: opts.rediscover ? 'rediscover' : 'freshness',
-        forceRescan: opts.rediscover,
-        skipConfirm: true,
+      await runEstudioInstrumentsUpdate({
         instrumentIds: ids,
-        at: new Date().toISOString(),
+        rediscover: opts.rediscover,
+        symbolOf: (id) =>
+          selectableItems.find((it) => it.id === id)?.symbol ?? id.slice(0, 8),
+        onProgress: setEstudioProgress,
       });
       void queryClient.invalidateQueries({ queryKey: ['list'] });
       void queryClient.invalidateQueries({ queryKey: ['lists'] });
-      emitEstudioProcessRunning({ instrumentId: null, lane: null });
     } finally {
       setUpdatingSelected(false);
       setEstudioProgress(null);
-      const snap = useListAutoActivityStore.getState();
-      if (
-        snap.active &&
-        snap.listId === ESTUDIO_LIST_ID &&
-        (snap.detail?.startsWith('Actualizar') || snap.detail?.startsWith('Redescubrir'))
-      ) {
-        snap.clear();
-      }
     }
   }
 
@@ -508,7 +426,7 @@ export function ListValuesPanel() {
       .map((id) => byId.get(id))
       .filter((item): item is (typeof selectableItems)[number] => Boolean(item));
     const { addToEstudioMembership } = await import('@/features/trading/estudio-membership');
-    const added = await addToEstudioMembership(batch);
+    const { added, ids: addedIds } = await addToEstudioMembership(batch);
     if (added > 0) {
       void queryClient.invalidateQueries({ queryKey: ['lists'] });
       void queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
@@ -521,6 +439,23 @@ export function ListValuesPanel() {
       });
       setSelectedInstrumentIds(new Set());
       selectionAnchorIndexRef.current = null;
+      // Alta = Actualizar ligero (velas + vigilia + frescura). Redescubrir sigue manual.
+      const symbolById = new Map(batch.map((it) => [it.id, it.symbol]));
+      setUpdatingSelected(true);
+      try {
+        await runEstudioInstrumentsUpdate({
+          instrumentIds: addedIds,
+          rediscover: false,
+          phaseLabel: 'Alta Estudio',
+          symbolOf: (id) => symbolById.get(id) ?? id.slice(0, 8),
+          onProgress: setEstudioProgress,
+        });
+        void queryClient.invalidateQueries({ queryKey: ['list'] });
+        void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      } finally {
+        setUpdatingSelected(false);
+        setEstudioProgress(null);
+      }
     }
   }
 
@@ -872,6 +807,67 @@ export function ListValuesPanel() {
     (activeVirtual === VIRTUAL_LIST_PORTFOLIO && portfolioQuery.isError) ||
     (!activeVirtual && quotesQuery.isError);
 
+  const estudioInstrumentIdsKey = viewingEstudio
+    ? listInstruments
+        .map((it) => it.id)
+        .slice()
+        .sort()
+        .join('|')
+    : '';
+
+  /**
+   * Al abrir Estudio: Actualizar automático de valores con vigilia/frescura vacía o caducada.
+   * (Alta a Estudio también dispara Actualizar; esto cubre los que ya estaban en la lista.)
+   */
+  useEffect(() => {
+    if (!viewingEstudio) {
+      estudioAutoKickRef.current = null;
+      return;
+    }
+    if (isLoading) return;
+    if (!estudioInstrumentIdsKey) return;
+    const ids = estudioInstrumentIdsKey.split('|').filter(Boolean);
+    const needing = collectEstudioIdsNeedingUpdate(ids);
+    if (needing.length === 0) {
+      estudioAutoKickRef.current = null;
+      return;
+    }
+    const key = needing.slice().sort().join('|');
+    if (estudioAutoKickRef.current === key) return;
+    estudioAutoKickRef.current = key;
+
+    const symbolById = new Map(listInstruments.map((it) => [it.id, it.symbol]));
+    let cancelled = false;
+    void (async () => {
+      setUpdatingSelected(true);
+      try {
+        await runEstudioInstrumentsUpdate({
+          instrumentIds: needing,
+          rediscover: false,
+          phaseLabel: 'Actualizar',
+          symbolOf: (id) => symbolById.get(id) ?? id.slice(0, 8),
+          onProgress: (p) => {
+            if (!cancelled) setEstudioProgress(p);
+          },
+        });
+        if (!cancelled) {
+          void queryClient.invalidateQueries({ queryKey: ['list'] });
+          void queryClient.invalidateQueries({ queryKey: ['lists'] });
+        }
+      } finally {
+        if (!cancelled) {
+          setUpdatingSelected(false);
+          setEstudioProgress(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // listInstruments solo para symbolOf; la clave de ids evita re-disparos por refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- kick por membresía Estudio
+  }, [viewingEstudio, isLoading, estudioInstrumentIdsKey, queryClient]);
+
   // Al enfocar valor (pestaña / búsqueda): dejarlo arriba del viewport sin reordenar.
   useEffect(() => {
     if (!activeInstrumentId || isLoading) return;
@@ -1046,6 +1042,7 @@ export function ListValuesPanel() {
         {!activeVirtual && (
           <SortedApiList
             items={listInstruments}
+            processSubtitle={viewingEstudio}
             activeInstrumentId={activeInstrumentId}
             isListSource={isListSourceRow}
             onOpenChart={focusInstrument}
@@ -1178,6 +1175,7 @@ export function ListValuesPanel() {
 
 function SortedApiList({
   items,
+  processSubtitle = false,
   activeInstrumentId,
   isListSource,
   onOpenChart,
@@ -1185,6 +1183,8 @@ function SortedApiList({
   onToggleSelect,
 }: {
   items: import('@bolsa/shared').InstrumentWithMetaDto[];
+  /** Estudio: resumen de procesos + barra al pulsar Actualizar. */
+  processSubtitle?: boolean;
   activeInstrumentId: string | undefined;
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
@@ -1212,6 +1212,7 @@ function SortedApiList({
         <ListItemAccordion
           key={item.id}
           item={item}
+          processSubtitle={processSubtitle}
           isChartActive={activeInstrumentId === item.id}
           isListSource={isListSource(item.id)}
           onOpenChart={() => onOpenChart(item.id, item.symbol)}
@@ -1281,7 +1282,6 @@ function SortedVisualizationList({
         <ListItemAccordion
           key={item.id}
           item={item}
-          processSubtitle
           isChartActive={activeInstrumentId === item.id}
           isListSource={isListSource(item.id)}
           onOpenChart={() => onOpenChart(item.id, item.symbol)}
