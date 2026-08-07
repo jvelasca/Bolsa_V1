@@ -157,6 +157,7 @@ const python = resolvePython();
 logInfo('dev', `Python: ${python}`);
 
 const children = [];
+let shuttingDown = false;
 
 function tee(stream, label, logFn) {
   stream.on('data', (chunk) => {
@@ -165,56 +166,37 @@ function tee(stream, label, logFn) {
   });
 }
 
-const { appendFileSync } = await import('node:fs');
-const log = (line) => appendFileSync(logFile, line);
-
-logInfo('dev', 'Arrancando API Python...');
-timeline.mark('api_spawn');
-const apiChild = spawn(python, [join(apiDir, 'run_dev.py')], {
-  cwd: apiDir,
-  stdio: ['inherit', 'pipe', 'pipe'],
-  env: {
-    ...process.env,
-    PYTHONPATH: join(apiDir, 'src'),
-    API_PYTHON_PORT: String(API_PORT),
-  },
-  shell: false,
-});
-children.push(apiChild);
-tee(apiChild.stdout, 'stdout', log);
-tee(apiChild.stderr, 'stderr', log);
-
-// Vite en paralelo con el boot de la API (no esperar health para abrir UI).
-logInfo('dev', 'Arrancando Web (Vite)...');
-timeline.mark('web_spawn');
-const webChild = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
-  stdio: ['inherit', 'pipe', 'pipe'],
-  env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
-});
-children.push(webChild);
-
-let webReadyMarked = false;
-let apiReadyMarked = false;
-
-webChild.stdout.on('data', (chunk) => {
-  process.stdout.write(chunk);
-  const text = chunk.toString();
-  if (!webReadyMarked && (text.includes('ready in') || text.includes(`localhost:${WEB_PORT}`))) {
-    webReadyMarked = true;
-    logInfo('dev', `Web lista -> http://localhost:${WEB_PORT}`);
-    timeline.mark('web_ready');
-    if (apiReadyMarked) {
-      timeline.finish('ready');
-      writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
-      writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
+/**
+ * Termina un proceso bajando TODO su árbol de procesos.
+ * - Windows: `taskkill /PID <pid> /T /F` (mata hijos). `kill('SIGTERM')` no
+ *   propaga a descendientes cuando se usa `shell:true` (pnpm.cmd).
+ * - Unix: SIGTERM con fallback a SIGKILL tras un margen.
+ */
+function terminateProcessTree(child) {
+  if (!child || child.exitCode !== null) return;
+  const pid = child.pid;
+  if (!pid) return;
+  try {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+    } else {
+      try {
+        child.kill('SIGTERM');
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // ignore
     }
   }
-  log(`[stdout] ${text}`);
-});
-webChild.stderr.on('data', (chunk) => {
-  process.stderr.write(chunk);
-  log(`[stderr] ${chunk.toString()}`);
-});
+}
+
+const { appendFileSync } = await import('node:fs');
+const log = (line) => appendFileSync(logFile, line);
 
 const xtbChildEarly = XTB_BRIDGE_AUTOSTART
   ? spawn(process.execPath, [join(ROOT, 'scripts', 'xtb-bridge-mock.mjs')], {
@@ -231,6 +213,25 @@ if (xtbChildEarly) {
   tee(xtbChildEarly.stderr, 'stderr', log);
 }
 
+// La API arranca primero y se espera a su health; Vite NO se levanta hasta que
+// la API responde. Así evitamos la cascada de ECONNREFUSED (/sync) que antes
+// tumbaba el stack en cada arranque.
+logInfo('dev', 'Arrancando API Python...');
+timeline.mark('api_spawn');
+const apiChild = spawn(python, [join(apiDir, 'run_dev.py')], {
+  cwd: apiDir,
+  stdio: ['inherit', 'pipe', 'pipe'],
+  env: {
+    ...process.env,
+    PYTHONPATH: join(apiDir, 'src'),
+    API_PYTHON_PORT: String(API_PORT),
+  },
+  shell: false,
+});
+children.push(apiChild);
+tee(apiChild.stdout, 'stdout', log);
+tee(apiChild.stderr, 'stderr', log);
+
 const apiReady = await waitForApi({
   port: API_PORT,
   maxWaitMs: 120_000,
@@ -239,19 +240,39 @@ const apiReady = await waitForApi({
 
 if (!apiReady.ok) {
   logError('dev', 'La API no arrancó a tiempo. Revisa logs arriba.');
-  for (const child of children) child.kill('SIGTERM');
+  for (const child of children) terminateProcessTree(child);
   timeline.finish('failed', { phase: 'api_health', waitMs: apiReady.elapsedMs });
   process.exit(1);
 }
 timeline.mark('api_ready', { waitMs: apiReady.elapsedMs });
-apiReadyMarked = true;
-if (webReadyMarked) {
-  timeline.finish('ready');
-  writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
-  writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
-} else {
-  logInfo('dev', 'API lista — esperando Vite…');
-}
+
+let webReadyMarked = false;
+
+logInfo('dev', 'API lista — arrancando Web (Vite)...');
+timeline.mark('web_spawn');
+const webChild = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
+  stdio: ['inherit', 'pipe', 'pipe'],
+  env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
+});
+children.push(webChild);
+
+webChild.stdout.on('data', (chunk) => {
+  process.stdout.write(chunk);
+  const text = chunk.toString();
+  if (!webReadyMarked && (text.includes('ready in') || text.includes(`localhost:${WEB_PORT}`))) {
+    webReadyMarked = true;
+    logInfo('dev', `Web lista -> http://localhost:${WEB_PORT}`);
+    timeline.mark('web_ready');
+    timeline.finish('ready');
+    writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
+    writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
+  }
+  log(`[stdout] ${text}`);
+});
+webChild.stderr.on('data', (chunk) => {
+  process.stderr.write(chunk);
+  log(`[stderr] ${chunk.toString()}`);
+});
 
 const arqChild =
   SCAN_QUEUE_BACKEND === 'arq'
@@ -270,13 +291,10 @@ if (arqChild) {
 }
 
 function shutdown(code = 0) {
-  for (const child of children) {
-    try {
-      child.kill('SIGTERM');
-    } catch {
-      // ignore
-    }
-  }
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logInfo('dev', `Deteniendo stack (exit=${code})…`);
+  for (const child of children) terminateProcessTree(child);
   writeAgentLog('dev', { status: 'stopped', exitCode: code });
   process.exit(code);
 }
@@ -284,7 +302,15 @@ function shutdown(code = 0) {
 apiChild.on('exit', (code) => {
   if (code && code !== 0) shutdown(code);
 });
-webChild.on('exit', (code) => shutdown(code ?? 0));
+webChild.on('exit', (code) => {
+  // Si Vite muere sin haber estado listo, seguro que algo falló en el boot.
+  // Si ya estaba listo, un exit de Vite en dev suele ser intencional (Ctrl+C).
+  if (!webReadyMarked && code && code !== 0) shutdown(code);
+});
 
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));
+// Guardia frente a huérfanos si el padre muere por crash/kill abrupto.
+process.on('exit', () => {
+  for (const child of children) terminateProcessTree(child);
+});
