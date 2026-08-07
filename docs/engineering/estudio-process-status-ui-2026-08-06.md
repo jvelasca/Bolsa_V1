@@ -49,14 +49,19 @@ Si CORE-R no encola nada (juicio OK), el icono de vigilia quedaba vacío.
 
 Componente: `list-name-process-subtitle.tsx`. Tooltip = títulos largos de cada capa (`ESTUDIO_LANE_PURPOSE` + estado + cadencia + cómo actualizar).
 
-## 5. Botones (sin Shift)
+## 5. Botones (sin Shift) + alta
 
-| Botón | Acción |
-|-------|--------|
+| Acción | Qué hace |
+|--------|----------|
+| **A Estudio** / alta | Membresía + **Actualizar ligero** automático de los ids nuevos (velas + vigilia + frescura). No Redescubrir. |
+| Abrir lista Estudio | Si hay valores con V/F vacíos o caducados → Actualizar automático de esos ids (keep-alive Lab hasta arrancar). |
 | **Actualizar** | `syncInstrument` → sellos F · CORE-R force · sello V · `emitEstudioLaneTick` `forceRescan: false` |
-| **Redescubrir** | Confirm costoso → igual + `forceRescan: true` (capa R) |
+| **Redescubrir** | Confirm costoso → igual + `forceRescan: true` (capa R). Solo a demanda del usuario. |
 
-Ubicación: solo barra inferior de selección (lista Estudio). El banner muestra cadencias, no estos botones.
+Implementación compartida: `estudio-instruments-update.ts`.  
+Ubicación botones: barra inferior de selección (lista Estudio). Iconos/procesos bajo el nombre y columna Procesos siguen mostrando qué está o no al día.
+
+**Pausa suave (banner Supervisión):** botón ⏸ junto a la barra de progreso. Termina el valor en curso y no arranca el siguiente (Actualizar/alta o Lista AUTO). El label pasa a `Termina SYMBOL y para…`. Reanudar (▶) solo si la campaña Lab quedó en pausa.
 
 ## 6. Operativa de cuenta (no por valor)
 
@@ -80,7 +85,7 @@ Panel Operativa = **Recomendación** + **Info** (por activo).
 | Columna iconos | `lists-tab/list-process-status-cell.tsx` |
 | Subtítulo + barra | `lists-tab/list-name-process-subtitle.tsx` |
 | Banner + botones | `estudio-supervision-panel.tsx` |
-| Actualizar / Redescubrir | `lists-tab/list-values-panel.tsx` → `updateSelectedInstruments` |
+| Actualizar / Redescubrir / alta | `estudio-instruments-update.ts` · callers: `list-values-panel.tsx`, `trading-operativa-panel.tsx` |
 | Barra estado modo | `trading-status-bar.tsx` |
 | Cuentas Operativa | `accounts/account-detail-panel.tsx` |
 | Animación barra | `apps/web/src/index.css` (`.estudio-row-progress`) |

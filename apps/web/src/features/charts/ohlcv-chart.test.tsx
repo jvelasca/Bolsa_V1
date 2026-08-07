@@ -1,5 +1,7 @@
 import { render, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
+import { ReactNode } from 'react';
 import { DEFAULT_CHART_CONFIG, type OhlcvBarDto } from '@bolsa/shared';
 import { OhlcvChart } from './ohlcv-chart';
 
@@ -40,15 +42,22 @@ const config = {
   display: { ...DEFAULT_CHART_CONFIG.display, height: 300 },
 };
 
+function renderWithProviders(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+}
+
 describe('OhlcvChart', () => {
   it('muestra mensaje cuando no hay barras', () => {
-    const { container } = render(<OhlcvChart bars={[]} config={config} />);
+    const { container } = renderWithProviders(<OhlcvChart bars={[]} config={config} />);
 
     expect(within(container).getByText(/Sin datos OHLCV/i)).toBeInTheDocument();
   });
 
   it('renderiza contenedor del gráfico con datos', () => {
-    const { container } = render(<OhlcvChart bars={sampleBars} config={config} />);
+    const { container } = renderWithProviders(<OhlcvChart bars={sampleBars} config={config} />);
 
     expect(within(container).queryByText(/Sin datos OHLCV/i)).not.toBeInTheDocument();
     expect(container.querySelector('.w-full')).toBeTruthy();

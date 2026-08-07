@@ -71,7 +71,7 @@ Execute AUTO **no** liberado — [checklist thaw](./engineering/camino-d-auto-th
 
 No seleccionar. No poner `PAPER_D_EXECUTE=1` en demo compartida. ADR-023 sigue **Proposed** hasta evidencia.
 
-**Estudio** = lista API canónica (universo supervisable). Abrir/cerrar gráfico **no** cambia membresía. Selección → **Pasar a Estudio** / **A Estudio**. SEMI/AUTO exigen pertenencia; MANUAL no.
+**Estudio** = lista API canónica (universo supervisable). Abrir/cerrar gráfico **no** cambia membresía. Selección → **Pasar a Estudio** / **A Estudio** (alta = Actualizar ligero de esos valores; Redescubrir sigue manual). SEMI/AUTO exigen pertenencia; MANUAL no.
 
 **Visualizados** = pestañas de gráfico abiertas (scratch). **Quitar** cierra pestañas. **Por IO** ordena por Índice Operativo (mejor a la izq.; misma métrica que Operativa). Columnas opcionales (⋯): IO · TA · FA · ★ Dict. · Postura. Al buscar o cambiar de pestaña: lista prioritaria **Cartera → Estudio → resto** y scroll del valor al tope (bajo cabecera). Detalle: [visualizados-list-ux-2026-08-06.md](./engineering/visualizados-list-ux-2026-08-06.md) · [ADR-024](./adr/024-estudio-supervision-universe.md) · [operativa](./engineering/trading-operativa-panel-2026-08-04.md).
 
@@ -154,7 +154,7 @@ Guía en Ayuda → Backtesting (`BACKTESTING_CORE_R_GUIDE`). Detalle: [list-auto
 
 | Paso | Qué |
 |------|-----|
-| 1 | Valores → **Pasar a Estudio** (lista API canónica) |
+| 1 | Valores → **Pasar a Estudio** (lista API + Actualizar ligero de los nuevos) |
 | 2 | Lista **Estudio** → banner **Supervisión ON** (Lista AUTO + CORE-R) · o Monitor → Auto-sync |
 | 3 | Monitor → cola de revisiones · deep-links Lab / Finalistas / Checklist → **Hecho** |
 | 4 | «Valorar cambio» + modo **SEMI** (barra/Cuentas) → **Adoptar** (abre mandato TOP#1; no auto en AUTO) |
@@ -175,7 +175,8 @@ Flags ops (off por defecto — ver [github-credentials-and-ops §9](./engineerin
 | Bajo el nombre | Resumen procesos: `al día` · `toca V` / `toca F·R` · `sin sync` (+ barra al actualizar) |
 | Columna Procesos (opcional) | Iconos Vigilia · Frescura · Redescubrir |
 | Chips banner (V·F·R) | Cadencia de cada capa; clic abre configuración |
-| **Actualizar** / **Redescubrir** | Barra inferior al seleccionar: velas+vigilia+frescura · embudo costoso (confirm) |
+| **Actualizar** / **Redescubrir** | Barra inferior al seleccionar: velas+vigilia+frescura · embudo costoso (confirm). Alta a Estudio lanza Actualizar, no Redescubrir |
+| Pausa ⏸ (banner) | Termina el valor en curso y para (`Termina XXX y para…`); no corta a mitad del valor |
 | `OPERATIVA: Semi` (barra) | Modo de la **cuenta** → clic abre Cuentas · Operativa |
 
 SEMI confirma operar/cambio de mandato. Detalle: [modelo](./engineering/estudio-supervision-model-2026-08-06.md) · [UI procesos](./engineering/estudio-process-status-ui-2026-08-06.md) · [ADR-024](./adr/024-estudio-supervision-universe.md) · [handoff](./engineering/session-handoff-2026-08-06-estudio-process-ui.md).
