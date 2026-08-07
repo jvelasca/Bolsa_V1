@@ -97,10 +97,32 @@ for (const [label, port] of [
 
 timeline.mark('ports_freed');
 
-if (!ensurePortFree(API_PORT, { label: 'dev' })) {
-  logError('dev', `Puerto ${API_PORT} sigue ocupado. Ejecuta: node scripts/dev-doctor.mjs --fix-ports`);
+// Liberar YA los puertos clave (API/Web/XTB) antes de iniciar, con reintentos.
+if (!ensureStackPortsFree()) {
   timeline.finish('failed', { phase: 'ports' });
   process.exit(1);
+}
+
+/**
+ * Libera de forma robusta los puertos del stack justo ANTES de usarlos.
+ * Con `strictPort:true`, un Vite huérfano de un arranque previo que aún no
+ * había bindeado 5173 al inicio podía dejar el puerto ocupado y provocar un
+ * aborto en seco (ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL) en cada arranque.
+ * @returns {boolean} true si todos los puertos quedaron libres
+ */
+function ensureStackPortsFree() {
+  let ok = true;
+  for (const [label, port] of [
+    ['API', API_PORT],
+    ['Web', WEB_PORT],
+    ['XTB mock', XTB_BRIDGE_PORT],
+  ]) {
+    if (!ensurePortFree(port, { label: 'dev', attempts: 4 })) {
+      logError('dev', `Puerto ${port} (${label}) sigue ocupado. Ejecuta: node scripts/dev-doctor.mjs --fix-ports`);
+      ok = false;
+    }
+  }
+  return ok;
 }
 
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -250,6 +272,11 @@ let webReadyMarked = false;
 
 logInfo('dev', 'API lista — arrancando Web (Vite)...');
 timeline.mark('web_spawn');
+// Un Vite huérfano de un arranque previo puede bindear 5173 con retardo:
+// re-liberar justo aquí para que `strictPort` no provoque un aborto en seco.
+if (!ensurePortFree(WEB_PORT)) {
+  logInfo('dev', `Re-chequeo puerto ${WEB_PORT} (Web) liberado`);
+}
 const webChild = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
   stdio: ['inherit', 'pipe', 'pipe'],
   env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
