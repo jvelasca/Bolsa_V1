@@ -1,0 +1,14 @@
+# Normalización de fin de línea para todo el repo.
+# En git se almacena SIEMPRE LF; en checkout Windows (autocrlf) se adapta.
+# Evita diffs falsos de CRLF y `git diff` ruidoso en Windows.
+* text=auto eol=lf
+
+# Binarios: no tocar fin de línea.
+# (genérico; añadir extensiones binarias aquí si aplica)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary

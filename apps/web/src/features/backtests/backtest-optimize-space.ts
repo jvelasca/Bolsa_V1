@@ -49,8 +49,8 @@ export function cpcvPathCount(nGroups: number): number {
 
 export function clampRange(range: OptimizeVarRange, minFloor = 2): OptimizeVarRange {
   const step = Math.max(1, Math.round(range.step) || 1);
-  let min = Math.max(minFloor, Math.round(range.min) || minFloor);
-  let max = Math.max(min, Math.round(range.max) || min);
+  const min = Math.max(minFloor, Math.round(range.min) || minFloor);
+  const max = Math.max(min, Math.round(range.max) || min);
   return { min, max, step };
 }
 

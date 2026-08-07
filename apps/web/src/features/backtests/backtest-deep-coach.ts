@@ -619,7 +619,7 @@ export function rankTechnicalRecommendations(
       let score = scoreTechnicalFit(row, ctx);
       // Soft fallback: mild penalty so stamped thirds dominate when comparable
       if (future.usedSoftFallback) score = Math.max(0, score - 8);
-      let qualityFlagged = isQualityFlagged(
+      const qualityFlagged = isQualityFlagged(
         {
           lateReturnPct: future.lateReturnPct,
           row,

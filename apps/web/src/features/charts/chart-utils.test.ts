@@ -9,7 +9,6 @@ import {
   formatPrice,
   formatChartBarPrice,
   formatBarIntraChangeLabel,
-  formatChartTimeAxisLabel,
   hasChartData,
   summarizeBars,
 } from './chart-utils';

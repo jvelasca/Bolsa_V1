@@ -374,7 +374,7 @@ function buildBackupWorkspaceDoc(backup: ChartPersistBackup): WorkspaceDocument 
 
 function prepareWorkspaceForSave(workspace: WorkspaceDocument): WorkspaceDocument {
   const session = drawToolSessionFromUi();
-  let prepared = syncSnapshotsFromCharts(
+  const prepared = syncSnapshotsFromCharts(
     attachActiveTabListSnapshot(
       {
         ...workspace,
@@ -1895,7 +1895,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 parameters: params,
                 visible: true,
               };
-              let indicatorInstances = assignSubPanelWeightOnAdd(
+              const indicatorInstances = assignSubPanelWeightOnAdd(
                 [...item.indicatorInstances, instance],
                 instance.instanceId,
               );

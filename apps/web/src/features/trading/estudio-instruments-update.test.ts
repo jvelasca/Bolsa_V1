@@ -78,7 +78,7 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
     let allowFirst: (() => void) | null = null;
     const firstGate = new Promise<void>((resolve) => (allowFirst = resolve));
     let calls = 0;
-    vi.mocked(api.syncInstrument).mockImplementation(async (id: string) => {
+    vi.mocked(api.syncInstrument).mockImplementation(async (_id: string) => {
       calls += 1;
       if (calls === 1) await firstGate; // pausa el ciclo justo en "a"
       return { data: { barsAdded: 1, status: 'ok' } };
@@ -128,7 +128,7 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
     // Gates por valor para un control determinista sobre el punto exacto de pausa.
     const gates: Array<() => void> = [];
     let calls = 0;
-    vi.mocked(api.syncInstrument).mockImplementation(async (id: string) => {
+    vi.mocked(api.syncInstrument).mockImplementation(async (_id: string) => {
       const idx = calls;
       calls += 1;
       await new Promise<void>((resolve) => {

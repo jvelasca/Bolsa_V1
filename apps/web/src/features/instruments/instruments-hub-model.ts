@@ -148,6 +148,7 @@ export function compareInstrumentsForHub(
       return cmpString(ad, bd, dir) || cmpString(a.symbol, b.symbol, 'asc');
     }
     case 'symbol':
+    // fall through
     default:
       return cmpString(a.symbol, b.symbol, dir);
   }
