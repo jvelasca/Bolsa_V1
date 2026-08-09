@@ -76,8 +76,8 @@ export function AlertsPage() {
     },
   });
 
-  const instruments = instrumentsQuery.data?.data ?? [];
-  const alerts = alertsQuery.data?.data ?? [];
+  const instruments = useMemo(() => instrumentsQuery.data?.data ?? [], [instrumentsQuery.data?.data]);
+  const alerts = useMemo(() => alertsQuery.data?.data ?? [], [alertsQuery.data?.data]);
 
   const filteredAlerts = useMemo(() => {
     if (filter === 'active') {

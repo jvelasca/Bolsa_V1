@@ -93,7 +93,14 @@ export function AlertsMonitor() {
       void evaluateSignalMutation.mutate();
     }, evaluateIntervalMs);
     return () => window.clearInterval(timer);
-  }, [activeCount, evaluateIntervalMs]);
+  }, [
+    activeCount,
+    evaluateIntervalMs,
+    activeQuery,
+    signalAlertsQuery,
+    evaluateMutation,
+    evaluateSignalMutation,
+  ]);
 
   return null;
 }

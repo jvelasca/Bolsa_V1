@@ -41,6 +41,9 @@ export function PendingOrdersMonitor() {
 
   const instrumentIds = useMemo(
     () => [...new Set(pendingOrders.map((order) => order.instrumentId))],
+    // orderSignature es el fingerprint estable de pendingOrders; evita recalcular
+    // este index en cada render por identidad de array (ya se recalcula al cambiar órdenes).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [orderSignature],
   );
 

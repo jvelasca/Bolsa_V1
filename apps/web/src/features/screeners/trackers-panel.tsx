@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Pause, Pencil, Play, Plus, Radar, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ExecutionPolicySummaryDto,
   TrackerScheduleKind,
@@ -64,7 +64,7 @@ export function TrackersPanel({
     queryFn: () => api.getTrackers(),
   });
 
-  const trackers = trackersQuery.data?.data ?? [];
+  const trackers = useMemo(() => trackersQuery.data?.data ?? [], [trackersQuery.data?.data]);
 
   useEffect(() => {
     if (!initialTrackerId) return;

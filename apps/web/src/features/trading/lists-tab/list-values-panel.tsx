@@ -143,8 +143,11 @@ export function ListValuesPanel() {
     staleTime: 30_000,
   });
 
-  const apiLists = listsQuery.data?.data ?? [];
-  const positions = portfolioQuery.data?.data.positions ?? [];
+  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
+  const positions = useMemo(
+    () => portfolioQuery.data?.data.positions ?? [],
+    [portfolioQuery.data?.data.positions],
+  );
   const pendingBuyOrders = useMemo(
     () => pendingOrders.filter((order) => order.side === 'buy'),
     [pendingOrders],
@@ -196,7 +199,10 @@ export function ListValuesPanel() {
     enabled: needsFullCatalog,
     staleTime: 60_000,
   });
-  const allInstruments = allInstrumentsQuery.data?.data ?? [];
+  const allInstruments = useMemo(
+    () => allInstrumentsQuery.data?.data ?? [],
+    [allInstrumentsQuery.data?.data],
+  );
 
   useEffect(() => {
     clearManualListSelectionIfChartChanged(activeChartId);
@@ -274,7 +280,10 @@ export function ListValuesPanel() {
     return map;
   }, [visualizationQuotesQuery.data]);
 
-  const listInstruments = activeVirtual ? [] : (quotesQuery.data?.data ?? []);
+  const listInstruments = useMemo(
+    () => (activeVirtual ? [] : quotesQuery.data?.data ?? []),
+    [activeVirtual, quotesQuery.data?.data],
+  );
 
   const visualizationListItems = useMemo(() => {
     const byId = new Map(visualizationEntries.map((e) => [e.instrumentId, e]));
@@ -541,7 +550,7 @@ export function ListValuesPanel() {
         .slice(0, 8),
       external: [],
     };
-  }, [allInstruments, debouncedQuery.length, query, remoteSearchQuery.data]);
+  }, [allInstruments, query, remoteSearchQuery.data, debouncedQuery]);
 
   const focusInstrument = useCallback(
     (instrumentId: string, symbol: string) => {

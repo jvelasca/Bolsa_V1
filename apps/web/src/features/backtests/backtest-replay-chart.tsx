@@ -208,7 +208,7 @@ export function BacktestReplayChart({
     const map = new Map<string, (typeof detail.trades)[number]>();
     for (const trade of detail.trades) map.set(trade.timestamp, trade);
     return map;
-  }, [detail.trades]);
+  }, [detail]);
 
   const drawingByTime = useMemo(() => {
     const map = new Map<string, DrawingReplayMarkerDto[]>();

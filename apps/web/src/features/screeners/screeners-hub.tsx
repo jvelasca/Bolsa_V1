@@ -13,7 +13,7 @@ import {
   Target,
   Zap,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { ScanJobDto, ScanRunResultDto } from '@bolsa/shared';
 import { api, ApiError } from '@/lib/api';
@@ -130,8 +130,8 @@ export function ScreenersHub() {
     refetchInterval: 2000,
   });
 
-  const lists = listsQuery.data?.data ?? [];
-  const strategies = strategiesQuery.data?.data ?? [];
+  const lists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
+  const strategies = useMemo(() => strategiesQuery.data?.data ?? [], [strategiesQuery.data?.data]);
   const executionPolicies = executionPoliciesQuery.data?.data ?? [];
   const recentJobs = jobsQuery.data?.data ?? [];
 

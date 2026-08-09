@@ -151,7 +151,7 @@ export function InstrumentDictamenEvolution({
     staleTime: 60_000,
   });
 
-  const rows = query.data?.data ?? [];
+  const rows = useMemo(() => query.data?.data ?? [], [query.data?.data]);
   const newestFirst = useMemo(() => [...rows].reverse(), [rows]);
   const latest = newestFirst[0];
 

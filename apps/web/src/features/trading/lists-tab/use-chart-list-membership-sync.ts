@@ -92,6 +92,9 @@ export function useChartListMembershipSync() {
         pendingOrders: new Set(pendingOrders.map((order) => order.instrumentId)),
       },
     };
+    // Las *Signature ya son los fingerprints estables de pendingOrders/portfolio/
+    // visualizationEntries; se evita recalcular el snapshot por identidad de array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     apiLists,
     listsQuery.isLoading,

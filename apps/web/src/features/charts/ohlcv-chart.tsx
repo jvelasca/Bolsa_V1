@@ -36,7 +36,6 @@ import {
   hasVolumeInstance,
   overlayTrendInstances,
   resolveOverlayRenderSeries,
-  buildIndicatorBarsFingerprint,
 } from '@/features/charts/indicator-compute';
 import { findOverlayInstanceAtPixel, type OverlaySeriesHitEntry } from '@/features/charts/chart-indicator-hit';
 import {
@@ -151,19 +150,6 @@ export function OhlcvChart({
   const { colors, display, grid, cursor } = config;
   const configuredHeight = display.height;
   const instanceMode = indicatorInstances !== undefined;
-  const overlayBarsFingerprint = useMemo(() => buildIndicatorBarsFingerprint(bars), [bars]);
-  const overlayInstancesKey = useMemo(
-    () =>
-      JSON.stringify(
-        (indicatorInstances ?? []).map((item) => ({
-          id: item.instanceId,
-          def: item.definitionId,
-          vis: item.visible,
-          p: item.parameters,
-        })),
-      ),
-    [indicatorInstances],
-  );
   const overlayRenderByInstance = useMemo(() => {
     if (!instanceMode) return new Map<string, ReturnType<typeof resolveOverlayRenderSeries>>();
     const map = new Map<string, ReturnType<typeof resolveOverlayRenderSeries>>();
@@ -171,7 +157,7 @@ export function OhlcvChart({
       map.set(instance.instanceId, resolveOverlayRenderSeries(instance, bars, indicators));
     }
     return map;
-  }, [instanceMode, overlayInstancesKey, overlayBarsFingerprint, indicators, bars, indicatorInstances]);
+  }, [instanceMode, indicators, bars, indicatorInstances]);
   const showVolume = instanceMode
     ? hasVolumeInstance(indicatorInstances ?? [])
     : display.showVolume;
@@ -434,6 +420,7 @@ export function OhlcvChart({
   }, [
     bars,
     chartReady,
+    chartSyncId,
     colors.downColor,
     colors.upColor,
     colors.volumeDownColor,
@@ -445,7 +432,6 @@ export function OhlcvChart({
     indicators,
     instanceMode,
     overlayRenderByInstance,
-    seriesTypeParams,
     usesSyntheticTime,
   ]);
 
@@ -522,6 +508,9 @@ export function OhlcvChart({
 
   useEffect(() => {
     if (!layoutReady || !containerRef.current || resolvedHeight <= 0) return;
+
+    const overlaySeries = overlaySeriesRef.current;
+    const overlaySeriesData = overlaySeriesDataRef.current;
 
     const container = containerRef.current;
     const chart = createChart(container, {
@@ -636,8 +625,8 @@ export function OhlcvChart({
       sma20Ref.current = null;
       sma50Ref.current = null;
       ema20Ref.current = null;
-      overlaySeriesRef.current.clear();
-      overlaySeriesDataRef.current.clear();
+      overlaySeries.clear();
+      overlaySeriesData.clear();
       setChartReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -865,6 +854,7 @@ export function OhlcvChart({
     grid,
     cursor.mode,
     drawTool,
+    crosshairMagnet,
     display.showSma20,
     display.showSma50,
     display.showEma20,

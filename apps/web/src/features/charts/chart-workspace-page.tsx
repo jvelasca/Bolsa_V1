@@ -332,6 +332,9 @@ export function ChartWorkspacePage() {
       timeframe: activeTab.timeframe,
     });
     requestChartReflow('tab-change');
+    // Deps por campo del tab: animar solo al cambiar id/instrument/timeframe. Usar el
+    // objeto `activeTab` entero re-dispararía por cambios no relacionados (dibujos/overlays).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.id, activeTab?.instrumentId, activeTab?.timeframe]);
 
   const bars = ohlcvQuery.data?.data ?? [];
@@ -371,12 +374,16 @@ export function ChartWorkspacePage() {
     if (!activeTab || chartInitialLoading) return;
     chartPerfDebug('reflow:ohlcv-ready', { tabId: activeTab.id, bars: bars.length });
     requestChartReflow('ohlcv-ready');
+    // Deps por campo de tab + bars.length; se evita el objeto `activeTab` completo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.id, activeTab?.instrumentId, chartInitialLoading, ohlcvQuery.dataUpdatedAt, bars.length]);
 
   useEffect(() => {
     if (!activeTab) return;
     chartPerfDebug('reflow:indicators', { tabId: activeTab.id, signature: indicatorSignature });
     requestChartReflow('indicators');
+    // Deps por campo de tab + firma de indicadores; se evita el objeto `activeTab` completo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.id, indicatorSignature]);
 
   useEffect(() => {

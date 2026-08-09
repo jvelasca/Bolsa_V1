@@ -58,7 +58,7 @@ export function ListMembershipPopover({
     queryFn: api.getPortfolio,
   });
 
-  const apiLists = listsQuery.data?.data ?? [];
+  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
 
   const membershipsQuery = useQuery({
     queryKey: ['lists', 'memberships'],

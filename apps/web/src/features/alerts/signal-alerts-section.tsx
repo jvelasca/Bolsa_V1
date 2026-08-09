@@ -71,7 +71,7 @@ export function SignalAlertsSection() {
     },
   });
 
-  const instruments = instrumentsQuery.data?.data ?? [];
+  const instruments = useMemo(() => instrumentsQuery.data?.data ?? [], [instrumentsQuery.data?.data]);
   const strategies = strategiesQuery.data?.data ?? [];
   const subscriptions = signalAlertsQuery.data?.data ?? [];
 

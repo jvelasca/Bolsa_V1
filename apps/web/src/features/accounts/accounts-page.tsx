@@ -109,7 +109,7 @@ export function AccountsPage() {
     staleTime: 30_000,
   });
 
-  const accounts = accountsQuery.data ?? [];
+  const accounts = useMemo(() => accountsQuery.data ?? [], [accountsQuery.data]);
   const equityByAccountId = useMemo(() => {
     const map = new Map<string, number>();
     for (const summary of summariesQuery.data ?? []) {

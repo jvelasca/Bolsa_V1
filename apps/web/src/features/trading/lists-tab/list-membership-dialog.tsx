@@ -18,7 +18,7 @@ export function ListMembershipDialog() {
     enabled: Boolean(instrument),
   });
 
-  const apiLists = listsQuery.data?.data ?? [];
+  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
   const listIds = apiLists.map((list) => list.id);
 
   const membershipsQuery = useQuery({

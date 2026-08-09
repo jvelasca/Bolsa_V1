@@ -29,7 +29,7 @@ export function useInstrumentsHubEnrichment() {
     staleTime: 30_000,
   });
 
-  const apiLists = listsQuery.data?.data ?? [];
+  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
 
   const portfolioQuery = useQuery({
     queryKey: ['portfolio', accountScope],

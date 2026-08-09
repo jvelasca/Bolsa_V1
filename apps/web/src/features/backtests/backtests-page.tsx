@@ -864,10 +864,13 @@ export function BacktestsPage() {
     }
   }
 
-  const instruments = instrumentsQuery.data?.data ?? [];
+  const instruments = useMemo(
+    () => instrumentsQuery.data?.data ?? [],
+    [instrumentsQuery.data?.data],
+  );
   const lists = listsQuery.data?.data ?? [];
   const listDetail = listDetailQuery.data?.data;
-  const listQuotes = listQuotesQuery.data?.data ?? [];
+  const listQuotes = useMemo(() => listQuotesQuery.data?.data ?? [], [listQuotesQuery.data?.data]);
   const listTopsById = useMemo(() => {
     const map = new Map<
       string,
@@ -2247,6 +2250,8 @@ export function BacktestsPage() {
     if (searchParams.get("verify") !== "1") return;
     setTab("run");
     setResultFocus("detail");
+    // setTab/setResultFocus son setters estables de estado; no requieren dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, onBacktestsRoute]);
 
   // Si la URL pide verify pero no hay sesión LAB, quitar el flag (evita pantallas rotas).
@@ -2257,6 +2262,9 @@ export function BacktestsPage() {
     patchSearchParams((params) => {
       params.delete("verify");
     });
+    // patchSearchParams se redefine cada render (función declarada en el componente);
+    // añadirla como dep re-dispararía el effect. El guard `searchParams` basta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, onBacktestsRoute, diaDVerifySession]);
 
   // Deep-link Biblioteca: ?tab=strategies&library=&strategyId=&preset=&q=

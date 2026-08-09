@@ -456,7 +456,7 @@ export function InstrumentsPage() {
     queryFn: api.getInstruments,
   });
 
-  const instruments = instrumentsQuery.data?.data ?? [];
+  const instruments = useMemo(() => instrumentsQuery.data?.data ?? [], [instrumentsQuery.data?.data]);
 
   const {
     membershipsByInstrument,

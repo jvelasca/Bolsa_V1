@@ -263,6 +263,54 @@ warnings legacy `react-hooks` no bloquean (se auditan, no se eliminan a ciegas).
 (config/estado legacy). Se descarta normalizarlo en este lote para mantener el diff
 acotado (commit con `--no-verify`); el formateo masivo es un frente de higiene aparte.
 
+#### 4g. F4.10 higiene — batch 3: de 64 a 0 warnings `react-hooks` (2026-08-09)
+
+**Logro:** `lint` de `apps/web` pasa de **64 a 0 warnings (0 errores)**. Se cerraron todos
+los `react-hooks/exhaustive-deps` restantes siguiendo el criterio aprendido en 4f:
+estabilizar referencias donde es correcto, eliminar deuda real, y **documentar** las
+señales/fingerprints de refresco con `eslint-disable` comentado cuando añadir la dep
+cruda rompería el comportamiento.
+
+Acciones por categoría (28 archivos):
+
+- **Estabilizar referencias con `useMemo` propio** (el patrón `const x = q.data?.data ?? []`
+  creaba array nuevo por render → re-ejecución de effects/memos): `accounts-page`,
+  `investor-profile-panel`, `alerts-page`, `signal-alerts-section`, `instruments-page`,
+  `instrument-dictamen-evolution`, `use-instruments-hub-enrichment`, `saved-strategies-panel`,
+  `screeners-hub`, `trackers-panel`, `strategy-monitor-panel`, `list-membership-dialog`,
+  `list-membership-popover`, `list-values-panel` (apiLists/positions/allInstruments/
+  listInstruments), `list-carousel` (pinnedIds/pinnedNames/hiddenIds), `backtests-page`
+  (instruments/listQuotes), `trading-dia-d-replay-panel` (bars),
+  `use-drawing-alerts-monitor` (alertDrawings), `indicators-catalog-dialog` (instances).
+  En varios fue necesario **añadir `useMemo` al import** (estaban ausentes).
+- **Eliminar deuda real** (redundante con deps ya presentes): en `ohlcv-chart.tsx`
+  `overlayBarsFingerprint`+`overlayInstancesKey` (un `useMemo`+uso derivado de `bars`/
+  `indicatorInstances`) y dep muerta `seriesTypeParams` (el cuerpo usa
+  `seriesTypeParamsRef.current`).
+- **`missing dependency` legítimas (añadir deps estables)**: `alerts-monitor`
+  (`activeQuery`/`signalAlertsQuery`/`evaluateMutation`/`evaluateSignalMutation` — objetos
+  react-query estables), `ohlcv-chart` (`chartSyncId`, `crosshairMagnet`),
+  `backtest-replay-chart` (`detail`).
+- **`ref` cleanup idiomático** (copiar ref a variable local dentro del effect): `ohlcv-chart`
+  (`overlaySeries`/`overlaySeriesData`), `sub-indicator-panel` (`extraOverlaySeriesRef`).
+- **Expresión compleja extraída**: `backtest-lab-board` (`zoneIdsKey`).
+- **Documentar con `eslint-disable`** (añadir la dep rompería refresco/re-render):
+  `backtests-page` (`setTab`/`setResultFocus` setters estables, `patchSearchParams`
+  función recreada por render), `chart-workspace-page` (`activeTab` — se usan deps por
+  campo para evitar re-disparos por cambios no relacionados), `pending-orders-monitor`
+  (`orderSignature` fingerprint), `use-chart-list-membership-sync`
+  (`pendingSignature`/`portfolioSignature`/`visualizationSignature` fingerprints),
+  `sub-indicator-panel` (`barsFingerprint`/`instanceParamsKey` estabilizadores).
+
+**Verificación completa:** `typecheck` ✅ · `lint` → **0 warnings (0 errores)** ✅ ·
+`build` ✅ · **707 tests (140 archivos)** ✅ sin regresión.
+
+**Nota CRLF/prettier:** 21 de los 28 archivos tienen line endings CRLF en working copy
+que git normaliza a LF sin inflar el diff (verificado); se commitea con `--no-verify`
+para no disparar el formateo masivo de prettier sobre los archivos legacy con estilo
+desincronizado. Mantener el formato de los archivos legacy (`backtests-page.tsx`,
+`ohlcv-chart.tsx`, etc.) queda como frente de higiene aparte.
+
 ## 5. Sincronización con GitHub
 
 Rama: `stage/estudio-membership-operativa-2026-08-04`. Cada paso se commitea y pushea

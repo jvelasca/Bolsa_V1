@@ -151,7 +151,7 @@ export function StrategyMonitorPanel({
     queryFn: () => api.getLists(),
     staleTime: 60_000,
   });
-  const lists = listsQuery.data?.data ?? [];
+  const lists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
   const estudioListId = useMemo(() => resolveEstudioListId(lists), [lists]);
 
   const effectiveListId = listId || lists[0]?.id || '';
@@ -209,7 +209,10 @@ export function StrategyMonitorPanel({
     retry: false,
   });
 
-  const accounts = Array.isArray(accountsQuery.data) ? accountsQuery.data : [];
+  const accounts = useMemo(
+    () => (Array.isArray(accountsQuery.data) ? accountsQuery.data : []),
+    [accountsQuery.data],
+  );
   const topByInstrumentId = useMemo(() => {
     const map = new Map<string, InstrumentStrategyTopV1>();
     for (const top of topsBatchQuery.data?.data ?? []) {

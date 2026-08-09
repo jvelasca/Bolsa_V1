@@ -241,7 +241,7 @@ export function TradingDiaDReplayPanel() {
     staleTime: 60_000,
   });
 
-  const bars = ohlcvQuery.data?.data ?? [];
+  const bars = useMemo(() => ohlcvQuery.data?.data ?? [], [ohlcvQuery.data?.data]);
 
   /** Barras lookback→fin del run (para portfolio@D). */
   const fullRunBars = useMemo(() => {

@@ -77,6 +77,7 @@ export function BacktestLabBoard({
   profileRiskTolerance = null,
 }: Props) {
   const padded = padLabZones(zones);
+  const zoneIdsKey = zones.map((z) => z.id).join('|');
   const zoneRefs = useRef<Array<LabZoneHandle | null>>([null, null, null]);
   const [improvedCount, setImprovedCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
@@ -230,7 +231,7 @@ export function BacktestLabBoard({
 
   useEffect(() => {
     autoHandoffFiredRef.current = false;
-  }, [zones.map((z) => z.id).join('|')]);
+  }, [zoneIdsKey]);
 
   useEffect(() => {
     if (pending || anyWorking) return;
@@ -286,7 +287,7 @@ export function BacktestLabBoard({
     }, LAB_CYCLE_WATCHDOG_MS);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoHandoff, filled, allDone, zones.map((z) => z.id).join('|')]);
+  }, [autoHandoff, filled, allDone, zoneIdsKey]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">

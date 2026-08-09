@@ -694,8 +694,11 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
   }, [family]);
 
   const multiPathMode = wfEnabled || cpcvEnabled;
-  const selectedMethods =
-    multiPathMode || family !== 'sma_crossover' ? (['h0'] as OptimizeEngine[]) : methods;
+  const selectedMethods = useMemo(
+    () =>
+      multiPathMode || family !== 'sma_crossover' ? (['h0'] as OptimizeEngine[]) : methods,
+    [multiPathMode, family, methods],
+  );
   const usesOptuna = selectedMethods.includes('optuna');
   const wfFoldCount = Math.max(2, Math.min(5, Number.parseInt(wfFolds, 10) || 3));
   const cpcvGroupCount = Math.max(4, Math.min(6, Number.parseInt(cpcvGroups, 10) || 5));

@@ -369,7 +369,10 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
     },
   });
 
-  const strategies = strategiesQuery.data?.data ?? [];
+  const strategies = useMemo(
+    () => strategiesQuery.data?.data ?? [],
+    [strategiesQuery.data?.data],
+  );
   const fieldClass =
     'mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm';
   const busy =

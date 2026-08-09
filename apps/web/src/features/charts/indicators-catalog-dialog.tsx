@@ -86,7 +86,7 @@ export function IndicatorsCatalogDialog({
 }) {
   const activeTab = useActiveChartTab();
   const chartId = activeTab?.id;
-  const instances = activeTab?.indicatorInstances ?? [];
+  const instances = useMemo(() => activeTab?.indicatorInstances ?? [], [activeTab]);
 
   const presets = useWorkspaceStore((s) => s.workspace.indicatorPresets ?? []);
   const templates = useWorkspaceStore((s) => s.workspace.indicatorTemplates ?? []);

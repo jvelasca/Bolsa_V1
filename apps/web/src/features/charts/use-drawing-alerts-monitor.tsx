@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { drawingAlertPrice } from '@bolsa/shared';
 import { api } from '@/lib/api';
 import { formatPrice } from '@/features/charts/chart-utils';
@@ -16,9 +16,13 @@ export function DrawingAlertsMonitor() {
 
   const instrumentId = activeTab?.instrumentId;
   const timeframe = activeTab?.timeframe ?? '1d';
-  const alertDrawings =
-    activeTab?.drawings.filter((drawing) => drawing.alertOnCross && drawingAlertPrice(drawing) != null) ??
-    [];
+  const alertDrawings = useMemo(
+    () =>
+      activeTab?.drawings.filter(
+        (drawing) => drawing.alertOnCross && drawingAlertPrice(drawing) != null,
+      ) ?? [],
+    [activeTab],
+  );
 
   const ohlcvQuery = useQuery({
     queryKey: ['ohlcv-alerts', instrumentId, timeframe],

@@ -102,6 +102,9 @@ export function SubIndicatorPanel({
   );
   const renderSeries = useMemo(
     () => resolveSubRenderSeries(instance, bars, apiIndicators),
+    // barsFingerprint/instanceParamsKey ya son los fingerprints estables de `bars`
+    // e `instance.parameters`; se evita así recalcular la serie en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       instance.instanceId,
       instance.definitionId,
@@ -243,6 +246,7 @@ export function SubIndicatorPanel({
 
   useEffect(() => {
     if (!showChart || !layoutReady || !containerRef.current || chartHeight <= 0) return;
+    const extraOverlaySeriesRef = extraRefs.current;
     const container = containerRef.current;
     const chart = createChart(container, {
       autoSize: false,
@@ -344,7 +348,7 @@ export function SubIndicatorPanel({
       lineRef.current = null;
       overboughtRef.current = null;
       oversoldRef.current = null;
-      extraRefs.current.clear();
+      extraOverlaySeriesRef.clear();
       layoutReadyRef.current = false;
       setChartReady(false);
     };

@@ -154,7 +154,7 @@ export function InvestorProfilePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot bootstrap
   }, [listQuery.isSuccess, listQuery.isLoading, accounts, bootstrapped]);
 
-  const profiles = listQuery.data ?? [];
+  const profiles = useMemo(() => listQuery.data ?? [], [listQuery.data]);
 
   useEffect(() => {
     setSelectedId(activeProfileId ?? null);

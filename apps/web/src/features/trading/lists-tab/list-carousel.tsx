@@ -140,11 +140,17 @@ export function ListCarousel({
 
 
 
-  const pinnedIds = listConfig.carouselListIds ?? [];
+  const pinnedIds = useMemo(() => listConfig.carouselListIds ?? [], [listConfig.carouselListIds]);
 
-  const pinnedNames = listConfig.carouselPinnedListNames ?? [];
+  const pinnedNames = useMemo(
+    () => listConfig.carouselPinnedListNames ?? [],
+    [listConfig.carouselPinnedListNames],
+  );
 
-  const hiddenIds = listConfig.carouselHiddenListIds ?? [];
+  const hiddenIds = useMemo(
+    () => listConfig.carouselHiddenListIds ?? [],
+    [listConfig.carouselHiddenListIds],
+  );
 
 
 
