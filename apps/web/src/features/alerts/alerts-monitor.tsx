@@ -78,29 +78,42 @@ export function AlertsMonitor() {
 
   const activeCount = activeAlerts.length + activeSignalAlerts.length;
 
-  useEffect(() => {
-    if (activeCount === 0) {
-      return;
-    }
-    void activeQuery.refetch();
-    void signalAlertsQuery.refetch();
-    void evaluateMutation.mutate();
-    void evaluateSignalMutation.mutate();
-    const timer = window.setInterval(() => {
-      void activeQuery.refetch();
-      void signalAlertsQuery.refetch();
-      void evaluateMutation.mutate();
-      void evaluateSignalMutation.mutate();
-    }, evaluateIntervalMs);
-    return () => window.clearInterval(timer);
-  }, [
-    activeCount,
-    evaluateIntervalMs,
+  // Las queries/mutaciones de TanStack son refs inestables (cambian en cada
+  // fetch/mutate). Meterlas como deps del setInterval reiniciaba el timer en
+  // cada evaluate -> bucle infinito de GET/POST de alertas. Se accede a la
+  // versión actual via refs y se conserva un intervalo estable.
+  const apiRef = useRef({ activeQuery, signalAlertsQuery, evaluateMutation, evaluateSignalMutation });
+  apiRef.current = {
     activeQuery,
     signalAlertsQuery,
     evaluateMutation,
     evaluateSignalMutation,
-  ]);
+  };
+
+  useEffect(() => {
+    if (activeCount === 0) {
+      return;
+    }
+    const { activeQuery: aq, signalAlertsQuery: saq, evaluateMutation: em, evaluateSignalMutation: esm } =
+      apiRef.current;
+    void aq.refetch();
+    void saq.refetch();
+    void em.mutate();
+    void esm.mutate();
+    const timer = window.setInterval(() => {
+      const {
+        activeQuery: aq2,
+        signalAlertsQuery: saq2,
+        evaluateMutation: em2,
+        evaluateSignalMutation: esm2,
+      } = apiRef.current;
+      void aq2.refetch();
+      void saq2.refetch();
+      void em2.mutate();
+      void esm2.mutate();
+    }, evaluateIntervalMs);
+    return () => window.clearInterval(timer);
+  }, [activeCount, evaluateIntervalMs]);
 
   return null;
 }

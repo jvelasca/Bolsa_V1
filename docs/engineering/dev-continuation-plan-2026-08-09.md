@@ -287,10 +287,12 @@ Acciones por categoría (28 archivos):
   `overlayBarsFingerprint`+`overlayInstancesKey` (un `useMemo`+uso derivado de `bars`/
   `indicatorInstances`) y dep muerta `seriesTypeParams` (el cuerpo usa
   `seriesTypeParamsRef.current`).
-- **`missing dependency` legítimas (añadir deps estables)**: `alerts-monitor`
-  (`activeQuery`/`signalAlertsQuery`/`evaluateMutation`/`evaluateSignalMutation` — objetos
-  react-query estables), `ohlcv-chart` (`chartSyncId`, `crosshairMagnet`),
-  `backtest-replay-chart` (`detail`).
+- **`missing dependency` legítimas (añadir deps estables)**: `ohlcv-chart`
+  (`chartSyncId`, `crosshairMagnet`), `backtest-replay-chart` (`detail`).
+  ⚠️ En `alerts-monitor` NO debía añadirse `activeQuery`/`signalAlertsQuery`/
+  `evaluateMutation`/`evaluateSignalMutation` como deps: son refs inestables de
+  TanStack que reiniciaban el `setInterval` en cada evaluate → **bucle infinito**
+  de GET/POST de alertas. Corregido en 4h.
 - **`ref` cleanup idiomático** (copiar ref a variable local dentro del effect): `ohlcv-chart`
   (`overlaySeries`/`overlaySeriesData`), `sub-indicator-panel` (`extraOverlaySeriesRef`).
 - **Expresión compleja extraída**: `backtest-lab-board` (`zoneIdsKey`).
@@ -310,6 +312,46 @@ que git normaliza a LF sin inflar el diff (verificado); se commitea con `--no-ve
 para no disparar el formateo masivo de prettier sobre los archivos legacy con estilo
 desincronizado. Mantener el formato de los archivos legacy (`backtests-page.tsx`,
 `ohlcv-chart.tsx`, etc.) queda como frente de higiene aparte.
+
+## 4h. REGRESIÓN detectada en el navegador — bucle infinito de alertas (2026-08-09, 22:1x)
+
+**Hallazgo usuario:** «no funciona bien. Se queda buscando los valores de las listas y
+no termina de mostrarlos» + «el terminal está continuamente haciendo GET... y los
+gráficos no terminan de cargarse o tardan mucho». La batería (typecheck/lint/test/build)
+**no lo detectó** (regresión funcional en runtime, no de tipos).
+
+**Diagnóstico (evidencia del log del dev-stack):** en ~5 minutos el backend registró
+`GET /api/alerts` × **1707**, `POST /api/alerts/evaluate` × **1390**, `GET
+/api/signal-alerts` × **1383**, `POST /api/signal-alerts/evaluate` × **1147** (frente a 1
+de `/api/health`). Un **bucle infinito de fetch en el frontend** saturaba el terminal de
+GETs continuos y ahogaba el servidor, por lo que listas y gráficos «se quedaban buscando».
+
+**Causa raíz:** en el batch 3 (4g) añadí `activeQuery` / `signalAlertsQuery` /
+`evaluateMutation` / `evaluateSignalMutation` —refs inestables de TanStack que cambian
+de identidad en cada fetch/mutate— al array de deps del `useEffect` que monta el
+`setInterval` de `AlertsMonitor` (`alerts-monitor.tsx`). Antes las deps eran los
+primitivos `[activeCount, evaluateIntervalMs]` (intervalo estable). Quedó así:
+
+`effect se re-ejecuta al cambiar la ref de la query → relanza evaluateMutation.mutate()
+(POST) → onSuccess invalidate ['alerts'] → refetch de activeQuery → cambia su ref →
+effect otra vez → loop infinito de GET/POST`.
+
+**Fix (`alerts-monitor.tsx`):** restaurar deps estables `[activeCount, evaluateIntervalMs]`
+y acceder a las queries/mutaciones a través de un ref de objeto
+(`apiRef = useRef({...}); apiRef.current = {...}`) actualizado en cada render. El
+`setInterval` vuelve a ser estable (un tick normal cada 10-20s) y se rompe el bucle. Se
+quita el `eslint-disable` (con el patrón ref no hay warning `exhaustive-deps`).
+
+**Verificación:** `typecheck` ✔ · `lint` **0w/0e** ✔ · `build` ✔ · **707 tests (140
+archivos)** ✔. En vivo (run-dev): con el fix servido, **0** GET/POST nuevos de alertas
+en 35-40s (ritmo 0 req/s, frente al bucle anterior de decenas por segundo); Vite estable
+sin crash. Listas y gráficos vuelven a completar su carga.
+
+**Lección para la auditoría:** los objetos de TanStack (query/mutation) **no son deps**
+seguras de `setInterval`/`useEffect`; el patrón correcto para un intervalo `evaluate` es
+refs estables + deps primitivas. Añadir «missing deps» a ciegas para callar
+`exhaustive-deps` puede **romper la semántica de refresh** — el mismo riesgo inverso que
+4f/4g ya documentaban para señales/fingerprints.
 
 ## 5. Sincronización con GitHub
 
