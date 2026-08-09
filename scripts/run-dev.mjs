@@ -282,29 +282,54 @@ timeline.mark('web_spawn');
 if (!ensurePortFree(WEB_PORT)) {
   logInfo('dev', `Re-chequeo puerto ${WEB_PORT} (Web) liberado`);
 }
-const webChild = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
-  stdio: ['inherit', 'pipe', 'pipe'],
-  env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
-});
-children.push(webChild);
+function startWebChild() {
+  const child = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
+    stdio: ['inherit', 'pipe', 'pipe'],
+    env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
+  });
+  child.stdout.on('data', (chunk) => {
+    process.stdout.write(chunk);
+    const text = chunk.toString();
+    if (!webReadyMarked && (text.includes('ready in') || text.includes(`localhost:${WEB_PORT}`))) {
+      webReadyMarked = true;
+      logInfo('dev', `Web lista -> http://localhost:${WEB_PORT}`);
+      timeline.mark('web_ready');
+      timeline.finish('ready');
+      writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
+      writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
+    }
+    log(`[stdout] ${text}`);
+  });
+  child.stderr.on('data', (chunk) => {
+    process.stderr.write(chunk);
+    log(`[stderr] ${chunk.toString()}`);
+  });
+  child.on('exit', (code) => {
+    // Si Vite muere sin haber estado listo, seguro que algo falló en el boot.
+    if (!webReadyMarked) {
+      shutdown(code ?? 1);
+      return;
+    }
+    // Ya estaba listo: exit de Vite en dev = intencional (Ctrl+C) o crash silencioso.
+    // No derribamos el stack; la API sigue viva y se reinicia Vite para no perder sesión.
+    if (shuttingDown) return;
+    if (restartWebTimer) return;
+    logInfo('dev', `Web (Vite) salió (exit=${code}) — se mantiene la API y se reinicia Vite…`);
+    ensurePortFree(WEB_PORT);
+    restartWebTimer = setTimeout(() => {
+      restartWebTimer = null;
+      if (shuttingDown) return;
+      webChild = startWebChild();
+      children.push(webChild);
+    }, 1000);
+  });
+  return child;
+}
 
-webChild.stdout.on('data', (chunk) => {
-  process.stdout.write(chunk);
-  const text = chunk.toString();
-  if (!webReadyMarked && (text.includes('ready in') || text.includes(`localhost:${WEB_PORT}`))) {
-    webReadyMarked = true;
-    logInfo('dev', `Web lista -> http://localhost:${WEB_PORT}`);
-    timeline.mark('web_ready');
-    timeline.finish('ready');
-    writeAgentLog('startup', readLatestStartupReport() ?? { status: 'ready' });
-    writeAgentLog('dev', { status: 'ready', webPort: WEB_PORT, apiPort: API_PORT });
-  }
-  log(`[stdout] ${text}`);
-});
-webChild.stderr.on('data', (chunk) => {
-  process.stderr.write(chunk);
-  log(`[stderr] ${chunk.toString()}`);
-});
+let webChild;
+let restartWebTimer = null;
+webChild = startWebChild();
+children.push(webChild);
 
 const arqChild =
   SCAN_QUEUE_BACKEND === 'arq'
@@ -334,11 +359,8 @@ function shutdown(code = 0) {
 apiChild.on('exit', (code) => {
   if (code && code !== 0) shutdown(code);
 });
-webChild.on('exit', (code) => {
-  // Si Vite muere sin haber estado listo, seguro que algo falló en el boot.
-  // Si ya estaba listo, un exit de Vite en dev suele ser intencional (Ctrl+C).
-  if (!webReadyMarked && code && code !== 0) shutdown(code);
-});
+// El manejo de exit/reinicio de Vite vive dentro de `startWebChild()` (evita duplicar
+// lógica sobre un `webChild` que puede reasignarse en cada reinicio).
 
 process.on('SIGINT', () => shutdown(0));
 process.on('SIGTERM', () => shutdown(0));

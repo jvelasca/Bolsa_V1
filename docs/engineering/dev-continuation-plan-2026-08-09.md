@@ -149,6 +149,19 @@ Vite cae (que lo **reinicie solo**); (a3) reducir el chunk con code-splitting.
 **Recomendación: (a2) hacer a `run-dev` resiliente al exit de Vite (autoreinicio)**
 es el de mayor impacto/mejor ratio y no toca la semántica del stack.
 
+**Resultado (a2) — HEcho (2026-08-09, más tarde):** se refactorizó `startWebChild()`
+en `scripts/run-dev.mjs`:
+
+- `webChild` pasa a ser `let` y se relanza vía `startWebChild()` en un `setTimeout`
+  de 1s cuando Vite sale **después** de haber estado listo.
+- El stack **ya NO se derriba** si Vite muere en el arranque-caliente: se loguea
+  `Web (Vite) salió (exit=X) — se mantiene la API y se reinicia Vite…`, se libera el
+  puerto y se relanza.
+- Solo se derriba todo si Vite muere **sin haber estado listo** (boot fallido).
+- Verificado por simulación: matado el proceso Vite deliberadamente → `api=ok`,
+  `web=200`, **sin `Deteniendo stack`**, Vite reinvestido y sirviendo en ≤6s.
+  Batería web: **701 tests (139 archivos)** intacta.
+
 ## 5. Sincronización con GitHub
 
 Rama: `stage/estudio-membership-operativa-2026-08-04`. Cada paso se commitea y pushea
