@@ -29,6 +29,9 @@ from bolsa_infrastructure.database.repositories.instrument_daily_opinion_reposit
     InstrumentDailyOpinionRecord,
     SqlAlchemyInstrumentDailyOpinionRepository,
 )
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
     SqlAlchemyInstrumentStrategyTopRepository,
 )
@@ -92,6 +95,7 @@ async def query_instrument_daily_opinions(
         SqlAlchemyInstrumentDailyOpinionRepository(session),
         SqlAlchemyInstrumentStrategyTopRepository(session),
         SqlAlchemyOhlcvRepository(session),
+        SqlAlchemyInstrumentRepository(session),
     )
     hints = [
         OpinionHint(
@@ -134,6 +138,7 @@ async def get_instrument_daily_opinion(
         SqlAlchemyInstrumentDailyOpinionRepository(session),
         SqlAlchemyInstrumentStrategyTopRepository(session),
         SqlAlchemyOhlcvRepository(session),
+        SqlAlchemyInstrumentRepository(session),
     )
     rows = await service.query(
         instrument_ids=[instrument_id],
@@ -159,6 +164,7 @@ async def list_instrument_daily_opinions(
         SqlAlchemyInstrumentDailyOpinionRepository(session),
         SqlAlchemyInstrumentStrategyTopRepository(session),
         SqlAlchemyOhlcvRepository(session),
+        SqlAlchemyInstrumentRepository(session),
     )
     rows = await service.history(
         instrument_id,
@@ -214,6 +220,7 @@ async def run_estudio_eod_opinion_batch(
         SqlAlchemyInstrumentDailyOpinionRepository(session),
         SqlAlchemyInstrumentStrategyTopRepository(session),
         SqlAlchemyOhlcvRepository(session),
+        SqlAlchemyInstrumentRepository(session),
     )
     rows = await service.run_eod_batch(
         instrument_ids=body.instrument_ids,

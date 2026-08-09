@@ -326,6 +326,36 @@ para no disparar el formateo masivo de prettier sobre los archivos legacy con es
 desincronizado. Mantener el formato de los archivos legacy (`backtests-page.tsx`,
 `ohlcv-chart.tsx`, etc.) queda como frente de higiene aparte.
 
+## 4i. Observaciones del dev-stack tras el fix de alerts (2026-08-09, 22:3x)
+
+- **Fix de alerts confirmado:** con el fix servido, el tráfico de `alerts`/`signal-alerts`
+  vuelve a ritmo normal (~1 par GET/POST cada pocos segundos, intervalo estable) y **no**
+  reaparece el bucle infinito de antes (`0 GET nuevos de alerts en 30-40s`).
+- **Crash silencioso de Vite persiste (F3.7):** `run-dev` relanzado volvió a salir con
+  `exit=1` (`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @bolsa/web dev: vite` / `Exit status 1`, sin
+  traza en stderr) y dejó **procesos huérfanos** sirviendo (API/Vite/XTB) con los puertos
+  200. La app sigue accesible pero el stack ya no está gestionado por `run-dev`. La
+  guardia anti-bucle de `8162044` quedó en su sitio para cuando se relance, pero **no**
+  es la causa del cierre (registró `intento 1/3`, que no alcanza el umbral). El crash es
+  el "puro" de Vite documentado en 4c; opciones a1 (subir Vite) / a3 (code-splitting del
+  chunk ~2.5 MB) siguen pendientes.
+- **Hallazgo aparte (500 en API, pre-existente):** la API devolvía
+  `500 Internal Server Error` en `POST /api/instrument-daily-opinions/query` por
+  `psycopg.errors.ForeignKeyViolation` → tabla `instrument_daily_opinions`, constraint
+  `instrument_daily_opinions_instrument_id_fkey` cuando un `instrument_id` del batch no
+  existía en el catálogo. **Corregido** (ver 4j): `DailyOpinionService.query` filtra los
+  ids huérfanos vía `SqlAlchemyInstrumentRepository.list_existing_ids()` (una sola query
+  `IN`), de modo que un instrumento desconocido ya **no derriba el batch** con un 500:
+  - query mixto (conocido + huérfano) → 200 y solo devuelve el conocido;
+  - query solo-huérfano → 200 y `{data:[]}`;
+  - query conocido normal → comportamiento sin cambio (200, 1 opinión).
+  El nuevo parámetro `instrument_repo` en `DailyOpinionService.__init__` es **opcional**
+  (`None` → comportamiento previo), preservando compatibilidad con otros callers/tests.
+  Verificado: ruff ✔ · mypy sin errores nuevos (5 pre-existentes ajenos en
+  `instrument_repository.py`) · pytest 654 passed / 2 failed **pre-existentes** en
+  `test_list_unsubscribe_index.py` (comprobados también en HEAD sin el cambio) · en vivo
+  contra la API (3 casos arriba).
+
 ## 4h. REGRESIÓN detectada en el navegador — bucle infinito de alertas (2026-08-09, 22:1x)
 
 **Hallazgo usuario:** «no funciona bien. Se queda buscando los valores de las listas y
@@ -365,6 +395,43 @@ seguras de `setInterval`/`useEffect`; el patrón correcto para un intervalo `eva
 refs estables + deps primitivas. Añadir «missing deps» a ciegas para callar
 `exhaustive-deps` puede **romper la semántica de refresh** — el mismo riesgo inverso que
 4f/4g ya documentaban para señales/fingerprints.
+
+## 4j. Fix: 500 ForeignKeyViolation en `POST /instrument-daily-opinions/query` (2026-08-09)
+
+**Síntoma (reportado hoy al operar en la app + visto en el log del dev-stack):** al pedir
+dictámenes diarios Estudio, la API respondía `500 Internal Server Error` con
+`psycopg.errors.ForeignKeyViolation` → constraint
+`instrument_daily_opinions_instrument_id_fkey`. Un `instrument_id` del batch que no existe
+en el catálogo hacía fallar el `upsert` y **se perdía todo el batch** (percepción de que
+la app "se rompe / no termina de cargar").
+
+**Diagnóstico:** `DailyOpinionService.query` iteraba `instrument_ids` y hacía
+`_compute_and_upsert` sin validar que el `instrument_id` existiera en `instruments`. Al
+insertar `InstrumentDailyOpinionRow` con un id huérfano, PostgreSQL lanzaba la violación
+de FK y el 500.
+
+**Fix (capa de servicio + repositorio, mínimo y acotado):**
+- `SqlAlchemyInstrumentRepository.list_existing_ids(ids)` (nuevo): una sola consulta
+  `IN` que devuelve `set` de ids existentes.
+- `DailyOpinionService.__init__` acepta `instrument_repo` **opcional** (default `None`);
+  si se inyecta, `query()` filtra `instrument_ids` a los existentes antes de computar.
+  Si es `None` (tests/callers que no lo inyectan), comportamiento previo intacto.
+- Los 4 handlers del route inyectan `SqlAlchemyInstrumentRepository(session)`.
+
+**Por qué no se crea el instrumento automáticamente:** un `Instrument` requiere campos
+(symbol, exchange, currency, yahoo_symbol…) que el endpoint no recibe; auto-crearlo sería
+adivinar el catálogo. La opción robusta es tratar el FK como fuente de verdad y
+**filtrar** los huérfanos (fail-closed por barra, en línea con O3-C/ADR-022).
+
+**Verificación:**
+- Ruff: `All checks passed!` en los 3 ficheros modificados.
+- Mypy: sin errores nuevos (5 `dict[type-arg]` **pre-existentes** en
+  `instrument_repository.py`, ajenos a estos cambios).
+- pytest (domain+market+application+analytics): **654 passed / 2 failed** — los 2 fallos
+  (`test_list_unsubscribe_index.py`) son **pre-existentes**, confirmado corriéndolos en
+  HEAD con `git stash`.
+- En vivo (API): mixto real+huérfano → 200 con 1 opinión; solo huérfano → 200 `{data:[]}`;
+  conocido normal → 200, comportamiento sin cambio.
 
 ## 5. Sincronización con GitHub
 

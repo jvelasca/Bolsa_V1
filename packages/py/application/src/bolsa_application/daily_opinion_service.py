@@ -17,6 +17,9 @@ from bolsa_infrastructure.database.repositories.instrument_daily_opinion_reposit
     SqlAlchemyInstrumentDailyOpinionRepository,
     make_idempotency_key,
 )
+from bolsa_infrastructure.database.repositories.instrument_repository import (
+    SqlAlchemyInstrumentRepository,
+)
 from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
     SqlAlchemyInstrumentStrategyTopRepository,
 )
@@ -76,10 +79,12 @@ class DailyOpinionService:
         opinion_repo: SqlAlchemyInstrumentDailyOpinionRepository,
         top_repo: SqlAlchemyInstrumentStrategyTopRepository,
         ohlcv_repo: SqlAlchemyOhlcvRepository,
+        instrument_repo: SqlAlchemyInstrumentRepository | None = None,
     ) -> None:
         self._opinions = opinion_repo
         self._tops = top_repo
         self._ohlcv = ohlcv_repo
+        self._instruments = instrument_repo
 
     async def query(
         self,
@@ -97,6 +102,18 @@ class DailyOpinionService:
         ids = list(dict.fromkeys(i for i in instrument_ids if i))
         if not ids:
             return []
+        # Robustez FK: descartar ids que no existen en el catálogo para que un único
+        # instrumento huérfano no derribe todo el batch con un 500 (FK de
+        # instrument_daily_opinions.instrument_id). Sin repo (p.ej. tests que no lo
+        # inyectan) se preserva el comportamiento anterior.
+        if self._instruments is not None:
+            existing = await self._instruments.list_existing_ids(ids)
+            known = [i for i in ids if i in existing]
+        else:
+            known = list(ids)
+        if not known:
+            return []
+        ids = known
         src = source if source in (SOURCE_ON_DEMAND, SOURCE_EOD_BATCH, "manual") else SOURCE_ON_DEMAND
 
         hint_by_id = {h.instrument_id: h for h in (hints or [])}

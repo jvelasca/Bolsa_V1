@@ -282,6 +282,20 @@ class SqlAlchemyInstrumentRepository:
             is_active=row.is_active,
         )
 
+    async def list_existing_ids(self, instrument_ids: list[str]) -> set[str]:
+        """Devuelve el subconjunto de ids que realmente existen en el catálogo.
+
+        Permite que servicios que hacen writes con FK (p.ej. instrument_daily_opinions)
+        descarten ids huérfanos/inválidos de una sola llamada en lugar de 500 por
+        violación de integridad referencial.
+        """
+        ids = [i for i in dict.fromkeys(instrument_ids) if i]
+        if not ids:
+            return set()
+        stmt = select(InstrumentRow.id).where(InstrumentRow.id.in_(ids))
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return {str(r) for r in rows}
+
     async def get_last_sync_detail(self, instrument_id: str) -> SyncLogDetail | None:
         stmt = (
             select(DataSyncLogRow)
