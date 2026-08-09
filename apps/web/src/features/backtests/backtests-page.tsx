@@ -15,6 +15,7 @@ import {
   type ResultFocus as ResultFocusNav,
   type UniverseMode as UniverseModeNav,
 } from "@/features/backtests/backtest-hub-nav";
+import { HubTabButton } from "@/features/backtests/backtest-hub-tabs";
 import {
   useMutation,
   useQueries,
@@ -22,14 +23,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { FileJson, LineChart, SlidersHorizontal, Table } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Navigate,
   useLocation,
@@ -3549,7 +3543,6 @@ export function BacktestsPage() {
 
     setAssistantProgress((p) => ({ ...p, labDone: true }));
     setAssistantStatus("Lab ✓ (TOP active). Pulsa Play para Finalistas.");
-     
   }, [
     fullCycleActive,
     assistantProgress.semifinalDone,
@@ -5763,30 +5756,5 @@ export function BacktestsPage() {
         </>
       ) : null}
     </div>
-  );
-}
-
-function HubTabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-        active
-          ? "bg-accent text-primary"
-          : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {children}
-    </button>
   );
 }
