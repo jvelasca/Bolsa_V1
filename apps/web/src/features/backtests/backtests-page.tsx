@@ -15,7 +15,7 @@ import {
   type ResultFocus as ResultFocusNav,
   type UniverseMode as UniverseModeNav,
 } from "@/features/backtests/backtest-hub-nav";
-import { HubTabButton } from "@/features/backtests/backtest-hub-tabs";
+import { BacktestHubTabsBar } from "@/features/backtests/backtest-hub-tabs";
 import {
   useMutation,
   useQueries,
@@ -3796,32 +3796,13 @@ export function BacktestsPage() {
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex flex-wrap rounded-lg border border-border p-0.5">
-                <HubTabButton
-                  active={tab === "run"}
-                  onClick={() => setTab("run")}
-                >
-                  Probar estrategia
-                </HubTabButton>
-                <HubTabButton
-                  active={tab === "strategies"}
-                  onClick={() => openLibrary({ library: strategiesListFilter })}
-                >
-                  Biblioteca
-                </HubTabButton>
-                <HubTabButton
-                  active={tab === "jobs"}
-                  onClick={() => setTab("jobs")}
-                >
-                  Lab · Optimizar
-                </HubTabButton>
-                <HubTabButton
-                  active={tab === "history"}
-                  onClick={() => setTab("history")}
-                >
-                  Pruebas anteriores
-                </HubTabButton>
-              </div>
+              <BacktestHubTabsBar
+                tab={tab}
+                onTab={(next) => setTab(next)}
+                onOpenLibrary={() =>
+                  openLibrary({ library: strategiesListFilter })
+                }
+              />
               <BacktestZoneSettingsButton
                 onClick={() => setZoneSettingsOpen(true)}
               />

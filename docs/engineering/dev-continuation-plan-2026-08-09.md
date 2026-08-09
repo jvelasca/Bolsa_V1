@@ -67,8 +67,12 @@ son robustez de entorno). "Poco a poco": cada paso con su batería de verificaci
 
 ### F4.8 — Continuar descomposición de `backtests-page` (5.549 → objetivo <3.500)
 
-- **Paso 3**: extraer el bloque de tabs del render (`setTab` + 4× `HubTabButton`) a un
-  sub-componente `BacktestHubTabsBar` (alto valor, bajo riesgo).
+- **Paso 3** ✅ **Hecho (2026-08-09)**: extraído el bloque de tabs del render a
+  `BacktestHubTabsBar` (en `backtest-hub-tabs.tsx`). Props: `tab`, `onTab`,
+  `onOpenLibrary`. `backtests-page.tsx` ahora usa el componente en vez de 4×
+  `HubTabButton` + `setTab`. Verificado: typecheck ✅ · lint (0 errores) ✅ ·
+  build ✅ · **703 tests** (2 nuevos para `BacktestHubTabsBar`) ✅ · sin errores HMR
+  en dev.
 - **Paso 4**: extraer hook `useBacktestHubNav` (estado/URL: `tab`, `setTab`,
   `resultFocus`, `runSource`, `patchSearchParams`).
 - **Paso 5**: migrar utilidades puras del cuerpo (helpers de copy/labels) a módulos
