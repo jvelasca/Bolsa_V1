@@ -1,9 +1,9 @@
 # Roadmap de mejoras — post-auditorías (laboratorio + producto)
 
 > **AsOf:** 2026-08-02  
-> **Fuente:** síntesis de 3 auditorías externas (lab C1–C3.5 · FIE/docs · observability/TOP) + estado real Bolsa_V1 (ADR-019/020/021, Lab WF/CPCV, FIE F1 parcial, stage-audit LAB/DÍA D/Mandato).  
+> **Fuente:** síntesis de 3 auditorías externas (lab C1–C3.5 · FIE/docs · observability/TOP) + estado real Bolsa*V1 (ADR-019/020/021, Lab WF/CPCV, FIE F1 parcial, stage-audit LAB/DÍA D/Mandato).  
 > **Canvas vivo:** abrir junto al chat `improvement-roadmap-post-audits.canvas.tsx`  
-> **No sustituye ADRs:** decide _orden de ejecución_; las decisiones de producto siguen en `docs/adr/`.
+> **No sustituye ADRs:** decide \_orden de ejecución*; las decisiones de producto siguen en `docs/adr/`.
 
 ---
 
@@ -218,6 +218,6 @@ _Siguiente paso operativo sugerido: empezar Q0.1 (Lab Health) en un PR pequeño.
 
 **Paquete auditoría:** [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md) (checklist + evidencia smoke + índice).
 
-**Dev-stack (2026-08-09) — hallazgo recurrente F3.7:** el stack `run-dev` vuelve a caerse (silent crash de Vite) bajo carga de `sync`: última línea en `logs/dev/*Z.log` = `[vite] http proxy error: /api/instruments/{id}/sync` + `Error: read ECONNRESET`, y luego `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`. Los contenedores BD y los puertos quedan libres al limpiar; la causa es que la API cierra la conexión TCP (ECONNRESET) durante syncs pesados y Vite aborta. **F3.7 lo mitiga, no lo elimina.** Pendiente de hardening (priorizar antes de F4.8): opciones — `disableHostCheck` no aplica; valorar (a) mantener Vite vivo ante proxy errors en `server.proxy.configure`, (b) límite de concurrencia de sync, o (c) separar API y proxy.
+**Dev-stack (2026-08-09) — hallazgo recurrente F3.7:** el stack `run-dev` vuelve a caerse (silent crash de Vite) bajo carga de `sync`: última línea en `logs/dev/*Z.log` = `[vite] http proxy error: /api/instruments/{id}/sync` + `Error: read ECONNRESET`, y luego `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`. Los contenedores BD y los puertos quedan libres al limpiar; la causa es que la API cierra la conexión TCP (ECONNRESET) durante syncs pesados y Vite aborta. **F3.7 lo mitiga, no lo elimina.** Pendiente de hardening (priorizar antes de F4.8): opciones — (a) mantener Vite vivo ante proxy errors en `server.proxy.configure`, (b) límite de concurrencia de sync, o (c) separar API y proxy. Plan de continuación detallado en **[dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)**.
 
 **Vigilancia ops (2026-08-03 mañana):** `pnpm test:operativa` OK · smokes API PASS · `pnpm audit:ibex35:missing` → `con_TOP=35/35`.
