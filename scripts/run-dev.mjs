@@ -8,6 +8,11 @@ import { spawnPnpm } from './lib/pnpm.mjs';
 import { resolvePython } from './lib/python.mjs';
 import { waitForApi } from './lib/wait-api.mjs';
 import { StartupTimeline, readLatestStartupReport } from './lib/startup-timeline.mjs';
+import { loadEnvFile } from './lib/load-env.mjs';
+
+// Cargar `.env` raíz para toda la cadena (API Python, Vite, XTB…). Las
+// variables ya exportadas en el entorno del shell tienen prioridad.
+loadEnvFile();
 
 function newestMtimeMs(dir) {
   let newest = 0;

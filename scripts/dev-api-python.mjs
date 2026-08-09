@@ -25,10 +25,14 @@ import { checkPort } from './lib/docker.mjs';
 import { resolvePython } from './lib/python.mjs';
 
 import { ensurePortFree, freePort } from './lib/ports.mjs';
+import { loadEnvFile } from './lib/load-env.mjs';
 
 
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+// Cargar `.env` raíz para que la API hereda DATABASE_URL y credenciales.
+loadEnvFile(join(root, '.env'));
 
 const apiDir = join(root, 'apps', 'api-python');
 
