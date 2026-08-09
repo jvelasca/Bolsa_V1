@@ -310,10 +310,10 @@ export function BacktestsPage() {
   const { pathname } = useLocation();
   const onBacktestsRoute = pathname.startsWith("/backtests");
   const tabParam = searchParams.get("tab");
-  // Solo redirigir legacy en la ruta real (no en keep-alive Lista AUTO fuera de /backtests).
-  if (onBacktestsRoute && tabParam === "screeners") {
-    return <Navigate to="/screeners" replace />;
-  }
+  // Nota: la redirección legacy `/backtests?tab=screeners` → `/screeners` se
+  // resuelve justo antes del return principal (después de todos los hooks) para
+  // respetar la Regla de Hooks (orden estable) — ver las ~150 llamadas a hooks
+  // que siguen y el bloque `if` previo al `return` principal.
   const tab = parseTab(tabParam);
   const runIdFromUrl = searchParams.get("runId");
 
@@ -3774,6 +3774,13 @@ export function BacktestsPage() {
     runTimeframe,
     coachProfilePolicy.profileId,
   ]);
+
+  // Redirección legacy ejecutada tras todos los hooks para respetar la Regla de
+  // Hooks (el componente no debe variar el número de hooks entre renders por un
+  // early return). Solo en la ruta real, no en keep-alive Lista AUTO fuera de /backtests.
+  if (onBacktestsRoute && tabParam === "screeners") {
+    return <Navigate to="/screeners" replace />;
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">

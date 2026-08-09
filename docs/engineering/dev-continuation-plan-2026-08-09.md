@@ -198,6 +198,37 @@ hacer un smoke de `backtests-page.tsx` completo exigiría mocks frágiles de
 react-router/react-query y se descarta por riesgo alto/poca ganancia). Siguiente frente
 de valor: reducir `backtests-page.tsx` (F4.8 pasos 5-6) o F4.10+ higiene de warnings.
 
+### 4e. F4.10 higiene — defecto real de Regla de Hooks en `backtests-page.tsx` (2026-08-09)
+
+**Hallazgo (auditando los 239 warnings de lint):** la mayoría de los warnings de
+`react-hooks/rules-of-hooks` de todo el web (≈150) procedían de un único **early
+return** en `BacktestsPage`: `if (onBacktestsRoute && tabParam === "screeners")`
+antes de ~150 llamadas a hooks. Un early return antes de hooks es un **defecto latente**:
+si la URL cambiara sin remontar el componente, React lanzaría _"Rendered more hooks
+than during the previous render"_ y rompería `/backtests`. No hay ninguna página de
+backtests testeada que renderice `BacktestsPage` (solo componentes/helpers), por lo que
+quedaba sin cobertura.
+
+**Cambio (acotado, sin tocar semántica):** se movió el `Navigate to="/screeners"`
+justo antes del `return` principal del componente (después de todos los hooks). El
+condicional y el componente `<Navigate>` son idénticos; solo cambia el momento de
+evaluación a tras montar los hooks. Efecto: los hooks se ejecutan siempre en orden
+estable (Regla de Hooks correcta) e `ESLint` deja de marcar los ~150 `rules-of-hooks`.
+
+**Verificación:**
+
+- `typecheck` ✅ · `lint` **239 → 79 warnings (0 errores)** ✅ · `build` ✅ ·
+  **707 tests (140 archivos)** ✅ sin regresión.
+- Dev (`pnpm dev`): redirección legacy `/backtests?tab=screeners` responde, el módulo
+  `backtests-page.tsx` compila en Vite (200), sin `proxy error`/`ECONNRESET`/
+  `Deteniendo stack` en el log. Puertos 5173/8000 liberados al cerrar.
+
+**Nota F4.8 pasos 5-6:** tras auditar el cuerpo, **no quedan utilidades puras
+extraíbles** — toda la lógica ya vive en módulos importados y el resto son handlers/
+`useMemo`/`useEffect` atados al estado. El paso 5-6 de F4·8 se descarta como está
+(extraerlo implicaría reescribir lógica entrelazada de dudosa ganancia). F4·8 queda en
+sus pasos 1-3 + este hardening de hooks.
+
 ## 5. Sincronización con GitHub
 
 Rama: `stage/estudio-membership-operativa-2026-08-04`. Cada paso se commitea y pushea
