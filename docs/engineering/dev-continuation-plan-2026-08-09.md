@@ -166,6 +166,19 @@ en `scripts/run-dev.mjs`:
   `web=200`, **sin `Deteniendo stack`**, Vite reinvestido y sirviendo en ≤6s.
   Batería web: **701 tests (139 archivos)** intacta.
 
+**Extensión de hoy (2026-08-09, tras la regresión de alerts en 4h):** de nuevo se
+reprodujo el crash "puro" de Vite (`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL @bolsa/web dev: vite`
+/ `Exit status 1`, sin traza en stderr). Con el autoreinicio simple, Vite entraba en
+**ráfaga de reinicio** (sale → se relanza en 1s → sale…), lo que además **regenera los
+GETs de la SPA en cada recarga**. Para no dejar girar el reinicio en vacío se añadió al
+`exit` handler de `startWebChild()` una **guardia anti-bucle**: si Vite, tras haber estado
+listo, vuelve a morir más de `MAX_WEB_QUICK_RESTARTS` (=3) veces seguidas, `run-dev`
+aborta con un `logError` claro en vez de reiniciar indefinidamente. El contador se
+**resetea** al volver a alcanzar "ready" de verdad (un arranque que aguanta listo perdona
+las caídas previas) y cada nuevo hijo debe alcanzar `ready` por sí mismo (`webReadyMarked`
+se resetea al entrar en `startWebChild`). Verificado en vivo: arranque limpio, API/Web
+200, **sin crash-loop** y sin bucle de alertas (0 GET nuevos de alerts en 30s).
+
 ## 4d. Resultado F4.9 (2026-08-09, siguiente paso)
 
 **Objetivo:** revisar si los smoke de backtest tienen "falso verde" (que pasan sin

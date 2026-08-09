@@ -283,6 +283,10 @@ if (!ensurePortFree(WEB_PORT)) {
   logInfo('dev', `Re-chequeo puerto ${WEB_PORT} (Web) liberado`);
 }
 function startWebChild() {
+  // Cada hijo debe volver a alcanzar el estado "ready" por sí mismo; no hereda
+  // el de un arranque previo. Si uno muere antes de listo se trata como boot
+  // fallido (ver guardia anti-bucle en el handler de exit).
+  webReadyMarked = false;
   const child = spawnPnpm(['--filter', '@bolsa/web', 'dev'], {
     stdio: ['inherit', 'pipe', 'pipe'],
     env: { ...process.env, BOLSA_LOG_DIR: join(ROOT, 'logs'), WEB_PORT: String(WEB_PORT) },
@@ -292,6 +296,9 @@ function startWebChild() {
     const text = chunk.toString();
     if (!webReadyMarked && (text.includes('ready in') || text.includes(`localhost:${WEB_PORT}`))) {
       webReadyMarked = true;
+      // Al alcanzar ready de verdad, reseteamos el contador anti-bucle: un arranque
+      // que aguanta listo "perdona" las caídas anteriores.
+      consecutiveQuickRestarts = 0;
       logInfo('dev', `Web lista -> http://localhost:${WEB_PORT}`);
       timeline.mark('web_ready');
       timeline.finish('ready');
@@ -314,7 +321,25 @@ function startWebChild() {
     // No derribamos el stack; la API sigue viva y se reinicia Vite para no perder sesión.
     if (shuttingDown) return;
     if (restartWebTimer) return;
-    logInfo('dev', `Web (Vite) salió (exit=${code}) — se mantiene la API y se reinicia Vite…`);
+    // Guardia anti-bucle: si Vite crashea en ráfaga (muere poco después de estar
+    // listo), no lo reiniciemos indefinidamente (eso regenera los GETs de la SPA y
+    // parece un loop). Tras MAX_WEB_QUICK_RESTARTS reinicios consecutivos rápidos
+    // derribamos el stack con un error claro en vez de girar en vacío.
+    consecutiveQuickRestarts += 1;
+    if (consecutiveQuickRestarts > MAX_WEB_QUICK_RESTARTS) {
+      logError(
+        'dev',
+        `Vite crasheó ${consecutiveQuickRestarts - 1} veces seguidas tras estar listo — abortando `
+          + 'para no quedar en bucle de reinicio. Revisa logs; si persiste, ejecuta node scripts/dev-doctor.mjs --fix-ports.',
+      );
+      shutdown(code ?? 1);
+      return;
+    }
+    logInfo(
+      'dev',
+      `Web (Vite) salió (exit=${code}) — se mantiene la API y se reinicia Vite… ` +
+        `(intento ${consecutiveQuickRestarts}/${MAX_WEB_QUICK_RESTARTS})`,
+    );
     ensurePortFree(WEB_PORT);
     restartWebTimer = setTimeout(() => {
       restartWebTimer = null;
@@ -328,6 +353,10 @@ function startWebChild() {
 
 let webChild;
 let restartWebTimer = null;
+// Nº de reinicios consecutivos en los que Vite, tras estar listo, vuelve a morir
+// antes de aguantar un periodo estable. Se resetea al alcanzar "ready" de verdad.
+let consecutiveQuickRestarts = 0;
+const MAX_WEB_QUICK_RESTARTS = 3;
 webChild = startWebChild();
 children.push(webChild);
 
