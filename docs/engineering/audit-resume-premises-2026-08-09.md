@@ -90,6 +90,51 @@ Dado que F4·8 paso 4 es de riesgo alto y poca ganancia, **recomendación**: mov
 impacto: code-splitting / subir Vite), y dejar F4·8 para pasos más marginales o
 suspenderlo. Confirmar con el usuario cuál abordan.
 
+## 7. Hallazgo recurrente F3·7 (resumen autosuficiente para el nuevo hilo)
+
+**Síntoma:** el stack `run-dev` cae de forma intermitente bajo carga de `sync`.
+Históricamente el patrón era:
+
+```text
+[vite] http proxy error: /api/instruments/{id}/sync
+Error: read ECONNRESET
+```
+
+seguido de `ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL` y `Deteniendo stack (exit=1)`,
+quedando procesos huérfanos (API + Vite) sirviendo.
+
+**Qué se ha mitigado (no eliminado del todo):**
+
+- Arranque API→Web (evita `ECONNREFUSED` de Vite contra una API aún no lista).
+- Limpieza de puertos en `run-dev` (`ensureStackPortsFree`) + `taskkill /T /F`.
+- `spawnPnpm` ejecuta `node pnpm.cjs` directamente (sin `cmd.exe`), para mejor
+  propagación de señales y cierre de árbol en Windows.
+- Vite captura los errores del proxy (`server.proxy.configure`) para que un
+  `ECONNRESET` no propague a fallo fatal.
+- **Autoreinicio de Vite** en `run-dev`: si Vite muere tras haberse iniciado, se
+  mantiene la API y se relanza Vite a los ~1 s en vez de derribar el stack.
+
+**Pendiente (crash "puro" sin rastro):** hay una segunda vía de crash silencioso de
+Vite (exit 1 sin stderr, sin `proxy error` ni `ECONNRESET` previo). No está resuelta.
+Hipótesis y opciones en la sección 4 (F3·7 residual).
+
+## 8. Logros consolidados (2026-08-02 → 2026-08-09)
+
+Registro de lo cerrado y verificado, para tener el sesgo al abrir el nuevo hilo:
+
+- **F1·3** — CI frontend (typecheck + lint + test + build) en GitHub Actions.
+- **F1·4** — Pre-commit con husky + lint-staged (prettier + eslint --fix).
+- **F1·5** — Refuerzo de `.gitignore` y `.gitattributes` (line-endings LF).
+- **F2·6** — Quitar secretos por defecto (auth_secret, BD) en `config.py` + tests.
+- **F3·7** — Endurecer `run-dev`: arranque API→Web, limpieza de puertos, `spawnPnpm`
+  con `node`, autoreinicio de Vite. (Mitigado — ver sección 7.)
+- **F4·8 (pasos 1-3)** — Descomposición de `backtests-page`: `backtest-hub-nav`,
+  `HubTabButton`, `BacktestHubTabsBar`. Reducción 5.792 → 5.530 líneas, con tests.
+- **Estudio/membership (previo)** — Actualización automática al añadir valores a
+  ESTUDIO, pausa suave (soft-pause) con checkpoints y reanudación, y estatus
+  "Termina X y para…" en el banner.
+- **Cierre de sesión** — 139 archivos / **703 tests en verde**; GitHub sincronizado.
+
 ---
 
 _Documento de premisas para nuevo hilo. 2026-08-09._
