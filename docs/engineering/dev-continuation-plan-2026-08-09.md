@@ -166,6 +166,38 @@ en `scripts/run-dev.mjs`:
   `web=200`, **sin `Deteniendo stack`**, Vite reinvestido y sirviendo en ≤6s.
   Batería web: **701 tests (139 archivos)** intacta.
 
+## 4d. Resultado F4.9 (2026-08-09, siguiente paso)
+
+**Objetivo:** revisar si los smoke de backtest tienen "falso verde" (que pasan sin
+verificar invariantes reales) y endeudar lo que falta.
+
+**Hallazgo (auditado pasando repo):** los smoke de backtest **no tienen falso verde**
+apreciable — verifican invariantes reales:
+
+- `verify_optimize_api_smoke.py`: comprueba trials no vacíos, `oosPct`, `oosMetrics`
+  presentes y orden OOS descendente.
+- `verify_dia_d_api_smoke.py`: comprueba metadata `asOfDate`/`pointInTime`,
+  `band`/`paragraphs` en Evidence, y `source='dia_d_session'` en persist.
+- `verify_core_p_api_smoke.py`: verifica el roundtrip de perfil (risk/horizon) y las
+  invariantes CORE-P (techo DD, Lab si débil, espacio, familia).
+- Web: "0 trades → gate" ya cubierto en `backtest-paper-gate.test.ts` (hard-block
+  `has_trades`); `lab-coach-caf-smoke.test.ts` verifica cantidad de recomendaciones y
+  quorum; `backtest-hub-tabs.test.tsx` y `backtest-hub-nav.test.ts` verifican
+  navegación real.
+
+**Gap real acotado encontrado y cerrado:** `use-instrument-sync.ts` (pieza de sync de
+velas del cliente) tenía una función pura `formatSyncError` **sin test**. Añadido
+`apps/web/src/features/instruments/use-instrument-sync.test.ts` (4 asserts: ApiError,
+`Failed to fetch`, Error genérico, valor desconocido).
+
+**Batería tras el paso:** typecheck ✅ · lint (0 errores) ✅ · build ✅ · **707 tests
+(140 archivos)** ✅ (antes 703/139). Sin errores HMR en dev.
+
+**Decisión:** F4.9 se considera **cubierto** (sin más smoke que añadir de bajo riesgo;
+hacer un smoke de `backtests-page.tsx` completo exigiría mocks frágiles de
+react-router/react-query y se descarta por riesgo alto/poca ganancia). Siguiente frente
+de valor: reducir `backtests-page.tsx` (F4.8 pasos 5-6) o F4.10+ higiene de warnings.
+
 ## 5. Sincronización con GitHub
 
 Rama: `stage/estudio-membership-operativa-2026-08-04`. Cada paso se commitea y pushea
