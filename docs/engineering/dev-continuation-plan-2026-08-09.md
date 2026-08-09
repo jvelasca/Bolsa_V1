@@ -97,6 +97,28 @@ son robustez de entorno). "Poco a poco": cada paso con su batería de verificaci
 
 Tras P3, seguir F4·8 paso 3.
 
+## 4b. Resultado P3 (2026-08-09, hecho)
+
+**Decisión:** opción (a) — capturar errores del proxy en `vite.config.ts` vía
+`server.proxy.configure(proxy => proxy.on('error', ...))`. Esto impide que el
+`ECONNRESET` emitido por `http-proxy` al reenviar `/api` a la API se propague como
+fallo fatal que derriba el proceso Vite.
+
+**Cambio:** `apps/web/vite.config.ts` (solo el bloque `proxy['/api']`).
+
+**Verificación:**
+
+- Stress: 10+ syncs concurrentes de instrumentos reales a través del proxy Vite
+  (`POST /api/instruments/{id}/sync`) → todos **200 OK** en la API.
+- Stack vivo tras el estrés (`api=200`, `web=200`), **0** `proxy error`/`ECONNRESET`/
+  `Deteniendo stack`/`ERR_PNPM` en el log.
+- Batería: typecheck ✅ · lint (0 errores) ✅ · build ✅ · **701 tests (139 archivos)** ✅.
+- No se observó regresión de build ni de dev.
+
+**Nota:** la causa última (API cerrando conexión en sync pesado) persiste como
+fragilidad; P3 la vuelve **no fatal para Vite**. Si reaparece un crash, las opciones
+(b) límite de concurrencia de sync y (c) separar proxy quedan documentadas.
+
 ## 5. Sincronización con GitHub
 
 Rama: `stage/estudio-membership-operativa-2026-08-04`. Cada paso se commitea y pushea
