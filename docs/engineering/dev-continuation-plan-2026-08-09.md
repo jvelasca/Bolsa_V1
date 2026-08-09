@@ -97,6 +97,12 @@ son robustez de entorno). "Poco a poco": cada paso con su batería de verificaci
 
 Tras P3, seguir F4·8 paso 3.
 
+> **Recomendación actualizada (2026-08-09, 21:0x):** tras el hallazgo 4c, el paso más
+> necesario es **endurecer `run-dev` para que NO muera si Vite cae (autoreinicio de
+> Vite / no-propagar exit a todo el stack)**, antes de seguir con F4·8. Es un cambio
+> en `scripts/run-dev.mjs` (tope), sin tocar Vite ni la semántica del stack, y ataca
+> la incidencia recurrente que bloquea el trabajo.
+
 ## 4b. Resultado P3 (2026-08-09, hecho)
 
 **Decisión:** opción (a) — capturar errores del proxy en `vite.config.ts` vía
@@ -118,6 +124,30 @@ fallo fatal que derriba el proceso Vite.
 **Nota:** la causa última (API cerrando conexión en sync pesado) persiste como
 fragilidad; P3 la vuelve **no fatal para Vite**. Si reaparece un crash, las opciones
 (b) límite de concurrencia de sync y (c) separar proxy quedan documentadas.
+
+## 4c. Hallazgo posterior (2026-08-09, MISMO día, tras P3)
+
+**El crash silencioso de Vite persiste aun con P3.** En la sesión que siguió a P3
+(shell `709482`), Vite volvió a salir con `Exit status 1` **sin ningún mensaje
+propio en stderr**, derribando el stack (`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`).
+Lo relevante:
+
+- **No hubo NI UN `proxy error` ni `ECONNRESET`** en todo el log de esa sesión.
+- Antes del crash todo era tráfico **200 OK** normal (syncs que completaron, alertas,
+  mono-ventana), sin carga extraordinaria.
+- Quedaron de nuevo huérfanos (API+Web) sirviendo tras el cierre.
+
+→ **Conclusión:** hay una **segunda vía de crash silencioso "puro" de Vite** (sin
+trigger visible en stderr, ni proxy error, ni rastro de memoria/stack en el log),
+independiente del `ECONNRESET` que atajó P3. El hardening P3 **no es suficiente**.
+
+Hipótesis a explorar (no probadas aún): problema de la versión de Vite/`http-proxy`
+con el chunk grande (~2.5 MB) y su HMR en `strictPort`, o un `uncaughtException`
+silencioso ligado a WebSocket/HMR del dev server. Siguientes opciones, en orden:
+(a1) subir la versión de Vite; (a2) aislar `run-dev` para que el run-dev NO muera si
+Vite cae (que lo **reinicie solo**); (a3) reducir el chunk con code-splitting.
+**Recomendación: (a2) hacer a `run-dev` resiliente al exit de Vite (autoreinicio)**
+es el de mayor impacto/mejor ratio y no toca la semántica del stack.
 
 ## 5. Sincronización con GitHub
 
