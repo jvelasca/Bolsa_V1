@@ -62,11 +62,15 @@ export function ListHubColumnLayoutProvider({ children }: { children: ReactNode 
 
   const layout = useMemo(
     () => mergeHubColumnWidths(serverLayout),
+    // hubSeeded/hubWidths son señales de refresco del store (layout del hub)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [hubSeeded, hubWidths, serverLayout],
   );
   const visibleColumns = useMemo(() => getVisibleListHubColumnLayout(layout), [layout]);
   const rowActionsWidth = useMemo(
     () => resolveLocalHubRowActionsWidth(serverRowActionsWidth),
+    // hubRowActionsWidth es señal de refresco del store
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [hubRowActionsWidth, serverRowActionsWidth],
   );
   const gridTemplateColumns = useMemo(

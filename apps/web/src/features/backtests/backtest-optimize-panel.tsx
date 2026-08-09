@@ -1259,11 +1259,14 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     [bestVsAnchor, zoneRank, zoneId, seed, family, result, instrumentId, timeframe, profileId],
   );
 
+  // savedRowId es señal de refresco: readLabAdoption lee localStorage no reactivo,
+  // la dependencia fuerza recalcular el hint cuando se guarda la fila del Lab.
   const adoptionHint = useMemo(() => {
     const id = seed?.instrumentId || instrumentId;
     const tf = seed?.timeframe || timeframe;
     const rec = readLabAdoption(id, tf);
     return rec ? formatLabAdoptionHint(rec) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed?.instrumentId, seed?.timeframe, instrumentId, timeframe, savedRowId]);
 
   return (

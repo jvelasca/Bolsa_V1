@@ -72,6 +72,8 @@ export function ListColumnLayoutProvider({
 
   const layout = useMemo(
     () => mergeListColumnWidths(listId, serverLayout),
+    // localWidths es señal de refresco del store: recalcula el layout al editar anchos
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [listId, localWidths, serverLayout],
   );
 
@@ -79,6 +81,8 @@ export function ListColumnLayoutProvider({
 
   const rowActionsWidth = useMemo(
     () => resolveLocalRowActionsWidth(serverRowActionsWidth),
+    // localRowActions es señal de refresco del store
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [localRowActions, serverRowActionsWidth],
   );
 

@@ -71,6 +71,8 @@ export function ListProcessStatusCell({ instrumentId, className }: Props) {
         prefs,
         runningLane: runningId === instrumentId ? runningLane : null,
       }),
+    // stampTick es señal de refresco (timestamps de proceso); conservar dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [instrumentId, prefs, runningId, runningLane, stampTick],
   );
 
@@ -129,6 +131,8 @@ export function ListProcessTimestampCell({ instrumentId, kind, className }: Stam
         prefs,
         runningLane: runningId === instrumentId ? runningLane : null,
       }),
+    // stampTick es señal de refresco (timestamps de proceso); conservar dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [instrumentId, prefs, runningId, runningLane, stampTick],
   );
 

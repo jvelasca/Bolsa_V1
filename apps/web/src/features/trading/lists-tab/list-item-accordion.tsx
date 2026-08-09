@@ -421,6 +421,8 @@ function ListItemExpandedDetail({
         prefs: loadEstudioSupervisionPrefs(),
         runningLane: runningId === itemId ? runningLane : null,
       }),
+    // stampTick es señal de refresco (timestamps de proceso); conservar dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [itemId, runningId, runningLane, stampTick],
   );
 

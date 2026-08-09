@@ -65,6 +65,8 @@ export function ListNameProcessSubtitle({ instrumentId, className }: Props) {
       runningLane: isRunning ? runningLane : null,
     });
     return summarizeEstudioProcessLanes(view.lanes);
+    // stampTick es señal de refresco (timestamps de proceso); conservar dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instrumentId, prefs, isRunning, runningLane, stampTick]);
 
   return (

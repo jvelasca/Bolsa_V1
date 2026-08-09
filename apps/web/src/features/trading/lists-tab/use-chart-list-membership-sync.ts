@@ -67,6 +67,8 @@ export function useChartListMembershipSync() {
       (portfolioQuery.data?.data.positions ?? [])
         .map((position) => position.instrumentId)
         .join(','),
+    // dataUpdatedAt es señal de refresco: recalcular memberships al refrescar portfolio
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [portfolioQuery.dataUpdatedAt, portfolioQuery.data?.data.positions],
   );
 

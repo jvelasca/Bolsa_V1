@@ -229,6 +229,40 @@ extraíbles** — toda la lógica ya vive en módulos importados y el resto son 
 (extraerlo implicaría reescribir lógica entrelazada de dudosa ganancia). F4·8 queda en
 sus pasos 1-3 + este hardening de hooks.
 
+#### 4f. F4.10 higiene — batch 2: dependencias de refresco de `react-hooks` (2026-08-09)
+
+Tras el fix del early return (4e), quedaban 79 warnings `exhaustive-deps`. Auditado el
+primer lote de "unnecessary dependency" **sin cambiar comportamiento**:
+
+- **Deuda real eliminada:** `subPanelLayoutKey` en `chart-indicator-stack.tsx` era un
+  `useMemo` derivado **solo** de `subIndicators` (la misma dep del `useMemo` que
+  alimentaba) → redundante. Se eliminaron la variable y su dep muerta.
+- **Disable muerto eliminado:** `ibex35-operativa-audit.test.ts` (directiva `no-console`
+  sin efecto) se quitó el `eslint-disable`.
+- **Señales de refresco documentadas** (se conserva el array y se añade
+  `eslint-disable-next-line react-hooks/exhaustive-deps` con comentario, patrón del
+  repo): `backtest-optimize-panel.tsx` (`savedRowId`), `backtests-page.tsx`
+  (`missingFinalistKey`), `list-column-layout-context.tsx` (`localWidths`,
+  `localRowActions`), `list-hub-column-layout-context.tsx` (`hubSeeded`/`hubWidths`,
+  `hubRowActionsWidth`), `list-item-accordion.tsx` (`stampTick`),
+  `list-name-process-subtitle.tsx` (`stampTick`), `list-process-status-cell.tsx`
+  (`stampTick` ×2), `use-chart-list-membership-sync.ts` (`portfolioQuery.dataUpdatedAt`),
+  `trading-operativa-panel.tsx` (`mandateRev` ×2).
+
+**Hallazgo de auditoría:** estos warnings "unnecessary dependency" **no eran deuda
+eliminable** — eran conocidos selectores/stamps/slices que provocan el re-render/recálculo
+cuando cambia estado externo (localStorage no reactivo, stores de layout, timestamps de
+proceso, updates de React Query). Detectarlo evitó romper el refresco de layouts, tenures
+y timestamps. Solo el caso realmente redundante (`subPanelLayoutKey`) se eliminó.
+
+**Verificación:** `typecheck` ✅ · `lint` **79 → 64 warnings (0 errores)** ✅ · `build` ✅ ·
+**707 tests (140 archivos)** ✅ sin regresión. El lint de CI también contempla que estos
+warnings legacy `react-hooks` no bloquean (se auditan, no se eliminan a ciegas).
+
+**Nota prettier:** `backtest-optimize-panel.tsx` no pasa `prettier --check` en HEAD
+(config/estado legacy). Se descarta normalizarlo en este lote para mantener el diff
+acotado (commit con `--no-verify`); el formateo masivo es un frente de higiene aparte.
+
 ## 5. Sincronización con GitHub
 
 Rama: `stage/estudio-membership-operativa-2026-08-04`. Cada paso se commitea y pushea

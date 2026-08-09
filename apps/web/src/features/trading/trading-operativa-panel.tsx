@@ -176,10 +176,14 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
 
   const openTenures = useMemo(
     () => listOpenMandateTenures(effectiveAccountId),
+    // mandateRev es señal de refresco (recalcular tenures/churn al escribir mandato)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [effectiveAccountId, mandateRev],
   );
   const churn = useMemo(
     () => summarizeMandateChurn({ accountId: effectiveAccountId }),
+    // mandateRev es señal de refresco (recalcular tenures/churn al escribir mandato)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [effectiveAccountId, mandateRev],
   );
 

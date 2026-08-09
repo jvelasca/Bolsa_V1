@@ -20,7 +20,6 @@ describe('IBEX35 operativa audit (offline)', () => {
 
   it('simula lista completa: coach diverso + Lista AUTO + política ciclo', () => {
     const report = runIbex35OperativaAudit();
-    // eslint-disable-next-line no-console
     console.log(formatIbex35AuditReport(report));
 
     expect(report.instrumentCount).toBe(35);

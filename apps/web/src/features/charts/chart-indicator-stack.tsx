@@ -65,20 +65,9 @@ export function ChartIndicatorStack({
   const pendingPct = useRef(resolvedPct);
   const [subGridHeightPx, setSubGridHeightPx] = useState(0);
 
-  const subPanelLayoutKey = useMemo(
-    () =>
-      subIndicators
-        .map(
-          (instance) =>
-            `${instance.instanceId}:${instance.visible}:${instance.subPanelWeight ?? ''}`,
-        )
-        .join('|'),
-    [subIndicators],
-  );
-
   const resolvedWeights = useMemo(
     () => resolveSubPanelWeights(subIndicators),
-    [subPanelLayoutKey, subIndicators],
+    [subIndicators],
   );
   const resolvedWeightsKey = useMemo(
     () => serializeSubPanelWeights(resolvedWeights),

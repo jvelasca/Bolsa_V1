@@ -929,6 +929,9 @@ export function BacktestsPage() {
       });
     }
     return [...byId.values()];
+    // missingFinalistKey es señal de refresco: recalcula `strategies` cuando se
+    // resuelven los lookups huérfanos asíncronos de finalists (missingFinalistQueries).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [strategiesQuery.data?.data, missingFinalistKey, missingFinalistQueries]);
   const runs = runsQuery.data?.data ?? [];
   const instrumentTop = instrumentTopQuery.data?.data ?? null;
