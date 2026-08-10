@@ -1008,3 +1008,31 @@ F4.8 `backtests-page.tsx` (5.127, ya sin islas JSX). HEAD `b54efd0` · índice d
 
 **Traspaso del frente (CIERRE):** [traspaso-m5-frente-list-values-instruments-cierre-2026-08-10.md](./traspaso-m5-frente-list-values-instruments-cierre-2026-08-10.md) —
 HEAD `b54efd0`, frentes list-values e instruments **CERRADOS**, M5 pausado, demás candidatos anotados en §2.3.
+
+### §7.6.e — Registro M5 frente `create-account-wizard-dialog.tsx` (accounts · pasos C.1–C.5 · CIERRE)
+
+Tras el cierre de list-values/instruments (HEAD `b54efd0`, §7.6.d), se retomó M5 sobre el **mejor candidato no-sliced**
+de `apps/web/src/features`: `apps/web/src/features/accounts/create-account-wizard-dialog.tsx` (monolito, **791 líneas**).
+FASE 1 diagnosticó **6 pasos de wizard**; de ellos **5 islas presentacionales de bajo riesgo** (Diseño B) y el paso
+**`profile` de alto acoplamiento** (depende de `catalogProfiles`, `selectedCatalog`, `createMutation.isPending`,
+`useUiStore`, `InvestorProfilePicker`, `toggleObjective`, `suggestedTemplate` + patch condicional). El plan aprobado
+excluyó `profile` con evidencia.
+
+Ejecución (cada paso con **batería completa en verde**):
+
+| Paso | Commit | Componente (fichero) | Reducción orquestador |
+|------|--------|----------------------|----------------------|
+| C.1 | `c36f39b` | `AccountWizardIdentityStep` (`account-wizard-identity-step.tsx`) | 791 → 764 |
+| C.2 | `6c82afe` | `AccountWizardCapitalStep` (`account-wizard-capital-step.tsx`) | → 723 |
+| C.3 | `71d295f` | `AccountWizardCommissionsStep` (`account-wizard-commissions-step.tsx`) | → 680 |
+| C.4 | `2394840` | `AccountWizardTaxStep` (`account-wizard-tax-step.tsx`) | → 613 |
+| C.5 | `007924f` | `AccountWizardReviewStep` (`account-wizard-review-step.tsx`) | → **632** |
+
+**Reducción total:** `create-account-wizard-dialog.tsx` de **791 → 632 (−159, ~20%)**. Batería 140/707 en cada paso.
+
+**Cierre del frente (2026-08-10):** con C.1–C.5, **`create-account-wizard-dialog.tsx` queda CERRADO** para
+feature-slicing de bajo riesgo. El paso **`profile` NO se extrae**: deuda anotada (alto acoplamiento → sería refactor a
+custom hooks/recalibración, fuera del criterio Diseño B de M5). HEAD `007924f` · índice de ingeniería actualizado.
+
+**Traspaso del frente (CIERRE):** [traspaso-m5-frente-create-account-wizard-cierre-2026-08-10.md](./traspaso-m5-frente-create-account-wizard-cierre-2026-08-10.md) —
+HEAD `007924f`, frente **CERRADO**, M5 pausado, orden de valor/riesgo restante anotado en §2.2 de dicho traspaso.
