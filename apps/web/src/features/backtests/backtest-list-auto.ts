@@ -41,11 +41,11 @@ export const LIST_AUTO_EXTRA_CONFIRM_AT = 200;
 
 /** Motivo de cierre de un ciclo 1-valor dentro de la campaña. */
 export type FullCycleSettleReason =
-  | 'saved'
-  | 'skip_lab'
-  | 'skip_finalists'
+  | "saved"
+  | "skip_lab"
+  | "skip_finalists"
   /** Datos de entrada iguales al stamp de Finalistas → no re-analizar. */
-  | 'skip_fresh';
+  | "skip_fresh";
 
 /** Estado mutable de la campaña (fuente de verdad en ref de página). */
 export type ListAutoCampaign = {
@@ -77,7 +77,10 @@ export function listAutoBatchProgressLabel(opts: {
   const batchSize = opts.batchSize ?? LIST_AUTO_BATCH_SIZE;
   if (opts.total <= batchSize) return null;
   const batches = listAutoBatchCount(opts.total, batchSize);
-  const batch = Math.min(batches, Math.floor(Math.max(0, opts.index) / batchSize) + 1);
+  const batch = Math.min(
+    batches,
+    Math.floor(Math.max(0, opts.index) / batchSize) + 1,
+  );
   return `Tanda ${batch}/${batches}`;
 }
 
@@ -156,9 +159,14 @@ export function listAutoOverCapWarning(
 }
 
 /** True si el ticker ya tiene Finalistas (TOP con slots). */
-export function instrumentHasFinalistSlots(top: {
-  slots?: unknown[] | null;
-} | null | undefined): boolean {
+export function instrumentHasFinalistSlots(
+  top:
+    | {
+        slots?: unknown[] | null;
+      }
+    | null
+    | undefined,
+): boolean {
   return (top?.slots?.length ?? 0) > 0;
 }
 
@@ -168,7 +176,9 @@ export function instrumentHasFinalistSlots(top: {
  */
 export async function filterListAutoIdsWithoutFinalists(
   ids: string[],
-  fetchTop: (instrumentId: string) => Promise<{ data: { slots?: unknown[] | null } | null }>,
+  fetchTop: (
+    instrumentId: string,
+  ) => Promise<{ data: { slots?: unknown[] | null } | null }>,
 ): Promise<string[]> {
   const results = await Promise.all(
     ids.map(async (id) => {
@@ -219,7 +229,7 @@ export function nextListAutoIndex(campaign: ListAutoCampaign): number | null {
   return next;
 }
 
-export type ListAutoAdvanceResult = 'done' | 'next' | 'aborted' | 'paused';
+export type ListAutoAdvanceResult = "done" | "next" | "aborted" | "paused";
 
 /**
  * Avanza la campaña tras cerrar el ciclo del ticker actual.
@@ -228,15 +238,15 @@ export type ListAutoAdvanceResult = 'done' | 'next' | 'aborted' | 'paused';
 export function advanceListAutoAfterSettle(
   campaign: ListAutoCampaign,
 ): ListAutoAdvanceResult {
-  if (campaign.aborted) return 'aborted';
+  if (campaign.aborted) return "aborted";
   const next = nextListAutoIndex(campaign);
   if (next == null) {
     campaign.index = campaign.instrumentIds.length;
-    return 'done';
+    return "done";
   }
   campaign.index = next;
-  if (campaign.paused) return 'paused';
-  return 'next';
+  if (campaign.paused) return "paused";
+  return "next";
 }
 
 export function pauseListAutoCampaign(campaign: ListAutoCampaign): void {
@@ -276,7 +286,7 @@ export function formatListAutoStatusBarSummary(opts: {
   const base = listAutoProgressLabel({
     index: Math.max(0, opts.index),
     total: Math.max(1, opts.total),
-    symbol: opts.symbol.trim() || '…',
+    symbol: opts.symbol.trim() || "…",
   });
   const tanda = listAutoBatchProgressLabel({
     index: Math.max(0, opts.index),
@@ -286,18 +296,20 @@ export function formatListAutoStatusBarSummary(opts: {
   if (opts.paused) return `${withTanda} · pausa`;
   const phase = shortenListAutoPhase(opts.detail);
   const listBit =
-    opts.listName && opts.listName.trim() && opts.listName.trim() !== 'IBEX 35'
+    opts.listName && opts.listName.trim() && opts.listName.trim() !== "IBEX 35"
       ? ` · ${opts.listName.trim()}`
-      : '';
+      : "";
   return phase ? `${withTanda} · ${phase}${listBit}` : `${withTanda}${listBit}`;
 }
 
 /** Extrae fase corta del mensaje del rail (evita repetir «Lista AUTO…»). */
-export function shortenListAutoPhase(detail: string | null | undefined): string | null {
+export function shortenListAutoPhase(
+  detail: string | null | undefined,
+): string | null {
   if (!detail?.trim()) return null;
   let s = detail.trim();
-  s = s.replace(/^Lista AUTO[^:]*:\s*/i, '');
-  s = s.replace(/^Lista AUTO\s+\d+\/\d+\s*·\s*\S+\s*[:·]?\s*/i, '');
+  s = s.replace(/^Lista AUTO[^:]*:\s*/i, "");
+  s = s.replace(/^Lista AUTO\s+\d+\/\d+\s*·\s*\S+\s*[:·]?\s*/i, "");
   // Primera cláusula útil
   const cut = s.split(/[·|]/)[0]?.trim() ?? s;
   const short = cut.length > 36 ? `${cut.slice(0, 34)}…` : cut;
@@ -322,11 +334,11 @@ export function listAutoPlayTitle(opts: {
   fullCycleOnPlay: boolean;
   listMode: boolean;
 }): string {
-  if (!opts.fullCycleOnPlay) return 'Play: ejecutar siguiente paso';
+  if (!opts.fullCycleOnPlay) return "Play: ejecutar siguiente paso";
   if (opts.listMode) {
     return `Play: lista AUTO (ciclo completo × cada valor · tandas de ${LIST_AUTO_BATCH_SIZE})`;
   }
-  return 'Play: ciclo completo (Coach → Lab → Coach² → Finalistas)';
+  return "Play: ciclo completo (Coach → Lab → Coach² → Finalistas)";
 }
 
 /**
@@ -335,29 +347,29 @@ export function listAutoPlayTitle(opts: {
  */
 export function listAutoUniverseHint(): string {
   return (
-    'Play lanza el embudo completo por cada valor: todas las genéricas ∪ Finalistas de ese ticker. ' +
-    'No hace falta seleccionar una estrategia. Clic en un miembro o fila del tablero → pestaña Valor. ' +
-    'Pausa / Stop gestionan la campaña; si los datos no cambiaron, se omite el valor (frescura). ' +
-    'Reanalizar (LAB) ≠ cambiar mandato en Trading (CORE-R propone; tú aceptas).'
+    "Play lanza el embudo completo por cada valor: todas las genéricas ∪ Finalistas de ese ticker. " +
+    "No hace falta seleccionar una estrategia. Clic en un miembro o fila del tablero → pestaña Valor. " +
+    "Pausa / Stop gestionan la campaña; si los datos no cambiaron, se omite el valor (frescura). " +
+    "Reanalizar (LAB) ≠ cambiar mandato en Trading (CORE-R propone; tú aceptas)."
   );
 }
 
 /** Resumen corto para el título del wizard en modo lista. */
 export function listModeWizardTitle(fullCycleOnPlay: boolean): string {
   return fullCycleOnPlay
-    ? 'Lista AUTO · Play (sin elegir estrategia)'
-    : 'Lista · activa ciclo completo para Lista AUTO';
+    ? "Lista AUTO · Play (sin elegir estrategia)"
+    : "Lista · activa ciclo completo para Lista AUTO";
 }
 
 /** ¿Play debe arrancar Lista AUTO en lugar del ciclo/paso de un valor? */
 export function shouldStartListAuto(opts: {
-  universeMode: 'single' | 'list';
+  universeMode: "single" | "list";
   fullCycleOnPlay: boolean;
   listId: string | null | undefined;
   instrumentCount: number;
 }): boolean {
   return (
-    opts.universeMode === 'list' &&
+    opts.universeMode === "list" &&
     opts.fullCycleOnPlay &&
     Boolean(opts.listId) &&
     opts.instrumentCount > 0

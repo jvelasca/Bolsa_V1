@@ -8,11 +8,14 @@
  * @see docs/engineering/list-auto-ops-2026-07-29.md
  */
 
-import type { ListAutoCampaign } from '@/features/backtests/backtest-list-auto';
-import type { ListAutoBoardState, ListAutoBoardRow } from '@/features/backtests/backtest-list-auto-board';
+import type { ListAutoCampaign } from "@/features/backtests/backtest-list-auto";
+import type {
+  ListAutoBoardState,
+  ListAutoBoardRow,
+} from "@/features/backtests/backtest-list-auto-board";
 
-export const LIST_AUTO_PAUSE_STORAGE_KEY = 'bolsa-list-auto-paused-v1';
-export const LIST_AUTO_CONTINUE_STORAGE_KEY = 'bolsa-list-auto-continue-v1';
+export const LIST_AUTO_PAUSE_STORAGE_KEY = "bolsa-list-auto-paused-v1";
+export const LIST_AUTO_CONTINUE_STORAGE_KEY = "bolsa-list-auto-continue-v1";
 
 export type ListAutoPausedSnapshotV1 = {
   version: 1;
@@ -49,7 +52,7 @@ export function buildListAutoPausedSnapshot(opts: {
 }): ListAutoPausedSnapshotV1 | null {
   if (opts.campaign.aborted || !opts.campaign.paused) return null;
   if (opts.board.done || opts.board.aborted || !opts.board.paused) return null;
-  if (opts.board.rows.some((r) => r.phase === 'running')) return null;
+  if (opts.board.rows.some((r) => r.phase === "running")) return null;
   if (opts.campaign.index >= opts.campaign.instrumentIds.length) return null;
 
   const freshnessMemory =
@@ -86,22 +89,26 @@ export function serializeListAutoPausedSnapshot(
 export function parseListAutoPausedSnapshot(
   raw: unknown,
 ): ListAutoPausedSnapshotV1 | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== "object") return null;
   const o = raw as Partial<ListAutoPausedSnapshotV1>;
   if (o.version !== 1) return null;
-  if (!o.campaign || typeof o.campaign !== 'object') return null;
-  if (!Array.isArray(o.campaign.instrumentIds) || o.campaign.instrumentIds.length === 0) {
+  if (!o.campaign || typeof o.campaign !== "object") return null;
+  if (
+    !Array.isArray(o.campaign.instrumentIds) ||
+    o.campaign.instrumentIds.length === 0
+  ) {
     return null;
   }
-  if (typeof o.campaign.listId !== 'string' || !o.campaign.listId) return null;
-  if (typeof o.campaign.index !== 'number' || o.campaign.index < 0) return null;
+  if (typeof o.campaign.listId !== "string" || !o.campaign.listId) return null;
+  if (typeof o.campaign.index !== "number" || o.campaign.index < 0) return null;
   if (o.campaign.index >= o.campaign.instrumentIds.length) return null;
-  if (!o.board || typeof o.board !== 'object') return null;
+  if (!o.board || typeof o.board !== "object") return null;
   if (!Array.isArray(o.board.rows) || o.board.rows.length === 0) return null;
 
   return {
     version: 1,
-    savedAt: typeof o.savedAt === 'string' ? o.savedAt : new Date().toISOString(),
+    savedAt:
+      typeof o.savedAt === "string" ? o.savedAt : new Date().toISOString(),
     campaign: {
       listId: o.campaign.listId,
       instrumentIds: o.campaign.instrumentIds.map(String),
@@ -110,20 +117,25 @@ export function parseListAutoPausedSnapshot(
     },
     board: {
       listId: String(o.board.listId ?? o.campaign.listId),
-      currentIndex: typeof o.board.currentIndex === 'number' ? o.board.currentIndex : o.campaign.index,
+      currentIndex:
+        typeof o.board.currentIndex === "number"
+          ? o.board.currentIndex
+          : o.campaign.index,
       aborted: false,
       done: false,
       paused: true,
-      rows: o.board.rows as ListAutoBoardState['rows'],
+      rows: o.board.rows as ListAutoBoardState["rows"],
     },
     freshnessMemory:
-      o.freshnessMemory && typeof o.freshnessMemory === 'object'
+      o.freshnessMemory && typeof o.freshnessMemory === "object"
         ? (o.freshnessMemory as Record<string, string>)
         : undefined,
   };
 }
 
-export function saveListAutoPausedSnapshot(snap: ListAutoPausedSnapshotV1): void {
+export function saveListAutoPausedSnapshot(
+  snap: ListAutoPausedSnapshotV1,
+): void {
   try {
     localStorage.setItem(
       LIST_AUTO_PAUSE_STORAGE_KEY,
@@ -179,7 +191,8 @@ export function buildListAutoContinueSnapshot(opts: {
   freshnessMemory?: Map<string, string> | Record<string, string>;
   at?: string;
 }): ListAutoContinueSnapshotV1 | null {
-  if (opts.nextIndex < 0 || opts.nextIndex >= opts.instrumentIds.length) return null;
+  if (opts.nextIndex < 0 || opts.nextIndex >= opts.instrumentIds.length)
+    return null;
   if (opts.instrumentIds.length === 0) return null;
   const freshnessMemory =
     opts.freshnessMemory instanceof Map
@@ -206,17 +219,20 @@ export function buildListAutoContinueSnapshot(opts: {
 export function parseListAutoContinueSnapshot(
   raw: unknown,
 ): ListAutoContinueSnapshotV1 | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== "object") return null;
   const o = raw as Partial<ListAutoContinueSnapshotV1>;
   if (o.version !== 1) return null;
-  if (typeof o.listId !== 'string' || !o.listId) return null;
-  if (!Array.isArray(o.instrumentIds) || o.instrumentIds.length === 0) return null;
-  if (typeof o.nextIndex !== 'number' || o.nextIndex < 0) return null;
+  if (typeof o.listId !== "string" || !o.listId) return null;
+  if (!Array.isArray(o.instrumentIds) || o.instrumentIds.length === 0)
+    return null;
+  if (typeof o.nextIndex !== "number" || o.nextIndex < 0) return null;
   if (o.nextIndex >= o.instrumentIds.length) return null;
-  if (!o.board || typeof o.board !== 'object' || !Array.isArray(o.board.rows)) return null;
+  if (!o.board || typeof o.board !== "object" || !Array.isArray(o.board.rows))
+    return null;
   return {
     version: 1,
-    savedAt: typeof o.savedAt === 'string' ? o.savedAt : new Date().toISOString(),
+    savedAt:
+      typeof o.savedAt === "string" ? o.savedAt : new Date().toISOString(),
     listId: o.listId,
     instrumentIds: o.instrumentIds.map(String),
     nextIndex: o.nextIndex,
@@ -229,13 +245,15 @@ export function parseListAutoContinueSnapshot(
       rows: o.board.rows as ListAutoBoardRow[],
     },
     freshnessMemory:
-      o.freshnessMemory && typeof o.freshnessMemory === 'object'
+      o.freshnessMemory && typeof o.freshnessMemory === "object"
         ? (o.freshnessMemory as Record<string, string>)
         : undefined,
   };
 }
 
-export function saveListAutoContinueSnapshot(snap: ListAutoContinueSnapshotV1): void {
+export function saveListAutoContinueSnapshot(
+  snap: ListAutoContinueSnapshotV1,
+): void {
   try {
     localStorage.setItem(LIST_AUTO_CONTINUE_STORAGE_KEY, JSON.stringify(snap));
   } catch {
@@ -292,31 +310,30 @@ export function boardFromContinueSnapshot(
     rows: snap.board.rows.map((row) => {
       if (row.index < nextIndex) {
         if (
-          row.phase === 'saved' ||
-          row.phase === 'omitted' ||
-          row.phase === 'same' ||
-          row.phase === 'skipped'
+          row.phase === "saved" ||
+          row.phase === "omitted" ||
+          row.phase === "same" ||
+          row.phase === "skipped"
         ) {
           return { ...row };
         }
         return {
           ...row,
-          phase: 'omitted',
-          detail: 'continuación · ya pasado',
-          change: 'same',
-          settleReason: 'skip_fresh',
+          phase: "omitted",
+          detail: "continuación · ya pasado",
+          change: "same",
+          settleReason: "skip_fresh",
         };
       }
       return {
         ...row,
-        phase: 'queued',
+        phase: "queued",
         detail: undefined,
         settleReason: undefined,
-        change: 'unknown',
+        change: "unknown",
         beforeTopKey: undefined,
         afterTopKey: undefined,
       };
     }),
   };
 }
-

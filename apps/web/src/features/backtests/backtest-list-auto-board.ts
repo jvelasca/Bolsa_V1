@@ -10,20 +10,20 @@
  * @see docs/engineering/research-lifecycle.md § Lista AUTO
  */
 
-import type { FullCycleSettleReason } from '@/features/backtests/backtest-list-auto';
-import type { CoreRJudgment } from '@/features/backtests/core-r-judgment';
+import type { FullCycleSettleReason } from "@/features/backtests/backtest-list-auto";
+import type { CoreRJudgment } from "@/features/backtests/core-r-judgment";
 
 export type ListAutoRowPhase =
-  | 'queued'
-  | 'running'
-  | 'saved'
-  | 'same'
-  | 'omitted'
-  | 'skipped'
-  | 'aborted';
+  | "queued"
+  | "running"
+  | "saved"
+  | "same"
+  | "omitted"
+  | "skipped"
+  | "aborted";
 
 /** Δ Finalistas respecto al TOP previo al ciclo de ese ticker. */
-export type ListAutoChangeKind = 'unknown' | 'changed' | 'same' | 'new';
+export type ListAutoChangeKind = "unknown" | "changed" | "same" | "new";
 
 export type ListAutoBoardRow = {
   instrumentId: string;
@@ -72,9 +72,9 @@ export function listAutoTopFingerprint(
 ): string | null {
   if (!top?.slots?.length) return null;
   const parts = top.slots.map(
-    (s) => `${s.strategyDefinitionId ?? ''}:${s.stars ?? ''}`,
+    (s) => `${s.strategyDefinitionId ?? ""}:${s.stars ?? ""}`,
   );
-  return `${top.status ?? '?'}|${parts.join(',')}`;
+  return `${top.status ?? "?"}|${parts.join(",")}`;
 }
 
 export function resolveListAutoChange(opts: {
@@ -82,21 +82,21 @@ export function resolveListAutoChange(opts: {
   beforeTopKey?: string | null;
   afterTopKey?: string | null;
 }): ListAutoChangeKind {
-  if (opts.reason === 'saved') {
-    if (!opts.beforeTopKey) return 'new';
-    return 'changed';
+  if (opts.reason === "saved") {
+    if (!opts.beforeTopKey) return "new";
+    return "changed";
   }
   // skip_lab / skip_finalists / skip_fresh → TOP intacto
-  return 'same';
+  return "same";
 }
 
 export function phaseFromSettleReason(
   reason: FullCycleSettleReason,
 ): ListAutoRowPhase {
-  if (reason === 'saved') return 'saved';
-  if (reason === 'skip_lab') return 'skipped';
-  if (reason === 'skip_fresh') return 'omitted';
-  return 'same';
+  if (reason === "saved") return "saved";
+  if (reason === "skip_lab") return "skipped";
+  if (reason === "skip_fresh") return "omitted";
+  return "same";
 }
 
 export function createListAutoBoard(opts: {
@@ -114,8 +114,8 @@ export function createListAutoBoard(opts: {
       symbol: inst.symbol,
       name: inst.name,
       index,
-      phase: 'queued',
-      change: 'unknown',
+      phase: "queued",
+      change: "unknown",
     })),
   };
 }
@@ -130,7 +130,10 @@ export function enrichListAutoBoardLabels(
     const label = labels[row.instrumentId];
     if (!label?.symbol) return row;
     const nextName = label.name ?? row.name;
-    if (row.symbol === label.symbol && (row.name ?? undefined) === (nextName ?? undefined)) {
+    if (
+      row.symbol === label.symbol &&
+      (row.name ?? undefined) === (nextName ?? undefined)
+    ) {
       return row;
     }
     changed = true;
@@ -156,15 +159,15 @@ export function markListAutoBoardRunning(
       if (row.index === index) {
         return {
           ...row,
-          phase: 'running',
-          detail: 'Universo → Coach → Lab…',
+          phase: "running",
+          detail: "Universo → Coach → Lab…",
           settleReason: undefined,
-          change: 'unknown',
+          change: "unknown",
           reeval: undefined,
         };
       }
-      if (row.phase === 'running') {
-        return { ...row, phase: 'queued', detail: undefined };
+      if (row.phase === "running") {
+        return { ...row, phase: "queued", detail: undefined };
       }
       return row;
     }),
@@ -201,7 +204,9 @@ export function markListAutoBoardSettled(
   const row = board.rows[index];
   const beforeTopKey = row?.beforeTopKey;
   const afterTopKey =
-    opts?.afterTopKey !== undefined ? opts.afterTopKey : row?.afterTopKey ?? null;
+    opts?.afterTopKey !== undefined
+      ? opts.afterTopKey
+      : (row?.afterTopKey ?? null);
   const change = resolveListAutoChange({
     reason,
     beforeTopKey,
@@ -221,7 +226,9 @@ export function markListAutoBoardSettled(
             afterTopKey,
             change,
             lastSearchAt:
-              opts?.lastSearchAt !== undefined ? opts.lastSearchAt : r.lastSearchAt,
+              opts?.lastSearchAt !== undefined
+                ? opts.lastSearchAt
+                : r.lastSearchAt,
             reeval: opts?.reeval !== undefined ? opts.reeval : r.reeval,
           }
         : r,
@@ -239,7 +246,12 @@ export function markListAutoBoardPaused(
 export function markListAutoBoardDone(
   board: ListAutoBoardState,
 ): ListAutoBoardState {
-  return { ...board, done: true, paused: false, currentIndex: board.rows.length };
+  return {
+    ...board,
+    done: true,
+    paused: false,
+    currentIndex: board.rows.length,
+  };
 }
 
 export function markListAutoBoardAborted(
@@ -251,8 +263,8 @@ export function markListAutoBoardAborted(
     done: true,
     paused: false,
     rows: board.rows.map((row) =>
-      row.phase === 'queued' || row.phase === 'running'
-        ? { ...row, phase: 'aborted', detail: 'Stop', change: 'unknown' }
+      row.phase === "queued" || row.phase === "running"
+        ? { ...row, phase: "aborted", detail: "Stop", change: "unknown" }
         : row,
     ),
   };
@@ -269,7 +281,7 @@ export function listAutoBoardProgress(board: ListAutoBoardState): {
 } {
   const total = board.rows.length;
   const settled = board.rows.filter((r) =>
-    ['saved', 'same', 'skipped', 'omitted'].includes(r.phase),
+    ["saved", "same", "skipped", "omitted"].includes(r.phase),
   );
   const doneCount = settled.length;
   const pct = total === 0 ? 0 : Math.round((doneCount / total) * 100);
@@ -277,32 +289,34 @@ export function listAutoBoardProgress(board: ListAutoBoardState): {
     doneCount,
     total,
     pct,
-    changedCount: board.rows.filter((r) => r.change === 'changed' || r.change === 'new')
-      .length,
-    sameCount: board.rows.filter(
-      (r) => r.change === 'same' && r.phase !== 'skipped' && r.phase !== 'omitted',
+    changedCount: board.rows.filter(
+      (r) => r.change === "changed" || r.change === "new",
     ).length,
-    skippedCount: board.rows.filter((r) => r.phase === 'skipped').length,
-    omittedCount: board.rows.filter((r) => r.phase === 'omitted').length,
+    sameCount: board.rows.filter(
+      (r) =>
+        r.change === "same" && r.phase !== "skipped" && r.phase !== "omitted",
+    ).length,
+    skippedCount: board.rows.filter((r) => r.phase === "skipped").length,
+    omittedCount: board.rows.filter((r) => r.phase === "omitted").length,
   };
 }
 
 export function listAutoPhaseLabel(phase: ListAutoRowPhase): string {
   switch (phase) {
-    case 'queued':
-      return 'En cola';
-    case 'running':
-      return 'En curso';
-    case 'saved':
-      return 'Finalistas';
-    case 'same':
-      return 'Sin cambio';
-    case 'omitted':
-      return 'Omitido';
-    case 'skipped':
-      return 'Skip Lab';
-    case 'aborted':
-      return 'Anulado (Stop)';
+    case "queued":
+      return "En cola";
+    case "running":
+      return "En curso";
+    case "saved":
+      return "Finalistas";
+    case "same":
+      return "Sin cambio";
+    case "omitted":
+      return "Omitido";
+    case "skipped":
+      return "Skip Lab";
+    case "aborted":
+      return "Anulado (Stop)";
     default:
       return phase;
   }
@@ -310,13 +324,13 @@ export function listAutoPhaseLabel(phase: ListAutoRowPhase): string {
 
 export function listAutoChangeLabel(change: ListAutoChangeKind): string {
   switch (change) {
-    case 'changed':
-      return 'Cambió';
-    case 'new':
-      return 'Nuevo TOP';
-    case 'same':
-      return 'Igual';
+    case "changed":
+      return "Cambió";
+    case "new":
+      return "Nuevo TOP";
+    case "same":
+      return "Igual";
     default:
-      return '—';
+      return "—";
   }
 }

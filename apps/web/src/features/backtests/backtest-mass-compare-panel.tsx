@@ -2,10 +2,10 @@
  * Q3.3 — panel comparación masiva (lista × estrategias, soft-cap).
  */
 
-import { useMemo, useRef, useState } from 'react';
-import type { BacktestStrategyType } from '@bolsa/shared';
-import { Button } from '@/components/ui/button';
-import type { ResolvedBacktestWindow } from '@/features/backtests/backtest-period';
+import { useMemo, useRef, useState } from "react";
+import type { BacktestStrategyType } from "@bolsa/shared";
+import { Button } from "@/components/ui/button";
+import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
 import {
   MASS_COMPARE_MAX_CELLS,
   MASS_COMPARE_MAX_INSTRUMENTS,
@@ -15,8 +15,8 @@ import {
   rankMassCompareByInstrument,
   runMassCompare,
   type MassCompareCell,
-} from '@/features/backtests/backtest-mass-compare';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/backtest-mass-compare";
+import { cn } from "@/lib/utils";
 
 type StrategyOpt = {
   key: string;
@@ -63,7 +63,10 @@ export function BacktestMassComparePanel({
   const abortRef = useRef<AbortController | null>(null);
 
   const strategies = useMemo(
-    () => strategyOptions.filter((s) => selected.includes(s.key)).slice(0, MASS_COMPARE_MAX_STRATEGIES),
+    () =>
+      strategyOptions
+        .filter((s) => selected.includes(s.key))
+        .slice(0, MASS_COMPARE_MAX_STRATEGIES),
     [strategyOptions, selected],
   );
 
@@ -78,7 +81,9 @@ export function BacktestMassComparePanel({
     window,
   });
 
-  const sharpes = cells.filter((c) => c.status === 'ok' && c.sharpeRatio != null).map((c) => c.sharpeRatio!);
+  const sharpes = cells
+    .filter((c) => c.status === "ok" && c.sharpeRatio != null)
+    .map((c) => c.sharpeRatio!);
   const minS = sharpes.length ? Math.min(...sharpes) : 0;
   const maxS = sharpes.length ? Math.max(...sharpes) : 1;
   const ranking = rankMassCompareByInstrument(cells);
@@ -115,10 +120,11 @@ export function BacktestMassComparePanel({
   }
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn("space-y-2", className)}>
       <p className="text-[10px] leading-snug text-muted-foreground">
-        Lista × estrategias (máx. {MASS_COMPARE_MAX_INSTRUMENTS}×{MASS_COMPARE_MAX_STRATEGIES},{' '}
-        {MASS_COMPARE_MAX_CELLS} celdas). Ranking por Sharpe medio · heatmap. No es Play / Lista AUTO.
+        Lista × estrategias (máx. {MASS_COMPARE_MAX_INSTRUMENTS}×
+        {MASS_COMPARE_MAX_STRATEGIES}, {MASS_COMPARE_MAX_CELLS} celdas). Ranking
+        por Sharpe medio · heatmap. No es Play / Lista AUTO.
       </p>
       <div className="flex flex-wrap gap-2">
         {strategyOptions.slice(0, 12).map((s) => {
@@ -131,7 +137,9 @@ export function BacktestMassComparePanel({
                 disabled={running}
                 onChange={() => {
                   setSelected((prev) =>
-                    on ? prev.filter((k) => k !== s.key) : [...prev, s.key].slice(0, MASS_COMPARE_MAX_STRATEGIES),
+                    on
+                      ? prev.filter((k) => k !== s.key)
+                      : [...prev, s.key].slice(0, MASS_COMPARE_MAX_STRATEGIES),
                   );
                 }}
               />
@@ -145,7 +153,9 @@ export function BacktestMassComparePanel({
           type="button"
           size="sm"
           variant="outline"
-          disabled={running || strategies.length === 0 || instrumentIds.length === 0}
+          disabled={
+            running || strategies.length === 0 || instrumentIds.length === 0
+          }
           onClick={() => void start()}
         >
           {running
@@ -182,24 +192,33 @@ export function BacktestMassComparePanel({
                 <tr key={sym} className="border-t border-border/40">
                   <td className="px-1 py-0.5 font-medium">{sym}</td>
                   {stratKeys.map((k) => {
-                    const cell = cells.find((c) => c.symbol === sym && c.strategyKey === k);
-                    const norm = massCompareHeatNorm(cell?.sharpeRatio, minS, maxS);
+                    const cell = cells.find(
+                      (c) => c.symbol === sym && c.strategyKey === k,
+                    );
+                    const norm = massCompareHeatNorm(
+                      cell?.sharpeRatio,
+                      minS,
+                      maxS,
+                    );
                     return (
                       <td
                         key={k}
                         className="px-1 py-0.5 text-center tabular-nums"
-                        style={{ backgroundColor: cell?.status === 'ok' ? cellBg(norm) : undefined }}
+                        style={{
+                          backgroundColor:
+                            cell?.status === "ok" ? cellBg(norm) : undefined,
+                        }}
                         title={cell?.error ?? cell?.runId}
                       >
-                        {cell?.status === 'ok'
+                        {cell?.status === "ok"
                           ? cell.sharpeRatio == null
-                            ? '—'
+                            ? "—"
                             : cell.sharpeRatio.toFixed(2)
-                          : cell?.status === 'error'
-                            ? 'err'
-                            : cell?.status === 'running'
-                              ? '…'
-                              : '·'}
+                          : cell?.status === "error"
+                            ? "err"
+                            : cell?.status === "running"
+                              ? "…"
+                              : "·"}
                       </td>
                     );
                   })}
@@ -215,8 +234,11 @@ export function BacktestMassComparePanel({
           {ranking.slice(0, 10).map((r) => (
             <li key={r.instrumentId}>
               <span className="font-medium text-foreground">{r.symbol}</span>
-              {' · '}
-              Sharpe medio {r.avgSharpe == null ? '—' : r.avgSharpe.toFixed(2)} ({r.okCount} ok)
+              {" · "}
+              Sharpe medio {r.avgSharpe == null
+                ? "—"
+                : r.avgSharpe.toFixed(2)}{" "}
+              ({r.okCount} ok)
             </li>
           ))}
         </ol>

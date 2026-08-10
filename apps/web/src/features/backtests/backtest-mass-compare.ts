@@ -3,16 +3,21 @@
  * Compone N×M llamadas a POST /backtests/run (sin batch API).
  */
 
-import type { BacktestStrategyType } from '@bolsa/shared';
-import { api } from '@/lib/api';
-import type { ResolvedBacktestWindow } from '@/features/backtests/backtest-period';
-import { LIST_AUTO_MAX_INSTRUMENTS } from '@/features/backtests/backtest-list-auto';
+import type { BacktestStrategyType } from "@bolsa/shared";
+import { api } from "@/lib/api";
+import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
+import { LIST_AUTO_MAX_INSTRUMENTS } from "@/features/backtests/backtest-list-auto";
 
 export const MASS_COMPARE_MAX_INSTRUMENTS = LIST_AUTO_MAX_INSTRUMENTS; // 40
 export const MASS_COMPARE_MAX_STRATEGIES = 8;
 export const MASS_COMPARE_MAX_CELLS = 120;
 
-export type MassCompareCellStatus = 'pending' | 'running' | 'ok' | 'error' | 'skipped';
+export type MassCompareCellStatus =
+  | "pending"
+  | "running"
+  | "ok"
+  | "error"
+  | "skipped";
 
 export type MassCompareCell = {
   instrumentId: string;
@@ -31,7 +36,12 @@ export type MassCompareCell = {
 export type MassCompareParams = {
   instrumentIds: string[];
   labels: Record<string, { symbol: string; name?: string }>;
-  strategies: Array<{ key: string; label: string; strategyType?: BacktestStrategyType; strategyDefinitionId?: string }>;
+  strategies: Array<{
+    key: string;
+    label: string;
+    strategyType?: BacktestStrategyType;
+    strategyDefinitionId?: string;
+  }>;
   initialCash: number;
   commissionBps: number;
   slippageBps: number;
@@ -50,10 +60,12 @@ function metricNum(
 ): number | null {
   if (!metrics) return null;
   const v = metrics[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-export function planMassCompareJobs(params: MassCompareParams): MassCompareCell[] {
+export function planMassCompareJobs(
+  params: MassCompareParams,
+): MassCompareCell[] {
   const maxI = params.maxInstruments ?? MASS_COMPARE_MAX_INSTRUMENTS;
   const maxS = params.maxStrategies ?? MASS_COMPARE_MAX_STRATEGIES;
   const ids = params.instrumentIds.slice(0, maxI);
@@ -67,7 +79,7 @@ export function planMassCompareJobs(params: MassCompareParams): MassCompareCell[
         symbol: label?.symbol ?? id.slice(0, 8),
         strategyKey: s.key,
         strategyLabel: s.label,
-        status: 'pending',
+        status: "pending",
       });
     }
   }
@@ -83,7 +95,7 @@ export function rankMassCompareByInstrument(cells: MassCompareCell[]): Array<{
 }> {
   const byInst = new Map<string, { symbol: string; sharpes: number[] }>();
   for (const c of cells) {
-    if (c.status !== 'ok') continue;
+    if (c.status !== "ok") continue;
     const cur = byInst.get(c.instrumentId) ?? { symbol: c.symbol, sharpes: [] };
     if (c.sharpeRatio != null) cur.sharpes.push(c.sharpeRatio);
     byInst.set(c.instrumentId, cur);
@@ -101,7 +113,9 @@ export function rankMassCompareByInstrument(cells: MassCompareCell[]): Array<{
     .sort((a, b) => (b.avgSharpe ?? -Infinity) - (a.avgSharpe ?? -Infinity));
 }
 
-export async function runMassCompare(params: MassCompareParams): Promise<MassCompareCell[]> {
+export async function runMassCompare(
+  params: MassCompareParams,
+): Promise<MassCompareCell[]> {
   const cells = planMassCompareJobs(params);
   const total = cells.length;
   let done = 0;
@@ -117,7 +131,7 @@ export async function runMassCompare(params: MassCompareParams): Promise<MassCom
       const i = next;
       next += 1;
       const cell = cells[i]!;
-      cells[i] = { ...cell, status: 'running' };
+      cells[i] = { ...cell, status: "running" };
       emit();
 
       const strat = params.strategies.find((s) => s.key === cell.strategyKey);
@@ -137,27 +151,30 @@ export async function runMassCompare(params: MassCompareParams): Promise<MassCom
           { signal: params.signal },
         );
         if (params.signal?.aborted) {
-          cells[i] = { ...cell, status: 'skipped', error: 'Cancelado' };
+          cells[i] = { ...cell, status: "skipped", error: "Cancelado" };
         } else {
           cells[i] = {
             ...cell,
-            status: 'ok',
+            status: "ok",
             runId: result.data.id,
             symbol: result.data.symbol || cell.symbol,
             totalReturnPct: result.data.totalReturnPct,
             maxDrawdownPct: result.data.maxDrawdownPct,
             tradeCount: result.data.tradeCount,
-            sharpeRatio: metricNum(result.metrics, 'sharpeRatio'),
+            sharpeRatio: metricNum(result.metrics, "sharpeRatio"),
           };
         }
       } catch (error) {
-        if (params.signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
-          cells[i] = { ...cell, status: 'skipped', error: 'Cancelado' };
+        if (
+          params.signal?.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          cells[i] = { ...cell, status: "skipped", error: "Cancelado" };
         } else {
           cells[i] = {
             ...cell,
-            status: 'error',
-            error: error instanceof Error ? error.message : 'Error',
+            status: "error",
+            error: error instanceof Error ? error.message : "Error",
           };
         }
       }
@@ -170,8 +187,8 @@ export async function runMassCompare(params: MassCompareParams): Promise<MassCom
 
   if (params.signal?.aborted) {
     for (let i = 0; i < cells.length; i += 1) {
-      if (cells[i]!.status === 'pending' || cells[i]!.status === 'running') {
-        cells[i] = { ...cells[i]!, status: 'skipped', error: 'Cancelado' };
+      if (cells[i]!.status === "pending" || cells[i]!.status === "running") {
+        cells[i] = { ...cells[i]!, status: "skipped", error: "Cancelado" };
       }
     }
     emit();
