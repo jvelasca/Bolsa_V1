@@ -19,7 +19,6 @@ import type {
   RiskTolerance,
 } from '@bolsa/shared';
 import { formatPct } from '@/features/charts/chart-utils';
-import { AiInfoButton } from '@/features/ai/ai-info-button';
 import {
   buildExploreCoachNote,
   sortExploreRows,
@@ -27,6 +26,7 @@ import {
   type ExploreSortKey,
 } from '@/features/backtests/backtest-explore-value';
 import { BacktestExploreBH } from '@/features/backtests/backtest-explore-bh';
+import { BacktestExploreHeader } from '@/features/backtests/backtest-explore-header';
 import {
   buildDeepTechnicalCoachNote,
   buildCoachFacts,
@@ -37,7 +37,6 @@ import {
 import {
   auditFindingsFromLlmPayload,
   buildAuditedDeepTechnicalCoachNote,
-  confidenceLabel,
   readPriorCoachAuditHint,
   type CoachConfidence,
 } from '@/features/backtests/coach-dual-audit';
@@ -877,136 +876,46 @@ export function BacktestExploreRanking({
     isOptimizableStrategy(r.row.strategyType),
   ).length;
 
+  const savedTopFooter = savedTop
+    ? `Finalistas BD: v${savedTop.version} · ${savedTop.status} · ${savedTop.slots
+        .map((s) => `#${s.rank} ${s.label}`)
+        .join(' · ')}`
+    : instrumentId
+      ? 'Sin TOP guardado aún para este valor/TF.'
+      : '';
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain pb-2">
       {/* Núcleo: TOP-3 ★ + acciones Lab */}
       <div className="space-y-2.5 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <p
-                className="text-[11px] font-semibold text-foreground"
-                title="Ranking local (A) + auditor (B) + gate. La IA puede vetar tipado; no inventa el TOP."
-              >
-                Coach · TOP a futuro
-              </p>
-              <AiInfoButton surface="backtest_coach" />
-            </div>
-            <p className="text-[10px] text-muted-foreground">{deepNote.contextLabel}</p>
-            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
-              Quorum: <strong className="font-medium text-foreground/80">A</strong> ranking ·{' '}
-              <strong className="font-medium text-foreground/80">A2</strong> shadow ·{' '}
-              <strong className="font-medium text-foreground/80">B</strong> auditor ·{' '}
-              <strong className="font-medium text-foreground/80">C</strong> adversario · red-team
-              pre-guardar.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {!running && okCount > 0 && deepNote.audit && (
-              <span
-                className={cn(
-                  'rounded-md border px-1.5 py-0.5 text-[10px] font-medium',
-                  confidence === 'consensus' &&
-                    'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-                  confidence === 'discrepancy' &&
-                    'border-amber-500/40 bg-amber-500/10 text-amber-200',
-                  confidence === 'weak' && 'border-amber-500/40 bg-amber-500/10 text-amber-200',
-                  confidence === 'no_auditor' && 'border-border text-muted-foreground',
-                )}
-                title={
-                  deepNote.audit.challenge.passed
-                    ? deepNote.audit.shadowDisagreement || deepNote.audit.auditorCDisagreement
-                      ? `Discrepancia A/A2/C · ack para guardar`
-                      : 'Quorum B + red-team OK'
-                    : deepNote.audit.challenge.checks
-                        .filter((c) => !c.passed && c.severity === 'hard')
-                        .map((c) => c.detail)
-                        .join(' · ') || 'TOP débil — ack para guardar'
-                }
-              >
-                {confidenceLabel(confidence)}
-              </span>
-            )}
-            <span className="text-[10px] text-muted-foreground">
-              {llmMutation.isPending ? 'IA A+C…' : engineLabel}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-7 text-[11px]"
-              disabled={
-                running ||
-                okCount === 0 ||
-                !instrumentId ||
-                !canSaveTop ||
-                saveTopMutation.isPending
-              }
-              onClick={() => {
-                setSaveMsg(null);
-                saveTopMutation.mutate({});
-              }}
-              title={
-                postLab
-                  ? 'Guarda Finalistas (active + lab_validated) tras el Lab. Sustituye el TOP del valor.'
-                  : 'Guarda TOP-3 semifinal (sin Lab). No escribe lab_validated.'
-              }
-            >
-              {postLab ? 'Guardar Finalistas' : 'Guardar TOP-3'}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="h-7 text-[11px]"
-              disabled={running || okCount === 0 || llmMutation.isPending || !llmNarrate}
-              onClick={() => {
-                lastLlmFingerprintRef.current = '';
-                llmMutation.mutate();
-              }}
-              title={
-                llmNarrate
-                  ? 'Vuelve a pedir narrativa IA (el ranking ★ es local-AT)'
-                  : 'Activa «Narración LLM Coach» en (…) del Asistente'
-              }
-            >
-              Reanalizar
-            </Button>
-          </div>
-        </div>
-
-        {(saveMsg || savedTop) && (
-          <p className="text-[10px] text-muted-foreground">
-            {saveMsg ? `${saveMsg}. ` : ''}
-            {savedTop
-              ? `Finalistas BD: v${savedTop.version} · ${savedTop.status} · ${savedTop.slots
-                  .map((s) => `#${s.rank} ${s.label}`)
-                  .join(' · ')}`
-              : instrumentId
-                ? 'Sin TOP guardado aún para este valor/TF.'
-                : ''}
-          </p>
-        )}
-
-        {priorAuditHint && !running && (
-          <p
-            className={cn(
-              'rounded-md border px-2 py-1.5 text-[10px]',
-              priorAuditHint.confidence === 'weak' || priorAuditHint.softWeak
-                ? 'border-amber-500/30 bg-amber-500/5 text-amber-100/90'
-                : priorAuditHint.confidence === 'discrepancy'
-                  ? 'border-amber-500/25 bg-amber-500/5 text-muted-foreground'
-                  : 'border-border/70 bg-muted/20 text-muted-foreground',
-            )}
-            title="Contexto de la pasada guardada (CORE A). No cambia el ranking ★ actual."
-          >
-            Pasada anterior · {confidenceLabel(priorAuditHint.confidence)}
-            {priorAuditHint.softWeak ? ' · soft-débil' : ''}
-            {priorAuditHint.coachPass === 'post_lab' ? ' · post-Lab' : ''}
-            {' · '}
-            no modula el TOP actual (solo contexto).
-          </p>
-        )}
+        <BacktestExploreHeader
+          contextLabel={deepNote.contextLabel}
+          running={running}
+          okCount={okCount}
+          audit={deepNote.audit}
+          confidence={confidence}
+          engineLabel={engineLabel}
+          llmNarrate={llmNarrate}
+          llmBusy={llmMutation.isPending}
+          saveEnabled={
+            !running && okCount > 0 && Boolean(instrumentId) && canSaveTop && !saveTopMutation.isPending
+          }
+          reanalyzeEnabled={
+            !running && okCount > 0 && !llmMutation.isPending && llmNarrate
+          }
+          postLab={postLab}
+          saveMsg={saveMsg}
+          savedTopFooter={savedTopFooter}
+          priorAuditHint={priorAuditHint}
+          onSaveTop={() => {
+            setSaveMsg(null);
+            saveTopMutation.mutate({});
+          }}
+          onReanalyze={() => {
+            lastLlmFingerprintRef.current = '';
+            llmMutation.mutate();
+          }}
+        />
 
         <p className="text-sm font-medium leading-snug text-foreground">{deepNote.headline}</p>
         {postLab && !running && (
