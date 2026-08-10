@@ -12,7 +12,6 @@ import type {
   TaxJurisdiction,
 } from '@bolsa/shared';
 import {
-  COMMISSION_PRESETS,
   POLICY_TEMPLATE_LABELS,
   TAX_PRESETS,
   calculateTradeFees,
@@ -23,6 +22,7 @@ import { Dialog, FieldRow, inputClassName } from '@/components/ui/dialog';
 import { InvestorProfilePicker } from '@/features/accounts/investor-profile-picker';
 import { AccountWizardIdentityStep } from '@/features/accounts/account-wizard-identity-step';
 import { AccountWizardCapitalStep } from '@/features/accounts/account-wizard-capital-step';
+import { AccountWizardCommissionsStep } from '@/features/accounts/account-wizard-commissions-step';
 import { formatPrice } from '@/features/charts/chart-utils';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -39,13 +39,6 @@ const STEPS = [
 ] as const;
 
 type StepId = (typeof STEPS)[number]['id'];
-
-const COMMISSION_OPTIONS: { id: CommissionPresetId; hint: string }[] = [
-  { id: 'standard_es', hint: '0,10 % · mín. 1 € · IVA 21 % · custodia 0,2 % anual' },
-  { id: 'xtb_zero_stock', hint: '0 % comisión en acciones · FX 0,5 %' },
-  { id: 'ibkr_tiered', hint: '0,05 % · mín. 1,25 € · IVA 21 %' },
-  { id: 'none', hint: 'Sin comisiones ni impuestos simulados' },
-];
 
 const HORIZON_OPTIONS: { id: ProfileHorizon; label: string }[] = [
   { id: 'intraday', label: 'Intradía' },
@@ -556,47 +549,11 @@ export function CreateAccountWizardDialog() {
       )}
 
       {step === 'commissions' && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Perfil de comisiones simuladas. Se aplican en cada operación y se registran en el ledger.
-          </p>
-          {COMMISSION_OPTIONS.map(({ id, hint }) => {
-            const preset = COMMISSION_PRESETS[id as keyof typeof COMMISSION_PRESETS];
-            if (!preset && id !== 'custom') return null;
-            const label = id === 'standard_es' ? COMMISSION_PRESETS.standard_es.label : preset?.label ?? id;
-            return (
-              <label
-                key={id}
-                className={cn(
-                  'flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors',
-                  form.commissionPresetId === id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:bg-accent/40',
-                )}
-              >
-                <input
-                  type="radio"
-                  name="commissionPreset"
-                  checked={form.commissionPresetId === id}
-                  onChange={() => patch({ commissionPresetId: id })}
-                  className="mt-1"
-                />
-                <div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xs text-muted-foreground">{hint}</p>
-                </div>
-              </label>
-            );
-          })}
-          <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">Ejemplo compra 5.000 €</p>
-            <p className="mt-1 tabular-nums">
-              Comisión {formatPrice(sampleFees.commission)} · IVA {formatPrice(sampleFees.vatOnCommission)}{' '}
-              · Transmisiones {formatPrice(sampleFees.stampDuty)} ·{' '}
-              <span className="font-medium text-foreground">Total {formatPrice(sampleFees.total)}</span>
-            </p>
-          </div>
-        </div>
+        <AccountWizardCommissionsStep
+          commissionPresetId={form.commissionPresetId}
+          sampleFees={sampleFees}
+          onPatch={patch}
+        />
       )}
 
       {step === 'tax' && (
