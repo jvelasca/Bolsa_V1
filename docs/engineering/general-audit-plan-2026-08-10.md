@@ -210,11 +210,25 @@ para esos docs, dejando la documentación limpia. Estado final:
 | `DISK_AND_CLEANUP.md` | No | No | Marca limpiada (docker.md) |
 | `sessions/2026-07-11-rd2-arq-worker.md` | No | No | Marca limpiada (API_REFERENCE) |
 | `sessions/2026-07-12-audit-close.md` | No | No | Marca limpiada (PERFORMANCE) |
-| `SCREENERS_SIGNALS_ALIGNMENT.md` | No | **Sí** (JSDoc `scan-api.ts:7`) | **Queda pendiente** — no se elimina su marca ni se actúa sobre el JSDoc sin decisión |
+| `SCREENERS_SIGNALS_ALIGNMENT.md` | No | **Sí** (JSDoc `scan-api.ts:7`) | **Resuelto** — JSDoc actualizado (retirada la cita al doc inexistente) |
 
 **Incluida también en esta tanda:** corrección de `docs/ARCHITECTURE.md` para listar
 `bolsa_ai` (tabla de paquetes Python) y reflejarlo en el diagrama de visión (línea
 `infra · ai`). Cierra el hallazgo 8.1.
+
+### 7.3 Resolución de `SCREENERS_SIGNALS_ALIGNMENT.md` (cierre del pendiente)
+
+El único uso de ese doc era un **JSDoc** en `packages/shared/src/scan-api.ts:7`
+(`/** Spec de job de scan — alineado SCREENERS_SIGNALS_ALIGNMENT.md */`). Opción **(a)**
+aprobada por el usuario: retirar la cita al doc inexistente, quedando
+`/** Spec de job de scan (alineación screeners/señales). */`. Verificado:
+`pnpm --filter @bolsa/shared typecheck` ✅ · `test` ✅ · `lint` sobre `scan-api.ts` ✅
+(exit 0). Con esto **no queda ninguna referencia** a `SCREENERS_SIGNALS_ALIGNMENT.md` en
+el repo. **Hallazgo aparte:** `pnpm --filter @bolsa/shared lint` global arroja **14 errores
+`no-unused-vars` pre-existentes** en otros 7 ficheros (`ai-indicator-series.ts`,
+`chart-defaults.ts`, `chart-drawing-templates.ts`, `chart-list-context.ts`,
+`hybrid-strategy.ts`, `indicator-presets.ts`, `indicator-templates.ts`), **ajenos** a este
+cambio. Sevilla á 4 de higiene/apuntar a módulo futuro; no se tocan aquí (alcance atómico).
 
 ---
 

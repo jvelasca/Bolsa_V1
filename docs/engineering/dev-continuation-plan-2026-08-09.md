@@ -527,3 +527,17 @@ confirmado que no queda ningún uso (registrado como pendiente en el plan 08-10)
 - **Pendiente (abierto):** `SCREENERS_SIGNALS_ALIGNMENT.md` — decidir qué se hace con el
   JSDoc de `scan-api.ts:7` que lo referencia en código (tocar código implicaría FASE 3 con
   batería de tests, fuera del alcance solo-docs de M0).
+
+### 6.5 Cierre de `SCREENERS_SIGNALS_ALIGNMENT.md` + hallazgo lint shared (2026-08-10)
+
+- **JSDoc `scan-api.ts:7` actualizado** (opción a): retirada la cita al doc inexistente →
+  `/** Spec de job de scan (alineación screeners/señales). */`. Con esto **no queda ninguna
+  referencia** a `SCREENERS_SIGNALS_ALIGNMENT.md` en el repo.
+- **Verificado:** `pnpm --filter @bolsa/shared typecheck` ✅ · `test` ✅ · `lint` sobre
+  `scan-api.ts` ✅ (exit 0).
+- **Hallazgo de auditoría (nuevo frente):** `pnpm --filter @bolsa/shared lint` global arroja
+  **14 errores `no-unused-vars` pre-existentes** en 7 ficheros ajenos a este cambio
+  (`ai-indicator-series.ts`, `chart-defaults.ts`, `chart-drawing-templates.ts`,
+  `chart-list-context.ts`, `hybrid-strategy.ts`, `indicator-presets.ts`,
+  `indicator-templates.ts`). No es parte del gate de CI (que cubre `apps/web`). Candidato a
+  **mini-módulo de higiene de `@bolsa/shared`** (FASE 1/2/3 propio).

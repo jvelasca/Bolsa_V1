@@ -4,7 +4,7 @@ import type { IndicatorSpec, StrategyDefinitionV1 } from './research-platform.js
 import type { SignalEventV1 } from './signal-events.js';
 import type { BacktestStrategyType } from './types.js';
 
-/** Spec de job de scan — alineado SCREENERS_SIGNALS_ALIGNMENT.md */
+/** Spec de job de scan (alineación screeners/señales). */
 export interface ScanJobSpecV1 {
   id: string;
   strategyDefinitionId: string;
