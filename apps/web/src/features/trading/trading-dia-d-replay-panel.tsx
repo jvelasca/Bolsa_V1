@@ -41,6 +41,7 @@ import {
 } from '@/features/trading/dia-d-session-evidence';
 import { DiaDReconciliationPanel } from '@/features/trading/dia-d-reconciliation-panel';
 import { DiaDTradesPanel } from '@/features/trading/dia-d-trades-panel';
+import { DiaDPendingTradeBanner } from '@/features/trading/dia-d-pending-trade-banner';
 import {
   buildCounterfactualOos,
   buildDiaDReconciliation,
@@ -1038,24 +1039,12 @@ export function TradingDiaDReplayPanel() {
         </Button>
       </div>
 
-      {pendingTrade ? (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px]">
-          <span className="font-semibold text-amber-950 dark:text-amber-50">
-            Propuesta {session.mode === 'manual' ? 'Manual' : 'Semi'}
-          </span>
-          <span className="tabular-nums">
-            {pendingTrade.type.toUpperCase()} · {formatDateDdMmYyyy(pendingTrade.timestamp)} ·{' '}
-            {formatPrice(pendingTrade.price)}
-            {pendingTrade.reason ? ` · ${pendingTrade.reason}` : ''}
-          </span>
-          <Button type="button" size="sm" className="h-6 px-2 text-[10px]" onClick={() => decideGate('accept')}>
-            Aceptar
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => decideGate('reject')}>
-            Rechazar
-          </Button>
-        </div>
-      ) : null}
+      <DiaDPendingTradeBanner
+        pendingTrade={pendingTrade}
+        mode={session.mode}
+        onAccept={() => decideGate('accept')}
+        onReject={() => decideGate('reject')}
+      />
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div

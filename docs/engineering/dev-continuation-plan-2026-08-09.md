@@ -870,17 +870,19 @@ candidato de valor/riesgo — ya parcialmente sliced (`BacktestReplayChart`, `Ba
 como thin wrappers. Otros frentes del §4.2 descartados (acoplamiento alto): `backtest-optimize-panel.tsx` (2.251),
 `backtest-strategy-matrix-panel.tsx` (1.033), `backtest-explore-panel.tsx` (1.456, MEDIO), `ohlcv-chart.tsx` (974).
 
-**Paso B.1 (`1303610`, primer sub-paso, aprobado):** extraída la **tabla de Operaciones** (bloque `<section>`
-~1272-1336) a `apps/web/src/features/trading/dia-d-trades-panel.tsx` → `DiaDTradesPanel` (**Diseño B**, thin
-wrapper, 4 props: `detail`, `replayCursor`, `focusTimestamp`, `onFocusTimestamp`). Los callbacks/estado del
-orquestador (`replayCursor`, `focusTimestamp`, `setFocusTimestamp`) **permanecen en el orquestador**; el JSX de la
-tabla se traslada fielmente. Reducción en el orquestador: **-58 líneas netas** (~1.341 → ~1.283).
+**Paso B.2 (`PENDIENTE`, aprobado):** extraído el **banner de trade pendiente** (bloque ~1041-1058) a
+`apps/web/src/features/trading/dia-d-pending-trade-banner.tsx` → `DiaDPendingTradeBanner` (**Diseño B**, thin
+wrapper, 4 props: `pendingTrade`, `mode`, `onAccept`, `onReject`). Los callbacks de decisión
+(`decideGate('accept'/'reject')`) y el estado del orquestador (`pendingTrade`, `session.mode`) **permanecen en el
+orquestador**; el JSX del banner se traslada fielmente (renderiza `null` si no hay pendiente, idéntico al original).
+Reducción en el orquestador: **-11 líneas netas**.
 
-**Batería verde (paso B.1):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings code-splitting
-pre-existentes = M7). **Cobertura verificada:** el feature `trading/dia-d` tiene tests de lógica
+**Batería verde (paso B.1 + B.2):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
+code-splitting pre-existentes = M7). **Cobertura verificada:** el feature `trading/dia-d` tiene tests de lógica
 (`dia-d-gate-equity`, `dia-d-evidence-archive-io`, `dia-d-verify-continuity`, `dia-d-session-evidence`,
-`dia-d-reconciliation`, `dia-d-favorites`); el bloque extraído es JSX presentacional sin test directo → no se rompe nada.
+`dia-d-reconciliation`, `dia-d-favorites`, `dia-d-trading-session-store`); los bloques extraídos (tabla + banner)
+son JSX presentacional sin test directo → no se rompe nada.
 
-**Pendiente del frente (no ejecutado, por alcance aprobado B.1 solo):** **B.2** banner de trade pendiente
-(~1040-1057) → `DiaDPendingTradeBanner`; **B.3** panel Informe sesión (`<aside>` ~1138-1164) →
-`DiaDSessionReportPanel`. Se valorarán en los próximos pasos del frente.
+**Pendiente del frente (no ejecutado, B.3):** panel **Informe sesión** (`<aside>` ~1138-1164) →
+`DiaDSessionReportPanel`. Es el de acoplamiento medio (usa `sessionReportBody`, `layout.reportWidthPct`,
+`setReportOpen`, drag-resize); se valorará en el próximo paso/frente.

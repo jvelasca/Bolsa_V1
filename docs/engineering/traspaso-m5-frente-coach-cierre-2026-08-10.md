@@ -62,11 +62,11 @@ Con este paso M5 **agota las islas JSX del monólito**. Batería Coach adicional
 1. ~~Extraer el Coach con Diseño B~~ — **HECHO** (paso 10, `BacktestResultFocusCoach`, ~33 props).
    M5 ya no deja islas JSX autocontenidas en `backtests-page.tsx`.
 2. **Reorientar M5 a otro frente — EN CURSO**: se inició el frente `trading-dia-d-replay-panel.tsx` (1.341 líneas),
-   el mejor candidato de valor/riesgo (parcialmente sliced y con thin wrappers limpios). **Paso B.1 hecho**
-   (`DiaDTradesPanel`, tabla de Operaciones). Pendiente del frente: **B.2** banner trade pendiente, **B.3** panel
-   Informe sesión. Otros candidatos del §4.2 (acoplamiento alto, descartados en FASE 1): `backtest-optimize-panel.tsx`
-   (2.251), `backtest-strategy-matrix-panel.tsx` (1.033), `backtest-explore-panel.tsx` (1.456, MEDIO),
-   `ohlcv-chart.tsx` (974, sin JSX extraíble).
+   el mejor candidato de valor/riesgo (parcialmente sliced y con thin wrappers limpios). **Pasos B.1 y B.2 hechos**:
+   `DiaDTradesPanel` (tabla de Operaciones) y `DiaDPendingTradeBanner` (banner trade pendiente). **Pendiente:**
+   **B.3** panel Informe sesión (acoplamiento medio). Otros candidatos del §4.2 (acoplamiento alto, descartados en
+   FASE 1): `backtest-optimize-panel.tsx` (2.251), `backtest-strategy-matrix-panel.tsx` (1.033),
+   `backtest-explore-panel.tsx` (1.456, MEDIO), `ohlcv-chart.tsx` (974, sin JSX extraíble).
 3. **Refactor a custom hooks** (extraer handlers/queries de orquestación de los frentes grandes) — más invasivo,
    fuera del patrón de slicing JSX aprobado; requiere recalibración explícita.
 
