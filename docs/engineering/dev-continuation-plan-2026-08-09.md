@@ -800,5 +800,8 @@ ruff sigue pendiente de mini-módulo (`--unsafe-fixes`); (3) `vectorbt==1.1.0` y
 conservados/fijados con guardas defensivas, sin perseguir upgrades.
 
 **Próximo módulo del plan 08-10 (sugerido):** **M5 — Frontend web por features** (el más grande, a
-dividir en hilos propios). M7 (dev-stack F3.7) queda con su plan ya documentado. Si el hilo para el
-frontend amenaza con sobrecargarse, se preparará un nuevo documento de traspaso dedicado antes de entrarlo.
+dividir en hilos propios). **Traspaso M5 creado (entrada):**
+[traspaso-m5-frontend-2026-08-10.md](./traspaso-m5-frontend-2026-08-10.md) — frontend confirmado en HEAD
+`06496bb` (typecheck exit 0 · lint exit 0 · test 140/707 · build exit 0). M5 se hará **por features/hilos**
+(hub de backtests, listas, accounts, alertas, charts), no en un solo commit masivo. M7 (dev-stack F3.7:
+chunk >500 kB + crash Vite) queda con su plan ya documentado y **fuera del alcance de M5**.
