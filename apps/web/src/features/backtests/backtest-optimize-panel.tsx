@@ -15,6 +15,8 @@ import {
   useState,
 } from 'react';
 import { OptimizeCardHeader } from '@/features/backtests/optimize-card-header';
+import { OptimizeEmptyTip } from '@/features/backtests/optimize-empty-tip';
+import { OptimizeSummaryStrip } from '@/features/backtests/optimize-summary-strip';
 import type { LabZoneHandle } from '@/features/backtests/backtest-lab-board-types';
 import type {
   ChartTimeframe,
@@ -1357,15 +1359,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
           </div>
         )}
 
-        {!seed && (
-          <p
-            className="rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground"
-            title="Consejo: ve a Probar estrategia, lanza una prueba y en el resultado pulsa Optimizar. Así se rellenan solo valor, estrategia y métricas."
-          >
-            Tip: primero prueba una estrategia; en el resultado pulsa <strong>Optimizar</strong> para
-            cargar aquí la prueba origen.
-          </p>
-        )}
+        {!seed && <OptimizeEmptyTip />}
 
         <div className="rounded-lg border border-border/70 bg-muted/20 px-3 py-2 text-xs">
           <p className="font-medium text-foreground">Qué se itera</p>
@@ -1814,22 +1808,14 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         {promoteMsg && <p className="text-xs text-muted-foreground">{promoteMsg}</p>}
 
         {result && (cpcv || walkForward || edgeReport || result.trials?.[0]?.oosMetrics) && (
-          <p
-            className="rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground"
-            title="Resumen del experimento. No es gate de producción."
-          >
-            Modo{' '}
-            <span className="font-medium text-foreground">
-              {cpcv ? 'CPCV' : walkForward ? 'walk-forward' : 'hold-out / IS'}
-            </span>
-            {(cpcv?.walkForwardEfficiency ?? walkForward?.walkForwardEfficiency) != null
-              ? ` · WFE ${formatWfe(cpcv?.walkForwardEfficiency ?? walkForward?.walkForwardEfficiency ?? null)}`
-              : ''}
-            {pbo != null ? ` · PBO ${formatPbo(pbo.pbo)} (${pboBandLabel(classifyPbo(pbo.pbo))})` : ''}
-            {edgeReport ? ` · Edge ${edgeReport.band}` : ''}
-            {' · '}
-            lab, no producción
-          </p>
+          <OptimizeSummaryStrip
+            mode={cpcv ? 'CPCV' : walkForward ? 'walk-forward' : 'hold-out / IS'}
+            wfe={
+              cpcv?.walkForwardEfficiency ?? walkForward?.walkForwardEfficiency ?? null
+            }
+            pbo={pbo}
+            edgeBand={edgeReport ? edgeReport.band : null}
+          />
         )}
 
         {walkForward && (
