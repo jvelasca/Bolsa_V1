@@ -1133,6 +1133,7 @@ Traspaso de entrada: [traspaso-higiene-formato-legacy-entrada-2026-08-10.md](./t
 | 2 | `0ceeb5b` | `backtests/optimize` = **8 `.tsx`** presentacionales (`optimize-card-header`, `optimize-cpcv-report`, `optimize-edge-report`, `optimize-empty-tip`, `optimize-seed-banner`, `optimize-summary-strip`, `optimize-walk-forward-report`, `backtest-optimize-compare-card`), diff +222/−149 solo formato | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 | 3 | `7c174c7` | `backtests/explore` = **7 files** (`backtest-explore-panel`, `at-outlook`, `battery-table`, `header`, `stars-grid`, `value`, `matrix-targets.test`), diff +553/−386 solo formato. **`backtest-explore-bh.tsx` = falso positivo EOL** (git lo normaliza a LF; contenido idéntico a HEAD; NO commiteado) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 | 4 | `d96123d` | `backtests/result` = **5 files** con contenido real (`backtest-result-view`, `focus-coach`, `focus-lab`, `tabs`, `fundamental`), diff +162/−120 solo formato. **`detail`/`focus-finalists`/`ranking` = falsos positivos EOL** (NO commiteados) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
+| 5 | `9fa403a` | `backtests/wizard` = **2 files** con contenido real (`backtest-wizard-advanced-options`, `list-auto`), diff +16/−10 solo formato. **`mass-compare`/`probe-list` = falsos positivos EOL** (NO commiteados) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 
 **Nota de alcance (features/backtests):** el feature como un todo es **plano y enorme (210 archivos desincronizados)**,
 sin subdirectorios naturales. Se subdivide **por dominio funcional**: el sub-lote `optimize` (2) se eligió por reúnir los
@@ -1146,5 +1147,6 @@ verificando que **no aparecen en `git diff --cached --numstat` tras `git add`**;
 aportan nada y ensucian el diff). Recomendación para el siguiente hilo: tras `--write`, comprobar siempre el staged
 `--numstat` y resetear los sin diff real.
 
-Siguiente lote: otro sub-lote por dominio de `features/backtests` (p. ej. `wizard`/`library`/`strategy-matrix`), después el
-resto de `apps/web/src` por sub-lotes. Verificación tras cada lote y commit propio. HEAD `d96123d` · sincronizado.
+Siguiente lote: otro sub-lote por dominio de `features/backtests` (p. ej. `library`/`strategy-matrix`/`core-r`/`dia-d`),
+después el resto de `apps/web/src` por sub-lotes. Verificación tras cada lote y commit propio. HEAD `9fa403a` ·
+sincronizado.

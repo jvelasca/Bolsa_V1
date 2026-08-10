@@ -31,9 +31,9 @@ docs/legacy debe hacerse **en commits propios de formateo único** (premisa M0/�
 - **Regla de oro:** cada lote = solo formateo Prettier, sin cambio funcional; verificar batería tras cada lote;
   commit Y push; pasar al siguiente lote.
 - **Criterio de orden** (mejor ratio valor/riesgo primero):
-  1. `components/ui` + `components/layout` — **15 ficheros** (todos `.tsx` de producción, ninguno de test); reuso alto,
-     poca lógica de negocio. (PRIMER LOTE, en ejecución en este hilo.)
-  2. Un feature aislado completo (p. ej. `features/backtests`).
+  1. `components/ui` + `components/layout` — reuso alto, poca lógica de negocio. (LOTE 1, hecho `d39bbbb`.)
+  2. `features/backtests` **subdividido por dominio funcional** (directorio plano enorme): `optimize`→`explore`→`result`→
+     `wizard` (hechos) → siguientes: `library`/`strategy-matrix`/`core-r`/`dia-d`… Cada sub-lote ≤ ~30 archivos.
   3. El resto de `apps/web/src` por sub-lotes.
 - **Riesgo controlado:** cada lote es pequeño y aislado; si algo falla en batería, se revierte el commit de ese lote
   sin afectar a los demás.
@@ -43,19 +43,28 @@ docs/legacy debe hacerse **en commits propios de formateo único** (premisa M0/�
 1. `git status` limpio.
 2. `npx prettier --check` sobre el subconjunto → confirmar recuento de desincronizados (≤ ~30 por lote).
 3. `npx prettier --write` sobre SOLO ese subconjunto.
-4. Batería reducida : `pnpm --filter @bolsa/web typecheck` · `lint` · `test` · `build` (exit 0).
-5. `git diff --stat` para confirmar que es solo formato (sin borrados funcionales ≠ suma de líneas de código).
-6. Commit `--no-verify` (por el propio hook lint-staged que ya está formateado) + push.
-7. Registrar en `dev-continuation-plan-2026-08-09.md` (§7.6.i) y anclar en `engineering-index`.
+4. **Detectar falsos positivos EOL:** `git add` TODO el subconjunto y leer `git diff --cached --numstat`. Los que no
+   aparezcan (numstat vacío) son **falsos positivos EOL** (contenido idéntico a HEAD; git ya los normaliza a LF) y se
+   **resetean** (`git reset -- <file>`), quedando fuera del commit. Solo se commitean los ficheros con diff de contenido
+   real. (Verificado en lotes 3, 4 y 5.)
+5. Batería : `pnpm --filter @bolsa/web typecheck` · `lint` · `test` · `build` (exit 0).
+6. `git diff --cached --stat` para confirmar que es solo formato (sin borrados funcionales).
+7. Commit `--no-verify` (por el propio hook lint-staged que ya está formateado) + push.
+8. Registrar en `dev-continuation-plan-2026-08-09.md` (§7.6.i) y anclar en `engineering-index`.
 
-## 5. Estado del primer lote (components/ui + components/layout)
+## 5. Estado de avance
 
-Confirmado con `npx prettier --check`:
+| Lote | Commit | Dominio | Ficheros con contenido real |
+|------|--------|---------|-----------------------------|
+| 1 | `d39bbbb` | components/ui + layout | 15 |
+| 2 | `0ceeb5b` | backtests/optimize | 8 |
+| 3 | `7c174c7` | backtests/explore | 7 (bh = falso +EOL) |
+| 4 | `d96123d` | backtests/result | 5 (detail/finalists/ranking = falso +EOL) |
+| 5 | `9fa403a` | backtests/wizard | 2 (mass-compare/probe-list = falso +EOL) |
 
-- **Desincronizados: 15** (listados a continuación), todos `.tsx` de producción.
-  `button.tsx` · `card.tsx` · `dialog.tsx` · `expiry-datetime-field.tsx` · `icon-button.tsx` · `info-tip.tsx` ·
-  `key-value-list.tsx` · `opaque-menu-panel.tsx` · `app-error-boundary.tsx` · `app-top-bar.tsx` · `chart-tab-bar.tsx` ·
-  `dock-zone.tsx` · `panel-resize-handle.tsx` · `platform-shell.tsx` · `trading-layout.tsx`.
+**Estado del hilo (2026-08-10):** lotes 1-5 ejecutados bajo+verde; este hilo se cierra con un relevo. El siguiente hilo
+retoma por dominio (`library`/`strategy-matrix`/`core-r`/`dia-d`…) siguiendo el protocolo que incluye el check de
+falsos positivos EOL (paso 4).
 
 ## 6. Documentos fuente de verdad / índices
 
