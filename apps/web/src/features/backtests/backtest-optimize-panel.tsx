@@ -17,6 +17,9 @@ import {
 import { OptimizeCardHeader } from '@/features/backtests/optimize-card-header';
 import { OptimizeEmptyTip } from '@/features/backtests/optimize-empty-tip';
 import { OptimizeSummaryStrip } from '@/features/backtests/optimize-summary-strip';
+import { OptimizeWalkForwardReport } from '@/features/backtests/optimize-walk-forward-report';
+import { OptimizeEdgeReport } from '@/features/backtests/optimize-edge-report';
+import { OptimizeCpcvReport } from '@/features/backtests/optimize-cpcv-report';
 import type { LabZoneHandle } from '@/features/backtests/backtest-lab-board-types';
 import type {
   ChartTimeframe,
@@ -62,13 +65,6 @@ import {
   oosEvidenceToPaperLabSnapshot,
   stashOosEvidenceForStrategy,
 } from '@/features/backtests/backtest-oos-evidence';
-import {
-  classifyWfe,
-  formatPositiveFoldShare,
-  formatWfe,
-  wfeBandLabel,
-} from '@/features/backtests/backtest-walk-forward-metrics';
-import { classifyPbo, formatPbo, pboBandLabel } from '@/features/backtests/backtest-pbo';
 import { credibilityHintFromLabWfe } from '@bolsa/shared';
 import {
   OPTIMIZE_CPCV_HELP,
@@ -1819,170 +1815,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         )}
 
         {walkForward && (
-          <div className="space-y-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-3 text-sm">
-            <p className="font-medium text-foreground">
-              Walk-forward · {walkForward.nFolds} pliegues ({walkForward.mode})
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Media OOS del mejor de cada pliegue:{' '}
-              <strong className="text-foreground tabular-nums">
-                {walkForward.meanOosScore.toFixed(2)}
-              </strong>
-              {walkForward.stdOosScore > 0
-                ? ` ± ${walkForward.stdOosScore.toFixed(2)}`
-                : ''}
-              {' · '}
-              WFE{' '}
-              <strong className="text-foreground tabular-nums">
-                {formatWfe(walkForward.walkForwardEfficiency)}
-              </strong>
-              {walkForward.walkForwardEfficiency != null
-                ? ` (${wfeBandLabel(classifyWfe(walkForward.walkForwardEfficiency))})`
-                : ''}
-              {walkForward.oosCv != null
-                ? ` · CV ${walkForward.oosCv.toFixed(2)}`
-                : ''}
-              {walkForward.positiveOosFoldShare != null
-                ? ` · ${formatPositiveFoldShare(walkForward.positiveOosFoldShare, walkForward.nFolds)}`
-                : ''}
-              . WFE = media OOS / media IS (score lab). La tabla inferior es el último pliegue + su
-              OOS.
-            </p>
-            {labWfeHint && !cpcv && (
-              <p className="text-[11px] text-muted-foreground">
-                Credibility hint (solo WFE lab): {labWfeHint.credibility.toFixed(1)} · banda{' '}
-                {labWfeHint.band}. {labWfeHint.note}
-              </p>
-            )}
-            <ul className="grid gap-1.5 text-[11px] text-muted-foreground sm:grid-cols-3">
-              {walkForward.folds.map((fold) => (
-                <li
-                  key={fold.index}
-                  className="rounded border border-border/60 bg-background/50 px-2 py-1.5"
-                  title={
-                    fold.testStartTimestamp
-                      ? `Test desde ${fold.testStartTimestamp}`
-                      : undefined
-                  }
-                >
-                  <span className="font-medium text-foreground">#{fold.index}</span>
-                  {' · '}
-                  train {fold.trainBarCount} / test {fold.testBarCount}
-                  <br />
-                  IS {fold.isScore.toFixed(1)}
-                  {fold.oosMetrics != null
-                    ? ` → OOS ${fold.oosMetrics.score.toFixed(1)}`
-                    : ''}
-                  {fold.walkForwardEfficiency != null
-                    ? ` · WFE ${fold.walkForwardEfficiency.toFixed(2)}`
-                    : ''}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <OptimizeWalkForwardReport
+            walkForward={walkForward}
+            labWfeHint={cpcv ? null : labWfeHint}
+          />
         )}
 
-        {edgeReport && (
-          <div className="space-y-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-3 text-sm">
-            <p className="font-medium text-foreground">
-              EdgeReport lab · banda {edgeReport.band} · credibility{' '}
-              <span className="tabular-nums">{edgeReport.credibility.toFixed(1)}</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              MC p=
-              <span className="tabular-nums">
-                {edgeReport.suite.monteCarloPValue != null
-                  ? edgeReport.suite.monteCarloPValue.toFixed(3)
-                  : 'n/d'}
-              </span>
-              {edgeReport.suite.dsr != null
-                ? ` · DSR ${edgeReport.suite.dsr.toFixed(2)}`
-                : ''}
-              {edgeReport.suite.psr != null
-                ? ` · PSR ${edgeReport.suite.psr.toFixed(2)}`
-                : ''}
-              {edgeReport.suite.walkForwardEfficiency != null
-                ? ` · WFE ${edgeReport.suite.walkForwardEfficiency.toFixed(2)} (${edgeReport.suite.wfeSource ?? 'lab'})`
-                : ''}
-              {edgeReport.sampleTradesCount != null
-                ? ` · ${edgeReport.sampleTradesCount} ops campeón`
-                : ''}
-              . Suite lite sobre trades del Mejor (OOS si hay); no es auto-live.
-              {edgeReport.persistedEdgeReportId
-                ? ` Persistido en edge_reports (${edgeReport.persistedEdgeReportId.slice(0, 12)}…).`
-                : ''}
-            </p>
-            {edgeReport.blockReasons && edgeReport.blockReasons.length > 0 && (
-              <p className="text-[11px] text-amber-700 dark:text-amber-400">
-                Bloqueos auto-live: {edgeReport.blockReasons.join(', ')}
-              </p>
-            )}
-          </div>
-        )}
+        {edgeReport && <OptimizeEdgeReport edgeReport={edgeReport} />}
 
         {cpcv && (
-          <div className="space-y-2 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-3 text-sm">
-            <p className="font-medium text-foreground">
-              CPCV ligero · {cpcv.pathCount} paths · {cpcv.nGroups} grupos (purge {cpcv.purgeBars} /
-              embargo {cpcv.embargoBars})
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Media OOS del mejor de cada path:{' '}
-              <strong className="text-foreground tabular-nums">
-                {cpcv.meanOosScore.toFixed(2)}
-              </strong>
-              {cpcv.stdOosScore > 0 ? ` ± ${cpcv.stdOosScore.toFixed(2)}` : ''}
-              {' · '}
-              WFE{' '}
-              <strong className="text-foreground tabular-nums">
-                {formatWfe(cpcv.walkForwardEfficiency)}
-              </strong>
-              {cpcv.walkForwardEfficiency != null
-                ? ` (${wfeBandLabel(classifyWfe(cpcv.walkForwardEfficiency))})`
-                : ''}
-              {cpcv.oosCv != null ? ` · CV ${cpcv.oosCv.toFixed(2)}` : ''}
-              {cpcv.positiveOosFoldShare != null
-                ? ` · ${formatPositiveFoldShare(cpcv.positiveOosFoldShare, cpcv.pathCount)}`
-                : ''}
-              . La tabla inferior es el último path + su OOS.
-            </p>
-            {pbo && (
-              <p className="text-xs text-muted-foreground">
-                PBO CSCV lab:{' '}
-                <strong className="text-foreground tabular-nums">{formatPbo(pbo.pbo)}</strong>
-                {' '}
-                ({pboBandLabel(classifyPbo(pbo.pbo))}) · S={pbo.segmentCount} ·{' '}
-                {pbo.splitCount} splits · N={pbo.strategyCount} · mean logit{' '}
-                {pbo.meanLogit.toFixed(2)}. ≥0.5 ≈ selección IS al azar OOS.
-              </p>
-            )}
-            {labWfeHint && (
-              <p className="text-[11px] text-muted-foreground">
-                Credibility hint (solo WFE lab): {labWfeHint.credibility.toFixed(1)} · banda{' '}
-                {labWfeHint.band}. {labWfeHint.note}
-              </p>
-            )}
-            <ul className="grid max-h-40 gap-1.5 overflow-y-auto text-[11px] text-muted-foreground sm:grid-cols-3">
-              {cpcv.paths.map((path) => (
-                <li
-                  key={path.index}
-                  className="rounded border border-border/60 bg-background/50 px-2 py-1.5"
-                >
-                  <span className="font-medium text-foreground">#{path.index}</span>
-                  {' · test G'}
-                  {path.testGroupIndices.join('+')}
-                  <br />
-                  train {path.trainBarCount} / test {path.testBarCount}
-                  <br />
-                  IS {path.isScore.toFixed(1)}
-                  {path.oosMetrics != null ? ` → OOS ${path.oosMetrics.score.toFixed(1)}` : ''}
-                  {path.walkForwardEfficiency != null
-                    ? ` · WFE ${path.walkForwardEfficiency.toFixed(2)}`
-                    : ''}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <OptimizeCpcvReport cpcv={cpcv} pbo={pbo} labWfeHint={labWfeHint} />
         )}
 
         {bestVsAnchor && (
