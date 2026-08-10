@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # Paleta (RGB 0–1) — slate + teal financiero
 C_INK = (0.07, 0.09, 0.15)
 C_MUTED = (0.39, 0.45, 0.55)

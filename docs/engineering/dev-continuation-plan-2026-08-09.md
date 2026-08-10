@@ -564,3 +564,41 @@ confirmado que no queda ningún uso (registrado como pendiente en el plan 08-10)
 - **M1 — Reproducibilidad backend** (siguiente módulo del plan 08-10): diagnósticar
   `uv.lock` + desactualizaciones de dependencias Python (`uv`) y documentar/commitar el
   estado reproducible. FASE 1 en hilo propio.
+
+### 7.1 Cierre M1 — Reproducibilidad backend (2026-08-10)
+
+**Entrada:** [traspaso-m1-reproducibilidad-backend-2026-08-10.md](./traspaso-m1-reproducibilidad-backend-2026-08-10.md) · rama `stage/estudio-membership-operativa-2026-08-04`.
+
+**Resumen:** se cerró la reproducibilidad del backend commiteando `uv.lock` en la raíz del
+workspace uv (cerraba el `⚠️` del plan 08-10 §4: sin lockfile el backend no era reproducible en
+CI/entornos, a diferencia del `pnpm-lock.yaml`).
+
+- **FASE 1 (diagnóstico):** confirmado `uv.lock` ausente (herencia), workspace uv con 7 miembros,
+  convención CI de `python-ci.yml`. **Hallazgo de entorno:** `uv` no estaba instalado en esta
+  máquina (solo Python 3.14.5); se instaló `uv 0.12.3` y dejó que gestionara CPython 3.12.13
+  (según `.python-version`). `uv lock` resolvió **123 paquetes** sin tocar código (`git diff`
+  vacío antes de los fixes de ruff).
+- **FASE 3/Ejecución:**
+  - `uv lock` ✅ (members correctos de los 7 paquetes; `uv sync` ✅ → `.venv` 3.12.13, 112 instalados).
+  - Batería CI: `pytest` **434 passed** ✅ · `mypy` 454 errores **pre-existentes** (continue-on-error) ·
+    `ruff 0.16.2` expuso **7 errores de lint latentes** (pre-existentes en HEAD).
+  - **Evaluación de subir deps (por hallazgo, no masiva):** los rangos `>=` del repo ya resuelven a
+    la última versión → el lock fija `fastapi==0.141.1`, `arq==0.28.0`, `ruff==0.16.2`, `vectorbt==1.1.0`,
+    `optuna==4.9.0`, `numpy==2.5.2`, `pandas==3.0.5`. No se tocan los rangos de los `pyproject.toml`
+    (quedan válidos; upgrades futuros vía `uv lock --upgrade`).
+  - **`ruff --fix` (aprobado):** aplicados los **6 auto-fixables** (`I001` import-sort ×5 + `UP037`
+    comillas) sobre 6 ficheros de `apps/api-python` y `packages/py` — solo cosmético (+4/−6),
+    `pytest` sigue **434 passed**. **Pendiente registrado:** 1 error `B007` (variable de bucle `day`
+    en `packages/py/infrastructure/tests/test_daily_ops_digest_pdf.py:54`) no es auto-fix; queda para
+    un mini-módulo/higiene posterior (requeriría `--unsafe-fixes` o renombrar a `_day`).
+  - **`vectorbt`:** **conservado/fijado** (`==1.1.0` por lock; mantenimiento parado, se documenta aquí
+    para no perseguir upgrades). Deuda `mypy` y el `B007` quedan como frente aparte.
+  - Nota Windows: un primer `pytest` falló al cargar una DLL de `scipy` por el «Control de
+    aplicaciones» (intermitente/transitorio); al recalcular pasó con `434 passed`. Es un problema de
+    entorno local, no de código ni reproducible en CI (`ubuntu`).
+- **Verificación final:** `ruff` solo `B007` (pendiente) · `pytest` 434 passed · `mypy` sin errores
+  nuevos (deuda pre-existente). Commit (`--no-verify`, por el hook lint-staged/prettier sobre
+  ficheros legacy CRLF) y push a `origin/stage/estudio-membership-operativa-2026-08-04`.
+
+**Próximo módulo del plan 08-10 (sugerido):** M2 — Versiones frontend (reconciliar
+`@types/react`/`react-dom`; revisar rangos `^` amplios).

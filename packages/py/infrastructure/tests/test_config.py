@@ -66,7 +66,7 @@ class _EnvCleanup:
         self._names = names
         self._saved = {}
 
-    def __enter__(self) -> "_EnvCleanup":
+    def __enter__(self) -> _EnvCleanup:
         for n in self._names:
             self._saved[n] = os.environ.pop(n, None)
         return self

@@ -51,6 +51,7 @@ Engineering Index  (este doc)
 │   ├── dev-continuation-plan-2026-08-09.md   ← continuación (estado + próximos pasos)
 │   ├── audit-resume-premises-2026-08-09.md   ← premisas nuevo hilo auditoría
 │   ├── general-audit-plan-2026-08-10.md       ← auditoría general + plan por módulos
+│   ├── traspaso-m1-reproducibilidad-backend-2026-08-10.md  ← M1 reproducibilidad backend (uv.lock)
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)

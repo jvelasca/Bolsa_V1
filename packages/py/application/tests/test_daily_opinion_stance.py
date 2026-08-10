@@ -11,7 +11,6 @@ from bolsa_application.daily_opinion_stance import (
     map_io_to_stars,
 )
 
-
 NOW = datetime(2026, 8, 4, 12, 0, tzinfo=UTC)
 
 
