@@ -895,6 +895,36 @@ code-splitting pre-existentes = M7). **Cobertura verificada:** el feature `tradi
 informe) son JSX presentacional sin test directo → no se rompe nada. **Resultado del frente:** las islas JSX del
 orquestador quedan extraídas (B.1 tabla, B.2 banner, B.3 informe); resta orquestación, no JSX autocontenido.
 
+### §7.6.c — Registro M5 frente `backtest-explore-panel.tsx` (área Coach/TOP, pasos E.1+E.2)
+
+**Estado:** tras cerrar trading-dia-d (B.1-B.3), M5 reorientó al siguiente candidato `backtest-explore-panel.tsx`
+(1.456 líneas, panel **Coach / TOP a futuro**). **Aplica la regla `coach-top-quality.mdc`** → cada paso exigió la
+batería estándar **+ `pnpm test:coach`** (web 26/186 + API smoke CORE-P live OK). Diagnóstico FASE 1: **no hay islas
+JSX autocontenidas de bajo riesgo**; el orquestador tiene ~660 líneas de lógica de ciclo no extraíble como JSX y los
+bloques dependen de ~40 closures. Se limitó el alcance a las **2 islas de menor acoplamiento**.
+
+**Paso E.1 (`5dae5da`, aprobado):** `BacktestExploreBH` (`backtest-explore-bh.tsx`) — evidencia **vs buy & hold**
+(`<details>` colapsable). 1 prop (`coach`). Orquestador **-15 líneas**.
+
+**Paso E.2 (`72061fd`, aprobado):** `BacktestExploreHeader` (`backtest-explore-header.tsx`) — cabecera (título +
+quorum + badge de confianza + motor + botones Guardar TOP/Finalistas y Reanalizar + saveMsg/savedTop + avisos de
+pasada anterior). Diseño B: ~16 props con 2 callbacks (**`onSaveTop`** = `setSaveMsg(null)`+`saveTopMutation.mutate({})`,
+**`onReanalyze`** = `lastLlmFingerprintRef.current=''`+`llmMutation.mutate()`); `canSaveTop` y los enables se computan
+**en el orquestador**. Orquestador **-91 líneas** (~1.441 → ~1.350). Se eliminaron imports no usados
+(`AiInfoButton`, `confidenceLabel`).
+
+**Batería verde (E.1 + E.2):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
+code-splitting = M7) · **`pnpm test:coach` OK** (web 26/186 + API smoke CORE-P live OK) en cada paso.
+**Cobertura verificada:** JSX presentacional sin test directo; los tests de lógica Coach pasan intactos.
+**No se movió lógica de ciclo**: auto-save Finalistas/ACK/atajo, `saveTopMutation` de negocio y gate permanecen en el
+orquestador.
+
+**Pendiente del frente (islas restantes, ver traspaso):** tabla de batería (bajo/medio), candidatas ★ grid
+(medio/alto), regime + AT outlook (bajo), banners de estado del ciclo (ALTO — tocan Coach²/ACK).
+
+**Traspaso del frente:** [traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md](./traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md) —
+HEAD `72061fd`, E.1+E.2 cerrados, islas restantes y opciones §2.3 para el siguiente hilo.
+
 **Traspaso del frente (actualizado):**
 [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) —
 HEAD `a8fede3`, pasos B.1+B.2+B.3 cerrados (frente trading-dia-d **cerrado**) con opciones §2.3 para el siguiente hilo.

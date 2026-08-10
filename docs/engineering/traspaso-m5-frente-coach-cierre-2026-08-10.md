@@ -74,8 +74,9 @@ Con este paso M5 **agota las islas JSX del monólito**. Batería Coach adicional
 
 > **Progreso (2026-08-10):** el hilo de reorientación ejecutó **B.1 + B.2 + B.3** en `trading-dia-d-replay-panel.tsx`
 > (`DiaDTradesPanel`, `DiaDPendingTradeBanner`, `DiaDSessionReportPanel`) → **frente trading-dia-d CERRADO**. El
-> punto de entrada del siguiente hilo está de nuevo en el
-> [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) (§2.3: opciones).
+> siguiente hilo inició `backtest-explore-panel.tsx` (área Coach/TOP): **E.1 (`BacktestExploreBH`) + E.2
+> (`BacktestExploreHeader`)**, HEAD `72061fd` — ver
+> [traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md](./traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md).
 
 ## 3. Reglas del juego (mantener en el nuevo chat)
 

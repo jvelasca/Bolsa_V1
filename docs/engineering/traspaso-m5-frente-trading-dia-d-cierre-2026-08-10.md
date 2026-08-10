@@ -82,6 +82,11 @@ drag-resize. `sessionReportBody` (~240 líneas, acoplamiento alto a archive/evid
 3. **Refactor a custom hooks** (extraer handlers/queries de orquestación de los frentes grandes) — más invasivo,
    requiere recalibración explícita del patrón.
 
+> **Progreso (2026-08-10, opción 1 EN CURSO):** el siguiente hilo inició `backtest-explore-panel.tsx` con **E.1
+> (BacktestExploreBH) + E.2 (BacktestExploreHeader)**, área Coach/TOP (**regla `coach-top-quality.mdc`**, batería
+> `pnpm test:coach`), HEAD `72061fd`. Traspaso del frente:
+> [traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md](./traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md).
+
 ---
 
 ## 3. Reglas del juego (mantener en el nuevo chat)
