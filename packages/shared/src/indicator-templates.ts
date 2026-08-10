@@ -1,6 +1,5 @@
 import type { ChartIndicatorInstance, IndicatorSource } from './indicators-catalog.js';
 import {
-  defaultParameters,
   findIndicatorDefinition,
   instanceLabel,
   newIndicatorInstanceId,

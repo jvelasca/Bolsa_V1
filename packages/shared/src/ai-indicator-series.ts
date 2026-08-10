@@ -229,7 +229,7 @@ function scoreVolatility(bars: OhlcvBarDto[], closes: number[], index: number): 
   return clamp(score);
 }
 
-function scoreMeanReversion(bars: OhlcvBarDto[], closes: number[]): number {
+function scoreMeanReversion(bars: OhlcvBarDto[]): number {
   const stoch = lastValue(computeStochK(bars, 14));
   const cci = lastValue(computeCci(bars, 20));
   let score = 50;
@@ -256,7 +256,7 @@ export function computeTechnicalRatingAtIndex(
   const trend = scoreTrend(closes, closes.length - 1);
   const momentum = scoreMomentum(closes);
   const volatility = scoreVolatility(slice, closes, closes.length - 1);
-  const meanReversion = scoreMeanReversion(slice, closes);
+  const meanReversion = scoreMeanReversion(slice);
   const pattern = 50;
   const total = clamp(
     trend * 0.38 + momentum * 0.28 + volatility * 0.14 + meanReversion * 0.14 + pattern * 0.06,

@@ -252,7 +252,6 @@ export function presetFromInstance(
   name: string,
   options?: { source?: IndicatorSource; locked?: boolean; derivedFromPresetId?: string },
 ): IndicatorPreset {
-  const definition = findIndicatorDefinition(instance.definitionId);
   return {
     id: newIndicatorPresetId(),
     name: name.trim() || instanceLabel(instance),

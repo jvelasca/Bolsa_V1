@@ -212,7 +212,6 @@ export function normalizeDrawingTemplates(
   raw: ChartDrawingTemplate[] | undefined,
 ): ChartDrawingTemplate[] {
   if (!raw?.length) return [...DEFAULT_DRAWING_TEMPLATES];
-  const builtins = new Map(DEFAULT_DRAWING_TEMPLATES.map((t) => [t.id, t]));
   const merged: ChartDrawingTemplate[] = raw.map((t) => ({
     ...t,
     style: {

@@ -2,7 +2,6 @@ import type { ChartDrawing } from './chart-drawings.js';
 import type { ChartInstanceConfig, ChartTabState } from './chart-defaults.js';
 import type { ChartTimeframe } from './chart-timeframes.js';
 import type { ChartSeriesType, ChartSeriesTypeParams } from './chart-series-type.js';
-import { normalizeChartSeriesType, normalizeChartSeriesTypeParams } from './chart-series-type.js';
 import type { ChartToolbarChartOverrides } from './chart-toolbar.js';
 import { normalizeChartToolbarChartOverrides } from './chart-toolbar.js';
 import type { ChartIndicatorInstance } from './indicators-catalog.js';

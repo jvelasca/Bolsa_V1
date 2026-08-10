@@ -4,7 +4,6 @@
 
 import type { ChartTimeframe } from './chart-timeframes.js';
 import type {
-  DEFAULT_EXECUTION_MODEL,
   ExecutionModel,
   IndicatorSpec,
   StrategyDefinitionV1,
@@ -15,7 +14,6 @@ import { buildFundamentalGate } from './fundamentals-gate.js';
 import {
   presetIndicatorSpecs,
   presetRuleGroups,
-  STRATEGY_PRESET_CATALOG,
   HYBRID_GATE_PRESET_KEYS,
   type BacktestStrategyType,
 } from './strategy-presets.js';
@@ -117,7 +115,6 @@ export function strategyDefinitionFromHybrid(options: {
   sectors?: string[];
   minDataQuality?: number;
 }): StrategyDefinitionV1 {
-  const preset = STRATEGY_PRESET_CATALOG[options.gatePresetKey];
   const gateRules = presetRuleGroups(options.gatePresetKey).entries;
   const fundamentalGate = buildFundamentalGate({
     maxTrailingPe: options.maxTrailingPe,

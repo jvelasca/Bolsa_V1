@@ -8,7 +8,6 @@ import type {
 import type { ChartListContext, ChartInstrumentSnapshot } from './chart-list-context.js';
 import type { ChartDataStripConfig } from './chart-data-strip.js';
 import type { ChartSeriesType, ChartSeriesTypeParams } from './chart-series-type.js';
-import { DEFAULT_CHART_SERIES_TYPE, normalizeChartSeriesType, normalizeChartSeriesTypeParams } from './chart-series-type.js';
 import type {
   ChartToolbarChartOverrides,
   ChartToolbarGlobalConfig,
@@ -18,10 +17,8 @@ import type { IndicatorFavoriteRef, IndicatorTemplate } from './indicator-templa
 import type { IndicatorPreset } from './indicator-presets.js';
 import type { ChartDrawTool } from './chart-drawings.js';
 import type { ChartTimeframe } from './chart-timeframes.js';
-import { DEFAULT_CHART_TIMEFRAME } from './chart-timeframes.js';
 import type { ChartIndicatorInstance } from './indicators-catalog.js';
 import type { ChartNewTabSeed, NewChartConfigSource } from './chart-new-tab-setup.js';
-import { normalizeChartNewTabSeed, normalizeNewChartConfigSource } from './chart-new-tab-setup.js';
 
 export type ListColumnId =
   | 'symbol'
