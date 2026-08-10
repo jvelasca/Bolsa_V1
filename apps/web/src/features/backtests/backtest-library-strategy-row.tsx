@@ -2,17 +2,20 @@
  * Fila de Mis estrategias en Biblioteca: ver, renombrar, duplicar, usar, eliminar.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BACKTEST_STRATEGIES, type StrategyDefinitionSummaryDto } from '@bolsa/shared';
-import { ApiError, api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { useEffect, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  BACKTEST_STRATEGIES,
+  type StrategyDefinitionSummaryDto,
+} from "@bolsa/shared";
+import { ApiError, api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   formatStrategyScopeBadge,
   MINE_STRATEGY_ORIGIN_LABELS,
-} from '@/features/backtests/mine-strategies-filters';
-import { PAPER_PATH_LAB } from '@/features/settings/paper-paths-copy';
+} from "@/features/backtests/mine-strategies-filters";
+import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
 
 function duplicateName(base: string, existing: Set<string>): string {
   const trimmed = base.trim();
@@ -53,11 +56,11 @@ export function BacktestLibraryStrategyRow({
 
   useEffect(() => {
     if (!focused) return;
-    rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focused]);
 
   const detailQuery = useQuery({
-    queryKey: ['strategy', strategy.id],
+    queryKey: ["strategy", strategy.id],
     queryFn: () => api.getStrategy(strategy.id),
     enabled: expanded,
     staleTime: 30_000,
@@ -68,16 +71,18 @@ export function BacktestLibraryStrategyRow({
     onSuccess: () => {
       setRenaming(false);
       setError(null);
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
-      void queryClient.invalidateQueries({ queryKey: ['strategy', strategy.id] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["strategy", strategy.id],
+      });
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'No se pudo renombrar');
+      setError(err instanceof ApiError ? err.message : "No se pudo renombrar");
     },
   });
 
   const timeframeMutation = useMutation({
-    mutationFn: async (timeframe: '1d' | '1wk') => {
+    mutationFn: async (timeframe: "1d" | "1wk") => {
       const response = await api.getStrategy(strategy.id);
       const detail = response.data;
       return api.updateStrategy(strategy.id, {
@@ -86,11 +91,17 @@ export function BacktestLibraryStrategyRow({
     },
     onSuccess: () => {
       setError(null);
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
-      void queryClient.invalidateQueries({ queryKey: ['strategy', strategy.id] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["strategy", strategy.id],
+      });
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'No se pudo cambiar el timeframe');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo cambiar el timeframe",
+      );
     },
   });
 
@@ -103,21 +114,21 @@ export function BacktestLibraryStrategyRow({
     },
     onSuccess: () => {
       setError(null);
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'No se pudo duplicar');
+      setError(err instanceof ApiError ? err.message : "No se pudo duplicar");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => api.deleteStrategy(strategy.id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
       onDeleted(strategy.id);
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : 'No se pudo eliminar');
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar");
     },
   });
 
@@ -125,7 +136,7 @@ export function BacktestLibraryStrategyRow({
     strategy.instrumentIds,
     instrumentSymbolById,
   );
-  const reusable = scopeBadge === 'Reutilizable';
+  const reusable = scopeBadge === "Reutilizable";
   const busy =
     renameMutation.isPending ||
     duplicateMutation.isPending ||
@@ -156,8 +167,8 @@ export function BacktestLibraryStrategyRow({
       ref={rowRef}
       id={`library-strategy-${strategy.id}`}
       className={cn(
-        'border-b border-border/50 py-2.5 text-sm last:border-0',
-        focused && 'rounded-md bg-primary/10 ring-1 ring-primary/40',
+        "border-b border-border/50 py-2.5 text-sm last:border-0",
+        focused && "rounded-md bg-primary/10 ring-1 ring-primary/40",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -171,8 +182,8 @@ export function BacktestLibraryStrategyRow({
                 aria-label="Nuevo nombre"
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveRename();
-                  if (e.key === 'Escape') {
+                  if (e.key === "Enter") handleSaveRename();
+                  if (e.key === "Escape") {
                     setRenaming(false);
                     setRenameValue(strategy.name);
                   }
@@ -202,10 +213,10 @@ export function BacktestLibraryStrategyRow({
               <p className="font-medium">{strategy.name}</p>
               <span
                 className={cn(
-                  'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                  "rounded px-1.5 py-0.5 text-[10px] font-medium",
                   reusable
-                    ? 'bg-muted text-muted-foreground'
-                    : 'bg-sky-500/10 text-sky-800 dark:text-sky-200',
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-sky-500/10 text-sky-800 dark:text-sky-200",
                 )}
               >
                 {scopeBadge}
@@ -220,8 +231,8 @@ export function BacktestLibraryStrategyRow({
           <p className="text-xs text-muted-foreground">
             {strategy.presetKey
               ? BACKTEST_STRATEGIES[strategy.presetKey]?.label
-              : strategy.kind}{' '}
-            · {strategy.timeframe} ·{' '}
+              : strategy.kind}{" "}
+            · {strategy.timeframe} ·{" "}
             {MINE_STRATEGY_ORIGIN_LABELS[
               strategy.origin as keyof typeof MINE_STRATEGY_ORIGIN_LABELS
             ] ?? strategy.origin}
@@ -244,7 +255,7 @@ export function BacktestLibraryStrategyRow({
             onClick={() => setExpanded((v) => !v)}
             aria-expanded={expanded}
           >
-            {expanded ? 'Ocultar' : 'Ver'}
+            {expanded ? "Ocultar" : "Ver"}
           </Button>
           <Button
             size="sm"
@@ -263,7 +274,7 @@ export function BacktestLibraryStrategyRow({
             disabled={busy}
             onClick={() => duplicateMutation.mutate()}
           >
-            {duplicateMutation.isPending ? '…' : 'Duplicar'}
+            {duplicateMutation.isPending ? "…" : "Duplicar"}
           </Button>
           <Button
             size="sm"
@@ -287,29 +298,30 @@ export function BacktestLibraryStrategyRow({
             <p className="text-destructive">
               {detailQuery.error instanceof ApiError
                 ? detailQuery.error.message
-                : 'No se pudo cargar el detalle'}
+                : "No se pudo cargar el detalle"}
             </p>
           ) : detail ? (
             <div className="space-y-1.5">
               <p>
-                <span className="font-medium text-foreground">Kind:</span>{' '}
+                <span className="font-medium text-foreground">Kind:</span>{" "}
                 {detail.definition.kind}
                 {detail.definition.presetKey
                   ? ` · preset ${detail.definition.presetKey}`
-                  : ''}
+                  : ""}
               </p>
               <label className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-foreground">Timeframe:</span>
                 <select
                   className="rounded border border-border bg-background px-2 py-1 text-xs text-foreground"
                   value={
-                    detail.definition.timeframe === '1wk' || strategy.timeframe === '1wk'
-                      ? '1wk'
-                      : '1d'
+                    detail.definition.timeframe === "1wk" ||
+                    strategy.timeframe === "1wk"
+                      ? "1wk"
+                      : "1d"
                   }
                   disabled={busy || timeframeMutation.isPending}
                   onChange={(e) => {
-                    const next = e.target.value === '1wk' ? '1wk' : '1d';
+                    const next = e.target.value === "1wk" ? "1wk" : "1d";
                     timeframeMutation.mutate(next);
                   }}
                   aria-label="Timeframe de la estrategia"
@@ -322,19 +334,21 @@ export function BacktestLibraryStrategyRow({
                 ) : null}
               </label>
               <p>
-                <span className="font-medium text-foreground">Actualizado:</span>{' '}
-                {new Date(detail.updatedAt).toLocaleString('es-ES')}
+                <span className="font-medium text-foreground">
+                  Actualizado:
+                </span>{" "}
+                {new Date(detail.updatedAt).toLocaleString("es-ES")}
               </p>
               <p>
-                <span className="font-medium text-foreground">Creado:</span>{' '}
-                {new Date(detail.createdAt).toLocaleString('es-ES')}
+                <span className="font-medium text-foreground">Creado:</span>{" "}
+                {new Date(detail.createdAt).toLocaleString("es-ES")}
               </p>
               {detail.instrumentIds.length > 0 ? (
                 <p>
-                  <span className="font-medium text-foreground">Valores:</span>{' '}
+                  <span className="font-medium text-foreground">Valores:</span>{" "}
                   {detail.instrumentIds
                     .map((id) => instrumentSymbolById.get(id) ?? id.slice(0, 8))
-                    .join(', ')}
+                    .join(", ")}
                 </p>
               ) : (
                 <p>Plantilla reutilizable (sin valor fijado).</p>

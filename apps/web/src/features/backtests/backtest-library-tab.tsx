@@ -3,35 +3,50 @@
  * Deep-link: ?tab=strategies&library=mine&strategyId=…
  */
 
-import type { BacktestStrategyType, InstrumentStrategyTopV1 } from '@bolsa/shared';
-import { ApiError } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import { BacktestAiAssistantPanel } from '@/features/backtests/backtest-ai-assistant-panel';
-import { BacktestLibraryStrategyRow } from '@/features/backtests/backtest-library-strategy-row';
-import { InstrumentStrategyTopPanel, type FinalistSlotUse } from '@/features/backtests/instrument-strategy-top-panel';
-import { StrategyFilterCarousel } from '@/features/backtests/strategy-filter-carousel';
+import type {
+  BacktestStrategyType,
+  InstrumentStrategyTopV1,
+} from "@bolsa/shared";
+import { ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { BacktestAiAssistantPanel } from "@/features/backtests/backtest-ai-assistant-panel";
+import { BacktestLibraryStrategyRow } from "@/features/backtests/backtest-library-strategy-row";
+import {
+  InstrumentStrategyTopPanel,
+  type FinalistSlotUse,
+} from "@/features/backtests/instrument-strategy-top-panel";
+import { StrategyFilterCarousel } from "@/features/backtests/strategy-filter-carousel";
 import {
   defaultMineStrategiesFilters,
   isMineStrategiesFilterActive,
   MINE_STRATEGY_ORIGIN_LABELS,
   type MineStrategiesFilterState,
-} from '@/features/backtests/mine-strategies-filters';
-import { PAPER_PATH_LAB } from '@/features/settings/paper-paths-copy';
-import type { StrategyDefinitionSummaryDto } from '@bolsa/shared';
-import { useEffect, useMemo, useRef } from 'react';
+} from "@/features/backtests/mine-strategies-filters";
+import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
+import type { StrategyDefinitionSummaryDto } from "@bolsa/shared";
+import { useEffect, useMemo, useRef } from "react";
 
 import {
   countLibraryBuckets,
   LIBRARY_FILTER_LABELS,
   LIBRARY_FILTER_TITLES,
   type StrategiesListFilter,
-} from '@/features/backtests/library-strategy-buckets';
+} from "@/features/backtests/library-strategy-buckets";
 
-export type { StrategiesListFilter } from '@/features/backtests/library-strategy-buckets';
+export type { StrategiesListFilter } from "@/features/backtests/library-strategy-buckets";
 
-type StrategyOption = [BacktestStrategyType, { label: string; description: string }];
+type StrategyOption = [
+  BacktestStrategyType,
+  { label: string; description: string },
+];
 
 type Props = {
   strategyOptions: StrategyOption[];
@@ -118,21 +133,21 @@ export function BacktestLibraryTab({
   useEffect(() => {
     if (!focusPresetKey) return;
     const el = presetRefs.current.get(focusPresetKey);
-    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [focusPresetKey, strategiesListFilter]);
 
   const buckets = useMemo(() => countLibraryBuckets(strategies), [strategies]);
 
   const description =
-    strategiesListFilter === 'generics'
+    strategiesListFilter === "generics"
       ? `${strategyOptions.length} genéricas del catálogo`
-      : strategiesListFilter === 'finalists'
-        ? `${filteredStrategies.length} finalistas${instrumentSymbol ? ` · ${instrumentSymbol}` : ''}`
-        : strategiesListFilter === 'optimized'
+      : strategiesListFilter === "finalists"
+        ? `${filteredStrategies.length} finalistas${instrumentSymbol ? ` · ${instrumentSymbol}` : ""}`
+        : strategiesListFilter === "optimized"
           ? isMineStrategiesFilterActive(mineFilters)
             ? `${filteredStrategies.length} de ${buckets.optimized} optimizadas`
             : `${buckets.optimized} genéricas optimizadas (Lab / clones)`
-          : strategiesListFilter === 'mine'
+          : strategiesListFilter === "mine"
             ? isMineStrategiesFilterActive(mineFilters)
               ? `${filteredStrategies.length} de ${buckets.mine} en Mis estrategias`
               : `${buckets.mine} mis estrategias (autoría)`
@@ -148,7 +163,7 @@ export function BacktestLibraryTab({
         <h3 className="text-lg font-semibold tracking-tight">Biblioteca</h3>
         <p className="text-sm text-muted-foreground">
           Genéricas · Optimizadas · Mis estrategias · Finalistas
-          {instrumentSymbol ? ` · ${instrumentSymbol}` : ''}.{' '}
+          {instrumentSymbol ? ` · ${instrumentSymbol}` : ""}.{" "}
           <span className="text-xs">{PAPER_PATH_LAB.libraryHint}</span>
         </p>
       </div>
@@ -159,62 +174,69 @@ export function BacktestLibraryTab({
             <CardTitle className="text-base">Estrategias</CardTitle>
             <CardDescription>
               {description}
-              {instrumentTop && strategiesListFilter === 'finalists'
+              {instrumentTop && strategiesListFilter === "finalists"
                 ? ` · TOP ${instrumentTop.status} (v${instrumentTop.version})`
-                : ''}
+                : ""}
             </CardDescription>
           </div>
           <StrategyFilterCarousel
             value={strategiesListFilter}
-            onChange={(id) => onStrategiesListFilterChange(id as StrategiesListFilter)}
+            onChange={(id) =>
+              onStrategiesListFilterChange(id as StrategiesListFilter)
+            }
             ariaLabel="Filtro de la biblioteca de estrategias"
             chips={[
               {
-                id: 'all',
+                id: "all",
                 label: LIBRARY_FILTER_LABELS.all,
                 count: strategyOptions.length + strategies.length,
                 title: LIBRARY_FILTER_TITLES.all,
               },
               {
-                id: 'generics',
+                id: "generics",
                 label: LIBRARY_FILTER_LABELS.generics,
                 count: strategyOptions.length,
                 title: LIBRARY_FILTER_TITLES.generics,
               },
               {
-                id: 'optimized',
+                id: "optimized",
                 label: LIBRARY_FILTER_LABELS.optimized,
                 count: buckets.optimized,
                 title: LIBRARY_FILTER_TITLES.optimized,
               },
               {
-                id: 'mine',
+                id: "mine",
                 label: LIBRARY_FILTER_LABELS.mine,
                 count: buckets.mine,
                 title: LIBRARY_FILTER_TITLES.mine,
               },
               {
-                id: 'finalists',
-                label: instrumentSymbol ? `Finalistas · ${instrumentSymbol}` : LIBRARY_FILTER_LABELS.finalists,
+                id: "finalists",
+                label: instrumentSymbol
+                  ? `Finalistas · ${instrumentSymbol}`
+                  : LIBRARY_FILTER_LABELS.finalists,
                 count: topStrategyIds.size,
                 disabled: !instrumentId,
                 title: instrumentId
                   ? LIBRARY_FILTER_TITLES.finalists
-                  : 'Elige un valor en Probar estrategia',
+                  : "Elige un valor en Probar estrategia",
               },
             ]}
           />
-          {(strategiesListFilter === 'mine' ||
-            strategiesListFilter === 'optimized' ||
-            strategiesListFilter === 'all' ||
-            strategiesListFilter === 'finalists') &&
+          {(strategiesListFilter === "mine" ||
+            strategiesListFilter === "optimized" ||
+            strategiesListFilter === "all" ||
+            strategiesListFilter === "finalists") &&
             strategies.length > 0 && (
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                 <input
                   type="search"
                   value={mineFilters.query}
                   onChange={(e) =>
-                    onMineFiltersChange({ ...mineFilters, query: e.target.value })
+                    onMineFiltersChange({
+                      ...mineFilters,
+                      query: e.target.value,
+                    })
                   }
                   placeholder="Buscar nombre o ticker…"
                   className="h-9 min-w-[12rem] flex-1 rounded-md border border-border bg-background px-2.5 text-sm"
@@ -234,9 +256,11 @@ export function BacktestLibraryTab({
                 >
                   <option value="">Instrumento: todos</option>
                   {instrumentId &&
-                    !mineFilterInstruments.some((i) => i.id === instrumentId) && (
+                    !mineFilterInstruments.some(
+                      (i) => i.id === instrumentId,
+                    ) && (
                       <option value={instrumentId}>
-                        {instrumentSymbol ?? 'Valor actual'}
+                        {instrumentSymbol ?? "Valor actual"}
                       </option>
                     )}
                   {mineFilterInstruments.map((i) => (
@@ -250,7 +274,8 @@ export function BacktestLibraryTab({
                   onChange={(e) =>
                     onMineFiltersChange({
                       ...mineFilters,
-                      scope: e.target.value as MineStrategiesFilterState['scope'],
+                      scope: e.target
+                        .value as MineStrategiesFilterState["scope"],
                     })
                   }
                   className="h-9 rounded-md border border-border bg-background px-2 text-xs"
@@ -263,13 +288,16 @@ export function BacktestLibraryTab({
                   <option value="fitted_current" disabled={!instrumentId}>
                     {instrumentSymbol
                       ? `Ajuste · ${instrumentSymbol}`
-                      : 'Ajuste · valor actual (elige en Probar)'}
+                      : "Ajuste · valor actual (elige en Probar)"}
                   </option>
                 </select>
                 <select
                   value={mineFilters.timeframe}
                   onChange={(e) =>
-                    onMineFiltersChange({ ...mineFilters, timeframe: e.target.value })
+                    onMineFiltersChange({
+                      ...mineFilters,
+                      timeframe: e.target.value,
+                    })
                   }
                   className="h-9 rounded-md border border-border bg-background px-2 text-xs"
                   aria-label="Timeframe"
@@ -284,7 +312,10 @@ export function BacktestLibraryTab({
                 <select
                   value={mineFilters.origin}
                   onChange={(e) =>
-                    onMineFiltersChange({ ...mineFilters, origin: e.target.value })
+                    onMineFiltersChange({
+                      ...mineFilters,
+                      origin: e.target.value,
+                    })
                   }
                   className="h-9 rounded-md border border-border bg-background px-2 text-xs"
                   aria-label="Origen"
@@ -302,7 +333,9 @@ export function BacktestLibraryTab({
                   <button
                     type="button"
                     className="h-9 text-xs text-muted-foreground underline-offset-2 hover:underline"
-                    onClick={() => onMineFiltersChange(defaultMineStrategiesFilters())}
+                    onClick={() =>
+                      onMineFiltersChange(defaultMineStrategiesFilters())
+                    }
                   >
                     Limpiar
                   </button>
@@ -311,7 +344,7 @@ export function BacktestLibraryTab({
             )}
         </CardHeader>
         <CardContent className="space-y-5">
-          {strategiesListFilter === 'finalists' && instrumentId && (
+          {strategiesListFilter === "finalists" && instrumentId && (
             <InstrumentStrategyTopPanel
               instrumentId={instrumentId}
               symbol={instrumentSymbol}
@@ -326,9 +359,10 @@ export function BacktestLibraryTab({
             />
           )}
 
-          {(strategiesListFilter === 'all' || strategiesListFilter === 'generics') && (
+          {(strategiesListFilter === "all" ||
+            strategiesListFilter === "generics") && (
             <div className="space-y-0">
-              {strategiesListFilter === 'all' && (
+              {strategiesListFilter === "all" && (
                 <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Genéricas
                 </p>
@@ -341,17 +375,23 @@ export function BacktestLibraryTab({
                   }}
                   id={`library-preset-${key}`}
                   className={cn(
-                    'flex flex-wrap items-center justify-between gap-2 border-b border-border/50 py-2.5 text-sm last:border-0',
+                    "flex flex-wrap items-center justify-between gap-2 border-b border-border/50 py-2.5 text-sm last:border-0",
                     focusPresetKey === key &&
-                      'rounded-md bg-primary/10 ring-1 ring-primary/40',
+                      "rounded-md bg-primary/10 ring-1 ring-primary/40",
                   )}
                 >
                   <div className="min-w-0">
                     <p className="font-medium">{meta.label}</p>
-                    <p className="text-xs text-muted-foreground">{meta.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {meta.description}
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => onUsePreset(key)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onUsePreset(key)}
+                    >
                       Usar
                     </Button>
                     <Button
@@ -372,28 +412,28 @@ export function BacktestLibraryTab({
             </div>
           )}
 
-          {(strategiesListFilter === 'all' ||
-            strategiesListFilter === 'mine' ||
-            strategiesListFilter === 'finalists') && (
+          {(strategiesListFilter === "all" ||
+            strategiesListFilter === "mine" ||
+            strategiesListFilter === "finalists") && (
             <div className="space-y-0">
-              {strategiesListFilter === 'all' && (
+              {strategiesListFilter === "all" && (
                 <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                   Mis estrategias
                 </p>
               )}
               {filteredStrategies.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  {strategiesListFilter === 'finalists'
+                  {strategiesListFilter === "finalists"
                     ? instrumentId
                       ? isMineStrategiesFilterActive(mineFilters)
-                        ? 'Ninguna finalista coincide con los filtros.'
+                        ? "Ninguna finalista coincide con los filtros."
                         : topStrategyIds.size > 0
-                          ? `TOP de ${instrumentSymbol ?? 'este valor'} referencia ${topStrategyIds.size} estrategia(s) que ya no están en Biblioteca (huérfanas tras purga). En Finalistas → Eliminar Finalistas, o vuelve a Play: el ciclo trata el TOP huérfano como vacío y puede grabar candidatas Coach.`
-                          : `Aún no hay finalistas ligadas a ${instrumentSymbol ?? 'este valor'}. El Coach muestra candidatas ★; solo se graban en BD con «Guardar TOP-3» (semifinal) o ciclo completo Lab → «Guardar Finalistas».`
-                      : 'Elige un valor en Probar estrategia.'
+                          ? `TOP de ${instrumentSymbol ?? "este valor"} referencia ${topStrategyIds.size} estrategia(s) que ya no están en Biblioteca (huérfanas tras purga). En Finalistas → Eliminar Finalistas, o vuelve a Play: el ciclo trata el TOP huérfano como vacío y puede grabar candidatas Coach.`
+                          : `Aún no hay finalistas ligadas a ${instrumentSymbol ?? "este valor"}. El Coach muestra candidatas ★; solo se graban en BD con «Guardar TOP-3» (semifinal) o ciclo completo Lab → «Guardar Finalistas».`
+                      : "Elige un valor en Probar estrategia."
                     : strategies.length === 0
-                      ? 'Aún no tienes ninguna. Clona una genérica abajo o importa desde el gráfico.'
-                      : 'Ninguna estrategia coincide con los filtros.'}
+                      ? "Aún no tienes ninguna. Clona una genérica abajo o importa desde el gráfico."
+                      : "Ninguna estrategia coincide con los filtros."}
                 </p>
               ) : (
                 filteredStrategies.map((strategy) => (
@@ -417,7 +457,9 @@ export function BacktestLibraryTab({
       <details
         className="rounded-lg border border-border/80 bg-muted/10 open:bg-muted/15"
         open={cloneOpen}
-        onToggle={(e) => onCloneOpenChange((e.target as HTMLDetailsElement).open)}
+        onToggle={(e) =>
+          onCloneOpenChange((e.target as HTMLDetailsElement).open)
+        }
       >
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium marker:content-none [&::-webkit-details-marker]:hidden">
           Clonar genérica → Optimizadas
@@ -443,7 +485,9 @@ export function BacktestLibraryTab({
             <select
               value={newStrategyPreset}
               onChange={(e) =>
-                onNewStrategyPresetChange(e.target.value as BacktestStrategyType)
+                onNewStrategyPresetChange(
+                  e.target.value as BacktestStrategyType,
+                )
               }
               className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2"
             >
@@ -454,14 +498,17 @@ export function BacktestLibraryTab({
               ))}
             </select>
           </label>
-          <Button disabled={!newStrategyName.trim() || createPending} onClick={onCreate}>
-            {createPending ? 'Guardando…' : 'Guardar en Optimizadas'}
+          <Button
+            disabled={!newStrategyName.trim() || createPending}
+            onClick={onCreate}
+          >
+            {createPending ? "Guardando…" : "Guardar en Optimizadas"}
           </Button>
           {createError != null && (
             <p className="text-sm text-destructive">
               {createError instanceof ApiError
                 ? createError.message
-                : 'Error al guardar'}
+                : "Error al guardar"}
             </p>
           )}
         </div>
@@ -475,9 +522,7 @@ export function BacktestLibraryTab({
           </span>
         </summary>
         <div className="border-t border-border/60 px-2 py-2">
-          <BacktestAiAssistantPanel
-            description="Describe tu estrategia en lenguaje natural. Se guarda en Mis estrategias (Prompt IA), no en Optimizadas."
-          />
+          <BacktestAiAssistantPanel description="Describe tu estrategia en lenguaje natural. Se guarda en Mis estrategias (Prompt IA), no en Optimizadas." />
         </div>
       </details>
     </div>

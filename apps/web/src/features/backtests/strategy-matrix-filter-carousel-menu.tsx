@@ -2,21 +2,21 @@
  * Menú (…) del carrusel de filtros de la matriz — visibles + favoritos ★.
  */
 
-import { MoreHorizontal, Star } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { checkboxClassName } from '@/components/ui/dialog';
+import { MoreHorizontal, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { checkboxClassName } from "@/components/ui/dialog";
 import {
   STRATEGY_MATRIX_FILTER_IDS,
   STRATEGY_MATRIX_FILTER_LABELS,
   type StrategyMatrixFilter,
-} from '@/features/backtests/backtest-strategy-matrix';
+} from "@/features/backtests/backtest-strategy-matrix";
 import {
   saveStrategyMatrixFilterCarouselPrefs,
   toggleStrategyMatrixFilterFavorite,
   toggleStrategyMatrixFilterVisible,
   type StrategyMatrixFilterCarouselPrefs,
-} from '@/features/backtests/strategy-matrix-filter-carousel-prefs';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/strategy-matrix-filter-carousel-prefs";
+import { cn } from "@/lib/utils";
 
 type Props = {
   prefs: StrategyMatrixFilterCarouselPrefs;
@@ -42,20 +42,23 @@ export function StrategyMatrixFilterCarouselMenu({
         setOpen(false);
       }
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
   function commit(next: StrategyMatrixFilterCarouselPrefs) {
     saveStrategyMatrixFilterCarouselPrefs(next);
     onPrefsChange(next);
     if (!next.visibleIds.includes(activeFilter) && onActiveHidden) {
-      onActiveHidden(next.visibleIds[0] ?? 'all');
+      onActiveHidden(next.visibleIds[0] ?? "all");
     }
   }
 
   return (
-    <div ref={menuRef} className="relative shrink-0 border-l border-border/60 pl-0.5">
+    <div
+      ref={menuRef}
+      className="relative shrink-0 border-l border-border/60 pl-0.5"
+    >
       <button
         type="button"
         title="Configurar carrusel de filtros"
@@ -84,21 +87,23 @@ export function StrategyMatrixFilterCarouselMenu({
                     className={checkboxClassName}
                     checked={visible}
                     disabled={lastVisible}
-                    onChange={() => commit(toggleStrategyMatrixFilterVisible(prefs, id))}
+                    onChange={() =>
+                      commit(toggleStrategyMatrixFilterVisible(prefs, id))
+                    }
                   />
                   <span className="min-w-0 flex-1 truncate">
                     {STRATEGY_MATRIX_FILTER_LABELS[id]}
                   </span>
                   <button
                     type="button"
-                    title={favorite ? 'Quitar de favoritos' : 'Marcar favorito'}
+                    title={favorite ? "Quitar de favoritos" : "Marcar favorito"}
                     disabled={!visible}
                     className={cn(
-                      'rounded p-0.5',
+                      "rounded p-0.5",
                       favorite
-                        ? 'text-amber-500'
-                        : 'text-muted-foreground/50 hover:text-muted-foreground',
-                      !visible && 'opacity-30',
+                        ? "text-amber-500"
+                        : "text-muted-foreground/50 hover:text-muted-foreground",
+                      !visible && "opacity-30",
                     )}
                     onClick={(event) => {
                       event.preventDefault();
@@ -108,7 +113,7 @@ export function StrategyMatrixFilterCarouselMenu({
                   >
                     <Star
                       className="h-3 w-3"
-                      fill={favorite ? 'currentColor' : 'none'}
+                      fill={favorite ? "currentColor" : "none"}
                     />
                   </button>
                 </label>
