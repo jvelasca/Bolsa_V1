@@ -283,6 +283,7 @@ import { BacktestWizardAdvancedOptions } from "@/features/backtests/backtest-wiz
 import { BacktestWizardListAuto } from "@/features/backtests/backtest-wizard-list-auto";
 import { BacktestWizardProbeList } from "@/features/backtests/backtest-wizard-probe-list";
 import { BacktestResultDetail } from "@/features/backtests/backtest-result-detail";
+import { BacktestResultFocusFinalists } from "@/features/backtests/backtest-result-focus-finalists";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
@@ -4825,65 +4826,46 @@ export function BacktestsPage() {
                       )}
 
                       {resultFocus === "finalists" && (
-                        <div className="space-y-3 overflow-auto">
-                          {instrumentId ? (
-                            <InstrumentStrategyTopPanel
-                              instrumentId={instrumentId}
-                              symbol={
-                                instrumentLabels[instrumentId]?.symbol ??
-                                instruments.find((i) => i.id === instrumentId)
-                                  ?.symbol
-                              }
-                              timeframe={runTimeframe}
-                              top={instrumentTop}
-                              asOfDiaD={diaD}
-                              activeProfileId={coachProfilePolicy.profileId}
-                              onUseStrategy={(strategyId, slot) => {
-                                setSavedStrategyId(strategyId);
-                                setRunSource("saved");
-                                if (slot?.runId) {
-                                  openFinalistChecklist(slot);
-                                  return;
-                                }
-                                setPreferOpenAnalysis(false);
-                                setResultFocus("detail");
-                                patchSearchParams((params) => {
-                                  params.set("focus", "detail");
-                                });
-                              }}
-                              onOpenChecklist={(slot) =>
-                                openFinalistChecklist(slot)
-                              }
-                              onProposeSupervised={(slot) =>
-                                proposeFinalistSupervisedSlot(slot)
-                              }
-                              proposePendingStrategyId={
-                                proposeFinalistMutation.isPending
-                                  ? (proposeFinalistMutation.variables
-                                      ?.strategyDefinitionId ?? null)
-                                  : null
-                              }
-                              onGoToCoach={() => {
-                                setResultFocus("coach");
-                                patchSearchParams((params) => {
-                                  params.set("focus", "coach");
-                                });
-                              }}
-                            />
-                          ) : (
-                            <div className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-                              <p className="font-medium text-foreground">
-                                Elige un valor
-                              </p>
-                              <p className="mt-1">
-                                Universo → Lista: clic en un miembro (IBEX,
-                                S&P…) para abrirlo en Valor. O elige un ticker
-                                en la pestaña Valor. Aquí verás Checklist y
-                                Proponer cuando haya TOP.
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                        <BacktestResultFocusFinalists
+                          instrumentId={instrumentId}
+                          symbol={
+                            instrumentLabels[instrumentId]?.symbol ??
+                            instruments.find((i) => i.id === instrumentId)
+                              ?.symbol ??
+                            "Valor"
+                          }
+                          timeframe={runTimeframe}
+                          top={instrumentTop}
+                          asOfDiaD={diaD}
+                          activeProfileId={coachProfilePolicy.profileId}
+                          proposePendingStrategyId={
+                            proposeFinalistMutation.isPending
+                              ? (proposeFinalistMutation.variables
+                                  ?.strategyDefinitionId ?? null)
+                              : null
+                          }
+                          onUseStrategy={(strategyId, slot) => {
+                            setSavedStrategyId(strategyId);
+                            setRunSource("saved");
+                            if (slot?.runId) {
+                              openFinalistChecklist(slot);
+                              return;
+                            }
+                            setPreferOpenAnalysis(false);
+                            setResultFocus("detail");
+                            patchSearchParams((params) => {
+                              params.set("focus", "detail");
+                            });
+                          }}
+                          onOpenChecklist={openFinalistChecklist}
+                          onProposeSupervised={proposeFinalistSupervisedSlot}
+                          onGoToCoach={() => {
+                            setResultFocus("coach");
+                            patchSearchParams((params) => {
+                              params.set("focus", "coach");
+                            });
+                          }}
+                        />
                       )}
 
                       {batchRows.length > 0 && resultFocus === "ranking" && (
