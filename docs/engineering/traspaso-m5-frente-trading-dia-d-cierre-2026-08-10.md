@@ -1,8 +1,8 @@
-# Traspaso parcial — M5 frente `trading-dia-d-replay-panel.tsx` (feature-slicing) · cierre B.1+B.2
+# Traspaso parcial — M5 frente `trading-dia-d-replay-panel.tsx` (feature-slicing) · cierre B.1+B.2+B.3
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `5d084f9` (traspaso parcial commit doc) · Árbol limpio · pasos: Lab `8ae445b` · Coach `d3315e8` ·
-B.1 `1303610` · B.2 `041457f`
+**HEAD:** `a8fede3` (paso B.3: DiaDSessionReportPanel — frente **cerrado**) · pasos: Lab `8ae445b` · Coach `d3315e8` ·
+B.1 `1303610` · B.2 `041457f` · B.3 `a8fede3`
 **Origen:** [traspaso-m5-frente-coach-cierre-2026-08-10.md](./traspaso-m5-frente-coach-cierre-2026-08-10.md) (§2.3
 reorientación a otro frente) + registro **§7.6.b** de
 [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
@@ -26,10 +26,21 @@ test **140/707** · build exit 0, warnings code-splitting pre-existentes = M7), 
 |------|--------|---------------------|-------|----------------------|
 | B.1 | `1303610` | `DiaDTradesPanel` (tabla de Operaciones, `apps/web/src/features/trading/dia-d-trades-panel.tsx`) | 4 | −58 líneas (~1.341 → ~1.283) |
 | B.2 | `041457f` | `DiaDPendingTradeBanner` (banner propuesta pending, `apps/web/src/features/trading/dia-d-pending-trade-banner.tsx`) | 4 | −11 líneas (~1.283 → ~1.272) |
+| B.3 | `a8fede3` | `DiaDSessionReportPanel` (panel Informe sesión, `apps/web/src/features/trading/dia-d-session-report-panel.tsx`) | 6 + `variant` | −67 líneas (~1.272 → ~1.205) — **cierra el frente** |
 
-**Patrón — Diseño B (consistent con hilo previo):** thin wrappers con los callbacks de ciclo/estado **en el
+**Patrón — Diseño B (consistente con hilo previo):** thin wrappers con los callbacks de ciclo/estado **en el
 orquestador** (`decideGate`, `setFocusTimestamp`, `replayCursor`, `pendingTrade`, `session.mode`) como props;
 el JSX presentacional se traslada fielmente. No se mueve lógica de estado/handlers.
+
+**B.3 — hallazgo de FASE 1 (verificado):** el informe se renderiza en **DOS sitios del DOM** (no dos ramas
+intercambiables): **desktop** (`isWide && report`) vive **dentro** de `<div ref={movieRowRef}>` como flex-child
+horizontal (`<PanelResizeHandle>` + `<aside>` redimensionable, o la pestaña vertical colapsada); **móvil**
+(`!isWide && report`) vive **debajo** del movie-row como `<details>`. Por ello `DiaDSessionReportPanel` usa una prop
+`variant: 'desktop' | 'mobile'` y se despliega en **dos sitios** guardados por `isWide`, preservando exactamente el
+DOM. El cuerpo compartido (`sessionReportBody`) se pasa como `body`. **La lógica de drag-resize permanece en el
+orquestador** (`reportPanelProps.onResizeDrag`/`onResizeDragEnd`, que usan `movieRowRef.current`,
+`pendingReportW.current`, `clampReportWidthPct`, `pxToPct`, `setLayout`, `persistLayout`) → no se rompe el layout
+drag-resize. `sessionReportBody` (~240 líneas, acoplamiento alto a archive/evidence/mutations) no se extrae.
 
 **Registros docs commiteados:** `0b2ffa6` (cabecera B.1) y `8c1a4bc` (cabecera B.1+B.2).
 **Cobertura verificada:** el feature `trading/dia-d` tiene tests de lógica (`dia-d-gate-equity`,
@@ -41,21 +52,17 @@ el JSX presentacional se traslada fielmente. No se mueve lógica de estado/handl
 
 ## 2. Punto de entrada del siguiente hilo
 
-### 2.1 Estado de `trading-dia-d-replay-panel.tsx` (→ ~1.272 líneas)
+### 2.1 Estado de `trading-dia-d-replay-panel.tsx` (→ ~1.205 líneas) — frente CERRADO
 
-- **Extraídos:** B.1 tabla de Operaciones (`DiaDTradesPanel`), B.2 banner de propuesta (`DiaDPendingTradeBanner`).
-- **Queda por extraer — B.3: panel de Informe de sesión.** **OJO (hallazgo de FASE 1 verificado):** el informe se
-  renderiza en **DOS ramas** que comparten el mismo `sessionReportBody` (derivado memoizado, ~línea 723):
-  1. **Desktop** (`isWide && report`, ~líneas 1110-1181): bloque con `PanelResizeHandle` (drag para
-     `layout.reportWidthPct`), toggle `reportOpen`/`setReportOpen` y `<aside id="dia-d-session-report-panel">`
-     con `sessionReportBody`.
-  2. **Móvil** (`!isWide && report`, ~líneas 1182-1202): `<details>` con `summary` (colapsar/expandir) y
-     `<div id="dia-d-session-report-panel">` con el mismo `sessionReportBody`.
-  → Extraer B.3 **no es un thin wrapper de un solo bloque**; implica decidir cómo encapsular dos ramas de
-  presentación + el drag-resize del desktop. Acoplamiento **medio**: usa `sessionReportBody`, `reportOpen`,
-  `setReportOpen`, `layout.reportWidthPct`, `pendingReportW.current`, `clampReportWidthPct`, `movieRowRef`.
-- Resta del fichero: orquestación (replay movie, gate, IA narrative, layout drag/resize, archivo). No hay más
-  islas JSX de bajo riesgo detectadas salvo B.3.
+- **Extraídos (B.1-B.3):** `DiaDTradesPanel` (tabla de Operaciones), `DiaDPendingTradeBanner` (banner propuesta),
+  `DiaDSessionReportPanel` (panel Informe de sesión, **dos ramas** desktop+móvil).
+- **B.3 resuelto con Diseño B:** hallazgo verificado de que el informe vive en **DOS sitios del DOM** (desktop dentro
+  del movie-row con drag-resize; móvil `<details>` debajo). `DiaDSessionReportPanel` acepta `variant:
+  'desktop' | 'mobile'` y se despliega en dos sitios guardados por `isWide`; el cuerpo compartido (`sessionReportBody`)
+  se pasa como `body`, y la lógica de drag-resize queda en el orquestador (`reportPanelProps.onResizeDrag`/
+  `onResizeDragEnd` con `movieRowRef`/`pendingReportW`/`clampReportWidthPct`/`pxToPct`/`setLayout`/`persistLayout`).
+- Resta del fichero: **orquestación** (replay movie, gate, IA narrative, layout drag/resize, archivo). **No quedan
+  islas JSX autocontenidas de bajo riesgo** → el frente trading-dia-d está **cerrado** para feature-slicing.
 
 ### 2.2 Otros frentes de M5 (diagnóstico heredado — NO rehacer salvo cambio)
 
@@ -66,13 +73,12 @@ el JSX presentacional se traslada fielmente. No se mueve lógica de estado/handl
   `backtest-explore-panel.tsx` (1.456, MEDIO).
 - El objetivo F4.8 (`backtests-page.tsx` <3.500, actual 5.127) sigue lejos porque el resto es orquestación, no JSX.
 
-### 2.3 Opciones para el siguiente hilo
+### 2.3 Opciones para el siguiente hilo (frente trading-dia-d CERRADO)
 
-1. **Completar B.3** (panel Informe sesión) en `trading-dia-d-replay-panel.tsx` — el cierre del frente. Requiere
-   FASE 1 propio primero (ver hallazgo de las 2 ramas + drag-resize); riesgo medio.
-2. **Cerrar el frente trading-dia-d en el estado actual** (B.1+B.2) y mover esfuerzo a otro frente de M5
-   (p. ej. `backtest-explore-panel.tsx` 1.456 (MEDIO), o higiene M0/§6.2 CRLF de backtests-page como commit de
-   formateo propio).
+1. **Mover esfuerzo a otro frente de M5**: `backtest-explore-panel.tsx` (1.456, **MEDIO**) — el candidato restante de
+   mejor valor/riesgo; o `backtest-optimize-panel.tsx`/`backtest-strategy-matrix-panel.tsx` (acoplamiento alto,
+   requerirían FASE 1 detallada).
+2. **Higiene M0/§6.2 CRLF** de `backtests-page.tsx` como commit de formateo propio (M0 out-of-M5).
 3. **Refactor a custom hooks** (extraer handlers/queries de orquestación de los frentes grandes) — más invasivo,
    requiere recalibración explícita del patrón.
 
@@ -101,5 +107,6 @@ el JSX presentacional se traslada fielmente. No se mueve lógica de estado/handl
 - `pnpm --filter @bolsa/web test` → 140 ficheros / 707 tests, 0 fallos
 - `pnpm --filter @bolsa/web build` → exit 0 (solo warnings code-splitting pre-existentes = M7)
 - Ficheros nuevos de este hilo: `apps/web/src/features/trading/dia-d-trades-panel.tsx`,
-  `apps/web/src/features/trading/dia-d-pending-trade-banner.tsx`, ambos importados desde
+  `apps/web/src/features/trading/dia-d-pending-trade-banner.tsx`,
+  `apps/web/src/features/trading/dia-d-session-report-panel.tsx`, importados desde
   `trading-dia-d-replay-panel.tsx`.

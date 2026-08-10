@@ -62,18 +62,20 @@ Con este paso M5 **agota las islas JSX del monólito**. Batería Coach adicional
 
 1. ~~Extraer el Coach con Diseño B~~ — **HECHO** (paso 10, `BacktestResultFocusCoach`, ~33 props).
    M5 ya no deja islas JSX autocontenidas en `backtests-page.tsx`.
-2. **Reorientar M5 a otro frente — EN CURSO**: se inició el frente `trading-dia-d-replay-panel.tsx` (1.341 líneas),
-   el mejor candidato de valor/riesgo (parcialmente sliced y con thin wrappers limpios). **Pasos B.1 y B.2 hechos**:
-   `DiaDTradesPanel` (tabla de Operaciones) y `DiaDPendingTradeBanner` (banner trade pendiente). **Pendiente:**
-   **B.3** panel Informe sesión (acoplamiento medio). Otros candidatos del §4.2 (acoplamiento alto, descartados en
-   FASE 1): `backtest-optimize-panel.tsx` (2.251), `backtest-strategy-matrix-panel.tsx` (1.033),
-   `backtest-explore-panel.tsx` (1.456, MEDIO), `ohlcv-chart.tsx` (974, sin JSX extraíble).
+2. **Reorientar M5 a otro frente — HECHO (frente trading-dia-d CERRADO)**: se inició el frente
+   `trading-dia-d-replay-panel.tsx` (1.341 líneas), el mejor candidato de valor/riesgo (parcialmente sliced y con
+   thin wrappers limpios). **Pasos B.1, B.2 y B.3 hechos**: `DiaDTradesPanel` (tabla de Operaciones),
+   `DiaDPendingTradeBanner` (banner trade pendiente) y `DiaDSessionReportPanel` (panel Informe sesión, desktop+móvil).
+   Otros candidatos del §4.2 (acoplamiento alto, descartados en FASE 1): `backtest-optimize-panel.tsx` (2.251),
+   `backtest-strategy-matrix-panel.tsx` (1.033), `backtest-explore-panel.tsx` (1.456, MEDIO), `ohlcv-chart.tsx` (974,
+   sin JSX extraíble).
 3. **Refactor a custom hooks** (extraer handlers/queries de orquestación de los frentes grandes) — más invasivo,
    fuera del patrón de slicing JSX aprobado; requiere recalibración explícita.
 
-> **Progreso (2026-08-10):** el hilo de reorientación ejecutó **B.1 + B.2** en `trading-dia-d-replay-panel.tsx`
-> (`DiaDTradesPanel`, `DiaDPendingTradeBanner`). Se preparó un **traspaso parcial nuevo** para el siguiente hilo:
-> [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md).
+> **Progreso (2026-08-10):** el hilo de reorientación ejecutó **B.1 + B.2 + B.3** en `trading-dia-d-replay-panel.tsx`
+> (`DiaDTradesPanel`, `DiaDPendingTradeBanner`, `DiaDSessionReportPanel`) → **frente trading-dia-d CERRADO**. El
+> punto de entrada del siguiente hilo está de nuevo en el
+> [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) (§2.3: opciones).
 
 ## 3. Reglas del juego (mantener en el nuevo chat)
 

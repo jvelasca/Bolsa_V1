@@ -877,17 +877,24 @@ wrapper, 4 props: `pendingTrade`, `mode`, `onAccept`, `onReject`). Los callbacks
 orquestador**; el JSX del banner se traslada fielmente (renderiza `null` si no hay pendiente, idéntico al original).
 Reducción en el orquestador: **-11 líneas netas**.
 
-**Batería verde (paso B.1 + B.2):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
+**Paso B.3 (`a8fede3`, aprobado — CIERRA el frente):** extraído el panel **Informe sesión** a
+`apps/web/src/features/trading/dia-d-session-report-panel.tsx` → `DiaDSessionReportPanel` (**Diseño B**). Hallazgo de
+FASE 1 verificado: el informe se renderiza en **DOS sitios del DOM** (no dos ramas intercambiables): **desktop**
+(`isWide`, dentro del `movie-row`) con `PanelResizeHandle`/`<aside>` y drag-resize de `reportWidthPct`, y **móvil**
+(`!isWide`, **debajo** del movie-row) como `<details>`. Por eso se usó un componente con prop
+`variant: 'desktop' | 'mobile'` desplegado en **dos sitios** guardados por `isWide` (el cuerpo `sessionReportBody` se
+pasa como `body` en ambos). Toda la lógica de estado/drag **permanece en el orquestador** (`sessionReportBody`,
+`reportPanelProps` con `reportOpen`/`onOpenChange`/`reportWidthPct`/`onResizeDrag`/`onResizeDragEnd`, el drag computa
+con `movieRowRef.current`/`pendingReportW.current`/`clampReportWidthPct`/`pxToPct`/`setLayout`/`persistLayout`) → no
+se rompe el layout drag-resize. Reducción en el orquestador: **-67 líneas** (~1.272 → ~1.205).
+
+**Batería verde (pasos B.1 + B.2 + B.3):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
 code-splitting pre-existentes = M7). **Cobertura verificada:** el feature `trading/dia-d` tiene tests de lógica
 (`dia-d-gate-equity`, `dia-d-evidence-archive-io`, `dia-d-verify-continuity`, `dia-d-session-evidence`,
-`dia-d-reconciliation`, `dia-d-favorites`, `dia-d-trading-session-store`); los bloques extraídos (tabla + banner)
-son JSX presentacional sin test directo → no se rompe nada.
+`dia-d-reconciliation`, `dia-d-favorites`, `dia-d-trading-session-store`); los bloques extraídos (tabla + banner +
+informe) son JSX presentacional sin test directo → no se rompe nada. **Resultado del frente:** las islas JSX del
+orquestador quedan extraídas (B.1 tabla, B.2 banner, B.3 informe); resta orquestación, no JSX autocontenido.
 
-**Pendiente del frente (no ejecutado, B.3):** panel **Informe sesión** (desktop `<aside>` ~1110-1181 + móvil
-`<details>` ~1182-1202) → `DiaDSessionReportPanel`. Acoplamiento **medio**: usa `sessionReportBody`,
-`layout.reportWidthPct`, `setReportOpen`, drag-resize (`pendingReportW.current`, `clampReportWidthPct`) y **dos
-ramas de render** que comparten el mismo `sessionReportBody`. Se valorará en el próximo hilo (ver traspaso nuevo).
-
-**Traspaso del frente preparado (cierre de este hilo):**
+**Traspaso del frente (actualizado):**
 [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) —
-HEAD `8c1a4bc`, pasos B.1+B.2 cerrados, B.3 pendiente con FASE 1 detallada y opciones §2.3 para el siguiente hilo.
+HEAD `a8fede3`, pasos B.1+B.2+B.3 cerrados (frente trading-dia-d **cerrado**) con opciones §2.3 para el siguiente hilo.
