@@ -4,7 +4,6 @@ import {
   ChevronUp,
   Loader2,
   Play,
-  SlidersHorizontal,
   X,
 } from 'lucide-react';
 import {
@@ -15,7 +14,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { BacktestFutureStars } from '@/features/backtests/backtest-future-stars';
+import { OptimizeCardHeader } from '@/features/backtests/optimize-card-header';
 import type { LabZoneHandle } from '@/features/backtests/backtest-lab-board-types';
 import type {
   ChartTimeframe,
@@ -70,7 +69,6 @@ import {
 import { classifyPbo, formatPbo, pboBandLabel } from '@/features/backtests/backtest-pbo';
 import { credibilityHintFromLabWfe } from '@bolsa/shared';
 import {
-  OPTIMIZE_CRITERION_LABEL,
   OPTIMIZE_CPCV_HELP,
   OPTIMIZE_OOS_HELP,
   OPTIMIZE_WF_HELP,
@@ -109,7 +107,7 @@ import {
   type LabAdoptionPlateauMeta,
 } from '@/features/backtests/lab-adoption-memory';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 interface BacktestOptimizePanelProps {
@@ -1280,76 +1278,17 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         showLiveProgress && 'border-sky-500/40 ring-1 ring-sky-400/25',
       )}
     >
-      <CardHeader className={cn('pb-2', compact && 'px-3 pt-3')}>
-        <CardTitle
-          className={cn(
-            'flex flex-wrap items-center gap-2',
-            compact ? 'text-sm' : 'text-base',
-          )}
-          title="Experimento de mejora: define el espacio de búsqueda, elige método(s) y compara contra tu operativa original."
-        >
-          {zoneRank != null ? (
-            <span
-              className={cn(
-                'inline-flex h-6 min-w-6 items-center justify-center rounded-md px-1.5 text-xs font-semibold',
-                zoneRank === 1
-                  ? 'bg-amber-500/20 text-amber-900 dark:text-amber-100'
-                  : 'bg-muted text-muted-foreground',
-              )}
-            >
-              #{zoneRank}
-            </span>
-          ) : (
-            <SlidersHorizontal className="h-4 w-4 text-primary" />
-          )}
-          <span className="min-w-0 flex-1 truncate">
-            {compact
-              ? (seed?.strategyLabel ?? 'Zona Lab')
-              : 'Laboratorio de optimización'}
-          </span>
-          {showLiveProgress && (
-            <span className="inline-flex items-center gap-1 rounded-md border border-sky-500/40 bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-medium text-sky-100">
-              <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-              {progressPhase === 'pending' ? 'En cola' : 'Analizando'}
-            </span>
-          )}
-          {zoneStars != null && zoneStars > 0 ? (
-            <BacktestFutureStars
-              stars={zoneStars}
-              capped={zoneStarsCapped}
-              size="sm"
-              titlePrefix={zoneRank != null ? `Coach #${zoneRank}` : undefined}
-            />
-          ) : null}
-        </CardTitle>
-        {!compact && (
-          <CardDescription
-            title={`${OPTIMIZE_CRITERION_LABEL}. Opcional: reserva un tramo final (OOS) para comprobar si el mejor candidato aguanta fuera de la ventana de búsqueda.`}
-          >
-            Elige qué variables probar y compara con tu prueba origen
-            {oosEnabled ? ' · con comprobación al final' : ''}
-          </CardDescription>
-        )}
-        {compact && seed && (
-          <CardDescription className="text-[11px]">
-            {showLiveProgress
-              ? progressPhase === 'pending'
-                ? 'Job en cola · el worker lo tomará en breve'
-                : 'Optimizando parámetros · progreso en vivo arriba'
-              : 'Inicial vs Mejor · config editable en esta zona · prioriza OOS / tramo reciente'}
-          </CardDescription>
-        )}
-        {adoptionHint ? (
-          <p
-            className="mt-1 rounded-md border border-border/70 bg-muted/25 px-2 py-1 text-[10px] text-muted-foreground"
-            title="Memoria Lab (CORE B v0.1). Guía el espacio (más ancho si meseta, más estrecho si pico); no cambia el ranking del Mejor."
-          >
-            {adoptionHint}
-            {' · '}
-            espacio guiado si misma familia.
-          </p>
-        ) : null}
-      </CardHeader>
+      <OptimizeCardHeader
+        compact={compact}
+        seed={seed}
+        zoneRank={zoneRank}
+        zoneStars={zoneStars}
+        zoneStarsCapped={zoneStarsCapped}
+        showLiveProgress={showLiveProgress}
+        progressPhase={progressPhase}
+        adoptionHint={adoptionHint}
+        oosEnabled={oosEnabled}
+      />
       <CardContent className={cn('space-y-4', compact && 'px-3 pb-3')}>
         {compact && showLiveProgress && progressNode}
 
