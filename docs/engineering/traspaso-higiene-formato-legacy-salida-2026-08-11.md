@@ -1,10 +1,10 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `de35c4c` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `6f8c668` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
-> Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-13) y los próximos dominios.
+> Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-14) y los próximos dominios.
 > No hay nada que redescubrir: cada hecho está verificado en el repo/CI.
 
 ---
@@ -53,7 +53,7 @@ formatee masivamente el estilo antiguo en el diff editorial).
 > archivos del dominio. **Los commits `--no-verify` requieren la aprobación del usuario** en la tarjeta nativa de
 > auto-review (flujo ya validado para los 9 lotes).
 
-## 4. Estado de avance real (2026-08-11, HEAD `f011918`)
+## 4. Estado de avance real (2026-08-11, HEAD `6f8c668`)
 
 | Lote | Commit | Dominio | Ficheros con contenido real |
 |------|--------|---------|-----------------------------|
@@ -70,9 +70,10 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 11 | `ee381d7` | backtests/strategy-matrix restantes | 11 |
 | 12 | `9975cd3` | backtests/list-auto + mass-compare | 11 |
 | 13 | `f011918` | backtests/finalists + top | 17 |
+| 14 | `6f8c668` | backtests/coach + lab | 21 |
 
-**Total formateado hasta aquí: 135 ficheros** con diff real en 13 commits propios de formateo. Todos con batería
-`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅`.
+**Total formateado hasta aquí: 156 ficheros** con diff real en 14 commits propios de formateo. Todos con batería
+`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en el lote 14, área Coach/TOP).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
 EOL** (contenido normalizado idéntico a HEAD). Se detectan porque **no aparecen en `git diff --cached --numstat`**
@@ -90,7 +91,7 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
   `backtest-optimize-progress.tsx`, `backtest-optimize-seed.ts`(+test), `backtest-optimize-space.ts`(+test),
   `backtest-optimize-validation-hint.ts`(+test), `backtest-optimized-strategy.ts` = **16 files (+1333/−932 solo formato)**.
 - ~~**`list-auto`/`mass-compare`**~~ **HECHO (lote 12, `9975cd3`)**: `backtest-list-auto.ts`(+tests: board/board-panel/persist/statusbar), `backtest-list-auto-board.ts`(+test), `backtest-list-auto-board-panel.tsx`, `backtest-list-auto-persist.ts`(+test), `backtest-list-auto-statusbar.test.ts`, `backtest-mass-compare.ts`(+test), `backtest-mass-compare-panel.tsx` = **11 files (+576/−430 solo formato)**.
-- **`coach`/`lab`** : `coach-dual-audit.ts`(+test), `coach-llm-invariant.test.ts`, `coach-profile-policy.ts`(+test), `coach-top-save.ts`(+test), `coach-quorum-bar.tsx`, `backtest-coach-*.ts`(+tests), `backtest-lab-board.tsx`(+types), `lab-board-activity-banner.tsx`, `lab-zone-verdict.tsx`, `lab-*`(memory/handoff/caf-smoke).
+- ~~**`coach`/`lab`**~~ **HECHO (lote 14, `6f8c668`)**: `coach-dual-audit.ts`(+test), `coach-llm-invariant.test.ts`, `coach-profile-policy.ts`(+test), `coach-top-save.ts`(+test), `coach-quorum-bar.tsx`, `coach-profile-battery-scenario.test.ts`; `lab-coach-handoff.ts`(+test), `lab-adoption-memory.ts`(+test), `lab-board-activity-banner.tsx`, `lab-zone-verdict.tsx`, `lab-coach-caf-smoke.test.ts`; `backtest-lab-board.tsx`(+`backtest-lab-board-types.ts`), `backtest-coach-lote.ts`(+test), `backtest-coach-coherence.test.ts` = **21 files (+1326/−1048 solo formato)**. Con batería `test:coach` 26/186 ✅ (área Coach/TOP).
 - ~~**`finalists`/`top`**~~ **HECHO (lote 13, `f011918`)**: `backtest-finalists-freshness.ts`(+tests), `finalists-stability-summary.ts`(+test), `finalist-propose-supervised.ts`(+test), `promote-finalist-to-tracker.ts`(+test), `instrument-strategy-top-panel.tsx`(+test), `instrument-strategy-top-promote.ts`(+test), `instrument-top-match.ts`(+test), `instrument-top-strategy-type.ts`(+test) = **17 files (+807/−667 solo formato)**.
 - ~~**`strategy-matrix` restantes**~~ **HECHO (lote 11, `ee381d7`)**: `backtest-strategy-matrix.ts`(+test), `strategy-matrix-column-layout.ts`(+test), `strategy-matrix-filter-carousel-prefs.ts`(+test), `strategy-monitor-panel.tsx`, `strategy-monitor.ts`(+test), `mine-strategies-filters.ts`(+test) = **11 files (+970/−785 solo formato)**.
 - **`hub`/`chart`/`misc`** : `backtest-hub-layout.tsx`, `backtest-hub-nav.ts`(+test), `backtest-hub-tabs.tsx`(+test), `backtest-global-bar.tsx`, `backtest-history-tab.tsx`, `backtest-chart-import-panel.tsx`, `backtest-equity-chart.tsx`, `backtest-replay-chart.tsx`, `backtest-stat-donut.tsx`, `backtest-ranking-table.tsx`, `backtest-universe-picker.tsx`, `backtest-zone-settings-dialog.tsx`, `backtest-zone-prefs.ts`(+test), `backtests-page.tsx`, `backtest-cursor-panel.tsx`, `backtest-favorites-menu.tsx`, `backtest-future-stars.tsx`(+test), `backtest-instrument-preview.tsx`, `backtest-movie-hud.tsx`, `backtest-movie-stats.ts`, `backtest-paper-checklist.tsx`, `backtest-paper-gate.ts`(+test), `backtest-run-context.ts`(+test), `backtest-batch-run.ts`, `backtest-export.ts`, `backtest-date-format.ts`, `backtest-split-layout.ts`, `backtest-hud-prefs.ts`, `use-backtest-hud-prefs.ts`, `backtest-buy-hold.ts`(+test), `backtest-deep-coach.ts`(+test), `backtest-oos-evidence.ts`(+test), `backtest-pbo.ts`(+test), `backtest-period.ts`(+test), `backtest-period-returns.ts`, `backtest-walk-forward-metrics.ts`(+test), `chart-strategy-bridge.test.ts`, `drawing-replay-parity.test.ts`, `library-nav.ts`(+test), `library-strategy-buckets.ts`(+test), `estudio-list.test.ts`, `estudio-personal-list.test.ts`, `ibex35-operativa-audit.ts`(+test), `signal-evaluate-parity.test.ts`.
@@ -98,21 +99,16 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
 > **Nota de método para el siguiente hilo (relevo):** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes
-> (11, `ee381d7`), `list-auto`/`mass-compare` (12, `9975cd3`) y `finalists`/`top` (13, `f011918`) ya están HECHOS.
-> Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
+> (11, `ee381d7`), `list-auto`/`mass-compare` (12, `9975cd3`), `finalists`/`top` (13, `f011918`) y `coach`/`lab`
+> (14, `6f8c668`) ya están HECHOS. Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin
+> mezclar dominios:
 >
-> **Siguiente: `coach`/`lab` — 16 files desincronizados YA CONFIRMADOS por `prettier --check` (2026-08-11):**
-> - **coach (9):** `coach-dual-audit.ts`(+test), `coach-profile-policy.ts`(+test), `coach-llm-invariant.test.ts`,
->   `coach-top-save.ts`(+test), `coach-quorum-bar.tsx`, `coach-profile-battery-scenario.test.ts`.
-> - **lab (7):** `lab-coach-handoff.ts`(+test), `lab-adoption-memory.ts`(+test), `lab-board-activity-banner.tsx`,
->   `lab-zone-verdict.tsx`, `lab-coach-caf-smoke.test.ts`.
-> - **Auto-lista para el `--check`/`--write`/`git add`** (16 rutas bajo `src/features/backtests/`): los anteriores.
-> - Quedan **por verificar** antes de cerrar el dominio: `backtest-lab-board.tsx`(+`backtest-lab-board-types.ts`),
->   `backtest-coach-lote.ts`(+test), `backtest-coach-coherence.test.ts`; si `--check` los reporta, se añaden al lote
->   (≤ ~30 en total).
-> Tras `coach`/`lab`, queda **`hub`/`chart`/`misc`** (mayor, ~44 archivos; conviene subdividirlo, p. ej. `hub` primero:
-> `backtest-hub-layout`/`hub-nav`/`hub-tabs`/`global-bar`/`history-tab`/`backtests-page`, luego el resto) y después el
-> **resto de `apps/web/src`**. Seguir el protocolo paso a paso, verificando el `git diff --cached --numstat` (paso 4).
+> **Siguiente: `hub`/`chart`/`misc`** (mayor, ~44 archivos; conviene subdividirlo, p. ej. `hub` primero:
+> `backtest-hub-layout`/`hub-nav`/`hub-tabs`/`global-bar`/`history-tab`/`backtests-page`, luego `chart` y luego el resto de
+> `misc`). Los 21 files de `coach`/`lab` que el `--check` confirmó + los pendientes que reportó
+> (`backtest-lab-board`(+types), `backtest-coach-lote`(+test), `backtest-coach-coherence.test`) ya se formatearon en el
+> lote 14. Después de `hub`/`chart`/`misc`, seguir con el **resto de `apps/web/src`**. Seguir el protocolo paso a paso,
+> verificando el `git diff --cached --numstat` (paso 4).
 
 
 ## 6. Documentos fuente de verdad / índices
