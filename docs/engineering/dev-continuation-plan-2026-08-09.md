@@ -839,5 +839,9 @@ traspaso parcial antes de continuar.
 subyacente de los módulos extraídos (`backtest-period`, `backtest-mass-compare`, `backtest-list-auto*`,
 `backtest-hub-tabs/nav`, etc.); la batería `test 140/707` pasó en cada uno de los 8 pasos.
 
-**Registro en índice engineering:** `docs/engineering/engineering-index.md` bajo Product/Ops (junto a los
+**Registro en índice engineering:** `docs/engineering/engineering-index-2026-08-03.md` bajo Product/Ops (junto a los
 traspasos), añadido `traspaso-m5-frontend-2026-08-10.md` como entrada del hilo M5 F4.8.
+
+**Punto de entrada siguiente hilo (Coach + Lab):** [traspaso-m5-f4-8-coach-lab-2026-08-10.md](./traspaso-m5-f4-8-coach-lab-2026-08-10.md)
+registrado en el índice engineering — detalla los bloques `BacktestExploreRanking` (Coach) y `BacktestLabBoard`
+(Lab) que quedan fuera de este hilo por riesgo y las opciones de extracción.

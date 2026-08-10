@@ -57,6 +57,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m4-infraestructura-datos-2026-08-10.md     ← M4 infraestructura/modelo datos (Prisma vs SQLAlchemy + Alembic + repos) CERRADO 08-10 · ADR-025
 │   ├── traspaso-m6-ai-analytics-2026-08-10.md              ← M6 AI/analytics (py/ai + py/analytics) CERRADO 08-10
 │   ├── traspaso-m5-frontend-2026-08-10.md                  ← M5 Frontend web por features (apps/web) tras M6 CERRADO-08-10 / entrada
+│   ├── traspaso-m5-f4-8-coach-lab-2026-08-10.md            ← M5 hilo F4.8 siguiente: Coach + Lab (feature-slicing backtests-page)
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)
