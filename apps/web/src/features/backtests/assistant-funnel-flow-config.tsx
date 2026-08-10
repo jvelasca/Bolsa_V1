@@ -6,9 +6,9 @@
  * Los checks viven en las ramas; el layout explica el contrato del ciclo.
  */
 
-import type { ReactNode } from 'react';
-import type { AssistantPrefs } from '@/features/backtests/backtest-assistant-prefs';
-import { cn } from '@/lib/utils';
+import type { ReactNode } from "react";
+import type { AssistantPrefs } from "@/features/backtests/backtest-assistant-prefs";
+import { cn } from "@/lib/utils";
 
 type Props = {
   prefs: AssistantPrefs;
@@ -32,10 +32,10 @@ function FlowCheck({
   return (
     <label
       className={cn(
-        'flex items-start gap-2 rounded-md px-1.5 py-1 text-[11px] leading-snug',
+        "flex items-start gap-2 rounded-md px-1.5 py-1 text-[11px] leading-snug",
         muted
-          ? 'cursor-default text-muted-foreground'
-          : 'cursor-pointer text-foreground hover:bg-accent/60',
+          ? "cursor-default text-muted-foreground"
+          : "cursor-pointer text-foreground hover:bg-accent/60",
       )}
       title={hint}
     >
@@ -77,16 +77,12 @@ function StageCard({
   );
 }
 
-function Branch({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Branch({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="ml-1 border-l-2 border-border/70 pl-2">
-      <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">{label}</p>
+      <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">
+        {label}
+      </p>
       {children}
     </div>
   );
@@ -105,11 +101,11 @@ function Arrow({ note }: { note?: string }) {
  * Diagrama editable del embudo. Sustituye la lista plana de prefs del ciclo.
  */
 export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
-  const patchUniverse = (partial: Partial<AssistantPrefs['universe']>) =>
+  const patchUniverse = (partial: Partial<AssistantPrefs["universe"]>) =>
     onPrefsChange({ ...prefs, universe: { ...prefs.universe, ...partial } });
-  const patchCoach = (partial: Partial<AssistantPrefs['coach']>) =>
+  const patchCoach = (partial: Partial<AssistantPrefs["coach"]>) =>
     onPrefsChange({ ...prefs, coach: { ...prefs.coach, ...partial } });
-  const patchSemifinal = (partial: Partial<AssistantPrefs['semifinal']>) =>
+  const patchSemifinal = (partial: Partial<AssistantPrefs["semifinal"]>) =>
     onPrefsChange({ ...prefs, semifinal: { ...prefs.semifinal, ...partial } });
 
   return (
@@ -169,7 +165,9 @@ export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
           checked={prefs.listAutoSkipOverCapConfirm}
           label="No preguntar tandas (>40)"
           hint="Lista AUTO: arranca sin diálogo si N ≤ 200. N > 200 siempre confirma."
-          onChange={(v) => onPrefsChange({ ...prefs, listAutoSkipOverCapConfirm: v })}
+          onChange={(v) =>
+            onPrefsChange({ ...prefs, listAutoSkipOverCapConfirm: v })
+          }
         />
       </StageCard>
 
@@ -177,7 +175,8 @@ export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
 
       <StageCard n={2} title="Coach · ACK¹">
         <p className="mb-1 px-1.5 text-[10px] leading-snug text-muted-foreground">
-          Analiza el lote. Si hace falta ACK (débil / discrepancia), esa es la puerta al Lab.
+          Analiza el lote. Si hace falta ACK (débil / discrepancia), esa es la
+          puerta al Lab.
         </p>
         <Branch label="Si hace falta ACK¹">
           <FlowCheck
@@ -274,7 +273,9 @@ export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
         />
         <Branch label="Tras ACK final / ciclo">
           <FlowCheck
-            checked={prefs.coach.autoAckOnCycle && !prefs.coach.pauseIfAckNeeded}
+            checked={
+              prefs.coach.autoAckOnCycle && !prefs.coach.pauseIfAckNeeded
+            }
             muted
             label="Grabar TOP-3 Finalistas en BD"
             hint="Con mejora Lab, o sin TOP previo (primera escritura). Si hay TOP y Lab no mejora → se conserva."
@@ -297,7 +298,8 @@ export function AssistantFunnelFlowConfig({ prefs, onPrefsChange }: Props) {
           }
         />
         <p className="px-1.5 pt-0.5 text-[10px] leading-snug text-muted-foreground">
-          Checklist = paper (A) · Proponer = Supervisado F3 (C). Auto-paper D congelado.
+          Checklist = paper (A) · Proponer = Supervisado F3 (C). Auto-paper D
+          congelado.
         </p>
       </StageCard>
     </div>

@@ -10,9 +10,9 @@
  * @see docs/engineering/research-lifecycle.md § Embudo D
  */
 
-import type { AssistantStepId } from '@/features/backtests/backtest-assistant-steps';
+import type { AssistantStepId } from "@/features/backtests/backtest-assistant-steps";
 
-export const ASSISTANT_PREFS_KEY = 'bolsa-backtest-assistant-prefs-v1';
+export const ASSISTANT_PREFS_KEY = "bolsa-backtest-assistant-prefs-v1";
 
 export type AssistantUniversePrefs = {
   selectAllGenerics: boolean;
@@ -155,12 +155,12 @@ export function defaultAssistantPrefs(): AssistantPrefs {
 }
 
 function asBool(value: unknown, fallback: boolean): boolean {
-  return typeof value === 'boolean' ? value : fallback;
+  return typeof value === "boolean" ? value : fallback;
 }
 
 function normalizeEnabledSteps(raw: unknown): Record<AssistantStepId, boolean> {
   const d = defaultEnabledSteps();
-  if (!raw || typeof raw !== 'object') return d;
+  if (!raw || typeof raw !== "object") return d;
   const o = raw as Partial<Record<AssistantStepId, boolean>>;
   return {
     universe: asBool(o.universe, d.universe),
@@ -172,9 +172,9 @@ function normalizeEnabledSteps(raw: unknown): Record<AssistantStepId, boolean> {
 
 function asFutureWeight(
   value: unknown,
-  fallback: AssistantCoachPrefs['futureWeight'],
-): AssistantCoachPrefs['futureWeight'] {
-  const n = typeof value === 'number' ? value : Number(value);
+  fallback: AssistantCoachPrefs["futureWeight"],
+): AssistantCoachPrefs["futureWeight"] {
+  const n = typeof value === "number" ? value : Number(value);
   if (n === 0.3) return 0.3;
   if (n === 0.55) return 0.55;
   if (n === 0.42) return 0.42;
@@ -183,14 +183,23 @@ function asFutureWeight(
 
 export function normalizeAssistantPrefs(raw: unknown): AssistantPrefs {
   const d = defaultAssistantPrefs();
-  if (!raw || typeof raw !== 'object') return d;
+  if (!raw || typeof raw !== "object") return d;
   const o = raw as Partial<AssistantPrefs>;
   return {
     enabledSteps: normalizeEnabledSteps(o.enabledSteps),
     universe: {
-      selectAllGenerics: asBool(o.universe?.selectAllGenerics, d.universe.selectAllGenerics),
-      runCoachOnEnter: asBool(o.universe?.runCoachOnEnter, d.universe.runCoachOnEnter),
-      autoAdvanceWhenDone: asBool(o.universe?.autoAdvanceWhenDone, d.universe.autoAdvanceWhenDone),
+      selectAllGenerics: asBool(
+        o.universe?.selectAllGenerics,
+        d.universe.selectAllGenerics,
+      ),
+      runCoachOnEnter: asBool(
+        o.universe?.runCoachOnEnter,
+        d.universe.runCoachOnEnter,
+      ),
+      autoAdvanceWhenDone: asBool(
+        o.universe?.autoAdvanceWhenDone,
+        d.universe.autoAdvanceWhenDone,
+      ),
       // Legacy: un solo check «Optimizadas y Mis» → ambos ON si estaba activo.
       includeOptimizedStrategies: asBool(
         o.universe?.includeOptimizedStrategies ??
@@ -242,7 +251,10 @@ export function normalizeAssistantPrefs(raw: unknown): AssistantPrefs {
       labEvenIfWeak: asBool(o.coach?.labEvenIfWeak, d.coach.labEvenIfWeak),
       llmNarrate: asBool(o.coach?.llmNarrate, d.coach.llmNarrate),
       autoAckOnCycle: asBool(o.coach?.autoAckOnCycle, d.coach.autoAckOnCycle),
-      pauseIfAckNeeded: asBool(o.coach?.pauseIfAckNeeded, d.coach.pauseIfAckNeeded),
+      pauseIfAckNeeded: asBool(
+        o.coach?.pauseIfAckNeeded,
+        d.coach.pauseIfAckNeeded,
+      ),
       requireAckBeforeLab: asBool(
         o.coach?.requireAckBeforeLab,
         d.coach.requireAckBeforeLab,

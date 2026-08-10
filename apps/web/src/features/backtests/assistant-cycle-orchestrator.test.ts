@@ -3,7 +3,7 @@
  * Reproduce el bug del doble Play (fingerprint) y el guardado con ACK.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   isCoach1AckSatisfied,
   isFinalistsSavedStatusMessage,
@@ -12,70 +12,73 @@ import {
   resolveCoach1AdvanceAction,
   sequenceExpectsFinalistsSave,
   shouldReenterUniverseToLabChain,
-} from '@/features/backtests/assistant-cycle-orchestrator';
-import { resolveFullCycleSaveDecision } from '@/features/backtests/backtest-assistant-full-cycle';
+} from "@/features/backtests/assistant-cycle-orchestrator";
+import { resolveFullCycleSaveDecision } from "@/features/backtests/backtest-assistant-full-cycle";
 
-const gateOk = { advance: true as const, reason: 'Coach¹ discrepancy · avance a Lab' };
+const gateOk = {
+  advance: true as const,
+  reason: "Coach¹ discrepancy · avance a Lab",
+};
 const gateWeakSkip = {
   advance: false as const,
-  reason: 'Coach¹ débil · check «pasar si débil» OFF · Finalistas intactos',
+  reason: "Coach¹ débil · check «pasar si débil» OFF · Finalistas intactos",
 };
 
-describe('ACS-like Coach¹ advance', () => {
-  it('with Auto-ACK ON does not wait for checkbox (no doble Play)', () => {
+describe("ACS-like Coach¹ advance", () => {
+  it("with Auto-ACK ON does not wait for checkbox (no doble Play)", () => {
     const action = resolveCoach1AdvanceAction({
       gate: gateOk,
-      confidence: 'discrepancy',
+      confidence: "discrepancy",
       requireAckBeforeLab: true,
       ackReady: false,
       autoAckOnCycle: true,
       pauseIfAckNeeded: false,
       saveSemifinalSkipLab: false,
     });
-    expect(action.type).toBe('go_lab');
+    expect(action.type).toBe("go_lab");
   });
 
-  it('with Pausar ACK waits until checkbox', () => {
+  it("with Pausar ACK waits until checkbox", () => {
     expect(
       resolveCoach1AdvanceAction({
         gate: gateOk,
-        confidence: 'discrepancy',
+        confidence: "discrepancy",
         requireAckBeforeLab: true,
         ackReady: false,
         autoAckOnCycle: true,
         pauseIfAckNeeded: true,
         saveSemifinalSkipLab: false,
       }).type,
-    ).toBe('wait_ack1');
+    ).toBe("wait_ack1");
 
     expect(
       resolveCoach1AdvanceAction({
         gate: gateOk,
-        confidence: 'discrepancy',
+        confidence: "discrepancy",
         requireAckBeforeLab: true,
         ackReady: true,
         autoAckOnCycle: true,
         pauseIfAckNeeded: true,
         saveSemifinalSkipLab: false,
       }).type,
-    ).toBe('go_lab');
+    ).toBe("go_lab");
   });
 
-  it('weak without labEvenIfWeak skips (gate)', () => {
+  it("weak without labEvenIfWeak skips (gate)", () => {
     expect(
       resolveCoach1AdvanceAction({
         gate: gateWeakSkip,
-        confidence: 'weak',
+        confidence: "weak",
         requireAckBeforeLab: true,
         ackReady: true,
         autoAckOnCycle: true,
         pauseIfAckNeeded: false,
         saveSemifinalSkipLab: false,
       }).type,
-    ).toBe('skip_lab');
+    ).toBe("skip_lab");
   });
 
-  it('re-enters chain after ACK¹ when fingerprint was consumed', () => {
+  it("re-enters chain after ACK¹ when fingerprint was consumed", () => {
     expect(
       shouldReenterUniverseToLabChain({
         fingerprintMatches: true,
@@ -100,8 +103,8 @@ describe('ACS-like Coach¹ advance', () => {
   });
 });
 
-describe('ACS-like Finalists save after ACK final', () => {
-  it('saves when Lab improved + ACK final (auto or manual)', () => {
+describe("ACS-like Finalists save after ACK final", () => {
+  it("saves when Lab improved + ACK final (auto or manual)", () => {
     expect(
       sequenceExpectsFinalistsSave({
         postLab: true,
@@ -132,10 +135,10 @@ describe('ACS-like Finalists save after ACK final', () => {
         labImprovedCount: 2,
         canSaveTop: true,
       }).action,
-    ).toBe('save_active');
+    ).toBe("save_active");
   });
 
-  it('blocks save without Lab improve (política)', () => {
+  it("blocks save without Lab improve (política)", () => {
     expect(
       sequenceExpectsFinalistsSave({
         postLab: true,
@@ -146,39 +149,41 @@ describe('ACS-like Finalists save after ACK final', () => {
         pauseIfAckNeeded: true,
         recommendationCount: 3,
       }),
-    ).toEqual({ shouldSave: false, blockedBy: 'no_lab_improve' });
+    ).toEqual({ shouldSave: false, blockedBy: "no_lab_improve" });
   });
 
-  it('detects saved status messages from auto-save', () => {
+  it("detects saved status messages from auto-save", () => {
     expect(
       isFinalistsSavedStatusMessage(
-        'Ciclo: Mejor(es) Lab + Coach² OK → Finalistas lab_validated.',
+        "Ciclo: Mejor(es) Lab + Coach² OK → Finalistas lab_validated.",
       ),
     ).toBe(true);
     expect(
-      isSemifinalShortcutStatusMessage('Ciclo: TOP semifinal guardado · Lab omitido (atajo).'),
+      isSemifinalShortcutStatusMessage(
+        "Ciclo: TOP semifinal guardado · Lab omitido (atajo).",
+      ),
     ).toBe(true);
   });
 
-  it('ACK policy: config ⋯ is the only ACK source (no duplicate checkbox)', () => {
+  it("ACK policy: config ⋯ is the only ACK source (no duplicate checkbox)", () => {
     expect(
       resolveAssistantAckPolicy({
         autoAckOnCycle: true,
         pauseIfAckNeeded: false,
       }),
-    ).toEqual({ mode: 'auto', showHumanCheckbox: false });
+    ).toEqual({ mode: "auto", showHumanCheckbox: false });
     expect(
       resolveAssistantAckPolicy({
         autoAckOnCycle: true,
         pauseIfAckNeeded: true,
       }),
-    ).toEqual({ mode: 'human', showHumanCheckbox: true });
+    ).toEqual({ mode: "human", showHumanCheckbox: true });
     expect(
       resolveAssistantAckPolicy({
         autoAckOnCycle: false,
         pauseIfAckNeeded: false,
       }),
-    ).toEqual({ mode: 'human', showHumanCheckbox: true });
+    ).toEqual({ mode: "human", showHumanCheckbox: true });
     expect(
       isCoach1AckSatisfied({
         needsAck: true,
@@ -189,17 +194,17 @@ describe('ACS-like Finalists save after ACK final', () => {
     ).toBe(true);
   });
 
-  it('full sequence story: wait → ack → lab → save', () => {
+  it("full sequence story: wait → ack → lab → save", () => {
     const wait = resolveCoach1AdvanceAction({
       gate: gateOk,
-      confidence: 'discrepancy',
+      confidence: "discrepancy",
       requireAckBeforeLab: true,
       ackReady: false,
       autoAckOnCycle: false,
       pauseIfAckNeeded: true,
       saveSemifinalSkipLab: false,
     });
-    expect(wait.type).toBe('wait_ack1');
+    expect(wait.type).toBe("wait_ack1");
 
     expect(
       shouldReenterUniverseToLabChain({
@@ -227,21 +232,21 @@ describe('ACS-like Finalists save after ACK final', () => {
 
     const go = resolveCoach1AdvanceAction({
       gate: gateOk,
-      confidence: 'discrepancy',
+      confidence: "discrepancy",
       requireAckBeforeLab: true,
       ackReady: true,
       autoAckOnCycle: false,
       pauseIfAckNeeded: true,
       saveSemifinalSkipLab: false,
     });
-    expect(go.type).toBe('go_lab');
+    expect(go.type).toBe("go_lab");
 
     const save = resolveFullCycleSaveDecision({
       postLab: true,
       labImprovedCount: 3,
       canSaveTop: true,
     });
-    expect(save.action).toBe('save_active');
+    expect(save.action).toBe("save_active");
     expect(isFinalistsSavedStatusMessage(`Ciclo: ${save.reason}`)).toBe(true);
   });
 });

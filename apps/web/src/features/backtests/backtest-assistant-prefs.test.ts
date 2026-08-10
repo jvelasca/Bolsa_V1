@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   defaultAssistantPrefs,
   normalizeAssistantPrefs,
-} from '@/features/backtests/backtest-assistant-prefs';
+} from "@/features/backtests/backtest-assistant-prefs";
 
-describe('assistant prefs', () => {
-  it('defaults enable coach + auto advances + flow gates', () => {
+describe("assistant prefs", () => {
+  it("defaults enable coach + auto advances + flow gates", () => {
     const d = defaultAssistantPrefs();
     expect(d.universe.runCoachOnEnter).toBe(true);
     expect(d.semifinal.optimizeTop3OnEnter).toBe(true);
@@ -22,7 +22,7 @@ describe('assistant prefs', () => {
     expect(d.coach.saveSemifinalSkipLab).toBe(false);
   });
 
-  it('normalizes partial patches', () => {
+  it("normalizes partial patches", () => {
     const n = normalizeAssistantPrefs({
       universe: { runCoachOnEnter: false },
       coach: {
@@ -55,7 +55,7 @@ describe('assistant prefs', () => {
     expect(n.listAutoSkipOverCapConfirm).toBe(true);
   });
 
-  it('migrates legacy includeMineStrategies true → both Optimized and Mine', () => {
+  it("migrates legacy includeMineStrategies true → both Optimized and Mine", () => {
     const n = normalizeAssistantPrefs({
       universe: { includeMineStrategies: true },
     });
@@ -63,7 +63,7 @@ describe('assistant prefs', () => {
     expect(n.universe.includeOptimizedStrategies).toBe(true);
   });
 
-  it('keeps independent Optimized / Mine flags when both present', () => {
+  it("keeps independent Optimized / Mine flags when both present", () => {
     const n = normalizeAssistantPrefs({
       universe: {
         includeMineStrategies: true,

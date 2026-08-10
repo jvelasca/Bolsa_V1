@@ -2,32 +2,32 @@
  * Tests — mapa embudo 5 etapas.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   FUNNEL_STAGES,
   funnelPrefsLegend,
   resolveActiveFunnelStage,
   resolveFunnelStageStatus,
-} from '@/features/backtests/assistant-funnel-map';
-import { emptyAssistantProgress } from '@/features/backtests/backtest-assistant-completion';
+} from "@/features/backtests/assistant-funnel-map";
+import { emptyAssistantProgress } from "@/features/backtests/backtest-assistant-completion";
 
-describe('assistant-funnel-map', () => {
-  it('has 5 product stages', () => {
+describe("assistant-funnel-map", () => {
+  it("has 5 product stages", () => {
     expect(FUNNEL_STAGES).toHaveLength(5);
     expect(funnelPrefsLegend()).toMatch(/1\. Probar.*5\. Finalistas/);
   });
 
-  it('starts at probe', () => {
+  it("starts at probe", () => {
     expect(
       resolveActiveFunnelStage({
         progress: emptyAssistantProgress(),
-        coachPass: 'initial',
+        coachPass: "initial",
         fullCycleActive: true,
       }),
-    ).toBe('probe');
+    ).toBe("probe");
   });
 
-  it('highlights revalidate on Coach² / awaiting ACK', () => {
+  it("highlights revalidate on Coach² / awaiting ACK", () => {
     const progress = {
       ...emptyAssistantProgress(),
       universeDone: true,
@@ -37,21 +37,21 @@ describe('assistant-funnel-map', () => {
     expect(
       resolveActiveFunnelStage({
         progress,
-        coachPass: 'post_lab',
+        coachPass: "post_lab",
         fullCycleActive: true,
       }),
-    ).toBe('revalidate');
+    ).toBe("revalidate");
     expect(
-      resolveFunnelStageStatus('revalidate', {
+      resolveFunnelStageStatus("revalidate", {
         progress,
-        coachPass: 'post_lab',
+        coachPass: "post_lab",
         fullCycleActive: true,
         awaitingAck: true,
       }),
-    ).toBe('blocked');
+    ).toBe("blocked");
   });
 
-  it('highlights coach1 when awaiting ACK¹', () => {
+  it("highlights coach1 when awaiting ACK¹", () => {
     const progress = {
       ...emptyAssistantProgress(),
       universeDone: true,
@@ -59,22 +59,22 @@ describe('assistant-funnel-map', () => {
     expect(
       resolveActiveFunnelStage({
         progress,
-        coachPass: 'initial',
+        coachPass: "initial",
         fullCycleActive: true,
         awaitingAck: true,
       }),
-    ).toBe('coach1');
+    ).toBe("coach1");
     expect(
-      resolveFunnelStageStatus('coach1', {
+      resolveFunnelStageStatus("coach1", {
         progress,
-        coachPass: 'initial',
+        coachPass: "initial",
         fullCycleActive: true,
         awaitingAck: true,
       }),
-    ).toBe('blocked');
+    ).toBe("blocked");
   });
 
-  it('marks finalists saved vs skipped', () => {
+  it("marks finalists saved vs skipped", () => {
     const progress = {
       ...emptyAssistantProgress(),
       universeDone: true,
@@ -83,20 +83,20 @@ describe('assistant-funnel-map', () => {
       finalistsDone: true,
     };
     expect(
-      resolveFunnelStageStatus('finalists', {
+      resolveFunnelStageStatus("finalists", {
         progress,
-        coachPass: 'post_lab',
+        coachPass: "post_lab",
         fullCycleActive: false,
         finalistsSaved: true,
       }),
-    ).toBe('done');
+    ).toBe("done");
     expect(
-      resolveFunnelStageStatus('finalists', {
+      resolveFunnelStageStatus("finalists", {
         progress,
-        coachPass: 'post_lab',
+        coachPass: "post_lab",
         fullCycleActive: false,
         finalistsSkipped: true,
       }),
-    ).toBe('skipped');
+    ).toBe("skipped");
   });
 });

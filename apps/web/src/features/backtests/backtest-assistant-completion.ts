@@ -3,8 +3,11 @@
  * Los ✓ NO dependen del TOP antiguo en BD: solo de lo hecho en esta pasada.
  */
 
-import type { AssistantStepId } from '@/features/backtests/backtest-assistant-steps';
-import { ASSISTANT_STEPS, assistantStepIndex } from '@/features/backtests/backtest-assistant-steps';
+import type { AssistantStepId } from "@/features/backtests/backtest-assistant-steps";
+import {
+  ASSISTANT_STEPS,
+  assistantStepIndex,
+} from "@/features/backtests/backtest-assistant-steps";
 
 export type AssistantSessionProgress = {
   /** 1 Universo: batería/coach terminó OK. */
@@ -37,13 +40,13 @@ export function isAssistantStepComplete(
   progress: AssistantSessionProgress,
 ): boolean {
   switch (step) {
-    case 'universe':
+    case "universe":
       return progress.universeDone;
-    case 'semifinal':
+    case "semifinal":
       return progress.semifinalDone;
-    case 'lab':
+    case "lab":
       return progress.labDone;
-    case 'finalists':
+    case "finalists":
       return progress.finalistsDone;
     default:
       return false;
@@ -56,7 +59,7 @@ export function canAutoRunStep(
   progress: AssistantSessionProgress,
   hasInstrument: boolean,
 ): boolean {
-  if (step === 'universe') return hasInstrument;
+  if (step === "universe") return hasInstrument;
   const idx = assistantStepIndex(step);
   for (let i = 0; i < idx; i++) {
     const prev = ASSISTANT_STEPS[i]?.id;
@@ -85,10 +88,10 @@ export function resolveAssistantActiveStep(
   focusOverride: AssistantStepId | null,
 ): AssistantStepId {
   if (focusOverride) return focusOverride;
-  if (!progress.universeDone) return 'universe';
-  if (!progress.semifinalDone) return 'semifinal';
-  if (!progress.labDone) return 'lab';
-  return 'finalists';
+  if (!progress.universeDone) return "universe";
+  if (!progress.semifinalDone) return "semifinal";
+  if (!progress.labDone) return "lab";
+  return "finalists";
 }
 
 export function assistantStepLabel(step: AssistantStepId): string {
@@ -97,5 +100,5 @@ export function assistantStepLabel(step: AssistantStepId): string {
 
 export function assistantStepOrdinal(step: AssistantStepId): string {
   const def = ASSISTANT_STEPS.find((s) => s.id === step);
-  return def ? `${def.n}/4` : '';
+  return def ? `${def.n}/4` : "";
 }

@@ -26,7 +26,7 @@
 export function coachNeedsHumanAck(
   confidence: string | null | undefined,
 ): boolean {
-  return confidence === 'weak' || confidence === 'discrepancy';
+  return confidence === "weak" || confidence === "discrepancy";
 }
 
 /**
@@ -52,19 +52,19 @@ export function instrumentTopIsDurable(
 }
 
 export type FullCyclePhase =
-  | 'idle'
-  | 'universe'
-  | 'lab'
-  | 'coach2'
-  | 'save_finalists'
-  | 'done'
-  | 'aborted';
+  | "idle"
+  | "universe"
+  | "lab"
+  | "coach2"
+  | "save_finalists"
+  | "done"
+  | "aborted";
 
 /** Decisión de auto-guardar Finalistas tras Coach². */
 export type FullCycleSaveDecision =
-  | { action: 'save_active'; reason: string }
-  | { action: 'skip_keep_previous'; reason: string }
-  | { action: 'skip_no_candidates'; reason: string };
+  | { action: "save_active"; reason: string }
+  | { action: "skip_keep_previous"; reason: string }
+  | { action: "skip_no_candidates"; reason: string };
 
 /**
  * ¿El Lab board puede auto-pasar a Coach²?
@@ -85,10 +85,13 @@ export function shouldAutoHandoffLab(opts: {
  * Mensaje de política cuando el Lab terminó sin Mejor ≥ ancla.
  * `null` si aún no hay resultados o sí hubo mejoras.
  */
-export function labNoImproveStatus(improvedCount: number, doneCount: number): string | null {
+export function labNoImproveStatus(
+  improvedCount: number,
+  doneCount: number,
+): string | null {
   if (doneCount <= 0) return null;
   if (improvedCount > 0) return null;
-  return 'Ciclo: Lab sin Mejor ≥ ancla. No se pisan Finalistas active. Revisa zonas o cambia candidatas.';
+  return "Ciclo: Lab sin Mejor ≥ ancla. No se pisan Finalistas active. Revisa zonas o cambia candidatas.";
 }
 
 /** Timeout Lab por ticker en ciclo / Lista AUTO (jobs colgados o worker caído). */
@@ -107,25 +110,25 @@ export function isLabZoneTerminal(opts: {
   if (!opts.hasSeed) return false;
   if (opts.hasResult) return true;
   const phase = opts.activityPhase ?? null;
-  if (phase === 'failed' || phase === 'completed') return true;
+  if (phase === "failed" || phase === "completed") return true;
   // Semilla sin job encolado → no hay nada que esperar.
   if (!opts.hasJob) return true;
   return false;
 }
 
 export function labEmptyZonesStatus(): string {
-  return 'Ciclo: Lab sin zonas optimizables. No se pisan Finalistas active.';
+  return "Ciclo: Lab sin zonas optimizables. No se pisan Finalistas active.";
 }
 
 export function labWatchdogStatus(): string {
-  return 'Ciclo: Lab timeout · no se pisan Finalistas. Siguiente valor…';
+  return "Ciclo: Lab timeout · no se pisan Finalistas. Siguiente valor…";
 }
 
 export function universeEmptyStatus(detail?: string | null): string {
   const d = detail?.trim();
   return d
     ? `Ciclo: Universo sin TOP útil (${d}). No se pisan Finalistas.`
-    : 'Ciclo: Universo sin TOP útil. No se pisan Finalistas.';
+    : "Ciclo: Universo sin TOP útil. No se pisan Finalistas.";
 }
 
 /**
@@ -147,49 +150,51 @@ export function resolveFullCycleSaveDecision(opts: {
 }): FullCycleSaveDecision {
   if (!opts.postLab) {
     return {
-      action: 'skip_no_candidates',
-      reason: 'Solo se auto-guardan Finalistas tras Coach² (post-Lab).',
+      action: "skip_no_candidates",
+      reason: "Solo se auto-guardan Finalistas tras Coach² (post-Lab).",
     };
   }
 
   const hasTop =
     opts.hasExistingTop !== undefined
       ? opts.hasExistingTop
-      : opts.existingTopStatus === 'active' ||
-        opts.existingTopStatus === 'semifinal';
+      : opts.existingTopStatus === "active" ||
+        opts.existingTopStatus === "semifinal";
 
   if (opts.labImprovedCount <= 0) {
     if (hasTop) {
       return {
-        action: 'skip_keep_previous',
+        action: "skip_keep_previous",
         reason:
-          opts.existingTopStatus === 'active'
-            ? 'Sin mejora Lab: se conserva el TOP active previo.'
-            : 'Sin mejora Lab: se conserva el TOP semifinal previo.',
+          opts.existingTopStatus === "active"
+            ? "Sin mejora Lab: se conserva el TOP active previo."
+            : "Sin mejora Lab: se conserva el TOP semifinal previo.",
       };
     }
     if (!opts.canSaveTop) {
       return {
-        action: 'skip_no_candidates',
-        reason: 'Sin TOP previo ni candidatas Coach² guardables. No se escribe Finalistas.',
+        action: "skip_no_candidates",
+        reason:
+          "Sin TOP previo ni candidatas Coach² guardables. No se escribe Finalistas.",
       };
     }
     return {
-      action: 'save_active',
+      action: "save_active",
       reason:
-        'Sin TOP previo · Coach OK → Finalistas lab_validated (primera escritura).',
+        "Sin TOP previo · Coach OK → Finalistas lab_validated (primera escritura).",
     };
   }
 
   if (!opts.canSaveTop) {
     return {
-      action: 'skip_no_candidates',
-      reason: 'Coach² sin TOP guardable (ack / quorum / runId). No se escribe Finalistas.',
+      action: "skip_no_candidates",
+      reason:
+        "Coach² sin TOP guardable (ack / quorum / runId). No se escribe Finalistas.",
     };
   }
   return {
-    action: 'save_active',
-    reason: 'Mejor(es) Lab + Coach² OK → Finalistas lab_validated.',
+    action: "save_active",
+    reason: "Mejor(es) Lab + Coach² OK → Finalistas lab_validated.",
   };
 }
 
@@ -206,7 +211,11 @@ export function shouldWaitBeforeFinalistsAutoSave(opts: {
 }): boolean {
   if (opts.running) return true;
   if (opts.okCount > 0 && opts.recommendationCount === 0) return true;
-  if (opts.postLab && opts.recommendationCount > 0 && opts.postLabRecsWithRunId === 0) {
+  if (
+    opts.postLab &&
+    opts.recommendationCount > 0 &&
+    opts.postLabRecsWithRunId === 0
+  ) {
     return true;
   }
   return false;
@@ -215,6 +224,6 @@ export function shouldWaitBeforeFinalistsAutoSave(opts: {
 /** Título del botón Play según pref de ciclo (1 valor). */
 export function fullCyclePlayTitle(fullCycleOnPlay: boolean): string {
   return fullCycleOnPlay
-    ? 'Play: ciclo (Probar genéricas → Coach → Lab → Revalidar → Finalistas)'
-    : 'Play: ejecutar siguiente paso';
+    ? "Play: ciclo (Probar genéricas → Coach → Lab → Revalidar → Finalistas)"
+    : "Play: ejecutar siguiente paso";
 }

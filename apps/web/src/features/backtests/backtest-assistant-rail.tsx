@@ -8,12 +8,12 @@
  * @see assistant-funnel-map.ts
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { MoreHorizontal, Play, Pause, RotateCcw, Square } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { AssistantStepId } from '@/features/backtests/backtest-assistant-steps';
-import type { AssistantPrefs } from '@/features/backtests/backtest-assistant-prefs';
-import type { AssistantSessionProgress } from '@/features/backtests/backtest-assistant-completion';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MoreHorizontal, Play, Pause, RotateCcw, Square } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { AssistantStepId } from "@/features/backtests/backtest-assistant-steps";
+import type { AssistantPrefs } from "@/features/backtests/backtest-assistant-prefs";
+import type { AssistantSessionProgress } from "@/features/backtests/backtest-assistant-completion";
 import {
   FUNNEL_STAGES,
   funnelPrefsLegend,
@@ -21,13 +21,13 @@ import {
   resolveActiveFunnelStage,
   resolveFunnelStageStatus,
   type FunnelStageStatus,
-} from '@/features/backtests/assistant-funnel-map';
-import { AssistantFunnelFlowConfig } from '@/features/backtests/assistant-funnel-flow-config';
-import { IconButton } from '@/components/ui/icon-button';
+} from "@/features/backtests/assistant-funnel-map";
+import { AssistantFunnelFlowConfig } from "@/features/backtests/assistant-funnel-flow-config";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   OpaqueMenuLabel,
   OpaqueMenuPanel,
-} from '@/components/ui/opaque-menu-panel';
+} from "@/components/ui/opaque-menu-panel";
 
 type ListAutoRailControls = {
   visible: boolean;
@@ -45,11 +45,11 @@ type Props = {
   prefs: AssistantPrefs;
   onPrefsChange: (next: AssistantPrefs) => void;
   progress: AssistantSessionProgress;
-  coachPass: 'initial' | 'post_lab';
+  coachPass: "initial" | "post_lab";
   fullCycleActive: boolean;
   awaitingAck?: boolean;
   /** 'coach1' | 'revalidate' — copy del aviso de pausa */
-  awaitingAckStage?: 'coach1' | 'revalidate' | null;
+  awaitingAckStage?: "coach1" | "revalidate" | null;
   flashMessage?: string | null;
   onStepClick?: (step: AssistantStepId) => void;
   onReset?: () => void;
@@ -64,19 +64,19 @@ type Props = {
 };
 
 function stageChipClass(status: FunnelStageStatus, active: boolean): string {
-  if (status === 'done') {
-    return 'border-emerald-500/45 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200';
+  if (status === "done") {
+    return "border-emerald-500/45 bg-emerald-500/15 text-emerald-800 dark:text-emerald-200";
   }
-  if (status === 'skipped') {
-    return 'border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200';
+  if (status === "skipped") {
+    return "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200";
   }
-  if (status === 'blocked') {
-    return 'border-amber-500/60 bg-amber-500/20 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/40';
+  if (status === "blocked") {
+    return "border-amber-500/60 bg-amber-500/20 text-amber-950 dark:text-amber-100 ring-1 ring-amber-500/40";
   }
-  if (active || status === 'active') {
-    return 'border-primary/50 bg-primary/10 text-foreground';
+  if (active || status === "active") {
+    return "border-primary/50 bg-primary/10 text-foreground";
   }
-  return 'border-border/70 bg-background/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground';
+  return "border-border/70 bg-background/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground";
 }
 
 export function BacktestAssistantRail({
@@ -120,8 +120,8 @@ export function BacktestAssistantRail({
     const onDoc = (e: MouseEvent) => {
       if (!menuRef.current?.contains(e.target as Node)) setMenuOpen(false);
     };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
   return (
@@ -136,10 +136,10 @@ export function BacktestAssistantRail({
         {profileLabel ? (
           <span
             className={cn(
-              'max-w-[10rem] truncate rounded border px-1.5 py-0.5 text-[10px]',
+              "max-w-[10rem] truncate rounded border px-1.5 py-0.5 text-[10px]",
               profileMissing
-                ? 'border-amber-500/40 text-amber-800 dark:text-amber-200'
-                : 'border-border/70 text-muted-foreground',
+                ? "border-amber-500/40 text-amber-800 dark:text-amber-200"
+                : "border-border/70 text-muted-foreground",
             )}
             title={profileLabel}
           >
@@ -152,23 +152,25 @@ export function BacktestAssistantRail({
             <button
               type="button"
               className={cn(
-                'rounded p-1 text-primary hover:bg-primary/10 disabled:opacity-40',
-                playBusy && 'bg-primary/10',
+                "rounded p-1 text-primary hover:bg-primary/10 disabled:opacity-40",
+                playBusy && "bg-primary/10",
               )}
               title={
                 playBusy
-                  ? `${playTitle ?? 'Play'} · en curso…`
-                  : (playTitle ?? 'Play')
+                  ? `${playTitle ?? "Play"} · en curso…`
+                  : (playTitle ?? "Play")
               }
-              aria-label={playBusy ? 'Asistente en curso' : 'Ejecutar asistente'}
+              aria-label={
+                playBusy ? "Asistente en curso" : "Ejecutar asistente"
+              }
               aria-busy={playBusy || undefined}
               disabled={playDisabled}
               onClick={onPlay}
             >
               <Play
                 className={cn(
-                  'h-3.5 w-3.5 fill-current',
-                  playBusy && 'animate-assistant-play-blink',
+                  "h-3.5 w-3.5 fill-current",
+                  playBusy && "animate-assistant-play-blink",
                 )}
               />
             </button>
@@ -224,7 +226,7 @@ export function BacktestAssistantRail({
               title="Configuración del asistente"
               active={menuOpen}
               onClick={() => setMenuOpen((o) => !o)}
-              className={menuOpen ? 'bg-muted text-foreground' : undefined}
+              className={menuOpen ? "bg-muted text-foreground" : undefined}
             />
             {menuOpen && (
               <OpaqueMenuPanel align="left" className="w-[22.5rem] py-1.5">
@@ -238,7 +240,10 @@ export function BacktestAssistantRail({
           </div>
         </div>
 
-        <span className="hidden h-4 w-px shrink-0 bg-border sm:block" aria-hidden />
+        <span
+          className="hidden h-4 w-px shrink-0 bg-border sm:block"
+          aria-hidden
+        />
 
         <div
           className="flex min-w-0 flex-1 flex-wrap items-center gap-1"
@@ -249,17 +254,24 @@ export function BacktestAssistantRail({
             const status = resolveFunnelStageStatus(stage.id, funnelInput);
             const active = stage.id === activeFunnel;
             const prefix =
-              status === 'done'
-                ? '✓ '
-                : status === 'skipped'
-                  ? '– '
-                  : status === 'blocked'
-                    ? '! '
-                    : '';
+              status === "done"
+                ? "✓ "
+                : status === "skipped"
+                  ? "– "
+                  : status === "blocked"
+                    ? "! "
+                    : "";
             return (
-              <div key={stage.id} className="flex items-center gap-1" role="listitem">
+              <div
+                key={stage.id}
+                className="flex items-center gap-1"
+                role="listitem"
+              >
                 {i > 0 && (
-                  <span className="text-[10px] text-muted-foreground/50" aria-hidden>
+                  <span
+                    className="text-[10px] text-muted-foreground/50"
+                    aria-hidden
+                  >
                     →
                   </span>
                 )}
@@ -269,11 +281,13 @@ export function BacktestAssistantRail({
                   disabled={!onStepClick}
                   onClick={() => onStepClick?.(stage.navStep)}
                   className={cn(
-                    'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
+                    "rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors",
                     stageChipClass(status, active),
                   )}
                 >
-                  <span className="tabular-nums text-[10px] opacity-70">{stage.n}</span>{' '}
+                  <span className="tabular-nums text-[10px] opacity-70">
+                    {stage.n}
+                  </span>{" "}
                   {prefix}
                   {stage.label}
                 </button>
@@ -292,10 +306,13 @@ export function BacktestAssistantRail({
         </p>
       ) : null}
       {awaitingAck ? (
-        <p className="mt-1 text-[11px] font-medium text-amber-800 dark:text-amber-200" aria-live="polite">
-          {awaitingAckStage === 'coach1'
-            ? 'Ciclo en pausa en Coach: marca «ACK¹» para pasar al Lab (o atajo semifinal).'
-            : 'Ciclo en pausa en Revalidar: marca «ACK final» para grabar o descartar Finalistas.'}
+        <p
+          className="mt-1 text-[11px] font-medium text-amber-800 dark:text-amber-200"
+          aria-live="polite"
+        >
+          {awaitingAckStage === "coach1"
+            ? "Ciclo en pausa en Coach: marca «ACK¹» para pasar al Lab (o atajo semifinal)."
+            : "Ciclo en pausa en Revalidar: marca «ACK final» para grabar o descartar Finalistas."}
         </p>
       ) : null}
     </div>
