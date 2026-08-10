@@ -1,7 +1,7 @@
 # Traspaso parcial — M5 frente Coach + frentes alternativos (frontend web por features)
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `e746ed8` (registro §7.6 + traspaso Coach+Lab · paso Lab `8ae445b`) · **Árbol limpio**
+**HEAD:** `cbc7aff` (cierre frente Coach+M5 + traspaso parcial nuevo) · **Árbol limpio** · paso Lab `8ae445b`
 **Origen:** [traspaso-m5-f4-8-coach-lab-2026-08-10.md](./traspaso-m5-f4-8-coach-lab-2026-08-10.md) + registro **§7.6**
 de [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
 
@@ -28,7 +28,7 @@ del orquestador, consistente con los pasos 1–8.
 
 ## 2. Punto de entrada del siguiente hilo
 
-### 2.1 Estado de `backtests-page.tsx` (HEAD `8ae445b` → 5.152 líneas, objetivo F4.8 <3.500)
+### 2.1 Estado de `backtests-page.tsx` (→ 5.152 líneas, objetivo F4.8 <3.500)
 
 - Queda **sin extraer** el result focus **Coach** (`BacktestExploreRanking`, ~130 líneas), en la pestaña
   `tab === "run"`, bloque `{exploreRows.length > 0 && (resultFocus === "coach" || (Boolean(listAutoBoard) &&
