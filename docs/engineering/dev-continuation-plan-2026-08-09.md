@@ -1130,6 +1130,13 @@ Traspaso de entrada: [traspaso-higiene-formato-legacy-entrada-2026-08-10.md](./t
 | Lote | Commit | Alcance | Batería |
 |------|--------|---------|---------|
 | 1 (PRIMERO) | `d39bbbb` | `components/ui` (8) + `components/layout` (7) = **15 `.tsx`** (todos de producción), diff +469/−321 solo formato | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ (warnings code-splitting = M7) |
+| 2 | `0ceeb5b` | `backtests/optimize` = **8 `.tsx`** presentacionales (`optimize-card-header`, `optimize-cpcv-report`, `optimize-edge-report`, `optimize-empty-tip`, `optimize-seed-banner`, `optimize-summary-strip`, `optimize-walk-forward-report`, `backtest-optimize-compare-card`), diff +222/−149 solo formato | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 
-Siguiente lote propuesto: **un feature aislado** (p. ej. `features/backtests`), después el resto de `apps/web/src` por
-sub-lotes. Verificación tras cada lote y commit propio. HEAD `5721c74` · sincronizado.
+**Nota de alcance (features/backtests):** el feature como un todo es **plano y enorme (210 archivos desincronizados)**,
+sin subdirectorios naturales. Se subdivide **por dominio funcional**: el sub-lote `optimize` (2) se eligió por reúnir los
+entregables recientes (presentacionales, sin estado de negocio complejo). Siguientes sub-lotes de
+`features/backtests` propuestos (≈ dominio cada uno): `assistant`/`explore`/`library`/`result`/`wizard`, `strategy-matrix`,
+`core-r`, `dia-d`, etc., cada uno ≤ ~30 archivos.
+
+Siguiente lote: otro sub-lote por dominio de `features/backtests` (p. ej. `explore`/`result`/`wizard`), después el resto de
+`apps/web/src` por sub-lotes. Verificación tras cada lote y commit propio. HEAD `0ceeb5b` · sincronizado.
