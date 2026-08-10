@@ -870,11 +870,11 @@ candidato de valor/riesgo — ya parcialmente sliced (`BacktestReplayChart`, `Ba
 como thin wrappers. Otros frentes del §4.2 descartados (acoplamiento alto): `backtest-optimize-panel.tsx` (2.251),
 `backtest-strategy-matrix-panel.tsx` (1.033), `backtest-explore-panel.tsx` (1.456, MEDIO), `ohlcv-chart.tsx` (974).
 
-**Paso B.1 (primer sub-paso, aprobado):** extraída la **tabla de Operaciones** (bloque `<section>` ~1272-1336) a
-`apps/web/src/features/trading/dia-d-trades-panel.tsx` → `DiaDTradesPanel` (**Diseño B**, thin wrapper, 4 props:
-`detail`, `replayCursor`, `focusTimestamp`, `onFocusTimestamp`). Los callbacks/estado del orquestador
-(`replayCursor`, `focusTimestamp`, `setFocusTimestamp`) **permanecen en el orquestador**; el JSX de la tabla se
-traslada fielmente. Reducción en el orquestador: **-58 líneas netas** (~1.341 → ~1.283).
+**Paso B.1 (`1303610`, primer sub-paso, aprobado):** extraída la **tabla de Operaciones** (bloque `<section>`
+~1272-1336) a `apps/web/src/features/trading/dia-d-trades-panel.tsx` → `DiaDTradesPanel` (**Diseño B**, thin
+wrapper, 4 props: `detail`, `replayCursor`, `focusTimestamp`, `onFocusTimestamp`). Los callbacks/estado del
+orquestador (`replayCursor`, `focusTimestamp`, `setFocusTimestamp`) **permanecen en el orquestador**; el JSX de la
+tabla se traslada fielmente. Reducción en el orquestador: **-58 líneas netas** (~1.341 → ~1.283).
 
 **Batería verde (paso B.1):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings code-splitting
 pre-existentes = M7). **Cobertura verificada:** el feature `trading/dia-d` tiene tests de lógica

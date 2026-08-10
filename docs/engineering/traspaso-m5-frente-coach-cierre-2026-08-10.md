@@ -1,7 +1,7 @@
 # Traspaso parcial — M5 frente Coach + frentes alternativos (frontend web por features)
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** *(PENDIENTE commit paso B.1 trading dia-d)* · paso Lab `8ae445b`
+**HEAD:** `1303610` (frente trading-dia-d, paso B.1: DiaDTradesPanel) · paso Lab `8ae445b`
 **Origen:** [traspaso-m5-f4-8-coach-lab-2026-08-10.md](./traspaso-m5-f4-8-coach-lab-2026-08-10.md) + registro **§7.6**
 de [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
 
