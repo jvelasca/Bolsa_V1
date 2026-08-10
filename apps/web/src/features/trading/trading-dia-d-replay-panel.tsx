@@ -42,6 +42,7 @@ import {
 import { DiaDReconciliationPanel } from '@/features/trading/dia-d-reconciliation-panel';
 import { DiaDTradesPanel } from '@/features/trading/dia-d-trades-panel';
 import { DiaDPendingTradeBanner } from '@/features/trading/dia-d-pending-trade-banner';
+import { DiaDSessionReportPanel } from '@/features/trading/dia-d-session-report-panel';
 import {
   buildCounterfactualOos,
   buildDiaDReconciliation,
@@ -964,6 +965,23 @@ export function TradingDiaDReplayPanel() {
     </>
   ) : null;
 
+  const reportPanelProps = {
+    body: sessionReportBody,
+    reportOpen,
+    onOpenChange: setReportOpen,
+    reportWidthPct: layout.reportWidthPct,
+    onResizeDrag: (dx: number) => {
+      const row = movieRowRef.current;
+      if (!row) return;
+      const next = clampReportWidthPct(
+        pendingReportW.current - pxToPct(dx, row.clientWidth),
+      );
+      pendingReportW.current = next;
+      setLayout((prev) => ({ ...prev, reportWidthPct: next }));
+    },
+    onResizeDragEnd: () => persistLayout({ reportWidthPct: pendingReportW.current }),
+  };
+
   return (
     <div
       className="flex min-h-0 flex-1 flex-col border-b border-border/70 bg-card"
@@ -1108,97 +1126,12 @@ export function TradingDiaDReplayPanel() {
           </div>
 
           {isWide && report ? (
-            reportOpen ? (
-              <>
-                <PanelResizeHandle
-                  label="Redimensionar informe de sesión"
-                  orientation="vertical"
-                  onDrag={(dx) => {
-                    const row = movieRowRef.current;
-                    if (!row) return;
-                    const next = clampReportWidthPct(
-                      pendingReportW.current - pxToPct(dx, row.clientWidth),
-                    );
-                    pendingReportW.current = next;
-                    setLayout((prev) => ({ ...prev, reportWidthPct: next }));
-                  }}
-                  onDragEnd={() => persistLayout({ reportWidthPct: pendingReportW.current })}
-                  className="mx-0.5"
-                />
-                <aside
-                  id="dia-d-session-report-panel"
-                  className="scroll-area flex shrink-0 flex-col overflow-hidden border-l border-border/60 text-[10px]"
-                  style={{ width: `${layout.reportWidthPct}%` }}
-                  data-testid="dia-d-session-report"
-                >
-                  <div className="flex shrink-0 items-center gap-1 border-b border-border/50 bg-muted/25 px-2 py-1">
-                    <p className="min-w-0 flex-1 truncate text-[11px] font-semibold text-foreground">
-                      Informe sesión
-                    </p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      className="h-6 shrink-0 gap-1 px-1.5 text-[10px]"
-                      title="Colapsar informe"
-                      aria-label="Colapsar informe"
-                      onClick={() => setReportOpen(false)}
-                    >
-                      <PanelRightClose className="size-3.5" aria-hidden />
-                      <span className="hidden sm:inline">Colapsar</span>
-                    </Button>
-                  </div>
-                  <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
-                    {sessionReportBody}
-                  </div>
-                </aside>
-              </>
-            ) : (
-              <div className="flex w-9 shrink-0 flex-col items-center border-l border-border/60 bg-muted/20 py-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  className="h-auto w-8 flex-col gap-1 px-1 py-2 text-[9px] leading-tight"
-                  title="Mostrar informe"
-                  aria-label="Mostrar informe"
-                  aria-expanded={false}
-                  aria-controls="dia-d-session-report-panel"
-                  onClick={() => setReportOpen(true)}
-                >
-                  <PanelRightOpen className="size-3.5" aria-hidden />
-                  <span
-                    className="max-h-24 overflow-hidden text-center"
-                    style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
-                  >
-                    Informe
-                  </span>
-                </Button>
-              </div>
-            )
+            <DiaDSessionReportPanel variant="desktop" {...reportPanelProps} />
           ) : null}
         </div>
 
         {!isWide && report ? (
-          <details
-            className="shrink-0 border-t border-border/60"
-            open={reportOpen}
-            onToggle={(e) => setReportOpen(e.currentTarget.open)}
-          >
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 bg-muted/30 px-3 py-1.5 text-[11px] font-semibold marker:content-none [&::-webkit-details-marker]:hidden">
-              <span>Informe sesión</span>
-              <span className="text-[10px] font-normal text-muted-foreground">
-                {reportOpen ? 'Colapsar' : 'Expandir'}
-              </span>
-            </summary>
-            <div
-              id="dia-d-session-report-panel"
-              className="max-h-[36vh] overflow-y-auto p-2 text-[10px]"
-              data-testid="dia-d-session-report"
-            >
-              {sessionReportBody}
-            </div>
-          </details>
+          <DiaDSessionReportPanel variant="mobile" {...reportPanelProps} />
         ) : null}
 
         <PanelResizeHandle
