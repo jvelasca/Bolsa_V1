@@ -943,8 +943,15 @@ Se eliminaron 6 imports que quedaban huérfanos (`formatPct`, `BacktestFutureSta
 `optimizeFamilyProxyNote`, `Button`, `cn`). **Batería verde:** typecheck exit 0 · lint 0e/0w · test **140/707** · build
 exit 0 (solo M7) · **`pnpm test:coach` OK** (web 26/186 + API smoke CORE-P live PASS). Commit `--no-verify` + push.
 
-**Traspaso del frente:** [traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md](./traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md) —
-HEAD `e66ddf7`, E.1+E.2+E.3+E.4+E.5 cerrados, islas restantes y opciones §2.3 para el siguiente hilo.
+**CIERRE FORMAL del frente — M5 en pausa (2026-08-10, decisión del usuario):** con E.1–E.5 completos, `backtest-explore
+-panel.tsx` queda de **1.456 → ~1.048 líneas (−408)** y el frente queda **CERRADO** para feature-slicing. Queda solo la
+isla de riesgo ALTO (banners de estado del ciclo, Coach²/ACK), que **no se toca** por decisión del usuario. **M5 se
+detiene aquí**; los demás frentes (`list-values-panel` 1.395, `instruments-page` 1.222, `chart-drawings-layer` 1.979,
+F4.8 `backtests-page` 5.127) quedan anotados en el traspaso de cierre. HEAD `7172bb7` (cierre formal) · índice de
+ingeniería actualizado.
+
+**Traspaso del frente (CIERRE):** [traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md](./traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md) —
+HEAD `7172bb7`, frente backtest-explore **CERRADO**, M5 en pausa, demás candidatos anotados en §2.3.
 
 **Traspaso del frente (actualizado):**
 [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) —
