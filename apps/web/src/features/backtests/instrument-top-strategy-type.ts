@@ -3,8 +3,8 @@
  * proxy de Lab (p. ej. SuperTrend → grid SMA no debe dejar type=supertrend_follow).
  */
 
-import type { InstrumentStrategyTopSlotV1 } from '@bolsa/shared';
-import { isBacktestStrategyType } from '@bolsa/shared';
+import type { InstrumentStrategyTopSlotV1 } from "@bolsa/shared";
+import { isBacktestStrategyType } from "@bolsa/shared";
 
 /**
  * Prioridad: preset de la def guardada → nested definition.presetKey →
@@ -20,7 +20,7 @@ export function resolveExecutableStrategyType(opts: {
     opts.nestedPresetKey,
     opts.slotStrategyType,
   ]) {
-    const t = typeof raw === 'string' ? raw.trim() : '';
+    const t = typeof raw === "string" ? raw.trim() : "";
     if (t && isBacktestStrategyType(t)) return t;
   }
   const fallback = opts.slotStrategyType?.trim();
@@ -49,6 +49,9 @@ export function sanitizeTopSlotsStrategyTypes(
   return slots.map((slot) => {
     const id = slot.strategyDefinitionId?.trim();
     if (!id) return slot;
-    return sanitizeTopSlotStrategyType(slot, presetByDefinitionId.get(id) ?? null);
+    return sanitizeTopSlotStrategyType(
+      slot,
+      presetByDefinitionId.get(id) ?? null,
+    );
   });
 }

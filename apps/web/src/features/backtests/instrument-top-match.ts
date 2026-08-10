@@ -6,7 +6,7 @@ import type {
   BacktestRunDetailDto,
   InstrumentStrategyTopSlotV1,
   InstrumentStrategyTopV1,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 
 export type FinalistHudBadge = {
   rank: 1 | 2 | 3;
@@ -14,15 +14,18 @@ export type FinalistHudBadge = {
   score: number;
   starsCapped: boolean;
   label: string;
-  source: InstrumentStrategyTopSlotV1['source'];
-  evidenceLevel: InstrumentStrategyTopV1['evidenceLevel'];
+  source: InstrumentStrategyTopSlotV1["source"];
+  evidenceLevel: InstrumentStrategyTopV1["evidenceLevel"];
 };
 
 /**
  * Match preferente: runId → strategyDefinitionId → strategyType (preset).
  */
 export function matchInstrumentTopSlot(
-  detail: Pick<BacktestRunDetailDto, 'id' | 'strategyType' | 'strategyDefinitionId'>,
+  detail: Pick<
+    BacktestRunDetailDto,
+    "id" | "strategyType" | "strategyDefinitionId"
+  >,
   top: InstrumentStrategyTopV1 | null | undefined,
 ): InstrumentStrategyTopSlotV1 | null {
   if (!top?.slots?.length) return null;
@@ -30,19 +33,26 @@ export function matchInstrumentTopSlot(
   if (byRun) return byRun;
   if (detail.strategyDefinitionId) {
     const byDef = top.slots.find(
-      (s) => s.strategyDefinitionId && s.strategyDefinitionId === detail.strategyDefinitionId,
+      (s) =>
+        s.strategyDefinitionId &&
+        s.strategyDefinitionId === detail.strategyDefinitionId,
     );
     if (byDef) return byDef;
   }
   if (detail.strategyType) {
-    const byType = top.slots.find((s) => s.strategyType === detail.strategyType);
+    const byType = top.slots.find(
+      (s) => s.strategyType === detail.strategyType,
+    );
     if (byType) return byType;
   }
   return null;
 }
 
 export function finalistHudBadgeFromTop(
-  detail: Pick<BacktestRunDetailDto, 'id' | 'strategyType' | 'strategyDefinitionId'>,
+  detail: Pick<
+    BacktestRunDetailDto,
+    "id" | "strategyType" | "strategyDefinitionId"
+  >,
   top: InstrumentStrategyTopV1 | null | undefined,
 ): FinalistHudBadge | null {
   const slot = matchInstrumentTopSlot(detail, top);

@@ -12,8 +12,8 @@ import {
   type InstrumentStrategyTopSlotV1,
   type KernelTimeframe,
   type TrackerScheduleKind,
-} from '@bolsa/shared';
-import { pickAlarmPolicyId } from '@/features/screeners/tracker-alarms';
+} from "@bolsa/shared";
+import { pickAlarmPolicyId } from "@/features/screeners/tracker-alarms";
 
 export type PromoteFinalistToTrackerInput = {
   instrumentId: string;
@@ -36,15 +36,15 @@ export type PromoteFinalistToTrackerResult =
   | { ok: false; error: string };
 
 export function kernelTimeframeFromTop(timeframe: string): KernelTimeframe {
-  return isKernelTimeframe(timeframe) ? timeframe : '1d';
+  return isKernelTimeframe(timeframe) ? timeframe : "1d";
 }
 
 export function buildTrackerNameFromFinalist(input: {
   symbol?: string | null;
   slot: InstrumentStrategyTopSlotV1;
 }): string {
-  const sym = (input.symbol ?? 'VALOR').trim() || 'VALOR';
-  const label = input.slot.label.trim() || 'estrategia';
+  const sym = (input.symbol ?? "VALOR").trim() || "VALOR";
+  const label = input.slot.label.trim() || "estrategia";
   const raw = `Radar · ${sym} · #${input.slot.rank} ${label}`;
   return raw.length > 80 ? `${raw.slice(0, 77)}…` : raw;
 }
@@ -59,20 +59,20 @@ export function buildTrackerFromFinalistSlot(
   if (!strategyDefinitionId) {
     return {
       ok: false,
-      error: 'El slot no tiene estrategia guardada (strategyDefinitionId).',
+      error: "El slot no tiene estrategia guardada (strategyDefinitionId).",
     };
   }
   if (!input.instrumentId.trim()) {
-    return { ok: false, error: 'Falta instrumentId.' };
+    return { ok: false, error: "Falta instrumentId." };
   }
 
   const timeframe = kernelTimeframeFromTop(input.timeframe);
   const scheduleKind: TrackerScheduleKind =
-    input.scheduleKind === 'on_bar_close'
-      ? 'on_bar_close'
-      : input.scheduleKind === 'cron'
-        ? 'cron'
-        : 'manual';
+    input.scheduleKind === "on_bar_close"
+      ? "on_bar_close"
+      : input.scheduleKind === "cron"
+        ? "cron"
+        : "manual";
 
   const universe = input.listId?.trim()
     ? { listId: input.listId.trim() }
@@ -93,7 +93,7 @@ export function buildTrackerFromFinalistSlot(
     maxResults: 20,
     schedule: { kind: scheduleKind },
     defaultExecutionPolicyId: policyId,
-    origin: 'assisted',
+    origin: "assisted",
     sourcePrompt: `finalist:${input.instrumentId}:${timeframe}:r${input.slot.rank}:v${input.topVersion ?? 0}`,
     enabled: true,
   };
@@ -103,7 +103,7 @@ export function buildTrackerFromFinalistSlot(
 
 /** Deep-link al hub Screeners tras crear el rastreador. */
 export function screenersHrefAfterTrackerCreate(trackerId?: string): string {
-  if (!trackerId) return '/screeners';
+  if (!trackerId) return "/screeners";
   const params = new URLSearchParams({ trackerId });
   return `/screeners?${params.toString()}`;
 }

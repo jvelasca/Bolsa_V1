@@ -16,18 +16,18 @@
  * @see docs/engineering/list-auto-ops-2026-07-29.md § Frescura
  */
 
-export const FINALISTS_FRESHNESS_ENGINE = 'finalists-fresh-v1';
-export const FINALISTS_FRESHNESS_STORAGE_KEY = 'bolsa-finalists-freshness-v1';
+export const FINALISTS_FRESHNESS_ENGINE = "finalists-fresh-v1";
+export const FINALISTS_FRESHNESS_STORAGE_KEY = "bolsa-finalists-freshness-v1";
 
 /** Días de calendario de holgura en `lastBarDate` por timeframe (histéresis v1.3). */
 export const FINALISTS_LAST_BAR_SLACK_DAYS: Record<string, number> = {
-  '1d': 5,
-  '1w': 14,
-  '1h': 2,
-  '5m': 1,
-  '15m': 1,
-  '30m': 1,
-  '4h': 2,
+  "1d": 5,
+  "1w": 14,
+  "1h": 2,
+  "5m": 1,
+  "15m": 1,
+  "30m": 1,
+  "4h": 2,
 };
 
 export const FINALISTS_LAST_BAR_SLACK_DEFAULT = 5;
@@ -52,15 +52,15 @@ export type SkipFinalistsDecision = {
 };
 
 function normalizeDatePart(value: string | null | undefined): string {
-  if (!value) return '';
+  if (!value) return "";
   const s = String(value).trim();
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
 function normalizeScalar(value: string | number | null | undefined): string {
-  if (value == null || value === '') return '';
-  const n = typeof value === 'number' ? value : Number(String(value).trim());
-  if (Number.isFinite(n) && String(value).trim() !== '') return String(n);
+  if (value == null || value === "") return "";
+  const n = typeof value === "number" ? value : Number(String(value).trim());
+  if (Number.isFinite(n) && String(value).trim() !== "") return String(n);
   return String(value);
 }
 
@@ -69,11 +69,11 @@ const FP_LAST_BAR_INDEX = 9;
 const FP_TIMEFRAME_INDEX = 2;
 
 export function parseFinalistsFingerprintParts(fingerprint: string): string[] {
-  return fingerprint.split('|');
+  return fingerprint.split("|");
 }
 
 export function lastBarSlackDaysForTimeframe(timeframe: string): number {
-  const tf = (timeframe || '1d').trim().toLowerCase();
+  const tf = (timeframe || "1d").trim().toLowerCase();
   return FINALISTS_LAST_BAR_SLACK_DAYS[tf] ?? FINALISTS_LAST_BAR_SLACK_DEFAULT;
 }
 
@@ -99,21 +99,24 @@ export function compareFinalistsFingerprints(
   candidate: string,
   current: string,
   slackDays?: number,
-): 'exact' | 'bar_hysteresis' | 'mismatch' {
-  if (candidate === current) return 'exact';
+): "exact" | "bar_hysteresis" | "mismatch" {
+  if (candidate === current) return "exact";
   const a = parseFinalistsFingerprintParts(candidate);
   const b = parseFinalistsFingerprintParts(current);
-  if (a.length !== b.length || a.length <= FP_LAST_BAR_INDEX) return 'mismatch';
+  if (a.length !== b.length || a.length <= FP_LAST_BAR_INDEX) return "mismatch";
   for (let i = 0; i < a.length; i += 1) {
     if (i === FP_LAST_BAR_INDEX) continue;
-    if (a[i] !== b[i]) return 'mismatch';
+    if (a[i] !== b[i]) return "mismatch";
   }
-  const tf = b[FP_TIMEFRAME_INDEX] || a[FP_TIMEFRAME_INDEX] || '1d';
+  const tf = b[FP_TIMEFRAME_INDEX] || a[FP_TIMEFRAME_INDEX] || "1d";
   const slack = slackDays ?? lastBarSlackDaysForTimeframe(tf);
-  const days = calendarDaysBetween(a[FP_LAST_BAR_INDEX] ?? '', b[FP_LAST_BAR_INDEX] ?? '');
-  if (!Number.isFinite(days)) return 'mismatch';
-  if (days <= slack) return 'bar_hysteresis';
-  return 'mismatch';
+  const days = calendarDaysBetween(
+    a[FP_LAST_BAR_INDEX] ?? "",
+    b[FP_LAST_BAR_INDEX] ?? "",
+  );
+  if (!Number.isFinite(days)) return "mismatch";
+  if (days <= slack) return "bar_hysteresis";
+  return "mismatch";
 }
 
 export function buildFinalistsInputFingerprint(opts: {
@@ -130,7 +133,7 @@ export function buildFinalistsInputFingerprint(opts: {
   profilePolicyVersion?: string | null;
   engine?: string;
 }): string {
-  const ids = [...new Set(opts.loteRowIds.filter(Boolean))].sort().join(',');
+  const ids = [...new Set(opts.loteRowIds.filter(Boolean))].sort().join(",");
   const engine = opts.engine ?? FINALISTS_FRESHNESS_ENGINE;
   return [
     engine,
@@ -143,25 +146,27 @@ export function buildFinalistsInputFingerprint(opts: {
     normalizeScalar(opts.commissionBps),
     normalizeScalar(opts.slippageBps),
     normalizeDatePart(opts.lastBarDate),
-    opts.profilePolicyVersion ?? '',
+    opts.profilePolicyVersion ?? "",
     `lote:${ids}`,
-  ].join('|');
+  ].join("|");
 }
 
 export function readFinalistsFreshness(
   coachFacts: Record<string, unknown> | null | undefined,
 ): FinalistsFreshnessStamp | null {
-  if (!coachFacts || typeof coachFacts !== 'object') return null;
+  if (!coachFacts || typeof coachFacts !== "object") return null;
   const raw = coachFacts.freshness;
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== "object") return null;
   const o = raw as Partial<FinalistsFreshnessStamp>;
-  if (typeof o.inputFingerprint !== 'string' || !o.inputFingerprint) return null;
-  if (typeof o.lastSearchAt !== 'string' || !o.lastSearchAt) return null;
+  if (typeof o.inputFingerprint !== "string" || !o.inputFingerprint)
+    return null;
+  if (typeof o.lastSearchAt !== "string" || !o.lastSearchAt) return null;
   return {
-    engine: typeof o.engine === 'string' ? o.engine : FINALISTS_FRESHNESS_ENGINE,
+    engine:
+      typeof o.engine === "string" ? o.engine : FINALISTS_FRESHNESS_ENGINE,
     inputFingerprint: o.inputFingerprint,
     lastSearchAt: o.lastSearchAt,
-    lastLabAt: typeof o.lastLabAt === 'string' ? o.lastLabAt : null,
+    lastLabAt: typeof o.lastLabAt === "string" ? o.lastLabAt : null,
   };
 }
 
@@ -190,17 +195,20 @@ export function mergeFreshnessIntoCoachFacts(
 }
 
 function localFreshnessKey(instrumentId: string, timeframe: string): string {
-  return `${instrumentId}|${timeframe || '1d'}`;
+  return `${instrumentId}|${timeframe || "1d"}`;
 }
 
 /** Mapa completo instrumentId|TF → entry (para columna Procesos / timestamps). */
-export function loadLocalFinalistsFreshnessMap(): Record<string, LocalFreshnessEntry> {
-  if (typeof localStorage === 'undefined') return {};
+export function loadLocalFinalistsFreshnessMap(): Record<
+  string,
+  LocalFreshnessEntry
+> {
+  if (typeof localStorage === "undefined") return {};
   try {
     const raw = localStorage.getItem(FINALISTS_FRESHNESS_STORAGE_KEY);
     if (!raw) return {};
     const map = JSON.parse(raw) as Record<string, LocalFreshnessEntry>;
-    return map && typeof map === 'object' ? map : {};
+    return map && typeof map === "object" ? map : {};
   } catch {
     return {};
   }
@@ -210,15 +218,18 @@ export function readLocalFreshnessFingerprint(
   instrumentId: string,
   timeframe: string,
 ): LocalFreshnessEntry | null {
-  if (typeof localStorage === 'undefined') return null;
+  if (typeof localStorage === "undefined") return null;
   try {
     const map = loadLocalFinalistsFreshnessMap();
     const entry = map[localFreshnessKey(instrumentId, timeframe)];
-    if (!entry || typeof entry.fingerprint !== 'string' || !entry.fingerprint) return null;
+    if (!entry || typeof entry.fingerprint !== "string" || !entry.fingerprint)
+      return null;
     return {
       fingerprint: entry.fingerprint,
       lastSearchAt:
-        typeof entry.lastSearchAt === 'string' ? entry.lastSearchAt : new Date().toISOString(),
+        typeof entry.lastSearchAt === "string"
+          ? entry.lastSearchAt
+          : new Date().toISOString(),
       timeframe: entry.timeframe || timeframe,
     };
   } catch {
@@ -232,14 +243,17 @@ export function writeLocalFreshnessFingerprint(opts: {
   fingerprint: string;
   at?: string;
 }): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === "undefined") return;
   try {
     const raw = localStorage.getItem(FINALISTS_FRESHNESS_STORAGE_KEY);
-    const map = (raw ? JSON.parse(raw) : {}) as Record<string, LocalFreshnessEntry>;
+    const map = (raw ? JSON.parse(raw) : {}) as Record<
+      string,
+      LocalFreshnessEntry
+    >;
     map[localFreshnessKey(opts.instrumentId, opts.timeframe)] = {
       fingerprint: opts.fingerprint,
       lastSearchAt: opts.at ?? new Date().toISOString(),
-      timeframe: opts.timeframe || '1d',
+      timeframe: opts.timeframe || "1d",
     };
     localStorage.setItem(FINALISTS_FRESHNESS_STORAGE_KEY, JSON.stringify(map));
   } catch {
@@ -252,7 +266,7 @@ export function clearLocalFreshnessFingerprint(
   instrumentId: string,
   timeframe: string,
 ): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === "undefined") return;
   try {
     const raw = localStorage.getItem(FINALISTS_FRESHNESS_STORAGE_KEY);
     if (!raw) return;
@@ -267,10 +281,10 @@ export function clearLocalFreshnessFingerprint(
 function matchFingerprint(
   candidate: string | null | undefined,
   current: string,
-): 'exact' | 'bar_hysteresis' | null {
+): "exact" | "bar_hysteresis" | null {
   if (!candidate) return null;
   const cmp = compareFinalistsFingerprints(candidate, current);
-  if (cmp === 'mismatch') return null;
+  if (cmp === "mismatch") return null;
   return cmp;
 }
 
@@ -293,65 +307,79 @@ export function shouldSkipFinalistsSearch(opts: {
   /** true si el TOP tiene al menos 1 slot (Finalistas reales). */
   hasSlots?: boolean;
 }): SkipFinalistsDecision {
-  if (!opts.preferSkip) return { skip: false, reason: 'prefs_off' };
-  if (opts.forceRescan) return { skip: false, reason: 'force' };
+  if (!opts.preferSkip) return { skip: false, reason: "prefs_off" };
+  if (opts.forceRescan) return { skip: false, reason: "force" };
 
   const hasFinalistSlots = opts.hasSlots === true;
 
   // Sin Finalistas reales: no omitir (aunque quede huella local de un análisis previo).
   if (!hasFinalistSlots) {
-    return { skip: false, reason: 'no_finalists_slots' };
+    return { skip: false, reason: "no_finalists_slots" };
   }
 
   const mem = matchFingerprint(opts.memoryFingerprint, opts.currentFingerprint);
-  if (mem === 'exact') return { skip: true, reason: 'session_fresh' };
-  if (mem === 'bar_hysteresis') return { skip: true, reason: 'bar_hysteresis' };
+  if (mem === "exact") return { skip: true, reason: "session_fresh" };
+  if (mem === "bar_hysteresis") return { skip: true, reason: "bar_hysteresis" };
 
-  const local = matchFingerprint(opts.localFingerprint, opts.currentFingerprint);
-  if (local === 'exact') return { skip: true, reason: 'local_fresh' };
-  if (local === 'bar_hysteresis') return { skip: true, reason: 'bar_hysteresis' };
+  const local = matchFingerprint(
+    opts.localFingerprint,
+    opts.currentFingerprint,
+  );
+  if (local === "exact") return { skip: true, reason: "local_fresh" };
+  if (local === "bar_hysteresis")
+    return { skip: true, reason: "bar_hysteresis" };
 
   if (opts.stored) {
     if (opts.stored.engine !== FINALISTS_FRESHNESS_ENGINE) {
-      return { skip: false, reason: 'engine_mismatch' };
+      return { skip: false, reason: "engine_mismatch" };
     }
-    const db = matchFingerprint(opts.stored.inputFingerprint, opts.currentFingerprint);
-    if (db === 'exact') return { skip: true, reason: 'fresh' };
-    if (db === 'bar_hysteresis') return { skip: true, reason: 'bar_hysteresis' };
-    return { skip: false, reason: 'fingerprint_mismatch' };
+    const db = matchFingerprint(
+      opts.stored.inputFingerprint,
+      opts.currentFingerprint,
+    );
+    if (db === "exact") return { skip: true, reason: "fresh" };
+    if (db === "bar_hysteresis")
+      return { skip: true, reason: "bar_hysteresis" };
+    return { skip: false, reason: "fingerprint_mismatch" };
   }
 
   // Legacy: Finalistas active con slots y sin stamp → adoptar.
-  if (opts.topStatus === 'active') {
-    return { skip: true, reason: 'adopt_existing_top', adoptFingerprint: true };
+  if (opts.topStatus === "active") {
+    return { skip: true, reason: "adopt_existing_top", adoptFingerprint: true };
   }
 
-  if (opts.topStatus !== 'active' && opts.topStatus !== 'semifinal') {
-    return { skip: false, reason: 'no_active_top' };
+  if (opts.topStatus !== "active" && opts.topStatus !== "semifinal") {
+    return { skip: false, reason: "no_active_top" };
   }
 
-  return { skip: false, reason: 'no_stamp' };
+  return { skip: false, reason: "no_stamp" };
 }
 
 export function instrumentLastBarDate(
   instrument:
-    | { meta?: { lastBarDate?: string | null } | null; lastBarDate?: string | null }
+    | {
+        meta?: { lastBarDate?: string | null } | null;
+        lastBarDate?: string | null;
+      }
     | null
     | undefined,
 ): string | null {
   if (!instrument) return null;
-  if (instrument.meta && 'lastBarDate' in instrument.meta) {
+  if (instrument.meta && "lastBarDate" in instrument.meta) {
     return instrument.meta.lastBarDate ?? null;
   }
   return instrument.lastBarDate ?? null;
 }
 
-export function formatFreshnessAge(iso: string | null | undefined, now = Date.now()): string {
-  if (!iso) return '—';
+export function formatFreshnessAge(
+  iso: string | null | undefined,
+  now = Date.now(),
+): string {
+  if (!iso) return "—";
   const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return '—';
+  if (!Number.isFinite(t)) return "—";
   const mins = Math.max(0, Math.round((now - t) / 60_000));
-  if (mins < 1) return 'ahora';
+  if (mins < 1) return "ahora";
   if (mins < 60) return `hace ${mins} min`;
   const hours = Math.round(mins / 60);
   if (hours < 48) return `hace ${hours} h`;
@@ -361,26 +389,26 @@ export function formatFreshnessAge(iso: string | null | undefined, now = Date.no
 
 export function freshnessSkipDenialLabel(reason: string): string {
   switch (reason) {
-    case 'prefs_off':
-      return 'frescura OFF';
-    case 'force':
-      return 'forzar reanálisis';
-    case 'no_active_top':
-      return 'sin Finalistas / sin huella previa';
-    case 'no_finalists_slots':
-      return 'sin Finalistas (slots vacíos · hay que analizar)';
-    case 'no_stamp':
-      return 'sin stamp de frescura';
-    case 'fingerprint_mismatch':
-      return 'datos/contexto distintos';
-    case 'engine_mismatch':
-      return 'motor de frescura distinto';
-    case 'context_not_ready':
-      return 'esperando perfil/datos';
-    case 'top_fetch_error':
-      return 'error leyendo TOP';
-    case 'bar_hysteresis':
-      return 'barra reciente (histéresis)';
+    case "prefs_off":
+      return "frescura OFF";
+    case "force":
+      return "forzar reanálisis";
+    case "no_active_top":
+      return "sin Finalistas / sin huella previa";
+    case "no_finalists_slots":
+      return "sin Finalistas (slots vacíos · hay que analizar)";
+    case "no_stamp":
+      return "sin stamp de frescura";
+    case "fingerprint_mismatch":
+      return "datos/contexto distintos";
+    case "engine_mismatch":
+      return "motor de frescura distinto";
+    case "context_not_ready":
+      return "esperando perfil/datos";
+    case "top_fetch_error":
+      return "error leyendo TOP";
+    case "bar_hysteresis":
+      return "barra reciente (histéresis)";
     default:
       return reason;
   }
@@ -394,5 +422,7 @@ export function isFinalistsFreshnessContextReady(opts: {
   /** false mientras cargan estrategias guardadas si Optimizadas o Mis están ON. */
   strategiesReady: boolean;
 }): boolean {
-  return opts.instrumentsFetched && opts.accountProfileReady && opts.strategiesReady;
+  return (
+    opts.instrumentsFetched && opts.accountProfileReady && opts.strategiesReady
+  );
 }

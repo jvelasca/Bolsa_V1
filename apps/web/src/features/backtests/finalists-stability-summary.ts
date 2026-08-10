@@ -3,23 +3,28 @@
  * Reutiliza formatPaperLabEvidence + flags WF del checklist (sin campaña Δ).
  */
 
-import type { PaperLabEvidenceSnapshot } from '@bolsa/shared';
-import { formatPaperLabEvidence } from '@/features/accounts/paper-lab-evidence';
+import type { PaperLabEvidenceSnapshot } from "@bolsa/shared";
+import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
 import {
   oosEvidenceToPaperLabSnapshot,
   resolveOosEvidence,
   type OosEvidence,
-} from '@/features/backtests/backtest-oos-evidence';
-import { walkForwardStabilityFlags } from '@/features/backtests/backtest-walk-forward-metrics';
+} from "@/features/backtests/backtest-oos-evidence";
+import { walkForwardStabilityFlags } from "@/features/backtests/backtest-walk-forward-metrics";
 
 export function readLabEvidenceFromCoachFacts(
   facts: Record<string, unknown> | null | undefined,
 ): PaperLabEvidenceSnapshot | null {
-  if (!facts || typeof facts !== 'object') return null;
+  if (!facts || typeof facts !== "object") return null;
   const raw = facts.labEvidence;
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const kind = (raw as PaperLabEvidenceSnapshot).kind;
-  if (kind !== 'holdout' && kind !== 'walkforward' && kind !== 'cpcv' && kind !== 'none') {
+  if (
+    kind !== "holdout" &&
+    kind !== "walkforward" &&
+    kind !== "cpcv" &&
+    kind !== "none"
+  ) {
     return null;
   }
   return raw as PaperLabEvidenceSnapshot;
@@ -30,12 +35,11 @@ export function buildFinalistsLabEvidenceSnapshot(
   evidence: OosEvidence | null | undefined,
   opts?: { sourceBacktestRunId?: string | null; trialId?: string | null },
 ): PaperLabEvidenceSnapshot | null {
-  if (!evidence || evidence.kind === 'none') return null;
+  if (!evidence || evidence.kind === "none") return null;
   const snap = oosEvidenceToPaperLabSnapshot(evidence, opts);
   return {
     ...snap,
-    note:
-      'Lab provenance on Finalistas — not a production gate, Belief, or auto-live.',
+    note: "Lab provenance on Finalistas — not a production gate, Belief, or auto-live.",
   };
 }
 
@@ -51,9 +55,9 @@ export function mergeLabEvidenceIntoCoachFacts(
 export function formatFinalistsStabilityBadge(
   snapshot: PaperLabEvidenceSnapshot | null | undefined,
 ): string | null {
-  if (!snapshot || snapshot.kind === 'none') return null;
+  if (!snapshot || snapshot.kind === "none") return null;
   const text = formatPaperLabEvidence(snapshot);
-  if (!text || text === '—' || text === 'Sin validación lab') return null;
+  if (!text || text === "—" || text === "Sin validación lab") return null;
   return text;
 }
 
@@ -67,10 +71,10 @@ export function finalistsStabilityWarnTitle(
     positiveOosFoldShare: snapshot.positiveOosFoldShare,
   });
   const parts: string[] = [];
-  if (flags.weakWfe) parts.push('WFE débil');
-  if (flags.unstableCv) parts.push('CV OOS alto');
-  if (flags.fewPositiveFolds) parts.push('pocos folds +');
-  return parts.length ? `Estabilidad frágil: ${parts.join(' · ')}` : null;
+  if (flags.weakWfe) parts.push("WFE débil");
+  if (flags.unstableCv) parts.push("CV OOS alto");
+  if (flags.fewPositiveFolds) parts.push("pocos folds +");
+  return parts.length ? `Estabilidad frágil: ${parts.join(" · ")}` : null;
 }
 
 /**
@@ -80,7 +84,9 @@ export function resolveLabEvidenceForFinalistsSave(opts: {
   strategyDefinitionId?: string | null;
   runId?: string | null;
 }): PaperLabEvidenceSnapshot | null {
-  const evidence = resolveOosEvidence({ strategyId: opts.strategyDefinitionId });
+  const evidence = resolveOosEvidence({
+    strategyId: opts.strategyDefinitionId,
+  });
   return buildFinalistsLabEvidenceSnapshot(evidence, {
     sourceBacktestRunId: opts.runId ?? null,
   });

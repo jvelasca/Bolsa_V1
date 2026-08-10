@@ -14,56 +14,59 @@
  * @see docs/engineering/research-radar-unification-2026-07-31.md
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { InstrumentStrategyTopV1 } from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { formatPct } from '@/features/charts/chart-utils';
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { InstrumentStrategyTopV1 } from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { formatPct } from "@/features/charts/chart-utils";
 import {
   PAPER_PATH_LAB,
   PAPER_PATH_RADAR,
   PAPER_PATH_SUPERVISED,
-} from '@/features/settings/paper-paths-copy';
-import { activeTopProfileMismatch } from '@/features/backtests/coach-profile-policy';
-import { libraryHrefForSavedStrategy } from '@/features/backtests/library-nav';
-import { clearLocalFreshnessFingerprint } from '@/features/backtests/backtest-finalists-freshness';
+} from "@/features/settings/paper-paths-copy";
+import { activeTopProfileMismatch } from "@/features/backtests/coach-profile-policy";
+import { libraryHrefForSavedStrategy } from "@/features/backtests/library-nav";
+import { clearLocalFreshnessFingerprint } from "@/features/backtests/backtest-finalists-freshness";
 import {
   buildTrackerFromFinalistSlot,
   screenersHrefAfterTrackerCreate,
-} from '@/features/backtests/promote-finalist-to-tracker';
-import { useAlertsStore } from '@/stores/alerts-store';
+} from "@/features/backtests/promote-finalist-to-tracker";
+import { useAlertsStore } from "@/stores/alerts-store";
 import {
   effectiveDiaD,
   isDiaDInPast,
   todayIsoDate,
-} from '@/features/backtests/backtest-period';
-import { loadBacktestRunContext } from '@/features/backtests/backtest-run-context';
-import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
+} from "@/features/backtests/backtest-period";
+import { loadBacktestRunContext } from "@/features/backtests/backtest-run-context";
+import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
 import {
   diaDVerifyHref,
   VERIFY_DIA_D_CTA,
-} from '@/features/platform/product-universe';
-import { setAdoption } from '@/features/platform/strategy-adoption';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
+} from "@/features/platform/product-universe";
+import { setAdoption } from "@/features/platform/strategy-adoption";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
 import {
   getDiaDExperimentTop,
   getDiaDExperimentTop1,
-} from '@/features/backtests/dia-d-experiment-top';
-import { sanitizeTopSlotsStrategyTypes } from '@/features/backtests/instrument-top-strategy-type';
+} from "@/features/backtests/dia-d-experiment-top";
+import { sanitizeTopSlotsStrategyTypes } from "@/features/backtests/instrument-top-strategy-type";
 import {
   finalistsStabilityWarnTitle,
   formatFinalistsStabilityBadge,
   readLabEvidenceFromCoachFacts,
-} from '@/features/backtests/finalists-stability-summary';
+} from "@/features/backtests/finalists-stability-summary";
 /** Deep-link hub → foco Finalistas del valor. */
-export function instrumentTopBacktestsHref(instrumentId: string, timeframe = '1d'): string {
+export function instrumentTopBacktestsHref(
+  instrumentId: string,
+  timeframe = "1d",
+): string {
   const params = new URLSearchParams({
-    tab: 'run',
+    tab: "run",
     instrumentId,
-    focus: 'finalists',
+    focus: "finalists",
     timeframe,
   });
   return `/backtests?${params.toString()}`;
@@ -79,7 +82,7 @@ export type FinalistSlotUse = {
 
 export function InstrumentStrategyTopBadge({
   instrumentId,
-  timeframe = '1d',
+  timeframe = "1d",
   className,
 }: {
   instrumentId: string;
@@ -87,7 +90,7 @@ export function InstrumentStrategyTopBadge({
   className?: string;
 }) {
   const query = useQuery({
-    queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+    queryKey: ["instrument-strategy-top", instrumentId, timeframe],
     queryFn: () => api.getInstrumentStrategyTop(instrumentId, timeframe),
     staleTime: 60_000,
     retry: false,
@@ -98,10 +101,10 @@ export function InstrumentStrategyTopBadge({
   return (
     <span
       className={cn(
-        'rounded-full px-2 py-0.5 text-xs',
-        top.status === 'active'
-          ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-200'
-          : 'bg-amber-500/15 text-amber-900 dark:text-amber-200',
+        "rounded-full px-2 py-0.5 text-xs",
+        top.status === "active"
+          ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
+          : "bg-amber-500/15 text-amber-900 dark:text-amber-200",
         className,
       )}
       title={`${top.slots.length} estrategias · ${top.status} · v${top.version}`}
@@ -122,7 +125,7 @@ function SlotRow({
   onSimulateDiaD,
   diaDActive,
 }: {
-  slot: InstrumentStrategyTopV1['slots'][number];
+  slot: InstrumentStrategyTopV1["slots"][number];
   onUse?: (use: FinalistSlotUse) => void;
   onOpenChecklist?: (use: FinalistSlotUse) => void;
   onProposeSupervised?: (use: FinalistSlotUse) => void;
@@ -140,7 +143,9 @@ function SlotRow({
           <p className="font-medium text-foreground">
             #{slot.rank} {slot.label}
           </p>
-          <p className="text-[11px] text-muted-foreground">sin estrategia guardada</p>
+          <p className="text-[11px] text-muted-foreground">
+            sin estrategia guardada
+          </p>
         </div>
       </div>
     );
@@ -165,15 +170,19 @@ function SlotRow({
           #{slot.rank} {slot.label}
           {slot.stars > 0 ? (
             <span className="ml-1.5 text-[11px] text-amber-700 dark:text-amber-300">
-              {'★'.repeat(Math.min(5, slot.stars))}
+              {"★".repeat(Math.min(5, slot.stars))}
             </span>
           ) : null}
         </p>
         <p className="text-[11px] text-muted-foreground">
           {slot.source}
-          {slot.totalReturnPct != null ? ` · ret ${formatPct(slot.totalReturnPct)}` : ''}
-          {slot.maxDrawdownPct != null ? ` · DD ${formatPct(slot.maxDrawdownPct)}` : ''}
-          {slot.runId ? ' · con resultado' : ''}
+          {slot.totalReturnPct != null
+            ? ` · ret ${formatPct(slot.totalReturnPct)}`
+            : ""}
+          {slot.maxDrawdownPct != null
+            ? ` · DD ${formatPct(slot.maxDrawdownPct)}`
+            : ""}
+          {slot.runId ? " · con resultado" : ""}
         </p>
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -199,7 +208,7 @@ function SlotRow({
             title={PAPER_PATH_SUPERVISED.blurb}
             onClick={() => onProposeSupervised!(usePayload)}
           >
-            {proposePending ? '…' : PAPER_PATH_SUPERVISED.cta}
+            {proposePending ? "…" : PAPER_PATH_SUPERVISED.cta}
           </Button>
         ) : null}
         {canChecklist ? (
@@ -224,7 +233,7 @@ function SlotRow({
             title={PAPER_PATH_RADAR.finalistsHint}
             onClick={() => onCreateTracker!(usePayload)}
           >
-            {trackerPending ? '…' : PAPER_PATH_RADAR.cta}
+            {trackerPending ? "…" : PAPER_PATH_RADAR.cta}
           </Button>
         ) : null}
         {onUse ? (
@@ -235,8 +244,8 @@ function SlotRow({
             className="h-7 text-[11px]"
             title={
               slot.runId
-                ? 'Seleccionar estrategia (y abrir resultado si hay run)'
-                : 'Seleccionar estrategia en el wizard'
+                ? "Seleccionar estrategia (y abrir resultado si hay run)"
+                : "Seleccionar estrategia en el wizard"
             }
             onClick={() => onUse(usePayload)}
           >
@@ -246,8 +255,8 @@ function SlotRow({
         <Link
           to={libraryHrefForSavedStrategy(strategyId)}
           className={cn(
-            buttonVariants({ variant: 'ghost', size: 'sm' }),
-            'h-7 text-[11px]',
+            buttonVariants({ variant: "ghost", size: "sm" }),
+            "h-7 text-[11px]",
           )}
           title="Abrir en Biblioteca (ver, renombrar, eliminar…)"
         >
@@ -269,7 +278,10 @@ type PanelProps = {
    * Usar estrategia. Segundo arg (slot) incluye runId cuando existe.
    * Firma amplia: acepta callbacks legacy `(id: string) => void`.
    */
-  onUseStrategy?: (strategyDefinitionId: string, slot?: FinalistSlotUse) => void;
+  onUseStrategy?: (
+    strategyDefinitionId: string,
+    slot?: FinalistSlotUse,
+  ) => void;
   /** Abrir run del slot + checklist pre-demo (Camino A). */
   onOpenChecklist?: (slot: FinalistSlotUse) => void;
   /** Camino C: propose FA+perfil → cola Supervisado F3. */
@@ -287,7 +299,7 @@ type PanelProps = {
 export function InstrumentStrategyTopPanel({
   instrumentId,
   symbol,
-  timeframe = '1d',
+  timeframe = "1d",
   top: topProp,
   compact,
   onUseStrategy,
@@ -310,9 +322,11 @@ export function InstrumentStrategyTopPanel({
   const diaDActive = isDiaDInPast(diaD);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [trackerPendingRank, setTrackerPendingRank] = useState<number | null>(null);
+  const [trackerPendingRank, setTrackerPendingRank] = useState<number | null>(
+    null,
+  );
   const query = useQuery({
-    queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+    queryKey: ["instrument-strategy-top", instrumentId, timeframe],
     queryFn: () => api.getInstrumentStrategyTop(instrumentId, timeframe),
     enabled: topProp !== undefined ? false : Boolean(instrumentId),
     staleTime: 30_000,
@@ -328,7 +342,7 @@ export function InstrumentStrategyTopPanel({
     : null;
 
   const strategiesQuery = useQuery({
-    queryKey: ['strategies'],
+    queryKey: ["strategies"],
     queryFn: () => api.getStrategies(),
     staleTime: 60_000,
   });
@@ -365,12 +379,14 @@ export function InstrumentStrategyTopPanel({
       })
       .then(() => {
         void queryClient.invalidateQueries({
-          queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+          queryKey: ["instrument-strategy-top", instrumentId, timeframe],
         });
         void queryClient.invalidateQueries({
-          queryKey: ['instrument-strategy-tops-batch'],
+          queryKey: ["instrument-strategy-tops-batch"],
         });
-        pushToast('Finalistas: tipos de estrategia alineados con la definición');
+        pushToast(
+          "Finalistas: tipos de estrategia alineados con la definición",
+        );
       })
       .catch(() => {
         repairedRef.current = null;
@@ -388,9 +404,11 @@ export function InstrumentStrategyTopPanel({
   const createTrackerMutation = useMutation({
     mutationFn: async (slotUse: FinalistSlotUse) => {
       const slot = top?.slots.find(
-        (s) => s.rank === slotUse.rank && s.strategyDefinitionId === slotUse.strategyDefinitionId,
+        (s) =>
+          s.rank === slotUse.rank &&
+          s.strategyDefinitionId === slotUse.strategyDefinitionId,
       );
-      if (!slot) throw new Error('Slot no encontrado en Finalistas');
+      if (!slot) throw new Error("Slot no encontrado en Finalistas");
       const policiesRes = await api.getExecutionPolicies(true);
       const built = buildTrackerFromFinalistSlot({
         instrumentId,
@@ -398,7 +416,7 @@ export function InstrumentStrategyTopPanel({
         timeframe: top?.timeframe ?? timeframe,
         slot,
         topVersion: top?.version,
-        scheduleKind: 'manual',
+        scheduleKind: "manual",
         listId: trackerListId,
         alarmPolicies: (policiesRes.data ?? []).map((p) => ({
           id: p.id,
@@ -414,7 +432,7 @@ export function InstrumentStrategyTopPanel({
       setTrackerPendingRank(slotUse.rank);
     },
     onSuccess: (detail) => {
-      void queryClient.invalidateQueries({ queryKey: ['trackers'] });
+      void queryClient.invalidateQueries({ queryKey: ["trackers"] });
       pushToast(
         `${PAPER_PATH_RADAR.cta} creado: ${detail.name}. Abre Screeners para escanear / programar.`,
       );
@@ -431,7 +449,7 @@ export function InstrumentStrategyTopPanel({
   async function handleDeleteFinalists() {
     if (!instrumentId || deleting) return;
     const ok = window.confirm(
-      `¿Eliminar Finalistas (TOP) de ${symbol ?? 'este valor'}?\n\nEl próximo Play / Lista AUTO volverá a analizarlo.`,
+      `¿Eliminar Finalistas (TOP) de ${symbol ?? "este valor"}?\n\nEl próximo Play / Lista AUTO volverá a analizarlo.`,
     );
     if (!ok) return;
     setDeleting(true);
@@ -440,17 +458,19 @@ export function InstrumentStrategyTopPanel({
       await api.deleteInstrumentStrategyTop(instrumentId, timeframe);
       clearLocalFreshnessFingerprint(instrumentId, timeframe);
       queryClient.setQueryData(
-        ['instrument-strategy-top', instrumentId, timeframe],
+        ["instrument-strategy-top", instrumentId, timeframe],
         { data: null },
       );
       await queryClient.invalidateQueries({
-        queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+        queryKey: ["instrument-strategy-top", instrumentId, timeframe],
       });
       await queryClient.invalidateQueries({
-        queryKey: ['instrument-strategy-tops-batch'],
+        queryKey: ["instrument-strategy-tops-batch"],
       });
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'No se pudo eliminar el TOP');
+      setDeleteError(
+        err instanceof Error ? err.message : "No se pudo eliminar el TOP",
+      );
     } finally {
       setDeleting(false);
     }
@@ -458,7 +478,7 @@ export function InstrumentStrategyTopPanel({
   const href = instrumentTopBacktestsHref(instrumentId, timeframe);
   const stampedProfileId = (() => {
     const facts = top?.coachFacts as Record<string, unknown> | null | undefined;
-    return typeof facts?.profileId === 'string' ? facts.profileId : null;
+    return typeof facts?.profileId === "string" ? facts.profileId : null;
   })();
   const profileWarn = activeTopProfileMismatch({
     topStatus: top?.status,
@@ -468,20 +488,27 @@ export function InstrumentStrategyTopPanel({
 
   if (query.isLoading && topProp === undefined) {
     return (
-      <p className={cn('text-sm text-muted-foreground', className)}>Cargando TOP del valor…</p>
+      <p className={cn("text-sm text-muted-foreground", className)}>
+        Cargando TOP del valor…
+      </p>
     );
   }
 
   if (!top || top.slots.length === 0) {
     return (
-      <div className={cn('rounded-lg border border-dashed border-border px-3 py-3 text-sm', className)}>
+      <div
+        className={cn(
+          "rounded-lg border border-dashed border-border px-3 py-3 text-sm",
+          className,
+        )}
+      >
         <p className="font-medium text-foreground">
-          {symbol ? `Sin Finalistas · ${symbol}` : 'Sin Finalistas'}
+          {symbol ? `Sin Finalistas · ${symbol}` : "Sin Finalistas"}
         </p>
         <p className="mt-1 text-muted-foreground">
-          Aún no hay TOP guardado. Ruta corta: Play (ciclo ON) → Coach → Lab → Coach² → Finalistas
-          (solo con mejora Lab). Alternativa: Coach → Guardar TOP-3 (semifinal) o Lab → Reanalizar →
-          Guardar Finalistas.
+          Aún no hay TOP guardado. Ruta corta: Play (ciclo ON) → Coach → Lab →
+          Coach² → Finalistas (solo con mejora Lab). Alternativa: Coach →
+          Guardar TOP-3 (semifinal) o Lab → Reanalizar → Guardar Finalistas.
         </p>
         {onGoToCoach ? (
           <Button
@@ -494,7 +521,10 @@ export function InstrumentStrategyTopPanel({
             Ir al Coach
           </Button>
         ) : (
-          <Link to={href} className="mt-2 inline-block text-xs font-medium text-primary hover:underline">
+          <Link
+            to={href}
+            className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
+          >
             Abrir Finalistas en Backtests
           </Link>
         )}
@@ -505,7 +535,7 @@ export function InstrumentStrategyTopPanel({
   return (
     <div
       className={cn(
-        'space-y-2 rounded-lg border border-border bg-muted/15 px-3 py-3',
+        "space-y-2 rounded-lg border border-border bg-muted/15 px-3 py-3",
         className,
       )}
     >
@@ -533,9 +563,13 @@ export function InstrumentStrategyTopPanel({
               );
               const badge = formatFinalistsStabilityBadge(snap);
               if (badge) return ` · ${badge}`;
-              return top.evidenceLevel === 'lab_validated' ? ' · lab OOS' : ' · in-sample';
+              return top.evidenceLevel === "lab_validated"
+                ? " · lab OOS"
+                : " · in-sample";
             })()}
-            {diaDActive ? ` · DÍA D ${effectiveDiaD(diaD)} (F-hoy intacto)` : ''}
+            {diaDActive
+              ? ` · DÍA D ${effectiveDiaD(diaD)} (F-hoy intacto)`
+              : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -548,7 +582,7 @@ export function InstrumentStrategyTopPanel({
             title="Borra el TOP del valor (no las estrategias de Biblioteca). Invalida Omitido en Lista AUTO."
             onClick={() => void handleDeleteFinalists()}
           >
-            {deleting ? 'Eliminando…' : 'Eliminar Finalistas'}
+            {deleting ? "Eliminando…" : "Eliminar Finalistas"}
           </Button>
           <Link
             to={href}
@@ -569,17 +603,18 @@ export function InstrumentStrategyTopPanel({
           className="rounded-md border border-sky-600/30 bg-sky-500/10 px-2 py-1.5 text-[11px] text-sky-950 dark:text-sky-50"
           role="status"
         >
-          Experimento F-D ({experimentAsOf}): {experimentTop.slots.length} slot(s)
-          {experimentTop1 ? ` · #1 ${experimentTop1.label}` : ''}. Verificar usa F-D; Finalistas
-          operativos (arriba) no se pisan.
+          Experimento F-D ({experimentAsOf}): {experimentTop.slots.length}{" "}
+          slot(s)
+          {experimentTop1 ? ` · #1 ${experimentTop1.label}` : ""}. Verificar usa
+          F-D; Finalistas operativos (arriba) no se pisan.
         </p>
       ) : diaDActive ? (
         <p
           className="rounded-md border-2 border-red-600 bg-red-600 px-2 py-1.5 text-[11px] font-medium text-white shadow-sm"
           role="status"
         >
-          DÍA D activo: Play guardará un TOP experimento (F-D) sin pisar Finalistas operativos.
-          Luego Verificar D→hoy.
+          DÍA D activo: Play guardará un TOP experimento (F-D) sin pisar
+          Finalistas operativos. Luego Verificar D→hoy.
         </p>
       ) : null}
       {profileWarn.mismatch && profileWarn.message ? (
@@ -596,16 +631,17 @@ export function InstrumentStrategyTopPanel({
           role="status"
           data-testid="dia-d-funnel-banner"
         >
-          Embudo as-of · DÍA D {effectiveDiaD(diaD)}. La #1 puede abrir{' '}
-          <strong className="font-bold">Verificar D→hoy</strong> en LAB (Cartera LAB · Manual / Semi / Auto).
+          Embudo as-of · DÍA D {effectiveDiaD(diaD)}. La #1 puede abrir{" "}
+          <strong className="font-bold">Verificar D→hoy</strong> en LAB (Cartera
+          LAB · Manual / Semi / Auto).
         </p>
       ) : null}
-      {onOpenChecklist && top.evidenceLevel === 'lab_validated' ? (
+      {onOpenChecklist && top.evidenceLevel === "lab_validated" ? (
         <p className="text-[11px] leading-snug text-muted-foreground">
           {PAPER_PATH_LAB.finalistsHint}
         </p>
       ) : null}
-      {onProposeSupervised && top.evidenceLevel === 'lab_validated' ? (
+      {onProposeSupervised && top.evidenceLevel === "lab_validated" ? (
         <p className="text-[11px] leading-snug text-muted-foreground">
           {PAPER_PATH_SUPERVISED.finalistsHint}
         </p>
@@ -613,7 +649,7 @@ export function InstrumentStrategyTopPanel({
       <p className="text-[11px] leading-snug text-muted-foreground">
         {PAPER_PATH_RADAR.finalistsHint}
       </p>
-      <div className={cn('space-y-1.5', compact && 'max-h-48 overflow-auto')}>
+      <div className={cn("space-y-1.5", compact && "max-h-48 overflow-auto")}>
         {top.slots
           .slice()
           .sort((a, b) => a.rank - b.rank)
@@ -628,29 +664,26 @@ export function InstrumentStrategyTopPanel({
               }
               onOpenChecklist={onOpenChecklist}
               onProposeSupervised={
-                onProposeSupervised && top.evidenceLevel === 'lab_validated'
+                onProposeSupervised && top.evidenceLevel === "lab_validated"
                   ? onProposeSupervised
                   : undefined
               }
-              proposePending={
-                Boolean(
-                  proposePendingStrategyId &&
-                    slot.strategyDefinitionId === proposePendingStrategyId,
-                )
-              }
+              proposePending={Boolean(
+                proposePendingStrategyId &&
+                slot.strategyDefinitionId === proposePendingStrategyId,
+              )}
               onCreateTracker={(use) => createTrackerMutation.mutate(use)}
               trackerPending={trackerPendingRank === slot.rank}
               diaDActive={diaDActive}
               onSimulateDiaD={(use) => {
                 const sym = symbol?.trim() || instrumentId.slice(0, 8);
-                const fromExp =
-                  experimentTop1?.strategyDefinitionId
-                    ? {
-                        strategyDefinitionId: experimentTop1.strategyDefinitionId,
-                        strategyLabel: experimentTop1.label,
-                        rank: experimentTop1.rank,
-                      }
-                    : null;
+                const fromExp = experimentTop1?.strategyDefinitionId
+                  ? {
+                      strategyDefinitionId: experimentTop1.strategyDefinitionId,
+                      strategyLabel: experimentTop1.label,
+                      rank: experimentTop1.rank,
+                    }
+                  : null;
                 enterDiaDSession({
                   instrumentId,
                   symbol: sym,
@@ -660,13 +693,13 @@ export function InstrumentStrategyTopPanel({
                   rank: fromExp?.rank ?? use.rank,
                   diaD: effectiveDiaD(diaD),
                   endDate: todayIsoDate(),
-                  mode: 'auto',
+                  mode: "auto",
                 });
                 if (effectiveAccountId) {
                   setAdoption({
                     instrumentId,
                     accountId: effectiveAccountId,
-                    state: 'candidata',
+                    state: "candidata",
                     strategyDefinitionId:
                       fromExp?.strategyDefinitionId ?? use.strategyDefinitionId,
                     strategyLabel: fromExp?.strategyLabel ?? use.label,

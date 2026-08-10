@@ -7,8 +7,8 @@ import type {
   InstrumentStrategyTopSlotV1,
   InstrumentStrategyTopV1,
   UpsertInstrumentStrategyTopRequestV1,
-} from '@bolsa/shared';
-import { resolveLabEvidenceForFinalistsSave } from '@/features/backtests/finalists-stability-summary';
+} from "@bolsa/shared";
+import { resolveLabEvidenceForFinalistsSave } from "@/features/backtests/finalists-stability-summary";
 
 export type LabPromotionSlotInput = {
   label: string;
@@ -33,7 +33,10 @@ function clampStars(score: number, explicit?: number): number {
 }
 
 function slotIdentityKey(
-  slot: Pick<InstrumentStrategyTopSlotV1, 'strategyDefinitionId' | 'strategyType' | 'label'>,
+  slot: Pick<
+    InstrumentStrategyTopSlotV1,
+    "strategyDefinitionId" | "strategyType" | "label"
+  >,
 ): string {
   if (slot.strategyDefinitionId) return `id:${slot.strategyDefinitionId}`;
   if (slot.strategyType) return `type:${slot.strategyType}`;
@@ -44,10 +47,12 @@ function slotIdentityKey(
 export function assertLabValidatedSlotsHaveRunId(
   slots: InstrumentStrategyTopSlotV1[],
 ): void {
-  const missing = slots.filter((s) => !s.runId?.trim()).map((s) => s.label || `#${s.rank}`);
+  const missing = slots
+    .filter((s) => !s.runId?.trim())
+    .map((s) => s.label || `#${s.rank}`);
   if (missing.length > 0) {
     throw new Error(
-      `lab_validated TOP requires runId on every slot (missing: ${missing.join(', ')})`,
+      `lab_validated TOP requires runId on every slot (missing: ${missing.join(", ")})`,
     );
   }
 }
@@ -65,7 +70,8 @@ export function dedupeInstrumentTopSlots(
   const seenKeys = new Set<string>();
   const out: InstrumentStrategyTopSlotV1[] = [];
   for (const slot of slots) {
-    if (slot.strategyDefinitionId && seenIds.has(slot.strategyDefinitionId)) continue;
+    if (slot.strategyDefinitionId && seenIds.has(slot.strategyDefinitionId))
+      continue;
     if (slot.strategyType && seenTypes.has(slot.strategyType)) continue;
     const key = slotIdentityKey(slot);
     if (seenKeys.has(key)) continue;
@@ -121,7 +127,7 @@ export function buildLabPromotionUpsertMany(opts: {
     score: p.score,
     starsCapped: false,
     runId: p.runId ?? null,
-    source: 'optimized' as const,
+    source: "optimized" as const,
     totalReturnPct: p.totalReturnPct ?? null,
     excessReturnPct: p.excessReturnPct ?? null,
     maxDrawdownPct: p.maxDrawdownPct ?? null,
@@ -136,7 +142,8 @@ export function buildLabPromotionUpsertMany(opts: {
   );
 
   const prior = (opts.existing?.slots ?? []).filter((s) => {
-    if (s.strategyDefinitionId && promotedIds.has(s.strategyDefinitionId)) return false;
+    if (s.strategyDefinitionId && promotedIds.has(s.strategyDefinitionId))
+      return false;
     if (s.strategyType && promotedTypes.has(s.strategyType)) return false;
     // lab_validated no puede arrastrar slots sin runId (Checklist).
     if (!s.runId?.trim()) return false;
@@ -145,7 +152,7 @@ export function buildLabPromotionUpsertMany(opts: {
 
   const slots = dedupeInstrumentTopSlots([...labSlots, ...prior], 3);
   assertLabValidatedSlotsHaveRunId(slots);
-  const topLabel = slots[0]?.label ?? 'lab';
+  const topLabel = slots[0]?.label ?? "lab";
   const slot1 = slots[0];
   const labEvidence =
     (opts.labFacts?.labEvidence as object | undefined) ??
@@ -159,8 +166,8 @@ export function buildLabPromotionUpsertMany(opts: {
     symbol: opts.symbol ?? opts.existing?.symbol ?? null,
     timeframe: opts.timeframe,
     periodLabel: opts.periodLabel ?? opts.existing?.periodLabel ?? null,
-    status: 'active',
-    evidenceLevel: 'lab_validated',
+    status: "active",
+    evidenceLevel: "lab_validated",
     slots,
     coachHeadline:
       opts.coachHeadline ??
@@ -171,13 +178,16 @@ export function buildLabPromotionUpsertMany(opts: {
       ...(opts.labFacts ?? {}),
       ...(labEvidence ? { labEvidence } : {}),
       promotedAt: new Date().toISOString(),
-      promotionSource: opts.promoted.length > 1 ? 'lab_adopt_many' : 'lab_adopt',
+      promotionSource:
+        opts.promoted.length > 1 ? "lab_adopt_many" : "lab_adopt",
       promotedCount: opts.promoted.length,
     },
   };
 }
 
 /** True si hay evidencia OOS/WF/CPCV suficiente para promover. */
-export function canPromoteTopFromLabEvidence(kind: string | null | undefined): boolean {
-  return kind === 'holdout' || kind === 'walkforward' || kind === 'cpcv';
+export function canPromoteTopFromLabEvidence(
+  kind: string | null | undefined,
+): boolean {
+  return kind === "holdout" || kind === "walkforward" || kind === "cpcv";
 }

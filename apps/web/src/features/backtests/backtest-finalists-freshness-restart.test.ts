@@ -2,7 +2,7 @@
  * Escenario: frescura Finalistas tras reinicio (sin sesión).
  */
 
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   FINALISTS_FRESHNESS_STORAGE_KEY,
   buildFinalistsFreshnessStamp,
@@ -10,10 +10,10 @@ import {
   isFinalistsFreshnessContextReady,
   shouldSkipFinalistsSearch,
   writeLocalFreshnessFingerprint,
-} from '@/features/backtests/backtest-finalists-freshness';
+} from "@/features/backtests/backtest-finalists-freshness";
 
-const INSTRUMENT_ID = 'inst-grf-test';
-const TIMEFRAME = '1d';
+const INSTRUMENT_ID = "inst-grf-test";
+const TIMEFRAME = "1d";
 
 function fingerprint(opts: {
   lastBarDate: string | null;
@@ -22,23 +22,24 @@ function fingerprint(opts: {
   return buildFinalistsInputFingerprint({
     instrumentId: INSTRUMENT_ID,
     timeframe: TIMEFRAME,
-    periodPreset: 'all',
-    initialCash: '10000',
-    commissionBps: '0',
-    slippageBps: '0',
+    periodPreset: "all",
+    initialCash: "10000",
+    commissionBps: "0",
+    slippageBps: "0",
     lastBarDate: opts.lastBarDate,
-    loteRowIds: ['preset:sma_crossover'],
-    profilePolicyVersion: opts.profilePolicyVersion ?? 'coach-profile-v1|pid:p1|ff:1',
+    loteRowIds: ["preset:sma_crossover"],
+    profilePolicyVersion:
+      opts.profilePolicyVersion ?? "coach-profile-v1|pid:p1|ff:1",
   });
 }
 
-describe('frescura cross-restart (Lista AUTO)', () => {
+describe("frescura cross-restart (Lista AUTO)", () => {
   beforeEach(() => {
     localStorage.removeItem(FINALISTS_FRESHNESS_STORAGE_KEY);
   });
 
-  it('NO omite sin slots aunque haya huella local (Finalistas borrados)', () => {
-    const fp = fingerprint({ lastBarDate: '2026-07-28' });
+  it("NO omite sin slots aunque haya huella local (Finalistas borrados)", () => {
+    const fp = fingerprint({ lastBarDate: "2026-07-28" });
     writeLocalFreshnessFingerprint({
       instrumentId: INSTRUMENT_ID,
       timeframe: TIMEFRAME,
@@ -54,11 +55,11 @@ describe('frescura cross-restart (Lista AUTO)', () => {
         localFingerprint: fp,
         hasSlots: false,
       }).reason,
-    ).toBe('no_finalists_slots');
+    ).toBe("no_finalists_slots");
   });
 
-  it('omite con huella local solo si hay Finalistas (slots)', () => {
-    const fp = fingerprint({ lastBarDate: '2026-07-28' });
+  it("omite con huella local solo si hay Finalistas (slots)", () => {
+    const fp = fingerprint({ lastBarDate: "2026-07-28" });
     writeLocalFreshnessFingerprint({
       instrumentId: INSTRUMENT_ID,
       timeframe: TIMEFRAME,
@@ -67,86 +68,89 @@ describe('frescura cross-restart (Lista AUTO)', () => {
     expect(
       shouldSkipFinalistsSearch({
         preferSkip: true,
-        topStatus: 'active',
+        topStatus: "active",
         stored: null,
         currentFingerprint: fp,
         memoryFingerprint: null,
         localFingerprint: fp,
         hasSlots: true,
       }).reason,
-    ).toBe('local_fresh');
+    ).toBe("local_fresh");
   });
 
-  it('omite con stamp DB tras reinicio (perfil ya listo)', () => {
-    const fp = fingerprint({ lastBarDate: '2026-07-28' });
-    const stored = buildFinalistsFreshnessStamp({ inputFingerprint: fp, lab: true });
+  it("omite con stamp DB tras reinicio (perfil ya listo)", () => {
+    const fp = fingerprint({ lastBarDate: "2026-07-28" });
+    const stored = buildFinalistsFreshnessStamp({
+      inputFingerprint: fp,
+      lab: true,
+    });
     expect(
       shouldSkipFinalistsSearch({
         preferSkip: true,
-        topStatus: 'active',
+        topStatus: "active",
         stored,
         currentFingerprint: fp,
         memoryFingerprint: null,
         localFingerprint: null,
         hasSlots: true,
       }).reason,
-    ).toBe('fresh');
+    ).toBe("fresh");
   });
 
-  it('NO omite si pid:none (carrera de perfil) ≠ stamp con perfil real', () => {
+  it("NO omite si pid:none (carrera de perfil) ≠ stamp con perfil real", () => {
     const stamped = fingerprint({
-      lastBarDate: '2026-07-28',
-      profilePolicyVersion: 'coach-profile-v1|pid:real|ff:1',
+      lastBarDate: "2026-07-28",
+      profilePolicyVersion: "coach-profile-v1|pid:real|ff:1",
     });
     const tooEarly = fingerprint({
-      lastBarDate: '2026-07-28',
-      profilePolicyVersion: 'coach-profile-v1|pid:none|ff:1',
+      lastBarDate: "2026-07-28",
+      profilePolicyVersion: "coach-profile-v1|pid:none|ff:1",
     });
     expect(stamped).not.toBe(tooEarly);
     expect(
       shouldSkipFinalistsSearch({
         preferSkip: true,
-        topStatus: 'active',
+        topStatus: "active",
         stored: buildFinalistsFreshnessStamp({ inputFingerprint: stamped }),
         currentFingerprint: tooEarly,
         hasSlots: true,
       }).reason,
-    ).toBe('fingerprint_mismatch');
+    ).toBe("fingerprint_mismatch");
   });
 
-  it('omite con histéresis si solo avanzó lastBarDate (≤5d en 1d)', () => {
-    const fpOld = fingerprint({ lastBarDate: '2026-07-28' });
+  it("omite con histéresis si solo avanzó lastBarDate (≤5d en 1d)", () => {
+    const fpOld = fingerprint({ lastBarDate: "2026-07-28" });
     const stored = buildFinalistsFreshnessStamp({ inputFingerprint: fpOld });
-    const fpNew = fingerprint({ lastBarDate: '2026-07-29' });
+    const fpNew = fingerprint({ lastBarDate: "2026-07-29" });
     expect(
       shouldSkipFinalistsSearch({
         preferSkip: true,
-        topStatus: 'active',
+        topStatus: "active",
         stored,
         currentFingerprint: fpNew,
         localFingerprint: fpOld,
         hasSlots: true,
       }).reason,
-    ).toBe('bar_hysteresis');
+    ).toBe("bar_hysteresis");
   });
 
-  it('reanaliza si lastBarDate supera slack (6+ días en 1d)', () => {
-    const fpOld = fingerprint({ lastBarDate: '2026-07-28' });
+  it("reanaliza si lastBarDate supera slack (6+ días en 1d)", () => {
+    const fpOld = fingerprint({ lastBarDate: "2026-07-28" });
     const stored = buildFinalistsFreshnessStamp({ inputFingerprint: fpOld });
-    const fpNew = fingerprint({ lastBarDate: '2026-08-03' });
+    const fpNew = fingerprint({ lastBarDate: "2026-08-03" });
     expect(
       shouldSkipFinalistsSearch({
         preferSkip: true,
-        topStatus: 'active',
+        topStatus: "active",
         stored,
         currentFingerprint: fpNew,
         localFingerprint: fpOld,
         hasSlots: true,
       }).reason,
-    ).toBe('fingerprint_mismatch');
+    ).toBe("fingerprint_mismatch");
   });
 
-  it('context ready exige perfil e instrumentos', () => {
+  it("context ready exige perfil e instrumentos", () => {
     expect(
       isFinalistsFreshnessContextReady({
         instrumentsFetched: true,
@@ -163,12 +167,12 @@ describe('frescura cross-restart (Lista AUTO)', () => {
     ).toBe(true);
   });
 
-  it('adopta TOP active con slots sin stamp', () => {
-    const fp = fingerprint({ lastBarDate: '2026-07-28' });
+  it("adopta TOP active con slots sin stamp", () => {
+    const fp = fingerprint({ lastBarDate: "2026-07-28" });
     expect(
       shouldSkipFinalistsSearch({
         preferSkip: true,
-        topStatus: 'active',
+        topStatus: "active",
         stored: null,
         currentFingerprint: fp,
         memoryFingerprint: null,
@@ -177,32 +181,35 @@ describe('frescura cross-restart (Lista AUTO)', () => {
       }),
     ).toEqual({
       skip: true,
-      reason: 'adopt_existing_top',
+      reason: "adopt_existing_top",
       adoptFingerprint: true,
     });
   });
 
-  it('lista multi-ticker: mayoritariamente Omitido tras reinicio (perfil listo)', () => {
-    const lastBar = '2026-07-28';
-    const tickers = ['ACS', 'ITX', 'SAN', 'BBVA', 'REP', 'IBE', 'TEF', 'AENA'];
+  it("lista multi-ticker: mayoritariamente Omitido tras reinicio (perfil listo)", () => {
+    const lastBar = "2026-07-28";
+    const tickers = ["ACS", "ITX", "SAN", "BBVA", "REP", "IBE", "TEF", "AENA"];
     let omit = 0;
     for (const symbol of tickers) {
       const instrumentId = `inst-${symbol.toLowerCase()}`;
       const fp = buildFinalistsInputFingerprint({
         instrumentId,
         timeframe: TIMEFRAME,
-        periodPreset: 'all',
-        initialCash: '10000',
-        commissionBps: '0',
-        slippageBps: '0',
+        periodPreset: "all",
+        initialCash: "10000",
+        commissionBps: "0",
+        slippageBps: "0",
         lastBarDate: lastBar,
-        loteRowIds: ['preset:sma_crossover'],
-        profilePolicyVersion: 'coach-profile-v1|pid:p1|ff:1',
+        loteRowIds: ["preset:sma_crossover"],
+        profilePolicyVersion: "coach-profile-v1|pid:p1|ff:1",
       });
       const decision = shouldSkipFinalistsSearch({
         preferSkip: true,
-        topStatus: 'active',
-        stored: buildFinalistsFreshnessStamp({ inputFingerprint: fp, lab: true }),
+        topStatus: "active",
+        stored: buildFinalistsFreshnessStamp({
+          inputFingerprint: fp,
+          lab: true,
+        }),
         currentFingerprint: fp,
         memoryFingerprint: null,
         localFingerprint: null,
