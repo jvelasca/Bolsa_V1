@@ -1,5 +1,8 @@
 import { FundamentalCardPanel } from "@/features/instruments/fundamental-card-panel";
-import { effectiveDiaD, isDiaDInPast } from "@/features/backtests/backtest-period";
+import {
+  effectiveDiaD,
+  isDiaDInPast,
+} from "@/features/backtests/backtest-period";
 
 interface BacktestResultFundamentalProps {
   instrumentId: string;

@@ -1,13 +1,13 @@
-import { cn } from '@/lib/utils';
-import type { BacktestTradeReasonDto } from '@bolsa/shared';
+import { cn } from "@/lib/utils";
+import type { BacktestTradeReasonDto } from "@bolsa/shared";
 
-type ResultPane = 'metrics' | 'equity' | 'trades' | 'replay';
+type ResultPane = "metrics" | "equity" | "trades" | "replay";
 
 const PANES: { id: ResultPane; label: string }[] = [
-  { id: 'metrics', label: 'Métricas' },
-  { id: 'equity', label: 'Equity' },
-  { id: 'trades', label: 'Trades' },
-  { id: 'replay', label: 'Replay' },
+  { id: "metrics", label: "Métricas" },
+  { id: "equity", label: "Equity" },
+  { id: "trades", label: "Trades" },
+  { id: "replay", label: "Replay" },
 ];
 
 export function BacktestResultTabs({
@@ -25,10 +25,10 @@ export function BacktestResultTabs({
           type="button"
           onClick={() => onChange(pane.id)}
           className={cn(
-            'rounded-md px-3 py-1.5 text-sm transition-colors',
+            "rounded-md px-3 py-1.5 text-sm transition-colors",
             value === pane.id
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >
           {pane.label}
@@ -58,8 +58,9 @@ export function TradeReasonPanel({
   if (!reason) {
     return (
       <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-        No hay explicación guardada para esta {tradeType === 'buy' ? 'compra' : 'venta'} (
-        {dateLabel}). Las pruebas nuevas sí la incluyen — vuelve a pulsar «Probar».
+        No hay explicación guardada para esta{" "}
+        {tradeType === "buy" ? "compra" : "venta"} ({dateLabel}). Las pruebas
+        nuevas sí la incluyen — vuelve a pulsar «Probar».
       </div>
     );
   }
@@ -73,19 +74,21 @@ export function TradeReasonPanel({
         <p className="mt-1 text-sm text-foreground">{reason.summary}</p>
       </div>
       <p className="text-xs text-muted-foreground">
-        {reason.presetKey ? `Preset ${reason.presetKey}` : 'Estrategia custom'}
-        {reason.signalKind ? ` · ${reason.signalKind}` : ''}
-        {reason.side ? ` · ${reason.side}` : ''}
-        {typeof reason.price === 'number' ? ` · mid ${reason.price}` : ''}
+        {reason.presetKey ? `Preset ${reason.presetKey}` : "Estrategia custom"}
+        {reason.signalKind ? ` · ${reason.signalKind}` : ""}
+        {reason.side ? ` · ${reason.side}` : ""}
+        {typeof reason.price === "number" ? ` · mid ${reason.price}` : ""}
       </p>
       {reason.rules && reason.rules.length > 0 && (
         <ul className="space-y-1 border-t border-border/60 pt-2">
           {reason.rules.map((rule, index) => (
             <li key={index} className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">
-                {typeof rule.summary === 'string' ? rule.summary : `Regla ${index + 1}`}
+                {typeof rule.summary === "string"
+                  ? rule.summary
+                  : `Regla ${index + 1}`}
               </span>
-              {typeof rule.type === 'string' ? ` · ${rule.type}` : ''}
+              {typeof rule.type === "string" ? ` · ${rule.type}` : ""}
             </li>
           ))}
         </ul>

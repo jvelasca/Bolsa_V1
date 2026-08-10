@@ -1,10 +1,5 @@
-import type {
-  BacktestEquityPointDto,
-  ChartTimeframe,
-} from "@bolsa/shared";
-import {
-  BacktestExploreRanking,
-} from "@/features/backtests/backtest-explore-panel";
+import type { BacktestEquityPointDto, ChartTimeframe } from "@bolsa/shared";
+import { BacktestExploreRanking } from "@/features/backtests/backtest-explore-panel";
 import type {
   ExplorePresetRow,
   ExploreSortKey,
@@ -111,8 +106,8 @@ export function BacktestResultFocusCoach({
     <>
       {isCoachFocus && !hasExploreRows && !hasListAutoBoard && (
         <p className="text-sm text-muted-foreground">
-          Sin lote de coach aún. Pulsa Play en Universo (o Probar +
-          coach) para rellenarlo.
+          Sin lote de coach aún. Pulsa Play en Universo (o Probar + coach) para
+          rellenarlo.
         </p>
       )}
       {isCoachFocus && !hasExploreRows && hasListAutoBoard && (
@@ -123,9 +118,7 @@ export function BacktestResultFocusCoach({
       )}
       {coachPanelVisible && (
         <div
-          className={
-            isCoachFocus ? "h-full min-h-0 overflow-auto" : "hidden"
-          }
+          className={isCoachFocus ? "h-full min-h-0 overflow-auto" : "hidden"}
           aria-hidden={!isCoachFocus}
         >
           <BacktestExploreRanking

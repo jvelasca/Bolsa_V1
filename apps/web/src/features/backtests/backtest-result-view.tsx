@@ -5,8 +5,15 @@
  * a ancho completo (apilados); tabla de operaciones en `text-xs`.
  */
 
-import type { ReactNode } from 'react';
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type {
   BacktestEquityPointDto,
   BacktestRunDetailDto,
@@ -14,22 +21,25 @@ import type {
   DrawingReplayMarkerDto,
   OhlcvBarDto,
   ResearchTrialDto,
-} from '@bolsa/shared';
-import { BACKTEST_STRATEGIES } from '@bolsa/shared';
+} from "@bolsa/shared";
+import { BACKTEST_STRATEGIES } from "@bolsa/shared";
 import {
   buyHoldReturnFromBars,
   excessReturnPct,
   trailingYearReturns,
-} from '@/features/backtests/backtest-buy-hold';
-import { BacktestEquityChart } from '@/features/backtests/backtest-equity-chart';
-import { BacktestReplayChart } from '@/features/backtests/backtest-replay-chart';
-import { formatDateDdMmYyyy, formatDateRangeDdMmYyyy } from '@/features/backtests/backtest-date-format';
-import { BacktestGlobalBar } from '@/features/backtests/backtest-global-bar';
-import type { FinalistHudBadge } from '@/features/backtests/instrument-top-match';
-import { BacktestMovieHud } from '@/features/backtests/backtest-movie-hud';
-import { computeMovieTradeStats } from '@/features/backtests/backtest-movie-stats';
-import { BacktestPaperChecklist } from '@/features/backtests/backtest-paper-checklist';
-import { useBacktestHudPrefs } from '@/features/backtests/use-backtest-hud-prefs';
+} from "@/features/backtests/backtest-buy-hold";
+import { BacktestEquityChart } from "@/features/backtests/backtest-equity-chart";
+import { BacktestReplayChart } from "@/features/backtests/backtest-replay-chart";
+import {
+  formatDateDdMmYyyy,
+  formatDateRangeDdMmYyyy,
+} from "@/features/backtests/backtest-date-format";
+import { BacktestGlobalBar } from "@/features/backtests/backtest-global-bar";
+import type { FinalistHudBadge } from "@/features/backtests/instrument-top-match";
+import { BacktestMovieHud } from "@/features/backtests/backtest-movie-hud";
+import { computeMovieTradeStats } from "@/features/backtests/backtest-movie-stats";
+import { BacktestPaperChecklist } from "@/features/backtests/backtest-paper-checklist";
+import { useBacktestHudPrefs } from "@/features/backtests/use-backtest-hud-prefs";
 import {
   clampBottomEquityHeightPct,
   clampChartHeightPct,
@@ -37,15 +47,15 @@ import {
   loadBacktestSplitLayout,
   pxToPct,
   saveBacktestSplitLayout,
-} from '@/features/backtests/backtest-split-layout';
-import { ResearchTrialResultBlock } from '@/features/research/research-trial-result-block';
-import { ResearchLabEvidenceSummary } from '@/features/research/research-lab-evidence-summary';
-import { formatPct, formatPrice } from '@/features/charts/chart-utils';
-import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { useMediaQuery } from '@/lib/use-media-query';
-import { Link } from 'react-router-dom';
+} from "@/features/backtests/backtest-split-layout";
+import { ResearchTrialResultBlock } from "@/features/research/research-trial-result-block";
+import { ResearchLabEvidenceSummary } from "@/features/research/research-lab-evidence-summary";
+import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/lib/use-media-query";
+import { Link } from "react-router-dom";
 
 type Props = {
   detail: BacktestRunDetailDto;
@@ -69,7 +79,7 @@ type Props = {
   finalistBadge?: FinalistHudBadge | null;
   /** P4 — deploy paper after checklist. */
   onDeployPaper?: (payload: {
-    labEvidence: import('@bolsa/shared').PaperLabEvidenceSnapshot;
+    labEvidence: import("@bolsa/shared").PaperLabEvidenceSnapshot;
   }) => void;
   deployingPaper?: boolean;
   /** Abrir «Análisis · paper · baseline» al llegar desde Finalistas. */
@@ -109,7 +119,7 @@ export function BacktestResultView({
   deployingPaper = false,
   preferOpenAnalysis = false,
 }: Props) {
-  const isWideBottom = useMediaQuery('(min-width: 720px)');
+  const isWideBottom = useMediaQuery("(min-width: 720px)");
   const [analysisOpen, setAnalysisOpen] = useState(preferOpenAnalysis);
   const {
     prefs: hudPrefs,
@@ -119,21 +129,24 @@ export function BacktestResultView({
     setCursorPanelPos,
   } = useBacktestHudPrefs();
   const strategyLabel =
-    BACKTEST_STRATEGIES[detail.strategyType as keyof typeof BACKTEST_STRATEGIES]?.label ??
-    detail.strategyType;
+    BACKTEST_STRATEGIES[detail.strategyType as keyof typeof BACKTEST_STRATEGIES]
+      ?.label ?? detail.strategyType;
 
   useEffect(() => {
     if (preferOpenAnalysis) setAnalysisOpen(true);
   }, [preferOpenAnalysis, detail.id]);
 
   const metricBuyHold = (() => {
-    const raw = displayMetrics?.buyHoldReturnPct ?? linkedTrial?.isMetrics?.buyHoldReturnPct;
-    return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+    const raw =
+      displayMetrics?.buyHoldReturnPct ??
+      linkedTrial?.isMetrics?.buyHoldReturnPct;
+    return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
   })();
   const buyHoldPct =
-    metricBuyHold ?? buyHoldReturnFromBars(bars, detail.firstDate, detail.lastDate);
+    metricBuyHold ??
+    buyHoldReturnFromBars(bars, detail.firstDate, detail.lastDate);
   const excessPct =
-    (typeof displayMetrics?.excessReturnPct === 'number'
+    (typeof displayMetrics?.excessReturnPct === "number"
       ? displayMetrics.excessReturnPct
       : null) ?? excessReturnPct(detail.totalReturnPct, buyHoldPct);
   const beatBuyHold = excessPct != null ? excessPct > 0 : null;
@@ -145,7 +158,9 @@ export function BacktestResultView({
   const stored = loadBacktestSplitLayout();
   const [chartPct, setChartPct] = useState(stored.chartHeightPct);
   const [equityPct, setEquityPct] = useState(stored.equityWidthPct);
-  const [bottomEquityPct, setBottomEquityPct] = useState(stored.bottomEquityHeightPct);
+  const [bottomEquityPct, setBottomEquityPct] = useState(
+    stored.bottomEquityHeightPct,
+  );
   const pendingChart = useRef(stored.chartHeightPct);
   const pendingEquity = useRef(stored.equityWidthPct);
   const pendingBottomEquity = useRef(stored.bottomEquityHeightPct);
@@ -163,7 +178,12 @@ export function BacktestResultView({
   const handleReplayCursorChange = useCallback(
     (
       timestamp: string | null,
-      meta: { playing: boolean; atEnd: boolean; barIndex: number; barTotal: number },
+      meta: {
+        playing: boolean;
+        atEnd: boolean;
+        barIndex: number;
+        barTotal: number;
+      },
     ) => {
       // Low-priority UI sync so the candle chart stays smooth while playing.
       startTransition(() => {
@@ -227,8 +247,8 @@ export function BacktestResultView({
       `[data-trade-id="${latestRevealedTrade.id}"]`,
     );
     row?.scrollIntoView({
-      block: 'nearest',
-      behavior: replayPlaying ? 'auto' : 'smooth',
+      block: "nearest",
+      behavior: replayPlaying ? "auto" : "smooth",
     });
   }, [latestRevealedTrade, replayAtEnd, replayPlaying]);
 
@@ -266,7 +286,9 @@ export function BacktestResultView({
   const adjustChartHeight = useCallback((deltaPx: number) => {
     const height = bodyRef.current?.getBoundingClientRect().height ?? 0;
     if (height <= 0) return;
-    const next = clampChartHeightPct(pendingChart.current + pxToPct(deltaPx, height));
+    const next = clampChartHeightPct(
+      pendingChart.current + pxToPct(deltaPx, height),
+    );
     pendingChart.current = next;
     setChartPct(next);
   }, []);
@@ -274,7 +296,9 @@ export function BacktestResultView({
   const adjustEquityWidth = useCallback((deltaPx: number) => {
     const width = bottomRef.current?.getBoundingClientRect().width ?? 0;
     if (width <= 0) return;
-    const next = clampEquityWidthPct(pendingEquity.current + pxToPct(deltaPx, width));
+    const next = clampEquityWidthPct(
+      pendingEquity.current + pxToPct(deltaPx, width),
+    );
     pendingEquity.current = next;
     setEquityPct(next);
   }, []);
@@ -312,11 +336,14 @@ export function BacktestResultView({
   );
 
   const chartBlock = (
-    <section id="backtest-replay" className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col">
+    <section
+      id="backtest-replay"
+      className="flex h-full min-h-0 w-full min-w-0 flex-1 flex-col"
+    >
       {barsError && !(bars && bars.length > 0) && (
         <p className="text-sm text-destructive">
-          No se pudo cargar el histórico del valor. Prueba a sincronizar el instrumento o vuelve a
-          abrir el detalle.
+          No se pudo cargar el histórico del valor. Prueba a sincronizar el
+          instrumento o vuelve a abrir el detalle.
         </p>
       )}
       {!barsLoading && !barsError && bars && bars.length === 0 && (
@@ -336,7 +363,7 @@ export function BacktestResultView({
             drawingMarkers={drawingMarkers}
             focusTimestamp={focusTimestamp}
             initialShowAll
-            height={fillHeight ? 'fill' : 320}
+            height={fillHeight ? "fill" : 320}
             onReplayCursorChange={handleReplayCursorChange}
             cursorFavorites={hudPrefs.cursorFavorites}
             onToggleCursorFavorite={toggleCursorFavorite}
@@ -352,11 +379,15 @@ export function BacktestResultView({
                 atEnd={replayAtEnd}
                 balance={
                   liveEquity ??
-                  (replayAtEnd || replayCursor == null ? detail.finalEquity : detail.initialCash)
+                  (replayAtEnd || replayCursor == null
+                    ? detail.finalEquity
+                    : detail.initialCash)
                 }
                 returnPct={
                   liveReturnPct ??
-                  (replayAtEnd || replayCursor == null ? detail.totalReturnPct : 0)
+                  (replayAtEnd || replayCursor == null
+                    ? detail.totalReturnPct
+                    : 0)
                 }
                 stats={movieStats}
                 totalOps={detail.tradeCount}
@@ -404,15 +435,16 @@ export function BacktestResultView({
                   key={trade.id}
                   data-trade-id={trade.id}
                   className={cn(
-                    'cursor-pointer border-t border-border/50 transition-colors hover:bg-muted/40',
-                    focused && 'bg-amber-500/10 ring-1 ring-inset ring-amber-400/40',
-                    liveHighlight && !focused && 'bg-sky-500/15',
-                    liveHighlight && focused && 'bg-amber-500/15',
+                    "cursor-pointer border-t border-border/50 transition-colors hover:bg-muted/40",
+                    focused &&
+                      "bg-amber-500/10 ring-1 ring-inset ring-amber-400/40",
+                    liveHighlight && !focused && "bg-sky-500/15",
+                    liveHighlight && focused && "bg-amber-500/15",
                   )}
                   onClick={() => onSelectTrade(trade.timestamp)}
                   onDoubleClick={() => onJumpToTrade(trade.timestamp)}
                   onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
+                    if (event.key === "Enter") {
                       event.preventDefault();
                       onJumpToTrade(trade.timestamp);
                     }
@@ -427,15 +459,19 @@ export function BacktestResultView({
                   </td>
                   <td
                     className={cn(
-                      'p-2',
-                      trade.type === 'buy' ? 'text-success' : 'text-destructive',
+                      "p-2",
+                      trade.type === "buy"
+                        ? "text-success"
+                        : "text-destructive",
                     )}
                   >
-                    {trade.type === 'buy' ? 'COMPRA' : 'VENTA'}
+                    {trade.type === "buy" ? "COMPRA" : "VENTA"}
                   </td>
-                  <td className="p-2 tabular-nums">{formatPrice(trade.price)}</td>
+                  <td className="p-2 tabular-nums">
+                    {formatPrice(trade.price)}
+                  </td>
                   <td className="max-w-[10rem] truncate p-2 text-muted-foreground">
-                    {trade.reason?.summary ?? '—'}
+                    {trade.reason?.summary ?? "—"}
                   </td>
                 </tr>
               );
@@ -449,20 +485,16 @@ export function BacktestResultView({
     <div
       ref={bottomRef}
       className={cn(
-        'flex w-full min-w-0 gap-0 overflow-hidden',
-        isWideBottom ? 'min-h-[280px] flex-row' : 'min-h-[420px] flex-col',
-        fillHeight ? 'flex-none' : 'min-h-0 flex-1',
+        "flex w-full min-w-0 gap-0 overflow-hidden",
+        isWideBottom ? "min-h-[280px] flex-row" : "min-h-[420px] flex-col",
+        fillHeight ? "flex-none" : "min-h-0 flex-1",
       )}
-      style={
-        fillHeight
-          ? { height: isWideBottom ? 320 : 480 }
-          : undefined
-      }
+      style={fillHeight ? { height: isWideBottom ? 320 : 480 } : undefined}
     >
       <section
         className={cn(
-          'flex min-h-0 flex-col gap-1.5 overflow-hidden',
-          isWideBottom ? 'shrink-0 self-stretch' : 'shrink-0',
+          "flex min-h-0 flex-col gap-1.5 overflow-hidden",
+          isWideBottom ? "shrink-0 self-stretch" : "shrink-0",
         )}
         style={
           isWideBottom
@@ -484,11 +516,13 @@ export function BacktestResultView({
               initialCash={detail.initialCash}
               focusTimestamp={focusTimestamp}
               untilTimestamp={replayCursor}
-              height={fillHeight ? 'fill' : 200}
+              height={fillHeight ? "fill" : 200}
             />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Sin curva de patrimonio en este run.</p>
+          <p className="text-sm text-muted-foreground">
+            Sin curva de patrimonio en este run.
+          </p>
         )}
       </section>
 
@@ -505,14 +539,16 @@ export function BacktestResultView({
           label="Redimensionar patrimonio y lista de operaciones"
           orientation="horizontal"
           onDrag={adjustBottomEquityHeight}
-          onDragEnd={() => persist({ bottomEquityHeightPct: pendingBottomEquity.current })}
+          onDragEnd={() =>
+            persist({ bottomEquityHeightPct: pendingBottomEquity.current })
+          }
         />
       )}
 
       <section
         className={cn(
-          'flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-xs',
-          !isWideBottom && 'min-h-[240px]',
+          "flex min-h-0 flex-1 flex-col gap-2 overflow-hidden text-xs",
+          !isWideBottom && "min-h-[240px]",
         )}
       >
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
@@ -525,12 +561,13 @@ export function BacktestResultView({
           <p className="tabular-nums text-muted-foreground">
             {replayPlaying ? (
               <span className="text-sky-400">
-                EN VIVO · {revealedTrades.length}/{detail.tradeCount} · {replayCursor ?? '…'}
+                EN VIVO · {revealedTrades.length}/{detail.tradeCount} ·{" "}
+                {replayCursor ?? "…"}
               </span>
             ) : (
               <>
                 {revealedTrades.length}/{detail.tradeCount}
-                {replayCursor ? ` · hasta ${replayCursor}` : ''}
+                {replayCursor ? ` · hasta ${replayCursor}` : ""}
               </>
             )}
           </p>
@@ -555,12 +592,14 @@ export function BacktestResultView({
           <div className="rounded-lg border border-border bg-muted/25 px-3 py-2 text-xs">
             <p className="font-medium text-foreground">Baseline buy & hold</p>
             <p className="mt-1 tabular-nums text-muted-foreground">
-              B&H {formatPct(buyHoldPct)} · estrategia {formatPct(detail.totalReturnPct)}
-              {excessPct != null ? ` · exceso ${formatPct(excessPct)}` : ''}
-              {' · '}
-              {finalMovieStats.winners} ganadoras / {finalMovieStats.losers} perdedoras
-              {' · '}
-              ganado {formatPrice(finalMovieStats.moneyWon)} / perdido{' '}
+              B&H {formatPct(buyHoldPct)} · estrategia{" "}
+              {formatPct(detail.totalReturnPct)}
+              {excessPct != null ? ` · exceso ${formatPct(excessPct)}` : ""}
+              {" · "}
+              {finalMovieStats.winners} ganadoras / {finalMovieStats.losers}{" "}
+              perdedoras
+              {" · "}
+              ganado {formatPrice(finalMovieStats.moneyWon)} / perdido{" "}
               {formatPrice(finalMovieStats.moneyLost)}
             </p>
           </div>
@@ -587,9 +626,9 @@ export function BacktestResultView({
           }}
         />
         <p className="text-xs text-muted-foreground">
-          Periodo: {formatDateRangeDdMmYyyy(detail.firstDate, detail.lastDate)} ·{' '}
-          {detail.barCount} barras
-          {detail.timeframe ? ` · TF ${detail.timeframe}` : ''}
+          Periodo: {formatDateRangeDdMmYyyy(detail.firstDate, detail.lastDate)}{" "}
+          · {detail.barCount} barras
+          {detail.timeframe ? ` · TF ${detail.timeframe}` : ""}
         </p>
         {footerNote}
       </div>
@@ -597,11 +636,14 @@ export function BacktestResultView({
   );
 
   const researchChip =
-    displayTrialId != null && displayTrialId !== '' ? (
+    displayTrialId != null && displayTrialId !== "" ? (
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         <Link
           to={`/research?tab=history&trialId=${encodeURIComponent(displayTrialId)}`}
-          className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'h-7 text-[11px]')}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "h-7 text-[11px]",
+          )}
         >
           Ver en Research
         </Link>
@@ -610,7 +652,9 @@ export function BacktestResultView({
             <ResearchLabEvidenceSummary trial={linkedTrial} variant="cell" />
           </span>
         ) : (
-          <span className="font-mono text-muted-foreground">{displayTrialId.slice(0, 10)}…</span>
+          <span className="font-mono text-muted-foreground">
+            {displayTrialId.slice(0, 10)}…
+          </span>
         )}
       </div>
     ) : null;
@@ -654,7 +698,9 @@ export function BacktestResultView({
           onDragEnd={() => persist({ chartHeightPct: pendingChart.current })}
         />
         {bottomRow}
-        <div className="w-full shrink-0 border-t border-border/50 pt-1">{analysis}</div>
+        <div className="w-full shrink-0 border-t border-border/50 pt-1">
+          {analysis}
+        </div>
       </div>
     </div>
   );

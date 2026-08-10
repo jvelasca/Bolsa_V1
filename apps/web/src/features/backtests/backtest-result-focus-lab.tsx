@@ -21,9 +21,7 @@ interface Props {
   profileHorizon: ProfileHorizon | null | undefined;
   profileRiskTolerance: RiskTolerance | null | undefined;
   onClearZoneSeed: (zoneId: string) => void;
-  onReanalyzeWithCoach: (
-    payload: LabReanalyzeRequest,
-  ) => void | Promise<void>;
+  onReanalyzeWithCoach: (payload: LabReanalyzeRequest) => void | Promise<void>;
   onAutoHandoffStatus: (message: string) => void;
   onGoToCoach: () => void;
 }
@@ -60,9 +58,8 @@ export function BacktestResultFocusLab({
         <div className="rounded-lg border border-dashed border-border bg-muted/10 px-3 py-2.5 text-sm">
           <p className="font-medium text-foreground">Lab sin semillas</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Desde Coach: «Pasar al Lab» o «Abrir Lab · #1».
-            Aquí optimizas parámetros; no escribe
-            Finalistas.
+            Desde Coach: «Pasar al Lab» o «Abrir Lab · #1». Aquí optimizas
+            parámetros; no escribe Finalistas.
           </p>
           <Button
             type="button"
