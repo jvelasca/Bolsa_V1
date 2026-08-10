@@ -61,6 +61,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m5-frente-coach-cierre-2026-08-10.md      ← M5 cierre frente: Lab extraído (paso 9) · Coach extraído (paso 10) · frentes alternativos evaluados
 │   ├── traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md ← M5 frente trading-dia-d: B.1+B.2+B.3 extraídos (DiaDTradesPanel, DiaDPendingTradeBanner, DiaDSessionReportPanel) · frente CERRADO
 │   ├── traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md ← M5 frente backtest-explore (área Coach/TOP): E.1+E.2+E.3+E.4+E.5 extraídos (BH, Header, BatteryTable, AtOutlook, StarsGrid) · frente CERRADO · M5 en pausa
+│   ├── traspaso-m5-continuacion-orquestacion-2026-08-10.md      ← M5 continuación: FASE 1 orquestación list-values-panel (1.395) / instruments-page (1.222) · punto de entrada del siguiente hilo
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)
