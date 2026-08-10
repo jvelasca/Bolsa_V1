@@ -24,6 +24,7 @@ import { AccountWizardIdentityStep } from '@/features/accounts/account-wizard-id
 import { AccountWizardCapitalStep } from '@/features/accounts/account-wizard-capital-step';
 import { AccountWizardCommissionsStep } from '@/features/accounts/account-wizard-commissions-step';
 import { AccountWizardTaxStep } from '@/features/accounts/account-wizard-tax-step';
+import { AccountWizardReviewStep } from '@/features/accounts/account-wizard-review-step';
 import { formatPrice } from '@/features/charts/chart-utils';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -578,28 +579,17 @@ export function CreateAccountWizardDialog() {
       )}
 
       {step === 'review' && (
-        <div className="space-y-3 text-sm">
-          <div className="rounded-lg border border-border divide-y divide-border">
-            {[
-              ['Cuenta', form.name],
-              ['Moneda', form.currency],
-              ['Depósito inicial', formatPrice(Number(form.initialDeposit) || 0)],
-              ['Apalancamiento', `${form.leverage}x`],
-              ['Perfil inversor', profileReviewLabel()],
-              ['Comisiones', settings.commission.label],
-              ['Fiscal', `${form.taxJurisdiction} · ${form.costBasisMethod.toUpperCase()}`],
-            ].map(([label, value]) => (
-              <div key={label} className="flex justify-between gap-4 px-3 py-2">
-                <span className="text-muted-foreground">{label}</span>
-                <span className="font-medium text-right">{value}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Se creará la cuenta demo con cartera, depósito en el ledger, perfil inversor activo y
-            preset de comisiones/fiscal.
-          </p>
-        </div>
+        <AccountWizardReviewStep
+          rows={[
+            ['Cuenta', form.name],
+            ['Moneda', form.currency],
+            ['Depósito inicial', formatPrice(Number(form.initialDeposit) || 0)],
+            ['Apalancamiento', `${form.leverage}x`],
+            ['Perfil inversor', profileReviewLabel()],
+            ['Comisiones', settings.commission.label],
+            ['Fiscal', `${form.taxJurisdiction} · ${form.costBasisMethod.toUpperCase()}`],
+          ]}
+        />
       )}
 
       {error && <p className="mt-4 text-sm text-destructive">{error}</p>}
