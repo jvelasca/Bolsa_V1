@@ -3,8 +3,8 @@
  * que aprovecha el ancho del panel (p. ej. Resumen en Instrumentos).
  */
 
-import { createContext, useContext, type ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { createContext, useContext, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 const KeyValueColumnsContext = createContext<1 | 2 | 3>(1);
 
@@ -23,7 +23,7 @@ export function KeyValueList({
       <KeyValueColumnsContext.Provider value={1}>
         <dl
           className={cn(
-            'grid w-max max-w-full grid-cols-[max-content_minmax(0,max-content)] gap-x-2 gap-y-1.5 text-[11px]',
+            "grid w-max max-w-full grid-cols-[max-content_minmax(0,max-content)] gap-x-2 gap-y-1.5 text-[11px]",
             className,
           )}
         >
@@ -37,10 +37,10 @@ export function KeyValueList({
     <KeyValueColumnsContext.Provider value={columns}>
       <div
         className={cn(
-          'grid w-full gap-x-4 gap-y-1.5 text-[11px]',
-          columns === 2 && 'grid-cols-1 min-[360px]:grid-cols-2',
+          "grid w-full gap-x-4 gap-y-1.5 text-[11px]",
+          columns === 2 && "grid-cols-1 min-[360px]:grid-cols-2",
           columns === 3 &&
-            'grid-cols-1 min-[360px]:grid-cols-2 min-[560px]:grid-cols-3',
+            "grid-cols-1 min-[360px]:grid-cols-2 min-[560px]:grid-cols-3",
           className,
         )}
         role="list"
@@ -68,7 +68,12 @@ export function KeyValueRow({
         <dt className="whitespace-nowrap text-muted-foreground after:ml-0 after:content-[':']">
           {label}
         </dt>
-        <dd className={cn('min-w-0 break-words tabular-nums text-foreground', valueClassName)}>
+        <dd
+          className={cn(
+            "min-w-0 break-words tabular-nums text-foreground",
+            valueClassName,
+          )}
+        >
           {children}
         </dd>
       </>
@@ -84,7 +89,10 @@ export function KeyValueRow({
         {label}
       </span>
       <span
-        className={cn('min-w-0 break-words tabular-nums text-foreground', valueClassName)}
+        className={cn(
+          "min-w-0 break-words tabular-nums text-foreground",
+          valueClassName,
+        )}
       >
         {children}
       </span>

@@ -9,15 +9,15 @@
  * @see docs/UI_PLATFORM.md — Barra superior / espacios
  * @see docs/engineering/lists-universes-design-2026-07-30.md — Listas / índices
  */
-import type { ComponentType } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import type { ComponentType } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   NavLink,
   NavigationType,
   useLocation,
   useNavigate,
   useNavigationType,
-} from 'react-router-dom';
+} from "react-router-dom";
 import {
   BarChart3,
   Bell,
@@ -38,18 +38,18 @@ import {
   SquareArrowOutUpRight,
   User,
   Wallet,
-} from 'lucide-react';
-import { AppHelpMenu } from '@/features/help/app-help-menu';
-import { UniverseChip } from '@/features/platform/universe-chip';
-import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/stores/auth-store';
-import { useUiStore } from '@/stores/ui-store';
-import { useTradingLayoutStore } from '@/stores/trading-layout-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { useScreenerNavBadge } from '@/features/screeners/use-screener-nav-badge';
-import { useAsesorAlarmaBadge } from '@/features/research/use-asesor-alarma-badge';
-import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
-import { isTradingRoute } from '@/lib/routes';
+} from "lucide-react";
+import { AppHelpMenu } from "@/features/help/app-help-menu";
+import { UniverseChip } from "@/features/platform/universe-chip";
+import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
+import { useUiStore } from "@/stores/ui-store";
+import { useTradingLayoutStore } from "@/stores/trading-layout-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useScreenerNavBadge } from "@/features/screeners/use-screener-nav-badge";
+import { useAsesorAlarmaBadge } from "@/features/research/use-asesor-alarma-badge";
+import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
+import { isTradingRoute } from "@/lib/routes";
 
 /** Historial SPA para habilitar ← / → en la barra (cualquier ruta / query). */
 function useSpaHistoryNav() {
@@ -127,10 +127,10 @@ function OpenAppInNewTabButton({ className }: { className?: string }) {
       title="Abrir esta vista en otra pestaña (segundo monitor)"
       aria-label="Abrir en otra pestaña"
       onClick={() => {
-        window.open(window.location.href, '_blank', 'noopener,noreferrer');
+        window.open(window.location.href, "_blank", "noopener,noreferrer");
       }}
       className={cn(
-        'rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground',
+        "rounded p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground",
         className,
       )}
     >
@@ -143,7 +143,7 @@ function DropdownMenu({
   label,
   icon: Icon,
   items,
-  align = 'right',
+  align = "right",
   navStyle = false,
   active = false,
   iconOnly = false,
@@ -151,7 +151,7 @@ function DropdownMenu({
   label: string;
   icon?: ComponentType<{ className?: string }>;
   items: MenuItem[];
-  align?: 'left' | 'right';
+  align?: "left" | "right";
   navStyle?: boolean;
   active?: boolean;
   iconOnly?: boolean;
@@ -166,8 +166,8 @@ function DropdownMenu({
         setOpen(false);
       }
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
   return (
@@ -176,10 +176,10 @@ function DropdownMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'flex items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-accent',
-          navStyle && 'gap-1.5 px-2.5 py-1.5 font-medium',
-          navStyle && active && 'bg-accent text-primary',
-          iconOnly && 'px-1.5',
+          "flex items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-accent",
+          navStyle && "gap-1.5 px-2.5 py-1.5 font-medium",
+          navStyle && active && "bg-accent text-primary",
+          iconOnly && "px-1.5",
         )}
         title={label}
         aria-label={label}
@@ -195,13 +195,16 @@ function DropdownMenu({
       {open && (
         <div
           className={cn(
-            'absolute top-full z-50 min-w-[200px] rounded-md border border-border bg-card py-1 shadow-xl',
-            align === 'left' ? 'left-0' : 'right-0',
+            "absolute top-full z-50 min-w-[200px] rounded-md border border-border bg-card py-1 shadow-xl",
+            align === "left" ? "left-0" : "right-0",
           )}
         >
           {items.map((item, index) =>
             item.separator ? (
-              <div key={`sep-${index}`} className="my-1 border-t border-border" />
+              <div
+                key={`sep-${index}`}
+                className="my-1 border-t border-border"
+              />
             ) : (
               <button
                 key={item.label}
@@ -218,11 +221,15 @@ function DropdownMenu({
                 <span className="flex w-full items-center justify-between">
                   <span>{item.label}</span>
                   {item.checked != null && (
-                    <span className="text-xs text-muted-foreground">{item.checked ? '✓' : ''}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {item.checked ? "✓" : ""}
+                    </span>
                   )}
                 </span>
                 {item.hint && (
-                  <span className="text-xs text-muted-foreground">{item.hint}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {item.hint}
+                  </span>
                 )}
               </button>
             ),
@@ -234,47 +241,47 @@ function DropdownMenu({
 }
 
 const MAIN_NAV = [
-  { to: '/overview', label: 'Overview', icon: LayoutDashboard },
-  { to: '/trading', label: 'Trading', icon: LineChart, end: true },
-  { to: '/accounts', label: 'Cuentas', icon: Wallet },
-  { to: '/alerts', label: 'Alertas', icon: Bell },
-  { to: '/instruments', label: 'Instrumentos', icon: BookOpen },
+  { to: "/overview", label: "Overview", icon: LayoutDashboard },
+  { to: "/trading", label: "Trading", icon: LineChart, end: true },
+  { to: "/accounts", label: "Cuentas", icon: Wallet },
+  { to: "/alerts", label: "Alertas", icon: Bell },
+  { to: "/instruments", label: "Instrumentos", icon: BookOpen },
 ] as const;
 
 const BACKTESTING_MENU: MenuItem[] = [
   {
-    label: 'Probar estrategia',
-    href: '/backtests?tab=run',
-    hint: 'Simulación sobre un valor y un periodo',
+    label: "Probar estrategia",
+    href: "/backtests?tab=run",
+    hint: "Simulación sobre un valor y un periodo",
   },
   {
-    label: 'Biblioteca',
-    href: '/backtests?tab=strategies',
-    hint: 'Genéricas, mías y finalistas',
+    label: "Biblioteca",
+    href: "/backtests?tab=strategies",
+    hint: "Genéricas, mías y finalistas",
   },
   {
-    label: 'Lab · Optimizar',
-    href: '/backtests?tab=jobs',
-    hint: 'Mismo Lab del embudo Coach',
+    label: "Lab · Optimizar",
+    href: "/backtests?tab=jobs",
+    hint: "Mismo Lab del embudo Coach",
   },
   {
-    label: 'Pruebas anteriores',
-    href: '/backtests?tab=history',
-    hint: 'Runs guardados · tope ⚙',
+    label: "Pruebas anteriores",
+    href: "/backtests?tab=history",
+    hint: "Runs guardados · tope ⚙",
   },
 ];
 
 const RESEARCH_MENU: MenuItem[] = [
-  { label: 'Resumen', href: '/research?tab=dashboard' },
-  { label: 'Diario', href: '/research?tab=diario' },
-  { label: 'Historial', href: '/research?tab=history' },
-  { label: 'Opiniones', href: '/research?tab=opiniones' },
+  { label: "Resumen", href: "/research?tab=dashboard" },
+  { label: "Diario", href: "/research?tab=diario" },
+  { label: "Historial", href: "/research?tab=history" },
+  { label: "Opiniones", href: "/research?tab=opiniones" },
 ];
 
 export function AppTopBar() {
   const location = useLocation();
-  const isBacktestsRoute = location.pathname.startsWith('/backtests');
-  const isResearchRoute = location.pathname.startsWith('/research');
+  const isBacktestsRoute = location.pathname.startsWith("/backtests");
+  const isResearchRoute = location.pathname.startsWith("/research");
   const trading = isTradingRoute(location.pathname);
   const historyNav = useSpaHistoryNav();
 
@@ -293,21 +300,23 @@ export function AppTopBar() {
 
   const sessionMenu: MenuItem[] = [
     {
-      label: 'Notificaciones…',
-      action: () => openPlatformConfig('notifications'),
+      label: "Notificaciones…",
+      action: () => openPlatformConfig("notifications"),
     },
     {
-      label: 'Configuración…',
-      action: () => openPlatformConfig('general'),
+      label: "Configuración…",
+      action: () => openPlatformConfig("general"),
     },
-    { label: 'Cerrar sesión', action: clearSession },
+    { label: "Cerrar sesión", action: clearSession },
   ];
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2">
       <div className="mr-1 flex items-center gap-2 pr-1 sm:mr-2 sm:pr-2">
         <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
-        <span className="hidden font-semibold tracking-tight sm:inline">Bolsa</span>
+        <span className="hidden font-semibold tracking-tight sm:inline">
+          Bolsa
+        </span>
       </div>
 
       {/* Historial SPA al inicio, antes de Overview */}
@@ -323,11 +332,11 @@ export function AppTopBar() {
           disabled={!historyNav.canGoBack}
           onClick={historyNav.goBack}
           className={cn(
-            'rounded-md p-1.5 transition-colors',
+            "rounded-md p-1.5 transition-colors",
             historyNav.canGoBack
-              ? 'border border-border/80 bg-background text-foreground shadow-sm hover:bg-accent'
-              : 'text-muted-foreground/50 opacity-50',
-            'disabled:pointer-events-none',
+              ? "border border-border/80 bg-background text-foreground shadow-sm hover:bg-accent"
+              : "text-muted-foreground/50 opacity-50",
+            "disabled:pointer-events-none",
           )}
         >
           <ChevronLeft className="h-4 w-4" strokeWidth={2.25} />
@@ -339,11 +348,11 @@ export function AppTopBar() {
           disabled={!historyNav.canGoForward}
           onClick={historyNav.goForward}
           className={cn(
-            'rounded-md p-1.5 transition-colors',
+            "rounded-md p-1.5 transition-colors",
             historyNav.canGoForward
-              ? 'border border-border/80 bg-background text-foreground shadow-sm hover:bg-accent'
-              : 'text-muted-foreground/50 opacity-50',
-            'disabled:pointer-events-none',
+              ? "border border-border/80 bg-background text-foreground shadow-sm hover:bg-accent"
+              : "text-muted-foreground/50 opacity-50",
+            "disabled:pointer-events-none",
           )}
         >
           <ChevronRight className="h-4 w-4" strokeWidth={2.25} />
@@ -357,11 +366,11 @@ export function AppTopBar() {
           <NavLink
             key={to}
             to={to}
-            end={'end' in rest ? rest.end : false}
+            end={"end" in rest ? rest.end : false}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent',
-                isActive && 'bg-accent text-primary',
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
+                isActive && "bg-accent text-primary",
               )
             }
           >
@@ -382,8 +391,8 @@ export function AppTopBar() {
           {listAutoActive ? (
             <span
               className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-semibold leading-none text-white"
-              title={listAutoSummary ?? 'Lista AUTO en curso'}
-              aria-label={listAutoSummary ?? 'Lista AUTO en curso'}
+              title={listAutoSummary ?? "Lista AUTO en curso"}
+              aria-label={listAutoSummary ?? "Lista AUTO en curso"}
             >
               …
             </span>
@@ -401,10 +410,10 @@ export function AppTopBar() {
           {asesorAlarmaBadge > 0 ? (
             <span
               className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold leading-none text-white"
-              title={`${asesorAlarmaBadge} alarma${asesorAlarmaBadge === 1 ? '' : 's'} de dictamen`}
+              title={`${asesorAlarmaBadge} alarma${asesorAlarmaBadge === 1 ? "" : "s"} de dictamen`}
               aria-label={`${asesorAlarmaBadge} alarmas de dictamen`}
             >
-              {asesorAlarmaBadge > 9 ? '9+' : asesorAlarmaBadge}
+              {asesorAlarmaBadge > 9 ? "9+" : asesorAlarmaBadge}
             </span>
           ) : null}
         </div>
@@ -412,14 +421,14 @@ export function AppTopBar() {
           to="/screeners"
           className={({ isActive }) =>
             cn(
-              'relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent',
-              isActive && 'bg-accent text-primary',
+              "relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
+              isActive && "bg-accent text-primary",
             )
           }
           title={
             screenerNavBadge > 0
-              ? `${screenerNavBadge} rastreo${screenerNavBadge === 1 ? '' : 's'} en curso`
-              : 'Rastreadores'
+              ? `${screenerNavBadge} rastreo${screenerNavBadge === 1 ? "" : "s"} en curso`
+              : "Rastreadores"
           }
         >
           <Radar className="h-4 w-4 shrink-0" />
@@ -429,7 +438,7 @@ export function AppTopBar() {
               className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
               aria-label={`${screenerNavBadge} rastreos en curso`}
             >
-              {screenerNavBadge > 9 ? '9+' : screenerNavBadge}
+              {screenerNavBadge > 9 ? "9+" : screenerNavBadge}
             </span>
           )}
         </NavLink>
@@ -437,7 +446,10 @@ export function AppTopBar() {
 
       {trading ? (
         <>
-          <div className="mx-2 hidden h-5 w-px bg-border sm:block" aria-hidden />
+          <div
+            className="mx-2 hidden h-5 w-px bg-border sm:block"
+            aria-hidden
+          />
           <div
             className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background/40 p-0.5"
             role="group"
@@ -445,33 +457,41 @@ export function AppTopBar() {
           >
             <button
               type="button"
-              title={layout.listsOpen ? 'Ocultar watchlist' : 'Mostrar watchlist'}
+              title={
+                layout.listsOpen ? "Ocultar watchlist" : "Mostrar watchlist"
+              }
               onClick={layout.toggleLists}
               className={cn(
-                'rounded p-1.5 hover:bg-accent',
-                layout.listsOpen && 'bg-accent text-primary',
+                "rounded p-1.5 hover:bg-accent",
+                layout.listsOpen && "bg-accent text-primary",
               )}
             >
               <List className="h-4 w-4" />
             </button>
             <button
               type="button"
-              title={layout.operationsOpen ? 'Ocultar operaciones' : 'Mostrar operaciones'}
+              title={
+                layout.operationsOpen
+                  ? "Ocultar operaciones"
+                  : "Mostrar operaciones"
+              }
               onClick={layout.toggleOperations}
               className={cn(
-                'rounded p-1.5 hover:bg-accent',
-                layout.operationsOpen && 'bg-accent text-primary',
+                "rounded p-1.5 hover:bg-accent",
+                layout.operationsOpen && "bg-accent text-primary",
               )}
             >
               <PanelBottom className="h-4 w-4" />
             </button>
             <button
               type="button"
-              title={layout.operativaOpen ? 'Ocultar operativa' : 'Mostrar operativa'}
+              title={
+                layout.operativaOpen ? "Ocultar operativa" : "Mostrar operativa"
+              }
               onClick={layout.toggleOperativa}
               className={cn(
-                'rounded p-1.5 hover:bg-accent',
-                layout.operativaOpen && 'bg-accent text-primary',
+                "rounded p-1.5 hover:bg-accent",
+                layout.operativaOpen && "bg-accent text-primary",
               )}
             >
               <PanelRight className="h-4 w-4" />
@@ -492,7 +512,10 @@ export function AppTopBar() {
         </>
       ) : (
         <>
-          <div className="mx-2 hidden h-5 w-px bg-border sm:block" aria-hidden />
+          <div
+            className="mx-2 hidden h-5 w-px bg-border sm:block"
+            aria-hidden
+          />
           <OpenAppInNewTabButton className="border border-border/70 bg-background/40" />
         </>
       )}
@@ -504,18 +527,22 @@ export function AppTopBar() {
           onClick={openWorkspacePicker}
           title="Espacio de trabajo — gestionar, guardar y exportar"
           className={cn(
-            'flex max-w-[200px] items-center gap-1.5 rounded-md border px-2 py-1 text-left text-xs transition-colors hover:bg-accent',
+            "flex max-w-[200px] items-center gap-1.5 rounded-md border px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
             isDirty && !isSaving
-              ? 'border-amber-500/40 bg-amber-500/5'
-              : 'border-border bg-background/60',
+              ? "border-amber-500/40 bg-amber-500/5"
+              : "border-border bg-background/60",
           )}
         >
           <span className="hidden truncate font-medium text-foreground sm:inline">
             {workspace.name}
           </span>
-          <span className="truncate text-muted-foreground sm:hidden">Espacio</span>
+          <span className="truncate text-muted-foreground sm:hidden">
+            Espacio
+          </span>
           {isSaving ? (
-            <span className="shrink-0 text-[10px] text-sky-400">Guardando…</span>
+            <span className="shrink-0 text-[10px] text-sky-400">
+              Guardando…
+            </span>
           ) : isDirty ? (
             <span className="shrink-0 text-[10px] text-amber-500">•</span>
           ) : null}
@@ -524,7 +551,7 @@ export function AppTopBar() {
         <AppHelpMenu />
         <button
           type="button"
-          onClick={() => openPlatformConfig('general')}
+          onClick={() => openPlatformConfig("general")}
           className="rounded-md p-1.5 hover:bg-accent"
           title="Configuración"
         >

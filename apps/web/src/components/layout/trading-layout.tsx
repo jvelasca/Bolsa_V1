@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   MAX_LISTS_WIDTH_PCT,
   MIN_LISTS_WIDTH_PCT,
@@ -8,15 +8,15 @@ import {
   MIN_OPERATIVA_WIDTH_PCT,
   MAX_OPERATIVA_WIDTH_PCT,
   useTradingLayoutStore,
-} from '@/stores/trading-layout-store';
-import { DockZone } from '@/components/layout/dock-zone';
-import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
-import { WatchlistPanel } from '@/features/trading/lists-tab/watchlist-panel';
-import { ChartsZone } from '@/features/trading/charts-zone';
-import { OperationsPanel } from '@/features/trading/operations-panel';
-import { TradingOperativaPanel } from '@/features/trading/trading-operativa-panel';
-import { useChartListMembershipSync } from '@/features/trading/lists-tab/use-chart-list-membership-sync';
-import { useChartVisualizationSync } from '@/features/trading/lists-tab/use-chart-visualization-sync';
+} from "@/stores/trading-layout-store";
+import { DockZone } from "@/components/layout/dock-zone";
+import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
+import { WatchlistPanel } from "@/features/trading/lists-tab/watchlist-panel";
+import { ChartsZone } from "@/features/trading/charts-zone";
+import { OperationsPanel } from "@/features/trading/operations-panel";
+import { TradingOperativaPanel } from "@/features/trading/trading-operativa-panel";
+import { useChartListMembershipSync } from "@/features/trading/lists-tab/use-chart-list-membership-sync";
+import { useChartVisualizationSync } from "@/features/trading/lists-tab/use-chart-visualization-sync";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -43,7 +43,9 @@ export function TradingLayout({ children }: { children: ReactNode }) {
 
   const [liveListsPct, setLiveListsPct] = useState(layout.listsWidthPct);
   const [liveOpsPct, setLiveOpsPct] = useState(layout.operationsHeightPct);
-  const [liveOperativaPct, setLiveOperativaPct] = useState(layout.operativaWidthPct);
+  const [liveOperativaPct, setLiveOperativaPct] = useState(
+    layout.operativaWidthPct,
+  );
   const pendingLists = useRef(layout.listsWidthPct);
   const pendingOps = useRef(layout.operationsHeightPct);
   const pendingOperativa = useRef(layout.operativaWidthPct);
@@ -102,7 +104,10 @@ export function TradingLayout({ children }: { children: ReactNode }) {
 
   if (layout.listsMaximized && layout.listsOpen) {
     return (
-      <div ref={containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        ref={containerRef}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
         <DockZone
           title="Watchlist"
           open
@@ -119,7 +124,10 @@ export function TradingLayout({ children }: { children: ReactNode }) {
 
   if (layout.operationsMaximized && layout.operationsOpen) {
     return (
-      <div ref={containerRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        ref={containerRef}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
         <DockZone
           title="Operaciones"
           open
@@ -137,12 +145,19 @@ export function TradingLayout({ children }: { children: ReactNode }) {
   const showLists =
     layout.listsOpen && (layout.listsMaximized || !layout.chartsMaximized);
   const showCharts = true;
-  const splitTop = showLists && showCharts && !layout.listsMaximized && !layout.chartsMaximized;
+  const splitTop =
+    showLists &&
+    showCharts &&
+    !layout.listsMaximized &&
+    !layout.chartsMaximized;
   const showOperativa = layout.operativaOpen;
 
   return (
     <div ref={containerRef} className="flex min-h-0 flex-1 overflow-hidden">
-      <div ref={leftColumnRef} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        ref={leftColumnRef}
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+      >
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {showLists && (
             <>
@@ -152,14 +167,14 @@ export function TradingLayout({ children }: { children: ReactNode }) {
                 maximized={layout.listsMaximized}
                 onClose={layout.toggleLists}
                 onToggleMaximize={layout.maximizeLists}
-                className={splitTop ? 'shrink-0' : 'shrink-0 border-r'}
+                className={splitTop ? "shrink-0" : "shrink-0 border-r"}
                 style={
                   splitTop
                     ? {
                         width: `${clamp(liveListsPct, MIN_LISTS_WIDTH_PCT, MAX_LISTS_WIDTH_PCT)}%`,
-                        minWidth: 'min(240px, 40vw)',
+                        minWidth: "min(240px, 40vw)",
                       }
-                    : { flex: 1, minWidth: 'min(240px, 40vw)' }
+                    : { flex: 1, minWidth: "min(240px, 40vw)" }
                 }
               >
                 <WatchlistPanel />
@@ -168,7 +183,9 @@ export function TradingLayout({ children }: { children: ReactNode }) {
                 <PanelResizeHandle
                   label="Redimensionar panel listas"
                   onDrag={adjustLists}
-                  onDragEnd={() => layout.setListsWidthPct(pendingLists.current)}
+                  onDragEnd={() =>
+                    layout.setListsWidthPct(pendingLists.current)
+                  }
                 />
               )}
             </>
@@ -202,7 +219,9 @@ export function TradingLayout({ children }: { children: ReactNode }) {
               label="Redimensionar panel operaciones"
               orientation="horizontal"
               onDrag={adjustOps}
-              onDragEnd={() => layout.setOperationsHeightPct(pendingOps.current)}
+              onDragEnd={() =>
+                layout.setOperationsHeightPct(pendingOps.current)
+              }
             />
             <DockZone
               title="Operaciones"
@@ -228,7 +247,9 @@ export function TradingLayout({ children }: { children: ReactNode }) {
             label="Redimensionar panel operativa"
             className="hidden md:flex"
             onDrag={adjustOperativa}
-            onDragEnd={() => layout.setOperativaWidthPct(pendingOperativa.current)}
+            onDragEnd={() =>
+              layout.setOperativaWidthPct(pendingOperativa.current)
+            }
           />
           <DockZone
             title="Operativa"

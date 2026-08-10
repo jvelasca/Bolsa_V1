@@ -1,6 +1,6 @@
-import { useEffect, type ReactNode } from 'react';
-import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useEffect, type ReactNode } from "react";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface DialogProps {
   open: boolean;
@@ -11,14 +11,21 @@ interface DialogProps {
   className?: string;
 }
 
-export function Dialog({ open, onClose, title, description, children, className }: DialogProps) {
+export function Dialog({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  className,
+}: DialogProps) {
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === "Escape") onClose();
     }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
   if (!open) return null;
@@ -36,7 +43,7 @@ export function Dialog({ open, onClose, title, description, children, className 
         aria-modal="true"
         aria-labelledby="dialog-title"
         className={cn(
-          'relative z-[101] flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl',
+          "relative z-[101] flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl",
           className,
         )}
       >
@@ -45,7 +52,11 @@ export function Dialog({ open, onClose, title, description, children, className 
             <h2 id="dialog-title" className="text-lg font-semibold">
               {title}
             </h2>
-            {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+            {description && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {description}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -83,10 +94,10 @@ export function DialogTabs({
           type="button"
           onClick={() => onChange(tab.id)}
           className={cn(
-            'border-b-2 px-3 py-2 text-sm transition-colors',
+            "border-b-2 px-3 py-2 text-sm transition-colors",
             active === tab.id
-              ? 'border-primary text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground',
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground",
           )}
         >
           {tab.label}
@@ -115,6 +126,6 @@ export function FieldRow({
 }
 
 export const inputClassName =
-  'rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-primary focus:ring-1';
+  "rounded-md border border-border bg-background px-3 py-2 text-sm outline-none ring-primary focus:ring-1";
 
-export const checkboxClassName = 'h-4 w-4 rounded border-border accent-primary';
+export const checkboxClassName = "h-4 w-4 rounded border-border accent-primary";

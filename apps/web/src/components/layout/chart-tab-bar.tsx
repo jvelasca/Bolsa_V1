@@ -3,13 +3,13 @@
  *
  * Las pestañas de gráficos se renderizan en charts-zone.tsx (TradingLayout).
  */
-import type { NavigateFunction } from 'react-router-dom';
-import { requestChartReflow } from '@/features/charts/chart-utils';
-import { isTradingRoute } from '@/lib/routes';
+import type { NavigateFunction } from "react-router-dom";
+import { requestChartReflow } from "@/features/charts/chart-utils";
+import { isTradingRoute } from "@/lib/routes";
 
 export function ensureChartRoute(navigate: NavigateFunction) {
   if (!isTradingRoute(window.location.pathname)) {
-    navigate('/trading');
+    navigate("/trading");
   }
 }
 

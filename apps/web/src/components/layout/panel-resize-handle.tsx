@@ -1,5 +1,5 @@
-import { useCallback, useRef } from 'react';
-import { cn } from '@/lib/utils';
+import { useCallback, useRef } from "react";
+import { cn } from "@/lib/utils";
 
 interface PanelResizeHandleProps {
   label: string;
@@ -7,7 +7,7 @@ interface PanelResizeHandleProps {
   onDragStart?: () => void;
   onDragEnd?: () => void;
   className?: string;
-  orientation?: 'vertical' | 'horizontal';
+  orientation?: "vertical" | "horizontal";
   disabled?: boolean;
 }
 
@@ -17,11 +17,11 @@ export function PanelResizeHandle({
   onDragStart,
   onDragEnd,
   className,
-  orientation = 'vertical',
+  orientation = "vertical",
   disabled = false,
 }: PanelResizeHandleProps) {
   const lastRef = useRef(0);
-  const isHorizontal = orientation === 'horizontal';
+  const isHorizontal = orientation === "horizontal";
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -32,8 +32,8 @@ export function PanelResizeHandle({
       const handle = event.currentTarget;
       handle.setPointerCapture(event.pointerId);
       lastRef.current = isHorizontal ? event.clientY : event.clientX;
-      document.body.style.cursor = isHorizontal ? 'row-resize' : 'col-resize';
-      document.body.style.userSelect = 'none';
+      document.body.style.cursor = isHorizontal ? "row-resize" : "col-resize";
+      document.body.style.userSelect = "none";
       onDragStart?.();
 
       const onPointerMove = (moveEvent: PointerEvent) => {
@@ -52,17 +52,17 @@ export function PanelResizeHandle({
         } catch {
           /* pointer already released */
         }
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-        window.removeEventListener('pointercancel', onPointerUp);
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        window.removeEventListener("pointercancel", onPointerUp);
         onDragEnd?.();
       };
 
-      window.addEventListener('pointermove', onPointerMove);
-      window.addEventListener('pointerup', onPointerUp);
-      window.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener("pointermove", onPointerMove);
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("pointercancel", onPointerUp);
     },
     [disabled, isHorizontal, onDrag, onDragEnd, onDragStart],
   );
@@ -70,25 +70,25 @@ export function PanelResizeHandle({
   return (
     <div
       role="separator"
-      aria-orientation={isHorizontal ? 'horizontal' : 'vertical'}
+      aria-orientation={isHorizontal ? "horizontal" : "vertical"}
       aria-label={label}
       aria-disabled={disabled || undefined}
       title={disabled ? undefined : label}
       onPointerDown={onPointerDown}
       className={cn(
-        'group relative shrink-0 touch-none select-none',
-        isHorizontal ? 'h-px w-full bg-border' : 'w-px self-stretch bg-border',
+        "group relative shrink-0 touch-none select-none",
+        isHorizontal ? "h-px w-full bg-border" : "w-px self-stretch bg-border",
         disabled
-          ? 'pointer-events-none z-10'
+          ? "pointer-events-none z-10"
           : cn(
-              'z-30',
+              "z-30",
               isHorizontal
-                ? 'cursor-row-resize hover:bg-primary/60 active:bg-primary/80'
-                : 'cursor-col-resize hover:bg-primary/60 active:bg-primary/80',
+                ? "cursor-row-resize hover:bg-primary/60 active:bg-primary/80"
+                : "cursor-col-resize hover:bg-primary/60 active:bg-primary/80",
               'before:absolute before:content-[""]',
               isHorizontal
-                ? 'before:inset-x-0 before:-top-1.5 before:-bottom-1.5'
-                : 'before:inset-y-0 before:-left-1.5 before:-right-1.5',
+                ? "before:inset-x-0 before:-top-1.5 before:-bottom-1.5"
+                : "before:inset-y-0 before:-left-1.5 before:-right-1.5",
             ),
         className,
       )}

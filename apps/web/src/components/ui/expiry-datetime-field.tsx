@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
-import { inputClassName } from '@/components/ui/dialog';
-import { IconButton } from '@/components/ui/icon-button';
+import { inputClassName } from "@/components/ui/dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   MONTH_LABELS_ES,
   WEEKDAY_LABELS_ES,
@@ -12,8 +12,8 @@ import {
   parseDateInputValue,
   type DateParts,
   type YearMonth,
-} from '@/lib/datetime-input';
-import { cn } from '@/lib/utils';
+} from "@/lib/datetime-input";
+import { cn } from "@/lib/utils";
 
 interface ExpiryDateTimeFieldProps {
   date: string;
@@ -22,14 +22,21 @@ interface ExpiryDateTimeFieldProps {
   onTimeChange: (value: string) => void;
 }
 
-function isSameDay(a: DateParts | null, year: number, month: number, day: number): boolean {
+function isSameDay(
+  a: DateParts | null,
+  year: number,
+  month: number,
+  day: number,
+): boolean {
   return Boolean(a && a.year === year && a.month === month && a.day === day);
 }
 
 function isToday(year: number, month: number, day: number): boolean {
   const now = new Date();
   return (
-    now.getFullYear() === year && now.getMonth() === month && now.getDate() === day
+    now.getFullYear() === year &&
+    now.getMonth() === month &&
+    now.getDate() === day
   );
 }
 
@@ -49,7 +56,10 @@ export function ExpiryDateTimeField({
       : { year: now.getFullYear(), month: now.getMonth() };
   });
 
-  const grid = useMemo(() => buildMonthGrid(view.year, view.month), [view.month, view.year]);
+  const grid = useMemo(
+    () => buildMonthGrid(view.year, view.month),
+    [view.month, view.year],
+  );
 
   useEffect(() => {
     if (!calendarOpen) return;
@@ -57,8 +67,8 @@ export function ExpiryDateTimeField({
       if (containerRef.current?.contains(event.target as Node)) return;
       setCalendarOpen(false);
     }
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
   }, [calendarOpen]);
 
   useEffect(() => {
@@ -78,7 +88,7 @@ export function ExpiryDateTimeField({
         <div className="flex min-w-0 items-center gap-1">
           <input
             type="date"
-            className={cn(inputClassName, 'min-w-0 flex-1')}
+            className={cn(inputClassName, "min-w-0 flex-1")}
             value={date}
             onChange={(event) => onDateChange(event.target.value)}
           />
@@ -133,13 +143,13 @@ export function ExpiryDateTimeField({
                   type="button"
                   onClick={() => selectDay(day)}
                   className={cn(
-                    'rounded py-1 text-[11px] tabular-nums transition-colors',
-                    'hover:bg-accent hover:text-foreground',
+                    "rounded py-1 text-[11px] tabular-nums transition-colors",
+                    "hover:bg-accent hover:text-foreground",
                     isSameDay(selected, view.year, view.month, day) &&
-                      'bg-primary text-primary-foreground hover:bg-primary',
+                      "bg-primary text-primary-foreground hover:bg-primary",
                     !isSameDay(selected, view.year, view.month, day) &&
                       isToday(view.year, view.month, day) &&
-                      'ring-1 ring-primary/50',
+                      "ring-1 ring-primary/50",
                   )}
                 >
                   {day}

@@ -1,7 +1,7 @@
-import type { CSSProperties, ReactNode } from 'react';
-import { Maximize2, Minimize2, X } from 'lucide-react';
-import { IconButton } from '@/components/ui/icon-button';
-import { cn } from '@/lib/utils';
+import type { CSSProperties, ReactNode } from "react";
+import { Maximize2, Minimize2, X } from "lucide-react";
+import { IconButton } from "@/components/ui/icon-button";
+import { cn } from "@/lib/utils";
 
 interface DockZoneProps {
   title: string;
@@ -35,7 +35,7 @@ export function DockZone({
   return (
     <section
       className={cn(
-        'flex min-h-0 min-w-0 flex-col overflow-hidden border-border bg-card/40',
+        "flex min-h-0 min-w-0 flex-col overflow-hidden border-border bg-card/40",
         className,
       )}
       style={style}
@@ -48,7 +48,7 @@ export function DockZone({
         {maximizable && (
           <IconButton
             icon={maximized ? Minimize2 : Maximize2}
-            title={maximized ? 'Restaurar' : 'Maximizar'}
+            title={maximized ? "Restaurar" : "Maximizar"}
             onClick={onToggleMaximize}
           />
         )}
