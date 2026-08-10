@@ -1131,6 +1131,7 @@ Traspaso de entrada: [traspaso-higiene-formato-legacy-entrada-2026-08-10.md](./t
 |------|--------|---------|---------|
 | 1 (PRIMERO) | `d39bbbb` | `components/ui` (8) + `components/layout` (7) = **15 `.tsx`** (todos de producción), diff +469/−321 solo formato | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ (warnings code-splitting = M7) |
 | 2 | `0ceeb5b` | `backtests/optimize` = **8 `.tsx`** presentacionales (`optimize-card-header`, `optimize-cpcv-report`, `optimize-edge-report`, `optimize-empty-tip`, `optimize-seed-banner`, `optimize-summary-strip`, `optimize-walk-forward-report`, `backtest-optimize-compare-card`), diff +222/−149 solo formato | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
+| 3 | `7c174c7` | `backtests/explore` = **7 files** (`backtest-explore-panel`, `at-outlook`, `battery-table`, `header`, `stars-grid`, `value`, `matrix-targets.test`), diff +553/−386 solo formato. **`backtest-explore-bh.tsx` = falso positivo EOL** (git lo normaliza a LF; contenido idéntico a HEAD; NO commiteado) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 
 **Nota de alcance (features/backtests):** el feature como un todo es **plano y enorme (210 archivos desincronizados)**,
 sin subdirectorios naturales. Se subdivide **por dominio funcional**: el sub-lote `optimize` (2) se eligió por reúnir los
@@ -1138,5 +1139,5 @@ entregables recientes (presentacionales, sin estado de negocio complejo). Siguie
 `features/backtests` propuestos (≈ dominio cada uno): `assistant`/`explore`/`library`/`result`/`wizard`, `strategy-matrix`,
 `core-r`, `dia-d`, etc., cada uno ≤ ~30 archivos.
 
-Siguiente lote: otro sub-lote por dominio de `features/backtests` (p. ej. `explore`/`result`/`wizard`), después el resto de
-`apps/web/src` por sub-lotes. Verificación tras cada lote y commit propio. HEAD `0ceeb5b` · sincronizado.
+Siguiente lote: otro sub-lote por dominio de `features/backtests` (p. ej. `result`/`wizard`/`library`), después el resto de
+`apps/web/src` por sub-lotes. Verificación tras cada lote y commit propio. HEAD `7c174c7` · sincronizado.
