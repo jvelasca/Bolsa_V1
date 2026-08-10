@@ -1036,3 +1036,23 @@ custom hooks/recalibración, fuera del criterio Diseño B de M5). HEAD `007924f`
 
 **Traspaso del frente (CIERRE):** [traspaso-m5-frente-create-account-wizard-cierre-2026-08-10.md](./traspaso-m5-frente-create-account-wizard-cierre-2026-08-10.md) —
 HEAD `007924f`, frente **CERRADO**, M5 pausado, orden de valor/riesgo restante anotado en §2.2 de dicho traspaso.
+
+### §7.6.f — Registro M5 frente `backtest-optimize-panel.tsx` (ENTRADA · FASE 1 hecha · primera ola sugerida C-OPT.1+)
+
+Tras cerrar create-account-wizard (`007924f`), se preparó **el siguiente frente de M5** sobre el mejor candidato no-sliceado:
+`apps/web/src/features/backtests/backtest-optimize-panel.tsx` (**2.168 líneas**; 30+ `useState`, 3 `useMutation`, 1
+`useQuery` polling, ~975 líneas JSX inline bajo un único `Card`). **FASE 1 (diagnóstico, sin cambios) YA HECHA** con
+subagente de exploración:
+
+- **7 bloques de bajo riesgo** extraíbles tipo Diseño B (en su mayoría **data-only / 0 callbacks**): `OptimizeCardHeader`
+  (riesgo medio-bajo, ~9 props), `OptimizeEmptyTip`, `OptimizeSummaryStrip`, `ExperimentSummaryBanner`,
+  `WalkForwardReportCard`, `EdgeReportCard`, `CpcvReportCard`, `AdoptionHintBanner`.
+- **6 bloques de acoplamiento alto** → NO en primera ola (formulario avanzado, editor de espacio, botonera `handleRun`,
+  comparación `handleSave`, select familia, botones de adopción).
+- **Ola sugerida:** C-OPT.1 (SummaryStrip+EmptyTip) → C-OPT.2 (3 cards métricas) → C-OPT.3 (2 banners) → C-OPT.4 (CardHeader).
+
+**Estado:** M5 sigue pausado; este frente queda **listo para retomar** en un chat nuevo leyendo el traspaso de entrada
+(Véase bajo Product/Ops en el engineering-index). No es área Coach/TOP (regla `coach-top-quality.mdc` NO aplica).
+
+**Traspaso del frente (ENTRADA):** [traspaso-m5-frente-optimize-panel-entrada-2026-08-10.md](./traspaso-m5-frente-optimize-panel-entrada-2026-08-10.md) —
+HEAD `d713a17`, FASE 1 hecha, primera ola sugerida C-OPT.1–C-OPT.4, pendiente de aprobación/ejecución.
