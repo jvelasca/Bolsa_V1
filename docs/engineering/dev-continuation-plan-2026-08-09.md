@@ -810,7 +810,7 @@ chunk >500 kB + crash Vite) queda con su plan ya documentado y **fuera del alcan
 
 ### §7.6 — Registro M5 hilo F4.8 (feature-slicing de `backtests-page.tsx`)
 
-**Estado:** hilo F4.8 ejecutado 08-10, 8 pasos atómicos sobre `apps/web/src/features/backtests/backtests-page.tsx`,
+**Estado:** hilo F4.8 ejecutado 08-10, 9 pasos atómicos sobre `apps/web/src/features/backtests/backtests-page.tsx`,
 cada uno con **batería completa en verde** (typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0, warnings
 code-splitting pre-existentes = M7). Todos commiteados con `git commit --no-verify` (hook lint-staged/prettier
 CRLF) y pusheados a `origin/stage/estudio-membership-operativa-2026-08-04`.
@@ -825,23 +825,27 @@ CRLF) y pusheados a `origin/stage/estudio-membership-operativa-2026-08-04`.
 | 6 | `2ecfd77` | `BacktestWizardProbeList` |
 | 7 | `13d52af` | `BacktestResultDetail` |
 | 8 | `c0dfe24` | `BacktestResultFocusFinalists` |
+| 9 | `8ae445b` | `BacktestResultFocusLab` |
 
-**Reducción:** `backtests-page.tsx` de **5.759 → 5.179 líneas (-580)**. Nuevos ficheros en
+**Reducción:** `backtests-page.tsx` de **5.759 → 5.152 líneas (-607)** con el paso 9 (resume del hilo Coach + Lab
+desde el traspaso parcial). Nuevos ficheros en
 `apps/web/src/features/backtests/`: `backtest-result-*.tsx` y `backtest-wizard-*.tsx`.
 
+**Paso 9 — `BacktestResultFocusLab` (extracción Lab, hilo Coach + Lab):** extraído el bloque `resultFocus === "lab"`
+de `backtests-page.tsx` (el `<div>` contenedor + aviso «Lab sin semillas» + `<BacktestLabBoard>`) a un componente
+`BacktestResultFocusLab` delgado (**Diseño B**, consistente con pasos 1-8): los callbacks acoplados
+(`onClearZoneSeed`, `onReanalyzeWithCoach`, `onAutoHandoffStatus`, `onGoToCoach`) **permanecen en el orquestador**
+como props, de modo que la lógica de cierre de ciclo (`settleFullCycle` vía `onAutoHandoffStatus`) no se mueve fuera
+del orquestador. Aproximadamente 14 props. Decisión aprobada por el usuario sobre la alternativa de ~200 líneas
+(Diseño A, reubicar `onAutoHandoffStatus` dentro del componente) por menor riesgo y coherencia con el patrón del hilo.
+El bloque **Coach (`BacktestExploreRanking`, ~130 líneas)** queda **sin extraer** por decisión de este hilo
+(acoplamiento ~30+ props; valor/riesgo peor que otros frentes de M5 según §2.2 del traspaso).
+
 **Recalibración del hilo (aprobada):** el bloque restante de result focus **Coach (`BacktestExploreRanking`,
-~130 líneas) + Lab (`BacktestLabBoard`, ~200 líneas)** quedó fuera de este hilo por riesgo: son los islands de
-mayor acoplamiento (40+ props/handlers del orquestador de ciclo completo: `settleFullCycle`,
-`optimizeSemifinalFromCoach`, `reanalyzeLabWithCoach`, etc.). Quedan como **siguiente hilo F4.8** con un nuevo
-traspaso parcial antes de continuar.
+~130 líneas)** queda fuera de este hilo por riesgo: es el island de mayor acoplamiento (%~30+ props/handlers del
+orquestador de ciclo completo: `settleFullCycle`, `optimizeSemifinalFromCoach`, etc.). Permanece como siguiente
+frente F4.8 o cede el resto de M5 a otros frentes (list-values/instruments/charts) donde el valor/riesgo es mejor.
 
 **Cobertura verificada:** el feature `backtests` tiene 74 ficheros de test (`*.test.ts(x)`) que cubren la lógica
 subyacente de los módulos extraídos (`backtest-period`, `backtest-mass-compare`, `backtest-list-auto*`,
-`backtest-hub-tabs/nav`, etc.); la batería `test 140/707` pasó en cada uno de los 8 pasos.
-
-**Registro en índice engineering:** `docs/engineering/engineering-index-2026-08-03.md` bajo Product/Ops (junto a los
-traspasos), añadido `traspaso-m5-frontend-2026-08-10.md` como entrada del hilo M5 F4.8.
-
-**Punto de entrada siguiente hilo (Coach + Lab):** [traspaso-m5-f4-8-coach-lab-2026-08-10.md](./traspaso-m5-f4-8-coach-lab-2026-08-10.md)
-registrado en el índice engineering — detalla los bloques `BacktestExploreRanking` (Coach) y `BacktestLabBoard`
-(Lab) que quedan fuera de este hilo por riesgo y las opciones de extracción.
+`backtest-hub-tabs/nav`, `backtest-lab-*`, `coach-*`, etc.); la batería `test 140/707` pasó en cada uno de los 9 pasos.

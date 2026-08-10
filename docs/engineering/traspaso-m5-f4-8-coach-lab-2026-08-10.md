@@ -1,7 +1,7 @@
 # Traspaso parcial — M5 hilo F4.8 · Coach + Lab (frontend web por features)
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `30a2785` (registro §7.6) · **Árbol limpio**
+**HEAD al crear:** `30a2785` (registro §7.6) · **HEAD al ejecutar el paso Lab:** `8ae445b`
 **Origen:** [traspaso-m5-frontend-2026-08-10.md](./traspaso-m5-frontend-2026-08-10.md) + registro **§7.6** de
 [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
 
@@ -25,6 +25,10 @@ Commits `git commit --no-verify` (hook lint-staged/prettier CRLF) + push a origi
 | 7 | `13d52af` | `backtest-result-detail.tsx` |
 | 8 | `c0dfe24` | `backtest-result-focus-finalists.tsx` |
 | — | `30a2785` | registro §7.6 en `dev-continuation-plan-2026-08-09.md` |
+| 9 | `8ae445b` | `backtest-result-focus-lab.tsx` (hilo Coach + Lab, paso Lab) |
+
+> **Progreso (2026-08-10):** el hilo Coach + Lab extrajo el **Lab** en el paso 9 → `BacktestResultFocusLab`
+> (Diseño B). `backtests-page.tsx` queda en **5.152 líneas (-607)**. Solo queda el **Coach** por decidir (ver §2.2).
 
 **Cobertura verificada:** feature `backtests` tiene **74 ficheros de test** que cubren la lógica subyacente de
 los módulos extraídos (`backtest-period`, `backtest-mass-compare`, `backtest-list-auto*`, `backtest-hub-tabs/nav`,
@@ -36,31 +40,26 @@ Los bloques de **result focus Coach** y **Lab** de `backtests-page.tsx` quedan *
 aprobada: son los islands de mayor acoplamiento con el orquestador del ciclo completo. Objetivo final F4.8:
 `backtests-page.tsx` **< 3.500 líneas** (faltan ~1.700 para llegar; este hilo es una parte del total).
 
-### 2.1 Bloques candidatos (actuales en HEAD `30a2785`, en la pestaña `tab === "run"`)
+> **Progreso del hilo Coach + Lab (2026-08-10):** el bloque **Lab ya se extrajo** en el paso 9 (`8ae445b`) →
+> `BacktestResultFocusLab` (~fine wrapper con callbacks en el orquestador, Diseño B). Queda **solo el Coach**
+> (`BacktestExploreRanking`, ~130 líneas) sin extraer por acoplamiento ~30+ props (ver §2.2 opción 2 vs 3).
 
-- **Coach** — `{resultFocus === "coach" ? ... : resultFocus === "lab" ? ...}` y el bloque
-  `{exploreRows.length > 0 && (resultFocus === "coach" || ...)}` que renderiza `<BacktestExploreRanking>`
-  (~130 líneas). Dependencias pesadas: `exploreRows`, `exploreSort`/`setExploreSort`, `coachPass`, `selectedId`,
-  `selectRun`, `startOptimizeFromExplore`, `optimizeSemifinalFromCoach`, `assistantPrefs.coach.*`,
-  `currentFinalistsInputFingerprint`, `assistantProgress`, `hasExistingTopForSave`, `semifinalShortcutArmed`,
-  `fullCycleActive`, `exploreRunning`, `setAwaitingAck`, `setAwaitingAckStage`, `setCoachGate`, `settleFullCycle`,
-  `exploreProgress`, `equityByRunId` (vía `queryClient`), `listAutoRef`.
-- **Lab** — bloque `{(resultFocus === "lab" || (Boolean(listAutoBoard) && fullCycleActive && labOpenedThisRun && !assistantProgress.labDone)) && ...}` que renderiza el aviso «Lab sin semillas» + `<BacktestLabBoard>` (~200 líneas).
-  Dependencias pesadas: `labZones`/`setLabZones`, `optimizeSeed`/`setOptimizeSeed`, `instrumentsQuery`,
-  `instrumentId`, `reanalyzeLabWithCoach`, `fullCycleActive`, `coachProfilePolicy` (5 campos), `labOpenedThisRun`,
-  `assistantProgress.labDone`, `onAutoHandoffStatus` (mensajes → `settleFullCycle`), y más handlers del Lab.
+### 2.1 Bloques candidatos (actuales en HEAD `8ae445b`, en la pestaña `tab === "run"`)
+
+- **Lab** — **EXTRAÍDO** en `BacktestResultFocusLab` (`backtest-result-focus-lab.tsx`), paso 9 `8ae445b`. El
+  `onAutoHandoffStatus` (~130 líneas, lógica de cierre de ciclo) **permanece en el orquestador** como prop.
 
 ### 2.2 Recomendación de estrategia
 
 Dado el acoplamiento, **no** transpone el bloque entero a props (serían 40+ props/handlers). Opciones por orden
 de riesgo creciente:
-1. Primero extraer el bloque **Lab** por separado (`<BacktestResultFocusLab>`), pasando los computados
-   (`labZones`, `optimizeSeed`, `coachProfilePolicy.*`) como props y los handlers que ya son funciones nombradas
-   (`reanalyzeLabWithCoach`, `setLabZones`, `setOptimizeSeed`) como callbacks. Es más autocontenido que Coach.
-2. Después extraer **Coach** (`<BacktestResultFocusCoach>`): requiere decidir qué callbacks acoplados
+1. **Lab — YA EXTRAÍDO** (paso 9 `8ae445b` → `BacktestResultFocusLab`, Diseño B): computados (`labZones`,
+   `optimizeSeed`, `coachProfilePolicy.*`) como props y los handlers acoplados (`reanalyzeLabWithCoach`,
+   `setLabZones`, `setOptimizeSeed`, `onAutoHandoffStatus`, `onGoToCoach`) como callbacks **en el orquestador**.
+2. Queda **Coach** (`<BacktestResultFocusCoach>`): requiere decidir qué callbacks acoplados
    (`onAwaitingAckChange`, `onCoachGateChange`, `onAutoSaveStatus`, `onSelectRun`, `onOptimizeCandidate`,
    `onOptimizeSemifinal`) se pasan tal cual y cuáles se reescriben con los setters que recibe.
-3. Alternativa segura: detener la descomposición de Coach/Lab (quedan en la zona de 40+ props) y dedicar el resto de
+3. Alternativa segura: **detener** la descomposición de Coach (quedaría en ~30+ props) y dedicar el resto de
    M5 a los **otros frentes** de feature-slicing del traspaso M5 (list-values, instruments, charts) donde el
    valor/riesgo es mejor.
 
