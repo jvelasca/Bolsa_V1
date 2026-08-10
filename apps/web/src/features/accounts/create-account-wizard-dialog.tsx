@@ -22,6 +22,7 @@ import {
 import { Dialog, FieldRow, inputClassName } from '@/components/ui/dialog';
 import { InvestorProfilePicker } from '@/features/accounts/investor-profile-picker';
 import { AccountWizardIdentityStep } from '@/features/accounts/account-wizard-identity-step';
+import { AccountWizardCapitalStep } from '@/features/accounts/account-wizard-capital-step';
 import { formatPrice } from '@/features/charts/chart-utils';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -365,45 +366,12 @@ export function CreateAccountWizardDialog() {
       )}
 
       {step === 'capital' && (
-        <div className="space-y-4">
-          <FieldRow label="Depósito inicial" hint="Efectivo disponible al abrir la cuenta">
-            <input
-              type="number"
-              min={0}
-              step={1000}
-              className={inputClassName}
-              value={form.initialDeposit}
-              onChange={(e) => patch({ initialDeposit: e.target.value })}
-            />
-          </FieldRow>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FieldRow label="Apalancamiento" hint="1 = sin apalancamiento (recomendado)">
-              <input
-                type="number"
-                min={1}
-                max={10}
-                step={0.5}
-                className={inputClassName}
-                value={form.leverage}
-                onChange={(e) => patch({ leverage: e.target.value })}
-              />
-            </FieldRow>
-            <FieldRow label="Nivel margin call (%)" hint="Alerta cuando margen caiga bajo este umbral">
-              <input
-                type="number"
-                min={50}
-                max={200}
-                className={inputClassName}
-                value={form.marginCallLevelPct}
-                onChange={(e) => patch({ marginCallLevelPct: e.target.value })}
-              />
-            </FieldRow>
-          </div>
-          <p className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-            Cuenta simulada: el apalancamiento afectará al cálculo de margen en fases posteriores. Por
-            ahora el trading opera con efectivo disponible.
-          </p>
-        </div>
+        <AccountWizardCapitalStep
+          initialDeposit={form.initialDeposit}
+          leverage={form.leverage}
+          marginCallLevelPct={form.marginCallLevelPct}
+          onPatch={patch}
+        />
       )}
 
       {step === 'profile' && (
