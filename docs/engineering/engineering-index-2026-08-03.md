@@ -27,7 +27,7 @@ Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4)
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -54,7 +54,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m1-reproducibilidad-backend-2026-08-10.md  ← M1 reproducibilidad backend (uv.lock)
 │   ├── traspaso-m2-versiones-frontend-2026-08-10.md        ← M2 versiones frontend (@types react) CERRADO 08-10
 │   ├── traspaso-m3-dominio-2026-08-10.md                   ← M3 capa de dominio (py/domain + application) CERRADO 08-10
-│   ├── traspaso-m4-infraestructura-datos-2026-08-10.md     ← M4 infraestructura/modelo datos (Prisma vs SQLAlchemy + Alembic + repos) pendiente
+│   ├── traspaso-m4-infraestructura-datos-2026-08-10.md     ← M4 infraestructura/modelo datos (Prisma vs SQLAlchemy + Alembic + repos) CERRADO 08-10 · ADR-025
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)

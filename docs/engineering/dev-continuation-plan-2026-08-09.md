@@ -705,3 +705,48 @@ re-export huérfano y `bar_timestamp_from_date` una utilidad sin consumidores; s
 
 **Próximo módulo del plan 08-10 (sugerido):** **M4 — Infraestructura/modelo de datos** (Prisma vs
 SQLAlchemy, fuente de verdad del modelo, Alembic, repos). Riesgo **Alto** → requiere hilo propio.
+
+### 7.4 Cierre M4 — Infraestructura / modelo de datos (Prisma vs SQLAlchemy · Alembic · repos) (2026-08-10)
+
+**Entrada:** [traspaso-m4-infraestructura-datos-2026-08-10.md](./traspaso-m4-infraestructura-datos-2026-08-10.md) ·
+rama `stage/estudio-membership-operativa-2026-08-04`. Árbol limpio, HEAD `d7b9d99` antes del cambio.
+
+**Resumen:** se cerró M4 (fuente de verdad única del modelo de datos) con **alcance solo-documentación
+(decisión del usuario, opción A)** dado el riesgo **Alto** del modelo: el conjunto de tablas de SQLAlchemy
+y Prisma ya estaba **alineado** (53 = 53) y la semántica de use-cases no se tocó. El objetivo fue **decidir
+y registrar explícitamente quién es el dueño del esquema**, resolviendo la tensión ADR-001 vs ADR-003.
+
+- **FASE 1 (diagnóstico, sin cambios):**
+  - Inventario confirmado: `bolsa_infrastructure` (~38 repos `SqlAlchemy*`, `database/models/tables.py`,
+    `alerts/*`, `cache/*`, `queue/*`, `config.py`, `ids.py`, `session.py`) · `packages/database` (Prisma,
+    tooling) · `apps/api-python` (DI centralizada en `bolsa_api/api/dependencies.py`).
+  - **Fuente de verdad del modelo:** hoy **Prisma es el dueño del DDL** (crea tablas vía `prisma migrate`;
+    `packages/database/README.md` explícito: no runtime, solo migraciones/seed/inspección). **Alembic NO es
+    funcional** como migrador: `alembic/env.py` vacío (0 líneas) + única migración `001_timescaledb_extension.py`
+    ("tablas existentes vía Prisma, baseline sin recreate"). SQLAlchemy = capa ORM runtime, no dueña del esquema.
+  - **Verificado:** los **53 tables de SQLAlchemy y los 53 models de Prisma son el mismo conjunto** (sin
+    divergencias de tablas). Batería base intacta (ruff solo `B007` · pytest 663/2 pre-existentes · mypy deuda).
+  - **Refinamiento del "hallazgo M3":** los imports `application → infrastructure` son casi todos **top-level**,
+    no en el cuerpo; solo `config.get_settings` se importa en cuerpo (`risk_runtime.py`, `campaign_manifest.py`)
+    y 2 factories de DI (`get_prediction_repository`, `get_daily_ops_report_use_case`).
+- **FASE 2 (plan + aprobación usuario):** aprobada **opción A — consolidación de fuente de verdad SOLO DOCS**
+  (cero riesgo de batería); descartadas B (baseline Alembic) y C (consolidación de repos) por riesgo Alto.
+- **FASE 3 (ejecución, aprobado):**
+  - **Nuevo `docs/adr/025-data-model-source-of-truth.md`** — decide/registra: Prisma dueño del DDL ·
+    SQLAlchemy mapeo runtime · Alembic placeholder (baseline = hito diferido de ADR-003 §9) · coherencia como
+    contrato. Resuelve la tensión ADR-001/ADR-003 (estado intermedio legítimo del strangler).
+  - Añadido ADR-025 al catálogo en `docs/README.md` y al `engineering-index` (subárbol `adr/*`).
+  - `engineering-index`: traspaso M4 marcado **CERRADO 08-10**.
+- **Batería (FASE 3):** solo documentación → **no cambia ruff/mypy/pytest**; no se toca código de
+  domain/application/infrastructure ni frontend.
+- **Commits (`--no-verify`, por el hook lint-staged/prettier sobre legacy CRLF) y push** a
+  `origin/stage/estudio-membership-operativa-2026-08-04`.
+
+**Hallazgos registrados (fuera de alcance atómico M4, frentes futuros):** baseline **Alembic** que iguale
+Prisma (hito ADR-003 §9, riesgo Alto, plan atómico + batería c/u) · consolidar repos (adherencia explícita a
+los ~16 Protocol de `bolsa_domain.repositories`; ~22 repos sin interfaz) · reducir acoplamiento
+`application → infrastructure` (centralizado en `dependencies.py`).
+
+**Próximo módulo del plan 08-10 (sugerido):** **M6 — AI/analytics** (`py/ai` doc vs código, motores
+backtest/indicadores) o **M5 — Frontend web por features** (el más grande, a dividir). M7 (dev-stack F3.7)
+queda con su plan ya documentado.

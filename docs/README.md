@@ -80,6 +80,7 @@
 | [DEV_STARTUP.md](./DEV_STARTUP.md) | F5 / `pnpm dev` · puertos · doctor |
 | [engineering/stability-campaign-protocol-2026-08-02.md](./engineering/stability-campaign-protocol-2026-08-02.md) | Protocolo estabilidad multi-ventana (Q1.2/Q1.3) |
 | [adr/016-research-persistence-model.md](./adr/016-research-persistence-model.md) | **Persistencia** científica (tablas, \(K\), Fase 1) |
+| [adr/025-data-model-source-of-truth.md](./adr/025-data-model-source-of-truth.md) | **Fuente de verdad del modelo** — Prisma dueño del DDL · SQLAlchemy mapeo runtime · Alembic placeholder (M4 08-10) |
 | [adr/017-baseline-v1-5-research-observatory.md](./adr/017-baseline-v1-5-research-observatory.md) | **Baseline v1.5** — laboratorio observable (congelado) |
 | [engineering/research-lifecycle.md](./engineering/research-lifecycle.md) | **Flujo** operativo BT → trials → Observatory · embudo · paper |
 | [engineering/session-handoff-2026-08-01.md](./engineering/session-handoff-2026-08-01.md) | **Handoff** frescura v1.3 · FA · Composite v1.1 |
