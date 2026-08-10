@@ -117,3 +117,18 @@ Esto **no** es un plan consensuado, es el diagnóstico heredado + elaborado. El 
 
 > Al cierre de M2 (FASE 3), actualizar `dev-continuation-plan-2026-08-09.md` con una sección 7.x
 > nueva y añadir este fichero al índice engineering (bajo Product/Ops, junto al de M1).
+
+## 7. Cierre M2 (2026-08-10) — EJECUTADO
+
+- **Rama/estado al arrancar:** `stage/estudio-membership-operativa-2026-08-04`, HEAD real `aa87ad7`
+  (este mismo commit de traspaso; el `67f8b46` de M1 es un ancestro). Árbol limpio.
+- **Decisión (usuario, FASE 2):** opción (b) — subir ambos `@types` a su `latest` (`@types/react`
+  `19.2.18` + `@types/react-dom` `19.2.4`), reconociendo el gap estructural upstream que no se elimina.
+- **Cambios:** `apps/web/package.json` (solo los 2 `@types`, a `^19.2.18`/`^19.2.4`) + `pnpm-lock.yaml`
+  (integridad + dependientes). Sin tocar código. Rangos `^` auditados → sin cambios.
+- **Batería:** typecheck ✅ · lint ✅ (0 errores) · test ✅ (707) · build ✅ · `@bolsa/shared` typecheck ✅ ·
+  `pnpm test` (turbo) ✅.
+- **Registro:** sección §7.2 en `dev-continuation-plan-2026-08-09.md`; entrada del índice engineering
+  marcada CERRADO en `engineering-index-2026-08-03.md`. Commit + push (botón CI en GitHub).
+- **Nota entorno:** `pnpm up` no relinkeaba `node_modules` local (estado "lockfile-only"); se sincronizó
+  con `pnpm install --force` (aprobado). No reproducible en CI (checkout limpio + `--frozen-lockfile`).
