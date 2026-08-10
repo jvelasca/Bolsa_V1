@@ -288,6 +288,7 @@ import {
 import { BacktestDiaDOriginControl } from "@/features/backtests/backtest-dia-d-origin-control";
 import { formatDiaDDisplay } from "@/features/backtests/dia-d-favorites";
 import { DiaDVerifyHost } from "@/features/backtests/dia-d-verify-host";
+import { BacktestResultFundamental } from "@/features/backtests/backtest-result-fundamental";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
@@ -5323,22 +5324,11 @@ export function BacktestsPage() {
                         />
                       )}
 
-                      {resultFocus === "fundamental" && instrumentId && (
-                        <div className="min-h-0 flex-1 overflow-auto">
-                          <FundamentalCardPanel
-                            instrumentId={instrumentId}
-                            asOf={
-                              isDiaDInPast(diaD) ? effectiveDiaD(diaD) : null
-                            }
-                          />
-                        </div>
-                      )}
-
-                      {resultFocus === "fundamental" && !instrumentId && (
-                        <p className="text-sm text-muted-foreground">
-                          Elige un valor en Universo para ver la Tarjeta Valor
-                          (análisis fundamental).
-                        </p>
+                      {resultFocus === "fundamental" && (
+                        <BacktestResultFundamental
+                          instrumentId={instrumentId}
+                          diaD={diaD}
+                        />
                       )}
 
                       {resultFocus === "detail" && diaDVerifyActive ? (
