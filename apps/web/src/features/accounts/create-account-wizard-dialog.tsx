@@ -21,6 +21,7 @@ import {
 } from '@bolsa/shared';
 import { Dialog, FieldRow, inputClassName } from '@/components/ui/dialog';
 import { InvestorProfilePicker } from '@/features/accounts/investor-profile-picker';
+import { AccountWizardIdentityStep } from '@/features/accounts/account-wizard-identity-step';
 import { formatPrice } from '@/features/charts/chart-utils';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -37,8 +38,6 @@ const STEPS = [
 ] as const;
 
 type StepId = (typeof STEPS)[number]['id'];
-
-const CURRENCIES = ['EUR', 'USD', 'GBP'] as const;
 
 const COMMISSION_OPTIONS: { id: CommissionPresetId; hint: string }[] = [
   { id: 'standard_es', hint: '0,10 % · mín. 1 € · IVA 21 % · custodia 0,2 % anual' },
@@ -357,38 +356,12 @@ export function CreateAccountWizardDialog() {
       <StepIndicator current={step} />
 
       {step === 'identity' && (
-        <div className="space-y-4">
-          <FieldRow label="Nombre de la cuenta" hint="Ej. Paper IBEX, Estrategia dividendos">
-            <input
-              className={inputClassName}
-              value={form.name}
-              onChange={(e) => patch({ name: e.target.value })}
-              placeholder="Cuenta demo EUR"
-              autoFocus
-            />
-          </FieldRow>
-          <FieldRow label="Descripción (opcional)">
-            <textarea
-              className={cn(inputClassName, 'min-h-[72px] resize-y')}
-              value={form.description}
-              onChange={(e) => patch({ description: e.target.value })}
-              placeholder="Objetivo, horizonte, notas…"
-            />
-          </FieldRow>
-          <FieldRow label="Moneda de la cuenta">
-            <select
-              className={inputClassName}
-              value={form.currency}
-              onChange={(e) => patch({ currency: e.target.value })}
-            >
-              {CURRENCIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </FieldRow>
-        </div>
+        <AccountWizardIdentityStep
+          name={form.name}
+          description={form.description}
+          currency={form.currency}
+          onPatch={patch}
+        />
       )}
 
       {step === 'capital' && (
