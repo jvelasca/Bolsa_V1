@@ -25,4 +25,4 @@ En superficies LLM / copiloto / propose hay un botón pequeño **IA** que abre u
 | `strategy_draft` | Screeners · Asistente IA (draft-from-prompt) |
 | `chart_propose` | Barra gráfico · estudio IA |
 
-Relacionado: [research-radar-unification-2026-07-31.md](./research-radar-unification-2026-07-31.md).
+Relacionado: [research-radar-unification-2026-07-31.md](../research-radar-unification-2026-07-31.md).

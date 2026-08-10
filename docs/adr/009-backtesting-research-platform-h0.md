@@ -6,7 +6,7 @@
 
 ## Contexto
 
-Bolsa V1 necesita backtesting como **base de la app** (ver [BACKTESTING_AUDIT.md](../BACKTESTING_AUDIT.md)). En paralelo, ADR-003 define evolución hacia IA/ML con orden obligatorio: backtest fiable antes de LLM.
+Bolsa V1 necesita backtesting como **base de la app** (ver [BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md), que hereda el rol de la eliminada auditoría previa). En paralelo, ADR-003 define evolución hacia IA/ML con orden obligatorio: backtest fiable antes de LLM.
 
 Este ADR acota la **fase H0** (implementación inmediata) y fija **contratos de datos** que no deben rehacerse cuando llegue procesamiento masivo e IA ([BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md)).
 
@@ -92,7 +92,6 @@ Tablas `strategy_definitions`, `data_snapshots`, `research_jobs`: **H1** (tipos 
 
 ## Referencias
 
-- [BACKTESTING_AUDIT.md](../BACKTESTING_AUDIT.md)
-- [BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md)
+- [BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md) *(histórico: `BACKTESTING_AUDIT.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso)*
 - [ADR-003](./003-python-backend-ai-platform.md)
 - **Evolución post-H0:** [ADR-011 Quantitative Research Operating System](./011-quantitative-research-platform.md) (hipótesis, Belief, landscape, Knowledge temprano).

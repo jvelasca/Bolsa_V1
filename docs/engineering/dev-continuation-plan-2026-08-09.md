@@ -437,3 +437,64 @@ adivinar el catálogo. La opción robusta es tratar el FK como fuente de verdad 
 
 Rama: `stage/estudio-membership-operativa-2026-08-04`. Cada paso se commitea y pushea
 (con aprobación) para mantener el roadmap recuperable.
+
+---
+
+## 6. M0 — Higiene de documentación + auditoría general (2026-08-10)
+
+**Contexto:** pausa de trabajo de código para auditar estructura general y documentación
+tras el crecimiento grande del monorepo. Decisión del usuario: **no hacer cambios de
+código**, solo auditoría + plan de refactorización por módulos, ejecutable en **hilos
+separados** con validación completa por tests y sin romper nada.
+
+### 6.1 Auditoría general + plan por módulos
+
+- Documento nuevo: [general-audit-plan-2026-08-10.md](./general-audit-plan-2026-08-10.md).
+- Inventario de estructura confirmado (monorepo pnpm + Turborepo + uv/Python + Prisma;
+  2 apps, 7 paquetes py, shared/database, scripts, CI, husky). Sin mezcla de gestores.
+- Plan de refactorización por módulos **M0–M7** (higiene docs, reproducibilidad backend,
+  versiones frontend, dominio, infra/modelo datos, frontend por features, AI/analytics,
+  dev-stack F3.7 residual). Cada módulo = hilo separado.
+
+### 6.2 Hallazgos y correcciones M0 (hechos hoy)
+
+**Enlaces rotos críticos resueltos** — decisión A del usuario (redirigir a doc existente
+que cumple el rol + dejar marca `*(histórico: … eliminado; pendiente de borrar
+definitivamente cuando se confirme libre de uso)*`). Registro oficial en §7 del plan:
+
+| Doc roto (eliminar al confirmar 0 usos) | Redirigido a |
+|---|---|
+| `docs/CUTOVER_PYTHON.md` | `docs/DEV_STARTUP.md` + `docs/README.md` |
+| `docs/BACKTESTING_AUDIT.md` (×4) | `docs/BACKTESTING_DATA_ARCHITECTURE.md` |
+| `docs/SCREENERS_SIGNALS_ALIGNMENT.md` | `docs/adr/011` |
+| `docs/PROJECT_STATE.md` | `docs/PORTFOLIO_AND_CASH.md` |
+| `docs/AI_TRACKER_STRATEGY.md` | — (marca histórica) |
+| `docs/DISK_AND_CLEANUP.md` | `docs/DATA_MODEL.md` |
+| `docs/sessions/2026-07-11-rd2-arq-worker.md` | — (marca histórica) |
+| `docs/sessions/2026-07-12-audit-close.md` | — (marca histórica) |
+
+**Índices:**
+- Conectados los docs 08-09 + el plan 08-10 a `docs/README.md` y `engineering-index`.
+- Indexados los 3 ficheros de research (07-29, 08-02-smoke, 08-03) en
+  `research/observations/index.md`.
+
+**Correcciones menores:**
+- "RFC-000…007" → "…008" en `docs/README.md`.
+- Enlace `./` → `../` roto en `docs/engineering/pending-delete/NEXT-IA-BUTTON.md`.
+- `packages/py/README.md`: `ai` corregido de "Placeholder fase 6+" a **implementado**
+  (`bolsa-ai`, RFC-007); añadido a lista de instalación y a tests.
+
+**Verificación M0:** 0 enlaces rotos hacia los docs originales (las menciones restantes
+son texto plano, no enlaces); lint sin errores; diff contenido (solo documentación). Por
+ser únicamente docs, riesgo nulo y no se requiere batería web/py.
+
+**Nota de higiene (descubierto al commitear):** al commitear, el hook lint-staged ejecuta
+`prettier --write` sobre los `.md`, que reformateó masivamente ficheros legacy con CRLF
+desincronizado (+981/−771 en vez del cambio editorial de ~+33/−18). Por la premisa de "no
+cambiar de lo necesario", se **revirtió ese formateo** y se rehicieron solo las ediciones
+editoriales (este commit). Queda documentado que el formateo masivo de prettier sobre docs
+legacy es un frente de higiene aparte (no se mezcla con cambios editoriales). Si se desea
+normalizar el formato de docs en el futuro, debe ser un commit propio de formateo único.
+
+**Pendiente en M0:** eliminar definitivamente cada doc de la columna izquierda una vez
+confirmado que no queda ningún uso (registrado como pendiente en el plan 08-10).

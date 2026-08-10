@@ -9,7 +9,7 @@
 | [PROJECT_PREMISES.md](./PROJECT_PREMISES.md) | **Premisas de proyecto** (documentar todo · índice de premisas · repo público) |
 | [AI_PLATFORM_SOLUTION.md](./AI_PLATFORM_SOLUTION.md) | Dictamen IA + estado F1/F2 · UI: Ayuda → Plataforma IA |
 | [HELP.md](./HELP.md) | Mapa Ayuda ↔ trackers ↔ docs (`HELP_CONTENT_AS_OF`) |
-| [rfc/README.md](./rfc/README.md) | Constitución RFC-000…007 · fases código |
+| [rfc/README.md](./rfc/README.md) | Constitución RFC-000…008 · fases código |
 | [API_REFERENCE.md](./API_REFERENCE.md) | Endpoints HTTP |
 | [ONBOARDING.md](./ONBOARDING.md) | Setup primer día |
 | [domain-language.md](./domain-language.md) | **Diccionario QROS** (Scientific / Trading / Infra · universos LAB/TRADING) |
@@ -45,6 +45,9 @@
 | [engineering/session-handoff-2026-08-06-estudio-process-ui.md](./engineering/session-handoff-2026-08-06-estudio-process-ui.md) | **Handoff** UI procesos + modos en barra (retomar agente) |
 | [engineering/visualizados-list-ux-2026-08-06.md](./engineering/visualizados-list-ux-2026-08-06.md) | **Visualizados** — pestañas · Por IO · columnas recomendación · foco lista |
 | [engineering/session-handoff-2026-08-06-visualizados-list-ux.md](./engineering/session-handoff-2026-08-06-visualizados-list-ux.md) | **Handoff** Visualizados / listas UX (retomar agente) |
+| [engineering/audit-resume-premises-2026-08-09.md](./engineering/audit-resume-premises-2026-08-09.md) | **Premisas de continuación** — auditoría APP (nuevo hilo) |
+| [engineering/dev-continuation-plan-2026-08-09.md](./engineering/dev-continuation-plan-2026-08-09.md) | **Plan de continuación 08-09** — estado + próximos pasos (P3/F4.8/F4.9) |
+| [engineering/general-audit-plan-2026-08-10.md](./engineering/general-audit-plan-2026-08-10.md) | **Auditoría general 08-10** — estructura + docs + plan por módulos |
 | [engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md) | Triage round 3 (A0·N4·Deep) — O3-C ratificado · secuencia Op→Asesor→Canales |
 | [engineering/audit-pack-estudio-asesor-canales-2026-08-04.md](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) | **Pack auditoría** Estudio→Operativa→Asesor→Canales (+ notif.) previo a AUTO |
 | [engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) | Pack auditoría prep AUTO A0–A5 (flag off) |

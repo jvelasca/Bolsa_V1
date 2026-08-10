@@ -39,7 +39,7 @@ pnpm dev
 > **Nota:** La API activa es FastAPI en `:8000`. Usa `pnpm dev` o la config F5 **Bolsa: Dev (pnpm dev)**.  
 > Tras pulls de código Python, **reinicia api-python** (rutas Evidence / asOf / CORE-R).
 
-Documentación completa del cutover: [`docs/CUTOVER_PYTHON.md`](./docs/CUTOVER_PYTHON.md).
+Documentación completa del cutover: [`docs/DEV_STARTUP.md`](./docs/DEV_STARTUP.md) · [`docs/README.md`](./docs/README.md) *(histórico: `docs/CUTOVER_PYTHON.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
 
 ## Scripts
 

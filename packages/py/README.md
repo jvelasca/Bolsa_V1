@@ -9,7 +9,7 @@ Capas del backend activo. Ver [ADR-003](../../docs/adr/003-python-backend-ai-pla
 | `infrastructure/` | `bolsa_infrastructure` | SQLAlchemy, config, repos concretos, Alembic |
 | `analytics/` | `bolsa_analytics` | SMA, EMA, RSI, motor backtest |
 | `market/` | `bolsa_market` | Yahoo provider, ingest OHLCV, símbolos XTB |
-| `ai/` | — | **Placeholder** fase 6+ (solo README) |
+| `ai/` | `bolsa-ai` | AI Governance (RFC-007): Proxy, Prompt Registry, adapters LLM (Ollama/OpenAI) |
 
 App HTTP: `apps/api-python` (`bolsa_api`).
 
@@ -23,7 +23,7 @@ Equivalente manual:
 
 ```bash
 pip install -e packages/py/domain -e packages/py/analytics -e packages/py/market \
-  -e packages/py/infrastructure -e packages/py/application \
+  -e packages/py/infrastructure -e packages/py/application -e packages/py/ai \
   -e "apps/api-python[dev]"
 ```
 
@@ -34,7 +34,7 @@ Alternativa con uv (opcional): `uv sync` + `make dev-api` si usas el Makefile de
 ```bash
 pnpm test:py
 # o: python -m pytest packages/py/market/tests packages/py/application/tests \
-#         packages/py/analytics/tests apps/api-python/tests -q
+#         packages/py/analytics/tests packages/py/ai/tests apps/api-python/tests -q
 ```
 
 ## Casos de uso clave (`bolsa_application/`)

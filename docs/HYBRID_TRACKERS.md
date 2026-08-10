@@ -1,7 +1,7 @@
 # Rastreadores híbridos — Guía de implementación
 
 > Estado: **jul 2026** — P10–P13 completados en MVP.  
-> Diseño original: [AI_TRACKER_STRATEGY.md](./AI_TRACKER_STRATEGY.md)
+> *(histórico: `AI_TRACKER_STRATEGY.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
 
 ## Resumen
 

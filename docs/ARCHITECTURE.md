@@ -61,7 +61,7 @@ Stack TS legacy archivado en `archive/legacy-ts/` — ver [LEGACY.md](./LEGACY.m
 - Middleware FastAPI valida `Authorization: Bearer <token>`.
 - Frontend: `AuthGate` → login o shell según `/api/auth/status`.
 
-Ver [CUTOVER_PYTHON.md](./CUTOVER_PYTHON.md).
+Ver [DEV_STARTUP.md](./DEV_STARTUP.md) *(histórico: `CUTOVER_PYTHON.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
 
 ## UI shell (ADR-004)
 

@@ -46,6 +46,11 @@ Engineering Index  (este doc)
 │   ├── estudio-supervision-model-2026-08-06.md  (ADR-024 · Supervisión ON · 3 cadencias)
 │   ├── estudio-process-status-ui-2026-08-06.md  (iconos · Actualizar/Redescubrir · OPERATIVA)
 │   ├── session-handoff-2026-08-06-estudio-process-ui.md
+│   ├── visualizados-list-ux-2026-08-06.md
+│   ├── session-handoff-2026-08-06-visualizados-list-ux.md
+│   ├── dev-continuation-plan-2026-08-09.md   ← continuación (estado + próximos pasos)
+│   ├── audit-resume-premises-2026-08-09.md   ← premisas nuevo hilo auditoría
+│   ├── general-audit-plan-2026-08-10.md       ← auditoría general + plan por módulos
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)

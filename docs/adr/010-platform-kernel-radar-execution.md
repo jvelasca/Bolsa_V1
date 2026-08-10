@@ -194,5 +194,5 @@ Frontend (panel flotante) **no antes de P3** — gestor de trackers necesita API
 ## Referencias
 
 - [platform-kernel.ts](../../packages/shared/src/platform-kernel.ts)
-- [SCREENERS_SIGNALS_ALIGNMENT.md](../SCREENERS_SIGNALS_ALIGNMENT.md)
+- [RESEARCH_RADAR/SCREENERS y señales](./011-quantitative-research-platform.md) *(histórico: `SCREENERS_SIGNALS_ALIGNMENT.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso)*
 - [BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md)
