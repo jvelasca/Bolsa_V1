@@ -26,6 +26,7 @@ import {
   type ExplorePresetRow,
   type ExploreSortKey,
 } from '@/features/backtests/backtest-explore-value';
+import { BacktestExploreBH } from '@/features/backtests/backtest-explore-bh';
 import {
   buildDeepTechnicalCoachNote,
   buildCoachFacts,
@@ -1302,23 +1303,7 @@ export function BacktestExploreRanking({
       </div>
 
       {/* Evidencia B&H: secundaria, no decide el TOP ★ */}
-      <details className="rounded-lg border border-dashed border-border/70 px-3 py-1.5">
-        <summary
-          className="cursor-pointer list-none text-[11px] text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden"
-          title="Heurística vs buy & hold del lote. No manda sobre las estrellas del TOP-3."
-        >
-          Comparativa vs buy & hold
-          <span className="ml-1 opacity-70">· no decide el TOP ★</span>
-        </summary>
-        <div className="mt-1.5 space-y-1 border-t border-border/40 pt-1.5">
-          <p className="text-xs text-foreground">{coach.headline}</p>
-          <ul className="list-inside list-disc space-y-0.5 text-[11px] text-muted-foreground">
-            {coach.bullets.map((bullet) => (
-              <li key={bullet}>{bullet}</li>
-            ))}
-          </ul>
-        </div>
-      </details>
+      <BacktestExploreBH coach={coach} />
 
       {/* Batería: evidencia completa, colapsada */}
       <details className="rounded-lg border border-border/70" open={running || okCount === 0}>
