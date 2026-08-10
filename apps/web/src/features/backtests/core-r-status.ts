@@ -9,14 +9,14 @@
 
 export type OpenHelpBacktestingOpts = {
   /** Scroll al Monitor Finalistas (cola CORE-R) en Ayuda → Backtesting. */
-  panel?: 'monitor';
+  panel?: "monitor";
 };
 
 /** Abre Ayuda → Backtesting (escuchado por AppHelpMenu). */
 export function openHelpBacktesting(opts?: OpenHelpBacktestingOpts): void {
   window.dispatchEvent(
-    new CustomEvent('bolsa:open-help', {
-      detail: { section: 'backtesting', panel: opts?.panel },
+    new CustomEvent("bolsa:open-help", {
+      detail: { section: "backtesting", panel: opts?.panel },
     }),
   );
 }
@@ -25,7 +25,7 @@ export function openHelpBacktesting(opts?: OpenHelpBacktestingOpts): void {
 export function formatCoreRStatusChip(openCount: number): string | null {
   const n = Math.max(0, Math.floor(Number(openCount) || 0));
   if (n <= 0) return null;
-  return n === 1 ? 'CORE-R 1' : `CORE-R ${n}`;
+  return n === 1 ? "CORE-R 1" : `CORE-R ${n}`;
 }
 
 /** Tooltip con símbolos abiertos (máx. 4). */
@@ -34,11 +34,11 @@ export function formatCoreRStatusTitle(
   symbols: ReadonlyArray<string>,
 ): string {
   const chip = formatCoreRStatusChip(openCount);
-  if (!chip) return 'Sin cola CORE-R abierta';
+  if (!chip) return "Sin cola CORE-R abierta";
   const uniq = [...new Set(symbols.map((s) => s.trim()).filter(Boolean))];
-  const preview = uniq.slice(0, 4).join(', ');
-  const more = uniq.length > 4 ? ` +${uniq.length - 4}` : '';
-  const list = preview ? ` · ${preview}${more}` : '';
+  const preview = uniq.slice(0, 4).join(", ");
+  const more = uniq.length > 4 ? ` +${uniq.length - 4}` : "";
+  const list = preview ? ` · ${preview}${more}` : "";
   return `${chip} a revisar${list}\nClic → Ayuda · Monitor (cola)`;
 }
 
@@ -50,10 +50,10 @@ export function formatCoreROpenSymbolsKey(
   items: ReadonlyArray<{ status: string; symbol: string }>,
 ): string {
   return items
-    .filter((i) => i.status === 'open')
+    .filter((i) => i.status === "open")
     .map((i) => i.symbol.trim())
     .filter(Boolean)
-    .join('\u0001');
+    .join("\u0001");
 }
 
 /**
@@ -63,6 +63,6 @@ export function formatCoreROpenSymbolsKey(
 export function formatCoreREnqueueToast(added: number): string | null {
   const n = Math.max(0, Math.floor(Number(added) || 0));
   if (n <= 0) return null;
-  if (n === 1) return 'CORE-R · 1 valor encolado · revisa Monitor / chip barra';
+  if (n === 1) return "CORE-R · 1 valor encolado · revisa Monitor / chip barra";
   return `CORE-R · ${n} valores encolados · revisa Monitor / chip barra`;
 }

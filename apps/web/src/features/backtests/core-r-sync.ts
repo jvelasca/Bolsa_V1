@@ -4,31 +4,31 @@
  * No auto-paper · no pisa TOP.
  */
 
-import { api } from '@/lib/api';
+import { api } from "@/lib/api";
 import {
   CORE_R_ENGINE,
   type CoreRReport,
   readAllCoreRReports,
   replaceAllCoreRReports,
-} from '@/features/backtests/core-r-judgment';
+} from "@/features/backtests/core-r-judgment";
 import {
   loadCoreRSchedulerPrefs,
   saveCoreRSchedulerPrefs,
   type CoreRSchedulerPrefs,
-} from '@/features/backtests/core-r-scheduler';
+} from "@/features/backtests/core-r-scheduler";
 import {
   loadLastSeenRemoteEnqueueAt,
   markCoreRRemoteEnqueueSeen,
   parseRemoteEnqueueSignal,
   shouldToastRemoteEnqueue,
-} from '@/features/backtests/core-r-remote-toast';
-import { formatCoreREnqueueToast } from '@/features/backtests/core-r-status';
+} from "@/features/backtests/core-r-remote-toast";
+import { formatCoreREnqueueToast } from "@/features/backtests/core-r-status";
 import {
   type CoreRReviewQueueItem,
   useCoreRReviewQueueStore,
-} from '@/stores/core-r-review-queue-store';
-import { useAlertsStore } from '@/stores/alerts-store';
-import { getActiveAccountId } from '@/stores/active-account-store';
+} from "@/stores/core-r-review-queue-store";
+import { useAlertsStore } from "@/stores/alerts-store";
+import { getActiveAccountId } from "@/stores/active-account-store";
 
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 const hydratedAccounts = new Set<string>();
@@ -36,14 +36,16 @@ let pushWired = false;
 
 function asQueue(raw: unknown): CoreRReviewQueueItem[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter((x): x is CoreRReviewQueueItem => !!x && typeof x === 'object');
+  return raw.filter(
+    (x): x is CoreRReviewQueueItem => !!x && typeof x === "object",
+  );
 }
 
 function asReports(raw: unknown): Record<string, CoreRReport> {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
   const out: Record<string, CoreRReport> = {};
   for (const [listId, rec] of Object.entries(raw as Record<string, unknown>)) {
-    if (!rec || typeof rec !== 'object') continue;
+    if (!rec || typeof rec !== "object") continue;
     const r = rec as CoreRReport;
     if (r.engine === CORE_R_ENGINE && r.listId) out[listId] = r;
   }
@@ -51,24 +53,26 @@ function asReports(raw: unknown): Record<string, CoreRReport> {
 }
 
 function asScheduler(raw: unknown): CoreRSchedulerPrefs | null {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const p = raw as Partial<CoreRSchedulerPrefs>;
   const interval = Number(p.intervalMinutes);
   const source =
-    p.lastTickSource === 'server_cron' || p.lastTickSource === 'shell'
+    p.lastTickSource === "server_cron" || p.lastTickSource === "shell"
       ? p.lastTickSource
       : null;
   const remoteAdded = Number(p.lastRemoteEnqueueAdded);
   return {
     enabled: Boolean(p.enabled),
     intervalMinutes:
-      Number.isFinite(interval) && interval >= 5 ? Math.min(24 * 60, interval) : 60,
-    lastTickAt: typeof p.lastTickAt === 'string' ? p.lastTickAt : null,
-    listId: typeof p.listId === 'string' && p.listId ? p.listId : null,
-    scope: p.scope === 'monitor' ? 'monitor' : 'shell',
+      Number.isFinite(interval) && interval >= 5
+        ? Math.min(24 * 60, interval)
+        : 60,
+    lastTickAt: typeof p.lastTickAt === "string" ? p.lastTickAt : null,
+    listId: typeof p.listId === "string" && p.listId ? p.listId : null,
+    scope: p.scope === "monitor" ? "monitor" : "shell",
     lastTickSource: source,
     lastRemoteEnqueueAt:
-      typeof p.lastRemoteEnqueueAt === 'string' && p.lastRemoteEnqueueAt
+      typeof p.lastRemoteEnqueueAt === "string" && p.lastRemoteEnqueueAt
         ? p.lastRemoteEnqueueAt
         : null,
     lastRemoteEnqueueAdded: Number.isFinite(remoteAdded)
@@ -136,8 +140,8 @@ export async function pollCoreRRemoteEnqueueToast(
     markCoreRRemoteEnqueueSeen(decision.at);
     useAlertsStore.getState().pushToast(msg, {
       action: {
-        type: 'open_help_backtesting_monitor',
-        label: 'Abrir Monitor',
+        type: "open_help_backtesting_monitor",
+        label: "Abrir Monitor",
       },
     });
     return decision.added;
@@ -184,7 +188,7 @@ export async function ensureCoreRHydrated(accountId: string): Promise<void> {
 
 /** Wire mutaciones locales → push (una vez). */
 export function wireCoreRPushSubscriptions(): void {
-  if (pushWired || typeof window === 'undefined') return;
+  if (pushWired || typeof window === "undefined") return;
   pushWired = true;
   useCoreRReviewQueueStore.subscribe(() => {
     scheduleCoreRPush();

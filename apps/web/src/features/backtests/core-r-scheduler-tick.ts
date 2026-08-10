@@ -14,21 +14,21 @@ import {
   readCoreRReport,
   type CoreRPaperPnlSnap,
   type CoreRReportRow,
-} from '@/features/backtests/core-r-judgment';
+} from "@/features/backtests/core-r-judgment";
 import {
   coreRSchedulerDue,
   emitCoreRSchedulerTick,
   loadCoreRSchedulerPrefs,
   markCoreRSchedulerTick,
   saveCoreRSchedulerPrefs,
-} from '@/features/backtests/core-r-scheduler';
-import { markCoreRRemoteEnqueueSeen } from '@/features/backtests/core-r-remote-toast';
+} from "@/features/backtests/core-r-scheduler";
+import { markCoreRRemoteEnqueueSeen } from "@/features/backtests/core-r-remote-toast";
 import {
   buildStrategyMonitorRow,
   sliceMonitorInstruments,
-} from '@/features/backtests/strategy-monitor';
-import { api } from '@/lib/api';
-import { useCoreRReviewQueueStore } from '@/stores/core-r-review-queue-store';
+} from "@/features/backtests/strategy-monitor";
+import { api } from "@/lib/api";
+import { useCoreRReviewQueueStore } from "@/stores/core-r-review-queue-store";
 
 export type CoreRTickResult = {
   listId: string;
@@ -46,7 +46,9 @@ async function fetchPnlExtraRows(listId: string): Promise<CoreRReportRow[]> {
       api.getAccounts(),
     ]);
     const ids = listRes.data?.instrumentIds ?? [];
-    const byId = new Map((instrumentsRes.data ?? []).map((i) => [i.id, i] as const));
+    const byId = new Map(
+      (instrumentsRes.data ?? []).map((i) => [i.id, i] as const),
+    );
     const accounts = Array.isArray(accountsRes.data) ? accountsRes.data : [];
     const instruments = sliceMonitorInstruments(
       ids.map((id) => {
@@ -57,7 +59,7 @@ async function fetchPnlExtraRows(listId: string): Promise<CoreRReportRow[]> {
 
     const topIds = instruments.map((inst) => inst.id);
     const topsRes = await api
-      .queryInstrumentStrategyTops({ instrumentIds: topIds, timeframe: '1d' })
+      .queryInstrumentStrategyTops({ instrumentIds: topIds, timeframe: "1d" })
       .catch(() => null);
     const topById = new Map(
       (topsRes?.data ?? []).map((t) => [t.instrumentId, t] as const),
@@ -66,14 +68,16 @@ async function fetchPnlExtraRows(listId: string): Promise<CoreRReportRow[]> {
     const rows = instruments.map((inst) =>
       buildStrategyMonitorRow({
         instrument: inst,
-        timeframe: '1d',
+        timeframe: "1d",
         top: topById.get(inst.id) ?? null,
         accounts,
         queue: [],
       }),
     );
 
-    const withPaper = rows.filter((r) => r.paperAccount?.id && r.top?.slots?.length);
+    const withPaper = rows.filter(
+      (r) => r.paperAccount?.id && r.top?.slots?.length,
+    );
     const summaries = await Promise.all(
       withPaper.map((r) =>
         api.getAccountSummary(r.paperAccount!.id).catch(() => null),
@@ -116,21 +120,26 @@ async function fetchPnlExtraRows(listId: string): Promise<CoreRReportRow[]> {
  */
 export async function runCoreRSchedulerTick(opts?: {
   force?: boolean;
-  scopeFilter?: 'monitor' | 'shell';
+  scopeFilter?: "monitor" | "shell";
   includePnl?: boolean;
 }): Promise<CoreRTickResult | null> {
   const prefs = loadCoreRSchedulerPrefs();
   if (!prefs.enabled && !opts?.force) {
-    return { listId: '', added: 0, skipped: true, reason: 'disabled' };
+    return { listId: "", added: 0, skipped: true, reason: "disabled" };
   }
   if (opts?.scopeFilter && prefs.scope !== opts.scopeFilter && !opts.force) {
-    return { listId: prefs.listId ?? '', added: 0, skipped: true, reason: 'scope' };
+    return {
+      listId: prefs.listId ?? "",
+      added: 0,
+      skipped: true,
+      reason: "scope",
+    };
   }
   if (!prefs.listId) {
-    return { listId: '', added: 0, skipped: true, reason: 'no_list' };
+    return { listId: "", added: 0, skipped: true, reason: "no_list" };
   }
   if (!opts?.force && !coreRSchedulerDue(prefs)) {
-    return { listId: prefs.listId, added: 0, skipped: true, reason: 'not_due' };
+    return { listId: prefs.listId, added: 0, skipped: true, reason: "not_due" };
   }
 
   const report = readCoreRReport(prefs.listId);
@@ -141,12 +150,11 @@ export async function runCoreRSchedulerTick(opts?: {
     .syncFromReport(prefs.listId, report, extras);
   // Sello de vigilia aunque no se encole nada (juicio OK / sin acción).
   try {
-    const { touchEstudioLaneStamps } = await import(
-      '@/features/trading/estudio-lane-stamps'
-    );
+    const { touchEstudioLaneStamps } =
+      await import("@/features/trading/estudio-lane-stamps");
     const detail = await api.getList(prefs.listId).catch(() => null);
     const ids = detail?.data?.instrumentIds ?? [];
-    if (ids.length > 0) touchEstudioLaneStamps(ids, 'vigilance');
+    if (ids.length > 0) touchEstudioLaneStamps(ids, "vigilance");
   } catch {
     // best-effort
   }
@@ -154,7 +162,7 @@ export async function runCoreRSchedulerTick(opts?: {
   if (added > 0) {
     saveCoreRSchedulerPrefs({
       ...marked,
-      lastTickSource: 'shell',
+      lastTickSource: "shell",
       lastRemoteEnqueueAt: marked.lastTickAt,
       lastRemoteEnqueueAdded: added,
     });

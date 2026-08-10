@@ -10,10 +10,12 @@
  * No lanza Lista AUTO ni pisa TOP (eso lo arma Supervisión ON).
  */
 
-export const CORE_R_SCHEDULER_KEY = 'bolsa-core-r-scheduler-v1';
+export const CORE_R_SCHEDULER_KEY = "bolsa-core-r-scheduler-v1";
 
 /** Presets de cadencia (minutos) en UI Monitor. */
-export const CORE_R_SCHEDULER_INTERVAL_PRESETS = [15, 30, 60, 120, 240, 1440] as const;
+export const CORE_R_SCHEDULER_INTERVAL_PRESETS = [
+  15, 30, 60, 120, 240, 1440,
+] as const;
 
 export type CoreRSchedulerPrefs = {
   enabled: boolean;
@@ -29,9 +31,9 @@ export type CoreRSchedulerPrefs = {
    * `monitor` = solo mientras el panel Monitor está montado (legacy).
    * `shell` = PlatformShell (app abierta).
    */
-  scope: 'monitor' | 'shell';
+  scope: "monitor" | "shell";
   /** Origen del último tick que escribió el blob (shell | server_cron). */
-  lastTickSource?: 'shell' | 'server_cron' | null;
+  lastTickSource?: "shell" | "server_cron" | null;
   /** Señal multi-dispositivo: último encolado remoto (ISO). */
   lastRemoteEnqueueAt?: string | null;
   lastRemoteEnqueueAdded?: number;
@@ -42,33 +44,42 @@ const DEFAULT: CoreRSchedulerPrefs = {
   intervalMinutes: 60,
   lastTickAt: null,
   listId: null,
-  scope: 'shell',
+  scope: "shell",
   lastTickSource: null,
   lastRemoteEnqueueAt: null,
   lastRemoteEnqueueAdded: 0,
 };
 
-function normalizePrefs(parsed: Partial<CoreRSchedulerPrefs>): CoreRSchedulerPrefs {
+function normalizePrefs(
+  parsed: Partial<CoreRSchedulerPrefs>,
+): CoreRSchedulerPrefs {
   const interval = Number(parsed.intervalMinutes);
-  const scope = parsed.scope === 'monitor' ? 'monitor' : 'shell';
+  const scope = parsed.scope === "monitor" ? "monitor" : "shell";
   const source =
-    parsed.lastTickSource === 'server_cron' || parsed.lastTickSource === 'shell'
+    parsed.lastTickSource === "server_cron" || parsed.lastTickSource === "shell"
       ? parsed.lastTickSource
       : null;
   const remoteAdded = Number(parsed.lastRemoteEnqueueAdded);
   return {
     enabled: Boolean(parsed.enabled),
     intervalMinutes:
-      Number.isFinite(interval) && interval >= 5 ? Math.min(24 * 60, interval) : 60,
-    lastTickAt: typeof parsed.lastTickAt === 'string' ? parsed.lastTickAt : null,
-    listId: typeof parsed.listId === 'string' && parsed.listId ? parsed.listId : null,
+      Number.isFinite(interval) && interval >= 5
+        ? Math.min(24 * 60, interval)
+        : 60,
+    lastTickAt:
+      typeof parsed.lastTickAt === "string" ? parsed.lastTickAt : null,
+    listId:
+      typeof parsed.listId === "string" && parsed.listId ? parsed.listId : null,
     scope,
     lastTickSource: source,
     lastRemoteEnqueueAt:
-      typeof parsed.lastRemoteEnqueueAt === 'string' && parsed.lastRemoteEnqueueAt
+      typeof parsed.lastRemoteEnqueueAt === "string" &&
+      parsed.lastRemoteEnqueueAt
         ? parsed.lastRemoteEnqueueAt
         : null,
-    lastRemoteEnqueueAdded: Number.isFinite(remoteAdded) ? Math.max(0, remoteAdded) : 0,
+    lastRemoteEnqueueAdded: Number.isFinite(remoteAdded)
+      ? Math.max(0, remoteAdded)
+      : 0,
   };
 }
 
@@ -92,17 +103,24 @@ export function saveCoreRSchedulerPrefs(
     // quota
   }
   if (!opts?.skipPush) {
-    void import('@/features/backtests/core-r-sync').then((m) => m.scheduleCoreRPush());
+    void import("@/features/backtests/core-r-sync").then((m) =>
+      m.scheduleCoreRPush(),
+    );
   }
 }
 
-export function markCoreRSchedulerTick(prefs: CoreRSchedulerPrefs): CoreRSchedulerPrefs {
+export function markCoreRSchedulerTick(
+  prefs: CoreRSchedulerPrefs,
+): CoreRSchedulerPrefs {
   const next = { ...prefs, lastTickAt: new Date().toISOString() };
   saveCoreRSchedulerPrefs(next);
   return next;
 }
 
-export function coreRSchedulerDue(prefs: CoreRSchedulerPrefs, nowMs = Date.now()): boolean {
+export function coreRSchedulerDue(
+  prefs: CoreRSchedulerPrefs,
+  nowMs = Date.now(),
+): boolean {
   if (!prefs.enabled) return false;
   if (!prefs.lastTickAt) return true;
   const last = Date.parse(prefs.lastTickAt);
@@ -135,7 +153,7 @@ export function resolveCoreRSchedulerListId(opts: {
   );
 }
 
-export const CORE_R_SCHEDULER_EVENT = 'bolsa-core-r-scheduler-tick';
+export const CORE_R_SCHEDULER_EVENT = "bolsa-core-r-scheduler-tick";
 
 export type CoreRSchedulerTickDetail = {
   listId: string;

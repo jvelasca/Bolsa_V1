@@ -17,23 +17,28 @@
  * @see docs/engineering/operativa-test-plan-2026-07-31.md
  */
 
-import type { FullCycleSettleReason } from '@/features/backtests/backtest-list-auto';
-import type { ListAutoChangeKind } from '@/features/backtests/backtest-list-auto-board';
-import { strategyMonitorChecklistHref } from '@/features/backtests/strategy-monitor';
-import { instrumentTopBacktestsHref } from '@/features/backtests/instrument-strategy-top-panel';
+import type { FullCycleSettleReason } from "@/features/backtests/backtest-list-auto";
+import type { ListAutoChangeKind } from "@/features/backtests/backtest-list-auto-board";
+import { strategyMonitorChecklistHref } from "@/features/backtests/strategy-monitor";
+import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
 
-export const CORE_R_ENGINE = 'core-r-v0';
-export const CORE_R_REPORT_KEY = 'bolsa-core-r-report-v1';
+export const CORE_R_ENGINE = "core-r-v0";
+export const CORE_R_REPORT_KEY = "bolsa-core-r-report-v1";
 
 export type CoreRVerdict =
-  | 'keep'
-  | 'fresh_ok'
-  | 'review_lab'
-  | 'consider_replace'
-  | 'profile_mismatch'
-  | 'skipped_weak';
+  | "keep"
+  | "fresh_ok"
+  | "review_lab"
+  | "consider_replace"
+  | "profile_mismatch"
+  | "skipped_weak";
 
-export type CoreRActionId = 'lab' | 'checklist' | 'propose_f3' | 'finalists' | 'none';
+export type CoreRActionId =
+  | "lab"
+  | "checklist"
+  | "propose_f3"
+  | "finalists"
+  | "none";
 
 export type CoreRAction = {
   id: CoreRActionId;
@@ -112,27 +117,29 @@ export type CoreRReport = {
 
 export function coreRVerdictLabel(v: CoreRVerdict): string {
   switch (v) {
-    case 'keep':
-      return 'Mantener';
-    case 'fresh_ok':
-      return 'Fresco OK';
-    case 'review_lab':
-      return 'Revisar Lab';
-    case 'consider_replace':
-      return 'Valorar cambio';
-    case 'profile_mismatch':
-      return 'Perfil ≠ TOP';
-    case 'skipped_weak':
-      return 'Débil · skip';
+    case "keep":
+      return "Mantener";
+    case "fresh_ok":
+      return "Fresco OK";
+    case "review_lab":
+      return "Revisar Lab";
+    case "consider_replace":
+      return "Valorar cambio";
+    case "profile_mismatch":
+      return "Perfil ≠ TOP";
+    case "skipped_weak":
+      return "Débil · skip";
     default:
       return v;
   }
 }
 
 /** Verdicts that need human follow-up (Lista AUTO «a revisar» · cola Monitor). */
-export function coreRNeedsAction(verdict: CoreRVerdict | null | undefined): boolean {
+export function coreRNeedsAction(
+  verdict: CoreRVerdict | null | undefined,
+): boolean {
   if (!verdict) return false;
-  return verdict !== 'keep' && verdict !== 'fresh_ok';
+  return verdict !== "keep" && verdict !== "fresh_ok";
 }
 
 /** Rows from a saved report that need review. */
@@ -146,30 +153,30 @@ export function listCoreRActionRows(
 /** Heurística: OOS/PBO/credibilidad debilitan el TOP → revisar / valorar cambio. */
 export function coreROosDegradation(
   oos: CoreROosSnap | null | undefined,
-): { level: 'review_lab' | 'consider_replace'; reason: string } | null {
-  if (!oos || !oos.kind || oos.kind === 'none') return null;
-  if (typeof oos.pbo === 'number' && oos.pbo >= 0.5) {
+): { level: "review_lab" | "consider_replace"; reason: string } | null {
+  if (!oos || !oos.kind || oos.kind === "none") return null;
+  if (typeof oos.pbo === "number" && oos.pbo >= 0.5) {
     return {
-      level: 'consider_replace',
+      level: "consider_replace",
       reason: `PBO OOS elevado (${oos.pbo.toFixed(2)}) · riesgo sobreajuste`,
     };
   }
-  const band = (oos.edgeBand ?? '').toLowerCase();
-  if (band === 'weak' || band === 'poor' || band === 'none') {
+  const band = (oos.edgeBand ?? "").toLowerCase();
+  if (band === "weak" || band === "poor" || band === "none") {
     return {
-      level: 'review_lab',
+      level: "review_lab",
       reason: `Edge OOS «${oos.edgeBand}» · revisar Lab`,
     };
   }
-  if (typeof oos.credibility === 'number' && oos.credibility < 0.35) {
+  if (typeof oos.credibility === "number" && oos.credibility < 0.35) {
     return {
-      level: 'review_lab',
+      level: "review_lab",
       reason: `Credibilidad OOS baja (${oos.credibility.toFixed(2)})`,
     };
   }
-  if (typeof oos.oosReturnPct === 'number' && oos.oosReturnPct < 0) {
+  if (typeof oos.oosReturnPct === "number" && oos.oosReturnPct < 0) {
     return {
-      level: 'consider_replace',
+      level: "consider_replace",
       reason: `Retorno OOS negativo (${oos.oosReturnPct.toFixed(1)}%)`,
     };
   }
@@ -192,24 +199,27 @@ export function coreRAccountReturnPct(
  */
 export function coreRPaperPnlDegradation(
   pnl: CoreRPaperPnlSnap | null | undefined,
-): { level: 'review_lab' | 'consider_replace'; reason: string } | null {
+): { level: "review_lab" | "consider_replace"; reason: string } | null {
   if (!pnl || !Number.isFinite(pnl.returnPct)) return null;
   if (pnl.returnPct <= -10) {
     return {
-      level: 'consider_replace',
+      level: "consider_replace",
       reason: `Demo/paper PnL ${pnl.returnPct.toFixed(1)}% vs depósito · valorar cambio`,
     };
   }
   if (pnl.returnPct <= -5) {
     return {
-      level: 'review_lab',
+      level: "review_lab",
       reason: `Demo/paper PnL ${pnl.returnPct.toFixed(1)}% · revisar Lab / checklist`,
     };
   }
   return null;
 }
 
-function checkFailed(audit: CoreRDualAuditSnap | null | undefined, code: string): boolean {
+function checkFailed(
+  audit: CoreRDualAuditSnap | null | undefined,
+  code: string,
+): boolean {
   const checks = audit?.challenge?.checks;
   if (!checks) return false;
   return checks.some((c) => c.code === code && c.passed === false);
@@ -223,46 +233,47 @@ function buildActions(opts: {
   slot1RunId?: string | null;
   hasPaper?: boolean;
 }): CoreRAction[] {
-  const { verdict, instrumentId, timeframe, symbol, slot1RunId, hasPaper } = opts;
+  const { verdict, instrumentId, timeframe, symbol, slot1RunId, hasPaper } =
+    opts;
   const actions: CoreRAction[] = [];
   const finalistsHref = instrumentTopBacktestsHref(instrumentId, timeframe);
   const labHref = `/backtests?tab=jobs&instrumentId=${encodeURIComponent(instrumentId)}&timeframe=${encodeURIComponent(timeframe)}`;
   const proposeHref = `/help?section=ai-platform&focus=supervised-f3${
-    symbol ? `&symbol=${encodeURIComponent(symbol)}` : ''
+    symbol ? `&symbol=${encodeURIComponent(symbol)}` : ""
   }`;
 
-  if (verdict === 'fresh_ok' || verdict === 'keep') {
-    actions.push({ id: 'finalists', label: 'Finalistas', href: finalistsHref });
+  if (verdict === "fresh_ok" || verdict === "keep") {
+    actions.push({ id: "finalists", label: "Finalistas", href: finalistsHref });
     if (hasPaper && slot1RunId) {
       actions.push({
-        id: 'checklist',
-        label: 'Checklist',
+        id: "checklist",
+        label: "Checklist",
         href: strategyMonitorChecklistHref(instrumentId, slot1RunId, timeframe),
       });
     }
-    return actions.length ? actions : [{ id: 'none', label: '—' }];
+    return actions.length ? actions : [{ id: "none", label: "—" }];
   }
 
-  if (verdict === 'profile_mismatch' || verdict === 'skipped_weak') {
-    actions.push({ id: 'finalists', label: 'Ver TOP', href: finalistsHref });
-    actions.push({ id: 'lab', label: 'Lab', href: labHref });
+  if (verdict === "profile_mismatch" || verdict === "skipped_weak") {
+    actions.push({ id: "finalists", label: "Ver TOP", href: finalistsHref });
+    actions.push({ id: "lab", label: "Lab", href: labHref });
     return actions;
   }
 
-  if (verdict === 'review_lab') {
-    actions.push({ id: 'lab', label: 'Lab', href: labHref });
-    actions.push({ id: 'finalists', label: 'Finalistas', href: finalistsHref });
+  if (verdict === "review_lab") {
+    actions.push({ id: "lab", label: "Lab", href: labHref });
+    actions.push({ id: "finalists", label: "Finalistas", href: finalistsHref });
     return actions;
   }
 
   // consider_replace
-  actions.push({ id: 'lab', label: 'Lab', href: labHref });
-  actions.push({ id: 'finalists', label: 'Finalistas', href: finalistsHref });
-  actions.push({ id: 'propose_f3', label: 'Proponer F3', href: proposeHref });
+  actions.push({ id: "lab", label: "Lab", href: labHref });
+  actions.push({ id: "finalists", label: "Finalistas", href: finalistsHref });
+  actions.push({ id: "propose_f3", label: "Proponer F3", href: proposeHref });
   if (slot1RunId) {
     actions.push({
-      id: 'checklist',
-      label: 'Checklist',
+      id: "checklist",
+      label: "Checklist",
       href: strategyMonitorChecklistHref(instrumentId, slot1RunId, timeframe),
     });
   }
@@ -301,25 +312,21 @@ export function judgeCoreR(input: CoreRJudgeInput): CoreRJudgment {
     }),
   });
 
-  if (settleReason === 'skip_fresh') {
-    return mk('fresh_ok', 'Finalistas frescos · sin re-scan (Omitido)');
+  if (settleReason === "skip_fresh") {
+    return mk("fresh_ok", "Finalistas frescos · sin re-scan (Omitido)");
   }
 
-  if (
-    topProfileId &&
-    activeProfileId &&
-    topProfileId !== activeProfileId
-  ) {
+  if (topProfileId && activeProfileId && topProfileId !== activeProfileId) {
     return mk(
-      'profile_mismatch',
-      'TOP stamp de otro perfil · re-Play recomendado (CORE-P)',
+      "profile_mismatch",
+      "TOP stamp de otro perfil · re-Play recomendado (CORE-P)",
     );
   }
 
-  if (settleReason === 'skip_lab') {
+  if (settleReason === "skip_lab") {
     return mk(
-      'skipped_weak',
-      'Coach¹ débil · Lab omitido · Finalistas intactos',
+      "skipped_weak",
+      "Coach¹ débil · Lab omitido · Finalistas intactos",
     );
   }
 
@@ -335,51 +342,57 @@ export function judgeCoreR(input: CoreRJudgeInput): CoreRJudgment {
 
   const confidence = dualAudit?.confidence ?? null;
   const softWeak = Boolean(dualAudit?.softWeak);
-  const beatsBhFailed = checkFailed(dualAudit, 'top_beats_bh');
-  const lateFailed = checkFailed(dualAudit, 'top_late_nonneg');
+  const beatsBhFailed = checkFailed(dualAudit, "top_beats_bh");
+  const lateFailed = checkFailed(dualAudit, "top_late_nonneg");
 
-  if (settleReason === 'skip_finalists') {
-    if (beatsBhFailed || lateFailed || confidence === 'weak' || softWeak) {
+  if (settleReason === "skip_finalists") {
+    if (beatsBhFailed || lateFailed || confidence === "weak" || softWeak) {
       return mk(
-        'consider_replace',
-        'Sin mejora Lab · señales débiles vs B&H/reciente',
+        "consider_replace",
+        "Sin mejora Lab · señales débiles vs B&H/reciente",
       );
     }
-    return mk('review_lab', 'Lab sin Mejor adoptável · revisar espacio / OOS');
+    return mk("review_lab", "Lab sin Mejor adoptável · revisar espacio / OOS");
   }
 
   // saved
-  if (evidenceLevel && evidenceLevel !== 'lab_validated') {
-    return mk('review_lab', 'TOP sin lab_validated · pasa por Lab antes de paper');
+  if (evidenceLevel && evidenceLevel !== "lab_validated") {
+    return mk(
+      "review_lab",
+      "TOP sin lab_validated · pasa por Lab antes de paper",
+    );
   }
 
-  if (confidence === 'weak' || softWeak) {
-    return mk('review_lab', 'Dual-audit débil tras ciclo · Lab / ack');
+  if (confidence === "weak" || softWeak) {
+    return mk("review_lab", "Dual-audit débil tras ciclo · Lab / ack");
   }
 
   if (beatsBhFailed || lateFailed) {
     return mk(
-      'consider_replace',
+      "consider_replace",
       beatsBhFailed
-        ? '#1 no bate B&H · valorar sustituir'
-        : '#1 tramo reciente negativo · valorar sustituir',
+        ? "#1 no bate B&H · valorar sustituir"
+        : "#1 tramo reciente negativo · valorar sustituir",
     );
   }
 
-  if (confidence === 'discrepancy') {
-    return mk('consider_replace', 'Discrepancia A/A2/C · revisar antes de paper');
-  }
-
-  if (change === 'changed' || change === 'new') {
+  if (confidence === "discrepancy") {
     return mk(
-      'keep',
-      change === 'new'
-        ? 'Nuevo TOP lab · mantener y vigilar'
-        : 'Finalistas actualizados · mantener',
+      "consider_replace",
+      "Discrepancia A/A2/C · revisar antes de paper",
     );
   }
 
-  return mk('keep', 'TOP estable · lab_validated · mantener');
+  if (change === "changed" || change === "new") {
+    return mk(
+      "keep",
+      change === "new"
+        ? "Nuevo TOP lab · mantener y vigilar"
+        : "Finalistas actualizados · mantener",
+    );
+  }
+
+  return mk("keep", "TOP estable · lab_validated · mantener");
 }
 
 type ReportStore = Record<string, CoreRReport>;
@@ -389,7 +402,8 @@ function readStore(): ReportStore {
     const raw = localStorage.getItem(CORE_R_REPORT_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
     return parsed as ReportStore;
   } catch {
     return {};
@@ -412,7 +426,9 @@ export function replaceAllCoreRReports(store: ReportStore): void {
   writeStore(store);
 }
 
-export function saveCoreRReport(report: Omit<CoreRReport, 'engine'> & { engine?: string }): CoreRReport {
+export function saveCoreRReport(
+  report: Omit<CoreRReport, "engine"> & { engine?: string },
+): CoreRReport {
   const full: CoreRReport = {
     ...report,
     engine: CORE_R_ENGINE,
@@ -421,11 +437,15 @@ export function saveCoreRReport(report: Omit<CoreRReport, 'engine'> & { engine?:
   store[full.listId] = full;
   writeStore(store);
   // Q3.4 — push BD (lazy import evita ciclo con core-r-sync).
-  void import('@/features/backtests/core-r-sync').then((m) => m.scheduleCoreRPush());
+  void import("@/features/backtests/core-r-sync").then((m) =>
+    m.scheduleCoreRPush(),
+  );
   return full;
 }
 
-export function readCoreRReport(listId: string | null | undefined): CoreRReport | null {
+export function readCoreRReport(
+  listId: string | null | undefined,
+): CoreRReport | null {
   if (!listId) return null;
   const rec = readStore()[listId];
   if (!rec || rec.engine !== CORE_R_ENGINE) return null;
@@ -452,9 +472,9 @@ export function buildCoreRPaperPnlReviewRow(opts: {
   const hit = coreRPaperPnlDegradation(opts.pnl);
   if (!hit) return null;
   const judgment = judgeCoreR({
-    settleReason: 'saved',
-    change: 'same',
-    evidenceLevel: 'lab_validated',
+    settleReason: "saved",
+    change: "same",
+    evidenceLevel: "lab_validated",
     paperPnl: opts.pnl,
     hasPaper: true,
     slot1RunId: opts.slot1RunId,
