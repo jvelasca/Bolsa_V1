@@ -3,10 +3,10 @@
  * No pisa Finalistas operativos (F-hoy) en BD.
  */
 
-import type { InstrumentStrategyTopSlotV1 } from '@bolsa/shared';
+import type { InstrumentStrategyTopSlotV1 } from "@bolsa/shared";
 
-export const DIA_D_EXPERIMENT_TOP_KEY = 'bolsa-dia-d-experiment-top-v1';
-export const DIA_D_EXPERIMENT_TOP_ENGINE = 'dia-d-experiment-top-v1' as const;
+export const DIA_D_EXPERIMENT_TOP_KEY = "bolsa-dia-d-experiment-top-v1";
+export const DIA_D_EXPERIMENT_TOP_ENGINE = "dia-d-experiment-top-v1" as const;
 
 export type DiaDExperimentTop1Ref = {
   strategyDefinitionId: string | null;
@@ -64,20 +64,22 @@ function emptyStore(): DiaDExperimentTopStore {
 }
 
 export function readDiaDExperimentTopStore(): DiaDExperimentTopStore {
-  if (typeof localStorage === 'undefined') return emptyStore();
+  if (typeof localStorage === "undefined") return emptyStore();
   try {
     const raw = localStorage.getItem(DIA_D_EXPERIMENT_TOP_KEY);
     if (!raw) return emptyStore();
     const parsed = JSON.parse(raw) as DiaDExperimentTopStore;
-    if (!parsed?.byKey || typeof parsed.byKey !== 'object') return emptyStore();
+    if (!parsed?.byKey || typeof parsed.byKey !== "object") return emptyStore();
     return { engine: DIA_D_EXPERIMENT_TOP_ENGINE, byKey: parsed.byKey };
   } catch {
     return emptyStore();
   }
 }
 
-export function writeDiaDExperimentTopStore(store: DiaDExperimentTopStore): void {
-  if (typeof localStorage === 'undefined') return;
+export function writeDiaDExperimentTopStore(
+  store: DiaDExperimentTopStore,
+): void {
+  if (typeof localStorage === "undefined") return;
   localStorage.setItem(
     DIA_D_EXPERIMENT_TOP_KEY,
     JSON.stringify({ engine: DIA_D_EXPERIMENT_TOP_ENGINE, byKey: store.byKey }),
@@ -104,8 +106,9 @@ export function saveDiaDExperimentTop(input: {
     productionTop1AtSave: input.productionTop1AtSave ?? null,
   };
   const store = readDiaDExperimentTopStore();
-  store.byKey[diaDExperimentKey(input.instrumentId, input.timeframe, input.asOfDiaD)] =
-    record;
+  store.byKey[
+    diaDExperimentKey(input.instrumentId, input.timeframe, input.asOfDiaD)
+  ] = record;
   // Cap: últimos 40 experimentos
   const keys = Object.keys(store.byKey);
   if (keys.length > 40) {

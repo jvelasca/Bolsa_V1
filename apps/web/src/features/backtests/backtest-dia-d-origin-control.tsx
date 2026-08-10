@@ -3,11 +3,11 @@
  * Hoy ↔ DÍA D + fecha concreta + carrusel (predeterminados / personalizados) + menú (…).
  */
 
-import { ChevronDown, ChevronLeft, ChevronRight, Star } from 'lucide-react';
-import { useEffect, useId, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
-import { DiaDCarouselMenu } from '@/features/backtests/dia-d-carousel-menu';
+import { ChevronDown, ChevronLeft, ChevronRight, Star } from "lucide-react";
+import { useEffect, useId, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { DiaDCarouselMenu } from "@/features/backtests/dia-d-carousel-menu";
 import {
   addCustomDiaD,
   formatDiaDDisplay,
@@ -16,13 +16,13 @@ import {
   saveDiaDCarouselPrefs,
   startOfLocalYearIso,
   type DiaDCarouselPrefs,
-} from '@/features/backtests/dia-d-favorites';
+} from "@/features/backtests/dia-d-favorites";
 import {
   effectiveDiaD,
   isDiaDInPast,
   todayIsoDate,
-} from '@/features/backtests/backtest-period';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/backtest-period";
+import { cn } from "@/lib/utils";
 
 type Props = {
   diaD: string;
@@ -39,7 +39,7 @@ export function BacktestDiaDOriginControl({
   const [prefs, setPrefs] = useState<DiaDCarouselPrefs>(() =>
     loadDiaDCarouselPrefs(),
   );
-  const [customLabel, setCustomLabel] = useState('');
+  const [customLabel, setCustomLabel] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -55,13 +55,13 @@ export function BacktestDiaDOriginControl({
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === "Escape") setOpen(false);
     };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
     };
   }, [open]);
 
@@ -71,26 +71,26 @@ export function BacktestDiaDOriginControl({
   }
 
   function selectToday() {
-    onDiaDChange('');
+    onDiaDChange("");
   }
 
   function selectDiaD(iso: string) {
-    const next = iso === today ? '' : iso;
+    const next = iso === today ? "" : iso;
     onDiaDChange(next);
   }
 
   function addActiveToCarousel() {
     if (!past) return;
     persistPrefs(addCustomDiaD(prefs, active, customLabel || undefined));
-    setCustomLabel('');
+    setCustomLabel("");
   }
 
   function scrollBy(delta: number) {
-    scrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
+    scrollRef.current?.scrollBy({ left: delta, behavior: "smooth" });
   }
 
   return (
-    <div ref={rootRef} className={cn('relative', className)}>
+    <div ref={rootRef} className={cn("relative", className)}>
       <button
         type="button"
         aria-expanded={open}
@@ -102,10 +102,10 @@ export function BacktestDiaDOriginControl({
         }
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'inline-flex max-w-full items-center gap-1.5 rounded-md border px-2.5 py-1 text-left text-xs font-medium transition-colors',
+          "inline-flex max-w-full items-center gap-1.5 rounded-md border px-2.5 py-1 text-left text-xs font-medium transition-colors",
           past
-            ? 'border-red-600 bg-red-600 text-white shadow-sm ring-2 ring-red-500/50 dark:border-red-500 dark:bg-red-600 dark:ring-red-400/40'
-            : 'border-border bg-muted/40 text-foreground hover:bg-muted/70',
+            ? "border-red-600 bg-red-600 text-white shadow-sm ring-2 ring-red-500/50 dark:border-red-500 dark:bg-red-600 dark:ring-red-400/40"
+            : "border-border bg-muted/40 text-foreground hover:bg-muted/70",
         )}
       >
         <span className="min-w-0 truncate tabular-nums">
@@ -124,7 +124,7 @@ export function BacktestDiaDOriginControl({
           )}
         </span>
         <ChevronDown
-          className={cn('size-3.5 shrink-0 opacity-70', open && 'rotate-180')}
+          className={cn("size-3.5 shrink-0 opacity-70", open && "rotate-180")}
           aria-hidden
         />
       </button>
@@ -137,18 +137,18 @@ export function BacktestDiaDOriginControl({
           className="absolute left-0 top-[calc(100%+6px)] z-40 w-[min(100vw-2rem,28rem)] rounded-lg border border-border bg-background p-3 text-foreground shadow-lg ring-1 ring-black/10 dark:bg-zinc-950 dark:ring-white/10"
         >
           <p className="text-[11px] leading-snug text-muted-foreground">
-            Carrusel como en Listas: predeterminados con (…) y fechas propias con
-            Añadir ★ (editables/borrables en el menú).
+            Carrusel como en Listas: predeterminados con (…) y fechas propias
+            con Añadir ★ (editables/borrables en el menú).
           </p>
 
           <div className="mt-2.5 flex gap-1 rounded-md border border-border bg-muted p-0.5">
             <button
               type="button"
               className={cn(
-                'flex-1 rounded px-2 py-1.5 text-[11px] font-medium',
+                "flex-1 rounded px-2 py-1.5 text-[11px] font-medium",
                 !past
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'bg-transparent text-muted-foreground hover:text-foreground',
+                  ? "bg-background text-foreground shadow-sm"
+                  : "bg-transparent text-muted-foreground hover:text-foreground",
               )}
               onClick={() => selectToday()}
             >
@@ -157,10 +157,10 @@ export function BacktestDiaDOriginControl({
             <button
               type="button"
               className={cn(
-                'flex-1 rounded px-2 py-1.5 text-[11px] font-medium',
+                "flex-1 rounded px-2 py-1.5 text-[11px] font-medium",
                 past
-                  ? 'bg-amber-100 text-amber-950 shadow-sm dark:bg-amber-900 dark:text-amber-50'
-                  : 'bg-transparent text-muted-foreground hover:text-foreground',
+                  ? "bg-amber-100 text-amber-950 shadow-sm dark:bg-amber-900 dark:text-amber-50"
+                  : "bg-transparent text-muted-foreground hover:text-foreground",
               )}
               onClick={() => {
                 if (!past) selectDiaD(startOfLocalYearIso());
@@ -200,14 +200,18 @@ export function BacktestDiaDOriginControl({
                       title={`${chip.label} → ${formatDiaDDisplay(chip.iso)}`}
                       onClick={() => selectDiaD(chip.iso)}
                       className={cn(
-                        'shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors',
+                        "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
                         isActive
-                          ? 'border-amber-600 bg-amber-100 text-amber-950 dark:border-amber-500 dark:bg-amber-900 dark:text-amber-50'
-                          : 'border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground dark:bg-zinc-900',
-                        chip.kind === 'custom' && !isActive && 'border-amber-500/35',
+                          ? "border-amber-600 bg-amber-100 text-amber-950 dark:border-amber-500 dark:bg-amber-900 dark:text-amber-50"
+                          : "border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground dark:bg-zinc-900",
+                        chip.kind === "custom" &&
+                          !isActive &&
+                          "border-amber-500/35",
                       )}
                     >
-                      <span className="max-w-[9rem] truncate">{chip.label}</span>
+                      <span className="max-w-[9rem] truncate">
+                        {chip.label}
+                      </span>
                     </button>
                   );
                 })
@@ -250,25 +254,27 @@ export function BacktestDiaDOriginControl({
               <Button
                 type="button"
                 size="sm"
-                variant={activeInCustoms ? 'outline' : 'default'}
+                variant={activeInCustoms ? "outline" : "default"}
                 className="h-8 gap-1 px-2.5 text-[10px]"
                 disabled={!past}
                 title={
                   past
                     ? activeInCustoms
-                      ? 'Ya está en personalizados (edítalo en …)'
-                      : 'Añadir al carrusel como personalizado'
-                    : 'Elige una fecha pasada'
+                      ? "Ya está en personalizados (edítalo en …)"
+                      : "Añadir al carrusel como personalizado"
+                    : "Elige una fecha pasada"
                 }
                 onClick={addActiveToCarousel}
               >
                 <Star
                   className={cn(
-                    'size-3.5',
-                    activeInCustoms ? 'fill-amber-400 text-amber-400' : undefined,
+                    "size-3.5",
+                    activeInCustoms
+                      ? "fill-amber-400 text-amber-400"
+                      : undefined,
                   )}
                 />
-                {activeInCustoms ? 'En carrusel' : 'Añadir ★'}
+                {activeInCustoms ? "En carrusel" : "Añadir ★"}
               </Button>
             </div>
           </div>

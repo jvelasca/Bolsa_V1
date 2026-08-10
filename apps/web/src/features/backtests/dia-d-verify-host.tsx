@@ -3,9 +3,9 @@
  * Montado en Backtesting · Análisis técnico (ADR-019 U2).
  */
 
-import { DiaDVerifyBanner } from '@/features/trading/trading-dia-d-banner';
-import { TradingDiaDReplayPanel } from '@/features/trading/trading-dia-d-replay-panel';
-import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
+import { DiaDVerifyBanner } from "@/features/trading/trading-dia-d-banner";
+import { TradingDiaDReplayPanel } from "@/features/trading/trading-dia-d-replay-panel";
+import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
 
 export function DiaDVerifyHost({
   fullBleed = false,

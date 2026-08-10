@@ -3,9 +3,9 @@
  * predeterminados (visibles vía …) + personalizados editables/borrables.
  */
 
-export const DIA_D_CAROUSEL_KEY = 'bolsa-dia-d-carousel-v1';
+export const DIA_D_CAROUSEL_KEY = "bolsa-dia-d-carousel-v1";
 /** Legacy: solo fechas ISO personalizadas. */
-export const DIA_D_FAVORITES_KEY = 'bolsa-dia-d-favorites-v1';
+export const DIA_D_FAVORITES_KEY = "bolsa-dia-d-favorites-v1";
 export const DIA_D_CUSTOM_MAX = 12;
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -19,26 +19,26 @@ export function startOfLocalYearIso(ref: Date = new Date()): string {
 }
 
 function clampPastIso(iso: string, ref: Date = new Date()): string {
-  const today = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}-${String(ref.getDate()).padStart(2, '0')}`;
+  const today = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}-${String(ref.getDate()).padStart(2, "0")}`;
   return iso > today ? today : iso;
 }
 
 export function monthsAgoIso(months: number, ref: Date = new Date()): string {
   const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
   d.setMonth(d.getMonth() - months);
-  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return clampPastIso(iso, ref);
 }
 
 export function yearsAgoIso(years: number, ref: Date = new Date()): string {
   const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
   d.setFullYear(d.getFullYear() - years);
-  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   return clampPastIso(iso, ref);
 }
 
 /** Predeterminados del carrusel (no borrables). */
-export type DiaDPresetId = '3m' | '6m' | '9m' | '1y' | '2y';
+export type DiaDPresetId = "3m" | "6m" | "9m" | "1y" | "2y";
 
 export type DiaDPresetDef = {
   id: DiaDPresetId;
@@ -47,19 +47,19 @@ export type DiaDPresetDef = {
 };
 
 export const DIA_D_PRESETS: readonly DiaDPresetDef[] = [
-  { id: '3m', label: 'Hace 3 meses', resolve: (ref) => monthsAgoIso(3, ref) },
-  { id: '6m', label: 'Hace 6 meses', resolve: (ref) => monthsAgoIso(6, ref) },
-  { id: '9m', label: 'Hace 9 meses', resolve: (ref) => monthsAgoIso(9, ref) },
-  { id: '1y', label: 'Hace 1 año', resolve: (ref) => yearsAgoIso(1, ref) },
-  { id: '2y', label: 'Hace 2 años', resolve: (ref) => yearsAgoIso(2, ref) },
+  { id: "3m", label: "Hace 3 meses", resolve: (ref) => monthsAgoIso(3, ref) },
+  { id: "6m", label: "Hace 6 meses", resolve: (ref) => monthsAgoIso(6, ref) },
+  { id: "9m", label: "Hace 9 meses", resolve: (ref) => monthsAgoIso(9, ref) },
+  { id: "1y", label: "Hace 1 año", resolve: (ref) => yearsAgoIso(1, ref) },
+  { id: "2y", label: "Hace 2 años", resolve: (ref) => yearsAgoIso(2, ref) },
 ] as const;
 
 export const DIA_D_DEFAULT_VISIBLE_PRESETS: readonly DiaDPresetId[] = [
-  '3m',
-  '6m',
-  '9m',
-  '1y',
-  '2y',
+  "3m",
+  "6m",
+  "9m",
+  "1y",
+  "2y",
 ];
 
 export type DiaDCustomEntry = {
@@ -84,8 +84,8 @@ export function defaultDiaDCarouselPrefs(): DiaDCarouselPrefs {
 
 export function formatDiaDDisplay(iso: string): string {
   const raw = iso.trim();
-  if (!isValidDiaDIso(raw)) return raw || '—';
-  const [y, m, d] = raw.split('-');
+  if (!isValidDiaDIso(raw)) return raw || "—";
+  const [y, m, d] = raw.split("-");
   return `${d}/${m}/${y}`;
 }
 
@@ -93,17 +93,18 @@ function sanitizeCustoms(raw: unknown): DiaDCustomEntry[] {
   if (!Array.isArray(raw)) return [];
   const out: DiaDCustomEntry[] = [];
   for (const item of raw) {
-    if (typeof item === 'string' && isValidDiaDIso(item)) {
+    if (typeof item === "string" && isValidDiaDIso(item)) {
       const iso = item.trim();
       if (!out.some((c) => c.iso === iso)) out.push({ iso });
-    } else if (item && typeof item === 'object') {
-      const iso = typeof (item as DiaDCustomEntry).iso === 'string'
-        ? (item as DiaDCustomEntry).iso.trim()
-        : '';
+    } else if (item && typeof item === "object") {
+      const iso =
+        typeof (item as DiaDCustomEntry).iso === "string"
+          ? (item as DiaDCustomEntry).iso.trim()
+          : "";
       if (!isValidDiaDIso(iso)) continue;
       if (out.some((c) => c.iso === iso)) continue;
       const label =
-        typeof (item as DiaDCustomEntry).label === 'string'
+        typeof (item as DiaDCustomEntry).label === "string"
           ? (item as DiaDCustomEntry).label!.trim() || undefined
           : undefined;
       out.push({ iso, label });
@@ -118,14 +119,14 @@ function sanitizeVisiblePresets(raw: unknown): DiaDPresetId[] {
   if (!Array.isArray(raw)) return [...DIA_D_DEFAULT_VISIBLE_PRESETS];
   const out: DiaDPresetId[] = [];
   for (const id of raw) {
-    if (typeof id !== 'string' || !allowed.has(id as DiaDPresetId)) continue;
+    if (typeof id !== "string" || !allowed.has(id as DiaDPresetId)) continue;
     if (!out.includes(id as DiaDPresetId)) out.push(id as DiaDPresetId);
   }
   return out.length > 0 ? out : [...DIA_D_DEFAULT_VISIBLE_PRESETS];
 }
 
 function migrateLegacyFavorites(): DiaDCustomEntry[] {
-  if (typeof localStorage === 'undefined') return [];
+  if (typeof localStorage === "undefined") return [];
   try {
     const raw = localStorage.getItem(DIA_D_FAVORITES_KEY);
     if (!raw) return [];
@@ -137,7 +138,7 @@ function migrateLegacyFavorites(): DiaDCustomEntry[] {
 
 export function loadDiaDCarouselPrefs(): DiaDCarouselPrefs {
   const fallback = defaultDiaDCarouselPrefs();
-  if (typeof localStorage === 'undefined') return fallback;
+  if (typeof localStorage === "undefined") return fallback;
   try {
     const raw = localStorage.getItem(DIA_D_CAROUSEL_KEY);
     if (!raw) {
@@ -158,7 +159,7 @@ export function loadDiaDCarouselPrefs(): DiaDCarouselPrefs {
 }
 
 export function saveDiaDCarouselPrefs(prefs: DiaDCarouselPrefs): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === "undefined") return;
   try {
     const clean: DiaDCarouselPrefs = {
       visiblePresetIds: sanitizeVisiblePresets(prefs.visiblePresetIds),
@@ -238,13 +239,13 @@ export function removeCustomDiaD(
 
 export type DiaDCarouselChip =
   | {
-      kind: 'preset';
+      kind: "preset";
       id: DiaDPresetId;
       label: string;
       iso: string;
     }
   | {
-      kind: 'custom';
+      kind: "custom";
       id: string;
       label: string;
       iso: string;
@@ -259,7 +260,7 @@ export function resolveDiaDCarouselChips(
   for (const preset of DIA_D_PRESETS) {
     if (!prefs.visiblePresetIds.includes(preset.id)) continue;
     chips.push({
-      kind: 'preset',
+      kind: "preset",
       id: preset.id,
       label: preset.label,
       iso: preset.resolve(ref),
@@ -267,7 +268,7 @@ export function resolveDiaDCarouselChips(
   }
   for (const custom of prefs.customs) {
     chips.push({
-      kind: 'custom',
+      kind: "custom",
       id: `custom:${custom.iso}`,
       label: custom.label?.trim() || formatDiaDDisplay(custom.iso),
       iso: custom.iso,
@@ -292,10 +293,7 @@ export function saveDiaDFavorites(dates: string[]): void {
   });
 }
 
-export function addDiaDFavorite(
-  current: string[],
-  iso: string,
-): string[] {
+export function addDiaDFavorite(current: string[], iso: string): string[] {
   const prefs = addCustomDiaD(
     { ...defaultDiaDCarouselPrefs(), customs: sanitizeCustoms(current) },
     iso,

@@ -2,9 +2,9 @@
  * Menú (…) del carrusel DÍA D — predeterminados (checkbox) + personalizados (editar/borrar).
  */
 
-import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { checkboxClassName } from '@/components/ui/dialog';
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { checkboxClassName } from "@/components/ui/dialog";
 import {
   DIA_D_PRESETS,
   formatDiaDDisplay,
@@ -14,9 +14,9 @@ import {
   updateCustomDiaD,
   type DiaDCarouselPrefs,
   type DiaDCustomEntry,
-} from '@/features/backtests/dia-d-favorites';
-import { todayIsoDate } from '@/features/backtests/backtest-period';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/dia-d-favorites";
+import { todayIsoDate } from "@/features/backtests/backtest-period";
+import { cn } from "@/lib/utils";
 
 type Props = {
   prefs: DiaDCarouselPrefs;
@@ -26,8 +26,8 @@ type Props = {
 export function DiaDCarouselMenu({ prefs, onPrefsChange }: Props) {
   const [open, setOpen] = useState(false);
   const [editingIso, setEditingIso] = useState<string | null>(null);
-  const [editIso, setEditIso] = useState('');
-  const [editLabel, setEditLabel] = useState('');
+  const [editIso, setEditIso] = useState("");
+  const [editLabel, setEditLabel] = useState("");
   const menuRef = useRef<HTMLDivElement>(null);
   const today = todayIsoDate();
 
@@ -39,14 +39,14 @@ export function DiaDCarouselMenu({ prefs, onPrefsChange }: Props) {
         setEditingIso(null);
       }
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
   function startEdit(entry: DiaDCustomEntry) {
     setEditingIso(entry.iso);
     setEditIso(entry.iso);
-    setEditLabel(entry.label ?? '');
+    setEditLabel(entry.label ?? "");
   }
 
   function commitEdit() {
@@ -166,7 +166,7 @@ export function DiaDCarouselMenu({ prefs, onPrefsChange }: Props) {
                     <button
                       type="button"
                       title="Editar"
-                      className={cn('rounded p-0.5 hover:bg-muted')}
+                      className={cn("rounded p-0.5 hover:bg-muted")}
                       onClick={() => startEdit(entry)}
                     >
                       <Pencil className="size-3 text-muted-foreground" />
