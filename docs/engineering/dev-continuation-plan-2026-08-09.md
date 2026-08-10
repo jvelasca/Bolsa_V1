@@ -1137,6 +1137,7 @@ Traspaso de entrada: [traspaso-higiene-formato-legacy-entrada-2026-08-10.md](./t
 | 6 | `68c9dac` | `backtests/library` + `strategy-matrix` = **5 files** (`backtest-library-strategy-row`, `backtest-library-tab`, `backtest-strategy-matrix-panel`, `strategy-filter-carousel`, `strategy-matrix-filter-carousel-menu`), diff +630/−471 solo formato. Sin falsos positivos EOL (los 5 con diff real) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 | 7 | `f241872` | `backtests/core-r` = **13 files** (prod + tests: `core-r-adopt-mandate`, `core-r-judgment`, `core-r-remote-toast`, `core-r-scheduler`(+host/tick), `core-r-status`, `core-r-sync`; cada uno también su `.test.ts`), diff +565/−475 solo formato. Sin falsos positivos EOL (los 13 con diff real) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 | 8 | `0a96220` | `backtests/dia-d` = **8 files** (`backtest-dia-d-origin-control`, `dia-d-carousel-menu`, `dia-d-experiment-top`, `dia-d-favorites`(+test), `dia-d-reconciliation`(+test), `dia-d-verify-host`), diff +298/−268 solo formato. Sin falsos positivos EOL (los 8 con diff real) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
+| 9 | `1cb6ee7` | `backtests/assistant` = **17 files** (prod + tests: `assistant-cycle-orchestrator`, `assistant-funnel-map`, `backtest-ai-assistant-panel`, `backtest-assistant-completion`, `backtest-assistant-full-cycle`, `backtest-assistant-plan`, `backtest-assistant-play-chain`(test), `backtest-assistant-prefs`, `backtest-assistant-rail`, `backtest-assistant-steps`; + `assistant-funnel-flow-config`), diff +558/−472 solo formato. Sin falsos positivos EOL (los 17 con diff real) | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ |
 
 **Nota de alcance (features/backtests):** el feature como un todo es **plano y enorme (210 archivos desincronizados)**,
 sin subdirectorios naturales. Se subdivide **por dominio funcional**: el sub-lote `optimize` (2) se eligió por reúnir los
@@ -1150,5 +1151,5 @@ verificando que **no aparecen en `git diff --cached --numstat` tras `git add`**;
 aportan nada y ensucian el diff). Recomendación para el siguiente hilo: tras `--write`, comprobar siempre el staged
 `--numstat` y resetear los sin diff real.
 
-Siguiente lote: otro sub-lote por dominio de `features/backtests` (p. ej. `assistant`/`lab`), después el resto de `apps/web/src` por sub-lotes. Verificación tras cada lote y commit propio. HEAD `0a96220` ·
+Siguiente lote: otro sub-lote por dominio de `features/backtests` (p. ej. `lab`/`optimize` restantes), después el resto de `apps/web/src` por sub-lotes. Verificación tras cada lote y commit propio. HEAD `1cb6ee7` ·
 sincronizado.

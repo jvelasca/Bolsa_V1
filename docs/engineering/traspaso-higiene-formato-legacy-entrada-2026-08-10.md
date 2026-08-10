@@ -64,9 +64,10 @@ docs/legacy debe hacerse **en commits propios de formateo único** (premisa M0/�
 | 6 | `68c9dac` | backtests/library + strategy-matrix | 5 |
 | 7 | `f241872` | backtests/core-r | 13 |
 | 8 | `0a96220` | backtests/dia-d | 8 |
+| 9 | `1cb6ee7` | backtests/assistant | 17 |
 
-**Estado del hilo (2026-08-10):** lotes 1-8 ejecutados bajo+verde. El siguiente hilo retoma por dominio
-(`assistant`/`lab`…) siguiendo el protocolo que incluye el check de falsos positivos EOL (paso 4).
+**Estado del hilo (2026-08-10):** lotes 1-9 ejecutados bajo+verde. El siguiente hilo retoma por dominio
+(`lab`/`optimize` restantes…) siguiendo el protocolo que incluye el check de falsos positivos EOL (paso 4).
 
 ## 6. Documentos fuente de verdad / índices
 
