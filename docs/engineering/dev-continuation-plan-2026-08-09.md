@@ -649,5 +649,8 @@ gap (`19.2.18` vs `19.2.4`) sin poder eliminarlo del todo.
   `Build` ✅ (2m9s). Única anotación: deprecación Node.js 20 de las actions (cosmética, ajena al repo).
   Estado previo: CI **rojo por defectos pre-existentes** (no de M2) en `aa87ad7`/`8e4ee62`.
 
-**Próximo módulo del plan 08-10 (sugerido):** M3 — Capa de dominio (`py/domain` + `application`);
-álternamente el mini-cierre M0 del `B007` de ruff pendiente.
+**Próximo módulo del plan 08-10 (sugerido):** **M3 — Capa de dominio** (`py/domain` + `application`).
+[Traspaso M3 creado](`./traspaso-m3-dominio-2026-08-10.md`) = punto de entrada para el hilo nuevo
+(protocolo sagrado + frentes de coherencia/docstrings/código muerto + batería backend). Alternativa
+opcional/independiente: mini-cierre M0 del `B007` de ruff pendiente
+(`packages/py/infrastructure/tests/test_daily_ops_digest_pdf.py:54`).
