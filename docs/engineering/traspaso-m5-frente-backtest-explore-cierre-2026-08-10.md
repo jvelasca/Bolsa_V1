@@ -1,7 +1,7 @@
 # Traspaso parcial — M5 frente `backtest-explore-panel.tsx` (feature-slicing área Coach/TOP) · pasos E.1+E.2+E.3+E.4
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `e079a3f` (paso E.4: BacktestExploreAtOutlook) · árbol limpio · pasos Lab `8ae445b` · Coach `d3315e8` ·
+**HEAD:** `4e74f54` (handoff E.5) · árbol limpio · pasos Lab `8ae445b` · Coach `d3315e8` ·
 trading-dia-d B.1 `1303610` · B.2 `041457f` · B.3 `a8fede3` · backtest-explore E.1 `5dae5da` · E.2 `72061fd` ·
 E.3 `fbf1ad0` · E.4 `e079a3f`
 **Origen:** [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md)
