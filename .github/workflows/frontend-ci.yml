@@ -40,6 +40,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # @bolsa/web consume @bolsa/shared via su dist/ (main/types -> ./dist/*),
+      # que NO esta commiteado. En checkout limpio hay que construirlo antes,
+      # si no el typecheck/test/build del web no resuelven el paquete workspace.
+      - name: Build shared
+        run: pnpm --filter @bolsa/shared build
+
       - name: Typecheck
         run: pnpm --filter @bolsa/web typecheck
 
