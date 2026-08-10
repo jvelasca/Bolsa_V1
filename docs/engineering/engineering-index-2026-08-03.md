@@ -65,6 +65,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m5-frente-list-values-instruments-cierre-2026-08-10.md ← M5 frentes list-values/instruments: FASE 1 + I.1+I.2 extraídos (ListSearchBox, ListSelectionToolbar) · list-values 1.395→1.242 · instruments CERRADO como ya feature-sliced · M5 en pausa
 │   ├── traspaso-m5-frente-create-account-wizard-cierre-2026-08-10.md ← M5 frente create-account-wizard: C.1–C.5 extraídos (IdentityStep, CapitalStep, CommissionsStep, TaxStep, ReviewStep) · 791→632 · profile excluido por alto acoplamiento · M5 en pausa
 │   ├── traspaso-m5-frente-optimize-panel-entrada-2026-08-10.md ← M5 frente backtest-optimize-panel (2.168): ENTRADA con FASE 1 hecha (7 islas data-only bajo riesgo) · primera ola sugerida C-OPT.1–C-OPT.4
+│   ├── traspaso-m5-frente-optimize-panel-cierre-2026-08-10.md ← M5 frente backtest-optimize-panel: CIERRE PARCIAL ola 1 data-only (C-OPT.4 cardheader + C-OPT.1 summarystrip/emptytip + C-OPT.2 WF/Edge/CPCV cards) · 2168→1935 
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)

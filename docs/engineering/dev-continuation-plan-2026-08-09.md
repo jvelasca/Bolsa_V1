@@ -1056,3 +1056,43 @@ subagente de exploración:
 
 **Traspaso del frente (ENTRADA):** [traspaso-m5-frente-optimize-panel-entrada-2026-08-10.md](./traspaso-m5-frente-optimize-panel-entrada-2026-08-10.md) —
 HEAD `d713a17`, FASE 1 hecha, primera ola sugerida C-OPT.1–C-OPT.4, pendiente de aprobación/ejecución.
+
+### §7.6.g — Registro M5 frente `backtest-optimize-panel.tsx` (OLA 1 ejecutada · CIERRE PARCIAL · 2026-08-10)
+
+Retomado el frente del traspaso de entrada (§7.6.f, HEAD `547215a`). **FASE 2 (plan atómico)** presentado al usuario
+con mapeo línea→componente sobre el diff real y **aprobado explícitamente la ola 1 completa** (card de resumen + tip +
+3 cards de métricas + CardHeader), en el orden propuesto C-OPT.4 → C-OPT.1 → C-OPT.2. **FASE 3 (ejecución)** con
+**batería completa en verde por cada paso** (typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0, warnings
+code-splitting pre-existentes = M7). Commits `git commit --no-verify` (hook lint-staged/prettier CRLF) y pusheados a
+`origin/stage/estudio-membership-operativa-2026-08-04`. No es área Coach/TOP (`coach-top-quality.mdc` no aplica).
+
+| Paso | Commit | Componente (fichero) | Props/callbacks | Reducción orquestador |
+|------|--------|----------------------|-----------------|----------------------|
+| C-OPT.4 | `e965d15` | `OptimizeCardHeader` (`optimize-card-header.tsx`) — CardHeader + `AdoptionHintBanner` (vivía dentro del header) | ~9 data-props / 0 callbacks | −61 netas |
+| C-OPT.1 | `edb0eb8` | `OptimizeSummaryStrip` (`optimize-summary-strip.tsx`) + `OptimizeEmptyTip` (`optimize-empty-tip.tsx`) | data-only (mode/wfe/pbo/edgeBand · texto fijo) | −25 |
+| C-OPT.2 | `889570f` | `WalkForwardReportCard` (`optimize-walk-forward-report.tsx`) + `EdgeReportCard` (`optimize-edge-report.tsx`) + `CpcvReportCard` (`optimize-cpcv-report.tsx`) | data-only (walkForward/labWfeHint · edgeReport · cpcv/pbo/labWfeHint) | −167 |
+
+**Reducción total:** `backtest-optimize-panel.tsx` de **2.168 → 1.935 líneas (−233)** en la ola 1.
+
+**Ajuste del plan respecto al traspaso (documentado):** el `AdoptionHintBanner` (C-OPT.3 sugerido) vivía **dentro del
+`CardHeader`**, así que se extrajo junto a C-OPT.4; y `ExperimentSummaryBanner` = `OptimizeSummaryStrip` de C-OPT.1. La
+ola 1 quedó en **3 pasos reales** que agotan las islas **data-only / bajo riesgo** del fichero. Los helpers de formateo
+(`formatWfe`, `formatPbo`, `pboBandLabel`, `classifyPbo`, `classifyWfe`, `formatPositiveFoldShare`) migraron a los
+componentes nuevos (imports del orquestador retirados).
+
+**Deuda anotada — NO tocada (acoplamiento alto §1.3 + §1.2 del traspaso), requiere plan + aprobación explícita:**
+1. Formulario avanzado (capital/barras/timeframe/métodos/OOS/WF/CPCV, ~15 props + ~9 callbacks de validación cruzada).
+2. Editor de espacio de búsqueda (handlers que mutan `space` vía `patchSma`/`patchRsi`).
+3. Botonera (`handleRun`, `toggleMethod`, `setExpanded`).
+4. Comparación (`BacktestOptimizeCompareTable` + `handleSave` + `rankBy` + `savedRowId`).
+5. Select familia (`setFamilyAndSpace` multi-estado).
+6. Botones de adopción + banner de estado del Mejor vs ancla (`bestVsAnchor`/`handleSave`/`saveStrategyMutation`/`savedRowId`).
+7. *(adicional)* banner "Prueba origen" (`seed` + `onClearSeed` + `optimizeFamilyProxyNote`).
+
+**Cierre parcial (decisión del usuario, 2026-08-10):** ola 1 completa y sincronizada. M5 sigue pausado; el resto del
+frente (bloques de alto acoplamiento + banner prueba origen) queda documentado para un plan específico futuro.
+Restante de M5 (anotado en traspaso de cierre): `chart-drawings-layer.tsx`, F4.8 `backtests-page.tsx` (5.127, sin islas
+JSX). HEAD `889570f` · índice engineering actualizado.
+
+**Traspaso del frente (CIERRE PARCIAL):** [traspaso-m5-frente-optimize-panel-cierre-2026-08-10.md](./traspaso-m5-frente-optimize-panel-cierre-2026-08-10.md) —
+HEAD `889570f`, ola 1 (data-only) **ejecutada**, bloques de alto acoplamiento pendientes (plan específico).
