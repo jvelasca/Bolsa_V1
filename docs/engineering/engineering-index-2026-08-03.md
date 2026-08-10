@@ -62,6 +62,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md ← M5 frente trading-dia-d: B.1+B.2+B.3 extraídos (DiaDTradesPanel, DiaDPendingTradeBanner, DiaDSessionReportPanel) · frente CERRADO
 │   ├── traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md ← M5 frente backtest-explore (área Coach/TOP): E.1+E.2+E.3+E.4+E.5 extraídos (BH, Header, BatteryTable, AtOutlook, StarsGrid) · frente CERRADO · M5 en pausa
 │   ├── traspaso-m5-continuacion-orquestacion-2026-08-10.md      ← M5 continuación: FASE 1 orquestación list-values-panel (1.395) / instruments-page (1.222) · punto de entrada del siguiente hilo
+│   ├── traspaso-m5-frente-list-values-instruments-cierre-2026-08-10.md ← M5 frentes list-values/instruments: FASE 1 + I.1+I.2 extraídos (ListSearchBox, ListSelectionToolbar) · list-values 1.395→1.242 · instruments CERRADO como ya feature-sliced · M5 en pausa
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)

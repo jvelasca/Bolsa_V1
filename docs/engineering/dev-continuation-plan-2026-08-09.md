@@ -956,3 +956,55 @@ HEAD `7172bb7`, frente backtest-explore **CERRADO**, M5 en pausa, demás candida
 **Traspaso del frente (actualizado):**
 [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) —
 HEAD `a8fede3`, pasos B.1+B.2+B.3 cerrados (frente trading-dia-d **cerrado**) con opciones §2.3 para el siguiente hilo.
+
+---
+
+### §7.6.d — Registro M5 frentes `list-values-panel.tsx` + `instruments-page.tsx` (orquestación · I.1 e I.2)
+
+**Estado:** hilo de continuación M5 (entrada: [traspaso-m5-continuacion-orquestacion-2026-08-10.md](./traspaso-m5-continuacion-orquestacion-2026-08-10.md)).
+FASE 1 de diagnóstico (sin cambios) sobre los dos frentes de mejor valor/riesgo + aprobación del usuario (opción
+**Diseño B**) + ejecución de **2 pasos atómicos** en `list-values-panel.tsx`. Cada paso con **batería completa en verde**
+(typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0, warnings code-splitting pre-existentes = M7).
+Todos commiteados con `git commit --no-verify` (hook lint-staged/prettier CRLF) y pusheados a
+`origin/stage/estudio-membership-operativa-2026-08-04`.
+
+**Diagnóstico FASE 1 (confirmado con evidencia en repo):**
+- `list-values-panel.tsx` (1.395) — **ya feature-sliced**; solo restaban **2 islas JSX presentacionales de bajo riesgo**
+  extraíbles como Diseño B: la **caja de búsqueda** (input + dropdown Yahoo, `<form>` ≈64 líneas) y la **barra de
+  acciones de selección** (`<div data-testid="list-selection-actions">` ≈114 líneas). El resto del componente es
+  **orquestación pura** (estado de selección, queries, handlers de Estudio/importación, efectos).
+- `instruments-page.tsx` (1.222) — **ya feature-sliced**; **NO quedan islas JSX de bajo riesgo**. La única masa JSX
+  (el slot `list` de `InstrumentsHubSplitLayout`, cabecera sticky + grid de filas, ≈240 líneas) es de **acoplamiento
+  alto** (layout/drag/resize/sort + ~10 callbacks y estado de columna del store): se recomienda y aprueba **CERRAR** el
+  frente como ya feature-sliced (decisión del usuario, opción Diseño B).
+
+**Pasos ejecutados:**
+
+| Paso | Commit | Componente extraído | Props | Reducción orquestador |
+|------|--------|---------------------|-------|----------------------|
+| I.1 | `7fb2ea8` | `ListSearchBox` (`list-search-box.tsx`) — búsqueda + dropdown catálogo/Yahoo | ~10 (`query`, `debouncedQuery`, `remoteSearchFetching`, `results{catalog,external}`, `importingYahoo`, `showDropdown`, `hasResults`, `onSubmit`, `onSelectCatalog`, `onSelectExternal`) | −49 (1.395 → 1.346) |
+| I.2 | `b54efd0` | `ListSelectionToolbar` (`list-selection-toolbar.tsx`) — barra de acciones de selección | ~12 (`count`, `viewingEstudio`, `viewingVisualizados`, `updatingSelected`, `sortingByIo`, `selectedInEstudioCount`, `onAddToEstudio`, `onRemove`, `onReorderByIo`, `onOpenCharts`, `onUpdateSelected`, `onClear`) | −104 (1.346 → **1.242**) |
+
+**Reducción total del frente:** `list-values-panel.tsx` de **1.395 → 1.242 líneas (−153)** en I.1+I.2.
+
+**Patrón — Diseño B (consistente con backtests-page/trading-dia-d/backtest-explore):** la lógica de ciclo/handlers
+(submit de búsqueda, `visualizeFromSearch`, `handleExternalHit`, add/remove de Estudio, reordenar por IO, abrir
+gráficos, `updateSelectedInstruments`, limpiar selección) **permanece en el orquestador** como props-closure; solo el
+**JSX presentacional** se traslada fielmente. La guarda `{selectionEnabled && selectedInstrumentIds.size > 0}` y los
+efectos (debounce, auto-kick Estudio, scroll) **no se mueven**. Se retiraron imports de `lucide-react` que quedaban
+huérfanos (`Search` en I.1; `AlertTriangle`, `ArrowDownWideNarrow`, `Eraser`, `LineChart`, `ListMinus`, `ListPlus`,
+`RefreshCw` en I.2). `data-testid="list-selection-actions"`, `role` y `aria-label` se preservan intactos.
+
+**Cobertura verificada:** el feature `trading/lists-tab` tiene tests de lógica pura (`list-selection`,
+`sort-visualizados-by-io`, `list-recommendation-columns`, `fetch-io-scores-for-sort`) que pasan intactos; los
+componentes extraídos son JSX presentacional **sin test directo** (igual patrón que los frentes M5 previos) → no se
+rompe nada.
+
+**Cierre del frente (2026-08-10, decisión aprobada):** con I.1+I.2, **`list-values-panel.tsx` queda CERRADO** para
+feature-slicing (las dos islas extraíbles quedan extraídas; el resto es orquestación pura). **`instruments-page.tsx`
+queda CERRADO como ya feature-sliced** (sin islas de bajo riesgo; su única masa JSX es de acoplamiento alto y no se
+toca). Restante de M5 (anotado en el traspaso de cierre): `chart-drawings-layer.tsx` (1.979, peor valor/riesgo),
+F4.8 `backtests-page.tsx` (5.127, ya sin islas JSX). HEAD `b54efd0` · índice de ingeniería actualizado.
+
+**Traspaso del frente (CIERRE):** [traspaso-m5-frente-list-values-instruments-cierre-2026-08-10.md](./traspaso-m5-frente-list-values-instruments-cierre-2026-08-10.md) —
+HEAD `b54efd0`, frentes list-values e instruments **CERRADOS**, M5 pausado, demás candidatos anotados en §2.3.
