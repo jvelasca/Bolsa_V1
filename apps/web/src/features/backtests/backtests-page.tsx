@@ -112,8 +112,6 @@ import {
   createListAutoCampaign,
   filterListAutoIdsWithoutFinalists,
   listAutoBatchCount,
-  listAutoBatchProgressLabel,
-  listAutoOverCapWarning,
   advanceListAutoAfterSettle,
   listAutoDoneStatus,
   listAutoPausedStatus,
@@ -289,6 +287,7 @@ import { BacktestResultFundamental } from "@/features/backtests/backtest-result-
 import { BacktestResultRanking } from "@/features/backtests/backtest-result-ranking";
 import { BacktestWizardMassCompare } from "@/features/backtests/backtest-wizard-mass-compare";
 import { BacktestWizardAdvancedOptions } from "@/features/backtests/backtest-wizard-advanced-options";
+import { BacktestWizardListAuto } from "@/features/backtests/backtest-wizard-list-auto";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
@@ -4037,134 +4036,22 @@ export function BacktestsPage() {
 
                       {universeMode === "list" ? (
                         <>
-                          <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2">
-                            <p className="text-[11px] font-medium text-foreground">
-                              Lista AUTO · Play
-                            </p>
-                            <p className="text-[10px] leading-snug text-muted-foreground">
-                              {listAutoUniverseHint()}
-                            </p>
-                            {!assistantPrefs.fullCycleOnPlay ? (
-                              <p className="text-[10px] leading-snug text-amber-700 dark:text-amber-400">
-                                Activa «Play: ciclo completo» en el Asistente
-                                para lanzar Lista AUTO.
-                              </p>
-                            ) : !listId ? (
-                              <p className="text-[10px] leading-snug text-muted-foreground">
-                                Elige una lista arriba y pulsa Play en el
-                                Asistente.
-                              </p>
-                            ) : (
-                              <>
-                                <label className="flex items-start gap-2 text-[10px] leading-snug text-muted-foreground">
-                                  <input
-                                    type="checkbox"
-                                    className="mt-0.5"
-                                    checked={listAutoSkipWithFinalists}
-                                    onChange={(e) =>
-                                      setListAutoSkipWithFinalists(
-                                        e.target.checked,
-                                      )
-                                    }
-                                  />
-                                  <span>
-                                    Solo sin Finalistas (excluye tickers que ya
-                                    tienen TOP; útil en S&P / listas grandes).
-                                  </span>
-                                </label>
-                                <label className="flex items-start gap-2 text-[10px] leading-snug text-muted-foreground">
-                                  <input
-                                    type="checkbox"
-                                    className="mt-0.5"
-                                    checked={
-                                      assistantPrefs.listAutoSkipOverCapConfirm
-                                    }
-                                    onChange={(e) =>
-                                      updateAssistantPrefs({
-                                        ...assistantPrefs,
-                                        listAutoSkipOverCapConfirm:
-                                          e.target.checked,
-                                      })
-                                    }
-                                  />
-                                  <span>
-                                    No preguntar al superar ~
-                                    {LIST_AUTO_BATCH_SIZE} (tandas encadenadas;
-                                    N &gt; 200 siempre confirma).
-                                  </span>
-                                </label>
-                                <p className="text-[10px] leading-snug text-muted-foreground">
-                                  {listDetail?.instrumentIds.length ?? 0} valor
-                                  {(listDetail?.instrumentIds.length ?? 0) === 1
-                                    ? ""
-                                    : "es"}{" "}
-                                  en cola
-                                  {(listDetail?.instrumentIds.length ?? 0) >
-                                  LIST_AUTO_BATCH_SIZE
-                                    ? ` · ${listAutoBatchCount(listDetail?.instrumentIds.length ?? 0)} tandas`
-                                    : ""}
-                                  {listAutoSkipWithFinalists
-                                    ? " (antes del filtro)"
-                                    : ""}
-                                  . Pulsa Play — no elijas estrategia.
-                                </p>
-                                {(() => {
-                                  const warn = listAutoOverCapWarning(
-                                    listDetail?.instrumentIds.length ?? 0,
-                                  );
-                                  return warn ? (
-                                    <p className="text-[10px] leading-snug text-amber-700 dark:text-amber-400">
-                                      {warn}
-                                    </p>
-                                  ) : null;
-                                })()}
-                                <p className="text-[10px] leading-snug text-muted-foreground">
-                                  Reanalizar aquí (LAB) no cambia Trading: el
-                                  mandato solo cambia si aceptas una propuesta
-                                  CORE-R en Monitor (o lo cambias a mano).
-                                </p>
-                              </>
-                            )}
-                            {listAutoBoard ? (
-                              <BacktestListAutoBoardPanel
-                                board={listAutoBoard}
-                                compact
-                                selectedInstrumentId={instrumentId || null}
-                                onSelectInstrument={openInstrumentInValor}
-                                campaignControls={
-                                  !listAutoBoard.done && !listAutoBoard.aborted
-                                    ? {
-                                        canPause: !listAutoBoard.paused,
-                                        canResume:
-                                          listAutoBoard.paused &&
-                                          !listAutoBoard.rows.some(
-                                            (r) => r.phase === "running",
-                                          ),
-                                        canStop: true,
-                                        onPause: pauseListAuto,
-                                        onResume: resumeListAuto,
-                                        onStop: stopListAuto,
-                                        onForceRescanRemaining:
-                                          forceListAutoRescanRemaining,
-                                      }
-                                    : undefined
-                                }
-                              />
-                            ) : listAutoUi ? (
-                              <p
-                                className="text-[11px] font-medium text-foreground"
-                                aria-live="polite"
-                              >
-                                {(() => {
-                                  const tanda = listAutoBatchProgressLabel({
-                                    index: listAutoUi.index,
-                                    total: listAutoUi.total,
-                                  });
-                                  return `${listAutoProgressLabel(listAutoUi)}${tanda ? ` · ${tanda}` : ""} en curso… ↻ cancela.`;
-                                })()}
-                              </p>
-                            ) : null}
-                          </div>
+                          <BacktestWizardListAuto
+                            assistantPrefs={assistantPrefs}
+                            onPrefsChange={updateAssistantPrefs}
+                            listId={listId}
+                            instrumentCount={listDetail?.instrumentIds.length ?? 0}
+                            skipWithFinalists={listAutoSkipWithFinalists}
+                            onSkipWithFinalistsChange={setListAutoSkipWithFinalists}
+                            board={listAutoBoard}
+                            ui={listAutoUi}
+                            selectedInstrumentId={instrumentId || null}
+                            onOpenInstrument={openInstrumentInValor}
+                            onPause={pauseListAuto}
+                            onResume={resumeListAuto}
+                            onStop={stopListAuto}
+                            onForceRescanRemaining={forceListAutoRescanRemaining}
+                          />
 
                           <details className="rounded-md border border-border/60 bg-muted/10">
                             <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[11px] font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden">
