@@ -55,6 +55,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m2-versiones-frontend-2026-08-10.md        ← M2 versiones frontend (@types react) CERRADO 08-10
 │   ├── traspaso-m3-dominio-2026-08-10.md                   ← M3 capa de dominio (py/domain + application) CERRADO 08-10
 │   ├── traspaso-m4-infraestructura-datos-2026-08-10.md     ← M4 infraestructura/modelo datos (Prisma vs SQLAlchemy + Alembic + repos) CERRADO 08-10 · ADR-025
+│   ├── traspaso-m6-ai-analytics-2026-08-10.md              ← M6 AI/analytics (py/ai + py/analytics) pendiente
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)

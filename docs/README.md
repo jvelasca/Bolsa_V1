@@ -48,6 +48,7 @@
 | [engineering/audit-resume-premises-2026-08-09.md](./engineering/audit-resume-premises-2026-08-09.md) | **Premisas de continuación** — auditoría APP (nuevo hilo) |
 | [engineering/dev-continuation-plan-2026-08-09.md](./engineering/dev-continuation-plan-2026-08-09.md) | **Plan de continuación 08-09** — estado + próximos pasos (P3/F4.8/F4.9) |
 | [engineering/general-audit-plan-2026-08-10.md](./engineering/general-audit-plan-2026-08-10.md) | **Auditoría general 08-10** — estructura + docs + plan por módulos |
+| [engineering/traspaso-m6-ai-analytics-2026-08-10.md](./engineering/traspaso-m6-ai-analytics-2026-08-10.md) | **Traspaso M6** — AI/analytics (py/ai + py/analytics) |
 | [engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md) | Triage round 3 (A0·N4·Deep) — O3-C ratificado · secuencia Op→Asesor→Canales |
 | [engineering/audit-pack-estudio-asesor-canales-2026-08-04.md](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) | **Pack auditoría** Estudio→Operativa→Asesor→Canales (+ notif.) previo a AUTO |
 | [engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) | Pack auditoría prep AUTO A0–A5 (flag off) |

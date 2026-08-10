@@ -748,5 +748,7 @@ los ~16 Protocol de `bolsa_domain.repositories`; ~22 repos sin interfaz) · redu
 `application → infrastructure` (centralizado en `dependencies.py`).
 
 **Próximo módulo del plan 08-10 (sugerido):** **M6 — AI/analytics** (`py/ai` doc vs código, motores
-backtest/indicadores) o **M5 — Frontend web por features** (el más grande, a dividir). M7 (dev-stack F3.7)
+backtest/indicadores). **Traspaso M6 creado:** [traspaso-m6-ai-analytics-2026-08-10.md](./traspaso-m6-ai-analytics-2026-08-10.md)
+= punto de entrada para el hilo nuevo (protocolo sagrado + frentes heredados + batería).
+Alternativa posterior: **M5 — Frontend web por features** (el más grande, a dividir). M7 (dev-stack F3.7)
 queda con su plan ya documentado.
