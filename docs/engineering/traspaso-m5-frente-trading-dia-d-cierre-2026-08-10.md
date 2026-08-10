@@ -1,7 +1,8 @@
 # Traspaso parcial — M5 frente `trading-dia-d-replay-panel.tsx` (feature-slicing) · cierre B.1+B.2
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `8c1a4bc` (cabecera traspaso para B.1+B.2) · **Árbol limpio** · paso Lab `8ae445b` · paso Coach `d3315e8`
+**HEAD:** `5d084f9` (traspaso parcial commit doc) · Árbol limpio · pasos: Lab `8ae445b` · Coach `d3315e8` ·
+B.1 `1303610` · B.2 `041457f`
 **Origen:** [traspaso-m5-frente-coach-cierre-2026-08-10.md](./traspaso-m5-frente-coach-cierre-2026-08-10.md) (§2.3
 reorientación a otro frente) + registro **§7.6.b** de
 [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
