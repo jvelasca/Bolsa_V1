@@ -1,5 +1,10 @@
 import { AiInfoButton } from "@/features/ai/ai-info-button";
-import { confidenceLabel, type CoachAuditResultV1, type CoachConfidence, type PriorCoachAuditHint } from "@/features/backtests/coach-dual-audit";
+import {
+  confidenceLabel,
+  type CoachAuditResultV1,
+  type CoachConfidence,
+  type PriorCoachAuditHint,
+} from "@/features/backtests/coach-dual-audit";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -68,41 +73,45 @@ export function BacktestExploreHeader({
         </div>
         <p className="text-[10px] text-muted-foreground">{contextLabel}</p>
         <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
-          Quorum: <strong className="font-medium text-foreground/80">A</strong> ranking ·{' '}
-          <strong className="font-medium text-foreground/80">A2</strong> shadow ·{' '}
-          <strong className="font-medium text-foreground/80">B</strong> auditor ·{' '}
-          <strong className="font-medium text-foreground/80">C</strong> adversario · red-team
-          pre-guardar.
+          Quorum: <strong className="font-medium text-foreground/80">A</strong>{" "}
+          ranking ·{" "}
+          <strong className="font-medium text-foreground/80">A2</strong> shadow
+          · <strong className="font-medium text-foreground/80">B</strong>{" "}
+          auditor ·{" "}
+          <strong className="font-medium text-foreground/80">C</strong>{" "}
+          adversario · red-team pre-guardar.
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {!running && okCount > 0 && audit && (
           <span
             className={cn(
-              'rounded-md border px-1.5 py-0.5 text-[10px] font-medium',
-              confidence === 'consensus' &&
-                'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
-              confidence === 'discrepancy' &&
-                'border-amber-500/40 bg-amber-500/10 text-amber-200',
-              confidence === 'weak' && 'border-amber-500/40 bg-amber-500/10 text-amber-200',
-              confidence === 'no_auditor' && 'border-border text-muted-foreground',
+              "rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
+              confidence === "consensus" &&
+                "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
+              confidence === "discrepancy" &&
+                "border-amber-500/40 bg-amber-500/10 text-amber-200",
+              confidence === "weak" &&
+                "border-amber-500/40 bg-amber-500/10 text-amber-200",
+              confidence === "no_auditor" &&
+                "border-border text-muted-foreground",
             )}
             title={
               audit.challenge.passed
                 ? audit.shadowDisagreement || audit.auditorCDisagreement
                   ? `Discrepancia A/A2/C · ack para guardar`
-                  : 'Quorum B + red-team OK'
+                  : "Quorum B + red-team OK"
                 : audit.challenge.checks
-                    .filter((c) => !c.passed && c.severity === 'hard')
+                    .filter((c) => !c.passed && c.severity === "hard")
                     .map((c) => c.detail)
-                    .join(' · ') || 'TOP débil — ack para guardar'
+                    .join(" · ") || "TOP débil — ack para guardar"
             }
           >
             {confidenceLabel(confidence)}
           </span>
         )}
         <span className="text-[10px] text-muted-foreground">
-          {llmBusy ? 'IA A+C…' : engineLabel}
+          {llmBusy ? "IA A+C…" : engineLabel}
         </span>
         <Button
           type="button"
@@ -113,11 +122,11 @@ export function BacktestExploreHeader({
           onClick={onSaveTop}
           title={
             postLab
-              ? 'Guarda Finalistas (active + lab_validated) tras el Lab. Sustituye el TOP del valor.'
-              : 'Guarda TOP-3 semifinal (sin Lab). No escribe lab_validated.'
+              ? "Guarda Finalistas (active + lab_validated) tras el Lab. Sustituye el TOP del valor."
+              : "Guarda TOP-3 semifinal (sin Lab). No escribe lab_validated."
           }
         >
-          {postLab ? 'Guardar Finalistas' : 'Guardar TOP-3'}
+          {postLab ? "Guardar Finalistas" : "Guardar TOP-3"}
         </Button>
         <Button
           type="button"
@@ -128,8 +137,8 @@ export function BacktestExploreHeader({
           onClick={onReanalyze}
           title={
             llmNarrate
-              ? 'Vuelve a pedir narrativa IA (el ranking ★ es local-AT)'
-              : 'Activa «Narración LLM Coach» en (…) del Asistente'
+              ? "Vuelve a pedir narrativa IA (el ranking ★ es local-AT)"
+              : "Activa «Narración LLM Coach» en (…) del Asistente"
           }
         >
           Reanalizar
@@ -138,7 +147,7 @@ export function BacktestExploreHeader({
 
       {(saveMsg || savedTopFooter) && (
         <p className="text-[10px] text-muted-foreground">
-          {saveMsg ? `${saveMsg}. ` : ''}
+          {saveMsg ? `${saveMsg}. ` : ""}
           {savedTopFooter}
         </p>
       )}
@@ -146,19 +155,19 @@ export function BacktestExploreHeader({
       {priorAuditHint && !running && (
         <p
           className={cn(
-            'rounded-md border px-2 py-1.5 text-[10px]',
-            priorAuditHint.confidence === 'weak' || priorAuditHint.softWeak
-              ? 'border-amber-500/30 bg-amber-500/5 text-amber-100/90'
-              : priorAuditHint.confidence === 'discrepancy'
-                ? 'border-amber-500/25 bg-amber-500/5 text-muted-foreground'
-                : 'border-border/70 bg-muted/20 text-muted-foreground',
+            "rounded-md border px-2 py-1.5 text-[10px]",
+            priorAuditHint.confidence === "weak" || priorAuditHint.softWeak
+              ? "border-amber-500/30 bg-amber-500/5 text-amber-100/90"
+              : priorAuditHint.confidence === "discrepancy"
+                ? "border-amber-500/25 bg-amber-500/5 text-muted-foreground"
+                : "border-border/70 bg-muted/20 text-muted-foreground",
           )}
           title="Contexto de la pasada guardada (CORE A). No cambia el ranking ★ actual."
         >
           Pasada anterior · {confidenceLabel(priorAuditHint.confidence)}
-          {priorAuditHint.softWeak ? ' · soft-débil' : ''}
-          {priorAuditHint.coachPass === 'post_lab' ? ' · post-Lab' : ''}
-          {' · '}
+          {priorAuditHint.softWeak ? " · soft-débil" : ""}
+          {priorAuditHint.coachPass === "post_lab" ? " · post-Lab" : ""}
+          {" · "}
           no modula el TOP actual (solo contexto).
         </p>
       )}

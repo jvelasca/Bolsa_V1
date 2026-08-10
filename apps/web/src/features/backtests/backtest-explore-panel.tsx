@@ -10,71 +10,74 @@
  * @see docs/engineering/research-lifecycle.md § P2
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   BacktestEquityPointDto,
   ChartTimeframe,
   ProfileHorizon,
   RiskTolerance,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 import {
   buildExploreCoachNote,
   type ExplorePresetRow,
   type ExploreSortKey,
-} from '@/features/backtests/backtest-explore-value';
-import { BacktestExploreBH } from '@/features/backtests/backtest-explore-bh';
-import { BacktestExploreHeader } from '@/features/backtests/backtest-explore-header';
-import { BacktestExploreBatteryTable } from '@/features/backtests/backtest-explore-battery-table';
-import { BacktestExploreAtOutlook } from '@/features/backtests/backtest-explore-at-outlook';
-import { BacktestExploreStarsGrid } from '@/features/backtests/backtest-explore-stars-grid';
+} from "@/features/backtests/backtest-explore-value";
+import { BacktestExploreBH } from "@/features/backtests/backtest-explore-bh";
+import { BacktestExploreHeader } from "@/features/backtests/backtest-explore-header";
+import { BacktestExploreBatteryTable } from "@/features/backtests/backtest-explore-battery-table";
+import { BacktestExploreAtOutlook } from "@/features/backtests/backtest-explore-at-outlook";
+import { BacktestExploreStarsGrid } from "@/features/backtests/backtest-explore-stars-grid";
 import {
   buildDeepTechnicalCoachNote,
   buildCoachFacts,
   mergeLlmIntoDeepCoach,
   sanitizeLlmDeepCoachPayload,
   type DeepTechnicalCoachNote,
-} from '@/features/backtests/backtest-deep-coach';
+} from "@/features/backtests/backtest-deep-coach";
 import {
   auditFindingsFromLlmPayload,
   buildAuditedDeepTechnicalCoachNote,
   readPriorCoachAuditHint,
   type CoachConfidence,
-} from '@/features/backtests/coach-dual-audit';
-import { CoachQuorumBar } from '@/features/backtests/coach-quorum-bar';
-import { buildCoachTopSlots } from '@/features/backtests/coach-top-save';
-import { sanitizeTopSlotsStrategyTypes } from '@/features/backtests/instrument-top-strategy-type';
+} from "@/features/backtests/coach-dual-audit";
+import { CoachQuorumBar } from "@/features/backtests/coach-quorum-bar";
+import { buildCoachTopSlots } from "@/features/backtests/coach-top-save";
+import { sanitizeTopSlotsStrategyTypes } from "@/features/backtests/instrument-top-strategy-type";
 import {
   buildCoachProfileBindingFacts,
   resolveCoachProfilePolicy,
-} from '@/features/backtests/coach-profile-policy';
+} from "@/features/backtests/coach-profile-policy";
 import {
   buildLabAdoptionFacts,
   readLabAdoption,
-} from '@/features/backtests/lab-adoption-memory';
-import { saveDiaDExperimentTop } from '@/features/backtests/dia-d-experiment-top';
-import { resolveFullCycleSaveDecision, shouldWaitBeforeFinalistsAutoSave } from '@/features/backtests/backtest-assistant-full-cycle';
+} from "@/features/backtests/lab-adoption-memory";
+import { saveDiaDExperimentTop } from "@/features/backtests/dia-d-experiment-top";
+import {
+  resolveFullCycleSaveDecision,
+  shouldWaitBeforeFinalistsAutoSave,
+} from "@/features/backtests/backtest-assistant-full-cycle";
 import {
   isCoach1AckSatisfied,
   resolveAssistantAckPolicy,
-} from '@/features/backtests/assistant-cycle-orchestrator';
+} from "@/features/backtests/assistant-cycle-orchestrator";
 import {
   buildFinalistsFreshnessStamp,
   mergeFreshnessIntoCoachFacts,
   writeLocalFreshnessFingerprint,
-} from '@/features/backtests/backtest-finalists-freshness';
+} from "@/features/backtests/backtest-finalists-freshness";
 import {
   mergeLabEvidenceIntoCoachFacts,
   resolveLabEvidenceForFinalistsSave,
-} from '@/features/backtests/finalists-stability-summary';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { api } from '@/lib/api';
+} from "@/features/backtests/finalists-stability-summary";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { api } from "@/lib/api";
 
 type Props = {
   rows: ExplorePresetRow[];
   instrumentId?: string | null;
   /** initial = Universo; post_lab = tras Reanalizar con Coach. */
-  coachPass?: 'initial' | 'post_lab';
+  coachPass?: "initial" | "post_lab";
   symbol: string;
   timeframe: ChartTimeframe | string;
   periodLabel?: string;
@@ -158,22 +161,22 @@ type Props = {
 
 function batteryText(rows: ExplorePresetRow[]): string {
   return rows
-    .filter((r) => r.status === 'ok')
+    .filter((r) => r.status === "ok")
     .map((r) => {
       const parts = [
         r.strategyType,
         r.label,
         `cat=${r.category}`,
-        `ret=${r.totalReturnPct?.toFixed(2) ?? 'n/a'}`,
-        `excess=${r.excessReturnPct?.toFixed(2) ?? 'n/a'}`,
-        `dd=${r.maxDrawdownPct?.toFixed(2) ?? 'n/a'}`,
-        `sharpe=${r.sharpeRatio?.toFixed(2) ?? 'n/a'}`,
-        `trades=${r.tradeCount ?? 'n/a'}`,
-        `bars=${r.barCount ?? 'n/a'}`,
+        `ret=${r.totalReturnPct?.toFixed(2) ?? "n/a"}`,
+        `excess=${r.excessReturnPct?.toFixed(2) ?? "n/a"}`,
+        `dd=${r.maxDrawdownPct?.toFixed(2) ?? "n/a"}`,
+        `sharpe=${r.sharpeRatio?.toFixed(2) ?? "n/a"}`,
+        `trades=${r.tradeCount ?? "n/a"}`,
+        `bars=${r.barCount ?? "n/a"}`,
       ];
-      return parts.join(' | ');
+      return parts.join(" | ");
     })
-    .join('\n');
+    .join("\n");
 }
 
 function localSummaryText(note: DeepTechnicalCoachNote): string {
@@ -182,19 +185,19 @@ function localSummaryText(note: DeepTechnicalCoachNote): string {
     ...note.analysis,
     ...note.recommendations.map(
       (r) =>
-        `#${r.rank} ${r.row.label} (${r.row.strategyType}) score=${r.score}: ${r.reasons.join('; ')}`,
+        `#${r.rank} ${r.row.label} (${r.row.strategyType}) score=${r.score}: ${r.reasons.join("; ")}`,
     ),
     note.regime?.narrative,
     ...note.outlook,
   ]
     .filter(Boolean)
-    .join('\n');
+    .join("\n");
 }
 
 export function BacktestExploreRanking({
   rows,
   instrumentId,
-  coachPass = 'initial',
+  coachPass = "initial",
   symbol,
   timeframe,
   periodLabel,
@@ -223,24 +226,28 @@ export function BacktestExploreRanking({
   experimentAsOf = null,
 }: Props) {
   const queryClient = useQueryClient();
-  const postLab = coachPass === 'post_lab';
+  const postLab = coachPass === "post_lab";
   const savingExperiment = Boolean(experimentAsOf);
   const autoSaveFiredRef = useRef(false);
   const softAckLatchedRef = useRef(false);
-  const loteKey = rows.map((r) => r.strategyDefinitionId ?? r.runId ?? r.strategyType).join('|');
+  const loteKey = rows
+    .map((r) => r.strategyDefinitionId ?? r.runId ?? r.strategyType)
+    .join("|");
   const carryRows = useMemo(
-    () => rows.filter((r) => r.labPass === 'lab_carry'),
+    () => rows.filter((r) => r.labPass === "lab_carry"),
     [rows],
   );
   const coach = useMemo(
     () => buildExploreCoachNote(rows, symbol, { barLimit }),
     [rows, symbol, barLimit],
   );
-  const okCount = rows.filter((row) => row.status === 'ok' && row.labPass !== 'lab_carry').length;
+  const okCount = rows.filter(
+    (row) => row.status === "ok" && row.labPass !== "lab_carry",
+  ).length;
 
   const { effectiveAccountId } = useActiveAccount();
   const profileQuery = useQuery({
-    queryKey: ['account-active-profile', effectiveAccountId],
+    queryKey: ["account-active-profile", effectiveAccountId],
     queryFn: () => api.getAccountActiveProfile(effectiveAccountId!),
     enabled: Boolean(effectiveAccountId),
     staleTime: 60_000,
@@ -248,45 +255,43 @@ export function BacktestExploreRanking({
   });
   const profile = profileQuery.data?.data;
   const horizon = (profile?.declared?.horizon ?? null) as ProfileHorizon | null;
-  const riskTolerance = (profile?.declared?.riskTolerance ?? null) as RiskTolerance | null;
+  const riskTolerance = (profile?.declared?.riskTolerance ??
+    null) as RiskTolerance | null;
 
-  const coachCtx = useMemo(
-    () => {
-      const policy = resolveCoachProfilePolicy({
-        profileId: profile?.profileId,
-        profileName: profile?.name,
-        horizon,
-        riskTolerance,
-      });
-      return {
-        symbol,
-        timeframe,
-        periodLabel,
-        horizon,
-        riskTolerance,
-        profileName: profile?.name,
-        profileId: profile?.profileId,
-        maxDrawdownSoftPct: policy.maxDrawdownSoftPct,
-        equityByRunId,
-        evidenceLevel: (postLab ? 'lab_validated' : 'in_sample_only') as
-          | 'lab_validated'
-          | 'in_sample_only',
-        futureWeight,
-      };
-    },
-    [
+  const coachCtx = useMemo(() => {
+    const policy = resolveCoachProfilePolicy({
+      profileId: profile?.profileId,
+      profileName: profile?.name,
+      horizon,
+      riskTolerance,
+    });
+    return {
       symbol,
       timeframe,
       periodLabel,
       horizon,
       riskTolerance,
-      profile?.name,
-      profile?.profileId,
+      profileName: profile?.name,
+      profileId: profile?.profileId,
+      maxDrawdownSoftPct: policy.maxDrawdownSoftPct,
       equityByRunId,
-      postLab,
+      evidenceLevel: (postLab ? "lab_validated" : "in_sample_only") as
+        | "lab_validated"
+        | "in_sample_only",
       futureWeight,
-    ],
-  );
+    };
+  }, [
+    symbol,
+    timeframe,
+    periodLabel,
+    horizon,
+    riskTolerance,
+    profile?.name,
+    profile?.profileId,
+    equityByRunId,
+    postLab,
+    futureWeight,
+  ]);
 
   /**
    * El TOP ★ solo se fija cuando la batería termina (ranking A + auditor B + gate).
@@ -301,20 +306,30 @@ export function BacktestExploreRanking({
           ? `${symbol} · ${coachCtx.periodLabel} · ${timeframe}`
           : `${symbol} · ${timeframe}`,
         analysis: [
-          'El TOP ★ a futuro se calcula al terminar todas las genéricas.',
-          'Motor A (ranking) + Motor B (auditor) + gate de consenso.',
-          'La IA puede vetar tipado; no inventa estrategias fuera del lote.',
+          "El TOP ★ a futuro se calcula al terminar todas las genéricas.",
+          "Motor A (ranking) + Motor B (auditor) + gate de consenso.",
+          "La IA puede vetar tipado; no inventa estrategias fuera del lote.",
         ],
         recommendations: [],
-        outlook: ['Espera al final del lote o cancela si no quieres seguir.'],
+        outlook: ["Espera al final del lote o cancela si no quieres seguir."],
         disclaimer:
-          'Mientras corre la batería no mostramos un TOP provisional: evita elecciones inestables.',
+          "Mientras corre la batería no mostramos un TOP provisional: evita elecciones inestables.",
       } satisfies DeepTechnicalCoachNote;
     }
     return buildAuditedDeepTechnicalCoachNote(rows, coachCtx, undefined, {
-      coachPass: postLab ? 'post_lab' : 'initial',
+      coachPass: postLab ? "post_lab" : "initial",
     });
-  }, [rows, coachCtx, running, progress?.done, progress?.total, okCount, symbol, timeframe, postLab]);
+  }, [
+    rows,
+    coachCtx,
+    running,
+    progress?.done,
+    progress?.total,
+    okCount,
+    symbol,
+    timeframe,
+    postLab,
+  ]);
 
   const coachFacts = useMemo(
     () =>
@@ -327,10 +342,10 @@ export function BacktestExploreRanking({
   );
 
   const [deepNote, setDeepNote] = useState<DeepTechnicalCoachNote>(localDeep);
-  const [engineLabel, setEngineLabel] = useState('local-AT+B');
+  const [engineLabel, setEngineLabel] = useState("local-AT+B");
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [discrepancyAck, setDiscrepancyAck] = useState(false);
-  const lastLlmFingerprintRef = useRef<string>('');
+  const lastLlmFingerprintRef = useRef<string>("");
 
   // Reset ACK solo al cambiar valor / pasada / lote — no en cada recompute de localDeep
   // (eso rompía soft-ACK y el auto-guardado de Finalistas).
@@ -343,21 +358,22 @@ export function BacktestExploreRanking({
 
   useEffect(() => {
     setDeepNote(localDeep);
-    setEngineLabel('local-AT+B');
+    setEngineLabel("local-AT+B");
     if (softAckLatchedRef.current) {
       setDiscrepancyAck(true);
     }
   }, [localDeep]);
 
-  const confidence: CoachConfidence = deepNote.audit?.confidence ?? 'no_auditor';
+  const confidence: CoachConfidence =
+    deepNote.audit?.confidence ?? "no_auditor";
   const softWeak = Boolean(deepNote.audit?.softWeak);
-  const needsAck = confidence === 'discrepancy' || confidence === 'weak';
+  const needsAck = confidence === "discrepancy" || confidence === "weak";
   /** Misma política que el check de ⋯ (no un segundo ACK distinto). */
   const ackPolicy = resolveAssistantAckPolicy({
     autoAckOnCycle,
     pauseIfAckNeeded,
   });
-  const prefsAutoAck = ackPolicy.mode === 'auto';
+  const prefsAutoAck = ackPolicy.mode === "auto";
   const ackSatisfied = isCoach1AckSatisfied({
     needsAck,
     ackReady: discrepancyAck,
@@ -381,14 +397,15 @@ export function BacktestExploreRanking({
 
   const labImprovedCount = useMemo(() => {
     const fromRows = rows.filter(
-      (r) => r.labPass === 'lab_improved' && r.status === 'ok',
+      (r) => r.labPass === "lab_improved" && r.status === "ok",
     ).length;
     return Math.max(fromRows, labImprovedCountHint);
   }, [rows, labImprovedCountHint]);
 
   const savedTopQuery = useQuery({
-    queryKey: ['instrument-strategy-top', instrumentId, timeframe],
-    queryFn: () => api.getInstrumentStrategyTop(instrumentId!, String(timeframe)),
+    queryKey: ["instrument-strategy-top", instrumentId, timeframe],
+    queryFn: () =>
+      api.getInstrumentStrategyTop(instrumentId!, String(timeframe)),
     enabled: Boolean(instrumentId),
     staleTime: 30_000,
     retry: false,
@@ -408,10 +425,10 @@ export function BacktestExploreRanking({
       /** Evita carrera: usar el note vivo (localDeep), no deepNote atrasado. */
       note?: DeepTechnicalCoachNote;
     }) => {
-      if (!instrumentId) throw new Error('Sin instrumento');
+      if (!instrumentId) throw new Error("Sin instrumento");
       const note = opts?.note ?? deepNote;
-      const conf = note.audit?.confidence ?? 'no_auditor';
-      const noteNeedsAck = conf === 'discrepancy' || conf === 'weak';
+      const conf = note.audit?.confidence ?? "no_auditor";
+      const noteNeedsAck = conf === "discrepancy" || conf === "weak";
       const ackOk =
         !noteNeedsAck ||
         discrepancyAck ||
@@ -419,11 +436,11 @@ export function BacktestExploreRanking({
         prefsAutoAck;
       const recs = note.recommendations.slice(0, 3);
       if (recs.length === 0) {
-        throw new Error('Sin candidatas TOP para guardar');
+        throw new Error("Sin candidatas TOP para guardar");
       }
       if (noteNeedsAck && !ackOk) {
         throw new Error(
-          'Marca el ack (TOP débil o discrepancia) para guardar con reserva',
+          "Marca el ack (TOP débil o discrepancia) para guardar con reserva",
         );
       }
 
@@ -435,14 +452,15 @@ export function BacktestExploreRanking({
         recommendations: recs,
         symbol,
         timeframe: tf,
-        slotSource: postLab ? 'optimized' : 'coach',
+        slotSource: postLab ? "optimized" : "coach",
         requireRunId: postLab,
         lookup: {
           existing,
           createFromPreset: async (input) => {
             const created = await api.createStrategyFromPreset({
               name: input.name,
-              presetKey: input.presetKey as import('@bolsa/shared').BacktestStrategyType,
+              presetKey:
+                input.presetKey as import("@bolsa/shared").BacktestStrategyType,
               timeframe: input.timeframe,
             });
             return {
@@ -459,7 +477,8 @@ export function BacktestExploreRanking({
           },
         },
       });
-      if (slots.length === 0) throw new Error('Sin recomendaciones para guardar');
+      if (slots.length === 0)
+        throw new Error("Sin recomendaciones para guardar");
 
       const strategiesFresh = await api.getStrategies();
       const presetById = new Map(
@@ -494,8 +513,8 @@ export function BacktestExploreRanking({
         ...(adoptionFacts ?? {}),
         dualAudit: note.audit ?? null,
         discrepancyAck:
-          conf === 'discrepancy' || conf === 'weak' ? true : false,
-        coachPass: postLab ? 'post_lab' : 'initial',
+          conf === "discrepancy" || conf === "weak" ? true : false,
+        coachPass: postLab ? "post_lab" : "initial",
         cycleAutoAck: Boolean(opts?.forceCycleAck) || prefsAutoAck,
       };
       const withFreshness =
@@ -508,7 +527,9 @@ export function BacktestExploreRanking({
               }),
             )
           : baseFacts;
-      const slot1ForEvidence = [...slotsSanitized].sort((a, b) => a.rank - b.rank)[0];
+      const slot1ForEvidence = [...slotsSanitized].sort(
+        (a, b) => a.rank - b.rank,
+      )[0];
       const labEvidenceSnap = postLab
         ? resolveLabEvidenceForFinalistsSave({
             strategyDefinitionId: slot1ForEvidence?.strategyDefinitionId,
@@ -522,8 +543,9 @@ export function BacktestExploreRanking({
 
       // ADR-021: experimento DÍA D → F-D local; no pisa F-hoy en BD.
       if (experimentAsOf) {
-        const prodSlot1 = [...(savedTop?.slots ?? [])]
-          .sort((a, b) => a.rank - b.rank)[0];
+        const prodSlot1 = [...(savedTop?.slots ?? [])].sort(
+          (a, b) => a.rank - b.rank,
+        )[0];
         saveDiaDExperimentTop({
           instrumentId,
           timeframe: tf,
@@ -550,15 +572,20 @@ export function BacktestExploreRanking({
         symbol,
         timeframe: tf,
         periodLabel: periodLabel ?? null,
-        status: postLab ? 'active' : 'semifinal',
-        evidenceLevel: postLab ? 'lab_validated' : noteFacts.evidenceLevel,
+        status: postLab ? "active" : "semifinal",
+        evidenceLevel: postLab ? "lab_validated" : noteFacts.evidenceLevel,
         slots: slotsSanitized,
         coachHeadline: note.headline,
         coachFacts: stampedFacts,
       });
     },
     onSuccess: async (data) => {
-      if (data && typeof data === 'object' && 'experiment' in data && data.experiment) {
+      if (
+        data &&
+        typeof data === "object" &&
+        "experiment" in data &&
+        data.experiment
+      ) {
         setSaveMsg(
           `Experimento DÍA D ${data.asOfDiaD}: TOP F-D guardado (${data.slotCount}) · Finalistas operativos intactos`,
         );
@@ -569,8 +596,8 @@ export function BacktestExploreRanking({
       }
       setSaveMsg(
         postLab
-          ? 'Finalistas actualizados (lab_validated) · en Mis estrategias'
-          : 'TOP-3 semifinal guardado (sustituye previos) · en Mis estrategias',
+          ? "Finalistas actualizados (lab_validated) · en Mis estrategias"
+          : "TOP-3 semifinal guardado (sustituye previos) · en Mis estrategias",
       );
       if (postLab && freshnessInputFingerprint && instrumentId) {
         writeLocalFreshnessFingerprint({
@@ -580,11 +607,13 @@ export function BacktestExploreRanking({
         });
       }
       await savedTopQuery.refetch();
-      await queryClient.invalidateQueries({ queryKey: ['strategies'] });
-      await queryClient.invalidateQueries({ queryKey: ['instrument-strategy-top'] });
+      await queryClient.invalidateQueries({ queryKey: ["strategies"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["instrument-strategy-top"],
+      });
     },
     onError: (err: Error) => {
-      setSaveMsg(err.message || 'Error al guardar TOP-3');
+      setSaveMsg(err.message || "Error al guardar TOP-3");
     },
   });
 
@@ -610,7 +639,8 @@ export function BacktestExploreRanking({
 
   // Atajo: guardar semifinal sin Lab (pref saveSemifinalSkipLab).
   useEffect(() => {
-    if (!autoSaveSemifinal || postLab || running || autoSaveFiredRef.current) return;
+    if (!autoSaveSemifinal || postLab || running || autoSaveFiredRef.current)
+      return;
     if (saveTopMutation.isPending) return;
     if (!ackSatisfied) {
       onAwaitingAckChange?.(true);
@@ -624,7 +654,7 @@ export function BacktestExploreRanking({
       autoSaveFiredRef.current = true;
       onAwaitingAckChange?.(false);
       onAutoSaveStatus?.(
-        'Ciclo: atajo semifinal sin TOP guardable · Finalistas intactos.',
+        "Ciclo: atajo semifinal sin TOP guardable · Finalistas intactos.",
       );
       return;
     }
@@ -635,7 +665,7 @@ export function BacktestExploreRanking({
       {
         onSuccess: () => {
           onAutoSaveStatus?.(
-            'Ciclo: TOP semifinal guardado · Lab omitido (atajo).',
+            "Ciclo: TOP semifinal guardado · Lab omitido (atajo).",
           );
         },
         onError: (err: Error) => {
@@ -659,13 +689,16 @@ export function BacktestExploreRanking({
   ]);
 
   useEffect(() => {
-    if (!autoSaveFinalists || !postLab || running || autoSaveFiredRef.current) return;
+    if (!autoSaveFinalists || !postLab || running || autoSaveFiredRef.current)
+      return;
     if (saveTopMutation.isPending) return;
 
     // Nota viva (localDeep): evita skip en el frame en que running=false pero
     // deepNote aún está vacío (carrera ACS / Coach²).
     const note = localDeep;
-    const recsWithRun = note.recommendations.filter((r) => Boolean(r.row.runId));
+    const recsWithRun = note.recommendations.filter((r) =>
+      Boolean(r.row.runId),
+    );
     if (
       shouldWaitBeforeFinalistsAutoSave({
         running: Boolean(running),
@@ -678,8 +711,8 @@ export function BacktestExploreRanking({
       return;
     }
 
-    const conf = note.audit?.confidence ?? 'no_auditor';
-    const noteNeedsAck = conf === 'weak' || conf === 'discrepancy';
+    const conf = note.audit?.confidence ?? "no_auditor";
+    const noteNeedsAck = conf === "weak" || conf === "discrepancy";
     const noteAckOk = isCoach1AckSatisfied({
       needsAck: noteNeedsAck,
       ackReady: discrepancyAck,
@@ -696,13 +729,14 @@ export function BacktestExploreRanking({
       setDiscrepancyAck(true);
     }
 
-    const canSave = note.recommendations.length > 0 && noteAckOk && recsWithRun.length > 0;
+    const canSave =
+      note.recommendations.length > 0 && noteAckOk && recsWithRun.length > 0;
 
     const decision = resolveFullCycleSaveDecision({
       postLab: true,
       labImprovedCount,
       canSaveTop: canSave,
-      existingTopStatus: savingExperiment ? null : savedTop?.status ?? null,
+      existingTopStatus: savingExperiment ? null : (savedTop?.status ?? null),
       // Experimento DÍA D: F-hoy no bloquea primera escritura de F-D.
       hasExistingTop: savingExperiment
         ? false
@@ -711,7 +745,7 @@ export function BacktestExploreRanking({
           : Boolean(savedTop),
     });
 
-    if (decision.action === 'save_active') {
+    if (decision.action === "save_active") {
       autoSaveFiredRef.current = true;
       onAwaitingAckChange?.(false);
       saveTopMutation.mutate(
@@ -733,7 +767,7 @@ export function BacktestExploreRanking({
 
     // Candidatas aún no listas: no quemar el ciclo.
     if (
-      decision.action === 'skip_no_candidates' &&
+      decision.action === "skip_no_candidates" &&
       (okCount > 0 || labImprovedCountHint > 0)
     ) {
       return;
@@ -764,7 +798,8 @@ export function BacktestExploreRanking({
 
   const llmAbortRef = useRef<AbortController | null>(null);
 
-  const llmMutation = useMutation({    mutationFn: async () => {
+  const llmMutation = useMutation({
+    mutationFn: async () => {
       llmAbortRef.current?.abort();
       const ac = new AbortController();
       llmAbortRef.current = ac;
@@ -776,36 +811,51 @@ export function BacktestExploreRanking({
       };
       try {
         const [narrate, adversary] = await Promise.all([
-          api.analyzeBacktestCoach({ ...base, mode: 'narrate' }, { signal: ac.signal }),
-          api.analyzeBacktestCoach({ ...base, mode: 'adversary' }, { signal: ac.signal }),
+          api.analyzeBacktestCoach(
+            { ...base, mode: "narrate" },
+            { signal: ac.signal },
+          ),
+          api.analyzeBacktestCoach(
+            { ...base, mode: "adversary" },
+            { signal: ac.signal },
+          ),
         ]);
         return { narrate, adversary, aborted: ac.signal.aborted };
       } catch (error) {
-        if (ac.signal.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+        if (
+          ac.signal.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
           return { narrate: null, adversary: null, aborted: true };
         }
         throw error;
       }
     },
     onSuccess: (result) => {
-      if (!result || result.aborted || !result.narrate || !result.adversary) return;
+      if (!result || result.aborted || !result.narrate || !result.adversary)
+        return;
       const { narrate, adversary } = result;
       const rawPayload = narrate.data.payload;
       const payload = sanitizeLlmDeepCoachPayload(rawPayload);
-      const llmFindings = auditFindingsFromLlmPayload(payload, 'llm');
+      const llmFindings = auditFindingsFromLlmPayload(payload, "llm");
       const adversaryFindings = auditFindingsFromLlmPayload(
         sanitizeLlmDeepCoachPayload(adversary.data.payload),
-        'llm_c',
+        "llm_c",
       );
-      const audited = buildAuditedDeepTechnicalCoachNote(rows, coachCtx, llmFindings, {
-        adversaryFindings,
-        coachPass: postLab ? 'post_lab' : 'initial',
-      });
+      const audited = buildAuditedDeepTechnicalCoachNote(
+        rows,
+        coachCtx,
+        llmFindings,
+        {
+          adversaryFindings,
+          coachPass: postLab ? "post_lab" : "initial",
+        },
+      );
       if (!payload) {
         setEngineLabel(
           adversary.data.provider
-            ? `${narrate.data.engine || 'heuristic'} · C`
-            : narrate.data.engine || 'heuristic',
+            ? `${narrate.data.engine || "heuristic"} · C`
+            : narrate.data.engine || "heuristic",
         );
         setDeepNote(audited);
         return;
@@ -815,7 +865,7 @@ export function BacktestExploreRanking({
       const model = narrate.data.model ?? adversary.data.model;
       setEngineLabel(
         provider
-          ? `${provider}${model ? ` · ${model}` : ''} · A/B/C`
+          ? `${provider}${model ? ` · ${model}` : ""} · A/B/C`
           : `${narrate.data.engine} · A/B/C`,
       );
     },
@@ -833,9 +883,9 @@ export function BacktestExploreRanking({
   }, []);
 
   const loteFingerprint = rows
-    .filter((r) => r.status === 'ok')
+    .filter((r) => r.status === "ok")
     .map((r) => r.runId ?? r.strategyType)
-    .join(',');
+    .join(",");
 
   // Auto-disparar IA una vez por lote terminado (CORE A: respeta llmNarrate).
   useEffect(() => {
@@ -852,16 +902,16 @@ export function BacktestExploreRanking({
   useEffect(() => {
     if (llmNarrate) return;
     if (running) return;
-    setEngineLabel('local-AT+B · sin LLM');
+    setEngineLabel("local-AT+B · sin LLM");
   }, [llmNarrate, running, loteFingerprint]);
 
   const savedTopFooter = savedTop
     ? `Finalistas BD: v${savedTop.version} · ${savedTop.status} · ${savedTop.slots
         .map((s) => `#${s.rank} ${s.label}`)
-        .join(' · ')}`
+        .join(" · ")}`
     : instrumentId
-      ? 'Sin TOP guardado aún para este valor/TF.'
-      : '';
+      ? "Sin TOP guardado aún para este valor/TF."
+      : "";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 overflow-y-auto overscroll-contain pb-2">
@@ -877,7 +927,11 @@ export function BacktestExploreRanking({
           llmNarrate={llmNarrate}
           llmBusy={llmMutation.isPending}
           saveEnabled={
-            !running && okCount > 0 && Boolean(instrumentId) && canSaveTop && !saveTopMutation.isPending
+            !running &&
+            okCount > 0 &&
+            Boolean(instrumentId) &&
+            canSaveTop &&
+            !saveTopMutation.isPending
           }
           reanalyzeEnabled={
             !running && okCount > 0 && !llmMutation.isPending && llmNarrate
@@ -891,27 +945,32 @@ export function BacktestExploreRanking({
             saveTopMutation.mutate({});
           }}
           onReanalyze={() => {
-            lastLlmFingerprintRef.current = '';
+            lastLlmFingerprintRef.current = "";
             llmMutation.mutate();
           }}
         />
 
-        <p className="text-sm font-medium leading-snug text-foreground">{deepNote.headline}</p>
+        <p className="text-sm font-medium leading-snug text-foreground">
+          {deepNote.headline}
+        </p>
         {postLab && !running && (
           <p className="rounded-md border border-emerald-500/25 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-100/90">
             <span className="font-medium">4 · Revalidar (Coach²)</span>
-            {' · '}
-            pasada tras Lab · evidencia lab · techo ★{coachFacts.starCeiling}. Las que no mejoraron
-            (si las llevaste) no entran en el ranking ★. Soft-fail del red-team no bloquea Guardar
-            si #1 está limpia.
+            {" · "}
+            pasada tras Lab · evidencia lab · techo ★{coachFacts.starCeiling}.
+            Las que no mejoraron (si las llevaste) no entran en el ranking ★.
+            Soft-fail del red-team no bloquea Guardar si #1 está limpia.
           </p>
         )}
         {!postLab && !running && okCount > 0 && (
           <p className="rounded-md border border-border/50 bg-muted/20 px-2 py-1 text-[10px] text-muted-foreground">
-            <span className="font-medium text-foreground">2 · Coach · ACK¹</span>
-            {' · '}
-            analiza el lote. Con ACK¹ (si hace falta) → Lab; sin mejora Lab no se
-            revalida ni se pisa Finalistas; con mejora → Revalidar (ACK final).
+            <span className="font-medium text-foreground">
+              2 · Coach · ACK¹
+            </span>
+            {" · "}
+            analiza el lote. Con ACK¹ (si hace falta) → Lab; sin mejora Lab no
+            se revalida ni se pisa Finalistas; con mejora → Revalidar (ACK
+            final).
           </p>
         )}
 
@@ -938,13 +997,13 @@ export function BacktestExploreRanking({
             title="Misma preferencia que ⋯ Asistente → «ACK final automático → grabar en BD»"
           >
             <span className="font-medium">
-              {postLab ? 'ACK final' : 'ACK¹'} = config Asistente
+              {postLab ? "ACK final" : "ACK¹"} = config Asistente
             </span>
-            {' · '}
-            automático (⋯).{' '}
+            {" · "}
+            automático (⋯).{" "}
             {postLab
-              ? 'Se graban Finalistas en BD si hubo mejora Lab.'
-              : 'El ciclo sigue al Lab sin checkbox extra.'}
+              ? "Se graban Finalistas en BD si hubo mejora Lab."
+              : "El ciclo sigue al Lab sin checkbox extra."}
           </p>
         )}
 
@@ -967,47 +1026,49 @@ export function BacktestExploreRanking({
             />
             <span>
               {postLab
-                ? confidence === 'weak'
-                  ? 'ACK final (paso 4→5): confirma para grabar Finalistas (⋯ tiene «Pausar ACK» o Auto-ACK OFF).'
-                  : 'ACK final: confirma para grabar Finalistas con reserva.'
-                : confidence === 'weak'
-                  ? 'ACK¹: confirma para pasar al Lab.'
-                  : 'ACK¹: confirma para pasar al Lab con reserva.'}
-              {!discrepancyAck ? ' · Ciclo en pausa.' : ''}
+                ? confidence === "weak"
+                  ? "ACK final (paso 4→5): confirma para grabar Finalistas (⋯ tiene «Pausar ACK» o Auto-ACK OFF)."
+                  : "ACK final: confirma para grabar Finalistas con reserva."
+                : confidence === "weak"
+                  ? "ACK¹: confirma para pasar al Lab."
+                  : "ACK¹: confirma para pasar al Lab con reserva."}
+              {!discrepancyAck ? " · Ciclo en pausa." : ""}
             </span>
           </label>
         )}
 
-        {softWeak && confidence !== 'weak' && !running && deepNote.audit && (
+        {softWeak && confidence !== "weak" && !running && deepNote.audit && (
           <p className="rounded-md border border-border/70 bg-muted/25 px-2 py-1.5 text-[10px] text-muted-foreground">
-            Aviso red-team (soft, no bloquea):{' '}
+            Aviso red-team (soft, no bloquea):{" "}
             {deepNote.audit.challenge.checks
-              .filter((c) => !c.passed && c.severity === 'soft')
+              .filter((c) => !c.passed && c.severity === "soft")
               .map((c) => c.detail)
-              .join(' · ')}
+              .join(" · ")}
           </p>
         )}
 
-        {confidence === 'weak' && !running && deepNote.audit && (
+        {confidence === "weak" && !running && deepNote.audit && (
           <p className="rounded-md border border-amber-500/25 bg-amber-500/5 px-2 py-1.5 text-[10px] text-amber-100/80">
-            Avisos red-team:{' '}
+            Avisos red-team:{" "}
             {deepNote.audit.challenge.checks
               .filter((c) => !c.passed)
               .map((c) => c.detail)
-              .join(' · ') || 'candidatas con veto suavizado'}
+              .join(" · ") || "candidatas con veto suavizado"}
             . El TOP-3 se muestra igual; las ★ bajas indican poca confianza.
           </p>
         )}
 
-        {deepNote.audit && !running && deepNote.audit.findings.some((f) => f.action === 'veto') && (
-          <p className="text-[10px] text-muted-foreground">
-            Vetos B/C:{' '}
-            {deepNote.audit.findings
-              .filter((f) => f.action === 'veto')
-              .map((f) => `${f.strategyType} (${f.code}/${f.source})`)
-              .join(' · ')}
-          </p>
-        )}
+        {deepNote.audit &&
+          !running &&
+          deepNote.audit.findings.some((f) => f.action === "veto") && (
+            <p className="text-[10px] text-muted-foreground">
+              Vetos B/C:{" "}
+              {deepNote.audit.findings
+                .filter((f) => f.action === "veto")
+                .map((f) => `${f.strategyType} (${f.code}/${f.source})`)
+                .join(" · ")}
+            </p>
+          )}
 
         <BacktestExploreStarsGrid
           recommendations={deepNote.recommendations}

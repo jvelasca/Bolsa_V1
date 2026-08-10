@@ -15,23 +15,23 @@ import {
   STRATEGY_PRESET_KEYS,
   type BacktestStrategyType,
   type StrategyPresetCategory,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
-import type { ResolvedBacktestWindow } from '@/features/backtests/backtest-period';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
 import {
   filterStrategyMatrixRows,
   type StrategyMatrixFilter,
   type StrategyMatrixRow,
-} from '@/features/backtests/backtest-strategy-matrix';
+} from "@/features/backtests/backtest-strategy-matrix";
 import {
   coachValidationNextStep,
   suggestOptimizeValidation,
   type OptimizeValidationHint,
-} from '@/features/backtests/backtest-optimize-validation-hint';
+} from "@/features/backtests/backtest-optimize-validation-hint";
 import {
   periodReturnsFromEquity,
   type EquityPeriodReturns,
-} from '@/features/backtests/backtest-period-returns';
+} from "@/features/backtests/backtest-period-returns";
 
 export type ExplorePeriodReturns = EquityPeriodReturns;
 
@@ -42,20 +42,27 @@ export { periodReturnsFromEquity };
  * Una pregunta por familia; útil como atajo mental, no como catálogo completo.
  */
 export const EXPLORE_PRESET_BATTERY: BacktestStrategyType[] = [
-  'sma_crossover',
-  'ema_crossover',
-  'rsi_mean_reversion',
-  'macd_signal_cross',
-  'bollinger_lower_bounce',
-  'golden_cross',
-  'pullback_in_uptrend',
-  'stoch_oversold',
+  "sma_crossover",
+  "ema_crossover",
+  "rsi_mean_reversion",
+  "macd_signal_cross",
+  "bollinger_lower_bounce",
+  "golden_cross",
+  "pullback_in_uptrend",
+  "stoch_oversold",
 ];
 
 /** Todas las genéricas del producto — coach / explorar completo. */
-export const ALL_PRESET_COACH_KEYS: BacktestStrategyType[] = [...STRATEGY_PRESET_KEYS];
+export const ALL_PRESET_COACH_KEYS: BacktestStrategyType[] = [
+  ...STRATEGY_PRESET_KEYS,
+];
 
-export type ExploreRowStatus = 'pending' | 'running' | 'ok' | 'error' | 'skipped';
+export type ExploreRowStatus =
+  | "pending"
+  | "running"
+  | "ok"
+  | "error"
+  | "skipped";
 
 export type ExplorePresetRow = {
   strategyType: BacktestStrategyType;
@@ -72,7 +79,7 @@ export type ExplorePresetRow = {
    * - lab_improved: re-simulada desde Mejor
    * - lab_carry: sin mejora; visible pero no reanalizada
    */
-  labPass?: 'lab_improved' | 'lab_carry' | null;
+  labPass?: "lab_improved" | "lab_carry" | null;
   barCount?: number;
   totalReturnPct?: number;
   maxDrawdownPct?: number;
@@ -88,7 +95,7 @@ export type ExplorePresetRow = {
   periodReturns?: ExplorePeriodReturns | null;
 };
 
-export type ExploreSortKey = 'excess' | 'sharpe' | 'return' | 'drawdown';
+export type ExploreSortKey = "excess" | "sharpe" | "return" | "drawdown";
 
 function metricNum(
   metrics: Record<string, number | string | null> | undefined,
@@ -96,24 +103,29 @@ function metricNum(
 ): number | null {
   if (!metrics) return null;
   const v = metrics[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-export function sortExploreRows(rows: ExplorePresetRow[], sort: ExploreSortKey): ExplorePresetRow[] {
-  const ok = rows.filter((row) => row.status === 'ok');
-  const rest = rows.filter((row) => row.status !== 'ok');
+export function sortExploreRows(
+  rows: ExplorePresetRow[],
+  sort: ExploreSortKey,
+): ExplorePresetRow[] {
+  const ok = rows.filter((row) => row.status === "ok");
+  const rest = rows.filter((row) => row.status !== "ok");
   const ranked = [...ok].sort((a, b) => {
-    if (sort === 'return') {
+    if (sort === "return") {
       return (b.totalReturnPct ?? -Infinity) - (a.totalReturnPct ?? -Infinity);
     }
-    if (sort === 'drawdown') {
+    if (sort === "drawdown") {
       return (a.maxDrawdownPct ?? Infinity) - (b.maxDrawdownPct ?? Infinity);
     }
-    if (sort === 'sharpe') {
+    if (sort === "sharpe") {
       const sa = a.sharpeRatio;
       const sb = b.sharpeRatio;
       if (sa == null && sb == null) {
-        return (b.excessReturnPct ?? -Infinity) - (a.excessReturnPct ?? -Infinity);
+        return (
+          (b.excessReturnPct ?? -Infinity) - (a.excessReturnPct ?? -Infinity)
+        );
       }
       if (sa == null) return 1;
       if (sb == null) return -1;
@@ -133,7 +145,9 @@ export type ExploreBatteryParams = {
   timeframe: string;
   window: ResolvedBacktestWindow;
   onProgress?: (rows: ExplorePresetRow[], done: number, total: number) => void;
-  onRunComplete?: (detail: import('@bolsa/shared').BacktestRunDetailDto) => void;
+  onRunComplete?: (
+    detail: import("@bolsa/shared").BacktestRunDetailDto,
+  ) => void;
   signal?: AbortSignal;
 };
 
@@ -141,15 +155,17 @@ export type ExploreBatteryParams = {
 export async function runExploreValueBattery(
   params: ExploreBatteryParams,
 ): Promise<ExplorePresetRow[]> {
-  const presets = params.presets?.length ? params.presets : ALL_PRESET_COACH_KEYS;
+  const presets = params.presets?.length
+    ? params.presets
+    : ALL_PRESET_COACH_KEYS;
   const rows: ExplorePresetRow[] = presets.map((strategyType) => {
     const meta = BACKTEST_STRATEGIES[strategyType];
     return {
       strategyType,
       label: meta?.label ?? strategyType,
-      category: meta?.category ?? 'trend',
-      categoryLabel: STRATEGY_PRESET_CATEGORY_LABELS[meta?.category ?? 'trend'],
-      status: 'pending' as const,
+      category: meta?.category ?? "trend",
+      categoryLabel: STRATEGY_PRESET_CATEGORY_LABELS[meta?.category ?? "trend"],
+      status: "pending" as const,
     };
   });
 
@@ -159,8 +175,12 @@ export async function runExploreValueBattery(
   for (let i = 0; i < rows.length; i += 1) {
     if (params.signal?.aborted) {
       for (let j = i; j < rows.length; j += 1) {
-        if (rows[j]!.status === 'pending') {
-          rows[j] = { ...rows[j]!, status: 'skipped', error: 'Cancelado — no finalizada' };
+        if (rows[j]!.status === "pending") {
+          rows[j] = {
+            ...rows[j]!,
+            status: "skipped",
+            error: "Cancelado — no finalizada",
+          };
         }
       }
       params.onProgress?.([...rows], i, total);
@@ -168,7 +188,7 @@ export async function runExploreValueBattery(
     }
 
     const row = rows[i]!;
-    rows[i] = { ...row, status: 'running' };
+    rows[i] = { ...row, status: "running" };
     params.onProgress?.([...rows], i, total);
 
     try {
@@ -185,30 +205,44 @@ export async function runExploreValueBattery(
         { signal: params.signal },
       );
       if (params.signal?.aborted) {
-        rows[i] = { ...row, status: 'skipped', error: 'Cancelado — no finalizada' };
+        rows[i] = {
+          ...row,
+          status: "skipped",
+          error: "Cancelado — no finalizada",
+        };
       } else {
         rows[i] = {
           ...row,
-          status: 'ok',
+          status: "ok",
           runId: result.data.id,
           barCount: result.data.barCount,
           totalReturnPct: result.data.totalReturnPct,
           maxDrawdownPct: result.data.maxDrawdownPct,
           tradeCount: result.data.tradeCount,
           winCount: result.data.winCount,
-          sharpeRatio: metricNum(result.metrics, 'sharpeRatio'),
-          buyHoldReturnPct: metricNum(result.metrics, 'buyHoldReturnPct'),
-          excessReturnPct: metricNum(result.metrics, 'excessReturnPct'),
+          sharpeRatio: metricNum(result.metrics, "sharpeRatio"),
+          buyHoldReturnPct: metricNum(result.metrics, "buyHoldReturnPct"),
+          excessReturnPct: metricNum(result.metrics, "excessReturnPct"),
           periodReturns: periodReturnsFromEquity(result.data.equityCurve),
         };
         params.onRunComplete?.(result.data);
       }
     } catch (error) {
-      if (params.signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
-        rows[i] = { ...row, status: 'skipped', error: 'Cancelado — no finalizada' };
+      if (
+        params.signal?.aborted ||
+        (error instanceof DOMException && error.name === "AbortError")
+      ) {
+        rows[i] = {
+          ...row,
+          status: "skipped",
+          error: "Cancelado — no finalizada",
+        };
       } else {
-        const message = error instanceof Error ? error.message : 'Error al ejecutar la prueba';
-        rows[i] = { ...row, status: 'error', error: message };
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Error al ejecutar la prueba";
+        rows[i] = { ...row, status: "error", error: message };
       }
     }
 
@@ -235,26 +269,30 @@ export function buildExploreCoachNote(
   symbol: string,
   opts?: { barLimit?: number | null },
 ): ExploreCoachNote {
-  const ok = rows.filter((row) => row.status === 'ok');
+  const ok = rows.filter((row) => row.status === "ok");
   const buyHold =
-    ok.map((row) => row.buyHoldReturnPct).find((v) => v != null && Number.isFinite(v)) ?? null;
+    ok
+      .map((row) => row.buyHoldReturnPct)
+      .find((v) => v != null && Number.isFinite(v)) ?? null;
   const beaters = sortExploreRows(
     ok.filter((row) => (row.excessReturnPct ?? -Infinity) > 0),
-    'excess',
+    "excess",
   );
-  const best = sortExploreRows(ok, 'excess')[0];
+  const best = sortExploreRows(ok, "excess")[0];
   const beatCount = beaters.length;
   const barLimit = opts?.barLimit ?? best?.barCount ?? ok[0]?.barCount;
   const validationHint = suggestOptimizeValidation(barLimit);
 
   const bhText =
-    buyHold == null ? 'sin baseline' : `${buyHold >= 0 ? '+' : ''}${buyHold.toFixed(1)}% buy & hold`;
+    buyHold == null
+      ? "sin baseline"
+      : `${buyHold >= 0 ? "+" : ""}${buyHold.toFixed(1)}% buy & hold`;
 
   if (ok.length === 0) {
     return {
       headline: `${symbol}: la batería no produjo resultados útiles.`,
-      bullets: ['Revisa sync OHLCV (≥50 barras) y vuelve a explorar.'],
-      nextSteps: ['Sincronizar el valor', 'Probar un solo preset manualmente'],
+      bullets: ["Revisa sync OHLCV (≥50 barras) y vuelve a explorar."],
+      nextSteps: ["Sincronizar el valor", "Probar un solo preset manualmente"],
       buyHoldReturnPct: null,
       beatCount: 0,
       validationHint,
@@ -267,14 +305,14 @@ export function buildExploreCoachNote(
       bullets: [
         best
           ? `La menos mala fue «${best.label}» (${(best.excessReturnPct ?? 0).toFixed(1)} pp vs B&H).`
-          : 'Sin candidatos.',
-        'En este periodo el edge no aparece con reglas simples — no es momento de optimizar parámetros a ciegas.',
+          : "Sin candidatos.",
+        "En este periodo el edge no aparece con reglas simples — no es momento de optimizar parámetros a ciegas.",
         validationHint.reason,
       ],
       nextSteps: [
-        'Probar otro valor del IBEX con el mismo periodo',
-        'O acotar una pregunta distinta (p. ej. solo tendencia alcista) antes de mezclar indicadores',
-        'No desplegar en paper todavía',
+        "Probar otro valor del IBEX con el mismo periodo",
+        "O acotar una pregunta distinta (p. ej. solo tendencia alcista) antes de mezclar indicadores",
+        "No desplegar en paper todavía",
         coachValidationNextStep(validationHint),
       ],
       buyHoldReturnPct: buyHold,
@@ -292,14 +330,14 @@ export function buildExploreCoachNote(
         (row, index) =>
           `${index + 1}. «${row.label}» · estrategia ${(row.totalReturnPct ?? 0).toFixed(1)}% · exceso ${(row.excessReturnPct ?? 0).toFixed(1)} pp · DD ${(row.maxDrawdownPct ?? 0).toFixed(1)}%`,
       ),
-      'Esto es solo evidencia in-sample (mismo periodo). No es luz verde para invertir.',
-      'El coach solo interpreta genéricas (presets), no Mis estrategias.',
+      "Esto es solo evidencia in-sample (mismo periodo). No es luz verde para invertir.",
+      "El coach solo interpreta genéricas (presets), no Mis estrategias.",
       validationHint.reason,
     ],
     nextSteps: [
       `Abrir el detalle de «${top[0]!.label}» y revisar operaciones / racional`,
       coachValidationNextStep(validationHint),
-      'Revisar checklist pre-paper tras adoptar (OOS/WF/CPCV + Edge lab)',
+      "Revisar checklist pre-paper tras adoptar (OOS/WF/CPCV + Edge lab)",
     ],
     buyHoldReturnPct: buyHold,
     beatCount,
@@ -309,24 +347,26 @@ export function buildExploreCoachNote(
 }
 
 /** Map matrix rows (presets / saved con presetKey) into coach/explore rows. */
-export function matrixRowsToExploreRows(rows: StrategyMatrixRow[]): ExplorePresetRow[] {
+export function matrixRowsToExploreRows(
+  rows: StrategyMatrixRow[],
+): ExplorePresetRow[] {
   return rows
     .filter((row) => Boolean(row.presetKey))
-    .filter((row) => row.status !== 'idle')
+    .filter((row) => row.status !== "idle")
     .map((row) => {
       const strategyType = row.presetKey!;
       const meta = BACKTEST_STRATEGIES[strategyType];
-      const category = meta?.category ?? 'trend';
+      const category = meta?.category ?? "trend";
       const status: ExploreRowStatus =
-        row.status === 'ok'
-          ? 'ok'
-          : row.status === 'error'
-            ? 'error'
-            : row.status === 'skipped'
-              ? 'skipped'
-              : row.status === 'running'
-                ? 'running'
-                : 'pending';
+        row.status === "ok"
+          ? "ok"
+          : row.status === "error"
+            ? "error"
+            : row.status === "skipped"
+              ? "skipped"
+              : row.status === "running"
+                ? "running"
+                : "pending";
       return {
         strategyType,
         label: row.label,
@@ -351,12 +391,16 @@ export function matrixRowsToExploreRows(rows: StrategyMatrixRow[]): ExplorePrese
 /**
  * @deprecated Prefer matrixRowsToExploreRows — solo filas preset ya cerradas.
  */
-export function matrixPresetRowsToExploreRows(rows: StrategyMatrixRow[]): ExplorePresetRow[] {
+export function matrixPresetRowsToExploreRows(
+  rows: StrategyMatrixRow[],
+): ExplorePresetRow[] {
   return matrixRowsToExploreRows(
     rows.filter(
       (row) =>
-        row.kind === 'preset' &&
-        (row.status === 'ok' || row.status === 'error' || row.status === 'skipped'),
+        row.kind === "preset" &&
+        (row.status === "ok" ||
+          row.status === "error" ||
+          row.status === "skipped"),
     ),
   );
 }
@@ -372,7 +416,7 @@ export function mergeExploreIntoStrategyMatrix(
   if (explore.length === 0) return matrix;
   const byType = new Map(explore.map((row) => [row.strategyType, row]));
   return matrix.map((row) => {
-    if (row.kind !== 'preset' || !row.presetKey) return row;
+    if (row.kind !== "preset" || !row.presetKey) return row;
     const er = byType.get(row.presetKey);
     if (!er) return row;
     return {
