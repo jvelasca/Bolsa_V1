@@ -135,3 +135,27 @@ Esto **no** es un plan consensuado, es el diagnóstico heredado + elaborado. El 
 > Al cierre de M5 (FASE 3), actualizar `dev-continuation-plan-2026-08-09.md` con una sección **§7.6**
 > nueva (patrón §7.1–7.5) y añadir/confirmar este fichero en el índice engineering (bajo Product/Ops,
 > junto a los traspasos).
+
+---
+
+## 7. NOTA DE CIERRE de M5 — feature-slicing Diseño B agotado (2026-08-10)
+
+Tras ejecutar los frentes de M5 por features, se concluye que **el feature-slicing por islas JSX (patrón
+Diseño B) de `apps/web` está agotado en los frentes de valor**: `backtests-page` (pasos 1-10 + hardening de hooks),
+`trading-dia-d` (B.1-B.3), `backtest-explore` (E.1-E.5), `create-account-wizard` (C.1-C.5), `list-values` (I.1-I.2),
+`instruments-page` (cerrado como ya feature-sliced) y `backtest-optimize-panel` (ola 1 C-OPT.4-C-OPT.1-C-OPT.2 +
+C-OPT.5 `OptimizeSeedBanner`; 2.168 → 1.880 líneas).
+
+**Lo que queda en M5 es de acoplamiento alto u orquestación pura y NO se recomienda extraer con Diseño B**
+(decisión con riesgo no favorable, sin aprobación explícita):
+- `backtest-optimize-panel.tsx` → 6 bloques de acoplamiento alto (formulario avanzado, editor de espacio, botonera,
+  comparación `handleSave`, select familia `setFamilyAndSpace`, Mejor-vs-ancla + adopción).
+- `chart-drawings-layer.tsx` (1.979) → peor ratio valor/riesgo (canvas SVG monolítico interdependiente).
+- F4.8 `backtests-page.tsx` (5.127) → sin islas JSX; solo orquestación.
+
+**Próximas líneas de valor superiores a seguir con feature-slicing:** higiene CRLF/prettier de legacy como commit de
+formateo propio (M0/§6.2, cero riesgo funcional), o frentes de mayor ROI fuera de M5 (backend: Alembic baseline,
+`B007` de ruff, coherencia doc-código Proxy RFC-007; dev-stack M7: code-splitting / Vite F3.7). Véase el traspaso de
+entrada de la línea elegida para el siguiente hilo.
+
+_Nota de cierre añadida 2026-08-10 (`c068451`)._

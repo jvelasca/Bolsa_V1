@@ -56,7 +56,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m3-dominio-2026-08-10.md                   ← M3 capa de dominio (py/domain + application) CERRADO 08-10
 │   ├── traspaso-m4-infraestructura-datos-2026-08-10.md     ← M4 infraestructura/modelo datos (Prisma vs SQLAlchemy + Alembic + repos) CERRADO 08-10 · ADR-025
 │   ├── traspaso-m6-ai-analytics-2026-08-10.md              ← M6 AI/analytics (py/ai + py/analytics) CERRADO 08-10
-│   ├── traspaso-m5-frontend-2026-08-10.md                  ← M5 Frontend web por features (apps/web) tras M6 CERRADO-08-10 / entrada
+│   ├── traspaso-m5-frontend-2026-08-10.md                  ← M5 Frontend web por features (apps/web): CERRADO-08-10 como feature-slicing Diseño B agotado (ver §7 nota de cierre) / entrada
 │   ├── traspaso-m5-f4-8-coach-lab-2026-08-10.md            ← M5 hilo F4.8 siguiente: Coach + Lab (feature-slicing backtests-page)
 │   ├── traspaso-m5-frente-coach-cierre-2026-08-10.md      ← M5 cierre frente: Lab extraído (paso 9) · Coach extraído (paso 10) · frentes alternativos evaluados
 │   ├── traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md ← M5 frente trading-dia-d: B.1+B.2+B.3 extraídos (DiaDTradesPanel, DiaDPendingTradeBanner, DiaDSessionReportPanel) · frente CERRADO

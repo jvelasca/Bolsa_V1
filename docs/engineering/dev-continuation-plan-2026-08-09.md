@@ -1098,3 +1098,20 @@ específico futuro. Restante de M5 (anotado en traspaso de cierre): `chart-drawi
 **Traspaso del frente (CIERRE PARCIAL):** [traspaso-m5-frente-optimize-panel-cierre-2026-08-10.md](./traspaso-m5-frente-optimize-panel-cierre-2026-08-10.md) —
 HEAD `3572739`, bajo y medio riesgo (ola 1 + C-OPT.5) **ejecutados**, solo bloques de acoplamiento alto pendientes
 (plan específico).
+
+### §7.6.h — CIERRE de M5 como "feature-slicing Diseño B agotado" (2026-08-10)
+
+Tras cerrar el frente `backtest-optimize-panel` en bajo+medio riesgo (ola 1 + `OptimizeSeedBanner`, HEAD `3572739`),
+se evalúa el estado global de M5 y, por decisión del usuario (`c068451`), **M5 se cierra como feature-slicing agotado**:
+los frentes de valor ya se descompusieron y lo que queda es de **acoplamiento alto u orquestación pura**, con riesgo
+desfavorable para el patrón Diseño B. **No se asumen los 6 bloques de alto acoplamiento de optimize-panel.**
+
+- **Frentes M5 ejecutados:** `backtests-page` (pasos 1-10 + hardening hooks), `trading-dia-d` (B.1-B.3),
+  `backtest-explore` (E.1-E.5, coach/TOP), `create-account-wizard` (C.1-C.5), `list-values` (I.1-I.2),
+  `instruments-page` (cerrado feature-sliced), `backtest-optimize-panel` (ola 1 + C-OPT.5, 2.168→1.880).
+- **Lo que NO se toca (riesgo alto / sin valor):** enunciados en el traspaso canónico M5 §7.
+- **Próximas líneas de mayor valor que seguir el feature-slicing:** higiene CRLF/prettier legacy (commit de formateo
+  propio, M0/§6.2, cero riesgo), o fuera de M5: backend (Alembic baseline, `B007` ruff, coherencia doc-código Proxy
+  RFC-007), dev-stack M7 (code-splitting / Vite F3.7).
+- HEAD `c068451` · árbol limpio · sincronizado con origin · traspaso canónico M5 actualizado (§7) · engineering-index
+  marcado.
