@@ -19,10 +19,10 @@
 import type {
   InstrumentStrategyTopV1,
   InvestmentAccountDto,
-} from '@bolsa/shared';
-import { LIST_AUTO_MAX_INSTRUMENTS } from '@/features/backtests/backtest-list-auto';
-import type { SupervisedQueueItem } from '@/stores/supervised-f3-queue-store';
-import { resolveSupervisedQueueOrigin } from '@/stores/supervised-f3-queue-store';
+} from "@bolsa/shared";
+import { LIST_AUTO_MAX_INSTRUMENTS } from "@/features/backtests/backtest-list-auto";
+import type { SupervisedQueueItem } from "@/stores/supervised-f3-queue-store";
+import { resolveSupervisedQueueOrigin } from "@/stores/supervised-f3-queue-store";
 
 export const STRATEGY_MONITOR_MAX = LIST_AUTO_MAX_INSTRUMENTS;
 
@@ -70,13 +70,13 @@ export function findPaperForTopSlots(
   if (idSet.size === 0) return null;
   const linked = accounts.filter(
     (a) =>
-      (a.type === 'simulated' || a.type === 'paper') &&
-      a.status !== 'closed' &&
+      (a.type === "simulated" || a.type === "paper") &&
+      a.status !== "closed" &&
       a.strategyDefinitionId,
   );
   // Prefer DEMO simulated over reserved paper broker type.
   const demo = linked.find(
-    (a) => a.type === 'simulated' && idSet.has(a.strategyDefinitionId!),
+    (a) => a.type === "simulated" && idSet.has(a.strategyDefinitionId!),
   );
   if (demo) return demo;
   return linked.find((a) => idSet.has(a.strategyDefinitionId!)) ?? null;
@@ -93,8 +93,10 @@ export function findLastFinalistsPropose(
   const sym = symbol.trim().toUpperCase();
   if (!sym) return null;
   for (const item of queue) {
-    if (resolveSupervisedQueueOrigin(item) !== 'finalists') continue;
-    const itemSym = (item.symbol ?? item.payload.symbol ?? '').trim().toUpperCase();
+    if (resolveSupervisedQueueOrigin(item) !== "finalists") continue;
+    const itemSym = (item.symbol ?? item.payload.symbol ?? "")
+      .trim()
+      .toUpperCase();
     if (itemSym === sym) return item;
   }
   return null;
@@ -139,7 +141,7 @@ export function buildStrategyMonitorRow(opts: {
 export function isOpenAnalysisQuery(value: string | null | undefined): boolean {
   if (!value) return false;
   const v = value.trim().toLowerCase();
-  return v === '1' || v === 'true' || v === 'yes';
+  return v === "1" || v === "true" || v === "yes";
 }
 
 /**
@@ -149,14 +151,14 @@ export function isOpenAnalysisQuery(value: string | null | undefined): boolean {
 export function strategyMonitorChecklistHref(
   instrumentId: string,
   runId: string,
-  timeframe = '1d',
+  timeframe = "1d",
 ): string {
   const params = new URLSearchParams({
-    tab: 'run',
+    tab: "run",
     instrumentId,
     runId,
-    focus: 'detail',
-    openAnalysis: '1',
+    focus: "detail",
+    openAnalysis: "1",
     timeframe,
   });
   return `/backtests?${params.toString()}`;

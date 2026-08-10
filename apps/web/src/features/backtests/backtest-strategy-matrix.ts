@@ -5,46 +5,55 @@ import {
   type BacktestStrategyType,
   type StrategyDefinitionSummaryDto,
   type StrategyOrigin,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
-import type { ResolvedBacktestWindow } from '@/features/backtests/backtest-period';
-import { periodReturnsFromEquity } from '@/features/backtests/backtest-period-returns';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
+import { periodReturnsFromEquity } from "@/features/backtests/backtest-period-returns";
 import {
   librarySavedBucket,
   type LibrarySavedBucket,
-} from '@/features/backtests/library-strategy-buckets';
+} from "@/features/backtests/library-strategy-buckets";
 
 export const STRATEGY_MATRIX_MAX_SELECTED = 40;
 
 /** Filtros del carrusel de la matriz (L0: Optimizadas ≠ Mis estrategias). */
 export type StrategyMatrixFilter =
-  | 'all'
-  | 'preset'
-  | 'optimized'
-  | 'mine'
-  | 'finalists';
+  | "all"
+  | "preset"
+  | "optimized"
+  | "mine"
+  | "finalists";
 
 export const STRATEGY_MATRIX_FILTER_IDS: readonly StrategyMatrixFilter[] = [
-  'all',
-  'preset',
-  'optimized',
-  'mine',
-  'finalists',
+  "all",
+  "preset",
+  "optimized",
+  "mine",
+  "finalists",
 ] as const;
 
-export const STRATEGY_MATRIX_FILTER_LABELS: Record<StrategyMatrixFilter, string> = {
-  all: 'Todas',
-  preset: 'Genéricas',
-  optimized: 'Optimizadas',
-  mine: 'Mis estrategias',
-  finalists: 'Finalistas',
+export const STRATEGY_MATRIX_FILTER_LABELS: Record<
+  StrategyMatrixFilter,
+  string
+> = {
+  all: "Todas",
+  preset: "Genéricas",
+  optimized: "Optimizadas",
+  mine: "Mis estrategias",
+  finalists: "Finalistas",
 };
 
-export type StrategyMatrixRowStatus = 'idle' | 'pending' | 'running' | 'ok' | 'error' | 'skipped';
+export type StrategyMatrixRowStatus =
+  | "idle"
+  | "pending"
+  | "running"
+  | "ok"
+  | "error"
+  | "skipped";
 
 export type StrategyMatrixRow = {
   rowId: string;
-  kind: 'preset' | 'saved';
+  kind: "preset" | "saved";
   label: string;
   subtitle: string;
   presetKey?: BacktestStrategyType;
@@ -82,7 +91,7 @@ function metricNum(
 ): number | null {
   if (!metrics) return null;
   const v = metrics[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
 export function buildStrategyMatrixRows(
@@ -90,14 +99,14 @@ export function buildStrategyMatrixRows(
 ): StrategyMatrixRow[] {
   const presets: StrategyMatrixRow[] = STRATEGY_PRESET_KEYS.map((presetKey) => {
     const meta = BACKTEST_STRATEGIES[presetKey];
-    const category = meta?.category ?? 'trend';
+    const category = meta?.category ?? "trend";
     return {
       rowId: `preset:${presetKey}`,
-      kind: 'preset',
+      kind: "preset",
       label: meta?.label ?? presetKey,
       subtitle: STRATEGY_PRESET_CATEGORY_LABELS[category] ?? category,
       presetKey,
-      status: 'idle',
+      status: "idle",
     };
   });
 
@@ -106,26 +115,26 @@ export function buildStrategyMatrixRows(
     const presetLabel = s.presetKey
       ? (BACKTEST_STRATEGIES[s.presetKey]?.label ?? s.presetKey)
       : null;
-    const tf = s.timeframe?.trim() || '';
+    const tf = s.timeframe?.trim() || "";
     const baseSubtitle =
-      bucket === 'optimized'
+      bucket === "optimized"
         ? presetLabel
           ? `Optimizada · ${presetLabel}`
-          : 'Optimizada'
+          : "Optimizada"
         : presetLabel
           ? `Mía · ${presetLabel}`
-          : 'Mis estrategias';
+          : "Mis estrategias";
     const subtitle = tf ? `${baseSubtitle} · ${tf}` : baseSubtitle;
     return {
       rowId: `saved:${s.id}`,
-      kind: 'saved',
+      kind: "saved",
       label: s.name,
       subtitle,
       presetKey: s.presetKey ?? undefined,
       strategyDefinitionId: s.id,
       origin: s.origin,
       savedBucket: bucket,
-      status: 'idle',
+      status: "idle",
     };
   });
 
@@ -144,7 +153,9 @@ export function annotateStrategyMatrixRowsWithTop(
   } | null,
 ): StrategyMatrixRow[] {
   if (!top?.slots?.length) {
-    return rows.map((r) => (r.topRank != null ? { ...r, topRank: undefined } : r));
+    return rows.map((r) =>
+      r.topRank != null ? { ...r, topRank: undefined } : r,
+    );
   }
   const byDef = new Map<string, 1 | 2 | 3>();
   const typeByDef = new Map<string, string>();
@@ -154,7 +165,8 @@ export function annotateStrategyMatrixRowsWithTop(
       byDef.set(slot.strategyDefinitionId, slot.rank);
       // Solo para rellenar presetKey en la fila saved — no marca también la genérica
       // (evita 3 finalistas → 6 filas: saved + preset).
-      if (slot.strategyType) typeByDef.set(slot.strategyDefinitionId, slot.strategyType);
+      if (slot.strategyType)
+        typeByDef.set(slot.strategyDefinitionId, slot.strategyType);
     } else if (slot.strategyType) {
       byTypeOnly.set(slot.strategyType, slot.rank);
     }
@@ -168,7 +180,11 @@ export function annotateStrategyMatrixRowsWithTop(
       if (!presetKey && fromSlot && fromSlot in BACKTEST_STRATEGIES) {
         presetKey = fromSlot as BacktestStrategyType;
       }
-    } else if (row.kind === 'preset' && row.presetKey && byTypeOnly.has(row.presetKey)) {
+    } else if (
+      row.kind === "preset" &&
+      row.presetKey &&
+      byTypeOnly.has(row.presetKey)
+    ) {
       topRank = byTypeOnly.get(row.presetKey);
     }
     if (row.topRank === topRank && row.presetKey === presetKey) return row;
@@ -180,14 +196,16 @@ export function filterStrategyMatrixRows(
   rows: StrategyMatrixRow[],
   filter: StrategyMatrixFilter,
 ): StrategyMatrixRow[] {
-  if (filter === 'preset') return rows.filter((r) => r.kind === 'preset');
-  if (filter === 'optimized') {
-    return rows.filter((r) => r.kind === 'saved' && r.savedBucket === 'optimized');
+  if (filter === "preset") return rows.filter((r) => r.kind === "preset");
+  if (filter === "optimized") {
+    return rows.filter(
+      (r) => r.kind === "saved" && r.savedBucket === "optimized",
+    );
   }
-  if (filter === 'mine') {
-    return rows.filter((r) => r.kind === 'saved' && r.savedBucket === 'mine');
+  if (filter === "mine") {
+    return rows.filter((r) => r.kind === "saved" && r.savedBucket === "mine");
   }
-  if (filter === 'finalists') return rows.filter((r) => r.topRank != null);
+  if (filter === "finalists") return rows.filter((r) => r.topRank != null);
   return rows;
 }
 
@@ -201,13 +219,14 @@ export function strategyMatrixFiltersWithSelection(
 ): Set<StrategyMatrixFilter> {
   const out = new Set<StrategyMatrixFilter>();
   if (selectedIds.size === 0) return out;
-  out.add('all');
+  out.add("all");
   for (const row of rows) {
     if (!selectedIds.has(row.rowId)) continue;
-    if (row.kind === 'preset') out.add('preset');
-    if (row.kind === 'saved' && row.savedBucket === 'optimized') out.add('optimized');
-    if (row.kind === 'saved' && row.savedBucket === 'mine') out.add('mine');
-    if (row.topRank != null) out.add('finalists');
+    if (row.kind === "preset") out.add("preset");
+    if (row.kind === "saved" && row.savedBucket === "optimized")
+      out.add("optimized");
+    if (row.kind === "saved" && row.savedBucket === "mine") out.add("mine");
+    if (row.topRank != null) out.add("finalists");
   }
   return out;
 }
@@ -244,7 +263,9 @@ export type StrategyMatrixRunParams = {
     progress: StrategyMatrixRunProgress,
   ) => void;
   /** Called for each successful run so the UI can cache detail (avoid prune race). */
-  onRunComplete?: (detail: import('@bolsa/shared').BacktestRunDetailDto) => void;
+  onRunComplete?: (
+    detail: import("@bolsa/shared").BacktestRunDetailDto,
+  ) => void;
   signal?: AbortSignal;
 };
 
@@ -263,11 +284,11 @@ function buildProgress(
   for (const id of selectedIds) {
     const row = byId.get(id);
     if (!row) continue;
-    if (row.status === 'ok') ok += 1;
-    else if (row.status === 'error') error += 1;
-    else if (row.status === 'skipped') skipped += 1;
-    else if (row.status === 'pending') pending += 1;
-    else if (row.status === 'running') runningLabels.push(row.label);
+    if (row.status === "ok") ok += 1;
+    else if (row.status === "error") error += 1;
+    else if (row.status === "skipped") skipped += 1;
+    else if (row.status === "pending") pending += 1;
+    else if (row.status === "running") runningLabels.push(row.label);
   }
   return { done, total, ok, error, skipped, pending, runningLabels, elapsedMs };
 }
@@ -289,7 +310,7 @@ export async function runStrategyMatrixBattery(
   for (const row of selected) {
     byId.set(row.rowId, {
       ...row,
-      status: 'pending',
+      status: "pending",
       error: undefined,
       runId: undefined,
       totalReturnPct: undefined,
@@ -309,12 +330,21 @@ export async function runStrategyMatrixBattery(
   const emit = () => {
     params.onProgress?.(
       params.rows.map((r) => byId.get(r.rowId) ?? r),
-      buildProgress(selectedIds, byId, done, total, Math.round(performance.now() - startedAt)),
+      buildProgress(
+        selectedIds,
+        byId,
+        done,
+        total,
+        Math.round(performance.now() - startedAt),
+      ),
     );
   };
   emit();
 
-  const concurrency = Math.max(1, Math.min(params.concurrency ?? 4, STRATEGY_MATRIX_MAX_SELECTED));
+  const concurrency = Math.max(
+    1,
+    Math.min(params.concurrency ?? 4, STRATEGY_MATRIX_MAX_SELECTED),
+  );
   let nextIndex = 0;
 
   async function worker() {
@@ -324,14 +354,14 @@ export async function runStrategyMatrixBattery(
       nextIndex += 1;
       const base = selected[i]!;
       const current = byId.get(base.rowId)!;
-      byId.set(base.rowId, { ...current, status: 'running', error: undefined });
+      byId.set(base.rowId, { ...current, status: "running", error: undefined });
       emit();
 
       try {
         const result = await api.runBacktest(
           {
             instrumentId: params.instrumentId,
-            ...(base.kind === 'saved' && base.strategyDefinitionId
+            ...(base.kind === "saved" && base.strategyDefinitionId
               ? {
                   strategyDefinitionId: base.strategyDefinitionId,
                   // Fallback if the API still strips preset on old builds: also send type when known.
@@ -351,8 +381,8 @@ export async function runStrategyMatrixBattery(
         if (params.signal?.aborted) {
           byId.set(base.rowId, {
             ...current,
-            status: 'skipped',
-            error: 'Cancelado — no finalizada',
+            status: "skipped",
+            error: "Cancelado — no finalizada",
             runId: undefined,
           });
         } else {
@@ -363,29 +393,33 @@ export async function runStrategyMatrixBattery(
               | undefined);
           byId.set(base.rowId, {
             ...current,
-            status: 'ok',
+            status: "ok",
             runId: result.data.id,
             totalReturnPct: result.data.totalReturnPct,
             maxDrawdownPct: result.data.maxDrawdownPct,
             tradeCount: result.data.tradeCount,
             barCount: result.data.barCount,
-            buyHoldReturnPct: metricNum(result.metrics, 'buyHoldReturnPct'),
-            excessReturnPct: metricNum(result.metrics, 'excessReturnPct'),
-            sharpeRatio: metricNum(result.metrics, 'sharpeRatio'),
+            buyHoldReturnPct: metricNum(result.metrics, "buyHoldReturnPct"),
+            excessReturnPct: metricNum(result.metrics, "excessReturnPct"),
+            sharpeRatio: metricNum(result.metrics, "sharpeRatio"),
             periodReturns: periodReturnsFromEquity(equity),
           });
           params.onRunComplete?.(result.data);
         }
       } catch (error) {
-        if (params.signal?.aborted || (error instanceof DOMException && error.name === 'AbortError')) {
+        if (
+          params.signal?.aborted ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
           byId.set(base.rowId, {
             ...current,
-            status: 'skipped',
-            error: 'Cancelado — no finalizada',
+            status: "skipped",
+            error: "Cancelado — no finalizada",
           });
         } else {
-          const message = error instanceof Error ? error.message : 'Error al ejecutar';
-          byId.set(base.rowId, { ...current, status: 'error', error: message });
+          const message =
+            error instanceof Error ? error.message : "Error al ejecutar";
+          byId.set(base.rowId, { ...current, status: "error", error: message });
         }
       }
 
@@ -394,16 +428,18 @@ export async function runStrategyMatrixBattery(
     }
   }
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, total) }, () => worker()));
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, total) }, () => worker()),
+  );
 
   if (params.signal?.aborted) {
     for (const row of selected) {
       const cur = byId.get(row.rowId)!;
-      if (cur.status === 'pending' || cur.status === 'running') {
+      if (cur.status === "pending" || cur.status === "running") {
         byId.set(row.rowId, {
           ...cur,
-          status: 'skipped',
-          error: 'Cancelado — no finalizada',
+          status: "skipped",
+          error: "Cancelado — no finalizada",
           runId: undefined,
         });
       }
@@ -415,7 +451,7 @@ export async function runStrategyMatrixBattery(
 }
 
 export function formatPct(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return '—';
-  const sign = value > 0 ? '+' : '';
+  if (value == null || !Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
 }

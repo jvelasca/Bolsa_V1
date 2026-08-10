@@ -3,14 +3,14 @@
  * Visible + favoritos (★ al frente), como columnas de la matriz / listas Trading.
  */
 
-import type { StrategyMatrixFilter } from '@/features/backtests/backtest-strategy-matrix';
+import type { StrategyMatrixFilter } from "@/features/backtests/backtest-strategy-matrix";
 import {
   STRATEGY_MATRIX_FILTER_IDS,
   STRATEGY_MATRIX_FILTER_LABELS,
-} from '@/features/backtests/backtest-strategy-matrix';
+} from "@/features/backtests/backtest-strategy-matrix";
 
 export const STRATEGY_MATRIX_FILTER_CAROUSEL_PREFS_KEY =
-  'bolsa-strategy-matrix-filter-carousel-v1';
+  "bolsa-strategy-matrix-filter-carousel-v1";
 
 export type StrategyMatrixFilterCarouselPrefs = {
   /** Chips visibles en el carrusel (al menos 1). */
@@ -25,24 +25,23 @@ export const DEFAULT_STRATEGY_MATRIX_FILTER_VISIBLE: StrategyMatrixFilter[] = [
   ...STRATEGY_MATRIX_FILTER_IDS,
 ];
 
-export const DEFAULT_STRATEGY_MATRIX_FILTER_FAVORITES: StrategyMatrixFilter[] = [
-  'all',
-  'preset',
-  'finalists',
-];
+export const DEFAULT_STRATEGY_MATRIX_FILTER_FAVORITES: StrategyMatrixFilter[] =
+  ["all", "preset", "finalists"];
 
 function isFilterId(raw: unknown): raw is StrategyMatrixFilter {
   return (
-    typeof raw === 'string' &&
+    typeof raw === "string" &&
     (STRATEGY_MATRIX_FILTER_IDS as readonly string[]).includes(raw)
   );
 }
 
 /** Legacy `saved` → Mis estrategias. */
-export function normalizeStrategyMatrixFilter(raw: unknown): StrategyMatrixFilter {
-  if (raw === 'saved') return 'mine';
+export function normalizeStrategyMatrixFilter(
+  raw: unknown,
+): StrategyMatrixFilter {
+  if (raw === "saved") return "mine";
   if (isFilterId(raw)) return raw;
-  return 'all';
+  return "all";
 }
 
 function normalizeIdList(
@@ -53,7 +52,7 @@ function normalizeIdList(
   const out: StrategyMatrixFilter[] = [];
   const seen = new Set<StrategyMatrixFilter>();
   for (const item of raw) {
-    if (item !== 'saved' && !isFilterId(item)) continue;
+    if (item !== "saved" && !isFilterId(item)) continue;
     const id = normalizeStrategyMatrixFilter(item);
     if (seen.has(id)) continue;
     seen.add(id);
@@ -73,12 +72,12 @@ export function normalizeStrategyMatrixFilterCarouselPrefs(
   raw: unknown,
 ): StrategyMatrixFilterCarouselPrefs {
   const d = defaultStrategyMatrixFilterCarouselPrefs();
-  if (!raw || typeof raw !== 'object') return d;
+  if (!raw || typeof raw !== "object") return d;
   const o = raw as Partial<StrategyMatrixFilterCarouselPrefs>;
   let visibleIds = normalizeIdList(o.visibleIds, d.visibleIds);
   if (visibleIds.length === 0) visibleIds = [...d.visibleIds];
-  const favoriteIds = normalizeIdList(o.favoriteIds, d.favoriteIds).filter((id) =>
-    visibleIds.includes(id),
+  const favoriteIds = normalizeIdList(o.favoriteIds, d.favoriteIds).filter(
+    (id) => visibleIds.includes(id),
   );
   return { visibleIds, favoriteIds };
 }
@@ -97,7 +96,10 @@ export function saveStrategyMatrixFilterCarouselPrefs(
   prefs: StrategyMatrixFilterCarouselPrefs,
 ): void {
   const n = normalizeStrategyMatrixFilterCarouselPrefs(prefs);
-  localStorage.setItem(STRATEGY_MATRIX_FILTER_CAROUSEL_PREFS_KEY, JSON.stringify(n));
+  localStorage.setItem(
+    STRATEGY_MATRIX_FILTER_CAROUSEL_PREFS_KEY,
+    JSON.stringify(n),
+  );
 }
 
 export function toggleStrategyMatrixFilterVisible(

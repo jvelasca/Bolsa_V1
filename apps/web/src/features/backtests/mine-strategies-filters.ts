@@ -1,8 +1,12 @@
 /** Filtros Biblioteca · Mis estrategias (alcance S3 + búsqueda). */
 
-import type { StrategyOrigin } from '@bolsa/shared';
+import type { StrategyOrigin } from "@bolsa/shared";
 
-export type MineStrategyScopeFilter = 'all' | 'reusable' | 'fitted' | 'fitted_current';
+export type MineStrategyScopeFilter =
+  | "all"
+  | "reusable"
+  | "fitted"
+  | "fitted_current";
 
 export type MineStrategiesFilterState = {
   query: string;
@@ -24,30 +28,38 @@ export type MineStrategyFilterable = {
 };
 
 export const MINE_STRATEGY_ORIGIN_LABELS: Record<StrategyOrigin, string> = {
-  manual: 'Manual',
-  assisted: 'Asistida',
-  ai_generated: 'Prompt IA',
-  imported: 'Importada',
-  preset: 'Optimizada',
+  manual: "Manual",
+  assisted: "Asistida",
+  ai_generated: "Prompt IA",
+  imported: "Importada",
+  preset: "Optimizada",
 };
 
 export function defaultMineStrategiesFilters(): MineStrategiesFilterState {
-  return { query: '', timeframe: '', origin: '', scope: 'all', instrumentId: '' };
+  return {
+    query: "",
+    timeframe: "",
+    origin: "",
+    scope: "all",
+    instrumentId: "",
+  };
 }
 
 export function strategyScopeKind(
   instrumentIds: string[] | undefined | null,
-): 'reusable' | 'fitted' {
-  return !instrumentIds || instrumentIds.length === 0 ? 'reusable' : 'fitted';
+): "reusable" | "fitted" {
+  return !instrumentIds || instrumentIds.length === 0 ? "reusable" : "fitted";
 }
 
-export function isMineStrategiesFilterActive(filters: MineStrategiesFilterState): boolean {
+export function isMineStrategiesFilterActive(
+  filters: MineStrategiesFilterState,
+): boolean {
   return Boolean(
     filters.query.trim() ||
-      filters.timeframe ||
-      filters.origin ||
-      filters.instrumentId ||
-      filters.scope !== 'all',
+    filters.timeframe ||
+    filters.origin ||
+    filters.instrumentId ||
+    filters.scope !== "all",
   );
 }
 
@@ -72,26 +84,27 @@ export function filterMineStrategies<T extends MineStrategyFilterable>(
     }
 
     const scope = strategyScopeKind(s.instrumentIds);
-    if (filters.scope === 'reusable' && scope !== 'reusable') return false;
-    if (filters.scope === 'fitted' && scope !== 'fitted') return false;
-    if (filters.scope === 'fitted_current') {
-      if (!currentId || !(s.instrumentIds ?? []).includes(currentId)) return false;
+    if (filters.scope === "reusable" && scope !== "reusable") return false;
+    if (filters.scope === "fitted" && scope !== "fitted") return false;
+    if (filters.scope === "fitted_current") {
+      if (!currentId || !(s.instrumentIds ?? []).includes(currentId))
+        return false;
     }
 
     if (!q) return true;
     const symbolLabels = (s.instrumentIds ?? [])
-      .map((id) => symbolById?.get(id) ?? '')
+      .map((id) => symbolById?.get(id) ?? "")
       .filter(Boolean);
     const haystack = [
       s.name,
       s.kind,
       s.timeframe,
       s.origin,
-      s.presetKey ?? '',
+      s.presetKey ?? "",
       ...symbolLabels,
       ...(s.instrumentIds ?? []),
     ]
-      .join(' ')
+      .join(" ")
       .toLowerCase();
     return haystack.includes(q);
   });
@@ -102,12 +115,16 @@ export function formatStrategyScopeBadge(
   instrumentIds: string[] | undefined | null,
   symbolById: Map<string, string>,
 ): string {
-  if (!instrumentIds?.length) return 'Reutilizable';
-  const labels = instrumentIds.map((id) => symbolById.get(id) ?? id.slice(0, 8));
+  if (!instrumentIds?.length) return "Reutilizable";
+  const labels = instrumentIds.map(
+    (id) => symbolById.get(id) ?? id.slice(0, 8),
+  );
   if (labels.length === 1) return `Ajuste · ${labels[0]}`;
   return `Ajuste · ${labels.length} valores`;
 }
 
 export function uniqueSortedValues(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  return [...new Set(values.filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "es"),
+  );
 }
