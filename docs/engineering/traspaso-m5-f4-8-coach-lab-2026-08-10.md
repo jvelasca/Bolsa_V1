@@ -63,6 +63,26 @@ de riesgo creciente:
    M5 a los **otros frentes** de feature-slicing del traspaso M5 (list-values, instruments, charts) donde el
    valor/riesgo es mejor.
 
+### 2.3 Conclusión del hilo Coach + Lab (2026-08-10) — frente detenido
+
+**Decisión aprobada (usuario):** extraer solo el **Lab** (opción 1, paso 9 `8ae445b`) y detener la extracción del
+**Coach** (alternativa segura, opción 3). Evaluadas en FASE 1 las alternativas de M5, **ninguna ofrece slicing JSX
+de bajo riesgo a corto plazo**:
+
+- `trading/lists-tab/list-values-panel.tsx` (1.395 líneas): **ya feature-sliced** en sub-componentes
+  (`ListCarousel`, `ListColumnHeader`, `ListItemAccordion`, `SortedApiList`, `SortedVisualizationList`,
+  `PortfolioKeyboardList`, `PendingOrdersKeyboardList`, `EstudioListSupervisionBanner`). Lo que resta es
+  lógica de orquestación (estado/queries/handlers de selección y estudio), no JSX monolítico.
+- `instruments/instruments-page.tsx` (1.222 líneas): celdas y barras ya en sub-componentes
+  (`InstrumentsHubFilterBar`, `InstrumentsHubSplitLayout`, `SyncBadge`, `ListsCell`, `ScoreCell`,
+  `SeguimientoCell`, `PortfolioCell`). Resta lógica de orquestación.
+- `charts/chart-drawings-layer.tsx` (1.979 líneas): canvas SVG monolítico con editor interdependiente
+  (estado de dibujo, coordenadas, eventos). **Peor ratio valor/riesgo**; no hay bloques JSX autocontenidos.
+
+Solo quedaría `backtests-page.tsx` (Coach, ~30+ props) como última isla JSX, sin extraer por decisión (bajo
+valor/riesgo). El siguiente hilo puede (a) aceptar el Coach con Diseño B si interesa reducir algo más de líneas
+(objetivo <3.500, va por 5.152), o (b) cerrar M5 en el estado actual.
+
 ## 3. Reglas del juego (mantener en el nuevo chat)
 
 - **Protocolo sagrado** del traspaso M5: FASE 1 diagnóstico (sin cambios) → FASE 2 plan atómico + aprobación →

@@ -849,3 +849,11 @@ frente F4.8 o cede el resto de M5 a otros frentes (list-values/instruments/chart
 **Cobertura verificada:** el feature `backtests` tiene 74 ficheros de test (`*.test.ts(x)`) que cubren la lógica
 subyacente de los módulos extraídos (`backtest-period`, `backtest-mass-compare`, `backtest-list-auto*`,
 `backtest-hub-tabs/nav`, `backtest-lab-*`, `coach-*`, etc.); la batería `test 140/707` pasó en cada uno de los 9 pasos.
+
+**Cierre del frente (2026-08-10, decisión aprobada):** tras el paso 9, el chat **detuvo la extracción del Coach**
+(alternativa segura del traspaso Coach + Lab) y **cerró el frente M5** en este estado. Diagnóstico de los frentes
+alternativos del traspaso M5: `list-values-panel.tsx` (1.395) e `instruments-page.tsx` (1.222) **ya están
+feature-sliced** en sub-componentes (lo restante es lógica de orquestación, no JSX monolítico); `chart-drawings-layer.tsx`
+(1.979) es un canvas SVG monolítico interdependiente con el peor ratio valor/riesgo. No quedan islas JSX de bajo
+riesgo en M5 aparte de `backtests-page.tsx` Coach (sin extraer por decisión). Se preparó un nuevo traspaso parcial
+para el siguiente hilo.

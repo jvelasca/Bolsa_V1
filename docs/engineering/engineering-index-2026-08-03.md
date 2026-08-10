@@ -58,6 +58,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-m6-ai-analytics-2026-08-10.md              ← M6 AI/analytics (py/ai + py/analytics) CERRADO 08-10
 │   ├── traspaso-m5-frontend-2026-08-10.md                  ← M5 Frontend web por features (apps/web) tras M6 CERRADO-08-10 / entrada
 │   ├── traspaso-m5-f4-8-coach-lab-2026-08-10.md            ← M5 hilo F4.8 siguiente: Coach + Lab (feature-slicing backtests-page)
+│   ├── traspaso-m5-frente-coach-cierre-2026-08-10.md      ← M5 cierre frente: Lab extraído (paso 9) · Coach sin extraer · frentes alternativos evaluados
 │   ├── chart-top1-indicator-switch-*.md
 │   └── operativa-test-plan-*.md
 ├── Audit (entrada externa)
