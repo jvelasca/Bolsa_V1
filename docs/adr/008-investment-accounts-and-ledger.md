@@ -3,7 +3,7 @@
 ## Estado
 
 **Aceptado** — jul 2026  
-**Implementado (jul 2026):** Fase 0–2 con modelo XTB (cuenta = unidad UI; cartera interna única). Hub `/accounts`, ledger, fiscal, comisiones, custodia. Ver [PORTFOLIO_AND_CASH.md](../PORTFOLIO_AND_CASH.md) *(histórico: `PROJECT_STATE.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
+**Implementado (jul 2026):** Fase 0–2 con modelo XTB (cuenta = unidad UI; cartera interna única). Hub `/accounts`, ledger, fiscal, comisiones, custodia. Ver [PORTFOLIO_AND_CASH.md](../PORTFOLIO_AND_CASH.md).
 
 ## Contexto
 

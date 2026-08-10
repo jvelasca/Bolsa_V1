@@ -514,4 +514,16 @@ confirmado que no queda ningún uso (registrado como pendiente en el plan 08-10)
     `packages/shared/src/scan-api.ts:7` lo referencia como fuente de la spec. Pendiente de
     decidir el comentario de código antes de poder eliminarlo.
 - **Hallazgo de arquitectura al anclar:** `docs/ARCHITECTURE.md` (tabla de paquetes Python y
-  diagrama) **no lista `bolsa_ai`** pese a estar implementado. Pendiente de corregir en M0.
+  diagrama) **no lista `bolsa_ai`** pese a estar implementado. **Corregido** (ver abajo).
+
+### 6.4 Resolución M0 (2026-08-10, tarde)
+
+- **6 docs libres eliminados:** verificado que no existen físicamente (referencias muertas);
+  se retiraron sus marcas de "pendiente de borrar" en los `docs` (README, ARCHITECTURE,
+  BACKTESTING_DATA_ARCHITECTURE ×2, adr/008, adr/009, HYBRID_TRACKERS, docker.md,
+  API_REFERENCE, PERFORMANCE). Solo queda el `SCREENERS_SIGNALS_ALIGNMENT.md` marcado.
+- **`docs/ARCHITECTURE.md` corregido:** se añade `bolsa_ai` a la tabla de paquetes Python y
+  se refleja `infra · ai` en el diagrama de visión (cierra hallazgo de §8.1).
+- **Pendiente (abierto):** `SCREENERS_SIGNALS_ALIGNMENT.md` — decidir qué se hace con el
+  JSDoc de `scan-api.ts:7` que lo referencia en código (tocar código implicaría FASE 3 con
+  batería de tests, fuera del alcance solo-docs de M0).

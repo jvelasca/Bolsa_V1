@@ -2,7 +2,7 @@
 
 Documento de diseño (jul 2026). Define **cómo procesaremos datos en el futuro cercano con IA** y qué estructura hay que plantear **ahora** para que el hub de backtesting encaje sin reescrituras.
 
-Complementa: [ADR-003](./adr/003-python-backend-ai-platform.md), [ADR-007](./adr/007-intraday-ohlcv-persistence.md), [CHART_INDICATORS.md](./CHART_INDICATORS.md) *(histórico: `BACKTESTING_AUDIT.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
+Complementa: [ADR-003](./adr/003-python-backend-ai-platform.md), [ADR-007](./adr/007-intraday-ohlcv-persistence.md), [CHART_INDICATORS.md](./CHART_INDICATORS.md).
 
 ---
 
@@ -647,7 +647,7 @@ Checklist de decisiones **de arquitectura** (no implementar IA aún):
 
 ## 16. Siguiente paso acordado
 
-1. **Revisar y aprobar** este documento *(histórico: `BACKTESTING_AUDIT.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
+1. **Revisar y aprobar** este documento.
 2. **Redactar ADR-009** formalizando BT-0…BT-4 y contratos H0.
 3. **Crear tipos shared** (`StrategyDefinitionV1`, `DataSnapshotRef`, `RunManifest`) — sin motor completo aún.
 4. **Implementar BT-0** (nav hub) con slots UI para fases futuras.

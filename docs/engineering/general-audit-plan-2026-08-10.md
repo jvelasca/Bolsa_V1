@@ -194,6 +194,28 @@ lo referencia como fuente de spec. Bajo la decisión A no se elimina sin resolve
 se hace con ese comentario (mantenerlo apuntando a un doc inexistente, o retirar/actualizar
 el comentario). Pendiente de decisión/propuesta en hilo específico.
 
+### 7.2 Resolución (2026-08-10, tarde) — 6 docs libres eliminados, 1 queda pendiente
+
+Tras la FASE 1, se confirmó que los **6 docs libres no existen físicamente** en el repo
+(nunca fueron ficheros reales; eran referencias muertas), por lo que la "eliminación"
+consistió en **retirar las marcas de "pendiente de borrar"** que se habían dejado en M0.1
+para esos docs, dejando la documentación limpia. Estado final:
+
+| Doc | Existía como fichero | Uso en código/CI | Resolución |
+|---|---|---|---|
+| `CUTOVER_PYTHON.md` | No | No | Marcas limpiadas (README, ARCHITECTURE) |
+| `BACKTESTING_AUDIT.md` | No | No | Marcas limpiadas (BACKTESTING_DATA_ARCHITECTURE ×2, adr/009) |
+| `PROJECT_STATE.md` | No | No | Marca limpiada (adr/008) |
+| `AI_TRACKER_STRATEGY.md` | No | No | Marca limpiada (HYBRID_TRACKERS) |
+| `DISK_AND_CLEANUP.md` | No | No | Marca limpiada (docker.md) |
+| `sessions/2026-07-11-rd2-arq-worker.md` | No | No | Marca limpiada (API_REFERENCE) |
+| `sessions/2026-07-12-audit-close.md` | No | No | Marca limpiada (PERFORMANCE) |
+| `SCREENERS_SIGNALS_ALIGNMENT.md` | No | **Sí** (JSDoc `scan-api.ts:7`) | **Queda pendiente** — no se elimina su marca ni se actúa sobre el JSDoc sin decisión |
+
+**Incluida también en esta tanda:** corrección de `docs/ARCHITECTURE.md` para listar
+`bolsa_ai` (tabla de paquetes Python) y reflejarlo en el diagrama de visión (línea
+`infra · ai`). Cierra el hallazgo 8.1.
+
 ---
 
 ## 8. Anclaje del plan a la fuente de verdad real (2026-08-10)

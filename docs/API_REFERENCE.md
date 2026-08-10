@@ -296,7 +296,7 @@ Worker en lifespan API procesa cola `scan_jobs` cada 5s. Cache de features por `
 **RD-2:** cola scan jobs — `SCAN_QUEUE_BACKEND`:
 - `postgres` (default): worker inline poll PG cada 5s
 - `redis`: LPUSH/BRPOP en `bolsa:scan_jobs:pending`
-- `arq`: encolado Arq + worker dedicado `bolsa-arq-worker` *(histórico: `sessions/2026-07-11-rd2-arq-worker.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso)*
+- `arq`: encolado Arq + worker dedicado `bolsa-arq-worker`
 
 ---
 

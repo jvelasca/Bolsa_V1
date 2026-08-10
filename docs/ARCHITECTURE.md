@@ -16,7 +16,7 @@ Bolsa V1 es un monorepo con **backend Python (FastAPI)** como API por defecto, f
              │ packages/py │    │ packages/py │    │ @bolsa/     │
              │ application │    │ analytics   │    │ shared      │
              │ domain      │    │ market      │    │ (DTOs TS)   │
-             │ infra       │    └──────┬──────┘    └─────────────┘
+             │ infra · ai  │    └──────┬──────┘    └─────────────┘
              └──────┬──────┘           │
                     │            ┌─────▼─────┐
              ┌──────▼──────┐     │ Yahoo/XTB │
@@ -35,6 +35,7 @@ Bolsa V1 es un monorepo con **backend Python (FastAPI)** como API por defecto, f
 | `bolsa_infrastructure` | SQLAlchemy, config, repos |
 | `bolsa_analytics` | SMA, EMA, RSI, motor backtest |
 | `bolsa_market` | Yahoo provider, XTB bridge |
+| `bolsa_ai` | AI Governance (RFC-007): Proxy, Prompt Registry, adapters LLM (Ollama/OpenAI) |
 
 ### TypeScript (frontend + tooling BD)
 
@@ -61,7 +62,7 @@ Stack TS legacy archivado en `archive/legacy-ts/` — ver [LEGACY.md](./LEGACY.m
 - Middleware FastAPI valida `Authorization: Bearer <token>`.
 - Frontend: `AuthGate` → login o shell según `/api/auth/status`.
 
-Ver [DEV_STARTUP.md](./DEV_STARTUP.md) *(histórico: `CUTOVER_PYTHON.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
+Ver [DEV_STARTUP.md](./DEV_STARTUP.md).
 
 ## UI shell (ADR-004)
 

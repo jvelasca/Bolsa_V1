@@ -92,6 +92,6 @@ Tablas `strategy_definitions`, `data_snapshots`, `research_jobs`: **H1** (tipos 
 
 ## Referencias
 
-- [BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md) *(histórico: `BACKTESTING_AUDIT.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso)*
+- [BACKTESTING_DATA_ARCHITECTURE.md](../BACKTESTING_DATA_ARCHITECTURE.md)
 - [ADR-003](./003-python-backend-ai-platform.md)
 - **Evolución post-H0:** [ADR-011 Quantitative Research Operating System](./011-quantitative-research-platform.md) (hipótesis, Belief, landscape, Knowledge temprano).

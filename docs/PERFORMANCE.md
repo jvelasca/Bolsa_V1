@@ -105,4 +105,4 @@ rg "useInstrumentLiveQuotesBatch" apps/web/src
 
 ---
 
-*Sesión de cierre (histórico: `sessions/2026-07-12-audit-close.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso)*
+---

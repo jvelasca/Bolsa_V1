@@ -180,5 +180,5 @@ docker compose down -v
 
 
 
-El volumen Docker `bolsa_pg_data` puede crecer con cada sincronización Yahoo (miles de barras OHLCV). Ver [DATA_MODEL.md](./DATA_MODEL.md) *(histórico: `DISK_AND_CLEANUP.md` eliminado; pendiente de borrar definitivamente cuando se confirme libre de uso).*
+El volumen Docker `bolsa_pg_data` puede crecer con cada sincronización Yahoo (miles de barras OHLCV). Ver [DATA_MODEL.md](./DATA_MODEL.md).
 
