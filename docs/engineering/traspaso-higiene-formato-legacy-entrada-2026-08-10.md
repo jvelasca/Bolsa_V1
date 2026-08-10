@@ -61,10 +61,10 @@ docs/legacy debe hacerse **en commits propios de formateo único** (premisa M0/�
 | 3 | `7c174c7` | backtests/explore | 7 (bh = falso +EOL) |
 | 4 | `d96123d` | backtests/result | 5 (detail/finalists/ranking = falso +EOL) |
 | 5 | `9fa403a` | backtests/wizard | 2 (mass-compare/probe-list = falso +EOL) |
+| 6 | `68c9dac` | backtests/library + strategy-matrix | 5 |
 
-**Estado del hilo (2026-08-10):** lotes 1-5 ejecutados bajo+verde; este hilo se cierra con un relevo. El siguiente hilo
-retoma por dominio (`library`/`strategy-matrix`/`core-r`/`dia-d`…) siguiendo el protocolo que incluye el check de
-falsos positivos EOL (paso 4).
+**Estado del hilo (2026-08-10):** lotes 1-6 ejecutados bajo+verde. El siguiente hilo retoma por dominio
+(`core-r`/`dia-d`/`assistant`…) siguiendo el protocolo que incluye el check de falsos positivos EOL (paso 4).
 
 ## 6. Documentos fuente de verdad / índices
 
