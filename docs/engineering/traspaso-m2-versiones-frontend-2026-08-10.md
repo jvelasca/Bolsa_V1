@@ -128,6 +128,11 @@ Esto **no** es un plan consensuado, es el diagnóstico heredado + elaborado. El 
   (integridad + dependientes). Sin tocar código. Rangos `^` auditados → sin cambios.
 - **Batería:** typecheck ✅ · lint ✅ (0 errores) · test ✅ (707) · build ✅ · `@bolsa/shared` typecheck ✅ ·
   `pnpm test` (turbo) ✅.
+- **CI (confirmado en GitHub):** los 3 commits (types `20ecad0` + fix `@bolsa/shared` dist `ae79c62` +
+  fix `@types/node` `57d81cd`) dejan `Frontend CI` **verde** en `57d81cd`. Antes era rojo por 2 defectos
+  pre-existentes (no de M2): (1) `@bolsa/shared` sin `dist/` → `TS2307`; (2) `process` global sin
+  `@types/node` → `TS2580`. Ambos resueltos en M2 (paso `Build shared` en el workflow + declarar
+  `@types/node@22.20.0`).
 - **Registro:** sección §7.2 en `dev-continuation-plan-2026-08-09.md`; entrada del índice engineering
   marcada CERRADO en `engineering-index-2026-08-03.md`. Commit + push (botón CI en GitHub).
 - **Nota entorno:** `pnpm up` no relinkeaba `node_modules` local (estado "lockfile-only"); se sincronizó

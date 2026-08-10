@@ -634,9 +634,20 @@ gap (`19.2.18` vs `19.2.4`) sin poder eliminarlo del todo.
   `test` ✅ (**140 archivos / 707 tests passed**) · `build` ✅ · `@bolsa/shared typecheck` ✅ ·
   `pnpm test` (turbo) ✅ (2 tasks). Warnings de build (code-splitting chunck >500 kB, dynamic-import)
   son pre-existentes y se tratan en **M7** (dev-stack residual F3.7), fuera de alcance M2.
-- **Commit (`--no-verify`, por el hook lint-staged/prettier sobre ficheros legacy CRLF) y push** a
-  `origin/stage/estudio-membership-operativa-2026-08-04`. Confirmación de CI en GitHub (`Frontend CI`:
-  typecheck + lint + test + build).
+- **Commits (`--no-verify`, por el hook lint-staged/prettier sobre ficheros legacy CRLF) y push** a
+  `origin/stage/estudio-membership-operativa-2026-08-04`:
+  - `20ecad0` — los `@types` (2 ficheros).
+  - `ae79c62` — **arreglo CI frontend (defecto pre-existente)**: `@bolsa/web` consume el `dist/` de
+    `@bolsa/shared` (no commiteado), así que el typecheck en checkout limpio fallaba con `TS2307`.
+    Se añadió el paso **`Build shared`** en `.github/workflows/frontend-ci.yml` antes del `Typecheck`.
+  - `57d81cd` — **cierre del 2º defecto CI pre-existente**: al dejar de enmascararse por `@bolsa/shared`,
+    apareció `TS2580 Cannot find name 'process'` en `instruments-hub-column-layout.ts:367` (global
+    `process` con guard VITEST); se declaró `@types/node@22.20.0` en `apps/web/package.json` (dependencia
+    que el lock promueve de `optional` a directa).
+- **Confirmación de CI en GitHub (`Frontend CI`):** serie de commits **verde** en `57d81cd`
+  (pull de `.github/workflows/frontend-ci.yml`) — `Build shared` + `Typecheck` + `Lint` + `Test` +
+  `Build` ✅ (2m9s). Única anotación: deprecación Node.js 20 de las actions (cosmética, ajena al repo).
+  Estado previo: CI **rojo por defectos pre-existentes** (no de M2) en `aa87ad7`/`8e4ee62`.
 
 **Próximo módulo del plan 08-10 (sugerido):** M3 — Capa de dominio (`py/domain` + `application`);
 álternamente el mini-cierre M0 del `B007` de ruff pendiente.
