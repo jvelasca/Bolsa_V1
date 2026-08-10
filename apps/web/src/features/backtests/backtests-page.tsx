@@ -22,7 +22,6 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { FileJson, LineChart, SlidersHorizontal, Table } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Navigate,
@@ -39,7 +38,7 @@ import {
   type ChartStrategySetupDraft,
   type ChartTimeframe,
 } from "@bolsa/shared";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import {
   runBacktestBatch,
@@ -204,11 +203,6 @@ import {
 } from "@/features/backtests/backtest-assistant-steps";
 import { buildOptimizeRequestsFromSeed } from "@/features/backtests/backtest-optimize-from-seed";
 import { BacktestHubLayout } from "@/features/backtests/backtest-hub-layout";
-import { BacktestResultView } from "@/features/backtests/backtest-result-view";
-import {
-  BacktestInstrumentPreview,
-  BacktestResultEmpty,
-} from "@/features/backtests/backtest-instrument-preview";
 import {
   equityCurveFromDetail,
   exportBacktestJson,
@@ -288,6 +282,7 @@ import { BacktestWizardMassCompare } from "@/features/backtests/backtest-wizard-
 import { BacktestWizardAdvancedOptions } from "@/features/backtests/backtest-wizard-advanced-options";
 import { BacktestWizardListAuto } from "@/features/backtests/backtest-wizard-list-auto";
 import { BacktestWizardProbeList } from "@/features/backtests/backtest-wizard-probe-list";
+import { BacktestResultDetail } from "@/features/backtests/backtest-result-detail";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
@@ -4923,210 +4918,71 @@ export function BacktestsPage() {
                         />
                       )}
 
-                      {resultFocus === "detail" && diaDVerifyActive ? (
-                        <div className="flex min-h-0 flex-1 flex-col">
-                          <DiaDVerifyHost />
-                        </div>
-                      ) : null}
-
-                      {resultFocus === "detail" &&
-                        !diaDVerifyActive &&
-                        !detail &&
-                        instrumentId &&
-                        !(
-                          selectedId &&
-                          detailQuery.isFetching &&
-                          (!detailQuery.data?.data ||
-                            detailQuery.data.data.instrumentId === instrumentId)
-                        ) && (
-                          <div className="flex min-h-0 flex-1 flex-col">
-                            <BacktestInstrumentPreview
-                              key={instrumentId}
-                              instrumentId={instrumentId}
-                              symbol={instrumentSymbol ?? "Valor"}
-                              name={instrumentLabels[instrumentId]?.name}
-                              timeframe={runTimeframe}
-                              periodPreset={periodPreset}
-                              customDateFrom={customDateFrom}
-                              customDateTo={customDateTo}
-                              diaD={diaD}
-                            />
-                          </div>
-                        )}
-
-                      {resultFocus === "detail" &&
-                        !diaDVerifyActive &&
-                        !detail &&
-                        !instrumentId && <BacktestResultEmpty />}
-
-                      {resultFocus === "detail" &&
-                        !diaDVerifyActive &&
-                        !detail &&
-                        selectedId &&
-                        detailQuery.isFetching &&
-                        (!detailQuery.data?.data ||
-                          detailQuery.data.data.instrumentId ===
-                            instrumentId) && (
-                          <p className="text-sm text-muted-foreground">
-                            Cargando resultado…
-                          </p>
-                        )}
-
-                      {resultFocus === "detail" &&
-                        !diaDVerifyActive &&
-                        selectedId &&
-                        !detail &&
-                        detailQuery.isError && (
-                          <p className="text-sm text-destructive">
-                            {detailQuery.error instanceof ApiError
-                              ? detailQuery.error.message
-                              : detailQuery.error instanceof Error
-                                ? detailQuery.error.message
-                                : "No se pudo cargar el detalle de esta prueba."}
-                          </p>
-                        )}
-
-                      {resultFocus === "detail" &&
-                        !diaDVerifyActive &&
-                        detail && (
-                          <div className="flex min-h-0 flex-1 flex-col">
-                            <BacktestResultView
-                              fillHeight
-                              detail={detail}
-                              preferOpenAnalysis={preferOpenAnalysis}
-                              bars={replayBarsQuery.data?.data}
-                              barsLoading={
-                                replayBarsQuery.isLoading &&
-                                !replayBarsQuery.data
-                              }
-                              barsError={
-                                replayBarsQuery.isError && !replayBarsQuery.data
-                              }
-                              equityCurve={equityCurve}
-                              focusTimestamp={focusTimestamp}
-                              focusedTrade={focusedTrade}
-                              onSelectTrade={setFocusTimestamp}
-                              onJumpToTrade={focusTrade}
-                              displayTrialId={displayTrialId}
-                              displayMetrics={displayMetrics}
-                              linkedTrial={linkedTrial}
-                              drawingMarkers={drawingMarkers}
-                              finalistBadge={detailFinalistBadge}
-                              actions={
-                                <>
-                                  {batchRows.length > 0 && (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setResultFocus("ranking")}
-                                    >
-                                      Volver al ranking
-                                    </Button>
-                                  )}
-                                  <Button
-                                    type="button"
-                                    variant="default"
-                                    size="sm"
-                                    className="gap-1.5"
-                                    title="Abre Lab con este valor, esta estrategia y estos resultados como punto de partida."
-                                    aria-label="Optimizar a partir de esta prueba"
-                                    onClick={startOptimizeFromDetail}
-                                  >
-                                    <SlidersHorizontal className="h-4 w-4" />
-                                    Lab
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    title="Exportar resultado completo (JSON)"
-                                    aria-label="Exportar JSON"
-                                    onClick={() => exportBacktestJson(detail)}
-                                  >
-                                    <FileJson className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    title="Exportar operaciones (CSV)"
-                                    aria-label="Exportar trades CSV"
-                                    disabled={detail.trades.length === 0}
-                                    onClick={() => exportTradesCsv(detail)}
-                                  >
-                                    <Table className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    title="Exportar evolución del patrimonio (CSV)"
-                                    aria-label="Exportar equity CSV"
-                                    disabled={equityCurve.length === 0}
-                                    onClick={() => exportEquityCsv(detail)}
-                                  >
-                                    <LineChart className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              }
-                              deployingPaper={deployPaperMutation.isPending}
-                              onDeployPaper={(payload) =>
-                                deployPaperMutation.mutate({
-                                  strategyId: detail.strategyDefinitionId ?? "",
-                                  runId: detail.id,
-                                  initialDeposit: detail.initialCash,
-                                  labEvidence: payload.labEvidence,
-                                })
-                              }
-                              footerNote={
-                                <>
-                                  {deployPaperMutation.isError && (
-                                    <p className="text-sm text-destructive">
-                                      {deployPaperMutation.error instanceof
-                                      ApiError
-                                        ? deployPaperMutation.error.message
-                                        : "No se pudo crear la cuenta paper"}
-                                    </p>
-                                  )}
-                                  {manifestSummary && (
-                                    <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs">
-                                      <p className="font-medium text-foreground">
-                                        Manifiesto de la prueba
-                                      </p>
-                                      <ul className="mt-1 space-y-0.5 text-muted-foreground">
-                                        <li>Motor: {manifestSummary.engine}</li>
-                                        <li>
-                                          Versión datos:{" "}
-                                          {manifestSummary.dataVersion ?? "—"}
-                                        </li>
-                                        <li>
-                                          Barras:{" "}
-                                          {manifestSummary.barCount ??
-                                            detail.barCount}
-                                        </li>
-                                        <li>
-                                          Hash métricas:{" "}
-                                          {manifestSummary.metricsHash}
-                                        </li>
-                                      </ul>
-                                    </div>
-                                  )}
-                                  <p className="text-xs text-muted-foreground">
-                                    El checklist Lab habilita «
-                                    {PAPER_PATH_LAB.cta}» (
-                                    {PAPER_PATH_LAB.shortTitle}; distinto del
-                                    Paper automático del rastreador). Cuenta
-                                    simulada desde este run; sin auto-ejecución.
-                                  </p>
-                                </>
-                              }
-                            />
-                          </div>
-                        )}
+                      {resultFocus === "detail" && (
+                        <BacktestResultDetail
+                          diaDVerifyActive={diaDVerifyActive}
+                          detail={detail}
+                          instrumentId={instrumentId}
+                          selectedId={selectedId}
+                          detailFetching={detailQuery.isFetching}
+                          detailHasData={Boolean(detailQuery.data?.data)}
+                          detailDataInstrumentId={
+                            detailQuery.data?.data?.instrumentId
+                          }
+                          detailErrorActive={detailQuery.isError}
+                          detailError={detailQuery.error}
+                          instrumentSymbol={instrumentSymbol}
+                          instrumentName={instrumentLabels[instrumentId]?.name}
+                          timeframe={runTimeframe}
+                          periodPreset={periodPreset}
+                          customDateFrom={customDateFrom}
+                          customDateTo={customDateTo}
+                          diaD={diaD}
+                          preferOpenAnalysis={preferOpenAnalysis}
+                          bars={replayBarsQuery.data?.data}
+                          barsLoading={
+                            replayBarsQuery.isLoading &&
+                            !replayBarsQuery.data
+                          }
+                          barsError={
+                            replayBarsQuery.isError && !replayBarsQuery.data
+                          }
+                          equityCurve={equityCurve}
+                          focusTimestamp={focusTimestamp}
+                          focusedTrade={focusedTrade}
+                          onSelectTrade={setFocusTimestamp}
+                          onJumpToTrade={focusTrade}
+                          displayTrialId={displayTrialId}
+                          displayMetrics={displayMetrics}
+                          linkedTrial={linkedTrial}
+                          drawingMarkers={drawingMarkers}
+                          finalistBadge={detailFinalistBadge}
+                          hasRankingRows={batchRows.length > 0}
+                          onBackToRanking={() => setResultFocus("ranking")}
+                          onStartOptimize={startOptimizeFromDetail}
+                          onExportJson={() => {
+                            if (detail) exportBacktestJson(detail);
+                          }}
+                          onExportTrades={() => {
+                            if (detail) exportTradesCsv(detail);
+                          }}
+                          onExportEquity={() => {
+                            if (detail) exportEquityCsv(detail);
+                          }}
+                          deployingPaper={deployPaperMutation.isPending}
+                          deployError={deployPaperMutation.error}
+                          onDeployPaper={(payload) => {
+                            if (!detail) return;
+                            deployPaperMutation.mutate({
+                              strategyId: detail.strategyDefinitionId ?? "",
+                              runId: detail.id,
+                              initialDeposit: detail.initialCash,
+                              labEvidence: payload.labEvidence,
+                            });
+                          }}
+                          manifestSummary={manifestSummary}
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 }
