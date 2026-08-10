@@ -1,7 +1,7 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `f011918` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `de35c4c` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
 > Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-13) y los próximos dominios.
@@ -30,8 +30,9 @@ formatee masivamente el estilo antiguo en el diff editorial).
 - **Orden** (mejor ratio valor/riesgo):
   1. `components/ui` + `components/layout` — hecho (LOTE 1).
   2. `features/backtests` **subdividido por dominio funcional** (directorio plano y enorme; ~210 files desincronizados
-     originalmente): `optimize`→`explore`→`result`→`wizard`→`library`/`strategy-matrix`→`core-r`→`dia-d`→`assistant`
-     (hechos). Siguientes: `lab`, `optimize` restantes, `chart`/`strategy-monitor`, etc. Cada sub-lote ≤ ~30 archivos.
+     originalmente): `optimize`→`explore`→`result`→`wizard`→`library`/`strategy-matrix`→`core-r`→`dia-d`→`assistant`→
+     `optimize restantes`→`strategy-matrix restantes`→`list-auto`/`mass-compare`→`finalists`/`top` (hechos, lotes 2-13).
+     Siguientes: `coach`/`lab`, `hub`/`chart`/`misc`. Cada sub-lote ≤ ~30 archivos.
   3. El resto de `apps/web/src` por sub-lotes.
 
 ## 3. Protocolo por lote (FASE 3) — 8 pasos
@@ -96,13 +97,22 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
-> **Nota de método para el siguiente hilo:** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes (11,
-> `ee381d7`), `list-auto`/`mass-compare` (12, `9975cd3`) y `finalists`/`top` (13, `f011918`) ya están HECHOS. Recomendar
-> arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios, p. ej. **`coach`/`lab`**
-> (`coach-dual-audit`(+test), `coach-llm-invariant.test`, `coach-profile-policy`(+test), `coach-top-save`(+test),
-> `coach-quorum-bar`, `backtest-coach-*.ts`(+tests), `backtest-lab-board`(+types), `lab-board-activity-banner`,
-> `lab-zone-verdict`, `lab-*(memory/handoff/caf-smoke)`) — acotar a ≤ ~30 archivos, o **`hub`/`chart`/`misc`**, y seguir el
-> protocolo exactamente paso a paso, verificando el `git diff --cached --numstat` (paso 4) en cada lote.
+> **Nota de método para el siguiente hilo (relevo):** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes
+> (11, `ee381d7`), `list-auto`/`mass-compare` (12, `9975cd3`) y `finalists`/`top` (13, `f011918`) ya están HECHOS.
+> Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
+>
+> **Siguiente: `coach`/`lab` — 16 files desincronizados YA CONFIRMADOS por `prettier --check` (2026-08-11):**
+> - **coach (9):** `coach-dual-audit.ts`(+test), `coach-profile-policy.ts`(+test), `coach-llm-invariant.test.ts`,
+>   `coach-top-save.ts`(+test), `coach-quorum-bar.tsx`, `coach-profile-battery-scenario.test.ts`.
+> - **lab (7):** `lab-coach-handoff.ts`(+test), `lab-adoption-memory.ts`(+test), `lab-board-activity-banner.tsx`,
+>   `lab-zone-verdict.tsx`, `lab-coach-caf-smoke.test.ts`.
+> - **Auto-lista para el `--check`/`--write`/`git add`** (16 rutas bajo `src/features/backtests/`): los anteriores.
+> - Quedan **por verificar** antes de cerrar el dominio: `backtest-lab-board.tsx`(+`backtest-lab-board-types.ts`),
+>   `backtest-coach-lote.ts`(+test), `backtest-coach-coherence.test.ts`; si `--check` los reporta, se añaden al lote
+>   (≤ ~30 en total).
+> Tras `coach`/`lab`, queda **`hub`/`chart`/`misc`** (mayor, ~44 archivos; conviene subdividirlo, p. ej. `hub` primero:
+> `backtest-hub-layout`/`hub-nav`/`hub-tabs`/`global-bar`/`history-tab`/`backtests-page`, luego el resto) y después el
+> **resto de `apps/web/src`**. Seguir el protocolo paso a paso, verificando el `git diff --cached --numstat` (paso 4).
 
 
 ## 6. Documentos fuente de verdad / índices
