@@ -66,8 +66,10 @@ docs/legacy debe hacerse **en commits propios de formateo único** (premisa M0/�
 | 8 | `0a96220` | backtests/dia-d | 8 |
 | 9 | `1cb6ee7` | backtests/assistant | 17 |
 
-**Estado del hilo (2026-08-10):** lotes 1-9 ejecutados bajo+verde. El siguiente hilo retoma por dominio
-(`lab`/`optimize` restantes…) siguiendo el protocolo que incluye el check de falsos positivos EOL (paso 4).
+**Estado del hilo (2026-08-11):** lotes 1-9 ejecutados bajo+verde (80 files, HEAD `2e1f8d1`). Este hilo cierra con el
+relevo consolidado en [traspaso-higiene-formato-legacy-salida-2026-08-11.md](./traspaso-higiene-formato-legacy-salida-2026-08-11.md),
+punto de entrada del siguiente hilo; retoma por dominio (`lab`/`optimize` restantes…) siguiendo el protocolo que incluye
+el check de falsos positivos EOL (paso 4).
 
 ## 6. Documentos fuente de verdad / índices
 
