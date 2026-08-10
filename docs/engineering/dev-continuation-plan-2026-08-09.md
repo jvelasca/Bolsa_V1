@@ -856,3 +856,31 @@ valor/riesgo. **M5 no deja islas JSX de bajo riesgo** en `backtests-page.tsx` (p
 (<3.500 líneas) sigue lejos (5.127) porque el resto es orquestación, no JSX autocontenido — el siguiente frente puede
 ser otro feature (list-values/instruments/charts) o la higiene M0/§6.2 (CRLF de backtests-page como commit de
 formateo propio). Se preparará un nuevo traspaso parcial para el siguiente hilo.
+
+---
+
+### §7.6.b — Registro M5 reorientado al feature `trading` (frente `trading-dia-d-replay-panel.tsx`)
+
+**Estado:** tras agotar las islas JSX de `backtests-page.tsx` (paso 10), el hilo siguiente de M5 **reorientó el
+esfuerzo a otro frente** por §2.3 del traspaso M5. Diagnosticado en FASE 1 (verificación del [subagente de
+exploración](22e3ea27-85b9-442b-a55e-e3130616353a) + lectura directa del fichero): el fichero
+`apps/web/src/features/trading/trading-dia-d-replay-panel.tsx` (1.341 líneas, panel **Modo DÍA D**) es el mejor
+candidato de valor/riesgo — ya parcialmente sliced (`BacktestReplayChart`, `BacktestMovieHud`,
+`BacktestEquityChart`, `DiaDReconciliationPanel`, `DiaDArchivePanel`) y con **3 bloques JSX inline extraíbles**
+como thin wrappers. Otros frentes del §4.2 descartados (acoplamiento alto): `backtest-optimize-panel.tsx` (2.251),
+`backtest-strategy-matrix-panel.tsx` (1.033), `backtest-explore-panel.tsx` (1.456, MEDIO), `ohlcv-chart.tsx` (974).
+
+**Paso B.1 (primer sub-paso, aprobado):** extraída la **tabla de Operaciones** (bloque `<section>` ~1272-1336) a
+`apps/web/src/features/trading/dia-d-trades-panel.tsx` → `DiaDTradesPanel` (**Diseño B**, thin wrapper, 4 props:
+`detail`, `replayCursor`, `focusTimestamp`, `onFocusTimestamp`). Los callbacks/estado del orquestador
+(`replayCursor`, `focusTimestamp`, `setFocusTimestamp`) **permanecen en el orquestador**; el JSX de la tabla se
+traslada fielmente. Reducción en el orquestador: **-58 líneas netas** (~1.341 → ~1.283).
+
+**Batería verde (paso B.1):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings code-splitting
+pre-existentes = M7). **Cobertura verificada:** el feature `trading/dia-d` tiene tests de lógica
+(`dia-d-gate-equity`, `dia-d-evidence-archive-io`, `dia-d-verify-continuity`, `dia-d-session-evidence`,
+`dia-d-reconciliation`, `dia-d-favorites`); el bloque extraído es JSX presentacional sin test directo → no se rompe nada.
+
+**Pendiente del frente (no ejecutado, por alcance aprobado B.1 solo):** **B.2** banner de trade pendiente
+(~1040-1057) → `DiaDPendingTradeBanner`; **B.3** panel Informe sesión (`<aside>` ~1138-1164) →
+`DiaDSessionReportPanel`. Se valorarán en los próximos pasos del frente.

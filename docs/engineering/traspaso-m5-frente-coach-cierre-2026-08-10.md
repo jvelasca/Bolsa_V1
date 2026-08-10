@@ -1,7 +1,7 @@
 # Traspaso parcial — M5 frente Coach + frentes alternativos (frontend web por features)
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `d3315e8` (paso 10 Coach extraído) · **Árbol limpio** · paso Lab `8ae445b`
+**HEAD:** *(PENDIENTE commit paso B.1 trading dia-d)* · paso Lab `8ae445b`
 **Origen:** [traspaso-m5-f4-8-coach-lab-2026-08-10.md](./traspaso-m5-f4-8-coach-lab-2026-08-10.md) + registro **§7.6**
 de [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
 
@@ -59,11 +59,14 @@ Con este paso M5 **agota las islas JSX del monólito**. Batería Coach adicional
 
 ### 2.3 Opciones para el siguiente hilo
 
-1. ~~Extraer el Coach con Diseño B~~ — **HECHO en este hilo** (paso 10, `BacktestResultFocusCoach`, ~33 props).
+1. ~~Extraer el Coach con Diseño B~~ — **HECHO** (paso 10, `BacktestResultFocusCoach`, ~33 props).
    M5 ya no deja islas JSX autocontenidas en `backtests-page.tsx`.
-2. **Cerrar M5 / reorientar**: mover esfuerzo a otro frente/feature de M5 (p. ej. `backtest-optimize-panel.tsx`
-   2.251, `backtest-explore-panel.tsx` 1.456, `trading-dia-d-replay-panel.tsx` 1.341, `backtest-strategy-matrix-panel.tsx`
-   1.033…, o higiene M0/§6.2 CRLF de backtests-page como commit de formateo propio).
+2. **Reorientar M5 a otro frente — EN CURSO**: se inició el frente `trading-dia-d-replay-panel.tsx` (1.341 líneas),
+   el mejor candidato de valor/riesgo (parcialmente sliced y con thin wrappers limpios). **Paso B.1 hecho**
+   (`DiaDTradesPanel`, tabla de Operaciones). Pendiente del frente: **B.2** banner trade pendiente, **B.3** panel
+   Informe sesión. Otros candidatos del §4.2 (acoplamiento alto, descartados en FASE 1): `backtest-optimize-panel.tsx`
+   (2.251), `backtest-strategy-matrix-panel.tsx` (1.033), `backtest-explore-panel.tsx` (1.456, MEDIO),
+   `ohlcv-chart.tsx` (974, sin JSX extraíble).
 3. **Refactor a custom hooks** (extraer handlers/queries de orquestación de los frentes grandes) — más invasivo,
    fuera del patrón de slicing JSX aprobado; requiere recalibración explícita.
 
