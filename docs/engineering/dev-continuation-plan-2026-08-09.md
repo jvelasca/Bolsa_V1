@@ -895,7 +895,7 @@ code-splitting pre-existentes = M7). **Cobertura verificada:** el feature `tradi
 informe) son JSX presentacional sin test directo → no se rompe nada. **Resultado del frente:** las islas JSX del
 orquestador quedan extraídas (B.1 tabla, B.2 banner, B.3 informe); resta orquestación, no JSX autocontenido.
 
-### §7.6.c — Registro M5 frente `backtest-explore-panel.tsx` (área Coach/TOP, pasos E.1+E.2+E.3)
+### §7.6.c — Registro M5 frente `backtest-explore-panel.tsx` (área Coach/TOP, pasos E.1+E.2+E.3+E.4)
 
 **Estado:** tras cerrar trading-dia-d (B.1-B.3), M5 reorientó al siguiente candidato `backtest-explore-panel.tsx`
 (1.456 líneas, panel **Coach / TOP a futuro**). **Aplica la regla `coach-top-quality.mdc`** → cada paso exigió la
@@ -920,17 +920,22 @@ B&H / DD / estado / Acción → Lab≈). Diseño B thin wrapper: acoplamiento **
 `onOptimizeCandidate`). El `useMemo` de `ranked` (`sortExploreRows`) y el const `SORT_OPTIONS` **migran al componente**.
 Orquestador **-186 líneas** (~1.350 → **~1.164**).
 
-**Batería verde (E.1 + E.2 + E.3):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
+**Paso E.4 (`e079a3f`, aprobado):** `BacktestExploreAtOutlook` (`backtest-explore-at-outlook.tsx`) — banner de
+**régimen** (cambio de tramo / mejor mitad) + `<details>` «**Análisis AT y outlook**» (analysis + outlook + disclaimer).
+Diseño B thin wrapper: acoplamiento **BAJO**, data-only; 4 props (`regime`, `analysis`, `outlook`, `disclaimer`).
+Orquestador **-19 líneas** (~1.164 → **~1.145**).
+
+**Batería verde (E.1 → E.4):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
 code-splitting = M7) · **`pnpm test:coach` OK** (web 26/186 + API smoke CORE-P live OK) en cada paso.
 **Cobertura verificada:** JSX presentacional sin test directo; los tests de lógica Coach pasan intactos.
 **No se movió lógica de ciclo**: auto-save Finalistas/ACK/atajo, `saveTopMutation` de negocio y gate permanecen en el
 orquestador.
 
-**Pendiente del frente (islas restantes, ver traspaso):** candidatas ★ grid (medio/alto), regime + AT outlook (bajo),
-banners de estado del ciclo (ALTO — tocan Coach²/ACK).
+**Pendiente del frente (islas restantes, ver traspaso):** candidatas ★ grid (medio/alto), banners de estado del ciclo
+(ALTO — tocan Coach²/ACK). Queda orquestación pura además de los bloques de ciclo no extraíbles como JSX.
 
 **Traspaso del frente:** [traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md](./traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md) —
-HEAD `fbf1ad0`, E.1+E.2+E.3 cerrados, islas restantes y opciones §2.3 para el siguiente hilo.
+HEAD `e079a3f`, E.1+E.2+E.3+E.4 cerrados, islas restantes y opciones §2.3 para el siguiente hilo.
 
 **Traspaso del frente (actualizado):**
 [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) —
