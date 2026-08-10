@@ -107,7 +107,6 @@ import {
 import {
   LIST_AUTO_BATCH_SIZE,
   LIST_AUTO_HARD_MAX,
-  LIST_AUTO_MAX_INSTRUMENTS,
   confirmListAutoOverCap,
   createListAutoCampaign,
   filterListAutoIdsWithoutFinalists,
@@ -288,6 +287,7 @@ import { BacktestResultRanking } from "@/features/backtests/backtest-result-rank
 import { BacktestWizardMassCompare } from "@/features/backtests/backtest-wizard-mass-compare";
 import { BacktestWizardAdvancedOptions } from "@/features/backtests/backtest-wizard-advanced-options";
 import { BacktestWizardListAuto } from "@/features/backtests/backtest-wizard-list-auto";
+import { BacktestWizardProbeList } from "@/features/backtests/backtest-wizard-probe-list";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
@@ -1824,11 +1824,6 @@ export function BacktestsPage() {
   });
 
   const drawingMarkers = drawingReplayQuery.data?.data ?? [];
-
-  const strategyMeta =
-    runSource === "preset" && strategyType
-      ? BACKTEST_STRATEGIES[strategyType]
-      : null;
 
   const manifestSummary = useMemo(() => {
     if (!detail?.manifest) return null;
@@ -4053,135 +4048,26 @@ export function BacktestsPage() {
                             onForceRescanRemaining={forceListAutoRescanRemaining}
                           />
 
-                          <details className="rounded-md border border-border/60 bg-muted/10">
-                            <summary className="cursor-pointer list-none px-2.5 py-1.5 text-[11px] font-medium text-foreground/90 marker:content-none [&::-webkit-details-marker]:hidden">
-                              Probar lista (opcional) · 1 estrategia × N valores
-                            </summary>
-                            <div className="space-y-2 border-t border-border/50 px-2.5 py-2.5">
-                              <p className="text-[10px] leading-snug text-muted-foreground">
-                                Ranking rápido Fase C. No es el embudo Play /
-                                Lista AUTO.
-                              </p>
-                              <fieldset className="space-y-2">
-                                <legend
-                                  className="text-[11px] font-medium"
-                                  title="Genérica = catálogo. Optimizadas = Lab/clones. Mis estrategias = autoría (prompt/manual)."
-                                >
-                                  Estrategia para «Probar lista»
-                                </legend>
-                                <label className="flex items-center gap-2 text-xs">
-                                  <input
-                                    type="radio"
-                                    checked={runSource === "preset"}
-                                    onChange={() => setRunSource("preset")}
-                                  />
-                                  Genérica
-                                </label>
-                                <label className="flex items-center gap-2 text-xs">
-                                  <input
-                                    type="radio"
-                                    checked={runSource === "saved"}
-                                    onChange={() => setRunSource("saved")}
-                                    disabled={strategies.length === 0}
-                                  />
-                                  Mis estrategias / Optimizadas
-                                </label>
-                              </fieldset>
-
-                              {runSource === "preset" ? (
-                                <>
-                                  <label className="block text-[11px] font-medium">
-                                    Estrategia
-                                    <select
-                                      value={strategyType}
-                                      onChange={(e) =>
-                                        setStrategyType(
-                                          e.target
-                                            .value as BacktestStrategyType,
-                                        )
-                                      }
-                                      className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-                                    >
-                                      {STRATEGY_OPTIONS.map(([key, meta]) => (
-                                        <option key={key} value={key}>
-                                          {meta.label}
-                                        </option>
-                                      ))}
-                                    </select>
-                                  </label>
-                                  {strategyMeta && (
-                                    <p className="text-[11px] text-muted-foreground">
-                                      {strategyMeta.description}
-                                    </p>
-                                  )}
-                                </>
-                              ) : (
-                                <label className="block text-[11px] font-medium">
-                                  Estrategia (guardada)
-                                  <select
-                                    value={savedStrategyId}
-                                    onChange={(e) =>
-                                      setSavedStrategyId(e.target.value)
-                                    }
-                                    className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-                                  >
-                                    <option value="">Selecciona…</option>
-                                    {strategies.map((s) => (
-                                      <option key={s.id} value={s.id}>
-                                        {s.name}
-                                        {s.presetKey
-                                          ? ` · ${BACKTEST_STRATEGIES[s.presetKey]?.label ?? s.presetKey}`
-                                          : ""}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </label>
-                              )}
-
-                              {batchRunning ? (
-                                <div className="flex gap-2">
-                                  <Button className="flex-1" disabled>
-                                    Probando lista… {batchProgress.done}/
-                                    {batchProgress.total}
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() =>
-                                      batchAbortRef.current?.abort()
-                                    }
-                                  >
-                                    Parar
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  className="w-full"
-                                  variant="outline"
-                                  onClick={() => void runListBatch()}
-                                  disabled={
-                                    batchRunning ||
-                                    exploreRunning ||
-                                    Boolean(listAutoUi) ||
-                                    (runSource === "saved" &&
-                                      !savedStrategyId) ||
-                                    (periodPreset === "custom" &&
-                                      (!customDateFrom || !customDateTo)) ||
-                                    !listId
-                                  }
-                                >
-                                  {`Probar lista${
-                                    listDetail
-                                      ? ` (${Math.min(
-                                          LIST_AUTO_MAX_INSTRUMENTS,
-                                          listDetail.instrumentIds.length,
-                                        )})`
-                                      : ""
-                                  }`}
-                                </Button>
-                              )}
-                            </div>
-                          </details>
+                          <BacktestWizardProbeList
+                            runSource={runSource}
+                            onRunSourceChange={setRunSource}
+                            strategyType={strategyType}
+                            onStrategyTypeChange={setStrategyType}
+                            strategies={strategies}
+                            savedStrategyId={savedStrategyId}
+                            onSavedStrategyIdChange={setSavedStrategyId}
+                            batchRunning={batchRunning}
+                            batchProgress={batchProgress}
+                            onAbortBatch={() => batchAbortRef.current?.abort()}
+                            onRunListBatch={() => void runListBatch()}
+                            exploreRunning={exploreRunning}
+                            listAutoRunning={Boolean(listAutoUi)}
+                            periodPreset={periodPreset}
+                            customDateFrom={customDateFrom}
+                            customDateTo={customDateTo}
+                            listId={listId}
+                            listDetail={listDetail}
+                          />
 
                           <BacktestWizardMassCompare
                             listDetail={listDetail}
