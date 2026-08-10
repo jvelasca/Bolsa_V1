@@ -866,7 +866,10 @@ export function BacktestsPage() {
   );
   const lists = listsQuery.data?.data ?? [];
   const listDetail = listDetailQuery.data?.data;
-  const listQuotes = useMemo(() => listQuotesQuery.data?.data ?? [], [listQuotesQuery.data?.data]);
+  const listQuotes = useMemo(
+    () => listQuotesQuery.data?.data ?? [],
+    [listQuotesQuery.data?.data],
+  );
   const listTopsById = useMemo(() => {
     const map = new Map<
       string,
@@ -4031,9 +4034,13 @@ export function BacktestsPage() {
                             assistantPrefs={assistantPrefs}
                             onPrefsChange={updateAssistantPrefs}
                             listId={listId}
-                            instrumentCount={listDetail?.instrumentIds.length ?? 0}
+                            instrumentCount={
+                              listDetail?.instrumentIds.length ?? 0
+                            }
                             skipWithFinalists={listAutoSkipWithFinalists}
-                            onSkipWithFinalistsChange={setListAutoSkipWithFinalists}
+                            onSkipWithFinalistsChange={
+                              setListAutoSkipWithFinalists
+                            }
                             board={listAutoBoard}
                             ui={listAutoUi}
                             selectedInstrumentId={instrumentId || null}
@@ -4041,7 +4048,9 @@ export function BacktestsPage() {
                             onPause={pauseListAuto}
                             onResume={resumeListAuto}
                             onStop={stopListAuto}
-                            onForceRescanRemaining={forceListAutoRescanRemaining}
+                            onForceRescanRemaining={
+                              forceListAutoRescanRemaining
+                            }
                           />
 
                           <BacktestWizardProbeList
@@ -4492,9 +4501,8 @@ export function BacktestsPage() {
                         symbol={
                           detail?.symbol ??
                           instrumentLabels[instrumentId]?.symbol ??
-                          instruments.find(
-                            (inst) => inst.id === instrumentId,
-                          )?.symbol ??
+                          instruments.find((inst) => inst.id === instrumentId)
+                            ?.symbol ??
                           "Valor"
                         }
                         timeframe={runTimeframe}
@@ -4544,12 +4552,8 @@ export function BacktestsPage() {
                           coachPass === "initial" &&
                           !exploreRunning
                         }
-                        autoAckOnCycle={
-                          assistantPrefs.coach.autoAckOnCycle
-                        }
-                        pauseIfAckNeeded={
-                          assistantPrefs.coach.pauseIfAckNeeded
-                        }
+                        autoAckOnCycle={assistantPrefs.coach.autoAckOnCycle}
+                        pauseIfAckNeeded={assistantPrefs.coach.pauseIfAckNeeded}
                         requireAckBeforeLab={
                           assistantPrefs.coach.requireAckBeforeLab
                         }
@@ -4561,9 +4565,7 @@ export function BacktestsPage() {
                             return;
                           }
                           setAwaitingAckStage(
-                            coachPass === "post_lab"
-                              ? "revalidate"
-                              : "coach1",
+                            coachPass === "post_lab" ? "revalidate" : "coach1",
                           );
                         }}
                         onCoachGateChange={setCoachGate}
@@ -4692,8 +4694,8 @@ export function BacktestsPage() {
                                       ],
                                     });
                                   }
-                                  const [stratsRes, topRes] =
-                                    await Promise.all([
+                                  const [stratsRes, topRes] = await Promise.all(
+                                    [
                                       queryClient.fetchQuery({
                                         queryKey: ["strategies"],
                                         queryFn: api.getStrategies,
@@ -4712,7 +4714,8 @@ export function BacktestsPage() {
                                               ),
                                           })
                                         : Promise.resolve(null),
-                                    ]);
+                                    ],
+                                  );
                                   const ids = new Set(
                                     (stratsRes?.data ?? []).map((s) => s.id),
                                   );
@@ -4871,8 +4874,7 @@ export function BacktestsPage() {
                           preferOpenAnalysis={preferOpenAnalysis}
                           bars={replayBarsQuery.data?.data}
                           barsLoading={
-                            replayBarsQuery.isLoading &&
-                            !replayBarsQuery.data
+                            replayBarsQuery.isLoading && !replayBarsQuery.data
                           }
                           barsError={
                             replayBarsQuery.isError && !replayBarsQuery.data

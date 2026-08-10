@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
 import {
   clampWizardStackHeightPct,
   clampWizardWidthPct,
@@ -8,8 +8,8 @@ import {
   pxToPct,
   saveBacktestSplitLayout,
   type BacktestSplitLayoutPrefs,
-} from '@/features/backtests/backtest-split-layout';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/backtest-split-layout";
+import { cn } from "@/lib/utils";
 
 type Props = {
   wizard: ReactNode;
@@ -19,17 +19,35 @@ type Props = {
   className?: string;
 };
 
-function ScrollPane({ children, className }: { children: ReactNode; className?: string }) {
+function ScrollPane({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cn('h-full min-h-0 overflow-auto overscroll-contain', className)}>
+    <div
+      className={cn(
+        "h-full min-h-0 overflow-auto overscroll-contain",
+        className,
+      )}
+    >
       {children}
     </div>
   );
 }
 
-export function BacktestHubLayout({ wizard, result, isWide, className }: Props) {
+export function BacktestHubLayout({
+  wizard,
+  result,
+  isWide,
+  className,
+}: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const [prefs, setPrefs] = useState<BacktestSplitLayoutPrefs>(() => loadBacktestSplitLayout());
+  const [prefs, setPrefs] = useState<BacktestSplitLayoutPrefs>(() =>
+    loadBacktestSplitLayout(),
+  );
   const [liveWizardPct, setLiveWizardPct] = useState(prefs.wizardWidthPct);
   const [liveStackPct, setLiveStackPct] = useState(prefs.wizardStackHeightPct);
   const pendingWizard = useRef(prefs.wizardWidthPct);
@@ -56,7 +74,9 @@ export function BacktestHubLayout({ wizard, result, isWide, className }: Props) 
   const adjustWizardWidth = useCallback((deltaPx: number) => {
     const width = rootRef.current?.getBoundingClientRect().width ?? 0;
     if (width <= 0) return;
-    const next = clampWizardWidthPct(pendingWizard.current + pxToPct(deltaPx, width));
+    const next = clampWizardWidthPct(
+      pendingWizard.current + pxToPct(deltaPx, width),
+    );
     pendingWizard.current = next;
     setLiveWizardPct(next);
   }, []);
@@ -64,7 +84,9 @@ export function BacktestHubLayout({ wizard, result, isWide, className }: Props) 
   const adjustStackHeight = useCallback((deltaPx: number) => {
     const height = rootRef.current?.getBoundingClientRect().height ?? 0;
     if (height <= 0) return;
-    const next = clampWizardStackHeightPct(pendingStack.current + pxToPct(deltaPx, height));
+    const next = clampWizardStackHeightPct(
+      pendingStack.current + pxToPct(deltaPx, height),
+    );
     pendingStack.current = next;
     setLiveStackPct(next);
   }, []);
@@ -76,7 +98,10 @@ export function BacktestHubLayout({ wizard, result, isWide, className }: Props) 
     return (
       <div
         ref={rootRef}
-        className={cn('flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border', className)}
+        className={cn(
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border",
+          className,
+        )}
       >
         <div
           className="min-h-0 shrink-0 overflow-hidden"
@@ -88,7 +113,9 @@ export function BacktestHubLayout({ wizard, result, isWide, className }: Props) 
           label="Redimensionar formulario y resultado"
           orientation="horizontal"
           onDrag={adjustStackHeight}
-          onDragEnd={() => persist({ wizardStackHeightPct: pendingStack.current })}
+          onDragEnd={() =>
+            persist({ wizardStackHeightPct: pendingStack.current })
+          }
         />
         <div className="min-h-0 flex-1 overflow-hidden">
           <ScrollPane className="p-1">{result}</ScrollPane>
@@ -100,7 +127,10 @@ export function BacktestHubLayout({ wizard, result, isWide, className }: Props) 
   return (
     <div
       ref={rootRef}
-      className={cn('flex min-h-0 flex-1 overflow-hidden rounded-lg border border-border', className)}
+      className={cn(
+        "flex min-h-0 flex-1 overflow-hidden rounded-lg border border-border",
+        className,
+      )}
     >
       <div
         className="min-h-0 shrink-0 overflow-hidden"

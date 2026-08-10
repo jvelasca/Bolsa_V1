@@ -2,11 +2,11 @@
  * Pestaña Pruebas anteriores — lista acotada + enlace Research.
  */
 
-import { Link } from 'react-router-dom';
-import { BACKTEST_STRATEGIES, type BacktestRunDto } from '@bolsa/shared';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { formatPct } from '@/features/charts/chart-utils';
+import { Link } from "react-router-dom";
+import { BACKTEST_STRATEGIES, type BacktestRunDto } from "@bolsa/shared";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { formatPct } from "@/features/charts/chart-utils";
 
 type Props = {
   runs: BacktestRunDto[];
@@ -29,10 +29,12 @@ export function BacktestHistoryTab({
     <div className="mx-auto min-h-0 w-full max-w-[900px] flex-1 space-y-3 overflow-auto px-1">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h3 className="text-lg font-semibold tracking-tight">Pruebas anteriores</h3>
+          <h3 className="text-lg font-semibold tracking-tight">
+            Pruebas anteriores
+          </h3>
           <p className="text-sm text-muted-foreground">
             {runs.length} de hasta {historyMaxKept} en este dispositivo
-            {runs.length > 0 ? ' · clic abre en Probar' : ''}.
+            {runs.length > 0 ? " · clic abre en Probar" : ""}.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -58,9 +60,16 @@ export function BacktestHistoryTab({
       {runs.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Aún no hay backtests guardados. Lanza una prueba en Probar estrategia.
+            Aún no hay backtests guardados. Lanza una prueba en Probar
+            estrategia.
           </p>
-          <Button type="button" size="sm" variant="outline" className="mt-3" onClick={onGoToRun}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="mt-3"
+            onClick={onGoToRun}
+          >
             Ir a Probar
           </Button>
         </div>
@@ -72,14 +81,14 @@ export function BacktestHistoryTab({
                 type="button"
                 onClick={() => onSelectRun(run.id)}
                 className={cn(
-                  'flex w-full flex-wrap items-center justify-between gap-2 px-3 py-3 text-left text-sm transition-colors hover:bg-muted/30',
-                  selectedId === run.id && 'bg-primary/5',
+                  "flex w-full flex-wrap items-center justify-between gap-2 px-3 py-3 text-left text-sm transition-colors hover:bg-muted/30",
+                  selectedId === run.id && "bg-primary/5",
                 )}
               >
                 <span className="min-w-0">
                   <span className="font-medium">{run.symbol}</span>
                   <span className="text-muted-foreground">
-                    {' '}
+                    {" "}
                     · {BACKTEST_STRATEGIES[run.strategyType].label}
                   </span>
                   {run.dataVersion && (
@@ -91,18 +100,20 @@ export function BacktestHistoryTab({
                 <span className="flex items-center gap-3 tabular-nums">
                   <span
                     className={cn(
-                      'font-medium',
-                      run.totalReturnPct >= 0 ? 'text-success' : 'text-destructive',
+                      "font-medium",
+                      run.totalReturnPct >= 0
+                        ? "text-success"
+                        : "text-destructive",
                     )}
                   >
                     {formatPct(run.totalReturnPct)}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(run.createdAt).toLocaleString('es-ES', {
-                      day: '2-digit',
-                      month: 'short',
-                      hour: '2-digit',
-                      minute: '2-digit',
+                    {new Date(run.createdAt).toLocaleString("es-ES", {
+                      day: "2-digit",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
                     })}
                   </span>
                 </span>
