@@ -826,7 +826,7 @@ CRLF) y pusheados a `origin/stage/estudio-membership-operativa-2026-08-04`.
 | 7 | `13d52af` | `BacktestResultDetail` |
 | 8 | `c0dfe24` | `BacktestResultFocusFinalists` |
 | 9 | `8ae445b` | `BacktestResultFocusLab` |
-| 10 | *(this commit)* | `BacktestResultFocusCoach` |
+| 10 | `d3315e8` | `BacktestResultFocusCoach` |
 
 **Reducción:** `backtests-page.tsx` de **5.759 → 5.127 líneas (-632)** con el paso 10 (extracción del Coach, último
 island de M5). Nuevos ficheros en `apps/web/src/features/backtests/`: `backtest-result-*.tsx` y

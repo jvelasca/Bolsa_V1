@@ -1,7 +1,7 @@
 # Traspaso parcial — M5 frente Coach + frentes alternativos (frontend web por features)
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** *(PENDIENTE commit paso 10 Coach)* · **Árbol:** por concretar tras commit · paso Lab `8ae445b`
+**HEAD:** `d3315e8` (paso 10 Coach extraído) · **Árbol limpio** · paso Lab `8ae445b`
 **Origen:** [traspaso-m5-f4-8-coach-lab-2026-08-10.md](./traspaso-m5-f4-8-coach-lab-2026-08-10.md) + registro **§7.6**
 de [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
 
@@ -18,7 +18,7 @@ build exit 0; warnings code-splitting pre-existentes = **M7, fuera de alcance**)
 |------|--------|---------------------|
 | 1–8 | `0fce03b`…`c0dfe24` | `BacktestResult*` / `BacktestWizard*` (hilo previo) |
 | 9 | `8ae445b` | `BacktestResultFocusLab` (hilo Coach + Lab) |
-| 10 | *(this commit)* | `BacktestResultFocusCoach` (último island de M5) |
+| 10 | `d3315e8` | `BacktestResultFocusCoach` (último island de M5) |
 | — | `e746ed8` | registro §7.6 + traspaso Coach+Lab actualizados |
 
 **Paso 9 (Lab, Diseño B):** extraído el bloque `resultFocus === "lab"` a `backtest-result-focus-lab.tsx`
