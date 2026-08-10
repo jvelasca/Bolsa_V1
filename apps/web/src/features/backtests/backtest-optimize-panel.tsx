@@ -1,10 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  ChevronDown,
-  ChevronUp,
-  Loader2,
-  Play,
-} from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronUp, Loader2, Play } from "lucide-react";
 import {
   forwardRef,
   useEffect,
@@ -12,15 +7,15 @@ import {
   useMemo,
   useRef,
   useState,
-} from 'react';
-import { OptimizeCardHeader } from '@/features/backtests/optimize-card-header';
-import { OptimizeEmptyTip } from '@/features/backtests/optimize-empty-tip';
-import { OptimizeSummaryStrip } from '@/features/backtests/optimize-summary-strip';
-import { OptimizeWalkForwardReport } from '@/features/backtests/optimize-walk-forward-report';
-import { OptimizeEdgeReport } from '@/features/backtests/optimize-edge-report';
-import { OptimizeCpcvReport } from '@/features/backtests/optimize-cpcv-report';
-import { OptimizeSeedBanner } from '@/features/backtests/optimize-seed-banner';
-import type { LabZoneHandle } from '@/features/backtests/backtest-lab-board-types';
+} from "react";
+import { OptimizeCardHeader } from "@/features/backtests/optimize-card-header";
+import { OptimizeEmptyTip } from "@/features/backtests/optimize-empty-tip";
+import { OptimizeSummaryStrip } from "@/features/backtests/optimize-summary-strip";
+import { OptimizeWalkForwardReport } from "@/features/backtests/optimize-walk-forward-report";
+import { OptimizeEdgeReport } from "@/features/backtests/optimize-edge-report";
+import { OptimizeCpcvReport } from "@/features/backtests/optimize-cpcv-report";
+import { OptimizeSeedBanner } from "@/features/backtests/optimize-seed-banner";
+import type { LabZoneHandle } from "@/features/backtests/backtest-lab-board-types";
 import type {
   ChartTimeframe,
   OptimizeEngine,
@@ -29,16 +24,16 @@ import type {
   OptimizeStrategyFamily,
   SmaGridTrialDto,
   StrategyDefinitionV1,
-} from '@bolsa/shared';
-import { api, ApiError } from '@/lib/api';
-import { formatPct } from '@/features/charts/chart-utils';
+} from "@bolsa/shared";
+import { api, ApiError } from "@/lib/api";
+import { formatPct } from "@/features/charts/chart-utils";
 import {
   BacktestOptimizeCompareTable,
   buildCompareRows,
   oosRankScore,
   type OptimizeCompareRow,
   type OptimizeRankBy,
-} from '@/features/backtests/backtest-optimize-compare';
+} from "@/features/backtests/backtest-optimize-compare";
 import {
   strategyDefinitionFromOptimizedMacd,
   strategyDefinitionFromOptimizedRsi,
@@ -46,9 +41,9 @@ import {
   suggestOptimizedMacdName,
   suggestOptimizedRsiName,
   suggestOptimizedSmaName,
-} from '@/features/backtests/backtest-optimized-strategy';
-import { BacktestOptimizeProgress } from '@/features/backtests/backtest-optimize-progress';
-import type { OptimizeProgressPhase } from '@/features/backtests/backtest-optimize-progress';
+} from "@/features/backtests/backtest-optimized-strategy";
+import { BacktestOptimizeProgress } from "@/features/backtests/backtest-optimize-progress";
+import type { OptimizeProgressPhase } from "@/features/backtests/backtest-optimize-progress";
 import {
   buildSmaPeriodLists,
   isOptimizableStrategy,
@@ -58,14 +53,14 @@ import {
   suggestBarLimit,
   suggestOptimizeValidation,
   type OptimizeSeed,
-} from '@/features/backtests/backtest-optimize-seed';
+} from "@/features/backtests/backtest-optimize-seed";
 import {
   buildOosEvidenceForAdopt,
   extractOosEvidenceFromOptimizeResult,
   oosEvidenceToPaperLabSnapshot,
   stashOosEvidenceForStrategy,
-} from '@/features/backtests/backtest-oos-evidence';
-import { credibilityHintFromLabWfe } from '@bolsa/shared';
+} from "@/features/backtests/backtest-oos-evidence";
+import { credibilityHintFromLabWfe } from "@bolsa/shared";
 import {
   OPTIMIZE_CPCV_HELP,
   OPTIMIZE_OOS_HELP,
@@ -84,10 +79,10 @@ import {
   type OptimizeSearchSpace,
   type RsiSearchSpace,
   type SmaSearchSpace,
-} from '@/features/backtests/backtest-optimize-space';
-import { BacktestOptimizeHeatmapPanel } from '@/features/backtests/backtest-optimize-heatmap-panel';
-import { plateauAdoptionMetaFromTrials } from '@/features/backtests/backtest-optimize-heatmap';
-import { LabZoneVerdictHero } from '@/features/backtests/lab-zone-verdict';
+} from "@/features/backtests/backtest-optimize-space";
+import { BacktestOptimizeHeatmapPanel } from "@/features/backtests/backtest-optimize-heatmap-panel";
+import { plateauAdoptionMetaFromTrials } from "@/features/backtests/backtest-optimize-heatmap";
+import { LabZoneVerdictHero } from "@/features/backtests/lab-zone-verdict";
 import {
   formatLabRiskSpaceHint,
   formatPreferredLabFamiliesHint,
@@ -95,7 +90,7 @@ import {
   labSpaceWidthFactorForRisk,
   preferredLabFamiliesForHorizon,
   resolveDefaultLabFamily,
-} from '@/features/backtests/coach-profile-policy';
+} from "@/features/backtests/coach-profile-policy";
 import {
   formatLabAdoptionHint,
   guidedSpaceFromAdoption,
@@ -103,10 +98,10 @@ import {
   rememberLabAdoption,
   shouldApplyGuidedSpace,
   type LabAdoptionPlateauMeta,
-} from '@/features/backtests/lab-adoption-memory';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/lab-adoption-memory";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface BacktestOptimizePanelProps {
   instruments: Array<{ id: string; symbol: string; name: string }>;
@@ -135,7 +130,7 @@ interface BacktestOptimizePanelProps {
     initialCash: number;
     timeframe: ChartTimeframe;
     barLimit?: number;
-    labEvidence?: import('@bolsa/shared').PaperLabEvidenceSnapshot | null;
+    labEvidence?: import("@bolsa/shared").PaperLabEvidenceSnapshot | null;
     skipAutoRun?: boolean;
   }) => void;
   /** Notifica estado de la zona para el CTA «Reanalizar con Coach». */
@@ -159,16 +154,16 @@ interface BacktestOptimizePanelProps {
   /** CORE-B / CORE-P: id perfil para stamp de memoria. */
   profileId?: string | null;
   /** CORE-P: horizonte → hint familias preferidas en espacio Lab. */
-  profileHorizon?: import('@bolsa/shared').ProfileHorizon | null;
+  profileHorizon?: import("@bolsa/shared").ProfileHorizon | null;
   /** CORE-P: riesgo → soft-bias anchura espacio Lab. */
-  profileRiskTolerance?: import('@bolsa/shared').RiskTolerance | null;
+  profileRiskTolerance?: import("@bolsa/shared").RiskTolerance | null;
 }
 
 function trialMergeKey(trial: SmaGridTrialDto, family: string): string {
-  if (family === 'rsi_mean_reversion') {
+  if (family === "rsi_mean_reversion") {
     return `rsi-${trial.period}-${trial.oversold}-${trial.overbought}`;
   }
-  if (family === 'macd_signal_cross') {
+  if (family === "macd_signal_cross") {
     return `macd-${trial.fastPeriod}-${trial.slowPeriod}-${trial.signalPeriod}`;
   }
   return `sma-${trial.fastPeriod}-${trial.slowPeriod}`;
@@ -176,11 +171,14 @@ function trialMergeKey(trial: SmaGridTrialDto, family: string): string {
 
 function trialOos(trial: SmaGridTrialDto): number | null {
   const score = trial.oosMetrics?.score;
-  return typeof score === 'number' && Number.isFinite(score) ? score : null;
+  return typeof score === "number" && Number.isFinite(score) ? score : null;
 }
 
 /** Prefer OOS (with sparse-trade penalty) when both trials have it; otherwise IS. */
-function isBetterTrial(candidate: SmaGridTrialDto, existing: SmaGridTrialDto): boolean {
+function isBetterTrial(
+  candidate: SmaGridTrialDto,
+  existing: SmaGridTrialDto,
+): boolean {
   const candOos = trialOos(candidate);
   const existOos = trialOos(existing);
   if (candOos != null && existOos != null) {
@@ -191,9 +189,11 @@ function isBetterTrial(candidate: SmaGridTrialDto, existing: SmaGridTrialDto): b
 }
 
 /** Union trials from several engines; keep the best OOS (else IS) per parameter set. */
-function mergeOptimizeResults(parts: OptimizeSmaGridResultDto[]): OptimizeSmaGridResultDto {
+function mergeOptimizeResults(
+  parts: OptimizeSmaGridResultDto[],
+): OptimizeSmaGridResultDto {
   const first = parts[0]!;
-  const family = String(first.strategyFamily ?? 'sma_crossover');
+  const family = String(first.strategyFamily ?? "sma_crossover");
   const byKey = new Map<string, SmaGridTrialDto>();
   for (const part of parts) {
     for (const trial of part.trials) {
@@ -213,40 +213,49 @@ function mergeOptimizeResults(parts: OptimizeSmaGridResultDto[]): OptimizeSmaGri
   });
   return {
     ...first,
-    engine: parts.map((part) => part.engine).join('+'),
-    trialsTotal: Math.max(...parts.map((part) => part.trialsTotal ?? part.trials.length)),
+    engine: parts.map((part) => part.engine).join("+"),
+    trialsTotal: Math.max(
+      ...parts.map((part) => part.trialsTotal ?? part.trials.length),
+    ),
     trials,
   };
 }
 
 function seedKey(seed: OptimizeSeed | null | undefined): string {
-  if (!seed) return '';
+  if (!seed) return "";
   return [
     seed.source,
-    seed.sourceRunId ?? '',
+    seed.sourceRunId ?? "",
     seed.instrumentId,
     seed.strategyType,
-    seed.barLimit ?? '',
+    seed.barLimit ?? "",
     seed.initialCash,
     seed.timeframe,
-  ].join('|');
+  ].join("|");
 }
 
-const METHOD_OPTIONS: Array<{ id: OptimizeEngine; label: string; title: string }> = [
+const METHOD_OPTIONS: Array<{
+  id: OptimizeEngine;
+  label: string;
+  title: string;
+}> = [
   {
-    id: 'h0',
-    label: 'Grid clásico',
-    title: 'Prueba todas las combinaciones válidas del espacio (rápida < lenta). Base fiable.',
+    id: "h0",
+    label: "Grid clásico",
+    title:
+      "Prueba todas las combinaciones válidas del espacio (rápida < lenta). Base fiable.",
   },
   {
-    id: 'vectorbt',
-    label: 'Grid VectorBT',
-    title: 'Mismo tipo de grid, motor más rápido si está instalado. Suele coincidir con el clásico.',
+    id: "vectorbt",
+    label: "Grid VectorBT",
+    title:
+      "Mismo tipo de grid, motor más rápido si está instalado. Suele coincidir con el clásico.",
   },
   {
-    id: 'optuna',
-    label: 'IA Optuna',
-    title: 'Búsqueda inteligente dentro del rango (no solo la malla). Complementa al grid; tarda más.',
+    id: "optuna",
+    label: "IA Optuna",
+    title:
+      "Búsqueda inteligente dentro del rango (no solo la malla). Complementa al grid; tarda más.",
   },
 ];
 
@@ -264,31 +273,33 @@ type AnchorOverride = {
   label: string;
 };
 
-export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizePanelProps>(
-  function BacktestOptimizePanel(
-    {
-      instruments,
-      defaultInstrumentId = '',
-      seed = null,
-      onClearSeed,
-      initialRunId = null,
-      initialRunIds = null,
-      compact = false,
-      zoneId,
-      zoneRank,
-      zoneStars,
-      zoneStarsCapped,
-      onOptimizeComplete,
-      onAdoptedStrategy,
-      onAdoptReadyChange,
-      onActivityChange,
-      maxDrawdownSoftPct = null,
-      profileId = null,
-      profileHorizon = null,
-      profileRiskTolerance = null,
-    },
-    ref,
-  ) {
+export const BacktestOptimizePanel = forwardRef<
+  LabZoneHandle,
+  BacktestOptimizePanelProps
+>(function BacktestOptimizePanel(
+  {
+    instruments,
+    defaultInstrumentId = "",
+    seed = null,
+    onClearSeed,
+    initialRunId = null,
+    initialRunIds = null,
+    compact = false,
+    zoneId,
+    zoneRank,
+    zoneStars,
+    zoneStarsCapped,
+    onOptimizeComplete,
+    onAdoptedStrategy,
+    onAdoptReadyChange,
+    onActivityChange,
+    maxDrawdownSoftPct = null,
+    profileId = null,
+    profileHorizon = null,
+    profileRiskTolerance = null,
+  },
+  ref,
+) {
   const queryClient = useQueryClient();
   const onActivityChangeRef = useRef(onActivityChange);
   const [instrumentId, setInstrumentId] = useState(defaultInstrumentId);
@@ -304,38 +315,43 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
   const [space, setSpace] = useState<OptimizeSearchSpace>(() =>
     defaultSpaceForFamily(resolveDefaultLabFamily({ horizon: profileHorizon })),
   );
-  const [initialCash, setInitialCash] = useState('10000');
-  const [barLimit, setBarLimit] = useState('500');
-  const [timeframe, setTimeframe] = useState<ChartTimeframe>('1d');
+  const [initialCash, setInitialCash] = useState("10000");
+  const [barLimit, setBarLimit] = useState("500");
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>("1d");
   /** SMA: can combine grid + Optuna. RSI/MACD always H0. */
-  const [methods, setMethods] = useState<OptimizeEngine[]>(['h0']);
+  const [methods, setMethods] = useState<OptimizeEngine[]>(["h0"]);
   /** Off by default — short windows from a prior backtest often cannot split cleanly. */
   const [oosEnabled, setOosEnabled] = useState(false);
-  const [oosPct, setOosPct] = useState('0.2');
+  const [oosPct, setOosPct] = useState("0.2");
   /** Expanding walk-forward (mutually exclusive with hold-out / CPCV). */
   const [wfEnabled, setWfEnabled] = useState(false);
-  const [wfFolds, setWfFolds] = useState('3');
+  const [wfFolds, setWfFolds] = useState("3");
   /** CPCV ligero (mutually exclusive with hold-out / WF). */
   const [cpcvEnabled, setCpcvEnabled] = useState(false);
-  const [cpcvGroups, setCpcvGroups] = useState('5');
-  const [cpcvPurge, setCpcvPurge] = useState('5');
-  const [cpcvEmbargo, setCpcvEmbargo] = useState('5');
+  const [cpcvGroups, setCpcvGroups] = useState("5");
+  const [cpcvPurge, setCpcvPurge] = useState("5");
+  const [cpcvEmbargo, setCpcvEmbargo] = useState("5");
   /** Prefer OOS for «Mejor» when hold-out/WF/CPCV produced oosMetrics. */
-  const [rankBy, setRankBy] = useState<OptimizeRankBy>('oos');
+  const [rankBy, setRankBy] = useState<OptimizeRankBy>("oos");
   const [expanded, setExpanded] = useState(true);
   /** Sync by default so the results table always appears without depending on a worker. */
   const [runInBackground, setRunInBackground] = useState(Boolean(initialRunId));
-  const [activeRunId, setActiveRunId] = useState<string | null>(initialRunId ?? null);
+  const [activeRunId, setActiveRunId] = useState<string | null>(
+    initialRunId ?? null,
+  );
   const [multiRunning, setMultiRunning] = useState(false);
   const [multiProgress, setMultiProgress] = useState<string | null>(null);
-  const [appliedSeedKey, setAppliedSeedKey] = useState('');
+  const [appliedSeedKey, setAppliedSeedKey] = useState("");
   const [savedRowId, setSavedRowId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [promoteMsg, setPromoteMsg] = useState<string | null>(null);
   const [jobError, setJobError] = useState<string | null>(null);
-  const [lastAsyncResult, setLastAsyncResult] = useState<OptimizeSmaGridResultDto | null>(null);
-  const [anchorOverride, setAnchorOverride] = useState<AnchorOverride | null>(null);
-  const optimizeNotifyRef = useRef('');
+  const [lastAsyncResult, setLastAsyncResult] =
+    useState<OptimizeSmaGridResultDto | null>(null);
+  const [anchorOverride, setAnchorOverride] = useState<AnchorOverride | null>(
+    null,
+  );
+  const optimizeNotifyRef = useRef("");
   const skipAutoRunRef = useRef(false);
   const attachedRunRef = useRef<string | null>(null);
   /** Coach→Lab multi-job (H0+Optuna): ids en orden + parts acumuladas. */
@@ -354,8 +370,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     onSuccess: (response) => {
       setLastAsyncResult(response.data);
       setJobError(null);
-      void queryClient.invalidateQueries({ queryKey: ['optimize-runs'] });
-      void queryClient.invalidateQueries({ queryKey: ['research'] });
+      void queryClient.invalidateQueries({ queryKey: ["optimize-runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["research"] });
     },
     onError: (error) => {
       setJobError(
@@ -363,7 +379,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'Error al optimizar',
+            : "Error al optimizar",
       );
     },
   });
@@ -374,14 +390,14 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       setActiveRunId(response.data.id);
       setJobError(null);
       // If the API already finished the job inline, show the table immediately.
-      if (response.data.status === 'completed' && response.data.result) {
+      if (response.data.status === "completed" && response.data.result) {
         setLastAsyncResult(response.data.result);
         setActiveRunId(null);
-      } else if (response.data.status === 'failed') {
-        setJobError(response.data.error ?? 'Optimización fallida');
+      } else if (response.data.status === "failed") {
+        setJobError(response.data.error ?? "Optimización fallida");
         setActiveRunId(null);
       }
-      void queryClient.invalidateQueries({ queryKey: ['optimize-runs'] });
+      void queryClient.invalidateQueries({ queryKey: ["optimize-runs"] });
     },
     onError: (error) => {
       setJobError(
@@ -389,7 +405,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'No se pudo encolar la optimización',
+            : "No se pudo encolar la optimización",
       );
     },
   });
@@ -417,12 +433,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       };
       /** CORE-B v0.1: meseta heatmap al adoptar. */
       plateau?: LabAdoptionPlateauMeta | null;
-    }) => api.createStrategy({ name: payload.name, definition: payload.definition }),
+    }) =>
+      api.createStrategy({
+        name: payload.name,
+        definition: payload.definition,
+      }),
     onSuccess: async (response, variables) => {
       setSavedRowId(variables.rowId);
       setSaveError(null);
       setPromoteMsg(null);
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
       if (variables.oosEvidence) {
         stashOosEvidenceForStrategy(response.data.id, variables.oosEvidence);
       }
@@ -469,13 +489,13 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'No se pudo guardar la estrategia',
+            : "No se pudo guardar la estrategia",
       );
     },
   });
 
   const activeRunQuery = useQuery({
-    queryKey: ['optimize-run', activeRunId],
+    queryKey: ["optimize-run", activeRunId],
     queryFn: () => api.getOptimizeRun(activeRunId!),
     enabled: Boolean(activeRunId),
     refetchInterval: 1500,
@@ -484,7 +504,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
   useEffect(() => {
     const run = activeRunQuery.data?.data;
     if (!run || run.id !== activeRunId) return;
-    if (run.status === 'completed') {
+    if (run.status === "completed") {
       if (run.result) {
         const queue = coachJobQueueRef.current;
         const isCoachBatch = queue.length > 1 && queue.includes(run.id);
@@ -513,22 +533,22 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         }
       } else {
         setJobError(
-          'La optimización terminó, pero no se pudieron leer los resultados. Prueba sin segundo plano.',
+          "La optimización terminó, pero no se pudieron leer los resultados. Prueba sin segundo plano.",
         );
         setActiveRunId(null);
         setMultiProgress(null);
         coachJobQueueRef.current = [];
         coachJobPartsRef.current = [];
       }
-      void queryClient.invalidateQueries({ queryKey: ['optimize-runs'] });
-      void queryClient.invalidateQueries({ queryKey: ['research'] });
-    } else if (run.status === 'failed') {
+      void queryClient.invalidateQueries({ queryKey: ["optimize-runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["research"] });
+    } else if (run.status === "failed") {
       const queue = coachJobQueueRef.current;
       const isCoachBatch = queue.length > 1;
       if (isCoachBatch && coachJobPartsRef.current.length > 0) {
         setLastAsyncResult(mergeOptimizeResults(coachJobPartsRef.current));
         setJobError(
-          `Un método falló (${run.error ?? 'error'}); se muestran los que sí terminaron.`,
+          `Un método falló (${run.error ?? "error"}); se muestran los que sí terminaron.`,
         );
         setMultiProgress(null);
         coachJobQueueRef.current = [];
@@ -536,7 +556,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         setActiveRunId(null);
         attachedRunRef.current = null;
       } else {
-        setJobError(run.error ?? 'Optimización fallida');
+        setJobError(run.error ?? "Optimización fallida");
         setActiveRunId(null);
         setMultiProgress(null);
         coachJobQueueRef.current = [];
@@ -557,7 +577,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     setBarLimit(String(bars));
     const hint = seed.validationHint ?? suggestOptimizeValidation(bars);
     setCpcvEnabled(false);
-    if (hint.mode === 'walkforward') {
+    if (hint.mode === "walkforward") {
       setOosEnabled(false);
       setWfEnabled(true);
       setWfFolds(String(hint.walkForwardFolds ?? 3));
@@ -567,7 +587,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       setOosPct(String(hint.oosPct ?? 0.2));
       setWfEnabled(false);
     }
-    setRankBy('oos');
+    setRankBy("oos");
     setExpanded(true);
     setLastAsyncResult(null);
     setJobError(null);
@@ -590,14 +610,17 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       attachedRunRef.current = null;
     }
 
-    const resolvedFamily = optimizeFamilyForStrategy(seed.strategyType) ?? 'sma_crossover';
+    const resolvedFamily =
+      optimizeFamilyForStrategy(seed.strategyType) ?? "sma_crossover";
     setFamily(resolvedFamily);
-    setMethods(resolvedFamily === 'sma_crossover' ? ['h0', 'optuna'] : ['h0']);
+    setMethods(resolvedFamily === "sma_crossover" ? ["h0", "optuna"] : ["h0"]);
     setSpace(defaultSpaceForFamily(resolvedFamily));
 
-    if (resolvedFamily === 'sma_crossover') {
+    if (resolvedFamily === "sma_crossover") {
       const lists = buildSmaPeriodLists(
-        isOptimizableStrategy(seed.strategyType) ? seed.strategyType : 'sma_crossover',
+        isOptimizableStrategy(seed.strategyType)
+          ? seed.strategyType
+          : "sma_crossover",
       );
       setSpace(spaceFromPeriodLists(lists.fastPeriods, lists.slowPeriods));
     }
@@ -615,11 +638,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       returnPct: ret ?? 0,
       ddPct: dd ?? 0,
       tradeCount: seed.anchorTradeCount ?? 0,
-      score: seed.anchorScore ?? (ret != null && dd != null ? ret - dd * 0.25 : 0),
+      score:
+        seed.anchorScore ?? (ret != null && dd != null ? ret - dd * 0.25 : 0),
       label: `Original · ${seed.strategyLabel}`,
     });
 
-    if (resolvedFamily === 'sma_crossover' && seed.anchorFast != null && seed.anchorSlow != null) {
+    if (
+      resolvedFamily === "sma_crossover" &&
+      seed.anchorFast != null &&
+      seed.anchorSlow != null
+    ) {
       if (ret == null || dd == null) {
         setSpace(spaceFromAnchor(seed.anchorFast, seed.anchorSlow));
       }
@@ -627,10 +655,18 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
 
     // CORE B: espacio guiado desde última adopción (misma familia).
     const priorAdoption = readLabAdoption(seed.instrumentId, seed.timeframe);
-    if (shouldApplyGuidedSpace(priorAdoption, resolvedFamily) && priorAdoption) {
+    if (
+      shouldApplyGuidedSpace(priorAdoption, resolvedFamily) &&
+      priorAdoption
+    ) {
       const guided = guidedSpaceFromAdoption(priorAdoption);
       if (guided) {
-        setSpace(scaleSearchSpace(guided, labSpaceWidthFactorForRisk(profileRiskTolerance)));
+        setSpace(
+          scaleSearchSpace(
+            guided,
+            labSpaceWidthFactorForRisk(profileRiskTolerance),
+          ),
+        );
       }
     }
 
@@ -682,32 +718,45 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
 
   useEffect(() => {
     if (seed) return;
-    if (defaultInstrumentId && !instrumentId) setInstrumentId(defaultInstrumentId);
+    if (defaultInstrumentId && !instrumentId)
+      setInstrumentId(defaultInstrumentId);
   }, [defaultInstrumentId, instrumentId, seed]);
 
   useEffect(() => {
-    if (family !== 'sma_crossover') setMethods(['h0']);
+    if (family !== "sma_crossover") setMethods(["h0"]);
   }, [family]);
 
   const multiPathMode = wfEnabled || cpcvEnabled;
   const selectedMethods = useMemo(
     () =>
-      multiPathMode || family !== 'sma_crossover' ? (['h0'] as OptimizeEngine[]) : methods,
+      multiPathMode || family !== "sma_crossover"
+        ? (["h0"] as OptimizeEngine[])
+        : methods,
     [multiPathMode, family, methods],
   );
-  const usesOptuna = selectedMethods.includes('optuna');
-  const wfFoldCount = Math.max(2, Math.min(5, Number.parseInt(wfFolds, 10) || 3));
-  const cpcvGroupCount = Math.max(4, Math.min(6, Number.parseInt(cpcvGroups, 10) || 5));
+  const usesOptuna = selectedMethods.includes("optuna");
+  const wfFoldCount = Math.max(
+    2,
+    Math.min(5, Number.parseInt(wfFolds, 10) || 3),
+  );
+  const cpcvGroupCount = Math.max(
+    4,
+    Math.min(6, Number.parseInt(cpcvGroups, 10) || 5),
+  );
   const cpcvPaths = cpcvPathCount(cpcvGroupCount);
   const trialTotal = useMemo(() => {
     const perMethod = countValidCombinations(
       space,
-      family === 'sma_crossover' ? (usesOptuna && selectedMethods.length === 1 ? 100 : 200) : 80,
+      family === "sma_crossover"
+        ? usesOptuna && selectedMethods.length === 1
+          ? 100
+          : 200
+        : 80,
     );
     // Rough total when stacking methods (Optuna capped at 100).
     let total = 0;
     for (const method of selectedMethods) {
-      total += method === 'optuna' ? Math.min(100, perMethod) : perMethod;
+      total += method === "optuna" ? Math.min(100, perMethod) : perMethod;
     }
     if (cpcvEnabled) {
       total = Math.min(perMethod, 80) * cpcvPaths;
@@ -715,10 +764,20 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       total = Math.min(perMethod, 80) * wfFoldCount;
     }
     return Math.max(1, total);
-  }, [space, family, selectedMethods, usesOptuna, wfEnabled, wfFoldCount, cpcvEnabled, cpcvPaths]);
+  }, [
+    space,
+    family,
+    selectedMethods,
+    usesOptuna,
+    wfEnabled,
+    wfFoldCount,
+    cpcvEnabled,
+    cpcvPaths,
+  ]);
 
   const result = lastAsyncResult ?? optimizeMutation.data?.data ?? null;
-  const resultFamily = (result?.strategyFamily as OptimizeStrategyFamily | undefined) ?? family;
+  const resultFamily =
+    (result?.strategyFamily as OptimizeStrategyFamily | undefined) ?? family;
   const seedValidationHint = seed
     ? (seed.validationHint ?? suggestOptimizeValidation(seed.barLimit))
     : null;
@@ -731,9 +790,9 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       result.engine,
       best.score,
       best.totalReturnPct,
-      best.fastPeriod ?? '',
-      best.period ?? '',
-    ].join('|');
+      best.fastPeriod ?? "",
+      best.period ?? "",
+    ].join("|");
     if (optimizeNotifyRef.current === key) return;
     optimizeNotifyRef.current = key;
     onOptimizeComplete({ seed, result });
@@ -746,7 +805,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
   const pbo = result?.pbo ?? result?.cpcv?.pbo ?? null;
   const labWfeHint = useMemo(() => {
     if (edgeReport) return null;
-    const wfe = cpcv?.walkForwardEfficiency ?? walkForward?.walkForwardEfficiency;
+    const wfe =
+      cpcv?.walkForwardEfficiency ?? walkForward?.walkForwardEfficiency;
     if (wfe == null || !Number.isFinite(wfe)) return null;
     return credibilityHintFromLabWfe(wfe, result?.trialsTotal ?? 1);
   }, [cpcv, walkForward, result?.trialsTotal, edgeReport]);
@@ -757,29 +817,35 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     enqueueMutation.isPending ||
     activeRunId !== null;
 
-  const selectedInstrument = instruments.find((item) => item.id === instrumentId);
+  const selectedInstrument = instruments.find(
+    (item) => item.id === instrumentId,
+  );
   const activeRun = activeRunQuery.data?.data;
   const payloadTotal =
-    typeof activeRun?.payload?.trialsTotal === 'number'
+    typeof activeRun?.payload?.trialsTotal === "number"
       ? activeRun.payload.trialsTotal
       : trialTotal;
 
   const progressPhase = (() => {
-    if (multiRunning || optimizeMutation.isPending || enqueueMutation.isPending) {
-      return 'running' as const;
+    if (
+      multiRunning ||
+      optimizeMutation.isPending ||
+      enqueueMutation.isPending
+    ) {
+      return "running" as const;
     }
     if (activeRunId) {
       const status = activeRun?.status;
-      if (status === 'pending') return 'pending' as const;
-      if (status === 'failed') return 'failed' as const;
-      if (status === 'completed') return 'completed' as const;
-      return 'processing' as const;
+      if (status === "pending") return "pending" as const;
+      if (status === "failed") return "failed" as const;
+      if (status === "completed") return "completed" as const;
+      return "processing" as const;
     }
     return null;
   })();
 
   const liveTrialDone =
-    activeRun?.status === 'processing' || activeRun?.status === 'completed'
+    activeRun?.status === "processing" || activeRun?.status === "completed"
       ? (activeRun.trialCount ?? 0)
       : null;
 
@@ -790,7 +856,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
   useEffect(() => {
     const notify = onActivityChangeRef.current;
     if (!notify) return;
-    const id = zoneId ?? (seed ? seedKey(seed) : 'lab-zone');
+    const id = zoneId ?? (seed ? seedKey(seed) : "lab-zone");
     notify({
       zoneId: id,
       rank: zoneRank ?? 1,
@@ -799,19 +865,12 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       trialDone: liveTrialDone,
       trialTotal: payloadTotal,
     });
-  }, [
-    zoneId,
-    zoneRank,
-    seed,
-    progressPhase,
-    liveTrialDone,
-    payloadTotal,
-  ]);
+  }, [zoneId, zoneRank, seed, progressPhase, liveTrialDone, payloadTotal]);
 
   const showLiveProgress =
     progressPhase != null &&
-    progressPhase !== 'completed' &&
-    progressPhase !== 'failed';
+    progressPhase !== "completed" &&
+    progressPhase !== "failed";
 
   const progressNode = progressPhase ? (
     <BacktestOptimizeProgress
@@ -819,12 +878,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       trialTotal={payloadTotal}
       trialDone={liveTrialDone}
       bestScore={activeRun?.bestScore ?? result?.trials[0]?.score ?? null}
-      scoreHistory={(result?.trials ?? []).slice(0, 12).map((t) => t.score).reverse()}
+      scoreHistory={(result?.trials ?? [])
+        .slice(0, 12)
+        .map((t) => t.score)
+        .reverse()}
       compact={compact}
       engineHint={
         multiProgress
-          ? 'h0+optuna'
-          : (typeof activeRun?.payload?.engine === 'string' && activeRun.payload.engine) ||
+          ? "h0+optuna"
+          : (typeof activeRun?.payload?.engine === "string" &&
+              activeRun.payload.engine) ||
             (selectedMethods.length === 1 ? selectedMethods[0] : null) ||
             family
       }
@@ -833,7 +896,10 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
 
   const compareRows = useMemo(() => {
     if (!result) return [];
-    const catalogAnchor = smaAnchorPeriods('sma_crossover') ?? { fast: 20, slow: 50 };
+    const catalogAnchor = smaAnchorPeriods("sma_crossover") ?? {
+      fast: 20,
+      slow: 50,
+    };
     let anchor = {
       fastPeriod: anchorOverride?.fast ?? catalogAnchor.fast,
       slowPeriod: anchorOverride?.slow ?? catalogAnchor.slow,
@@ -841,30 +907,34 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       period: anchorOverride?.period,
       oversold: anchorOverride?.oversold,
       overbought: anchorOverride?.overbought,
-      totalReturnPct: anchorOverride?.returnPct ?? result.baseline.totalReturnPct,
+      totalReturnPct:
+        anchorOverride?.returnPct ?? result.baseline.totalReturnPct,
       maxDrawdownPct: anchorOverride?.ddPct ?? result.baseline.maxDrawdownPct,
       tradeCount: anchorOverride?.tradeCount ?? result.baseline.tradeCount,
       score: anchorOverride?.score ?? result.baseline.score,
-      label: anchorOverride?.label ?? 'Baseline',
+      label: anchorOverride?.label ?? "Baseline",
       oosMetrics: result.baseline.oosMetrics,
     };
 
     const matched = result.trials.find((trial) => {
-      if (resultFamily === 'rsi_mean_reversion') {
+      if (resultFamily === "rsi_mean_reversion") {
         return (
           trial.period === anchor.period &&
           trial.oversold === anchor.oversold &&
           trial.overbought === anchor.overbought
         );
       }
-      if (resultFamily === 'macd_signal_cross') {
+      if (resultFamily === "macd_signal_cross") {
         return (
           trial.fastPeriod === anchor.fastPeriod &&
           trial.slowPeriod === anchor.slowPeriod &&
           trial.signalPeriod === anchor.signalPeriod
         );
       }
-      return trial.fastPeriod === anchor.fastPeriod && trial.slowPeriod === anchor.slowPeriod;
+      return (
+        trial.fastPeriod === anchor.fastPeriod &&
+        trial.slowPeriod === anchor.slowPeriod
+      );
     });
     if (matched && (anchorOverride?.returnPct == null || seed == null)) {
       anchor = {
@@ -882,22 +952,26 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       anchor,
       trials: result.trials,
       topN: 10,
-      rankBy: showOos ? rankBy : 'is',
+      rankBy: showOos ? rankBy : "is",
     });
   }, [anchorOverride, rankBy, result, resultFamily, seed, showOos]);
 
   const bestVsAnchor = useMemo(() => {
-    const best = compareRows.find((row) => row.status === 'best');
-    const anchor = compareRows.find((row) => row.status === 'anchor');
+    const best = compareRows.find((row) => row.status === "best");
+    const anchor = compareRows.find((row) => row.status === "anchor");
     if (!best || !anchor || best.deltaScore == null) return null;
-    const useOos = showOos && rankBy === 'oos' && best.deltaOosScore != null;
-    const scoreImproved = useOos ? best.deltaOosScore! > 0 : best.deltaScore > 0;
+    const useOos = showOos && rankBy === "oos" && best.deltaOosScore != null;
+    const scoreImproved = useOos
+      ? best.deltaOosScore! > 0
+      : best.deltaScore > 0;
     const { improved, profileDdBlocked } = labImprovedRespectingProfileDd({
       scoreImproved,
       maxDrawdownPct: best.maxDrawdownPct,
       maxDrawdownSoftPct,
     });
-    const isChamp = compareRows.find((row) => row.label === 'Mejor IS (no OOS)');
+    const isChamp = compareRows.find(
+      (row) => row.label === "Mejor IS (no OOS)",
+    );
     return {
       best,
       anchor,
@@ -911,7 +985,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     };
   }, [compareRows, rankBy, showOos, maxDrawdownSoftPct]);
 
-  const fieldClass = 'mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm';
+  const fieldClass =
+    "mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm";
   const familyReady = seed ? isOptimizableStrategy(seed.strategyType) : true;
 
   function setFamilyAndSpace(next: OptimizeStrategyFamily) {
@@ -920,9 +995,12 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     setSpace(scaleSearchSpace(defaultSpaceForFamily(next), riskSpaceFactor));
   }
 
-  function patchSma(side: 'fast' | 'slow', patch: Partial<{ min: number; max: number; step: number }>) {
+  function patchSma(
+    side: "fast" | "slow",
+    patch: Partial<{ min: number; max: number; step: number }>,
+  ) {
     setSpace((current) => {
-      if (current.family !== 'sma_crossover') return current;
+      if (current.family !== "sma_crossover") return current;
       return {
         ...current,
         [side]: clampRange({ ...current[side], ...patch }),
@@ -931,12 +1009,12 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
   }
 
   function patchRsi(
-    side: 'period' | 'oversold' | 'overbought',
+    side: "period" | "oversold" | "overbought",
     patch: Partial<{ min: number; max: number; step: number }>,
   ) {
     setSpace((current) => {
-      if (current.family !== 'rsi_mean_reversion') return current;
-      const floor = side === 'period' ? 2 : 5;
+      if (current.family !== "rsi_mean_reversion") return current;
+      const floor = side === "period" ? 2 : 5;
       return {
         ...current,
         [side]: clampRange({ ...current[side], ...patch }, floor),
@@ -947,18 +1025,24 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
   function buildRequest(engine: OptimizeEngine): OptimizeSmaGridRequestDto {
     const limit = Number.parseInt(barLimit, 10);
     const oos = !multiPathMode && oosEnabled ? Number.parseFloat(oosPct) : null;
-    const purge = Math.max(0, Math.min(20, Number.parseInt(cpcvPurge, 10) || 5));
-    const embargo = Math.max(0, Math.min(20, Number.parseInt(cpcvEmbargo, 10) || 5));
+    const purge = Math.max(
+      0,
+      Math.min(20, Number.parseInt(cpcvPurge, 10) || 5),
+    );
+    const embargo = Math.max(
+      0,
+      Math.min(20, Number.parseInt(cpcvEmbargo, 10) || 5),
+    );
     const base: OptimizeSmaGridRequestDto = {
       instrumentId,
       strategyFamily: family,
       initialCash: Number.parseFloat(initialCash) || 10000,
       timeframe,
-      engine: multiPathMode || family !== 'sma_crossover' ? 'h0' : engine,
+      engine: multiPathMode || family !== "sma_crossover" ? "h0" : engine,
       maxTrials: multiPathMode
         ? 80
-        : family === 'sma_crossover'
-          ? engine === 'optuna'
+        : family === "sma_crossover"
+          ? engine === "optuna"
             ? 100
             : 200
           : 80,
@@ -974,14 +1058,14 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         : {}),
     };
 
-    if (space.family === 'sma_crossover') {
+    if (space.family === "sma_crossover") {
       return {
         ...base,
         fastPeriods: expandRange(space.fast),
         slowPeriods: expandRange(space.slow),
       };
     }
-    if (space.family === 'rsi_mean_reversion') {
+    if (space.family === "rsi_mean_reversion") {
       return {
         ...base,
         periods: expandRange(space.period),
@@ -1012,7 +1096,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     const engines = selectedMethods;
     if (engines.length > 1 && runInBackground) {
       setJobError(
-        'Con varios métodos a la vez, desactiva «Segundo plano» (se ejecutan uno tras otro y se unen los resultados).',
+        "Con varios métodos a la vez, desactiva «Segundo plano» (se ejecutan uno tras otro y se unen los resultados).",
       );
       return;
     }
@@ -1035,15 +1119,15 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       }
       setLastAsyncResult(mergeOptimizeResults(parts));
       setJobError(null);
-      void queryClient.invalidateQueries({ queryKey: ['optimize-runs'] });
-      void queryClient.invalidateQueries({ queryKey: ['research'] });
+      void queryClient.invalidateQueries({ queryKey: ["optimize-runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["research"] });
     } catch (error) {
       setJobError(
         error instanceof ApiError
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'Error al optimizar',
+            : "Error al optimizar",
       );
     } finally {
       setMultiRunning(false);
@@ -1056,11 +1140,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     definition: StrategyDefinitionV1;
   } {
     const symbol = selectedInstrument?.symbol ?? seed?.symbol;
-    if (resultFamily === 'rsi_mean_reversion') {
+    if (resultFamily === "rsi_mean_reversion") {
       const period = row.period ?? 14;
       const oversold = row.oversold ?? 30;
       const overbought = row.overbought ?? 70;
-      const name = suggestOptimizedRsiName({ period, oversold, overbought, symbol });
+      const name = suggestOptimizedRsiName({
+        period,
+        oversold,
+        overbought,
+        symbol,
+      });
       return {
         name,
         definition: strategyDefinitionFromOptimizedRsi({
@@ -1073,11 +1162,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         }),
       };
     }
-    if (resultFamily === 'macd_signal_cross') {
+    if (resultFamily === "macd_signal_cross") {
       const fastPeriod = row.fastPeriod || 12;
       const slowPeriod = row.slowPeriod || 26;
       const signalPeriod = row.signalPeriod ?? 9;
-      const name = suggestOptimizedMacdName({ fastPeriod, slowPeriod, signalPeriod, symbol });
+      const name = suggestOptimizedMacdName({
+        fastPeriod,
+        slowPeriod,
+        signalPeriod,
+        symbol,
+      });
       return {
         name,
         definition: strategyDefinitionFromOptimizedMacd({
@@ -1112,7 +1206,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     return plateauAdoptionMetaFromTrials({
       trials: result.trials,
       family: resultFamily,
-      scoreMode: showOos && rankBy === 'oos' ? 'oos' : 'is',
+      scoreMode: showOos && rankBy === "oos" ? "oos" : "is",
     });
   }
 
@@ -1160,7 +1254,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     onAdoptReadyChange?.({
       canAdopt: zoneImproved,
       improved: zoneImproved,
-      label: bestVsAnchor?.best.paramsLabel ?? seed?.strategyLabel ?? '—',
+      label: bestVsAnchor?.best.paramsLabel ?? seed?.strategyLabel ?? "—",
       score: bestVsAnchor?.best.score ?? 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1202,13 +1296,15 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
           ensureBestStrategy: async () => {
             if (!bestVsAnchor.improved) return null;
             try {
-              const { name, definition } = buildDefinitionForRow(bestVsAnchor.best);
+              const { name, definition } = buildDefinitionForRow(
+                bestVsAnchor.best,
+              );
               const oosEvidence = buildOosEvidenceForAdopt(
                 result ?? undefined,
                 bestVsAnchor.best,
               );
               const created = await api.createStrategy({ name, definition });
-              if (oosEvidence.kind !== 'none') {
+              if (oosEvidence.kind !== "none") {
                 stashOosEvidenceForStrategy(created.data.id, oosEvidence);
               }
               if (instrumentId) {
@@ -1227,7 +1323,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                   paramsLabel: bestVsAnchor.best.paramsLabel,
                   strategyId: created.data.id,
                   oosKind: oosEvidence.kind,
-                  oosScore: oosEvidence.oosScore ?? oosEvidence.meanOosScore ?? null,
+                  oosScore:
+                    oosEvidence.oosScore ?? oosEvidence.meanOosScore ?? null,
                   score: bestVsAnchor.best.score,
                   maxDrawdownPct: bestVsAnchor.best.maxDrawdownPct,
                   profileId,
@@ -1235,19 +1332,23 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                 });
               }
               setSavedRowId(bestVsAnchor.best.id);
-              void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+              void queryClient.invalidateQueries({ queryKey: ["strategies"] });
               return {
                 ok: true as const,
                 strategyId: created.data.id,
                 name,
                 definition,
                 // Identidad ejecutable = preset de la def (grid SMA), no seed proxy (SuperTrend…).
-                presetKey: definition.presetKey ?? family ?? seed?.strategyType ?? null,
+                presetKey:
+                  definition.presetKey ?? family ?? seed?.strategyType ?? null,
               };
             } catch (err) {
               return {
                 ok: false as const,
-                error: err instanceof Error ? err.message : 'Error al guardar el Mejor',
+                error:
+                  err instanceof Error
+                    ? err.message
+                    : "Error al guardar el Mejor",
               };
             }
           },
@@ -1255,7 +1356,17 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bestVsAnchor, zoneRank, zoneId, seed, family, result, instrumentId, timeframe, profileId],
+    [
+      bestVsAnchor,
+      zoneRank,
+      zoneId,
+      seed,
+      family,
+      result,
+      instrumentId,
+      timeframe,
+      profileId,
+    ],
   );
 
   // savedRowId es señal de refresco: readLabAdoption lee localStorage no reactivo,
@@ -1266,14 +1377,20 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
     const rec = readLabAdoption(id, tf);
     return rec ? formatLabAdoptionHint(rec) : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seed?.instrumentId, seed?.timeframe, instrumentId, timeframe, savedRowId]);
+  }, [
+    seed?.instrumentId,
+    seed?.timeframe,
+    instrumentId,
+    timeframe,
+    savedRowId,
+  ]);
 
   return (
     <Card
       className={cn(
-        'w-full',
-        compact && 'border-border/70 shadow-none',
-        showLiveProgress && 'border-sky-500/40 ring-1 ring-sky-400/25',
+        "w-full",
+        compact && "border-border/70 shadow-none",
+        showLiveProgress && "border-sky-500/40 ring-1 ring-sky-400/25",
       )}
     >
       <OptimizeCardHeader
@@ -1287,7 +1404,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         adoptionHint={adoptionHint}
         oosEnabled={oosEnabled}
       />
-      <CardContent className={cn('space-y-4', compact && 'px-3 pb-3')}>
+      <CardContent className={cn("space-y-4", compact && "px-3 pb-3")}>
         {compact && showLiveProgress && progressNode}
 
         {seed && (
@@ -1308,12 +1425,13 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
             className="mt-1 text-muted-foreground"
             title="Grid barre la malla de parámetros. Optuna busca de forma inteligente en el mismo rango. Puedes marcar ambos."
           >
-            {family === 'sma_crossover'
-              ? `Métodos activos: ${selectedMethods.join(', ')}. Si eliges varios, se unen los candidatos.`
-              : 'Esta familia usa grid clásico (H0).'}
+            {family === "sma_crossover"
+              ? `Métodos activos: ${selectedMethods.join(", ")}. Si eliges varios, se unen los candidatos.`
+              : "Esta familia usa grid clásico (H0)."}
           </p>
           <p className="mt-1 tabular-nums text-muted-foreground">
-            Combinaciones previstas: <strong className="text-foreground">{trialTotal}</strong>
+            Combinaciones previstas:{" "}
+            <strong className="text-foreground">{trialTotal}</strong>
           </p>
         </div>
 
@@ -1337,14 +1455,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
             Familia
             <select
               value={family}
-              onChange={(e) => setFamilyAndSpace(e.target.value as OptimizeStrategyFamily)}
+              onChange={(e) =>
+                setFamilyAndSpace(e.target.value as OptimizeStrategyFamily)
+              }
               className={fieldClass}
             >
               {(
                 [
-                  ['sma_crossover', 'SMA crossover'],
-                  ['rsi_mean_reversion', 'RSI mean-reversion'],
-                  ['macd_signal_cross', 'MACD signal cross'],
+                  ["sma_crossover", "SMA crossover"],
+                  ["rsi_mean_reversion", "RSI mean-reversion"],
+                  ["macd_signal_cross", "MACD signal cross"],
                 ] as const
               )
                 .slice()
@@ -1356,7 +1476,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                 .map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
-                    {preferredLabFamilies[0] === value ? ' · perfil' : ''}
+                    {preferredLabFamilies[0] === value ? " · perfil" : ""}
                   </option>
                 ))}
             </select>
@@ -1368,13 +1488,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
         ) : null}
         {!preferredLabFamilies.includes(family) ? (
           <p className="text-[11px] text-amber-800 dark:text-amber-200">
-            Familia actual fuera del prior del perfil — ok si viene del Coach/semilla.
+            Familia actual fuera del prior del perfil — ok si viene del
+            Coach/semilla.
           </p>
         ) : null}
 
         <div className="space-y-2 rounded-lg border border-border p-3">
-          <p className="text-sm font-medium text-foreground">Espacio de búsqueda</p>
-          {space.family === 'sma_crossover' && (
+          <p className="text-sm font-medium text-foreground">
+            Espacio de búsqueda
+          </p>
+          {space.family === "sma_crossover" && (
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
@@ -1388,13 +1511,23 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
               <tbody>
                 {(
                   [
-                    ['fast', 'SMA rápida', space.fast, expandRange(space.fast).length],
-                    ['slow', 'SMA lenta', space.slow, expandRange(space.slow).length],
+                    [
+                      "fast",
+                      "SMA rápida",
+                      space.fast,
+                      expandRange(space.fast).length,
+                    ],
+                    [
+                      "slow",
+                      "SMA lenta",
+                      space.slow,
+                      expandRange(space.slow).length,
+                    ],
                   ] as const
                 ).map(([key, label, range, count]) => (
                   <tr key={key} className="border-t border-border/50">
                     <td className="py-1.5 pr-2 font-medium">{label}</td>
-                    {(['min', 'max', 'step'] as const).map((field) => (
+                    {(["min", "max", "step"] as const).map((field) => (
                       <td key={field} className="py-1.5 pr-2">
                         <input
                           type="number"
@@ -1406,13 +1539,15 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                         />
                       </td>
                     ))}
-                    <td className="py-1.5 tabular-nums text-muted-foreground">{count}</td>
+                    <td className="py-1.5 tabular-nums text-muted-foreground">
+                      {count}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-          {space.family === 'rsi_mean_reversion' && (
+          {space.family === "rsi_mean_reversion" && (
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground">
@@ -1425,14 +1560,14 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
               <tbody>
                 {(
                   [
-                    ['period', 'Periodo RSI', space.period],
-                    ['oversold', 'Oversold', space.oversold],
-                    ['overbought', 'Overbought', space.overbought],
+                    ["period", "Periodo RSI", space.period],
+                    ["oversold", "Oversold", space.oversold],
+                    ["overbought", "Overbought", space.overbought],
                   ] as const
                 ).map(([key, label, range]) => (
                   <tr key={key} className="border-t border-border/50">
                     <td className="py-1.5 pr-2 font-medium">{label}</td>
-                    {(['min', 'max', 'step'] as const).map((field) => (
+                    {(["min", "max", "step"] as const).map((field) => (
                       <td key={field} className="py-1.5 pr-2">
                         <input
                           type="number"
@@ -1449,10 +1584,10 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
               </tbody>
             </table>
           )}
-          {space.family === 'macd_signal_cross' && (
+          {space.family === "macd_signal_cross" && (
             <p className="text-xs text-muted-foreground">
-              Vecindario clásico (~25 triples around 12/26/9). Puedes resetear con el selector de
-              familia.
+              Vecindario clásico (~25 triples around 12/26/9). Puedes resetear
+              con el selector de familia.
               <button
                 type="button"
                 className="ml-2 underline"
@@ -1462,7 +1597,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
               </button>
             </p>
           )}
-          {space.family === 'rsi_mean_reversion' && (
+          {space.family === "rsi_mean_reversion" && (
             <button
               type="button"
               className="text-[11px] underline text-muted-foreground"
@@ -1522,12 +1657,14 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                   className="h-7 text-[11px]"
                   title="Grid + Optuna + hold-out 20% · listo para adoptar TOP"
                   onClick={() => {
-                    setMethods(family === 'sma_crossover' ? ['h0', 'optuna'] : ['h0']);
+                    setMethods(
+                      family === "sma_crossover" ? ["h0", "optuna"] : ["h0"],
+                    );
                     setOosEnabled(true);
-                    setOosPct('0.2');
+                    setOosPct("0.2");
                     setWfEnabled(false);
                     setCpcvEnabled(false);
-                    setRankBy('oos');
+                    setRankBy("oos");
                     setExpanded(true);
                   }}
                 >
@@ -1546,7 +1683,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                       checked={selectedMethods.includes(option.id)}
                       disabled={
                         multiPathMode ||
-                        (family !== 'sma_crossover' && option.id !== 'h0')
+                        (family !== "sma_crossover" && option.id !== "h0")
                       }
                       onChange={() => toggleMethod(option.id)}
                       className="rounded border-border"
@@ -1557,8 +1694,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
               </div>
               {selectedMethods.length > 1 && (
                 <p className="text-[11px] text-muted-foreground">
-                  Se lanzarán en serie y se unirán los candidatos (quedará el mejor score por
-                  parámetros).
+                  Se lanzarán en serie y se unirán los candidatos (quedará el
+                  mejor score por parámetros).
                 </p>
               )}
             </div>
@@ -1605,7 +1742,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                   if (e.target.checked) {
                     setOosEnabled(false);
                     setCpcvEnabled(false);
-                    setMethods(['h0']);
+                    setMethods(["h0"]);
                     setRunInBackground(false);
                   }
                 }}
@@ -1625,9 +1762,12 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
               </select>
             </label>
             {wfEnabled && !cpcvEnabled && (
-              <p className="col-span-2 text-[11px] text-muted-foreground" title={OPTIMIZE_WF_HELP}>
-                Solo grid H0 · ~{trialTotal} trials (×{wfFoldCount} pliegues). Optuna/VectorBT no
-                aplican en WF v1.
+              <p
+                className="col-span-2 text-[11px] text-muted-foreground"
+                title={OPTIMIZE_WF_HELP}
+              >
+                Solo grid H0 · ~{trialTotal} trials (×{wfFoldCount} pliegues).
+                Optuna/VectorBT no aplican en WF v1.
               </p>
             )}
             <label
@@ -1642,7 +1782,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                   if (e.target.checked) {
                     setOosEnabled(false);
                     setWfEnabled(false);
-                    setMethods(['h0']);
+                    setMethods(["h0"]);
                     setRunInBackground(false);
                   }
                 }}
@@ -1686,8 +1826,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                     />
                   </label>
                   <span title={OPTIMIZE_CPCV_HELP}>
-                    Solo H0 · ~{trialTotal} trials (C({cpcvGroupCount},2)={cpcvPaths} paths) · PBO
-                    CSCV lab al cerrar.
+                    Solo H0 · ~{trialTotal} trials (C({cpcvGroupCount},2)=
+                    {cpcvPaths} paths) · PBO CSCV lab al cerrar.
                   </span>
                 </div>
               </>
@@ -1713,7 +1853,7 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
             size="sm"
             className="h-8 w-8 p-0"
             disabled={!instrumentId || isRunning}
-            title={isRunning ? 'Optimización en curso…' : 'Lanzar experimento'}
+            title={isRunning ? "Optimización en curso…" : "Lanzar experimento"}
             aria-label="Lanzar optimización"
             onClick={handleRun}
           >
@@ -1727,17 +1867,21 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
             size="sm"
             variant="ghost"
             className="h-8 w-8 p-0"
-            title={expanded ? 'Ocultar opciones' : 'Más opciones'}
-            aria-label={expanded ? 'Menos opciones' : 'Más opciones'}
+            title={expanded ? "Ocultar opciones" : "Más opciones"}
+            aria-label={expanded ? "Menos opciones" : "Más opciones"}
             onClick={() => setExpanded((value) => !value)}
           >
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {expanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
           </Button>
           <span className="text-[11px] text-muted-foreground">
             {multiProgress
               ? multiProgress
               : isRunning
-                ? 'Explorando…'
+                ? "Explorando…"
                 : `Listo · ~${trialTotal} trials · ${selectedMethods.length} método(s)`}
           </span>
         </div>
@@ -1746,18 +1890,28 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
 
         {jobError && <p className="text-sm text-destructive">{jobError}</p>}
         {saveError && <p className="text-sm text-destructive">{saveError}</p>}
-        {promoteMsg && <p className="text-xs text-muted-foreground">{promoteMsg}</p>}
-
-        {result && (cpcv || walkForward || edgeReport || result.trials?.[0]?.oosMetrics) && (
-          <OptimizeSummaryStrip
-            mode={cpcv ? 'CPCV' : walkForward ? 'walk-forward' : 'hold-out / IS'}
-            wfe={
-              cpcv?.walkForwardEfficiency ?? walkForward?.walkForwardEfficiency ?? null
-            }
-            pbo={pbo}
-            edgeBand={edgeReport ? edgeReport.band : null}
-          />
+        {promoteMsg && (
+          <p className="text-xs text-muted-foreground">{promoteMsg}</p>
         )}
+
+        {result &&
+          (cpcv ||
+            walkForward ||
+            edgeReport ||
+            result.trials?.[0]?.oosMetrics) && (
+            <OptimizeSummaryStrip
+              mode={
+                cpcv ? "CPCV" : walkForward ? "walk-forward" : "hold-out / IS"
+              }
+              wfe={
+                cpcv?.walkForwardEfficiency ??
+                walkForward?.walkForwardEfficiency ??
+                null
+              }
+              pbo={pbo}
+              edgeBand={edgeReport ? edgeReport.band : null}
+            />
+          )}
 
         {walkForward && (
           <OptimizeWalkForwardReport
@@ -1786,123 +1940,139 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
               engine={result?.engine}
               trialsDone={result?.trials?.length ?? null}
               trialsTotal={
-                result?.engine?.includes('+')
-                  ? result.trials?.length ?? null
+                result?.engine?.includes("+")
+                  ? (result.trials?.length ?? null)
                   : (result?.trialsTotal ?? result?.trials?.length ?? null)
               }
               oosPct={result?.oosPct ?? null}
-              walkForwardFolds={walkForward?.nFolds ?? walkForward?.foldCount ?? null}
+              walkForwardFolds={
+                walkForward?.nFolds ?? walkForward?.foldCount ?? null
+              }
               cpcvPaths={cpcv?.pathCount ?? null}
             />
-          <div
-            className={cn(
-              'space-y-3 rounded-lg border px-3 py-3 text-sm',
-              bestVsAnchor.improved
-                ? 'border-emerald-500/40 bg-emerald-500/10'
-                : 'border-amber-500/40 bg-amber-500/10',
-            )}
-          >
-            {bestVsAnchor.improved ? (
-              <>
-                <div>
-                  <p className="font-medium text-foreground">
-                    {bestVsAnchor.rankedByOos ? 'Mejor OOS' : 'Mejor IS'} ·{' '}
-                    {bestVsAnchor.best.paramsLabel}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {bestVsAnchor.rankedByOos ? (
-                      <>
-                        Score OOS{' '}
-                        {bestVsAnchor.best.deltaOosScore != null &&
-                        bestVsAnchor.best.deltaOosScore >= 0
-                          ? '+'
-                          : ''}
-                        {bestVsAnchor.best.deltaOosScore?.toFixed(2)} vs ancla
-                        {' · '}
-                        IS{' '}
-                        {bestVsAnchor.best.deltaScore != null && bestVsAnchor.best.deltaScore >= 0
-                          ? '+'
-                          : ''}
-                        {bestVsAnchor.best.deltaScore?.toFixed(2)}
-                      </>
-                    ) : (
-                      <>
-                        Score IS{' '}
-                        {bestVsAnchor.best.deltaScore != null && bestVsAnchor.best.deltaScore >= 0
-                          ? '+'
-                          : ''}
-                        {bestVsAnchor.best.deltaScore?.toFixed(2)} vs tu prueba origen
-                        {bestVsAnchor.best.oosMetrics
-                          ? ` · OOS ${bestVsAnchor.best.oosMetrics.score.toFixed(2)}`
-                          : ''}
-                      </>
-                    )}
-                    .
-                  </p>
-                  {bestVsAnchor.isChampDiffers && bestVsAnchor.isChampParams && (
-                    <p className="mt-1 text-xs text-amber-200/90">
-                      Ojo: el pico IS ({bestVsAnchor.isChampParams}) no es el mejor OOS. Priorizamos
-                      OOS para reducir sobreajuste.
+            <div
+              className={cn(
+                "space-y-3 rounded-lg border px-3 py-3 text-sm",
+                bestVsAnchor.improved
+                  ? "border-emerald-500/40 bg-emerald-500/10"
+                  : "border-amber-500/40 bg-amber-500/10",
+              )}
+            >
+              {bestVsAnchor.improved ? (
+                <>
+                  <div>
+                    <p className="font-medium text-foreground">
+                      {bestVsAnchor.rankedByOos ? "Mejor OOS" : "Mejor IS"} ·{" "}
+                      {bestVsAnchor.best.paramsLabel}
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {bestVsAnchor.rankedByOos ? (
+                        <>
+                          Score OOS{" "}
+                          {bestVsAnchor.best.deltaOosScore != null &&
+                          bestVsAnchor.best.deltaOosScore >= 0
+                            ? "+"
+                            : ""}
+                          {bestVsAnchor.best.deltaOosScore?.toFixed(2)} vs ancla
+                          {" · "}
+                          IS{" "}
+                          {bestVsAnchor.best.deltaScore != null &&
+                          bestVsAnchor.best.deltaScore >= 0
+                            ? "+"
+                            : ""}
+                          {bestVsAnchor.best.deltaScore?.toFixed(2)}
+                        </>
+                      ) : (
+                        <>
+                          Score IS{" "}
+                          {bestVsAnchor.best.deltaScore != null &&
+                          bestVsAnchor.best.deltaScore >= 0
+                            ? "+"
+                            : ""}
+                          {bestVsAnchor.best.deltaScore?.toFixed(2)} vs tu
+                          prueba origen
+                          {bestVsAnchor.best.oosMetrics
+                            ? ` · OOS ${bestVsAnchor.best.oosMetrics.score.toFixed(2)}`
+                            : ""}
+                        </>
+                      )}
+                      .
+                    </p>
+                    {bestVsAnchor.isChampDiffers &&
+                      bestVsAnchor.isChampParams && (
+                        <p className="mt-1 text-xs text-amber-200/90">
+                          Ojo: el pico IS ({bestVsAnchor.isChampParams}) no es
+                          el mejor OOS. Priorizamos OOS para reducir
+                          sobreajuste.
+                        </p>
+                      )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Lab no escribe Finalistas. Cuando terminen las zonas, usa{" "}
+                    <strong className="text-foreground">
+                      Reanalizar con Coach
+                    </strong>{" "}
+                    y guarda Finalistas desde el Coach.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={
+                        saveStrategyMutation.isPending ||
+                        savedRowId === bestVsAnchor.best.id
+                      }
+                      onClick={() => void handleSave(bestVsAnchor.best, false)}
+                      title="Guarda el Mejor en Optimizadas (clone Lab · origin preset; no toca Finalistas)"
+                    >
+                      {savedRowId === bestVsAnchor.best.id
+                        ? "Ya en Optimizadas"
+                        : "Guardar en Optimizadas"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  {bestVsAnchor.profileDdBlocked ? (
+                    <>
+                      <p>
+                        Score mejor, pero DD{" "}
+                        {formatPct(Math.abs(bestVsAnchor.best.maxDrawdownPct))}{" "}
+                        supera el techo del perfil (
+                        {bestVsAnchor.maxDrawdownSoftPct}%). No se adopta como
+                        Mejor (CORE-P).
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Cambia de perfil o sube el riesgo en Configuración →
+                        Perfil inversor si quieres aceptar más drawdown.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        Completado · ningún candidato mejora el score{" "}
+                        {bestVsAnchor.rankedByOos ? "OOS" : "IS"} de la ancla en
+                        esta ventana. No hace falta reanalizarla en Coach.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Opcional: márcala «Llevar al Coach» en el tablero para
+                        verla allí con el aviso «no mejoró» (sin re-score).
+                      </p>
+                    </>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Lab no escribe Finalistas. Cuando terminen las zonas, usa{' '}
-                  <strong className="text-foreground">Reanalizar con Coach</strong> y guarda
-                  Finalistas desde el Coach.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={saveStrategyMutation.isPending || savedRowId === bestVsAnchor.best.id}
-                    onClick={() => void handleSave(bestVsAnchor.best, false)}
-                    title="Guarda el Mejor en Optimizadas (clone Lab · origin preset; no toca Finalistas)"
-                  >
-                    {savedRowId === bestVsAnchor.best.id
-                      ? 'Ya en Optimizadas'
-                      : 'Guardar en Optimizadas'}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-2">
-                {bestVsAnchor.profileDdBlocked ? (
-                  <>
-                    <p>
-                      Score mejor, pero DD{' '}
-                      {formatPct(Math.abs(bestVsAnchor.best.maxDrawdownPct))} supera el techo del
-                      perfil ({bestVsAnchor.maxDrawdownSoftPct}%). No se adopta como Mejor (CORE-P).
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Cambia de perfil o sube el riesgo en Configuración → Perfil inversor si quieres
-                      aceptar más drawdown.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      Completado · ningún candidato mejora el score{' '}
-                      {bestVsAnchor.rankedByOos ? 'OOS' : 'IS'} de la ancla en esta ventana.
-                      No hace falta reanalizarla en Coach.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Opcional: márcala «Llevar al Coach» en el tablero para verla allí con el aviso
-                      «no mejoró» (sin re-score).
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           </div>
         )}
 
         {result && (
           <div className="space-y-2">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <p className="text-sm font-medium text-foreground">Comparación vs ancla</p>
+              <p className="text-sm font-medium text-foreground">
+                Comparación vs ancla
+              </p>
               <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                 {showOos && (
                   <label
@@ -1912,7 +2082,9 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                     Elegir Mejor por
                     <select
                       value={rankBy}
-                      onChange={(e) => setRankBy(e.target.value as OptimizeRankBy)}
+                      onChange={(e) =>
+                        setRankBy(e.target.value as OptimizeRankBy)
+                      }
                       className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] text-foreground"
                     >
                       <option value="oos">Score OOS</option>
@@ -1924,8 +2096,8 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
                   {result.barCount} barras
                   {result.isBarCount != null && result.oosBarCount != null
                     ? ` · IS ${result.isBarCount} / OOS ${result.oosBarCount}`
-                    : ''}
-                  {' · '}
+                    : ""}
+                  {" · "}
                   {result.engine}
                 </span>
               </div>
@@ -1933,14 +2105,16 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
             <BacktestOptimizeHeatmapPanel
               trials={result.trials}
               family={resultFamily}
-              scoreMode={showOos && rankBy === 'oos' ? 'oos' : 'is'}
+              scoreMode={showOos && rankBy === "oos" ? "oos" : "is"}
               compact={compact}
             />
             <BacktestOptimizeCompareTable
               rows={compareRows}
               family={resultFamily}
               showOos={showOos}
-              oosMode={cpcv ? 'walkforward' : walkForward ? 'walkforward' : 'holdout'}
+              oosMode={
+                cpcv ? "walkforward" : walkForward ? "walkforward" : "holdout"
+              }
               onSave={(row) => handleSave(row, false)}
               savingId={
                 saveStrategyMutation.isPending
@@ -1959,5 +2133,4 @@ export const BacktestOptimizePanel = forwardRef<LabZoneHandle, BacktestOptimizeP
       </CardContent>
     </Card>
   );
-},
-);
+});

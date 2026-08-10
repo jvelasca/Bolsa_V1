@@ -1,16 +1,20 @@
-import { Save } from 'lucide-react';
-import type { OptimizeStrategyFamily, OosMetricsDto, SmaGridTrialDto } from '@bolsa/shared';
+import { Save } from "lucide-react";
+import type {
+  OptimizeStrategyFamily,
+  OosMetricsDto,
+  SmaGridTrialDto,
+} from "@bolsa/shared";
 import {
   formatDelta,
   formatTrialParams,
-} from '@/features/backtests/backtest-optimize-space';
-import { formatPct } from '@/features/charts/chart-utils';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/backtest-optimize-space";
+import { formatPct } from "@/features/charts/chart-utils";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export type OptimizeCompareRow = {
   id: string;
-  status: 'anchor' | 'candidate' | 'best' | 'adopted';
+  status: "anchor" | "candidate" | "best" | "adopted";
   label: string;
   paramsLabel: string;
   fastPeriod: number;
@@ -38,7 +42,7 @@ type Props = {
   family?: OptimizeStrategyFamily | string;
   showOos?: boolean;
   /** How OOS columns were produced (footer copy). */
-  oosMode?: 'holdout' | 'walkforward';
+  oosMode?: "holdout" | "walkforward";
   onSave?: (row: OptimizeCompareRow) => void;
   savingId?: string | null;
   savedId?: string | null;
@@ -47,7 +51,7 @@ type Props = {
 function DeltaCell({
   value,
   invert = false,
-  suffix = ' pp',
+  suffix = " pp",
 }: {
   value: number | null;
   invert?: boolean;
@@ -61,10 +65,10 @@ function DeltaCell({
   return (
     <span
       className={cn(
-        'tabular-nums',
-        good && 'text-emerald-400',
-        bad && 'text-rose-400',
-        !good && !bad && 'text-muted-foreground',
+        "tabular-nums",
+        good && "text-emerald-400",
+        bad && "text-rose-400",
+        !good && !bad && "text-muted-foreground",
       )}
     >
       {formatDelta(value)}
@@ -73,24 +77,30 @@ function DeltaCell({
   );
 }
 
-function StatusBadge({ status }: { status: OptimizeCompareRow['status'] }) {
+function StatusBadge({ status }: { status: OptimizeCompareRow["status"] }) {
   const map = {
-    anchor: { label: 'Ancla', className: 'border-sky-500/40 bg-sky-500/15 text-sky-200' },
-    best: { label: 'Mejor', className: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' },
+    anchor: {
+      label: "Ancla",
+      className: "border-sky-500/40 bg-sky-500/15 text-sky-200",
+    },
+    best: {
+      label: "Mejor",
+      className: "border-emerald-500/40 bg-emerald-500/15 text-emerald-300",
+    },
     adopted: {
-      label: 'Guardada',
-      className: 'border-amber-500/40 bg-amber-500/15 text-amber-200',
+      label: "Guardada",
+      className: "border-amber-500/40 bg-amber-500/15 text-amber-200",
     },
     candidate: {
-      label: 'Candidato',
-      className: 'border-border/70 bg-muted/40 text-muted-foreground',
+      label: "Candidato",
+      className: "border-border/70 bg-muted/40 text-muted-foreground",
     },
   } as const;
   const item = map[status];
   return (
     <span
       className={cn(
-        'inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+        "inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         item.className,
       )}
     >
@@ -100,10 +110,10 @@ function StatusBadge({ status }: { status: OptimizeCompareRow['status'] }) {
 }
 
 function trialKey(trial: SmaGridTrialDto, family: string): string {
-  if (family === 'rsi_mean_reversion') {
+  if (family === "rsi_mean_reversion") {
     return `rsi-${trial.period}-${trial.oversold}-${trial.overbought}`;
   }
-  if (family === 'macd_signal_cross') {
+  if (family === "macd_signal_cross") {
     return `macd-${trial.fastPeriod}-${trial.slowPeriod}-${trial.signalPeriod}`;
   }
   return `sma-${trial.fastPeriod}-${trial.slowPeriod}`;
@@ -112,9 +122,9 @@ function trialKey(trial: SmaGridTrialDto, family: string): string {
 /** Comparison table: original anchor vs optimized candidates with deltas. */
 export function BacktestOptimizeCompareTable({
   rows,
-  family = 'sma_crossover',
+  family = "sma_crossover",
   showOos = false,
-  oosMode = 'holdout',
+  oosMode = "holdout",
   onSave,
   savingId = null,
   savedId = null,
@@ -149,14 +159,14 @@ export function BacktestOptimizeCompareTable({
         <tbody>
           {rows.map((row) => {
             const isSaved = savedId === row.id;
-            const status = isSaved ? 'adopted' : row.status;
+            const status = isSaved ? "adopted" : row.status;
             return (
               <tr
                 key={row.id}
                 className={cn(
-                  'border-t border-border/50',
-                  row.status === 'anchor' && 'bg-sky-500/5',
-                  row.status === 'best' && 'bg-emerald-500/5',
+                  "border-t border-border/50",
+                  row.status === "anchor" && "bg-sky-500/5",
+                  row.status === "best" && "bg-emerald-500/5",
                 )}
               >
                 <td className="p-2">
@@ -166,24 +176,30 @@ export function BacktestOptimizeCompareTable({
                 <td className="p-2 tabular-nums">{row.paramsLabel}</td>
                 <td className="p-2 tabular-nums text-muted-foreground">
                   {row.deltaFast == null && row.deltaSlow == null ? (
-                    '—'
+                    "—"
                   ) : (
                     <>
                       {row.deltaFast != null && row.deltaFast !== 0 && (
-                        <span className="mr-1">Δa {formatDelta(row.deltaFast, 0)}</span>
+                        <span className="mr-1">
+                          Δa {formatDelta(row.deltaFast, 0)}
+                        </span>
                       )}
                       {row.deltaSlow != null && row.deltaSlow !== 0 && (
                         <span>Δb {formatDelta(row.deltaSlow, 0)}</span>
                       )}
-                      {row.deltaFast === 0 && row.deltaSlow === 0 && 'igual'}
+                      {row.deltaFast === 0 && row.deltaSlow === 0 && "igual"}
                     </>
                   )}
                 </td>
-                <td className="p-2 tabular-nums">{formatPct(row.totalReturnPct)}</td>
+                <td className="p-2 tabular-nums">
+                  {formatPct(row.totalReturnPct)}
+                </td>
                 <td className="p-2">
                   <DeltaCell value={row.deltaReturnPct} />
                 </td>
-                <td className="p-2 tabular-nums">{formatPct(row.maxDrawdownPct)}</td>
+                <td className="p-2 tabular-nums">
+                  {formatPct(row.maxDrawdownPct)}
+                </td>
                 <td className="p-2 font-medium tabular-nums">
                   {(Number.isFinite(row.score) ? row.score : 0).toFixed(2)}
                 </td>
@@ -195,10 +211,10 @@ export function BacktestOptimizeCompareTable({
                     <td className="p-2 tabular-nums">
                       {row.oosMetrics
                         ? formatPct(row.oosMetrics.totalReturnPct)
-                        : '—'}
+                        : "—"}
                     </td>
                     <td className="p-2 tabular-nums">
-                      {row.oosMetrics ? row.oosMetrics.score.toFixed(2) : '—'}
+                      {row.oosMetrics ? row.oosMetrics.score.toFixed(2) : "—"}
                     </td>
                     <td className="p-2">
                       <DeltaCell value={row.deltaOosScore} suffix="" />
@@ -208,17 +224,17 @@ export function BacktestOptimizeCompareTable({
                 <td className="p-2 tabular-nums">{row.tradeCount}</td>
                 {onSave && (
                   <td className="p-2 text-right">
-                    {row.status === 'anchor' ? (
+                    {row.status === "anchor" ? (
                       <span className="text-muted-foreground">—</span>
                     ) : (
                       <Button
                         type="button"
                         size="sm"
-                        variant={isSaved ? 'default' : 'outline'}
+                        variant={isSaved ? "default" : "outline"}
                         className="h-7 w-7 p-0"
                         title={
                           isSaved
-                            ? 'Ya guardada como estrategia propia'
+                            ? "Ya guardada como estrategia propia"
                             : `Guardar «${row.paramsLabel} · opt»`
                         }
                         aria-label={`Guardar ${row.paramsLabel}`}
@@ -237,29 +253,29 @@ export function BacktestOptimizeCompareTable({
       </table>
       {showOos && (
         <p className="border-t border-border/50 px-2 py-1.5 text-[10px] text-muted-foreground">
-          Familia {family} · columnas OOS ={' '}
-          {oosMode === 'walkforward'
-            ? 'último pliegue walk-forward (ver resumen arriba)'
-            : 'hold-out (un corte)'}
+          Familia {family} · columnas OOS ={" "}
+          {oosMode === "walkforward"
+            ? "último pliegue walk-forward (ver resumen arriba)"
+            : "hold-out (un corte)"}
         </p>
       )}
     </div>
   );
 }
 
-export type OptimizeRankBy = 'is' | 'oos';
+export type OptimizeRankBy = "is" | "oos";
 
 /** OOS with fewer trades than this is treated as weak evidence when ranking. */
 export const MIN_OOS_TRADES_FOR_RANK = 2;
 
 function trialOosScore(trial: SmaGridTrialDto): number | null {
   const score = trial.oosMetrics?.score;
-  return typeof score === 'number' && Number.isFinite(score) ? score : null;
+  return typeof score === "number" && Number.isFinite(score) ? score : null;
 }
 
 function trialOosTradeCount(trial: SmaGridTrialDto): number {
   const count = trial.oosMetrics?.tradeCount;
-  return typeof count === 'number' && Number.isFinite(count) ? count : 0;
+  return typeof count === "number" && Number.isFinite(count) ? count : 0;
 }
 
 /** Sort key for OOS: sparse OOS (few trades) ranks below denser evidence. */
@@ -279,7 +295,7 @@ export function rankTrialsForCompare(
 ): SmaGridTrialDto[] {
   const copy = [...trials];
   const oosReady =
-    rankBy === 'oos' &&
+    rankBy === "oos" &&
     copy.length > 0 &&
     copy.every((trial) => trialOosScore(trial) != null);
 
@@ -314,21 +330,21 @@ export function buildCompareRows(opts: {
   /** When 'oos' and data allows, «Mejor» = best out-of-sample score. */
   rankBy?: OptimizeRankBy;
 }): OptimizeCompareRow[] {
-  const { family, anchor, trials, topN = 8, rankBy = 'is' } = opts;
+  const { family, anchor, trials, topN = 8, rankBy = "is" } = opts;
   const anchorParams = formatTrialParams(anchor, family);
   const ranked = rankTrialsForCompare(trials, rankBy);
-  const rankedIs = rankTrialsForCompare(trials, 'is');
+  const rankedIs = rankTrialsForCompare(trials, "is");
   const effectiveRankBy: OptimizeRankBy =
-    rankBy === 'oos' &&
+    rankBy === "oos" &&
     trials.length > 0 &&
     trials.every((trial) => trialOosScore(trial) != null)
-      ? 'oos'
-      : 'is';
+      ? "oos"
+      : "is";
 
   const rows: OptimizeCompareRow[] = [
     {
       id: `anchor-${trialKey(anchor as SmaGridTrialDto, family)}`,
-      status: 'anchor',
+      status: "anchor",
       label: anchor.label,
       paramsLabel: anchorParams,
       fastPeriod: anchor.fastPeriod ?? 0,
@@ -354,20 +370,21 @@ export function buildCompareRows(opts: {
   const bestKey = ranked.length > 0 ? trialKey(ranked[0]!, family) : null;
   const bestIsKey = rankedIs.length > 0 ? trialKey(rankedIs[0]!, family) : null;
   const anchorKey = trialKey(anchor as SmaGridTrialDto, family);
-  const bestLabel = effectiveRankBy === 'oos' ? 'Mejor OOS' : 'Mejor IS';
+  const bestLabel = effectiveRankBy === "oos" ? "Mejor OOS" : "Mejor IS";
 
   for (const trial of ranked.slice(0, topN)) {
     const key = trialKey(trial, family);
     if (key === anchorKey) continue;
     const isBest = key === bestKey;
     const isIsChamp = key === bestIsKey;
-    let label = 'Candidato';
+    let label = "Candidato";
     if (isBest) label = bestLabel;
-    else if (effectiveRankBy === 'oos' && isIsChamp) label = 'Mejor IS (no OOS)';
+    else if (effectiveRankBy === "oos" && isIsChamp)
+      label = "Mejor IS (no OOS)";
 
     rows.push({
       id: `trial-${key}`,
-      status: isBest ? 'best' : 'candidate',
+      status: isBest ? "best" : "candidate",
       label,
       paramsLabel: formatTrialParams(trial, family),
       fastPeriod: trial.fastPeriod ?? 0,

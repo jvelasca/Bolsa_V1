@@ -3,16 +3,16 @@
  * Compact mode = zona del tablero (visible sin scroll).
  */
 
-import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export type OptimizeProgressPhase =
-  | 'pending'
-  | 'processing'
-  | 'running'
-  | 'completed'
-  | 'failed';
+  | "pending"
+  | "processing"
+  | "running"
+  | "completed"
+  | "failed";
 
 type Props = {
   phase: OptimizeProgressPhase;
@@ -27,34 +27,34 @@ type Props = {
   className?: string;
 };
 
-const ACTIVITY_STEPS: Record<'pending' | 'busy', string[]> = {
+const ACTIVITY_STEPS: Record<"pending" | "busy", string[]> = {
   pending: [
-    'Job en cola del worker…',
-    'Esperando hueco en el laboratorio…',
-    'Preparando espacio de búsqueda…',
+    "Job en cola del worker…",
+    "Esperando hueco en el laboratorio…",
+    "Preparando espacio de búsqueda…",
   ],
   busy: [
-    'Explorando combinaciones de parámetros…',
-    'Evaluando score vs ancla…',
-    'Comprobando tramo hold-out / OOS…',
-    'Descartando candidatos flojos…',
-    'Afinando el Mejor del lote…',
+    "Explorando combinaciones de parámetros…",
+    "Evaluando score vs ancla…",
+    "Comprobando tramo hold-out / OOS…",
+    "Descartando candidatos flojos…",
+    "Afinando el Mejor del lote…",
   ],
 };
 
 function phaseLabel(phase: OptimizeProgressPhase): string {
   switch (phase) {
-    case 'pending':
-      return 'En cola';
-    case 'processing':
-    case 'running':
-      return 'Analizando';
-    case 'completed':
-      return 'Listo';
-    case 'failed':
-      return 'Falló';
+    case "pending":
+      return "En cola";
+    case "processing":
+    case "running":
+      return "Analizando";
+    case "completed":
+      return "Listo";
+    case "failed":
+      return "Falló";
     default:
-      return 'Lab';
+      return "Lab";
   }
 }
 
@@ -72,7 +72,7 @@ function useRotatingStep(
     }, intervalMs);
     return () => window.clearInterval(id);
   }, [active, steps, intervalMs]);
-  return steps[idx] ?? steps[0] ?? '';
+  return steps[idx] ?? steps[0] ?? "";
 }
 
 /** Attractive progress strip: bar + soft sparkline while an optimize job runs. */
@@ -86,19 +86,19 @@ export function BacktestOptimizeProgress({
   engineHint = null,
   className,
 }: Props) {
-  const busy = phase === 'processing' || phase === 'running';
-  const waiting = phase === 'pending';
+  const busy = phase === "processing" || phase === "running";
+  const waiting = phase === "pending";
   const live = busy || waiting;
   const steps = waiting ? ACTIVITY_STEPS.pending : ACTIVITY_STEPS.busy;
   const activity = useRotatingStep(live, steps);
 
   const knownDone = trialDone != null && trialDone >= 0;
   const pct =
-    phase === 'completed'
+    phase === "completed"
       ? 100
-      : phase === 'failed'
+      : phase === "failed"
         ? 0
-        : phase === 'pending'
+        : phase === "pending"
           ? 8
           : knownDone && trialTotal > 0
             ? Math.min(96, Math.round((trialDone / trialTotal) * 100))
@@ -118,14 +118,14 @@ export function BacktestOptimizeProgress({
       const y = 100 - ((value - min) / span) * 78 - 8;
       return `${x},${y}`;
     })
-    .join(' ');
+    .join(" ");
 
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-xl border border-sky-500/35 bg-gradient-to-br from-sky-500/15 via-card/90 to-emerald-500/10 shadow-sm',
-        live && 'ring-1 ring-sky-400/30',
-        compact ? 'p-2.5' : 'p-3',
+        "overflow-hidden rounded-xl border border-sky-500/35 bg-gradient-to-br from-sky-500/15 via-card/90 to-emerald-500/10 shadow-sm",
+        live && "ring-1 ring-sky-400/30",
+        compact ? "p-2.5" : "p-3",
         className,
       )}
       role="status"
@@ -135,26 +135,40 @@ export function BacktestOptimizeProgress({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p
           className={cn(
-            'flex items-center gap-1.5 font-semibold uppercase tracking-[0.12em] text-sky-200',
-            compact ? 'text-[10px]' : 'text-xs',
+            "flex items-center gap-1.5 font-semibold uppercase tracking-[0.12em] text-sky-200",
+            compact ? "text-[10px]" : "text-xs",
           )}
         >
-          {live && <Loader2 className="h-3.5 w-3.5 animate-spin text-sky-300" aria-hidden />}
+          {live && (
+            <Loader2
+              className="h-3.5 w-3.5 animate-spin text-sky-300"
+              aria-hidden
+            />
+          )}
           {phaseLabel(phase)}
           {engineHint ? (
-            <span className="normal-case tracking-normal text-sky-200/70">· {engineHint}</span>
+            <span className="normal-case tracking-normal text-sky-200/70">
+              · {engineHint}
+            </span>
           ) : null}
         </p>
-        <p className={cn('tabular-nums text-muted-foreground', compact ? 'text-[10px]' : 'text-[11px]')}>
+        <p
+          className={cn(
+            "tabular-nums text-muted-foreground",
+            compact ? "text-[10px]" : "text-[11px]",
+          )}
+        >
           {knownDone
             ? `${trialDone} / ${trialTotal} trials`
-            : phase === 'pending'
+            : phase === "pending"
               ? `Cola · ~${trialTotal} trials`
               : `~${trialTotal} trials`}
           {bestScore != null && Number.isFinite(bestScore) && (
-            <span className="ml-2 text-emerald-300">mejor {bestScore.toFixed(2)}</span>
+            <span className="ml-2 text-emerald-300">
+              mejor {bestScore.toFixed(2)}
+            </span>
           )}
-          {pct != null && phase !== 'failed' && (
+          {pct != null && phase !== "failed" && (
             <span className="ml-2 text-sky-300">{pct}%</span>
           )}
         </p>
@@ -164,15 +178,20 @@ export function BacktestOptimizeProgress({
         <p
           key={activity}
           className={cn(
-            'mt-1.5 text-foreground/90 transition-opacity duration-300',
-            compact ? 'text-[11px] leading-snug' : 'text-xs',
+            "mt-1.5 text-foreground/90 transition-opacity duration-300",
+            compact ? "text-[11px] leading-snug" : "text-xs",
           )}
         >
           {activity}
         </p>
       )}
 
-      <div className={cn('relative overflow-hidden rounded-full bg-muted/60', compact ? 'mt-2 h-1.5' : 'mt-2 h-2')}>
+      <div
+        className={cn(
+          "relative overflow-hidden rounded-full bg-muted/60",
+          compact ? "mt-2 h-1.5" : "mt-2 h-2",
+        )}
+      >
         {pct != null ? (
           <div
             className="h-full rounded-full bg-gradient-to-r from-sky-400 to-emerald-400 transition-[width] duration-500"
@@ -192,8 +211,16 @@ export function BacktestOptimizeProgress({
         >
           <defs>
             <linearGradient id="opt-progress-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="rgb(56 189 248)" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="rgb(52 211 153)" stopOpacity="0.02" />
+              <stop
+                offset="0%"
+                stopColor="rgb(56 189 248)"
+                stopOpacity="0.35"
+              />
+              <stop
+                offset="100%"
+                stopColor="rgb(52 211 153)"
+                stopOpacity="0.02"
+              />
             </linearGradient>
           </defs>
           <polyline
@@ -203,7 +230,10 @@ export function BacktestOptimizeProgress({
             points={points}
             vectorEffect="non-scaling-stroke"
           />
-          <polygon fill="url(#opt-progress-fill)" points={`0,100 ${points} 100,100`} />
+          <polygon
+            fill="url(#opt-progress-fill)"
+            points={`0,100 ${points} 100,100`}
+          />
         </svg>
       )}
 

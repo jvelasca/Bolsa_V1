@@ -2,27 +2,33 @@
  * Build default optimize job request(s) from an OptimizeSeed (Coach → Lab).
  */
 
-import type { OptimizeSmaGridRequestDto, OptimizeStrategyFamily } from '@bolsa/shared';
+import type {
+  OptimizeSmaGridRequestDto,
+  OptimizeStrategyFamily,
+} from "@bolsa/shared";
 import {
   optimizeFamilyForStrategy,
   type OptimizeSeed,
-} from '@/features/backtests/backtest-optimize-seed';
+} from "@/features/backtests/backtest-optimize-seed";
 import {
   defaultMacdSpace,
   defaultRsiSpace,
   expandRange,
   spaceFromAnchor,
   type OptimizeSearchSpace,
-} from '@/features/backtests/backtest-optimize-space';
+} from "@/features/backtests/backtest-optimize-space";
 
-function spaceForSeed(seed: OptimizeSeed, family: OptimizeStrategyFamily): OptimizeSearchSpace {
-  if (family === 'sma_crossover') {
+function spaceForSeed(
+  seed: OptimizeSeed,
+  family: OptimizeStrategyFamily,
+): OptimizeSearchSpace {
+  if (family === "sma_crossover") {
     if (seed.anchorFast != null && seed.anchorSlow != null) {
       return spaceFromAnchor(seed.anchorFast, seed.anchorSlow);
     }
     return spaceFromAnchor(20, 50);
   }
-  if (family === 'rsi_mean_reversion') {
+  if (family === "rsi_mean_reversion") {
     const base = defaultRsiSpace();
     if (seed.anchorPeriod != null) {
       return {
@@ -43,14 +49,14 @@ function attachSpace(
   base: OptimizeSmaGridRequestDto,
   space: OptimizeSearchSpace,
 ): OptimizeSmaGridRequestDto {
-  if (space.family === 'sma_crossover') {
+  if (space.family === "sma_crossover") {
     return {
       ...base,
       fastPeriods: expandRange(space.fast),
       slowPeriods: expandRange(space.slow),
     };
   }
-  if (space.family === 'rsi_mean_reversion') {
+  if (space.family === "rsi_mean_reversion") {
     return {
       ...base,
       periods: expandRange(space.period),
@@ -80,30 +86,32 @@ export function buildOptimizeRequestsFromSeed(
     strategyFamily: family,
     initialCash: seed.initialCash,
     timeframe: seed.timeframe,
-    ...(seed.barLimit != null && seed.barLimit > 0 ? { barLimit: seed.barLimit } : {}),
+    ...(seed.barLimit != null && seed.barLimit > 0
+      ? { barLimit: seed.barLimit }
+      : {}),
   };
 
-  if (hint?.mode === 'walkforward' && hint.walkForwardFolds) {
+  if (hint?.mode === "walkforward" && hint.walkForwardFolds) {
     shared.walkForwardFolds = hint.walkForwardFolds;
-  } else if (hint?.mode === 'holdout' && hint.oosPct) {
+  } else if (hint?.mode === "holdout" && hint.oosPct) {
     shared.oosPct = hint.oosPct;
-  } else if (hint?.mode !== 'none') {
+  } else if (hint?.mode !== "none") {
     if ((seed.barLimit ?? 0) >= 250) shared.oosPct = 0.2;
   }
 
   // WF/CPCV en seed → solo H0 (motores avanzados no aplican en WF v1).
   if (shared.walkForwardFolds != null || shared.cpcvGroups != null) {
-    return [attachSpace({ ...shared, engine: 'h0', maxTrials: 80 }, space)];
+    return [attachSpace({ ...shared, engine: "h0", maxTrials: 80 }, space)];
   }
 
-  if (family === 'sma_crossover') {
+  if (family === "sma_crossover") {
     return [
-      attachSpace({ ...shared, engine: 'h0', maxTrials: 200 }, space),
-      attachSpace({ ...shared, engine: 'optuna', maxTrials: 100 }, space),
+      attachSpace({ ...shared, engine: "h0", maxTrials: 200 }, space),
+      attachSpace({ ...shared, engine: "optuna", maxTrials: 100 }, space),
     ];
   }
 
-  return [attachSpace({ ...shared, engine: 'h0', maxTrials: 80 }, space)];
+  return [attachSpace({ ...shared, engine: "h0", maxTrials: 80 }, space)];
 }
 
 /** Primer job (compat). Preferir `buildOptimizeRequestsFromSeed` en Coach→Lab. */

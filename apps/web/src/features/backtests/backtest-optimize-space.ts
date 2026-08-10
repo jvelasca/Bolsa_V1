@@ -1,6 +1,6 @@
 /** Search-space helpers for SMA / RSI / MACD optimization (min / max / step). */
 
-import type { OptimizeStrategyFamily } from '@bolsa/shared';
+import type { OptimizeStrategyFamily } from "@bolsa/shared";
 
 export type OptimizeVarRange = {
   min: number;
@@ -9,37 +9,40 @@ export type OptimizeVarRange = {
 };
 
 export type SmaSearchSpace = {
-  family: 'sma_crossover';
+  family: "sma_crossover";
   fast: OptimizeVarRange;
   slow: OptimizeVarRange;
 };
 
 export type RsiSearchSpace = {
-  family: 'rsi_mean_reversion';
+  family: "rsi_mean_reversion";
   period: OptimizeVarRange;
   oversold: OptimizeVarRange;
   overbought: OptimizeVarRange;
 };
 
 export type MacdSearchSpace = {
-  family: 'macd_signal_cross';
+  family: "macd_signal_cross";
   /** Compact neighbourhood around classic 12/26/9 — not a full cube. */
   useDefaultTriples: boolean;
 };
 
-export type OptimizeSearchSpace = SmaSearchSpace | RsiSearchSpace | MacdSearchSpace;
+export type OptimizeSearchSpace =
+  | SmaSearchSpace
+  | RsiSearchSpace
+  | MacdSearchSpace;
 
 export const OPTIMIZE_CRITERION_LABEL =
-  'Búsqueda IS: score = retorno % − 0.25 × drawdown máximo %. Con hold-out/WF, el «Mejor» se elige por score OOS (más fiable).';
+  "Búsqueda IS: score = retorno % − 0.25 × drawdown máximo %. Con hold-out/WF, el «Mejor» se elige por score OOS (más fiable).";
 
 export const OPTIMIZE_OOS_HELP =
-  'Hold-out: optimiza en las primeras barras (IS) y valida el candidato en el tramo final (OOS). Un solo corte.';
+  "Hold-out: optimiza en las primeras barras (IS) y valida el candidato en el tramo final (OOS). Un solo corte.";
 
 export const OPTIMIZE_WF_HELP =
-  'Walk-forward expandido: varios pliegues; en cada uno se re-optimiza en train y se valida en el tramo siguiente. Más lento; solo grid H0.';
+  "Walk-forward expandido: varios pliegues; en cada uno se re-optimiza en train y se valida en el tramo siguiente. Más lento; solo grid H0.";
 
 export const OPTIMIZE_CPCV_HELP =
-  'CPCV ligero: combina grupos de test con purge/embargo en barras. Al terminar calcula PBO CSCV lab (S par). Solo grid H0; más lento que WF.';
+  "CPCV ligero: combina grupos de test con purge/embargo en barras. Al terminar calcula PBO CSCV lab (S par). Solo grid H0; más lento que WF.";
 
 /** C(n,2) path counts for CPCV groups 4–6. */
 export function cpcvPathCount(nGroups: number): number {
@@ -47,7 +50,10 @@ export function cpcvPathCount(nGroups: number): number {
   return (n * (n - 1)) / 2;
 }
 
-export function clampRange(range: OptimizeVarRange, minFloor = 2): OptimizeVarRange {
+export function clampRange(
+  range: OptimizeVarRange,
+  minFloor = 2,
+): OptimizeVarRange {
   const step = Math.max(1, Math.round(range.step) || 1);
   const min = Math.max(minFloor, Math.round(range.min) || minFloor);
   const max = Math.max(min, Math.round(range.max) || min);
@@ -84,16 +90,16 @@ export function scaleSearchSpace(
   factor: number,
 ): OptimizeSearchSpace {
   if (!Number.isFinite(factor) || Math.abs(factor - 1) < 1e-9) return space;
-  if (space.family === 'sma_crossover') {
+  if (space.family === "sma_crossover") {
     return {
-      family: 'sma_crossover',
+      family: "sma_crossover",
       fast: scaleVarRange(space.fast, factor),
       slow: scaleVarRange(space.slow, factor),
     };
   }
-  if (space.family === 'rsi_mean_reversion') {
+  if (space.family === "rsi_mean_reversion") {
     return {
-      family: 'rsi_mean_reversion',
+      family: "rsi_mean_reversion",
       period: scaleVarRange(space.period, factor),
       oversold: scaleVarRange(space.oversold, factor, 5),
       overbought: scaleVarRange(space.overbought, factor, 50),
@@ -113,8 +119,11 @@ export function expandRange(range: OptimizeVarRange, minFloor = 2): number[] {
   return [...new Set(values)].sort((a, b) => a - b);
 }
 
-export function countValidCombinations(space: OptimizeSearchSpace, maxTrials = 200): number {
-  if (space.family === 'sma_crossover') {
+export function countValidCombinations(
+  space: OptimizeSearchSpace,
+  maxTrials = 200,
+): number {
+  if (space.family === "sma_crossover") {
     const fast = expandRange(space.fast);
     const slow = expandRange(space.slow);
     let count = 0;
@@ -127,7 +136,7 @@ export function countValidCombinations(space: OptimizeSearchSpace, maxTrials = 2
     }
     return Math.max(1, count);
   }
-  if (space.family === 'rsi_mean_reversion') {
+  if (space.family === "rsi_mean_reversion") {
     const periods = expandRange(space.period);
     const os = expandRange(space.oversold, 5);
     const ob = expandRange(space.overbought, 50);
@@ -147,7 +156,10 @@ export function countValidCombinations(space: OptimizeSearchSpace, maxTrials = 2
   return Math.min(25, maxTrials);
 }
 
-export function spaceFromPeriodLists(fastCsv: string, slowCsv: string): SmaSearchSpace {
+export function spaceFromPeriodLists(
+  fastCsv: string,
+  slowCsv: string,
+): SmaSearchSpace {
   const parse = (raw: string) =>
     raw
       .split(/[,;\s]+/)
@@ -161,22 +173,31 @@ export function spaceFromPeriodLists(fastCsv: string, slowCsv: string): SmaSearc
   const slowMax = slow.length ? Math.max(...slow) : 100;
   const fastStep =
     fast.length >= 2
-      ? Math.max(1, Math.round((fastMax - fastMin) / Math.max(1, fast.length - 1)))
+      ? Math.max(
+          1,
+          Math.round((fastMax - fastMin) / Math.max(1, fast.length - 1)),
+        )
       : 5;
   const slowStep =
     slow.length >= 2
-      ? Math.max(1, Math.round((slowMax - slowMin) / Math.max(1, slow.length - 1)))
+      ? Math.max(
+          1,
+          Math.round((slowMax - slowMin) / Math.max(1, slow.length - 1)),
+        )
       : 10;
   return {
-    family: 'sma_crossover',
+    family: "sma_crossover",
     fast: { min: fastMin, max: fastMax, step: fastStep },
     slow: { min: slowMin, max: slowMax, step: slowStep },
   };
 }
 
-export function spaceFromAnchor(anchorFast: number, anchorSlow: number): SmaSearchSpace {
+export function spaceFromAnchor(
+  anchorFast: number,
+  anchorSlow: number,
+): SmaSearchSpace {
   return {
-    family: 'sma_crossover',
+    family: "sma_crossover",
     fast: {
       min: Math.max(2, anchorFast - 10),
       max: anchorFast + 10,
@@ -192,7 +213,7 @@ export function spaceFromAnchor(anchorFast: number, anchorSlow: number): SmaSear
 
 export function defaultRsiSpace(): RsiSearchSpace {
   return {
-    family: 'rsi_mean_reversion',
+    family: "rsi_mean_reversion",
     period: { min: 10, max: 20, step: 2 },
     oversold: { min: 20, max: 35, step: 5 },
     overbought: { min: 65, max: 80, step: 5 },
@@ -200,34 +221,42 @@ export function defaultRsiSpace(): RsiSearchSpace {
 }
 
 export function defaultMacdSpace(): MacdSearchSpace {
-  return { family: 'macd_signal_cross', useDefaultTriples: true };
+  return { family: "macd_signal_cross", useDefaultTriples: true };
 }
 
-export function defaultSpaceForFamily(family: OptimizeStrategyFamily): OptimizeSearchSpace {
-  if (family === 'rsi_mean_reversion') return defaultRsiSpace();
-  if (family === 'macd_signal_cross') return defaultMacdSpace();
-  return spaceFromPeriodLists('10,15,20,25,30', '40,50,60,80,100');
+export function defaultSpaceForFamily(
+  family: OptimizeStrategyFamily,
+): OptimizeSearchSpace {
+  if (family === "rsi_mean_reversion") return defaultRsiSpace();
+  if (family === "macd_signal_cross") return defaultMacdSpace();
+  return spaceFromPeriodLists("10,15,20,25,30", "40,50,60,80,100");
 }
 
 export function formatDelta(value: number, digits = 1): string {
-  if (!Number.isFinite(value)) return '—';
-  const sign = value > 0 ? '+' : '';
+  if (!Number.isFinite(value)) return "—";
+  const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(digits)}`;
 }
 
-export function formatTrialParams(trial: {
-  fastPeriod?: number | null;
-  slowPeriod?: number | null;
-  signalPeriod?: number | null;
-  period?: number | null;
-  oversold?: number | null;
-  overbought?: number | null;
-}, family: OptimizeStrategyFamily | string = 'sma_crossover'): string {
-  if (family === 'rsi_mean_reversion' || (trial.period != null && trial.oversold != null)) {
+export function formatTrialParams(
+  trial: {
+    fastPeriod?: number | null;
+    slowPeriod?: number | null;
+    signalPeriod?: number | null;
+    period?: number | null;
+    oversold?: number | null;
+    overbought?: number | null;
+  },
+  family: OptimizeStrategyFamily | string = "sma_crossover",
+): string {
+  if (
+    family === "rsi_mean_reversion" ||
+    (trial.period != null && trial.oversold != null)
+  ) {
     return `RSI ${trial.period} · ${trial.oversold}/${trial.overbought}`;
   }
-  if (family === 'macd_signal_cross' || trial.signalPeriod != null) {
+  if (family === "macd_signal_cross" || trial.signalPeriod != null) {
     return `MACD ${trial.fastPeriod}/${trial.slowPeriod}/${trial.signalPeriod}`;
   }
-  return `SMA ${trial.fastPeriod ?? '—'}/${trial.slowPeriod ?? '—'}`;
+  return `SMA ${trial.fastPeriod ?? "—"}/${trial.slowPeriod ?? "—"}`;
 }

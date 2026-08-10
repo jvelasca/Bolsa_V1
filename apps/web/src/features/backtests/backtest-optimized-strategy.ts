@@ -1,5 +1,5 @@
-import type { ChartTimeframe, StrategyDefinitionV1 } from '@bolsa/shared';
-import { DEFAULT_EXECUTION_MODEL } from '@bolsa/shared';
+import type { ChartTimeframe, StrategyDefinitionV1 } from "@bolsa/shared";
+import { DEFAULT_EXECUTION_MODEL } from "@bolsa/shared";
 
 /** Suggest a distinct name so optimized variants don't collide with presets. */
 export function suggestOptimizedSmaName(opts: {
@@ -7,7 +7,7 @@ export function suggestOptimizedSmaName(opts: {
   slowPeriod: number;
   symbol?: string | null;
 }): string {
-  const symbol = opts.symbol?.trim() ? ` · ${opts.symbol.trim()}` : '';
+  const symbol = opts.symbol?.trim() ? ` · ${opts.symbol.trim()}` : "";
   return `SMA ${opts.fastPeriod}/${opts.slowPeriod} · opt${symbol}`;
 }
 
@@ -17,7 +17,7 @@ export function suggestOptimizedRsiName(opts: {
   overbought: number;
   symbol?: string | null;
 }): string {
-  const symbol = opts.symbol?.trim() ? ` · ${opts.symbol.trim()}` : '';
+  const symbol = opts.symbol?.trim() ? ` · ${opts.symbol.trim()}` : "";
   return `RSI ${opts.period} · ${opts.oversold}/${opts.overbought} · opt${symbol}`;
 }
 
@@ -27,7 +27,7 @@ export function suggestOptimizedMacdName(opts: {
   signalPeriod: number;
   symbol?: string | null;
 }): string {
-  const symbol = opts.symbol?.trim() ? ` · ${opts.symbol.trim()}` : '';
+  const symbol = opts.symbol?.trim() ? ` · ${opts.symbol.trim()}` : "";
   return `MACD ${opts.fastPeriod}/${opts.slowPeriod}/${opts.signalPeriod} · opt${symbol}`;
 }
 
@@ -41,48 +41,54 @@ export function strategyDefinitionFromOptimizedSma(opts: {
 }): StrategyDefinitionV1 {
   const fast = opts.fastPeriod;
   const slow = opts.slowPeriod;
-  const leftSpec = { definitionId: 'sma' as const, parameters: { period: fast } };
-  const rightSpec = { definitionId: 'sma' as const, parameters: { period: slow } };
+  const leftSpec = {
+    definitionId: "sma" as const,
+    parameters: { period: fast },
+  };
+  const rightSpec = {
+    definitionId: "sma" as const,
+    parameters: { period: slow },
+  };
 
   return {
     id: `opt:sma:${fast}-${slow}`,
     version: 1,
     name: opts.name,
-    kind: 'indicator_signals',
+    kind: "indicator_signals",
     // Keep presetKey for H0 engine compatibility; name/params mark it as optimized.
-    presetKey: 'sma_crossover',
+    presetKey: "sma_crossover",
     universe: { instrumentIds: opts.instrumentIds ?? [] },
-    timeframe: opts.timeframe ?? '1d',
-    dataSnapshotPolicy: 'latest',
+    timeframe: opts.timeframe ?? "1d",
+    dataSnapshotPolicy: "latest",
     entries: {
-      operator: 'all',
+      operator: "all",
       rules: [
         {
-          type: 'indicator_cross',
+          type: "indicator_cross",
           leftSpec,
           rightSpec,
-          direction: 'bullish',
-          signalKind: 'entry_long',
+          direction: "bullish",
+          signalKind: "entry_long",
         },
       ],
     },
     exits: {
-      operator: 'all',
+      operator: "all",
       rules: [
         {
-          type: 'indicator_cross',
+          type: "indicator_cross",
           leftSpec,
           rightSpec,
-          direction: 'bearish',
-          signalKind: 'exit',
+          direction: "bearish",
+          signalKind: "exit",
         },
       ],
     },
-    sizing: { mode: 'fixed_cash', value: 1 },
+    sizing: { mode: "fixed_cash", value: 1 },
     risk: {},
     indicatorSpecs: [leftSpec, rightSpec],
     execution: { ...DEFAULT_EXECUTION_MODEL },
-    origin: 'preset',
+    origin: "preset",
   };
 }
 
@@ -98,46 +104,46 @@ export function strategyDefinitionFromOptimizedRsi(opts: {
   const period = opts.period;
   const oversold = opts.oversold;
   const overbought = opts.overbought;
-  const rsiSpec = { definitionId: 'rsi' as const, parameters: { period } };
+  const rsiSpec = { definitionId: "rsi" as const, parameters: { period } };
 
   return {
     id: `opt:rsi:${period}-${oversold}-${overbought}`,
     version: 1,
     name: opts.name,
-    kind: 'indicator_signals',
-    presetKey: 'rsi_mean_reversion',
+    kind: "indicator_signals",
+    presetKey: "rsi_mean_reversion",
     universe: { instrumentIds: opts.instrumentIds ?? [] },
-    timeframe: opts.timeframe ?? '1d',
-    dataSnapshotPolicy: 'latest',
+    timeframe: opts.timeframe ?? "1d",
+    dataSnapshotPolicy: "latest",
     entries: {
-      operator: 'all',
+      operator: "all",
       rules: [
         {
-          type: 'indicator_compare',
+          type: "indicator_compare",
           leftSpec: rsiSpec,
-          operator: 'lt',
+          operator: "lt",
           rightValue: oversold,
-          signalKind: 'entry_long',
+          signalKind: "entry_long",
         },
       ],
     },
     exits: {
-      operator: 'all',
+      operator: "all",
       rules: [
         {
-          type: 'indicator_compare',
+          type: "indicator_compare",
           leftSpec: rsiSpec,
-          operator: 'gt',
+          operator: "gt",
           rightValue: overbought,
-          signalKind: 'exit',
+          signalKind: "exit",
         },
       ],
     },
-    sizing: { mode: 'fixed_cash', value: 1 },
+    sizing: { mode: "fixed_cash", value: 1 },
     risk: {},
     indicatorSpecs: [rsiSpec],
     execution: { ...DEFAULT_EXECUTION_MODEL },
-    origin: 'preset',
+    origin: "preset",
   };
 }
 
@@ -154,52 +160,62 @@ export function strategyDefinitionFromOptimizedMacd(opts: {
   const slow = opts.slowPeriod;
   const signal = opts.signalPeriod;
   const mainSpec = {
-    definitionId: 'macd' as const,
-    parameters: { fastPeriod: fast, slowPeriod: slow, signalPeriod: signal, line: 'main' },
+    definitionId: "macd" as const,
+    parameters: {
+      fastPeriod: fast,
+      slowPeriod: slow,
+      signalPeriod: signal,
+      line: "main",
+    },
   };
   const signalSpec = {
-    definitionId: 'macd' as const,
-    parameters: { fastPeriod: fast, slowPeriod: slow, signalPeriod: signal, line: 'signal' },
+    definitionId: "macd" as const,
+    parameters: {
+      fastPeriod: fast,
+      slowPeriod: slow,
+      signalPeriod: signal,
+      line: "signal",
+    },
   };
 
   return {
     id: `opt:macd:${fast}-${slow}-${signal}`,
     version: 1,
     name: opts.name,
-    kind: 'indicator_signals',
-    presetKey: 'macd_signal_cross',
+    kind: "indicator_signals",
+    presetKey: "macd_signal_cross",
     universe: { instrumentIds: opts.instrumentIds ?? [] },
-    timeframe: opts.timeframe ?? '1d',
-    dataSnapshotPolicy: 'latest',
+    timeframe: opts.timeframe ?? "1d",
+    dataSnapshotPolicy: "latest",
     entries: {
-      operator: 'all',
+      operator: "all",
       rules: [
         {
-          type: 'indicator_cross',
+          type: "indicator_cross",
           leftSpec: mainSpec,
           rightSpec: signalSpec,
-          direction: 'bullish',
-          signalKind: 'entry_long',
+          direction: "bullish",
+          signalKind: "entry_long",
         },
       ],
     },
     exits: {
-      operator: 'all',
+      operator: "all",
       rules: [
         {
-          type: 'indicator_cross',
+          type: "indicator_cross",
           leftSpec: mainSpec,
           rightSpec: signalSpec,
-          direction: 'bearish',
-          signalKind: 'exit',
+          direction: "bearish",
+          signalKind: "exit",
         },
       ],
     },
-    sizing: { mode: 'fixed_cash', value: 1 },
+    sizing: { mode: "fixed_cash", value: 1 },
     risk: {},
     indicatorSpecs: [mainSpec, signalSpec],
     execution: { ...DEFAULT_EXECUTION_MODEL },
-    origin: 'preset',
+    origin: "preset",
   };
 }
 
