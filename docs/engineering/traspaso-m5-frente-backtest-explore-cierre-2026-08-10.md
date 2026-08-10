@@ -1,9 +1,9 @@
-# Traspaso parcial — M5 frente `backtest-explore-panel.tsx` (feature-slicing área Coach/TOP) · pasos E.1+E.2+E.3+E.4
+# Traspaso parcial — M5 frente `backtest-explore-panel.tsx` (feature-slicing área Coach/TOP) · pasos E.1+E.2+E.3+E.4+E.5
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `4e74f54` (handoff E.5) · árbol limpio · pasos Lab `8ae445b` · Coach `d3315e8` ·
+**HEAD:** `e66ddf7` (frente E.1–E.5 completo) · árbol limpio · pasos Lab `8ae445b` · Coach `d3315e8` ·
 trading-dia-d B.1 `1303610` · B.2 `041457f` · B.3 `a8fede3` · backtest-explore E.1 `5dae5da` · E.2 `72061fd` ·
-E.3 `fbf1ad0` · E.4 `e079a3f`
+E.3 `fbf1ad0` · E.4 `e079a3f` · **E.5 `e66ddf7`**
 **Origen:** [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md)
 (§2.3 opción 1: reorientar a `backtest-explore-panel.tsx` 1.456 MEDIO) + registro **§7.6.b** de
 [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
@@ -30,6 +30,7 @@ cabecera**, **E.3 tabla de batería** y **E.4 regime + AT outlook**.
 | E.2 | `72061fd` | `BacktestExploreHeader` (cabecera + quorum + confianza + Guardar/Reanalizar + avisos, `backtest-explore-header.tsx`) | ~16 props (+2 callbacks) | −91 líneas (~1.441 → ~1.350) |
 | E.3 | `fbf1ad0` | `BacktestExploreBatteryTable` (tabla de batería, `backtest-explore-battery-table.tsx`) | 10 props (`rows`, `symbol`, `okCount`, `progress`, `running`, `sort`, `onSortChange`, `selectedRunId`, `onSelectRun`, `onOptimizeCandidate`) | −186 líneas (~1.350 → ~1.164) |
 | E.4 | `e079a3f` | `BacktestExploreAtOutlook` (banner regime + Análisis AT y outlook, `backtest-explore-at-outlook.tsx`) | 4 props (`regime`, `analysis`, `outlook`, `disclaimer`) | −19 líneas (~1.164 → ~1.145) |
+| E.5 | `e66ddf7` | `BacktestExploreStarsGrid` (candidatas ★ grid + botones Lab, `backtest-explore-stars-grid.tsx`) | 7 props (`recommendations`, `starCeiling`, `postLab`, `running`, `onSelectRun`, `onOptimizeCandidate`, `onOptimizeSemifinal`) | −97 líneas (~1.145 → **~1.048**) |
 
 **Patrón — Diseño B (consistente con B.1/B.3/E.2):** callbacks/handlers de ciclo **en el orquestador** como props-closure
 (`saveTopMutation.mutate({})`, `llmMutation.mutate()`, `setSaveMsg`, `lastLlmFingerprintRef.current=''`,
@@ -38,7 +39,7 @@ const `SORT_OPTIONS` **migran al componente** (únicos consumidores eran la tabl
 movió lógica de ciclo**: las effects de auto-guardado (Finalistas/ACK/atajo), la mutation de negocio y el gate quedan
 intactos en el orquestador.
 
-**Batería verde (E.1 → E.4):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
+**Batería verde (E.1 → E.5):** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (warnings
 code-splitting = M7) · **`pnpm test:coach` OK** (web 26/186 + API smoke CORE-P live OK) en cada paso.
 **Cobertura verificada:** los componentes extraídos son JSX presentacional sin test directo; los tests de lógica del área
 Coach (`backtest-deep-coach`, `coach-top-save`, `backtest-coach-coherence`, `coach-dual-audit`, etc.) pasan intactos.
@@ -47,20 +48,18 @@ Coach (`backtest-deep-coach`, `coach-top-save`, `backtest-coach-coherence`, `coa
 
 ## 2. Punto de entrada del siguiente hilo
 
-### 2.1 Estado de `backtest-explore-panel.tsx` (→ ~1.145 líneas)
+### 2.1 Estado de `backtest-explore-panel.tsx` (ACTUALIZADO tras E.5: → ~1.048 líneas)
 
-> **PUNTO DE HANDOFF (2026-08-10):** el hilo previo terminó tras E.4 con árbol limpio en HEAD `f08ac8a`. El próximo paso
-> **recomendado** es **E.5 (candidatas ★ grid)** — ejecutar en un **chat nuevo** (por ser la isla más compleja del frente,
-> riesgo medio/alto). Ver plan detallado en §2.3 opción 1.
+> **PUNTO DE HANDOFF (2026-08-10, tras E.5):** el hilo que ejecutó E.5 terminó con árbol limpio en HEAD `e66ddf7`.
+> El próximo paso **recomendado**: **cerrar este frente en el estado actual** (E.1–E.5 completos) y mover esfuerzo a
+> otro candidato de M5, **sin tocar** los banners de estado del ciclo (ALTO — tocan Coach²/ACK). Ver §2.3.
 
-- **Extraídos (E.1–E.4):** `BacktestExploreBH` (vs B&H), `BacktestExploreHeader` (cabecera),
-  `BacktestExploreBatteryTable` (tabla de batería) y `BacktestExploreAtOutlook` (regime + AT outlook). El orquestador
-  sigue teniendo la lógica de ciclo completa (saveTopMutation, llmMutation, auto-save, ACK, gate) + los bloques JSX de
-  **candidatas ★ (grid)** y **banners de estado del ciclo** (Revalidar/ACK¹/quorum/carry/prefs ACK/vetos).
+- **Extraídos (E.1–E.5):** `BacktestExploreBH` (vs B&H), `BacktestExploreHeader` (cabecera),
+  `BacktestExploreBatteryTable` (tabla de batería), `BacktestExploreAtOutlook` (regime + AT outlook) y
+  **`BacktestExploreStarsGrid` (candidatas ★ grid)**. El orquestador sigue teniendo la lógica de ciclo completa
+  (saveTopMutation, llmMutation, auto-save, ACK, gate) + los **banners de estado del ciclo**
+  (Revalidar/ACK¹/quorum/carry/prefs ACK/vetos).
 - **Islas restantes y su riesgo (diagnóstico FASE 1):**
-  - **Candidatas ★ (grid + botones Lab)**: usa `deepNote.recommendations`, `coachFacts.starCeiling`, `onOptimizeSemifinal`,
-    `onOptimizeCandidate`, `onSelectRun`, `postLab`, `running`, `isOptimizableStrategy`, `optimizeFamilyProxyNote`.
-    **Medio/alto** — ~10-15 props con callbacks de ciclo.
   - **Banners de estado del ciclo** (Revalidar/ACK¹/quorum/carry/prefs ACK/checkbox human/softWeak/weak/vetos): usa
     `postLab`, `running`, `deepNote`, `coachFacts`, `carryRows`, `ackPolicy`, `discrepancyAck`, `setDiscrepancyAck`,
     `softAckLatchedRef`, `onAwaitingAckChange`, `confidence`… **ALTO** — toca el ciclo Coach² (ACK / auto-guardado).
@@ -76,23 +75,18 @@ Coach (`backtest-deep-coach`, `coach-top-save`, `backtest-coach-coherence`, `coa
 
 ### 2.3 Opciones para el siguiente hilo
 
-**Recomendación (decisión del hilo previo): ejecutar E.5 en un chat NUEVO por máxima garantía.**
+> **E.5 EJECUTADO (2026-08-10, commit `e66ddf7`):** este chat ejecutó la opción 1 (E.5) del hilo previo. Queda
+> **PENDIENTE** decidir el siguiente paso (ver recomendación en §2.1 y opciones abajo).
 
-1. **PRÓXIMO PASO RECOMENDADO — E.5: `BacktestExploreStarsGrid` (candidatas ★ grid).** Isla de riesgo **medio/alto**
-   (toca callbacks de ciclo), por eso se delega a un chat fresco. **Plan ya diagnóstico (FASE 1 hecho en hilo previo):**
-   - Bloque actual: líneas ~1026-1171 de `backtest-explore-panel.tsx` (~150 líneas): encabezado "Candidatas ★ (1–5)"
-     con botones «Pasar las N al Lab» + «Abrir Lab · #1», grid `sm:grid-cols-3` de tarjetas (rank, label, `BacktestFutureStars`,
-     retorno total/reciente/vs B&H/DD, tercios/fallback/calidad, motivo, botones Ver / Lab (aprox.) / Sin lab), y pie de nota.
-   - **Props del componente (Diseño B):** `recommendations: TechnicalRecommendation[]`, `starCeiling: number`, `postLab: boolean`,
-     `running?: boolean`, `onSelectRun: (runId: string) => void`, `onOptimizeCandidate: (row: ExplorePresetRow) => void`,
-     `onOptimizeSemifinal: (candidates: ...) => void`.
-   - **Migra dentro del componente:** `firstLabRec` y `labRecCount` (hoy calculados en el orquestador líneas ~865-870,
-     únicos consumidores son este bloque) → cálculo local con `isOptimizableStrategy`. Orquestador **-2 derivaciones**.
-   - **NO se mueve lógica de ciclo**: los callbacks se pasan como props-closure; `postLab`/`running` solo para `disabled`.
-   - **Batería obligatoria:** typecheck + lint 0e/0w + test **140/707** + build (solo M7) + **`pnpm test:coach`**
-     (web 26/186 + API smoke CORE-P). Commit `--no-verify` + push + registro §7.6.
-   - **Reducción esperada del orquestador:** ~120-150 líneas (~1.145 → ~1.000).
-2. **Cerrar este frente en el estado actual (E.1–E.4)** y mover esfuerzo a otro candidato de M5.
+1. **✅ HECHO — E.5: `BacktestExploreStarsGrid` (candidatas ★ grid).** Ejecutado en este chat (único paso atómico).
+   - **Props (Diseño B):** `recommendations: TechnicalRecommendation[]`, `starCeiling: number`, `postLab: boolean`,
+     `running?: boolean`, `onSelectRun`, `onOptimizeCandidate`, `onOptimizeSemifinal`.
+   - **Migrado al componente:** `firstLabRec` y `labRecCount` (cálculo local con `isOptimizableStrategy`).
+   - **NO se movió lógica de ciclo**: callbacks como props-closure; `postLab`/`running` solo para `disabled`.
+   - **Batería verde:** typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0 (solo M7) ·
+     **`pnpm test:coach` OK** (web 26/186 + API smoke CORE-P live PASS). Commit `--no-verify` `e66ddf7` + push + registro §7.6.
+   - **Reducción del orquestador:** ~1.145 → **~1.048** (net −97, el bloque ~150 se traslada al fichero nuevo).
+2. **RECOMENDADO (próximo paso): cerrar este frente en el estado actual (E.1–E.5)** y mover esfuerzo a otro candidato de M5.
    - No tocar los banners de estado del ciclo (ALTO — toca Coach²/ACK).
 3. **Refactor a custom hooks** (extraer `saveTopMutation`/`llmMutation`/auto-save como hooks) — más invasivo, toca el
    ciclo Coach², requiere recalibración explícita.
@@ -124,6 +118,9 @@ Coach (`backtest-deep-coach`, `coach-top-save`, `backtest-coach-coherence`, `coa
 - `pnpm --filter @bolsa/web build` → exit 0 (solo warnings code-splitting pre-existentes = M7)
 - Ficheros nuevos de este hilo: `apps/web/src/features/backtests/backtest-explore-bh.tsx`,
   `apps/web/src/features/backtests/backtest-explore-header.tsx`,
-  `apps/web/src/features/backtests/backtest-explore-battery-table.tsx` y
-  `apps/web/src/features/backtests/backtest-explore-at-outlook.tsx`, importados desde
+  `apps/web/src/features/backtests/backtest-explore-battery-table.tsx`,
+  `apps/web/src/features/backtests/backtest-explore-at-outlook.tsx` y
+  `apps/web/src/features/backtests/backtest-explore-stars-grid.tsx`, importados desde
   `backtest-explore-panel.tsx`.
+- **E.5 (`e66ddf7`)** añade: `backtest-explore-stars-grid.tsx` (nuevo) y reduce `backtest-explore-panel.tsx`
+  de ~1.145 a **~1.048 líneas** (net −97).

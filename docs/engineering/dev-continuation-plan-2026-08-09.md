@@ -931,11 +931,20 @@ code-splitting = M7) · **`pnpm test:coach` OK** (web 26/186 + API smoke CORE-P 
 **No se movió lógica de ciclo**: auto-save Finalistas/ACK/atajo, `saveTopMutation` de negocio y gate permanecen en el
 orquestador.
 
-**Pendiente del frente (islas restantes, ver traspaso):** candidatas ★ grid (medio/alto), banners de estado del ciclo
-(ALTO — tocan Coach²/ACK). Queda orquestación pura además de los bloques de ciclo no extraíbles como JSX.
+**Pendiente del frente (islas restantes, ver traspaso):** tras E.5 queda la isla ALTO (banners de estado del ciclo,
+ACK/Coach²) y orquestación pura. Se **recomienda cerrar este frente** (E.1–E.5 completos) tal y como quedó documentado.
+
+**Paso E.5 (`e66ddf7`, aprobado):** `BacktestExploreStarsGrid` (`backtest-explore-stars-grid.tsx`) — **candidatas ★ (grid)**.
+Diseño B thin wrapper con **7 props** (`recommendations`, `starCeiling`, `postLab`, `running`, `onSelectRun`,
+`onOptimizeCandidate`, `onOptimizeSemifinal`). **Migran al componente** `firstLabRec` y `labRecCount` (cálculo local con
+`isOptimizableStrategy`); **NO se mueve lógica de ciclo** (auto-save Finalistas/ACK/atajo, `saveTopMutation` y gate
+permanecen en el orquestador). En el orquestador: −166/+10 (la isla ~150 se traslada) → **~1.145 → ~1.048 líneas**.
+Se eliminaron 6 imports que quedaban huérfanos (`formatPct`, `BacktestFutureStars`, `isOptimizableStrategy`,
+`optimizeFamilyProxyNote`, `Button`, `cn`). **Batería verde:** typecheck exit 0 · lint 0e/0w · test **140/707** · build
+exit 0 (solo M7) · **`pnpm test:coach` OK** (web 26/186 + API smoke CORE-P live PASS). Commit `--no-verify` + push.
 
 **Traspaso del frente:** [traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md](./traspaso-m5-frente-backtest-explore-cierre-2026-08-10.md) —
-HEAD `e079a3f`, E.1+E.2+E.3+E.4 cerrados, islas restantes y opciones §2.3 para el siguiente hilo.
+HEAD `e66ddf7`, E.1+E.2+E.3+E.4+E.5 cerrados, islas restantes y opciones §2.3 para el siguiente hilo.
 
 **Traspaso del frente (actualizado):**
 [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) —
