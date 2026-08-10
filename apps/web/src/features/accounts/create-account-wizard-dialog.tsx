@@ -23,6 +23,7 @@ import { InvestorProfilePicker } from '@/features/accounts/investor-profile-pick
 import { AccountWizardIdentityStep } from '@/features/accounts/account-wizard-identity-step';
 import { AccountWizardCapitalStep } from '@/features/accounts/account-wizard-capital-step';
 import { AccountWizardCommissionsStep } from '@/features/accounts/account-wizard-commissions-step';
+import { AccountWizardTaxStep } from '@/features/accounts/account-wizard-tax-step';
 import { formatPrice } from '@/features/charts/chart-utils';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -557,71 +558,23 @@ export function CreateAccountWizardDialog() {
       )}
 
       {step === 'tax' && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Parámetros fiscales para simulación y futuros informes. No constituyen asesoramiento fiscal.
-          </p>
-          <FieldRow label="Jurisdicción fiscal">
-            <select
-              className={inputClassName}
-              value={form.taxJurisdiction}
-              onChange={(e) => {
-                const j = e.target.value as TaxJurisdiction;
-                const preset = TAX_PRESETS[j];
-                patch({
-                  taxJurisdiction: j,
-                  stampDutyBuyPct: String(preset.stampDutyBuyPct),
-                  dividendWithholdingPct: String(preset.dividendWithholdingPct),
-                  costBasisMethod: preset.costBasisMethod,
-                });
-              }}
-            >
-              <option value="ES">España (ES)</option>
-              <option value="EU_OTHER">Unión Europea (otro)</option>
-              <option value="US">Estados Unidos</option>
-              <option value="CUSTOM">Personalizado</option>
-            </select>
-          </FieldRow>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <FieldRow label="Método de coste" hint="FIFO recomendado para fiscalidad ES">
-              <select
-                className={inputClassName}
-                value={form.costBasisMethod}
-                onChange={(e) => patch({ costBasisMethod: e.target.value as 'fifo' | 'average' })}
-              >
-                <option value="fifo">FIFO (primero en entrar)</option>
-                <option value="average">Coste medio ponderado</option>
-              </select>
-            </FieldRow>
-            <FieldRow label="Imp. transmisiones compra (%)" hint="España acciones ~0,2 %">
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                className={inputClassName}
-                value={form.stampDutyBuyPct}
-                onChange={(e) => patch({ stampDutyBuyPct: e.target.value })}
-              />
-            </FieldRow>
-            <FieldRow label="Retención dividendos (%)" hint="Referencia IRPF / doble imposición">
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                className={inputClassName}
-                value={form.dividendWithholdingPct}
-                onChange={(e) => patch({ dividendWithholdingPct: e.target.value })}
-              />
-            </FieldRow>
-          </div>
-          <FieldRow label="Notas internas (opcional)">
-            <textarea
-              className={cn(inputClassName, 'min-h-[56px] resize-y')}
-              value={form.notes}
-              onChange={(e) => patch({ notes: e.target.value })}
-            />
-          </FieldRow>
-        </div>
+        <AccountWizardTaxStep
+          taxJurisdiction={form.taxJurisdiction}
+          costBasisMethod={form.costBasisMethod}
+          stampDutyBuyPct={form.stampDutyBuyPct}
+          dividendWithholdingPct={form.dividendWithholdingPct}
+          notes={form.notes}
+          onPatch={patch}
+          onJurisdictionChange={(j) => {
+            const preset = TAX_PRESETS[j];
+            patch({
+              taxJurisdiction: j,
+              stampDutyBuyPct: String(preset.stampDutyBuyPct),
+              dividendWithholdingPct: String(preset.dividendWithholdingPct),
+              costBasisMethod: preset.costBasisMethod,
+            });
+          }}
+        />
       )}
 
       {step === 'review' && (
