@@ -1115,3 +1115,21 @@ desfavorable para el patrón Diseño B. **No se asumen los 6 bloques de alto aco
   RFC-007), dev-stack M7 (code-splitting / Vite F3.7).
 - HEAD `c068451` · árbol limpio · sincronizado con origin · traspaso canónico M5 actualizado (§7) · engineering-index
   marcado.
+
+### §7.6.i — Higiene de formato Prettier legacy por lotes aislados (M0/§6.2) (2026-08-10)
+
+Tras el cierre de M5 (§7.6.h), se inicia la línea de **higiene de formato** heredada de M0/§6.2. Primera corrección
+importante de alcance: la "higiene CRLF" **no es deuda commiteada** — el repo normaliza a LF vía `.gitattributes`
+(`* text=auto eol=lf`), así que el problema real es **formato Prettier** de ficheros legacy desincronizados:
+`prettier --check "apps/web/src/**/*.{ts,tsx,css,json}"` reporta **643 archivos**. Estrategia aprobada por el usuario:
+**por lotes aislados** (por directorio/feature), cada uno como **commit de formateo propio** (batería verde + push),
+empezando por `components/ui` + `components/layout` (mejor ratio valor/riesgo: reuso alto, poca lógica de negocio).
+
+Traspaso de entrada: [traspaso-higiene-formato-legacy-entrada-2026-08-10.md](./traspaso-higiene-formato-legacy-entrada-2026-08-10.md).
+
+| Lote | Commit | Alcance | Batería |
+|------|--------|---------|---------|
+| 1 (PRIMERO) | `d39bbbb` | `components/ui` (8) + `components/layout` (7) = **15 `.tsx`** (todos de producción), diff +469/−321 solo formato | typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅ (warnings code-splitting = M7) |
+
+Siguiente lote propuesto: **un feature aislado** (p. ej. `features/backtests`), después el resto de `apps/web/src` por
+sub-lotes. Verificación tras cada lote y commit propio. HEAD `5721c74` · sincronizado.
