@@ -52,7 +52,9 @@ export function BacktestWizardListAuto({
     : "";
   return (
     <div className="space-y-1.5 rounded-md border border-border/60 bg-muted/20 px-2.5 py-2">
-      <p className="text-[11px] font-medium text-foreground">Lista AUTO · Play</p>
+      <p className="text-[11px] font-medium text-foreground">
+        Lista AUTO · Play
+      </p>
       <p className="text-[10px] leading-snug text-muted-foreground">
         {listAutoUniverseHint()}
       </p>
@@ -74,8 +76,8 @@ export function BacktestWizardListAuto({
               onChange={(e) => onSkipWithFinalistsChange(e.target.checked)}
             />
             <span>
-              Solo sin Finalistas (excluye tickers que ya tienen TOP; útil en S&P
-              / listas grandes).
+              Solo sin Finalistas (excluye tickers que ya tienen TOP; útil en
+              S&P / listas grandes).
             </span>
           </label>
           <label className="flex items-start gap-2 text-[10px] leading-snug text-muted-foreground">
@@ -91,8 +93,8 @@ export function BacktestWizardListAuto({
               }
             />
             <span>
-              No preguntar al superar ~{LIST_AUTO_BATCH_SIZE} (tandas encadenadas;
-              N &gt; 200 siempre confirma).
+              No preguntar al superar ~{LIST_AUTO_BATCH_SIZE} (tandas
+              encadenadas; N &gt; 200 siempre confirma).
             </span>
           </label>
           <p className="text-[10px] leading-snug text-muted-foreground">
@@ -128,7 +130,8 @@ export function BacktestWizardListAuto({
               ? {
                   canPause: !board.paused,
                   canResume:
-                    board.paused && !board.rows.some((r) => r.phase === "running"),
+                    board.paused &&
+                    !board.rows.some((r) => r.phase === "running"),
                   canStop: true,
                   onPause,
                   onResume,

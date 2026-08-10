@@ -59,14 +59,15 @@ export function BacktestWizardAdvancedOptions({
   return (
     <details className="rounded-md border border-border/60 bg-muted/15">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-1.5 text-[11px] text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden">
-        <span className="font-medium text-foreground/80">Opciones avanzadas</span>
+        <span className="font-medium text-foreground/80">
+          Opciones avanzadas
+        </span>
         <span className="min-w-0 truncate tabular-nums opacity-80">
           {isDiaDInPast(diaD) ? `DÍA D ${effectiveDiaD(diaD)} · ` : ""}
           {PERIOD_PRESET_OPTIONS.find((o) => o.value === periodPreset)?.label ??
             periodPreset}
           {" · "}
-          {cashDisplay} €
-          {" · "}
+          {cashDisplay} €{" · "}
           {runTimeframe}
           {(Number(commissionBps) > 0 || Number(slippageBps) > 0) &&
             ` · ${commissionBps}/${slippageBps} bps`}
@@ -80,7 +81,9 @@ export function BacktestWizardAdvancedOptions({
           Periodo
           <select
             value={periodPreset}
-            onChange={(e) => onPeriodPresetChange(e.target.value as PeriodPreset)}
+            onChange={(e) =>
+              onPeriodPresetChange(e.target.value as PeriodPreset)
+            }
             className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
           >
             {PERIOD_PRESET_OPTIONS.map((opt) => (
