@@ -1,10 +1,10 @@
-import type { WalkForwardSummaryDto } from '@bolsa/shared';
+import type { WalkForwardSummaryDto } from "@bolsa/shared";
 import {
   classifyWfe,
   formatPositiveFoldShare,
   formatWfe,
   wfeBandLabel,
-} from '@/features/backtests/backtest-walk-forward-metrics';
+} from "@/features/backtests/backtest-walk-forward-metrics";
 
 export interface OptimizeLabWfeHint {
   credibility: number;
@@ -34,34 +34,34 @@ export function OptimizeWalkForwardReport({
         Walk-forward · {walkForward.nFolds} pliegues ({walkForward.mode})
       </p>
       <p className="text-xs text-muted-foreground">
-        Media OOS del mejor de cada pliegue:{' '}
+        Media OOS del mejor de cada pliegue:{" "}
         <strong className="text-foreground tabular-nums">
           {walkForward.meanOosScore.toFixed(2)}
         </strong>
         {walkForward.stdOosScore > 0
           ? ` ± ${walkForward.stdOosScore.toFixed(2)}`
-          : ''}
-        {' · '}
-        WFE{' '}
+          : ""}
+        {" · "}
+        WFE{" "}
         <strong className="text-foreground tabular-nums">
           {formatWfe(walkForward.walkForwardEfficiency)}
         </strong>
         {walkForward.walkForwardEfficiency != null
           ? ` (${wfeBandLabel(classifyWfe(walkForward.walkForwardEfficiency))})`
-          : ''}
+          : ""}
         {walkForward.oosCv != null
           ? ` · CV ${walkForward.oosCv.toFixed(2)}`
-          : ''}
+          : ""}
         {walkForward.positiveOosFoldShare != null
           ? ` · ${formatPositiveFoldShare(walkForward.positiveOosFoldShare, walkForward.nFolds)}`
-          : ''}
-        . WFE = media OOS / media IS (score lab). La tabla inferior es el último pliegue + su
-        OOS.
+          : ""}
+        . WFE = media OOS / media IS (score lab). La tabla inferior es el último
+        pliegue + su OOS.
       </p>
       {labWfeHint && (
         <p className="text-[11px] text-muted-foreground">
-          Credibility hint (solo WFE lab): {labWfeHint.credibility.toFixed(1)} · banda{' '}
-          {labWfeHint.band}. {labWfeHint.note}
+          Credibility hint (solo WFE lab): {labWfeHint.credibility.toFixed(1)} ·
+          banda {labWfeHint.band}. {labWfeHint.note}
         </p>
       )}
       <ul className="grid gap-1.5 text-[11px] text-muted-foreground sm:grid-cols-3">
@@ -76,16 +76,16 @@ export function OptimizeWalkForwardReport({
             }
           >
             <span className="font-medium text-foreground">#{fold.index}</span>
-            {' · '}
+            {" · "}
             train {fold.trainBarCount} / test {fold.testBarCount}
             <br />
             IS {fold.isScore.toFixed(1)}
             {fold.oosMetrics != null
               ? ` → OOS ${fold.oosMetrics.score.toFixed(1)}`
-              : ''}
+              : ""}
             {fold.walkForwardEfficiency != null
               ? ` · WFE ${fold.walkForwardEfficiency.toFixed(2)}`
-              : ''}
+              : ""}
           </li>
         ))}
       </ul>

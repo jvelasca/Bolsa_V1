@@ -1,9 +1,9 @@
-import { X } from 'lucide-react';
-import type { OptimizeSeed } from '@/features/backtests/backtest-optimize-seed';
-import type { OptimizeValidationHint } from '@/features/backtests/backtest-optimize-seed';
-import { Button } from '@/components/ui/button';
-import { formatPct } from '@/features/charts/chart-utils';
-import { cn } from '@/lib/utils';
+import { X } from "lucide-react";
+import type { OptimizeSeed } from "@/features/backtests/backtest-optimize-seed";
+import type { OptimizeValidationHint } from "@/features/backtests/backtest-optimize-seed";
+import { Button } from "@/components/ui/button";
+import { formatPct } from "@/features/charts/chart-utils";
+import { cn } from "@/lib/utils";
 
 interface OptimizeSeedBannerProps {
   seed: OptimizeSeed;
@@ -32,17 +32,17 @@ export function OptimizeSeedBanner({
   return (
     <div
       className={cn(
-        'space-y-2 rounded-lg border px-3 py-2 text-sm',
+        "space-y-2 rounded-lg border px-3 py-2 text-sm",
         seed.beatBuyHold === false
-          ? 'border-amber-500/40 bg-amber-500/10'
-          : 'border-sky-500/40 bg-sky-500/10',
+          ? "border-amber-500/40 bg-amber-500/10"
+          : "border-sky-500/40 bg-sky-500/10",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-medium text-foreground">
             Prueba origen · {seed.strategyLabel}
-            {seed.symbol ? ` · ${seed.symbol}` : ''}
+            {seed.symbol ? ` · ${seed.symbol}` : ""}
           </p>
           <p
             className="mt-1 text-xs text-muted-foreground"
@@ -51,12 +51,14 @@ export function OptimizeSeedBanner({
             Partimos de tu prueba
             {seed.anchorReturnPct != null
               ? ` · retorno ${formatPct(seed.anchorReturnPct)}`
-              : ''}
+              : ""}
             {seed.anchorMaxDrawdownPct != null
               ? ` · caída máx. ${formatPct(seed.anchorMaxDrawdownPct)}`
-              : ''}
-            {seed.anchorTradeCount != null ? ` · ${seed.anchorTradeCount} ops` : ''}
-            {seed.barLimit != null ? ` · ${seed.barLimit} barras` : ''}.
+              : ""}
+            {seed.anchorTradeCount != null
+              ? ` · ${seed.anchorTradeCount} ops`
+              : ""}
+            {seed.barLimit != null ? ` · ${seed.barLimit} barras` : ""}.
           </p>
           {validationHint && (
             <p
@@ -88,7 +90,8 @@ export function OptimizeSeedBanner({
       </div>
       {!familyReady && (
         <p className="text-xs text-muted-foreground">
-          Esta regla aún no tiene buscador propio: se probará un grid SMA en el mismo valor.
+          Esta regla aún no tiene buscador propio: se probará un grid SMA en el
+          mismo valor.
         </p>
       )}
     </div>
