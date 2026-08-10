@@ -27,6 +27,7 @@ import {
 import { BacktestExploreBH } from '@/features/backtests/backtest-explore-bh';
 import { BacktestExploreHeader } from '@/features/backtests/backtest-explore-header';
 import { BacktestExploreBatteryTable } from '@/features/backtests/backtest-explore-battery-table';
+import { BacktestExploreAtOutlook } from '@/features/backtests/backtest-explore-at-outlook';
 import {
   buildDeepTechnicalCoachNote,
   buildCoachFacts,
@@ -1174,33 +1175,12 @@ export function BacktestExploreRanking({
           </p>
         )}
 
-        {deepNote.regime && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-1.5">
-            <p className="text-[11px] font-medium text-foreground">{deepNote.regime.label}</p>
-            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
-              {deepNote.regime.narrative}
-            </p>
-          </div>
-        )}
-
-        <details className="rounded-md border border-border/50 bg-background/40">
-          <summary className="cursor-pointer list-none px-2 py-1.5 text-[11px] text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden">
-            Análisis AT y outlook
-          </summary>
-          <div className="space-y-2 border-t border-border/40 px-2 py-2">
-            <ul className="list-inside list-disc space-y-0.5 text-[11px] leading-snug text-muted-foreground">
-              {deepNote.analysis.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-            <ul className="list-inside list-disc space-y-0.5 text-[11px] text-muted-foreground">
-              {deepNote.outlook.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-            <p className="text-[10px] leading-snug text-muted-foreground">{deepNote.disclaimer}</p>
-          </div>
-        </details>
+        <BacktestExploreAtOutlook
+          regime={deepNote.regime}
+          analysis={deepNote.analysis}
+          outlook={deepNote.outlook}
+          disclaimer={deepNote.disclaimer}
+        />
       </div>
 
       {/* Evidencia B&H: secundaria, no decide el TOP ★ */}
