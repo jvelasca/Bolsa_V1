@@ -208,7 +208,6 @@ import {
 } from "@/features/backtests/backtest-assistant-steps";
 import { buildOptimizeRequestsFromSeed } from "@/features/backtests/backtest-optimize-from-seed";
 import { BacktestHubLayout } from "@/features/backtests/backtest-hub-layout";
-import { BacktestRankingTable } from "@/features/backtests/backtest-ranking-table";
 import { BacktestResultView } from "@/features/backtests/backtest-result-view";
 import {
   BacktestInstrumentPreview,
@@ -289,6 +288,7 @@ import { BacktestDiaDOriginControl } from "@/features/backtests/backtest-dia-d-o
 import { formatDiaDDisplay } from "@/features/backtests/dia-d-favorites";
 import { DiaDVerifyHost } from "@/features/backtests/dia-d-verify-host";
 import { BacktestResultFundamental } from "@/features/backtests/backtest-result-fundamental";
+import { BacktestResultRanking } from "@/features/backtests/backtest-result-ranking";
 import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
@@ -5297,24 +5297,21 @@ export function BacktestsPage() {
                       )}
 
                       {batchRows.length > 0 && resultFocus === "ranking" && (
-                        <BacktestRankingTable
+                        <BacktestResultRanking
                           rows={batchRows}
                           sort={batchSort}
                           onSortChange={setBatchSort}
                           selectedRunId={selectedId}
                           selectedInstrumentId={instrumentId || null}
-                          onSelectInstrument={(id) => {
-                            const row = batchRows.find(
-                              (r) => r.instrumentId === id,
-                            );
+                          onOpenInstrument={(id, runId) =>
                             openInstrumentInValor(id, {
-                              runId: row?.runId ?? null,
+                              runId,
                               soft: true,
-                            });
-                          }}
-                          onSelectRun={(runId) => {
-                            selectRun(runId, { tab: "run", focus: "detail" });
-                          }}
+                            })
+                          }
+                          onSelectRun={(runId) =>
+                            selectRun(runId, { tab: "run", focus: "detail" })
+                          }
                           progress={batchProgress}
                           listName={
                             listDetail?.name ??
