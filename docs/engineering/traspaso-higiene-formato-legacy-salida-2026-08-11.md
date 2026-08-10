@@ -1,10 +1,10 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `ee381d7` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `9975cd3` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
-> Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-11) y los próximos dominios.
+> Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-12) y los próximos dominios.
 > No hay nada que redescubrir: cada hecho está verificado en el repo/CI.
 
 ---
@@ -52,7 +52,7 @@ formatee masivamente el estilo antiguo en el diff editorial).
 > archivos del dominio. **Los commits `--no-verify` requieren la aprobación del usuario** en la tarjeta nativa de
 > auto-review (flujo ya validado para los 9 lotes).
 
-## 4. Estado de avance real (2026-08-11, HEAD `ee381d7`)
+## 4. Estado de avance real (2026-08-11, HEAD `9975cd3`)
 
 | Lote | Commit | Dominio | Ficheros con contenido real |
 |------|--------|---------|-----------------------------|
@@ -67,13 +67,14 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 9 | `1cb6ee7` | backtests/assistant | 17 |
 | 10 | `9853e79` | backtests/optimize restantes | 16 |
 | 11 | `ee381d7` | backtests/strategy-matrix restantes | 11 |
+| 12 | `9975cd3` | backtests/list-auto + mass-compare | 11 |
 
-**Total formateado hasta aquí: 107 ficheros** con diff real en 11 commits propios de formateo. Todos con batería
+**Total formateado hasta aquí: 118 ficheros** con diff real en 12 commits propios de formateo. Todos con batería
 `typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅`.
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
 EOL** (contenido normalizado idéntico a HEAD). Se detectan porque **no aparecen en `git diff --cached --numstat`**
-tras el `--write`+`git add`; deben **resetearse** (`git reset -- <file>`) y quedar fuera del commit. En los lotes 6-11
+tras el `--write`+`git add`; deben **resetearse** (`git reset -- <file>`) y quedar fuera del commit. En los lotes 6-12
 ningún fichero fue falso positivo (todos con diff real).
 
 ## 5. Próximos sub-lotes por dominio restante en `features/backtests`
@@ -86,7 +87,7 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
   `backtest-optimize-from-seed.ts`(+test), `backtest-optimize-heatmap-panel.tsx`(+test), `backtest-optimize-panel.tsx`,
   `backtest-optimize-progress.tsx`, `backtest-optimize-seed.ts`(+test), `backtest-optimize-space.ts`(+test),
   `backtest-optimize-validation-hint.ts`(+test), `backtest-optimized-strategy.ts` = **16 files (+1333/−932 solo formato)**.
-- **`list-auto`/`mass-compare`** : `backtest-list-auto.ts`(+tests: board/board-panel/persist/statusbar), `backtest-list-auto-board.ts`(+test), `backtest-list-auto-board-panel.tsx`, `backtest-list-auto-persist.ts`(+test), `backtest-list-auto-statusbar.test.ts`, `backtest-mass-compare.ts`(+test), `backtest-mass-compare-panel.tsx`.
+- ~~**`list-auto`/`mass-compare`**~~ **HECHO (lote 12, `9975cd3`)**: `backtest-list-auto.ts`(+tests: board/board-panel/persist/statusbar), `backtest-list-auto-board.ts`(+test), `backtest-list-auto-board-panel.tsx`, `backtest-list-auto-persist.ts`(+test), `backtest-list-auto-statusbar.test.ts`, `backtest-mass-compare.ts`(+test), `backtest-mass-compare-panel.tsx` = **11 files (+576/−430 solo formato)**.
 - **`coach`/`lab`** : `coach-dual-audit.ts`(+test), `coach-llm-invariant.test.ts`, `coach-profile-policy.ts`(+test), `coach-top-save.ts`(+test), `coach-quorum-bar.tsx`, `backtest-coach-*.ts`(+tests), `backtest-lab-board.tsx`(+types), `lab-board-activity-banner.tsx`, `lab-zone-verdict.tsx`, `lab-*`(memory/handoff/caf-smoke).
 - **`finalists`/`top`** : `backtest-finalists-freshness.ts`(+tests), `finalists-stability-summary.ts`(+test), `finalist-propose-supervised.ts`(+test), `promote-finalist-to-tracker.ts`(+test), `instrument-strategy-top-panel.tsx`(+test), `instrument-strategy-top-promote.ts`(+test), `instrument-top-match.ts`(+test), `instrument-top-strategy-type.ts`(+test).
 - ~~**`strategy-matrix` restantes**~~ **HECHO (lote 11, `ee381d7`)**: `backtest-strategy-matrix.ts`(+test), `strategy-matrix-column-layout.ts`(+test), `strategy-matrix-filter-carousel-prefs.ts`(+test), `strategy-monitor-panel.tsx`, `strategy-monitor.ts`(+test), `mine-strategies-filters.ts`(+test) = **11 files (+970/−785 solo formato)**.
@@ -94,13 +95,13 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
-> **Nota de método para el siguiente hilo:** `optimize` restantes (lote 10, `9853e79`) y `strategy-matrix` restantes
-> (lote 11, `ee381d7`) ya están HECHOS. Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y
-> sin mezclar dominios, p. ej. **`list-auto`/`mass-compare`** (7 files: `backtest-list-auto`(+tests: board/board-panel/
-> persist/statusbar), `backtest-list-auto-board`(+test), `backtest-list-auto-board-panel`, `backtest-list-auto-persist`
-> (+test), `backtest-list-auto-statusbar.test`, `backtest-mass-compare`(+test), `backtest-mass-compare-panel`) o
-> **`coach`/`lab`**, y seguir el protocolo exactamente paso a paso, verificando el `git diff --cached --numstat` (paso 4)
-> en cada lote.
+> **Nota de método para el siguiente hilo:** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes (11,
+> `ee381d7`) y `list-auto`/`mass-compare` (12, `9975cd3`) ya están HECHOS. Recomendar arrancar el siguiente sub-lote por
+> un dominio con pocos archivos y sin mezclar dominios, p. ej. **`finalists`/`top`** (8 files: `backtest-finalists-freshness`
+> (+tests), `finalists-stability-summary`(+test), `finalist-propose-supervised`(+test), `promote-finalist-to-tracker`(+test),
+> `instrument-strategy-top-panel`(+test), `instrument-strategy-top-promote`(+test), `instrument-top-match`(+test),
+> `instrument-top-strategy-type`(+test)) o **`coach`/`lab`**, y seguir el protocolo exactamente paso a paso, verificando el
+> `git diff --cached --numstat` (paso 4) en cada lote.
 
 
 ## 6. Documentos fuente de verdad / índices
