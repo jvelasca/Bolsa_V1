@@ -2,7 +2,7 @@
  * Tests — CORE-P CoachProfilePolicy / gate Lab / techo DD / multi-perfil.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   activeTopProfileMismatch,
   buildCoachProfileBindingFacts,
@@ -18,42 +18,48 @@ import {
   labSpaceWidthFactorForRisk,
   formatLabRiskSpaceHint,
   shouldAdvanceToLab,
-} from '@/features/backtests/coach-profile-policy';
+} from "@/features/backtests/coach-profile-policy";
 
-describe('resolveCoachProfilePolicy', () => {
-  it('defaults conservative without profile', () => {
+describe("resolveCoachProfilePolicy", () => {
+  it("defaults conservative without profile", () => {
     const p = resolveCoachProfilePolicy({});
     expect(p.allowLabIfWeak).toBe(false);
     expect(p.suggestedFutureWeight).toBe(0.3);
-    expect(p.policyVersion).toBe('coach-profile-v1');
+    expect(p.policyVersion).toBe("coach-profile-v1");
     expect(p.profileId).toBeNull();
   });
 
-  it('high risk may lab if weak', () => {
+  it("high risk may lab if weak", () => {
     const p = resolveCoachProfilePolicy({
-      profileId: 'p-agg',
-      riskTolerance: 'high',
-      horizon: 'swing',
+      profileId: "p-agg",
+      riskTolerance: "high",
+      horizon: "swing",
     });
     expect(p.allowLabIfWeak).toBe(true);
     expect(p.maxDrawdownSoftPct).toBeGreaterThan(30);
-    expect(p.profileId).toBe('p-agg');
+    expect(p.profileId).toBe("p-agg");
   });
 
-  it('moderate / low block lab if weak', () => {
-    expect(resolveCoachProfilePolicy({ riskTolerance: 'moderate' }).allowLabIfWeak).toBe(false);
-    expect(resolveCoachProfilePolicy({ riskTolerance: 'low' }).allowLabIfWeak).toBe(false);
-    expect(resolveCoachProfilePolicy({ riskTolerance: 'low' }).maxDrawdownSoftPct).toBe(18);
+  it("moderate / low block lab if weak", () => {
+    expect(
+      resolveCoachProfilePolicy({ riskTolerance: "moderate" }).allowLabIfWeak,
+    ).toBe(false);
+    expect(
+      resolveCoachProfilePolicy({ riskTolerance: "low" }).allowLabIfWeak,
+    ).toBe(false);
+    expect(
+      resolveCoachProfilePolicy({ riskTolerance: "low" }).maxDrawdownSoftPct,
+    ).toBe(18);
   });
 });
 
-describe('shouldAdvanceToLab', () => {
-  const conservative = resolveCoachProfilePolicy({ riskTolerance: 'low' });
-  const aggressive = resolveCoachProfilePolicy({ riskTolerance: 'high' });
+describe("shouldAdvanceToLab", () => {
+  const conservative = resolveCoachProfilePolicy({ riskTolerance: "low" });
+  const aggressive = resolveCoachProfilePolicy({ riskTolerance: "high" });
 
-  it('skips lab when weak and check OFF (overrides aggressive profile)', () => {
+  it("skips lab when weak and check OFF (overrides aggressive profile)", () => {
     const d = shouldAdvanceToLab({
-      confidence: 'weak',
+      confidence: "weak",
       policy: aggressive,
       labEvenIfWeak: false,
       recommendationCount: 3,
@@ -62,9 +68,9 @@ describe('shouldAdvanceToLab', () => {
     expect(d.reason).toMatch(/check/i);
   });
 
-  it('allows lab when weak and check ON (overrides conservative profile)', () => {
+  it("allows lab when weak and check ON (overrides conservative profile)", () => {
     const d = shouldAdvanceToLab({
-      confidence: 'weak',
+      confidence: "weak",
       policy: conservative,
       labEvenIfWeak: true,
       recommendationCount: 3,
@@ -72,27 +78,27 @@ describe('shouldAdvanceToLab', () => {
     expect(d.advance).toBe(true);
   });
 
-  it('falls back to profile when check omitted', () => {
+  it("falls back to profile when check omitted", () => {
     expect(
       shouldAdvanceToLab({
-        confidence: 'weak',
+        confidence: "weak",
         policy: conservative,
         recommendationCount: 3,
       }).advance,
     ).toBe(false);
     expect(
       shouldAdvanceToLab({
-        confidence: 'weak',
+        confidence: "weak",
         policy: aggressive,
         recommendationCount: 3,
       }).advance,
     ).toBe(true);
   });
 
-  it('advances on consensus', () => {
+  it("advances on consensus", () => {
     expect(
       shouldAdvanceToLab({
-        confidence: 'consensus',
+        confidence: "consensus",
         policy: conservative,
         labEvenIfWeak: false,
         recommendationCount: 3,
@@ -100,10 +106,10 @@ describe('shouldAdvanceToLab', () => {
     ).toBe(true);
   });
 
-  it('blocks empty TOP', () => {
+  it("blocks empty TOP", () => {
     expect(
       shouldAdvanceToLab({
-        confidence: 'consensus',
+        confidence: "consensus",
         policy: aggressive,
         labEvenIfWeak: true,
         recommendationCount: 0,
@@ -112,31 +118,31 @@ describe('shouldAdvanceToLab', () => {
   });
 });
 
-describe('CORE-P multi-perfil', () => {
-  it('same weak audit → different gate by profile', () => {
+describe("CORE-P multi-perfil", () => {
+  it("same weak audit → different gate by profile", () => {
     const low = resolveCoachProfilePolicy({
-      profileId: 'conservative',
-      profileName: 'Conservador',
-      riskTolerance: 'low',
-      horizon: 'position',
+      profileId: "conservative",
+      profileName: "Conservador",
+      riskTolerance: "low",
+      horizon: "position",
     });
     const high = resolveCoachProfilePolicy({
-      profileId: 'aggressive',
-      profileName: 'Agresivo',
-      riskTolerance: 'high',
-      horizon: 'swing',
+      profileId: "aggressive",
+      profileName: "Agresivo",
+      riskTolerance: "high",
+      horizon: "swing",
     });
     expect(low.allowLabIfWeak).not.toBe(high.allowLabIfWeak);
     expect(
       shouldAdvanceToLab({
-        confidence: 'weak',
+        confidence: "weak",
         policy: low,
         recommendationCount: 3,
       }).advance,
     ).toBe(false);
     expect(
       shouldAdvanceToLab({
-        confidence: 'weak',
+        confidence: "weak",
         policy: high,
         recommendationCount: 3,
       }).advance,
@@ -145,11 +151,11 @@ describe('CORE-P multi-perfil', () => {
       buildProfilePolicyFingerprintSegment(high),
     );
     expect(formatCoachProfileRailLabel(low)).toMatch(/Conservador/);
-    expect(buildCoachProfileBindingFacts(high).profileId).toBe('aggressive');
+    expect(buildCoachProfileBindingFacts(high).profileId).toBe("aggressive");
   });
 
-  it('Lab techo DD: mejora de score no adopta si rompe perfil', () => {
-    const low = resolveCoachProfilePolicy({ riskTolerance: 'low' });
+  it("Lab techo DD: mejora de score no adopta si rompe perfil", () => {
+    const low = resolveCoachProfilePolicy({ riskTolerance: "low" });
     expect(isDrawdownWithinSoftCap(12, low.maxDrawdownSoftPct)).toBe(true);
     expect(isDrawdownWithinSoftCap(22, low.maxDrawdownSoftPct)).toBe(false);
 
@@ -169,7 +175,7 @@ describe('CORE-P multi-perfil', () => {
     expect(ok.improved).toBe(true);
     expect(ok.profileDdBlocked).toBe(false);
 
-    const high = resolveCoachProfilePolicy({ riskTolerance: 'high' });
+    const high = resolveCoachProfilePolicy({ riskTolerance: "high" });
     expect(
       labImprovedRespectingProfileDd({
         scoreImproved: true,
@@ -180,63 +186,74 @@ describe('CORE-P multi-perfil', () => {
   });
 });
 
-describe('CORE-P preferred Lab families + profile mismatch', () => {
-  it('maps horizon categories to Lab families', () => {
-    expect(preferredCategoriesForHorizon('long_term')).toEqual(['trend', 'composite']);
-    expect(preferredLabFamiliesForHorizon('long_term')).toEqual(['sma_crossover']);
-    expect(preferredLabFamiliesForHorizon('intraday')[0]).toBe('rsi_mean_reversion');
-    expect(formatPreferredLabFamiliesHint('swing')).toMatch(/Lab prioriza/);
+describe("CORE-P preferred Lab families + profile mismatch", () => {
+  it("maps horizon categories to Lab families", () => {
+    expect(preferredCategoriesForHorizon("long_term")).toEqual([
+      "trend",
+      "composite",
+    ]);
+    expect(preferredLabFamiliesForHorizon("long_term")).toEqual([
+      "sma_crossover",
+    ]);
+    expect(preferredLabFamiliesForHorizon("intraday")[0]).toBe(
+      "rsi_mean_reversion",
+    );
+    expect(formatPreferredLabFamiliesHint("swing")).toMatch(/Lab prioriza/);
   });
 
-  it('resolveDefaultLabFamily: seed > adopción > horizonte', () => {
+  it("resolveDefaultLabFamily: seed > adopción > horizonte", () => {
     expect(
       resolveDefaultLabFamily({
-        seedFamily: 'macd_signal_cross',
-        adoptionFamily: 'rsi_mean_reversion',
-        horizon: 'long_term',
+        seedFamily: "macd_signal_cross",
+        adoptionFamily: "rsi_mean_reversion",
+        horizon: "long_term",
       }),
-    ).toBe('macd_signal_cross');
+    ).toBe("macd_signal_cross");
     expect(
       resolveDefaultLabFamily({
-        adoptionFamily: 'rsi_mean_reversion',
-        horizon: 'long_term',
+        adoptionFamily: "rsi_mean_reversion",
+        horizon: "long_term",
       }),
-    ).toBe('rsi_mean_reversion');
-    expect(resolveDefaultLabFamily({ horizon: 'intraday' })).toBe('rsi_mean_reversion');
-    expect(resolveDefaultLabFamily({ horizon: 'long_term' })).toBe('sma_crossover');
-    expect(resolveDefaultLabFamily({})).toBe('sma_crossover');
+    ).toBe("rsi_mean_reversion");
+    expect(resolveDefaultLabFamily({ horizon: "intraday" })).toBe(
+      "rsi_mean_reversion",
+    );
+    expect(resolveDefaultLabFamily({ horizon: "long_term" })).toBe(
+      "sma_crossover",
+    );
+    expect(resolveDefaultLabFamily({})).toBe("sma_crossover");
   });
 
-  it('soft-bias Lab space width by riskTolerance', () => {
-    expect(labSpaceWidthFactorForRisk('low')).toBe(0.75);
-    expect(labSpaceWidthFactorForRisk('high')).toBe(1.35);
-    expect(labSpaceWidthFactorForRisk('moderate')).toBe(1);
+  it("soft-bias Lab space width by riskTolerance", () => {
+    expect(labSpaceWidthFactorForRisk("low")).toBe(0.75);
+    expect(labSpaceWidthFactorForRisk("high")).toBe(1.35);
+    expect(labSpaceWidthFactorForRisk("moderate")).toBe(1);
     expect(labSpaceWidthFactorForRisk(null)).toBe(1);
-    expect(formatLabRiskSpaceHint('low')).toMatch(/estrecho/);
-    expect(formatLabRiskSpaceHint('high')).toMatch(/amplio/);
-    expect(formatLabRiskSpaceHint('moderate')).toBeNull();
+    expect(formatLabRiskSpaceHint("low")).toMatch(/estrecho/);
+    expect(formatLabRiskSpaceHint("high")).toMatch(/amplio/);
+    expect(formatLabRiskSpaceHint("moderate")).toBeNull();
   });
 
-  it('warns when active TOP stamped with another profile', () => {
+  it("warns when active TOP stamped with another profile", () => {
     expect(
       activeTopProfileMismatch({
-        topStatus: 'active',
-        stampedProfileId: 'p-old',
-        activeProfileId: 'p-new',
+        topStatus: "active",
+        stampedProfileId: "p-old",
+        activeProfileId: "p-new",
       }).mismatch,
     ).toBe(true);
     expect(
       activeTopProfileMismatch({
-        topStatus: 'active',
-        stampedProfileId: 'p1',
-        activeProfileId: 'p1',
+        topStatus: "active",
+        stampedProfileId: "p1",
+        activeProfileId: "p1",
       }).mismatch,
     ).toBe(false);
     expect(
       activeTopProfileMismatch({
-        topStatus: 'draft',
-        stampedProfileId: 'a',
-        activeProfileId: 'b',
+        topStatus: "draft",
+        stampedProfileId: "a",
+        activeProfileId: "b",
       }).mismatch,
     ).toBe(false);
   });

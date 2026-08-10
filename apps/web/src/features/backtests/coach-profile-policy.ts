@@ -15,37 +15,37 @@ import type {
   ProfileHorizon,
   RiskTolerance,
   StrategyPresetCategory,
-} from '@bolsa/shared';
-import type { CoachConfidence } from '@/features/backtests/coach-dual-audit';
+} from "@bolsa/shared";
+import type { CoachConfidence } from "@/features/backtests/coach-dual-audit";
 
-export const COACH_PROFILE_POLICY_VERSION = 'coach-profile-v1' as const;
+export const COACH_PROFILE_POLICY_VERSION = "coach-profile-v1" as const;
 
 /** Categorías Coach ★ más naturales por horizonte (AT puro). */
 export function preferredCategoriesForHorizon(
   horizon: ProfileHorizon | null | undefined,
 ): StrategyPresetCategory[] {
   switch (horizon) {
-    case 'intraday':
-      return ['mean_reversion', 'momentum', 'volatility'];
-    case 'swing':
-      return ['trend', 'momentum', 'mean_reversion', 'composite'];
-    case 'position':
-      return ['trend', 'composite', 'momentum'];
-    case 'long_term':
-      return ['trend', 'composite'];
+    case "intraday":
+      return ["mean_reversion", "momentum", "volatility"];
+    case "swing":
+      return ["trend", "momentum", "mean_reversion", "composite"];
+    case "position":
+      return ["trend", "composite", "momentum"];
+    case "long_term":
+      return ["trend", "composite"];
     default:
-      return ['trend', 'mean_reversion', 'momentum'];
+      return ["trend", "mean_reversion", "momentum"];
   }
 }
 
 const CATEGORY_TO_LAB_FAMILY: Partial<
   Record<StrategyPresetCategory, OptimizeStrategyFamily>
 > = {
-  trend: 'sma_crossover',
-  composite: 'sma_crossover',
-  mean_reversion: 'rsi_mean_reversion',
-  momentum: 'macd_signal_cross',
-  volatility: 'macd_signal_cross',
+  trend: "sma_crossover",
+  composite: "sma_crossover",
+  mean_reversion: "rsi_mean_reversion",
+  momentum: "macd_signal_cross",
+  volatility: "macd_signal_cross",
 };
 
 /**
@@ -62,7 +62,7 @@ export function preferredLabFamiliesForHorizon(
   }
   return out.length > 0
     ? out
-    : ['sma_crossover', 'rsi_mean_reversion', 'macd_signal_cross'];
+    : ["sma_crossover", "rsi_mean_reversion", "macd_signal_cross"];
 }
 
 /**
@@ -77,13 +77,13 @@ export function resolveDefaultLabFamily(opts: {
 }): OptimizeStrategyFamily {
   if (opts.seedFamily) return opts.seedFamily;
   if (opts.adoptionFamily) return opts.adoptionFamily;
-  return preferredLabFamiliesForHorizon(opts.horizon)[0] ?? 'sma_crossover';
+  return preferredLabFamiliesForHorizon(opts.horizon)[0] ?? "sma_crossover";
 }
 
 const LAB_FAMILY_LABEL: Record<OptimizeStrategyFamily, string> = {
-  sma_crossover: 'SMA/trend',
-  rsi_mean_reversion: 'RSI',
-  macd_signal_cross: 'MACD',
+  sma_crossover: "SMA/trend",
+  rsi_mean_reversion: "RSI",
+  macd_signal_cross: "MACD",
 };
 
 /**
@@ -94,8 +94,8 @@ const LAB_FAMILY_LABEL: Record<OptimizeStrategyFamily, string> = {
 export function labSpaceWidthFactorForRisk(
   risk: RiskTolerance | null | undefined,
 ): number {
-  if (risk === 'low') return 0.75;
-  if (risk === 'high') return 1.35;
+  if (risk === "low") return 0.75;
+  if (risk === "high") return 1.35;
   return 1;
 }
 
@@ -104,8 +104,8 @@ export function formatPreferredLabFamiliesHint(
   horizon: ProfileHorizon | null | undefined,
 ): string {
   const families = preferredLabFamiliesForHorizon(horizon);
-  const labels = families.map((f) => LAB_FAMILY_LABEL[f]).join(' · ');
-  const h = horizon ?? 'sin horizonte';
+  const labels = families.map((f) => LAB_FAMILY_LABEL[f]).join(" · ");
+  const h = horizon ?? "sin horizonte";
   return `Perfil ${h} → Lab prioriza ${labels}`;
 }
 
@@ -131,7 +131,7 @@ export function activeTopProfileMismatch(opts: {
   activeProfileId?: string | null;
 }): { mismatch: boolean; message: string | null } {
   const status = opts.topStatus ?? null;
-  if (status !== 'active' && status !== 'semifinal') {
+  if (status !== "active" && status !== "semifinal") {
     return { mismatch: false, message: null };
   }
   const stamped = opts.stampedProfileId?.trim() || null;
@@ -142,7 +142,7 @@ export function activeTopProfileMismatch(opts: {
   return {
     mismatch: true,
     message:
-      'Finalistas guardados con otro perfil. Re-Play / Lab para alinear, o ignora si el cambio es deliberado.',
+      "Finalistas guardados con otro perfil. Re-Play / Lab para alinear, o ignora si el cambio es deliberado.",
   };
 }
 
@@ -195,16 +195,16 @@ export function resolveCoachProfilePolicy(opts: {
     policyVersion: COACH_PROFILE_POLICY_VERSION,
   } as const;
 
-  if (risk === 'high') {
+  if (risk === "high") {
     return {
       ...base,
       allowLabIfWeak: true,
       maxDrawdownSoftPct: 40,
-      suggestedFutureWeight: horizon === 'intraday' ? 0.55 : 0.42,
+      suggestedFutureWeight: horizon === "intraday" ? 0.55 : 0.42,
     };
   }
 
-  if (risk === 'moderate') {
+  if (risk === "moderate") {
     return {
       ...base,
       allowLabIfWeak: false,
@@ -218,23 +218,25 @@ export function resolveCoachProfilePolicy(opts: {
     ...DEFAULT_POLICY,
     ...base,
     allowLabIfWeak: false,
-    maxDrawdownSoftPct: risk === 'low' ? 18 : 25,
+    maxDrawdownSoftPct: risk === "low" ? 18 : 25,
     suggestedFutureWeight: 0.3,
   };
 }
 
 /** Segmento de fingerprint de frescura (cambio de perfil invalida skip). */
 export function buildProfilePolicyFingerprintSegment(
-  policy: Pick<CoachProfilePolicy, 'policyVersion' | 'profileId'>,
+  policy: Pick<CoachProfilePolicy, "policyVersion" | "profileId">,
 ): string {
-  return `${policy.policyVersion}|pid:${policy.profileId ?? 'none'}`;
+  return `${policy.policyVersion}|pid:${policy.profileId ?? "none"}`;
 }
 
 /** Label compacto para el rail del Asistente. */
-export function formatCoachProfileRailLabel(policy: CoachProfilePolicy): string {
-  const name = policy.profileName?.trim() || 'sin perfil';
-  const horizon = policy.horizon ?? '—';
-  const risk = policy.riskTolerance ?? '—';
+export function formatCoachProfileRailLabel(
+  policy: CoachProfilePolicy,
+): string {
+  const name = policy.profileName?.trim() || "sin perfil";
+  const horizon = policy.horizon ?? "—";
+  const risk = policy.riskTolerance ?? "—";
   return `Perfil: ${name} · ${horizon} · riesgo ${risk}`;
 }
 
@@ -267,7 +269,9 @@ export function labImprovedRespectingProfileDd(opts: {
 }
 
 /** Stamp en coachFacts al guardar Finalistas / semifinal. */
-export function buildCoachProfileBindingFacts(policy: CoachProfilePolicy): Record<string, unknown> {
+export function buildCoachProfileBindingFacts(
+  policy: CoachProfilePolicy,
+): Record<string, unknown> {
   return {
     profileId: policy.profileId ?? null,
     policyVersion: policy.policyVersion,
@@ -297,15 +301,15 @@ export function shouldAdvanceToLab(opts: {
   if (opts.recommendationCount <= 0) {
     return {
       advance: false,
-      reason: 'Coach¹ sin TOP útil · no Lab · no se tocan Finalistas',
+      reason: "Coach¹ sin TOP útil · no Lab · no se tocan Finalistas",
     };
   }
-  const conf = opts.confidence ?? 'no_auditor';
+  const conf = opts.confidence ?? "no_auditor";
   const allowWeak =
-    typeof opts.labEvenIfWeak === 'boolean'
+    typeof opts.labEvenIfWeak === "boolean"
       ? opts.labEvenIfWeak
       : opts.policy.allowLabIfWeak;
-  if (conf === 'weak' && !allowWeak) {
+  if (conf === "weak" && !allowWeak) {
     return {
       advance: false,
       reason: `Coach¹ débil · check «pasar si débil» OFF · Finalistas intactos`,
@@ -314,8 +318,8 @@ export function shouldAdvanceToLab(opts: {
   return {
     advance: true,
     reason:
-      conf === 'weak'
-        ? 'Coach¹ débil · check Asistente permite Lab'
+      conf === "weak"
+        ? "Coach¹ débil · check Asistente permite Lab"
         : `Coach¹ ${conf} · avance a Lab`,
   };
 }

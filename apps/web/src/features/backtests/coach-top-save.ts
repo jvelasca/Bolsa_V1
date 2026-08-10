@@ -7,9 +7,9 @@ import type {
   ChartTimeframe,
   InstrumentStrategyTopSlotV1,
   StrategyDefinitionSummaryDto,
-} from '@bolsa/shared';
-import type { TechnicalRecommendation } from '@/features/backtests/backtest-deep-coach';
-import { dedupeInstrumentTopSlots } from '@/features/backtests/instrument-strategy-top-promote';
+} from "@bolsa/shared";
+import type { TechnicalRecommendation } from "@/features/backtests/backtest-deep-coach";
+import { dedupeInstrumentTopSlots } from "@/features/backtests/instrument-strategy-top-promote";
 
 export type CoachTopCreatePreset = (input: {
   name: string;
@@ -40,7 +40,7 @@ export async function buildCoachTopSlots(opts: {
   lookup: CoachTopStrategyLookup;
   limit?: number;
   /** Origen del slot (Finalistas post-Lab → optimized). */
-  slotSource?: InstrumentStrategyTopSlotV1['source'];
+  slotSource?: InstrumentStrategyTopSlotV1["source"];
   /**
    * Post-Lab / Finalistas active: exige runId (Checklist Camino A).
    * Omite candidatas sin run; si ninguna queda → error.
@@ -49,7 +49,9 @@ export async function buildCoachTopSlots(opts: {
 }): Promise<InstrumentStrategyTopSlotV1[]> {
   const limit = opts.limit ?? 3;
   const recs = opts.recommendations.slice(0, Math.max(limit * 2, limit));
-  const tf = (opts.timeframe === '1w' ? '1wk' : opts.timeframe) as ChartTimeframe;
+  const tf = (
+    opts.timeframe === "1w" ? "1wk" : opts.timeframe
+  ) as ChartTimeframe;
   const existing = [...opts.lookup.existing];
   const usedTypes = new Set<string>();
   const usedDefIds = new Set<string>();
@@ -60,12 +62,16 @@ export async function buildCoachTopSlots(opts: {
     if (opts.requireRunId && !rec.row.runId) continue;
 
     const presetKey = rec.row.strategyType;
-    if (presetKey && !rec.row.strategyDefinitionId && usedTypes.has(presetKey)) continue;
+    if (presetKey && !rec.row.strategyDefinitionId && usedTypes.has(presetKey))
+      continue;
 
-    let strategyDefinitionId: string | null = rec.row.strategyDefinitionId ?? null;
+    let strategyDefinitionId: string | null =
+      rec.row.strategyDefinitionId ?? null;
     if (!strategyDefinitionId && presetKey) {
       const wantedName = coachTopStrategyName(opts.symbol, rec.row.label);
-      const found = existing.find((s) => s.name === wantedName && s.presetKey === presetKey);
+      const found = existing.find(
+        (s) => s.name === wantedName && s.presetKey === presetKey,
+      );
       if (found) {
         if (usedDefIds.has(found.id)) continue;
         strategyDefinitionId = found.id;
@@ -108,7 +114,9 @@ export async function buildCoachTopSlots(opts: {
       score: rec.score,
       starsCapped: Boolean(rec.starsCapped),
       runId: rec.row.runId ?? null,
-      source: opts.slotSource ?? (rec.row.labPass === 'lab_improved' ? 'optimized' : 'coach'),
+      source:
+        opts.slotSource ??
+        (rec.row.labPass === "lab_improved" ? "optimized" : "coach"),
       totalReturnPct: rec.row.totalReturnPct ?? null,
       excessReturnPct: rec.row.excessReturnPct ?? null,
       maxDrawdownPct: rec.row.maxDrawdownPct ?? null,
@@ -118,7 +126,7 @@ export async function buildCoachTopSlots(opts: {
 
   if (opts.requireRunId && rawSlots.length === 0) {
     throw new Error(
-      'Finalistas: ninguna candidata con runId. Re-simula el lote post-Lab antes de guardar.',
+      "Finalistas: ninguna candidata con runId. Re-simula el lote post-Lab antes de guardar.",
     );
   }
 

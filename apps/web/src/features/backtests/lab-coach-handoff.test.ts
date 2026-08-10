@@ -2,14 +2,14 @@
  * Tests — bloqueo handoff Lab→Coach si falla guardar Mejor.
  */
 
-import { describe, expect, it } from 'vitest';
-import { resolveLabReanalyzeGate } from '@/features/backtests/lab-coach-handoff';
+import { describe, expect, it } from "vitest";
+import { resolveLabReanalyzeGate } from "@/features/backtests/lab-coach-handoff";
 
-describe('resolveLabReanalyzeGate', () => {
-  it('blocks when any save failed (even if others ok)', () => {
+describe("resolveLabReanalyzeGate", () => {
+  it("blocks when any save failed (even if others ok)", () => {
     const gate = resolveLabReanalyzeGate({
       improvedSaved: 2,
-      saveFailures: [{ rank: 2, error: 'API 500' }],
+      saveFailures: [{ rank: 2, error: "API 500" }],
       carriedCount: 0,
     });
     expect(gate.allow).toBe(false);
@@ -17,7 +17,7 @@ describe('resolveLabReanalyzeGate', () => {
     expect(gate.message).toMatch(/#2/);
   });
 
-  it('allows when all improved saved', () => {
+  it("allows when all improved saved", () => {
     const gate = resolveLabReanalyzeGate({
       improvedSaved: 2,
       saveFailures: [],
@@ -27,7 +27,7 @@ describe('resolveLabReanalyzeGate', () => {
     expect(gate.message).toBeNull();
   });
 
-  it('blocks empty handoff', () => {
+  it("blocks empty handoff", () => {
     const gate = resolveLabReanalyzeGate({
       improvedSaved: 0,
       saveFailures: [],
@@ -37,7 +37,7 @@ describe('resolveLabReanalyzeGate', () => {
     expect(gate.message).toMatch(/Nada que llevar/);
   });
 
-  it('allows carry-only', () => {
+  it("allows carry-only", () => {
     const gate = resolveLabReanalyzeGate({
       improvedSaved: 0,
       saveFailures: [],

@@ -2,7 +2,7 @@
  * Identidad y reutilización del lote Coach (sin re-simular si no cambió el contexto).
  */
 
-import { STRATEGY_MATRIX_MAX_SELECTED } from '@/features/backtests/backtest-strategy-matrix';
+import { STRATEGY_MATRIX_MAX_SELECTED } from "@/features/backtests/backtest-strategy-matrix";
 
 export type CoachLoteRowSnapshot = {
   rowId: string;
@@ -15,7 +15,7 @@ export function buildCoachBatteryFingerprint(opts: {
   contextFingerprint: string;
   targetRowIds: readonly string[];
 }): string {
-  const ids = [...new Set(opts.targetRowIds.filter(Boolean))].sort().join(',');
+  const ids = [...new Set(opts.targetRowIds.filter(Boolean))].sort().join(",");
   return `${opts.contextFingerprint}|ids:${ids}`;
 }
 
@@ -27,20 +27,20 @@ export function canReuseCoachLote(opts: {
   targetRowIds: readonly string[];
   forceResim?: boolean;
 }): { reuse: boolean; reason: string } {
-  if (!opts.preferReuse) return { reuse: false, reason: 'prefs_off' };
-  if (opts.forceResim) return { reuse: false, reason: 'force' };
-  if (opts.targetRowIds.length === 0) return { reuse: false, reason: 'empty' };
+  if (!opts.preferReuse) return { reuse: false, reason: "prefs_off" };
+  if (opts.forceResim) return { reuse: false, reason: "force" };
+  if (opts.targetRowIds.length === 0) return { reuse: false, reason: "empty" };
   if (!opts.lastFingerprint || opts.lastFingerprint !== opts.fingerprint) {
-    return { reuse: false, reason: 'fingerprint_mismatch' };
+    return { reuse: false, reason: "fingerprint_mismatch" };
   }
   const byId = new Map(opts.rows.map((r) => [r.rowId, r]));
   for (const id of opts.targetRowIds) {
     const row = byId.get(id);
-    if (!row || row.status !== 'ok' || !row.runId) {
-      return { reuse: false, reason: 'incomplete_ok' };
+    if (!row || row.status !== "ok" || !row.runId) {
+      return { reuse: false, reason: "incomplete_ok" };
     }
   }
-  return { reuse: true, reason: 'ok' };
+  return { reuse: true, reason: "ok" };
 }
 
 /** Universo: genéricas ± Finalistas ± Optimizadas ± Mis estrategias, tope matriz. */

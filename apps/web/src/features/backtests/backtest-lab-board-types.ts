@@ -3,9 +3,9 @@
  * Lab no escribe Finalistas: el siguiente paso es Reanalizar con Coach.
  */
 
-import type { OptimizeSeed } from '@/features/backtests/backtest-optimize-seed';
-import type { LabHandoffSaveResult } from '@/features/backtests/lab-coach-handoff';
-import type { BacktestStrategyType, StrategyDefinitionV1 } from '@bolsa/shared';
+import type { OptimizeSeed } from "@/features/backtests/backtest-optimize-seed";
+import type { LabHandoffSaveResult } from "@/features/backtests/lab-coach-handoff";
+import type { BacktestStrategyType, StrategyDefinitionV1 } from "@bolsa/shared";
 
 export type LabBoardZone = {
   id: string;
@@ -76,7 +76,7 @@ export type LabReanalyzeRequest = {
 export function padLabZones(zones: LabBoardZone[]): LabBoardZone[] {
   const out = zones.slice(0, 3).map((z, i) => ({
     ...z,
-    rank: ((i + 1) as 1 | 2 | 3),
+    rank: (i + 1) as 1 | 2 | 3,
   }));
   while (out.length < 3) {
     const rank = (out.length + 1) as 1 | 2 | 3;

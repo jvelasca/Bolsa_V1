@@ -17,18 +17,18 @@
  * @see docs/engineering/assistant-play-funnel-design-2026-07-29.md §6
  */
 
-import type { ChartTimeframe, OptimizeStrategyFamily } from '@bolsa/shared';
+import type { ChartTimeframe, OptimizeStrategyFamily } from "@bolsa/shared";
 import {
   clampRange,
   defaultMacdSpace,
   type OptimizeSearchSpace,
   type RsiSearchSpace,
   type SmaSearchSpace,
-} from '@/features/backtests/backtest-optimize-space';
-import type { OosEvidenceKind } from '@/features/backtests/backtest-oos-evidence';
+} from "@/features/backtests/backtest-optimize-space";
+import type { OosEvidenceKind } from "@/features/backtests/backtest-oos-evidence";
 
-export const LAB_ADOPTION_MEMORY_KEY = 'bolsa-lab-adoption-memory-v1';
-export const LAB_ADOPTION_ENGINE = 'lab-adoption-v1';
+export const LAB_ADOPTION_MEMORY_KEY = "bolsa-lab-adoption-memory-v1";
+export const LAB_ADOPTION_ENGINE = "lab-adoption-v1";
 
 export type LabAdoptionParams = {
   fastPeriod?: number | null;
@@ -95,7 +95,8 @@ function readStore(): MemoryStore {
     const raw = localStorage.getItem(LAB_ADOPTION_MEMORY_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+      return {};
     return parsed as MemoryStore;
   } catch {
     return {};
@@ -129,7 +130,7 @@ export function readLabAdoption(
 }
 
 export function rememberLabAdoption(
-  record: Omit<LabAdoptionRecord, 'engine' | 'adoptedAt'> & {
+  record: Omit<LabAdoptionRecord, "engine" | "adoptedAt"> & {
     adoptedAt?: string;
   },
 ): LabAdoptionRecord {
@@ -155,18 +156,17 @@ export function clearLabAdoption(
 
 /** Hint compacto para banner Lab (solo lectura). */
 export function formatLabAdoptionHint(rec: LabAdoptionRecord): string {
-  const kind =
-    rec.oosKind && rec.oosKind !== 'none' ? rec.oosKind : 'IS';
+  const kind = rec.oosKind && rec.oosKind !== "none" ? rec.oosKind : "IS";
   const oos =
     rec.oosScore != null && Number.isFinite(rec.oosScore)
       ? ` · OOS ${rec.oosScore.toFixed(2)}`
-      : '';
+      : "";
   const meseta =
     rec.plateau?.isPlateau === true
-      ? ' · meseta'
+      ? " · meseta"
       : rec.plateau?.isPlateau === false
-        ? ' · pico'
-        : '';
+        ? " · pico"
+        : "";
   return `Adopción previa · ${rec.paramsLabel} · ${kind}${oos}${meseta}`;
 }
 
@@ -203,14 +203,14 @@ export function guidedSpaceFromAdoption(
 ): OptimizeSearchSpace | null {
   const hw = guidedHalfWidthsForPlateau(rec.plateau);
 
-  if (rec.family === 'sma_crossover') {
+  if (rec.family === "sma_crossover") {
     const f = rec.params.fastPeriod;
     const s = rec.params.slowPeriod;
     if (f == null || s == null || !Number.isFinite(f) || !Number.isFinite(s)) {
       return null;
     }
     const space: SmaSearchSpace = {
-      family: 'sma_crossover',
+      family: "sma_crossover",
       fast: clampRange({
         min: Math.max(2, f - hw.smaFast),
         max: f + hw.smaFast,
@@ -225,7 +225,7 @@ export function guidedSpaceFromAdoption(
     return space;
   }
 
-  if (rec.family === 'rsi_mean_reversion') {
+  if (rec.family === "rsi_mean_reversion") {
     const p = rec.params.period;
     const os = rec.params.oversold;
     const ob = rec.params.overbought;
@@ -240,7 +240,7 @@ export function guidedSpaceFromAdoption(
       return null;
     }
     const space: RsiSearchSpace = {
-      family: 'rsi_mean_reversion',
+      family: "rsi_mean_reversion",
       period: clampRange({
         min: Math.max(2, p - hw.rsiPeriod),
         max: p + hw.rsiPeriod,
@@ -262,7 +262,7 @@ export function guidedSpaceFromAdoption(
     return space;
   }
 
-  if (rec.family === 'macd_signal_cross') {
+  if (rec.family === "macd_signal_cross") {
     return defaultMacdSpace();
   }
 

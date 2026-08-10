@@ -3,24 +3,24 @@
  * Lab no escribe Finalistas → CTA «Reanalizar con Coach».
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Beaker, FlaskConical, Loader2 } from 'lucide-react';
-import { BacktestOptimizePanel } from '@/features/backtests/backtest-optimize-panel';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Beaker, FlaskConical, Loader2 } from "lucide-react";
+import { BacktestOptimizePanel } from "@/features/backtests/backtest-optimize-panel";
 import type {
   LabBoardZone,
   LabReanalyzeRequest,
   LabZoneHandle,
-} from '@/features/backtests/backtest-lab-board-types';
-import { padLabZones } from '@/features/backtests/backtest-lab-board-types';
-import type { OptimizeSeed } from '@/features/backtests/backtest-optimize-seed';
-import type { OptimizeBeforeAfterSnapshot } from '@/features/backtests/backtest-optimize-delta';
-import { buildOptimizeBeforeAfter } from '@/features/backtests/backtest-optimize-delta';
-import { BacktestOptimizeCompareCard } from '@/features/backtests/backtest-optimize-compare-card';
+} from "@/features/backtests/backtest-lab-board-types";
+import { padLabZones } from "@/features/backtests/backtest-lab-board-types";
+import type { OptimizeSeed } from "@/features/backtests/backtest-optimize-seed";
+import type { OptimizeBeforeAfterSnapshot } from "@/features/backtests/backtest-optimize-delta";
+import { buildOptimizeBeforeAfter } from "@/features/backtests/backtest-optimize-delta";
+import { BacktestOptimizeCompareCard } from "@/features/backtests/backtest-optimize-compare-card";
 import {
   LabBoardActivityBanner,
   type LabZoneActivitySnapshot,
-} from '@/features/backtests/lab-board-activity-banner';
-import { resolveLabReanalyzeGate } from '@/features/backtests/lab-coach-handoff';
+} from "@/features/backtests/lab-board-activity-banner";
+import { resolveLabReanalyzeGate } from "@/features/backtests/lab-coach-handoff";
 import {
   isLabZoneTerminal,
   LAB_CYCLE_WATCHDOG_MS,
@@ -28,9 +28,9 @@ import {
   labNoImproveStatus,
   labWatchdogStatus,
   shouldAutoHandoffLab,
-} from '@/features/backtests/backtest-assistant-full-cycle';
-import { Button } from '@/components/ui/button';
-import type { OptimizeSmaGridResultDto, ProfileHorizon } from '@bolsa/shared';
+} from "@/features/backtests/backtest-assistant-full-cycle";
+import { Button } from "@/components/ui/button";
+import type { OptimizeSmaGridResultDto, ProfileHorizon } from "@bolsa/shared";
 
 type Props = {
   zones: LabBoardZone[];
@@ -48,16 +48,19 @@ type Props = {
   /** CORE-P: horizonte → hint familias Lab preferidas. */
   profileHorizon?: ProfileHorizon | null;
   /** CORE-P: riesgo → soft-bias anchura espacio Lab. */
-  profileRiskTolerance?: import('@bolsa/shared').RiskTolerance | null;
+  profileRiskTolerance?: import("@bolsa/shared").RiskTolerance | null;
 };
 
 function EmptyLabZone({ rank }: { rank: 1 | 2 | 3 }) {
   return (
     <div className="flex min-h-[220px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
       <FlaskConical className="h-7 w-7 text-muted-foreground/50" aria-hidden />
-      <p className="text-sm font-medium text-muted-foreground">Zona #{rank} vacía</p>
+      <p className="text-sm font-medium text-muted-foreground">
+        Zona #{rank} vacía
+      </p>
       <p className="max-w-[220px] text-[11px] text-muted-foreground">
-        Sin candidata optimizable. Pasa desde Coach (TOP con 1–3) o abre Lab en otra tarjeta.
+        Sin candidata optimizable. Pasa desde Coach (TOP con 1–3) o abre Lab en
+        otra tarjeta.
       </p>
     </div>
   );
@@ -77,18 +80,22 @@ export function BacktestLabBoard({
   profileRiskTolerance = null,
 }: Props) {
   const padded = padLabZones(zones);
-  const zoneIdsKey = zones.map((z) => z.id).join('|');
+  const zoneIdsKey = zones.map((z) => z.id).join("|");
   const zoneRefs = useRef<Array<LabZoneHandle | null>>([null, null, null]);
   const [improvedCount, setImprovedCount] = useState(0);
   const [doneCount, setDoneCount] = useState(0);
   const [zoneOutcomes, setZoneOutcomes] = useState<
     Record<string, { improved: boolean; hasResult: boolean }>
   >({});
-  const [zoneActivity, setZoneActivity] = useState<Record<string, LabZoneActivitySnapshot>>({});
+  const [zoneActivity, setZoneActivity] = useState<
+    Record<string, LabZoneActivitySnapshot>
+  >({});
   const [carryIds, setCarryIds] = useState<Set<string>>(() => new Set());
   const [pending, setPending] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [compares, setCompares] = useState<Record<string, OptimizeBeforeAfterSnapshot | null>>({});
+  const [compares, setCompares] = useState<
+    Record<string, OptimizeBeforeAfterSnapshot | null>
+  >({});
   const autoHandoffFiredRef = useRef(false);
 
   const refreshZoneStats = useCallback(() => {
@@ -105,7 +112,11 @@ export function BacktestLabBoard({
   }, []);
 
   const handleComplete = useCallback(
-    (zoneId: string, seed: OptimizeSeed | null, result: OptimizeSmaGridResultDto) => {
+    (
+      zoneId: string,
+      seed: OptimizeSeed | null,
+      result: OptimizeSmaGridResultDto,
+    ) => {
       const snap = buildOptimizeBeforeAfter(seed, result);
       setCompares((prev) => ({ ...prev, [zoneId]: snap }));
       queueMicrotask(refreshZoneStats);
@@ -127,8 +138,8 @@ export function BacktestLabBoard({
     setPending(true);
     setStatusMsg(null);
     try {
-      const improved: LabReanalyzeRequest['improved'] = [];
-      const carried: LabReanalyzeRequest['carried'] = [];
+      const improved: LabReanalyzeRequest["improved"] = [];
+      const carried: LabReanalyzeRequest["carried"] = [];
       const saveFailures: Array<{ rank: number; error: string }> = [];
 
       for (const h of zoneRefs.current) {
@@ -140,7 +151,7 @@ export function BacktestLabBoard({
           if (!saved) {
             saveFailures.push({
               rank: handoff.rank,
-              error: 'Sin resultado de guardado',
+              error: "Sin resultado de guardado",
             });
             continue;
           }
@@ -180,12 +191,16 @@ export function BacktestLabBoard({
 
       setStatusMsg(
         `Coach: reanalizando ${improved.length} mejora(s)` +
-          (carried.length ? ` · ${carried.length} sin mejora (solo aviso)` : '') +
-          '…',
+          (carried.length
+            ? ` · ${carried.length} sin mejora (solo aviso)`
+            : "") +
+          "…",
       );
       await onReanalyzeWithCoach({ improved, carried });
     } catch (err) {
-      setStatusMsg(err instanceof Error ? err.message : 'Error al pasar al Coach');
+      setStatusMsg(
+        err instanceof Error ? err.message : "Error al pasar al Coach",
+      );
     } finally {
       setPending(false);
       refreshZoneStats();
@@ -205,13 +220,16 @@ export function BacktestLabBoard({
           // Sin job → idle (no «pending» eterno). Con job y sin snap aún → pending.
           phase:
             z.jobId || (z.jobIds && z.jobIds.length > 0)
-              ? ('pending' as const)
+              ? ("pending" as const)
               : null,
         }
       );
     });
   const anyWorking = activityList.some(
-    (z) => z.phase === 'pending' || z.phase === 'processing' || z.phase === 'running',
+    (z) =>
+      z.phase === "pending" ||
+      z.phase === "processing" ||
+      z.phase === "running",
   );
   const terminalCount = padded.filter((z) => {
     if (!z.seed) return false;
@@ -222,7 +240,7 @@ export function BacktestLabBoard({
       hasSeed: true,
       hasJob,
       hasResult: Boolean(outcome?.hasResult),
-      activityPhase: act?.phase ?? (!hasJob ? null : 'pending'),
+      activityPhase: act?.phase ?? (!hasJob ? null : "pending"),
     });
   }).length;
   // Terminal incluye fallos / sin job — no solo Mejores con resultado.
@@ -251,11 +269,17 @@ export function BacktestLabBoard({
       })
     ) {
       autoHandoffFiredRef.current = true;
-      onAutoHandoffStatus?.('Ciclo: Lab listo · pasando a Coach²…');
+      onAutoHandoffStatus?.("Ciclo: Lab listo · pasando a Coach²…");
       void reanalyzeWithCoach();
       return;
     }
-    if (autoHandoff && allDone && filled > 0 && improvedCount === 0 && !autoHandoffFiredRef.current) {
+    if (
+      autoHandoff &&
+      allDone &&
+      filled > 0 &&
+      improvedCount === 0 &&
+      !autoHandoffFiredRef.current
+    ) {
       autoHandoffFiredRef.current = true;
       const msg =
         labNoImproveStatus(improvedCount, Math.max(doneCount, terminalCount)) ??
@@ -304,13 +328,17 @@ export function BacktestLabBoard({
             )}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            No hace falta pulsar Play: al «Pasar al Lab» ya se encolan las búsquedas (SMA→H0+Optuna
-            unidos; RSI/MACD→grid H0; hold-out/WF según barras). Cada zona muestra el veredicto Mejoró /
-            Sin mejora. Lab no escribe Finalistas.
+            No hace falta pulsar Play: al «Pasar al Lab» ya se encolan las
+            búsquedas (SMA→H0+Optuna unidos; RSI/MACD→grid H0; hold-out/WF según
+            barras). Cada zona muestra el veredicto Mejoró / Sin mejora. Lab no
+            escribe Finalistas.
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Estado: {doneCount}/{filled || 0} con resultado · {improvedCount} mejora(s)
-            {!allDone ? ' · espera a que terminen todas antes de reanalizar' : ''}
+            Estado: {doneCount}/{filled || 0} con resultado · {improvedCount}{" "}
+            mejora(s)
+            {!allDone
+              ? " · espera a que terminen todas antes de reanalizar"
+              : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -322,8 +350,8 @@ export function BacktestLabBoard({
             onClick={() => void reanalyzeWithCoach()}
             title={
               allDone
-                ? 'Persiste los Mejores que mejoraron, los re-simula y abre Coach. Las no mejoradas marcadas van solo como aviso.'
-                : 'Espera a que las 3 zonas terminen (o las que tengas en el tablero).'
+                ? "Persiste los Mejores que mejoraron, los re-simula y abre Coach. Las no mejoradas marcadas van solo como aviso."
+                : "Espera a que las 3 zonas terminen (o las que tengas en el tablero)."
             }
           >
             {pending ? (
@@ -334,7 +362,7 @@ export function BacktestLabBoard({
             ) : !allDone ? (
               `Esperando zonas (${doneCount}/${filled})…`
             ) : (
-              'Reanalizar con Coach'
+              "Reanalizar con Coach"
             )}
           </Button>
         </div>
@@ -383,8 +411,10 @@ export function BacktestLabBoard({
                     onChange={() => toggleCarry(zone.id)}
                   />
                   <span>
-                    <span className="font-medium text-foreground">Llevar al Coach</span>
-                    {' · '}
+                    <span className="font-medium text-foreground">
+                      Llevar al Coach
+                    </span>
+                    {" · "}
                     no mejoró · no se reanaliza (solo aviso)
                   </span>
                 </label>
@@ -397,7 +427,9 @@ export function BacktestLabBoard({
                 defaultInstrumentId={defaultInstrumentId}
                 seed={zone.seed}
                 initialRunId={zone.jobId ?? null}
-                initialRunIds={zone.jobIds ?? (zone.jobId ? [zone.jobId] : null)}
+                initialRunIds={
+                  zone.jobIds ?? (zone.jobId ? [zone.jobId] : null)
+                }
                 compact
                 zoneId={zone.id}
                 zoneRank={zone.rank}

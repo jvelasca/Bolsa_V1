@@ -6,25 +6,25 @@
  * deben colapsar a 2 en el gate, y soft-fail post-Lab no fuerza weak.
  */
 
-import { describe, expect, it } from 'vitest';
-import type { ExplorePresetRow } from '@/features/backtests/backtest-explore-value';
+import { describe, expect, it } from "vitest";
+import type { ExplorePresetRow } from "@/features/backtests/backtest-explore-value";
 import {
   applyAuditGate,
   runCoachDualAudit,
-} from '@/features/backtests/coach-dual-audit';
-import { rankTechnicalRecommendations } from '@/features/backtests/backtest-deep-coach';
-import { buildOptimizeHeatmap } from '@/features/backtests/backtest-optimize-heatmap';
-import { resolveLabReanalyzeGate } from '@/features/backtests/lab-coach-handoff';
-import type { SmaGridTrialDto } from '@bolsa/shared';
+} from "@/features/backtests/coach-dual-audit";
+import { rankTechnicalRecommendations } from "@/features/backtests/backtest-deep-coach";
+import { buildOptimizeHeatmap } from "@/features/backtests/backtest-optimize-heatmap";
+import { resolveLabReanalyzeGate } from "@/features/backtests/lab-coach-handoff";
+import type { SmaGridTrialDto } from "@bolsa/shared";
 
 function exploreRow(
   partial: Partial<ExplorePresetRow> &
-    Pick<ExplorePresetRow, 'strategyType' | 'label' | 'strategyDefinitionId'>,
+    Pick<ExplorePresetRow, "strategyType" | "label" | "strategyDefinitionId">,
 ): ExplorePresetRow {
   return {
-    category: 'trend',
-    categoryLabel: 'Tendencia',
-    status: 'ok',
+    category: "trend",
+    categoryLabel: "Tendencia",
+    status: "ok",
     totalReturnPct: 28,
     excessReturnPct: 8,
     maxDrawdownPct: 14,
@@ -38,34 +38,34 @@ function exploreRow(
 }
 
 const cafCtx = {
-  symbol: 'CAF',
-  timeframe: '1d' as const,
-  horizon: 'swing' as const,
-  riskTolerance: 'moderate' as const,
-  evidenceLevel: 'lab_validated' as const,
+  symbol: "CAF",
+  timeframe: "1d" as const,
+  horizon: "swing" as const,
+  riskTolerance: "moderate" as const,
+  evidenceLevel: "lab_validated" as const,
 };
 
-describe('CAF Lab→Coach² smoke', () => {
-  it('keeps 3 Lab Mejores with same presetKey via distinct definitionId', () => {
+describe("CAF Lab→Coach² smoke", () => {
+  it("keeps 3 Lab Mejores with same presetKey via distinct definitionId", () => {
     const rows = [
       exploreRow({
-        strategyType: 'sma_crossover',
-        label: 'CAF · SMA opt #1',
-        strategyDefinitionId: 'def_caf_1',
+        strategyType: "sma_crossover",
+        label: "CAF · SMA opt #1",
+        strategyDefinitionId: "def_caf_1",
         periodReturns: { early: 5, mid: 9, late: 18 },
         excessReturnPct: 12,
       }),
       exploreRow({
-        strategyType: 'sma_crossover',
-        label: 'CAF · Donchian→SMA #2',
-        strategyDefinitionId: 'def_caf_2',
+        strategyType: "sma_crossover",
+        label: "CAF · Donchian→SMA #2",
+        strategyDefinitionId: "def_caf_2",
         periodReturns: { early: 3, mid: 7, late: 15 },
         excessReturnPct: 9,
       }),
       exploreRow({
-        strategyType: 'sma_crossover',
-        label: 'CAF · Supertrend→SMA #3',
-        strategyDefinitionId: 'def_caf_3',
+        strategyType: "sma_crossover",
+        label: "CAF · Supertrend→SMA #3",
+        strategyDefinitionId: "def_caf_3",
         periodReturns: { early: 2, mid: 6, late: 12 },
         excessReturnPct: 6,
       }),
@@ -82,36 +82,36 @@ describe('CAF Lab→Coach² smoke', () => {
     const bundle = runCoachDualAudit({
       rows,
       ctx: cafCtx,
-      coachPass: 'post_lab',
+      coachPass: "post_lab",
     });
     expect(bundle.recommendations).toHaveLength(3);
-    expect(bundle.audit.coachPass).toBe('post_lab');
-    expect(bundle.audit.schemaVersion).toBe('1.1.0');
+    expect(bundle.audit.coachPass).toBe("post_lab");
+    expect(bundle.audit.schemaVersion).toBe("1.1.0");
     expect(bundle.audit.quorum.chips).toHaveLength(4);
   });
 
-  it('post_lab soft family-clone does not force weak when #1 is clean', () => {
+  it("post_lab soft family-clone does not force weak when #1 is clean", () => {
     const clones = [
       exploreRow({
-        strategyType: 'sma_crossover',
-        label: 'A',
-        strategyDefinitionId: 'a',
+        strategyType: "sma_crossover",
+        label: "A",
+        strategyDefinitionId: "a",
         periodReturns: { early: 8, mid: 10, late: 16 },
         excessReturnPct: 12,
         tradeCount: 30,
       }),
       exploreRow({
-        strategyType: 'golden_cross',
-        label: 'B',
-        strategyDefinitionId: 'b',
+        strategyType: "golden_cross",
+        label: "B",
+        strategyDefinitionId: "b",
         periodReturns: { early: 4, mid: 5, late: 9 },
         excessReturnPct: 4,
         tradeCount: 22,
       }),
       exploreRow({
-        strategyType: 'donchian_breakout',
-        label: 'C',
-        strategyDefinitionId: 'c',
+        strategyType: "donchian_breakout",
+        label: "C",
+        strategyDefinitionId: "c",
         periodReturns: { early: 3, mid: 4, late: 8 },
         excessReturnPct: 3,
         tradeCount: 18,
@@ -120,21 +120,21 @@ describe('CAF Lab→Coach² smoke', () => {
     // Force same category to trigger soft family_diversity
     const sameFamily = clones.map((r) => ({
       ...r,
-      category: 'trend' as const,
-      categoryLabel: 'Tendencia',
+      category: "trend" as const,
+      categoryLabel: "Tendencia",
     }));
 
     const post = runCoachDualAudit({
       rows: sameFamily,
       ctx: cafCtx,
-      coachPass: 'post_lab',
+      coachPass: "post_lab",
     });
     expect(post.audit.softWeak).toBe(true);
-    expect(post.audit.confidence).not.toBe('weak');
-    expect(post.recommendations[0]?.row.strategyDefinitionId).toBe('a');
+    expect(post.audit.confidence).not.toBe("weak");
+    expect(post.recommendations[0]?.row.strategyDefinitionId).toBe("a");
   });
 
-  it('Lab P1 heatmap + plateau + handoff block compose', () => {
+  it("Lab P1 heatmap + plateau + handoff block compose", () => {
     const trials: SmaGridTrialDto[] = [
       {
         fastPeriod: 10,
@@ -179,7 +179,7 @@ describe('CAF Lab→Coach² smoke', () => {
     ];
     const heat = buildOptimizeHeatmap({
       trials,
-      family: 'sma_crossover',
+      family: "sma_crossover",
       plateauAbsTol: 0.35,
       plateauMinClose: 2,
     });
@@ -188,7 +188,7 @@ describe('CAF Lab→Coach² smoke', () => {
 
     const blocked = resolveLabReanalyzeGate({
       improvedSaved: 1,
-      saveFailures: [{ rank: 1, error: 'network' }],
+      saveFailures: [{ rank: 1, error: "network" }],
       carriedCount: 0,
     });
     expect(blocked.allow).toBe(false);

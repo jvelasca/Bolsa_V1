@@ -2,7 +2,7 @@
  * Hero de zona Lab: veredicto en 2 segundos + badge de qué se corrió.
  */
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 export type LabZoneVerdictProps = {
   improved: boolean;
@@ -45,7 +45,7 @@ export function LabZoneVerdictHero({
   className,
 }: LabZoneVerdictProps) {
   const scoreDelta = rankedByOos ? deltaOosScore : deltaScore;
-  const scoreLabel = rankedByOos ? 'OOS' : 'IS';
+  const scoreLabel = rankedByOos ? "OOS" : "IS";
 
   const runBits: string[] = [];
   if (engine) runBits.push(engine);
@@ -66,23 +66,23 @@ export function LabZoneVerdictHero({
   return (
     <div
       className={cn(
-        'space-y-2 rounded-lg border px-3 py-2.5',
+        "space-y-2 rounded-lg border px-3 py-2.5",
         improved
-          ? 'border-emerald-500/45 bg-emerald-500/10'
-          : 'border-amber-500/45 bg-amber-500/10',
+          ? "border-emerald-500/45 bg-emerald-500/10"
+          : "border-amber-500/45 bg-amber-500/10",
         className,
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
           className={cn(
-            'inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+            "inline-flex rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide",
             improved
-              ? 'bg-emerald-500/25 text-emerald-950 dark:text-emerald-50'
-              : 'bg-amber-500/25 text-amber-950 dark:text-amber-50',
+              ? "bg-emerald-500/25 text-emerald-950 dark:text-emerald-50"
+              : "bg-amber-500/25 text-amber-950 dark:text-amber-50",
           )}
         >
-          {improved ? 'Mejoró' : 'Sin mejora clara'}
+          {improved ? "Mejoró" : "Sin mejora clara"}
         </span>
         {scoreDelta != null && Number.isFinite(scoreDelta) && (
           <span className="text-sm font-semibold tabular-nums text-foreground">
@@ -94,15 +94,19 @@ export function LabZoneVerdictHero({
             ret {signDelta(deltaReturnPct, 1)} pp
             {deltaDrawdownPct != null && Number.isFinite(deltaDrawdownPct)
               ? ` · DD ${signDelta(deltaDrawdownPct, 1)} pp${
-                  deltaDrawdownPct < 0 ? ' (mejor)' : deltaDrawdownPct > 0 ? ' (peor)' : ''
+                  deltaDrawdownPct < 0
+                    ? " (mejor)"
+                    : deltaDrawdownPct > 0
+                      ? " (peor)"
+                      : ""
                 }`
-              : ''}
+              : ""}
           </span>
         )}
       </div>
 
       <p className="text-xs leading-snug text-foreground">
-        <span className="text-muted-foreground">Params</span>{' '}
+        <span className="text-muted-foreground">Params</span>{" "}
         <span className="font-medium">{beforeParams}</span>
         <span className="mx-1 text-muted-foreground" aria-hidden>
           →
@@ -115,7 +119,7 @@ export function LabZoneVerdictHero({
           className="text-[10px] text-muted-foreground"
           title="Qué se ejecutó en esta zona (enqueue Coach→Lab o Play manual)"
         >
-          Corrió: {runBits.join(' · ')}
+          Corrió: {runBits.join(" · ")}
         </p>
       )}
     </div>
@@ -134,5 +138,5 @@ export function formatLabRunBadge(opts: {
   if (opts.oosPct != null && opts.oosPct > 0) {
     parts.push(`OOS ${(opts.oosPct * 100).toFixed(0)}%`);
   }
-  return parts.join(' · ') || 'Lab';
+  return parts.join(" · ") || "Lab";
 }

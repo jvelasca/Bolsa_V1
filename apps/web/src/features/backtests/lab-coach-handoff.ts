@@ -28,7 +28,7 @@ export function resolveLabReanalyzeGate(opts: {
   if (opts.saveFailures.length > 0) {
     const detail = opts.saveFailures
       .map((f) => `#${f.rank}: ${f.error}`)
-      .join(' · ');
+      .join(" · ");
     return {
       allow: false,
       message: `No se puede pasar al Coach: falló guardar el Mejor (${detail}). Reintenta Guardar o revisa la API.`,
@@ -38,7 +38,7 @@ export function resolveLabReanalyzeGate(opts: {
     return {
       allow: false,
       message:
-        'Nada que llevar: espera a que terminen las zonas con mejora, o marca «Llevar» en las que no mejoraron.',
+        "Nada que llevar: espera a que terminen las zonas con mejora, o marca «Llevar» en las que no mejoraron.",
     };
   }
   return { allow: true, message: null };
