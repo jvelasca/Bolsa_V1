@@ -59,7 +59,7 @@ import {
   type OptimizeBeforeAfterSnapshot,
 } from "@/features/backtests/backtest-optimize-delta";
 import { BacktestOptimizeCompareCard } from "@/features/backtests/backtest-optimize-compare-card";
-import { BacktestLabBoard } from "@/features/backtests/backtest-lab-board";
+import { BacktestResultFocusLab } from "@/features/backtests/backtest-result-focus-lab";
 import type {
   LabBoardZone,
   LabReanalyzeRequest,
@@ -4631,198 +4631,171 @@ export function BacktestsPage() {
                           fullCycleActive &&
                           labOpenedThisRun &&
                           !assistantProgress.labDone)) && (
-                        <div
-                          className={
-                            resultFocus === "lab"
-                              ? "flex h-full min-h-0 flex-col gap-3 overflow-auto"
-                              : "hidden"
-                          }
-                          aria-hidden={resultFocus !== "lab"}
-                        >
-                          {!(
+                        <BacktestResultFocusLab
+                          isLabFocus={resultFocus === "lab"}
+                          hasSeeds={
                             (labZones ?? []).some((z) => z.seed) ||
                             Boolean(optimizeSeed)
-                          ) && (
-                            <div className="rounded-lg border border-dashed border-border bg-muted/10 px-3 py-2.5 text-sm">
-                              <p className="font-medium text-foreground">
-                                Lab sin semillas
-                              </p>
-                              <p className="mt-0.5 text-xs text-muted-foreground">
-                                Desde Coach: «Pasar al Lab» o «Abrir Lab · #1».
-                                Aquí optimizas parámetros; no escribe
-                                Finalistas.
-                              </p>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                className="mt-2"
-                                onClick={() => {
-                                  setResultFocus("coach");
-                                  patchSearchParams((params) => {
-                                    params.set("focus", "coach");
-                                  });
-                                }}
-                              >
-                                Ir al Coach
-                              </Button>
-                            </div>
-                          )}
-                          <BacktestLabBoard
-                            zones={
-                              labZones ??
-                              padLabZones(
-                                optimizeSeed
-                                  ? [
-                                      {
-                                        id: `zone-1-${optimizeSeed.strategyType}`,
-                                        rank: 1,
-                                        seed: optimizeSeed,
-                                      },
-                                    ]
-                                  : [],
-                              )
-                            }
-                            instruments={instrumentsQuery.data?.data ?? []}
-                            defaultInstrumentId={instrumentId}
-                            onClearZoneSeed={(zoneId) => {
-                              setLabZones((prev) => {
-                                if (!prev) {
-                                  setOptimizeSeed(null);
-                                  return null;
-                                }
-                                const next = prev.map((z) =>
-                                  z.id === zoneId
-                                    ? {
-                                        ...z,
-                                        seed: null,
-                                        jobId: null,
-                                        jobIds: null,
-                                      }
-                                    : z,
-                                );
-                                setOptimizeSeed(
-                                  next.find((z) => z.seed)?.seed ?? null,
-                                );
-                                return next;
-                              });
-                            }}
-                            onReanalyzeWithCoach={(payload) =>
-                              reanalyzeLabWithCoach(payload)
-                            }
-                            autoHandoff={fullCycleActive}
-                            maxDrawdownSoftPct={
-                              coachProfilePolicy.maxDrawdownSoftPct
-                            }
-                            profileId={coachProfilePolicy.profileId}
-                            profileHorizon={coachProfilePolicy.horizon}
-                            profileRiskTolerance={
-                              coachProfilePolicy.riskTolerance
-                            }
-                            onAutoHandoffStatus={(message) => {
-                              if (
-                                message.includes("No se pisan Finalistas") ||
-                                message.includes("Lab sin Mejor") ||
-                                message.includes("Lab sin zonas") ||
-                                message.includes("Lab timeout")
-                              ) {
-                                // Sin TOP durable (vacío o huérfano tras borrar estrategias):
-                                // Coach² / auto-save con el lote actual (primera escritura).
-                                void (async () => {
-                                  let durable = hasExistingTopForSave;
-                                  try {
-                                    await queryClient.invalidateQueries({
-                                      queryKey: ["strategies"],
-                                    });
-                                    if (instrumentId) {
-                                      await queryClient.invalidateQueries({
-                                        queryKey: [
-                                          "instrument-strategy-top",
-                                          instrumentId,
-                                          runTimeframe,
-                                        ],
-                                      });
+                          }
+                          zones={
+                            labZones ??
+                            padLabZones(
+                              optimizeSeed
+                                ? [
+                                    {
+                                      id: `zone-1-${optimizeSeed.strategyType}`,
+                                      rank: 1,
+                                      seed: optimizeSeed,
+                                    },
+                                  ]
+                                : [],
+                            )
+                          }
+                          instruments={instrumentsQuery.data?.data ?? []}
+                          defaultInstrumentId={instrumentId}
+                          autoHandoff={fullCycleActive}
+                          maxDrawdownSoftPct={
+                            coachProfilePolicy.maxDrawdownSoftPct
+                          }
+                          profileId={coachProfilePolicy.profileId}
+                          profileHorizon={coachProfilePolicy.horizon}
+                          profileRiskTolerance={
+                            coachProfilePolicy.riskTolerance
+                          }
+                          onGoToCoach={() => {
+                            setResultFocus("coach");
+                            patchSearchParams((params) => {
+                              params.set("focus", "coach");
+                            });
+                          }}
+                          onClearZoneSeed={(zoneId) => {
+                            setLabZones((prev) => {
+                              if (!prev) {
+                                setOptimizeSeed(null);
+                                return null;
+                              }
+                              const next = prev.map((z) =>
+                                z.id === zoneId
+                                  ? {
+                                      ...z,
+                                      seed: null,
+                                      jobId: null,
+                                      jobIds: null,
                                     }
-                                    const [stratsRes, topRes] =
-                                      await Promise.all([
-                                        queryClient.fetchQuery({
-                                          queryKey: ["strategies"],
-                                          queryFn: api.getStrategies,
-                                        }),
-                                        instrumentId
-                                          ? queryClient.fetchQuery({
-                                              queryKey: [
-                                                "instrument-strategy-top",
+                                  : z,
+                              );
+                              setOptimizeSeed(
+                                next.find((z) => z.seed)?.seed ?? null,
+                              );
+                              return next;
+                            });
+                          }}
+                          onReanalyzeWithCoach={(payload) =>
+                            reanalyzeLabWithCoach(payload)
+                          }
+                          onAutoHandoffStatus={(message) => {
+                            if (
+                              message.includes("No se pisan Finalistas") ||
+                              message.includes("Lab sin Mejor") ||
+                              message.includes("Lab sin zonas") ||
+                              message.includes("Lab timeout")
+                            ) {
+                              // Sin TOP durable (vacío o huérfano tras borrar estrategias):
+                              // Coach² / auto-save con el lote actual (primera escritura).
+                              void (async () => {
+                                let durable = hasExistingTopForSave;
+                                try {
+                                  await queryClient.invalidateQueries({
+                                    queryKey: ["strategies"],
+                                  });
+                                  if (instrumentId) {
+                                    await queryClient.invalidateQueries({
+                                      queryKey: [
+                                        "instrument-strategy-top",
+                                        instrumentId,
+                                        runTimeframe,
+                                      ],
+                                    });
+                                  }
+                                  const [stratsRes, topRes] =
+                                    await Promise.all([
+                                      queryClient.fetchQuery({
+                                        queryKey: ["strategies"],
+                                        queryFn: api.getStrategies,
+                                      }),
+                                      instrumentId
+                                        ? queryClient.fetchQuery({
+                                            queryKey: [
+                                              "instrument-strategy-top",
+                                              instrumentId,
+                                              runTimeframe,
+                                            ],
+                                            queryFn: () =>
+                                              api.getInstrumentStrategyTop(
                                                 instrumentId,
                                                 runTimeframe,
-                                              ],
-                                              queryFn: () =>
-                                                api.getInstrumentStrategyTop(
-                                                  instrumentId,
-                                                  runTimeframe,
-                                                ),
-                                            })
-                                          : Promise.resolve(null),
-                                      ]);
-                                    const ids = new Set(
-                                      (stratsRes?.data ?? []).map((s) => s.id),
-                                    );
-                                    const top = topRes?.data ?? null;
-                                    for (const slot of top?.slots ?? []) {
-                                      const sid = slot.strategyDefinitionId;
-                                      if (!sid || ids.has(sid)) continue;
-                                      try {
-                                        const one = await api.getStrategy(sid);
-                                        if (one?.data?.id) ids.add(one.data.id);
-                                      } catch {
-                                        /* slot huérfano */
-                                      }
+                                              ),
+                                          })
+                                        : Promise.resolve(null),
+                                    ]);
+                                  const ids = new Set(
+                                    (stratsRes?.data ?? []).map((s) => s.id),
+                                  );
+                                  const top = topRes?.data ?? null;
+                                  for (const slot of top?.slots ?? []) {
+                                    const sid = slot.strategyDefinitionId;
+                                    if (!sid || ids.has(sid)) continue;
+                                    try {
+                                      const one = await api.getStrategy(sid);
+                                      if (one?.data?.id) ids.add(one.data.id);
+                                    } catch {
+                                      /* slot huérfano */
                                     }
-                                    durable = instrumentTopIsDurable(top, ids);
-                                    const experimentMode = isDiaDInPast(diaD);
-                                    if (
-                                      (!durable || experimentMode) &&
-                                      exploreOkCount > 0
-                                    ) {
-                                      setLabImprovedThisCycle(0);
-                                      setCoachPass("post_lab");
-                                      setResultFocus("coach");
-                                      setAssistantStatus(
-                                        experimentMode
-                                          ? `Ciclo: Lab sin mejora · DÍA D ${effectiveDiaD(diaD)} → grabando F-D (F-hoy intacto)…`
-                                          : top
-                                            ? "Ciclo: Lab sin mejora · Finalistas huérfanos → grabando (primera escritura)…"
-                                            : "Ciclo: Lab sin mejora · sin TOP previo → grabando Finalistas (primera escritura)…",
-                                      );
-                                      return;
-                                    }
-                                    settleFullCycle("skip_lab", message);
-                                    return;
-                                  } catch {
-                                    durable = hasExistingTopForSave;
                                   }
+                                  durable = instrumentTopIsDurable(top, ids);
+                                  const experimentMode = isDiaDInPast(diaD);
                                   if (
-                                    (!durable || isDiaDInPast(diaD)) &&
+                                    (!durable || experimentMode) &&
                                     exploreOkCount > 0
                                   ) {
                                     setLabImprovedThisCycle(0);
                                     setCoachPass("post_lab");
                                     setResultFocus("coach");
                                     setAssistantStatus(
-                                      isDiaDInPast(diaD)
+                                      experimentMode
                                         ? `Ciclo: Lab sin mejora · DÍA D ${effectiveDiaD(diaD)} → grabando F-D (F-hoy intacto)…`
-                                        : "Ciclo: Lab sin mejora · sin TOP previo → grabando Finalistas (primera escritura)…",
+                                        : top
+                                          ? "Ciclo: Lab sin mejora · Finalistas huérfanos → grabando (primera escritura)…"
+                                          : "Ciclo: Lab sin mejora · sin TOP previo → grabando Finalistas (primera escritura)…",
                                     );
                                     return;
                                   }
                                   settleFullCycle("skip_lab", message);
-                                })();
-                                return;
-                              }
-                              setAssistantStatus(message);
-                            }}
-                          />
-                        </div>
+                                  return;
+                                } catch {
+                                  durable = hasExistingTopForSave;
+                                }
+                                if (
+                                  (!durable || isDiaDInPast(diaD)) &&
+                                  exploreOkCount > 0
+                                ) {
+                                  setLabImprovedThisCycle(0);
+                                  setCoachPass("post_lab");
+                                  setResultFocus("coach");
+                                  setAssistantStatus(
+                                    isDiaDInPast(diaD)
+                                      ? `Ciclo: Lab sin mejora · DÍA D ${effectiveDiaD(diaD)} → grabando F-D (F-hoy intacto)…`
+                                      : "Ciclo: Lab sin mejora · sin TOP previo → grabando Finalistas (primera escritura)…",
+                                  );
+                                  return;
+                                }
+                                settleFullCycle("skip_lab", message);
+                              })();
+                              return;
+                            }
+                            setAssistantStatus(message);
+                          }}
+                        />
                       )}
 
                       {resultFocus === "finalists" && (
