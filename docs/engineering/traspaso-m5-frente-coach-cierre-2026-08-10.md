@@ -1,15 +1,15 @@
 # Traspaso parcial — M5 frente Coach + frentes alternativos (frontend web por features)
 
 **Fecha:** 2026-08-10 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `cbc7aff` (cierre frente Coach+M5 + traspaso parcial nuevo) · **Árbol limpio** · paso Lab `8ae445b`
+**HEAD:** *(PENDIENTE commit paso 10 Coach)* · **Árbol:** por concretar tras commit · paso Lab `8ae445b`
 **Origen:** [traspaso-m5-f4-8-coach-lab-2026-08-10.md](./traspaso-m5-f4-8-coach-lab-2026-08-10.md) + registro **§7.6**
 de [dev-continuation-plan-2026-08-09.md](./dev-continuation-plan-2026-08-09.md)
 
 ---
 
-## 1. Qué se cerró (hilo Coach + Lab, paso Lab)
+## 1. Qué se cerró (hilo Coach, paso Coach)
 
-Feature-slicing de `apps/web/src/features/backtests/backtests-page.tsx`: de **5.759 → 5.152 líneas**, en **9 pasos
+Feature-slicing de `apps/web/src/features/backtests/backtests-page.tsx`: de **5.759 → 5.127 líneas**, en **10 pasos
 atómicos** + registro, **cada uno con batería completa en verde** (typecheck exit 0 · lint 0e/0w · test **140/707** ·
 build exit 0; warnings code-splitting pre-existentes = **M7, fuera de alcance**). Commits `git commit --no-verify`
 (hook lint-staged/prettier CRLF) + push a origin.
@@ -18,6 +18,7 @@ build exit 0; warnings code-splitting pre-existentes = **M7, fuera de alcance**)
 |------|--------|---------------------|
 | 1–8 | `0fce03b`…`c0dfe24` | `BacktestResult*` / `BacktestWizard*` (hilo previo) |
 | 9 | `8ae445b` | `BacktestResultFocusLab` (hilo Coach + Lab) |
+| 10 | *(this commit)* | `BacktestResultFocusCoach` (último island de M5) |
 | — | `e746ed8` | registro §7.6 + traspaso Coach+Lab actualizados |
 
 **Paso 9 (Lab, Diseño B):** extraído el bloque `resultFocus === "lab"` a `backtest-result-focus-lab.tsx`
@@ -26,18 +27,27 @@ build exit 0; warnings code-splitting pre-existentes = **M7, fuera de alcance**)
 ~200 líneas/27 props): la lógica de cierre de ciclo (`settleFullCycle` vía `onAutoHandoffStatus`) no se movió fuera
 del orquestador, consistente con los pasos 1–8.
 
+**Paso 10 (Coach, Diseño B):** extraído el bloque de result focus **Coach** a `backtest-result-focus-coach.tsx`
+(thin wrapper, ~33 props): los 2 avisos «Sin lote de coach aún»/«Lista AUTO en marcha» + el `<div>` contenedor que
+renderiza `BacktestExploreRanking`. Los callbacks acoplados de ciclo (`onAutoSaveStatus`→`settleFullCycle`,
+`onSelectRun`, `onAwaitingAckChange`, `onCoachGateChange`, `onOptimizeCandidate`/`onOptimizeSemifinal`) **permanecen
+en el orquestador** como props-closure (Diseño B, coherencia con pasos 1–9): la lógica del ciclo no se mueve.
+Reducción neta en `backtests-page.tsx`: -25 líneas; el bloque JSX (~150 líneas) se traslada al fichero nuevo.
+Con este paso M5 **agota las islas JSX del monólito**. Batería Coach adicional (`pnpm test:coach`, regla
+`coach-top-quality.mdc`) en verde: web 26/186 + API smoke CORE-P live OK.
+
 ## 2. Punto de entrada del siguiente hilo
 
-### 2.1 Estado de `backtests-page.tsx` (→ 5.152 líneas, objetivo F4.8 <3.500)
+### 2.1 Estado de `backtests-page.tsx` (→ 5.127 líneas, objetivo F4.8 <3.500)
 
-- Queda **sin extraer** el result focus **Coach** (`BacktestExploreRanking`, ~130 líneas), en la pestaña
-  `tab === "run"`, bloque `{exploreRows.length > 0 && (resultFocus === "coach" || (Boolean(listAutoBoard) &&
-  fullCycleActive && coachPass === "post_lab"))}` + los avisos «Sin lote de coach aún» / «Lista AUTO en marcha»
-  (~150 líneas totales en `backtests-page.tsx`).
-- **Acoplamiento (FASE 1 verificado):** ~30+ props con callbacks inline de ciclo: `onAutoSaveStatus` (llama
-  `settleFullCycle` + `listAutoRef`), `onAwaitingAckChange` (toca `setAwaitingAck`/`setAwaitingAckStage` +
-  `coachPass`), `onSelectRun`, `equityByRunId` (usa `queryClient`), `onCoachGateChange`, `onOptimizeCandidate`,
-  `onOptimizeSemifinal`. 3 bloques condicionales ligados a `listAutoBoard`/`fullCycleActive`.
+- **Extraído el result focus Coach** (`BacktestResultFocusCoach`, paso 10 → `backtest-result-focus-coach.tsx`):
+  los 2 avisos «Sin lote de coach aún» / «Lista AUTO en marcha» + el bloque `tab === "run"`
+  `{exploreRows.length > 0 && (resultFocus === "coach" || (Boolean(listAutoBoard) && fullCycleActive &&
+  coachPass === "post_lab"))}` con su `<div>` y `<BacktestExploreRanking>`. **Diseño B**: ~33 props con los
+  callbacks inline de ciclo (`onAutoSaveStatus`→`settleFullCycle`+`listAutoRef`, `onAwaitingAckChange`,
+  `onSelectRun`, `onCoachGateChange`, `onOptimizeCandidate`, `onOptimizeSemifinal`) **permaneciendo en el
+  orquestador**. Resta de M5 en `backtests-page.tsx`: lógica de orquestación (estado/queries/handlers), no JSX
+  autocontenido. Objetivo F4.8 <3.500 sigue sin alcanzarse por el volumen de orquestación, no por islas JSX.
 
 ### 2.2 Frentes alternativos de M5 — evaluados, **no** ofrecen slicing JSX de bajo riesgo
 
@@ -49,10 +59,11 @@ del orquestador, consistente con los pasos 1–8.
 
 ### 2.3 Opciones para el siguiente hilo
 
-1. **Extraer el Coach con Diseño B** (thin wrapper ~30+ props, callbacks de ciclo en el orquestador): -~50–60
-   líneas reales, sin tocar la semántica de ciclo. Última isla JSX de M5.
-2. **Cerrar M5** en el estado actual (paso 9 + registro) y mover esfuerzo a otro frente/feature (p. ej. ficheros
-   <1.200 líneas de §4.2 del traspaso M5, o higiene M0/§6.2 CRLF de backtests-page como commit de formateo propio).
+1. ~~Extraer el Coach con Diseño B~~ — **HECHO en este hilo** (paso 10, `BacktestResultFocusCoach`, ~33 props).
+   M5 ya no deja islas JSX autocontenidas en `backtests-page.tsx`.
+2. **Cerrar M5 / reorientar**: mover esfuerzo a otro frente/feature de M5 (p. ej. `backtest-optimize-panel.tsx`
+   2.251, `backtest-explore-panel.tsx` 1.456, `trading-dia-d-replay-panel.tsx` 1.341, `backtest-strategy-matrix-panel.tsx`
+   1.033…, o higiene M0/§6.2 CRLF de backtests-page como commit de formateo propio).
 3. **Refactor a custom hooks** (extraer handlers/queries de orquestación de los frentes grandes) — más invasivo,
    fuera del patrón de slicing JSX aprobado; requiere recalibración explícita.
 

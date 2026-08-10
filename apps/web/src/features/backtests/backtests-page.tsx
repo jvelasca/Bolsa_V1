@@ -45,7 +45,6 @@ import {
   type BatchRankRow,
   type BatchSortKey,
 } from "@/features/backtests/backtest-batch-run";
-import { BacktestExploreRanking } from "@/features/backtests/backtest-explore-panel";
 import {
   matrixRowsToExploreRows,
   periodReturnsFromEquity,
@@ -60,6 +59,7 @@ import {
 } from "@/features/backtests/backtest-optimize-delta";
 import { BacktestOptimizeCompareCard } from "@/features/backtests/backtest-optimize-compare-card";
 import { BacktestResultFocusLab } from "@/features/backtests/backtest-result-focus-lab";
+import { BacktestResultFocusCoach } from "@/features/backtests/backtest-result-focus-coach";
 import type {
   LabBoardZone,
   LabReanalyzeRequest,
@@ -4475,156 +4475,131 @@ export function BacktestsPage() {
                         />
                       )}
 
-                      {resultFocus === "coach" &&
-                        exploreRows.length === 0 &&
-                        !listAutoBoard && (
-                          <p className="text-sm text-muted-foreground">
-                            Sin lote de coach aún. Pulsa Play en Universo (o
-                            Probar + coach) para rellenarlo.
-                          </p>
+                      <BacktestResultFocusCoach
+                        isCoachFocus={resultFocus === "coach"}
+                        hasExploreRows={exploreRows.length > 0}
+                        hasListAutoBoard={Boolean(listAutoBoard)}
+                        coachPanelVisible={
+                          exploreRows.length > 0 &&
+                          (resultFocus === "coach" ||
+                            (Boolean(listAutoBoard) &&
+                              fullCycleActive &&
+                              coachPass === "post_lab"))
+                        }
+                        coachPass={coachPass}
+                        rows={exploreRows}
+                        instrumentId={instrumentId || null}
+                        symbol={
+                          detail?.symbol ??
+                          instrumentLabels[instrumentId]?.symbol ??
+                          instruments.find(
+                            (inst) => inst.id === instrumentId,
+                          )?.symbol ??
+                          "Valor"
+                        }
+                        timeframe={runTimeframe}
+                        periodLabel={
+                          PERIOD_PRESET_OPTIONS.find(
+                            (o) => o.value === periodPreset,
+                          )?.label ?? periodPreset
+                        }
+                        sort={exploreSort}
+                        onSortChange={setExploreSort}
+                        selectedRunId={selectedId}
+                        onSelectRun={(runId) => {
+                          selectRun(runId, { tab: "run" });
+                          setResultFocus("detail");
+                        }}
+                        onOptimizeCandidate={(row) =>
+                          startOptimizeFromExplore(row, "explore_best")
+                        }
+                        onOptimizeSemifinal={(candidates) => {
+                          void optimizeSemifinalFromCoach(candidates);
+                        }}
+                        barLimit={
+                          exploreRows.find(
+                            (row) =>
+                              row.status === "ok" && row.barCount != null,
+                          )?.barCount ?? detail?.barCount
+                        }
+                        futureWeight={assistantPrefs.coach.futureWeight}
+                        llmNarrate={assistantPrefs.coach.llmNarrate}
+                        freshnessInputFingerprint={
+                          instrumentId
+                            ? currentFinalistsInputFingerprint(instrumentId)
+                            : null
+                        }
+                        autoSaveFinalists={
+                          coachPass === "post_lab" &&
+                          !assistantProgress.finalistsSaved &&
+                          !assistantProgress.finalistsSkipped
+                        }
+                        hasExistingTopForSave={hasExistingTopForSave}
+                        experimentAsOf={
+                          isDiaDInPast(diaD) ? effectiveDiaD(diaD) : null
+                        }
+                        autoSaveSemifinal={semifinalShortcutArmed}
+                        cycleCoach1Active={
+                          fullCycleActive &&
+                          coachPass === "initial" &&
+                          !exploreRunning
+                        }
+                        autoAckOnCycle={
+                          assistantPrefs.coach.autoAckOnCycle
+                        }
+                        pauseIfAckNeeded={
+                          assistantPrefs.coach.pauseIfAckNeeded
+                        }
+                        requireAckBeforeLab={
+                          assistantPrefs.coach.requireAckBeforeLab
+                        }
+                        labImprovedCountHint={labImprovedThisCycle}
+                        onAwaitingAckChange={(awaiting) => {
+                          setAwaitingAck(awaiting);
+                          if (!awaiting) {
+                            setAwaitingAckStage(null);
+                            return;
+                          }
+                          setAwaitingAckStage(
+                            coachPass === "post_lab"
+                              ? "revalidate"
+                              : "coach1",
+                          );
+                        }}
+                        onCoachGateChange={setCoachGate}
+                        onAutoSaveStatus={(message) => {
+                          if (isSemifinalShortcutStatusMessage(message)) {
+                            settleFullCycle("skip_lab", message);
+                            return;
+                          }
+                          const saved = isFinalistsSavedStatusMessage(message);
+                          if (saved && !listAutoRef.current) {
+                            setResultFocus("finalists");
+                            setStrategiesListFilter("finalists");
+                          }
+                          settleFullCycle(
+                            saved ? "saved" : "skip_finalists",
+                            message,
+                          );
+                        }}
+                        progress={exploreProgress}
+                        running={exploreRunning}
+                        equityByRunId={Object.fromEntries(
+                          exploreRows
+                            .filter((r) => r.runId)
+                            .map((r) => {
+                              const cached = queryClient.getQueryData<{
+                                data?: {
+                                  equityCurve?: import("@bolsa/shared").BacktestEquityPointDto[];
+                                };
+                              }>(["backtest", r.runId!]);
+                              return [
+                                r.runId!,
+                                cached?.data?.equityCurve,
+                              ] as const;
+                            }),
                         )}
-                      {resultFocus === "coach" &&
-                        exploreRows.length === 0 &&
-                        listAutoBoard && (
-                          <p className="text-sm text-muted-foreground">
-                            Lista AUTO en marcha. El Coach del valor actual
-                            aparece aquí al terminar su Universo; el tablero
-                            completo está en «Lista AUTO».
-                          </p>
-                        )}
-                      {exploreRows.length > 0 &&
-                        (resultFocus === "coach" ||
-                          (Boolean(listAutoBoard) &&
-                            fullCycleActive &&
-                            coachPass === "post_lab")) && (
-                          <div
-                            className={
-                              resultFocus === "coach"
-                                ? "h-full min-h-0 overflow-auto"
-                                : "hidden"
-                            }
-                            aria-hidden={resultFocus !== "coach"}
-                          >
-                            <BacktestExploreRanking
-                              rows={exploreRows}
-                              instrumentId={instrumentId || null}
-                              coachPass={coachPass}
-                              symbol={
-                                detail?.symbol ??
-                                instrumentLabels[instrumentId]?.symbol ??
-                                instruments.find(
-                                  (inst) => inst.id === instrumentId,
-                                )?.symbol ??
-                                "Valor"
-                              }
-                              timeframe={runTimeframe}
-                              periodLabel={
-                                PERIOD_PRESET_OPTIONS.find(
-                                  (o) => o.value === periodPreset,
-                                )?.label ?? periodPreset
-                              }
-                              sort={exploreSort}
-                              onSortChange={setExploreSort}
-                              selectedRunId={selectedId}
-                              onSelectRun={(runId) => {
-                                selectRun(runId, { tab: "run" });
-                                setResultFocus("detail");
-                              }}
-                              onOptimizeCandidate={(row) =>
-                                startOptimizeFromExplore(row, "explore_best")
-                              }
-                              onOptimizeSemifinal={(candidates) => {
-                                void optimizeSemifinalFromCoach(candidates);
-                              }}
-                              barLimit={
-                                exploreRows.find(
-                                  (row) =>
-                                    row.status === "ok" && row.barCount != null,
-                                )?.barCount ?? detail?.barCount
-                              }
-                              futureWeight={assistantPrefs.coach.futureWeight}
-                              llmNarrate={assistantPrefs.coach.llmNarrate}
-                              freshnessInputFingerprint={
-                                instrumentId
-                                  ? currentFinalistsInputFingerprint(
-                                      instrumentId,
-                                    )
-                                  : null
-                              }
-                              autoSaveFinalists={
-                                coachPass === "post_lab" &&
-                                !assistantProgress.finalistsSaved &&
-                                !assistantProgress.finalistsSkipped
-                              }
-                              hasExistingTopForSave={hasExistingTopForSave}
-                              experimentAsOf={
-                                isDiaDInPast(diaD) ? effectiveDiaD(diaD) : null
-                              }
-                              autoSaveSemifinal={semifinalShortcutArmed}
-                              cycleCoach1Active={
-                                fullCycleActive &&
-                                coachPass === "initial" &&
-                                !exploreRunning
-                              }
-                              autoAckOnCycle={
-                                assistantPrefs.coach.autoAckOnCycle
-                              }
-                              pauseIfAckNeeded={
-                                assistantPrefs.coach.pauseIfAckNeeded
-                              }
-                              requireAckBeforeLab={
-                                assistantPrefs.coach.requireAckBeforeLab
-                              }
-                              labImprovedCountHint={labImprovedThisCycle}
-                              onAwaitingAckChange={(awaiting) => {
-                                setAwaitingAck(awaiting);
-                                if (!awaiting) {
-                                  setAwaitingAckStage(null);
-                                  return;
-                                }
-                                setAwaitingAckStage(
-                                  coachPass === "post_lab"
-                                    ? "revalidate"
-                                    : "coach1",
-                                );
-                              }}
-                              onCoachGateChange={setCoachGate}
-                              onAutoSaveStatus={(message) => {
-                                if (isSemifinalShortcutStatusMessage(message)) {
-                                  settleFullCycle("skip_lab", message);
-                                  return;
-                                }
-                                const saved =
-                                  isFinalistsSavedStatusMessage(message);
-                                if (saved && !listAutoRef.current) {
-                                  setResultFocus("finalists");
-                                  setStrategiesListFilter("finalists");
-                                }
-                                settleFullCycle(
-                                  saved ? "saved" : "skip_finalists",
-                                  message,
-                                );
-                              }}
-                              progress={exploreProgress}
-                              running={exploreRunning}
-                              equityByRunId={Object.fromEntries(
-                                exploreRows
-                                  .filter((r) => r.runId)
-                                  .map((r) => {
-                                    const cached = queryClient.getQueryData<{
-                                      data?: {
-                                        equityCurve?: import("@bolsa/shared").BacktestEquityPointDto[];
-                                      };
-                                    }>(["backtest", r.runId!]);
-                                    return [
-                                      r.runId!,
-                                      cached?.data?.equityCurve,
-                                    ] as const;
-                                  }),
-                              )}
-                            />
-                          </div>
-                        )}
+                      />
 
                       {(resultFocus === "lab" ||
                         (Boolean(listAutoBoard) &&

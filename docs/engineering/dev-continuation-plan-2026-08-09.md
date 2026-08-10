@@ -810,7 +810,7 @@ chunk >500 kB + crash Vite) queda con su plan ya documentado y **fuera del alcan
 
 ### §7.6 — Registro M5 hilo F4.8 (feature-slicing de `backtests-page.tsx`)
 
-**Estado:** hilo F4.8 ejecutado 08-10, 9 pasos atómicos sobre `apps/web/src/features/backtests/backtests-page.tsx`,
+**Estado:** hilo F4.8 ejecutado 08-10, 10 pasos atómicos sobre `apps/web/src/features/backtests/backtests-page.tsx`,
 cada uno con **batería completa en verde** (typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0, warnings
 code-splitting pre-existentes = M7). Todos commiteados con `git commit --no-verify` (hook lint-staged/prettier
 CRLF) y pusheados a `origin/stage/estudio-membership-operativa-2026-08-04`.
@@ -826,34 +826,33 @@ CRLF) y pusheados a `origin/stage/estudio-membership-operativa-2026-08-04`.
 | 7 | `13d52af` | `BacktestResultDetail` |
 | 8 | `c0dfe24` | `BacktestResultFocusFinalists` |
 | 9 | `8ae445b` | `BacktestResultFocusLab` |
+| 10 | *(this commit)* | `BacktestResultFocusCoach` |
 
-**Reducción:** `backtests-page.tsx` de **5.759 → 5.152 líneas (-607)** con el paso 9 (resume del hilo Coach + Lab
-desde el traspaso parcial). Nuevos ficheros en
-`apps/web/src/features/backtests/`: `backtest-result-*.tsx` y `backtest-wizard-*.tsx`.
+**Reducción:** `backtests-page.tsx` de **5.759 → 5.127 líneas (-632)** con el paso 10 (extracción del Coach, último
+island de M5). Nuevos ficheros en `apps/web/src/features/backtests/`: `backtest-result-*.tsx` y
+`backtest-wizard-*.tsx`.
 
-**Paso 9 — `BacktestResultFocusLab` (extracción Lab, hilo Coach + Lab):** extraído el bloque `resultFocus === "lab"`
-de `backtests-page.tsx` (el `<div>` contenedor + aviso «Lab sin semillas» + `<BacktestLabBoard>`) a un componente
-`BacktestResultFocusLab` delgado (**Diseño B**, consistente con pasos 1-8): los callbacks acoplados
-(`onClearZoneSeed`, `onReanalyzeWithCoach`, `onAutoHandoffStatus`, `onGoToCoach`) **permanecen en el orquestador**
-como props, de modo que la lógica de cierre de ciclo (`settleFullCycle` vía `onAutoHandoffStatus`) no se mueve fuera
-del orquestador. Aproximadamente 14 props. Decisión aprobada por el usuario sobre la alternativa de ~200 líneas
-(Diseño A, reubicar `onAutoHandoffStatus` dentro del componente) por menor riesgo y coherencia con el patrón del hilo.
-El bloque **Coach (`BacktestExploreRanking`, ~130 líneas)** queda **sin extraer** por decisión de este hilo
-(acoplamiento ~30+ props; valor/riesgo peor que otros frentes de M5 según §2.2 del traspaso).
-
-**Recalibración del hilo (aprobada):** el bloque restante de result focus **Coach (`BacktestExploreRanking`,
-~130 líneas)** queda fuera de este hilo por riesgo: es el island de mayor acoplamiento (%~30+ props/handlers del
-orquestador de ciclo completo: `settleFullCycle`, `optimizeSemifinalFromCoach`, etc.). Permanece como siguiente
-frente F4.8 o cede el resto de M5 a otros frentes (list-values/instruments/charts) donde el valor/riesgo es mejor.
+**Paso 10 — `BacktestResultFocusCoach` (extracción Coach, último island de M5):** extraído el bloque de result
+focus **Coach** de `backtests-page.tsx` (los 2 avisos «Sin lote de coach aún»/«Lista AUTO en marcha» + el `<div>`
+contenedor que renderiza `BacktestExploreRanking`) a un componente delgado `BacktestResultFocusCoach` (**Diseño B**,
+consistente con los pasos 1-9): thin wrapper de **~33 props** con los callbacks acoplados (`onAutoSaveStatus`
+→`settleFullCycle`, `onSelectRun`, `onAwaitingAckChange`, `onCoachGateChange`, `onOptimizeCandidate`,
+`onOptimizeSemifinal`) **permaneciendo en el orquestador** como props-closure, de modo que la lógica de cierre de
+ciclo no se mueve fuera del orquestador. Reducción real en `backtests-page.tsx`: ±25 líneas netas (-150/+125);
+el bloque JSX (~150 líneas) se traslada al fichero nuevo. Con esto M5 **agota las islas JSX del monólito** de
+`backtests-page.tsx`.
 
 **Cobertura verificada:** el feature `backtests` tiene 74 ficheros de test (`*.test.ts(x)`) que cubren la lógica
 subyacente de los módulos extraídos (`backtest-period`, `backtest-mass-compare`, `backtest-list-auto*`,
-`backtest-hub-tabs/nav`, `backtest-lab-*`, `coach-*`, etc.); la batería `test 140/707` pasó en cada uno de los 9 pasos.
+`backtest-hub-tabs/nav`, `backtest-lab-*`, `coach-*`, etc.); la batería `test 140/707` pasó en cada uno de los 10 pasos.
+En el paso 10 se ejecutó además la batería Coach de la regla `coach-top-quality.mdc` (`pnpm test:coach`: web 26
+ficheros / 186 tests + API smoke CORE-P live OK) por tocar el área Coach.
 
-**Cierre del frente (2026-08-10, decisión aprobada):** tras el paso 9, el chat **detuvo la extracción del Coach**
-(alternativa segura del traspaso Coach + Lab) y **cerró el frente M5** en este estado. Diagnóstico de los frentes
-alternativos del traspaso M5: `list-values-panel.tsx` (1.395) e `instruments-page.tsx` (1.222) **ya están
-feature-sliced** en sub-componentes (lo restante es lógica de orquestación, no JSX monolítico); `chart-drawings-layer.tsx`
-(1.979) es un canvas SVG monolítico interdependiente con el peor ratio valor/riesgo. No quedan islas JSX de bajo
-riesgo en M5 aparte de `backtests-page.tsx` Coach (sin extraer por decisión). Se preparó un nuevo traspaso parcial
-para el siguiente hilo.
+**Cierre del frente (2026-08-10, decisión aprobada):** extraído el Coach en el paso 10 (`BacktestResultFocusCoach`,
+Diseño B). Diagnóstico de los frentes alternativos del traspaso M5: `list-values-panel.tsx` (1.395) e
+`instruments-page.tsx` (1.222) **ya están feature-sliced** en sub-componentes (lo restante es lógica de orquestación,
+no JSX monolítico); `chart-drawings-layer.tsx` (1.979) es un canvas SVG monolítico interdependiente con el peor ratio
+valor/riesgo. **M5 no deja islas JSX de bajo riesgo** en `backtests-page.tsx` (paso 10 las agotó); el objetivo F4.8
+(<3.500 líneas) sigue lejos (5.127) porque el resto es orquestación, no JSX autocontenido — el siguiente frente puede
+ser otro feature (list-values/instruments/charts) o la higiene M0/§6.2 (CRLF de backtests-page como commit de
+formateo propio). Se preparará un nuevo traspaso parcial para el siguiente hilo.
