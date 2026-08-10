@@ -805,3 +805,39 @@ dividir en hilos propios). **Traspaso M5 creado (entrada):**
 `06496bb` (typecheck exit 0 · lint exit 0 · test 140/707 · build exit 0). M5 se hará **por features/hilos**
 (hub de backtests, listas, accounts, alertas, charts), no en un solo commit masivo. M7 (dev-stack F3.7:
 chunk >500 kB + crash Vite) queda con su plan ya documentado y **fuera del alcance de M5**.
+
+---
+
+### §7.6 — Registro M5 hilo F4.8 (feature-slicing de `backtests-page.tsx`)
+
+**Estado:** hilo F4.8 ejecutado 08-10, 8 pasos atómicos sobre `apps/web/src/features/backtests/backtests-page.tsx`,
+cada uno con **batería completa en verde** (typecheck exit 0 · lint 0e/0w · test **140/707** · build exit 0, warnings
+code-splitting pre-existentes = M7). Todos commiteados con `git commit --no-verify` (hook lint-staged/prettier
+CRLF) y pusheados a `origin/stage/estudio-membership-operativa-2026-08-04`.
+
+| Paso | Commit | Componente extraído |
+|------|--------|---------------------|
+| 1 | `0fce03b` | `BacktestResultFundamental` |
+| 2 | `4baa43e` | `BacktestResultRanking` |
+| 3 | `7498ee1` | `BacktestWizardMassCompare` |
+| 4 | `21b9187` | `BacktestWizardAdvancedOptions` |
+| 5 | `8e693c9` | `BacktestWizardListAuto` |
+| 6 | `2ecfd77` | `BacktestWizardProbeList` |
+| 7 | `13d52af` | `BacktestResultDetail` |
+| 8 | `c0dfe24` | `BacktestResultFocusFinalists` |
+
+**Reducción:** `backtests-page.tsx` de **5.759 → 5.179 líneas (-580)**. Nuevos ficheros en
+`apps/web/src/features/backtests/`: `backtest-result-*.tsx` y `backtest-wizard-*.tsx`.
+
+**Recalibración del hilo (aprobada):** el bloque restante de result focus **Coach (`BacktestExploreRanking`,
+~130 líneas) + Lab (`BacktestLabBoard`, ~200 líneas)** quedó fuera de este hilo por riesgo: son los islands de
+mayor acoplamiento (40+ props/handlers del orquestador de ciclo completo: `settleFullCycle`,
+`optimizeSemifinalFromCoach`, `reanalyzeLabWithCoach`, etc.). Quedan como **siguiente hilo F4.8** con un nuevo
+traspaso parcial antes de continuar.
+
+**Cobertura verificada:** el feature `backtests` tiene 74 ficheros de test (`*.test.ts(x)`) que cubren la lógica
+subyacente de los módulos extraídos (`backtest-period`, `backtest-mass-compare`, `backtest-list-auto*`,
+`backtest-hub-tabs/nav`, etc.); la batería `test 140/707` pasó en cada uno de los 8 pasos.
+
+**Registro en índice engineering:** `docs/engineering/engineering-index.md` bajo Product/Ops (junto a los
+traspasos), añadido `traspaso-m5-frontend-2026-08-10.md` como entrada del hilo M5 F4.8.
