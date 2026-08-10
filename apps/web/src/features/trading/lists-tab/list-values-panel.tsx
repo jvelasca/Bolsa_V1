@@ -20,7 +20,6 @@ import {
   ListMinus,
   ListPlus,
   RefreshCw,
-  Search,
 } from 'lucide-react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -83,6 +82,7 @@ import {
 import { sortInstrumentListWithRecommendation } from '@/lib/list-sort-with-recommendation';
 import { PendingOrderListItem } from '@/features/trading/lists-tab/pending-order-list-item';
 import { ListCarousel } from '@/features/trading/lists-tab/list-carousel';
+import { ListSearchBox } from '@/features/trading/lists-tab/list-search-box';
 import { useListInstrumentKeyboardNav } from '@/features/trading/lists-tab/use-list-instrument-keyboard-nav';
 import {
   EstudioListSupervisionBanner,
@@ -888,70 +888,21 @@ export function ListValuesPanel() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <form onSubmit={handleSearchSubmit} className="shrink-0 border-b border-border p-2">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Buscar activo (ticker, nombre o ISIN)…"
-            className="w-full rounded border border-border bg-background py-1 pl-7 pr-2 text-xs outline-none ring-primary focus:ring-1"
-          />
-        </div>
-
-        {showDropdown && (
-          <div className="scroll-area mt-1 max-h-36 overflow-auto rounded border border-border bg-background text-xs">
-            {remoteSearchQuery.isFetching && debouncedQuery.length >= 2 && (
-              <p className="px-2 py-1 text-muted-foreground">Buscando en Yahoo…</p>
-            )}
-            {!hasResults && !remoteSearchQuery.isFetching && (
-              <p className="px-2 py-1 text-muted-foreground">Sin resultados</p>
-            )}
-            {searchResults.catalog.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="flex w-full px-2 py-1 text-left hover:bg-accent"
-                onClick={() => visualizeFromSearch(item, { searchQuery: query.trim(), source: 'search' })}
-              >
-                <span className="font-medium">{item.symbol}</span>
-                <span className="ml-2 truncate text-muted-foreground">
-                  {item.name}
-                  {item.isin ? <span className="ml-1 opacity-70">· {item.isin}</span> : null}
-                </span>
-              </button>
-            ))}
-            {searchResults.external.length > 0 && (
-              <p className="border-t border-border/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Yahoo
-              </p>
-            )}
-            {searchResults.external.map((item) => (
-              <button
-                key={item.yahooSymbol}
-                type="button"
-                className="flex w-full flex-col px-2 py-1 text-left hover:bg-accent/70 sm:flex-row sm:items-center"
-                disabled={importingYahoo === item.yahooSymbol}
-                onClick={() => void handleExternalHit(item)}
-              >
-                <span className="font-medium">
-                  {item.symbol}
-                  <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
-                    {item.yahooSymbol}
-                  </span>
-                </span>
-                <span className="truncate text-muted-foreground sm:ml-2">
-                  {item.name}
-                  <span className="ml-1 opacity-60">
-                    · {item.exchange} · {item.currency}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-      </form>
+      <ListSearchBox
+        query={query}
+        debouncedQuery={debouncedQuery}
+        onQueryChange={setQuery}
+        remoteSearchFetching={remoteSearchQuery.isFetching}
+        results={searchResults}
+        importingYahoo={importingYahoo}
+        showDropdown={showDropdown}
+        hasResults={hasResults}
+        onSubmit={handleSearchSubmit}
+        onSelectCatalog={(item) =>
+          visualizeFromSearch(item, { searchQuery: query.trim(), source: 'search' })
+        }
+        onSelectExternal={(hit) => void handleExternalHit(hit)}
+      />
 
       <div className="shrink-0 border-b border-border px-2 py-1.5">
         <ListCarousel
