@@ -71,6 +71,10 @@ Con este paso M5 **agota las islas JSX del monólito**. Batería Coach adicional
 3. **Refactor a custom hooks** (extraer handlers/queries de orquestación de los frentes grandes) — más invasivo,
    fuera del patrón de slicing JSX aprobado; requiere recalibración explícita.
 
+> **Progreso (2026-08-10):** el hilo de reorientación ejecutó **B.1 + B.2** en `trading-dia-d-replay-panel.tsx`
+> (`DiaDTradesPanel`, `DiaDPendingTradeBanner`). Se preparó un **traspaso parcial nuevo** para el siguiente hilo:
+> [traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md).
+
 ## 3. Reglas del juego (mantener en el nuevo chat)
 
 - **Protocolo sagrado** del traspaso M5: FASE 1 diagnóstico (sin cambios) → FASE 2 plan atómico + aprobación →

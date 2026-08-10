@@ -883,6 +883,11 @@ code-splitting pre-existentes = M7). **Cobertura verificada:** el feature `tradi
 `dia-d-reconciliation`, `dia-d-favorites`, `dia-d-trading-session-store`); los bloques extraídos (tabla + banner)
 son JSX presentacional sin test directo → no se rompe nada.
 
-**Pendiente del frente (no ejecutado, B.3):** panel **Informe sesión** (`<aside>` ~1138-1164) →
-`DiaDSessionReportPanel`. Es el de acoplamiento medio (usa `sessionReportBody`, `layout.reportWidthPct`,
-`setReportOpen`, drag-resize); se valorará en el próximo paso/frente.
+**Pendiente del frente (no ejecutado, B.3):** panel **Informe sesión** (desktop `<aside>` ~1110-1181 + móvil
+`<details>` ~1182-1202) → `DiaDSessionReportPanel`. Acoplamiento **medio**: usa `sessionReportBody`,
+`layout.reportWidthPct`, `setReportOpen`, drag-resize (`pendingReportW.current`, `clampReportWidthPct`) y **dos
+ramas de render** que comparten el mismo `sessionReportBody`. Se valorará en el próximo hilo (ver traspaso nuevo).
+
+**Traspaso del frente preparado (cierre de este hilo):**
+[traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md](./traspaso-m5-frente-trading-dia-d-cierre-2026-08-10.md) —
+HEAD `8c1a4bc`, pasos B.1+B.2 cerrados, B.3 pendiente con FASE 1 detallada y opciones §2.3 para el siguiente hilo.
