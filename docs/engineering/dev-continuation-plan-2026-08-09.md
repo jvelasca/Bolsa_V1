@@ -870,7 +870,7 @@ candidato de valor/riesgo — ya parcialmente sliced (`BacktestReplayChart`, `Ba
 como thin wrappers. Otros frentes del §4.2 descartados (acoplamiento alto): `backtest-optimize-panel.tsx` (2.251),
 `backtest-strategy-matrix-panel.tsx` (1.033), `backtest-explore-panel.tsx` (1.456, MEDIO), `ohlcv-chart.tsx` (974).
 
-**Paso B.2 (`PENDIENTE`, aprobado):** extraído el **banner de trade pendiente** (bloque ~1041-1058) a
+**Paso B.2 (`041457f`, aprobado):** extraído el **banner de trade pendiente** (bloque ~1041-1058) a
 `apps/web/src/features/trading/dia-d-pending-trade-banner.tsx` → `DiaDPendingTradeBanner` (**Diseño B**, thin
 wrapper, 4 props: `pendingTrade`, `mode`, `onAccept`, `onReject`). Los callbacks de decisión
 (`decideGate('accept'/'reject')`) y el estado del orquestador (`pendingTrade`, `session.mode`) **permanecen en el
