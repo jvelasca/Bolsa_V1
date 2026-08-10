@@ -49,6 +49,10 @@ Coach (`backtest-deep-coach`, `coach-top-save`, `backtest-coach-coherence`, `coa
 
 ### 2.1 Estado de `backtest-explore-panel.tsx` (→ ~1.145 líneas)
 
+> **PUNTO DE HANDOFF (2026-08-10):** el hilo previo terminó tras E.4 con árbol limpio en HEAD `f08ac8a`. El próximo paso
+> **recomendado** es **E.5 (candidatas ★ grid)** — ejecutar en un **chat nuevo** (por ser la isla más compleja del frente,
+> riesgo medio/alto). Ver plan detallado en §2.3 opción 1.
+
 - **Extraídos (E.1–E.4):** `BacktestExploreBH` (vs B&H), `BacktestExploreHeader` (cabecera),
   `BacktestExploreBatteryTable` (tabla de batería) y `BacktestExploreAtOutlook` (regime + AT outlook). El orquestador
   sigue teniendo la lógica de ciclo completa (saveTopMutation, llmMutation, auto-save, ACK, gate) + los bloques JSX de
@@ -72,9 +76,24 @@ Coach (`backtest-deep-coach`, `coach-top-save`, `backtest-coach-coherence`, `coa
 
 ### 2.3 Opciones para el siguiente hilo
 
-1. **Continuar `backtest-explore-panel` con las islas restantes** — E.5 (candidatas ★ grid) solo si el valor/riesgo lo
-   justifica. Evitar los banners de estado del ciclo (ALTO). Cada paso con batería completa + `test:coach`.
+**Recomendación (decisión del hilo previo): ejecutar E.5 en un chat NUEVO por máxima garantía.**
+
+1. **PRÓXIMO PASO RECOMENDADO — E.5: `BacktestExploreStarsGrid` (candidatas ★ grid).** Isla de riesgo **medio/alto**
+   (toca callbacks de ciclo), por eso se delega a un chat fresco. **Plan ya diagnóstico (FASE 1 hecho en hilo previo):**
+   - Bloque actual: líneas ~1026-1171 de `backtest-explore-panel.tsx` (~150 líneas): encabezado "Candidatas ★ (1–5)"
+     con botones «Pasar las N al Lab» + «Abrir Lab · #1», grid `sm:grid-cols-3` de tarjetas (rank, label, `BacktestFutureStars`,
+     retorno total/reciente/vs B&H/DD, tercios/fallback/calidad, motivo, botones Ver / Lab (aprox.) / Sin lab), y pie de nota.
+   - **Props del componente (Diseño B):** `recommendations: TechnicalRecommendation[]`, `starCeiling: number`, `postLab: boolean`,
+     `running?: boolean`, `onSelectRun: (runId: string) => void`, `onOptimizeCandidate: (row: ExplorePresetRow) => void`,
+     `onOptimizeSemifinal: (candidates: ...) => void`.
+   - **Migra dentro del componente:** `firstLabRec` y `labRecCount` (hoy calculados en el orquestador líneas ~865-870,
+     únicos consumidores son este bloque) → cálculo local con `isOptimizableStrategy`. Orquestador **-2 derivaciones**.
+   - **NO se mueve lógica de ciclo**: los callbacks se pasan como props-closure; `postLab`/`running` solo para `disabled`.
+   - **Batería obligatoria:** typecheck + lint 0e/0w + test **140/707** + build (solo M7) + **`pnpm test:coach`**
+     (web 26/186 + API smoke CORE-P). Commit `--no-verify` + push + registro §7.6.
+   - **Reducción esperada del orquestador:** ~120-150 líneas (~1.145 → ~1.000).
 2. **Cerrar este frente en el estado actual (E.1–E.4)** y mover esfuerzo a otro candidato de M5.
+   - No tocar los banners de estado del ciclo (ALTO — toca Coach²/ACK).
 3. **Refactor a custom hooks** (extraer `saveTopMutation`/`llmMutation`/auto-save como hooks) — más invasivo, toca el
    ciclo Coach², requiere recalibración explícita.
 
