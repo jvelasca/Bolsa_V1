@@ -162,7 +162,7 @@ def _average_realized(transactions: list[TaxReportTransaction]) -> list[Realized
     return lines
 
 
-def compute_realized_gains(
+def _compute_realized_gains(
     transactions: list[TaxReportTransaction],
     method: str,
 ) -> list[RealizedGainLine]:
@@ -227,7 +227,7 @@ def build_tax_report(
         for tx in transactions
     ]
 
-    all_realized = compute_realized_gains(report_tx, method)
+    all_realized = _compute_realized_gains(report_tx, method)
     realized_lines = [
         line
         for line in all_realized

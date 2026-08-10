@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 from bolsa_domain.value_objects.timeframe import TimeFrame
 
@@ -24,10 +24,6 @@ def format_bar_timestamp(moment: datetime, timeframe: TimeFrame) -> str:
     if timeframe == TimeFrame.D1:
         return utc.date().isoformat()
     return utc.isoformat().replace("+00:00", "Z")
-
-
-def bar_timestamp_from_date(day: date) -> datetime:
-    return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
 REFRESH_TTL_SECONDS: dict[TimeFrame, int] = {

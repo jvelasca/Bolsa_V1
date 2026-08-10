@@ -44,7 +44,6 @@ pnpm test:py
 | `sync_instrument.py` | Sync OHLCV Yahoo → PostgreSQL |
 | `import_instrument.py` | Importar activo externo + sync opcional |
 | `search_instruments.py` | Búsqueda catálogo + Yahoo |
-| `portfolio.py` | Cartera y trades |
 | `lists.py` | Listas personalizadas |
 | `alerts.py` | Alertas de precio |
 | `backtests.py` | Ejecutar backtests |
