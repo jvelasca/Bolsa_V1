@@ -172,6 +172,59 @@ para proceder a su **eliminación definitiva** cuando se verifique que no queda 
 > **Pendiente de confirmación:** eliminar definitivamente cada doc de la columna izquierda
 > una vez verificado que no hay ninguna otra referencia ni uso en el repo (código, CI o docs).
 
+### 7.1 Resultado FASE 1 — verificación de cero-uso (2026-08-10)
+
+Con la decisión A, antes de eliminar nada se audita el **cero-uso** real (código TS/Py, CI
+`workflows/*`, todos los `*.md` y `git history`). Resultado:
+
+| Doc (pendiente) | Uso en código/CI | ¿Libre para eliminar? |
+|---|---|---|
+| `SCREENERS_SIGNALS_ALIGNMENT.md` | **SÍ** — `packages/shared/src/scan-api.ts:7` (JSDoc de `ScanJobSpecV1` lo cita como fuente de la spec) | **No** — requiere decidir el comentario de código |
+| `CUTOVER_PYTHON.md` | No | Sí |
+| `BACKTESTING_AUDIT.md` | No | Sí |
+| `PROJECT_STATE.md` | No | Sí |
+| `AI_TRACKER_STRATEGY.md` | No | Sí |
+| `DISK_AND_CLEANUP.md` | No | Sí |
+| `sessions/2026-07-11-rd2-arq-worker.md` | No | Sí |
+| `sessions/2026-07-12-audit-close.md` | No | Sí |
+
+**Conclusión:** 7 de 8 están libres de uso real (las menciones restantes en `.md` son texto
+plano, no enlaces). **`SCREENERS_SIGNALS_ALIGNMENT.md` NO está libre**: un JSDoc de código
+lo referencia como fuente de spec. Bajo la decisión A no se elimina sin resolver antes qué
+se hace con ese comentario (mantenerlo apuntando a un doc inexistente, o retirar/actualizar
+el comentario). Pendiente de decisión/propuesta en hilo específico.
+
+---
+
+## 8. Anclaje del plan a la fuente de verdad real (2026-08-10)
+
+> **Premisas originales** del protocolo de auditoría citaban `.github/docs/ARCHITECTURE.md`
+> y `.github/docs/AUDIT_MASTER_PLAN.md`. **Verificado: esa ruta NO existe** en el repo
+> (`.github/` solo contiene `workflows/`). Las fuentes de verdad reales del monorepo son:
+
+| Rol | Fuente de verdad real |
+|---|---|
+| Arquitectura | [`docs/ARCHITECTURE.md`](../ARCHITECTURE.md) |
+| Índice maestro de docs de ingeniería | [`docs/engineering/engineering-index-2026-08-03.md`](./engineering-index-2026-08-03.md) |
+| Roadmap de mejoras (Q0–Q3) | [`docs/engineering/improvement-roadmap-post-audits-2026-08-02.md`](./improvement-roadmap-post-audits-2026-08-02.md) |
+| Plan de continuación vivo | [`docs/engineering/dev-continuation-plan-2026-08-09.md`](./dev-continuation-plan-2026-08-09.md) |
+| Premisas de proyecto | [`docs/PROJECT_PREMISES.md`](../PROJECT_PREMISES.md) |
+| Premisas de auditoría (hilo) | [`docs/engineering/audit-resume-premises-2026-08-09.md`](./audit-resume-premises-2026-08-09.md) |
+
+### 8.1 Hallazgos de arquitectura detectados al anclar el plan
+
+- **`docs/ARCHITECTURE.md` §Paquetes (Python) no lista `bolsa_ai` / `packages/py/ai`.**
+  El paquete `ai` está **implementado** (AI Governance · RFC-007 · `bolsa-ai`) y ya se
+  corrigió `packages/py/README.md` en M0, pero el diagrama y la tabla de paquetes de
+  `ARCHITECTURE.md` (líneas 29-47) **no lo reflejan**. Es una desconexión doc↔código a
+  corregir en la **fase de higiene M0** (también en el diagrama de visión, l.15-24).
+- El resto de paquetes descritos en `ARCHITECTURE.md` coinciden con la implementación
+  (domain/application/infrastructure/analytics/market, shared/web/database, archivo TS
+  legacy en `archive/legacy-ts/`).
+
+> Este anclaje alinea el plan con la Regla 5 del protocolo ("respetar la arquitectura
+> definida"), usando los ficheros reales en vez de la ruta plantilla inexistente.
+
 ---
 
 _Documento de auditoría general y plan de refactorización por módulos. 2026-08-10._

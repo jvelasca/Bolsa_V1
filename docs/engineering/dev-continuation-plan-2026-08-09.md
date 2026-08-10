@@ -498,3 +498,20 @@ normalizar el formato de docs en el futuro, debe ser un commit propio de formate
 
 **Pendiente en M0:** eliminar definitivamente cada doc de la columna izquierda una vez
 confirmado que no queda ningún uso (registrado como pendiente en el plan 08-10).
+
+### 6.3 Continuación M0 (2026-08-10, tarde)
+
+- **Push hecho:** commit `4b5ddbb` pusheado a `origin/stage/estudio-membership-operativa-2026-08-04`
+  (`5d39e7a..4b5ddbb`).
+- **Anclaje a fuente de verdad real (Regla 5 del protocolo):** verificado que `.github/docs/`
+  **no existe** (solo `workflows/`). Las fuentes reales son `docs/ARCHITECTURE.md` +
+  `docs/engineering/engineering-index-2026-08-03.md` (más roadmap/continuación/premisas).
+  El plan 08-10 queda anclado a estos ficheros (§8).
+- **FASE 1 — verificación de cero-uso de los 8 pendientes (decisión A):**
+  - **7 de 8 están libres** de uso real (solo texto plano en `.md`, sin enlaces): CUTOVER_PYTHON,
+    BACKTESTING_AUDIT, PROJECT_STATE, AI_TRACKER_STRATEGY, DISK_AND_CLEANUP, 2× sessions.
+  - **`SCREENERS_SIGNALS_ALIGNMENT.md` NO está libre:** un JSDoc en
+    `packages/shared/src/scan-api.ts:7` lo referencia como fuente de la spec. Pendiente de
+    decidir el comentario de código antes de poder eliminarlo.
+- **Hallazgo de arquitectura al anclar:** `docs/ARCHITECTURE.md` (tabla de paquetes Python y
+  diagrama) **no lista `bolsa_ai`** pese a estar implementado. Pendiente de corregir en M0.
