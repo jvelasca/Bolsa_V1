@@ -39,6 +39,7 @@ from bolsa_analytics.optimize.macd_grid import (
     estimate_macd_grid_trial_total,
     run_macd_signal_cross_grid,
 )
+from bolsa_analytics.optimize.metrics import trial_score
 from bolsa_analytics.optimize.pbo import (
     equal_segment_ranges,
     estimate_pbo_cscv,
@@ -206,8 +207,10 @@ def _baseline_for_family(
         return _sma_to_grid(run_baseline_preset_backtest(bars, initial_cash))
     result = run_backtest(bars, family, initial_cash)
     metrics = {**result.is_metrics}
-    score = float(metrics["totalReturnPct"]) - float(metrics["maxDrawdownPct"]) * 0.25
-    metrics["score"] = round(score, 6)
+    score = trial_score(
+        float(metrics["totalReturnPct"]), float(metrics["maxDrawdownPct"])
+    )
+    metrics["score"] = score
     if family == STRATEGY_FAMILY_RSI:
         params: dict[str, Any] = {"period": 14, "oversold": 30.0, "overbought": 70.0}
     else:
@@ -216,7 +219,7 @@ def _baseline_for_family(
         total_return_pct=result.total_return_pct,
         max_drawdown_pct=result.max_drawdown_pct,
         trade_count=result.trade_count,
-        score=round(score, 4),
+        score=score,
         params=params,
         is_metrics=metrics,
     )
