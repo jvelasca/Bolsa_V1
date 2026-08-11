@@ -82,10 +82,11 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 23 | `4300674` | features/settings (sub-lote resto de apps/web/src, fuera de backtests) | 25 |
 | 24 | `e38be2d` | features/instruments (sub-lote resto de apps/web/src, fuera de backtests) | 30 |
 | 25 | `110667b` | stores (apps/web/src/stores, sub-lote resto de apps/web/src, fuera de backtests) | 31 |
+| 26 | `465137a` | lib sub-batch A (apps/web/src/lib, 18 de 35, sub-lote resto de apps/web/src) | 18 |
 
-**Total formateado hasta aquí: 344 ficheros** con diff real en 25 commits propios de formateo (210 de `features/backtests`
+**Total formateado hasta aquí: 362 ficheros** con diff real en 26 commits propios de formateo (210 de `features/backtests`
 en lotes 1-18 + 17 `accounts` lote 19 + 7 `workspace` lote 20 + 14 `config`+`platform` lote 21 + 10 `research` lote 22
-+ 25 `settings` lote 23 + 30 `instruments` lote 24 + 31 `stores` lote 25). Todos con batería
++ 25 `settings` lote 23 + 30 `instruments` lote 24 + 31 `stores` lote 25 + 18 `lib` sub-batch A lote 26). Todos con batería
 `typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17 y 18, área Coach/TOP).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
@@ -118,16 +119,17 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 - ~~ **`settings`** ~~ **HECHO (lote 23, `4300674`)**: todos los `.ts`/`.tsx` de `features/settings` = **25 files (+1927/−1433 solo formato)**: `ai-platform-section`, `ai-platform-tracker`(+test), `backtesting-help-section`, `backtesting-tracker`(+test), `chart-platform-section`, `chart-platform-tracker`, `data-capture-section`, `data-market-tracker`, `data-sync-summary-card`, `decision-replay-panel`, `dia-d-evidence-archive-help-card`, `effectiveness-panel`, `general-settings-section`, `market-providers-status-card`, `paper-paths-copy`(+test), `settings-redirect-page`, `settings-section`, `supervised-f3-panel`, `value-analysis-section`, `value-analysis-tracker`, `watchlist-help-section`, `watchlist-lists-tracker`. Sin falsos positivos EOL (los 25 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
 - ~~ **`instruments`** ~~ **HECHO (lote 24, `e38be2d`)**: todos los `.ts`/`.tsx` de `features/instruments` = **30 files (+2128/−1399 solo formato)**: `composite-leg-labels`(+test), `fundamental-card-panel`, `instrument-detail-page`, `instrument-dictamen-evolution`(+test), `instrument-narrative-editor`(+test), `instrument-sync-dialog`, `instruments-hub-column-layout`(+test), `instruments-hub-detail-panel`, `instruments-hub-enrichment`(+test), `instruments-hub-filter-bar`, `instruments-hub-model`(+test), `instruments-hub-scores`(+test), `instruments-hub-split-layout`, `instruments-hub-trackers`(+test), `instruments-page`, `use-activate-instrument-tracking`, `use-ensure-instrument-fundamentals`, `use-instrument-data-freshness`, `use-instrument-live-quotes-batch`, `use-instrument-sync`(+test ya formateado), `use-instruments-hub-enrichment`, `use-instruments-hub-scores`, `use-instruments-hub-trackers`. Sin falsos positivos EOL (los 30 con diff real; `use-instrument-sync.test.ts` quedó `(unchanged)`. solo `'→"` + line-wrapping). No es área Coach/TOP.
 - ~~ **`stores`** ~~ **HECHO (lote 25, `110667b`)**: todos los `.ts` de `apps/web/src/stores` = **31 files (+1911/−1207 solo formato)**: `active-account-store`, `alerts-store`(+test), `auth-store`, `chart-cursor-store`, `core-r-review-queue-store`(+test), `dia-d-evidence-archive-store`(+test), `dia-d-trading-session-store`(+test), `estudio-membership-store`, `estudio-process-running-store`, `instruments-hub-preferences-store`, `list-auto-activity-store`, `list-chrome-layout-store`, `list-tracker-results-store`, `notification-prefs-store`, `screener-activity-store`, `screener-preferences-store`, `supervised-f3-queue-store`(+test), `tracker-alarm-inbox-store`(+test), `trade-preferences-store`, `trading-layout-store`, `trading-ui-store`, `ui-store`, `visualization-store`, `workspace-store`, `workspace-ui-bridge`. Sin falsos positivos EOL (los 31 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
+- ~~ **`lib` sub-batch A** ~~ **HECHO (lote 26, `465137a`)**: primer sub-lote (18 de 35) de `apps/web/src/lib` = **18 files (+1299/−897 solo formato)**: `api-base-url`, `api`(+808/−574, el más grande), `chart-list-membership`(+test), `chart-list-snapshot`, `chart-tab-uniqueness`(+test), `close-chart-on-list-removal`, `datetime-input`, `default-lists`, `draw-tool-favorites-storage`, `draw-tool-session-storage`, `instrument-search.test`, `list-carousel-config`, `list-column-layout`, `list-hub-column-layout`, `list-selection-guard`, `list-sort-with-recommendation.test`. Sin falsos positivos EOL (los 18 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP. Quedan **17 files de `lib`** (sub-batch B: `list-sort-with-recommendation`, `list-sync`(+test), `list-utils`, `query-client`, `query-invalidation`, `routes`, `scan-results-column-layout`(+test), `screener-split-layout`(+test), `scroll-list-instrument-into-view`(+test), `search-ranking`, `use-media-query`, `utils`, `workspace-payload`).
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
 > **Nota de método para el siguiente hilo (relevo):** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes
 > (14, `6f8c668`), `hub` (15, `6c32b06`), `chart` (16, `a42587e`), `misc`/motores (17, `da2f7d9`) y cierre
 > `library`/`estudio`/`ibex` (18, `5bec6ed`) ya están HECHOS. **El dominio `hub`/`chart`/`misc` está CERRADO y
-> `features/backtests` queda COMPLETO.** Lotes 19-25 del resto de `apps/web/src`: **`accounts` (19, `689c294`),
+> `features/backtests` queda COMPLETO.** Lotes 19-26 del resto de `apps/web/src`: **`accounts` (19, `689c294`),
 > `workspace` (20, `1081809`), `config`+`platform` (21, `75f6595`), `research` (22, `cbd0fff`), `settings` (23,
-> `4300674`), `instruments` (24, `e38be2d`), `stores` (25, `110667b`).** Tras los lotes 19-25, el `prettier --check` amplio (excl. `features/backtests`) marca **285 files**
-> desincronizados restantes.
+> `4300674`), `instruments` (24, `e38be2d`), `stores` (25, `110667b`), `lib` sub-batch A (26, `465137a`).** Tras los lotes 19-26, el `prettier --check` amplio (excl. `features/backtests`) marca **267 files**
+> desincronizados restantes (resto de `lib` 17 files incluidos).
 > Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
 >
 > **Siguiente: otro dominio del resto de `apps/web/src`** (fuera de `features/backtests`, que queda completo) por
@@ -135,7 +137,7 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 > screeners—, lib, stores, components/ui, layout, etc.), ejecutando `prettier --check` por
 > sub-lote y verificando el `git diff --cached --numstat` (paso 4). Correr `test:coach` cuando el sub-lote toque área
 > Coach/TOP. Hechos: `accounts` (19), `workspace` (20), `config`+`platform` (21), `research` (22), `settings` (23),
-> `instruments` (24), `stores` (25).
+> `instruments` (24), `stores` (25), `lib` sub-batch A (26).
 
 
 ## 6. Documentos fuente de verdad / índices
