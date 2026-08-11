@@ -152,6 +152,50 @@ es un **no-op**; sobre una BD limpia construye el esquema **sin depender de Pris
 
 > Norma permanente del proyecto. Al cerrar: preparar el siguiente con su `traspaso-*`, entrada única en `engineering-index`, y entregar en el chat el **texto exacto** para pegar en el próximo.
 
-## 9. Texto exacto de traspaso — siguiente hilo (rellenar al cierre F3a)
+## 9. Texto exacto de traspaso — siguiente hilo
 
-_Se completa al cierre F3a y se entrega en el chat. Ver el mensaje final del hilo._
+```text
+Texto de traspaso → nuevo chat (F3a completado — siguiente fase tras F3a)
+
+CONTEXTO INMEDIATO: F3a (Arquitectura de procesos y DB) COMPLETADO con 6 commits
+en rama stage/f3a-procesos-db-2026-08-11 y PR #33 ABIERTO:
+  - C1 docs(F3a) `6edb751`: traspaso + alcance pactado.
+  - C2 feat(workers, D3) `4f5d314`: scheduler_worker.py (proceso dedicado) + main.py
+    con 0 workers + pyproject script + run-dev.mjs + test_scheduler_worker (3 tests).
+  - C3 feat(accounts, P1.2) `f8d6c92`: run_account_data_migration idempotente una-vez
+    (lifespan + scheduler); retiradas las 12 llamadas destructivas por-request +
+    ensure_migrated/_migration_done del repositorio.
+  - C4 feat(db, D2) `8c2dea8`: 003_prisma_schema_baseline (takeover: 53 tablas + 8
+    enums quoted, idempotente) + generador dump_alembic_prisma_baseline.py --check
+    (reproducible byte-a-byte) + guards idempotencia en 002 + test head=003.
+  - C5 fix(db,rules) `b0628c0`: orden de borrado de cuentas respetando FK
+    (delete_simulated_account evita ForeignKeyViolation) + ruff I001 limpio.
+  - C6 docs(F3a) `d75d5ef`: batería de cierre + engineering-index.
+  - PR #33 https://github.com/jvelasca/Bolsa_V1/pull/33 → base stage/f1-integridad-financiera-2026-08-11 (open).
+
+BATERÍA (verde): ruff 0 errores en ficheros de fase (totales 25→13→7, los 7 restantes
+  = deuda preexistente F3b/F5a → F4) · mypy limpio en ficheros nuevos (gate no bloqueante,
+  ~500 errores preexistentes) · pytest infra 48✓ + api-python 30✓ (bolsa_v1) +
+  domain/market/application/analytics/ai 676✓ · dump_alembic_prisma_baseline --check OK ·
+  test_f3b_alembic (head=003, data_epoch, idempotencia) OK.
+
+VALIDACIÓN D2 (construida): alembic upgrade head = no-op sobre BD Prisma bolsa_v1 (55
+  tablas + datos intactos) · fresh-build en BD limpia == Base.metadata (0 faltantes/extra/
+  mismatches, 8 enums case-exacta) · generador reproducible.
+
+NOTA TESTS DB: los tests de api-python DB se ejecutan contra bolsa_v1 (DATABASE_URL).
+  Si DATABASE_URL apunta a una BD scratch vacía (p.ej. bolsa_v1_scratch), test_lists/
+  test_accounts fallan por falta de datos de mercado (no regresión). Las BD scratch
+  bolsa_v1_scratch/test2/test3 son throwaway (dropeables).
+
+DEUDA REGISTRADA → F4 (siguiente fase conjunta F3a+F4+F5b): P1.6 mypy gate duro ·
+  ruff gates infra restantes (7: portfolio.py, alembic/env.py, 001_timescaledb_extension,
+  account_migration, migrations, portfolio_repository, test_daily_ops_digest_pdf) ·
+  P1.9 API thin · P0.6 ciclo analytics↔market. → F5b: D4 auth HttpOnly/TTL. Deuda F5a §6
+  (fidelidad DTOs campo-a-campo, openapi-fetch) sigue pendiente.
+
+Lee PRIMERO: docs/engineering/traspaso-f3a-procesos-db-2026-08-11.md (§4-§7) y su fuente
+  audit-consolidado-internas-externas-2026-08-11.md (P0.4/P0.5/P1.2 + D0-D5). Para la fase
+  siguiente usa engineering-index-2026-08-03.md y el plan de la fase declarada (F4).
+NO toques código fuera del alcance de la fase que se declare.
+```
