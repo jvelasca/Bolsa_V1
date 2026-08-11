@@ -1,3 +1,4 @@
+"""Servicio de dominio para construir resumen de precios a partir de barras OHLCV."""
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
 from bolsa_domain.value_objects.price_summary import PriceSummary
 

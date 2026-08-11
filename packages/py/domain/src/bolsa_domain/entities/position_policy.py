@@ -1,3 +1,4 @@
+"""Entidad de dominio de política de posición — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any
 

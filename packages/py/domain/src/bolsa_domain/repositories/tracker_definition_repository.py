@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para definiciones de tracker (Protocol)."""
 from typing import Any, Protocol
 
 from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord

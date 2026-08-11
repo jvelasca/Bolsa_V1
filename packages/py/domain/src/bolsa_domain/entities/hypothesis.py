@@ -1,3 +1,4 @@
+"""Entidad de dominio de hipótesis de investigación — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any, Literal
 

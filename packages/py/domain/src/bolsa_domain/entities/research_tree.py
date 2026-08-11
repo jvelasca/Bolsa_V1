@@ -1,3 +1,4 @@
+"""Entidades de dominio del árbol de investigación y sus eventos de sincronización."""
 from dataclasses import dataclass
 from typing import Any
 

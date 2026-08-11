@@ -1,3 +1,4 @@
+"""Entidad de dominio de creencias y su historial para hipótesis — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any
 

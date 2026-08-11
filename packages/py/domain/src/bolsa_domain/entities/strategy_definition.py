@@ -1,3 +1,4 @@
+"""Entidad de dominio de definición de estrategia — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any
 

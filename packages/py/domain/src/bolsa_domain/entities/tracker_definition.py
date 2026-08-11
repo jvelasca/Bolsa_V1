@@ -1,3 +1,4 @@
+"""Entidad de dominio de definición de tracker — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any
 

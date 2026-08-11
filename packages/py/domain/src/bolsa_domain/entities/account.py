@@ -1,3 +1,4 @@
+"""Entidad de dominio cuenta de inversión y cartera — sin dependencias externas."""
 from dataclasses import dataclass
 
 

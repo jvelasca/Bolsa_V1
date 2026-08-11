@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para logs de sincronización (Protocol)."""
 from typing import Literal, Protocol
 
 

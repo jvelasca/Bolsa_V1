@@ -1,3 +1,4 @@
+"""Entidad de dominio de cartera, posiciones y transacciones — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Literal
 

@@ -1,3 +1,4 @@
+"""Entidad de dominio de nodo de conocimiento consolidado — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any, Literal
 

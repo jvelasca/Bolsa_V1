@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para políticas de ejecución (Protocol)."""
 from typing import Any, Protocol
 
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord

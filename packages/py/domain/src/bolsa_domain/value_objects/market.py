@@ -1,3 +1,4 @@
+"""Value object de dominio de resumen de mercado y resultados de sincronización."""
 from dataclasses import dataclass
 from typing import Literal
 

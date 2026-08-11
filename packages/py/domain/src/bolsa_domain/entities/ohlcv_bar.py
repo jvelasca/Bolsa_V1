@@ -1,3 +1,4 @@
+"""Entidad de dominio de vela OHLCV de mercado — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Literal
 

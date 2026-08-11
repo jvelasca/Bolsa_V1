@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para ensayos de investigación (Protocol)."""
 from typing import Any, Literal, Protocol
 
 from bolsa_domain.entities.research_trial import ResearchTrial

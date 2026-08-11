@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para definiciones de estrategia (Protocol)."""
 from typing import Any, Protocol
 
 from bolsa_domain.entities.strategy_definition import StrategyDefinitionRecord

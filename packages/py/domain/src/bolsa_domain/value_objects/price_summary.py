@@ -1,3 +1,4 @@
+"""Value object de dominio de resumen de precio (inmutable, sin dependencias externas)."""
 from dataclasses import dataclass
 
 

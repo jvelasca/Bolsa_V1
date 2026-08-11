@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para instrumentos y su log de sincronización (Protocol)."""
 from dataclasses import dataclass
 from typing import Protocol
 

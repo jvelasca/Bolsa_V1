@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para políticas de posición (Protocol)."""
 from typing import Any, Protocol
 
 from bolsa_domain.entities.position_policy import PositionPolicyRecord

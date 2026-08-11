@@ -1,3 +1,4 @@
+"""Entidad de dominio de ejecuciones de backtest y sus resultados — sin dependencias externas."""
 from dataclasses import dataclass, field
 from typing import Any, Literal
 

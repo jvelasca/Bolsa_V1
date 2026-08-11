@@ -1,3 +1,4 @@
+"""Entidades de dominio de manifiesto de escaneo y snapshot de datos — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any
 

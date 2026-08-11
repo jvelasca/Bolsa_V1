@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para eventos de plataforma (Protocol)."""
 from typing import Any, Protocol
 
 from bolsa_domain.entities.platform_event import PlatformEventRecord

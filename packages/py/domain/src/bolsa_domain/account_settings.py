@@ -1,3 +1,4 @@
+"""Ajustes de cuenta y cálculo de comisiones/impuestos (reglas de dominio)."""
 from __future__ import annotations
 
 from dataclasses import dataclass

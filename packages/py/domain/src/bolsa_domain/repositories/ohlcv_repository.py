@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para barras OHLCV (Protocol)."""
 from typing import Protocol
 
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar

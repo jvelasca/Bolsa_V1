@@ -1,3 +1,4 @@
+"""Value object de dominio de marcos temporales (inmutable, sin dependencias externas)."""
 from enum import StrEnum
 
 

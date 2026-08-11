@@ -1,3 +1,4 @@
+"""Entidad de dominio de instrumento/activo listado — sin dependencias externas."""
 from dataclasses import dataclass
 
 

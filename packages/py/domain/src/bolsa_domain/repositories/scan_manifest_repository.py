@@ -1,3 +1,4 @@
+"""Contratos/Puertos de repositorio para manifiestos de escaneo y snapshots (Protocol)."""
 from typing import Any, Protocol
 
 from bolsa_domain.entities.scan_manifest import DataSnapshotRecord, ScanManifestRecord

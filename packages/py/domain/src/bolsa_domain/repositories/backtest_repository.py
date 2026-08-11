@@ -1,3 +1,4 @@
+"""Contrato/Puerto de repositorio para backtests (Protocol)."""
 from typing import Any, Literal, Protocol
 
 from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail

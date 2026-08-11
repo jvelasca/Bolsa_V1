@@ -1,3 +1,4 @@
+"""Entidad de dominio de evento de plataforma (auditoría) — sin dependencias externas."""
 from dataclasses import dataclass
 from typing import Any
 
