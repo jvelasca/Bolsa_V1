@@ -3,13 +3,13 @@
  * Cache local: `estudio-membership-store` (no Visualizados).
  */
 
-import type { InstrumentWithMetaDto } from '@bolsa/shared';
-import { ESTUDIO_LIST_ID } from '@bolsa/shared';
-import { api } from '@/lib/api';
+import type { InstrumentWithMetaDto } from "@bolsa/shared";
+import { ESTUDIO_LIST_ID } from "@bolsa/shared";
+import { api } from "@/lib/api";
 import {
   useEstudioMembershipStore,
   type EstudioMemberEntry,
-} from '@/stores/estudio-membership-store';
+} from "@/stores/estudio-membership-store";
 
 export type EstudioMemberMeta = {
   instrumentId: string;
@@ -80,12 +80,13 @@ export async function addToEstudioMembership(
   const ids: string[] = [];
   for (const raw of instruments) {
     const id =
-      'id' in raw && typeof (raw as InstrumentWithMetaDto).id === 'string'
+      "id" in raw && typeof (raw as InstrumentWithMetaDto).id === "string"
         ? (raw as InstrumentWithMetaDto).id
         : (raw as EstudioMemberMeta).instrumentId;
     const symbol =
-      'symbol' in raw ? String(raw.symbol) : (raw as EstudioMemberMeta).symbol;
-    const name = 'name' in raw ? String(raw.name) : (raw as EstudioMemberMeta).name;
+      "symbol" in raw ? String(raw.symbol) : (raw as EstudioMemberMeta).symbol;
+    const name =
+      "name" in raw ? String(raw.name) : (raw as EstudioMemberMeta).name;
     if (!id || set.has(id)) continue;
     set.add(id);
     metas.push({ instrumentId: id, symbol, name });

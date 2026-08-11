@@ -6,28 +6,28 @@
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md §4
  */
 
-import type { DemoBookCountryPrefer } from '@/features/trading/demo-book-prefs';
+import type { DemoBookCountryPrefer } from "@/features/trading/demo-book-prefs";
 
 /** Países / mercados tratados como Europa para preferencia suave. */
 export const EUROPE_COUNTRIES: ReadonlySet<string> = new Set([
-  'ES',
-  'DE',
-  'FR',
-  'IT',
-  'PT',
-  'NL',
-  'BE',
-  'AT',
-  'IE',
-  'FI',
-  'SE',
-  'DK',
-  'NO',
-  'CH',
-  'GB',
-  'PL',
-  'LU',
-  'GR',
+  "ES",
+  "DE",
+  "FR",
+  "IT",
+  "PT",
+  "NL",
+  "BE",
+  "AT",
+  "IE",
+  "FI",
+  "SE",
+  "DK",
+  "NO",
+  "CH",
+  "GB",
+  "PL",
+  "LU",
+  "GR",
 ]);
 
 export type GeoTier = 0 | 1 | 2;
@@ -54,15 +54,17 @@ export function inferHomeCountry(opts: {
 }): string {
   const fromPositions = modeCountry(opts.positionCountries);
   if (fromPositions) return fromPositions;
-  const ccy = (opts.accountCurrency ?? '').trim().toUpperCase();
-  if (ccy === 'EUR') return 'ES';
-  if (ccy === 'USD') return 'US';
-  if (ccy === 'GBP') return 'GB';
-  if (ccy === 'CHF') return 'CH';
-  return 'ES';
+  const ccy = (opts.accountCurrency ?? "").trim().toUpperCase();
+  if (ccy === "EUR") return "ES";
+  if (ccy === "USD") return "US";
+  if (ccy === "GBP") return "GB";
+  if (ccy === "CHF") return "CH";
+  return "ES";
 }
 
-function modeCountry(list: readonly string[] | null | undefined): string | null {
+function modeCountry(
+  list: readonly string[] | null | undefined,
+): string | null {
   if (!list?.length) return null;
   const counts = new Map<string, number>();
   for (const raw of list) {
@@ -81,7 +83,9 @@ function modeCountry(list: readonly string[] | null | undefined): string | null 
   return best;
 }
 
-export function normalizeCountry(raw: string | null | undefined): string | null {
+export function normalizeCountry(
+  raw: string | null | undefined,
+): string | null {
   if (raw == null) return null;
   const c = raw.trim().toUpperCase();
   return c.length >= 2 ? c.slice(0, 2) : null;
@@ -96,11 +100,11 @@ export function geoTier(
   homeCountry: string,
   prefer: DemoBookCountryPrefer,
 ): GeoTier {
-  if (prefer === 'global_ok') return 0;
+  if (prefer === "global_ok") return 0;
   const c = normalizeCountry(country);
-  const home = normalizeCountry(homeCountry) ?? 'ES';
+  const home = normalizeCountry(homeCountry) ?? "ES";
   if (!c) return 2;
-  if (prefer === 'europe_first') {
+  if (prefer === "europe_first") {
     if (EUROPE_COUNTRIES.has(c)) return 0;
     return 2;
   }
@@ -129,7 +133,7 @@ export function compareByOptimalThenGeo(
   const ta = geoTier(resolveCountry(a, ctx), ctx.homeCountry, ctx.prefer);
   const tb = geoTier(resolveCountry(b, ctx), ctx.homeCountry, ctx.prefer);
   if (ta !== tb) return ta - tb;
-  return (a.tieBreak ?? '').localeCompare(b.tieBreak ?? '');
+  return (a.tieBreak ?? "").localeCompare(b.tieBreak ?? "");
 }
 
 /** Copia ordenada; no muta ni filtra. */
@@ -146,13 +150,16 @@ export function optimalScoreFromPayload(payload: {
   scoreTa?: number | null;
   metrics?: { conviction?: number | null } | null;
 }): number {
-  if (typeof payload.combinedScore === 'number' && Number.isFinite(payload.combinedScore)) {
+  if (
+    typeof payload.combinedScore === "number" &&
+    Number.isFinite(payload.combinedScore)
+  ) {
     return payload.combinedScore;
   }
-  if (typeof payload.scoreTa === 'number' && Number.isFinite(payload.scoreTa)) {
+  if (typeof payload.scoreTa === "number" && Number.isFinite(payload.scoreTa)) {
     return payload.scoreTa;
   }
   const c = payload.metrics?.conviction;
-  if (typeof c === 'number' && Number.isFinite(c)) return c;
+  if (typeof c === "number" && Number.isFinite(c)) return c;
   return 0;
 }

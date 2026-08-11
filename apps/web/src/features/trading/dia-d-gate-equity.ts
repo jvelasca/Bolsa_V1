@@ -14,20 +14,20 @@ import type {
   BacktestEquityPointDto,
   BacktestRunDetailDto,
   BacktestTradeDto,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 
 export type GateDecisionLike = {
   tradeId: string;
-  action: 'accept' | 'reject';
+  action: "accept" | "reject";
 };
 
-export type GateFillPolicy = 'auto' | 'gated';
+export type GateFillPolicy = "auto" | "gated";
 
 /** Trades que realmente se ejecutan tras el gate (orden temporal del Auto). */
 export function applyGateFills(
   trades: BacktestTradeDto[],
   decisions: ReadonlyArray<GateDecisionLike>,
-  policy: GateFillPolicy = 'auto',
+  policy: GateFillPolicy = "auto",
   opts?: { initialShares?: number },
 ): BacktestTradeDto[] {
   const decision = new Map(decisions.map((d) => [d.tradeId, d.action]));
@@ -35,18 +35,18 @@ export function applyGateFills(
   let shares = opts?.initialShares ?? 0;
   for (const trade of trades) {
     const action = decision.get(trade.id);
-    if (policy === 'gated') {
-      if (action !== 'accept') continue;
-    } else if (action === 'reject') {
+    if (policy === "gated") {
+      if (action !== "accept") continue;
+    } else if (action === "reject") {
       continue;
     }
-    if (trade.type === 'buy') {
+    if (trade.type === "buy") {
       if (shares > 0) continue;
       shares = trade.quantity;
       applied.push(trade);
       continue;
     }
-    if (trade.type === 'sell') {
+    if (trade.type === "sell") {
       if (shares <= 0) continue;
       shares = 0;
       applied.push(trade);
@@ -74,7 +74,7 @@ export function rebuildEquityCurve(opts: {
     ) {
       const trade = opts.trades[tradeIdx]!;
       const notional = trade.price * trade.quantity;
-      if (trade.type === 'buy') {
+      if (trade.type === "buy") {
         cash -= notional;
         shares += trade.quantity;
       } else {
@@ -92,7 +92,9 @@ export function rebuildEquityCurve(opts: {
   return curve;
 }
 
-export function maxDrawdownPct(curve: ReadonlyArray<BacktestEquityPointDto>): number {
+export function maxDrawdownPct(
+  curve: ReadonlyArray<BacktestEquityPointDto>,
+): number {
   if (curve.length === 0) return 0;
   let peak = curve[0]!.equity;
   let maxDd = 0;
@@ -124,7 +126,7 @@ export function computeGatedSessionMetrics(opts: {
   decisions: ReadonlyArray<GateDecisionLike>;
   policy?: GateFillPolicy;
 }): GatedSessionMetrics {
-  const policy = opts.policy ?? 'auto';
+  const policy = opts.policy ?? "auto";
   const initialShares = opts.initialShares ?? 0;
   const trades = applyGateFills([...opts.autoTrades], opts.decisions, policy, {
     initialShares,

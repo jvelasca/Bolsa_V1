@@ -3,7 +3,7 @@
  * Premisa UI: preferencias en el dispositivo ([UI_PREFS_LOCALSTORAGE.md](../../UI_PREFS_LOCALSTORAGE.md)).
  */
 
-export const DIA_D_VERIFY_LAYOUT_KEY = 'bolsa-dia-d-verify-layout-v1';
+export const DIA_D_VERIFY_LAYOUT_KEY = "bolsa-dia-d-verify-layout-v1";
 
 export type DiaDVerifyLayoutPrefs = {
   /** Informe lateral abierto. */
@@ -41,15 +41,21 @@ export function loadDiaDVerifyLayout(): DiaDVerifyLayoutPrefs {
     if (!raw) return { ...DEFAULT_DIA_D_VERIFY_LAYOUT };
     const o = JSON.parse(raw) as Partial<DiaDVerifyLayoutPrefs>;
     return {
-      reportOpen: typeof o.reportOpen === 'boolean' ? o.reportOpen : true,
+      reportOpen: typeof o.reportOpen === "boolean" ? o.reportOpen : true,
       reportWidthPct: clampReportWidthPct(
-        typeof o.reportWidthPct === 'number' ? o.reportWidthPct : DEFAULT_DIA_D_VERIFY_LAYOUT.reportWidthPct,
+        typeof o.reportWidthPct === "number"
+          ? o.reportWidthPct
+          : DEFAULT_DIA_D_VERIFY_LAYOUT.reportWidthPct,
       ),
       movieHeightPct: clampMovieHeightPct(
-        typeof o.movieHeightPct === 'number' ? o.movieHeightPct : DEFAULT_DIA_D_VERIFY_LAYOUT.movieHeightPct,
+        typeof o.movieHeightPct === "number"
+          ? o.movieHeightPct
+          : DEFAULT_DIA_D_VERIFY_LAYOUT.movieHeightPct,
       ),
       equityWidthPct: clampEquityWidthPct(
-        typeof o.equityWidthPct === 'number' ? o.equityWidthPct : DEFAULT_DIA_D_VERIFY_LAYOUT.equityWidthPct,
+        typeof o.equityWidthPct === "number"
+          ? o.equityWidthPct
+          : DEFAULT_DIA_D_VERIFY_LAYOUT.equityWidthPct,
       ),
     };
   } catch {

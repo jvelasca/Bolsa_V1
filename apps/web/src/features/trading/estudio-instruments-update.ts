@@ -9,16 +9,16 @@
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md
  */
 
-import { ESTUDIO_LIST_ID } from '@bolsa/shared';
-import { api } from '@/lib/api';
+import { ESTUDIO_LIST_ID } from "@bolsa/shared";
+import { api } from "@/lib/api";
 import {
   emitEstudioProcessRunning,
   laneFromListAutoMode,
   resolveEstudioProcessStatus,
-} from '@/features/trading/estudio-process-status';
-import { emitEstudioLaneTick } from '@/features/trading/estudio-supervision';
-import { loadEstudioSupervisionPrefs } from '@/features/trading/estudio-supervision';
-import { touchEstudioLaneStamps } from '@/features/trading/estudio-lane-stamps';
+} from "@/features/trading/estudio-process-status";
+import { emitEstudioLaneTick } from "@/features/trading/estudio-supervision";
+import { loadEstudioSupervisionPrefs } from "@/features/trading/estudio-supervision";
+import { touchEstudioLaneStamps } from "@/features/trading/estudio-lane-stamps";
 import {
   beginEstudioUpdateRun,
   clearEstudioUpdatePauseCheckpoint,
@@ -26,8 +26,8 @@ import {
   getEstudioUpdatePauseCheckpoint,
   isEstudioUpdateSoftStopRequested,
   settleEstudioUpdatePause,
-} from '@/features/trading/estudio-update-control';
-import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
+} from "@/features/trading/estudio-update-control";
+import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 
 export type EstudioUpdateProgress = {
   current: number;
@@ -65,8 +65,8 @@ export function collectEstudioIdsNeedingUpdate(
     });
     const needs = view.lanes.some(
       (lane) =>
-        (lane.id === 'vigilance' || lane.id === 'freshness') &&
-        (lane.state === 'empty' || lane.state === 'stale'),
+        (lane.id === "vigilance" || lane.id === "freshness") &&
+        (lane.state === "empty" || lane.state === "stale"),
     );
     if (needs) out.push(id);
   }
@@ -88,10 +88,13 @@ export async function resumeEstudioInstrumentsUpdate(opts?: {
     active: true,
     paused: false,
     listId: ESTUDIO_LIST_ID,
-    listName: 'Estudio',
+    listName: "Estudio",
     index: Math.max(0, cp.nextIndex),
     total: Math.max(cp.ids.length, 1),
-    symbol: cp.symbols[cp.ids[cp.nextIndex] ?? ''] ?? cp.symbols[cp.ids[0] ?? ''] ?? '…',
+    symbol:
+      cp.symbols[cp.ids[cp.nextIndex] ?? ""] ??
+      cp.symbols[cp.ids[0] ?? ""] ??
+      "…",
     detail: `${cp.phaseLabel} · reanudando…`,
   });
   await runEstudioInstrumentsUpdate({
@@ -117,7 +120,12 @@ export async function runEstudioInstrumentsUpdate(
 
   const snap0 = useListAutoActivityStore.getState();
   // Solapar solo si hay trabajo activo no pausado (la pausa con checkpoint se reanuda aparte).
-  if (snap0.active && snap0.listId === ESTUDIO_LIST_ID && !snap0.paused && !opts.resume) {
+  if (
+    snap0.active &&
+    snap0.listId === ESTUDIO_LIST_ID &&
+    !snap0.paused &&
+    !opts.resume
+  ) {
     return;
   }
   if (snap0.active && snap0.paused && !opts.resume) {
@@ -132,25 +140,19 @@ export async function runEstudioInstrumentsUpdate(
 
   const rediscover = opts.rediscover;
   const lane = laneFromListAutoMode(rediscover);
-  const phase =
-    opts.phaseLabel ?? (rediscover ? 'Redescubrir' : 'Actualizar');
-  const symbolOf =
-    opts.symbolOf ?? ((id: string) => id.slice(0, 8));
+  const phase = opts.phaseLabel ?? (rediscover ? "Redescubrir" : "Actualizar");
+  const symbolOf = opts.symbolOf ?? ((id: string) => id.slice(0, 8));
   const startIndex = Math.max(0, Math.min(opts.startIndex ?? 0, ids.length));
 
-  const publishKeepAlive = (
-    index: number,
-    detail: string,
-    paused = false,
-  ) => {
+  const publishKeepAlive = (index: number, detail: string, paused = false) => {
     useListAutoActivityStore.getState().publish({
       active: true,
       paused,
       listId: ESTUDIO_LIST_ID,
-      listName: 'Estudio',
+      listName: "Estudio",
       index,
       total: ids.length,
-      symbol: symbolOf(ids[index] ?? ids[0] ?? ''),
+      symbol: symbolOf(ids[index] ?? ids[0] ?? ""),
       detail,
     });
   };
@@ -190,7 +192,10 @@ export async function runEstudioInstrumentsUpdate(
       const id = ids[i]!;
       const sym = symbolOf(id);
 
-      if (isEstudioUpdateSoftStopRequested() && completed.length > completedBefore.length) {
+      if (
+        isEstudioUpdateSoftStopRequested() &&
+        completed.length > completedBefore.length
+      ) {
         stoppedEarly = true;
         break;
       }
@@ -206,7 +211,7 @@ export async function runEstudioInstrumentsUpdate(
         publishKeepAlive(i, `${phase} · ${sym}`);
       }
 
-      emitEstudioProcessRunning({ instrumentId: id, lane: 'freshness' });
+      emitEstudioProcessRunning({ instrumentId: id, lane: "freshness" });
       try {
         await api.syncInstrument(id, 5);
       } catch {
@@ -230,7 +235,7 @@ export async function runEstudioInstrumentsUpdate(
     if (freshlySynced.length > 0) {
       touchEstudioLaneStamps(
         freshlySynced,
-        rediscover ? 'rediscover' : 'freshness',
+        rediscover ? "rediscover" : "freshness",
       );
     }
 
@@ -246,7 +251,7 @@ export async function runEstudioInstrumentsUpdate(
       setProgress({
         current: completed.length,
         total: ids.length,
-        label: useListAutoActivityStore.getState().detail ?? 'Pausa',
+        label: useListAutoActivityStore.getState().detail ?? "Pausa",
       });
       emitEstudioProcessRunning({ instrumentId: null, lane: null });
       return;
@@ -259,17 +264,16 @@ export async function runEstudioInstrumentsUpdate(
     });
     emitEstudioProcessRunning({
       instrumentId: completed[0] ?? null,
-      lane: 'vigilance',
+      lane: "vigilance",
     });
     try {
-      const { runCoreRSchedulerTick } = await import(
-        '@/features/backtests/core-r-scheduler-tick'
-      );
+      const { runCoreRSchedulerTick } =
+        await import("@/features/backtests/core-r-scheduler-tick");
       await runCoreRSchedulerTick({ force: true, includePnl: true });
     } catch {
       // best-effort
     }
-    touchEstudioLaneStamps(completed, 'vigilance');
+    touchEstudioLaneStamps(completed, "vigilance");
 
     if (isEstudioUpdateSoftStopRequested()) {
       // Sync completo; al reanudar solo falta vigilia/Lab (nextIndex = length).
@@ -284,7 +288,7 @@ export async function runEstudioInstrumentsUpdate(
       setProgress({
         current: ids.length,
         total: ids.length,
-        label: useListAutoActivityStore.getState().detail ?? 'Pausa',
+        label: useListAutoActivityStore.getState().detail ?? "Pausa",
       });
       emitEstudioProcessRunning({ instrumentId: null, lane: null });
       return;
@@ -299,7 +303,7 @@ export async function runEstudioInstrumentsUpdate(
     emitEstudioProcessRunning({ instrumentId: completed[0] ?? null, lane });
     emitEstudioLaneTick({
       listId: ESTUDIO_LIST_ID,
-      lane: rediscover ? 'rediscover' : 'freshness',
+      lane: rediscover ? "rediscover" : "freshness",
       forceRescan: rediscover,
       skipConfirm: true,
       instrumentIds: completed,
@@ -314,14 +318,14 @@ export async function runEstudioInstrumentsUpdate(
     }
     if (!handedOffToLab && !settledPause) {
       const snap = useListAutoActivityStore.getState();
-      const detail = snap.detail ?? '';
+      const detail = snap.detail ?? "";
       if (
         snap.active &&
         snap.listId === ESTUDIO_LIST_ID &&
-        (detail.startsWith('Actualizar') ||
-          detail.startsWith('Redescubrir') ||
-          detail.startsWith('Alta Estudio') ||
-          detail.startsWith('Termina '))
+        (detail.startsWith("Actualizar") ||
+          detail.startsWith("Redescubrir") ||
+          detail.startsWith("Alta Estudio") ||
+          detail.startsWith("Termina "))
       ) {
         snap.clear();
       }

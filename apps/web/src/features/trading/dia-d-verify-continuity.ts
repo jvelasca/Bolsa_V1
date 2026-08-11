@@ -13,13 +13,13 @@ import type {
   BacktestEquityPointDto,
   BacktestRunDetailDto,
   BacktestTradeDto,
-} from '@bolsa/shared';
-import { isoDateUTC } from '@/features/backtests/backtest-period';
-import { equityCurveFromDetail } from '@/features/backtests/backtest-export';
+} from "@bolsa/shared";
+import { isoDateUTC } from "@/features/backtests/backtest-period";
+import { equityCurveFromDetail } from "@/features/backtests/backtest-export";
 import {
   maxDrawdownPct,
   rebuildEquityCurve,
-} from '@/features/trading/dia-d-gate-equity';
+} from "@/features/trading/dia-d-gate-equity";
 
 /** Años de historial previo a D para warmup (cubre SMA 200 / SuperTrend). */
 export const VERIFY_LOOKBACK_YEARS = 3;
@@ -29,7 +29,10 @@ export function dayKey(timestamp: string): string {
 }
 
 /** dateFrom del POST Verify: D − N años (nunca posterior a D). */
-export function verifyApiDateFrom(diaD: string, years = VERIFY_LOOKBACK_YEARS): string {
+export function verifyApiDateFrom(
+  diaD: string,
+  years = VERIFY_LOOKBACK_YEARS,
+): string {
   const raw = diaD.trim().slice(0, 10);
   const d = new Date(`${raw}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return raw;
@@ -57,7 +60,7 @@ export function portfolioJustBeforeDiaD(
   for (const trade of trades) {
     if (dayKey(trade.timestamp) >= d) break;
     const notional = trade.price * trade.quantity;
-    if (trade.type === 'buy') {
+    if (trade.type === "buy") {
       cash -= notional;
       shares += trade.quantity;
     } else {
@@ -130,15 +133,20 @@ export function sliceDetailFromDiaD(
     equityCurve = equityFromDiaD(fullCurve, d);
   }
 
-  const equityAtStart = equityCurve[0]?.equity ?? (port.equity > 0 ? port.equity : detail.initialCash);
+  const equityAtStart =
+    equityCurve[0]?.equity ??
+    (port.equity > 0 ? port.equity : detail.initialCash);
   const finalEquity =
     equityCurve.length > 0
       ? equityCurve[equityCurve.length - 1]!.equity
       : equityAtStart;
   const totalReturnPct =
-    equityAtStart > 0 ? ((finalEquity - equityAtStart) / equityAtStart) * 100 : 0;
+    equityAtStart > 0
+      ? ((finalEquity - equityAtStart) / equityAtStart) * 100
+      : 0;
 
-  const firstOos = fromDBars[0]?.timestamp ?? oosTrades[0]?.timestamp ?? detail.firstDate;
+  const firstOos =
+    fromDBars[0]?.timestamp ?? oosTrades[0]?.timestamp ?? detail.firstDate;
   const lastOos =
     fromDBars[fromDBars.length - 1]?.timestamp ??
     oosTrades[oosTrades.length - 1]?.timestamp ??

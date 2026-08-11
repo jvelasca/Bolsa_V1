@@ -1,58 +1,58 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { api } from '@/lib/api';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { api } from "@/lib/api";
 import {
   collectEstudioIdsNeedingUpdate,
   resumeEstudioInstrumentsUpdate,
   runEstudioInstrumentsUpdate,
-} from '@/features/trading/estudio-instruments-update';
+} from "@/features/trading/estudio-instruments-update";
 import {
   beginEstudioUpdateRun,
   clearEstudioUpdatePauseCheckpoint,
   clearEstudioUpdateSoftStop,
   getEstudioUpdatePauseCheckpoint,
   requestEstudioUpdateSoftStop,
-} from '@/features/trading/estudio-update-control';
-import { ESTUDIO_LANE_STAMPS_KEY } from '@/features/trading/estudio-lane-stamps';
-import { ESTUDIO_SUPERVISION_KEY } from '@/features/trading/estudio-supervision';
-import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
+} from "@/features/trading/estudio-update-control";
+import { ESTUDIO_LANE_STAMPS_KEY } from "@/features/trading/estudio-lane-stamps";
+import { ESTUDIO_SUPERVISION_KEY } from "@/features/trading/estudio-supervision";
+import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 
-vi.mock('@/lib/api', () => ({
+vi.mock("@/lib/api", () => ({
   api: {
     syncInstrument: vi.fn(async () => ({
-      data: { barsAdded: 1, status: 'ok' },
+      data: { barsAdded: 1, status: "ok" },
     })),
   },
 }));
 
-vi.mock('@/features/backtests/core-r-scheduler-tick', () => ({
+vi.mock("@/features/backtests/core-r-scheduler-tick", () => ({
   runCoreRSchedulerTick: vi.fn(async () => ({ ok: true })),
 }));
 
-vi.mock('@/features/trading/estudio-process-status', async () => {
-  const actual =
-    await vi.importActual<typeof import('@/features/trading/estudio-process-status')>(
-      '@/features/trading/estudio-process-status',
-    );
+vi.mock("@/features/trading/estudio-process-status", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/features/trading/estudio-process-status")
+  >("@/features/trading/estudio-process-status");
   return {
     ...actual,
     emitEstudioProcessRunning: vi.fn(),
-    laneFromListAutoMode: (forceRescan: boolean) => (forceRescan ? 'rediscover' : 'freshness'),
+    laneFromListAutoMode: (forceRescan: boolean) =>
+      forceRescan ? "rediscover" : "freshness",
   };
 });
 
-describe('collectEstudioIdsNeedingUpdate', () => {
+describe("collectEstudioIdsNeedingUpdate", () => {
   beforeEach(() => {
     localStorage.removeItem(ESTUDIO_LANE_STAMPS_KEY);
     localStorage.removeItem(ESTUDIO_SUPERVISION_KEY);
   });
 
-  it('marks instruments without stamps as needing update', () => {
-    const ids = collectEstudioIdsNeedingUpdate(['a', 'b']);
-    expect(ids).toEqual(['a', 'b']);
+  it("marks instruments without stamps as needing update", () => {
+    const ids = collectEstudioIdsNeedingUpdate(["a", "b"]);
+    expect(ids).toEqual(["a", "b"]);
   });
 });
 
-describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
+describe("runEstudioInstrumentsUpdate soft-stop / resume", () => {
   const onProgress = () => {};
 
   beforeEach(() => {
@@ -70,8 +70,8 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
     useListAutoActivityStore.getState().clear();
   });
 
-  it('PAUSA (soft-stop) tras un valor deja checkpoint y RETOMA desde ahí al reanudar', async () => {
-    const ids = ['a', 'b', 'c'];
+  it("PAUSA (soft-stop) tras un valor deja checkpoint y RETOMA desde ahí al reanudar", async () => {
+    const ids = ["a", "b", "c"];
     const symbolOf = (id: string) => `SYM-${id}`;
 
     // Control determinista: bloquear la 1ª sync hasta que decidamos.
@@ -81,13 +81,13 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
     vi.mocked(api.syncInstrument).mockImplementation(async (_id: string) => {
       calls += 1;
       if (calls === 1) await firstGate; // pausa el ciclo justo en "a"
-      return { data: { barsAdded: 1, status: 'ok' } };
+      return { data: { barsAdded: 1, status: "ok" } };
     });
 
     const resolving = runEstudioInstrumentsUpdate({
       instrumentIds: ids,
       rediscover: false,
-      phaseLabel: 'Actualizar',
+      phaseLabel: "Actualizar",
       symbolOf,
       onProgress,
     });
@@ -107,9 +107,9 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
     const paused = useListAutoActivityStore.getState();
     expect(paused.paused).toBe(true);
     expect(paused.active).toBe(true);
-    expect(paused.symbol).toBe('SYM-b');
-    expect(paused.detail).toContain('SYM-b');
-    expect(paused.detail).toContain('quedan 2');
+    expect(paused.symbol).toBe("SYM-b");
+    expect(paused.detail).toContain("SYM-b");
+    expect(paused.detail).toContain("quedan 2");
 
     // Reanudar desde el checkpoint: continúa sincronizando "b" y "c".
     await resumeEstudioInstrumentsUpdate();
@@ -120,8 +120,8 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
     expect(final.paused).toBe(false);
   });
 
-  it('si el soft-stop llega tras completar el sync, deja checkpoint con nextIndex=length (falta vigilia/Lab)', async () => {
-    const ids = ['a', 'b'];
+  it("si el soft-stop llega tras completar el sync, deja checkpoint con nextIndex=length (falta vigilia/Lab)", async () => {
+    const ids = ["a", "b"];
     beginEstudioUpdateRun();
     clearEstudioUpdateSoftStop();
 
@@ -134,13 +134,13 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
       await new Promise<void>((resolve) => {
         gates[idx] = resolve;
       });
-      return { data: { barsAdded: 1, status: 'ok' } };
+      return { data: { barsAdded: 1, status: "ok" } };
     });
 
     const running = runEstudioInstrumentsUpdate({
       instrumentIds: ids,
       rediscover: true,
-      phaseLabel: 'Redescubrir',
+      phaseLabel: "Redescubrir",
       symbolOf: (id) => `SYM-${id}`,
     });
 
@@ -165,22 +165,22 @@ describe('runEstudioInstrumentsUpdate soft-stop / resume', () => {
     expect(snap.paused).toBe(true);
   });
 
-  it('sobreescritura: no arranca una segunda tanda si ya hay actividad Estudio activa no pausada', async () => {
+  it("sobreescritura: no arranca una segunda tanda si ya hay actividad Estudio activa no pausada", async () => {
     useListAutoActivityStore.getState().publish({
       active: true,
       paused: false,
-      listId: 'estudio',
-      listName: 'Estudio',
+      listId: "estudio",
+      listName: "Estudio",
       index: 0,
       total: 2,
-      symbol: 'A',
-      detail: 'Actualizar · A',
+      symbol: "A",
+      detail: "Actualizar · A",
     });
 
     await runEstudioInstrumentsUpdate({
-      instrumentIds: ['x', 'y'],
+      instrumentIds: ["x", "y"],
       rediscover: false,
-      phaseLabel: 'Actualizar',
+      phaseLabel: "Actualizar",
       symbolOf: (id) => id,
     });
 

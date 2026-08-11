@@ -3,8 +3,8 @@
  * Montar una vez en PlatformShell. No toca Visualizados.
  */
 
-import { useEffect, useRef } from 'react';
-import { hydrateEstudioMembershipFromApi } from '@/features/trading/estudio-membership';
+import { useEffect, useRef } from "react";
+import { hydrateEstudioMembershipFromApi } from "@/features/trading/estudio-membership";
 
 export function EstudioApiSync() {
   const ran = useRef(false);

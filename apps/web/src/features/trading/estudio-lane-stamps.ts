@@ -11,10 +11,10 @@
  * @see docs/adr/024-estudio-supervision-universe.md
  */
 
-import type { EstudioProcessLaneId } from '@/features/trading/estudio-process-status';
+import type { EstudioProcessLaneId } from "@/features/trading/estudio-process-status";
 
-export const ESTUDIO_LANE_STAMPS_KEY = 'bolsa-estudio-lane-stamps-v1';
-export const ESTUDIO_LANE_STAMPS_EVENT = 'bolsa-estudio-lane-stamps';
+export const ESTUDIO_LANE_STAMPS_KEY = "bolsa-estudio-lane-stamps-v1";
+export const ESTUDIO_LANE_STAMPS_EVENT = "bolsa-estudio-lane-stamps";
 
 export type EstudioLaneStampsMap = Record<
   string,
@@ -22,12 +22,12 @@ export type EstudioLaneStampsMap = Record<
 >;
 
 export function loadEstudioLaneStamps(): EstudioLaneStampsMap {
-  if (typeof localStorage === 'undefined') return {};
+  if (typeof localStorage === "undefined") return {};
   try {
     const raw = localStorage.getItem(ESTUDIO_LANE_STAMPS_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as EstudioLaneStampsMap;
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
@@ -80,7 +80,7 @@ export function readEstudioLaneStamp(
   lane: EstudioProcessLaneId,
 ): string | null {
   const at = loadEstudioLaneStamps()[instrumentId]?.[lane];
-  return typeof at === 'string' && at ? at : null;
+  return typeof at === "string" && at ? at : null;
 }
 
 /** El más reciente entre dos ISO. */

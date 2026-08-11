@@ -12,14 +12,14 @@
  * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A1
  */
 
-import { DEMO_BOOK_AUTO_UI_ENABLED } from '@/features/trading/demo-book-auto-copy';
+import { DEMO_BOOK_AUTO_UI_ENABLED } from "@/features/trading/demo-book-auto-copy";
 
-export const DEMO_BOOK_PREFS_KEY = 'bolsa-demo-book-prefs-v1';
+export const DEMO_BOOK_PREFS_KEY = "bolsa-demo-book-prefs-v1";
 
-export type DemoBookMode = 'manual' | 'semi' | 'auto';
+export type DemoBookMode = "manual" | "semi" | "auto";
 
 /** Preferencia suave de diversificación geográfica (no veto duro). */
-export type DemoBookCountryPrefer = 'home_first' | 'europe_first' | 'global_ok';
+export type DemoBookCountryPrefer = "home_first" | "europe_first" | "global_ok";
 
 export type DemoBookPrefs = {
   /** MANUAL = aviso · SEMI = Confirm F3 · AUTO reserved (A1: UI disabled). */
@@ -38,43 +38,52 @@ export const DEMO_BOOK_SIZE_PCT_MAX = 100;
 
 export function defaultDemoBookPrefs(): DemoBookPrefs {
   return {
-    mode: 'semi',
+    mode: "semi",
     maxOpenPositions: 10,
     defaultSizePctOfCash: 10,
-    countryPrefer: 'home_first',
+    countryPrefer: "home_first",
   };
 }
 
-function clampInt(n: number, min: number, max: number, fallback: number): number {
+function clampInt(
+  n: number,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
 export function normalizeDemoBookPrefs(raw: unknown): DemoBookPrefs {
   const d = defaultDemoBookPrefs();
-  if (!raw || typeof raw !== 'object') return d;
+  if (!raw || typeof raw !== "object") return d;
   const o = raw as Partial<DemoBookPrefs>;
   const modeRaw: DemoBookMode =
-    o.mode === 'manual' || o.mode === 'semi' || o.mode === 'auto' ? o.mode : d.mode;
+    o.mode === "manual" || o.mode === "semi" || o.mode === "auto"
+      ? o.mode
+      : d.mode;
   // A1: no persistir AUTO seleccionable hasta DEMO_BOOK_AUTO_UI_ENABLED.
   const mode: DemoBookMode =
-    modeRaw === 'auto' && !DEMO_BOOK_AUTO_UI_ENABLED ? 'semi' : modeRaw;
+    modeRaw === "auto" && !DEMO_BOOK_AUTO_UI_ENABLED ? "semi" : modeRaw;
   const countryPrefer: DemoBookCountryPrefer =
-    o.countryPrefer === 'home_first' ||
-    o.countryPrefer === 'europe_first' ||
-    o.countryPrefer === 'global_ok'
+    o.countryPrefer === "home_first" ||
+    o.countryPrefer === "europe_first" ||
+    o.countryPrefer === "global_ok"
       ? o.countryPrefer
       : d.countryPrefer;
   return {
     mode,
     maxOpenPositions: clampInt(
-      typeof o.maxOpenPositions === 'number' ? o.maxOpenPositions : d.maxOpenPositions,
+      typeof o.maxOpenPositions === "number"
+        ? o.maxOpenPositions
+        : d.maxOpenPositions,
       DEMO_BOOK_MAX_OPEN_MIN,
       DEMO_BOOK_MAX_OPEN_MAX,
       d.maxOpenPositions,
     ),
     defaultSizePctOfCash: clampInt(
-      typeof o.defaultSizePctOfCash === 'number'
+      typeof o.defaultSizePctOfCash === "number"
         ? o.defaultSizePctOfCash
         : d.defaultSizePctOfCash,
       DEMO_BOOK_SIZE_PCT_MIN,
@@ -108,10 +117,10 @@ function prefsEqual(a: DemoBookPrefs, b: DemoBookPrefs): boolean {
 let cachedClientSnapshot: DemoBookPrefs | null = null;
 
 const SERVER_SNAPSHOT: DemoBookPrefs = {
-  mode: 'semi',
+  mode: "semi",
   maxOpenPositions: 10,
   defaultSizePctOfCash: 10,
-  countryPrefer: 'home_first',
+  countryPrefer: "home_first",
 };
 
 function rememberSnapshot(next: DemoBookPrefs): DemoBookPrefs {
@@ -129,7 +138,9 @@ export function saveDemoBookPrefs(prefs: DemoBookPrefs): void {
   notifyDemoBookPrefs();
 }
 
-export function patchDemoBookPrefs(patch: Partial<DemoBookPrefs>): DemoBookPrefs {
+export function patchDemoBookPrefs(
+  patch: Partial<DemoBookPrefs>,
+): DemoBookPrefs {
   const next = normalizeDemoBookPrefs({ ...loadDemoBookPrefs(), ...patch });
   saveDemoBookPrefs(next);
   return next;
@@ -153,13 +164,13 @@ function onDemoBookPrefsStorage(e: StorageEvent) {
 /** Suscripción misma-pestaña; también reacciona a `storage` entre pestañas. */
 export function subscribeDemoBookPrefs(listener: () => void): () => void {
   demoBookPrefsListeners.add(listener);
-  if (demoBookPrefsListeners.size === 1 && typeof window !== 'undefined') {
-    window.addEventListener('storage', onDemoBookPrefsStorage);
+  if (demoBookPrefsListeners.size === 1 && typeof window !== "undefined") {
+    window.addEventListener("storage", onDemoBookPrefsStorage);
   }
   return () => {
     demoBookPrefsListeners.delete(listener);
-    if (demoBookPrefsListeners.size === 0 && typeof window !== 'undefined') {
-      window.removeEventListener('storage', onDemoBookPrefsStorage);
+    if (demoBookPrefsListeners.size === 0 && typeof window !== "undefined") {
+      window.removeEventListener("storage", onDemoBookPrefsStorage);
     }
   };
 }
@@ -178,12 +189,12 @@ export function getDemoBookPrefsServerSnapshot(): DemoBookPrefs {
 
 /** SEMI permite encolar Confirm; MANUAL solo aviso; AUTO reserved (execute nunca hasta thaw). */
 export function demoBookAllowsEnqueueConfirm(mode: DemoBookMode): boolean {
-  return mode === 'semi' || mode === 'auto';
+  return mode === "semi" || mode === "auto";
 }
 
 /** Solo SEMI ejecuta Confirm hoy. AUTO → false aunque el modo exista en tipos. */
 export function demoBookAllowsExecute(mode: DemoBookMode): boolean {
-  return mode === 'semi';
+  return mode === "semi";
 }
 
 /**
@@ -191,12 +202,11 @@ export function demoBookAllowsExecute(mode: DemoBookMode): boolean {
  * MANUAL no lo exige (puedes operar sin meterlo en el universo).
  */
 export function demoBookRequiresEstudioMembership(mode: DemoBookMode): boolean {
-  return mode === 'semi' || mode === 'auto';
+  return mode === "semi" || mode === "auto";
 }
 
 export const ESTUDIO_MEMBERSHIP_REQUIRED_MSG =
-  'SEMI/AUTO requieren el valor en la lista Estudio. Añádelo desde Listas (selección → A Estudio) o abriendo el gráfico.';
-
+  "SEMI/AUTO requieren el valor en la lista Estudio. Añádelo desde Listas (selección → A Estudio) o abriendo el gráfico.";
 
 /**
  * Cantidad entera sugerida: floor((cash * pct/100) / price).
@@ -209,7 +219,12 @@ export function suggestQuantityFromCash(opts: {
 }): number {
   const cash = Number(opts.cash);
   const price = Number(opts.price);
-  const pct = clampInt(opts.sizePctOfCash, DEMO_BOOK_SIZE_PCT_MIN, DEMO_BOOK_SIZE_PCT_MAX, 10);
+  const pct = clampInt(
+    opts.sizePctOfCash,
+    DEMO_BOOK_SIZE_PCT_MIN,
+    DEMO_BOOK_SIZE_PCT_MAX,
+    10,
+  );
   if (!(cash > 0) || !(price > 0)) return 0;
   const budget = cash * (pct / 100);
   if (budget < price) return 0;

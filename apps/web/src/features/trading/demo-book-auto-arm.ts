@@ -3,7 +3,7 @@
  * No habilita execute; `DEMO_BOOK_AUTO_UI_ENABLED` sigue false hasta thaw.
  */
 
-export const DEMO_BOOK_AUTO_ARM_KEY = 'bolsa-demo-book-auto-arm-v1';
+export const DEMO_BOOK_AUTO_ARM_KEY = "bolsa-demo-book-auto-arm-v1";
 
 export type DemoBookAutoArm = {
   /** Usuario completó doble confirmación (prep). */
@@ -13,7 +13,7 @@ export type DemoBookAutoArm = {
   confirmPhrase: string | null;
 };
 
-export const AUTO_ARM_CONFIRM_PHRASE = 'ACTIVAR AUTO';
+export const AUTO_ARM_CONFIRM_PHRASE = "ACTIVAR AUTO";
 
 export function defaultAutoArm(): DemoBookAutoArm {
   return { armed: false, armedAt: null, confirmPhrase: null };
@@ -26,8 +26,9 @@ export function loadAutoArm(): DemoBookAutoArm {
     const o = JSON.parse(raw) as Partial<DemoBookAutoArm>;
     return {
       armed: Boolean(o.armed),
-      armedAt: typeof o.armedAt === 'string' ? o.armedAt : null,
-      confirmPhrase: typeof o.confirmPhrase === 'string' ? o.confirmPhrase : null,
+      armedAt: typeof o.armedAt === "string" ? o.armedAt : null,
+      confirmPhrase:
+        typeof o.confirmPhrase === "string" ? o.confirmPhrase : null,
     };
   } catch {
     return defaultAutoArm();
@@ -36,7 +37,7 @@ export function loadAutoArm(): DemoBookAutoArm {
 
 export function saveAutoArm(arm: DemoBookAutoArm): void {
   localStorage.setItem(DEMO_BOOK_AUTO_ARM_KEY, JSON.stringify(arm));
-  window.dispatchEvent(new Event('bolsa-demo-book-auto-arm'));
+  window.dispatchEvent(new Event("bolsa-demo-book-auto-arm"));
 }
 
 export function disarmAutoArm(): DemoBookAutoArm {
@@ -46,7 +47,9 @@ export function disarmAutoArm(): DemoBookAutoArm {
 }
 
 /** Doble paso: step1 OK + phrase exacta → armed. */
-export function tryArmAuto(phrase: string): { ok: true; arm: DemoBookAutoArm } | { ok: false; error: string } {
+export function tryArmAuto(
+  phrase: string,
+): { ok: true; arm: DemoBookAutoArm } | { ok: false; error: string } {
   if (phrase.trim() !== AUTO_ARM_CONFIRM_PHRASE) {
     return {
       ok: false,

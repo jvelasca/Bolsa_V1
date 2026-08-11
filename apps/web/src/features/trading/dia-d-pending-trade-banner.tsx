@@ -29,14 +29,20 @@ export function DiaDPendingTradeBanner({
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[11px]">
       <span className="font-semibold text-amber-950 dark:text-amber-50">
-        Propuesta {mode === 'manual' ? 'Manual' : 'Semi'}
+        Propuesta {mode === "manual" ? "Manual" : "Semi"}
       </span>
       <span className="tabular-nums">
-        {pendingTrade.type.toUpperCase()} · {formatDateDdMmYyyy(pendingTrade.timestamp)} ·{' '}
+        {pendingTrade.type.toUpperCase()} ·{" "}
+        {formatDateDdMmYyyy(pendingTrade.timestamp)} ·{" "}
         {formatPrice(pendingTrade.price)}
-        {pendingTrade.reason ? ` · ${pendingTrade.reason}` : ''}
+        {pendingTrade.reason ? ` · ${pendingTrade.reason}` : ""}
       </span>
-      <Button type="button" size="sm" className="h-6 px-2 text-[10px]" onClick={onAccept}>
+      <Button
+        type="button"
+        size="sm"
+        className="h-6 px-2 text-[10px]"
+        onClick={onAccept}
+      >
         Aceptar
       </Button>
       <Button

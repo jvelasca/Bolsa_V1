@@ -6,25 +6,25 @@
  * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A1–A3
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 
-import { cn } from '@/lib/utils';
-import { api } from '@/lib/api';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
+import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
 import {
   AUTO_ARM_CONFIRM_PHRASE,
   disarmAutoArm,
   loadAutoArm,
   tryArmAuto,
   type DemoBookAutoArm,
-} from '@/features/trading/demo-book-auto-arm';
+} from "@/features/trading/demo-book-auto-arm";
 import {
   DEMO_BOOK_AUTO_FOOTER,
   DEMO_BOOK_AUTO_RISK_LINES,
   DEMO_BOOK_AUTO_TOOLTIP,
   DEMO_BOOK_AUTO_UI_ENABLED,
-} from '@/features/trading/demo-book-auto-copy';
+} from "@/features/trading/demo-book-auto-copy";
 import {
   DEMO_BOOK_MAX_OPEN_MAX,
   DEMO_BOOK_MAX_OPEN_MIN,
@@ -34,19 +34,19 @@ import {
   type DemoBookCountryPrefer,
   type DemoBookMode,
   type DemoBookPrefs,
-} from '@/features/trading/demo-book-prefs';
-import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
+} from "@/features/trading/demo-book-prefs";
+import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 
 const MODE_LABEL: Record<DemoBookMode, string> = {
-  manual: 'Manual',
-  semi: 'Semi',
-  auto: 'Auto',
+  manual: "Manual",
+  semi: "Semi",
+  auto: "Auto",
 };
 
 const GEO_LABEL: Record<DemoBookCountryPrefer, string> = {
-  home_first: 'País primero',
-  europe_first: 'Europa primero',
-  global_ok: 'Sin preferencia',
+  home_first: "País primero",
+  europe_first: "Europa primero",
+  global_ok: "Sin preferencia",
 };
 
 type Props = {
@@ -57,28 +57,30 @@ type Props = {
 export function DemoBookModePanel({ className, compact }: Props) {
   const { account } = useActiveAccount();
   const prefs = useDemoBookPrefs();
-  const accountTitle = account?.name?.trim() || 'Sin cuenta activa';
+  const accountTitle = account?.name?.trim() || "Sin cuenta activa";
   const qc = useQueryClient();
 
   const [arm, setArm] = useState<DemoBookAutoArm>(() =>
-    typeof window === 'undefined' ? { armed: false, armedAt: null, confirmPhrase: null } : loadAutoArm(),
+    typeof window === "undefined"
+      ? { armed: false, armedAt: null, confirmPhrase: null }
+      : loadAutoArm(),
   );
   const [armStep, setArmStep] = useState<0 | 1 | 2>(0);
-  const [armPhrase, setArmPhrase] = useState('');
+  const [armPhrase, setArmPhrase] = useState("");
   const [armError, setArmError] = useState<string | null>(null);
 
   useEffect(() => {
     const sync = () => setArm(loadAutoArm());
-    window.addEventListener('bolsa-demo-book-auto-arm', sync);
-    window.addEventListener('storage', sync);
+    window.addEventListener("bolsa-demo-book-auto-arm", sync);
+    window.addEventListener("storage", sync);
     return () => {
-      window.removeEventListener('bolsa-demo-book-auto-arm', sync);
-      window.removeEventListener('storage', sync);
+      window.removeEventListener("bolsa-demo-book-auto-arm", sync);
+      window.removeEventListener("storage", sync);
     };
   }, []);
 
   const killQ = useQuery({
-    queryKey: ['risk-kill-switch'],
+    queryKey: ["risk-kill-switch"],
     queryFn: () => api.getRiskKillSwitch(),
     refetchInterval: 15_000,
   });
@@ -86,7 +88,7 @@ export function DemoBookModePanel({ className, compact }: Props) {
   const killMut = useMutation({
     mutationFn: (enabled: boolean) => api.setRiskKillSwitch(enabled),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['risk-kill-switch'] });
+      void qc.invalidateQueries({ queryKey: ["risk-kill-switch"] });
     },
   });
 
@@ -102,7 +104,7 @@ export function DemoBookModePanel({ className, compact }: Props) {
     }
     setArm(result.arm);
     setArmStep(0);
-    setArmPhrase('');
+    setArmPhrase("");
     setArmError(null);
   }, [armPhrase]);
 
@@ -111,7 +113,7 @@ export function DemoBookModePanel({ className, compact }: Props) {
   return (
     <div
       className={cn(
-        'space-y-2 rounded-md border border-border/80 bg-muted/20 p-2 text-[11px]',
+        "space-y-2 rounded-md border border-border/80 bg-muted/20 p-2 text-[11px]",
         className,
       )}
       data-testid="demo-book-mode-panel"
@@ -125,8 +127,8 @@ export function DemoBookModePanel({ className, compact }: Props) {
         ) : null}
       </p>
       <div className="flex flex-wrap gap-1">
-        {(['manual', 'semi', 'auto'] as const).map((mode) => {
-          const disabled = mode === 'auto' && !DEMO_BOOK_AUTO_UI_ENABLED;
+        {(["manual", "semi", "auto"] as const).map((mode) => {
+          const disabled = mode === "auto" && !DEMO_BOOK_AUTO_UI_ENABLED;
           const active = prefs.mode === mode;
           return (
             <button
@@ -137,20 +139,20 @@ export function DemoBookModePanel({ className, compact }: Props) {
               title={
                 disabled
                   ? DEMO_BOOK_AUTO_TOOLTIP
-                  : mode === 'manual'
-                    ? 'Solo avisos · sin Confirm automático'
-                    : 'Propuestas → Confirm F3 → DEMO'
+                  : mode === "manual"
+                    ? "Solo avisos · sin Confirm automático"
+                    : "Propuestas → Confirm F3 → DEMO"
               }
               onClick={() => {
-                if (mode === 'auto' && !DEMO_BOOK_AUTO_UI_ENABLED) return;
+                if (mode === "auto" && !DEMO_BOOK_AUTO_UI_ENABLED) return;
                 update({ mode });
               }}
               className={cn(
-                'rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                 active
-                  ? 'border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
-                  : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground',
-                disabled && 'border-dashed',
+                  ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+                  : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                disabled && "border-dashed",
               )}
             >
               {MODE_LABEL[mode]}
@@ -169,23 +171,25 @@ export function DemoBookModePanel({ className, compact }: Props) {
         <button
           type="button"
           className={cn(
-            'rounded border px-2 py-0.5 text-[10px] font-medium',
+            "rounded border px-2 py-0.5 text-[10px] font-medium",
             killOn
-              ? 'border-red-500/60 bg-red-500/15 text-red-800 dark:text-red-300'
-              : 'border-border text-muted-foreground hover:text-foreground',
+              ? "border-red-500/60 bg-red-500/15 text-red-800 dark:text-red-300"
+              : "border-border text-muted-foreground hover:text-foreground",
           )}
           disabled={killMut.isPending}
           title="OR-P7: bloquea aperturas automáticas (Risk Engine) en &lt;1s"
           onClick={() => killMut.mutate(!killOn)}
         >
-          {killOn ? 'Kill switch ON' : 'Kill switch off'}
+          {killOn ? "Kill switch ON" : "Kill switch off"}
         </button>
         {killQ.data?.paperDExecuteEnv ? (
           <span className="text-[10px] text-amber-700 dark:text-amber-300">
             PAPER_D_EXECUTE=1
           </span>
         ) : (
-          <span className="text-[10px] text-muted-foreground">PAPER_D_EXECUTE off</span>
+          <span className="text-[10px] text-muted-foreground">
+            PAPER_D_EXECUTE off
+          </span>
         )}
         {arm.armed ? (
           <button
@@ -206,7 +210,7 @@ export function DemoBookModePanel({ className, compact }: Props) {
             onClick={() => {
               setArmStep(1);
               setArmError(null);
-              setArmPhrase('');
+              setArmPhrase("");
             }}
           >
             Armar AUTO (doble confirm)
@@ -222,8 +226,8 @@ export function DemoBookModePanel({ className, compact }: Props) {
           {armStep === 1 ? (
             <>
               <p className="text-[10px] text-foreground">
-                Paso 1/2 — AUTO execute sigue congelado. Esto solo registra intención local
-                (checklist P8). ¿Continuar?
+                Paso 1/2 — AUTO execute sigue congelado. Esto solo registra
+                intención local (checklist P8). ¿Continuar?
               </p>
               <div className="flex gap-1">
                 <button
@@ -245,7 +249,8 @@ export function DemoBookModePanel({ className, compact }: Props) {
           ) : (
             <>
               <p className="text-[10px] text-foreground">
-                Paso 2/2 — escribe <code className="text-[10px]">{AUTO_ARM_CONFIRM_PHRASE}</code>
+                Paso 2/2 — escribe{" "}
+                <code className="text-[10px]">{AUTO_ARM_CONFIRM_PHRASE}</code>
               </p>
               <input
                 value={armPhrase}
@@ -255,7 +260,9 @@ export function DemoBookModePanel({ className, compact }: Props) {
                 aria-label="Frase de confirmación AUTO"
               />
               {armError ? (
-                <p className="text-[10px] text-red-600 dark:text-red-400">{armError}</p>
+                <p className="text-[10px] text-red-600 dark:text-red-400">
+                  {armError}
+                </p>
               ) : null}
               <div className="flex gap-1">
                 <button
@@ -283,7 +290,9 @@ export function DemoBookModePanel({ className, compact }: Props) {
           className="space-y-1 border-t border-border/60 pt-1.5 text-[10px] leading-snug text-muted-foreground"
           data-testid="demo-book-auto-risk"
         >
-          <p className="font-medium text-foreground/80">AUTO (Camino D) — riesgos</p>
+          <p className="font-medium text-foreground/80">
+            AUTO (Camino D) — riesgos
+          </p>
           <ul className="list-disc space-y-0.5 pl-3.5">
             {DEMO_BOOK_AUTO_RISK_LINES.map((line) => (
               <li key={line}>{line}</li>
@@ -291,7 +300,9 @@ export function DemoBookModePanel({ className, compact }: Props) {
           </ul>
         </div>
       ) : null}
-      <div className={cn('grid gap-1.5', compact ? 'grid-cols-1' : 'grid-cols-2')}>
+      <div
+        className={cn("grid gap-1.5", compact ? "grid-cols-1" : "grid-cols-2")}
+      >
         <label className="flex flex-col gap-0.5">
           <span className="text-muted-foreground">Máx. posiciones</span>
           <input
@@ -319,7 +330,9 @@ export function DemoBookModePanel({ className, compact }: Props) {
             title="Por defecto ~10% del efectivo disponible"
           />
         </label>
-        <label className={cn('flex flex-col gap-0.5', compact ? '' : 'col-span-2')}>
+        <label
+          className={cn("flex flex-col gap-0.5", compact ? "" : "col-span-2")}
+        >
           <span className="text-muted-foreground">Preferencia geo</span>
           <select
             value={prefs.countryPrefer}
@@ -337,7 +350,9 @@ export function DemoBookModePanel({ className, compact }: Props) {
           </select>
         </label>
       </div>
-      <p className="text-[10px] leading-snug text-muted-foreground">{DEMO_BOOK_AUTO_FOOTER}</p>
+      <p className="text-[10px] leading-snug text-muted-foreground">
+        {DEMO_BOOK_AUTO_FOOTER}
+      </p>
     </div>
   );
 }
