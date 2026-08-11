@@ -3,17 +3,17 @@
  * Montado en PlatformShell (junto al Radar inbox poller).
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from "react";
 import {
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   mapOpinionToChannel,
-} from '@bolsa/shared';
-import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
-import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
-import { useAlertsStore } from '@/stores/alerts-store';
-import { useNotificationPrefsStore } from '@/stores/notification-prefs-store';
+} from "@bolsa/shared";
+import { useInstrumentDailyOpinions } from "@/features/trading/use-instrument-daily-opinions";
+import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
+import { useAlertsStore } from "@/stores/alerts-store";
+import { useNotificationPrefsStore } from "@/stores/notification-prefs-store";
 
-const SEEN_KEY = 'bolsa-estudio-alarma-seen-v1';
+const SEEN_KEY = "bolsa-estudio-alarma-seen-v1";
 const POLL_MS = 60_000;
 
 function loadSeen(): Set<string> {
@@ -22,7 +22,7 @@ function loadSeen(): Set<string> {
     if (!raw) return new Set();
     const arr = JSON.parse(raw) as unknown;
     if (!Array.isArray(arr)) return new Set();
-    return new Set(arr.filter((x): x is string => typeof x === 'string'));
+    return new Set(arr.filter((x): x is string => typeof x === "string"));
   } catch {
     return new Set();
   }
@@ -36,19 +36,23 @@ function saveSeen(seen: Set<string>): void {
   }
 }
 
-function fingerprint(instrumentId: string, asOf: string, stance: string, stars: number): string {
+function fingerprint(
+  instrumentId: string,
+  asOf: string,
+  stance: string,
+  stars: number,
+): string {
   return `${instrumentId}|${asOf}|${stance}|${stars}`;
 }
 
 export function EstudioOpinionAlarmPoller() {
   // Selector estable: no devolver .map() desde Zustand (rompe Object.is → loop).
   const entries = useEstudioMembershipStore((s) => s.members);
-  const studyIds = useMemo(
-    () => entries.map((e) => e.instrumentId),
-    [entries],
-  );
+  const studyIds = useMemo(() => entries.map((e) => e.instrumentId), [entries]);
   const pushToast = useAlertsStore((s) => s.pushToast);
-  const alarmaToastEnabled = useNotificationPrefsStore((s) => s.alarmaToastEnabled);
+  const alarmaToastEnabled = useNotificationPrefsStore(
+    (s) => s.alarmaToastEnabled,
+  );
   const seenRef = useRef<Set<string> | null>(null);
   const primedRef = useRef(false);
 
@@ -65,11 +69,21 @@ export function EstudioOpinionAlarmPoller() {
 
     const symbolById = new Map(entries.map((e) => [e.instrumentId, e.symbol]));
     const seen = seenRef.current;
-    const fresh: Array<{ symbol: string; stance: string; stars: number; key: string }> = [];
+    const fresh: Array<{
+      symbol: string;
+      stance: string;
+      stars: number;
+      key: string;
+    }> = [];
 
     for (const op of data) {
-      if (mapOpinionToChannel(op) !== 'alarma') continue;
-      const key = fingerprint(op.instrumentId, op.asOfBarDate, op.stance, op.dictamenStars);
+      if (mapOpinionToChannel(op) !== "alarma") continue;
+      const key = fingerprint(
+        op.instrumentId,
+        op.asOfBarDate,
+        op.stance,
+        op.dictamenStars,
+      );
       if (seen.has(key)) continue;
       fresh.push({
         key,
@@ -95,11 +109,14 @@ export function EstudioOpinionAlarmPoller() {
     const head = fresh
       .slice(0, 3)
       .map((f) => `${f.symbol} ${f.stance} ★${f.stars}`)
-      .join(' · ');
-    const more = fresh.length > 3 ? ` (+${fresh.length - 3})` : '';
-    pushToast(`Asesor · ${fresh.length} alarma${fresh.length === 1 ? '' : 's'}: ${head}${more}`, {
-      action: { type: 'open_asesor_opiniones', label: 'Ver Opiniones' },
-    });
+      .join(" · ");
+    const more = fresh.length > 3 ? ` (+${fresh.length - 3})` : "";
+    pushToast(
+      `Asesor · ${fresh.length} alarma${fresh.length === 1 ? "" : "s"}: ${head}${more}`,
+      {
+        action: { type: "open_asesor_opiniones", label: "Ver Opiniones" },
+      },
+    );
   }, [alarmaToastEnabled, opinionsQuery.data, entries, pushToast]);
 
   return null;
