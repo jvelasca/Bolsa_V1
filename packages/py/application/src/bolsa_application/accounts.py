@@ -509,11 +509,9 @@ class ExecuteTrade:
             fee_amount=fees.total,
         )
         amount = -result.transaction.total if trade_type == "buy" else result.transaction.total
-        trade_balance = (
-            result.summary.portfolio.cash + fees.total
-            if trade_type == "buy"
-            else result.summary.portfolio.cash - fees.total
-        )
+        # M3: balance_after = cash real grabado por el repo (ya incluye comisiones),
+        # NO un recálculo manual que doble-contaría las fees.
+        trade_balance = result.summary.portfolio.cash
         await self._ledger_repo.append_trade(
             account_id=scope.account.id,
             portfolio_id=scope.portfolio.id,
