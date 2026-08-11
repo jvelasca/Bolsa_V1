@@ -66,19 +66,22 @@ def _yahoo_component() -> ComponentHealthDto:
             message="Yahoo Finance client available (no live probe)",
             details=details,
         )
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover - defensive
+        # P2.5: no filtrar la excepción interna (detalle al público redactado).
         return ComponentHealthDto(
             status="error",
-            message=f"Yahoo health introspection failed: {exc}",
+            message="Yahoo health introspection failed",
         )
 
 
 def _xtb_component() -> ComponentHealthDto:
     settings = get_settings()
     if settings.xtb_bridge_url:
+        # P2.5: exponer la URL real del bridge filtra infraestructura interna;
+        # solo se informa del estado configurado, sin el valor.
         return ComponentHealthDto(
             status="configured",
-            message=f"XTB_BRIDGE_URL set ({settings.xtb_bridge_url})",
+            message="XTB_BRIDGE_URL set",
         )
     return ComponentHealthDto(
         status="disabled",
@@ -104,47 +107,35 @@ async def _redis_component() -> ComponentHealthDto:
         finally:
             await client.aclose()
         if pong:
-            return ComponentHealthDto(
-                status="ok",
-                message="Redis ping ok",
-                details={"url_host": url.split("@")[-1] if "@" in url else url},
-            )
+            # P2.5: no exponer host/URL de Redis; solo el estado.
+            return ComponentHealthDto(status="ok", message="Redis ping ok")
         return ComponentHealthDto(status="degraded", message="Redis ping returned falsy")
-    except Exception as exc:
-        return ComponentHealthDto(
-            status="degraded",
-            message=f"Redis unreachable: {exc}",
-        )
+    except Exception:
+        # P2.5: detalle de la excepción (host/port/credenciales) redactado del público.
+        return ComponentHealthDto(status="degraded", message="Redis unreachable")
 
 
 def _auth_component() -> ComponentHealthDto:
-    """OR-S1: APP_PASSWORD requerido en demos compartidas / no-dev."""
+    """P2.5: estado auth sin exponer claves de config internas ni nombres de política."""
     settings = get_settings()
     pwd = (settings.app_password or "").strip()
     env = (settings.environment or "development").strip().lower()
     if pwd:
-        return ComponentHealthDto(
-            status="ok",
-            message="APP_PASSWORD configured",
-            details={"environment": env},
-        )
+        return ComponentHealthDto(status="ok", message="auth secret configured")
     if env in {"development", "dev", "test", "local"}:
         return ComponentHealthDto(
             status="configured",
-            message="APP_PASSWORD empty (OK local). OR-S1: set for shared demos.",
-            details={"environment": env},
+            message="auth secret empty (OK local)",
         )
     return ComponentHealthDto(
         status="degraded",
-        message="APP_PASSWORD empty outside development — set for shared demos (OR-S1)",
-        details={"environment": env},
+        message="auth secret empty outside development — set for shared demos",
     )
 
 
 async def _worker_heartbeat_component() -> ComponentHealthDto:
     """OR-Obs: último heartbeat Arq en Redis (TTL ~180s)."""
     from bolsa_infrastructure.queue.worker_heartbeat import (
-        WORKER_ARQ_HEARTBEAT_KEY,
         WORKER_HEARTBEAT_TTL_SEC,
         read_arq_heartbeat,
     )
@@ -160,12 +151,12 @@ async def _worker_heartbeat_component() -> ComponentHealthDto:
         return ComponentHealthDto(
             status="degraded",
             message="No Arq worker heartbeat (worker down or never started)",
-            details={"key": WORKER_ARQ_HEARTBEAT_KEY, "ttlSec": WORKER_HEARTBEAT_TTL_SEC},
+            details={"ttlSec": WORKER_HEARTBEAT_TTL_SEC},
         )
     return ComponentHealthDto(
         status="ok",
         message=f"Arq worker heartbeat at {ts}",
-        details={"key": WORKER_ARQ_HEARTBEAT_KEY, "at": ts, "ttlSec": WORKER_HEARTBEAT_TTL_SEC},
+        details={"at": ts, "ttlSec": WORKER_HEARTBEAT_TTL_SEC},
     )
 
 
@@ -209,12 +200,6 @@ def _smtp_component() -> ComponentHealthDto:
             if ready
             else f"SMTP incompleto — define en .env: {', '.join(missing) or 'SMTP_HOST / SMTP_FROM'}"
         ),
-        details={
-            "ready": ready,
-            "port": settings.smtp_port,
-            "hasUser": bool((settings.smtp_user or "").strip()),
-            "missing": missing,
-        },
     )
 
 

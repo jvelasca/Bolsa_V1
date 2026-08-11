@@ -241,14 +241,16 @@ class TaxReportResponseDto(BaseModel):
 class DepositCashDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    amount: float
+    # P2.7: dinero en movimiento (alimenta deposit → ledger). Estricto: >0 y sin
+    # NaN/Inf (mismo contrato que TradeRequestDto desde F1/M4).
+    amount: float = Field(gt=0, allow_inf_nan=False)
     note: str | None = None
 
 
 class WithdrawCashDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    amount: float
+    amount: float = Field(gt=0, allow_inf_nan=False)
     note: str | None = None
 
 

@@ -21,9 +21,12 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 
 
 async def check_database(engine: AsyncEngine) -> tuple[bool, str]:
+    # El mensaje de error NO debe filtrar detalles internos de conexión (URL, host,
+    # port, credenciales) en un endpoint público /api/health (P2.5). En fallo se
+    # devuelve un mensaje genérico; el origen real queda en logs.
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return True, "PostgreSQL conectado"
-    except Exception as exc:  # noqa: BLE001 — health check
-        return False, str(exc)
+    except Exception:  # noqa: BLE001 — health check (detalle redactado, ver P2.5)
+        return False, "PostgreSQL inaccesible"
