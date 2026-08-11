@@ -35,7 +35,10 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "openapi.json"
     payload = json.dumps(schema, indent=2, ensure_ascii=False, sort_keys=True)
-    out_path.write_text(payload + "\n", encoding="utf-8")
+    # Salto de línea LF fijo (no CRLF): el repo normaliza a LF (`* eol=lf` en
+    # .gitattributes) y así la regeneración en Windows no ensucia el árbol.
+    with open(out_path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(payload + "\n")
 
     n_schemas = len(schema.get("components", {}).get("schemas", {}))
     n_paths = len(schema.get("paths", {}))

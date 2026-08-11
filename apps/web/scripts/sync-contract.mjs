@@ -60,6 +60,13 @@ function snapshot() {
   };
 }
 
+/** Compara ignorando el final de línea (CRLF vs LF), que Git normaliza a LF. */
+function sameText(a, b) {
+  if (!a || !b) return false;
+  const norm = (buf) => buf.toString("utf8").replace(/\r\n/g, "\n");
+  return norm(a) === norm(b);
+}
+
 function main() {
   try {
     if (isCheck) {
@@ -70,8 +77,8 @@ function main() {
       const before = snapshot();
       dumpSpec();
       genSchema();
-      const specChanged = before.spec ? !before.spec.equals(readFileSync(SPEC)) : true;
-      const schemaChanged = before.schema ? !before.schema.equals(readFileSync(SCHEMA)) : true;
+      const specChanged = !sameText(before.spec, readFileSync(SPEC));
+      const schemaChanged = !sameText(before.schema, readFileSync(SCHEMA));
       if (specChanged || schemaChanged) {
         console.error(
           "contract:check — el contrato ha cambiado. Ejecuta `pnpm --filter @bolsa/web contract:gen` y commitéalo.",
