@@ -14,9 +14,9 @@ from bolsa_analytics.research.data_snapshot import (
     compute_data_version,
 )
 
-RUN_MANIFEST_VERSION = "1.0"
+RUN_MANIFEST_VERSION = "1.1"
 ENGINE_NAME = "bolsa_event_backtest"
-ENGINE_VERSION = "0.3.0"
+ENGINE_VERSION = "0.4.0"
 
 
 def metrics_hash(

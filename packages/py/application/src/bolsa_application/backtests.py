@@ -159,7 +159,15 @@ class RunAndSaveBacktest:
             )
 
         fingerprints = [
-            BarFingerprint(timestamp=bar.timestamp, close=bar.close) for bar in bars
+            BarFingerprint(
+                timestamp=bar.timestamp,
+                open=float(bar.open),
+                high=float(bar.high),
+                low=float(bar.low),
+                close=float(bar.close),
+                volume=float(bar.volume),
+            )
+            for bar in bars
         ]
         data_version = compute_data_version(fingerprints)
 
