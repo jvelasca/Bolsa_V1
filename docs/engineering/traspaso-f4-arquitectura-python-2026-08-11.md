@@ -2,7 +2,7 @@
 
 > **Padre único:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) §5 (sub-entrada de la Auditoría consolidada, junto a F1/F2/F3a/F3b/F5a).
 > **Fuentes de verdad (leer primero):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) (P0.6/P1.6/P1.9 + D0–D5) · [traspaso-f3a-procesos-db-2026-08-11.md](./traspaso-f3a-procesos-db-2026-08-11.md) (§6 deuda → F4).
-> **Rama de ejecución:** `stage/f4-arquitectura-python-2026-08-12` (desgajada desde `stage/f1-*`, tras merge PR #33).
+> **Rama de ejecución:** `stage/f4-arquitectura-python-2026-08-11` (desgajada desde `stage/f1-*`, tras merge PR #33).
 > **Regla del hilo:** NO tocar código fuera del alcance F4 pactado. Cambios validados con la batería antes del commit.
 > **Estado:** F4 COMPLETADO (P0.6 ✓ · 7 ruff gates ✓ · P1.6 gate scoped ✓). Ver §4–§7.
 
@@ -100,7 +100,7 @@ Dos aristas cruzadas (ninguna declarada en los `pyproject.toml`):
 
 | Fecha      | Acción                                                                                                                                                                                                                                                                     |
 | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-12 | Arranque F4: rama `stage/f4-arquitectura-python-2026-08-12` desde `stage/f1-*` (HEAD `0690834`, tras merge PR #33). Alcance pactado con el usuario: P0.6 ciclo (mover MarketEvent + prefer_summary_excerpt a domain), 7 ruff gates, P1.6 mypy gate por fases (files_only). |
+| 2026-08-12 | Arranque F4: rama `stage/f4-arquitectura-python-2026-08-11` desde `stage/f1-*` (HEAD `0690834`, tras merge PR #33). Alcance pactado con el usuario: P0.6 ciclo (mover MarketEvent + prefer_summary_excerpt a domain), 7 ruff gates, P1.6 mypy gate por fases (files_only). |
 | 2026-08-12 | P0.6: `market_event.py` + `excerpt.py` en domain; eliminado `analytics/cognitive/market_events.py`; 8+ callers actualizados; ciclo roto (market & analytics → solo domain). Battery: ruff✓ · mypy✓ · pytest market+analytics 431 + application 222.                        |
 | 2026-08-12 | ruff gates: `--fix` I001 en 6 ficheros + fix B007 en test_daily_ops_digest_pdf. `ruff check packages/py apps/api-python` → 0 errores. Battery: pytest infra digest 3✓.                                                                                                     |
 | 2026-08-12 | P1.6: paso `Mypy — gate scoped F4 (bloqueante)` en CI sobre 13 ficheros (exit 0). Battery ampliada: infra+domain 57✓· api-python 30✓ (bolsa_v1) · ai+analytics 337✓.                                                                                                       |
@@ -116,7 +116,7 @@ Dos aristas cruzadas (ninguna declarada en los `pyproject.toml`):
 Texto de traspaso → nuevo chat (F4 completado — siguiente fase tras F4)
 
 CONTEXTO INMEDIATO: F4 (Arquitectura Python) COMPLETADO. Rápidas en rama
-  stage/f4-arquitectura-python-2026-08-12 (desde stage/f1-* tras merge PR #33):
+  stage/f4-arquitectura-python-2026-08-11 (desde stage/f1-* tras merge PR #33):
   - P0.6 ciclo analytics↔market ROTO: MarketEvent+MarketEventCalendar+
     EventBlackoutContext+build_market_event+event_decay_weight movidos a
     bolsa_domain/entities/market_event.py; prefer_summary_excerpt a
@@ -139,7 +139,7 @@ DEUDA REGISTRADA → fases posteriores: P1.9 API thin (hilo propio) · mypy rest
   árbol ~451 preexistentes (por fases) · application→ai dynamic imports (lazy) ·
   D4 auth → F5b · F5a §6 fidelidad DTOs/openapi-fetch → posterior.
 
-Lee PRIMERO: docs/engineering/traspaso-f4-arquitectura-python-2026-08-12.md (§4-§7) y su
+Lee PRIMERO: docs/engineering/traspaso-f4-arquitectura-python-2026-08-11.md (§4-§7) y su
   fuente audit-consolidado-internas-externas-2026-08-11.md (P0.6/P1.6/P1.9 + D0-D5).
   Para la fase siguiente usa engineering-index-2026-08-03.md y el plan de la fase
   declarada. NO toques código fuera del alcance de la fase que se declare.
