@@ -5,13 +5,13 @@
  * @see docs/engineering/research-radar-unification-2026-07-31.md §3b / B1.2
  */
 
-import { useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { isAlarmSafeMode } from '@/features/screeners/tracker-alarms';
-import { useAlertsStore } from '@/stores/alerts-store';
-import { useTrackerAlarmInboxStore } from '@/stores/tracker-alarm-inbox-store';
+import { useEffect, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { isAlarmSafeMode } from "@/features/screeners/tracker-alarms";
+import { useAlertsStore } from "@/stores/alerts-store";
+import { useTrackerAlarmInboxStore } from "@/stores/tracker-alarm-inbox-store";
 
 const POLL_MS = 12_000;
 
@@ -22,7 +22,7 @@ export function TrackerAlarmInboxPoller() {
   const lastNotifiedScanRef = useRef<string | null>(null);
 
   const jobsQuery = useQuery({
-    queryKey: ['scan-jobs', 'alarm-inbox'],
+    queryKey: ["scan-jobs", "alarm-inbox"],
     queryFn: api.getScanJobs,
     refetchInterval: POLL_MS,
     staleTime: POLL_MS / 2,
@@ -32,7 +32,7 @@ export function TrackerAlarmInboxPoller() {
     if (!effectiveAccountId || !jobsQuery.data?.data) return;
     const jobs = jobsQuery.data.data;
     for (const job of jobs) {
-      if (job.status !== 'completed') continue;
+      if (job.status !== "completed") continue;
       if (!job.trackerDefinitionId) continue;
       const result = job.result;
       if (!result?.scanId || !result.alarmRoute) continue;
@@ -45,7 +45,7 @@ export function TrackerAlarmInboxPoller() {
       if (n > 0 && lastNotifiedScanRef.current !== result.scanId) {
         lastNotifiedScanRef.current = result.scanId;
         pushToast(
-          `Radar · ${n} alarma${n === 1 ? '' : 's'} (scan programado) → inbox Trading`,
+          `Radar · ${n} alarma${n === 1 ? "" : "s"} (scan programado) → inbox Trading`,
         );
       }
     }

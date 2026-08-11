@@ -4,4 +4,4 @@
 export {
   TradingOperativaPanel,
   TradingCoachRail,
-} from '@/features/trading/trading-operativa-panel';
+} from "@/features/trading/trading-operativa-panel";

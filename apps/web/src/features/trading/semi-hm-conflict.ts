@@ -8,7 +8,7 @@
 import {
   resolveSupervisedQueueOrigin,
   type SupervisedQueueItem,
-} from '@/stores/supervised-f3-queue-store';
+} from "@/stores/supervised-f3-queue-store";
 
 export type HmConflictPair = {
   instrumentId: string;
@@ -31,8 +31,8 @@ export function findHmConflicts(
   }
   const out: HmConflictPair[] = [];
   for (const [instrumentId, list] of byInst) {
-    const h = list.find((i) => resolveSupervisedQueueOrigin(i) === 'finalists');
-    const m = list.find((i) => resolveSupervisedQueueOrigin(i) === 'alarm');
+    const h = list.find((i) => resolveSupervisedQueueOrigin(i) === "finalists");
+    const m = list.find((i) => resolveSupervisedQueueOrigin(i) === "alarm");
     if (!h || !m) continue;
     out.push({
       instrumentId,
@@ -49,7 +49,5 @@ export function conflictForActive(
   activeId: string | null,
 ): HmConflictPair | null {
   if (!activeId) return null;
-  return (
-    pairs.find((p) => p.h.id === activeId || p.m.id === activeId) ?? null
-  );
+  return pairs.find((p) => p.h.id === activeId || p.m.id === activeId) ?? null;
 }

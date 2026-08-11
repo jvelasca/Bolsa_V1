@@ -3,39 +3,39 @@
  * Filtrado por cuenta activa DEMO · abrir valor · ack · Proponer F3.
  */
 
-import { useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { Bell, BrainCircuit, Loader2 } from 'lucide-react';
-import { SIGNAL_KIND_LABELS } from '@bolsa/shared';
-import { Button } from '@/components/ui/button';
-import { IconButton } from '@/components/ui/icon-button';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { openHitInTrading } from '@/features/screeners/open-hit-in-trading';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { useAlertsStore } from '@/stores/alerts-store';
+import { useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { Bell, BrainCircuit, Loader2 } from "lucide-react";
+import { SIGNAL_KIND_LABELS } from "@bolsa/shared";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useAlertsStore } from "@/stores/alerts-store";
 import {
   openHelpAiPlatform,
   type SupervisedProposePayload,
   useSupervisedF3QueueStore,
-} from '@/stores/supervised-f3-queue-store';
+} from "@/stores/supervised-f3-queue-store";
 import {
   itemsForAccount,
   unreadCountForAccount,
   useTrackerAlarmInboxStore,
   type TrackerAlarmInboxItem,
-} from '@/stores/tracker-alarm-inbox-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
+} from "@/stores/tracker-alarm-inbox-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { PAPER_PATH_SUPERVISED } from "@/features/settings/paper-paths-copy";
 import {
   demoBookAllowsEnqueueConfirm,
   demoBookRequiresEstudioMembership,
   ESTUDIO_MEMBERSHIP_REQUIRED_MSG,
   loadDemoBookPrefs,
   suggestQuantityFromCash,
-} from '@/features/trading/demo-book-prefs';
-import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
+} from "@/features/trading/demo-book-prefs";
+import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 
 function kindLabel(kind: string): string {
   return (SIGNAL_KIND_LABELS as Record<string, string>)[kind] ?? kind;
@@ -45,10 +45,10 @@ function formatWhen(iso: string): string {
   try {
     const d = new Date(iso);
     return d.toLocaleString(undefined, {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
     return iso;
@@ -72,8 +72,8 @@ function AlarmRow({
   return (
     <li
       className={cn(
-        'flex flex-col gap-1 border-b border-border/60 px-2.5 py-2 last:border-0',
-        unread ? 'bg-primary/5' : 'opacity-80',
+        "flex flex-col gap-1 border-b border-border/60 px-2.5 py-2 last:border-0",
+        unread ? "bg-primary/5" : "opacity-80",
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -90,7 +90,8 @@ function AlarmRow({
             </span>
           </p>
           <p className="text-[10px] tabular-nums text-muted-foreground">
-            {item.price != null ? `@ ${item.price.toFixed(2)}` : '—'} · {formatWhen(item.createdAt)}
+            {item.price != null ? `@ ${item.price.toFixed(2)}` : "—"} ·{" "}
+            {formatWhen(item.createdAt)}
           </p>
         </button>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
@@ -121,7 +122,9 @@ function AlarmRow({
               OK
             </Button>
           ) : (
-            <span className="text-[9px] uppercase text-muted-foreground">visto</span>
+            <span className="text-[9px] uppercase text-muted-foreground">
+              visto
+            </span>
           )}
         </div>
       </div>
@@ -143,7 +146,9 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
   const setActive = useSupervisedF3QueueStore((s) => s.setActive);
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
   const updateChartTimeframe = useWorkspaceStore((s) => s.updateChartTimeframe);
-  const focusInstrumentFromList = useWorkspaceStore((s) => s.focusInstrumentFromList);
+  const focusInstrumentFromList = useWorkspaceStore(
+    (s) => s.focusInstrumentFromList,
+  );
 
   const accountItems = useMemo(
     () => itemsForAccount(items, effectiveAccountId),
@@ -153,11 +158,11 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
 
   const proposeMutation = useMutation({
     mutationFn: async (item: TrackerAlarmInboxItem) => {
-      if (!effectiveAccountId) throw new Error('Sin cuenta DEMO activa');
+      if (!effectiveAccountId) throw new Error("Sin cuenta DEMO activa");
       const book = loadDemoBookPrefs();
       if (!demoBookAllowsEnqueueConfirm(book.mode)) {
         throw new Error(
-          'Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.',
+          "Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
         );
       }
       if (
@@ -167,7 +172,8 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
         throw new Error(ESTUDIO_MEMBERSHIP_REQUIRED_MSG);
       }
       const summary = (await api.getAccountSummary(effectiveAccountId)).data;
-      const priceHint = item.price != null && item.price > 0 ? item.price : null;
+      const priceHint =
+        item.price != null && item.price > 0 ? item.price : null;
       let suggestedQuantity = 1;
       if (priceHint != null && summary.cash > 0) {
         const q = suggestQuantityFromCash({
@@ -199,7 +205,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
         item,
         payload: {
           ...(res.data as SupervisedProposePayload),
-          source: 'alarm',
+          source: "alarm",
           strategyOrSignalRef: item.strategyDefinitionId ?? null,
           strategyLabel: item.symbol,
         } satisfies SupervisedProposePayload,
@@ -211,7 +217,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
     onSuccess: ({ item, payload }) => {
       const id = enqueue(payload, {
         symbol: payload.symbol ?? item.symbol,
-        origin: 'alarm',
+        origin: "alarm",
         scanId: item.scanId,
       });
       setActive(id);
@@ -219,7 +225,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
       pushToast(
         `${PAPER_PATH_SUPERVISED.cta} · ${item.symbol}: ${payload.action} → Supervisado F3`,
       );
-      openHelpAiPlatform({ panel: 'supervised-f3' });
+      openHelpAiPlatform({ panel: "supervised-f3" });
       setOpen(false);
     },
     onError: (err: Error, item) => {
@@ -247,7 +253,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        'relative flex h-6 w-9 shrink-0 items-center justify-center',
+        "relative flex h-6 w-9 shrink-0 items-center justify-center",
         className,
       )}
       data-testid="trading-status-alarms"
@@ -257,23 +263,23 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
         title={
           unread > 0
             ? `Alarmas Radar · ${unread} sin leer (cuenta activa DEMO)`
-            : 'Alarmas Radar (entrada/salida · cuenta activa)'
+            : "Alarmas Radar (entrada/salida · cuenta activa)"
         }
         onClick={() => setOpen((v) => !v)}
-        className={cn(unread > 0 && 'text-amber-700 dark:text-amber-300')}
+        className={cn(unread > 0 && "text-amber-700 dark:text-amber-300")}
       />
       {/* Slot badge siempre reservado (2 dígitos) → no redimensiona la barra */}
       <span
         className={cn(
-          'pointer-events-none absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[1.1rem] items-center justify-center rounded-full px-0.5 text-[8px] font-semibold tabular-nums',
+          "pointer-events-none absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[1.1rem] items-center justify-center rounded-full px-0.5 text-[8px] font-semibold tabular-nums",
           unread > 0
-            ? 'bg-amber-500 text-white'
-            : 'bg-transparent text-transparent',
+            ? "bg-amber-500 text-white"
+            : "bg-transparent text-transparent",
         )}
         aria-hidden={unread <= 0}
         aria-label={unread > 0 ? `${unread} alarmas sin leer` : undefined}
       >
-        {unread > 99 ? '99+' : unread > 0 ? unread : '0'}
+        {unread > 99 ? "99+" : unread > 0 ? unread : "0"}
       </span>
 
       {open ? (
@@ -295,7 +301,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
                   Alarmas Radar
                   <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
                     ({accountItems.length}
-                    {unread > 0 ? ` · ${unread} nuevas` : ''})
+                    {unread > 0 ? ` · ${unread} nuevas` : ""})
                   </span>
                 </p>
                 <p className="text-[9px] text-muted-foreground">
@@ -333,7 +339,8 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
               </p>
             ) : accountItems.length === 0 ? (
               <p className="px-2.5 py-3 text-[11px] text-muted-foreground">
-                Sin alarmas. Scan manual o programado (on_bar_close) con política inform/alert.
+                Sin alarmas. Scan manual o programado (on_bar_close) con
+                política inform/alert.
               </p>
             ) : (
               <ul className="max-h-64 min-h-[4.5rem] overflow-y-auto">

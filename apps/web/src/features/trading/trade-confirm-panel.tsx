@@ -1,12 +1,12 @@
-import type { AccountSettings } from '@bolsa/shared';
-import { calculateTradeFees } from '@bolsa/shared';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { cn } from '@/lib/utils';
+import type { AccountSettings } from "@bolsa/shared";
+import { calculateTradeFees } from "@bolsa/shared";
+import { formatPrice } from "@/features/charts/chart-utils";
+import { cn } from "@/lib/utils";
 
 export interface TradeConfirmDetails {
   symbol: string;
   name?: string;
-  side: 'buy' | 'sell';
+  side: "buy" | "sell";
   quantity: number;
   price: number;
   instrumentCurrency: string;
@@ -52,8 +52,9 @@ export function TradeConfirmPanel({
     currency: accountCurrency,
     isFxConversion,
   });
-  const totalDebit = side === 'buy' ? notional + fees.total : notional - fees.total;
-  const sideLabel = side === 'buy' ? 'Compra' : 'Venta';
+  const totalDebit =
+    side === "buy" ? notional + fees.total : notional - fees.total;
+  const sideLabel = side === "buy" ? "Compra" : "Venta";
 
   return (
     <div className="space-y-4">
@@ -78,7 +79,9 @@ export function TradeConfirmPanel({
       <div className="space-y-1.5 rounded-md border border-border bg-muted/20 p-3 text-xs">
         <div className="flex justify-between gap-2">
           <span className="text-muted-foreground">Importe operación</span>
-          <span className="tabular-nums">{formatPrice(notional)} {accountCurrency}</span>
+          <span className="tabular-nums">
+            {formatPrice(notional)} {accountCurrency}
+          </span>
         </div>
         {fees.commission > 0 && (
           <div className="flex justify-between gap-2">
@@ -89,7 +92,9 @@ export function TradeConfirmPanel({
         {fees.vatOnCommission > 0 && (
           <div className="flex justify-between gap-2">
             <span className="text-muted-foreground">IVA comisión</span>
-            <span className="tabular-nums">{formatPrice(fees.vatOnCommission)}</span>
+            <span className="tabular-nums">
+              {formatPrice(fees.vatOnCommission)}
+            </span>
           </div>
         )}
         {fees.stampDuty > 0 && (
@@ -101,17 +106,25 @@ export function TradeConfirmPanel({
         {fees.fxConversion > 0 && (
           <div className="flex justify-between gap-2">
             <span className="text-muted-foreground">Conversión FX</span>
-            <span className="tabular-nums">{formatPrice(fees.fxConversion)}</span>
+            <span className="tabular-nums">
+              {formatPrice(fees.fxConversion)}
+            </span>
           </div>
         )}
         <div className="flex justify-between gap-2 border-t border-border/60 pt-1.5 font-medium">
-          <span>{side === 'buy' ? 'Total a debitar (est.)' : 'Neto estimado en cuenta'}</span>
+          <span>
+            {side === "buy"
+              ? "Total a debitar (est.)"
+              : "Neto estimado en cuenta"}
+          </span>
           <span className="tabular-nums">
-            {formatPrice(side === 'buy' ? notional + fees.total : totalDebit)} {accountCurrency}
+            {formatPrice(side === "buy" ? notional + fees.total : totalDebit)}{" "}
+            {accountCurrency}
           </span>
         </div>
         <p className="pt-1 text-[10px] text-muted-foreground">
-          Perfil: {settings.commission.label} · Fiscal {settings.tax.jurisdiction}
+          Perfil: {settings.commission.label} · Fiscal{" "}
+          {settings.tax.jurisdiction}
         </p>
       </div>
 
@@ -131,11 +144,13 @@ export function TradeConfirmPanel({
           disabled={isPending}
           onClick={onConfirm}
           className={cn(
-            'flex-1 rounded-md px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50',
-            side === 'buy' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500',
+            "flex-1 rounded-md px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50",
+            side === "buy"
+              ? "bg-emerald-600 hover:bg-emerald-500"
+              : "bg-red-600 hover:bg-red-500",
           )}
         >
-          {isPending ? 'Ejecutando…' : `Confirmar ${sideLabel.toLowerCase()}`}
+          {isPending ? "Ejecutando…" : `Confirmar ${sideLabel.toLowerCase()}`}
         </button>
       </div>
     </div>

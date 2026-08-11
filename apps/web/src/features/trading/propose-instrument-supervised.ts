@@ -3,16 +3,16 @@
  * Misma disciplina que Finalistas y Alarm inbox. No Camino D.
  */
 
-import { api } from '@/lib/api';
+import { api } from "@/lib/api";
 import {
   demoBookAllowsEnqueueConfirm,
   demoBookRequiresEstudioMembership,
   ESTUDIO_MEMBERSHIP_REQUIRED_MSG,
   loadDemoBookPrefs,
   suggestQuantityFromCash,
-} from '@/features/trading/demo-book-prefs';
-import type { SupervisedProposePayload } from '@/stores/supervised-f3-queue-store';
-import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
+} from "@/features/trading/demo-book-prefs";
+import type { SupervisedProposePayload } from "@/stores/supervised-f3-queue-store";
+import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 
 export async function proposeInstrumentSupervised(opts: {
   instrumentId: string;
@@ -27,7 +27,7 @@ export async function proposeInstrumentSupervised(opts: {
   const book = loadDemoBookPrefs();
   if (!demoBookAllowsEnqueueConfirm(book.mode)) {
     throw new Error(
-      'Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.',
+      "Libro en MANUAL: solo aviso. Cambia a SEMI en Operativa → Configuración para Proponer F3.",
     );
   }
   if (demoBookRequiresEstudioMembership(book.mode)) {
@@ -68,7 +68,7 @@ export async function proposeInstrumentSupervised(opts: {
 
   let payload: SupervisedProposePayload = {
     ...(res.data as SupervisedProposePayload),
-    source: opts.source ?? 'operativa',
+    source: opts.source ?? "operativa",
     strategyOrSignalRef: strategyRef ?? null,
     strategyLabel: opts.strategyLabel ?? opts.symbol,
   };

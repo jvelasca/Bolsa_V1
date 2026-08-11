@@ -7,64 +7,71 @@
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
-import { api } from '@/lib/api';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { instrumentTopBacktestsHref } from '@/features/backtests/instrument-strategy-top-panel';
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
+import { api } from "@/lib/api";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
 import {
   finalistsStabilityWarnTitle,
   formatFinalistsStabilityBadge,
   readLabEvidenceFromCoachFacts,
-} from '@/features/backtests/finalists-stability-summary';
-import { diaDVerifyHref, VERIFY_DIA_D_CTA } from '@/features/platform/product-universe';
+} from "@/features/backtests/finalists-stability-summary";
+import {
+  diaDVerifyHref,
+  VERIFY_DIA_D_CTA,
+} from "@/features/platform/product-universe";
 import {
   STRATEGY_ADOPTION_LABELS,
   getAdoptionState,
   type StrategyAdoptionState,
-} from '@/features/platform/strategy-adoption';
-import { MandateTimelinePanel } from '@/features/trading/mandate-timeline-panel';
+} from "@/features/platform/strategy-adoption";
+import { MandateTimelinePanel } from "@/features/trading/mandate-timeline-panel";
 import {
   demoBookAllowsEnqueueConfirm,
   demoBookRequiresEstudioMembership,
-} from '@/features/trading/demo-book-prefs';
-import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
-import { proposeInstrumentSupervised } from '@/features/trading/propose-instrument-supervised';
-import { TradingOperativaSection } from '@/features/trading/trading-operativa-section';
-import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
+} from "@/features/trading/demo-book-prefs";
+import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
+import { TradingOperativaSection } from "@/features/trading/trading-operativa-section";
+import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import {
   OperativaPulseBlock,
   OperativaPulseSummary,
-} from '@/features/trading/operativa-pulse';
-import { OperativaDictamenBlock } from '@/features/trading/operativa-dictamen';
-import { OperativaOutcomesBlock } from '@/features/trading/operativa-outcomes';
-import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
+} from "@/features/trading/operativa-pulse";
+import { OperativaDictamenBlock } from "@/features/trading/operativa-dictamen";
+import { OperativaOutcomesBlock } from "@/features/trading/operativa-outcomes";
+import { useInstrumentDailyOpinions } from "@/features/trading/use-instrument-daily-opinions";
 import {
   computeIndiceOperativo,
   rankIndiceOperativo,
   type OperativaScoreRow,
-} from '@/features/trading/operativa-index';
-import { useInstrumentsHubScores } from '@/features/instruments/use-instruments-hub-scores';
-import { getDiaDExperimentTop1 } from '@/features/backtests/dia-d-experiment-top';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { effectiveDiaD, isDiaDInPast, todayIsoDate } from '@/features/backtests/backtest-period';
-import { loadBacktestRunContext } from '@/features/backtests/backtest-run-context';
-import { useDiaDTradingSessionStore } from '@/stores/dia-d-trading-session-store';
-import { useAlertsStore } from '@/stores/alerts-store';
+} from "@/features/trading/operativa-index";
+import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
+import { getDiaDExperimentTop1 } from "@/features/backtests/dia-d-experiment-top";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import {
+  effectiveDiaD,
+  isDiaDInPast,
+  todayIsoDate,
+} from "@/features/backtests/backtest-period";
+import { loadBacktestRunContext } from "@/features/backtests/backtest-run-context";
+import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
+import { useAlertsStore } from "@/stores/alerts-store";
 import {
   openHelpAiPlatform,
   useSupervisedF3QueueStore,
-} from '@/stores/supervised-f3-queue-store';
-import { cn } from '@/lib/utils';
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
-import type { InstrumentDailyOpinionHintV1 } from '@bolsa/shared';
+} from "@/stores/supervised-f3-queue-store";
+import { cn } from "@/lib/utils";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
+import type { InstrumentDailyOpinionHintV1 } from "@bolsa/shared";
 import {
   getMandateStoreSnapshot,
   listOpenMandateTenures,
   subscribeMandateStore,
   summarizeMandateChurn,
-} from '@/features/platform/operating-mandate';
-import { ensureMandateHydrated } from '@/features/platform/operating-mandate-sync';
+} from "@/features/platform/operating-mandate";
+import { ensureMandateHydrated } from "@/features/platform/operating-mandate-sync";
 
 function formatAdoption(state: StrategyAdoptionState): string {
   return STRATEGY_ADOPTION_LABELS[state];
@@ -77,8 +84,8 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const activeChartId = useWorkspaceStore((s) => s.workspace.activeChartId);
   const active = charts.find((c) => c.id === activeChartId) ?? charts[0];
   const instrumentId = active?.instrumentId ?? null;
-  const symbol = active?.label ?? '—';
-  const timeframe = (active?.timeframe as string) || '1d';
+  const symbol = active?.label ?? "—";
+  const timeframe = (active?.timeframe as string) || "1d";
   const { effectiveAccountId } = useActiveAccount();
   const bookPrefs = useDemoBookPrefs();
   const pushToast = useAlertsStore((s) => s.pushToast);
@@ -105,7 +112,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const canEnqueueConfirm = demoBookAllowsEnqueueConfirm(bookPrefs.mode);
 
   const portfolioQuery = useQuery({
-    queryKey: ['portfolio', 'operativa'],
+    queryKey: ["portfolio", "operativa"],
     queryFn: api.getPortfolio,
     staleTime: 30_000,
   });
@@ -113,11 +120,14 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     if (!instrumentId) return false;
     const positions = portfolioQuery.data?.data.positions ?? [];
     return positions.some(
-      (p) => p.instrumentId === instrumentId && Math.abs(Number(p.quantity ?? 0)) > 0,
+      (p) =>
+        p.instrumentId === instrumentId &&
+        Math.abs(Number(p.quantity ?? 0)) > 0,
     );
   }, [instrumentId, portfolioQuery.data]);
 
-  const { faByInstrument, taByInstrument, scoresLoading } = useInstrumentsHubScores(studyIds);
+  const { faByInstrument, taByInstrument, scoresLoading } =
+    useInstrumentsHubScores(studyIds);
 
   const scoreRows: OperativaScoreRow[] = useMemo(
     () =>
@@ -188,7 +198,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   );
 
   const topQuery = useQuery({
-    queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+    queryKey: ["instrument-strategy-top", instrumentId, timeframe],
     queryFn: () => api.getInstrumentStrategyTop(instrumentId!, timeframe),
     enabled: Boolean(instrumentId),
     staleTime: 60_000,
@@ -200,15 +210,17 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
 
   const proposeMutation = useMutation({
     mutationFn: async () => {
-      if (!instrumentId) throw new Error('Sin instrumento');
-      if (!effectiveAccountId) throw new Error('Sin cuenta DEMO activa');
+      if (!instrumentId) throw new Error("Sin instrumento");
+      if (!effectiveAccountId) throw new Error("Sin cuenta DEMO activa");
       const topSlot =
-        topQuery.data?.data?.slots?.slice().sort((a, b) => a.rank - b.rank)[0] ?? null;
+        topQuery.data?.data?.slots
+          ?.slice()
+          .sort((a, b) => a.rank - b.rank)[0] ?? null;
       return proposeInstrumentSupervised({
         instrumentId,
         symbol,
         accountId: effectiveAccountId,
-        source: 'operativa',
+        source: "operativa",
         strategyDefinitionId: topSlot?.strategyDefinitionId ?? null,
         strategyLabel: topSlot?.label ?? symbol,
       });
@@ -216,11 +228,13 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     onSuccess: (payload) => {
       const id = enqueueSupervised(payload, {
         symbol: payload.symbol ?? symbol,
-        origin: 'operativa',
+        origin: "operativa",
       });
       setActiveSupervised(id);
-      pushToast(`Operativa · ${payload.symbol ?? symbol}: ${payload.action} → Confirm`);
-      openHelpAiPlatform({ panel: 'supervised-f3' });
+      pushToast(
+        `Operativa · ${payload.symbol ?? symbol}: ${payload.action} → Confirm`,
+      );
+      openHelpAiPlatform({ panel: "supervised-f3" });
     },
     onError: (e: Error) => {
       pushToast(`Operativa · ${symbol}: ${e.message}`);
@@ -234,19 +248,22 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const stabilityWarn = finalistsStabilityWarnTitle(labEvidence);
   const adoption = instrumentId
     ? getAdoptionState(instrumentId, effectiveAccountId)
-    : 'none';
+    : "none";
 
   if (!instrumentId) {
     return (
       <div
         className={cn(
-          'flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-2 text-[11px] text-muted-foreground',
+          "flex h-full min-h-0 flex-col gap-2 overflow-y-auto p-2 text-[11px] text-muted-foreground",
           className,
         )}
         data-testid="trading-operativa-panel-empty"
       >
         <p className="font-medium text-foreground">Sin valor activo</p>
-        <p>Abre un instrumento en el gráfico para ver recomendación, info y configuración.</p>
+        <p>
+          Abre un instrumento en el gráfico para ver recomendación, info y
+          configuración.
+        </p>
       </div>
     );
   }
@@ -264,11 +281,11 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
       instrumentId,
       symbol,
       strategyDefinitionId,
-      strategyLabel: exp1?.label ?? slot1?.label ?? 'Finalista',
+      strategyLabel: exp1?.label ?? slot1?.label ?? "Finalista",
       rank: exp1?.rank ?? slot1?.rank ?? 1,
       diaD: asOf,
       endDate: todayIsoDate(),
-      mode: 'auto',
+      mode: "auto",
     });
     navigate(diaDVerifyHref(instrumentId));
   }
@@ -283,13 +300,16 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn('flex h-full min-h-0 flex-col gap-2 overflow-hidden p-2 text-[11px]', className)}
+      className={cn(
+        "flex h-full min-h-0 flex-col gap-2 overflow-hidden p-2 text-[11px]",
+        className,
+      )}
       data-testid="trading-operativa-panel"
       aria-label={`Operativa · ${symbol}`}
     >
       <p className="shrink-0 px-0.5 text-[10px] font-medium text-muted-foreground">
         {symbol} · {timeframe}
-        {positionOpen ? ' · en cartera' : ''}
+        {positionOpen ? " · en cartera" : ""}
       </p>
 
       {requiresEstudio && !inEstudio ? (
@@ -306,33 +326,36 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
             onClick={() => {
               if (!instrumentId) return;
               void (async () => {
-                const { addToEstudioMembership } = await import(
-                  '@/features/trading/estudio-membership'
-                );
+                const { addToEstudioMembership } =
+                  await import("@/features/trading/estudio-membership");
                 const { added, ids } = await addToEstudioMembership([
                   {
                     id: instrumentId,
                     symbol,
                     yahooSymbol: symbol,
                     name: symbol,
-                    exchange: '—',
-                    country: '—',
-                    currency: 'EUR',
+                    exchange: "—",
+                    country: "—",
+                    currency: "EUR",
                     sector: null,
                     isActive: true,
-                    meta: { barCount: 0, lastSync: null, lastClose: null, changePct: null },
+                    meta: {
+                      barCount: 0,
+                      lastSync: null,
+                      lastClose: null,
+                      changePct: null,
+                    },
                   },
                 ]);
                 if (added <= 0) return;
                 upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
                 pushToast(`${symbol} → Estudio · actualizando…`);
-                const { runEstudioInstrumentsUpdate } = await import(
-                  '@/features/trading/estudio-instruments-update'
-                );
+                const { runEstudioInstrumentsUpdate } =
+                  await import("@/features/trading/estudio-instruments-update");
                 await runEstudioInstrumentsUpdate({
                   instrumentIds: ids,
                   rediscover: false,
-                  phaseLabel: 'Alta Estudio',
+                  phaseLabel: "Alta Estudio",
                   symbolOf: () => symbol,
                 });
                 pushToast(`${symbol} → Estudio · datos al día`);
@@ -374,7 +397,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
               {slot1.source}
               {slot1.totalReturnPct != null
                 ? ` · ret ${slot1.totalReturnPct.toFixed(1)}%`
-                : ''}
+                : ""}
             </p>
             {stabilityBadge ? (
               <p
@@ -391,8 +414,10 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         )}
 
         <p className="text-muted-foreground">
-          Adopción:{' '}
-          <span className="font-medium text-foreground">{formatAdoption(adoption)}</span>
+          Adopción:{" "}
+          <span className="font-medium text-foreground">
+            {formatAdoption(adoption)}
+          </span>
         </p>
 
         <MandateTimelinePanel
@@ -414,26 +439,26 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
             }
             title={
               !canEnqueueConfirm
-                ? 'Cambia a SEMI en Configuración para Proponer F3'
+                ? "Cambia a SEMI en Configuración para Proponer F3"
                 : requiresEstudio && !inEstudio
-                  ? 'Añade el valor a Estudio primero'
-                  : 'Propose → cola Confirm (Camino C)'
+                  ? "Añade el valor a Estudio primero"
+                  : "Propose → cola Confirm (Camino C)"
             }
             onClick={() => proposeMutation.mutate()}
           >
             {proposeMutation.isPending
-              ? 'Proponiendo…'
+              ? "Proponiendo…"
               : !canEnqueueConfirm
-                ? 'Proponer F3 (pasa a SEMI)'
-                : 'Proponer F3 → Confirm'}
+                ? "Proponer F3 (pasa a SEMI)"
+                : "Proponer F3 → Confirm"}
           </button>
           <button
             type="button"
             data-testid="operativa-cola-confirm"
             className="rounded-md border border-border px-2 py-1 text-left font-medium text-foreground hover:bg-accent"
-            onClick={() => openHelpAiPlatform({ panel: 'supervised-f3' })}
+            onClick={() => openHelpAiPlatform({ panel: "supervised-f3" })}
           >
-            Cola Confirm{confirmQueueCount > 0 ? ` (${confirmQueueCount})` : ''}
+            Cola Confirm{confirmQueueCount > 0 ? ` (${confirmQueueCount})` : ""}
           </button>
           <Link
             to={instrumentTopBacktestsHref(instrumentId, timeframe)}
@@ -444,8 +469,11 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           {canVerify &&
           (slot1?.strategyDefinitionId ||
             (instrumentId &&
-              getDiaDExperimentTop1(instrumentId, timeframe, effectiveDiaD(diaD))
-                ?.strategyDefinitionId)) ? (
+              getDiaDExperimentTop1(
+                instrumentId,
+                timeframe,
+                effectiveDiaD(diaD),
+              )?.strategyDefinitionId)) ? (
             <button
               type="button"
               className="rounded-md border border-amber-600/30 bg-amber-500/10 px-2 py-1 text-left font-medium text-amber-950 hover:bg-amber-500/20 dark:text-amber-50"
@@ -463,30 +491,32 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         summary={
           <span className="text-[10px] text-muted-foreground">
             Activas {churn.openCount}
-            {confirmQueueCount > 0 ? ` · Confirm ${confirmQueueCount}` : ''}
+            {confirmQueueCount > 0 ? ` · Confirm ${confirmQueueCount}` : ""}
           </span>
         }
       >
         <div data-testid="operativa-mandate-review" className="space-y-2">
           <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-2 py-1.5">
             <p className="font-semibold text-foreground">
-              Estrategia activa{' '}
-              <span className="font-normal text-muted-foreground">(mandato)</span>
+              Estrategia activa{" "}
+              <span className="font-normal text-muted-foreground">
+                (mandato)
+              </span>
             </p>
             <p className="text-[10px] leading-snug text-muted-foreground">
-              Un <span className="font-medium text-foreground/90">mandato</span> es el
-              plan que estás siguiendo en un valor con esta cuenta: qué estrategia
-              usas ahora. No es una orden de compra/venta; es el compromiso vigente
-              hasta que lo cambies o lo cierres.
+              Un <span className="font-medium text-foreground/90">mandato</span>{" "}
+              es el plan que estás siguiendo en un valor con esta cuenta: qué
+              estrategia usas ahora. No es una orden de compra/venta; es el
+              compromiso vigente hasta que lo cambies o lo cierres.
             </p>
             <p className="text-[10px] text-muted-foreground">
-              En esta cuenta:{' '}
+              En esta cuenta:{" "}
               <span className="font-medium text-foreground">
-                {churn.openCount} activa{churn.openCount === 1 ? '' : 's'}
+                {churn.openCount} activa{churn.openCount === 1 ? "" : "s"}
               </span>
               {churn.closedCount > 0
-                ? ` · ${churn.closedCount} cerrada${churn.closedCount === 1 ? '' : 's'}`
-                : ''}
+                ? ` · ${churn.closedCount} cerrada${churn.closedCount === 1 ? "" : "s"}`
+                : ""}
             </p>
             {openTenures.length > 0 ? (
               <ul className="space-y-0.5 text-[10px] text-muted-foreground">
@@ -524,8 +554,9 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
                   estrategia cierra el tenure anterior y abre uno nuevo (churn).
                 </p>
                 <p>
-                  Learning / Outcomes abajo mide si las decisiones Confirm de este
-                  valor salieron bien a posteriori — no es el dictamen del día.
+                  Learning / Outcomes abajo mide si las decisiones Confirm de
+                  este valor salieron bien a posteriori — no es el dictamen del
+                  día.
                 </p>
               </div>
             </details>
@@ -537,7 +568,6 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           />
         </div>
       </TradingOperativaSection>
-
     </div>
   );
 }

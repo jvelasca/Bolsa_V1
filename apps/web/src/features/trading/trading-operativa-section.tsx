@@ -5,15 +5,21 @@
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { ChevronDown } from "lucide-react";
 import {
   MAX_OPERATIVA_SECTION_HEIGHT_PX,
   MIN_OPERATIVA_SECTION_HEIGHT_PX,
   type OperativaSectionId,
   useTradingLayoutStore,
-} from '@/stores/trading-layout-store';
-import { cn } from '@/lib/utils';
+} from "@/stores/trading-layout-store";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_HEIGHTS: Record<OperativaSectionId, number> = {
   recommendation: 320,
@@ -35,7 +41,9 @@ export function TradingOperativaSection({
   children: ReactNode;
   className?: string;
 }) {
-  const open = useTradingLayoutStore((s) => s.operativaSections?.[sectionId] ?? true);
+  const open = useTradingLayoutStore(
+    (s) => s.operativaSections?.[sectionId] ?? true,
+  );
   const storedHeight = useTradingLayoutStore(
     (s) => s.operativaSectionHeights?.[sectionId] ?? DEFAULT_HEIGHTS[sectionId],
   );
@@ -71,23 +79,23 @@ export function TradingOperativaSection({
         setLiveHeight(next);
       };
       const onUp = () => {
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onUp);
-        handle.removeEventListener('pointercancel', onUp);
+        handle.removeEventListener("pointermove", onMove);
+        handle.removeEventListener("pointerup", onUp);
+        handle.removeEventListener("pointercancel", onUp);
         try {
           handle.releasePointerCapture(event.pointerId);
         } catch {
           /* already released */
         }
         setHeight(sectionId, pendingRef.current);
-        document.body.style.cursor = '';
-        document.body.style.userSelect = '';
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
       };
-      document.body.style.cursor = 'row-resize';
-      document.body.style.userSelect = 'none';
-      handle.addEventListener('pointermove', onMove);
-      handle.addEventListener('pointerup', onUp);
-      handle.addEventListener('pointercancel', onUp);
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
+      handle.addEventListener("pointermove", onMove);
+      handle.addEventListener("pointerup", onUp);
+      handle.addEventListener("pointercancel", onUp);
     },
     [liveHeight, sectionId, setHeight],
   );
@@ -95,7 +103,7 @@ export function TradingOperativaSection({
   return (
     <section
       className={cn(
-        'flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border/80 bg-background/60',
+        "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-border/80 bg-background/60",
         className,
       )}
       data-testid={`operativa-section-${sectionId}`}
@@ -108,14 +116,18 @@ export function TradingOperativaSection({
       >
         <ChevronDown
           className={cn(
-            'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform',
-            !open && '-rotate-90',
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+            !open && "-rotate-90",
           )}
         />
         <span className="min-w-0 flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           {title}
         </span>
-        {summary ? <span className="max-w-[45%] shrink-0 truncate text-right">{summary}</span> : null}
+        {summary ? (
+          <span className="max-w-[45%] shrink-0 truncate text-right">
+            {summary}
+          </span>
+        ) : null}
       </button>
       {open ? (
         <>

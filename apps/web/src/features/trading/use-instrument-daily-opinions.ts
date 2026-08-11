@@ -3,12 +3,12 @@
  * @see docs/adr/022-estudio-daily-opinion-motor.md
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 import type {
   InstrumentDailyOpinionHintV1,
   InstrumentDailyOpinionV1,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
 
 export function useInstrumentDailyOpinions(
   instrumentIds: string[],
@@ -24,18 +24,18 @@ export function useInstrumentDailyOpinions(
 
   return useQuery({
     queryKey: [
-      'instrument-daily-opinions',
+      "instrument-daily-opinions",
       ids,
       options?.forceRefresh ?? false,
       hints.map((h) =>
         [
           h.instrumentId,
-          h.ioScore ?? '',
+          h.ioScore ?? "",
           h.distress ? 1 : 0,
           h.positionOpen ? 1 : 0,
           h.allowTrading === false ? 0 : 1,
-          h.hasEodBar === undefined ? 'u' : h.hasEodBar ? 1 : 0,
-        ].join(':'),
+          h.hasEodBar === undefined ? "u" : h.hasEodBar ? 1 : 0,
+        ].join(":"),
       ),
     ],
     enabled,

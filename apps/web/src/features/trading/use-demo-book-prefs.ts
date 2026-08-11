@@ -6,13 +6,13 @@
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
-import { useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from "react";
 import {
   getDemoBookPrefsServerSnapshot,
   getDemoBookPrefsSnapshot,
   subscribeDemoBookPrefs,
   type DemoBookPrefs,
-} from '@/features/trading/demo-book-prefs';
+} from "@/features/trading/demo-book-prefs";
 
 export function useDemoBookPrefs(): DemoBookPrefs {
   return useSyncExternalStore(

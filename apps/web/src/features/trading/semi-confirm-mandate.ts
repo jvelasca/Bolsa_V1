@@ -5,9 +5,9 @@
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md §5
  */
 
-import { setAdoption } from '@/features/platform/strategy-adoption';
-import { linkTradeToMandate } from '@/features/platform/operating-mandate';
-import type { SupervisedProposePayload } from '@/stores/supervised-f3-queue-store';
+import { setAdoption } from "@/features/platform/strategy-adoption";
+import { linkTradeToMandate } from "@/features/platform/operating-mandate";
+import type { SupervisedProposePayload } from "@/stores/supervised-f3-queue-store";
 
 export type SemiConfirmTradeResult = {
   status: string;
@@ -20,22 +20,24 @@ function strategyRefFromPayload(payload: SupervisedProposePayload): {
   strategyLabel: string | null;
 } {
   const direct =
-    typeof payload.strategyOrSignalRef === 'string' && payload.strategyOrSignalRef
+    typeof payload.strategyOrSignalRef === "string" &&
+    payload.strategyOrSignalRef
       ? payload.strategyOrSignalRef
       : null;
   const pkg = payload.decisionPackage as Record<string, unknown> | undefined;
   const fromPkg =
-    (typeof pkg?.strategyOrSignalRef === 'string' && pkg.strategyOrSignalRef) ||
-    (typeof pkg?.strategyDefinitionId === 'string' && pkg.strategyDefinitionId) ||
+    (typeof pkg?.strategyOrSignalRef === "string" && pkg.strategyOrSignalRef) ||
+    (typeof pkg?.strategyDefinitionId === "string" &&
+      pkg.strategyDefinitionId) ||
     null;
   const fromEdge =
-    typeof payload.edgeReportRef === 'string' && payload.edgeReportRef
+    typeof payload.edgeReportRef === "string" && payload.edgeReportRef
       ? payload.edgeReportRef
       : null;
   const id = direct || fromPkg || fromEdge || null;
   const label =
-    (typeof payload.strategyLabel === 'string' && payload.strategyLabel) ||
-    (typeof pkg?.strategyLabel === 'string' && pkg.strategyLabel) ||
+    (typeof payload.strategyLabel === "string" && payload.strategyLabel) ||
+    (typeof pkg?.strategyLabel === "string" && pkg.strategyLabel) ||
     payload.symbol ||
     id?.slice(0, 12) ||
     null;
@@ -52,20 +54,22 @@ export function recordSemiConfirmMandate(opts: {
   intentStatus: string;
   trade: SemiConfirmTradeResult;
 }): { mandateTenureId: string | null; linked: boolean } {
-  if (opts.intentStatus !== 'executed' && opts.intentStatus !== 'authorized') {
+  if (opts.intentStatus !== "executed" && opts.intentStatus !== "authorized") {
     return { mandateTenureId: null, linked: false };
   }
-  const { strategyDefinitionId, strategyLabel } = strategyRefFromPayload(opts.payload);
+  const { strategyDefinitionId, strategyLabel } = strategyRefFromPayload(
+    opts.payload,
+  );
   const rec = setAdoption({
     instrumentId: opts.payload.instrumentId,
     accountId: opts.accountId,
-    state: 'propuesta',
-    reason: 'propose_accepted',
+    state: "propuesta",
+    reason: "propose_accepted",
     strategyDefinitionId,
     strategyLabel,
-    timeframe: '1d',
-    actor: 'user',
-    evidenceLevel: strategyDefinitionId ? 'lab_validated' : null,
+    timeframe: "1d",
+    actor: "user",
+    evidenceLevel: strategyDefinitionId ? "lab_validated" : null,
   });
   let linked = false;
   const txId = opts.trade?.transactionId;

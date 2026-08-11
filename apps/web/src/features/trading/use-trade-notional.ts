@@ -1,8 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 function formatFxRate(rate: number) {
-  return rate.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 6 });
+  return rate.toLocaleString("es-ES", {
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 6,
+  });
 }
 
 export function useTradeNotional(
@@ -14,7 +17,7 @@ export function useTradeNotional(
   const needsFx = instrumentCurrency !== accountCurrency;
 
   const fxQuery = useQuery({
-    queryKey: ['fx', instrumentCurrency, accountCurrency],
+    queryKey: ["fx", instrumentCurrency, accountCurrency],
     queryFn: () => api.getFxRate(instrumentCurrency, accountCurrency),
     enabled: needsFx && quantity > 0 && price > 0,
     staleTime: 60_000,
@@ -34,8 +37,8 @@ export function useTradeNotional(
     fxRate != null
       ? `1 ${instrumentCurrency} = ${formatFxRate(fxRate)} ${accountCurrency}`
       : fxQuery.isLoading
-        ? 'Cargando…'
-        : '—';
+        ? "Cargando…"
+        : "—";
 
   return {
     needsFx,

@@ -8,63 +8,58 @@
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
  */
 
-import { Settings2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { resolveApiBaseUrl } from '@/lib/api-base-url';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { IconButton } from '@/components/ui/icon-button';
-import { cn } from '@/lib/utils';
-import { Dialog } from '@/components/ui/dialog';
-import { AccountScopeSelector } from '@/features/accounts/account-scope-selector';
+import { Settings2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { formatPrice } from "@/features/charts/chart-utils";
+import { IconButton } from "@/components/ui/icon-button";
+import { cn } from "@/lib/utils";
+import { Dialog } from "@/components/ui/dialog";
+import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
 import {
   accountTypeShortLabel,
   useActiveAccount,
-} from '@/features/accounts/use-active-account';
-import { TradingAppThreads } from '@/features/trading/trading-app-threads';
-import { TradingAlarmInboxButton } from '@/features/trading/trading-alarm-inbox-button';
-import { useDemoBookPrefs } from '@/features/trading/use-demo-book-prefs';
-import type { DemoBookMode } from '@/features/trading/demo-book-prefs';
+} from "@/features/accounts/use-active-account";
+import { TradingAppThreads } from "@/features/trading/trading-app-threads";
+import { TradingAlarmInboxButton } from "@/features/trading/trading-alarm-inbox-button";
+import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import type { DemoBookMode } from "@/features/trading/demo-book-prefs";
 
 const OPERATIVA_MODE_LABEL: Record<DemoBookMode, string> = {
-  manual: 'Manual',
-  semi: 'Semi',
-  auto: 'Auto',
+  manual: "Manual",
+  semi: "Semi",
+  auto: "Auto",
 };
 
-type StatusItemId = 'equity' | 'cash' | 'marketValue' | 'pnl' | 'positions';
+type StatusItemId = "equity" | "cash" | "marketValue" | "pnl" | "positions";
 
 const STATUS_LABELS: Record<StatusItemId, string> = {
-  equity: 'Patrimonio',
-  cash: 'Capital disponible',
-  marketValue: 'Valor operaciones',
-  pnl: 'Beneficio',
-  positions: 'Posiciones',
+  equity: "Patrimonio",
+  cash: "Capital disponible",
+  marketValue: "Valor operaciones",
+  pnl: "Beneficio",
+  positions: "Posiciones",
 };
 
 const STATUS_LABELS_SHORT: Record<StatusItemId, string> = {
-  equity: 'Pat.',
-  cash: 'Disp.',
-  marketValue: 'Ops.',
-  pnl: 'P&L',
-  positions: 'Pos.',
+  equity: "Pat.",
+  cash: "Disp.",
+  marketValue: "Ops.",
+  pnl: "P&L",
+  positions: "Pos.",
 };
 
-const DEFAULT_ITEMS: StatusItemId[] = ['marketValue', 'cash', 'pnl', 'equity'];
+const DEFAULT_ITEMS: StatusItemId[] = ["marketValue", "cash", "pnl", "equity"];
 
 function StatusSeparator() {
-  return (
-    <span
-      aria-hidden
-      className="mx-0.5 h-3.5 w-px shrink-0 bg-border"
-    />
-  );
+  return <span aria-hidden className="mx-0.5 h-3.5 w-px shrink-0 bg-border" />;
 }
 
 function connectionLabel(): string {
-  if (typeof window === 'undefined') return 'local';
+  if (typeof window === "undefined") return "local";
   const host = window.location.hostname;
   const port = window.location.port;
   const apiBase = resolveApiBaseUrl();
@@ -72,7 +67,7 @@ function connectionLabel(): string {
   if (!apiBase) return `${web} · API proxy`;
   try {
     const apiHost = new URL(apiBase).host;
-    return apiHost === web || apiHost.startsWith('localhost')
+    return apiHost === web || apiHost.startsWith("localhost")
       ? web
       : `${web} → ${apiHost}`;
   } catch {
@@ -82,23 +77,24 @@ function connectionLabel(): string {
 
 export function TradingStatusBar() {
   const [configOpen, setConfigOpen] = useState(false);
-  const [visibleItems, setVisibleItems] = useState<StatusItemId[]>(DEFAULT_ITEMS);
+  const [visibleItems, setVisibleItems] =
+    useState<StatusItemId[]>(DEFAULT_ITEMS);
   const { account, effectiveAccountId } = useActiveAccount();
   const bookPrefs = useDemoBookPrefs();
   const endpointLabel = useMemo(() => connectionLabel(), []);
   const accountsHref = account
     ? `/accounts?selected=${encodeURIComponent(account.id)}&tab=config&focus=operativa`
-    : '/accounts';
+    : "/accounts";
 
   const healthQuery = useQuery({
-    queryKey: ['health'],
+    queryKey: ["health"],
     queryFn: api.getHealth,
     refetchInterval: 30_000,
     retry: 1,
   });
 
   const portfolioQuery = useQuery({
-    queryKey: ['portfolio', effectiveAccountId],
+    queryKey: ["portfolio", effectiveAccountId],
     queryFn: api.getPortfolio,
     enabled: Boolean(effectiveAccountId),
     refetchInterval: 60_000,
@@ -108,11 +104,11 @@ export function TradingStatusBar() {
   const apiOk = healthQuery.isSuccess && !healthQuery.isError;
 
   const values: Record<StatusItemId, string> = {
-    equity: summary ? formatPrice(summary.totalEquity) : '—',
-    cash: summary ? formatPrice(summary.portfolio.cash) : '—',
-    marketValue: summary ? formatPrice(summary.totalMarketValue) : '—',
-    pnl: summary ? formatPrice(summary.totalUnrealizedPnl) : '—',
-    positions: summary ? String(summary.positions.length) : '—',
+    equity: summary ? formatPrice(summary.totalEquity) : "—",
+    cash: summary ? formatPrice(summary.portfolio.cash) : "—",
+    marketValue: summary ? formatPrice(summary.totalMarketValue) : "—",
+    pnl: summary ? formatPrice(summary.totalUnrealizedPnl) : "—",
+    positions: summary ? String(summary.positions.length) : "—",
   };
 
   return (
@@ -122,21 +118,29 @@ export function TradingStatusBar() {
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
           <span
             className="flex shrink-0 items-center gap-1.5 whitespace-nowrap"
-            title={apiOk ? 'API conectada' : 'API no responde'}
+            title={apiOk ? "API conectada" : "API no responde"}
           >
             <span
               className={cn(
-                'inline-block h-1.5 w-1.5 rounded-full',
-                apiOk ? 'bg-emerald-500' : healthQuery.isLoading ? 'bg-amber-400' : 'bg-red-500',
+                "inline-block h-1.5 w-1.5 rounded-full",
+                apiOk
+                  ? "bg-emerald-500"
+                  : healthQuery.isLoading
+                    ? "bg-amber-400"
+                    : "bg-red-500",
               )}
             />
-            <span className="tabular-nums text-muted-foreground/90">{endpointLabel}</span>
+            <span className="tabular-nums text-muted-foreground/90">
+              {endpointLabel}
+            </span>
           </span>
 
           <StatusSeparator />
 
           <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-            <span className="shrink-0 uppercase tracking-wide text-muted-foreground/70">Activa</span>
+            <span className="shrink-0 uppercase tracking-wide text-muted-foreground/70">
+              Activa
+            </span>
             {account ? (
               <>
                 <Link
@@ -152,18 +156,20 @@ export function TradingStatusBar() {
                 <Link
                   to={accountsHref}
                   className={cn(
-                    'shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold tracking-wide hover:bg-accent',
-                    bookPrefs.mode === 'auto'
-                      ? 'border-amber-500/60 bg-amber-500/10 text-amber-800 dark:text-amber-200'
-                      : bookPrefs.mode === 'semi'
-                        ? 'border-sky-500/60 bg-sky-500/10 text-sky-800 dark:text-sky-200'
-                        : 'border-border bg-muted/40 text-foreground',
+                    "shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold tracking-wide hover:bg-accent",
+                    bookPrefs.mode === "auto"
+                      ? "border-amber-500/60 bg-amber-500/10 text-amber-800 dark:text-amber-200"
+                      : bookPrefs.mode === "semi"
+                        ? "border-sky-500/60 bg-sky-500/10 text-sky-800 dark:text-sky-200"
+                        : "border-border bg-muted/40 text-foreground",
                   )}
                   title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nAfecta a todos los valores. Clic → cambiar en Cuentas`}
                   data-testid="status-bar-operativa-mode"
                 >
-                  <span className="text-muted-foreground">OPERATIVA:</span>{' '}
-                  <span className="text-foreground">{OPERATIVA_MODE_LABEL[bookPrefs.mode]}</span>
+                  <span className="text-muted-foreground">OPERATIVA:</span>{" "}
+                  <span className="text-foreground">
+                    {OPERATIVA_MODE_LABEL[bookPrefs.mode]}
+                  </span>
                 </Link>
                 <span className="hidden shrink-0 text-muted-foreground/60 sm:inline">
                   {account.currency}
@@ -178,17 +184,26 @@ export function TradingStatusBar() {
           <StatusSeparator />
 
           {visibleItems.map((id) => (
-            <span key={id} className="flex shrink-0 items-center gap-1 whitespace-nowrap">
+            <span
+              key={id}
+              className="flex shrink-0 items-center gap-1 whitespace-nowrap"
+            >
               <span className="text-muted-foreground/80">
-                <span className="trading-status-label-full">{STATUS_LABELS[id]}:</span>
-                <span className="trading-status-label-short">{STATUS_LABELS_SHORT[id]}:</span>
+                <span className="trading-status-label-full">
+                  {STATUS_LABELS[id]}:
+                </span>
+                <span className="trading-status-label-short">
+                  {STATUS_LABELS_SHORT[id]}:
+                </span>
               </span>
               <span
                 className={cn(
-                  'font-medium tabular-nums text-foreground',
-                  id === 'pnl' &&
+                  "font-medium tabular-nums text-foreground",
+                  id === "pnl" &&
                     summary &&
-                    (summary.totalUnrealizedPnl >= 0 ? 'text-emerald-400' : 'text-red-400'),
+                    (summary.totalUnrealizedPnl >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400"),
                 )}
               >
                 {values[id]}
@@ -227,7 +242,9 @@ export function TradingStatusBar() {
                 checked={visibleItems.includes(id)}
                 onChange={(e) => {
                   setVisibleItems((prev) =>
-                    e.target.checked ? [...prev, id] : prev.filter((item) => item !== id),
+                    e.target.checked
+                      ? [...prev, id]
+                      : prev.filter((item) => item !== id),
                   );
                 }}
                 className="h-3.5 w-3.5 accent-primary"
@@ -236,8 +253,9 @@ export function TradingStatusBar() {
             </label>
           ))}
           <p className="pt-2 text-[11px] leading-snug text-muted-foreground">
-            La zona derecha reserva espacio fijo para Colas (Velas · CORE-R · F3 · Lista AUTO) y el
-            panel de Alarmas Radar (nº sin leer), para que la barra no salte al cambiar conteos.
+            La zona derecha reserva espacio fijo para Colas (Velas · CORE-R · F3
+            · Lista AUTO) y el panel de Alarmas Radar (nº sin leer), para que la
+            barra no salte al cambiar conteos.
           </p>
         </div>
       </Dialog>
