@@ -9,11 +9,11 @@
 
 ## 0. Cómo leer (cuatro públicos)
 
-| Público | Empieza aquí | No necesita |
-|---------|--------------|-------------|
-| **Usuario** | [HELP.md](../HELP.md) · Ayuda (?) en app | ADRs / RFCs |
-| **Desarrollador** | [ONBOARDING.md](../ONBOARDING.md) · [DEV_STARTUP.md](../DEV_STARTUP.md) · este índice §1–2 | RFCs completos |
-| **Arquitecto** | [ARCHITECTURE.md](../ARCHITECTURE.md) · [adr/](../adr/) · [rfc/](../rfc/) · §3 | Notebooks de campaña |
+| Público                    | Empieza aquí                                                                                        | No necesita          |
+| -------------------------- | --------------------------------------------------------------------------------------------------- | -------------------- |
+| **Usuario**                | [HELP.md](../HELP.md) · Ayuda (?) en app                                                            | ADRs / RFCs          |
+| **Desarrollador**          | [ONBOARDING.md](../ONBOARDING.md) · [DEV_STARTUP.md](../DEV_STARTUP.md) · este índice §1–2          | RFCs completos       |
+| **Arquitecto**             | [ARCHITECTURE.md](../ARCHITECTURE.md) · [adr/](../adr/) · [rfc/](../rfc/) · §3                      | Notebooks de campaña |
 | **Investigador / auditor** | [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md) · freeze · lifecycle | Detalle UI de charts |
 
 Índice general de todos los docs: [README.md](../README.md) (catálogo). **Este Engineering Index es el mapa de navegación**, no duplica el catálogo.
@@ -86,14 +86,16 @@ Engineering Index  (este doc)
 
 **Anti-patrón:** un doc con tres “padres” (p. ej. enlazado como raíz desde README + HELP + lifecycle sin declarar jerarquía). Enlazar **sí**; ser raíz **no**.
 
+**Protocolo recurrente (norma permanente, 2026-08-11):** al **cerrar cualquier hilo de chat** (fin de módulo/fase/frente o saturación de contexto), el agente DEBE preparar el siguiente: crear/actualizar su `traspaso-*` con estado + decisiones + deuda residual, añadir su entrada aquí, y **entregar al usuario en el chat el texto exacto para pegar en el siguiente hilo**. Este índice es el punto de enrutamiento de esas continuaciones.
+
 ---
 
 ## 2. Producto vs docs (no confundir)
 
-| Capa | Qué es | Riesgo si diverge |
-|------|--------|-------------------|
-| **Producto (código)** | FastAPI + React + motor BT | Fuente de verdad de comportamiento |
-| **Docs** | Premisas, ADRs, freeze, HELP | Explican y **congelan política**; no ejecutan |
+| Capa                  | Qué es                       | Riesgo si diverge                             |
+| --------------------- | ---------------------------- | --------------------------------------------- |
+| **Producto (código)** | FastAPI + React + motor BT   | Fuente de verdad de comportamiento            |
+| **Docs**              | Premisas, ADRs, freeze, HELP | Explican y **congelan política**; no ejecutan |
 
 Si código y ADR divergen: **ADR o freeze gana en política**; el código se alinea o se abre enmienda. No “arreglar” en silencio.
 
@@ -101,12 +103,12 @@ Si código y ADR divergen: **ADR o freeze gana en política**; el código se ali
 
 ## 3. CORE — taxonomía única (A0 H5)
 
-| Código | Nombre canónico | Dominio | Depende de | No puede depender de |
-|--------|-----------------|---------|------------|----------------------|
-| **CORE-P** | Profile / Policy | Trading | InvestorProfile, TradingPolicy | Coach LLM, Belief |
-| **CORE-R** | Recommendation monitor | Trading ops | Finalistas, BD `core_r_*` | Research Belief, Lab re-opt en vivo |
-| **CORE-A** | Assistant / Coach soft | Research UX | Ranking determinista, narración | Reordenar TOP, Belief (freeze) |
-| **CORE-B** | Behaviour / Lab board | Research Lab | Jobs hold-out/WF | DEMO ledger, paper_auto |
+| Código     | Nombre canónico        | Dominio      | Depende de                      | No puede depender de                |
+| ---------- | ---------------------- | ------------ | ------------------------------- | ----------------------------------- |
+| **CORE-P** | Profile / Policy       | Trading      | InvestorProfile, TradingPolicy  | Coach LLM, Belief                   |
+| **CORE-R** | Recommendation monitor | Trading ops  | Finalistas, BD `core_r_*`       | Research Belief, Lab re-opt en vivo |
+| **CORE-A** | Assistant / Coach soft | Research UX  | Ranking determinista, narración | Reordenar TOP, Belief (freeze)      |
+| **CORE-B** | Behaviour / Lab board  | Research Lab | Jobs hold-out/WF                | DEMO ledger, paper_auto             |
 
 Crecer en vertical bajo **CORE**, no inventar CORE-X sin fila aquí + issue.
 
@@ -122,18 +124,21 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 
 ## 5. Auditorías externas
 
-1. Entrada: [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md)  
-2. Round 2 triage: [audit-ext-round2-triage-2026-08-03.md](./audit-ext-round2-triage-2026-08-03.md)  
-3. Freeze: [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md)  
-4. **Round 3 (pausa motor Estudio):** [audit-brief-estudio-motor-operativo-2026-08-04.md](./audit-brief-estudio-motor-operativo-2026-08-04.md)  
-5. **Round 3 triage (ratificado O3-C · D1–Canales cerrados):** [audit-ext-round3-triage-estudio-motor-2026-08-04.md](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) §11 · [ADR-022](../adr/022-estudio-daily-opinion-motor.md)  
-6. Diseño interno: [estudio-daily-opinion-alarms-design-2026-08-04.md](./estudio-daily-opinion-alarms-design-2026-08-04.md)  
-7. **Asesor UI:** [asesor-ui-2026-08-04.md](./asesor-ui-2026-08-04.md) (ex-Research · tab Opiniones)  
-8. **Pack cierre Estudio/Asesor/Canales:** [audit-pack-estudio-asesor-canales-2026-08-04.md](./audit-pack-estudio-asesor-canales-2026-08-04.md)  
-9. **Thaw AUTO (prep, flag off):** [camino-d-auto-thaw-checklist-2026-08-04.md](./camino-d-auto-thaw-checklist-2026-08-04.md)  
-10. **Triage institucional pre-AUTO (Aud 1+2):** [audit-ext-institutional-pre-auto-triage-2026-08-04.md](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)  
-11. **Risk Engine OR-RE v0:** [risk-engine-or-re-2026-08-04.md](./risk-engine-or-re-2026-08-04.md)  
-12. **OR-lite + Repro+ + Obs/CI:** [or-lite-repro-obs-2026-08-04.md](./or-lite-repro-obs-2026-08-04.md)  
-13. **Prep A2–A5 (flag off):** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed  
-14. **Pack auditoría prep AUTO:** [audit-pack-pre-auto-a0-a5-2026-08-04.md](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — SEMI OK · execute AUTO **no**  
+1.  Entrada: [audit-pack-post-audits-2026-08-03.md](./audit-pack-post-audits-2026-08-03.md)
+2.  Round 2 triage: [audit-ext-round2-triage-2026-08-03.md](./audit-ext-round2-triage-2026-08-03.md)
+3.  Freeze: [post-audit-decision-freeze-2026-08-03.md](./post-audit-decision-freeze-2026-08-03.md)
+4.  **Round 3 (pausa motor Estudio):** [audit-brief-estudio-motor-operativo-2026-08-04.md](./audit-brief-estudio-motor-operativo-2026-08-04.md)
+5.  **Round 3 triage (ratificado O3-C · D1–Canales cerrados):** [audit-ext-round3-triage-estudio-motor-2026-08-04.md](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) §11 · [ADR-022](../adr/022-estudio-daily-opinion-motor.md)
+6.  Diseño interno: [estudio-daily-opinion-alarms-design-2026-08-04.md](./estudio-daily-opinion-alarms-design-2026-08-04.md)
+7.  **Asesor UI:** [asesor-ui-2026-08-04.md](./asesor-ui-2026-08-04.md) (ex-Research · tab Opiniones)
+8.  **Pack cierre Estudio/Asesor/Canales:** [audit-pack-estudio-asesor-canales-2026-08-04.md](./audit-pack-estudio-asesor-canales-2026-08-04.md)
+9.  **Thaw AUTO (prep, flag off):** [camino-d-auto-thaw-checklist-2026-08-04.md](./camino-d-auto-thaw-checklist-2026-08-04.md)
+10. **Triage institucional pre-AUTO (Aud 1+2):** [audit-ext-institutional-pre-auto-triage-2026-08-04.md](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)
+11. **Risk Engine OR-RE v0:** [risk-engine-or-re-2026-08-04.md](./risk-engine-or-re-2026-08-04.md)
+12. **OR-lite + Repro+ + Obs/CI:** [or-lite-repro-obs-2026-08-04.md](./or-lite-repro-obs-2026-08-04.md)
+13. **Prep A2–A5 (flag off):** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed
+14. **Pack auditoría prep AUTO:** [audit-pack-pre-auto-a0-a5-2026-08-04.md](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — SEMI OK · execute AUTO **no**
 15. **Resumen operativo diario (R1–R4):** [daily-ops-report-brief-2026-08-04.md](./daily-ops-report-brief-2026-08-04.md) — Diario · HTML email · PDF opt-in
+16. **Auditoría consolidada interna+externas + plan hardening (2026-08-11):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) — 4 fuentes cruzadas (interna · externa 1 · externa 2 · externa 3) · mapa P0/P1/P2 · plan F1–F5 · decisiones D0–D5 pactadas · checkpoint git `audit-checkpoint-2026-08-11` · NO tocar código
+    >     └── **Plan F1 (integridad financiera):** [plan-f1-integridad-financiera-2026-08-11.md](./plan-f1-integridad-financiera-2026-08-11.md) — micro-cambios M1–M5 (`with_for_update`, `deduct_cash`, `ExecuteTrade`, idempotencia, invariantes) · batería+riesgos+orden commits · pendiente de aprobación
+    >         └── **F1 — traspaso de hilo:** [traspaso-f1-integridad-financiera-2026-08-11.md](./traspaso-f1-integridad-financiera-2026-08-11.md) — traspaso de arranque del hilo F1 (integridad financiera) · **M2 resuelta (Opción B: `allow_partial`)**, rama `stage/f1-integridad-financiera-2026-08-11` desde checkpoint, orden M1→M5
