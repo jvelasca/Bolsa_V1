@@ -161,6 +161,7 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 
 - `docs/engineering/traspaso-higiene-formato-legacy-entrada-2026-08-10.md` (ENTRADA original; protocolo + estrategia).
 - `docs/engineering/relevo-higiene-formato-lotes-24-27-2026-08-11.md` (RELEVO del hilo: estado verificado HEAD `e498c68`, protocolo 8 pasos + encodificación, dominios pendientes, docs a tocar).
+- `docs/engineering/relevo-higiene-formato-cierre-2026-08-11.md` (CIERRE del hilo: estado final COMPLETO, HEAD `6112fb2`, 512 files / 36 commits, sin pendientes; ancla de cierre).
 - `docs/engineering/dev-continuation-plan-2026-08-09.md` (§7.6.i → registro detallado de cada lote).
 - `docs/engineering/engineering-index-2026-08-03.md` (índice; este documento anclado).
 - `docs/engineering/traspaso-m5-frontend-2026-08-10.md` (§7 nota de cierre M5).
