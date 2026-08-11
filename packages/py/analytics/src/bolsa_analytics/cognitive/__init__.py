@@ -59,13 +59,6 @@ from bolsa_analytics.cognitive.investor_profile import (
 )
 from bolsa_analytics.cognitive.macro_facts import build_macro_fact_set
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
-from bolsa_analytics.cognitive.market_events import (
-    EventBlackoutContext,
-    MarketEvent,
-    MarketEventCalendar,
-    build_market_event,
-    event_decay_weight,
-)
 from bolsa_analytics.cognitive.market_state import (
     ContextValidationResult,
     MarketState,
@@ -111,6 +104,13 @@ from bolsa_analytics.cognitive.weight_rules import (
     WeightRuleResult,
     resolve_weight_rules,
     weight_rules_for_horizon,
+)
+from bolsa_domain.entities.market_event import (
+    EventBlackoutContext,
+    MarketEvent,
+    MarketEventCalendar,
+    build_market_event,
+    event_decay_weight,
 )
 
 __all__ = [

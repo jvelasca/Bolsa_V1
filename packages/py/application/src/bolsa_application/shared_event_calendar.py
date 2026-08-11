@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bolsa_analytics.cognitive.market_events import MarketEventCalendar
+from bolsa_domain.entities.market_event import MarketEventCalendar
 
 _SHARED_CALENDAR = MarketEventCalendar()
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from bolsa_market.filing_store import prefer_summary_excerpt
+from bolsa_domain.value_objects.excerpt import prefer_summary_excerpt
 
 
 def build_filing_summary_variables(

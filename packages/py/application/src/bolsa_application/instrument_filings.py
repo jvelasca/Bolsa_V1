@@ -14,6 +14,7 @@ from bolsa_analytics.knowledge.filing_summary import (
     heuristic_filing_summary,
 )
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
+from bolsa_domain.value_objects.excerpt import prefer_summary_excerpt
 from bolsa_market.filing_rag import (
     FILING_RAG_VERSION,
     ensure_chunk_index,
@@ -26,7 +27,6 @@ from bolsa_market.filing_store import (
     find_filing_by_accession,
     get_filing,
     list_filings,
-    prefer_summary_excerpt,
     read_filing_text,
     save_filing,
     update_filing_summary,

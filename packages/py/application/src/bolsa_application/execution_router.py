@@ -11,7 +11,6 @@ DENY pre-Gate y en fill; claim de idempotencia AUTO antes del trade.
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from bolsa_analytics.cognitive.market_events import MarketEventCalendar
 from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
 from bolsa_application.auto_execute_idempotency import (
@@ -29,6 +28,7 @@ from bolsa_application.risk_runtime import (
 )
 from bolsa_application.trading_policy_guard import CognitiveGuardResult
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
+from bolsa_domain.entities.market_event import MarketEventCalendar
 from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository

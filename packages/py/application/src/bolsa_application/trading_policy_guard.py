@@ -9,7 +9,6 @@ from typing import Any, Literal
 from bolsa_analytics.cognitive.decision_memory import DecisionMemoryEntry
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.gate_decision import ProposedTradeContext, gate_decision_package
-from bolsa_analytics.cognitive.market_events import MarketEventCalendar
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
 from bolsa_analytics.cognitive.trading_policy_templates import get_policy_template
 from bolsa_analytics.knowledge.decision_package_ta import (
@@ -18,6 +17,7 @@ from bolsa_analytics.knowledge.decision_package_ta import (
 )
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.entities.market_event import MarketEventCalendar
 
 
 @dataclass(frozen=True, slots=True)

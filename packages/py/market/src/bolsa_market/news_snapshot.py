@@ -8,7 +8,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from bolsa_analytics.cognitive.market_events import (
+from bolsa_domain.entities.market_event import (
     MarketEvent,
     MarketEventCalendar,
     build_market_event,
@@ -176,6 +176,8 @@ def earnings_from_quote_summary(
         return []
     first = dates[0] if isinstance(dates, list) else dates
     raw = first.get("raw") if isinstance(first, dict) else first
+    if raw is None:
+        return []
     try:
         ts = int(raw)
     except (TypeError, ValueError):
@@ -217,9 +219,9 @@ async def fetch_yahoo_market_events(
     global _CACHE
     now_m = time.monotonic()
     if use_cache and sym in _CACHE:
-        at, events = _CACHE[sym]
+        at, cached_events = _CACHE[sym]
         if now_m - at < _CACHE_TTL_SEC:
-            return list(events)
+            return list(cached_events)
 
     cli = client or get_yahoo_finance_client()
     events: list[MarketEvent] = []
