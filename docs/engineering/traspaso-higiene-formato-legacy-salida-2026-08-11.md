@@ -1,7 +1,7 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `5bec6ed` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `689c294` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
 > Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-18) y los próximos dominios.
@@ -75,9 +75,11 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 16 | `a42587e` | backtests/chart (parte del dominio hub/chart/misc) | 16 |
 | 17 | `da2f7d9` | backtests/misc motores (parte del dominio hub/chart/misc) | 23 |
 | 18 | `5bec6ed` | backtests/library + estudio/ibex/tests sueltos (CIERRE dominio hub/chart/misc) | 11 |
+| 19 | `689c294` | features/accounts (PRIMER sub-lote del resto de apps/web/src, fuera de backtests) | 17 |
 
-**Total formateado hasta aquí: 210 ficheros** con diff real en 18 commits propios de formateo. Todos con batería
-`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en lote 14, 17 y 18, área Coach/TOP).
+**Total formateado hasta aquí: 227 ficheros** con diff real en 19 commits propios de formateo (210 de `features/backtests`
+en lotes 1-18 + 17 de `features/accounts` en lote 19). Todos con batería
+`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17 y 18, área Coach/TOP).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
 EOL** (contenido normalizado idéntico a HEAD). Se detectan porque **no aparecen en `git diff --cached --numstat`**
@@ -102,18 +104,21 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 - ~~ **`chart`** (parte del dominio `hub`/`chart`/`misc`) ~~ **HECHO (lote 16, `a42587e`)**: `backtest-chart-import-panel.tsx`, `backtest-equity-chart.tsx`, `backtest-replay-chart.tsx`, `backtest-stat-donut.tsx`, `backtest-ranking-table.tsx`, `backtest-universe-picker.tsx`, `backtest-zone-settings-dialog.tsx`, `backtest-zone-prefs.ts`(+test), `backtest-cursor-panel.tsx`, `backtest-favorites-menu.tsx`, `backtest-future-stars.tsx`(+test), `backtest-instrument-preview.tsx`, `backtest-movie-hud.tsx`, `backtest-movie-stats.ts` = **16 files (+721/−458 solo formato)**. Sin falsos positivos EOL (los 16 con diff real).
 - ~~ **`misc` motores** (parte del dominio `hub`/`chart`/`misc`) ~~ **HECHO (lote 17, `da2f7d9`)**: `backtest-paper-checklist.tsx`, `backtest-paper-gate.ts`(+test), `backtest-run-context.ts`(+test), `backtest-batch-run.ts`, `backtest-export.ts`, `backtest-date-format.ts`, `backtest-split-layout.ts`, `backtest-hud-prefs.ts`, `use-backtest-hud-prefs.ts`, `backtest-buy-hold.ts`(+test), `backtest-deep-coach.ts`(+test), `backtest-oos-evidence.ts`(+test), `backtest-pbo.ts`(+test), `backtest-period.ts`(+test), `backtest-walk-forward-metrics.ts`(+test) = **23 files reales (+1389/−1087 solo formato)**. **1 falso +EOL** (`backtest-period-returns.ts`, contenido normalizado idéntico a HEAD) → fuera del commit. Área Coach/TOP (test:coach 26/186 ✅).
 - ~~ **`library`/`estudio`/`ibex`/tests sueltos** (cierre del dominio `hub`/`chart`/`misc`) ~~ **HECHO (lote 18, `5bec6ed`)**: `chart-strategy-bridge.test.ts`, `drawing-replay-parity.test.ts`, `signal-evaluate-parity.test.ts`, `library-nav.ts`(+test), `library-strategy-buckets.ts`(+test), `estudio-list.test.ts`, `estudio-personal-list.test.ts`, `ibex35-operativa-audit.ts`(+test) = **11 files (+360/−295 solo formato)**. Sin falsos positivos EOL (los 11 con diff real). Área Coach/TOP (test:coach 26/186 ✅). **Con esto el dominio `hub`/`chart`/`misc` queda CERRADO (lotes 15-18).**
+|- ~~ **`accounts`** (primer sub-lote del **resto de `apps/web/src`**, fuera de `features/backtests`) ~~ **HECHO (lote 19, `689c294`)**: todos los `.ts`/`.tsx` de `features/accounts` = **17 files (+973/−656 solo formato)**: `account-detail-panel`, `account-investor-profile-select`, `account-scope-selector`, `account-settings-dialog`, `account-settings-panel`, `account-wizard-capital-step`, `account-wizard-commissions-step`, `account-wizard-identity-step`, `account-wizard-review-step`, `account-wizard-tax-step`, `accounts-page`, `create-account-wizard-dialog`, `investor-profile-panel`, `investor-profile-picker`, `paper-lab-evidence`(+test), `use-active-account`. Sin falsos positivos EOL (los 17 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP. **`prettier --check` amplio (excl. `features/backtests`) tras el lote 19: quedan 418 files desincronizados.**
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
 > **Nota de método para el siguiente hilo (relevo):** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes
 > (14, `6f8c668`), `hub` (15, `6c32b06`), `chart` (16, `a42587e`), `misc`/motores (17, `da2f7d9`) y cierre
-> `library`/`estudio`/`ibex` (18, `5bec6ed`) ya están HECHOS. **El dominio `hub`/`chart`/`misc` está CERRADO.**
+> `library`/`estudio`/`ibex` (18, `5bec6ed`) ya están HECHOS. **El dominio `hub`/`chart`/`misc` está CERRADO y
+> `features/backtests` queda COMPLETO.** **Lote 19 hecho (`689c294`): `features/accounts`, 17 files.**
 > Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
 >
-> **Siguiente: el resto de `apps/web/src`** (fuera de `features/backtests`, que queda completo) por sub-lotes, con el
-> mismo protocolo de 8 pasos (components/ui, layout, features de otros dominios —charts, instruments, trading, settings,
-> screeners, accounts, research, platform, config—, lib, stores, etc.), ejecutando `prettier --check` por sub-lote y
-> verificando el `git diff --cached --numstat` (paso 4). Correr `test:coach` cuando el sub-lote toque área Coach/TOP.
+> **Siguiente: otro dominio del resto de `apps/web/src`** (fuera de `features/backtests`, que queda completo) por
+> sub-lotes, con el mismo protocolo de 8 pasos (features de otros dominios —charts, instruments, trading, settings,
+> screeners, research, platform, config—, lib, stores, components/ui, layout, etc.), ejecutando `prettier --check` por
+> sub-lote y verificando el `git diff --cached --numstat` (paso 4). Correr `test:coach` cuando el sub-lote toque área
+> Coach/TOP. `features/accounts` (lote 19) ya hecho.
 
 
 ## 6. Documentos fuente de verdad / índices
