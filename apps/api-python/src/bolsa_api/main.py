@@ -132,7 +132,13 @@ def create_app() -> FastAPI:
 
     # Last added = outermost. Rate limit before auth so 429 does not require token dance.
     app.add_middleware(AuthMiddleware)
-    app.add_middleware(RateLimitMiddleware, enabled=settings.environment != "test")
+    # P1.8: rate-limit con store Redis (distribuido) si REDIS_URL configurado,
+    # degradando a memoria cuando Redis no responde; desactivado en test.
+    app.add_middleware(
+        RateLimitMiddleware,
+        enabled=settings.environment != "test",
+        redis_url=settings.redis_url,
+    )
 
     app.add_middleware(
         CORSMiddleware,
