@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from bolsa_analytics.backtest import BacktestBarInput
 from bolsa_analytics.indicators.legacy import rsi
@@ -37,6 +37,7 @@ def _simulate_rsi_mean_reversion(
     initial_cash: float,
     trade_from_index: int = 0,
     attach_round_trips: bool = False,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> dict[str, Any]:
     """RSI MR sim. Indicator uses all bars; trading starts at ``trade_from_index``."""
     if period < 2:
@@ -61,19 +62,22 @@ def _simulate_rsi_mean_reversion(
     for index, bar in enumerate(bars):
         if index < start:
             continue
-        value = series[index]
-        price = bar.close
+        if index - 1 < start:
+            continue
+        value = series[index - 1]
+        fill_price = float(bar.open if bar.open is not None else bar.close)
+        close_price = float(bar.close)
         if value is not None:
-            if shares == 0 and value < oversold and cash >= price:
-                quantity = int(cash // price)
+            if shares == 0 and value < oversold and cash >= fill_price:
+                quantity = int(cash // fill_price)
                 if quantity > 0:
-                    cost = quantity * price
+                    cost = quantity * fill_price
                     cash -= cost
                     shares = float(quantity)
                     trades += 1
                     open_entry_cost = cost
             elif shares > 0 and value > overbought:
-                proceeds = shares * price
+                proceeds = shares * fill_price
                 cash += proceeds
                 if open_entry_cost is not None:
                     entry_costs.append(open_entry_cost)
@@ -82,7 +86,7 @@ def _simulate_rsi_mean_reversion(
                 shares = 0.0
                 trades += 1
 
-        equity = cash + shares * price
+        equity = cash + shares * close_price
         equity_values.append(equity)
         peak = max(peak, equity)
         if peak > 0:
@@ -131,6 +135,7 @@ def run_rsi_mean_reversion_grid(
     initial_cash: float = 10000.0,
     max_trials: int = 25,
     on_progress: ProgressCallback | None = None,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> list[RsiGridTrial]:
     """Ejecuta ``rsi_mean_reversion_grid``."""
     if not bars:
@@ -165,6 +170,7 @@ def run_rsi_mean_reversion_grid(
                         oversold=oversold,
                         overbought=overbought,
                         initial_cash=initial_cash,
+                        execution_model=execution_model,
                     )
                 except ValueError:
                     continue

@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
-from typing import Any
+from typing import Any, Literal
 
 from bolsa_analytics.backtest import BacktestBarInput, run_backtest
 from bolsa_analytics.optimize.cpcv import (
@@ -203,6 +203,7 @@ def _baseline_for_family(
     bars: list[BacktestBarInput],
     family: str,
     initial_cash: float,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> OptimizeGridTrial:
     if family == STRATEGY_FAMILY_SMA:
         return _sma_to_grid(run_baseline_preset_backtest(bars, initial_cash))
@@ -234,6 +235,7 @@ def _simulate_family_metrics(
     initial_cash: float,
     trade_from_index: int = 0,
     attach_round_trips: bool = False,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> dict[str, Any]:
     if family == STRATEGY_FAMILY_SMA:
         return _simulate_sma_crossover(
@@ -243,6 +245,7 @@ def _simulate_family_metrics(
             initial_cash,
             trade_from_index=trade_from_index,
             attach_round_trips=attach_round_trips,
+            execution_model=execution_model,
         )
     if family == STRATEGY_FAMILY_RSI:
         return _simulate_rsi_mean_reversion(
@@ -253,6 +256,7 @@ def _simulate_family_metrics(
             initial_cash=initial_cash,
             trade_from_index=trade_from_index,
             attach_round_trips=attach_round_trips,
+            execution_model=execution_model,
         )
     return _simulate_macd_signal_cross(
         bars,
@@ -262,6 +266,7 @@ def _simulate_family_metrics(
         initial_cash=initial_cash,
         trade_from_index=trade_from_index,
         attach_round_trips=attach_round_trips,
+        execution_model=execution_model,
     )
 
 
@@ -565,6 +570,7 @@ class RunSmaGridOptimize:
         cpcv_purge_bars: int | None = None,
         cpcv_embargo_bars: int | None = None,
         on_progress: AsyncProgressCallback | None = None,
+        execution_model: Literal["next_open"] = "next_open",
     ) -> OptimizeSmaGridResult:
         instrument = await self._instruments.get_by_id(instrument_id)
         if instrument is None:
@@ -610,6 +616,7 @@ class RunSmaGridOptimize:
                 max_trials=max_trials,
                 timeframe=timeframe,
                 on_progress=on_progress,
+                execution_model=execution_model,
             )
 
         wf_n = normalize_walk_forward_folds(walk_forward_folds)
@@ -629,6 +636,7 @@ class RunSmaGridOptimize:
                 max_trials=max_trials,
                 timeframe=timeframe,
                 on_progress=on_progress,
+                execution_model=execution_model,
             )
 
         # Hold-out is best-effort: never abort the whole optimize if the split
@@ -653,6 +661,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 max_trials=min(max_trials, 80),
                 on_progress=on_progress,
+                execution_model=execution_model,
             )
         if family == STRATEGY_FAMILY_MACD:
             return await self._run_macd(
@@ -664,6 +673,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 max_trials=min(max_trials, 80),
                 on_progress=on_progress,
+                execution_model=execution_model,
             )
         return await self._run_sma(
             instrument_id=instrument_id,
@@ -677,6 +687,7 @@ class RunSmaGridOptimize:
             engine=engine,
             timeframe=timeframe,
             on_progress=on_progress,
+            execution_model=execution_model,
         )
 
     async def _run_h0_partial_on_bars(
@@ -695,6 +706,7 @@ class RunSmaGridOptimize:
         initial_cash: float,
         timeframe: str,
         on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
     ) -> OptimizeSmaGridResult:
         if family == STRATEGY_FAMILY_RSI:
             return await self._run_rsi(
@@ -708,6 +720,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 max_trials=fold_max,
                 on_progress=on_progress,
+                execution_model=execution_model,
             )
         if family == STRATEGY_FAMILY_MACD:
             return await self._run_macd(
@@ -719,6 +732,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 max_trials=fold_max,
                 on_progress=on_progress,
+                execution_model=execution_model,
             )
         return await self._run_sma(
             instrument_id=instrument_id,
@@ -732,6 +746,7 @@ class RunSmaGridOptimize:
             engine="h0",
             timeframe=timeframe,
             on_progress=on_progress,
+            execution_model=execution_model,
         )
 
     async def _run_cpcv(
@@ -753,6 +768,7 @@ class RunSmaGridOptimize:
         max_trials: int,
         timeframe: str,
         on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
     ) -> OptimizeSmaGridResult:
         """CPCV ligero: H0 per combinatorial path; OOS = selected best."""
         purge = normalize_cpcv_gap(
@@ -806,6 +822,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 timeframe=timeframe,
                 on_progress=_path_progress,
+                execution_model=execution_model,
             )
             best = partial.trials[0] if partial.trials else partial.baseline
             best_oos = _eval_oos_for_grid(
@@ -938,6 +955,7 @@ class RunSmaGridOptimize:
         max_trials: int,
         timeframe: str,
         on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
     ) -> OptimizeSmaGridResult:
         """Anchored expanding WF: re-optimize H0 per fold; OOS = selected best."""
         folds = split_walk_forward_bars(bars, n_folds)
@@ -980,6 +998,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 timeframe=timeframe,
                 on_progress=_fold_progress,
+                execution_model=execution_model,
             )
 
             best = partial.trials[0] if partial.trials else partial.baseline
@@ -1096,6 +1115,7 @@ class RunSmaGridOptimize:
         engine: str | None,
         timeframe: str,
         on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
     ) -> OptimizeSmaGridResult:
         resolved_fast = fast_periods or [10, 15, 20, 25, 30]
         resolved_slow = slow_periods or [40, 50, 60, 80, 100]
@@ -1109,7 +1129,9 @@ class RunSmaGridOptimize:
         if on_progress is not None:
             await on_progress(0, trials_total, None)
 
-        baseline = _baseline_for_family(search_bars, STRATEGY_FAMILY_SMA, initial_cash)
+        baseline = _baseline_for_family(
+            search_bars, STRATEGY_FAMILY_SMA, initial_cash, execution_model=execution_model
+        )
 
         if resolved_engine == "optuna":
             from bolsa_analytics.optimize.optuna_sma import run_optuna_sma_search
@@ -1125,6 +1147,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 max_trials=trial_limit,
                 timeframe=timeframe,
+                execution_model=execution_model,
             )
             trials = [_sma_to_grid(item) for item in raw]
         elif resolved_engine == "vectorbt":
@@ -1140,6 +1163,7 @@ class RunSmaGridOptimize:
                 initial_cash=initial_cash,
                 max_trials=max_trials,
                 timeframe=timeframe,
+                execution_model=execution_model,
             )
             trials = [_sma_to_grid(item) for item in raw]
         else:
@@ -1153,7 +1177,11 @@ class RunSmaGridOptimize:
                         break
                     try:
                         metrics = _simulate_sma_crossover(
-                            search_bars, fast, slow, initial_cash
+                            search_bars,
+                            fast,
+                            slow,
+                            initial_cash,
+                            execution_model=execution_model,
                         )
                     except ValueError:
                         continue
@@ -1206,6 +1234,7 @@ class RunSmaGridOptimize:
         initial_cash: float,
         max_trials: int,
         on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
     ) -> OptimizeSmaGridResult:
         resolved_periods = periods or [10, 12, 14, 16, 18, 20]
         resolved_os = oversold_levels or [20.0, 25.0, 30.0, 35.0]
@@ -1216,7 +1245,9 @@ class RunSmaGridOptimize:
         if on_progress is not None:
             await on_progress(0, trials_total, None)
 
-        baseline = _baseline_for_family(search_bars, STRATEGY_FAMILY_RSI, initial_cash)
+        baseline = _baseline_for_family(
+            search_bars, STRATEGY_FAMILY_RSI, initial_cash, execution_model=execution_model
+        )
         raw = await _run_in_thread_with_live_progress(
             run_rsi_mean_reversion_grid,
             search_bars,
@@ -1227,6 +1258,7 @@ class RunSmaGridOptimize:
             overbought_levels=resolved_ob,
             initial_cash=initial_cash,
             max_trials=max_trials,
+            execution_model=execution_model,
         )
         trials = [_rsi_to_grid(item) for item in raw]
         return self._finalize(
@@ -1252,13 +1284,16 @@ class RunSmaGridOptimize:
         initial_cash: float,
         max_trials: int,
         on_progress: AsyncProgressCallback | None,
+        execution_model: Literal["next_open"] = "next_open",
     ) -> OptimizeSmaGridResult:
         resolved = macd_triples or list(DEFAULT_MACD_TRIPLES)
         trials_total = estimate_macd_grid_trial_total(resolved, max_trials=max_trials)
         if on_progress is not None:
             await on_progress(0, trials_total, None)
 
-        baseline = _baseline_for_family(search_bars, STRATEGY_FAMILY_MACD, initial_cash)
+        baseline = _baseline_for_family(
+            search_bars, STRATEGY_FAMILY_MACD, initial_cash, execution_model=execution_model
+        )
         raw = await _run_in_thread_with_live_progress(
             run_macd_signal_cross_grid,
             search_bars,
@@ -1267,6 +1302,7 @@ class RunSmaGridOptimize:
             triples=resolved,
             initial_cash=initial_cash,
             max_trials=max_trials,
+            execution_model=execution_model,
         )
         trials = [_macd_to_grid(item) for item in raw]
         return self._finalize(

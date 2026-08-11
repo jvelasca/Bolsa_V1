@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from bolsa_analytics.backtest import BacktestBarInput
 from bolsa_analytics.indicators.compute import compute_macd_line, compute_macd_signal_line
@@ -37,6 +37,7 @@ def _simulate_macd_signal_cross(
     initial_cash: float,
     trade_from_index: int = 0,
     attach_round_trips: bool = False,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> dict[str, Any]:
     """MACD sim. Indicator uses all bars; trading starts at ``trade_from_index``."""
     if fast_period < 2 or slow_period < 2 or signal_period < 2:
@@ -64,39 +65,42 @@ def _simulate_macd_signal_cross(
     for index, bar in enumerate(bars):
         if index < start:
             continue
-        price = bar.close
-        if index > 0:
-            prev_macd = macd_line[index - 1]
-            prev_signal = signal_line[index - 1]
-            cur_macd = macd_line[index]
-            cur_signal = signal_line[index]
-            if (
-                prev_macd is not None
-                and prev_signal is not None
-                and cur_macd is not None
-                and cur_signal is not None
-            ):
-                bullish = prev_macd <= prev_signal and cur_macd > cur_signal
-                bearish = prev_macd >= prev_signal and cur_macd < cur_signal
-                if shares == 0 and bullish and cash >= price:
-                    quantity = int(cash // price)
-                    if quantity > 0:
-                        cost = quantity * price
-                        cash -= cost
-                        shares = float(quantity)
-                        trades += 1
-                        open_entry_cost = cost
-                elif shares > 0 and bearish:
-                    proceeds = shares * price
-                    cash += proceeds
-                    if open_entry_cost is not None:
-                        entry_costs.append(open_entry_cost)
-                        exit_proceeds.append(proceeds)
-                        open_entry_cost = None
-                    shares = 0.0
+        signal_bar = index - 1
+        if signal_bar < start or signal_bar - 1 < 0:
+            continue
+        fill_price = float(bar.open if bar.open is not None else bar.close)
+        close_price = float(bar.close)
+        prev_macd = macd_line[signal_bar - 1]
+        prev_signal = signal_line[signal_bar - 1]
+        cur_macd = macd_line[signal_bar]
+        cur_signal = signal_line[signal_bar]
+        if (
+            prev_macd is not None
+            and prev_signal is not None
+            and cur_macd is not None
+            and cur_signal is not None
+        ):
+            bullish = prev_macd <= prev_signal and cur_macd > cur_signal
+            bearish = prev_macd >= prev_signal and cur_macd < cur_signal
+            if shares == 0 and bullish and cash >= fill_price:
+                quantity = int(cash // fill_price)
+                if quantity > 0:
+                    cost = quantity * fill_price
+                    cash -= cost
+                    shares = float(quantity)
                     trades += 1
+                    open_entry_cost = cost
+            elif shares > 0 and bearish:
+                proceeds = shares * fill_price
+                cash += proceeds
+                if open_entry_cost is not None:
+                    entry_costs.append(open_entry_cost)
+                    exit_proceeds.append(proceeds)
+                    open_entry_cost = None
+                shares = 0.0
+                trades += 1
 
-        equity = cash + shares * price
+        equity = cash + shares * close_price
         equity_values.append(equity)
         peak = max(peak, equity)
         if peak > 0:
@@ -162,6 +166,7 @@ def run_macd_signal_cross_grid(
     initial_cash: float = 10000.0,
     max_trials: int = 25,
     on_progress: ProgressCallback | None = None,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> list[MacdGridTrial]:
     """Ejecuta ``macd_signal_cross_grid``."""
     if not bars:
@@ -194,6 +199,7 @@ def run_macd_signal_cross_grid(
                 slow_period=slow_period,
                 signal_period=signal_period,
                 initial_cash=initial_cash,
+                execution_model=execution_model,
             )
         except ValueError:
             continue
