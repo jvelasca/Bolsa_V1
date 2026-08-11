@@ -10,7 +10,9 @@
     "lint": "eslint src/",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "contract:gen": "node scripts/sync-contract.mjs",
+    "contract:check": "node scripts/sync-contract.mjs --check"
   },
   "dependencies": {
     "@bolsa/shared": "workspace:*",
@@ -35,6 +37,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^4.5.2",
     "jsdom": "^26.1.0",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4.1.8",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
