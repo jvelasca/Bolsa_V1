@@ -1,7 +1,7 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `cbd0fff` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `4300674` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
 > Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-18) y los próximos dominios.
@@ -79,10 +79,11 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 20 | `1081809` | features/workspace (sub-lote resto de apps/web/src, fuera de backtests) | 7 |
 | 21 | `75f6595` | features/config + platform (sub-lote resto de apps/web/src, fuera de backtests) | 14 |
 | 22 | `cbd0fff` | features/research (sub-lote resto de apps/web/src, fuera de backtests) | 10 |
+| 23 | `4300674` | features/settings (sub-lote resto de apps/web/src, fuera de backtests) | 25 |
 
-**Total formateado hasta aquí: 258 ficheros** con diff real en 22 commits propios de formateo (210 de `features/backtests`
-en lotes 1-18 + 17 `accounts` lote 19 + 7 `workspace` lote 20 + 14 `config`+`platform` lote 21 + 10 `research` lote 22).
-Todos con batería
+**Total formateado hasta aquí: 283 ficheros** con diff real en 23 commits propios de formateo (210 de `features/backtests`
+en lotes 1-18 + 17 `accounts` lote 19 + 7 `workspace` lote 20 + 14 `config`+`platform` lote 21 + 10 `research` lote 22
++ 25 `settings` lote 23). Todos con batería
 `typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17 y 18, área Coach/TOP).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
@@ -112,23 +113,24 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 - ~~ **`workspace`** ~~ **HECHO (lote 20, `1081809`)**: todos los `.ts`/`.tsx` de `features/workspace` = **7 files (+107/−78 solo formato)**: `use-visualization-workspace-sync`, `visualization-workspace-sync`, `workspace-auto-save`, `workspace-bootstrap`, `workspace-picker-dialog`, `workspace-remote-sync`, `workspace-ui-bridge-register`. Sin falsos positivos EOL (los 7 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
 - ~~ **`config` + `platform`** ~~ **HECHO (lote 21, `75f6595`)**: todos los `.ts`/`.tsx` de `features/config` + `features/platform` = **14 files (+601/−443 solo formato)**: `config`: `database-config-panel`, `notification-prefs`(+test), `notifications-settings-panel`, `platform-config-dialog`; `platform`: `mandate-tenure-pnl`(+test), `operating-mandate`(+test), `operating-mandate-sync`, `product-universe`(+test), `strategy-adoption`, `universe-chip`. Sin falsos positivos EOL (los 14 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
 - ~~ **`research`** ~~ **HECHO (lote 22, `cbd0fff`)**: todos los `.ts`/`.tsx` de `features/research` = **10 files (+749/−452 solo formato)**: `asesor-daily-ops-panel`, `asesor-opiniones-panel`, `estudio-opinion-alarm-poller`, `opinion-channel-map.test`, `research-lab-evidence-summary`, `research-lab-evidence`(+test), `research-page`, `research-trial-result-block`, `use-asesor-alarma-badge`. Sin falsos positivos EOL (los 10 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
+- ~~ **`settings`** ~~ **HECHO (lote 23, `4300674`)**: todos los `.ts`/`.tsx` de `features/settings` = **25 files (+1927/−1433 solo formato)**: `ai-platform-section`, `ai-platform-tracker`(+test), `backtesting-help-section`, `backtesting-tracker`(+test), `chart-platform-section`, `chart-platform-tracker`, `data-capture-section`, `data-market-tracker`, `data-sync-summary-card`, `decision-replay-panel`, `dia-d-evidence-archive-help-card`, `effectiveness-panel`, `general-settings-section`, `market-providers-status-card`, `paper-paths-copy`(+test), `settings-redirect-page`, `settings-section`, `supervised-f3-panel`, `value-analysis-section`, `value-analysis-tracker`, `watchlist-help-section`, `watchlist-lists-tracker`. Sin falsos positivos EOL (los 25 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
 > **Nota de método para el siguiente hilo (relevo):** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes
 > (14, `6f8c668`), `hub` (15, `6c32b06`), `chart` (16, `a42587e`), `misc`/motores (17, `da2f7d9`) y cierre
 > `library`/`estudio`/`ibex` (18, `5bec6ed`) ya están HECHOS. **El dominio `hub`/`chart`/`misc` está CERRADO y
-> `features/backtests` queda COMPLETO.** **Lote 19 (`689c294`): `features/accounts`. Lote 20 (`1081809`):
-> `features/workspace`. Lote 21 (`75f6595`): `features/config`+`platform`. Lote 22 (`cbd0fff`): `features/research`.**
-> Tras los lotes 19-22, el `prettier --check` amplio (excl. `features/backtests`) marca **371 files** desincronizados
-> restantes.
+> `features/backtests` queda COMPLETO.** Lotes 19-23 del resto de `apps/web/src`: **`accounts` (19, `689c294`),
+> `workspace` (20, `1081809`), `config`+`platform` (21, `75f6595`), `research` (22, `cbd0fff`), `settings` (23,
+> `4300674`).** Tras los lotes 19-23, el `prettier --check` amplio (excl. `features/backtests`) marca **346 files**
+> desincronizados restantes.
 > Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
 >
 > **Siguiente: otro dominio del resto de `apps/web/src`** (fuera de `features/backtests`, que queda completo) por
-> sub-lotes, con el mismo protocolo de 8 pasos (features de otros dominios —charts, instruments, trading, settings,
+> sub-lotes, con el mismo protocolo de 8 pasos (features de otros dominios —charts, instruments, trading,
 > screeners—, lib, stores, components/ui, layout, etc.), ejecutando `prettier --check` por
 > sub-lote y verificando el `git diff --cached --numstat` (paso 4). Correr `test:coach` cuando el sub-lote toque área
-> Coach/TOP. Hechos: `accounts` (19), `workspace` (20), `config`+`platform` (21), `research` (22).
+> Coach/TOP. Hechos: `accounts` (19), `workspace` (20), `config`+`platform` (21), `research` (22), `settings` (23).
 
 
 ## 6. Documentos fuente de verdad / índices
