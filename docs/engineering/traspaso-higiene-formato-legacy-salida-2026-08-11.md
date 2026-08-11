@@ -1,10 +1,10 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `a42587e` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `da2f7d9` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
-> Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-16) y los próximos dominios.
+> Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-17) y los próximos dominios.
 > No hay nada que redescubrir: cada hecho está verificado en el repo/CI.
 
 ---
@@ -53,7 +53,7 @@ formatee masivamente el estilo antiguo en el diff editorial).
 > archivos del dominio. **Los commits `--no-verify` requieren la aprobación del usuario** en la tarjeta nativa de
 > auto-review (flujo ya validado para los 9 lotes).
 
-## 4. Estado de avance real (2026-08-11, HEAD `a42587e`)
+## 4. Estado de avance real (2026-08-11, HEAD `da2f7d9`)
 
 | Lote | Commit | Dominio | Ficheros con contenido real |
 |------|--------|---------|-----------------------------|
@@ -73,9 +73,10 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 14 | `6f8c668` | backtests/coach + lab | 21 |
 | 15 | `6c32b06` | backtests/hub (hub del dominio hub/chart/misc) | 4 |
 | 16 | `a42587e` | backtests/chart (parte del dominio hub/chart/misc) | 16 |
+| 17 | `da2f7d9` | backtests/misc motores (parte del dominio hub/chart/misc) | 23 |
 
-**Total formateado hasta aquí: 176 ficheros** con diff real en 16 commits propios de formateo. Todos con batería
-`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en el lote 14, área Coach/TOP).
+**Total formateado hasta aquí: 199 ficheros** con diff real en 17 commits propios de formateo. Todos con batería
+`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en lote 14 y 17, área Coach/TOP).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
 EOL** (contenido normalizado idéntico a HEAD). Se detectan porque **no aparecen en `git diff --cached --numstat`**
@@ -98,23 +99,21 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 - ~~**`strategy-matrix` restantes**~~ **HECHO (lote 11, `ee381d7`)**: `backtest-strategy-matrix.ts`(+test), `strategy-matrix-column-layout.ts`(+test), `strategy-matrix-filter-carousel-prefs.ts`(+test), `strategy-monitor-panel.tsx`, `strategy-monitor.ts`(+test), `mine-strategies-filters.ts`(+test) = **11 files (+970/−785 solo formato)**.
 - ~~ **`hub`** (parte del dominio `hub`/`chart`/`misc`) ~~ **HECHO (lote 15, `6c32b06`)**: `backtest-hub-layout.tsx`, `backtest-global-bar.tsx`, `backtest-history-tab.tsx`, `backtests-page.tsx` = **4 files (+161/−102 solo formato)**. `hub-nav`(+test)/`hub-tabs`(+test) YA estaban formateados.
 - ~~ **`chart`** (parte del dominio `hub`/`chart`/`misc`) ~~ **HECHO (lote 16, `a42587e`)**: `backtest-chart-import-panel.tsx`, `backtest-equity-chart.tsx`, `backtest-replay-chart.tsx`, `backtest-stat-donut.tsx`, `backtest-ranking-table.tsx`, `backtest-universe-picker.tsx`, `backtest-zone-settings-dialog.tsx`, `backtest-zone-prefs.ts`(+test), `backtest-cursor-panel.tsx`, `backtest-favorites-menu.tsx`, `backtest-future-stars.tsx`(+test), `backtest-instrument-preview.tsx`, `backtest-movie-hud.tsx`, `backtest-movie-stats.ts` = **16 files (+721/−458 solo formato)**. Sin falsos positivos EOL (los 16 con diff real).
-- **`misc` (resto del dominio `hub`/`chart`/`misc`)**: `backtest-paper-checklist.tsx`, `backtest-paper-gate.ts`(+test), `backtest-run-context.ts`(+test), `backtest-batch-run.ts`, `backtest-export.ts`, `backtest-date-format.ts`, `backtest-split-layout.ts`, `backtest-hud-prefs.ts`, `use-backtest-hud-prefs.ts`, `backtest-buy-hold.ts`(+test), `backtest-deep-coach.ts`(+test), `backtest-oos-evidence.ts`(+test), `backtest-pbo.ts`(+test), `backtest-period.ts`(+test), `backtest-period-returns.ts`, `backtest-walk-forward-metrics.ts`(+test), `chart-strategy-bridge.test.ts`, `drawing-replay-parity.test.ts`, `library-nav.ts`(+test), `library-strategy-buckets.ts`(+test), `estudio-list.test.ts`, `estudio-personal-list.test.ts`, `ibex35-operativa-audit.ts`(+test), `signal-evaluate-parity.test.ts`.
+- ~~ **`misc` motores** (parte del dominio `hub`/`chart`/`misc`) ~~ **HECHO (lote 17, `da2f7d9`)**: `backtest-paper-checklist.tsx`, `backtest-paper-gate.ts`(+test), `backtest-run-context.ts`(+test), `backtest-batch-run.ts`, `backtest-export.ts`, `backtest-date-format.ts`, `backtest-split-layout.ts`, `backtest-hud-prefs.ts`, `use-backtest-hud-prefs.ts`, `backtest-buy-hold.ts`(+test), `backtest-deep-coach.ts`(+test), `backtest-oos-evidence.ts`(+test), `backtest-pbo.ts`(+test), `backtest-period.ts`(+test), `backtest-walk-forward-metrics.ts`(+test) = **23 files reales (+1389/−1087 solo formato)**. **1 falso +EOL** (`backtest-period-returns.ts`, contenido normalizado idéntico a HEAD) → fuera del commit. Área Coach/TOP (test:coach 26/186 ✅).
+- **`library`/`estudio`/`ibex`/tests sueltos (cierre del dominio `hub`/`chart`/`misc`)**: `chart-strategy-bridge.test.ts`, `drawing-replay-parity.test.ts`, `signal-evaluate-parity.test.ts`, `library-nav.ts`(+test), `library-strategy-buckets.ts`(+test), `estudio-list.test.ts`, `estudio-personal-list.test.ts`, `ibex35-operativa-audit.ts`(+test).
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
 > **Nota de método para el siguiente hilo (relevo):** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes
-> (14, `6f8c668`), `hub` (15, `6c32b06`) y `chart` (16, `a42587e`) ya están HECHOS. Recomendar arrancar el siguiente
-> sub-lote por un dominio con pocos archivos y sin mezclar dominios:
+> (14, `6f8c668`), `hub` (15, `6c32b06`), `chart` (16, `a42587e`) y `misc`/motores (17, `da2f7d9`) ya están HECHOS.
+> Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
 >
-> **Siguiente: `misc`** (resto del dominio `hub`/`chart`/`misc`; `hub` HECHO lote 15 `6c32b06`, `chart` HECHO lote 16
-> `a42587e`). Restan ~35 files: `paper-checklist`, `paper-gate`(+test), `run-context`(+test), `batch-run`, `export`,
-> `date-format`, `split-layout`, `hud-prefs`, `use-backtest-hud-prefs`, `buy-hold`(+test), `deep-coach`(+test),
-> `oos-evidence`(+test), `pbo`(+test), `period`(+test), `period-returns`, `walk-forward-metrics`(+test),
-> `chart-strategy-bridge.test`, `drawing-replay-parity.test`, `signal-evaluate-parity.test`, `library-nav`(+test),
-> `library-strategy-buckets`(+test), `estudio-list.test`, `estudio-personal-list.test`, `ibex35-operativa-audit`(+test).
-> Algunos son área Coach/TOP (deep-coach, oos-evidence, pbo) → recordar correr `test:coach` en ese sub-lote. Si excede
-> ~30 files, subdividirlo en dos. Después de `misc`, seguir con el **resto de `apps/web/src`**. Seguir el protocolo paso
-> a paso, verificando el `git diff --cached --numstat` (paso 4).
+> **Siguiente: `library`/`estudio`/`ibex`/tests sueltos** (cierre del dominio `hub`/`chart`/`misc`; `hub` lote 15
+> `6c32b06`, `chart` lote 16 `a42587e`, `misc`/motores lote 17 `da2f7d9`). Restan **11 files**: `chart-strategy-bridge.test`,
+> `drawing-replay-parity.test`, `signal-evaluate-parity.test`, `library-nav`(+test), `library-strategy-buckets`(+test),
+> `estudio-list.test`, `estudio-personal-list.test`, `ibex35-operativa-audit`(+test). Conveniente correr `test:coach`
+> (cubre `ibex35-operativa-audit`). Después, seguir con el **resto de `apps/web/src`**. Seguir el protocolo paso a paso,
+> verificando el `git diff --cached --numstat` (paso 4).
 
 
 ## 6. Documentos fuente de verdad / índices
