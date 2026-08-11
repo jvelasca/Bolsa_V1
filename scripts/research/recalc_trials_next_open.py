@@ -44,23 +44,22 @@ async def _targets(
     args: argparse.Namespace,
 ) -> list[dict[str, Any]]:
     """Distinct (instrument_id, strategy_type, timeframe) de trials existentes."""
-    from sqlalchemy import distinct, select
+    from sqlalchemy import select
 
     from bolsa_infrastructure.database.models.tables import BacktestRunRow, ResearchTrialRow
 
     stmt = (
         select(
-            distinct(
-                BacktestRunRow.instrument_id,
-                BacktestRunRow.strategy_type,
-                BacktestRunRow.timeframe,
-            )
+            BacktestRunRow.instrument_id,
+            BacktestRunRow.strategy_type,
+            BacktestRunRow.timeframe,
         )
         .join(ResearchTrialRow, ResearchTrialRow.backtest_run_id == BacktestRunRow.id)
         .where(
             BacktestRunRow.strategy_type.is_not(None),
             BacktestRunRow.timeframe.is_not(None),
         )
+        .distinct()
     )
     if args.symbol:
         from bolsa_infrastructure.database.models.tables import InstrumentRow
