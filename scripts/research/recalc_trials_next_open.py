@@ -27,6 +27,50 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 
+DATA_EPOCH_LEGACY = "legacy"
+DATA_EPOCH_NEXT_OPEN = "next_open"
+
+
+def _old_theme(row: Any, *, engine_version: str) -> bool:
+    """Un run es old-theme si su manifest.engine.version no es el actual (F2 next_open)."""
+    engine = (row.manifest or {}).get("engine") or {}
+    return engine.get("version") != engine_version
+
+
+async def _mark_legacy(session: Any, *, engine_version: str) -> int:
+    """Etiqueta ``data_epoch`` de backtest_runs/research_trials (old ↔ next_open).
+
+    Los runs con ``manifest.engine.version`` actual (F2 ``next_open``) se marcan
+    ``next_open``; los restantes (old-theme, previos a la corrección) se marcan
+    ``legacy`` y sus trials se propagan. Devuelve el nº de runs cuya etiqueta
+    cambió. Idempotente.
+    """
+    from sqlalchemy import select
+
+    from bolsa_infrastructure.database.models.tables import BacktestRunRow, ResearchTrialRow
+
+    runs = (await session.execute(select(BacktestRunRow))).scalars().all()
+    changed = 0
+    for run in runs:
+        target = (
+            DATA_EPOCH_NEXT_OPEN
+            if not _old_theme(run, engine_version=engine_version)
+            else DATA_EPOCH_LEGACY
+        )
+        if run.data_epoch != target:
+            run.data_epoch = target
+            changed += 1
+    await session.flush()
+
+    trials = (await session.execute(select(ResearchTrialRow))).scalars().all()
+    run_by_id = {r.id: r for r in runs}
+    for trial in trials:
+        run = run_by_id.get(trial.backtest_run_id)
+        if run is not None and trial.data_epoch != run.data_epoch:
+            trial.data_epoch = run.data_epoch
+    await session.flush()
+    return changed
+
 
 def _load_env() -> None:
     env_path = ROOT / ".env"
@@ -233,12 +277,17 @@ async def _recalc_one(
 
 
 async def _run(args: argparse.Namespace) -> int:
+    from bolsa_analytics.research.manifest import ENGINE_VERSION
     from bolsa_infrastructure.config import get_settings
+    from bolsa_infrastructure.database.migrations import ensure_migrated
     from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
     dry_run = not args.apply
     get_settings.cache_clear()
     settings = get_settings()
+    if args.mark_legacy and not dry_run:
+        # La columna data_epoch debe existir (Alembic F3b). Idempotente.
+        ensure_migrated()
     engine = create_engine(settings)
     factory = create_session_factory(engine)
 
@@ -248,6 +297,7 @@ async def _run(args: argparse.Namespace) -> int:
         "already_new": 0,
         "skipped_short": 0,
         "errors": 0,
+        "marked": 0,
     }
 
     async with factory() as session:
@@ -255,7 +305,7 @@ async def _run(args: argparse.Namespace) -> int:
         print(f"Targets a revisar: {len(targets)}")
         for t in targets:
             try:
-                status, changed = await _recalc_one(
+                status, _changed = await _recalc_one(
                     session,
                     instrument_id=t["instrument_id"],
                     strategy_type=t["strategy_type"],
@@ -269,19 +319,25 @@ async def _run(args: argparse.Namespace) -> int:
                 counts["errors"] += 1
                 print(f"  ERROR {t['instrument_id']} {t['strategy_type']}: {exc}")
 
-    await engine.dispose()
+        if args.mark_legacy:
+            if dry_run:
+                print("INFO: --mark-legacy en dry-run: no escribe (pasa --apply para etiquetar).")
+            else:
+                marked_runs = await _mark_legacy(session, engine_version=ENGINE_VERSION)
+                await session.commit()
+                counts["marked"] += marked_runs
+                print(
+                    f"Marcado data_epoch: {marked_runs} runs con data_epoch distinto "
+                    "(legacy/next_open)."
+                )
 
-    if args.mark_legacy:
-        print(
-            "INFO: --mark-legacy no hace nada: research_trials/backtest_runs no tienen "
-            "columna de marca de época (contrato/columna no existe; Alembic F3b queda "
-            "fuera de alcance y se registra como deuda)."
-        )
+    await engine.dispose()
 
     print(
         f"\nResumen: recalced={counts['recalced']} would_recalc={counts['would_recalc']} "
         f"already_new={counts['already_new']} skipped_short={counts['skipped_short']} "
-        f"errors={counts['errors']} mode={'apply' if args.apply else 'dry-run'}"
+        f"marked={counts['marked']} errors={counts['errors']} "
+        f"mode={'apply' if args.apply else 'dry-run'}"
     )
     return 1 if (counts["errors"] or (args.apply and counts["recalced"] == 0 and counts["already_new"] == 0)) else 0
 
@@ -296,7 +352,7 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Escribe en DB (default: dry-run)")
     parser.add_argument("--dry-run", action="store_true", help="Alias explícito (default)")
     parser.add_argument("--reset", action="store_true", help="Re-ejecuta aunque ya exista run nuevo-theme")
-    parser.add_argument("--mark-legacy", action="store_true", help="Marca runs antiguos (no-op: sin columna)")
+    parser.add_argument("--mark-legacy", action="store_true", help="Marca runs/trials old-theme como data_epoch='legacy' (runs next_open='next_open')")
     args = parser.parse_args()
     if args.apply and args.dry_run:
         print("Elige --apply o --dry-run, no ambos")
