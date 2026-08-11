@@ -7,27 +7,32 @@
  * - Finalistas: TOP del valor (sin cambio).
  */
 
-import type { StrategyOrigin } from '@bolsa/shared';
+import type { StrategyOrigin } from "@bolsa/shared";
 
-export type StrategiesListFilter = 'all' | 'generics' | 'optimized' | 'mine' | 'finalists';
+export type StrategiesListFilter =
+  | "all"
+  | "generics"
+  | "optimized"
+  | "mine"
+  | "finalists";
 
-export type LibrarySavedBucket = 'optimized' | 'mine';
+export type LibrarySavedBucket = "optimized" | "mine";
 
 export const LIBRARY_FILTER_LABELS: Record<StrategiesListFilter, string> = {
-  all: 'Todas',
-  generics: 'Genéricas',
-  optimized: 'Optimizadas',
-  mine: 'Mis estrategias',
-  finalists: 'Finalistas',
+  all: "Todas",
+  generics: "Genéricas",
+  optimized: "Optimizadas",
+  mine: "Mis estrategias",
+  finalists: "Finalistas",
 };
 
 /** Copy corto para chips / tooltips. */
 export const LIBRARY_FILTER_TITLES: Record<StrategiesListFilter, string> = {
-  all: 'Catálogo + optimizadas + mis autorías',
-  generics: 'Plantillas del catálogo (no guardadas)',
-  optimized: 'Clones y ajustes Lab sobre genéricas',
-  mine: 'Autoría propia (manual, prompt IA, asistida, import)',
-  finalists: 'TOP del valor seleccionado en Probar',
+  all: "Catálogo + optimizadas + mis autorías",
+  generics: "Plantillas del catálogo (no guardadas)",
+  optimized: "Clones y ajustes Lab sobre genéricas",
+  mine: "Autoría propia (manual, prompt IA, asistida, import)",
+  finalists: "TOP del valor seleccionado en Probar",
 };
 
 export type LibraryBucketable = {
@@ -40,19 +45,20 @@ export type LibraryBucketable = {
  * `preset` → optimizada. Legacy Lab (`manual` + presetKey) también → optimizada.
  */
 export function librarySavedBucket(s: LibraryBucketable): LibrarySavedBucket {
-  if (s.origin === 'preset') return 'optimized';
+  if (s.origin === "preset") return "optimized";
   // Lab adoptaba como manual + presetKey antes de L0.
-  if (s.origin === 'manual' && s.presetKey) return 'optimized';
-  return 'mine';
+  if (s.origin === "manual" && s.presetKey) return "optimized";
+  return "mine";
 }
 
 export function filterStrategiesByLibraryBucket<T extends LibraryBucketable>(
   strategies: T[],
   filter: StrategiesListFilter,
 ): T[] {
-  if (filter === 'generics' || filter === 'finalists') return [];
-  if (filter === 'all') return strategies;
-  const want: LibrarySavedBucket = filter === 'optimized' ? 'optimized' : 'mine';
+  if (filter === "generics" || filter === "finalists") return [];
+  if (filter === "all") return strategies;
+  const want: LibrarySavedBucket =
+    filter === "optimized" ? "optimized" : "mine";
   return strategies.filter((s) => librarySavedBucket(s) === want);
 }
 
@@ -63,7 +69,7 @@ export function countLibraryBuckets(strategies: LibraryBucketable[]): {
   let optimized = 0;
   let mine = 0;
   for (const s of strategies) {
-    if (librarySavedBucket(s) === 'optimized') optimized += 1;
+    if (librarySavedBucket(s) === "optimized") optimized += 1;
     else mine += 1;
   }
   return { optimized, mine };
@@ -71,22 +77,24 @@ export function countLibraryBuckets(strategies: LibraryBucketable[]): {
 
 /** Etiquetas de origen alineadas a L0. */
 export const LIBRARY_ORIGIN_LABELS: Record<StrategyOrigin, string> = {
-  manual: 'Manual',
-  assisted: 'Asistida',
-  ai_generated: 'Prompt IA',
-  imported: 'Importada',
-  preset: 'Optimizada',
+  manual: "Manual",
+  assisted: "Asistida",
+  ai_generated: "Prompt IA",
+  imported: "Importada",
+  preset: "Optimizada",
 };
 
-export function normalizeStrategiesListFilter(raw: unknown): StrategiesListFilter {
+export function normalizeStrategiesListFilter(
+  raw: unknown,
+): StrategiesListFilter {
   if (
-    raw === 'all' ||
-    raw === 'generics' ||
-    raw === 'optimized' ||
-    raw === 'mine' ||
-    raw === 'finalists'
+    raw === "all" ||
+    raw === "generics" ||
+    raw === "optimized" ||
+    raw === "mine" ||
+    raw === "finalists"
   ) {
     return raw;
   }
-  return 'all';
+  return "all";
 }

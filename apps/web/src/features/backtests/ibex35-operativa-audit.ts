@@ -13,14 +13,14 @@
  * @see docs/engineering/backtesting-funnel-handoff-2026-07-29.md
  */
 
-import { IBEX35_INSTRUMENTS } from '@bolsa/shared';
+import { IBEX35_INSTRUMENTS } from "@bolsa/shared";
 import {
   rankTechnicalRecommendations,
   type DeepCoachContext,
   type TechnicalRecommendation,
-} from '@/features/backtests/backtest-deep-coach';
-import type { ExplorePresetRow } from '@/features/backtests/backtest-explore-value';
-import { periodReturnsFromEquity } from '@/features/backtests/backtest-period-returns';
+} from "@/features/backtests/backtest-deep-coach";
+import type { ExplorePresetRow } from "@/features/backtests/backtest-explore-value";
+import { periodReturnsFromEquity } from "@/features/backtests/backtest-period-returns";
 import {
   createListAutoCampaign,
   isListAutoComplete,
@@ -30,13 +30,13 @@ import {
   advanceListAutoAfterSettle,
   shouldStartListAuto,
   type FullCycleSettleReason,
-} from '@/features/backtests/backtest-list-auto';
+} from "@/features/backtests/backtest-list-auto";
 import {
   resolveFullCycleSaveDecision,
   shouldAutoHandoffLab,
-} from '@/features/backtests/backtest-assistant-full-cycle';
+} from "@/features/backtests/backtest-assistant-full-cycle";
 
-export type AuditSeverity = 'critical' | 'warn' | 'info' | 'ok';
+export type AuditSeverity = "critical" | "warn" | "info" | "ok";
 
 export type AuditFinding = {
   code: string;
@@ -73,37 +73,52 @@ export type Ibex35OperativaAuditReport = {
 };
 
 const PRESET_DEFS: Array<{
-  strategyType: ExplorePresetRow['strategyType'];
+  strategyType: ExplorePresetRow["strategyType"];
   label: string;
-  category: ExplorePresetRow['category'];
+  category: ExplorePresetRow["category"];
   categoryLabel: string;
 }> = [
-  { strategyType: 'sma_crossover', label: 'SMA 20/50', category: 'trend', categoryLabel: 'Tendencia' },
-  { strategyType: 'golden_cross', label: 'Golden', category: 'trend', categoryLabel: 'Tendencia' },
-  { strategyType: 'ma_stack_bullish', label: 'MA stack', category: 'trend', categoryLabel: 'Tendencia' },
   {
-    strategyType: 'rsi_mean_reversion',
-    label: 'RSI',
-    category: 'mean_reversion',
-    categoryLabel: 'Reversión',
+    strategyType: "sma_crossover",
+    label: "SMA 20/50",
+    category: "trend",
+    categoryLabel: "Tendencia",
   },
   {
-    strategyType: 'stoch_oversold',
-    label: 'Stoch',
-    category: 'mean_reversion',
-    categoryLabel: 'Reversión',
+    strategyType: "golden_cross",
+    label: "Golden",
+    category: "trend",
+    categoryLabel: "Tendencia",
   },
   {
-    strategyType: 'macd_signal_cross',
-    label: 'MACD',
-    category: 'momentum',
-    categoryLabel: 'Momentum',
+    strategyType: "ma_stack_bullish",
+    label: "MA stack",
+    category: "trend",
+    categoryLabel: "Tendencia",
   },
   {
-    strategyType: 'donchian_breakout',
-    label: 'Donchian',
-    category: 'trend',
-    categoryLabel: 'Tendencia',
+    strategyType: "rsi_mean_reversion",
+    label: "RSI",
+    category: "mean_reversion",
+    categoryLabel: "Reversión",
+  },
+  {
+    strategyType: "stoch_oversold",
+    label: "Stoch",
+    category: "mean_reversion",
+    categoryLabel: "Reversión",
+  },
+  {
+    strategyType: "macd_signal_cross",
+    label: "MACD",
+    category: "momentum",
+    categoryLabel: "Momentum",
+  },
+  {
+    strategyType: "donchian_breakout",
+    label: "Donchian",
+    category: "trend",
+    categoryLabel: "Tendencia",
   },
 ];
 
@@ -130,12 +145,13 @@ function thirdsEquity(earlyMul: number, midMul: number, lateMul: number) {
 }
 
 function baseRow(
-  partial: Partial<ExplorePresetRow> & Pick<ExplorePresetRow, 'strategyType' | 'label'>,
+  partial: Partial<ExplorePresetRow> &
+    Pick<ExplorePresetRow, "strategyType" | "label">,
 ): ExplorePresetRow {
   return {
-    category: 'trend',
-    categoryLabel: 'Tendencia',
-    status: 'ok',
+    category: "trend",
+    categoryLabel: "Tendencia",
+    status: "ok",
     totalReturnPct: 10,
     excessReturnPct: 2,
     maxDrawdownPct: 12,
@@ -229,9 +245,9 @@ function snapshotFromRank(
 function ctx(symbol: string): DeepCoachContext {
   return {
     symbol,
-    timeframe: '1d',
-    horizon: 'swing',
-    riskTolerance: 'moderate',
+    timeframe: "1d",
+    horizon: "swing",
+    riskTolerance: "moderate",
   };
 }
 
@@ -251,22 +267,22 @@ export function runIbex35OperativaAudit(opts?: {
 
   if (symbols.length !== expected.length && !opts?.symbols) {
     findings.push({
-      code: 'ibex_count_mismatch',
-      severity: 'critical',
+      code: "ibex_count_mismatch",
+      severity: "critical",
       message: `Catálogo IBEX esperado ${expected.length}, got ${symbols.length}`,
     });
   }
 
   if (symbols.length > LIST_AUTO_HARD_MAX) {
     findings.push({
-      code: 'list_auto_over_cap',
-      severity: 'warn',
+      code: "list_auto_over_cap",
+      severity: "warn",
       message: `Lista ${symbols.length} > tope duro ${LIST_AUTO_HARD_MAX}; Lista AUTO recorta.`,
     });
   } else if (symbols.length > LIST_AUTO_BATCH_SIZE) {
     findings.push({
-      code: 'list_auto_multi_batch',
-      severity: 'ok',
+      code: "list_auto_multi_batch",
+      severity: "ok",
       message: `Lista ${symbols.length} · ${Math.ceil(symbols.length / LIST_AUTO_BATCH_SIZE)} tandas de ~${LIST_AUTO_BATCH_SIZE} (sin truncar).`,
     });
   }
@@ -293,8 +309,8 @@ export function runIbex35OperativaAudit(opts?: {
 
     if (snap.slotCount < 3) {
       findings.push({
-        code: 'thin_top',
-        severity: 'warn',
+        code: "thin_top",
+        severity: "warn",
         message: `${symbol}: TOP con ${snap.slotCount} slots (esperado 3)`,
       });
     }
@@ -302,19 +318,19 @@ export function runIbex35OperativaAudit(opts?: {
     const uniqueTypes = new Set(snap.topTypes);
     if (uniqueTypes.size < snap.topTypes.length) {
       findings.push({
-        code: 'duplicate_slot_types',
-        severity: 'critical',
+        code: "duplicate_slot_types",
+        severity: "critical",
         message: `${symbol}: strategyType duplicado en TOP`,
-        detail: snap.topTypes.join(', '),
+        detail: snap.topTypes.join(", "),
       });
     }
 
     const cats = new Set(snap.categories);
     if (snap.slotCount >= 3 && cats.size < 2) {
       findings.push({
-        code: 'mono_family_top',
-        severity: 'warn',
-        message: `${symbol}: TOP-3 mono-familia (${[...cats].join(',')})`,
+        code: "mono_family_top",
+        severity: "warn",
+        message: `${symbol}: TOP-3 mono-familia (${[...cats].join(",")})`,
       });
     }
   }
@@ -330,15 +346,15 @@ export function runIbex35OperativaAudit(opts?: {
 
   if (stickyTop1Share >= 0.75 && snapshots.length >= 10) {
     findings.push({
-      code: 'sticky_top1',
-      severity: 'critical',
+      code: "sticky_top1",
+      severity: "critical",
       message: `TOP #1 pegajoso: ${(stickyTop1Share * 100).toFixed(0)}% comparten el mismo preset`,
       detail: JSON.stringify(top1Frequency),
     });
   } else if (stickyTop1Share >= 0.5 && snapshots.length >= 10) {
     findings.push({
-      code: 'sticky_top1',
-      severity: 'warn',
+      code: "sticky_top1",
+      severity: "warn",
       message: `TOP #1 concentrado: ${(stickyTop1Share * 100).toFixed(0)}% mismo preset`,
       detail: JSON.stringify(top1Frequency),
     });
@@ -346,72 +362,76 @@ export function runIbex35OperativaAudit(opts?: {
 
   if (softFallbackRate > 0.4) {
     findings.push({
-      code: 'soft_fallback_rate',
-      severity: 'critical',
+      code: "soft_fallback_rate",
+      severity: "critical",
       message: `Soft-fallback ${(softFallbackRate * 100).toFixed(0)}% de slots (periodReturns ausentes o rota)`,
     });
   } else if (softFallbackRate > 0.05) {
     findings.push({
-      code: 'soft_fallback_rate',
-      severity: 'warn',
+      code: "soft_fallback_rate",
+      severity: "warn",
       message: `Soft-fallback ${(softFallbackRate * 100).toFixed(0)}% de slots`,
     });
   }
 
   // ——— Lista AUTO operativa ———
   const startOk = shouldStartListAuto({
-    universeMode: 'list',
+    universeMode: "list",
     fullCycleOnPlay: true,
-    listId: 'ibex35',
+    listId: "ibex35",
     instrumentCount: symbols.length,
   });
   if (!startOk) {
     findings.push({
-      code: 'list_auto_start_blocked',
-      severity: 'critical',
-      message: 'shouldStartListAuto=false con lista + ciclo ON',
+      code: "list_auto_start_blocked",
+      severity: "critical",
+      message: "shouldStartListAuto=false con lista + ciclo ON",
     });
   }
 
   const campaign = createListAutoCampaign({
-    listId: 'ibex35',
+    listId: "ibex35",
     instrumentIds: symbols.map((s) => `id-${s}`),
   });
   const expectedQueue = Math.min(symbols.length, LIST_AUTO_HARD_MAX);
   if (campaign.instrumentIds.length !== expectedQueue) {
     findings.push({
-      code: 'list_auto_slice_bug',
-      severity: 'critical',
+      code: "list_auto_slice_bug",
+      severity: "critical",
       message: `Campaña recortó mal: ${campaign.instrumentIds.length} vs min(${symbols.length},${LIST_AUTO_HARD_MAX})`,
     });
   }
 
-  const settleReasons: FullCycleSettleReason[] = ['saved', 'skip_lab', 'skip_finalists'];
+  const settleReasons: FullCycleSettleReason[] = [
+    "saved",
+    "skip_lab",
+    "skip_finalists",
+  ];
   let steps = 0;
   while (!isListAutoComplete(campaign) && !campaign.aborted) {
     void settleReasons[steps % settleReasons.length];
     const adv = advanceListAutoAfterSettle(campaign);
     steps += 1;
-    if (adv === 'done' || adv === 'aborted') break;
+    if (adv === "done" || adv === "aborted") break;
     if (steps > expectedQueue + 5) {
       findings.push({
-        code: 'list_auto_infinite',
-        severity: 'critical',
-        message: 'Bucle Lista AUTO no termina',
+        code: "list_auto_infinite",
+        severity: "critical",
+        message: "Bucle Lista AUTO no termina",
       });
       break;
     }
   }
   if (!isListAutoComplete(campaign) && !campaign.aborted) {
     findings.push({
-      code: 'list_auto_incomplete',
-      severity: 'critical',
+      code: "list_auto_incomplete",
+      severity: "critical",
       message: `Campaña incompleta index=${campaign.index}/${campaign.instrumentIds.length}`,
     });
   } else {
     findings.push({
-      code: 'list_auto_complete',
-      severity: 'ok',
+      code: "list_auto_complete",
+      severity: "ok",
       message: `Lista AUTO recorrió ${campaign.instrumentIds.length} valores (settle mixto)`,
     });
   }
@@ -426,9 +446,9 @@ export function runIbex35OperativaAudit(opts?: {
     })
   ) {
     findings.push({
-      code: 'cycle_handoff_without_improve',
-      severity: 'critical',
-      message: 'Lab auto-handoff con improvedCount=0 (no debe)',
+      code: "cycle_handoff_without_improve",
+      severity: "critical",
+      message: "Lab auto-handoff con improvedCount=0 (no debe)",
     });
   }
 
@@ -436,19 +456,19 @@ export function runIbex35OperativaAudit(opts?: {
     postLab: true,
     labImprovedCount: 0,
     canSaveTop: true,
-    existingTopStatus: 'active',
+    existingTopStatus: "active",
   });
-  if (keep.action !== 'skip_keep_previous') {
+  if (keep.action !== "skip_keep_previous") {
     findings.push({
-      code: 'cycle_overwrite_active',
-      severity: 'critical',
+      code: "cycle_overwrite_active",
+      severity: "critical",
       message: `Sin mejora Lab debería skip_keep_previous, got ${keep.action}`,
     });
   } else {
     findings.push({
-      code: 'cycle_preserve_active',
-      severity: 'ok',
-      message: 'Sin mejora Lab conserva TOP active',
+      code: "cycle_preserve_active",
+      severity: "ok",
+      message: "Sin mejora Lab conserva TOP active",
     });
   }
 
@@ -457,21 +477,23 @@ export function runIbex35OperativaAudit(opts?: {
     labImprovedCount: 2,
     canSaveTop: true,
   });
-  if (save.action !== 'save_active') {
+  if (save.action !== "save_active") {
     findings.push({
-      code: 'cycle_save_blocked',
-      severity: 'critical',
+      code: "cycle_save_blocked",
+      severity: "critical",
       message: `Con mejora Lab debería save_active, got ${save.action}`,
     });
   }
 
-  const criticalCount = findings.filter((f) => f.severity === 'critical').length;
-  const warnCount = findings.filter((f) => f.severity === 'warn').length;
+  const criticalCount = findings.filter(
+    (f) => f.severity === "critical",
+  ).length;
+  const warnCount = findings.filter((f) => f.severity === "warn").length;
 
   if (criticalCount === 0 && warnCount === 0) {
     findings.push({
-      code: 'ibex_coach_healthy',
-      severity: 'ok',
+      code: "ibex_coach_healthy",
+      severity: "ok",
       message: `Coach IBEX simulado OK · ${symbols.length} valores · #1 diversificado`,
       detail: JSON.stringify(top1Frequency),
     });
@@ -494,17 +516,19 @@ export function runIbex35OperativaAudit(opts?: {
 }
 
 /** Resumen texto para consola / observación. */
-export function formatIbex35AuditReport(report: Ibex35OperativaAuditReport): string {
+export function formatIbex35AuditReport(
+  report: Ibex35OperativaAuditReport,
+): string {
   const lines = [
     `IBEX35 operativa audit · ${report.asOf}`,
     `valores=${report.instrumentCount} (esperado ${report.expectedCount}) · cap Lista AUTO=${report.listAutoCap}`,
     `stickyTop1=${(report.stickyTop1Share * 100).toFixed(1)}% · softFallback=${(report.softFallbackRate * 100).toFixed(1)}%`,
     `passed=${report.passed} · critical=${report.criticalCount} · warn=${report.warnCount}`,
-    'TOP #1 freq: ' + JSON.stringify(report.top1Frequency),
-    'Findings:',
+    "TOP #1 freq: " + JSON.stringify(report.top1Frequency),
+    "Findings:",
   ];
   for (const f of report.findings) {
     lines.push(`  [${f.severity}] ${f.code}: ${f.message}`);
   }
-  return lines.join('\n');
+  return lines.join("\n");
 }
