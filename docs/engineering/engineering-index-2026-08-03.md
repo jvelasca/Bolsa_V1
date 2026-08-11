@@ -53,7 +53,8 @@ Engineering Index  (este doc)
 │   ├── general-audit-plan-2026-08-10.md       ← auditoría general + plan por módulos
 │   ├── traspaso-m1-reproducibilidad-backend-2026-08-10.md  ← M1 reproducibilidad backend (uv.lock)
 │   ├── traspaso-m2-versiones-frontend-2026-08-10.md        ← M2 versiones frontend (@types react) CERRADO 08-10
-│   ├── traspaso-m3-dominio-2026-08-10.md                   ← M3 capa de dominio (py/domain + application) CERRADO 08-10
+│   ├── traspaso-m3-dominio-2026-08-10.md                   ← M3 capa de dominio (py/domain + application) · entrada original (punto de entrada del hilo)
+│   ├── traspaso-m3-dominio-cierre-2026-08-11.md            ← M3 CIERRE real: 4 lotes (fix ADR-024 `ce0cdab` · código muerto 5 Protocols `f13b09d` · docstrings 33 módulos `03472dc` · coherencia MIN_SCAN_BARS+KnowledgeStage `2c41b41`) · HEAD `2c41b41` · pytest domain+application 222 passed · deuda remanente: timeframes y mypy
 │   ├── traspaso-m4-infraestructura-datos-2026-08-10.md     ← M4 infraestructura/modelo datos (Prisma vs SQLAlchemy + Alembic + repos) CERRADO 08-10 · ADR-025
 │   ├── traspaso-m6-ai-analytics-2026-08-10.md              ← M6 AI/analytics (py/ai + py/analytics) CERRADO 08-10
 │   ├── traspaso-m5-frontend-2026-08-10.md                  ← M5 Frontend web por features (apps/web): CERRADO-08-10 como feature-slicing Diseño B agotado (ver §7 nota de cierre) / entrada

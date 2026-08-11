@@ -1180,3 +1180,23 @@ aportan nada y ensucian el diff). Recomendación para el siguiente hilo: tras `-
 
 Siguiente lote: **resto de `apps/web/src`** (fuera de `features/backtests`, que queda COMPLETO). **Lote 19 (`689c294`): `accounts`. Lote 20 (`1081809`): `workspace`. Lote 21 (`75f6595`): `config`+`platform`. Lote 22 (`cbd0fff`): `research`. Lote 23 (`4300674`): `settings`, 25 files, +1927/-1433. Lote 24 (`e38be2d`): `instruments`, 30 files, +2128/-1399. Lote 25 (`110667b`): `stores`, 31 files, +1911/-1207. Lote 26 (`465137a`): `lib` sub-batch A, 18 files, +1299/-897. Lote 27 (`0b8f04b`): `lib` sub-batch B, 17 files, +518/-388 (CIERRE dominio `lib`). Lote 29 (`998ed1d`): `features/charts` sub-batch A, 29 files, +2784/-1540. Lote 30 (`87e47e5`): `features/charts` sub-batch B, 29 files, +1148/-759. Lote 31 (`ce981e7`): `features/charts` sub-batch C, 29 files, +2178/-1134 (CIERRE dominio `charts`). Lote 32 (`7367447`): `features/trading` sub-batch A, 28 files, +878/-648. Lote 33 (`3b92e76`): `features/trading` sub-batch B, 29 files, +1909/-1471. Lote 34 (`cafba4c`): `features/trading` sub-batch C, 28 files, +1129/-924. Lote 35 (`49c7fac`): `features/trading` sub-batch D, 27 files, +1169/-938 (CIERRE dominio `trading`). Lote 36 (`5b47f60`): auxiliares + root app/main, 19 files, +1571/-1077 (CIERRE del resto de `apps/web/src`).** Con el lote 36, **TODO `apps/web/src` (fuera de `features/backtests`, que queda COMPLETO) queda CERRADO en higiene de formato**: `prettier --check` amplio (excl. `features/backtests`) = **0 files desincronizados**. Total: 512 files con diff real formateados en 36 commits (210 de `features/backtests` lotes 2-18; 302 del resto lotes 19-36, incl. los 2 falsos +EOL de trading en el git). Verificación tras cada lote y commit propio. HEAD `5b47f60` ·
 sincronizado.
+
+---
+
+### §7.7 — CIERRE M3: capa de dominio (`py/domain` + `application`) (2026-08-11)
+
+Tras cerrar la higiene de formato legacy (§7.6.i, 512 files / 36 commits, HEAD `6112fb2`/`032c619`), se ejecutó **M3** (coherencia de negocio, docstrings, código muerto) en **4 lotes atómicos**, cada uno con batería verde + push:
+
+| Lote | Commit | Alcance |
+|------|--------|---------|
+| A | `ce0cdab` | Fix coherencia ADR-024: 2 tests rotos en `test_list_unsubscribe_index.py` (mocks no preparaban `ensure_estudio_list` en `ListInstrumentLists.execute`) |
+| B | `f13b09d` | Código muerto: retirados 5 `Protocol` de repositorio huérfanos (`Portfolio/hypothesis/hypothesis_belief/research_evidence/knowledge_node`), sin consumidores (infra usa `SqlAlchemy*`) · −184 líneas |
+| C | `03472dc` | Docstrings de módulo a los 33 módulos de `bolsa_domain` sin docstring (solo texto) |
+| D | `2c41b41` | Coherencia de constantes: `MIN_SCAN_BARS` en `backtests.py`/`optimize.py`; import directo en `signal_alerts.py` (arregla error mypy); `ALLOWED_STAGES = frozenset(get_args(KnowledgeStage))` en `knowledge_consolidation.py` |
+
+**Batería:** ruff domain+application ✅ 0 errores · mypy sin empeorar (deuda pre-existente 115 errores, además −1 por `MIN_SCAN_BARS`/scans) · pytest domain+application **222 passed** (antes 229+2 FAILED → corregido) · pytest alcance CI **434 passed** (intacto).
+
+**Hallazgos M3 no modificados (por preservación funcional):** subconjuntos intencionados `ALARM_SAFE_MODES`/`"inform_only"`; duplicación masiva de timeframes `"1d"`/`"1wk"` (deuda remanente); `50` de `get_instrument_composite.py` sobre `indicator_bars` (semántica distinta); deuda mypy 115 (frente aparte).
+
+**Docs:** `traspaso-m3-dominio-cierre-2026-08-11.md` (ancla de cierre) creado e indexado. Módulo siguiente del plan 08-10: **M4** (infraestructura/modelo datos, CERRADO 08-10 según índice — verificar) o deuda objetivo (mypy / `B007` de ruff / timeframes).
+
