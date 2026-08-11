@@ -2,9 +2,9 @@
 
 > **Padre único:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) §16 (sub-entrada de la Auditoría consolidada, junto a F1/F2).
 > **Fuentes de verdad (leer primero):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) (P0.5/P1.2 + D0–D5) · [traspaso-f2-backtest-next-open-2026-08-11.md](./traspaso-f2-backtest-next-open-2026-08-11.md) (§6 deuda: `--mark-legacy` no-op → F3b).
-> **Rama de ejecución:** continuación sobre la punta activa `stage/f1-integridad-financiera-2026-08-11` (HEAD `9859d62`).
+> **Rama de ejecución:** `stage/f3b-alembic-data-epoch-2026-08-11` (desgajada desde `stage/f1-*`), **PR #31 ABIERTO** → base `stage/f1-integridad-financiera-2026-08-11` (aún sin mergear).
 > **Regla del hilo:** NO tocar código fuera del alcance F3b. Cambios validados con la batería (ruff+mypy+pytest) antes del commit.
-> **Estado:** F3b implementado y verificado (working tree). Pendiente de aprobación del usuario para commitear (norma F1 §8). Ver §7/§8.
+> **Estado:** F3b **COMMITEADO (7 commits C1–C7, HEAD `b9e9b6c`)** y **PR #31 ABIERTO** (sin mergear). Batería **602✓ · 0 fallos**. Working tree limpio. Pendiente de **merge** del PR #31 (fast-forward) para consolidar en `stage/f1-*`. Ver §7/§8.
 
 ---
 
@@ -58,14 +58,15 @@ Hacer **Alembic la única autoridad de esquema PostgreSQL** (D2) para el DDL nue
 
 ## 7. Registro
 
-| Fecha      | Acción                                                                                                                                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-08-11 | Traspaso F3b creado sobre `stage/f1-*` (HEAD `9859d62`). Alcance incremental (Alembic op + `ensure_migrated` + columna + `--mark-legacy`).                                                             |
-| 2026-08-11 | A–B: `env.py` real + ini (`prepend_sys_path`/`path_separator`).                                                                                                                                        |
-| 2026-08-11 | C–D: baseline `001` tolerante a TimescaleDB ausente; migración `002` (DDL `data_epoch`).                                                                                                               |
-| 2026-08-11 | E–F: `migrations.ensure_migrated()` + llamada en lifespan. `ensure_migrated` aplicado en local: `alembic_version=002`, columnas presentes, idempotente.                                                |
-| 2026-08-11 | G–H: columna en `tables.py` + cable `--mark-legacy` (deja de ser no-op).                                                                                                                               |
-| 2026-08-11 | I: tests F3b (3). Batería: ruff✓ · mypy✓ · pytest infra 46✓ + app 222✓ + analytics 323✓ + api offline 11✓ = **602✓ · 0 fallos**. **Working tree**. Pendiente de aprobación del usuario para commitear. |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Traspaso F3b creado sobre `stage/f1-*` (HEAD `9859d62`). Alcance incremental (Alembic op + `ensure_migrated` + columna + `--mark-legacy`).                                                                                                                                                                                   |
+| 2026-08-11 | A–B: `env.py` real + ini (`prepend_sys_path`/`path_separator`).                                                                                                                                                                                                                                                              |
+| 2026-08-11 | C–D: baseline `001` tolerante a TimescaleDB ausente; migración `002` (DDL `data_epoch`).                                                                                                                                                                                                                                     |
+| 2026-08-11 | E–F: `migrations.ensure_migrated()` + llamada en lifespan. `ensure_migrated` aplicado en local: `alembic_version=002`, columnas presentes, idempotente.                                                                                                                                                                      |
+| 2026-08-11 | G–H: columna en `tables.py` + cable `--mark-legacy` (deja de ser no-op).                                                                                                                                                                                                                                                     |
+| 2026-08-11 | I: tests F3b (3). Batería: ruff✓ · mypy✓ · pytest infra 46✓ + app 222✓ + analytics 323✓ + api offline 11✓ = **602✓ · 0 fallos**.                                                                                                                                                                                             |
+| 2026-08-11 | **COMMITS + PR**: 7 commits atómicos C1–C7 en `stage/f3b-alembic-data-epoch-2026-08-11` (C7 `b9e9b6c`). **PR #31 ABIERTO** → base `stage/f1-*`. Working tree limpio. `origin/stage/f1-*` sigue en `9859d62` (F2); base local `stage/f1-*` quedó adelantada a `b9e9b6c` (se reconcilia por fast-forward tras mergear PR #31). |
 
 ## 8. Protocolo recurrente (obligatorio en TODOS los hilos)
 
@@ -77,7 +78,9 @@ Hacer **Alembic la única autoridad de esquema PostgreSQL** (D2) para el DDL nue
 Texto de traspaso → nuevo chat (F3b completado — siguiente fase tras F3b)
 
 CONTEXTO INMEDIATO: F3b (Alembic como autoridad BD + columna data_epoch para --mark-legacy)
-está IMPLEMENTADO y VERIFICADO (working tree, pendiente de commit aprobado):
+está COMPLETADO con 7 commits en rama stage/f3b-alembic-data-epoch-2026-08-11 y PR #31 ABIERTO:
+  - 7 commits atómicos C1..C7 (doc cierre C7 `b9e9b6c`) en stage/f3b-alembic-data-epoch-2026-08-11.
+  - PR #31 (https://github.com/jvelasca/Bolsa_V1/pull/31) → base stage/f1-integridad-financiera-2026-08-11, AÚN SIN MERGEAR.
   - Alembic operativo: env.py real, baseline 001 tolerante a TimescaleDB ausente, migración 002
     (data_epoch en backtest_runs/research_trials). alembic_version=002 aplicado en local.
   - bolsa_infrastructure.database.migrations.ensure_migrated(): upgrade head programático e idempotente,
@@ -85,26 +88,43 @@ está IMPLEMENTADO y VERIFICADO (working tree, pendiente de commit aprobado):
   - --mark-legacy (recalc_trials_next_open.py) deja de ser no-op: etiqueta data_epoch legacy/next_open.
   - Batería: ruff✓ · mypy✓ · pytest infra 46✓ + app 222✓ + analytics 323✓ + api offline 11✓ = 602✓.
 
+ESTADO GIT (VERIFICADO, OJO): origin/main = eb31a7d · origin/stage/f1-* = 9859d62 (F2) · origin NO ha
+avanzado con F3b. PR #31 PENDIENTE DE MERGE. IMPORTANTE: la rama LOCAL stage/f1-* quedó ADELANTADA a
+`b9e9b6c` (no 9859d62) porque F3b se commiteó y desgajó a una rama propia; NO es un reset destructivo y
+NO afecta al PR. Tras mergear PR #31 (fast-forward) origin/stage/f1-* alcanza esos mismos commits y la
+rama local se reconcilia sin conflictos. NO hacer reset --hard salvo aprobación explícita. Checkpoint
+de retroceso global: tag audit-checkpoint-2026-08-11 (2683c49).
+
 Lee PRIMERO: docs/engineering/traspaso-f3b-alembic-data-epoch-2026-08-11.md (§4 implementación A–I,
 §5 batería 602✓, §6 deuda) y su fuente: audit-consolidado-internas-externas-2026-08-11.md (D0–D5).
 Para la fase siguiente usa engineering-index-2026-08-03.md y el plan de la fase declarada.
 NO toques código fuera del alcance de la fase que se declare.
 
 SIGUIENTE FASE (orden pactado D0, NO renegociar): F3b → F5a → (F3a+F4+F5b). Tras F3b, la siguiente es
-F5a (contratos FE/BE, P1.5 drift openapi-typescript). Alembic/ensure_migrated ya operativos (F3b).
-
-DECISIONES Y ESTADO git (verificar): stage/f1-integridad-financiera-2026-08-11 = base/punta activa.
-F1+F2 consolidados en ella. Checkpoint de retroceso global: tag audit-checkpoint-2026-08-11 (2683c49).
+F5a = CONTRATOS FE/BE (hallazgo P1.5, drift openapi-typescript):
+  - Problema (P1.5): DTOs/TypeScript a mano en packages/shared (manual) + api.ts vs Pydantic (FastAPI);
+    sin cliente generado desde OpenAPI → drift silencioso FE/BE.
+  - Objetivo: generar tipos/contrato TS del OpenAPI de FastAPI con openapi-typescript; eliminar la
+    duplicación manual y el drift. Cero features (D5). P1.5 confirmado en código.
+  - ARRANQUE RECOMENDADO: (1) mergear PR #31 y ponerte en la punta stage/f1-*; (2) leer el hallazgo P1.5
+    completo y revisar cómo FastAPI expone el schema OpenAPI (apps/api-python) y cómo el FE consume
+    endpoints (apps/web: api.ts / packages/shared); (3) pactar alcance incremental con el usuario
+    antes de implementar (mismo patrón que F3b). Preparar traspaso F5a + entrada única en
+    engineering-index + texto exacto al cerrar (norma permanente).
 
 Decisiones pactadas (NO renegociar): D0 orden F1→F2→F3b→F5a→(F3a+F4+F5b); D1 next_open inmutable 1D
-(MOC fuera); D2 Alembic única autoridad BD; D5 cero features. Deuda registrada en F3b §6: portar TODO el
-DDL Prisma a Alembic (→F3a/F4), account_repository.ensure_migrated por-request no retirado (→F3a),
-workers en lifespan (F3a), MOC/auth/contratos FE-BE no tocados.
+(MOC fuera); D2 Alembic única autoridad BD; D3 extraer workers de FastAPI (F3a); D4 auth local diferida
+(F5b); D5 Solo F1–F5, CERO FEATURES. Deuda registrada en F3b §6: portar TODO el DDL Prisma a Alembic
+(→F3a/F4), account_repository.ensure_migrated por-request no retirado (→F3a), workers en lifespan (F3a),
+MOC/auth/ciclo analytics↔market (→F4), contratos FE/BE = PRECISAMENTE F5a.
 
 NOTA OPERATIVA: al tocar scripts que imprimen caracteres Unicode ('→') en Windows, ejecutar con
 $env:PYTHONIOENCODING="utf-8"; (consola cp1252 lanza UnicodeEncodeError).
 
 BATERÍA OBLIGATORIA: ruff check + mypy (ficheros tocados) + pytest (analytics/application/api-python,
-+ infraestructura si se tocan DB/repos). Al cerrar cualquiera: preparar el siguiente traspaso-* +
-entrada única en engineering-index + texto exacto en el chat (norma permanente del proyecto).
++ infraestructura si se tocan DB/repos) + pnpm test / CI si toca web. Al cerrar cualquiera: preparar el
+siguiente traspaso-* + entrada única en engineering-index + texto exacto en el chat (norma permanente).
+
+FLUJO DE COMMITS (patrón proyecto): trabajo en rama stage/fX-*-fecha; commits atómicos por cambio; push +
+PR hacia la base activa (stage/f1-* actualmente); merge fast-forward tras aprobación del usuario.
 ```
