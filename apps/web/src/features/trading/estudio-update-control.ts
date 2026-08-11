@@ -7,13 +7,13 @@
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md
  */
 
-import { ESTUDIO_LIST_ID } from '@bolsa/shared';
-import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
+import { ESTUDIO_LIST_ID } from "@bolsa/shared";
+import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 
-export const LIST_AUTO_SOFT_PAUSE_EVENT = 'bolsa-list-auto-soft-pause';
-export const LIST_AUTO_SOFT_RESUME_EVENT = 'bolsa-list-auto-soft-resume';
+export const LIST_AUTO_SOFT_PAUSE_EVENT = "bolsa-list-auto-soft-pause";
+export const LIST_AUTO_SOFT_RESUME_EVENT = "bolsa-list-auto-soft-resume";
 /** Reanudar Actualizar/alta pausado (checkpoint local). */
-export const ESTUDIO_UPDATE_RESUME_EVENT = 'bolsa-estudio-update-resume';
+export const ESTUDIO_UPDATE_RESUME_EVENT = "bolsa-estudio-update-resume";
 
 export type EstudioUpdatePauseCheckpoint = {
   /** Lista completa del lote. */
@@ -56,7 +56,7 @@ export function hasEstudioUpdatePauseCheckpoint(): boolean {
 /** Pide parar tras el valor en curso. Devuelve el símbolo anunciado. */
 export function requestEstudioUpdateSoftStop(): { symbol: string } {
   softStopRequested = true;
-  const symbol = useListAutoActivityStore.getState().symbol || '…';
+  const symbol = useListAutoActivityStore.getState().symbol || "…";
   return { symbol };
 }
 
@@ -87,7 +87,7 @@ export function settleEstudioUpdatePause(opts: {
 
   const remaining = Math.max(0, ids.length - nextIndex);
   const nextId = ids[nextIndex] ?? ids[nextIndex - 1] ?? ids[0];
-  const symbol = nextId ? opts.symbolOf(nextId) : '…';
+  const symbol = nextId ? opts.symbolOf(nextId) : "…";
   const label =
     remaining > 0
       ? `Pausa · ${symbol} · quedan ${remaining}`
@@ -97,7 +97,7 @@ export function settleEstudioUpdatePause(opts: {
     active: true,
     paused: true,
     listId: ESTUDIO_LIST_ID,
-    listName: 'Estudio',
+    listName: "Estudio",
     index: Math.max(0, nextIndex - 1),
     total: Math.max(ids.length, 1),
     symbol,
@@ -134,16 +134,19 @@ export function requestEstudioUpdateResume(): void {
  * - si hay Actualizar/alta en curso → soft-stop cooperativo
  * - si no, pausa Lista AUTO (Lab)
  */
-export function requestEstudioBannerSoftPause(): { mode: 'update' | 'list_auto'; symbol: string } {
+export function requestEstudioBannerSoftPause(): {
+  mode: "update" | "list_auto";
+  symbol: string;
+} {
   const snap = useListAutoActivityStore.getState();
-  const detail = snap.detail ?? '';
+  const detail = snap.detail ?? "";
   const isLocalUpdate =
     snap.active &&
     !snap.paused &&
-    (detail.startsWith('Actualizar') ||
-      detail.startsWith('Redescubrir') ||
-      detail.startsWith('Alta Estudio') ||
-      detail.startsWith('Termina '));
+    (detail.startsWith("Actualizar") ||
+      detail.startsWith("Redescubrir") ||
+      detail.startsWith("Alta Estudio") ||
+      detail.startsWith("Termina "));
 
   if (isLocalUpdate) {
     const { symbol } = requestEstudioUpdateSoftStop();
@@ -158,10 +161,10 @@ export function requestEstudioBannerSoftPause(): { mode: 'update' | 'list_auto';
       symbol,
       detail: announce,
     });
-    return { mode: 'update', symbol };
+    return { mode: "update", symbol };
   }
 
-  const symbol = snap.symbol || '…';
+  const symbol = snap.symbol || "…";
   requestListAutoSoftPause();
   if (snap.active) {
     snap.publish({
@@ -172,15 +175,17 @@ export function requestEstudioBannerSoftPause(): { mode: 'update' | 'list_auto';
       symbol,
     });
   }
-  return { mode: 'list_auto', symbol };
+  return { mode: "list_auto", symbol };
 }
 
 /** Reanudar: checkpoint Actualizar o Lista AUTO. */
-export function requestEstudioBannerSoftResume(): { mode: 'update' | 'list_auto' } {
+export function requestEstudioBannerSoftResume(): {
+  mode: "update" | "list_auto";
+} {
   if (hasEstudioUpdatePauseCheckpoint()) {
     requestEstudioUpdateResume();
-    return { mode: 'update' };
+    return { mode: "update" };
   }
   requestListAutoSoftResume();
-  return { mode: 'list_auto' };
+  return { mode: "list_auto" };
 }

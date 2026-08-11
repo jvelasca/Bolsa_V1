@@ -1,21 +1,21 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { InstrumentWithMetaDto } from '@bolsa/shared';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { InstrumentWithMetaDto } from "@bolsa/shared";
 import {
   isVirtualListId,
   VIRTUAL_LIST_LABELS,
   VIRTUAL_LIST_PENDING_ORDERS,
   VIRTUAL_LIST_PORTFOLIO,
   VIRTUAL_LIST_VISUALIZATION,
-} from '@bolsa/shared';
-import { Loader2 } from 'lucide-react';
-import { api } from '@/lib/api';
-import { useActiveAccountQueryKey } from '@/stores/active-account-store';
-import { checkboxClassName } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { usePendingOrders } from '@/features/trading/use-pending-orders';
-import { useListInstrumentRemoval } from '@/features/trading/lists-tab/use-list-instrument-removal';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@bolsa/shared";
+import { Loader2 } from "lucide-react";
+import { api } from "@/lib/api";
+import { useActiveAccountQueryKey } from "@/stores/active-account-store";
+import { checkboxClassName } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { useListInstrumentRemoval } from "@/features/trading/lists-tab/use-list-instrument-removal";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 interface ListMembershipPopoverProps {
   instrument: InstrumentWithMetaDto;
@@ -49,19 +49,22 @@ export function ListMembershipPopover({
   const accountScope = useActiveAccountQueryKey();
 
   const listsQuery = useQuery({
-    queryKey: ['lists'],
+    queryKey: ["lists"],
     queryFn: api.getLists,
   });
 
   const portfolioQuery = useQuery({
-    queryKey: ['portfolio', accountScope],
+    queryKey: ["portfolio", accountScope],
     queryFn: api.getPortfolio,
   });
 
-  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
+  const apiLists = useMemo(
+    () => listsQuery.data?.data ?? [],
+    [listsQuery.data?.data],
+  );
 
   const membershipsQuery = useQuery({
-    queryKey: ['lists', 'memberships'],
+    queryKey: ["lists", "memberships"],
     queryFn: api.getListMemberships,
     staleTime: 30_000,
   });
@@ -95,12 +98,18 @@ export function ListMembershipPopover({
       if ((target as HTMLElement).closest?.('[role="dialog"]')) return;
       onClose();
     }
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
   }, [anchorRef, onClose]);
 
   const updateMutation = useMutation({
-    mutationFn: async ({ listId, include }: { listId: string; include: boolean }) => {
+    mutationFn: async ({
+      listId,
+      include,
+    }: {
+      listId: string;
+      include: boolean;
+    }) => {
       if (!include) {
         await removeFromList(listId, instrument.id);
         return;
@@ -111,10 +120,12 @@ export function ListMembershipPopover({
       await api.updateList(listId, { instrumentIds: [...ids] });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['lists'] });
-      await queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
-      await queryClient.invalidateQueries({ queryKey: ['list'] });
-      await queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
+      await queryClient.invalidateQueries({ queryKey: ["lists"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["lists", "memberships"],
+      });
+      await queryClient.invalidateQueries({ queryKey: ["list"] });
+      await queryClient.invalidateQueries({ queryKey: ["list-quotes"] });
     },
   });
 
@@ -125,7 +136,7 @@ export function ListMembershipPopover({
         name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
         checked: inVisualizados,
         locked: false,
-        hint: 'pestañas',
+        hint: "pestañas",
       },
       {
         id: VIRTUAL_LIST_PORTFOLIO,
@@ -134,14 +145,16 @@ export function ListMembershipPopover({
           (position) => position.instrumentId === instrument.id,
         ),
         locked: true,
-        hint: 'posición',
+        hint: "posición",
       },
       {
         id: VIRTUAL_LIST_PENDING_ORDERS,
         name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_PENDING_ORDERS],
-        checked: pendingOrders.some((order) => order.instrumentId === instrument.id),
+        checked: pendingOrders.some(
+          (order) => order.instrumentId === instrument.id,
+        ),
         locked: true,
-        hint: 'orden',
+        hint: "orden",
       },
     ];
 
@@ -150,9 +163,13 @@ export function ListMembershipPopover({
         id: list.id,
         name: list.name,
         checked: Boolean(membershipByListId[list.id]),
-        locked: list.source !== 'custom',
+        locked: list.source !== "custom",
         hint:
-          list.source === 'catalog' ? 'índice' : list.source === 'custom' ? 'personal' : undefined,
+          list.source === "catalog"
+            ? "índice"
+            : list.source === "custom"
+              ? "personal"
+              : undefined,
       });
     }
 
@@ -174,19 +191,19 @@ export function ListMembershipPopover({
   async function handleToggle(row: MembershipRow) {
     if (row.locked) return;
     if (row.id === VIRTUAL_LIST_VISUALIZATION) {
-      const { reconcileVisualizadosToOpenCharts } = await import(
-        '@/features/trading/lists-tab/use-chart-visualization-sync'
-      );
+      const { reconcileVisualizadosToOpenCharts } =
+        await import("@/features/trading/lists-tab/use-chart-visualization-sync");
       if (row.checked) {
-        const { closeOpenChartsForInstrument } = await import(
-          '@/lib/close-chart-on-list-removal'
-        );
+        const { closeOpenChartsForInstrument } =
+          await import("@/lib/close-chart-on-list-removal");
         closeOpenChartsForInstrument(instrument.id);
         reconcileVisualizadosToOpenCharts();
       } else {
         // Abrir pestaña = entra en Visualizados (SoT = charts).
-        const { useWorkspaceStore } = await import('@/stores/workspace-store');
-        useWorkspaceStore.getState().openChartTab(instrument.id, instrument.symbol);
+        const { useWorkspaceStore } = await import("@/stores/workspace-store");
+        useWorkspaceStore
+          .getState()
+          .openChartTab(instrument.id, instrument.symbol);
         reconcileVisualizadosToOpenCharts();
       }
       return;
@@ -206,7 +223,9 @@ export function ListMembershipPopover({
       >
         <p className="mb-2 border-b border-border pb-1.5 text-xs font-medium">
           {instrument.symbol}
-          <span className="ml-1 font-normal text-muted-foreground">· listas</span>
+          <span className="ml-1 font-normal text-muted-foreground">
+            · listas
+          </span>
         </p>
 
         {(loading || loadingPreview) && (
@@ -222,8 +241,10 @@ export function ListMembershipPopover({
               <li key={row.id}>
                 <label
                   className={cn(
-                    'flex items-center gap-2 rounded px-1 py-1 text-xs',
-                    row.locked ? 'opacity-80' : 'cursor-pointer hover:bg-accent/50',
+                    "flex items-center gap-2 rounded px-1 py-1 text-xs",
+                    row.locked
+                      ? "opacity-80"
+                      : "cursor-pointer hover:bg-accent/50",
                   )}
                 >
                   <input
@@ -235,7 +256,9 @@ export function ListMembershipPopover({
                   />
                   <span className="min-w-0 flex-1 truncate">{row.name}</span>
                   {row.hint && (
-                    <span className="shrink-0 text-[10px] text-muted-foreground">{row.hint}</span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">
+                      {row.hint}
+                    </span>
                   )}
                 </label>
               </li>

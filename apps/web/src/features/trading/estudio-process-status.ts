@@ -14,20 +14,20 @@ import {
   loadEstudioSupervisionPrefs,
   type EstudioLane,
   type EstudioSupervisionPrefs,
-} from '@/features/trading/estudio-supervision';
+} from "@/features/trading/estudio-supervision";
 import {
   loadLocalFinalistsFreshnessMap,
   type LocalFreshnessEntry,
-} from '@/features/backtests/backtest-finalists-freshness';
+} from "@/features/backtests/backtest-finalists-freshness";
 import {
   maxIso,
   readEstudioLaneStamp,
-} from '@/features/trading/estudio-lane-stamps';
-import { useCoreRReviewQueueStore } from '@/stores/core-r-review-queue-store';
+} from "@/features/trading/estudio-lane-stamps";
+import { useCoreRReviewQueueStore } from "@/stores/core-r-review-queue-store";
 
-export type EstudioProcessLaneId = 'vigilance' | 'freshness' | 'rediscover';
+export type EstudioProcessLaneId = "vigilance" | "freshness" | "rediscover";
 
-export type EstudioProcessLaneState = 'ok' | 'stale' | 'empty' | 'running';
+export type EstudioProcessLaneState = "ok" | "stale" | "empty" | "running";
 
 export type EstudioProcessLaneView = {
   id: EstudioProcessLaneId;
@@ -41,21 +41,21 @@ export type EstudioProcessLaneView = {
 /** Qué supervisa cada capa (tooltip 1ª línea). */
 export const ESTUDIO_LANE_PURPOSE: Record<EstudioProcessLaneId, string> = {
   vigilance:
-    'Vigilia: supervisa mandato operativo y PnL paper (juicios CORE-R). No sincroniza velas ni corre el embudo Lab.',
+    "Vigilia: supervisa mandato operativo y PnL paper (juicios CORE-R). No sincroniza velas ni corre el embudo Lab.",
   freshness:
-    'Frescura: comprueba si Finalistas / TOP siguen válidos (Lista AUTO; puede omitir si no cambió).',
+    "Frescura: comprueba si Finalistas / TOP siguen válidos (Lista AUTO; puede omitir si no cambió).",
   rediscover:
-    'Redescubrir: embudo completo para buscar otra estrategia (caro; usa presupuesto).',
+    "Redescubrir: embudo completo para buscar otra estrategia (caro; usa presupuesto).",
 };
 
 /** Qué acción del usuario actualiza cada capa. */
 export const ESTUDIO_LANE_HOW_UPDATED: Record<EstudioProcessLaneId, string> = {
   vigilance:
-    'Cómo actualizar: Supervisión ON · Auto-sync CORE-R · o «Actualizar» (dispara vigilia + Lab).',
+    "Cómo actualizar: Supervisión ON · Auto-sync CORE-R · o «Actualizar» (dispara vigilia + Lab).",
   freshness:
-    'Cómo actualizar: Supervisión ON · Lista AUTO · o botón «Actualizar» (velas + frescura).',
+    "Cómo actualizar: Supervisión ON · Lista AUTO · o botón «Actualizar» (velas + frescura).",
   rediscover:
-    'Cómo actualizar: cadencia lenta · botón «Redescubrir» (costoso) · o Reevaluar embudo.',
+    "Cómo actualizar: cadencia lenta · botón «Redescubrir» (costoso) · o Reevaluar embudo.",
 };
 
 export type EstudioProcessStatusView = {
@@ -65,7 +65,7 @@ export type EstudioProcessStatusView = {
   lastCoreRAt: string | null;
 };
 
-export const ESTUDIO_PROCESS_RUNNING_EVENT = 'bolsa-estudio-process-running';
+export const ESTUDIO_PROCESS_RUNNING_EVENT = "bolsa-estudio-process-running";
 
 export type EstudioProcessRunningDetail = {
   instrumentId: string | null;
@@ -73,33 +73,33 @@ export type EstudioProcessRunningDetail = {
 };
 
 const LANE_LABEL: Record<EstudioProcessLaneId, string> = {
-  vigilance: 'Vigilia',
-  freshness: 'Frescura',
-  rediscover: 'Redescubrir',
+  vigilance: "Vigilia",
+  freshness: "Frescura",
+  rediscover: "Redescubrir",
 };
 
 function stateLabel(state: EstudioProcessLaneState): string {
   switch (state) {
-    case 'ok':
-      return 'al día';
-    case 'stale':
-      return 'toca actualizar';
-    case 'empty':
-      return 'sin registro';
-    case 'running':
-      return 'en curso';
+    case "ok":
+      return "al día";
+    case "stale":
+      return "toca actualizar";
+    case "empty":
+      return "sin registro";
+    case "running":
+      return "en curso";
   }
 }
 
 function formatShortAt(iso: string | null): string {
-  if (!iso) return '—';
+  if (!iso) return "—";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -123,7 +123,9 @@ function pickLatestLocalLabAt(
   return best;
 }
 
-export function latestCoreRAtForInstrument(instrumentId: string): string | null {
+export function latestCoreRAtForInstrument(
+  instrumentId: string,
+): string | null {
   const items = useCoreRReviewQueueStore.getState().items;
   let best: string | null = null;
   let bestMs = -1;
@@ -145,12 +147,12 @@ export function resolveLaneState(
   running: boolean,
   nowMs = Date.now(),
 ): EstudioProcessLaneState {
-  if (running) return 'running';
-  if (!lastAt) return 'empty';
-  if (cadenceMinutes <= 0) return 'ok';
+  if (running) return "running";
+  if (!lastAt) return "empty";
+  if (cadenceMinutes <= 0) return "ok";
   const last = Date.parse(lastAt);
-  if (!Number.isFinite(last)) return 'empty';
-  return nowMs - last >= cadenceMinutes * 60_000 ? 'stale' : 'ok';
+  if (!Number.isFinite(last)) return "empty";
+  return nowMs - last >= cadenceMinutes * 60_000 ? "stale" : "ok";
 }
 
 function buildLaneView(opts: {
@@ -160,10 +162,15 @@ function buildLaneView(opts: {
   running: boolean;
   nowMs: number;
 }): EstudioProcessLaneView {
-  const state = resolveLaneState(opts.lastAt, opts.cadenceMinutes, opts.running, opts.nowMs);
+  const state = resolveLaneState(
+    opts.lastAt,
+    opts.cadenceMinutes,
+    opts.running,
+    opts.nowMs,
+  );
   const cadence =
     opts.cadenceMinutes <= 0
-      ? 'off'
+      ? "off"
       : `cada ${formatEstudioCadenceMinutes(opts.cadenceMinutes)}`;
   return {
     id: opts.id,
@@ -177,7 +184,7 @@ function buildLaneView(opts: {
       `Última pasada: ${formatShortAt(opts.lastAt)}`,
       `Cadencia: ${cadence}`,
       ESTUDIO_LANE_HOW_UPDATED[opts.id],
-    ].join('\n'),
+    ].join("\n"),
   };
 }
 
@@ -197,38 +204,38 @@ export function resolveEstudioProcessStatus(
   const map = opts.localFreshnessMap ?? loadLocalFinalistsFreshnessMap();
   const lastLabAt = maxIso(
     pickLatestLocalLabAt(opts.instrumentId, map),
-    readEstudioLaneStamp(opts.instrumentId, 'freshness'),
+    readEstudioLaneStamp(opts.instrumentId, "freshness"),
   );
   const lastCoreRAt = maxIso(
     latestCoreRAtForInstrument(opts.instrumentId),
-    readEstudioLaneStamp(opts.instrumentId, 'vigilance'),
+    readEstudioLaneStamp(opts.instrumentId, "vigilance"),
   );
   const lastRediscoverAt = maxIso(
     lastLabAt,
-    readEstudioLaneStamp(opts.instrumentId, 'rediscover'),
+    readEstudioLaneStamp(opts.instrumentId, "rediscover"),
   );
   const running = opts.runningLane ?? null;
 
   const lanes: EstudioProcessLaneView[] = [
     buildLaneView({
-      id: 'vigilance',
+      id: "vigilance",
       lastAt: lastCoreRAt,
       cadenceMinutes: prefs.vigilanceMinutes,
-      running: running === 'vigilance',
+      running: running === "vigilance",
       nowMs,
     }),
     buildLaneView({
-      id: 'freshness',
+      id: "freshness",
       lastAt: lastLabAt,
       cadenceMinutes: prefs.freshnessMinutes,
-      running: running === 'freshness',
+      running: running === "freshness",
       nowMs,
     }),
     buildLaneView({
-      id: 'rediscover',
+      id: "rediscover",
       lastAt: lastRediscoverAt,
       cadenceMinutes: prefs.rediscoverMinutes,
-      running: running === 'rediscover',
+      running: running === "rediscover",
       nowMs,
     }),
   ];
@@ -241,31 +248,39 @@ export function resolveEstudioProcessStatus(
   };
 }
 
-export function formatEstudioProcessTimestamp(iso: string | null | undefined): string {
+export function formatEstudioProcessTimestamp(
+  iso: string | null | undefined,
+): string {
   return formatShortAt(iso ?? null);
 }
 
-export function emitEstudioProcessRunning(detail: EstudioProcessRunningDetail): void {
+export function emitEstudioProcessRunning(
+  detail: EstudioProcessRunningDetail,
+): void {
   try {
-    window.dispatchEvent(new CustomEvent(ESTUDIO_PROCESS_RUNNING_EVENT, { detail }));
+    window.dispatchEvent(
+      new CustomEvent(ESTUDIO_PROCESS_RUNNING_EVENT, { detail }),
+    );
   } catch {
     // SSR / tests
   }
 }
 
-export function laneFromListAutoMode(forceRescan: boolean): EstudioProcessLaneId {
-  return forceRescan ? 'rediscover' : 'freshness';
+export function laneFromListAutoMode(
+  forceRescan: boolean,
+): EstudioProcessLaneId {
+  return forceRescan ? "rediscover" : "freshness";
 }
 
 const LANE_SHORT: Record<EstudioProcessLaneId, string> = {
-  vigilance: 'V',
-  freshness: 'F',
-  rediscover: 'R',
+  vigilance: "V",
+  freshness: "F",
+  rediscover: "R",
 };
 
 export type EstudioProcessSummary = {
   text: string;
-  tone: 'ok' | 'attention' | 'empty' | 'running';
+  tone: "ok" | "attention" | "empty" | "running";
   title: string;
 };
 
@@ -273,21 +288,24 @@ export type EstudioProcessSummary = {
 export function summarizeEstudioProcessLanes(
   lanes: ReadonlyArray<EstudioProcessLaneView>,
 ): EstudioProcessSummary {
-  const title = lanes.map((l) => l.title).join('\n\n');
-  if (lanes.some((l) => l.state === 'running')) {
-    return { text: 'actualizando…', tone: 'running', title };
+  const title = lanes.map((l) => l.title).join("\n\n");
+  if (lanes.some((l) => l.state === "running")) {
+    return { text: "actualizando…", tone: "running", title };
   }
-  const needs = lanes.filter((l) => l.state === 'stale' || l.state === 'empty');
+  const needs = lanes.filter((l) => l.state === "stale" || l.state === "empty");
   if (needs.length === 0) {
-    return { text: 'al día', tone: 'ok', title };
+    return { text: "al día", tone: "ok", title };
   }
-  if (needs.length === lanes.length && needs.every((l) => l.state === 'empty')) {
-    return { text: 'sin sync', tone: 'empty', title };
+  if (
+    needs.length === lanes.length &&
+    needs.every((l) => l.state === "empty")
+  ) {
+    return { text: "sin sync", tone: "empty", title };
   }
-  const letters = needs.map((l) => LANE_SHORT[l.id]).join('·');
+  const letters = needs.map((l) => LANE_SHORT[l.id]).join("·");
   return {
     text: `toca ${letters}`,
-    tone: 'attention',
+    tone: "attention",
     title,
   };
 }

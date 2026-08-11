@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { InstrumentRemovalPreviewDto, InstrumentWithMetaDto } from '@bolsa/shared';
-import { Dialog, checkboxClassName } from '@/components/ui/dialog';
-import { api, ApiError } from '@/lib/api';
-import { closeOpenChartsForInstrument } from '@/lib/close-chart-on-list-removal';
-import { useTradingUiStore } from '@/stores/trading-ui-store';
-import { InstrumentRemovalConfirmDialog } from '@/features/trading/lists-tab/instrument-removal-confirm-dialog';
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type {
+  InstrumentRemovalPreviewDto,
+  InstrumentWithMetaDto,
+} from "@bolsa/shared";
+import { Dialog, checkboxClassName } from "@/components/ui/dialog";
+import { api, ApiError } from "@/lib/api";
+import { closeOpenChartsForInstrument } from "@/lib/close-chart-on-list-removal";
+import { useTradingUiStore } from "@/stores/trading-ui-store";
+import { InstrumentRemovalConfirmDialog } from "@/features/trading/lists-tab/instrument-removal-confirm-dialog";
 
 export function ListMembershipDialog() {
   const instrument = useTradingUiStore((s) => s.listMembershipInstrument);
@@ -13,16 +16,19 @@ export function ListMembershipDialog() {
   const queryClient = useQueryClient();
 
   const listsQuery = useQuery({
-    queryKey: ['lists'],
+    queryKey: ["lists"],
     queryFn: api.getLists,
     enabled: Boolean(instrument),
   });
 
-  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
+  const apiLists = useMemo(
+    () => listsQuery.data?.data ?? [],
+    [listsQuery.data?.data],
+  );
   const listIds = apiLists.map((list) => list.id);
 
   const membershipsQuery = useQuery({
-    queryKey: ['lists', 'memberships'],
+    queryKey: ["lists", "memberships"],
     queryFn: api.getListMemberships,
     enabled: Boolean(instrument),
     staleTime: 30_000,
@@ -39,7 +45,8 @@ export function ListMembershipDialog() {
   }, [apiLists, membershipsQuery.data?.data, instrument]);
 
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [orphanPreview, setOrphanPreview] = useState<InstrumentRemovalPreviewDto | null>(null);
+  const [orphanPreview, setOrphanPreview] =
+    useState<InstrumentRemovalPreviewDto | null>(null);
   const [pendingRemovals, setPendingRemovals] = useState<string[]>([]);
   const [pendingAdds, setPendingAdds] = useState<string[]>([]);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -49,18 +56,24 @@ export function ListMembershipDialog() {
   }, [instrument, initialMembership]);
 
   const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['lists'] });
-    await queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
-    await queryClient.invalidateQueries({ queryKey: ['list'] });
-    await queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
-    await queryClient.invalidateQueries({ queryKey: ['database-summary'] });
-    await queryClient.invalidateQueries({ queryKey: ['database-orphans'] });
+    await queryClient.invalidateQueries({ queryKey: ["lists"] });
+    await queryClient.invalidateQueries({ queryKey: ["lists", "memberships"] });
+    await queryClient.invalidateQueries({ queryKey: ["list"] });
+    await queryClient.invalidateQueries({ queryKey: ["list-quotes"] });
+    await queryClient.invalidateQueries({ queryKey: ["database-summary"] });
+    await queryClient.invalidateQueries({ queryKey: ["database-orphans"] });
   };
 
-  const applyChanges = async (removals: string[], adds: string[], purgeIfOrphan: boolean) => {
+  const applyChanges = async (
+    removals: string[],
+    adds: string[],
+    purgeIfOrphan: boolean,
+  ) => {
     if (!instrument) return;
     for (const listId of removals) {
-      await api.removeInstrumentFromList(listId, instrument.id, { purgeIfOrphan: false });
+      await api.removeInstrumentFromList(listId, instrument.id, {
+        purgeIfOrphan: false,
+      });
     }
     for (const listId of adds) {
       const current = membershipsQuery.data?.data?.[listId] ?? [];
@@ -84,11 +97,16 @@ export function ListMembershipDialog() {
       const removals = listIds.filter(
         (listId) => initialMembership[listId] && !selected[listId],
       );
-      const adds = listIds.filter((listId) => !initialMembership[listId] && selected[listId]);
+      const adds = listIds.filter(
+        (listId) => !initialMembership[listId] && selected[listId],
+      );
 
       let orphan: InstrumentRemovalPreviewDto | null = null;
       for (const listId of removals) {
-        const { data } = await api.getInstrumentRemovalPreview(instrument.id, listId);
+        const { data } = await api.getInstrumentRemovalPreview(
+          instrument.id,
+          listId,
+        );
         // Simula el efecto acumulado: tras quitar todas las listas de este guardado
         const remainingAfterAll = data.listMemberships.filter(
           (m) => !removals.includes(m.listId),
@@ -125,7 +143,9 @@ export function ListMembershipDialog() {
       await applyChanges(removals, adds, false);
     },
     onError: (err) => {
-      setConfirmError(err instanceof ApiError ? err.message : 'No se pudo guardar');
+      setConfirmError(
+        err instanceof ApiError ? err.message : "No se pudo guardar",
+      );
     },
   });
 
@@ -135,7 +155,9 @@ export function ListMembershipDialog() {
       setOrphanPreview(null);
     },
     onError: (err) => {
-      setConfirmError(err instanceof ApiError ? err.message : 'No se pudo guardar');
+      setConfirmError(
+        err instanceof ApiError ? err.message : "No se pudo guardar",
+      );
     },
   });
 
@@ -152,21 +174,27 @@ export function ListMembershipDialog() {
         description="Marca en qué listas debe aparecer este valor."
         className="max-w-md"
       >
-        {loading && <p className="text-xs text-muted-foreground">Cargando listas…</p>}
+        {loading && (
+          <p className="text-xs text-muted-foreground">Cargando listas…</p>
+        )}
         {!loading && listIds.length === 0 && (
-          <p className="text-xs text-muted-foreground">No hay listas disponibles.</p>
+          <p className="text-xs text-muted-foreground">
+            No hay listas disponibles.
+          </p>
         )}
 
         <ul className="scroll-area max-h-56 space-y-1 overflow-auto rounded border border-border p-2">
           {listIds.map((listId) => {
-            const summary = listsQuery.data?.data.find((list) => list.id === listId);
+            const summary = listsQuery.data?.data.find(
+              (list) => list.id === listId,
+            );
             if (!summary) return null;
-            const locked = summary.source === 'catalog';
+            const locked = summary.source === "catalog";
             return (
               <li key={listId}>
                 <label
                   className={`flex items-center gap-2 rounded px-1 py-1 text-sm ${
-                    locked ? 'opacity-70' : 'cursor-pointer hover:bg-accent/50'
+                    locked ? "opacity-70" : "cursor-pointer hover:bg-accent/50"
                   }`}
                 >
                   <input
@@ -175,13 +203,16 @@ export function ListMembershipDialog() {
                     checked={Boolean(selected[listId])}
                     disabled={locked || saveMutation.isPending}
                     onChange={(e) =>
-                      setSelected((prev) => ({ ...prev, [listId]: e.target.checked }))
+                      setSelected((prev) => ({
+                        ...prev,
+                        [listId]: e.target.checked,
+                      }))
                     }
                   />
                   <span className="font-medium">{summary.name}</span>
                   <span className="text-xs text-muted-foreground">
                     ({summary.itemCount}
-                    {summary.source === 'catalog' ? ' · índice' : ''})
+                    {summary.source === "catalog" ? " · índice" : ""})
                   </span>
                 </label>
               </li>
@@ -194,7 +225,7 @@ export function ListMembershipDialog() {
             {confirmError ??
               (saveMutation.error instanceof Error
                 ? saveMutation.error.message
-                : 'Error al guardar')}
+                : "Error al guardar")}
           </p>
         )}
 
@@ -212,7 +243,7 @@ export function ListMembershipDialog() {
             className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             onClick={() => saveMutation.mutate()}
           >
-            {saveMutation.isPending ? 'Guardando…' : 'Guardar'}
+            {saveMutation.isPending ? "Guardando…" : "Guardar"}
           </button>
         </div>
       </Dialog>

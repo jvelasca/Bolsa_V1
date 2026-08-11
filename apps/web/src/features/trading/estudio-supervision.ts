@@ -9,20 +9,20 @@
  * Quitar de Estudio → dismiss colas + excluir de campaña en curso.
  */
 
-import { ESTUDIO_LIST_ID } from '@bolsa/shared';
+import { ESTUDIO_LIST_ID } from "@bolsa/shared";
 import {
   loadCoreRSchedulerPrefs,
   saveCoreRSchedulerPrefs,
   clampCoreRSchedulerInterval,
-} from '@/features/backtests/core-r-scheduler';
-import { useCoreRReviewQueueStore } from '@/stores/core-r-review-queue-store';
-import { useSupervisedF3QueueStore } from '@/stores/supervised-f3-queue-store';
+} from "@/features/backtests/core-r-scheduler";
+import { useCoreRReviewQueueStore } from "@/stores/core-r-review-queue-store";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 
-export const ESTUDIO_SUPERVISION_KEY = 'bolsa-estudio-supervision-v1';
-export const ESTUDIO_SUPERVISION_EVENT = 'bolsa-estudio-supervision-changed';
-export const ESTUDIO_UNSUBSCRIBE_EVENT = 'bolsa-estudio-unsubscribe';
+export const ESTUDIO_SUPERVISION_KEY = "bolsa-estudio-supervision-v1";
+export const ESTUDIO_SUPERVISION_EVENT = "bolsa-estudio-supervision-changed";
+export const ESTUDIO_UNSUBSCRIBE_EVENT = "bolsa-estudio-unsubscribe";
 /** Tick programado capa media / lenta (lo consume BacktestsPage). */
-export const ESTUDIO_LANE_TICK_EVENT = 'bolsa-estudio-lane-tick';
+export const ESTUDIO_LANE_TICK_EVENT = "bolsa-estudio-lane-tick";
 
 /**
  * Presets vigilia (minutos; tope CORE-R = 24 h). En vela 1d al cierre el default
@@ -98,7 +98,7 @@ export type EstudioUnsubscribeEventDetail = {
   instrumentIds: string[];
 };
 
-export type EstudioLane = 'freshness' | 'rediscover';
+export type EstudioLane = "freshness" | "rediscover";
 
 export type EstudioLaneTickDetail = {
   listId: string;
@@ -112,7 +112,11 @@ export type EstudioLaneTickDetail = {
   at: string;
 };
 
-function clampPositiveMinutes(value: number, fallback: number, max = 90 * 1_440): number {
+function clampPositiveMinutes(
+  value: number,
+  fallback: number,
+  max = 90 * 1_440,
+): number {
   if (!Number.isFinite(value) || value < 1) return fallback;
   return Math.min(max, Math.round(value));
 }
@@ -163,12 +167,19 @@ export function normalizeEstudioSupervisionPrefs(
     freshnessMinutes,
     rediscoverMinutes,
     rediscoverBudgetPerTick:
-      Number.isFinite(budget) && budget >= 1 ? Math.min(40, Math.round(budget)) : 5,
-    rediscoverCursor: Number.isFinite(cursor) && cursor >= 0 ? Math.floor(cursor) : 0,
+      Number.isFinite(budget) && budget >= 1
+        ? Math.min(40, Math.round(budget))
+        : 5,
+    rediscoverCursor:
+      Number.isFinite(cursor) && cursor >= 0 ? Math.floor(cursor) : 0,
     lastFreshnessTickAt:
-      typeof parsed.lastFreshnessTickAt === 'string' ? parsed.lastFreshnessTickAt : null,
+      typeof parsed.lastFreshnessTickAt === "string"
+        ? parsed.lastFreshnessTickAt
+        : null,
     lastRediscoverTickAt:
-      typeof parsed.lastRediscoverTickAt === 'string' ? parsed.lastRediscoverTickAt : null,
+      typeof parsed.lastRediscoverTickAt === "string"
+        ? parsed.lastRediscoverTickAt
+        : null,
   };
 }
 
@@ -188,7 +199,9 @@ export function loadEstudioSupervisionPrefs(): EstudioSupervisionPrefs {
   }
 }
 
-export function saveEstudioSupervisionPrefs(prefs: EstudioSupervisionPrefs): void {
+export function saveEstudioSupervisionPrefs(
+  prefs: EstudioSupervisionPrefs,
+): void {
   try {
     localStorage.setItem(ESTUDIO_SUPERVISION_KEY, JSON.stringify(prefs));
   } catch {
@@ -196,9 +209,13 @@ export function saveEstudioSupervisionPrefs(prefs: EstudioSupervisionPrefs): voi
   }
 }
 
-export function emitEstudioSupervisionChanged(detail: EstudioSupervisionEventDetail): void {
+export function emitEstudioSupervisionChanged(
+  detail: EstudioSupervisionEventDetail,
+): void {
   try {
-    window.dispatchEvent(new CustomEvent(ESTUDIO_SUPERVISION_EVENT, { detail }));
+    window.dispatchEvent(
+      new CustomEvent(ESTUDIO_SUPERVISION_EVENT, { detail }),
+    );
   } catch {
     // SSR / tests
   }
@@ -241,7 +258,11 @@ export function clearPendingEstudioLaneTick(): void {
   pendingEstudioLaneTick = null;
 }
 
-function laneDue(lastAt: string | null, intervalMinutes: number, nowMs: number): boolean {
+function laneDue(
+  lastAt: string | null,
+  intervalMinutes: number,
+  nowMs: number,
+): boolean {
   if (intervalMinutes <= 0) return false;
   if (!lastAt) return true;
   const last = Date.parse(lastAt);
@@ -275,7 +296,9 @@ export function sliceRediscoverBudget(
   if (instrumentIds.length === 0 || budget <= 0) {
     return { ids: [], nextCursor: 0 };
   }
-  const start = ((cursor % instrumentIds.length) + instrumentIds.length) % instrumentIds.length;
+  const start =
+    ((cursor % instrumentIds.length) + instrumentIds.length) %
+    instrumentIds.length;
   const ids: string[] = [];
   for (let i = 0; i < Math.min(budget, instrumentIds.length); i += 1) {
     ids.push(instrumentIds[(start + i) % instrumentIds.length]!);
@@ -301,7 +324,9 @@ export function markEstudioRediscoverTick(
     ...prefs,
     lastRediscoverTickAt: opts?.at ?? new Date().toISOString(),
     rediscoverCursor:
-      opts?.cursor !== undefined ? Math.max(0, Math.floor(opts.cursor)) : prefs.rediscoverCursor,
+      opts?.cursor !== undefined
+        ? Math.max(0, Math.floor(opts.cursor))
+        : prefs.rediscoverCursor,
   };
   saveEstudioSupervisionPrefs(next);
   return next;
@@ -310,11 +335,11 @@ export function markEstudioRediscoverTick(
 export type PatchEstudioSupervision = Partial<
   Pick<
     EstudioSupervisionPrefs,
-    | 'enabled'
-    | 'vigilanceMinutes'
-    | 'freshnessMinutes'
-    | 'rediscoverMinutes'
-    | 'rediscoverBudgetPerTick'
+    | "enabled"
+    | "vigilanceMinutes"
+    | "freshnessMinutes"
+    | "rediscoverMinutes"
+    | "rediscoverBudgetPerTick"
   >
 >;
 
@@ -344,7 +369,7 @@ export function patchEstudioSupervision(
     enabled: next.enabled,
     intervalMinutes: next.vigilanceMinutes,
     listId: next.enabled ? listId : sched.listId,
-    scope: 'shell',
+    scope: "shell",
   });
 
   emitEstudioSupervisionChanged({
@@ -404,14 +429,14 @@ export function unsubscribeInstrumentFromSupervision(
 }
 
 export function formatEstudioCadenceMinutes(minutes: number): string {
-  if (minutes <= 0) return 'off';
+  if (minutes <= 0) return "off";
   if (minutes >= 1_440 && minutes % 1_440 === 0) {
     const days = minutes / 1_440;
-    return days === 1 ? '1 día' : `${days} días`;
+    return days === 1 ? "1 día" : `${days} días`;
   }
   if (minutes >= 60 && minutes % 60 === 0) {
     const hours = minutes / 60;
-    return hours === 1 ? '1 h' : `${hours} h`;
+    return hours === 1 ? "1 h" : `${hours} h`;
   }
   return `${minutes} min`;
 }

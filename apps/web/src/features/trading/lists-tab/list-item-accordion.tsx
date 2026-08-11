@@ -1,55 +1,46 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { InstrumentWithMetaDto } from '@bolsa/shared';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { InstrumentWithMetaDto } from "@bolsa/shared";
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 
+import { ChevronDown, ChevronRight, Info, ListPlus, Plus } from "lucide-react";
+
+import { api } from "@/lib/api";
+
+import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { useExpandedInstrumentLiveQuote } from "@/features/trading/lists-tab/use-expanded-instrument-live-quote";
+import { getListCellDisplay } from "@/lib/list-utils";
 import {
-
-  ChevronDown,
-
-  ChevronRight,
-
-  Info,
-
-  ListPlus,
-
-  Plus,
-
-} from 'lucide-react';
-
-import { api } from '@/lib/api';
-
-import { formatPct, formatPrice } from '@/features/charts/chart-utils';
-import { useExpandedInstrumentLiveQuote } from '@/features/trading/lists-tab/use-expanded-instrument-live-quote';
-import { getListCellDisplay } from '@/lib/list-utils';
-import { listColumnContentClass, LIST_ROW_EXPAND_WIDTH_PX, LIST_ROW_SELECT_WIDTH_PX, listRowLeftGutterWidthPx } from '@/lib/list-column-layout';
-import { useListColumnLayoutContext } from '@/features/trading/lists-tab/list-column-layout-context';
+  listColumnContentClass,
+  LIST_ROW_EXPAND_WIDTH_PX,
+  LIST_ROW_SELECT_WIDTH_PX,
+  listRowLeftGutterWidthPx,
+} from "@/lib/list-column-layout";
+import { useListColumnLayoutContext } from "@/features/trading/lists-tab/list-column-layout-context";
 import {
   isRecommendationListColumn,
   useListRecommendationRow,
-} from '@/features/trading/lists-tab/list-recommendation-scores-context';
-import { ListMembershipPopover } from '@/features/trading/lists-tab/list-membership-popover';
-import { ListSyncStatusCell } from '@/features/trading/lists-tab/list-sync-status-cell';
+} from "@/features/trading/lists-tab/list-recommendation-scores-context";
+import { ListMembershipPopover } from "@/features/trading/lists-tab/list-membership-popover";
+import { ListSyncStatusCell } from "@/features/trading/lists-tab/list-sync-status-cell";
 import {
   ListProcessStatusCell,
   ListProcessTimestampCell,
-} from '@/features/trading/lists-tab/list-process-status-cell';
-import { ListNameProcessSubtitle } from '@/features/trading/lists-tab/list-name-process-subtitle';
+} from "@/features/trading/lists-tab/list-process-status-cell";
+import { ListNameProcessSubtitle } from "@/features/trading/lists-tab/list-name-process-subtitle";
 import {
   formatEstudioProcessTimestamp,
   resolveEstudioProcessStatus,
-} from '@/features/trading/estudio-process-status';
-import { ESTUDIO_LANE_STAMPS_EVENT } from '@/features/trading/estudio-lane-stamps';
-import { loadEstudioSupervisionPrefs } from '@/features/trading/estudio-supervision';
-import { useEstudioProcessRunningStore } from '@/stores/estudio-process-running-store';
+} from "@/features/trading/estudio-process-status";
+import { ESTUDIO_LANE_STAMPS_EVENT } from "@/features/trading/estudio-lane-stamps";
+import { loadEstudioSupervisionPrefs } from "@/features/trading/estudio-supervision";
+import { useEstudioProcessRunningStore } from "@/stores/estudio-process-running-store";
 
-import { IconButton } from '@/components/ui/icon-button';
+import { IconButton } from "@/components/ui/icon-button";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
-import { useTradingUiStore } from '@/stores/trading-ui-store';
-
-
+import { useTradingUiStore } from "@/stores/trading-ui-store";
 
 interface ListItemAccordionProps {
   item: InstrumentWithMetaDto;
@@ -81,11 +72,18 @@ export function ListItemAccordion({
 }: ListItemAccordionProps) {
   const membershipRef = useRef<HTMLButtonElement>(null);
   const [membershipOpen, setMembershipOpen] = useState(false);
-  const selectModsRef = useRef({ ctrlKey: false, metaKey: false, shiftKey: false });
-  const { visibleColumns, dataGridTemplateColumns, rowActionsWidth } = useListColumnLayoutContext();
+  const selectModsRef = useRef({
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+  });
+  const { visibleColumns, dataGridTemplateColumns, rowActionsWidth } =
+    useListColumnLayoutContext();
   const recommendation = useListRecommendationRow(item.id);
 
-  const expanded = useTradingUiStore((s) => s.expandedInstrumentIds[item.id] ?? false);
+  const expanded = useTradingUiStore(
+    (s) => s.expandedInstrumentIds[item.id] ?? false,
+  );
 
   const toggleExpanded = useTradingUiStore((s) => s.toggleExpanded);
 
@@ -93,25 +91,17 @@ export function ListItemAccordion({
 
   const openInfoDialog = useTradingUiStore((s) => s.openInfoDialog);
 
-
-
   const liveQuery = useExpandedInstrumentLiveQuote(item.id, expanded);
 
-
-
   const dayBarQuery = useQuery({
-
-    queryKey: ['day-bar', item.id],
+    queryKey: ["day-bar", item.id],
 
     queryFn: () => api.getOhlcv(item.id, 1),
 
     enabled: expanded,
 
     staleTime: 60_000,
-
   });
-
-
 
   const lastClose = item.meta.lastClose;
 
@@ -132,21 +122,16 @@ export function ListItemAccordion({
   const dayClose = dayBar?.close ?? lastClose;
 
   return (
-
     <div
       data-instrument-id={item.id}
       className={cn(
-
-        'border-b border-border/60',
+        "border-b border-border/60",
 
         isListSource &&
-          'border-l-2 border-l-emerald-500 ring-1 ring-inset ring-emerald-500/40',
-        isChartActive && !isListSource && 'bg-primary/5',
-
+          "border-l-2 border-l-emerald-500 ring-1 ring-inset ring-emerald-500/40",
+        isChartActive && !isListSource && "bg-primary/5",
       )}
-
     >
-
       <div className="flex items-center gap-0 px-1 py-1">
         <div
           className="flex shrink-0 items-center"
@@ -187,7 +172,7 @@ export function ListItemAccordion({
           >
             <IconButton
               icon={expanded ? ChevronDown : ChevronRight}
-              title={expanded ? 'Contraer' : 'Expandir'}
+              title={expanded ? "Contraer" : "Expandir"}
               onClick={() => toggleExpanded(item.id)}
             />
           </div>
@@ -200,13 +185,13 @@ export function ListItemAccordion({
           {visibleColumns.map((column) => {
             const cell = getListCellDisplay(item, column.id);
 
-            if (column.id === 'syncStatus') {
+            if (column.id === "syncStatus") {
               return (
                 <div
                   key={column.id}
                   className={cn(
-                    'flex min-w-0 items-center justify-center',
-                    listColumnContentClass(column.id, 'data'),
+                    "flex min-w-0 items-center justify-center",
+                    listColumnContentClass(column.id, "data"),
                   )}
                 >
                   <ListSyncStatusCell item={item} />
@@ -214,13 +199,13 @@ export function ListItemAccordion({
               );
             }
 
-            if (column.id === 'processStatus') {
+            if (column.id === "processStatus") {
               return (
                 <div
                   key={column.id}
                   className={cn(
-                    'flex min-w-0 items-center justify-center',
-                    listColumnContentClass(column.id, 'data'),
+                    "flex min-w-0 items-center justify-center",
+                    listColumnContentClass(column.id, "data"),
                   )}
                 >
                   <ListProcessStatusCell instrumentId={item.id} />
@@ -228,18 +213,18 @@ export function ListItemAccordion({
               );
             }
 
-            if (column.id === 'lastLabAt' || column.id === 'lastCoreRAt') {
+            if (column.id === "lastLabAt" || column.id === "lastCoreRAt") {
               return (
                 <div
                   key={column.id}
                   className={cn(
-                    'flex min-w-0 items-center justify-end',
-                    listColumnContentClass(column.id, 'data'),
+                    "flex min-w-0 items-center justify-end",
+                    listColumnContentClass(column.id, "data"),
                   )}
                 >
                   <ListProcessTimestampCell
                     instrumentId={item.id}
-                    kind={column.id === 'lastLabAt' ? 'lab' : 'coreR'}
+                    kind={column.id === "lastLabAt" ? "lab" : "coreR"}
                   />
                 </div>
               );
@@ -247,36 +232,36 @@ export function ListItemAccordion({
 
             if (isRecommendationListColumn(column.id)) {
               const text =
-                column.id === 'ioScore'
+                column.id === "ioScore"
                   ? recommendation?.io != null
                     ? String(recommendation.io)
-                    : '—'
-                  : column.id === 'taScore'
+                    : "—"
+                  : column.id === "taScore"
                     ? recommendation?.ta != null
                       ? String(Math.round(recommendation.ta))
-                      : '—'
-                    : column.id === 'faScore'
+                      : "—"
+                    : column.id === "faScore"
                       ? recommendation?.fa != null
                         ? String(Math.round(recommendation.fa))
-                        : '—'
-                      : column.id === 'dictamenStars'
+                        : "—"
+                      : column.id === "dictamenStars"
                         ? recommendation?.dictamenStars != null
                           ? `★${recommendation.dictamenStars}`
-                          : '—'
-                        : (recommendation?.stanceLabel ?? '—');
+                          : "—"
+                        : (recommendation?.stanceLabel ?? "—");
               return (
                 <div
                   key={column.id}
                   className={cn(
-                    'min-w-0 truncate text-[10px] tabular-nums',
-                    listColumnContentClass(column.id, 'data'),
-                    column.id === 'recStance' && 'text-[9px]',
+                    "min-w-0 truncate text-[10px] tabular-nums",
+                    listColumnContentClass(column.id, "data"),
+                    column.id === "recStance" && "text-[9px]",
                   )}
                   title={
-                    column.id === 'ioScore'
-                      ? 'Índice Operativo 0–100'
-                      : column.id === 'dictamenStars'
-                        ? 'Estrellas del dictamen diario'
+                    column.id === "ioScore"
+                      ? "Índice Operativo 0–100"
+                      : column.id === "dictamenStars"
+                        ? "Estrellas del dictamen diario"
                         : undefined
                   }
                 >
@@ -285,7 +270,7 @@ export function ListItemAccordion({
               );
             }
 
-            if (column.id === 'name') {
+            if (column.id === "name") {
               return (
                 <button
                   key={column.id}
@@ -293,8 +278,8 @@ export function ListItemAccordion({
                   className={cn(
                     // Sin `truncate`/`nowrap` en el botón: la 2ª línea (procesos / subtítulo)
                     // debe poder apilarse; el ellipsis va en los spans hijos.
-                    'min-w-0 overflow-hidden text-left text-[10px]',
-                    listColumnContentClass(column.id, 'data'),
+                    "min-w-0 overflow-hidden text-left text-[10px]",
+                    listColumnContentClass(column.id, "data"),
                     cell.className,
                   )}
                   title={
@@ -306,11 +291,15 @@ export function ListItemAccordion({
                   }
                   onClick={onOpenChart}
                 >
-                  <span className="block truncate font-medium text-foreground">{cell.text}</span>
+                  <span className="block truncate font-medium text-foreground">
+                    {cell.text}
+                  </span>
                   {processSubtitle ? (
                     <ListNameProcessSubtitle instrumentId={item.id} />
                   ) : subtitle ? (
-                    <span className="block truncate text-[9px] text-muted-foreground">{subtitle}</span>
+                    <span className="block truncate text-[9px] text-muted-foreground">
+                      {subtitle}
+                    </span>
                   ) : null}
                 </button>
               );
@@ -321,12 +310,12 @@ export function ListItemAccordion({
                 key={column.id}
                 type="button"
                 className={cn(
-                  'min-w-0 truncate text-[10px]',
-                  listColumnContentClass(column.id, 'data'),
+                  "min-w-0 truncate text-[10px]",
+                  listColumnContentClass(column.id, "data"),
                   cell.className,
                   isListSource &&
-                    (column.id === 'symbol' || column.id === 'lastClose') &&
-                    'font-semibold text-emerald-600 dark:text-emerald-400',
+                    (column.id === "symbol" || column.id === "lastClose") &&
+                    "font-semibold text-emerald-600 dark:text-emerald-400",
                 )}
                 onClick={onOpenChart}
               >
@@ -338,20 +327,28 @@ export function ListItemAccordion({
 
         <div
           className={cn(
-            'sticky right-0 z-[1] flex shrink-0 items-center border-l border-border/50 bg-card pl-0.5',
-            isChartActive && !isListSource && 'bg-primary/5',
+            "sticky right-0 z-[1] flex shrink-0 items-center border-l border-border/50 bg-card pl-0.5",
+            isChartActive && !isListSource && "bg-primary/5",
           )}
           style={{ width: rowActionsWidth }}
         >
-          <IconButton icon={Info} title="Información del valor" onClick={() => openInfoDialog(item)} />
+          <IconButton
+            icon={Info}
+            title="Información del valor"
+            onClick={() => openInfoDialog(item)}
+          />
           <IconButton
             ref={membershipRef}
             icon={ListPlus}
             title="Listas del valor"
-            className={membershipOpen ? 'bg-accent text-primary' : undefined}
+            className={membershipOpen ? "bg-accent text-primary" : undefined}
             onClick={() => setMembershipOpen((open) => !open)}
           />
-          <IconButton icon={Plus} title="Operar" onClick={() => openOrderDialog(item)} />
+          <IconButton
+            icon={Plus}
+            title="Operar"
+            onClick={() => openOrderDialog(item)}
+          />
         </div>
       </div>
 
@@ -362,8 +359,6 @@ export function ListItemAccordion({
           onClose={() => setMembershipOpen(false)}
         />
       )}
-
-
 
       {expanded && (
         <ListItemExpandedDetail
@@ -378,11 +373,8 @@ export function ListItemAccordion({
           onOrder={() => openOrderDialog(item)}
         />
       )}
-
     </div>
-
   );
-
 }
 
 function ListItemExpandedDetail({
@@ -412,7 +404,8 @@ function ListItemExpandedDetail({
   useEffect(() => {
     const onStamps = () => setStampTick((n) => n + 1);
     window.addEventListener(ESTUDIO_LANE_STAMPS_EVENT, onStamps);
-    return () => window.removeEventListener(ESTUDIO_LANE_STAMPS_EVENT, onStamps);
+    return () =>
+      window.removeEventListener(ESTUDIO_LANE_STAMPS_EVENT, onStamps);
   }, []);
   const processView = useMemo(
     () =>
@@ -439,13 +432,13 @@ function ListItemExpandedDetail({
         <div className="min-w-0">
           <div className="text-[9px] text-muted-foreground">Apert.</div>
           <div className="truncate font-medium">
-            {dayOpen != null ? formatPrice(dayOpen) : '—'}
+            {dayOpen != null ? formatPrice(dayOpen) : "—"}
           </div>
         </div>
         <div className="min-w-0">
           <div className="text-[9px] text-muted-foreground">Cierre</div>
           <div className="truncate font-medium">
-            {dayClose != null ? formatPrice(dayClose) : '—'}
+            {dayClose != null ? formatPrice(dayClose) : "—"}
           </div>
         </div>
         <div className="min-w-0">
@@ -453,24 +446,24 @@ function ListItemExpandedDetail({
           <div className="truncate font-medium">
             {dayHigh != null && dayLow != null
               ? `${formatPrice(dayHigh)}/${formatPrice(dayLow)}`
-              : '—'}
+              : "—"}
           </div>
         </div>
         <div className="min-w-0">
           <div className="text-[9px] text-muted-foreground">Spread</div>
           <div className="truncate font-medium">
-            {spreadPct != null ? formatPct(spreadPct) : '—'}
+            {spreadPct != null ? formatPct(spreadPct) : "—"}
           </div>
         </div>
         <div className="min-w-0">
           <div className="text-[9px] text-muted-foreground">% día</div>
           <div
             className={cn(
-              'truncate font-medium',
-              isUp ? 'text-emerald-500' : 'text-red-500',
+              "truncate font-medium",
+              isUp ? "text-emerald-500" : "text-red-500",
             )}
           >
-            {changePct != null ? formatPct(changePct) : '—'}
+            {changePct != null ? formatPct(changePct) : "—"}
           </div>
         </div>
       </div>
@@ -489,17 +482,20 @@ function ListItemExpandedDetail({
               <span className="text-muted-foreground" title={lane.title}>
                 {lane.label}
               </span>
-              <span className="text-right tabular-nums text-foreground/90" title={lane.title}>
+              <span
+                className="text-right tabular-nums text-foreground/90"
+                title={lane.title}
+              >
                 {formatEstudioProcessTimestamp(lane.lastAt)}
                 <span className="ml-1 text-[9px] text-muted-foreground">
                   (
-                  {lane.state === 'ok'
-                    ? 'ok'
-                    : lane.state === 'stale'
-                      ? 'toca'
-                      : lane.state === 'running'
-                        ? '…'
-                        : '—'}
+                  {lane.state === "ok"
+                    ? "ok"
+                    : lane.state === "stale"
+                      ? "toca"
+                      : lane.state === "running"
+                        ? "…"
+                        : "—"}
                   )
                 </span>
               </span>
@@ -522,4 +518,3 @@ function ListItemExpandedDetail({
     </div>
   );
 }
-

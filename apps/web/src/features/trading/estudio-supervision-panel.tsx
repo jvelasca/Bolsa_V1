@@ -10,7 +10,7 @@
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   FlaskConical,
@@ -18,8 +18,8 @@ import {
   Pause,
   Play,
   RefreshCcw,
-} from 'lucide-react';
-import { OpaqueMenuPanel } from '@/components/ui/opaque-menu-panel';
+} from "lucide-react";
+import { OpaqueMenuPanel } from "@/components/ui/opaque-menu-panel";
 import {
   ESTUDIO_FRESHNESS_PRESETS,
   ESTUDIO_REDISCOVER_PRESETS,
@@ -30,21 +30,21 @@ import {
   patchEstudioSupervision,
   setEstudioSupervisionEnabled,
   type EstudioSupervisionPrefs,
-} from '@/features/trading/estudio-supervision';
+} from "@/features/trading/estudio-supervision";
 import {
   ESTUDIO_LANE_PURPOSE,
   type EstudioProcessLaneId,
-} from '@/features/trading/estudio-process-status';
+} from "@/features/trading/estudio-process-status";
 import {
   hasEstudioUpdatePauseCheckpoint,
   isEstudioUpdateSoftStopRequested,
   requestEstudioBannerSoftPause,
   requestListAutoSoftResume,
-} from '@/features/trading/estudio-update-control';
-import { resumeEstudioInstrumentsUpdate } from '@/features/trading/estudio-instruments-update';
-import { ESTUDIO_LIST_ID } from '@bolsa/shared';
-import { useListAutoActivityStore } from '@/stores/list-auto-activity-store';
-import { cn } from '@/lib/utils';
+} from "@/features/trading/estudio-update-control";
+import { resumeEstudioInstrumentsUpdate } from "@/features/trading/estudio-instruments-update";
+import { ESTUDIO_LIST_ID } from "@bolsa/shared";
+import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
+import { cn } from "@/lib/utils";
 
 export type EstudioBannerProgress = {
   current: number;
@@ -59,15 +59,15 @@ const LANE_ICON = {
 } as const;
 
 const LANE_CHIP_TONE: Record<EstudioProcessLaneId, string> = {
-  vigilance: 'text-sky-600 dark:text-sky-400',
-  freshness: 'text-violet-600 dark:text-violet-400',
-  rediscover: 'text-amber-700 dark:text-amber-300',
+  vigilance: "text-sky-600 dark:text-sky-400",
+  freshness: "text-violet-600 dark:text-violet-400",
+  rediscover: "text-amber-700 dark:text-amber-300",
 };
 
 const LANE_SHORT: Record<EstudioProcessLaneId, string> = {
-  vigilance: 'Vigilia',
-  freshness: 'Frescura',
-  rediscover: 'Redescubrir',
+  vigilance: "Vigilia",
+  freshness: "Frescura",
+  rediscover: "Redescubrir",
 };
 
 function useEstudioSupervisionPrefsState() {
@@ -79,7 +79,8 @@ function useEstudioSupervisionPrefsState() {
     setPrefs(loadEstudioSupervisionPrefs());
     const onChange = () => setPrefs(loadEstudioSupervisionPrefs());
     window.addEventListener(ESTUDIO_SUPERVISION_EVENT, onChange);
-    return () => window.removeEventListener(ESTUDIO_SUPERVISION_EVENT, onChange);
+    return () =>
+      window.removeEventListener(ESTUDIO_SUPERVISION_EVENT, onChange);
   }, []);
 
   const onToggle = (enabled: boolean) => {
@@ -112,12 +113,13 @@ function CadenceField({
 }) {
   const Icon = LANE_ICON[lane];
   const title = LANE_SHORT[lane];
-  const options = allowOff || presets.includes(value) ? presets : [...presets, value];
+  const options =
+    allowOff || presets.includes(value) ? presets : [...presets, value];
   return (
     <div className="mb-2.5 space-y-1">
       <div className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
         <Icon
-          className={cn('h-3.5 w-3.5 shrink-0', LANE_CHIP_TONE[lane])}
+          className={cn("h-3.5 w-3.5 shrink-0", LANE_CHIP_TONE[lane])}
           strokeWidth={2.4}
           aria-hidden
         />
@@ -133,7 +135,7 @@ function CadenceField({
       >
         {options.map((m) => (
           <option key={m} value={m}>
-            {m <= 0 ? 'Desactivado' : `Cada ${formatEstudioCadenceMinutes(m)}`}
+            {m <= 0 ? "Desactivado" : `Cada ${formatEstudioCadenceMinutes(m)}`}
           </option>
         ))}
       </select>
@@ -152,9 +154,9 @@ function CadenceSummaryChips({
     id: EstudioProcessLaneId;
     minutes: number;
   }> = [
-    { id: 'vigilance', minutes: prefs.vigilanceMinutes },
-    { id: 'freshness', minutes: prefs.freshnessMinutes },
-    { id: 'rediscover', minutes: prefs.rediscoverMinutes },
+    { id: "vigilance", minutes: prefs.vigilanceMinutes },
+    { id: "freshness", minutes: prefs.freshnessMinutes },
+    { id: "rediscover", minutes: prefs.rediscoverMinutes },
   ];
 
   return (
@@ -171,8 +173,8 @@ function CadenceSummaryChips({
         const title = [
           `${LANE_SHORT[id]}: cada ${label}`,
           ESTUDIO_LANE_PURPOSE[id],
-          'Clic para configurar cadencias.',
-        ].join('\n');
+          "Clic para configurar cadencias.",
+        ].join("\n");
         return (
           <button
             key={id}
@@ -181,24 +183,24 @@ function CadenceSummaryChips({
             title={title}
             aria-label={`${LANE_SHORT[id]}: ${label}`}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5',
-              'bg-background/80 font-medium tabular-nums transition-colors',
-              'hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+              "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5",
+              "bg-background/80 font-medium tabular-nums transition-colors",
+              "hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
               off
-                ? 'border-border/50 text-muted-foreground'
-                : 'border-border/80 text-foreground',
+                ? "border-border/50 text-muted-foreground"
+                : "border-border/80 text-foreground",
             )}
           >
             <Icon
               className={cn(
-                'h-3 w-3 shrink-0',
-                off ? 'text-muted-foreground/60' : LANE_CHIP_TONE[id],
+                "h-3 w-3 shrink-0",
+                off ? "text-muted-foreground/60" : LANE_CHIP_TONE[id],
               )}
               strokeWidth={2.4}
               aria-hidden
             />
             <span className="text-[10px] leading-none tracking-tight">
-              {off ? 'off' : label}
+              {off ? "off" : label}
             </span>
           </button>
         );
@@ -226,13 +228,13 @@ function SupervisionCadenceMenu({
       if (!rootRef.current?.contains(e.target as Node)) onOpenChange(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onOpenChange(false);
+      if (e.key === "Escape") onOpenChange(false);
     };
-    document.addEventListener('mousedown', onDoc);
-    document.addEventListener('keydown', onKey);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener('mousedown', onDoc);
-      document.removeEventListener('keydown', onKey);
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
     };
   }, [open, onOpenChange]);
 
@@ -249,7 +251,10 @@ function SupervisionCadenceMenu({
         <MoreHorizontal className="h-3.5 w-3.5" />
       </button>
       {open ? (
-        <OpaqueMenuPanel align="left" className="w-[300px] p-2.5 text-[11px] leading-snug">
+        <OpaqueMenuPanel
+          align="left"
+          className="w-[300px] p-2.5 text-[11px] leading-snug"
+        >
           <p className="mb-2 text-[12px] font-semibold text-foreground">
             Cadencias · vela diaria al cierre
           </p>
@@ -328,11 +333,11 @@ export function EstudioListSupervisionBanner({
 
   const softStopPending =
     isEstudioUpdateSoftStopRequested() ||
-    Boolean(listAutoDetail?.startsWith('Termina '));
+    Boolean(listAutoDetail?.startsWith("Termina "));
   const updatePaused =
     listAutoPaused &&
     (hasEstudioUpdatePauseCheckpoint() ||
-      Boolean(listAutoDetail?.startsWith('Pausa ·')));
+      Boolean(listAutoDetail?.startsWith("Pausa ·")));
   const stoppingOrPaused = listAutoPaused || softStopPending;
 
   const activity = useMemo((): EstudioBannerProgress | null => {
@@ -349,8 +354,8 @@ export function EstudioListSupervisionBanner({
         label:
           listAutoDetail?.slice(0, 52) ||
           (softStopPending
-            ? `Termina ${listAutoSymbol || '…'} y para…`
-            : `Pausa · ${listAutoSymbol || '…'}`),
+            ? `Termina ${listAutoSymbol || "…"} y para…`
+            : `Pausa · ${listAutoSymbol || "…"}`),
       };
     }
     if (progress && progress.total > 0) {
@@ -364,7 +369,7 @@ export function EstudioListSupervisionBanner({
       return {
         current: Math.min(listAutoIndex + 1, listAutoTotal),
         total: listAutoTotal,
-        label: listAutoDetail?.slice(0, 40) || listAutoSymbol || 'Procesando…',
+        label: listAutoDetail?.slice(0, 40) || listAutoSymbol || "Procesando…",
       };
     }
     return null;
@@ -388,8 +393,7 @@ export function EstudioListSupervisionBanner({
 
   const canSoftPause = Boolean(activity) && !stoppingOrPaused;
   /** ▶ solo cuando ya paró (no mientras «Termina…»). */
-  const canResume =
-    Boolean(activity) && listAutoPaused && !softStopPending;
+  const canResume = Boolean(activity) && listAutoPaused && !softStopPending;
 
   return (
     <div
@@ -403,10 +407,13 @@ export function EstudioListSupervisionBanner({
           checked={prefs.enabled}
           onChange={(e) => onToggle(e.target.checked)}
         />
-        Supervisión {prefs.enabled ? 'ON' : 'OFF'}
+        Supervisión {prefs.enabled ? "ON" : "OFF"}
       </label>
       {prefs.enabled ? (
-        <CadenceSummaryChips prefs={prefs} onOpenMenu={() => setMenuOpen(true)} />
+        <CadenceSummaryChips
+          prefs={prefs}
+          onOpenMenu={() => setMenuOpen(true)}
+        />
       ) : null}
       <SupervisionCadenceMenu
         prefs={prefs}
@@ -424,7 +431,9 @@ export function EstudioListSupervisionBanner({
             title={`${activity.label} · ${activity.current}/${activity.total}`}
           >
             <div className="flex items-center justify-between gap-2 text-[10px] text-foreground/85">
-              <span className="min-w-0 truncate font-medium">{activity.label}</span>
+              <span className="min-w-0 truncate font-medium">
+                {activity.label}
+              </span>
               <span className="shrink-0 tabular-nums text-muted-foreground">
                 {activity.current}/{activity.total}
               </span>
@@ -432,10 +441,12 @@ export function EstudioListSupervisionBanner({
             <div className="h-1 overflow-hidden rounded-sm bg-border/80">
               <div
                 className={cn(
-                  'h-full rounded-sm transition-[width] duration-300',
-                  stoppingOrPaused ? 'bg-amber-500' : 'bg-sky-500',
+                  "h-full rounded-sm transition-[width] duration-300",
+                  stoppingOrPaused ? "bg-amber-500" : "bg-sky-500",
                 )}
-                style={{ width: `${Math.max(pct, activity.current > 0 ? 8 : 0)}%` }}
+                style={{
+                  width: `${Math.max(pct, activity.current > 0 ? 8 : 0)}%`,
+                }}
               />
             </div>
           </div>
@@ -475,7 +486,11 @@ export function EstudioListSupervisionBanner({
   );
 }
 
-export function EstudioSupervisionPanel({ compact = false }: { compact?: boolean }) {
+export function EstudioSupervisionPanel({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
   const { prefs, onToggle, onPatch } = useEstudioSupervisionPrefsState();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -483,8 +498,8 @@ export function EstudioSupervisionPanel({ compact = false }: { compact?: boolean
     <div
       className={
         compact
-          ? 'space-y-1.5 rounded border border-border/60 bg-background/40 px-2 py-1.5'
-          : 'space-y-2 rounded border border-border p-2'
+          ? "space-y-1.5 rounded border border-border/60 bg-background/40 px-2 py-1.5"
+          : "space-y-2 rounded border border-border p-2"
       }
       data-testid="estudio-supervision-panel"
     >
@@ -500,7 +515,10 @@ export function EstudioSupervisionPanel({ compact = false }: { compact?: boolean
         </label>
         <div className="flex items-center gap-1.5">
           {prefs.enabled ? (
-            <CadenceSummaryChips prefs={prefs} onOpenMenu={() => setMenuOpen(true)} />
+            <CadenceSummaryChips
+              prefs={prefs}
+              onOpenMenu={() => setMenuOpen(true)}
+            />
           ) : null}
           <SupervisionCadenceMenu
             prefs={prefs}

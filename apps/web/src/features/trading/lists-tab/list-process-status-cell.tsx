@@ -3,26 +3,23 @@
  * Sincro (velas) es otra columna — no mezclar.
  */
 
-import { Activity, FlaskConical, RefreshCcw } from 'lucide-react';
-import { useMemo } from 'react';
-import { cn } from '@/lib/utils';
+import { Activity, FlaskConical, RefreshCcw } from "lucide-react";
+import { useMemo } from "react";
+import { cn } from "@/lib/utils";
 import {
   ESTUDIO_SUPERVISION_EVENT,
   loadEstudioSupervisionPrefs,
-} from '@/features/trading/estudio-supervision';
-import { ESTUDIO_LANE_STAMPS_EVENT } from '@/features/trading/estudio-lane-stamps';
+} from "@/features/trading/estudio-supervision";
+import { ESTUDIO_LANE_STAMPS_EVENT } from "@/features/trading/estudio-lane-stamps";
 import {
   resolveEstudioProcessStatus,
   type EstudioProcessLaneId,
   type EstudioProcessLaneState,
-} from '@/features/trading/estudio-process-status';
-import { useEstudioProcessRunningStore } from '@/stores/estudio-process-running-store';
-import { useEffect, useState } from 'react';
+} from "@/features/trading/estudio-process-status";
+import { useEstudioProcessRunningStore } from "@/stores/estudio-process-running-store";
+import { useEffect, useState } from "react";
 
-const ICONS: Record<
-  EstudioProcessLaneId,
-  typeof Activity
-> = {
+const ICONS: Record<EstudioProcessLaneId, typeof Activity> = {
   vigilance: Activity,
   freshness: FlaskConical,
   rediscover: RefreshCcw,
@@ -30,15 +27,15 @@ const ICONS: Record<
 
 function toneClass(state: EstudioProcessLaneState): string {
   switch (state) {
-    case 'ok':
-      return 'text-emerald-500';
-    case 'stale':
-      return 'text-amber-500';
-    case 'running':
-      return 'text-sky-500';
-    case 'empty':
+    case "ok":
+      return "text-emerald-500";
+    case "stale":
+      return "text-amber-500";
+    case "running":
+      return "text-sky-500";
+    case "empty":
     default:
-      return 'text-muted-foreground/50';
+      return "text-muted-foreground/50";
   }
 }
 
@@ -78,7 +75,10 @@ export function ListProcessStatusCell({ instrumentId, className }: Props) {
 
   return (
     <span
-      className={cn('inline-flex items-center justify-center gap-0.5', className)}
+      className={cn(
+        "inline-flex items-center justify-center gap-0.5",
+        className,
+      )}
       data-testid="list-process-status-cell"
     >
       {view.lanes.map((lane) => {
@@ -87,9 +87,9 @@ export function ListProcessStatusCell({ instrumentId, className }: Props) {
           <span key={lane.id} title={lane.title} className="inline-flex">
             <Icon
               className={cn(
-                'h-3.5 w-3.5',
+                "h-3.5 w-3.5",
                 toneClass(lane.state),
-                lane.state === 'running' && 'animate-spin',
+                lane.state === "running" && "animate-spin",
               )}
               strokeWidth={2.4}
               aria-label={`${lane.label}: ${lane.state}`}
@@ -103,11 +103,15 @@ export function ListProcessStatusCell({ instrumentId, className }: Props) {
 
 type StampProps = {
   instrumentId: string;
-  kind: 'lab' | 'coreR';
+  kind: "lab" | "coreR";
   className?: string;
 };
 
-export function ListProcessTimestampCell({ instrumentId, kind, className }: StampProps) {
+export function ListProcessTimestampCell({
+  instrumentId,
+  kind,
+  className,
+}: StampProps) {
   const [prefs, setPrefs] = useState(() => loadEstudioSupervisionPrefs());
   const [stampTick, setStampTick] = useState(0);
   const runningId = useEstudioProcessRunningStore((s) => s.instrumentId);
@@ -136,18 +140,18 @@ export function ListProcessTimestampCell({ instrumentId, kind, className }: Stam
     [instrumentId, prefs, runningId, runningLane, stampTick],
   );
 
-  const iso = kind === 'lab' ? view.lastLabAt : view.lastCoreRAt;
+  const iso = kind === "lab" ? view.lastLabAt : view.lastCoreRAt;
   const text = iso
-    ? new Date(iso).toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: 'short',
+    ? new Date(iso).toLocaleDateString("es-ES", {
+        day: "2-digit",
+        month: "short",
       })
-    : '—';
+    : "—";
 
   return (
     <span
-      className={cn('text-[10px] tabular-nums text-foreground/80', className)}
-      title={iso ? new Date(iso).toLocaleString('es-ES') : 'Sin registro'}
+      className={cn("text-[10px] tabular-nums text-foreground/80", className)}
+      title={iso ? new Date(iso).toLocaleString("es-ES") : "Sin registro"}
     >
       {text}
     </span>

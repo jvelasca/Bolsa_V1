@@ -6,9 +6,9 @@
  * BacktestsPage (keep-alive si Supervisión ON) consume el tick.
  */
 
-import { useEffect } from 'react';
-import { ESTUDIO_LIST_ID } from '@bolsa/shared';
-import { api } from '@/lib/api';
+import { useEffect } from "react";
+import { ESTUDIO_LIST_ID } from "@bolsa/shared";
+import { api } from "@/lib/api";
 import {
   ESTUDIO_SUPERVISION_EVENT,
   emitEstudioLaneTick,
@@ -18,7 +18,7 @@ import {
   markEstudioFreshnessTick,
   markEstudioRediscoverTick,
   sliceRediscoverBudget,
-} from '@/features/trading/estudio-supervision';
+} from "@/features/trading/estudio-supervision";
 
 const POLL_MS = 60_000;
 
@@ -56,7 +56,7 @@ export function EstudioSupervisionHost() {
           if (ids.length > 0) {
             emitEstudioLaneTick({
               listId,
-              lane: 'rediscover',
+              lane: "rediscover",
               forceRescan: true,
               skipConfirm: true,
               instrumentIds: ids,
@@ -71,7 +71,7 @@ export function EstudioSupervisionHost() {
           markEstudioFreshnessTick(prefs, at);
           emitEstudioLaneTick({
             listId,
-            lane: 'freshness',
+            lane: "freshness",
             forceRescan: false,
             skipConfirm: true,
             instrumentIds: null,

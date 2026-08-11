@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { InstrumentListSummaryDto } from '@bolsa/shared';
-import { isEstudioListNameCollision } from '@bolsa/shared';
-import { MoreHorizontal } from 'lucide-react';
-import { checkboxClassName } from '@/components/ui/dialog';
-import { isListPinnedInCarousel, patchToggleCarouselList } from '@/lib/list-carousel-config';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { InstrumentListSummaryDto } from "@bolsa/shared";
+import { isEstudioListNameCollision } from "@bolsa/shared";
+import { MoreHorizontal } from "lucide-react";
+import { checkboxClassName } from "@/components/ui/dialog";
+import {
+  isListPinnedInCarousel,
+  patchToggleCarouselList,
+} from "@/lib/list-carousel-config";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function ListCarouselMenu({
   virtualLists,
@@ -35,8 +38,8 @@ export function ListCarouselMenu({
         setMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, [menuOpen]);
 
   function toggleList(listId: string) {
@@ -45,7 +48,10 @@ export function ListCarouselMenu({
   }
 
   return (
-    <div ref={menuRef} className="relative shrink-0 border-l border-border/60 pl-0.5">
+    <div
+      ref={menuRef}
+      className="relative shrink-0 border-l border-border/60 pl-0.5"
+    >
       <button
         type="button"
         title="Configurar carrusel"
@@ -56,7 +62,9 @@ export function ListCarouselMenu({
       </button>
       {menuOpen && (
         <div className="absolute right-0 top-full z-20 mt-1 min-w-[200px] rounded-md border border-border bg-card py-1 shadow-lg">
-          <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">Carrusel</p>
+          <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
+            Carrusel
+          </p>
           <div className="scroll-area max-h-48 overflow-auto">
             {allLists.map((list) => (
               <label

@@ -4,8 +4,8 @@
  * - FA en un batch; Composite en trozos pequeños y secuenciales.
  */
 
-import type { QueryClient } from '@tanstack/react-query';
-import type { CompositeChipDto, FundamentalChipDto } from '@bolsa/shared';
+import type { QueryClient } from "@tanstack/react-query";
+import type { CompositeChipDto, FundamentalChipDto } from "@bolsa/shared";
 
 import {
   chunkIds,
@@ -13,24 +13,30 @@ import {
   indexTaScores,
   type HubFaScore,
   type HubTaScore,
-} from '@/features/instruments/instruments-hub-scores';
-import { ioFromCompositeAndFa } from '@/features/trading/lists-tab/sort-visualizados-by-io';
+} from "@/features/instruments/instruments-hub-scores";
+import { ioFromCompositeAndFa } from "@/features/trading/lists-tab/sort-visualizados-by-io";
 
 /** Trozo pequeño: cada chip Composite puede ser caro (OHLCV + rating). */
 export const IO_SORT_COMPOSITE_CHUNK = 4;
 export const IO_SORT_FA_CHUNK = 40;
 
 export type IoScoreFetchDeps = {
-  queryFundamentals: (instrumentIds: string[]) => Promise<{ data: FundamentalChipDto[] }>;
-  queryComposite: (instrumentIds: string[]) => Promise<{ data: CompositeChipDto[] }>;
+  queryFundamentals: (
+    instrumentIds: string[],
+  ) => Promise<{ data: FundamentalChipDto[] }>;
+  queryComposite: (
+    instrumentIds: string[],
+  ) => Promise<{ data: CompositeChipDto[] }>;
   /** Opcional: ceder el event loop entre trozos. */
   yieldBetweenChunks?: () => Promise<void>;
 };
 
-export function collectCachedFaScores(queryClient: QueryClient): Map<string, HubFaScore> {
+export function collectCachedFaScores(
+  queryClient: QueryClient,
+): Map<string, HubFaScore> {
   const map = new Map<string, HubFaScore>();
   for (const [, data] of queryClient.getQueriesData<FundamentalChipDto[]>({
-    queryKey: ['instrument-fundamentals-batch'],
+    queryKey: ["instrument-fundamentals-batch"],
   })) {
     if (!Array.isArray(data)) continue;
     for (const [id, score] of indexFaScores(data)) {
@@ -40,10 +46,12 @@ export function collectCachedFaScores(queryClient: QueryClient): Map<string, Hub
   return map;
 }
 
-export function collectCachedTaScores(queryClient: QueryClient): Map<string, HubTaScore> {
+export function collectCachedTaScores(
+  queryClient: QueryClient,
+): Map<string, HubTaScore> {
   const map = new Map<string, HubTaScore>();
   for (const [, data] of queryClient.getQueriesData<CompositeChipDto[]>({
-    queryKey: ['instrument-composite-batch'],
+    queryKey: ["instrument-composite-batch"],
   })) {
     if (!Array.isArray(data)) continue;
     for (const [id, score] of indexTaScores(data)) {

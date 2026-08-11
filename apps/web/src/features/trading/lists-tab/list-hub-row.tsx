@@ -1,35 +1,51 @@
-import type { InstrumentListSummaryDto, InstrumentWithMetaDto } from '@bolsa/shared';
+import type {
+  InstrumentListSummaryDto,
+  InstrumentWithMetaDto,
+} from "@bolsa/shared";
 import {
   isVirtualListId,
   VIRTUAL_LIST_PENDING_ORDERS,
   VIRTUAL_LIST_VISUALIZATION,
-} from '@bolsa/shared';
-import { Check, ChevronDown, ChevronRight, Copy, Download, History, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { checkboxClassName } from '@/components/ui/dialog';
-import { IconButton } from '@/components/ui/icon-button';
+} from "@bolsa/shared";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Download,
+  History,
+  Trash2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { checkboxClassName } from "@/components/ui/dialog";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   LIST_HUB_ROW_CHART_MEMBERSHIP_WIDTH_PX,
   LIST_HUB_ROW_EXPAND_WIDTH_PX,
   isCenteredListHubColumn,
   isNumericListHubColumn,
   listHubColumnContentClass,
-} from '@/lib/list-hub-column-layout';
-import { useListHubColumnLayoutContext } from '@/features/trading/lists-tab/list-hub-column-layout-context';
-import { ListHubShortcutsSection } from '@/features/trading/lists-tab/list-hub-shortcuts-section';
+} from "@/lib/list-hub-column-layout";
+import { useListHubColumnLayoutContext } from "@/features/trading/lists-tab/list-hub-column-layout-context";
+import { ListHubShortcutsSection } from "@/features/trading/lists-tab/list-hub-shortcuts-section";
 
 function formatLastSynced(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function listTypeLabel(list: InstrumentListSummaryDto): string {
-  if (isVirtualListId(list.id)) return 'sistema';
-  if (list.source === 'catalog' || list.kind === 'linked_universe') return 'índice';
-  if (list.kind === 'snapshot') return 'copia';
-  return 'personal';
+  if (isVirtualListId(list.id)) return "sistema";
+  if (list.source === "catalog" || list.kind === "linked_universe")
+    return "índice";
+  if (list.kind === "snapshot") return "copia";
+  return "personal";
 }
 
 export function ListHubRow({
@@ -73,48 +89,57 @@ export function ListHubRow({
     useListHubColumnLayoutContext();
   const typeLabel = listTypeLabel(list);
   const isExpandable = !isVirtualListId(list.id);
-  const isIndex = list.source === 'catalog' || list.kind === 'linked_universe';
+  const isIndex = list.source === "catalog" || list.kind === "linked_universe";
   const syncedLabel = isIndex ? formatLastSynced(list.lastSyncedAt) : null;
 
-  function hubCellValue(columnId: (typeof visibleColumns)[number]['id']) {
-    if (columnId === 'name') {
+  function hubCellValue(columnId: (typeof visibleColumns)[number]["id"]) {
+    if (columnId === "name") {
       return (
         <span className="flex min-w-0 flex-col items-start gap-0 text-left">
           <span className="flex min-w-0 items-center gap-1">
             {isActive && <Check className="h-3 w-3 shrink-0 text-primary" />}
-            <span className={listHubColumnContentClass('name', 'data')}>{list.name}</span>
+            <span className={listHubColumnContentClass("name", "data")}>
+              {list.name}
+            </span>
           </span>
           {syncedLabel ? (
-            <span className="truncate pl-4 text-[9px] text-muted-foreground" title="Última sync de constitutivos">
+            <span
+              className="truncate pl-4 text-[9px] text-muted-foreground"
+              title="Última sync de constitutivos"
+            >
               Últ. sync {syncedLabel}
             </span>
           ) : null}
         </span>
       );
     }
-    if (columnId === 'type') {
+    if (columnId === "type") {
       return (
         <span
           className={cn(
-            listHubColumnContentClass('type', 'data'),
-            'inline-block rounded px-1 py-0.5',
-            isVirtualListId(list.id) ? 'bg-amber-500/15 text-amber-600' : 'bg-muted/60',
+            listHubColumnContentClass("type", "data"),
+            "inline-block rounded px-1 py-0.5",
+            isVirtualListId(list.id)
+              ? "bg-amber-500/15 text-amber-600"
+              : "bg-muted/60",
           )}
         >
           {typeLabel}
         </span>
       );
     }
-    if (columnId === 'carousel') {
+    if (columnId === "carousel") {
       return (
         <label
           className={cn(
-            'inline-flex items-center justify-center rounded p-0.5',
-            carouselLocked ? 'cursor-default opacity-60' : 'cursor-pointer hover:bg-accent/50',
+            "inline-flex items-center justify-center rounded p-0.5",
+            carouselLocked
+              ? "cursor-default opacity-60"
+              : "cursor-pointer hover:bg-accent/50",
           )}
           title={
             carouselLocked
-              ? 'Siempre en el carrusel de Valores'
+              ? "Siempre en el carrusel de Valores"
               : isPinned
                 ? `Quitar «${list.name}» del carrusel (misma acción que el menú ⋯ del carrusel)`
                 : `Mostrar «${list.name}» en el carrusel de Valores (misma acción que el menú ⋯ del carrusel)`
@@ -123,7 +148,7 @@ export function ListHubRow({
         >
           <input
             type="checkbox"
-            className={cn(checkboxClassName, 'h-3 w-3')}
+            className={cn(checkboxClassName, "h-3 w-3")}
             checked={isPinned}
             disabled={carouselLocked}
             onChange={() => {
@@ -139,15 +164,17 @@ export function ListHubRow({
       );
     }
     return (
-      <span className={listHubColumnContentClass('count', 'data')}>{list.itemCount}</span>
+      <span className={listHubColumnContentClass("count", "data")}>
+        {list.itemCount}
+      </span>
     );
   }
 
   return (
     <div
       className={cn(
-        'border-b border-border/60',
-        isActive && 'border-l-2 border-l-primary bg-primary/5',
+        "border-b border-border/60",
+        isActive && "border-l-2 border-l-primary bg-primary/5",
       )}
     >
       <div className="flex items-center gap-0 px-1 py-1">
@@ -159,7 +186,11 @@ export function ListHubRow({
           {isExpandable ? (
             <IconButton
               icon={expanded ? ChevronDown : ChevronRight}
-              title={expanded ? 'Contraer' : 'Accesos: Rastreadores, Alertas, Backtesting'}
+              title={
+                expanded
+                  ? "Contraer"
+                  : "Accesos: Rastreadores, Alertas, Backtesting"
+              }
               onClick={onToggleExpand}
             />
           ) : (
@@ -174,7 +205,7 @@ export function ListHubRow({
           title={`Abrir ${list.name} en Valores`}
           onClick={onSelect}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
+            if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
               onSelect();
             }
@@ -190,12 +221,16 @@ export function ListHubRow({
                 type="checkbox"
                 className={cn(
                   checkboxClassName,
-                  'pointer-events-none h-3 w-3',
-                  !chartMembershipKnown && 'opacity-40',
+                  "pointer-events-none h-3 w-3",
+                  !chartMembershipKnown && "opacity-40",
                 )}
-                checked={Boolean(chartMembershipKnown && containsChartInstrument)}
+                checked={Boolean(
+                  chartMembershipKnown && containsChartInstrument,
+                )}
                 ref={(el) => {
-                  if (el) el.indeterminate = Boolean(chartInstrumentLabel) && !chartMembershipKnown;
+                  if (el)
+                    el.indeterminate =
+                      Boolean(chartInstrumentLabel) && !chartMembershipKnown;
                 }}
                 readOnly
                 tabIndex={-1}
@@ -225,10 +260,10 @@ export function ListHubRow({
               <div
                 key={column.id}
                 className={cn(
-                  'min-w-0 px-1',
+                  "min-w-0 px-1",
                   isCenteredListHubColumn(column.id)
-                    ? 'flex justify-center'
-                    : isNumericListHubColumn(column.id) && 'text-right',
+                    ? "flex justify-center"
+                    : isNumericListHubColumn(column.id) && "text-right",
                 )}
               >
                 {hubCellValue(column.id)}
@@ -246,7 +281,8 @@ export function ListHubRow({
             icon={Download}
             title="Exportar CSV"
             disabled={
-              (isVirtualListId(list.id) && list.id === VIRTUAL_LIST_PENDING_ORDERS) ||
+              (isVirtualListId(list.id) &&
+                list.id === VIRTUAL_LIST_PENDING_ORDERS) ||
               (isVirtualListId(list.id) &&
                 list.id === VIRTUAL_LIST_VISUALIZATION &&
                 list.itemCount === 0)
@@ -261,16 +297,16 @@ export function ListHubRow({
             />
           ) : null}
           {list.id === VIRTUAL_LIST_VISUALIZATION && onShowLog && (
-            <IconButton icon={History} title="Historial de sesión" onClick={onShowLog} />
+            <IconButton
+              icon={History}
+              title="Historial de sesión"
+              onClick={onShowLog}
+            />
           )}
           {canMutate && (
             <IconButton
               icon={Trash2}
-              title={
-                isIndex
-                  ? 'Desuscribir índice'
-                  : 'Eliminar lista'
-              }
+              title={isIndex ? "Desuscribir índice" : "Eliminar lista"}
               className="text-destructive hover:text-destructive"
               onClick={onDelete}
             />
@@ -320,14 +356,17 @@ export function ListHubInstrumentPicker({
   return (
     <ul className="scroll-area max-h-40 space-y-1 overflow-auto rounded-md border border-border p-2">
       {filtered.length === 0 && (
-        <li className="px-2 py-1 text-xs text-muted-foreground">Sin coincidencias</li>
+        <li className="px-2 py-1 text-xs text-muted-foreground">
+          Sin coincidencias
+        </li>
       )}
       {filtered.map((item) => (
         <li key={item.id}>
           <label
             className={cn(
-              'flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent/50',
-              highlightInstrumentId === item.id && 'bg-primary/10 ring-1 ring-primary/30',
+              "flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-accent/50",
+              highlightInstrumentId === item.id &&
+                "bg-primary/10 ring-1 ring-primary/30",
             )}
           >
             <input
@@ -337,7 +376,9 @@ export function ListHubInstrumentPicker({
               onChange={() => toggle(item.id)}
             />
             <span className="font-medium">{item.symbol}</span>
-            <span className="truncate text-xs text-muted-foreground">{item.name}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {item.name}
+            </span>
           </label>
         </li>
       ))}

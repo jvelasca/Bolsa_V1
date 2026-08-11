@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import type { InstrumentRemovalPreviewDto } from '@bolsa/shared';
-import { Dialog } from '@/components/ui/dialog';
-import { checkboxClassName } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { useState } from "react";
+import type { InstrumentRemovalPreviewDto } from "@bolsa/shared";
+import { Dialog } from "@/components/ui/dialog";
+import { checkboxClassName } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface InstrumentRemovalConfirmDialogProps {
   open: boolean;
@@ -40,11 +40,13 @@ export function InstrumentRemovalConfirmDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title={preview ? `Quitar ${preview.symbol}` : 'Quitar valor'}
+      title={preview ? `Quitar ${preview.symbol}` : "Quitar valor"}
       description="Este valor ya no pertenecerá a ninguna lista persistente."
       className="max-w-lg"
     >
-      {loading && <p className="text-sm text-muted-foreground">Calculando impacto…</p>}
+      {loading && (
+        <p className="text-sm text-muted-foreground">Calculando impacto…</p>
+      )}
 
       {!loading && preview && (
         <div className="space-y-3 text-sm">
@@ -53,14 +55,17 @@ export function InstrumentRemovalConfirmDialog({
             <span className="text-muted-foreground"> · {preview.name}</span>
           </p>
           <p className="text-xs text-muted-foreground">
-            Velas OHLCV: {preview.ohlcvBarCount.toLocaleString()} · Alertas precio:{' '}
-            {preview.priceAlertsTotal} · Alertas señal: {preview.signalAlertsTotal} · Posiciones:{' '}
-            {preview.positions} · Órdenes: {preview.pendingOrders}
+            Velas OHLCV: {preview.ohlcvBarCount.toLocaleString()} · Alertas
+            precio: {preview.priceAlertsTotal} · Alertas señal:{" "}
+            {preview.signalAlertsTotal} · Posiciones: {preview.positions} ·
+            Órdenes: {preview.pendingOrders}
           </p>
 
           {blocked.length > 0 && (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs">
-              <p className="font-medium text-destructive">No se puede borrar de BD</p>
+              <p className="font-medium text-destructive">
+                No se puede borrar de BD
+              </p>
               <ul className="mt-1 list-disc space-y-0.5 pl-4">
                 {blocked.map((reason) => (
                   <li key={reason}>{reason}</li>
@@ -84,11 +89,13 @@ export function InstrumentRemovalConfirmDialog({
             <label className="flex items-start gap-2 text-xs">
               <input
                 type="checkbox"
-                className={cn(checkboxClassName, 'mt-0.5')}
+                className={cn(checkboxClassName, "mt-0.5")}
                 checked={ackWarnings}
                 onChange={(e) => setAckWarnings(e.target.checked)}
               />
-              <span>Entiendo que se eliminarán alertas, velas y datos asociados.</span>
+              <span>
+                Entiendo que se eliminarán alertas, velas y datos asociados.
+              </span>
             </label>
           )}
 
@@ -116,9 +123,9 @@ export function InstrumentRemovalConfirmDialog({
               className="rounded bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
               disabled={pending || !canPurge || (needsAck && !ackWarnings)}
               onClick={onPurge}
-              title={!canPurge ? blocked.join(' ') : undefined}
+              title={!canPurge ? blocked.join(" ") : undefined}
             >
-              {pending ? 'Eliminando…' : 'Quitar y borrar de BD'}
+              {pending ? "Eliminando…" : "Quitar y borrar de BD"}
             </button>
           </div>
         </div>

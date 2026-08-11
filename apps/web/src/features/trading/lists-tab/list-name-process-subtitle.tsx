@@ -8,35 +8,37 @@
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import {
   ESTUDIO_SUPERVISION_EVENT,
   loadEstudioSupervisionPrefs,
-} from '@/features/trading/estudio-supervision';
-import { ESTUDIO_LANE_STAMPS_EVENT } from '@/features/trading/estudio-lane-stamps';
+} from "@/features/trading/estudio-supervision";
+import { ESTUDIO_LANE_STAMPS_EVENT } from "@/features/trading/estudio-lane-stamps";
 import {
   resolveEstudioProcessStatus,
   summarizeEstudioProcessLanes,
-} from '@/features/trading/estudio-process-status';
-import { useEstudioProcessRunningStore } from '@/stores/estudio-process-running-store';
+} from "@/features/trading/estudio-process-status";
+import { useEstudioProcessRunningStore } from "@/stores/estudio-process-running-store";
 
 type Props = {
   instrumentId: string;
   className?: string;
 };
 
-function toneClass(tone: ReturnType<typeof summarizeEstudioProcessLanes>['tone']): string {
+function toneClass(
+  tone: ReturnType<typeof summarizeEstudioProcessLanes>["tone"],
+): string {
   switch (tone) {
-    case 'ok':
-      return 'text-emerald-600 dark:text-emerald-400/90';
-    case 'attention':
-      return 'text-amber-600 dark:text-amber-400/90';
-    case 'running':
-      return 'text-sky-700 dark:text-sky-300';
-    case 'empty':
+    case "ok":
+      return "text-emerald-600 dark:text-emerald-400/90";
+    case "attention":
+      return "text-amber-600 dark:text-amber-400/90";
+    case "running":
+      return "text-sky-700 dark:text-sky-300";
+    case "empty":
     default:
-      return 'text-muted-foreground';
+      return "text-muted-foreground";
   }
 }
 
@@ -72,13 +74,13 @@ export function ListNameProcessSubtitle({ instrumentId, className }: Props) {
   return (
     <span
       className={cn(
-        'relative mt-0.5 block h-[12px] overflow-hidden rounded-[2px]',
+        "relative mt-0.5 block h-[12px] overflow-hidden rounded-[2px]",
         className,
       )}
       title={summary.title}
       data-testid="list-name-process-subtitle"
     >
-      {isRunning || summary.tone === 'running' ? (
+      {isRunning || summary.tone === "running" ? (
         <span
           aria-hidden
           className="pointer-events-none absolute inset-0 overflow-hidden rounded-[2px] bg-sky-500/10"
@@ -88,7 +90,7 @@ export function ListNameProcessSubtitle({ instrumentId, className }: Props) {
       ) : null}
       <span
         className={cn(
-          'relative z-[1] block truncate px-0.5 text-[9px] font-medium leading-[12px]',
+          "relative z-[1] block truncate px-0.5 text-[9px] font-medium leading-[12px]",
           toneClass(summary.tone),
         )}
       >

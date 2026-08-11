@@ -1,5 +1,16 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import type { ListHubColumnId, ListHubColumnLayoutItem, ListHubSortState } from '@bolsa/shared';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
+import type {
+  ListHubColumnId,
+  ListHubColumnLayoutItem,
+  ListHubSortState,
+} from "@bolsa/shared";
 import {
   buildListHubDataGridTemplate,
   buildListHubRowGridTemplate,
@@ -11,14 +22,14 @@ import {
   resolveListHubRowActionsWidth,
   resolveListHubSort,
   toggleListHubColumnInLayout,
-} from '@/lib/list-hub-column-layout';
+} from "@/lib/list-hub-column-layout";
 import {
   hubLayoutForServerSync,
   mergeHubColumnWidths,
   resolveLocalHubRowActionsWidth,
   useListChromeLayoutStore,
-} from '@/stores/list-chrome-layout-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/stores/list-chrome-layout-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 interface ListHubColumnLayoutContextValue {
   layout: ListHubColumnLayoutItem[];
@@ -36,21 +47,37 @@ interface ListHubColumnLayoutContextValue {
   commitLayout: () => void;
 }
 
-const ListHubColumnLayoutContext = createContext<ListHubColumnLayoutContextValue | null>(null);
+const ListHubColumnLayoutContext =
+  createContext<ListHubColumnLayoutContextValue | null>(null);
 
-export function ListHubColumnLayoutProvider({ children }: { children: ReactNode }) {
+export function ListHubColumnLayoutProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const listConfig = useWorkspaceStore((state) => state.workspace.list);
   const updateListConfig = useWorkspaceStore((state) => state.updateListConfig);
   const save = useWorkspaceStore((state) => state.save);
 
   const hubWidths = useListChromeLayoutStore((state) => state.hubWidths);
-  const hubRowActionsWidth = useListChromeLayoutStore((state) => state.hubRowActionsWidth);
+  const hubRowActionsWidth = useListChromeLayoutStore(
+    (state) => state.hubRowActionsWidth,
+  );
   const hubSeeded = useListChromeLayoutStore((state) => state.hubSeeded);
-  const seedHubIfNeeded = useListChromeLayoutStore((state) => state.seedHubIfNeeded);
-  const setHubColumnWidth = useListChromeLayoutStore((state) => state.setHubColumnWidth);
-  const setHubRowActionsWidth = useListChromeLayoutStore((state) => state.setHubRowActionsWidth);
+  const seedHubIfNeeded = useListChromeLayoutStore(
+    (state) => state.seedHubIfNeeded,
+  );
+  const setHubColumnWidth = useListChromeLayoutStore(
+    (state) => state.setHubColumnWidth,
+  );
+  const setHubRowActionsWidth = useListChromeLayoutStore(
+    (state) => state.setHubRowActionsWidth,
+  );
 
-  const serverLayout = useMemo(() => resolveListHubColumnLayout(listConfig), [listConfig]);
+  const serverLayout = useMemo(
+    () => resolveListHubColumnLayout(listConfig),
+    [listConfig],
+  );
   const serverRowActionsWidth = useMemo(
     () => resolveListHubRowActionsWidth(listConfig),
     [listConfig],
@@ -66,7 +93,10 @@ export function ListHubColumnLayoutProvider({ children }: { children: ReactNode 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [hubSeeded, hubWidths, serverLayout],
   );
-  const visibleColumns = useMemo(() => getVisibleListHubColumnLayout(layout), [layout]);
+  const visibleColumns = useMemo(
+    () => getVisibleListHubColumnLayout(layout),
+    [layout],
+  );
   const rowActionsWidth = useMemo(
     () => resolveLocalHubRowActionsWidth(serverRowActionsWidth),
     // hubRowActionsWidth es señal de refresco del store
@@ -85,7 +115,9 @@ export function ListHubColumnLayoutProvider({ children }: { children: ReactNode 
 
   const persistLayout = useCallback(
     (next: ListHubColumnLayoutItem[], shouldSave = true) => {
-      updateListConfig(patchListHubColumnLayout(listConfig, hubLayoutForServerSync(next)));
+      updateListConfig(
+        patchListHubColumnLayout(listConfig, hubLayoutForServerSync(next)),
+      );
       if (shouldSave) save();
     },
     [listConfig, save, updateListConfig],
@@ -129,11 +161,11 @@ export function ListHubColumnLayoutProvider({ children }: { children: ReactNode 
       const current = resolveListHubSort(listConfig);
       let next: ListHubSortState;
       if (current.column !== columnId) {
-        next = { column: columnId, direction: 'asc' };
-      } else if (current.direction === 'asc') {
-        next = { column: columnId, direction: 'desc' };
+        next = { column: columnId, direction: "asc" };
+      } else if (current.direction === "asc") {
+        next = { column: columnId, direction: "desc" };
       } else {
-        next = { column: 'name', direction: 'asc' };
+        next = { column: "name", direction: "asc" };
       }
       updateListConfig({ hubSort: next });
       save();
@@ -175,7 +207,9 @@ export function ListHubColumnLayoutProvider({ children }: { children: ReactNode 
   );
 
   return (
-    <ListHubColumnLayoutContext.Provider value={value}>{children}</ListHubColumnLayoutContext.Provider>
+    <ListHubColumnLayoutContext.Provider value={value}>
+      {children}
+    </ListHubColumnLayoutContext.Provider>
   );
 }
 
@@ -183,7 +217,7 @@ export function useListHubColumnLayoutContext() {
   const context = useContext(ListHubColumnLayoutContext);
   if (!context) {
     throw new Error(
-      'useListHubColumnLayoutContext debe usarse dentro de ListHubColumnLayoutProvider',
+      "useListHubColumnLayoutContext debe usarse dentro de ListHubColumnLayoutProvider",
     );
   }
   return context;

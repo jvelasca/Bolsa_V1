@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
-import type { ListHubColumnId } from '@bolsa/shared';
-import { LIST_HUB_COLUMN_LABELS } from '@bolsa/shared';
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, GripVertical, MoreHorizontal, Star } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useEffect, useRef, useState } from "react";
+import type { ListHubColumnId } from "@bolsa/shared";
+import { LIST_HUB_COLUMN_LABELS } from "@bolsa/shared";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Check,
+  GripVertical,
+  MoreHorizontal,
+  Star,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   LIST_HUB_HEADER_GRIP_INSET_PX,
   LIST_HUB_ROW_CHART_MEMBERSHIP_WIDTH_PX,
@@ -12,9 +20,9 @@ import {
   isSortableListHubColumn,
   listHubColumnContentClass,
   toggleListHubFavoriteColumn,
-} from '@/lib/list-hub-column-layout';
-import { useListHubColumnLayoutContext } from '@/features/trading/lists-tab/list-hub-column-layout-context';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/lib/list-hub-column-layout";
+import { useListHubColumnLayoutContext } from "@/features/trading/lists-tab/list-hub-column-layout-context";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 function ColumnResizeHandle({
   columnId,
@@ -35,17 +43,20 @@ function ColumnResizeHandle({
     startRef.current = { x: event.clientX, width };
 
     function onMouseMove(moveEvent: MouseEvent) {
-      onResize(columnId, startRef.current.width + (moveEvent.clientX - startRef.current.x));
+      onResize(
+        columnId,
+        startRef.current.width + (moveEvent.clientX - startRef.current.x),
+      );
     }
 
     function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
       onResizeEnd();
     }
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   }
 
   return (
@@ -80,13 +91,13 @@ function RowActionsResizeHandle({
     }
 
     function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
       onResizeEnd();
     }
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   }
 
   return (
@@ -122,10 +133,16 @@ export function ListHubColumnHeader({
     commitLayout,
   } = useListHubColumnLayoutContext();
 
-  const favoriteIds = new Set(listConfig.hubFavoriteColumnIds ?? ['name', 'count']);
-  const configurableColumns = layout.filter((column) => column.id !== 'carousel');
+  const favoriteIds = new Set(
+    listConfig.hubFavoriteColumnIds ?? ["name", "count"],
+  );
+  const configurableColumns = layout.filter(
+    (column) => column.id !== "carousel",
+  );
   const [dragId, setDragId] = useState<ListHubColumnId | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<ListHubColumnId | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<ListHubColumnId | null>(
+    null,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -136,8 +153,8 @@ export function ListHubColumnHeader({
         setMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, [menuOpen]);
 
   function handleResizeEnd() {
@@ -146,7 +163,11 @@ export function ListHubColumnHeader({
 
   return (
     <div className="sticky top-0 z-10 flex items-center gap-0 border-b border-border bg-card px-1 py-1 text-[10px] text-muted-foreground select-none">
-      <span className="shrink-0" style={{ width: LIST_HUB_ROW_EXPAND_WIDTH_PX }} aria-hidden />
+      <span
+        className="shrink-0"
+        style={{ width: LIST_HUB_ROW_EXPAND_WIDTH_PX }}
+        aria-hidden
+      />
 
       {chartInstrumentLabel && (
         <span
@@ -155,7 +176,7 @@ export function ListHubColumnHeader({
           title={
             chartInstrumentLabel
               ? `${chartInstrumentLabel} · ¿está en cada lista? (solo lectura)`
-              : 'Pertenencia del valor del gráfico a cada lista'
+              : "Pertenencia del valor del gráfico a cada lista"
           }
         >
           <Check className="h-3 w-3 shrink-0 opacity-40" />
@@ -191,18 +212,19 @@ export function ListHubColumnHeader({
               setDropTargetId(null);
             }}
             className={cn(
-              'relative min-w-0 overflow-hidden',
-              dragId === column.id && 'opacity-40',
-              dropTargetId === column.id && 'bg-primary/15 ring-1 ring-primary/40',
-              isCenteredListHubColumn(column.id) && 'flex justify-center',
+              "relative min-w-0 overflow-hidden",
+              dragId === column.id && "opacity-40",
+              dropTargetId === column.id &&
+                "bg-primary/15 ring-1 ring-primary/40",
+              isCenteredListHubColumn(column.id) && "flex justify-center",
             )}
             title="Clic para ordenar · arrastra para reordenar · borde para ancho"
           >
             <div
               className={cn(
-                'relative flex min-w-0 items-center rounded py-0.5',
-                listHubColumnContentClass(column.id, 'header'),
-                isCenteredListHubColumn(column.id) && 'w-full justify-center',
+                "relative flex min-w-0 items-center rounded py-0.5",
+                listHubColumnContentClass(column.id, "header"),
+                isCenteredListHubColumn(column.id) && "w-full justify-center",
               )}
             >
               {!isCenteredListHubColumn(column.id) && (
@@ -215,24 +237,29 @@ export function ListHubColumnHeader({
                 type="button"
                 disabled={!isSortableListHubColumn(column.id)}
                 className={cn(
-                  'flex min-w-0 items-center gap-0.5',
+                  "flex min-w-0 items-center gap-0.5",
                   isCenteredListHubColumn(column.id)
-                    ? 'justify-center'
+                    ? "justify-center"
                     : isNumericListHubColumn(column.id)
-                      ? 'flex-1 justify-end pr-1'
-                      : 'flex-1 justify-start pl-3.5',
+                      ? "flex-1 justify-end pr-1"
+                      : "flex-1 justify-start pl-3.5",
                 )}
                 onClick={(event) => {
                   event.stopPropagation();
                   cycleSort(column.id);
                 }}
               >
-                <span className={cn('truncate', isCenteredListHubColumn(column.id) && 'text-[9px]')}>
+                <span
+                  className={cn(
+                    "truncate",
+                    isCenteredListHubColumn(column.id) && "text-[9px]",
+                  )}
+                >
                   {LIST_HUB_COLUMN_LABELS[column.id]}
                 </span>
                 {isSortableListHubColumn(column.id) &&
                   (sortState.column === column.id ? (
-                    sortState.direction === 'asc' ? (
+                    sortState.direction === "asc" ? (
                       <ArrowUp className="h-3 w-3 shrink-0 text-primary" />
                     ) : (
                       <ArrowDown className="h-3 w-3 shrink-0 text-primary" />
@@ -261,7 +288,10 @@ export function ListHubColumnHeader({
           onResize={resizeRowActionsWidth}
           onResizeEnd={handleResizeEnd}
         />
-        <div ref={menuRef} className="flex h-full items-center justify-end pr-0.5">
+        <div
+          ref={menuRef}
+          className="flex h-full items-center justify-end pr-0.5"
+        >
           <button
             type="button"
             title="Configurar columnas de Listas"
@@ -285,19 +315,21 @@ export function ListHubColumnHeader({
                     checked={column.visible}
                     onChange={() => toggleColumn(column.id)}
                   />
-                  <span className="flex-1">{LIST_HUB_COLUMN_LABELS[column.id]}</span>
+                  <span className="flex-1">
+                    {LIST_HUB_COLUMN_LABELS[column.id]}
+                  </span>
                   <button
                     type="button"
                     title={
                       favoriteIds.has(column.id)
-                        ? 'Quitar de favoritas'
-                        : 'Marcar como favorita'
+                        ? "Quitar de favoritas"
+                        : "Marcar como favorita"
                     }
                     className={cn(
-                      'rounded p-0.5',
+                      "rounded p-0.5",
                       favoriteIds.has(column.id)
-                        ? 'text-amber-500'
-                        : 'text-muted-foreground/40 hover:text-muted-foreground',
+                        ? "text-amber-500"
+                        : "text-muted-foreground/40 hover:text-muted-foreground",
                     )}
                     onClick={(event) => {
                       event.preventDefault();
@@ -312,7 +344,9 @@ export function ListHubColumnHeader({
                   >
                     <Star
                       className="h-3 w-3"
-                      fill={favoriteIds.has(column.id) ? 'currentColor' : 'none'}
+                      fill={
+                        favoriteIds.has(column.id) ? "currentColor" : "none"
+                      }
                     />
                   </button>
                 </label>

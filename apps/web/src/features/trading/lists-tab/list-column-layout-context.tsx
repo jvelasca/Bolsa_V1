@@ -1,5 +1,16 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
-import type { ListColumnId, ListColumnLayoutItem, ListSortState } from '@bolsa/shared';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react";
+import type {
+  ListColumnId,
+  ListColumnLayoutItem,
+  ListSortState,
+} from "@bolsa/shared";
 import {
   buildListRowDataGridTemplate,
   buildListRowGridTemplate,
@@ -9,14 +20,14 @@ import {
   resolveListColumnLayout,
   resolveListRowActionsWidthFromConfig,
   toggleColumnInLayout,
-} from '@/lib/list-column-layout';
+} from "@/lib/list-column-layout";
 import {
   layoutForServerSync,
   mergeListColumnWidths,
   resolveLocalRowActionsWidth,
   useListChromeLayoutStore,
-} from '@/stores/list-chrome-layout-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/stores/list-chrome-layout-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 interface ListColumnLayoutContextValue {
   listId: string;
@@ -35,7 +46,8 @@ interface ListColumnLayoutContextValue {
   commitLayout: () => void;
 }
 
-const ListColumnLayoutContext = createContext<ListColumnLayoutContextValue | null>(null);
+const ListColumnLayoutContext =
+  createContext<ListColumnLayoutContextValue | null>(null);
 
 export function ListColumnLayoutProvider({
   listId,
@@ -48,12 +60,24 @@ export function ListColumnLayoutProvider({
   const updateListConfig = useWorkspaceStore((state) => state.updateListConfig);
   const save = useWorkspaceStore((state) => state.save);
 
-  const localWidths = useListChromeLayoutStore((state) => state.widthsByListId[listId]);
-  const localRowActions = useListChromeLayoutStore((state) => state.rowActionsWidth);
-  const seedListWidthsIfNeeded = useListChromeLayoutStore((state) => state.seedListWidthsIfNeeded);
-  const seedRowActionsIfNeeded = useListChromeLayoutStore((state) => state.seedRowActionsIfNeeded);
-  const setListColumnWidth = useListChromeLayoutStore((state) => state.setListColumnWidth);
-  const setRowActionsWidth = useListChromeLayoutStore((state) => state.setRowActionsWidth);
+  const localWidths = useListChromeLayoutStore(
+    (state) => state.widthsByListId[listId],
+  );
+  const localRowActions = useListChromeLayoutStore(
+    (state) => state.rowActionsWidth,
+  );
+  const seedListWidthsIfNeeded = useListChromeLayoutStore(
+    (state) => state.seedListWidthsIfNeeded,
+  );
+  const seedRowActionsIfNeeded = useListChromeLayoutStore(
+    (state) => state.seedRowActionsIfNeeded,
+  );
+  const setListColumnWidth = useListChromeLayoutStore(
+    (state) => state.setListColumnWidth,
+  );
+  const setRowActionsWidth = useListChromeLayoutStore(
+    (state) => state.setRowActionsWidth,
+  );
 
   const serverLayout = useMemo(
     () => resolveListColumnLayout(listConfig, listId),
@@ -68,7 +92,13 @@ export function ListColumnLayoutProvider({
   useEffect(() => {
     seedListWidthsIfNeeded(listId, serverLayout);
     seedRowActionsIfNeeded(serverRowActionsWidth);
-  }, [listId, seedListWidthsIfNeeded, seedRowActionsIfNeeded, serverLayout, serverRowActionsWidth]);
+  }, [
+    listId,
+    seedListWidthsIfNeeded,
+    seedRowActionsIfNeeded,
+    serverLayout,
+    serverRowActionsWidth,
+  ]);
 
   const layout = useMemo(
     () => mergeListColumnWidths(listId, serverLayout),
@@ -77,7 +107,10 @@ export function ListColumnLayoutProvider({
     [listId, localWidths, serverLayout],
   );
 
-  const visibleColumns = useMemo(() => getVisibleColumnLayout(layout), [layout]);
+  const visibleColumns = useMemo(
+    () => getVisibleColumnLayout(layout),
+    [layout],
+  );
 
   const rowActionsWidth = useMemo(
     () => resolveLocalRowActionsWidth(serverRowActionsWidth),
@@ -101,7 +134,9 @@ export function ListColumnLayoutProvider({
   /** Orden / visibilidad → servidor (anchos por defecto). Anchos reales van en chrome local. */
   const persistLayout = useCallback(
     (next: ListColumnLayoutItem[], shouldSave = true) => {
-      updateListConfig(patchListColumnLayout(listConfig, listId, layoutForServerSync(next)));
+      updateListConfig(
+        patchListColumnLayout(listConfig, listId, layoutForServerSync(next)),
+      );
       if (shouldSave) save();
     },
     [listConfig, listId, save, updateListConfig],
@@ -137,9 +172,9 @@ export function ListColumnLayoutProvider({
       const current = listConfig.sortByListId?.[listId];
       let next: ListSortState | undefined;
       if (!current || current.column !== columnId) {
-        next = { column: columnId, direction: 'asc' };
-      } else if (current.direction === 'asc') {
-        next = { column: columnId, direction: 'desc' };
+        next = { column: columnId, direction: "asc" };
+      } else if (current.direction === "asc") {
+        next = { column: columnId, direction: "desc" };
       } else {
         next = undefined;
       }
@@ -198,14 +233,18 @@ export function ListColumnLayoutProvider({
   );
 
   return (
-    <ListColumnLayoutContext.Provider value={value}>{children}</ListColumnLayoutContext.Provider>
+    <ListColumnLayoutContext.Provider value={value}>
+      {children}
+    </ListColumnLayoutContext.Provider>
   );
 }
 
 export function useListColumnLayoutContext() {
   const context = useContext(ListColumnLayoutContext);
   if (!context) {
-    throw new Error('useListColumnLayoutContext debe usarse dentro de ListColumnLayoutProvider');
+    throw new Error(
+      "useListColumnLayoutContext debe usarse dentro de ListColumnLayoutProvider",
+    );
   }
   return context;
 }

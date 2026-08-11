@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
-import { Bell, FlaskConical, Radar } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Link } from "react-router-dom";
+import { Bell, FlaskConical, Radar } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ListHubShortcutsSectionProps {
   listId: string;
@@ -8,17 +8,20 @@ interface ListHubShortcutsSectionProps {
 }
 
 const shortcutClassName = cn(
-  'flex min-w-0 flex-1 items-center gap-2 rounded-md border border-border/70 bg-background/80 px-2.5 py-2',
-  'text-left text-xs transition-colors hover:bg-accent/60 hover:text-foreground',
+  "flex min-w-0 flex-1 items-center gap-2 rounded-md border border-border/70 bg-background/80 px-2.5 py-2",
+  "text-left text-xs transition-colors hover:bg-accent/60 hover:text-foreground",
 );
 
 /**
  * Accesos directos al mismo flujo que los menús generales, acotados a esta lista
  * cuando la sección lo soporta (Rastreadores vía ?listId=).
  */
-export function ListHubShortcutsSection({ listId, listName }: ListHubShortcutsSectionProps) {
+export function ListHubShortcutsSection({
+  listId,
+  listName,
+}: ListHubShortcutsSectionProps) {
   const encoded = encodeURIComponent(listId);
-  const nameHint = listName.trim() || 'esta lista';
+  const nameHint = listName.trim() || "esta lista";
 
   return (
     <section className="space-y-1.5" aria-label={`Accesos de ${nameHint}`}>
