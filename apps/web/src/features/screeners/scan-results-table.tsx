@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -11,22 +11,25 @@ import {
   LineChart,
   MoreHorizontal,
   Star,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   SIGNAL_KIND_LABELS,
   type ScanHitDto,
   type ScanRunResultDto,
   type TechnicalRatingBreakdownV1,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { OpaqueMenuLabel, OpaqueMenuPanel } from '@/components/ui/opaque-menu-panel';
-import { cn } from '@/lib/utils';
-import { openHitInTrading } from '@/features/screeners/open-hit-in-trading';
-import type { ScanRunnerConfig } from '@/features/screeners/scan-runner-form';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { useScreenerPreferencesStore } from '@/stores/screener-preferences-store';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { formatPrice } from "@/features/charts/chart-utils";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  OpaqueMenuLabel,
+  OpaqueMenuPanel,
+} from "@/components/ui/opaque-menu-panel";
+import { cn } from "@/lib/utils";
+import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
+import type { ScanRunnerConfig } from "@/features/screeners/scan-runner-form";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useScreenerPreferencesStore } from "@/stores/screener-preferences-store";
 import {
   SCAN_RESULTS_COLUMN_LABELS,
   buildScanResultsGridTemplate,
@@ -42,7 +45,7 @@ import {
   visibleScanResultsColumns,
   type ScanResultsColumnId,
   type ScanResultsColumnLayoutItem,
-} from '@/lib/scan-results-column-layout';
+} from "@/lib/scan-results-column-layout";
 
 interface ScanResultsTableProps {
   result: ScanRunResultDto;
@@ -69,16 +72,19 @@ function ColumnResizeHandle({
     startRef.current = { x: event.clientX, width };
 
     function onMouseMove(moveEvent: MouseEvent) {
-      onResize(columnId, startRef.current.width + (moveEvent.clientX - startRef.current.x));
+      onResize(
+        columnId,
+        startRef.current.width + (moveEvent.clientX - startRef.current.x),
+      );
     }
 
     function onMouseUp() {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
     }
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   }
 
   return (
@@ -91,23 +97,34 @@ function ColumnResizeHandle({
   );
 }
 
-function BreakdownBars({ breakdown }: { breakdown: TechnicalRatingBreakdownV1 }) {
+function BreakdownBars({
+  breakdown,
+}: {
+  breakdown: TechnicalRatingBreakdownV1;
+}) {
   const items = [
-    { label: 'T', value: breakdown.trend },
-    { label: 'M', value: breakdown.momentum },
-    { label: 'V', value: breakdown.volatility },
-    { label: 'R', value: breakdown.meanReversion },
-    ...(breakdown.pattern != null ? [{ label: 'P', value: breakdown.pattern }] : []),
+    { label: "T", value: breakdown.trend },
+    { label: "M", value: breakdown.momentum },
+    { label: "V", value: breakdown.volatility },
+    { label: "R", value: breakdown.meanReversion },
+    ...(breakdown.pattern != null
+      ? [{ label: "P", value: breakdown.pattern }]
+      : []),
   ];
   return (
-    <div className="mt-1 flex flex-wrap justify-center gap-0.5" title="Tendencia · Momentum · Vol · Rev · Patrón">
+    <div
+      className="mt-1 flex flex-wrap justify-center gap-0.5"
+      title="Tendencia · Momentum · Vol · Rev · Patrón"
+    >
       {items.map((item) => (
         <span
           key={item.label}
           className="inline-flex min-w-[1.25rem] flex-col items-center rounded bg-muted/60 px-0.5 py-0.5 text-[9px] leading-none"
         >
           <span className="text-muted-foreground">{item.label}</span>
-          <span className="font-medium tabular-nums text-foreground">{Math.round(item.value)}</span>
+          <span className="font-medium tabular-nums text-foreground">
+            {Math.round(item.value)}
+          </span>
         </span>
       ))}
     </div>
@@ -118,10 +135,10 @@ function ScoreBadge({ score }: { score: number }) {
   return (
     <span
       className={cn(
-        'rounded px-1.5 py-0.5 text-xs font-medium tabular-nums',
-        score >= 70 && 'bg-emerald-500/15 text-emerald-600',
-        score >= 55 && score < 70 && 'bg-sky-500/15 text-sky-700',
-        score < 55 && 'bg-muted text-muted-foreground',
+        "rounded px-1.5 py-0.5 text-xs font-medium tabular-nums",
+        score >= 70 && "bg-emerald-500/15 text-emerald-600",
+        score >= 55 && score < 70 && "bg-sky-500/15 text-sky-700",
+        score < 55 && "bg-muted text-muted-foreground",
       )}
     >
       {Math.round(score)}
@@ -130,12 +147,14 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 function RatingCell({ hit }: { hit: ScanHitDto }) {
-  if (hit.aiScore == null) return <span className="text-muted-foreground">—</span>;
+  if (hit.aiScore == null)
+    return <span className="text-muted-foreground">—</span>;
   return <ScoreBadge score={hit.aiScore} />;
 }
 
 function DataQualityCell({ hit }: { hit: ScanHitDto }) {
-  if (hit.dataQualityScore == null) return <span className="text-muted-foreground">—</span>;
+  if (hit.dataQualityScore == null)
+    return <span className="text-muted-foreground">—</span>;
   return (
     <div className="min-w-0">
       <ScoreBadge score={hit.dataQualityScore} />
@@ -154,12 +173,18 @@ function DataQualityCell({ hit }: { hit: ScanHitDto }) {
 }
 
 function GlobalScoreCell({ hit }: { hit: ScanHitDto }) {
-  if (hit.globalScore == null) return <span className="text-muted-foreground">—</span>;
+  if (hit.globalScore == null)
+    return <span className="text-muted-foreground">—</span>;
   const quality = qualityFromScore(hit.globalScore);
   return (
     <div className="min-w-0">
       <ScoreBadge score={hit.globalScore} />
-      <span className={cn('mt-0.5 block rounded px-1 py-0.5 text-[9px] font-medium', quality.className)}>
+      <span
+        className={cn(
+          "mt-0.5 block rounded px-1 py-0.5 text-[9px] font-medium",
+          quality.className,
+        )}
+      >
         {quality.label}
       </span>
     </div>
@@ -167,11 +192,17 @@ function GlobalScoreCell({ hit }: { hit: ScanHitDto }) {
 }
 
 function QualityCell({ hit }: { hit: ScanHitDto }) {
-  if (hit.aiScore == null) return <span className="text-muted-foreground">—</span>;
+  if (hit.aiScore == null)
+    return <span className="text-muted-foreground">—</span>;
   const quality = qualityFromScore(hit.aiScore);
   return (
     <div className="min-w-0">
-      <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium', quality.className)}>
+      <span
+        className={cn(
+          "rounded px-1.5 py-0.5 text-[10px] font-medium",
+          quality.className,
+        )}
+      >
         {quality.label}
       </span>
       {hit.ratingBreakdown && <BreakdownBars breakdown={hit.ratingBreakdown} />}
@@ -193,16 +224,28 @@ export function ScanResultsTable({
 }: ScanResultsTableProps) {
   const navigate = useNavigate();
   const openChartTab = useWorkspaceStore((state) => state.openChartTab);
-  const updateChartTimeframe = useWorkspaceStore((state) => state.updateChartTimeframe);
-  const focusInstrumentFromList = useWorkspaceStore((state) => state.focusInstrumentFromList);
+  const updateChartTimeframe = useWorkspaceStore(
+    (state) => state.updateChartTimeframe,
+  );
+  const focusInstrumentFromList = useWorkspaceStore(
+    (state) => state.focusInstrumentFromList,
+  );
 
-  const storedLayout = useScreenerPreferencesStore((state) => state.scanResultsTable.columnLayout);
-  const sortState = useScreenerPreferencesStore((state) => state.scanResultsTable.sort);
+  const storedLayout = useScreenerPreferencesStore(
+    (state) => state.scanResultsTable.columnLayout,
+  );
+  const sortState = useScreenerPreferencesStore(
+    (state) => state.scanResultsTable.sort,
+  );
   const favoriteColumnIds = useScreenerPreferencesStore(
     (state) => state.scanResultsTable.favoriteColumnIds,
   );
-  const setColumnLayout = useScreenerPreferencesStore((state) => state.setScanResultsColumnLayout);
-  const setSortState = useScreenerPreferencesStore((state) => state.setScanResultsSort);
+  const setColumnLayout = useScreenerPreferencesStore(
+    (state) => state.setScanResultsColumnLayout,
+  );
+  const setSortState = useScreenerPreferencesStore(
+    (state) => state.setScanResultsSort,
+  );
   const setFavoriteColumnIds = useScreenerPreferencesStore(
     (state) => state.setScanResultsFavoriteColumnIds,
   );
@@ -211,7 +254,9 @@ export function ScanResultsTable({
 
   const hasRating = result.hits.some((hit) => hit.aiScore != null);
   const hasBreakdown = result.hits.some((hit) => hit.ratingBreakdown != null);
-  const hasDataQuality = result.hits.some((hit) => hit.dataQualityScore != null);
+  const hasDataQuality = result.hits.some(
+    (hit) => hit.dataQualityScore != null,
+  );
 
   const layout = useMemo(() => {
     const normalized = normalizeScanResultsLayout(storedLayout, {
@@ -224,31 +269,41 @@ export function ScanResultsTable({
 
     const favorites = new Set(favoriteColumnIds);
     return normalized.map((column) => {
-      if (column.id === 'actions' || column.id === 'name') {
+      if (column.id === "actions" || column.id === "name") {
         return { ...column, visible: false };
       }
       const isFavorite = favorites.has(column.id);
-      const isCore = column.id === 'symbol' || column.id === 'signal';
+      const isCore = column.id === "symbol" || column.id === "signal";
       if (!isFavorite && !isCore) return { ...column, visible: false };
-      if ((column.id === 'rating' || column.id === 'quality') && !hasRating) {
-        return { ...column, visible: false };
-      }
-      if ((column.id === 'dataQuality' || column.id === 'globalScore') && !hasDataQuality) {
+      if ((column.id === "rating" || column.id === "quality") && !hasRating) {
         return { ...column, visible: false };
       }
       if (
-        (column.id === 'trend' ||
-          column.id === 'momentum' ||
-          column.id === 'volatility' ||
-          column.id === 'meanReversion' ||
-          column.id === 'pattern') &&
+        (column.id === "dataQuality" || column.id === "globalScore") &&
+        !hasDataQuality
+      ) {
+        return { ...column, visible: false };
+      }
+      if (
+        (column.id === "trend" ||
+          column.id === "momentum" ||
+          column.id === "volatility" ||
+          column.id === "meanReversion" ||
+          column.id === "pattern") &&
         !hasBreakdown
       ) {
         return { ...column, visible: false };
       }
       return { ...column, visible: isFavorite || isCore };
     });
-  }, [storedLayout, full, hasRating, hasBreakdown, hasDataQuality, favoriteColumnIds]);
+  }, [
+    storedLayout,
+    full,
+    hasRating,
+    hasBreakdown,
+    hasDataQuality,
+    favoriteColumnIds,
+  ]);
 
   const visibleColumns = visibleScanResultsColumns(layout);
   const gridTemplate = buildScanResultsGridTemplate(visibleColumns);
@@ -258,7 +313,9 @@ export function ScanResultsTable({
   );
 
   const [dragId, setDragId] = useState<ScanResultsColumnId | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<ScanResultsColumnId | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<ScanResultsColumnId | null>(
+    null,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -269,8 +326,8 @@ export function ScanResultsTable({
         setMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, [menuOpen]);
 
   const subscribeMutation = useMutation({
@@ -278,7 +335,7 @@ export function ScanResultsTable({
       api.createSignalAlert({
         instrumentId: hit.instrumentId,
         signalKinds: [hit.signal.kind],
-        ...(scanConfig.scanSource === 'saved'
+        ...(scanConfig.scanSource === "saved"
           ? { strategyDefinitionId: scanConfig.savedStrategyId }
           : { presetKey: scanConfig.presetKey }),
         timeframe: scanConfig.timeframe,
@@ -286,7 +343,9 @@ export function ScanResultsTable({
       }),
     onSuccess: () => onSubscribeSuccess?.(),
     onError: (error) =>
-      onSubscribeError?.(error instanceof Error ? error.message : 'Error al crear alerta'),
+      onSubscribeError?.(
+        error instanceof Error ? error.message : "Error al crear alerta",
+      ),
   });
 
   function handleOpenChart(hit: ScanHitDto) {
@@ -304,7 +363,7 @@ export function ScanResultsTable({
 
   function renderCell(columnId: ScanResultsColumnId, hit: ScanHitDto) {
     switch (columnId) {
-      case 'symbol':
+      case "symbol":
         return (
           <button
             type="button"
@@ -315,58 +374,73 @@ export function ScanResultsTable({
             {hit.symbol}
           </button>
         );
-      case 'name':
+      case "name":
         return (
           <div className="min-w-0 truncate text-xs text-muted-foreground">
             {hit.name}
             {full && (
               <>
-                {' · '}
-                <Link to={`/instruments/${hit.instrumentId}`} className="hover:text-primary">
+                {" · "}
+                <Link
+                  to={`/instruments/${hit.instrumentId}`}
+                  className="hover:text-primary"
+                >
                   ficha
                 </Link>
               </>
             )}
           </div>
         );
-      case 'signal':
+      case "signal":
         return (
           <span
             className={cn(
-              'rounded px-1.5 py-0.5 text-xs',
-              hit.signal.kind === 'entry_long' && 'bg-emerald-500/15 text-emerald-600',
-              hit.signal.kind === 'exit' && 'bg-amber-500/15 text-amber-600',
+              "rounded px-1.5 py-0.5 text-xs",
+              hit.signal.kind === "entry_long" &&
+                "bg-emerald-500/15 text-emerald-600",
+              hit.signal.kind === "exit" && "bg-amber-500/15 text-amber-600",
             )}
           >
             {SIGNAL_KIND_LABELS[hit.signal.kind]}
           </span>
         );
-      case 'rating':
+      case "rating":
         return <RatingCell hit={hit} />;
-      case 'quality':
+      case "quality":
         return <QualityCell hit={hit} />;
-      case 'dataQuality':
+      case "dataQuality":
         return <DataQualityCell hit={hit} />;
-      case 'globalScore':
+      case "globalScore":
         return <GlobalScoreCell hit={hit} />;
-      case 'trend':
+      case "trend":
         return <SubScoreCell value={hit.ratingBreakdown?.trend} />;
-      case 'momentum':
+      case "momentum":
         return <SubScoreCell value={hit.ratingBreakdown?.momentum} />;
-      case 'volatility':
+      case "volatility":
         return <SubScoreCell value={hit.ratingBreakdown?.volatility} />;
-      case 'meanReversion':
+      case "meanReversion":
         return <SubScoreCell value={hit.ratingBreakdown?.meanReversion} />;
-      case 'pattern':
+      case "pattern":
         return <SubScoreCell value={hit.ratingBreakdown?.pattern} />;
-      case 'price':
-        return <span className="tabular-nums">{formatPrice(hit.signal.price)}</span>;
-      case 'bar':
-        return <span className="text-xs text-muted-foreground">{hit.signal.timestamp}</span>;
-      case 'actions':
+      case "price":
+        return (
+          <span className="tabular-nums">{formatPrice(hit.signal.price)}</span>
+        );
+      case "bar":
+        return (
+          <span className="text-xs text-muted-foreground">
+            {hit.signal.timestamp}
+          </span>
+        );
+      case "actions":
         return full ? (
           <div className="flex justify-end gap-1">
-            <Button type="button" size="sm" variant="outline" onClick={() => handleOpenChart(hit)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => handleOpenChart(hit)}
+            >
               <LineChart className="mr-1 h-3.5 w-3.5" />
               Gráfico
             </Button>
@@ -382,7 +456,10 @@ export function ScanResultsTable({
             </Button>
             <Link
               to={`/backtests?tab=run&instrumentId=${hit.instrumentId}`}
-              className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'px-2')}
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "px-2",
+              )}
               title="Backtest"
             >
               <ExternalLink className="h-3.5 w-3.5" />
@@ -395,11 +472,17 @@ export function ScanResultsTable({
   }
 
   return (
-    <div className={cn('overflow-x-auto', full && 'rounded-lg border border-border')}>
+    <div
+      className={cn(
+        "overflow-x-auto",
+        full && "rounded-lg border border-border",
+      )}
+    >
       <div className="sticky top-0 z-10 border-b border-border bg-card px-2 py-1">
         <div className="flex items-center justify-between gap-2">
           <p className="text-[10px] text-muted-foreground">
-            Clic en cabecera para ordenar · arrastra para mover · borde derecho para ancho
+            Clic en cabecera para ordenar · arrastra para mover · borde derecho
+            para ancho
           </p>
           <div className="relative" ref={menuRef}>
             <Button
@@ -415,7 +498,7 @@ export function ScanResultsTable({
               <OpaqueMenuPanel className="min-w-[200px] p-2">
                 <OpaqueMenuLabel>Columnas visibles</OpaqueMenuLabel>
                 {layout
-                  .filter((column) => column.id !== 'actions')
+                  .filter((column) => column.id !== "actions")
                   .map((column) => (
                     <label
                       key={column.id}
@@ -424,32 +507,43 @@ export function ScanResultsTable({
                       <input
                         type="checkbox"
                         checked={column.visible}
-                        onChange={() => persistLayout(toggleScanResultsColumn(layout, column.id))}
+                        onChange={() =>
+                          persistLayout(
+                            toggleScanResultsColumn(layout, column.id),
+                          )
+                        }
                       />
-                      <span className="flex-1">{SCAN_RESULTS_COLUMN_LABELS[column.id]}</span>
+                      <span className="flex-1">
+                        {SCAN_RESULTS_COLUMN_LABELS[column.id]}
+                      </span>
                       <button
                         type="button"
                         title={
                           favoriteIds.has(column.id)
-                            ? 'Quitar de favoritas'
-                            : 'Marcar como favorita'
+                            ? "Quitar de favoritas"
+                            : "Marcar como favorita"
                         }
                         className={cn(
-                          'rounded p-0.5',
+                          "rounded p-0.5",
                           favoriteIds.has(column.id)
-                            ? 'text-amber-500'
-                            : 'text-muted-foreground/50 hover:text-muted-foreground',
+                            ? "text-amber-500"
+                            : "text-muted-foreground/50 hover:text-muted-foreground",
                         )}
                         onClick={(event) => {
                           event.preventDefault();
                           setFavoriteColumnIds(
-                            toggleScanResultsFavoriteColumn(favoriteColumnIds, column.id),
+                            toggleScanResultsFavoriteColumn(
+                              favoriteColumnIds,
+                              column.id,
+                            ),
                           );
                         }}
                       >
                         <Star
                           className="h-3 w-3"
-                          fill={favoriteIds.has(column.id) ? 'currentColor' : 'none'}
+                          fill={
+                            favoriteIds.has(column.id) ? "currentColor" : "none"
+                          }
                         />
                       </button>
                     </label>
@@ -461,15 +555,18 @@ export function ScanResultsTable({
             )}
           </div>
         </div>
-        <div className="grid min-w-0 items-center" style={{ gridTemplateColumns: gridTemplate }}>
+        <div
+          className="grid min-w-0 items-center"
+          style={{ gridTemplateColumns: gridTemplate }}
+        >
           {visibleColumns.map((column) => {
             const align = scanResultsColumnAlign(column.id);
             const isSorted = sortState?.columnId === column.id;
-            const sortable = column.id !== 'actions';
+            const sortable = column.id !== "actions";
             return (
               <div
                 key={column.id}
-                draggable={column.id !== 'actions'}
+                draggable={column.id !== "actions"}
                 onDragStart={() => setDragId(column.id)}
                 onDragEnd={() => {
                   setDragId(null);
@@ -477,7 +574,8 @@ export function ScanResultsTable({
                 }}
                 onDragOver={(event) => {
                   event.preventDefault();
-                  if (dragId && dragId !== column.id) setDropTargetId(column.id);
+                  if (dragId && dragId !== column.id)
+                    setDropTargetId(column.id);
                 }}
                 onDragLeave={() => {
                   if (dropTargetId === column.id) setDropTargetId(null);
@@ -485,50 +583,62 @@ export function ScanResultsTable({
                 onDrop={(event) => {
                   event.preventDefault();
                   if (dragId && dragId !== column.id) {
-                    persistLayout(reorderScanResultsColumns(layout, dragId, column.id));
+                    persistLayout(
+                      reorderScanResultsColumns(layout, dragId, column.id),
+                    );
                   }
                   setDragId(null);
                   setDropTargetId(null);
                 }}
                 className={cn(
-                  'relative min-w-0 py-1',
-                  dragId === column.id && 'opacity-40',
-                  dropTargetId === column.id && 'bg-primary/15 ring-1 ring-primary/40',
+                  "relative min-w-0 py-1",
+                  dragId === column.id && "opacity-40",
+                  dropTargetId === column.id &&
+                    "bg-primary/15 ring-1 ring-primary/40",
                 )}
               >
                 <div
                   className={cn(
-                    'flex min-w-0 items-center gap-0.5 px-2 text-[10px] font-medium text-muted-foreground',
-                    align === 'left' && 'justify-start',
-                    align === 'center' && 'justify-center',
-                    align === 'right' && 'justify-end',
-                    sortable && 'cursor-pointer select-none hover:text-foreground',
+                    "flex min-w-0 items-center gap-0.5 px-2 text-[10px] font-medium text-muted-foreground",
+                    align === "left" && "justify-start",
+                    align === "center" && "justify-center",
+                    align === "right" && "justify-end",
+                    sortable &&
+                      "cursor-pointer select-none hover:text-foreground",
                   )}
                   onClick={() => {
                     if (!sortable) return;
                     setSortState(cycleScanResultsSort(sortState, column.id));
                   }}
                 >
-                  {column.id !== 'actions' && (
+                  {column.id !== "actions" && (
                     <GripVertical className="h-3 w-3 shrink-0 cursor-grab opacity-40" />
                   )}
-                  <span className="truncate">{SCAN_RESULTS_COLUMN_LABELS[column.id]}</span>
+                  <span className="truncate">
+                    {SCAN_RESULTS_COLUMN_LABELS[column.id]}
+                  </span>
                   {sortable && (
                     <span className="shrink-0">
-                      {!isSorted && <ArrowUpDown className="h-3 w-3 opacity-50" />}
-                      {isSorted && sortState?.direction === 'asc' && <ArrowUp className="h-3 w-3" />}
-                      {isSorted && sortState?.direction === 'desc' && (
+                      {!isSorted && (
+                        <ArrowUpDown className="h-3 w-3 opacity-50" />
+                      )}
+                      {isSorted && sortState?.direction === "asc" && (
+                        <ArrowUp className="h-3 w-3" />
+                      )}
+                      {isSorted && sortState?.direction === "desc" && (
                         <ArrowDown className="h-3 w-3" />
                       )}
                     </span>
                   )}
                 </div>
-                {column.id !== 'actions' && (
+                {column.id !== "actions" && (
                   <ColumnResizeHandle
                     columnId={column.id}
                     width={column.width}
                     onResize={(columnId, width) =>
-                      persistLayout(resizeScanResultsColumn(layout, columnId, width))
+                      persistLayout(
+                        resizeScanResultsColumn(layout, columnId, width),
+                      )
                     }
                   />
                 )}
@@ -551,10 +661,10 @@ export function ScanResultsTable({
                 <div
                   key={column.id}
                   className={cn(
-                    'min-w-0 px-2',
-                    align === 'left' && 'text-left',
-                    align === 'center' && 'text-center',
-                    align === 'right' && 'text-right tabular-nums',
+                    "min-w-0 px-2",
+                    align === "left" && "text-left",
+                    align === "center" && "text-center",
+                    align === "right" && "text-right tabular-nums",
                   )}
                 >
                   {renderCell(column.id, hit)}

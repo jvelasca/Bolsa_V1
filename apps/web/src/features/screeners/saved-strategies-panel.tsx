@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDown,
   ArrowUp,
@@ -12,9 +12,9 @@ import {
   Save,
   Trash2,
   X,
-} from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BACKTEST_STRATEGIES,
   DEFAULT_HYBRID_MIN_SCORE,
@@ -26,57 +26,57 @@ import {
   type StrategyDefinitionSummaryDto,
   type StrategyDefinitionV1,
   type StrategyOrigin,
-} from '@bolsa/shared';
-import { api, ApiError } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { inputClassName } from '@/components/ui/dialog';
+} from "@bolsa/shared";
+import { api, ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { inputClassName } from "@/components/ui/dialog";
 import {
   OpaqueMenuItem,
   OpaqueMenuLabel,
   OpaqueMenuPanel,
-} from '@/components/ui/opaque-menu-panel';
-import { ScreenerPanelShell } from '@/features/screeners/screener-panel-shell';
+} from "@/components/ui/opaque-menu-panel";
+import { ScreenerPanelShell } from "@/features/screeners/screener-panel-shell";
 import {
   scanConfigFromStrategyDefinition,
   strategyUpsertFromScanConfig,
   type ScanRunnerConfig,
-} from '@/features/screeners/scan-runner-form';
-import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores/ui-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/features/screeners/scan-runner-form";
+import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 interface SavedStrategiesPanelProps {
   embedded?: boolean;
   onLoadConfig: (config: ScanRunnerConfig) => void;
 }
 
-type SortColumn = 'name' | 'kind' | 'timeframe' | 'origin' | 'updatedAt';
-type SortDirection = 'asc' | 'desc';
+type SortColumn = "name" | "kind" | "timeframe" | "origin" | "updatedAt";
+type SortDirection = "asc" | "desc";
 
-const KIND_LABELS: Record<StrategyDefinitionV1['kind'], string> = {
-  rule_based: 'Reglas',
-  indicator_signals: 'Indicadores',
-  ml_model: 'ML',
-  hybrid: 'Híbrido',
+const KIND_LABELS: Record<StrategyDefinitionV1["kind"], string> = {
+  rule_based: "Reglas",
+  indicator_signals: "Indicadores",
+  ml_model: "ML",
+  hybrid: "Híbrido",
 };
 
 const ORIGIN_LABELS: Record<StrategyOrigin, string> = {
-  manual: 'Manual',
-  assisted: 'Asistida',
-  ai_generated: 'IA',
-  imported: 'Importada',
-  preset: 'Preset',
+  manual: "Manual",
+  assisted: "Asistida",
+  ai_generated: "IA",
+  imported: "Importada",
+  preset: "Preset",
 };
 
 function formatUpdatedAt(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -113,8 +113,12 @@ function SortHeader({
     >
       <span>{label}</span>
       {!active && <ArrowUpDown className="h-3 w-3 opacity-30" />}
-      {active && sortDirection === 'asc' && <ArrowUp className="h-3 w-3 text-primary" />}
-      {active && sortDirection === 'desc' && <ArrowDown className="h-3 w-3 text-primary" />}
+      {active && sortDirection === "asc" && (
+        <ArrowUp className="h-3 w-3 text-primary" />
+      )}
+      {active && sortDirection === "desc" && (
+        <ArrowDown className="h-3 w-3 text-primary" />
+      )}
     </button>
   );
 }
@@ -139,7 +143,10 @@ function StrategyRowMenu({
   busy?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<{ top: number; left: number } | null>(null);
+  const [menuStyle, setMenuStyle] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -155,7 +162,10 @@ function StrategyRowMenu({
       const margin = 8;
 
       let left = rect.right - menuWidth;
-      left = Math.max(margin, Math.min(left, window.innerWidth - menuWidth - margin));
+      left = Math.max(
+        margin,
+        Math.min(left, window.innerWidth - menuWidth - margin),
+      );
 
       let top = rect.bottom + 4;
       if (top + menuHeight > window.innerHeight - margin) {
@@ -166,11 +176,11 @@ function StrategyRowMenu({
     }
 
     updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
     return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
     };
   }, [open]);
 
@@ -186,8 +196,8 @@ function StrategyRowMenu({
       }
       setOpen(false);
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
   return (
@@ -212,7 +222,12 @@ function StrategyRowMenu({
           <OpaqueMenuPanel
             ref={menuRef}
             className="min-w-[220px]"
-            style={{ position: 'fixed', top: menuStyle.top, left: menuStyle.left, zIndex: 200 }}
+            style={{
+              position: "fixed",
+              top: menuStyle.top,
+              left: menuStyle.left,
+              zIndex: 200,
+            }}
           >
             <OpaqueMenuLabel>{strategy.name}</OpaqueMenuLabel>
             <OpaqueMenuItem
@@ -279,35 +294,47 @@ function StrategyRowMenu({
   );
 }
 
-function canShowPublishScoreAction(strategy: StrategyDefinitionSummaryDto): boolean {
-  if (strategy.kind === 'hybrid') return true;
-  if (strategy.kind === 'indicator_signals' && strategy.presetKey) return true;
-  if (strategy.kind === 'rule_based') return true;
+function canShowPublishScoreAction(
+  strategy: StrategyDefinitionSummaryDto,
+): boolean {
+  if (strategy.kind === "hybrid") return true;
+  if (strategy.kind === "indicator_signals" && strategy.presetKey) return true;
+  if (strategy.kind === "rule_based") return true;
   return false;
 }
 
-export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategiesPanelProps) {
+export function SavedStrategiesPanel({
+  embedded,
+  onLoadConfig,
+}: SavedStrategiesPanelProps) {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState('');
-  const [sortColumn, setSortColumn] = useState<SortColumn>('updatedAt');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [search, setSearch] = useState("");
+  const [sortColumn, setSortColumn] = useState<SortColumn>("updatedAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [renameValue, setRenameValue] = useState('');
-  const [editGatePreset, setEditGatePreset] = useState<BacktestStrategyType>('price_above_sma200');
+  const [editName, setEditName] = useState("");
+  const [renameValue, setRenameValue] = useState("");
+  const [editGatePreset, setEditGatePreset] =
+    useState<BacktestStrategyType>("price_above_sma200");
   const [editMinScore, setEditMinScore] = useState(DEFAULT_HYBRID_MIN_SCORE);
-  const [editMinDataQuality, setEditMinDataQuality] = useState(DEFAULT_HYBRID_MIN_DATA_QUALITY);
-  const [editMaxPe, setEditMaxPe] = useState('');
-  const [editMinCap, setEditMinCap] = useState('');
+  const [editMinDataQuality, setEditMinDataQuality] = useState(
+    DEFAULT_HYBRID_MIN_DATA_QUALITY,
+  );
+  const [editMaxPe, setEditMaxPe] = useState("");
+  const [editMinCap, setEditMinCap] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const addIndicatorPresetFromDraft = useWorkspaceStore((state) => state.addIndicatorPresetFromDraft);
+  const addIndicatorPresetFromDraft = useWorkspaceStore(
+    (state) => state.addIndicatorPresetFromDraft,
+  );
   const saveWorkspace = useWorkspaceStore((state) => state.save);
-  const openIndicatorsCatalog = useUiStore((state) => state.openIndicatorsCatalog);
+  const openIndicatorsCatalog = useUiStore(
+    (state) => state.openIndicatorsCatalog,
+  );
 
   const strategiesQuery = useQuery({
-    queryKey: ['strategies'],
+    queryKey: ["strategies"],
     queryFn: api.getStrategies,
   });
 
@@ -331,10 +358,12 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
       setEditingId(null);
       setRenamingId(null);
       setActionError(null);
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
     },
     onError: (error) => {
-      setActionError(error instanceof ApiError ? error.message : 'No se pudo guardar');
+      setActionError(
+        error instanceof ApiError ? error.message : "No se pudo guardar",
+      );
     },
   });
 
@@ -342,11 +371,13 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
     mutationFn: (id: string) => api.deleteStrategy(id),
     onSuccess: () => {
       setActionError(null);
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
-      void queryClient.invalidateQueries({ queryKey: ['trackers'] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
+      void queryClient.invalidateQueries({ queryKey: ["trackers"] });
     },
     onError: (error) => {
-      setActionError(error instanceof ApiError ? error.message : 'No se pudo eliminar');
+      setActionError(
+        error instanceof ApiError ? error.message : "No se pudo eliminar",
+      );
     },
   });
 
@@ -355,17 +386,21 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
       const response = await api.getStrategy(strategyId);
       const detail = response.data;
       const existingNames = new Set(
-        (strategiesQuery.data?.data ?? []).map((item) => item.name.trim().toLowerCase()),
+        (strategiesQuery.data?.data ?? []).map((item) =>
+          item.name.trim().toLowerCase(),
+        ),
       );
       const name = duplicateName(detail.name, existingNames);
       return api.createStrategy({ name, definition: detail.definition });
     },
     onSuccess: () => {
       setActionError(null);
-      void queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
     },
     onError: (error) => {
-      setActionError(error instanceof ApiError ? error.message : 'No se pudo duplicar');
+      setActionError(
+        error instanceof ApiError ? error.message : "No se pudo duplicar",
+      );
     },
   });
 
@@ -374,9 +409,11 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
     [strategiesQuery.data?.data],
   );
   const fieldClass =
-    'mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm';
+    "mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm";
   const busy =
-    updateMutation.isPending || deleteMutation.isPending || duplicateMutation.isPending;
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    duplicateMutation.isPending;
 
   const filteredStrategies = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -388,7 +425,7 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
             KIND_LABELS[strategy.kind],
             ORIGIN_LABELS[strategy.origin],
           ]
-            .join(' ')
+            .join(" ")
             .toLowerCase();
           return haystack.includes(query);
         })
@@ -397,33 +434,39 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
     return [...rows].sort((left, right) => {
       let cmp = 0;
       switch (sortColumn) {
-        case 'name':
-          cmp = left.name.localeCompare(right.name, 'es');
+        case "name":
+          cmp = left.name.localeCompare(right.name, "es");
           break;
-        case 'kind':
-          cmp = KIND_LABELS[left.kind].localeCompare(KIND_LABELS[right.kind], 'es');
+        case "kind":
+          cmp = KIND_LABELS[left.kind].localeCompare(
+            KIND_LABELS[right.kind],
+            "es",
+          );
           break;
-        case 'timeframe':
-          cmp = left.timeframe.localeCompare(right.timeframe, 'es');
+        case "timeframe":
+          cmp = left.timeframe.localeCompare(right.timeframe, "es");
           break;
-        case 'origin':
-          cmp = ORIGIN_LABELS[left.origin].localeCompare(ORIGIN_LABELS[right.origin], 'es');
+        case "origin":
+          cmp = ORIGIN_LABELS[left.origin].localeCompare(
+            ORIGIN_LABELS[right.origin],
+            "es",
+          );
           break;
-        case 'updatedAt':
+        case "updatedAt":
           cmp = left.updatedAt.localeCompare(right.updatedAt);
           break;
       }
-      return sortDirection === 'asc' ? cmp : -cmp;
+      return sortDirection === "asc" ? cmp : -cmp;
     });
   }, [search, sortColumn, sortDirection, strategies]);
 
   function handleSort(column: SortColumn) {
     if (sortColumn === column) {
-      setSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
       return;
     }
     setSortColumn(column);
-    setSortDirection(column === 'name' ? 'asc' : 'desc');
+    setSortDirection(column === "name" ? "asc" : "desc");
   }
 
   async function handleStartEdit(strategyId: string) {
@@ -433,17 +476,19 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
     setEditingId(strategyId);
     setRenamingId(null);
     setEditName(strategy.name);
-    if (strategy.kind === 'hybrid') {
+    if (strategy.kind === "hybrid") {
       setEditGatePreset(config.hybridGatePresetKey);
       setEditMinScore(config.hybridMinScore);
       setEditMinDataQuality(config.hybridMinDataQuality);
       setEditMaxPe(
-        config.hybridMaxTrailingPe != null ? String(config.hybridMaxTrailingPe) : '',
+        config.hybridMaxTrailingPe != null
+          ? String(config.hybridMaxTrailingPe)
+          : "",
       );
       setEditMinCap(
         config.hybridMinMarketCapMillions != null
           ? String(config.hybridMinMarketCapMillions)
-          : '',
+          : "",
       );
     }
   }
@@ -455,7 +500,7 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
   }
 
   function buildEditConfig(base: ScanRunnerConfig): ScanRunnerConfig {
-    if (base.scanMode !== 'hybrid') return base;
+    if (base.scanMode !== "hybrid") return base;
     return {
       ...base,
       hybridGatePresetKey: editGatePreset,
@@ -476,17 +521,19 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
     try {
       const response = await api.getStrategy(strategyId);
       if (!canPublishStrategyScoreAsIndicator(response.data)) {
-        setActionError('Solo estrategias con rating técnico o preset ejecutable admiten score en gráfico.');
+        setActionError(
+          "Solo estrategias con rating técnico o preset ejecutable admiten score en gráfico.",
+        );
         return;
       }
       const preset = presetFromStrategyScore(response.data);
       if (!preset) {
-        setActionError('No se pudo crear el preset de score.');
+        setActionError("No se pudo crear el preset de score.");
         return;
       }
       const presetId = addIndicatorPresetFromDraft(preset);
       if (!presetId) {
-        setActionError('No se pudo guardar el preset en el workspace.');
+        setActionError("No se pudo guardar el preset en el workspace.");
         return;
       }
       saveWorkspace();
@@ -495,12 +542,18 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
         `Indicador «${preset.name}» guardado en catálogo IA. En Trading → Indicadores → IA, añádelo con ★.`,
       );
     } catch (error) {
-      setActionError(error instanceof ApiError ? error.message : 'Error al publicar score');
+      setActionError(
+        error instanceof ApiError ? error.message : "Error al publicar score",
+      );
     }
   }
 
   function handleDelete(strategy: StrategyDefinitionSummaryDto) {
-    if (!window.confirm(`¿Eliminar la estrategia «${strategy.name}»? Esta acción no se puede deshacer.`)) {
+    if (
+      !window.confirm(
+        `¿Eliminar la estrategia «${strategy.name}»? Esta acción no se puede deshacer.`,
+      )
+    ) {
       return;
     }
     deleteMutation.mutate(strategy.id);
@@ -516,12 +569,18 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
     <ScreenerPanelShell
       embedded={embedded}
       title="Estrategias guardadas"
-      description={embedded ? undefined : 'Gestión estándar: renombrar, editar, duplicar y eliminar'}
+      description={
+        embedded
+          ? undefined
+          : "Gestión estándar: renombrar, editar, duplicar y eliminar"
+      }
     >
       {strategiesQuery.isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando estrategias…</p>
       ) : strategies.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Sin estrategias guardadas.</p>
+        <p className="text-sm text-muted-foreground">
+          Sin estrategias guardadas.
+        </p>
       ) : (
         <div className="space-y-2">
           <input
@@ -587,14 +646,17 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
               <tbody className="divide-y divide-border/60">
                 {filteredStrategies.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-3 py-4 text-sm text-muted-foreground">
+                    <td
+                      colSpan={6}
+                      className="px-3 py-4 text-sm text-muted-foreground"
+                    >
                       Ninguna estrategia coincide con la búsqueda.
                     </td>
                   </tr>
                 )}
                 {filteredStrategies.map((strategy) => {
                   const isRenaming = renamingId === strategy.id;
-                  const isHybrid = strategy.kind === 'hybrid';
+                  const isHybrid = strategy.kind === "hybrid";
 
                   return (
                     <tr key={strategy.id} className="hover:bg-muted/20">
@@ -604,19 +666,24 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
                             <input
                               autoFocus
                               value={renameValue}
-                              onChange={(event) => setRenameValue(event.target.value)}
+                              onChange={(event) =>
+                                setRenameValue(event.target.value)
+                              }
                               onKeyDown={(event) => {
-                                if (event.key === 'Enter') handleSaveRename(strategy.id);
-                                if (event.key === 'Escape') setRenamingId(null);
+                                if (event.key === "Enter")
+                                  handleSaveRename(strategy.id);
+                                if (event.key === "Escape") setRenamingId(null);
                               }}
-                              className={cn(inputClassName, 'h-8 py-1 text-sm')}
+                              className={cn(inputClassName, "h-8 py-1 text-sm")}
                             />
                             <Button
                               type="button"
                               size="sm"
                               variant="ghost"
                               className="h-8 px-2"
-                              disabled={!renameValue.trim() || updateMutation.isPending}
+                              disabled={
+                                !renameValue.trim() || updateMutation.isPending
+                              }
                               onClick={() => handleSaveRename(strategy.id)}
                             >
                               <Save className="h-3.5 w-3.5" />
@@ -638,16 +705,18 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
                       <td className="px-3 py-2">
                         <span
                           className={cn(
-                            'rounded px-1.5 py-0.5 text-[10px] font-medium',
+                            "rounded px-1.5 py-0.5 text-[10px] font-medium",
                             isHybrid
-                              ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300'
-                              : 'bg-muted text-muted-foreground',
+                              ? "bg-violet-500/15 text-violet-700 dark:text-violet-300"
+                              : "bg-muted text-muted-foreground",
                           )}
                         >
                           {KIND_LABELS[strategy.kind]}
                         </span>
                       </td>
-                      <td className="px-3 py-2 tabular-nums">{strategy.timeframe}</td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {strategy.timeframe}
+                      </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {ORIGIN_LABELS[strategy.origin]}
                       </td>
@@ -661,11 +730,14 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
                           onLoad={() => void handleLoad(strategy.id)}
                           onRename={() => handleStartRename(strategy)}
                           onEdit={() => void handleStartEdit(strategy.id)}
-                          onDuplicate={() => duplicateMutation.mutate(strategy.id)}
+                          onDuplicate={() =>
+                            duplicateMutation.mutate(strategy.id)
+                          }
                           onDelete={() => handleDelete(strategy)}
                           onPublishScore={
                             canShowPublishScoreAction(strategy)
-                              ? () => void handlePublishScoreToChart(strategy.id)
+                              ? () =>
+                                  void handlePublishScoreToChart(strategy.id)
                               : undefined
                           }
                         />
@@ -679,7 +751,7 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
 
           {filteredStrategies.map((strategy) => {
             if (editingId !== strategy.id) return null;
-            const isHybrid = strategy.kind === 'hybrid';
+            const isHybrid = strategy.kind === "hybrid";
 
             return (
               <section
@@ -687,8 +759,15 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
                 className="space-y-2 rounded-lg border border-border bg-card p-3"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium">Editar «{strategy.name}»</p>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                  <p className="text-xs font-medium">
+                    Editar «{strategy.name}»
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingId(null)}
+                  >
                     Cerrar
                   </Button>
                 </div>
@@ -707,7 +786,9 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
                       <select
                         value={editGatePreset}
                         onChange={(event) =>
-                          setEditGatePreset(event.target.value as BacktestStrategyType)
+                          setEditGatePreset(
+                            event.target.value as BacktestStrategyType,
+                          )
                         }
                         className={fieldClass}
                       >
@@ -725,7 +806,9 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
                         min={0}
                         max={100}
                         value={editMinScore}
-                        onChange={(event) => setEditMinScore(Number(event.target.value) || 0)}
+                        onChange={(event) =>
+                          setEditMinScore(Number(event.target.value) || 0)
+                        }
                         className={fieldClass}
                       />
                     </label>
@@ -791,7 +874,12 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
                       </>
                     )}
                   </Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setEditingId(null)}
+                  >
                     Cancelar
                   </Button>
                 </div>
@@ -799,7 +887,9 @@ export function SavedStrategiesPanel({ embedded, onLoadConfig }: SavedStrategies
             );
           })}
 
-          {actionError && <p className="text-xs text-destructive">{actionError}</p>}
+          {actionError && (
+            <p className="text-xs text-destructive">{actionError}</p>
+          )}
         </div>
       )}
     </ScreenerPanelShell>

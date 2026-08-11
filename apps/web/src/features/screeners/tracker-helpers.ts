@@ -6,20 +6,24 @@ import {
   type TrackerDefinitionDetailDto,
   type TrackerScheduleKind,
   type UpdateTrackerDefinitionDto,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 import {
   defaultScanRunnerConfig,
   type ScanRunnerConfig,
-} from '@/features/screeners/scan-runner-form';
+} from "@/features/screeners/scan-runner-form";
 
-export function scanConfigFromTracker(tracker: TrackerDefinitionDetailDto): ScanRunnerConfig {
+export function scanConfigFromTracker(
+  tracker: TrackerDefinitionDetailDto,
+): ScanRunnerConfig {
   const def = tracker.definition;
-  const timeframe = isKernelTimeframe(tracker.timeframe) ? tracker.timeframe : '1d';
+  const timeframe = isKernelTimeframe(tracker.timeframe)
+    ? tracker.timeframe
+    : "1d";
   return {
     ...defaultScanRunnerConfig(),
-    scanSource: 'saved',
+    scanSource: "saved",
     savedStrategyId: tracker.strategyDefinitionId,
-    listId: def.universe?.listId ?? '',
+    listId: def.universe?.listId ?? "",
     maxResults: def.maxResults ?? 50,
     timeframe,
   };
@@ -34,7 +38,9 @@ export function buildCreateTrackerDto(
     defaultExecutionPolicyId?: string | null;
   },
 ): CreateTrackerDefinitionDto {
-  const timeframe = isKernelTimeframe(config.timeframe) ? config.timeframe : '1d';
+  const timeframe = isKernelTimeframe(config.timeframe)
+    ? config.timeframe
+    : "1d";
   return {
     name: options.name,
     strategyDefinitionId: options.strategyDefinitionId,
@@ -42,9 +48,9 @@ export function buildCreateTrackerDto(
     timeframe,
     maxResults: config.maxResults,
     schedule:
-      options.scheduleKind === 'on_bar_close'
-        ? { kind: 'on_bar_close' }
-        : { kind: 'manual' },
+      options.scheduleKind === "on_bar_close"
+        ? { kind: "on_bar_close" }
+        : { kind: "manual" },
     defaultExecutionPolicyId: options.defaultExecutionPolicyId ?? null,
     enabled: true,
   };
@@ -54,7 +60,7 @@ export function trackerScheduleKindFromTracker(
   tracker: TrackerDefinitionDetailDto,
 ): TrackerScheduleKind {
   const kind = tracker.definition.schedule?.kind;
-  return kind === 'on_bar_close' ? 'on_bar_close' : 'manual';
+  return kind === "on_bar_close" ? "on_bar_close" : "manual";
 }
 
 export function buildUpdateTrackerDto(
@@ -66,26 +72,30 @@ export function buildUpdateTrackerDto(
     enabled?: boolean;
   },
 ): UpdateTrackerDefinitionDto {
-  const timeframe = isKernelTimeframe(config.timeframe) ? config.timeframe : '1d';
+  const timeframe = isKernelTimeframe(config.timeframe)
+    ? config.timeframe
+    : "1d";
   return {
     name: options.name,
     universe: { listId: config.listId },
     timeframe,
     maxResults: config.maxResults,
     schedule:
-      options.scheduleKind === 'on_bar_close'
-        ? { kind: 'on_bar_close' }
-        : { kind: 'manual' },
+      options.scheduleKind === "on_bar_close"
+        ? { kind: "on_bar_close" }
+        : { kind: "manual" },
     defaultExecutionPolicyId: options.defaultExecutionPolicyId ?? null,
     enabled: options.enabled,
   };
 }
 
-export function trackerScheduleLabel(tracker: TrackerDefinitionDetailDto): string | null {
+export function trackerScheduleLabel(
+  tracker: TrackerDefinitionDetailDto,
+): string | null {
   const kind = tracker.definition.schedule?.kind;
-  if (!kind || kind === 'manual') return null;
-  if (kind === 'on_bar_close') return 'Auto · cierre barra';
-  if (kind === 'cron') return 'Cron';
+  if (!kind || kind === "manual") return null;
+  if (kind === "on_bar_close") return "Auto · cierre barra";
+  if (kind === "cron") return "Cron";
   return kind;
 }
 
@@ -96,7 +106,7 @@ export function latestCompletedScanResultForTracker(
   const completed = jobs.filter(
     (job) =>
       job.trackerDefinitionId === trackerId &&
-      job.status === 'completed' &&
+      job.status === "completed" &&
       job.result != null,
   );
   if (completed.length === 0) return null;

@@ -1,6 +1,12 @@
-import type { LucideIcon } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import type { LucideIcon } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface ScreenerPanelShellProps {
   embedded?: boolean;
@@ -22,12 +28,12 @@ export function ScreenerPanelShell({
   headerClassName,
 }: ScreenerPanelShellProps) {
   if (embedded) {
-    return <div className={cn('space-y-4 min-w-0', className)}>{children}</div>;
+    return <div className={cn("space-y-4 min-w-0", className)}>{children}</div>;
   }
 
   return (
-    <Card className={cn('min-w-0', className)}>
-      <CardHeader className={cn('pb-3', headerClassName)}>
+    <Card className={cn("min-w-0", className)}>
+      <CardHeader className={cn("pb-3", headerClassName)}>
         <CardTitle className="flex items-center gap-2 text-base">
           {Icon && <Icon className="h-4 w-4 text-primary" />}
           {title}

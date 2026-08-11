@@ -1,10 +1,10 @@
-import type { LucideIcon } from 'lucide-react';
-import { ChevronDown } from 'lucide-react';
+import type { LucideIcon } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import {
   type ScreenerPanelId,
   useScreenerPreferencesStore,
-} from '@/stores/screener-preferences-store';
-import { cn } from '@/lib/utils';
+} from "@/stores/screener-preferences-store";
+import { cn } from "@/lib/utils";
 
 interface ScreenerCollapsibleSectionProps {
   panelId: ScreenerPanelId;
@@ -27,15 +27,17 @@ export function ScreenerCollapsibleSection({
   children,
   className,
 }: ScreenerCollapsibleSectionProps) {
-  const storedOpen = useScreenerPreferencesStore((state) => state.layout.panels[panelId]);
+  const storedOpen = useScreenerPreferencesStore(
+    (state) => state.layout.panels[panelId],
+  );
   const togglePanel = useScreenerPreferencesStore((state) => state.togglePanel);
   const open = storedOpen ?? defaultOpen;
 
   return (
     <section
       className={cn(
-        'min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm',
-        splitMode && 'flex h-full min-h-0 flex-col',
+        "min-w-0 overflow-hidden rounded-lg border border-border bg-card shadow-sm",
+        splitMode && "flex h-full min-h-0 flex-col",
         className,
       )}
     >
@@ -46,19 +48,24 @@ export function ScreenerCollapsibleSection({
         onClick={() => togglePanel(panelId)}
       >
         <ChevronDown
-          className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', !open && '-rotate-90')}
+          className={cn(
+            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+            !open && "-rotate-90",
+          )}
         />
         {Icon && <Icon className="h-4 w-4 shrink-0 text-primary" />}
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">{title}</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          {title}
+        </span>
         {badge}
       </button>
       {open && (
         <div
           className={cn(
-            'border-t border-border px-3 py-3 min-w-0',
+            "border-t border-border px-3 py-3 min-w-0",
             splitMode
-              ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-              : 'max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain',
+              ? "flex min-h-0 flex-1 flex-col overflow-hidden"
+              : "max-h-[min(70vh,520px)] overflow-y-auto overscroll-contain",
           )}
         >
           {children}

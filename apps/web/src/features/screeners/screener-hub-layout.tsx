@@ -1,18 +1,18 @@
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
-import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
-import { Button } from '@/components/ui/button';
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
+import { Button } from "@/components/ui/button";
 import {
   clampScreenerFooterHeightPct,
   clampScreenerRunnerHeightPct,
   clampScreenerSidebarWidthPct,
-} from '@/lib/screener-split-layout';
+} from "@/lib/screener-split-layout";
 import {
   type ScreenerPanelId,
   useScreenerPreferencesStore,
-} from '@/stores/screener-preferences-store';
-import { cn } from '@/lib/utils';
+} from "@/stores/screener-preferences-store";
+import { cn } from "@/lib/utils";
 
 interface ScreenerHubLayoutProps {
   className?: string;
@@ -35,9 +35,20 @@ function pxToPct(px: number, total: number): number {
   return total > 0 ? (px / total) * 100 : 0;
 }
 
-function ScrollPanel({ children, className }: { children: ReactNode; className?: string }) {
+function ScrollPanel({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className={cn('scroll-area h-full min-h-0 overflow-auto overscroll-contain', className)}>
+    <div
+      className={cn(
+        "scroll-area h-full min-h-0 overflow-auto overscroll-contain",
+        className,
+      )}
+    >
       {children}
     </div>
   );
@@ -56,7 +67,9 @@ export function ScreenerHubLayout({
   sidebarPanels,
 }: ScreenerHubLayoutProps) {
   const split = useScreenerPreferencesStore((state) => state.layout.split);
-  const patchSplitLayout = useScreenerPreferencesStore((state) => state.patchSplitLayout);
+  const patchSplitLayout = useScreenerPreferencesStore(
+    (state) => state.patchSplitLayout,
+  );
 
   const rootRef = useRef<HTMLDivElement>(null);
   const workflowRef = useRef<HTMLDivElement>(null);
@@ -118,12 +131,17 @@ export function ScreenerHubLayout({
   const workflowWidthPct = 100 - toolsWidthPct;
 
   const workflowPanel = (
-    <div ref={workflowRef} className="flex h-full min-h-0 flex-col overflow-hidden">
+    <div
+      ref={workflowRef}
+      className="flex h-full min-h-0 flex-col overflow-hidden"
+    >
       {isSplitViewport && hasResults ? (
         <>
           <div
             className="min-h-0 shrink-0 overflow-hidden"
-            style={{ height: `${clampScreenerRunnerHeightPct(liveRunnerPct)}%` }}
+            style={{
+              height: `${clampScreenerRunnerHeightPct(liveRunnerPct)}%`,
+            }}
           >
             <ScrollPanel>{runner}</ScrollPanel>
           </div>
@@ -170,7 +188,9 @@ export function ScreenerHubLayout({
               minHeight: 112,
             }}
           >
-            <ScrollPanel className="space-y-3 p-0.5">{workflowFooter}</ScrollPanel>
+            <ScrollPanel className="space-y-3 p-0.5">
+              {workflowFooter}
+            </ScrollPanel>
           </div>
         </>
       )}
@@ -213,7 +233,7 @@ export function ScreenerHubLayout({
 
   if (!isSplitViewport) {
     return (
-      <div className={cn('min-w-0 space-y-4', className)}>
+      <div className={cn("min-w-0 space-y-4", className)}>
         {showWorkflow && workflowPanel}
         {showTools && (
           <aside className="screener-sidebar min-w-0 space-y-2">
@@ -229,7 +249,7 @@ export function ScreenerHubLayout({
 
   if (!showSidebar) {
     return (
-      <div className={cn('flex h-full min-h-0 flex-col', className)}>
+      <div className={cn("flex h-full min-h-0 flex-col", className)}>
         {showMain && (
           <div className="relative min-h-0 flex-1 overflow-hidden">
             {!split.sidebarOpen && showTools && (
@@ -252,7 +272,10 @@ export function ScreenerHubLayout({
   }
 
   return (
-    <div ref={rootRef} className={cn('flex h-full min-h-0 overflow-hidden', className)}>
+    <div
+      ref={rootRef}
+      className={cn("flex h-full min-h-0 overflow-hidden", className)}
+    >
       {showMain && (
         <>
           <div
@@ -264,14 +287,16 @@ export function ScreenerHubLayout({
           <PanelResizeHandle
             label="Redimensionar panel de herramientas"
             onDrag={adjustToolsWidth}
-            onDragEnd={() => patchSplitLayout({ sidebarWidthPct: pendingToolsPct.current })}
+            onDragEnd={() =>
+              patchSplitLayout({ sidebarWidthPct: pendingToolsPct.current })
+            }
           />
         </>
       )}
       <div
         className="min-h-0 shrink-0 overflow-hidden"
         style={{
-          width: showMain ? `${toolsWidthPct}%` : '100%',
+          width: showMain ? `${toolsWidthPct}%` : "100%",
           minWidth: 240,
         }}
       >

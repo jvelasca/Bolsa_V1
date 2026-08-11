@@ -1,16 +1,16 @@
-import { useMutation } from '@tanstack/react-query';
-import { FileJson, Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import type { ScanJobDto, ScanManifestV1 } from '@bolsa/shared';
-import { api, ApiError } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { ScreenerPanelShell } from '@/features/screeners/screener-panel-shell';
+import { useMutation } from "@tanstack/react-query";
+import { FileJson, Loader2 } from "lucide-react";
+import { useState } from "react";
+import type { ScanJobDto, ScanManifestV1 } from "@bolsa/shared";
+import { api, ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { ScreenerPanelShell } from "@/features/screeners/screener-panel-shell";
 
 const JOB_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
-  processing: 'Procesando',
-  completed: 'Completado',
-  failed: 'Fallido',
+  pending: "Pendiente",
+  processing: "Procesando",
+  completed: "Completado",
+  failed: "Fallido",
 };
 
 interface ScanJobsPanelProps {
@@ -19,7 +19,11 @@ interface ScanJobsPanelProps {
   embedded?: boolean;
 }
 
-export function ScanJobsPanel({ jobs, onLoadResult, embedded }: ScanJobsPanelProps) {
+export function ScanJobsPanel({
+  jobs,
+  onLoadResult,
+  embedded,
+}: ScanJobsPanelProps) {
   const [manifestJobId, setManifestJobId] = useState<string | null>(null);
   const [manifest, setManifest] = useState<ScanManifestV1 | null>(null);
 
@@ -49,7 +53,9 @@ export function ScanJobsPanel({ jobs, onLoadResult, embedded }: ScanJobsPanelPro
       embedded={embedded}
       title="Tareas recientes"
       description={
-        embedded ? undefined : 'Cola async — carga resultados o consulta el manifiesto P4.'
+        embedded
+          ? undefined
+          : "Cola async — carga resultados o consulta el manifiesto P4."
       }
     >
       <div className="space-y-3">
@@ -64,7 +70,9 @@ export function ScanJobsPanel({ jobs, onLoadResult, embedded }: ScanJobsPanelPro
                 {JOB_STATUS_LABELS[job.status] ?? job.status}
               </span>
               {job.result && (
-                <span className="text-xs">{job.result.hitCount} coincidencias</span>
+                <span className="text-xs">
+                  {job.result.hitCount} coincidencias
+                </span>
               )}
               {job.cacheHits != null && (
                 <span className="text-xs text-muted-foreground">
@@ -72,8 +80,13 @@ export function ScanJobsPanel({ jobs, onLoadResult, embedded }: ScanJobsPanelPro
                 </span>
               )}
               <div className="flex gap-1">
-                {job.status === 'completed' && job.result && (
-                  <Button type="button" size="sm" variant="ghost" onClick={() => onLoadResult(job)}>
+                {job.status === "completed" && job.result && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => onLoadResult(job)}
+                  >
                     Ver coincidencias
                   </Button>
                 )}
@@ -82,10 +95,14 @@ export function ScanJobsPanel({ jobs, onLoadResult, embedded }: ScanJobsPanelPro
                   size="sm"
                   variant="ghost"
                   title="Manifiesto del rastreo"
-                  disabled={manifestMutation.isPending && manifestMutation.variables === job.id}
+                  disabled={
+                    manifestMutation.isPending &&
+                    manifestMutation.variables === job.id
+                  }
                   onClick={() => manifestMutation.mutate(job.id)}
                 >
-                  {manifestMutation.isPending && manifestMutation.variables === job.id ? (
+                  {manifestMutation.isPending &&
+                  manifestMutation.variables === job.id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <FileJson className="h-3.5 w-3.5" />
@@ -102,18 +119,21 @@ export function ScanJobsPanel({ jobs, onLoadResult, embedded }: ScanJobsPanelPro
               Manifiesto · tarea {manifestJobId.slice(0, 10)}…
             </p>
             <p className="text-muted-foreground">
-              Rastreo {manifest.scanId.slice(0, 8)}… · {manifest.hitCount} coincidencias · TF{' '}
-              {manifest.timeframe}
+              Rastreo {manifest.scanId.slice(0, 8)}… · {manifest.hitCount}{" "}
+              coincidencias · TF {manifest.timeframe}
             </p>
             {manifest.dataSnapshots?.[0]?.dataVersion && (
               <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                versión de datos {manifest.dataSnapshots[0].dataVersion.slice(0, 20)}…
+                versión de datos{" "}
+                {manifest.dataSnapshots[0].dataVersion.slice(0, 20)}…
               </p>
             )}
           </div>
         )}
 
-        {manifestError && <p className="text-xs text-destructive">{manifestError}</p>}
+        {manifestError && (
+          <p className="text-xs text-destructive">{manifestError}</p>
+        )}
       </div>
     </ScreenerPanelShell>
   );
