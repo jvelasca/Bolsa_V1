@@ -131,7 +131,8 @@ Cada **M** es un commit independiente, atómico, con su batería. Se aprueban un
 
 ## 7. Registro
 
-| Fecha      | Acción                                                                                                                                      |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-11 | Verificación en código del estado de F1 (Decimal ya en DB, falta de locks, deduct_cash, recálculo manual, DTO permisivo, sin idempotencia). |
-| 2026-08-11 | Plan atómico M1–M5 redactado para revisión. **Pendiente de aprobación** por el usuario antes de abrir rama y tocar código.                  |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Verificación en código del estado de F1 (Decimal ya en DB, falta de locks, deduct_cash, recálculo manual, DTO permisivo, sin idempotencia).                                                                                                                                                                   |
+| 2026-08-11 | Plan atómico M1–M5 redactado para revisión. **Pendiente de aprobación** por el usuario antes de abrir rama y tocar código.                                                                                                                                                                                    |
+| 2026-08-11 | **M1 aplicado** (rama `stage/f1-integridad-financiera-2026-08-11`): `with_for_update()` en `execute_trade` (portfolio+position), `deduct_cash`, `add_cash` y `transfer_cash` (lock from+to en orden determinista por id). Batería verde: ruff ✓ · mypy ✓ · pytest (257) ✓. Pendiente de commit+push aprobado. |

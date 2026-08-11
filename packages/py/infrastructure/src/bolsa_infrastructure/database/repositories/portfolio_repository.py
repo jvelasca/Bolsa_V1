@@ -2,10 +2,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     PortfolioSummary,
@@ -14,6 +10,10 @@ from bolsa_domain.entities.portfolio import (
     Transaction,
 )
 from bolsa_domain.value_objects.timeframe import TimeFrame
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
     OhlcvBarRow,
@@ -204,7 +204,11 @@ class SqlAlchemyPortfolioRepository:
         total = Decimal(str(quantity)) * Decimal(str(price))
         fees = Decimal(str(max(fee_amount, 0)))
 
-        portfolio_row = await self._session.get(PortfolioRow, portfolio.id)
+        portfolio_row = await self._session.get(
+            PortfolioRow,
+            portfolio.id,
+            with_for_update=True,
+        )
         if portfolio_row is None:
             raise ValueError("Cartera no encontrada")
 
@@ -215,9 +219,13 @@ class SqlAlchemyPortfolioRepository:
                 f"Efectivo insuficiente (incl. comisiones). Necesario: {needed:.2f} € · Disponible: {float(cash):.2f} €",
             )
 
-        position_stmt = select(PositionRow).where(
-            PositionRow.portfolio_id == portfolio.id,
-            PositionRow.instrument_id == instrument_id,
+        position_stmt = (
+            select(PositionRow)
+            .where(
+                PositionRow.portfolio_id == portfolio.id,
+                PositionRow.instrument_id == instrument_id,
+            )
+            .with_for_update()
         )
         position_result = await self._session.execute(position_stmt)
         existing_position = position_result.scalar_one_or_none()
@@ -293,7 +301,11 @@ class SqlAlchemyPortfolioRepository:
         if amount <= 0:
             portfolio = await self.get_summary(legacy_portfolio_id)
             return portfolio.portfolio.cash
-        row = await self._session.get(PortfolioRow, legacy_portfolio_id)
+        row = await self._session.get(
+            PortfolioRow,
+            legacy_portfolio_id,
+            with_for_update=True,
+        )
         if row is None:
             raise ValueError("Cartera no encontrada")
         fee = Decimal(str(amount))
@@ -315,10 +327,23 @@ class SqlAlchemyPortfolioRepository:
             raise ValueError("El importe debe ser mayor que cero")
 
         amount_dec = Decimal(str(amount))
-        from_row = await self._session.get(PortfolioRow, from_legacy_portfolio_id)
-        to_row = await self._session.get(PortfolioRow, to_legacy_portfolio_id)
-        if from_row is None or to_row is None:
+        # Lock both rows in deterministic order by id (left_id < right_id) to
+        # avoid deadlocks when two transfers run in opposite directions (A→B / B→A).
+        left_id, right_id = sorted((from_legacy_portfolio_id, to_legacy_portfolio_id))
+        left_row = await self._session.get(
+            PortfolioRow,
+            left_id,
+            with_for_update=True,
+        )
+        right_row = await self._session.get(
+            PortfolioRow,
+            right_id,
+            with_for_update=True,
+        )
+        if left_row is None or right_row is None:
             raise ValueError("Cartera no encontrada")
+        from_row = left_row if from_legacy_portfolio_id == left_id else right_row
+        to_row = right_row if from_legacy_portfolio_id == left_id else left_row
         if from_row.currency != to_row.currency:
             raise ValueError("Las carteras deben usar la misma moneda")
         if from_row.cash < amount_dec:
@@ -339,7 +364,11 @@ class SqlAlchemyPortfolioRepository:
         if amount <= 0:
             portfolio = await self.get_summary(legacy_portfolio_id)
             return portfolio.portfolio.cash
-        row = await self._session.get(PortfolioRow, legacy_portfolio_id)
+        row = await self._session.get(
+            PortfolioRow,
+            legacy_portfolio_id,
+            with_for_update=True,
+        )
         if row is None:
             raise ValueError("Cartera no encontrada")
         credit = Decimal(str(amount))
