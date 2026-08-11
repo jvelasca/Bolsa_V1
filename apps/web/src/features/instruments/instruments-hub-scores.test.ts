@@ -1,21 +1,22 @@
-import { describe, expect, it } from 'vitest';
-import type { CompositeChipDto, FundamentalChipDto } from '@bolsa/shared';
+import { describe, expect, it } from "vitest";
+import type { CompositeChipDto, FundamentalChipDto } from "@bolsa/shared";
 import {
   chunkIds,
   indexFaScores,
   indexTaScores,
-} from '@/features/instruments/instruments-hub-scores';
-import { filterAndSortInstrumentsHub } from '@/features/instruments/instruments-hub-model';
-import type { InstrumentWithMetaDto } from '@bolsa/shared';
+} from "@/features/instruments/instruments-hub-scores";
+import { filterAndSortInstrumentsHub } from "@/features/instruments/instruments-hub-model";
+import type { InstrumentWithMetaDto } from "@bolsa/shared";
 
 function inst(
-  partial: Partial<InstrumentWithMetaDto> & Pick<InstrumentWithMetaDto, 'id' | 'symbol' | 'name'>,
+  partial: Partial<InstrumentWithMetaDto> &
+    Pick<InstrumentWithMetaDto, "id" | "symbol" | "name">,
 ): InstrumentWithMetaDto {
   return {
     yahooSymbol: `${partial.symbol}.MC`,
-    exchange: 'MCE',
-    country: 'ES',
-    currency: 'EUR',
+    exchange: "MCE",
+    country: "ES",
+    currency: "EUR",
     sector: null,
     isin: null,
     isActive: true,
@@ -31,58 +32,58 @@ function inst(
   } as InstrumentWithMetaDto;
 }
 
-describe('instruments-hub-scores', () => {
-  it('chunks ids', () => {
-    expect(chunkIds(['a', 'b', 'c', 'd'], 2)).toEqual([
-      ['a', 'b'],
-      ['c', 'd'],
+describe("instruments-hub-scores", () => {
+  it("chunks ids", () => {
+    expect(chunkIds(["a", "b", "c", "d"], 2)).toEqual([
+      ["a", "b"],
+      ["c", "d"],
     ]);
   });
 
-  it('indexes FA and TA scores', () => {
+  it("indexes FA and TA scores", () => {
     const fa = indexFaScores([
       {
-        instrumentId: '1',
-        ticker: 'SAN',
+        instrumentId: "1",
+        ticker: "SAN",
         scoreDisplay100: 72,
-        confidence: 'HIGH',
+        confidence: "HIGH",
         isStale: true,
         distress: false,
       },
     ] as FundamentalChipDto[]);
-    expect(fa.get('1')?.scoreDisplay100).toBe(72);
-    expect(fa.get('1')?.isStale).toBe(true);
+    expect(fa.get("1")?.scoreDisplay100).toBe(72);
+    expect(fa.get("1")?.isStale).toBe(true);
 
     const ta = indexTaScores([
       {
-        instrumentId: '1',
-        ticker: 'SAN',
+        instrumentId: "1",
+        ticker: "SAN",
         scoreDisplay100: 55,
-        confidence: 'MEDIUM',
+        confidence: "MEDIUM",
         combinedScore: 0.1,
-        regime: 'neutral',
+        regime: "neutral",
         paperDUnlocked: true,
         technicalDisplay100: 61,
       },
     ] as CompositeChipDto[]);
-    expect(ta.get('1')?.technicalDisplay100).toBe(61);
-    expect(ta.get('1')?.compositeDisplay100).toBe(55);
+    expect(ta.get("1")?.technicalDisplay100).toBe(61);
+    expect(ta.get("1")?.compositeDisplay100).toBe(55);
   });
 
-  it('sorts hub by scoreFa', () => {
+  it("sorts hub by scoreFa", () => {
     const catalog = [
-      inst({ id: '1', symbol: 'SAN', name: 'Santander' }),
-      inst({ id: '2', symbol: 'ACS', name: 'ACS' }),
+      inst({ id: "1", symbol: "SAN", name: "Santander" }),
+      inst({ id: "2", symbol: "ACS", name: "ACS" }),
     ];
     const faByInstrument = new Map([
-      ['1', { scoreDisplay100: 40, isStale: false, distress: false }],
-      ['2', { scoreDisplay100: 80, isStale: false, distress: false }],
+      ["1", { scoreDisplay100: 40, isStale: false, distress: false }],
+      ["2", { scoreDisplay100: 80, isStale: false, distress: false }],
     ]);
     const rows = filterAndSortInstrumentsHub(catalog, {
-      sortKey: 'scoreFa',
-      sortDir: 'desc',
+      sortKey: "scoreFa",
+      sortDir: "desc",
       enrichment: { faByInstrument },
     });
-    expect(rows.map((r) => r.symbol)).toEqual(['ACS', 'SAN']);
+    expect(rows.map((r) => r.symbol)).toEqual(["ACS", "SAN"]);
   });
 });

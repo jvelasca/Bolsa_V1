@@ -4,7 +4,7 @@
  * @see docs/engineering/instruments-hub-2026-07-31.md
  */
 
-import type { CompositeChipDto, FundamentalChipDto } from '@bolsa/shared';
+import type { CompositeChipDto, FundamentalChipDto } from "@bolsa/shared";
 
 export const HUB_FA_QUERY_CHUNK = 80;
 export const HUB_COMPOSITE_QUERY_CHUNK = 40;
@@ -31,7 +31,9 @@ export function chunkIds(ids: string[], size: number): string[][] {
   return out;
 }
 
-export function indexFaScores(chips: FundamentalChipDto[]): Map<string, HubFaScore> {
+export function indexFaScores(
+  chips: FundamentalChipDto[],
+): Map<string, HubFaScore> {
   const map = new Map<string, HubFaScore>();
   for (const chip of chips) {
     map.set(chip.instrumentId, {
@@ -43,7 +45,9 @@ export function indexFaScores(chips: FundamentalChipDto[]): Map<string, HubFaSco
   return map;
 }
 
-export function indexTaScores(chips: CompositeChipDto[]): Map<string, HubTaScore> {
+export function indexTaScores(
+  chips: CompositeChipDto[],
+): Map<string, HubTaScore> {
   const map = new Map<string, HubTaScore>();
   for (const chip of chips) {
     map.set(chip.instrumentId, {

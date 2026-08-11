@@ -6,9 +6,9 @@
  * @see docs/engineering/fundamental-intelligence-engine-2026-07-30.md §10–§13
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, RefreshCw, Sparkles } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileText, RefreshCw, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   CompositeCardDto,
   FundamentalCardDto,
@@ -18,13 +18,13 @@ import type {
   InstrumentFilingAskResponseV1,
   InstrumentFilingMetaV1,
   InstrumentFilingSummarizeResponseV1,
-} from '@bolsa/shared';
-import { Button } from '@/components/ui/button';
-import { AiInfoButton } from '@/features/ai/ai-info-button';
-import { formatCompositeLegMethod } from '@/features/instruments/composite-leg-labels';
-import { useEnsureInstrumentFundamentals } from '@/features/instruments/use-ensure-instrument-fundamentals';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+} from "@bolsa/shared";
+import { Button } from "@/components/ui/button";
+import { AiInfoButton } from "@/features/ai/ai-info-button";
+import { formatCompositeLegMethod } from "@/features/instruments/composite-leg-labels";
+import { useEnsureInstrumentFundamentals } from "@/features/instruments/use-ensure-instrument-fundamentals";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Props = {
   instrumentId: string;
@@ -36,29 +36,29 @@ type Props = {
 };
 
 const PILLAR_LABELS: Record<keyof FundamentalPillarsV1, string> = {
-  value: 'Value',
-  quality: 'Quality',
-  growth: 'Growth',
-  risk: 'Risk',
+  value: "Value",
+  quality: "Quality",
+  growth: "Growth",
+  risk: "Risk",
 };
 
 function fmtNum(n: number | null | undefined, digits = 2): string {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return "—";
   return n.toFixed(digits);
 }
 
 function fmtPctRatio(n: number | null | undefined, digits = 1): string {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return "—";
   return `${(n * 100).toFixed(digits)}%`;
 }
 
 function fmtPe(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return '—';
+  if (n == null || !Number.isFinite(n)) return "—";
   return n.toFixed(1);
 }
 
 function fmtMcap(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n) || n <= 0) return '—';
+  if (n == null || !Number.isFinite(n) || n <= 0) return "—";
   if (n >= 1e12) return `${(n / 1e12).toFixed(2)} T`;
   if (n >= 1e9) return `${(n / 1e9).toFixed(1)} B`;
   if (n >= 1e6) return `${(n / 1e6).toFixed(0)} M`;
@@ -66,22 +66,24 @@ function fmtMcap(n: number | null | undefined): string {
 }
 
 function scoreTone(score100: number | null): string {
-  if (score100 == null) return 'text-muted-foreground';
-  if (score100 >= 70) return 'text-emerald-600 dark:text-emerald-400';
-  if (score100 >= 45) return 'text-amber-600 dark:text-amber-400';
-  return 'text-destructive';
+  if (score100 == null) return "text-muted-foreground";
+  if (score100 >= 70) return "text-emerald-600 dark:text-emerald-400";
+  if (score100 >= 45) return "text-amber-600 dark:text-amber-400";
+  return "text-destructive";
 }
 
 function confidenceClass(c: FundamentalDataConfidence): string {
-  if (c === 'HIGH') return 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
-  if (c === 'MEDIUM') return 'bg-amber-500/15 text-amber-800 dark:text-amber-300';
-  return 'bg-destructive/15 text-destructive';
+  if (c === "HIGH")
+    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300";
+  if (c === "MEDIUM")
+    return "bg-amber-500/15 text-amber-800 dark:text-amber-300";
+  return "bg-destructive/15 text-destructive";
 }
 
 function confidenceLabel(c: FundamentalDataConfidence): string {
-  if (c === 'HIGH') return 'Alta confianza';
-  if (c === 'MEDIUM') return 'Confianza media';
-  return 'Baja confianza';
+  if (c === "HIGH") return "Alta confianza";
+  if (c === "MEDIUM") return "Confianza media";
+  return "Baja confianza";
 }
 
 /** Pilar [-1,1] → ancho de barra 0–100%. */
@@ -91,41 +93,52 @@ function pillarBarPct(v: number): number {
 
 function freshnessLabel(card: FundamentalCardDto): string {
   const { fetchedAt, staleDays, isStale } = card.metadata;
-  if (!fetchedAt) return 'Sin fecha de datos';
+  if (!fetchedAt) return "Sin fecha de datos";
   if (isStale) {
-    return staleDays != null ? `Datos hace ${staleDays} d (obsoletos)` : 'Datos obsoletos';
+    return staleDays != null
+      ? `Datos hace ${staleDays} d (obsoletos)`
+      : "Datos obsoletos";
   }
-  if (staleDays == null) return 'Datos recientes';
-  if (staleDays <= 0) return 'Datos de hoy';
-  if (staleDays === 1) return 'Datos hace 1 día';
+  if (staleDays == null) return "Datos recientes";
+  if (staleDays <= 0) return "Datos de hoy";
+  if (staleDays === 1) return "Datos hace 1 día";
   return `Datos hace ${staleDays} días`;
 }
 
 function PillarBars({ pillars }: { pillars: FundamentalPillarsV1 }) {
   return (
     <div className="space-y-1.5">
-      {(Object.keys(PILLAR_LABELS) as (keyof FundamentalPillarsV1)[]).map((key) => {
-        const v = pillars[key];
-        return (
-          <div key={key} className="grid grid-cols-[4.5rem_1fr_2.25rem] items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-              {PILLAR_LABELS[key]}
-            </span>
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn(
-                  'h-full rounded-full transition-[width]',
-                  v >= 0.25 ? 'bg-emerald-500/80' : v >= -0.25 ? 'bg-amber-500/70' : 'bg-destructive/70',
-                )}
-                style={{ width: `${pillarBarPct(v)}%` }}
-              />
+      {(Object.keys(PILLAR_LABELS) as (keyof FundamentalPillarsV1)[]).map(
+        (key) => {
+          const v = pillars[key];
+          return (
+            <div
+              key={key}
+              className="grid grid-cols-[4.5rem_1fr_2.25rem] items-center gap-2"
+            >
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {PILLAR_LABELS[key]}
+              </span>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-[width]",
+                    v >= 0.25
+                      ? "bg-emerald-500/80"
+                      : v >= -0.25
+                        ? "bg-amber-500/70"
+                        : "bg-destructive/70",
+                  )}
+                  style={{ width: `${pillarBarPct(v)}%` }}
+                />
+              </div>
+              <span className="text-right text-[11px] tabular-nums text-muted-foreground">
+                {fmtNum(v, 2)}
+              </span>
             </div>
-            <span className="text-right text-[11px] tabular-nums text-muted-foreground">
-              {fmtNum(v, 2)}
-            </span>
-          </div>
-        );
-      })}
+          );
+        },
+      )}
     </div>
   );
 }
@@ -133,7 +146,9 @@ function PillarBars({ pillars }: { pillars: FundamentalPillarsV1 }) {
 function MetricCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-md border border-border/50 bg-background/40 px-2 py-1.5">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-0.5 text-sm tabular-nums text-foreground">{value}</p>
     </div>
   );
@@ -162,7 +177,7 @@ function CardSection({
           onClick={() => setOpen((v) => !v)}
         >
           <span aria-hidden className="tabular-nums text-muted-foreground/80">
-            {open ? '▾' : '▸'}
+            {open ? "▾" : "▸"}
           </span>
           {title}
         </button>
@@ -183,7 +198,7 @@ function MoreMetrics({ children }: { children: ReactNode }) {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {open ? 'Ocultar más métricas' : 'Más métricas (valoración, liquidez…)'}
+        {open ? "Ocultar más métricas" : "Más métricas (valoración, liquidez…)"}
       </button>
       {open ? children : null}
     </div>
@@ -198,19 +213,22 @@ export function FundamentalCardPanel({
 }: Props) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [copilot, setCopilot] = useState<FundamentalExplainResponseV1 | null>(null);
+  const [copilot, setCopilot] = useState<FundamentalExplainResponseV1 | null>(
+    null,
+  );
   const [filingSummary, setFilingSummary] =
     useState<InstrumentFilingSummarizeResponseV1 | null>(null);
   const [askFilingId, setAskFilingId] = useState<string | null>(null);
-  const [askQuestion, setAskQuestion] = useState('');
-  const [filingAsk, setFilingAsk] = useState<InstrumentFilingAskResponseV1 | null>(null);
+  const [askQuestion, setAskQuestion] = useState("");
+  const [filingAsk, setFilingAsk] =
+    useState<InstrumentFilingAskResponseV1 | null>(null);
   const asOfNorm = asOf?.trim() || undefined;
 
   useEffect(() => {
     setCopilot(null);
     setFilingSummary(null);
     setAskFilingId(null);
-    setAskQuestion('');
+    setAskQuestion("");
     setFilingAsk(null);
   }, [instrumentId, asOfNorm]);
 
@@ -224,20 +242,20 @@ export function FundamentalCardPanel({
   } = useEnsureInstrumentFundamentals(instrumentId, { asOf: asOfNorm });
 
   const filingsQuery = useQuery({
-    queryKey: ['instrument-filings', instrumentId],
+    queryKey: ["instrument-filings", instrumentId],
     queryFn: () => api.listInstrumentFilings(instrumentId),
     enabled: Boolean(instrumentId) && !compact,
     staleTime: 30_000,
   });
 
   const compositeQuery = useQuery({
-    queryKey: ['instrument-composite', instrumentId, asOfNorm ?? null],
+    queryKey: ["instrument-composite", instrumentId, asOfNorm ?? null],
     queryFn: () =>
       api.getInstrumentComposite(instrumentId, {
-        horizon: 'swing',
+        horizon: "swing",
         ...(asOfNorm ? { asOf: asOfNorm } : {}),
       }),
-    enabled: Boolean(instrumentId) && !compact && ensureStatus === 'ready',
+    enabled: Boolean(instrumentId) && !compact && ensureStatus === "ready",
     staleTime: 60_000,
   });
 
@@ -249,41 +267,57 @@ export function FundamentalCardPanel({
   });
 
   const uploadFilingMutation = useMutation({
-    mutationFn: (file: File) => api.uploadInstrumentFiling(instrumentId, file, '10-K'),
+    mutationFn: (file: File) =>
+      api.uploadInstrumentFiling(instrumentId, file, "10-K"),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['instrument-filings', instrumentId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["instrument-filings", instrumentId],
+      });
       setFilingSummary(null);
     },
   });
 
   const secFetchMutation = useMutation({
-    mutationFn: () => api.fetchInstrumentFilingFromSec(instrumentId, '10-K'),
+    mutationFn: () => api.fetchInstrumentFilingFromSec(instrumentId, "10-K"),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['instrument-filings', instrumentId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["instrument-filings", instrumentId],
+      });
       setFilingSummary(null);
     },
   });
 
   const summarizeFilingMutation = useMutation({
-    mutationFn: (filingId: string) => api.summarizeInstrumentFiling(instrumentId, filingId),
+    mutationFn: (filingId: string) =>
+      api.summarizeInstrumentFiling(instrumentId, filingId),
     onSuccess: async (res) => {
       setFilingSummary(res.data);
-      await queryClient.invalidateQueries({ queryKey: ['instrument-filings', instrumentId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["instrument-filings", instrumentId],
+      });
     },
   });
 
   const deleteFilingMutation = useMutation({
-    mutationFn: (filingId: string) => api.deleteInstrumentFiling(instrumentId, filingId),
+    mutationFn: (filingId: string) =>
+      api.deleteInstrumentFiling(instrumentId, filingId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['instrument-filings', instrumentId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["instrument-filings", instrumentId],
+      });
       setFilingSummary(null);
       setFilingAsk(null);
     },
   });
 
   const askFilingMutation = useMutation({
-    mutationFn: ({ filingId, question }: { filingId: string; question: string }) =>
-      api.askInstrumentFiling(instrumentId, filingId, question),
+    mutationFn: ({
+      filingId,
+      question,
+    }: {
+      filingId: string;
+      question: string;
+    }) => api.askInstrumentFiling(instrumentId, filingId, question),
     onSuccess: (res) => {
       setFilingAsk(res.data);
     },
@@ -293,37 +327,44 @@ export function FundamentalCardPanel({
   const filings: InstrumentFilingMetaV1[] = filingsQuery.data?.data ?? [];
   const composite: CompositeCardDto | null = compositeQuery.data?.data ?? null;
   const askTargetId =
-    askFilingId ?? filings.find((f) => (f.charCount ?? 0) > 0)?.id ?? filings[0]?.id ?? null;
-  const ensureBusy = ensureStatus === 'loading' || ensureStatus === 'refreshing';
+    askFilingId ??
+    filings.find((f) => (f.charCount ?? 0) > 0)?.id ??
+    filings[0]?.id ??
+    null;
+  const ensureBusy =
+    ensureStatus === "loading" || ensureStatus === "refreshing";
 
   if (ensureBusy && !card) {
     return (
       <div
         className={cn(
-          'rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5 text-xs text-muted-foreground',
+          "rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5 text-xs text-muted-foreground",
           className,
         )}
       >
         <span className="inline-flex items-center gap-1.5">
-          <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden />
-          {ensureLabel || 'Cargando fundamentales…'}
+          <RefreshCw
+            className="h-3.5 w-3.5 shrink-0 animate-spin"
+            aria-hidden
+          />
+          {ensureLabel || "Cargando fundamentales…"}
         </span>
       </div>
     );
   }
 
-  if ((ensureStatus === 'error' || ensureStatus === 'empty') && !card) {
+  if ((ensureStatus === "error" || ensureStatus === "empty") && !card) {
     return (
       <div
         className={cn(
-          'space-y-2 rounded-lg border px-3 py-2.5 text-xs',
-          ensureStatus === 'error'
-            ? 'border-destructive/40 bg-destructive/5 text-destructive'
-            : 'border-border/60 bg-muted/15 text-muted-foreground',
+          "space-y-2 rounded-lg border px-3 py-2.5 text-xs",
+          ensureStatus === "error"
+            ? "border-destructive/40 bg-destructive/5 text-destructive"
+            : "border-border/60 bg-muted/15 text-muted-foreground",
           className,
         )}
       >
-        <p>{ensureLabel || 'Sin datos de análisis fundamental.'}</p>
+        <p>{ensureLabel || "Sin datos de análisis fundamental."}</p>
         <Button
           type="button"
           variant="outline"
@@ -332,7 +373,9 @@ export function FundamentalCardPanel({
           disabled={ensureRefreshing}
           onClick={() => refreshNow()}
         >
-          <RefreshCw className={cn('h-3 w-3', ensureRefreshing && 'animate-spin')} />
+          <RefreshCw
+            className={cn("h-3 w-3", ensureRefreshing && "animate-spin")}
+          />
           Reintentar Yahoo
         </Button>
       </div>
@@ -342,13 +385,13 @@ export function FundamentalCardPanel({
   if (!card) return null;
 
   const pe = card.facts.forwardPe ?? card.facts.trailingPe;
-  const sector = card.facts.sector ?? '—';
+  const sector = card.facts.sector ?? "—";
 
   if (compact) {
     return (
       <div
         className={cn(
-          'flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/60 bg-muted/15 px-3 py-2',
+          "flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border border-border/60 bg-muted/15 px-3 py-2",
           className,
         )}
       >
@@ -358,17 +401,24 @@ export function FundamentalCardPanel({
         {ensureBusy ? (
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <RefreshCw className="h-3 w-3 animate-spin" aria-hidden />
-            {ensureStatus === 'refreshing' ? 'Actualizando…' : 'Cargando…'}
+            {ensureStatus === "refreshing" ? "Actualizando…" : "Cargando…"}
           </span>
         ) : (
           <>
-            <span className={cn('text-lg font-semibold tabular-nums', scoreTone(card.scoreDisplay100))}>
-              {card.scoreDisplay100 != null ? `${card.scoreDisplay100}` : '—'}
-              <span className="ml-0.5 text-[10px] font-normal text-muted-foreground">/100</span>
+            <span
+              className={cn(
+                "text-lg font-semibold tabular-nums",
+                scoreTone(card.scoreDisplay100),
+              )}
+            >
+              {card.scoreDisplay100 != null ? `${card.scoreDisplay100}` : "—"}
+              <span className="ml-0.5 text-[10px] font-normal text-muted-foreground">
+                /100
+              </span>
             </span>
             <span
               className={cn(
-                'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                "rounded-full px-2 py-0.5 text-[10px] font-medium",
                 confidenceClass(card.metadata.confidence),
               )}
             >
@@ -379,22 +429,27 @@ export function FundamentalCardPanel({
                 Distress
               </span>
             ) : null}
-            <span className="text-[10px] text-muted-foreground">{freshnessLabel(card)}</span>
+            <span className="text-[10px] text-muted-foreground">
+              {freshnessLabel(card)}
+            </span>
             <span className="text-[10px] tabular-nums text-muted-foreground">
-              ROE {fmtPctRatio(card.facts.roe)} · D/E {fmtNum(card.facts.debtToEquity)} · Z{' '}
+              ROE {fmtPctRatio(card.facts.roe)} · D/E{" "}
+              {fmtNum(card.facts.debtToEquity)} · Z{" "}
               {fmtNum(card.derived.altmanZ)}
             </span>
           </>
         )}
-        {(ensureStatus === 'empty' || ensureStatus === 'error') && (
+        {(ensureStatus === "empty" || ensureStatus === "error") && (
           <span
             className={cn(
-              'text-[10px]',
-              ensureStatus === 'error' ? 'text-destructive' : 'text-muted-foreground',
+              "text-[10px]",
+              ensureStatus === "error"
+                ? "text-destructive"
+                : "text-muted-foreground",
             )}
             title={ensureLabel}
           >
-            {ensureStatus === 'empty' ? 'Sin datos FA' : 'Error FA'}
+            {ensureStatus === "empty" ? "Sin datos FA" : "Error FA"}
           </span>
         )}
       </div>
@@ -404,7 +459,7 @@ export function FundamentalCardPanel({
   return (
     <section
       className={cn(
-        'shrink-0 space-y-3 rounded-lg border border-border bg-muted/15 px-3 py-3',
+        "shrink-0 space-y-3 rounded-lg border border-border bg-muted/15 px-3 py-3",
         className,
       )}
       aria-label="Análisis fundamental"
@@ -414,18 +469,29 @@ export function FundamentalCardPanel({
           <div className="flex flex-wrap items-baseline gap-2">
             <h3 className="text-sm font-medium text-foreground">
               {card.ticker}
-              <span className="ml-1.5 font-normal text-muted-foreground">· Fundamental</span>
+              <span className="ml-1.5 font-normal text-muted-foreground">
+                · Fundamental
+              </span>
             </h3>
-            <span className="text-[11px] text-muted-foreground">Sector: {sector}</span>
+            <span className="text-[11px] text-muted-foreground">
+              Sector: {sector}
+            </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className={cn('text-2xl font-semibold tabular-nums leading-none', scoreTone(card.scoreDisplay100))}>
-              {card.scoreDisplay100 != null ? card.scoreDisplay100 : '—'}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">/100</span>
+            <p
+              className={cn(
+                "text-2xl font-semibold tabular-nums leading-none",
+                scoreTone(card.scoreDisplay100),
+              )}
+            >
+              {card.scoreDisplay100 != null ? card.scoreDisplay100 : "—"}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">
+                /100
+              </span>
             </p>
             <span
               className={cn(
-                'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                "rounded-full px-2 py-0.5 text-[11px] font-medium",
                 confidenceClass(card.metadata.confidence),
               )}
             >
@@ -452,7 +518,12 @@ export function FundamentalCardPanel({
             onClick={() => explainMutation.mutate()}
             title="Explica Score_FUND y facts (Ollama o heurística). No recalcula."
           >
-            <Sparkles className={cn('h-3.5 w-3.5', explainMutation.isPending && 'animate-pulse')} />
+            <Sparkles
+              className={cn(
+                "h-3.5 w-3.5",
+                explainMutation.isPending && "animate-pulse",
+              )}
+            />
             Copiloto
           </Button>
           <Button
@@ -464,19 +535,21 @@ export function FundamentalCardPanel({
             onClick={() => refreshNow()}
             title="Sincroniza el valor (Yahoo) y recarga Score_FUND"
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', ensureRefreshing && 'animate-spin')} />
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", ensureRefreshing && "animate-spin")}
+            />
             Refresh
           </Button>
         </div>
       </div>
 
-      {(ensureStatus === 'empty' || ensureStatus === 'error' || ensureBusy) && (
+      {(ensureStatus === "empty" || ensureStatus === "error" || ensureBusy) && (
         <div
           className={cn(
-            'rounded-md border px-2.5 py-2 text-[11px] leading-snug',
-            ensureStatus === 'error'
-              ? 'border-destructive/40 bg-destructive/5 text-destructive'
-              : 'border-border/60 bg-background/40 text-muted-foreground',
+            "rounded-md border px-2.5 py-2 text-[11px] leading-snug",
+            ensureStatus === "error"
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : "border-border/60 bg-background/40 text-muted-foreground",
           )}
         >
           {ensureLabel}
@@ -484,7 +557,9 @@ export function FundamentalCardPanel({
       )}
 
       {explainMutation.isError ? (
-        <p className="text-[11px] text-destructive">No se pudo generar la explicación.</p>
+        <p className="text-[11px] text-destructive">
+          No se pudo generar la explicación.
+        </p>
       ) : null}
       {copilot?.payload?.paragraphs?.length ? (
         <div className="space-y-2 rounded-md border border-border/60 bg-background/50 px-2.5 py-2">
@@ -492,16 +567,21 @@ export function FundamentalCardPanel({
             Copiloto
             <span className="ml-1.5 font-normal normal-case">
               · {copilot.engine}
-              {copilot.model ? ` · ${copilot.model}` : ''}
+              {copilot.model ? ` · ${copilot.model}` : ""}
             </span>
           </p>
           {copilot.payload.paragraphs.map((p, i) => (
-            <p key={`${i}-${p.slice(0, 24)}`} className="text-xs leading-relaxed text-foreground/90">
+            <p
+              key={`${i}-${p.slice(0, 24)}`}
+              className="text-xs leading-relaxed text-foreground/90"
+            >
               {p}
             </p>
           ))}
           {copilot.payload.disclaimer ? (
-            <p className="text-[10px] italic text-muted-foreground">{copilot.payload.disclaimer}</p>
+            <p className="text-[10px] italic text-muted-foreground">
+              {copilot.payload.disclaimer}
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -511,7 +591,9 @@ export function FundamentalCardPanel({
           <PillarBars pillars={card.pillars} />
         </CardSection>
       ) : (
-        <p className="text-xs text-muted-foreground">Sin puntuación (faltan datos fundamentales).</p>
+        <p className="text-xs text-muted-foreground">
+          Sin puntuación (faltan datos fundamentales).
+        </p>
       )}
 
       <CardSection title="Métricas clave" defaultOpen>
@@ -522,7 +604,9 @@ export function FundamentalCardPanel({
           <MetricCell
             label="Piotroski"
             value={
-              card.derived.piotroski != null ? `${card.derived.piotroski}/9` : '—'
+              card.derived.piotroski != null
+                ? `${card.derived.piotroski}/9`
+                : "—"
             }
           />
           <MetricCell label="ROIC" value={fmtPctRatio(card.derived.roic)} />
@@ -531,12 +615,18 @@ export function FundamentalCardPanel({
         <MoreMetrics>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-5">
             <MetricCell label="D/E" value={fmtNum(card.facts.debtToEquity)} />
-            <MetricCell label="FCF Yield" value={fmtPctRatio(card.derived.fcfYield)} />
+            <MetricCell
+              label="FCF Yield"
+              value={fmtPctRatio(card.derived.fcfYield)}
+            />
             <MetricCell
               label="DCF upside"
               value={fmtPctRatio(card.derived.dcfUpside)}
             />
-            <MetricCell label="WACC/ke" value={fmtPctRatio(card.derived.wacc)} />
+            <MetricCell
+              label="WACC/ke"
+              value={fmtPctRatio(card.derived.wacc)}
+            />
             <MetricCell label="Beta" value={fmtNum(card.derived.beta)} />
             <MetricCell
               label="Graham upside"
@@ -544,9 +634,18 @@ export function FundamentalCardPanel({
             />
             <MetricCell label="ADV $" value={fmtMcap(card.derived.advUsd)} />
             <MetricCell label="Mcap" value={fmtMcap(card.facts.marketCap)} />
-            <MetricCell label="Op. margin" value={fmtPctRatio(card.facts.operatingMargin)} />
-            <MetricCell label="Rev. growth" value={fmtPctRatio(card.facts.revenueGrowth)} />
-            <MetricCell label="Current" value={fmtNum(card.facts.currentRatio)} />
+            <MetricCell
+              label="Op. margin"
+              value={fmtPctRatio(card.facts.operatingMargin)}
+            />
+            <MetricCell
+              label="Rev. growth"
+              value={fmtPctRatio(card.facts.revenueGrowth)}
+            />
+            <MetricCell
+              label="Current"
+              value={fmtNum(card.facts.currentRatio)}
+            />
           </div>
           {card.derived.dcfScenarios ? (
             <div className="mt-1.5 grid grid-cols-3 gap-1.5">
@@ -564,7 +663,7 @@ export function FundamentalCardPanel({
               />
             </div>
           ) : null}
-          {card.derived.altmanEbitSource === 'financial_ebitda_proxy' ? (
+          {card.derived.altmanEbitSource === "financial_ebitda_proxy" ? (
             <p className="mt-1 text-[10px] text-amber-700 dark:text-amber-400">
               Altman usa proxy EBITDA (no EBIT de income statement).
             </p>
@@ -573,36 +672,45 @@ export function FundamentalCardPanel({
           card.derived.beneishM == null &&
           card.derived.altmanZ == null ? (
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Piotroski / Beneish / Altman omitidos si faltan current assets/liabilities
-              (típico bancos; null-if-incomplete).
+              Piotroski / Beneish / Altman omitidos si faltan current
+              assets/liabilities (típico bancos; null-if-incomplete).
             </p>
           ) : null}
           {card.derived.dcfMethod ? (
             <p className="mt-1 text-[10px] text-muted-foreground">
-              DCF {card.derived.dcfMethod ?? '—'}: FCF 5y + Gordon (r=
-              {card.derived.waccMethod === 'fund_capm_v1' ? 'CAPM ke' : 'WACC sector'}
-              {card.derived.wacc != null ? ` ${fmtPctRatio(card.derived.wacc)}` : ''}
-              {card.derived.waccMethod ? ` · ${card.derived.waccMethod}` : ''}
-              , g_term=2.5%); simplificación equity.
+              DCF {card.derived.dcfMethod ?? "—"}: FCF 5y + Gordon (r=
+              {card.derived.waccMethod === "fund_capm_v1"
+                ? "CAPM ke"
+                : "WACC sector"}
+              {card.derived.wacc != null
+                ? ` ${fmtPctRatio(card.derived.wacc)}`
+                : ""}
+              {card.derived.waccMethod ? ` · ${card.derived.waccMethod}` : ""},
+              g_term=2.5%); simplificación equity.
               {card.derived.dcfScenarios
                 ? ` Escenarios ${card.derived.dcfScenarios.method}: g±3pp · r±1pp.`
-                : ''}
+                : ""}
             </p>
           ) : null}
-          {card.derived.waccMethod === 'fund_capm_v1' &&
+          {card.derived.waccMethod === "fund_capm_v1" &&
           card.derived.capmRf != null &&
           card.derived.capmErp != null &&
           card.derived.beta != null ? (
             <p className="mt-1 text-[10px] text-muted-foreground">
-              CAPM: ke = rf {fmtPctRatio(card.derived.capmRf)} + β{' '}
-              {fmtNum(card.derived.beta)} × ERP {fmtPctRatio(card.derived.capmErp)}
-              {card.derived.wacc != null ? ` → ${fmtPctRatio(card.derived.wacc)}` : ''}.
-              rf/ERP versionados ({card.derived.waccMethod}); no son tasas live.
+              CAPM: ke = rf {fmtPctRatio(card.derived.capmRf)} + β{" "}
+              {fmtNum(card.derived.beta)} × ERP{" "}
+              {fmtPctRatio(card.derived.capmErp)}
+              {card.derived.wacc != null
+                ? ` → ${fmtPctRatio(card.derived.wacc)}`
+                : ""}
+              . rf/ERP versionados ({card.derived.waccMethod}); no son tasas
+              live.
             </p>
           ) : null}
           {card.derived.grahamMethod && card.derived.grahamNumber != null ? (
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Graham {card.derived.grahamMethod}: {fmtNum(card.derived.grahamNumber)} / acción.
+              Graham {card.derived.grahamMethod}:{" "}
+              {fmtNum(card.derived.grahamNumber)} / acción.
             </p>
           ) : null}
         </MoreMetrics>
@@ -622,43 +730,52 @@ export function FundamentalCardPanel({
         trailing={
           composite ? (
             <p className="text-xs tabular-nums">
-              <span className={cn('font-semibold', scoreTone(composite.scoreDisplay100))}>
-                {composite.scoreDisplay100 ?? '—'}
+              <span
+                className={cn(
+                  "font-semibold",
+                  scoreTone(composite.scoreDisplay100),
+                )}
+              >
+                {composite.scoreDisplay100 ?? "—"}
               </span>
               <span className="text-muted-foreground">
                 /100 · {composite.metadata.confidence}
-                {composite.metadata.paperDUnlocked ? ' · Paper D listo' : ''}
+                {composite.metadata.paperDUnlocked ? " · Paper D listo" : ""}
               </span>
             </p>
           ) : null
         }
       >
         {compositeQuery.isLoading ? (
-          <p className="text-[11px] text-muted-foreground">Calculando Composite…</p>
+          <p className="text-[11px] text-muted-foreground">
+            Calculando Composite…
+          </p>
         ) : compositeQuery.isError ? (
-          <p className="text-[11px] text-destructive">No se pudo cargar el Composite.</p>
+          <p className="text-[11px] text-destructive">
+            No se pudo cargar el Composite.
+          </p>
         ) : composite ? (
           <>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {composite.legs.map((leg) => {
                 const methodLabel = formatCompositeLegMethod(leg.method);
                 return (
-                <div
-                  key={leg.key}
-                  className="rounded-md border border-border/50 bg-background/40 px-2 py-1.5"
-                >
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {leg.label}
-                  </p>
-                  <p className="mt-0.5 text-sm tabular-nums text-foreground">
-                    {leg.score != null ? fmtNum(leg.score, 2) : '—'}
-                    <span className="ml-1 text-[10px] text-muted-foreground">
-                      · {leg.status}
-                      {leg.weight > 0 ? ` · w${fmtNum(leg.weight, 2)}` : ''}
-                      {methodLabel ? ` · ${methodLabel}` : ''}
-                    </span>
-                  </p>
-                </div>
+                  <div
+                    key={leg.key}
+                    className="rounded-md border border-border/50 bg-background/40 px-2 py-1.5"
+                  >
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {leg.label}
+                    </p>
+                    <p className="mt-0.5 text-sm tabular-nums text-foreground">
+                      {leg.score != null ? fmtNum(leg.score, 2) : "—"}
+                      <span className="ml-1 text-[10px] text-muted-foreground">
+                        · {leg.status}
+                        {leg.weight > 0 ? ` · w${fmtNum(leg.weight, 2)}` : ""}
+                        {methodLabel ? ` · ${methodLabel}` : ""}
+                      </span>
+                    </p>
+                  </div>
                 );
               })}
             </div>
@@ -666,7 +783,7 @@ export function FundamentalCardPanel({
               {composite.metadata.scoreVersion} · {composite.weights.rationale}
               {composite.metadata.technicalMethod
                 ? ` · TA ${composite.metadata.technicalMethod}`
-                : ' · sin TA'}
+                : " · sin TA"}
             </p>
           </>
         ) : null}
@@ -685,7 +802,7 @@ export function FundamentalCardPanel({
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              e.target.value = '';
+              e.target.value = "";
               if (file) uploadFilingMutation.mutate(file);
             }}
           />
@@ -699,7 +816,10 @@ export function FundamentalCardPanel({
             title="Sube PDF o TXT (10-K). No altera Score_FUND."
           >
             <FileText
-              className={cn('h-3.5 w-3.5', uploadFilingMutation.isPending && 'animate-pulse')}
+              className={cn(
+                "h-3.5 w-3.5",
+                uploadFilingMutation.isPending && "animate-pulse",
+              )}
             />
             Subir 10-K
           </Button>
@@ -713,26 +833,33 @@ export function FundamentalCardPanel({
             title="Descarga el último 10-K desde SEC EDGAR (solo tickers US). Sin RAG."
           >
             <FileText
-              className={cn('h-3.5 w-3.5', secFetchMutation.isPending && 'animate-pulse')}
+              className={cn(
+                "h-3.5 w-3.5",
+                secFetchMutation.isPending && "animate-pulse",
+              )}
             />
             Traer SEC
           </Button>
         </div>
         <p className="text-[10px] text-muted-foreground">
-          Almacén local · SEC EDGAR (US) · resumen / Q&A TF-IDF · no entra en Score_FUND.
-          Para SEC: env BOLSA_SEC_USER_AGENT (contacto real).
+          Almacén local · SEC EDGAR (US) · resumen / Q&A TF-IDF · no entra en
+          Score_FUND. Para SEC: env BOLSA_SEC_USER_AGENT (contacto real).
         </p>
         {uploadFilingMutation.isError ? (
-          <p className="text-[11px] text-destructive">No se pudo subir el documento.</p>
+          <p className="text-[11px] text-destructive">
+            No se pudo subir el documento.
+          </p>
         ) : null}
         {secFetchMutation.isError ? (
           <p className="text-[11px] text-destructive">
             {(secFetchMutation.error as Error)?.message ||
-              'No se pudo traer el filing desde SEC (¿ticker US? ¿User-Agent?).'}
+              "No se pudo traer el filing desde SEC (¿ticker US? ¿User-Agent?)."}
           </p>
         ) : null}
         {filings.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground">Sin documentos adjuntos.</p>
+          <p className="text-[11px] text-muted-foreground">
+            Sin documentos adjuntos.
+          </p>
         ) : (
           <ul className="space-y-1.5">
             {filings.slice(0, 5).map((f) => (
@@ -743,14 +870,15 @@ export function FundamentalCardPanel({
                 <span className="min-w-0 truncate">
                   <span className="font-medium">{f.kind}</span>
                   <span className="text-muted-foreground">
-                    {' '}
-                    · {f.source === 'sec_edgar' ? 'SEC' : 'manual'} · {f.originalName}
+                    {" "}
+                    · {f.source === "sec_edgar" ? "SEC" : "manual"} ·{" "}
+                    {f.originalName}
                   </span>
                   <span className="text-muted-foreground">
-                    {' '}
+                    {" "}
                     · {f.extractStatus}
-                    {f.filingDate ? ` · ${f.filingDate}` : ''}
-                    {f.charCount ? ` · ${f.charCount} chars` : ''}
+                    {f.filingDate ? ` · ${f.filingDate}` : ""}
+                    {f.charCount ? ` · ${f.charCount} chars` : ""}
                   </span>
                 </span>
                 <span className="flex shrink-0 gap-1">
@@ -759,7 +887,9 @@ export function FundamentalCardPanel({
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2"
-                    disabled={summarizeFilingMutation.isPending || f.charCount === 0}
+                    disabled={
+                      summarizeFilingMutation.isPending || f.charCount === 0
+                    }
                     onClick={() => summarizeFilingMutation.mutate(f.id)}
                   >
                     Resumir
@@ -769,8 +899,8 @@ export function FundamentalCardPanel({
                     variant="ghost"
                     size="sm"
                     className={cn(
-                      'h-7 px-2',
-                      askTargetId === f.id && 'bg-muted text-foreground',
+                      "h-7 px-2",
+                      askTargetId === f.id && "bg-muted text-foreground",
                     )}
                     disabled={(f.charCount ?? 0) === 0}
                     onClick={() => setAskFilingId(f.id)}
@@ -799,11 +929,14 @@ export function FundamentalCardPanel({
               Resumen filing
               <span className="ml-1.5 font-normal normal-case">
                 · {filingSummary.engine}
-                {filingSummary.model ? ` · ${filingSummary.model}` : ''}
+                {filingSummary.model ? ` · ${filingSummary.model}` : ""}
               </span>
             </p>
             {filingSummary.payload.paragraphs.map((p, i) => (
-              <p key={`${i}-${p.slice(0, 24)}`} className="text-xs leading-relaxed text-foreground/90">
+              <p
+                key={`${i}-${p.slice(0, 24)}`}
+                className="text-xs leading-relaxed text-foreground/90"
+              >
                 {p}
               </p>
             ))}
@@ -826,7 +959,7 @@ export function FundamentalCardPanel({
                 maxLength={800}
                 disabled={!askTargetId || askFilingMutation.isPending}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && askTargetId && askQuestion.trim()) {
+                  if (e.key === "Enter" && askTargetId && askQuestion.trim()) {
                     e.preventDefault();
                     askFilingMutation.mutate({
                       filingId: askTargetId,
@@ -841,7 +974,9 @@ export function FundamentalCardPanel({
                 size="sm"
                 className="h-8"
                 disabled={
-                  !askTargetId || !askQuestion.trim() || askFilingMutation.isPending
+                  !askTargetId ||
+                  !askQuestion.trim() ||
+                  askFilingMutation.isPending
                 }
                 onClick={() => {
                   if (!askTargetId || !askQuestion.trim()) return;
@@ -852,13 +987,13 @@ export function FundamentalCardPanel({
                 }}
                 title="Retrieval TF-IDF local + LLM/heurística"
               >
-                {askFilingMutation.isPending ? 'Buscando…' : 'Preguntar'}
+                {askFilingMutation.isPending ? "Buscando…" : "Preguntar"}
               </Button>
             </div>
             {askFilingMutation.isError ? (
               <p className="text-[11px] text-destructive">
                 {(askFilingMutation.error as Error)?.message ||
-                  'No se pudo responder sobre el filing.'}
+                  "No se pudo responder sobre el filing."}
               </p>
             ) : null}
             {filingAsk?.payload?.answer ? (
@@ -867,13 +1002,15 @@ export function FundamentalCardPanel({
                   Q&A filing
                   <span className="ml-1.5 font-normal normal-case">
                     · {filingAsk.engine}
-                    {filingAsk.model ? ` · ${filingAsk.model}` : ''}
+                    {filingAsk.model ? ` · ${filingAsk.model}` : ""}
                     {filingAsk.hits?.length
                       ? ` · ${filingAsk.hits.length} pasajes`
-                      : ''}
+                      : ""}
                   </span>
                 </p>
-                <p className="text-[10px] text-muted-foreground">«{filingAsk.question}»</p>
+                <p className="text-[10px] text-muted-foreground">
+                  «{filingAsk.question}»
+                </p>
                 <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">
                   {filingAsk.payload.answer}
                 </p>
@@ -889,10 +1026,13 @@ export function FundamentalCardPanel({
       </CardSection>
 
       <p className="text-[10px] text-muted-foreground">
-        {card.metadata.provider} · {card.metadata.sourceVersion ?? '—'} ·{' '}
+        {card.metadata.provider} · {card.metadata.sourceVersion ?? "—"} ·{" "}
         {card.metadata.scoreVersion}
         {card.scoreFund != null ? (
-          <span className="tabular-nums"> · Score_FUND {card.scoreFund.toFixed(2)}</span>
+          <span className="tabular-nums">
+            {" "}
+            · Score_FUND {card.scoreFund.toFixed(2)}
+          </span>
         ) : null}
       </p>
     </section>

@@ -4,7 +4,7 @@
  * @see docs/engineering/instruments-hub-2026-07-31.md
  */
 
-import type { PositionDto } from '@bolsa/shared';
+import type { PositionDto } from "@bolsa/shared";
 
 export type HubListMembership = {
   listId: string;
@@ -37,7 +37,9 @@ export function invertListMemberships(
     }
   }
   for (const [, refs] of map) {
-    refs.sort((a, b) => a.listName.localeCompare(b.listName, undefined, { sensitivity: 'base' }));
+    refs.sort((a, b) =>
+      a.listName.localeCompare(b.listName, undefined, { sensitivity: "base" }),
+    );
   }
   return map;
 }
@@ -73,10 +75,12 @@ export function pickListChips(
   maxVisible = 2,
 ): { visible: HubListMembership[]; overflow: number } {
   const ordered = [...memberships].sort((a, b) => {
-    const ac = a.source === 'custom' ? 0 : 1;
-    const bc = b.source === 'custom' ? 0 : 1;
+    const ac = a.source === "custom" ? 0 : 1;
+    const bc = b.source === "custom" ? 0 : 1;
     if (ac !== bc) return ac - bc;
-    return a.listName.localeCompare(b.listName, undefined, { sensitivity: 'base' });
+    return a.listName.localeCompare(b.listName, undefined, {
+      sensitivity: "base",
+    });
   });
   if (ordered.length <= maxVisible) return { visible: ordered, overflow: 0 };
   return {

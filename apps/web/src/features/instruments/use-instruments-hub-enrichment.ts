@@ -3,36 +3,39 @@
  * Reutiliza query keys: ['lists'], ['lists','memberships'], ['portfolio', accountScope].
  */
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { PositionDto } from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { useActiveAccountQueryKey } from '@/stores/active-account-store';
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { PositionDto } from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import {
   indexPositionsByInstrument,
   invertListMemberships,
   type HubListMembership,
-} from '@/features/instruments/instruments-hub-enrichment';
+} from "@/features/instruments/instruments-hub-enrichment";
 
 export function useInstrumentsHubEnrichment() {
   const accountScope = useActiveAccountQueryKey();
 
   const listsQuery = useQuery({
-    queryKey: ['lists'],
+    queryKey: ["lists"],
     queryFn: api.getLists,
     staleTime: 30_000,
   });
 
   const membershipsQuery = useQuery({
-    queryKey: ['lists', 'memberships'],
+    queryKey: ["lists", "memberships"],
     queryFn: api.getListMemberships,
     staleTime: 30_000,
   });
 
-  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
+  const apiLists = useMemo(
+    () => listsQuery.data?.data ?? [],
+    [listsQuery.data?.data],
+  );
 
   const portfolioQuery = useQuery({
-    queryKey: ['portfolio', accountScope],
+    queryKey: ["portfolio", accountScope],
     queryFn: api.getPortfolio,
     staleTime: 15_000,
   });
@@ -60,10 +63,14 @@ export function useInstrumentsHubEnrichment() {
   const portfolioReady = portfolioQuery.isSuccess || portfolioQuery.isError;
 
   return {
-    membershipsByInstrument: membershipsByInstrument as Map<string, HubListMembership[]>,
+    membershipsByInstrument: membershipsByInstrument as Map<
+      string,
+      HubListMembership[]
+    >,
     positionsByInstrument: positionsByInstrument as Map<string, PositionDto>,
     apiLists,
-    listsLoading: listsQuery.isLoading || membershipsQuery.isLoading || !listsReady,
+    listsLoading:
+      listsQuery.isLoading || membershipsQuery.isLoading || !listsReady,
     portfolioLoading: portfolioQuery.isLoading && !portfolioReady,
     accountScope,
   };

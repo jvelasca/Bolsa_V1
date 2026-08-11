@@ -3,47 +3,53 @@
  * Estética alineada con ListCarouselMenu (Trading → Listas).
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { MoreHorizontal } from 'lucide-react';
-import type { InstrumentListSummaryDto } from '@bolsa/shared';
-import { isEstudioListNameCollision } from '@bolsa/shared';
-import { checkboxClassName } from '@/components/ui/dialog';
-import { OpaqueMenuLabel, OpaqueMenuPanel } from '@/components/ui/opaque-menu-panel';
-import { cn } from '@/lib/utils';
-import type { InstrumentsHubScopeFilter } from '@/features/instruments/instruments-hub-model';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
+import type { InstrumentListSummaryDto } from "@bolsa/shared";
+import { isEstudioListNameCollision } from "@bolsa/shared";
+import { checkboxClassName } from "@/components/ui/dialog";
+import {
+  OpaqueMenuLabel,
+  OpaqueMenuPanel,
+} from "@/components/ui/opaque-menu-panel";
+import { cn } from "@/lib/utils";
+import type { InstrumentsHubScopeFilter } from "@/features/instruments/instruments-hub-model";
 
-export type InstrumentsHubBuiltinFilterId = 'all' | 'estudio' | 'portfolio';
+export type InstrumentsHubBuiltinFilterId = "all" | "estudio" | "portfolio";
 
 export const INSTRUMENTS_HUB_BUILTIN_FILTERS: Array<{
   id: InstrumentsHubBuiltinFilterId;
   label: string;
 }> = [
-  { id: 'all', label: 'Todos' },
-  { id: 'estudio', label: 'Estudio' },
-  { id: 'portfolio', label: 'Cartera' },
+  { id: "all", label: "Todos" },
+  { id: "estudio", label: "Estudio" },
+  { id: "portfolio", label: "Cartera" },
 ];
 
-export const DEFAULT_INSTRUMENTS_HUB_FAVORITE_BUILTIN_FILTERS: InstrumentsHubBuiltinFilterId[] = [
-  'all',
-  'estudio',
-  'portfolio',
-];
+export const DEFAULT_INSTRUMENTS_HUB_FAVORITE_BUILTIN_FILTERS: InstrumentsHubBuiltinFilterId[] =
+  ["all", "estudio", "portfolio"];
 
 export function normalizeFavoriteBuiltinFilters(
   value: unknown,
 ): InstrumentsHubBuiltinFilterId[] {
   const allowed = new Set(INSTRUMENTS_HUB_BUILTIN_FILTERS.map((f) => f.id));
-  if (!Array.isArray(value)) return [...DEFAULT_INSTRUMENTS_HUB_FAVORITE_BUILTIN_FILTERS];
+  if (!Array.isArray(value))
+    return [...DEFAULT_INSTRUMENTS_HUB_FAVORITE_BUILTIN_FILTERS];
   const next = value.filter(
     (id): id is InstrumentsHubBuiltinFilterId =>
-      typeof id === 'string' && allowed.has(id as InstrumentsHubBuiltinFilterId),
+      typeof id === "string" &&
+      allowed.has(id as InstrumentsHubBuiltinFilterId),
   );
-  return next.length > 0 ? next : [...DEFAULT_INSTRUMENTS_HUB_FAVORITE_BUILTIN_FILTERS];
+  return next.length > 0
+    ? next
+    : [...DEFAULT_INSTRUMENTS_HUB_FAVORITE_BUILTIN_FILTERS];
 }
 
 export function normalizeFavoriteListIds(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+  return value.filter(
+    (id): id is string => typeof id === "string" && id.trim().length > 0,
+  );
 }
 
 export function toggleFavoriteBuiltinFilter(
@@ -58,10 +64,15 @@ export function toggleFavoriteBuiltinFilter(
     set.add(id);
   }
   // Conservar orden canónico.
-  return INSTRUMENTS_HUB_BUILTIN_FILTERS.map((f) => f.id).filter((x) => set.has(x));
+  return INSTRUMENTS_HUB_BUILTIN_FILTERS.map((f) => f.id).filter((x) =>
+    set.has(x),
+  );
 }
 
-export function toggleFavoriteListId(current: string[], listId: string): string[] {
+export function toggleFavoriteListId(
+  current: string[],
+  listId: string,
+): string[] {
   const set = new Set(current);
   if (set.has(listId)) set.delete(listId);
   else set.add(listId);
@@ -87,14 +98,14 @@ function FilterChip({
       title={title ?? label}
       onClick={onClick}
       className={cn(
-        'inline-flex max-w-[9rem] items-center rounded-md border px-2 py-1 text-[11px] font-medium transition-colors',
+        "inline-flex max-w-[9rem] items-center rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
         active
-          ? 'border-primary/50 bg-primary/10 text-primary'
-          : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+          ? "border-primary/50 bg-primary/10 text-primary"
+          : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
       )}
     >
       <span className="truncate">{label}</span>
-      {badge != null && badge !== '' ? (
+      {badge != null && badge !== "" ? (
         <span className="ml-1 tabular-nums opacity-70">{badge}</span>
       ) : null}
     </button>
@@ -131,7 +142,10 @@ export function InstrumentsHubFilterBar({
     () => new Set(favoriteBuiltinFilters),
     [favoriteBuiltinFilters],
   );
-  const favoriteListSet = useMemo(() => new Set(favoriteListIds), [favoriteListIds]);
+  const favoriteListSet = useMemo(
+    () => new Set(favoriteListIds),
+    [favoriteListIds],
+  );
 
   /** Listas API elegibles: oculta homónimas de la virtual Estudio (evita chip duplicado). */
   const selectableApiLists = useMemo(
@@ -140,7 +154,10 @@ export function InstrumentsHubFilterBar({
   );
 
   const visibleBuiltins = useMemo(
-    () => INSTRUMENTS_HUB_BUILTIN_FILTERS.filter((f) => favoriteBuiltinSet.has(f.id)),
+    () =>
+      INSTRUMENTS_HUB_BUILTIN_FILTERS.filter((f) =>
+        favoriteBuiltinSet.has(f.id),
+      ),
     [favoriteBuiltinSet],
   );
 
@@ -151,7 +168,7 @@ export function InstrumentsHubFilterBar({
       .filter((l): l is InstrumentListSummaryDto => Boolean(l));
     // Si el filtro activo es una lista no favorita, mostrarla igual (transient).
     if (
-      scopeFilter === 'list' &&
+      scopeFilter === "list" &&
       scopeListId &&
       !favoriteListSet.has(scopeListId) &&
       byId.has(scopeListId)
@@ -159,7 +176,13 @@ export function InstrumentsHubFilterBar({
       return [...pinned, byId.get(scopeListId)!];
     }
     return pinned;
-  }, [selectableApiLists, favoriteListIds, favoriteListSet, scopeFilter, scopeListId]);
+  }, [
+    selectableApiLists,
+    favoriteListIds,
+    favoriteListSet,
+    scopeFilter,
+    scopeListId,
+  ]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -168,8 +191,8 @@ export function InstrumentsHubFilterBar({
         setMenuOpen(false);
       }
     }
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
   }, [menuOpen]);
 
   return (
@@ -183,14 +206,16 @@ export function InstrumentsHubFilterBar({
           key={chip.id}
           label={chip.label}
           title={
-            chip.id === 'estudio'
+            chip.id === "estudio"
               ? `Filtrar lista Estudio (${estudioCount})`
-              : chip.id === 'portfolio'
-                ? 'Solo posiciones abiertas (cuenta activa)'
-                : 'Catálogo completo'
+              : chip.id === "portfolio"
+                ? "Solo posiciones abiertas (cuenta activa)"
+                : "Catálogo completo"
           }
           active={scopeFilter === chip.id}
-          badge={chip.id === 'estudio' && estudioCount > 0 ? estudioCount : undefined}
+          badge={
+            chip.id === "estudio" && estudioCount > 0 ? estudioCount : undefined
+          }
           onClick={() => onSelectBuiltin(chip.id)}
         />
       ))}
@@ -199,12 +224,15 @@ export function InstrumentsHubFilterBar({
           key={list.id}
           label={list.name}
           title={`Filtrar lista ${list.name}`}
-          active={scopeFilter === 'list' && scopeListId === list.id}
+          active={scopeFilter === "list" && scopeListId === list.id}
           onClick={() => onSelectList(list.id)}
         />
       ))}
 
-      <div ref={menuRef} className="relative shrink-0 border-l border-border/60 pl-0.5">
+      <div
+        ref={menuRef}
+        className="relative shrink-0 border-l border-border/60 pl-0.5"
+      >
         <button
           type="button"
           title="Configurar filtros favoritos"
@@ -238,7 +266,9 @@ export function InstrumentsHubFilterBar({
             <OpaqueMenuLabel>Listas</OpaqueMenuLabel>
             <div className="scroll-area max-h-48 overflow-auto">
               {selectableApiLists.length === 0 ? (
-                <p className="px-2 py-1.5 text-[10px] text-muted-foreground">Sin listas API</p>
+                <p className="px-2 py-1.5 text-[10px] text-muted-foreground">
+                  Sin listas API
+                </p>
               ) : (
                 selectableApiLists.map((list) => (
                   <label

@@ -3,10 +3,10 @@
  * El detalle gestiona su propio scroll; la lista también.
  */
 
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
-import { cn } from '@/lib/utils';
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
+import { cn } from "@/lib/utils";
 
 export const MIN_INSTRUMENTS_HUB_LIST_PCT = 28;
 export const MAX_INSTRUMENTS_HUB_LIST_PCT = 78;
@@ -79,7 +79,9 @@ export function InstrumentsHubSplitLayout({
   const adjustListWidth = useCallback((deltaPx: number) => {
     const width = rootRef.current?.getBoundingClientRect().width ?? 0;
     if (width <= 0) return;
-    const next = clampInstrumentsHubListPct(pendingList.current + pxToPct(deltaPx, width));
+    const next = clampInstrumentsHubListPct(
+      pendingList.current + pxToPct(deltaPx, width),
+    );
     pendingList.current = next;
     setLiveListPct(next);
   }, []);
@@ -87,7 +89,9 @@ export function InstrumentsHubSplitLayout({
   const adjustStackHeight = useCallback((deltaPx: number) => {
     const height = rootRef.current?.getBoundingClientRect().height ?? 0;
     if (height <= 0) return;
-    const next = clampInstrumentsHubStackPct(pendingStack.current + pxToPct(deltaPx, height));
+    const next = clampInstrumentsHubStackPct(
+      pendingStack.current + pxToPct(deltaPx, height),
+    );
     pendingStack.current = next;
     setLiveStackPct(next);
   }, []);
@@ -100,7 +104,7 @@ export function InstrumentsHubSplitLayout({
       <div
         ref={rootRef}
         className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/60',
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/60",
           className,
         )}
       >
@@ -114,16 +118,16 @@ export function InstrumentsHubSplitLayout({
       <div
         ref={rootRef}
         className={cn(
-          'flex min-h-0 flex-1 overflow-hidden rounded-md border border-border/60',
-          isWide ? 'flex-row' : 'flex-col',
+          "flex min-h-0 flex-1 overflow-hidden rounded-md border border-border/60",
+          isWide ? "flex-row" : "flex-col",
           className,
         )}
       >
         <div className="min-h-0 min-w-0 flex-1 overflow-hidden">{list}</div>
         <div
           className={cn(
-            'shrink-0 overflow-hidden bg-muted/20',
-            isWide ? 'w-10' : 'h-10 border-t border-border/60',
+            "shrink-0 overflow-hidden bg-muted/20",
+            isWide ? "w-10" : "h-10 border-t border-border/60",
           )}
         >
           {detail}
@@ -137,17 +141,20 @@ export function InstrumentsHubSplitLayout({
       <div
         ref={rootRef}
         className={cn(
-          'flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/60',
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/60",
           className,
         )}
       >
-        <div className="min-h-0 shrink-0 overflow-hidden" style={{ height: `${stackPct}%` }}>
+        <div
+          className="min-h-0 shrink-0 overflow-hidden"
+          style={{ height: `${stackPct}%` }}
+        >
           {list}
         </div>
         <PanelResizeHandle
           label="Redimensionar lista y detalle"
           orientation="horizontal"
-          className={cn(dragging && 'bg-primary/70')}
+          className={cn(dragging && "bg-primary/70")}
           onDragStart={() => setDragging(true)}
           onDrag={adjustStackHeight}
           onDragEnd={() => {
@@ -155,7 +162,9 @@ export function InstrumentsHubSplitLayout({
             onStackHeightPctChange(pendingStack.current);
           }}
         />
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-card">{detail}</div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-card">
+          {detail}
+        </div>
       </div>
     );
   }
@@ -164,17 +173,20 @@ export function InstrumentsHubSplitLayout({
     <div
       ref={rootRef}
       className={cn(
-        'flex min-h-0 flex-1 overflow-hidden rounded-md border border-border/60',
+        "flex min-h-0 flex-1 overflow-hidden rounded-md border border-border/60",
         className,
       )}
     >
-      <div className="min-h-0 shrink-0 overflow-hidden" style={{ width: `${listPct}%` }}>
+      <div
+        className="min-h-0 shrink-0 overflow-hidden"
+        style={{ width: `${listPct}%` }}
+      >
         {list}
       </div>
       <PanelResizeHandle
         label="Redimensionar lista y detalle"
         orientation="vertical"
-        className={cn(dragging && 'bg-primary/70')}
+        className={cn(dragging && "bg-primary/70")}
         onDragStart={() => setDragging(true)}
         onDrag={adjustListWidth}
         onDragEnd={() => {

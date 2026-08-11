@@ -2,43 +2,43 @@
  * Panel detalle del hub Instrumentos — colapsable; secciones apiladas (acordeón).
  */
 
-import type { ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { ChevronDown, PanelRightClose, X } from 'lucide-react';
+import type { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { ChevronDown, PanelRightClose, X } from "lucide-react";
 import {
   DEFAULT_CHART_CONFIG,
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   type InstrumentWithMetaDto,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { formatPct, formatPrice } from '@/features/charts/chart-utils';
-import { OhlcvChart } from '@/features/charts/ohlcv-chart';
-import { InstrumentStrategyTopPanel } from '@/features/backtests/instrument-strategy-top-panel';
-import { InstrumentAnalysisSummary } from '@/features/trading/instrument-analysis-summary';
-import { InstrumentNarrativeEditor } from '@/features/instruments/instrument-narrative-editor';
-import { InstrumentDictamenEvolution } from '@/features/instruments/instrument-dictamen-evolution';
-import { IconButton } from '@/components/ui/icon-button';
-import { KeyValueList, KeyValueRow } from '@/components/ui/key-value-list';
-import { cn } from '@/lib/utils';
-import { useInstrumentDailyOpinions } from '@/features/trading/use-instrument-daily-opinions';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { OhlcvChart } from "@/features/charts/ohlcv-chart";
+import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-strategy-top-panel";
+import { InstrumentAnalysisSummary } from "@/features/trading/instrument-analysis-summary";
+import { InstrumentNarrativeEditor } from "@/features/instruments/instrument-narrative-editor";
+import { InstrumentDictamenEvolution } from "@/features/instruments/instrument-dictamen-evolution";
+import { IconButton } from "@/components/ui/icon-button";
+import { KeyValueList, KeyValueRow } from "@/components/ui/key-value-list";
+import { cn } from "@/lib/utils";
+import { useInstrumentDailyOpinions } from "@/features/trading/use-instrument-daily-opinions";
 
 export type InstrumentsHubDetailSectionId =
-  | 'resumen'
-  | 'grafico'
-  | 'analisis'
-  | 'evolucion'
-  | 'coach';
+  | "resumen"
+  | "grafico"
+  | "analisis"
+  | "evolucion"
+  | "coach";
 
 export const INSTRUMENTS_HUB_DETAIL_SECTIONS: Array<{
   id: InstrumentsHubDetailSectionId;
   label: string;
 }> = [
-  { id: 'resumen', label: 'Resumen' },
-  { id: 'grafico', label: 'Gráfico' },
-  { id: 'analisis', label: 'Análisis' },
-  { id: 'evolucion', label: 'Evolución' },
-  { id: 'coach', label: 'Coach' },
+  { id: "resumen", label: "Resumen" },
+  { id: "grafico", label: "Gráfico" },
+  { id: "analisis", label: "Análisis" },
+  { id: "evolucion", label: "Evolución" },
+  { id: "coach", label: "Coach" },
 ];
 
 export const DEFAULT_INSTRUMENTS_HUB_DETAIL_SECTIONS: Record<
@@ -73,14 +73,18 @@ function DetailSection({
       >
         <ChevronDown
           className={cn(
-            'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform',
-            !open && '-rotate-90',
+            "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+            !open && "-rotate-90",
           )}
         />
-        <span className="text-[11px] font-semibold text-foreground">{title}</span>
+        <span className="text-[11px] font-semibold text-foreground">
+          {title}
+        </span>
       </button>
       {open ? (
-        <div className="border-t border-border/60 px-2.5 py-2.5">{children}</div>
+        <div className="border-t border-border/60 px-2.5 py-2.5">
+          {children}
+        </div>
       ) : null}
     </section>
   );
@@ -103,14 +107,14 @@ export function InstrumentsHubDetailPanel({
 }) {
   const chartOpen = sectionsOpen.grafico;
   const ohlcvQuery = useQuery({
-    queryKey: ['ohlcv', instrument.id, 'hub-detail'],
+    queryKey: ["ohlcv", instrument.id, "hub-detail"],
     queryFn: () => api.getOhlcv(instrument.id, 180),
     enabled: chartOpen,
     staleTime: 60_000,
   });
 
   const indicatorsQuery = useQuery({
-    queryKey: ['indicators', instrument.id, 'hub-detail'],
+    queryKey: ["indicators", instrument.id, "hub-detail"],
     queryFn: () => api.getIndicators(instrument.id, 180),
     enabled: chartOpen,
     staleTime: 60_000,
@@ -131,11 +135,17 @@ export function InstrumentsHubDetailPanel({
   const opinion = opinionQuery.data?.[0];
 
   return (
-    <div className={cn('flex h-full min-h-0 flex-col overflow-hidden', className)}>
+    <div
+      className={cn("flex h-full min-h-0 flex-col overflow-hidden", className)}
+    >
       <div className="flex shrink-0 items-start justify-between gap-2 border-b border-border px-3 py-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-foreground">{instrument.symbol}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{instrument.name}</p>
+          <p className="truncate text-sm font-semibold text-foreground">
+            {instrument.symbol}
+          </p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {instrument.name}
+          </p>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
           <Link
@@ -158,46 +168,50 @@ export function InstrumentsHubDetailPanel({
           <DetailSection
             title="Resumen"
             open={sectionsOpen.resumen}
-            onToggle={() => onToggleSection('resumen')}
+            onToggle={() => onToggleSection("resumen")}
           >
             <KeyValueList columns={3}>
               <KeyValueRow label="Precio">
                 {instrument.meta.lastClose != null
                   ? formatPrice(instrument.meta.lastClose)
-                  : '—'}
+                  : "—"}
               </KeyValueRow>
               <KeyValueRow
                 label="Δ%"
                 valueClassName={cn(
                   instrument.meta.changePct == null
-                    ? 'text-muted-foreground'
+                    ? "text-muted-foreground"
                     : instrument.meta.changePct >= 0
-                      ? 'text-success'
-                      : 'text-destructive',
+                      ? "text-success"
+                      : "text-destructive",
                 )}
               >
                 {instrument.meta.changePct != null
                   ? formatPct(instrument.meta.changePct)
-                  : '—'}
+                  : "—"}
               </KeyValueRow>
               <KeyValueRow label="Exchange">{instrument.exchange}</KeyValueRow>
               <KeyValueRow label="Yahoo" valueClassName="font-mono text-[10px]">
                 {instrument.yahooSymbol}
               </KeyValueRow>
-              <KeyValueRow label="Sector">{instrument.sector ?? '—'}</KeyValueRow>
-              <KeyValueRow label="ISIN" valueClassName="font-mono text-[10px]">
-                {instrument.isin?.trim() || '—'}
+              <KeyValueRow label="Sector">
+                {instrument.sector ?? "—"}
               </KeyValueRow>
-              <KeyValueRow label="Barras">{instrument.meta.barCount}</KeyValueRow>
+              <KeyValueRow label="ISIN" valueClassName="font-mono text-[10px]">
+                {instrument.isin?.trim() || "—"}
+              </KeyValueRow>
+              <KeyValueRow label="Barras">
+                {instrument.meta.barCount}
+              </KeyValueRow>
               <KeyValueRow label="Últ. vela">
-                {instrument.meta.lastBarDate ?? '—'}
+                {instrument.meta.lastBarDate ?? "—"}
               </KeyValueRow>
               <KeyValueRow label="Dictamen">
                 {opinionQuery.isLoading
-                  ? '…'
+                  ? "…"
                   : opinion
                     ? `${INSTRUMENT_DAILY_OPINION_STANCE_LABELS[opinion.stance]} · ★${opinion.dictamenStars}`
-                    : '—'}
+                    : "—"}
               </KeyValueRow>
             </KeyValueList>
           </DetailSection>
@@ -205,11 +219,13 @@ export function InstrumentsHubDetailPanel({
           <DetailSection
             title="Gráfico"
             open={sectionsOpen.grafico}
-            onToggle={() => onToggleSection('grafico')}
+            onToggle={() => onToggleSection("grafico")}
           >
             <div className="flex h-[min(240px,32vh)] min-h-[140px] flex-col">
               {ohlcvQuery.isLoading ? (
-                <p className="text-[11px] text-muted-foreground">Cargando gráfico…</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Cargando gráfico…
+                </p>
               ) : (
                 <OhlcvChart
                   bars={ohlcvQuery.data?.data ?? []}
@@ -227,7 +243,7 @@ export function InstrumentsHubDetailPanel({
           <DetailSection
             title="Análisis"
             open={sectionsOpen.analisis}
-            onToggle={() => onToggleSection('analisis')}
+            onToggle={() => onToggleSection("analisis")}
           >
             <InstrumentAnalysisSummary
               instrumentId={instrument.id}
@@ -238,7 +254,7 @@ export function InstrumentsHubDetailPanel({
           <DetailSection
             title="Evolución"
             open={sectionsOpen.evolucion}
-            onToggle={() => onToggleSection('evolucion')}
+            onToggle={() => onToggleSection("evolucion")}
           >
             <div className="space-y-3">
               <InstrumentDictamenEvolution instrumentId={instrument.id} />
@@ -254,7 +270,7 @@ export function InstrumentsHubDetailPanel({
           <DetailSection
             title="Coach"
             open={sectionsOpen.coach}
-            onToggle={() => onToggleSection('coach')}
+            onToggle={() => onToggleSection("coach")}
           >
             <InstrumentStrategyTopPanel
               instrumentId={instrument.id}
@@ -310,7 +326,7 @@ export function InstrumentsHubDetailCollapsedRail({
       <button
         type="button"
         className="flex flex-1 items-center justify-center px-1 text-[10px] font-semibold tracking-wide text-muted-foreground hover:text-foreground"
-        style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+        style={{ writingMode: "vertical-rl", textOrientation: "mixed" }}
         title={`Mostrar detalle · ${symbol}`}
         onClick={onExpand}
       >

@@ -2,21 +2,21 @@
  * Carga trackers + detalle + políticas para hub Instrumentos I3.
  */
 
-import { useMemo } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
-import type { ExecutionMode, TrackerDefinitionDetailDto } from '@bolsa/shared';
-import { api } from '@/lib/api';
-import type { HubListMembership } from '@/features/instruments/instruments-hub-enrichment';
+import { useMemo } from "react";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import type { ExecutionMode, TrackerDefinitionDetailDto } from "@bolsa/shared";
+import { api } from "@/lib/api";
+import type { HubListMembership } from "@/features/instruments/instruments-hub-enrichment";
 import {
   invertTrackersByInstrument,
   type HubTrackerChip,
-} from '@/features/instruments/instruments-hub-trackers';
+} from "@/features/instruments/instruments-hub-trackers";
 
 export function useInstrumentsHubTrackers(
   membershipsByInstrument: Map<string, HubListMembership[]>,
 ) {
   const trackersQuery = useQuery({
-    queryKey: ['trackers'],
+    queryKey: ["trackers"],
     queryFn: () => api.getTrackers(),
     staleTime: 30_000,
   });
@@ -26,7 +26,7 @@ export function useInstrumentsHubTrackers(
 
   const detailQueries = useQueries({
     queries: trackerIds.map((id) => ({
-      queryKey: ['tracker', id],
+      queryKey: ["tracker", id],
       queryFn: () => api.getTracker(id),
       enabled: trackerIds.length > 0,
       staleTime: 30_000,
@@ -34,7 +34,7 @@ export function useInstrumentsHubTrackers(
   });
 
   const policiesQuery = useQuery({
-    queryKey: ['execution-policies', true],
+    queryKey: ["execution-policies", true],
     queryFn: () => api.getExecutionPolicies(true),
     staleTime: 60_000,
   });
@@ -54,12 +54,18 @@ export function useInstrumentsHubTrackers(
   }, [detailQueries]);
 
   const trackersByInstrument = useMemo(
-    () => invertTrackersByInstrument(details, membershipsByInstrument, policyModeById),
+    () =>
+      invertTrackersByInstrument(
+        details,
+        membershipsByInstrument,
+        policyModeById,
+      ),
     [details, membershipsByInstrument, policyModeById],
   ) as Map<string, HubTrackerChip[]>;
 
   const detailsReady =
-    trackerIds.length === 0 || detailQueries.every((q) => q.isSuccess || q.isError);
+    trackerIds.length === 0 ||
+    detailQueries.every((q) => q.isSuccess || q.isError);
 
   return {
     trackersByInstrument,

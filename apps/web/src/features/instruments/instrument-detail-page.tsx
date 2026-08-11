@@ -1,40 +1,55 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Bell, RefreshCw, Settings2 } from 'lucide-react';
-import { DEFAULT_CHART_CONFIG } from '@bolsa/shared';
-import { api, ApiError } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, inputClassName } from '@/components/ui/dialog';
-import { useActiveAccount, useActiveAccountSettings } from '@/features/accounts/use-active-account';
-import { InstrumentStrategyTopPanel } from '@/features/backtests/instrument-strategy-top-panel';
-import { OhlcvChart } from '@/features/charts/ohlcv-chart';
-import { formatPct, formatPrice } from '@/features/charts/chart-utils';
-import { TradeConfirmPanel } from '@/features/trading/trade-confirm-panel';
-import { TradeFeeBreakdown } from '@/features/trading/trade-fee-breakdown';
-import { useTradeNotional } from '@/features/trading/use-trade-notional';
-import { linkTradeToMandate } from '@/features/platform/operating-mandate';
-import { cn } from '@/lib/utils';
-import { invalidateInstrumentMarketData } from '@/lib/query-invalidation';
-import { useTradePreferencesStore } from '@/stores/trade-preferences-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Bell, RefreshCw, Settings2 } from "lucide-react";
+import { DEFAULT_CHART_CONFIG } from "@bolsa/shared";
+import { api, ApiError } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Dialog, inputClassName } from "@/components/ui/dialog";
+import {
+  useActiveAccount,
+  useActiveAccountSettings,
+} from "@/features/accounts/use-active-account";
+import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-strategy-top-panel";
+import { OhlcvChart } from "@/features/charts/ohlcv-chart";
+import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { TradeConfirmPanel } from "@/features/trading/trade-confirm-panel";
+import { TradeFeeBreakdown } from "@/features/trading/trade-fee-breakdown";
+import { useTradeNotional } from "@/features/trading/use-trade-notional";
+import { linkTradeToMandate } from "@/features/platform/operating-mandate";
+import { cn } from "@/lib/utils";
+import { invalidateInstrumentMarketData } from "@/lib/query-invalidation";
+import { useTradePreferencesStore } from "@/stores/trade-preferences-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function InstrumentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [tradeQty, setTradeQty] = useState('10');
-  const [pendingSide, setPendingSide] = useState<'buy' | 'sell' | null>(null);
+  const [tradeQty, setTradeQty] = useState("10");
+  const [pendingSide, setPendingSide] = useState<"buy" | "sell" | null>(null);
   const [tradeError, setTradeError] = useState<string | null>(null);
-  const confirmBeforeTrade = useTradePreferencesStore((s) => s.confirmBeforeTrade);
-  const { settings, currency: accountCurrency, accountName } = useActiveAccountSettings();
+  const confirmBeforeTrade = useTradePreferencesStore(
+    (s) => s.confirmBeforeTrade,
+  );
+  const {
+    settings,
+    currency: accountCurrency,
+    accountName,
+  } = useActiveAccountSettings();
   const { effectiveAccountId } = useActiveAccount();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
   const openChartInspector = useWorkspaceStore((s) => s.openChartInspector);
 
   const instrumentQuery = useQuery({
-    queryKey: ['instrument', id],
+    queryKey: ["instrument", id],
     queryFn: () => api.getInstrument(id!),
     enabled: Boolean(id),
   });
@@ -46,12 +61,8 @@ export function InstrumentDetailPage() {
   const instrumentCurrency = instrument?.currency ?? accountCurrency;
   const quantity = Number(tradeQty) || 0;
 
-  const { needsFx, fxLabel, notionalAccount, isFxLoading, yahooSymbol } = useTradeNotional(
-    instrumentCurrency,
-    accountCurrency,
-    quantity,
-    lastPrice,
-  );
+  const { needsFx, fxLabel, notionalAccount, isFxLoading, yahooSymbol } =
+    useTradeNotional(instrumentCurrency, accountCurrency, quantity, lastPrice);
 
   const feeNotional =
     notionalAccount != null && Number.isFinite(notionalAccount)
@@ -65,22 +76,23 @@ export function InstrumentDetailPage() {
   }, [id, instrument?.symbol, openChartTab]);
 
   const ohlcvQuery = useQuery({
-    queryKey: ['ohlcv', id],
+    queryKey: ["ohlcv", id],
     queryFn: () => api.getOhlcv(id!, 500),
     enabled: Boolean(id),
   });
 
   const indicatorsQuery = useQuery({
-    queryKey: ['indicators', id],
+    queryKey: ["indicators", id],
     queryFn: () => api.getIndicators(id!, 500),
     enabled: Boolean(id),
   });
 
   const liveQuoteQuery = useQuery({
-    queryKey: ['live-quote', id],
+    queryKey: ["live-quote", id],
     queryFn: () => api.getLiveQuote(id!),
     enabled: Boolean(id),
-    refetchInterval: (query) => (query.state.data?.data.xtbAvailable ? 30_000 : false),
+    refetchInterval: (query) =>
+      query.state.data?.data.xtbAvailable ? 30_000 : false,
   });
 
   const syncMutation = useMutation({
@@ -91,7 +103,7 @@ export function InstrumentDetailPage() {
   });
 
   const tradeMutation = useMutation({
-    mutationFn: (type: 'buy' | 'sell') =>
+    mutationFn: (type: "buy" | "sell") =>
       api.executeTrade({
         instrumentId: id!,
         type,
@@ -107,10 +119,10 @@ export function InstrumentDetailPage() {
           accountId: effectiveAccountId,
         });
       }
-      await queryClient.invalidateQueries({ queryKey: ['portfolio'] });
-      await queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      await queryClient.invalidateQueries({ queryKey: ['ledger'] });
-      await queryClient.invalidateQueries({ queryKey: ['account-summary'] });
+      await queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      await queryClient.invalidateQueries({ queryKey: ["ledger"] });
+      await queryClient.invalidateQueries({ queryKey: ["account-summary"] });
       setPendingSide(null);
       setTradeError(null);
     },
@@ -118,14 +130,16 @@ export function InstrumentDetailPage() {
   });
 
   function validateTrade(): string | null {
-    if (!Number.isFinite(quantity) || quantity <= 0) return 'Indica una cantidad válida.';
-    if (lastPrice <= 0) return 'No hay precio de referencia.';
-    if (needsFx && isFxLoading) return 'Espera el tipo de cambio.';
-    if (needsFx && notionalAccount == null) return 'No se pudo obtener el tipo de cambio.';
+    if (!Number.isFinite(quantity) || quantity <= 0)
+      return "Indica una cantidad válida.";
+    if (lastPrice <= 0) return "No hay precio de referencia.";
+    if (needsFx && isFxLoading) return "Espera el tipo de cambio.";
+    if (needsFx && notionalAccount == null)
+      return "No se pudo obtener el tipo de cambio.";
     return null;
   }
 
-  function requestTrade(side: 'buy' | 'sell') {
+  function requestTrade(side: "buy" | "sell") {
     setTradeError(null);
     const validationError = validateTrade();
     if (validationError) {
@@ -140,7 +154,9 @@ export function InstrumentDetailPage() {
   }
 
   if (instrumentQuery.isLoading) {
-    return <p className="text-sm text-muted-foreground">Cargando instrumento…</p>;
+    return (
+      <p className="text-sm text-muted-foreground">Cargando instrumento…</p>
+    );
   }
 
   if (instrumentQuery.isError || !instrument) {
@@ -175,7 +191,9 @@ export function InstrumentDetailPage() {
           </Link>
           <h1 className="text-2xl font-semibold tracking-tight">
             {instrument.symbol}
-            <span className="ml-2 text-base font-normal text-muted-foreground">{instrument.name}</span>
+            <span className="ml-2 text-base font-normal text-muted-foreground">
+              {instrument.name}
+            </span>
           </h1>
           <p className="text-sm text-muted-foreground">
             {instrument.exchange} · {instrument.yahooSymbol}
@@ -187,8 +205,8 @@ export function InstrumentDetailPage() {
             size="sm"
             onClick={() => {
               openChartTab(id!, instrument.symbol);
-              navigate('/trading');
-              openChartInspector({ mode: 'config', configSection: 'styles' });
+              navigate("/trading");
+              openChartInspector({ mode: "config", configSection: "styles" });
             }}
             title="Estilos del gráfico en el workspace"
           >
@@ -202,8 +220,18 @@ export function InstrumentDetailPage() {
             <Bell className="h-4 w-4" />
             Alerta
           </Link>
-          <Button variant="outline" size="sm" disabled={syncMutation.isPending} onClick={() => syncMutation.mutate()}>
-            <RefreshCw className={cn('mr-1 h-4 w-4', syncMutation.isPending && 'animate-spin')} />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={syncMutation.isPending}
+            onClick={() => syncMutation.mutate()}
+          >
+            <RefreshCw
+              className={cn(
+                "mr-1 h-4 w-4",
+                syncMutation.isPending && "animate-spin",
+              )}
+            />
             Sincronizar
           </Button>
         </div>
@@ -219,8 +247,10 @@ export function InstrumentDetailPage() {
 
       {syncMutation.isError && (
         <p className="text-sm text-destructive">
-          Error de sincronización:{' '}
-          {syncMutation.error instanceof ApiError ? syncMutation.error.message : 'Error desconocido'}
+          Error de sincronización:{" "}
+          {syncMutation.error instanceof ApiError
+            ? syncMutation.error.message
+            : "Error desconocido"}
         </p>
       )}
 
@@ -231,13 +261,15 @@ export function InstrumentDetailPage() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-semibold tabular-nums">
-              {summary?.lastClose != null ? formatPrice(summary.lastClose) : '—'}
+              {summary?.lastClose != null
+                ? formatPrice(summary.lastClose)
+                : "—"}
             </p>
             {summary?.changePct != null && (
               <p
                 className={cn(
-                  'text-sm tabular-nums',
-                  summary.changePct >= 0 ? 'text-success' : 'text-destructive',
+                  "text-sm tabular-nums",
+                  summary.changePct >= 0 ? "text-success" : "text-destructive",
                 )}
               >
                 {formatPct(summary.changePct)}
@@ -250,7 +282,9 @@ export function InstrumentDetailPage() {
             <CardTitle className="text-sm font-medium">Barras en BD</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-semibold tabular-nums">{summary?.barCount ?? 0}</p>
+            <p className="text-2xl font-semibold tabular-nums">
+              {summary?.barCount ?? 0}
+            </p>
             {lastSync && (
               <p className="text-xs text-muted-foreground">
                 Sync: {lastSync.status} ({lastSync.barsAdded} añadidas)
@@ -260,12 +294,18 @@ export function InstrumentDetailPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Cotización XTB</CardTitle>
-            <CardDescription>{liveQuote?.xtbAvailable ? 'Bridge activo' : 'No disponible'}</CardDescription>
+            <CardTitle className="text-sm font-medium">
+              Cotización XTB
+            </CardTitle>
+            <CardDescription>
+              {liveQuote?.xtbAvailable ? "Bridge activo" : "No disponible"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {liveQuote?.xtbAvailable && liveQuote.xtb ? (
-              <p className="text-lg font-semibold tabular-nums">{formatPrice(liveQuote.xtb.last)}</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {formatPrice(liveQuote.xtb.last)}
+              </p>
             ) : (
               <p className="text-sm text-muted-foreground">—</p>
             )}
@@ -273,13 +313,19 @@ export function InstrumentDetailPage() {
         </Card>
       </div>
 
-      <OhlcvChart bars={bars} indicators={indicators} config={DEFAULT_CHART_CONFIG} />
+      <OhlcvChart
+        bars={bars}
+        indicators={indicators}
+        config={DEFAULT_CHART_CONFIG}
+      />
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Operar (simulado)</CardTitle>
           <CardDescription>
-            {accountName ? `Cuenta ${accountName} (${accountCurrency})` : 'Cuenta activa'}
+            {accountName
+              ? `Cuenta ${accountName} (${accountCurrency})`
+              : "Cuenta activa"}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -291,13 +337,13 @@ export function InstrumentDetailPage() {
                 min={1}
                 value={tradeQty}
                 onChange={(e) => setTradeQty(e.target.value)}
-                className={cn(inputClassName, 'ml-2 w-24')}
+                className={cn(inputClassName, "ml-2 w-24")}
               />
             </label>
             <Button
               size="sm"
               disabled={tradeMutation.isPending || !summary?.lastClose}
-              onClick={() => requestTrade('buy')}
+              onClick={() => requestTrade("buy")}
             >
               Comprar
             </Button>
@@ -305,7 +351,7 @@ export function InstrumentDetailPage() {
               size="sm"
               variant="outline"
               disabled={tradeMutation.isPending || !summary?.lastClose}
-              onClick={() => requestTrade('sell')}
+              onClick={() => requestTrade("sell")}
             >
               Vender
             </Button>
@@ -322,15 +368,20 @@ export function InstrumentDetailPage() {
               {instrumentCurrency !== accountCurrency && (
                 <>
                   FX: {fxLabel}
-                  {yahooSymbol && <span className="ml-1 opacity-60">· {yahooSymbol}</span>}
-                  {' · '}
+                  {yahooSymbol && (
+                    <span className="ml-1 opacity-60">· {yahooSymbol}</span>
+                  )}
+                  {" · "}
                 </>
               )}
-              {!confirmBeforeTrade && 'Confirmación desactivada en Configuración → Confirmaciones.'}
+              {!confirmBeforeTrade &&
+                "Confirmación desactivada en Configuración → Confirmaciones."}
             </p>
           </div>
 
-          {tradeError && <p className="text-sm text-destructive">{tradeError}</p>}
+          {tradeError && (
+            <p className="text-sm text-destructive">{tradeError}</p>
+          )}
         </CardContent>
       </Card>
 

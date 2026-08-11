@@ -4,13 +4,13 @@
  * Una sola petición `GET /instruments/live-quotes?ids=…` compartida vía React Query.
  * La clave de caché ordena los IDs para maximizar reutilización entre paneles.
  */
-import { useQuery } from '@tanstack/react-query';
-import type { InstrumentLiveQuoteDto } from '@bolsa/shared';
-import { api } from '@/lib/api';
+import { useQuery } from "@tanstack/react-query";
+import type { InstrumentLiveQuoteDto } from "@bolsa/shared";
+import { api } from "@/lib/api";
 
 /** Clave estable de React Query para un conjunto de instrumentos. */
 function batchQueryKey(ids: string[]): string[] {
-  return ['live-quotes-batch', [...ids].sort().join(',')];
+  return ["live-quotes-batch", [...ids].sort().join(",")];
 }
 
 /**

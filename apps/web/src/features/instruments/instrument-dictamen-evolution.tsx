@@ -2,43 +2,43 @@
  * Evolución del dictamen: micrográfica ★ + resumen por días.
  */
 
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   type InstrumentDailyOpinionStance,
   type InstrumentDailyOpinionV1,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 function stanceFill(stance: InstrumentDailyOpinionStance): string {
   switch (stance) {
-    case 'buy':
-      return 'fill-emerald-600';
-    case 'sell_exit':
-    case 'reduce':
-      return 'fill-rose-600';
-    case 'no_trade':
-    case 'review_strategy':
-      return 'fill-amber-600';
-    case 'overbought':
-      return 'fill-orange-500';
+    case "buy":
+      return "fill-emerald-600";
+    case "sell_exit":
+    case "reduce":
+      return "fill-rose-600";
+    case "no_trade":
+    case "review_strategy":
+      return "fill-amber-600";
+    case "overbought":
+      return "fill-orange-500";
     default:
-      return 'fill-sky-700';
+      return "fill-sky-700";
   }
 }
 
 function formatDay(isoDate: string): string {
   const d = isoDate.slice(0, 10);
-  const [, m, day] = d.split('-');
+  const [, m, day] = d.split("-");
   return `${day}/${m}`;
 }
 
 function reasonHint(reasons: string[]): string {
-  if (!reasons.length) return '';
-  return reasons.slice(0, 2).join(', ');
+  if (!reasons.length) return "";
+  return reasons.slice(0, 2).join(", ");
 }
 
 /** Construye puntos SVG para sparkline de ★ dictamen (1–5). */
@@ -47,8 +47,11 @@ export function buildDictamenSparklinePath(
   width: number,
   height: number,
   pad = 4,
-): { line: string; dots: Array<{ x: number; y: number; stance: InstrumentDailyOpinionStance }> } {
-  if (!rows.length) return { line: '', dots: [] };
+): {
+  line: string;
+  dots: Array<{ x: number; y: number; stance: InstrumentDailyOpinionStance }>;
+} {
+  if (!rows.length) return { line: "", dots: [] };
   const w = Math.max(1, width - pad * 2);
   const h = Math.max(1, height - pad * 2);
   const n = rows.length;
@@ -58,7 +61,9 @@ export function buildDictamenSparklinePath(
     const y = pad + h - ((stars - 1) / 4) * h;
     return { x, y, stance: row.stance };
   });
-  const line = dots.map((d, i) => `${i === 0 ? 'M' : 'L'}${d.x.toFixed(1)},${d.y.toFixed(1)}`).join(' ');
+  const line = dots
+    .map((d, i) => `${i === 0 ? "M" : "L"}${d.x.toFixed(1)},${d.y.toFixed(1)}`)
+    .join(" ");
   return { line, dots };
 }
 
@@ -78,7 +83,7 @@ function DictamenSparkline({
 
   if (!rows.length) {
     return (
-      <p className={cn('text-[10px] text-muted-foreground', className)}>
+      <p className={cn("text-[10px] text-muted-foreground", className)}>
         Sin serie aún — pulsa «Rellenar 14d».
       </p>
     );
@@ -87,7 +92,7 @@ function DictamenSparkline({
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className={cn('h-11 w-full max-w-[240px]', className)}
+      className={cn("h-11 w-full max-w-[240px]", className)}
       role="img"
       aria-label="Evolución ★ dictamen"
       data-testid="dictamen-sparkline"
@@ -112,7 +117,12 @@ function DictamenSparkline({
         strokeDasharray="2 3"
       />
       {line ? (
-        <path d={line} fill="none" className="stroke-foreground/70" strokeWidth="1.5" />
+        <path
+          d={line}
+          fill="none"
+          className="stroke-foreground/70"
+          strokeWidth="1.5"
+        />
       ) : null}
       {dots.map((d, i) => (
         <circle
@@ -138,7 +148,7 @@ export function InstrumentDictamenEvolution({
 
   const query = useQuery({
     queryKey: [
-      'instrument-daily-opinions-history',
+      "instrument-daily-opinions-history",
       instrumentId,
       request.ensureDays,
       request.nonce,
@@ -156,7 +166,10 @@ export function InstrumentDictamenEvolution({
   const latest = newestFirst[0];
 
   return (
-    <div className={cn('space-y-2', className)} data-testid="instrument-dictamen-evolution">
+    <div
+      className={cn("space-y-2", className)}
+      data-testid="instrument-dictamen-evolution"
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -164,14 +177,18 @@ export function InstrumentDictamenEvolution({
           </p>
           {latest ? (
             <p className="text-[11px] text-foreground">
-              Último {formatDay(latest.asOfBarDate)} ·{' '}
+              Último {formatDay(latest.asOfBarDate)} ·{" "}
               {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[latest.stance]} · ★
               {latest.dictamenStars}
             </p>
           ) : query.isLoading ? (
-            <p className="text-[11px] text-muted-foreground">Calculando serie…</p>
+            <p className="text-[11px] text-muted-foreground">
+              Calculando serie…
+            </p>
           ) : (
-            <p className="text-[11px] text-muted-foreground">Sin puntos en caché</p>
+            <p className="text-[11px] text-muted-foreground">
+              Sin puntos en caché
+            </p>
           )}
         </div>
         <DictamenSparkline rows={rows} />
@@ -188,7 +205,9 @@ export function InstrumentDictamenEvolution({
             setRequest((prev) => ({ ensureDays: 14, nonce: prev.nonce + 1 }))
           }
         >
-          {query.isFetching && request.ensureDays > 0 ? 'Rellenando…' : 'Rellenar 14d'}
+          {query.isFetching && request.ensureDays > 0
+            ? "Rellenando…"
+            : "Rellenar 14d"}
         </Button>
         <Button
           type="button"
@@ -205,7 +224,9 @@ export function InstrumentDictamenEvolution({
       </div>
 
       {query.isError ? (
-        <p className="text-[10px] text-destructive">No se pudo cargar el historial</p>
+        <p className="text-[10px] text-destructive">
+          No se pudo cargar el historial
+        </p>
       ) : null}
 
       {newestFirst.length > 0 ? (
@@ -223,16 +244,22 @@ export function InstrumentDictamenEvolution({
               </span>
               <span
                 className={cn(
-                  'min-w-[4.5rem] font-medium',
-                  row.stance === 'buy' && 'text-emerald-700 dark:text-emerald-300',
-                  (row.stance === 'sell_exit' || row.stance === 'reduce') &&
-                    'text-rose-700 dark:text-rose-300',
+                  "min-w-[4.5rem] font-medium",
+                  row.stance === "buy" &&
+                    "text-emerald-700 dark:text-emerald-300",
+                  (row.stance === "sell_exit" || row.stance === "reduce") &&
+                    "text-rose-700 dark:text-rose-300",
                 )}
               >
                 {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[row.stance]}
               </span>
-              <span className="shrink-0 tabular-nums">★{row.dictamenStars}</span>
-              <span className="truncate text-muted-foreground" title={row.reasons.join(', ')}>
+              <span className="shrink-0 tabular-nums">
+                ★{row.dictamenStars}
+              </span>
+              <span
+                className="truncate text-muted-foreground"
+                title={row.reasons.join(", ")}
+              >
                 {reasonHint(row.reasons)}
               </span>
             </li>
@@ -241,7 +268,8 @@ export function InstrumentDictamenEvolution({
       ) : null}
 
       <p className="text-[9px] text-muted-foreground">
-        ★ dictamen ≠ ★ TOP · la serie crece al abrir Estudio / Operativa o al rellenar.
+        ★ dictamen ≠ ★ TOP · la serie crece al abrir Estudio / Operativa o al
+        rellenar.
       </p>
     </div>
   );

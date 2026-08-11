@@ -5,13 +5,10 @@
  * @see docs/engineering/instruments-hub-2026-07-31.md
  */
 
-import type {
-  ExecutionMode,
-  TrackerDefinitionDetailDto,
-} from '@bolsa/shared';
-import type { HubListMembership } from '@/features/instruments/instruments-hub-enrichment';
+import type { ExecutionMode, TrackerDefinitionDetailDto } from "@bolsa/shared";
+import type { HubListMembership } from "@/features/instruments/instruments-hub-enrichment";
 
-export type HubTrackerCoverage = 'pin' | 'list';
+export type HubTrackerCoverage = "pin" | "list";
 
 export type HubTrackerChip = {
   trackerId: string;
@@ -28,16 +25,16 @@ export type HubTrackerChip = {
 
 export function hubExecutionModeShort(mode: string | null | undefined): string {
   switch (mode) {
-    case 'inform_only':
-      return 'aviso';
-    case 'alert':
-      return 'alerta';
-    case 'paper_auto':
-      return 'auto';
-    case 'live_auto':
-      return 'live';
+    case "inform_only":
+      return "aviso";
+    case "alert":
+      return "alerta";
+    case "paper_auto":
+      return "auto";
+    case "live_auto":
+      return "live";
     default:
-      return '—';
+      return "—";
   }
 }
 
@@ -45,9 +42,9 @@ export function hubTrackerScheduleLabel(
   detail: TrackerDefinitionDetailDto,
 ): string {
   const kind = detail.definition.schedule?.kind;
-  if (!kind || kind === 'manual') return 'Manual';
-  if (kind === 'on_bar_close') return 'Auto · cierre barra';
-  if (kind === 'cron') return 'Cron';
+  if (!kind || kind === "manual") return "Manual";
+  if (kind === "on_bar_close") return "Auto · cierre barra";
+  if (kind === "cron") return "Cron";
   return kind;
 }
 
@@ -110,12 +107,12 @@ export function invertTrackersByInstrument(
     const universe = detail.definition.universe;
     const pins = universe.instrumentIds ?? [];
     for (const instrumentId of pins) {
-      push(instrumentId, chipFromDetail(detail, 'pin', policyModeById));
+      push(instrumentId, chipFromDetail(detail, "pin", policyModeById));
     }
     const listId = universe.listId?.trim();
     if (listId) {
       for (const instrumentId of listMembers.get(listId) ?? []) {
-        push(instrumentId, chipFromDetail(detail, 'list', policyModeById));
+        push(instrumentId, chipFromDetail(detail, "list", policyModeById));
       }
     }
   }
@@ -123,8 +120,8 @@ export function invertTrackersByInstrument(
   for (const [, chips] of map) {
     chips.sort((a, b) => {
       if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
-      if (a.coverage !== b.coverage) return a.coverage === 'pin' ? -1 : 1;
-      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      if (a.coverage !== b.coverage) return a.coverage === "pin" ? -1 : 1;
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     });
   }
 
@@ -148,15 +145,15 @@ export function hubTrackerChipTitle(chip: HubTrackerChip): string {
     chip.name,
     chip.timeframe,
     chip.scheduleLabel,
-    chip.modeShort !== '—' ? chip.modeShort : 'sin política',
-    chip.coverage === 'pin' ? 'pin' : 'vía lista',
-    chip.enabled ? null : 'pausado',
+    chip.modeShort !== "—" ? chip.modeShort : "sin política",
+    chip.coverage === "pin" ? "pin" : "vía lista",
+    chip.enabled ? null : "pausado",
   ].filter(Boolean);
-  return parts.join(' · ');
+  return parts.join(" · ");
 }
 
 /** Nombre corto para chip denso. */
 export function hubTrackerChipLabel(chip: HubTrackerChip): string {
-  const raw = chip.name.replace(/^Radar\s*·\s*/i, '').trim() || chip.name;
+  const raw = chip.name.replace(/^Radar\s*·\s*/i, "").trim() || chip.name;
   return raw.length > 14 ? `${raw.slice(0, 12)}…` : raw;
 }
