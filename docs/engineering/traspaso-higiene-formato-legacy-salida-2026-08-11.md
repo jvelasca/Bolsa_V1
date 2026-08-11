@@ -1,7 +1,7 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `ce981e7` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `5b47f60` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
 > Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-18) y los próximos dominios.
@@ -88,11 +88,16 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 29 | `998ed1d` | features/charts sub-batch A (sub-lote resto de apps/web/src) | 29 |
 | 30 | `87e47e5` | features/charts sub-batch B (sub-lote resto de apps/web/src) | 29 |
 | 31 | `ce981e7` | features/charts sub-batch C (sub-lote resto de apps/web/src, CIERRE dominio charts) | 29 |
+| 32 | `7367447` | features/trading sub-batch A (sub-lote resto de apps/web/src) | 28 |
+| 33 | `3b92e76` | features/trading sub-batch B (sub-lote resto de apps/web/src) | 29 |
+| 34 | `cafba4c` | features/trading sub-batch C (sub-lote resto de apps/web/src) | 28 |
+| 35 | `49c7fac` | features/trading sub-batch D (sub-lote resto de apps/web/src, CIERRE dominio trading) | 27 |
+| 36 | `5b47f60` | auxiliares + root app/main (sub-lote resto de apps/web/src, CIERRE resto de apps/web/src) | 19 |
 
-**Total formateado hasta aquí: 493 ficheros** con diff real en 31 commits propios de formateo (210 de `features/backtests`
+**Total formateado hasta aquí: 512 ficheros** con diff real en 36 commits propios de formateo (210 de `features/backtests`
 en lotes 1-18 + 17 `accounts` lote 19 + 7 `workspace` lote 20 + 14 `config`+`platform` lote 21 + 10 `research` lote 22
-+ 25 `settings` lote 23 + 30 `instruments` lote 24 + 31 `stores` lote 25 + 18 `lib` sub-batch A lote 26 + 17 `lib` sub-batch B lote 27 + 27 `screeners` lote 28 + 29 `charts` sub-batch A lote 29 + 29 `charts` sub-batch B lote 30 + 29 `charts` sub-batch C lote 31). Todos con batería
-`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17, 18, 30 y 31, área Coach/TOP).
++ 25 `settings` lote 23 + 30 `instruments` lote 24 + 31 `stores` lote 25 + 18 `lib` sub-batch A lote 26 + 17 `lib` sub-batch B lote 27 + 27 `screeners` lote 28 + 29 `charts` sub-batch A lote 29 + 29 `charts` sub-batch B lote 30 + 29 `charts` sub-batch C lote 31 + 28 `trading` A lote 32 + 29 `trading` B lote 33 + 28 `trading` C lote 34 + 27 `trading` D lote 35 + 19 auxiliares+root lote 36). Todos con batería
+`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17, 18, 30, 31 y 33-35, área Coach/TOP; y 36 de forma conservadora).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
 EOL** (contenido normalizado idéntico a HEAD). Se detectan porque **no aparecen en `git diff --cached --numstat`**
@@ -130,6 +135,11 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 - ~~ **`charts` sub-batch A** ~~ **HECHO (lote 29, `998ed1d`)**: primer sub-lote (29 de 87) de `features/charts` por orden alfabético = **29 files (+2784/−1540 solo formato)**: `ai-indicators-panel`, `chart-advanced-series`(+test), `chart-analysis-score-buttons`, `chart-bar-zone-picker`, `chart-bar-zone-rail-button`, `chart-bar-zone-styles`, `chart-canvas-styles-panel`, `chart-crosshair-measure`, `chart-cursor-style-overlay`, `chart-cursor-zone`, `chart-data-bar-settings-dialog`, `chart-database-dialog`, `chart-database-panel`, `chart-data-status-badge`, `chart-draw-style-memory.test`, `chart-draw-tool-style-bar`, `chart-draw-tool-utils`(+test), `chart-drawing-edit-popover`, `chart-drawing-global-toggles`, `chart-drawing-properties-panel`, `chart-drawing-rail.test`, `chart-drawing-regression`, `chart-drawing-sidebar`, `chart-drawing-templates-dialog`, `chart-drawing-tools`, `chart-drawing-utils`, `chart-drawings-layer`. Sin falsos positivos EOL (los 29 con diff real). No es área Coach/TOP.
 - ~~ **`charts` sub-batch B** ~~ **HECHO (lote 30, `87e47e5`)**: segundo sub-lote (29 de 87) de `features/charts` = **29 files (+1148/−759 solo formato)**: `chart-finalist-top1-switch`, `chart-global-bar-settings-dialog`, `chart-indicator-hit`, `chart-indicators-bar`, `chart-indicator-stack`, `chart-indicator-template-zone`, `chart-inspector-bar-shortcut-nav`, `chart-inspector-nav`, `chart-inspector-panel`, `chart-inspector-shortcut-button`, `chart-instrument-ai-button`, `chart-instrument-zone`, `chart-main-series`, `chart-new-chart-template-pin-button`, `chart-overlay-indicators-zone`, `chart-perf-analyzer`, `chart-perf-debug`, `chart-price-pan`, `chart-quick-trade-buttons`, `chart-scale-utils`, `chart-scale-wheel`, `chart-series-style-panel`, `chart-series-type-zone`, `chart-stable-resize`, `chart-time-axis-label`, `chart-timeframe-bar`, `chart-time-pan`, `chart-time-sync`(+test). Sin falsos positivos EOL (los 29 con diff real). Área potencial Coach/TOP (test:coach 26/186 ✅).
 - ~~ **`charts` sub-batch C** ~~ **HECHO (lote 31, `ce981e7`)**: tercer y último sub-lote (29 de 87) de `features/charts` = **29 files (+2178/−1134 solo formato)**: `chart-toolbar-chart-bar`, `chart-toolbar-global-bar`, `chart-toolbar-settings-fields`, `chart-trading-view-url`, `chart-utils`(+test), `chart-workspace-page`, `indicator-compute`(+`indicator-compute-parity.test`), `indicator-draft-feedback`, `indicator-instance-config-dialog`, `indicator-panel-chrome`, `indicator-parameters-form`, `indicator-preset-editor-panel`, `indicator-prompt-assistant-panel`, `indicator-templates-dialog`, `indicators-catalog-dialog`, `ohlcv-chart`(+test), `rsi-indicator-chart`, `strategy-top1-chart-indicators.test`, `sub-indicator-panel`, `use-chart-bar-zone-favorites`, `use-chart-indicator-template-favorites`, `use-chart-series-type-favorites`, `use-chart-timeframe-favorites`, `use-drawing-alerts-monitor`, `use-draw-tool-favorites`, `use-inspector-bar-shortcut-favorites`. Sin falsos positivos EOL (los 29 con diff real). **Con esto el dominio `charts` queda CERRADO (lotes 29-31, 87 files).** Área Coach/TOP (test:coach 26/186 ✅).
+- ~~ **`trading` sub-batch A** ~~ **HECHO (lote 32, `7367447`)**: primer sub-lote (28 de 112 con diff real) de `features/trading` = `charts-zone`, `demo-book-*` (auto-arm/auto-copy/geo-rank/mode-panel/prefs), `dia-d-*` (evidence-archive-io/gate-equity/pending-trade-banner/reconciliation-panel/session-evidence/session-report-panel/trades/verify-continuity/verify-layout), `estudio-api-sync`, `estudio-instruments-update`, `estudio-lane-stamps`, `estudio-membership`, `estudio-process-status.test`. 1 falso +EOL excluido (`dia-d-session-report-panel.tsx`). No es área Coach/TOP.
+- ~~ **`trading` sub-batch B** ~~ **HECHO (lote 33, `3b92e76`)**: segundo sub-lote (29 files con diff real) de `features/trading` = `estudio-process-status`, `estudio-supervision-*`, `estudio-update-control`, `instrument-analysis-summary`, `instrument-db-tab`, `instrument-info-dialog`, y primeros de `lists-tab/` (`fetch-io-scores-for-sort`, `instrument-removal-confirm-dialog`, `list-carousel*`, `list-column-*`, `list-hub-*`, `list-item-accordion`, `list-membership-*`, `list-name-process-subtitle`, `list-process-status-cell`, `list-recommendation-columns.test`). Área Coach/TOP (test:coach 26/186 ✅).
+- ~~ **`trading` sub-batch C** ~~ **HECHO (lote 34, `cafba4c`)**: tercer sub-lote (28 files con diff real) de `features/trading` = resto de `lists-tab/` (`list-recommendation-scores-context`, `list-search-box`, `list-selection-*`, `list-sync-status-cell`, `list-values-panel`, `lists-tab`, `pending-order-list-item`, `sort-visualizados-by-io`, `use-chart-*`, `use-expanded-*`, `use-list-*`, `visualization-log-dialog`, `watchlist-panel`) + `mandate-timeline-panel`, `open-list-hub`, `operations-panel`, `operativa-*`, `order-dialog`, `pending-orders-monitor`, `propose-instrument-supervised.test`. 1 falso +EOL excluido (`lists-tab/list-selection.ts`). Área Coach/TOP (test:coach 26/186 ✅).
+- ~~ **`trading` sub-batch D** ~~ **HECHO (lote 35, `49c7fac`)**: cuarto y último sub-lote (27 files con diff real) de `features/trading` = `propose-instrument-supervised`, `semi-*`, `supervised-f3-*`, `tracker-alarm-inbox-poller`, `trade-confirm-panel`, `trade-fee-breakdown`, `trading-*` (alarm-inbox-button/app-threads/background-status/sync-summary/coach-rail/dia-d-banner/dia-d-replay-panel/operativa-panel/operativa-section/status-bar), `use-demo-book-prefs`, `use-instrument-daily-opinions`, `use-pending-orders`, `use-trade-notional`. **Con esto el dominio `trading` queda CERRADO (lotes 32-35, 112 files con diff real + 2 falsos EOL).** Área Coach/TOP (test:coach 26/186 ✅).
+- ~~ **`auxiliares + root app/main`** ~~ **HECHO (lote 36, `5b47f60`)**: cierre del resto de `apps/web/src` = **19 files con diff real**: root (`app.tsx`, `main.tsx`), `ai`×2 (`ai-info-button`, `ai-info-catalog`), `alerts`×4 (`alert-toasts`, `alerts-monitor`, `alerts-page`, `signal-alerts-section`), `auth`×2 (`auth-gate`, `login-page`), `dashboard` (`dashboard-page`), `fiscal` (`tax-report-page`), `help`×4 (`app-help-menu`, `help-content-as-of`, `help-registry`, `help-sources-footer`), `history` (`history-page`), `operations` (`operations-page`), `sync` (`sync-settings-panel`). 1 falso +EOL excluido (`vite-env.d.ts`). **Con esto TODO `apps/web/src` (fuera de `features/backtests`) queda CERRADO.**
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
@@ -140,16 +150,11 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 > `workspace` (20, `1081809`), `config`+`platform` (21, `75f6595`), `research` (22, `cbd0fff`), `settings` (23,
 > `4300674`), `instruments` (24, `e38be2d`), `stores` (25, `110667b`), `lib` sub-batch A (26, `465137a`),
 > `lib` sub-batch B (27, `0b8f04b`), `screeners` (28, `882082c`, cierre de dominio), `charts` sub-batch A (29, `998ed1d`),
-> `charts` sub-batch B (30, `87e47e5`), `charts` sub-batch C (31, `ce981e7`, cierre de dominio).** Tras los lotes 19-31, el `prettier --check` amplio (excl. `features/backtests`) marca **135 files**
-> desincronizados restantes (493 formateados en 31 commits).
-> Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
->
-> **Siguiente: otro dominio del resto de `apps/web/src`** (fuera de `features/backtests`, que queda completo) por
-> sub-lotes, con el mismo protocolo de 8 pasos (features de otros dominios —trading, auxiliares
-> alerts/auth/ai/help—, components/ui, layout, etc.), ejecutando `prettier --check` por
-> sub-lote y verificando el `git diff --cached --numstat` (paso 4). Correr `test:coach` cuando el sub-lote toque área
-> Coach/TOP (revisar `features/trading`). Hechos: `accounts` (19), `workspace` (20), `config`+`platform` (21), `research` (22), `settings` (23),
-> `instruments` (24), `stores` (25), `lib` sub-batch A (26), `lib` sub-batch B (27, cierre de dominio), `screeners` (28, cierre de dominio), `charts` (29-31, cierre de dominio).
+> `charts` sub-batch B (30, `87e47e5`), `charts` sub-batch C (31, `ce981e7`, cierre de dominio), `trading` sub-batch A (32, `7367447`),
+> `trading` sub-batch B (33, `3b92e76`), `trading` sub-batch C (34, `cafba4c`), `trading` sub-batch D (35, `49c7fac`, cierre de dominio),
+> auxiliares+root (36, `5b47f60`, cierre del resto de `apps/web/src`).** Tras los lotes 19-36, el `prettier --check` amplio (excl. `features/backtests`) marca **0 files**
+> desincronizados restantes. **Se concluye la higiene de formato de `apps/web/src` (fuera de `features/backtests`, ya COMPLETO)** con 512 files con diff real en 36 commits.
+> Si se continúa y el chat se satura, elaborar un nuevo documento de relevo con el estado aquí recogido y actualizar GitHub.
 
 
 ## 6. Documentos fuente de verdad / índices
