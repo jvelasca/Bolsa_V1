@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from bolsa_analytics.backtest import BacktestBarInput, run_backtest
 from bolsa_analytics.indicators.legacy import sma
@@ -36,6 +36,7 @@ def _simulate_sma_crossover(
     *,
     trade_from_index: int = 0,
     attach_round_trips: bool = False,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> dict[str, Any]:
     """Simulate SMA cross. Indicators use all bars; trading starts at ``trade_from_index``."""
     if fast_period >= slow_period:
@@ -65,18 +66,21 @@ def _simulate_sma_crossover(
     for index, bar in enumerate(bars):
         if index < start:
             continue
-        kind = signal_by_index.get(index)
-        price = bar.close
-        if kind == "entry_long" and cash >= price and shares == 0:
-            quantity = int(cash // price)
+        kind = signal_by_index.get(index - 1)
+        if index - 1 < start:
+            continue
+        fill_price = float(bar.open if bar.open is not None else bar.close)
+        close_price = float(bar.close)
+        if kind == "entry_long" and cash >= fill_price and shares == 0:
+            quantity = int(cash // fill_price)
             if quantity > 0:
-                cost = quantity * price
+                cost = quantity * fill_price
                 cash -= cost
                 shares = float(quantity)
                 trades += 1
                 open_entry_cost = cost
         elif kind == "exit" and shares > 0:
-            proceeds = shares * price
+            proceeds = shares * fill_price
             cash += proceeds
             if open_entry_cost is not None:
                 entry_costs.append(open_entry_cost)
@@ -85,7 +89,7 @@ def _simulate_sma_crossover(
             shares = 0.0
             trades += 1
 
-        equity = cash + shares * price
+        equity = cash + shares * close_price
         equity_values.append(equity)
         peak = max(peak, equity)
         if peak > 0:
@@ -131,6 +135,7 @@ def run_sma_grid_search(
     initial_cash: float = 10000.0,
     max_trials: int = 200,
     on_progress: ProgressCallback | None = None,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> list[SmaGridTrial]:
     """Ejecuta ``sma_grid_search``."""
     if not bars:
@@ -159,7 +164,9 @@ def run_sma_grid_search(
             if len(trials) >= max_trials:
                 break
             try:
-                metrics = _simulate_sma_crossover(bars, fast, slow, initial_cash)
+                metrics = _simulate_sma_crossover(
+                    bars, fast, slow, initial_cash, execution_model=execution_model
+                )
             except ValueError:
                 continue
             score = float(metrics["score"])
