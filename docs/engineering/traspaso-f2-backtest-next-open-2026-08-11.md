@@ -2,9 +2,9 @@
 
 > **Padre único:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) §16 (sub-entrada de la Auditoría consolidada, junto a F1).
 > **Fuentes de verdad (leer primero):** plan F2 (`.cursor/plans/f2_rigor_cientifico_backtest_next_open_8b76de60.plan.md`, micro-cambios A–F) · `audit-consolidado-internas-externas-2026-08-11.md` (P0.1/P0.2 + D0–D5) · [traspaso-f1-integridad-financiera-2026-08-11.md](./traspaso-f1-integridad-financiera-2026-08-11.md) (cierre F1).
-> **Rama de ejecución:** `stage/f2-backtest-next-open-2026-08-11`, creada desde `3c59dc8` (HEAD/corte de F1, decisión del usuario). Rama `stage/f1-*` se mantiene como base (no fusionar/borrar por ahora).
-> **Regla del hilo:** NO tocar código fuera de F2. Cada micro-cambio A–F atómico se valida con la batería (ruff+mypy+pytest) antes de commit. Los commits quedan **pendientes de aprobación** del usuario (norma F1 §8: aprobación previa a cada commit).
-> **Estado:** F2 **IMPLEMENTADO 2026-08-11** ✅ (A–F, working tree verde). **Commits sin crear todavía — pendientes de aprobación del usuario.** Ver §7.
+> **Rama de ejecución:** `stage/f2-backtest-next-open-2026-08-11` (creada desde `3c59dc8`), **MERGEADA (fast-forward) en `stage/f1-integridad-financiera-2026-08-11`** y eliminada. Rama `stage/f1-*` es ahora la punta activa que integra F2.
+> **Regla del hilo:** NO tocar código fuera de F2. Cada micro-cambio A–F atómico se valida con la batería (ruff+mypy+pytest) antes de commit.
+> **Estado:** F2 **COMPLETADO 2026-08-11** ✅ — implementado (A–F) · commiteado en 6 commits atómicos (C1–C6) · **PR #30 MERGED** (`3d5513f`, fast-forward) · **recálculo de trials ejecutado (20/20, `next_open`)** · fix `distinct` SQLAlchemy 2.0 (`a3573ae`). Working tree limpio. Ver §7/§7bis.
 
 ---
 
@@ -52,16 +52,19 @@ Los 5 simuladores llenaban con el **cierre de la misma barra** donde nace la se�
 
 ## 7. Registro
 
-| Fecha      | Acción                                                                                                                                                                                                                                                                                                                        |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-11 | Traspaso F2 creado. Rama `stage/f2-backtest-next-open-2026-08-11` creada desde `3c59dc8` (estado F1, decisión del usuario).                                                                                                                                                                                                   |
-| 2026-08-11 | **A** implementado en `backtest.py` (motor next_open). Ruff✓ · pytest backtest 7✓ · mypy sin errores nuevos (el único es pre-existente, fuera del gate CI).                                                                                                                                                                   |
-| 2026-08-11 | **B** grids H0 + `optimize.py` (propagación `execution_model`). Ruff✓ · pytest analytics 317✓ · application 222✓ · mypy grids 0.                                                                                                                                                                                              |
-| 2026-08-11 | **C** vectorbt+optuna (shift numpy + open). Fix: `.shift()` de pandas daba dtype `object` y rompía numba → shift con `np.zeros_like`+asignación. `test_vectorbt_optuna` 4✓ · analytics 317✓ · application 222✓.                                                                                                               |
-| 2026-08-11 | **D** fingerprint OHLCV completo + bump 1.1/0.4.0 + **E** test anti-lookahead (`test_no_lookahead.py`). analytics **323✓** · api offline 9✓.                                                                                                                                                                                  |
-| 2026-08-11 | **E** afianzado: motor llena en `open[t+1]` sin fill en barra de señal; última barra no ejecuta; grids usan `open` (invariante open-vs-close). [`test_research_manifest` actualizado a 1.1 + test OHLCV].                                                                                                                     |
-| 2026-08-11 | **F** script `recalc_trials_next_open.py` (idempotente, dry-run/apply, campañas). ruff✓ · py_compile✓ · smoke import✓. No ejecutable e2e sin Postgres: queda listo para `--apply`.                                                                                                                                            |
-| 2026-08-11 | **CIERRE F2 (working tree)** — ruff 0 nuevos en ficheros F2 · mypy sin errores nuevos (pre-existentes fuera del gate CI) · pytest analytics 323✓ + application 222✓ + api offline 9✓ = **554✓ · 0 fallos**. **Commits A–F pendientes de aprobación del usuario** (norma F1 §8). Siguiente fase: **F3b** (u orden pactado D0). |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-11 | Traspaso F2 creado. Rama `stage/f2-backtest-next-open-2026-08-11` creada desde `3c59dc8` (estado F1, decisión del usuario).                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-08-11 | **A** implementado en `backtest.py` (motor next_open). Ruff✓ · pytest backtest 7✓ · mypy sin errores nuevos (el único es pre-existente, fuera del gate CI).                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-08-11 | **B** grids H0 + `optimize.py` (propagación `execution_model`). Ruff✓ · pytest analytics 317✓ · application 222✓ · mypy grids 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-08-11 | **C** vectorbt+optuna (shift numpy + open). Fix: `.shift()` de pandas daba dtype `object` y rompía numba → shift con `np.zeros_like`+asignación. `test_vectorbt_optuna` 4✓ · analytics 317✓ · application 222✓.                                                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-08-11 | **D** fingerprint OHLCV completo + bump 1.1/0.4.0 + **E** test anti-lookahead (`test_no_lookahead.py`). analytics **323✓** · api offline 9✓.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 2026-08-11 | **E** afianzado: motor llena en `open[t+1]` sin fill en barra de señal; última barra no ejecuta; grids usan `open` (invariante open-vs-close). [`test_research_manifest` actualizado a 1.1 + test OHLCV].                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-08-11 | **F** script `recalc_trials_next_open.py` (idempotente, dry-run/apply, campañas). ruff✓ · py_compile✓ · smoke import✓. No ejecutable e2e sin Postgres: queda listo para `--apply`.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 2026-08-11 | **CIERRE F2 (working tree)** — ruff 0 nuevos en ficheros F2 · mypy sin errores nuevos (pre-existentes fuera del gate CI) · pytest analytics 323✓ + application 222✓ + api offline 9✓ = **554✓ · 0 fallos**. **Commits A–F pendientes de aprobación del usuario** (norma F1 §8). Siguiente fase: **F3b** (u orden pactado D0).                                                                                                                                                                                                                                                                    |
+| 2026-08-11 | **COMMITS A–F APROBADOS** (usuario: "adelante"). 6 commits atómicos C1–C6 creados en `stage/f2-backtest-next-open-2026-08-11` y **pusheados**: C1 `c216af6` (A motor) · C2 `ffdf811` (B grids) · C3 `39940f9` (C vectorbt+optuna) · C4 `066ed28` (D fingerprint 1.1/0.4.0) · C5 `ed4b57b` (E test) · C6 `c595a0a` (F script+docs).                                                                                                                                                                                                                                                               |
+| 2026-08-11 | **MERGE PR #30** ([link](https://github.com/jvelasca/Bolsa_V1/pull/30)) — `stage/f2-*` → `stage/f1-integridad-financiera-2026-08-11` como **fast-forward** (`c945858..3d5513f`, rebase), conservando los 6 commits. Rama `stage/f2-*` eliminada (local+remota). Working tree local limpio.                                                                                                                                                                                                                                                                                                       |
+| 2026-08-11 | **RECÁLCULO DE TRIALS `next_open` EJECUTADO** — `recalc_trials_next_open.py --apply`: **20/20 recalced · 0 errores · 0 skipped** (1 instrumento `0cb4372c…`, 20 estrategias, D1). Runs nuevos con `engine.version=0.4.0` y `data_version=sha256:b830e3ef8fcb3af9`. Idempotencia verificada (dry-run posterior → `already_new=20`). **Fix aplicado al script:** `distinct(col1,col2,col3)` rompe en SQLAlchemy 2.0 → `.distinct()` sobre select de 3 columnas (commit `a3573ae`, pusheado). Ejecutar con `PYTHONIOENCODING=utf-8` (consola Windows cp1252) para que los prints con `→` no fallen. |
 
 ---
 
@@ -73,38 +76,41 @@ Los 5 simuladores llenaban con el **cierre de la misma barra** donde nace la se�
 
 ## 9. Texto exacto de traspaso — siguiente hilo (F3b / continuación)
 
-> IMPORTANTE: F2 quedó IMPLEMENTADO en working tree pero **sin commits** (pendientes de aprobación). El próximo hilo debe, PRIMERO, decidir y aprobar los commits A–F y crear el push; después seguir con la siguiente fase (D0: F3b → F5a → F3a+F4+F5b). Aprobar cada commit. No renegociar D0–D5.
+> IMPORTANTE: F2 está **FULLY COMPLETADO y FUSIONADO** (PR #30 MERGED, fast-forward en `stage/f1-*`; recálculo de trials ejecutado 20/20). La rama `stage/f2-*` fue eliminada tras el merge. El próximo hilo continúa con la fase siguiente según D0 (F3b) sobre la punta `stage/f1-integridad-financiera-2026-08-11`. Recap del estado en §4/§7/§7bis. No renegociar D0–D5.
 
 ```text
-Texto de traspaso → nuevo chat (CONTINUACIÓN — commits F2 + fase siguiente)
+Texto de traspaso → nuevo chat (F3b — siguiente fase tras F2)
 
-CONTEXTO INMEDIATO: En working tree está IMPLEMENTADO F2 (Rigor científico del backtest, fill
-next_open) con los micro-cambios A–F VERDES (ruff✓ · mypy sin errores nuevos fuera del gate CI ·
-pytest: analytics 323✓ + application 222✓ + api offline 9✓ = 554✓, 0 fallos). NO se crearon los
-commits ni se pusheó aún. Rama actual: stage/f2-backtest-next-open-2026-08-11 (desde 3c59dc8).
+CONTEXTO INMEDIATO: F2 (Rigor científico del backtest, fill next_open) está FULLY COMPLETADO:
+  - Commiteado en 6 commits atómicos (C1 c216af6 … C6 c595a0a) y MERGEADO vía PR #30 (fast-forward) sobre
+    la rama stage/f1-integridad-financiera-2026-08-11. La rama stage/f2-backtest-next-open-2026-08-11 fue
+    eliminada tras el merge. Rama stage/f1-* es la punta activa (HEAD a3573ae).
+  - Recálculo de trials ejecutado: recalc_trials_next_open.py --apply → 20/20 recalced, 0 errores.
+    Runs nuevos con engine.version=0.4.0 y data_version=sha256:b830e3ef8fcb3af9 (OHLCV completo).
+  - Fix aplicado y commiteado (a3573ae): distinct() SQLAlchemy 2.0 en recalc_trials (era TypeError).
+  - Working tree LIMPIO.
 
 Lee PRIMERO: docs/engineering/traspaso-f2-backtest-next-open-2026-08-11.md (§4 implementación A–F,
-§5 batería, §6 deuda, §7 registro) y su fuente plan F2 (.cursor/plans/f2_rigor_cientifico_backtest_next_open_8b76de60.plan.md).
+§5 batería 554✓, §6 deuda, §7 registro + recálculo) y su fuente plan F2
+(.cursor/plans/f2_rigor_cientifico_backtest_next_open_8b76de60.plan.md). Para la fase siguiente usa
+engineering-index-2026-08-03.md y el plan de la fase declarada.
 NO toques código fuera del alcance de la fase que se declare.
 
-TAREA INMEDIATA (pendiente de aprobación del usuario): aprobar los 6 commits atómicos F2
-(orden del plan y del traspaso §4 A,B,C,D,E,F), hacer push a origin/stage/f2-backtest-next-open-2026-08-11,
-y validar CI green (pnpm test global). Ruta de ficheros tocados por A–F (no perderse):
-  A packages/py/analytics/src/bolsa_analytics/backtest.py
-  B packages/py/analytics/src/bolsa_analytics/optimize/{sma_grid,rsi_grid,macd_grid}.py + packages/py/application/src/bolsa_application/optimize.py
-  C packages/py/analytics/src/bolsa_analytics/optimize/{vectorbt_sma,optuna_sma}.py
-  D packages/py/analytics/src/bolsa_analytics/research/{data_snapshot,manifest}.py + packages/py/application/src/bolsa_application/backtests.py
-  E packages/py/analytics/tests/test_no_lookahead.py (nuevo) + packages/py/analytics/tests/test_research_manifest.py
-  F scripts/research/recalc_trials_next_open.py (nuevo)
+SIGUIENTE FASE (orden pactado D0, NO renegociar): F3b → F5a → (F3a+F4+F5b). F3b = Alembic
+(ensure_migrated + columna de marca en research_trials/backtest_runs para el --mark-legacy que hoy es
+no-op, deuda registrada en F2 §6). Cero features (D5).
 
-DECISIONES Y ESTADO git (verificar): rama stage/f1-integridad-financiera-2026-08-11 se mantiene como
-base (no fusionar/borrar). HEAD cortado = 3c59dc8 (M5 F1). F2 alive colgando en stage/f2-*. Checkpoint
-de retroceso global: tag audit-checkpoint-2026-08-11 (2683c49).
+DECISIONES Y ESTADO git (verificar): stage/f1-integridad-financiera-2026-08-11 = base/punta activa.
+F2 consolidado en ella. Checkpoint de retroceso global: tag audit-checkpoint-2026-08-11 (2683c49).
 
 Decisiones pactadas (NO renegociar): D0 orden F1→F2→F3b→F5a→(F3a+F4+F5b); D1 next_open inmutable 1D
 (MOC fuera); D5 cero features (contratos FE/BE F5a, Alembic F3b, auth F5b, ciclo analytics↔market F4,
-ensure_migrated F3b FUERA). Deuda registrada en F2 §6: --mark-legacy no-op (falta columna), versiones
-TS sin tocar, mypy pre-existentes en backtest.py/optimize.py fuera del gate CI, numba/vectorbt sin stubs.
+ensure_migrated F3b — F3b es LA siguiente etapa). Deuda registrada en F2 §6: --mark-legacy no-op (falta
+columna; requiere F3b), versiones TS sin tocar, mypy pre-existentes en backtest.py/optimize.py fuera del
+gate CI, numba/vectorbt sin stubs.
+
+NOTA OPERATIVA: al tocar scripts que imprimen caracteres Unicode ('→') en Windows, ejecutar con
+$env:PYTHONIOENCODING="utf-8"; (consola cp1252 lanza UnicodeEncodeError).
 
 BATERÍA OBLIGATORIA: ruff check + mypy (ficheros tocados) + pytest (analytics/application/api-python).
 Al cerrar cualquiera: preparar el siguiente traspaso-* + entrada única en engineering-index + texto
