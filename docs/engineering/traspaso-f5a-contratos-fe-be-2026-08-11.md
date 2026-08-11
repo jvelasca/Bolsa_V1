@@ -4,7 +4,7 @@
 > **Fuentes de verdad (leer primero):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) (hallazgo **P1.5** + D0/D5) · [ADR-003](../adr/003-python-backend-ai-platform.md) §2 (contrato objetivo `openapi.json → openapi-typescript + openapi-fetch → apps/web`) · [traspaso-f3b-alembic-data-epoch-2026-08-11.md](./traspaso-f3b-alembic-data-epoch-2026-08-11.md) (§9: siguiente fase).
 > **Rama de ejecución:** `stage/f5a-contratos-fe-be-2026-08-11` (desgajada desde `stage/f1-*`, tras merge de PR #31).
 > **Regla del hilo:** NO tocar código fuera del alcance F5a. Cambios validados con la batería antes del commit.
-> **Estado:** F5a **en ejecución** — piloto scoped: contrato OpenAPI versionado + tipos TS generados + gate de tipos + gate de spec. Ver §7.
+> **Estado:** F5a **COMMITEADO (4 commits C1–C4, HEAD `164f692`)**. Batería **556 py✓ + web 707✓ · gates contract ✓**. Working tree limpio. Pendiente de **merge** del PR (fast-forward) en `stage/f1-*`. Ver §7/§8.
 
 ---
 
@@ -77,7 +77,7 @@ Resolver el **hallazgo P1.5 (drift silencioso FE/BE)**: los DTOs TypeScript se e
 | 2026-08-11 | D–E: `sync-contract.mjs` + scripts `contract:gen`/`contract:check` en `apps/web`. Gate `contract:check` verificado (verde; falla ante drift → restaurado).                 |
 | 2026-08-11 | F: `contract-check.ts` gate de tipos (claves FE ⊆ contrato) para sentinelas `BacktestRunDto`/`PortfolioSummaryDto`/`InvestmentAccountDto`. Verificado `typecheck` verde.   |
 | 2026-08-11 | Batería: ruff✓ · mypy✓ · pytest api 11✓ + analytics 323✓ + app 222✓ = 556✓ · web typecheck✓ lint✓ test 707✓ · contract:check✓.                                             |
-| 2026-08-11 | **(en curso)** commits atómicos C1–C4 + push + PR hacia `stage/f1-*`.                                                                                                      |
+| 2026-08-11 | **COMMITS + PR**: 4 commits atómicos C1–C4 en `stage/f5a-contratos-fe-be-2026-08-11` (C4 `164f692`). **PR abierto** → base `stage/f1-*`. Working tree limpio.              |
 
 ## 8. Protocolo recurrente (obligatorio en TODOS los hilos)
 
@@ -85,4 +85,58 @@ Resolver el **hallazgo P1.5 (drift silencioso FE/BE)**: los DTOs TypeScript se e
 
 ## 9. Texto exacto de traspaso — siguiente hilo (tras F5a)
 
-> (Se rellena al CERRAR F5a — es el texto que va en el chat.)
+```text
+Texto de traspaso → nuevo chat (F5a completado — siguiente fase tras F5a)
+
+CONTEXTO INMEDIATO: F5a (Contratos FE/BE — OpenAPI fuente de verdad + gates de drift,
+hallazgo P1.5 / ADR-003) está COMPLETADO con 4 commits en rama
+stage/f5a-contratos-fe-be-2026-08-11 y PR #32 ABIERTO:
+  - 4 commits atómicos C1..C4 (C4 `164f692`): dump_openapi.py + openapi.json versionado
+    (fuente de verdad, 180 paths / 367 schemas) + schema.d.ts generado
+    (openapi-typescript@7.13.0) + sync-contract.mjs (contract:gen/contract:check) +
+    contract-check.ts (gate de tipos: claves FE ⊆ contrato).
+  - PR #32 (https://github.com/jvelasca/Bolsa_V1/pull/32) → base stage/f1-integridad-financiera-2026-08-11.
+  - Gates: `pnpm --filter @bolsa/web contract:check` (regenera openapi.json desde FastAPI via uv
+    y falla si hay diff) ✓ · `contract:gen` regenera en sitio ✓ · `contract-check.ts`
+    (compilación tipo: rompe typecheck si un DTO-FE centinela declara un campo ausente del OpenAPI).
+  - Drift medido P1.5: BacktestRunDto.manifest FE (`manifest?: RunManifest`) no cabe en
+    `manifest: object|null` del contrato; normalizaciones number↔integer / ?↔null.
+  - Batería: ruff✓ · mypy✓ (dump_openapi.py) · pytest api offline 11✓ + analytics 323✓ +
+    application 222✓ = 556✓ · web typecheck✓ (incl. contract-check) + lint✓ + test 707✓.
+
+ESTADO GIT (VERIFICADO, OJO): origin/stage/f1-* = `014a207` (F3b mergeado, PR #31). PR #32
+PENDIENTE DE MERGE. La rama LOCAL stage/f5a-* está adelantada respecto a origin/stage/f1-*;
+merge fast-forward posible (base es ancestro). NO hacer reset --hard salvo aprobación explícita.
+Checkpoint de retroceso global: tag audit-checkpoint-2026-08-11 (2683c49).
+
+Lee PRIMERO: docs/engineering/traspaso-f5a-contratos-fe-be-2026-08-11.md (§4 A–F, §5 batería
++ drift medido, §6 deuda) y su fuente: audit-consolidado-internas-externas-2026-08-11.md (P1.5 + D0–D5).
+Para la fase siguiente usa engineering-index-2026-08-03.md y el plan de la fase declarada.
+NO toques código fuera del alcance de la fase que se declare.
+
+SIGUIENTE FASE (orden pactado D0, NO renegociar): F5a → (F3a+F4+F5b). Tras F5a, la siguiente es
+CONJUNTA: F3a (arquitectura de procesos y DB) + F4 (arquitectura Python) + F5b (auth), o bien
+F3a en primer lugar. Las deudas registradas en F5a §6 para esas fases:
+  - Deuda F5a: reconciliar DTOs manuales de packages/shared campo-a-campo contra el contrato
+    (fidelidad de tipos: manifest, number↔integer, ?↔null) y adoptar openapi-fetch como cliente
+    completo (reescribir/reducir api.ts). Mover el contrato de apps/web a un home compartido.
+  - Deuda heredada F3b §6: portar TODO el DDL Prisma a Alembic (→F3a/F4) · account_repository.
+    ensure_migrated por-request no retirado (→F3a) · workers en lifespan de FastAPI (→F3a).
+  - Deuda consolidada auditoría: P0.6 ciclo analytics↔market y mypy gate (→F4) · auth HttpOnly
+    cookie/TTL (→F5b) · P1.2/P1.4/P1.9 (→F3a).
+
+Decisiones pactadas (NO renegociar): D0 orden F1→F2→F3b→F5a→(F3a+F4+F5b); D1 next_open inmutable
+1D (MOC fuera); D2 Alembic única autoridad BD; D3 extraer workers de FastAPI (F3a); D4 auth local
+diferida (F5b); D5 Solo F1–F5, CERO FEATURES. F5a fue un piloto scoped (no reescribió api.ts).
+
+NOTA OPERATIVA: al tocar scripts que imprimen caracteres Unicode ('→') en Windows, ejecutar con
+$env:PYTHONIOENCODING="utf-8"; (consola cp1252 lanza UnicodeEncodeError). Para regenerar el
+contrato OpenAPI se necesita el venv Python de apps/api-python (uv): `pnpm --filter @bolsa/web contract:gen`.
+
+BATERÍA OBLIGATORIA: ruff check + mypy (ficheros tocados) + pytest (analytics/application/api-python,
++ infraestructura si se tocan DB/repos) + pnpm test / CI si toca web. Al cerrar cualquiera: preparar el
+siguiente traspaso-* + entrada única en engineering-index + texto exacto en el chat (norma permanente).
+
+FLUJO DE COMMITS (patrón proyecto): trabajo en rama stage/fX-*-fecha; commits atómicos por cambio; push +
+PR hacia la base activa (stage/f1-* actualmente); merge fast-forward tras aprobación del usuario.
+```
