@@ -169,35 +169,38 @@ class SqlAlchemyOhlcvRepository:
             return 0
 
         now = datetime.now(UTC)
-        for bar in bars:
-            bar_moment = parse_bar_timestamp(bar.timestamp)
-            stmt = insert(OhlcvBarRow).values(
-                id=new_id(),
-                instrument_id=instrument_id,
-                timeframe=timeframe,
-                timestamp=bar_moment,
-                open=bar.open,
-                high=bar.high,
-                low=bar.low,
-                close=bar.close,
-                volume=bar.volume,
-                adj_close=bar.adj_close,
-                source=bar.source,
-                created_at=now,
-            )
-            stmt = stmt.on_conflict_do_update(
-                index_elements=["instrument_id", "timeframe", "timestamp"],
-                set_={
-                    "open": stmt.excluded.open,
-                    "high": stmt.excluded.high,
-                    "low": stmt.excluded.low,
-                    "close": stmt.excluded.close,
-                    "volume": stmt.excluded.volume,
-                    "adj_close": stmt.excluded.adj_close,
-                    "source": stmt.excluded.source,
-                },
-            )
-            await self._session.execute(stmt)
-
+        rows = [
+            {
+                "id": new_id(),
+                "instrument_id": instrument_id,
+                "timeframe": timeframe,
+                "timestamp": parse_bar_timestamp(bar.timestamp),
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
+                "volume": bar.volume,
+                "adj_close": bar.adj_close,
+                "source": bar.source,
+                "created_at": now,
+            }
+            for bar in bars
+        ]
+        stmt = insert(OhlcvBarRow).values(rows)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["instrument_id", "timeframe", "timestamp"],
+            set_={
+                "open": stmt.excluded.open,
+                "high": stmt.excluded.high,
+                "low": stmt.excluded.low,
+                "close": stmt.excluded.close,
+                "volume": stmt.excluded.volume,
+                "adj_close": stmt.excluded.adj_close,
+                "source": stmt.excluded.source,
+            },
+        )
+        # P2.3: un solo INSERT multi-fila ON CONFLICT DO UPDATE (bulk) en vez del
+        # loop 1×1 previo (N+1). `excluded` se resuelve a nivel de BD.
+        await self._session.execute(stmt)
         await self._session.flush()
         return len(bars)
