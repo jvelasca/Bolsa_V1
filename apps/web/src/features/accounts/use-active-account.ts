@@ -1,16 +1,16 @@
-import { useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { InvestmentAccountDto } from '@bolsa/shared';
-import { defaultAccountSettings } from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { useActiveAccountStore } from '@/stores/active-account-store';
+import { useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { InvestmentAccountDto } from "@bolsa/shared";
+import { defaultAccountSettings } from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { useActiveAccountStore } from "@/stores/active-account-store";
 
 function asAccountList(value: unknown): InvestmentAccountDto[] {
   if (Array.isArray(value)) return value as InvestmentAccountDto[];
   // Cache legado: algún queryFn guardó `{ data: Account[] }` bajo la misma key.
   if (
     value &&
-    typeof value === 'object' &&
+    typeof value === "object" &&
     Array.isArray((value as { data?: unknown }).data)
   ) {
     return (value as { data: InvestmentAccountDto[] }).data;
@@ -18,8 +18,10 @@ function asAccountList(value: unknown): InvestmentAccountDto[] {
   return [];
 }
 
-function pickFallbackAccountId(accounts: InvestmentAccountDto[]): string | null {
-  const open = accounts.filter((a) => a.status === 'active');
+function pickFallbackAccountId(
+  accounts: InvestmentAccountDto[],
+): string | null {
+  const open = accounts.filter((a) => a.status === "active");
   if (open.length === 0) return null;
   // Prefer last-used mirrored on server (isDefault), else first open account.
   return open.find((a) => a.isDefault)?.id ?? open[0]?.id ?? null;
@@ -46,12 +48,12 @@ export function useActiveAccount(): {
   const setActiveAccountId = useActiveAccountStore((s) => s.setActiveAccountId);
 
   const accountsQuery = useQuery({
-    queryKey: ['accounts'],
+    queryKey: ["accounts"],
     queryFn: async () => (await api.getAccounts()).data,
   });
 
   const accounts = asAccountList(accountsQuery.data);
-  const openAccounts = accounts.filter((a) => a.status === 'active');
+  const openAccounts = accounts.filter((a) => a.status === "active");
 
   const storedStillValid = Boolean(
     activeAccountId && openAccounts.some((a) => a.id === activeAccountId),
@@ -100,7 +102,7 @@ export function useActivateAccount() {
       return accountId;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
     },
   });
 }
@@ -109,15 +111,17 @@ export function useActiveAccountSettings() {
   const { account, effectiveAccountId, isLoading } = useActiveAccount();
   return {
     settings: account?.settings ?? defaultAccountSettings(),
-    currency: account?.currency ?? 'EUR',
+    currency: account?.currency ?? "EUR",
     accountName: account?.name ?? null,
     effectiveAccountId,
     isLoading,
   };
 }
 
-export function accountTypeShortLabel(type: InvestmentAccountDto['type']): string {
-  if (type === 'simulated') return 'Demo';
-  if (type === 'paper') return 'Paper (futuro · broker)';
-  return 'Live (reservado)';
+export function accountTypeShortLabel(
+  type: InvestmentAccountDto["type"],
+): string {
+  if (type === "simulated") return "Demo";
+  if (type === "paper") return "Paper (futuro · broker)";
+  return "Live (reservado)";
 }

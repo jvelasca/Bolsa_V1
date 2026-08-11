@@ -1,4 +1,4 @@
-import { FieldRow, inputClassName } from '@/components/ui/dialog';
+import { FieldRow, inputClassName } from "@/components/ui/dialog";
 
 /**
  * Paso «Capital» del asistente de cuenta demo (Diseño B).
@@ -23,7 +23,10 @@ export function AccountWizardCapitalStep({
 }) {
   return (
     <div className="space-y-4">
-      <FieldRow label="Depósito inicial" hint="Efectivo disponible al abrir la cuenta">
+      <FieldRow
+        label="Depósito inicial"
+        hint="Efectivo disponible al abrir la cuenta"
+      >
         <input
           type="number"
           min={0}
@@ -34,7 +37,10 @@ export function AccountWizardCapitalStep({
         />
       </FieldRow>
       <div className="grid gap-4 sm:grid-cols-2">
-        <FieldRow label="Apalancamiento" hint="1 = sin apalancamiento (recomendado)">
+        <FieldRow
+          label="Apalancamiento"
+          hint="1 = sin apalancamiento (recomendado)"
+        >
           <input
             type="number"
             min={1}
@@ -45,7 +51,10 @@ export function AccountWizardCapitalStep({
             onChange={(e) => onPatch({ leverage: e.target.value })}
           />
         </FieldRow>
-        <FieldRow label="Nivel margin call (%)" hint="Alerta cuando margen caiga bajo este umbral">
+        <FieldRow
+          label="Nivel margin call (%)"
+          hint="Alerta cuando margen caiga bajo este umbral"
+        >
           <input
             type="number"
             min={50}
@@ -57,8 +66,8 @@ export function AccountWizardCapitalStep({
         </FieldRow>
       </div>
       <p className="rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
-        Cuenta simulada: el apalancamiento afectará al cálculo de margen en fases posteriores. Por
-        ahora el trading opera con efectivo disponible.
+        Cuenta simulada: el apalancamiento afectará al cálculo de margen en
+        fases posteriores. Por ahora el trading opera con efectivo disponible.
       </p>
     </div>
   );

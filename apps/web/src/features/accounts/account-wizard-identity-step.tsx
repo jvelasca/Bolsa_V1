@@ -1,7 +1,7 @@
-import { FieldRow, inputClassName } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
+import { FieldRow, inputClassName } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
-const CURRENCIES = ['EUR', 'USD', 'GBP'] as const;
+const CURRENCIES = ["EUR", "USD", "GBP"] as const;
 
 /**
  * Paso «Identidad» del asistente de cuenta demo (Diseño B).
@@ -19,11 +19,18 @@ export function AccountWizardIdentityStep({
   name: string;
   description: string;
   currency: string;
-  onPatch: (values: { name?: string; description?: string; currency?: string }) => void;
+  onPatch: (values: {
+    name?: string;
+    description?: string;
+    currency?: string;
+  }) => void;
 }) {
   return (
     <div className="space-y-4">
-      <FieldRow label="Nombre de la cuenta" hint="Ej. Paper IBEX, Estrategia dividendos">
+      <FieldRow
+        label="Nombre de la cuenta"
+        hint="Ej. Paper IBEX, Estrategia dividendos"
+      >
         <input
           className={inputClassName}
           value={name}
@@ -34,7 +41,7 @@ export function AccountWizardIdentityStep({
       </FieldRow>
       <FieldRow label="Descripción (opcional)">
         <textarea
-          className={cn(inputClassName, 'min-h-[72px] resize-y')}
+          className={cn(inputClassName, "min-h-[72px] resize-y")}
           value={description}
           onChange={(e) => onPatch({ description: e.target.value })}
           placeholder="Objetivo, horizonte, notas…"

@@ -9,26 +9,32 @@
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import type { InvestmentAccountDto, LedgerEntryDto } from '@bolsa/shared';
-import { formatLedgerEntryLabel, ledgerEntryHint } from '@bolsa/shared';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { inputClassName } from '@/components/ui/dialog';
-import { AccountInvestorProfileSelect } from '@/features/accounts/account-investor-profile-select';
-import { AccountSettingsDialog } from '@/features/accounts/account-settings-dialog';
-import { formatPaperLabEvidence } from '@/features/accounts/paper-lab-evidence';
-import { PAPER_PATH_LAB } from '@/features/settings/paper-paths-copy';
-import { useActivateAccount } from '@/features/accounts/use-active-account';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { DemoBookModePanel } from '@/features/trading/demo-book-mode-panel';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { useActiveAccountStore } from '@/stores/active-account-store';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import type { InvestmentAccountDto, LedgerEntryDto } from "@bolsa/shared";
+import { formatLedgerEntryLabel, ledgerEntryHint } from "@bolsa/shared";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { inputClassName } from "@/components/ui/dialog";
+import { AccountInvestorProfileSelect } from "@/features/accounts/account-investor-profile-select";
+import { AccountSettingsDialog } from "@/features/accounts/account-settings-dialog";
+import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
+import { PAPER_PATH_LAB } from "@/features/settings/paper-paths-copy";
+import { useActivateAccount } from "@/features/accounts/use-active-account";
+import { formatPrice } from "@/features/charts/chart-utils";
+import { DemoBookModePanel } from "@/features/trading/demo-book-mode-panel";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useActiveAccountStore } from "@/stores/active-account-store";
 
-type DetailTab = 'resumen' | 'posiciones' | 'movimientos' | 'config';
+type DetailTab = "resumen" | "posiciones" | "movimientos" | "config";
 
 type AccountDetailPanelProps = {
   account: InvestmentAccountDto;
@@ -40,7 +46,12 @@ type AccountDetailPanelProps = {
 };
 
 function parseDetailTab(raw: string | null | undefined): DetailTab | null {
-  if (raw === 'resumen' || raw === 'posiciones' || raw === 'movimientos' || raw === 'config') {
+  if (
+    raw === "resumen" ||
+    raw === "posiciones" ||
+    raw === "movimientos" ||
+    raw === "config"
+  ) {
     return raw;
   }
   return null;
@@ -56,24 +67,28 @@ export function AccountDetailPanel({
   const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
   const activateAccount = useActivateAccount();
   const isWorkingAccount = activeAccountId === account.id;
-  const [tab, setTab] = useState<DetailTab>(() => parseDetailTab(initialTab) ?? 'resumen');
+  const [tab, setTab] = useState<DetailTab>(
+    () => parseDetailTab(initialTab) ?? "resumen",
+  );
   const [editName, setEditName] = useState(account.name);
-  const [editDescription, setEditDescription] = useState(account.description ?? '');
+  const [editDescription, setEditDescription] = useState(
+    account.description ?? "",
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [amount, setAmount] = useState('');
-  const [note, setNote] = useState('');
-  const [cashTab, setCashTab] = useState<'deposit' | 'withdraw'>('deposit');
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [cashTab, setCashTab] = useState<"deposit" | "withdraw">("deposit");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const operativaRef = useRef<HTMLDivElement>(null);
 
-  const isClosed = account.status === 'closed';
-  const isSimulated = account.type === 'simulated';
-  const isPaper = account.type === 'paper';
+  const isClosed = account.status === "closed";
+  const isSimulated = account.type === "simulated";
+  const isPaper = account.type === "paper";
 
   useEffect(() => {
     setEditName(account.name);
-    setEditDescription(account.description ?? '');
+    setEditDescription(account.description ?? "");
     setError(null);
     setMessage(null);
   }, [account.id, account.name, account.description]);
@@ -84,26 +99,29 @@ export function AccountDetailPanel({
   }, [initialTab, account.id]);
 
   useEffect(() => {
-    if (tab !== 'config' || focus !== 'operativa') return;
+    if (tab !== "config" || focus !== "operativa") return;
     const t = window.setTimeout(() => {
-      operativaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      operativaRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
     }, 80);
     return () => window.clearTimeout(t);
   }, [tab, focus, account.id]);
 
   const summaryQuery = useQuery({
-    queryKey: ['account-summary', account.id],
+    queryKey: ["account-summary", account.id],
     queryFn: async () => (await api.getAccountSummary(account.id)).data,
   });
 
   const portfolioQuery = useQuery({
-    queryKey: ['portfolio', account.id],
+    queryKey: ["portfolio", account.id],
     queryFn: api.getPortfolio,
     enabled: !isClosed,
   });
 
   const ledgerQuery = useQuery({
-    queryKey: ['ledger', account.id],
+    queryKey: ["ledger", account.id],
     queryFn: async () => (await api.getAccountLedger(account.id, 30)).data,
   });
 
@@ -119,9 +137,9 @@ export function AccountDetailPanel({
       }),
     onSuccess: () => {
       setError(null);
-      setMessage('Datos actualizados.');
-      void queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      void queryClient.invalidateQueries({ queryKey: ['account-summaries'] });
+      setMessage("Datos actualizados.");
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["account-summaries"] });
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -129,9 +147,9 @@ export function AccountDetailPanel({
   const closeMutation = useMutation({
     mutationFn: () => api.closeAccount(account.id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      void queryClient.invalidateQueries({ queryKey: ['account-summaries'] });
-      setMessage('Cuenta cerrada. El historial se conserva para auditoría.');
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["account-summaries"] });
+      setMessage("Cuenta cerrada. El historial se conserva para auditoría.");
     },
     onError: (e: Error) => setError(e.message),
   });
@@ -139,8 +157,8 @@ export function AccountDetailPanel({
   const deleteMutation = useMutation({
     mutationFn: () => api.deleteAccount(account.id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      void queryClient.invalidateQueries({ queryKey: ['account-summaries'] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["account-summaries"] });
       onDelete();
     },
     onError: (e: Error) => setError(e.message),
@@ -148,31 +166,41 @@ export function AccountDetailPanel({
 
   const cashMutation = useMutation({
     mutationFn: async () => {
-      const parsed = Number(amount.replace(',', '.'));
+      const parsed = Number(amount.replace(",", "."));
       if (!Number.isFinite(parsed) || parsed <= 0) {
-        throw new Error('Importe inválido');
+        throw new Error("Importe inválido");
       }
-      if (cashTab === 'deposit') {
-        return api.depositCash(account.id, { amount: parsed, note: note.trim() || null });
+      if (cashTab === "deposit") {
+        return api.depositCash(account.id, {
+          amount: parsed,
+          note: note.trim() || null,
+        });
       }
-      return api.withdrawCash(account.id, { amount: parsed, note: note.trim() || null });
+      return api.withdrawCash(account.id, {
+        amount: parsed,
+        note: note.trim() || null,
+      });
     },
     onSuccess: () => {
-      setAmount('');
-      setNote('');
-      setMessage('Movimiento registrado.');
-      void queryClient.invalidateQueries({ queryKey: ['account-summary', account.id] });
-      void queryClient.invalidateQueries({ queryKey: ['portfolio', account.id] });
-      void queryClient.invalidateQueries({ queryKey: ['ledger', account.id] });
+      setAmount("");
+      setNote("");
+      setMessage("Movimiento registrado.");
+      void queryClient.invalidateQueries({
+        queryKey: ["account-summary", account.id],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["portfolio", account.id],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["ledger", account.id] });
     },
     onError: (e: Error) => setError(e.message),
   });
 
   const tabs: { id: DetailTab; label: string }[] = [
-    { id: 'resumen', label: 'Resumen' },
-    { id: 'posiciones', label: 'Posiciones' },
-    { id: 'movimientos', label: 'Movimientos' },
-    { id: 'config', label: 'Configuración' },
+    { id: "resumen", label: "Resumen" },
+    { id: "posiciones", label: "Posiciones" },
+    { id: "movimientos", label: "Movimientos" },
+    { id: "config", label: "Configuración" },
   ];
 
   return (
@@ -189,13 +217,17 @@ export function AccountDetailPanel({
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {isSimulated ? 'Demo' : isPaper ? 'Paper (futuro · broker)' : 'Live (reservado)'} ·{' '}
-              {account.currency}
-              {isClosed ? ' · cerrada' : ''}
+              {isSimulated
+                ? "Demo"
+                : isPaper
+                  ? "Paper (futuro · broker)"
+                  : "Live (reservado)"}{" "}
+              · {account.currency}
+              {isClosed ? " · cerrada" : ""}
             </p>
             {isPaper && account.strategyDefinitionId && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Estrategia:{' '}
+                Estrategia:{" "}
                 <Link
                   to="/backtests?tab=strategies"
                   className="font-mono text-primary hover:underline"
@@ -204,9 +236,11 @@ export function AccountDetailPanel({
                 </Link>
                 {account.sourceBacktestRunId ? (
                   <>
-                    {' '}
-                    · backtest{' '}
-                    <span className="font-mono">{account.sourceBacktestRunId.slice(0, 8)}…</span>
+                    {" "}
+                    · backtest{" "}
+                    <span className="font-mono">
+                      {account.sourceBacktestRunId.slice(0, 8)}…
+                    </span>
                   </>
                 ) : null}
               </p>
@@ -216,14 +250,14 @@ export function AccountDetailPanel({
                 className="mt-1.5 text-[11px] text-muted-foreground"
                 title={
                   account.labEvidence?.note ??
-                  'Provenance lab al desplegar. No es gate de producción ni auto-live.'
+                  "Provenance lab al desplegar. No es gate de producción ni auto-live."
                 }
               >
-                Evidencia lab:{' '}
+                Evidencia lab:{" "}
                 <span className="text-foreground">
                   {formatPaperLabEvidence(account.labEvidence)}
                 </span>
-                {' · '}
+                {" · "}
                 {PAPER_PATH_LAB.accountNote}
               </p>
             )}
@@ -235,7 +269,9 @@ export function AccountDetailPanel({
                 disabled={activateAccount.isPending}
                 onClick={() => {
                   void activateAccount.mutateAsync(account.id).then(() => {
-                    setMessage('Cuenta Activa cambiada. Se restaurará al reabrir la app.');
+                    setMessage(
+                      "Cuenta Activa cambiada. Se restaurará al reabrir la app.",
+                    );
                   });
                 }}
                 className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
@@ -243,10 +279,16 @@ export function AccountDetailPanel({
                 Usar ahora
               </button>
             )}
-            <Link to="/history" className="text-xs text-primary hover:underline">
+            <Link
+              to="/history"
+              className="text-xs text-primary hover:underline"
+            >
               Historial completo
             </Link>
-            <Link to="/fiscal" className="text-xs text-muted-foreground hover:text-primary">
+            <Link
+              to="/fiscal"
+              className="text-xs text-muted-foreground hover:text-primary"
+            >
               Informe fiscal
             </Link>
           </div>
@@ -258,8 +300,10 @@ export function AccountDetailPanel({
               type="button"
               onClick={() => setTab(t.id)}
               className={cn(
-                'rounded-md px-3 py-1 text-sm',
-                tab === t.id ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-accent',
+                "rounded-md px-3 py-1 text-sm",
+                tab === t.id
+                  ? "bg-primary/15 text-primary"
+                  : "text-muted-foreground hover:bg-accent",
               )}
             >
               {t.label}
@@ -272,29 +316,40 @@ export function AccountDetailPanel({
         {message && <p className="mb-3 text-sm text-success">{message}</p>}
         {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
 
-        {tab === 'resumen' && (
+        {tab === "resumen" && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Metric label="Patrimonio" value={summary ? formatPrice(summary.totalEquity) : '—'} />
-            <Metric label="Efectivo" value={summary ? formatPrice(summary.cash) : '—'} />
+            <Metric
+              label="Patrimonio"
+              value={summary ? formatPrice(summary.totalEquity) : "—"}
+            />
+            <Metric
+              label="Efectivo"
+              value={summary ? formatPrice(summary.cash) : "—"}
+            />
             <Metric
               label="P&amp;L no realizado"
-              value={summary ? formatPrice(summary.totalUnrealizedPnl) : '—'}
+              value={summary ? formatPrice(summary.totalUnrealizedPnl) : "—"}
               tone={
                 summary
                   ? summary.totalUnrealizedPnl >= 0
-                    ? 'positive'
-                    : 'negative'
+                    ? "positive"
+                    : "negative"
                   : undefined
               }
             />
-            <Metric label="Posiciones" value={summary ? String(summary.positionsCount) : '—'} />
+            <Metric
+              label="Posiciones"
+              value={summary ? String(summary.positionsCount) : "—"}
+            />
           </div>
         )}
 
-        {tab === 'posiciones' && (
+        {tab === "posiciones" && (
           <div className="space-y-2">
             {!portfolio?.positions.length && (
-              <p className="text-sm text-muted-foreground">Sin posiciones abiertas.</p>
+              <p className="text-sm text-muted-foreground">
+                Sin posiciones abiertas.
+              </p>
             )}
             {portfolio?.positions.map((pos) => (
               <div
@@ -302,54 +357,65 @@ export function AccountDetailPanel({
                 className="flex justify-between rounded-md border border-border/60 px-3 py-2 text-sm"
               >
                 <span>
-                  <Link to={`/instruments/${pos.instrumentId}`} className="font-medium hover:text-primary">
+                  <Link
+                    to={`/instruments/${pos.instrumentId}`}
+                    className="font-medium hover:text-primary"
+                  >
                     {pos.symbol}
                   </Link>
-                  <span className="ml-2 text-muted-foreground">{pos.quantity} uds.</span>
+                  <span className="ml-2 text-muted-foreground">
+                    {pos.quantity} uds.
+                  </span>
                 </span>
-                <span className="tabular-nums">{formatPrice(pos.marketValue)}</span>
+                <span className="tabular-nums">
+                  {formatPrice(pos.marketValue)}
+                </span>
               </div>
             ))}
           </div>
         )}
 
-        {tab === 'movimientos' && (
+        {tab === "movimientos" && (
           <div className="space-y-4">
             {!isClosed && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Capital externo (simulado)</CardTitle>
-                  <CardDescription>Depósitos y retiradas en modo demo</CardDescription>
+                  <CardTitle className="text-sm">
+                    Capital externo (simulado)
+                  </CardTitle>
+                  <CardDescription>
+                    Depósitos y retiradas en modo demo
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-wrap items-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setCashTab('deposit')}
+                    onClick={() => setCashTab("deposit")}
                     className={cn(
-                      'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs',
-                      cashTab === 'deposit' && 'border-primary text-primary',
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs",
+                      cashTab === "deposit" && "border-primary text-primary",
                     )}
                   >
                     <ArrowDownToLine className="h-3 w-3" /> Depósito
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCashTab('withdraw')}
+                    onClick={() => setCashTab("withdraw")}
                     className={cn(
-                      'inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs',
-                      cashTab === 'withdraw' && 'border-primary text-primary',
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs",
+                      cashTab === "withdraw" && "border-primary text-primary",
                     )}
                   >
                     <ArrowUpFromLine className="h-3 w-3" /> Retirada
                   </button>
                   <input
-                    className={cn(inputClassName, 'w-28')}
+                    className={cn(inputClassName, "w-28")}
                     placeholder="Importe"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                   />
                   <input
-                    className={cn(inputClassName, 'min-w-[140px] flex-1')}
+                    className={cn(inputClassName, "min-w-[140px] flex-1")}
                     placeholder="Nota"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
@@ -366,9 +432,9 @@ export function AccountDetailPanel({
               </Card>
             )}
             <p className="text-xs text-muted-foreground">
-              Los importes negativos (rojo) salen de tu efectivo; los positivos (verde) lo aumentan.
-              Las comisiones de cada operación aparecen como líneas «Comisión y cargos» separadas de la
-              compra o venta.
+              Los importes negativos (rojo) salen de tu efectivo; los positivos
+              (verde) lo aumentan. Las comisiones de cada operación aparecen
+              como líneas «Comisión y cargos» separadas de la compra o venta.
             </p>
             <ul className="space-y-2 text-sm">
               {ledger.map((entry) => (
@@ -378,28 +444,31 @@ export function AccountDetailPanel({
           </div>
         )}
 
-        {tab === 'config' && (
+        {tab === "config" && (
           <div className="space-y-4">
             <div className="rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
               <p className="font-medium text-foreground">Cuenta Activa</p>
               <p className="mt-1">
-                Es la que usa Trading, la barra inferior y las operaciones. Se guarda al cerrar la
-                app y se restaura al volver. Las demás cuentas quedan disponibles para cambiar cuando
-                quieras (otras demos / mercados). Paper broker = futuro.
+                Es la que usa Trading, la barra inferior y las operaciones. Se
+                guarda al cerrar la app y se restaura al volver. Las demás
+                cuentas quedan disponibles para cambiar cuando quieras (otras
+                demos / mercados). Paper broker = futuro.
                 {isWorkingAccount ? (
                   <span className="text-primary"> Esta es la activa.</span>
                 ) : (
                   !isClosed && (
                     <>
-                      {' '}
+                      {" "}
                       <button
                         type="button"
                         className="text-primary underline-offset-2 hover:underline disabled:opacity-50"
                         disabled={activateAccount.isPending}
                         onClick={() => {
-                          void activateAccount.mutateAsync(account.id).then(() => {
-                            setMessage('Cuenta Activa cambiada.');
-                          });
+                          void activateAccount
+                            .mutateAsync(account.id)
+                            .then(() => {
+                              setMessage("Cuenta Activa cambiada.");
+                            });
                         }}
                       >
                         Usar ahora
@@ -414,22 +483,25 @@ export function AccountDetailPanel({
               id="account-operativa"
               data-testid="account-operativa-block"
               className={cn(
-                'rounded-md border border-border p-3',
-                focus === 'operativa' && 'ring-2 ring-primary/40',
+                "rounded-md border border-border p-3",
+                focus === "operativa" && "ring-2 ring-primary/40",
               )}
             >
-              <p className="mb-1 text-sm font-medium text-foreground">Operativa</p>
+              <p className="mb-1 text-sm font-medium text-foreground">
+                Operativa
+              </p>
               <p className="mb-2 text-xs text-muted-foreground">
-                Manual / SEMI / AUTO aplica a toda la cuenta (todos los valores). Se configura
-                aquí, no en el panel Operativa de cada instrumento.
+                Manual / SEMI / AUTO aplica a toda la cuenta (todos los
+                valores). Se configura aquí, no en el panel Operativa de cada
+                instrumento.
               </p>
               {isWorkingAccount && !isClosed ? (
                 <DemoBookModePanel />
               ) : (
                 <p className="text-xs text-muted-foreground">
                   {isClosed
-                    ? 'Cuenta cerrada: no se puede cambiar la operativa.'
-                    : 'Activa esta cuenta («Usar ahora») para cambiar Manual / SEMI / AUTO.'}
+                    ? "Cuenta cerrada: no se puede cambiar la operativa."
+                    : "Activa esta cuenta («Usar ahora») para cambiar Manual / SEMI / AUTO."}
                 </p>
               )}
             </div>
@@ -474,9 +546,9 @@ export function AccountDetailPanel({
             <div className="rounded-md border border-border bg-muted/20 p-3 text-sm">
               <p className="font-medium">Comisiones y fiscal</p>
               <p className="text-muted-foreground">
-                {account.settings?.commission.label ?? '—'} ·{' '}
-                {account.settings?.tax.jurisdiction ?? '—'} ·{' '}
-                {account.settings?.tax.costBasisMethod.toUpperCase() ?? '—'}
+                {account.settings?.commission.label ?? "—"} ·{" "}
+                {account.settings?.tax.jurisdiction ?? "—"} ·{" "}
+                {account.settings?.tax.costBasisMethod.toUpperCase() ?? "—"}
               </p>
               {!isClosed && (
                 <button
@@ -496,7 +568,11 @@ export function AccountDetailPanel({
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm('¿Cerrar esta cuenta? Se conservará el historial para auditoría.')) {
+                    if (
+                      window.confirm(
+                        "¿Cerrar esta cuenta? Se conservará el historial para auditoría.",
+                      )
+                    ) {
                       void closeMutation.mutateAsync();
                     }
                   }}
@@ -511,7 +587,7 @@ export function AccountDetailPanel({
                   onClick={() => {
                     if (
                       window.confirm(
-                        '¿Eliminar definitivamente esta cuenta demo? Esta acción no se puede deshacer.',
+                        "¿Eliminar definitivamente esta cuenta demo? Esta acción no se puede deshacer.",
                       )
                     ) {
                       void deleteMutation.mutateAsync();
@@ -553,14 +629,14 @@ function LedgerMovementRow({ entry }: { entry: LedgerEntryDto }) {
             {entry.symbol}
             {entry.quantity != null && entry.price != null
               ? ` · ${entry.quantity} × ${formatPrice(entry.price)}`
-              : ''}
+              : ""}
           </p>
         )}
       </div>
       <span
         className={cn(
-          'shrink-0 tabular-nums',
-          entry.amount >= 0 ? 'text-success' : 'text-destructive',
+          "shrink-0 tabular-nums",
+          entry.amount >= 0 ? "text-success" : "text-destructive",
         )}
       >
         {formatPrice(entry.amount)}
@@ -576,16 +652,16 @@ function Metric({
 }: {
   label: string;
   value: string;
-  tone?: 'positive' | 'negative';
+  tone?: "positive" | "negative";
 }) {
   return (
     <div className="rounded-md border border-border/60 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={cn(
-          'text-lg font-semibold tabular-nums',
-          tone === 'positive' && 'text-success',
-          tone === 'negative' && 'text-destructive',
+          "text-lg font-semibold tabular-nums",
+          tone === "positive" && "text-success",
+          tone === "negative" && "text-destructive",
         )}
       >
         {value}

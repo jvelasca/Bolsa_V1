@@ -1,6 +1,6 @@
-import { Dialog } from '@/components/ui/dialog';
-import type { InvestmentAccountDto } from '@bolsa/shared';
-import { AccountSettingsPanel } from './account-settings-panel';
+import { Dialog } from "@/components/ui/dialog";
+import type { InvestmentAccountDto } from "@bolsa/shared";
+import { AccountSettingsPanel } from "./account-settings-panel";
 
 interface AccountSettingsDialogProps {
   account: InvestmentAccountDto | null;
@@ -8,7 +8,11 @@ interface AccountSettingsDialogProps {
   onClose: () => void;
 }
 
-export function AccountSettingsDialog({ account, open, onClose }: AccountSettingsDialogProps) {
+export function AccountSettingsDialog({
+  account,
+  open,
+  onClose,
+}: AccountSettingsDialogProps) {
   if (!account) return null;
 
   return (

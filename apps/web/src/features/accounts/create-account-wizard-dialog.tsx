@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   AccountSettings,
   CommissionPresetId,
@@ -10,66 +10,66 @@ import type {
   RiskTolerance,
   SuggestablePolicyTemplateId,
   TaxJurisdiction,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 import {
   POLICY_TEMPLATE_LABELS,
   TAX_PRESETS,
   calculateTradeFees,
   resolveCommissionProfile,
   suggestPolicyTemplateFromDeclared,
-} from '@bolsa/shared';
-import { Dialog, FieldRow, inputClassName } from '@/components/ui/dialog';
-import { InvestorProfilePicker } from '@/features/accounts/investor-profile-picker';
-import { AccountWizardIdentityStep } from '@/features/accounts/account-wizard-identity-step';
-import { AccountWizardCapitalStep } from '@/features/accounts/account-wizard-capital-step';
-import { AccountWizardCommissionsStep } from '@/features/accounts/account-wizard-commissions-step';
-import { AccountWizardTaxStep } from '@/features/accounts/account-wizard-tax-step';
-import { AccountWizardReviewStep } from '@/features/accounts/account-wizard-review-step';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { useActiveAccountStore } from '@/stores/active-account-store';
-import { useUiStore } from '@/stores/ui-store';
+} from "@bolsa/shared";
+import { Dialog, FieldRow, inputClassName } from "@/components/ui/dialog";
+import { InvestorProfilePicker } from "@/features/accounts/investor-profile-picker";
+import { AccountWizardIdentityStep } from "@/features/accounts/account-wizard-identity-step";
+import { AccountWizardCapitalStep } from "@/features/accounts/account-wizard-capital-step";
+import { AccountWizardCommissionsStep } from "@/features/accounts/account-wizard-commissions-step";
+import { AccountWizardTaxStep } from "@/features/accounts/account-wizard-tax-step";
+import { AccountWizardReviewStep } from "@/features/accounts/account-wizard-review-step";
+import { formatPrice } from "@/features/charts/chart-utils";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useActiveAccountStore } from "@/stores/active-account-store";
+import { useUiStore } from "@/stores/ui-store";
 
 const STEPS = [
-  { id: 'identity', label: 'Identidad' },
-  { id: 'capital', label: 'Capital' },
-  { id: 'profile', label: 'Perfil' },
-  { id: 'commissions', label: 'Comisiones' },
-  { id: 'tax', label: 'Fiscal' },
-  { id: 'review', label: 'Revisión' },
+  { id: "identity", label: "Identidad" },
+  { id: "capital", label: "Capital" },
+  { id: "profile", label: "Perfil" },
+  { id: "commissions", label: "Comisiones" },
+  { id: "tax", label: "Fiscal" },
+  { id: "review", label: "Revisión" },
 ] as const;
 
-type StepId = (typeof STEPS)[number]['id'];
+type StepId = (typeof STEPS)[number]["id"];
 
 const HORIZON_OPTIONS: { id: ProfileHorizon; label: string }[] = [
-  { id: 'intraday', label: 'Intradía' },
-  { id: 'swing', label: 'Swing' },
-  { id: 'position', label: 'Posicional' },
-  { id: 'long_term', label: 'Largo plazo' },
+  { id: "intraday", label: "Intradía" },
+  { id: "swing", label: "Swing" },
+  { id: "position", label: "Posicional" },
+  { id: "long_term", label: "Largo plazo" },
 ];
 
 const RISK_OPTIONS: { id: RiskTolerance; label: string; hint: string }[] = [
-  { id: 'low', label: 'Baja', hint: 'Preservar capital' },
-  { id: 'moderate', label: 'Moderada', hint: 'Equilibrio' },
-  { id: 'high', label: 'Alta', hint: 'Mayor volatilidad' },
+  { id: "low", label: "Baja", hint: "Preservar capital" },
+  { id: "moderate", label: "Moderada", hint: "Equilibrio" },
+  { id: "high", label: "Alta", hint: "Mayor volatilidad" },
 ];
 
 const EXPERIENCE_OPTIONS: { id: ExperienceLevel; label: string }[] = [
-  { id: 'novice', label: 'Principiante' },
-  { id: 'intermediate', label: 'Intermedio' },
-  { id: 'advanced', label: 'Avanzado' },
-  { id: 'professional', label: 'Profesional' },
+  { id: "novice", label: "Principiante" },
+  { id: "intermediate", label: "Intermedio" },
+  { id: "advanced", label: "Avanzado" },
+  { id: "professional", label: "Profesional" },
 ];
 
 const OBJECTIVE_OPTIONS = [
-  { id: 'preservation', label: 'Preservación' },
-  { id: 'income', label: 'Renta' },
-  { id: 'growth', label: 'Crecimiento' },
-  { id: 'speculation', label: 'Especulación' },
+  { id: "preservation", label: "Preservación" },
+  { id: "income", label: "Renta" },
+  { id: "growth", label: "Crecimiento" },
+  { id: "speculation", label: "Especulación" },
 ] as const;
 
-type ProfileMode = 'new' | 'existing';
+type ProfileMode = "new" | "existing";
 
 interface FormState {
   name: string;
@@ -92,33 +92,33 @@ interface FormState {
   taxJurisdiction: TaxJurisdiction;
   stampDutyBuyPct: string;
   dividendWithholdingPct: string;
-  costBasisMethod: 'fifo' | 'average';
+  costBasisMethod: "fifo" | "average";
   notes: string;
 }
 
 const INITIAL_FORM: FormState = {
-  name: '',
-  description: '',
-  currency: 'EUR',
-  initialDeposit: '100000',
-  leverage: '1',
-  marginCallLevelPct: '100',
-  portfolioName: 'Cartera principal',
-  portfolioDescription: '',
-  strategyTag: 'core',
-  profileMode: 'existing',
-  existingProfileId: '',
-  profileName: '',
-  horizon: 'swing',
-  riskTolerance: 'moderate',
-  experience: 'intermediate',
-  objectives: ['growth'],
-  commissionPresetId: 'standard_es',
-  taxJurisdiction: 'ES',
-  stampDutyBuyPct: '0.2',
-  dividendWithholdingPct: '19',
-  costBasisMethod: 'fifo',
-  notes: '',
+  name: "",
+  description: "",
+  currency: "EUR",
+  initialDeposit: "100000",
+  leverage: "1",
+  marginCallLevelPct: "100",
+  portfolioName: "Cartera principal",
+  portfolioDescription: "",
+  strategyTag: "core",
+  profileMode: "existing",
+  existingProfileId: "",
+  profileName: "",
+  horizon: "swing",
+  riskTolerance: "moderate",
+  experience: "intermediate",
+  objectives: ["growth"],
+  commissionPresetId: "standard_es",
+  taxJurisdiction: "ES",
+  stampDutyBuyPct: "0.2",
+  dividendWithholdingPct: "19",
+  costBasisMethod: "fifo",
+  notes: "",
 };
 
 function buildSettings(form: FormState): AccountSettings {
@@ -146,13 +146,13 @@ function buildPayload(form: FormState): CreateInvestmentAccountRequestDto {
     initialDeposit: Number(form.initialDeposit) || 0,
     leverage: Number(form.leverage) || 1,
     marginCallLevelPct: Number(form.marginCallLevelPct) || 100,
-    portfolioName: form.portfolioName.trim() || 'Cartera principal',
+    portfolioName: form.portfolioName.trim() || "Cartera principal",
     portfolioDescription: form.portfolioDescription.trim() || null,
     strategyTag: form.strategyTag,
     settings: buildSettings(form),
   };
 
-  if (form.profileMode === 'existing' && form.existingProfileId) {
+  if (form.profileMode === "existing" && form.existingProfileId) {
     return { ...base, activeProfileId: form.existingProfileId };
   }
 
@@ -164,7 +164,7 @@ function buildPayload(form: FormState): CreateInvestmentAccountRequestDto {
   const profileName =
     form.profileName.trim() ||
     `Perfil · ${form.name.trim()}`.slice(0, 80) ||
-    'Perfil por defecto';
+    "Perfil por defecto";
 
   return {
     ...base,
@@ -173,7 +173,7 @@ function buildPayload(form: FormState): CreateInvestmentAccountRequestDto {
       horizon: form.horizon,
       riskTolerance: form.riskTolerance,
       experience: form.experience,
-      objectives: form.objectives.length ? form.objectives : ['growth'],
+      objectives: form.objectives.length ? form.objectives : ["growth"],
       suggestedPolicyTemplateId: suggested,
       selectedPolicyTemplateId: suggested,
     },
@@ -188,12 +188,12 @@ function StepIndicator({ current }: { current: StepId }) {
         <div
           key={step.id}
           className={cn(
-            'rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide',
+            "rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
             i === index
-              ? 'bg-primary text-primary-foreground'
+              ? "bg-primary text-primary-foreground"
               : i < index
-                ? 'bg-primary/20 text-primary'
-                : 'bg-muted text-muted-foreground',
+                ? "bg-primary/20 text-primary"
+                : "bg-muted text-muted-foreground",
           )}
         >
           {step.label}
@@ -209,19 +209,20 @@ export function CreateAccountWizardDialog() {
   const queryClient = useQueryClient();
   const setActiveAccountId = useActiveAccountStore((s) => s.setActiveAccountId);
 
-  const [step, setStep] = useState<StepId>('identity');
+  const [step, setStep] = useState<StepId>("identity");
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [error, setError] = useState<string | null>(null);
 
   const profilesQuery = useQuery({
-    queryKey: ['investor-profiles'],
+    queryKey: ["investor-profiles"],
     queryFn: async () => (await api.listInvestorProfiles()).data,
     enabled: open,
   });
 
   const settings = useMemo(() => buildSettings(form), [form]);
   const sampleFees = useMemo(
-    () => calculateTradeFees(5000, 'buy', settings, { currency: form.currency }),
+    () =>
+      calculateTradeFees(5000, "buy", settings, { currency: form.currency }),
     [settings, form.currency],
   );
   const suggestedTemplate = useMemo(
@@ -235,10 +236,13 @@ export function CreateAccountWizardDialog() {
   );
 
   const catalogProfiles = profilesQuery.data ?? [];
-  const selectedCatalog = catalogProfiles.find((p) => p.profileId === form.existingProfileId);
+  const selectedCatalog = catalogProfiles.find(
+    (p) => p.profileId === form.existingProfileId,
+  );
 
   const createMutation = useMutation({
-    mutationFn: (payload: CreateInvestmentAccountRequestDto) => api.createAccount(payload),
+    mutationFn: (payload: CreateInvestmentAccountRequestDto) =>
+      api.createAccount(payload),
     onSuccess: async (response) => {
       setActiveAccountId(response.data.id);
       try {
@@ -246,12 +250,12 @@ export function CreateAccountWizardDialog() {
       } catch {
         /* Activa local ya fijada; espejo servidor best-effort */
       }
-      void queryClient.invalidateQueries({ queryKey: ['accounts'] });
-      void queryClient.invalidateQueries({ queryKey: ['account-summaries'] });
-      void queryClient.invalidateQueries({ queryKey: ['portfolio'] });
-      void queryClient.invalidateQueries({ queryKey: ['investor-profiles'] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["account-summaries"] });
+      void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+      void queryClient.invalidateQueries({ queryKey: ["investor-profiles"] });
       setForm(INITIAL_FORM);
-      setStep('identity');
+      setStep("identity");
       setError(null);
       close();
     },
@@ -269,7 +273,9 @@ export function CreateAccountWizardDialog() {
     const list = profilesQuery.data ?? [];
     if (list.length === 0) {
       setForm((prev) =>
-        prev.profileMode === 'existing' ? { ...prev, profileMode: 'new' } : prev,
+        prev.profileMode === "existing"
+          ? { ...prev, profileMode: "new" }
+          : prev,
       );
       return;
     }
@@ -277,7 +283,7 @@ export function CreateAccountWizardDialog() {
       if (prev.existingProfileId) return prev;
       return {
         ...prev,
-        profileMode: 'existing',
+        profileMode: "existing",
         existingProfileId: list[0]!.profileId,
       };
     });
@@ -286,22 +292,31 @@ export function CreateAccountWizardDialog() {
   function toggleObjective(id: string) {
     setForm((prev) => {
       const has = prev.objectives.includes(id);
-      const next = has ? prev.objectives.filter((o) => o !== id) : [...prev.objectives, id];
-      return { ...prev, objectives: next.length ? next : ['growth'] };
+      const next = has
+        ? prev.objectives.filter((o) => o !== id)
+        : [...prev.objectives, id];
+      return { ...prev, objectives: next.length ? next : ["growth"] };
     });
     setError(null);
   }
 
   function validateStep(current: StepId): string | null {
-    if (current === 'identity' && !form.name.trim()) return 'Indica un nombre para la cuenta.';
-    if (current === 'capital') {
+    if (current === "identity" && !form.name.trim())
+      return "Indica un nombre para la cuenta.";
+    if (current === "capital") {
       const deposit = Number(form.initialDeposit);
-      if (!Number.isFinite(deposit) || deposit <= 0) return 'El depósito inicial debe ser mayor que cero.';
+      if (!Number.isFinite(deposit) || deposit <= 0)
+        return "El depósito inicial debe ser mayor que cero.";
       const lev = Number(form.leverage);
-      if (!Number.isFinite(lev) || lev < 1 || lev > 10) return 'Apalancamiento entre 1 y 10.';
+      if (!Number.isFinite(lev) || lev < 1 || lev > 10)
+        return "Apalancamiento entre 1 y 10.";
     }
-    if (current === 'profile' && form.profileMode === 'existing' && !form.existingProfileId) {
-      return 'Elige un perfil del catálogo o crea uno nuevo.';
+    if (
+      current === "profile" &&
+      form.profileMode === "existing" &&
+      !form.existingProfileId
+    ) {
+      return "Elige un perfil del catálogo o crea uno nuevo.";
     }
     return null;
   }
@@ -327,7 +342,7 @@ export function CreateAccountWizardDialog() {
   }
 
   function profileReviewLabel(): string {
-    if (form.profileMode === 'existing' && selectedCatalog) {
+    if (form.profileMode === "existing" && selectedCatalog) {
       const tpl =
         POLICY_TEMPLATE_LABELS[
           selectedCatalog.selectedPolicyTemplateId as SuggestablePolicyTemplateId
@@ -337,7 +352,7 @@ export function CreateAccountWizardDialog() {
     const tpl = POLICY_TEMPLATE_LABELS[suggestedTemplate];
     const name =
       form.profileName.trim() ||
-      (form.name.trim() ? `Perfil · ${form.name.trim()}` : 'Nuevo perfil');
+      (form.name.trim() ? `Perfil · ${form.name.trim()}` : "Nuevo perfil");
     return `${name} · ${tpl} · ${form.riskTolerance}`;
   }
 
@@ -351,7 +366,7 @@ export function CreateAccountWizardDialog() {
     >
       <StepIndicator current={step} />
 
-      {step === 'identity' && (
+      {step === "identity" && (
         <AccountWizardIdentityStep
           name={form.name}
           description={form.description}
@@ -360,7 +375,7 @@ export function CreateAccountWizardDialog() {
         />
       )}
 
-      {step === 'capital' && (
+      {step === "capital" && (
         <AccountWizardCapitalStep
           initialDeposit={form.initialDeposit}
           leverage={form.leverage}
@@ -369,22 +384,25 @@ export function CreateAccountWizardDialog() {
         />
       )}
 
-      {step === 'profile' && (
+      {step === "profile" && (
         <div className="space-y-4">
           <div>
-            <p className="text-sm font-medium text-foreground">Perfil inversor de esta cuenta</p>
+            <p className="text-sm font-medium text-foreground">
+              Perfil inversor de esta cuenta
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Cada cuenta tiene <span className="text-foreground">un solo perfil activo</span> del
-              catálogo (Policy Gate). Elige uno existente o crea uno nuevo. No confundir con el
-              preset de comisiones del paso siguiente.
+              Cada cuenta tiene{" "}
+              <span className="text-foreground">un solo perfil activo</span> del
+              catálogo (Policy Gate). Elige uno existente o crea uno nuevo. No
+              confundir con el preset de comisiones del paso siguiente.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {(
               [
-                { id: 'existing' as const, label: 'Del catálogo' },
-                { id: 'new' as const, label: 'Crear nuevo' },
+                { id: "existing" as const, label: "Del catálogo" },
+                { id: "new" as const, label: "Crear nuevo" },
               ] as const
             ).map((opt) => (
               <button
@@ -394,16 +412,18 @@ export function CreateAccountWizardDialog() {
                   patch({
                     profileMode: opt.id,
                     existingProfileId:
-                      opt.id === 'existing' && !form.existingProfileId && catalogProfiles[0]
+                      opt.id === "existing" &&
+                      !form.existingProfileId &&
+                      catalogProfiles[0]
                         ? catalogProfiles[0].profileId
                         : form.existingProfileId,
                   })
                 }
                 className={cn(
-                  'rounded-md border px-3 py-1.5 text-sm transition-colors',
+                  "rounded-md border px-3 py-1.5 text-sm transition-colors",
                   form.profileMode === opt.id
-                    ? 'border-primary bg-primary/10 text-foreground'
-                    : 'border-border text-muted-foreground hover:bg-accent/40',
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-accent/40",
                 )}
               >
                 {opt.label}
@@ -411,19 +431,23 @@ export function CreateAccountWizardDialog() {
             ))}
           </div>
 
-          {form.profileMode === 'existing' ? (
+          {form.profileMode === "existing" ? (
             <div className="space-y-2">
               <InvestorProfilePicker
                 value={form.existingProfileId}
-                onChange={(profileId) => patch({ existingProfileId: profileId })}
+                onChange={(profileId) =>
+                  patch({ existingProfileId: profileId })
+                }
                 disabled={createMutation.isPending}
                 maxHeightClassName="max-h-64"
               />
               {selectedCatalog ? (
                 <p className="text-xs text-muted-foreground">
-                  Seleccionado:{' '}
-                  <span className="font-medium text-foreground">{selectedCatalog.name}</span>
-                  {' · '}
+                  Seleccionado:{" "}
+                  <span className="font-medium text-foreground">
+                    {selectedCatalog.name}
+                  </span>
+                  {" · "}
                   {POLICY_TEMPLATE_LABELS[
                     selectedCatalog.selectedPolicyTemplateId as SuggestablePolicyTemplateId
                   ] ?? selectedCatalog.selectedPolicyTemplateId}
@@ -432,7 +456,9 @@ export function CreateAccountWizardDialog() {
               <button
                 type="button"
                 className="text-xs text-primary hover:underline"
-                onClick={() => useUiStore.getState().openPlatformConfig('investor-profile')}
+                onClick={() =>
+                  useUiStore.getState().openPlatformConfig("investor-profile")
+                }
               >
                 Gestionar catálogo →
               </button>
@@ -440,7 +466,8 @@ export function CreateAccountWizardDialog() {
           ) : (
             <div className="space-y-4">
               <p className="text-xs text-muted-foreground">
-                Se creará un perfil nuevo en el catálogo y se asignará a esta cuenta.
+                Se creará un perfil nuevo en el catálogo y se asignará a esta
+                cuenta.
               </p>
               <FieldRow
                 label="Nombre del perfil (opcional)"
@@ -453,22 +480,24 @@ export function CreateAccountWizardDialog() {
                   placeholder={
                     form.name.trim()
                       ? `Perfil · ${form.name.trim()}`
-                      : 'Perfil · Cuenta demo'
+                      : "Perfil · Cuenta demo"
                   }
                 />
               </FieldRow>
 
               <div>
-                <p className="mb-2 text-xs text-muted-foreground">Tolerancia al riesgo</p>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Tolerancia al riesgo
+                </p>
                 <div className="grid gap-2 sm:grid-cols-3">
                   {RISK_OPTIONS.map((opt) => (
                     <label
                       key={opt.id}
                       className={cn(
-                        'flex cursor-pointer flex-col rounded-lg border p-3 transition-colors',
+                        "flex cursor-pointer flex-col rounded-lg border p-3 transition-colors",
                         form.riskTolerance === opt.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:bg-accent/40',
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-accent/40",
                       )}
                     >
                       <input
@@ -479,7 +508,9 @@ export function CreateAccountWizardDialog() {
                         onChange={() => patch({ riskTolerance: opt.id })}
                       />
                       <span className="text-sm font-medium">{opt.label}</span>
-                      <span className="text-[11px] text-muted-foreground">{opt.hint}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {opt.hint}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -490,7 +521,9 @@ export function CreateAccountWizardDialog() {
                   <select
                     className={inputClassName}
                     value={form.horizon}
-                    onChange={(e) => patch({ horizon: e.target.value as ProfileHorizon })}
+                    onChange={(e) =>
+                      patch({ horizon: e.target.value as ProfileHorizon })
+                    }
                   >
                     {HORIZON_OPTIONS.map((o) => (
                       <option key={o.id} value={o.id}>
@@ -503,7 +536,9 @@ export function CreateAccountWizardDialog() {
                   <select
                     className={inputClassName}
                     value={form.experience}
-                    onChange={(e) => patch({ experience: e.target.value as ExperienceLevel })}
+                    onChange={(e) =>
+                      patch({ experience: e.target.value as ExperienceLevel })
+                    }
                   >
                     {EXPERIENCE_OPTIONS.map((o) => (
                       <option key={o.id} value={o.id}>
@@ -525,10 +560,10 @@ export function CreateAccountWizardDialog() {
                         type="button"
                         onClick={() => toggleObjective(o.id)}
                         className={cn(
-                          'rounded-md border px-2.5 py-1 text-xs transition-colors',
+                          "rounded-md border px-2.5 py-1 text-xs transition-colors",
                           on
-                            ? 'border-primary bg-primary/10 text-foreground'
-                            : 'border-border text-muted-foreground hover:bg-accent/40',
+                            ? "border-primary bg-primary/10 text-foreground"
+                            : "border-border text-muted-foreground hover:bg-accent/40",
                         )}
                       >
                         {o.label}
@@ -539,7 +574,7 @@ export function CreateAccountWizardDialog() {
               </div>
 
               <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
-                Plantilla de política sugerida:{' '}
+                Plantilla de política sugerida:{" "}
                 <span className="font-medium text-foreground">
                   {POLICY_TEMPLATE_LABELS[suggestedTemplate]}
                 </span>
@@ -550,7 +585,7 @@ export function CreateAccountWizardDialog() {
         </div>
       )}
 
-      {step === 'commissions' && (
+      {step === "commissions" && (
         <AccountWizardCommissionsStep
           commissionPresetId={form.commissionPresetId}
           sampleFees={sampleFees}
@@ -558,7 +593,7 @@ export function CreateAccountWizardDialog() {
         />
       )}
 
-      {step === 'tax' && (
+      {step === "tax" && (
         <AccountWizardTaxStep
           taxJurisdiction={form.taxJurisdiction}
           costBasisMethod={form.costBasisMethod}
@@ -578,16 +613,19 @@ export function CreateAccountWizardDialog() {
         />
       )}
 
-      {step === 'review' && (
+      {step === "review" && (
         <AccountWizardReviewStep
           rows={[
-            ['Cuenta', form.name],
-            ['Moneda', form.currency],
-            ['Depósito inicial', formatPrice(Number(form.initialDeposit) || 0)],
-            ['Apalancamiento', `${form.leverage}x`],
-            ['Perfil inversor', profileReviewLabel()],
-            ['Comisiones', settings.commission.label],
-            ['Fiscal', `${form.taxJurisdiction} · ${form.costBasisMethod.toUpperCase()}`],
+            ["Cuenta", form.name],
+            ["Moneda", form.currency],
+            ["Depósito inicial", formatPrice(Number(form.initialDeposit) || 0)],
+            ["Apalancamiento", `${form.leverage}x`],
+            ["Perfil inversor", profileReviewLabel()],
+            ["Comisiones", settings.commission.label],
+            [
+              "Fiscal",
+              `${form.taxJurisdiction} · ${form.costBasisMethod.toUpperCase()}`,
+            ],
           ]}
         />
       )}
@@ -597,20 +635,20 @@ export function CreateAccountWizardDialog() {
       <div className="mt-6 flex items-center justify-between gap-2 border-t border-border pt-4">
         <button
           type="button"
-          onClick={step === 'identity' ? handleClose : goBack}
+          onClick={step === "identity" ? handleClose : goBack}
           className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-sm hover:bg-accent"
         >
           <ChevronLeft className="h-4 w-4" />
-          {step === 'identity' ? 'Cancelar' : 'Atrás'}
+          {step === "identity" ? "Cancelar" : "Atrás"}
         </button>
-        {step === 'review' ? (
+        {step === "review" ? (
           <button
             type="button"
             disabled={createMutation.isPending}
             onClick={() => void createMutation.mutateAsync(buildPayload(form))}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
           >
-            {createMutation.isPending ? 'Creando cuenta…' : 'Crear cuenta'}
+            {createMutation.isPending ? "Creando cuenta…" : "Crear cuenta"}
           </button>
         ) : (
           <button
