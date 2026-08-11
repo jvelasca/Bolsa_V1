@@ -1,4 +1,4 @@
-import type { ScreenerPanelId } from '@/stores/screener-preferences-store';
+import type { ScreenerPanelId } from "@/stores/screener-preferences-store";
 
 export const MIN_SCREENER_SIDEBAR_WIDTH_PCT = 20;
 export const MAX_SCREENER_SIDEBAR_WIDTH_PCT = 55;
@@ -31,15 +31,24 @@ export const DEFAULT_SCREENER_SPLIT_LAYOUT: ScreenerSplitLayoutPrefs = {
 };
 
 export function clampScreenerSidebarWidthPct(value: number): number {
-  return Math.min(MAX_SCREENER_SIDEBAR_WIDTH_PCT, Math.max(MIN_SCREENER_SIDEBAR_WIDTH_PCT, value));
+  return Math.min(
+    MAX_SCREENER_SIDEBAR_WIDTH_PCT,
+    Math.max(MIN_SCREENER_SIDEBAR_WIDTH_PCT, value),
+  );
 }
 
 export function clampScreenerRunnerHeightPct(value: number): number {
-  return Math.min(MAX_SCREENER_RUNNER_HEIGHT_PCT, Math.max(MIN_SCREENER_RUNNER_HEIGHT_PCT, value));
+  return Math.min(
+    MAX_SCREENER_RUNNER_HEIGHT_PCT,
+    Math.max(MIN_SCREENER_RUNNER_HEIGHT_PCT, value),
+  );
 }
 
 export function clampScreenerFooterHeightPct(value: number): number {
-  return Math.min(MAX_SCREENER_FOOTER_HEIGHT_PCT, Math.max(MIN_SCREENER_FOOTER_HEIGHT_PCT, value));
+  return Math.min(
+    MAX_SCREENER_FOOTER_HEIGHT_PCT,
+    Math.max(MIN_SCREENER_FOOTER_HEIGHT_PCT, value),
+  );
 }
 
 export function normalizeSidebarPanelLayout(

@@ -1,11 +1,11 @@
-import type { InstrumentListSummaryDto, ListPanelConfig } from '@bolsa/shared';
+import type { InstrumentListSummaryDto, ListPanelConfig } from "@bolsa/shared";
 import {
   CATALOG_IBEX_LIST_ID,
   isVirtualListId,
   VIRTUAL_LIST_LABELS,
   VIRTUAL_LIST_PORTFOLIO,
-} from '@bolsa/shared';
-import type { QueryClient } from '@tanstack/react-query';
+} from "@bolsa/shared";
+import type { QueryClient } from "@tanstack/react-query";
 
 /** ID de lista activo válido (virtual o existente en API). */
 export function resolveSelectedListId(
@@ -13,11 +13,12 @@ export function resolveSelectedListId(
   apiLists: InstrumentListSummaryDto[],
 ): string {
   if (apiListId && isVirtualListId(apiListId)) return apiListId;
-  if (apiListId && apiLists.some((list) => list.id === apiListId)) return apiListId;
+  if (apiListId && apiLists.some((list) => list.id === apiListId))
+    return apiListId;
   return (
     apiLists.find((list) => list.id === CATALOG_IBEX_LIST_ID)?.id ??
-    apiLists.find((list) => list.name === 'IBEX 35')?.id ??
-    apiLists.find((list) => list.source === 'catalog')?.id ??
+    apiLists.find((list) => list.name === "IBEX 35")?.id ??
+    apiLists.find((list) => list.source === "catalog")?.id ??
     apiLists[0]?.id ??
     VIRTUAL_LIST_PORTFOLIO
   );
@@ -29,7 +30,9 @@ export function pruneCarouselListIds(
 ): string[] {
   if (apiLists.length === 0) return carouselListIds ?? [];
   const apiIds = new Set(apiLists.map((list) => list.id));
-  return (carouselListIds ?? []).filter((id) => !isVirtualListId(id) && apiIds.has(id));
+  return (carouselListIds ?? []).filter(
+    (id) => !isVirtualListId(id) && apiIds.has(id),
+  );
 }
 
 /**
@@ -75,7 +78,7 @@ export function reconcileCarouselListIds(
   if (next.length === 0 && pinned.length > 0) {
     const ibex =
       apiById.get(CATALOG_IBEX_LIST_ID) ??
-      apiLists.find((list) => list.name === 'IBEX 35');
+      apiLists.find((list) => list.name === "IBEX 35");
     if (ibex) next.push(ibex.id);
   }
 
@@ -105,7 +108,7 @@ export function pickFallbackListId(
   excludeId?: string,
 ): string {
   const candidates = apiLists.filter((list) => list.id !== excludeId);
-  const catalog = candidates.find((list) => list.source === 'catalog');
+  const catalog = candidates.find((list) => list.source === "catalog");
   if (catalog) return catalog.id;
   if (candidates[0]) return candidates[0].id;
   return VIRTUAL_LIST_PORTFOLIO;
@@ -114,12 +117,12 @@ export function pickFallbackListId(
 export function listConfigForSelection(
   listId: string,
   apiLists: InstrumentListSummaryDto[],
-): Pick<ListPanelConfig, 'apiListId' | 'name' | 'source'> {
+): Pick<ListPanelConfig, "apiListId" | "name" | "source"> {
   if (isVirtualListId(listId)) {
     return {
       apiListId: listId,
       name: VIRTUAL_LIST_LABELS[listId],
-      source: 'virtual',
+      source: "virtual",
     };
   }
   const list = apiLists.find((item) => item.id === listId);
@@ -127,10 +130,10 @@ export function listConfigForSelection(
     return {
       apiListId: VIRTUAL_LIST_PORTFOLIO,
       name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_PORTFOLIO],
-      source: 'virtual',
+      source: "virtual",
     };
   }
-  return { apiListId: list.id, name: list.name, source: 'api' };
+  return { apiListId: list.id, name: list.name, source: "api" };
 }
 
 /** Tras borrar una lista API: cache, carrusel y selección activa. */
@@ -138,29 +141,43 @@ export function syncAfterListDeleted(
   queryClient: QueryClient,
   listId: string,
   listConfig: ListPanelConfig,
-): Pick<ListPanelConfig, 'apiListId' | 'name' | 'source' | 'carouselListIds' | 'carouselPinnedListNames'> {
+): Pick<
+  ListPanelConfig,
+  | "apiListId"
+  | "name"
+  | "source"
+  | "carouselListIds"
+  | "carouselPinnedListNames"
+> {
   const oldLists =
-    queryClient.getQueryData<{ data: InstrumentListSummaryDto[] }>(['lists'])?.data ?? [];
+    queryClient.getQueryData<{ data: InstrumentListSummaryDto[] }>(["lists"])
+      ?.data ?? [];
   const deletedName = oldLists.find((list) => list.id === listId)?.name;
 
-  queryClient.setQueryData<{ data: InstrumentListSummaryDto[] }>(['lists'], (old) => ({
-    data: (old?.data ?? []).filter((list) => list.id !== listId),
-  }));
-  queryClient.removeQueries({ queryKey: ['list-quotes', listId] });
-  queryClient.removeQueries({ queryKey: ['list', listId] });
+  queryClient.setQueryData<{ data: InstrumentListSummaryDto[] }>(
+    ["lists"],
+    (old) => ({
+      data: (old?.data ?? []).filter((list) => list.id !== listId),
+    }),
+  );
+  queryClient.removeQueries({ queryKey: ["list-quotes", listId] });
+  queryClient.removeQueries({ queryKey: ["list", listId] });
 
   const apiLists =
-    queryClient.getQueryData<{ data: InstrumentListSummaryDto[] }>(['lists'])?.data ?? [];
+    queryClient.getQueryData<{ data: InstrumentListSummaryDto[] }>(["lists"])
+      ?.data ?? [];
   const carouselListIds = pruneCarouselListIds(
     (listConfig.carouselListIds ?? []).filter((id) => id !== listId),
     apiLists,
   );
-  const carouselPinnedListNames = (listConfig.carouselPinnedListNames ?? []).filter(
-    (name) => name !== deletedName,
-  );
+  const carouselPinnedListNames = (
+    listConfig.carouselPinnedListNames ?? []
+  ).filter((name) => name !== deletedName);
   const fallbackId = pickFallbackListId(apiLists, listId);
   const selection = listConfigForSelection(
-    listConfig.apiListId === listId ? fallbackId : (listConfig.apiListId ?? fallbackId),
+    listConfig.apiListId === listId
+      ? fallbackId
+      : (listConfig.apiListId ?? fallbackId),
     apiLists,
   );
 

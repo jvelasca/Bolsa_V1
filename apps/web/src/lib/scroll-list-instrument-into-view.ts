@@ -4,7 +4,7 @@
  */
 
 export function stickyListHeaderOffset(container: HTMLElement): number {
-  const sticky = container.querySelector('.sticky.top-0') as HTMLElement | null;
+  const sticky = container.querySelector(".sticky.top-0") as HTMLElement | null;
   if (!sticky) return 0;
   return sticky.getBoundingClientRect().height;
 }
@@ -27,7 +27,7 @@ export function scrollListInstrumentToTop(
   const nextTop = container.scrollTop + (eRect.top - cRect.top) - topOffset;
   container.scrollTo({
     top: Math.max(0, nextTop),
-    behavior: options?.behavior ?? 'smooth',
+    behavior: options?.behavior ?? "smooth",
   });
   return true;
 }
