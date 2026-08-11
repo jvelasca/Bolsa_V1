@@ -14,6 +14,7 @@ from bolsa_application.dataset_metadata import (
 from bolsa_application.paper_lab_evidence import trial_blocks_from_lab_evidence_snapshot
 from bolsa_application.research_evidence import emit_evidence_for_trial
 from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
+from bolsa_domain.platform_kernel import MIN_SCAN_BARS
 from bolsa_domain.repositories.backtest_repository import BacktestRepository
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
@@ -150,9 +151,9 @@ class RunAndSaveBacktest:
             date_from=date_from,
             date_to=date_to,
         )
-        if len(bars) < 50:
+        if len(bars) < MIN_SCAN_BARS:
             raise ValueError(
-                f"Se necesitan al menos 50 barras en {tf.value} "
+                f"Se necesitan al menos {MIN_SCAN_BARS} barras en {tf.value} "
                 f"(hay {len(bars)}). Sincroniza el instrumento en ese timeframe "
                 f"o cambia el TF de la estrategia (p. ej. a 1d)."
             )

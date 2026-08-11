@@ -63,6 +63,7 @@ from bolsa_analytics.optimize.walk_forward import (
     normalize_walk_forward_folds,
     split_walk_forward_bars,
 )
+from bolsa_domain.platform_kernel import MIN_SCAN_BARS
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
@@ -572,8 +573,8 @@ class RunSmaGridOptimize:
         family = normalize_strategy_family(strategy_family)
         tf = TimeFrame(timeframe) if timeframe in {t.value for t in TimeFrame} else TimeFrame.D1
         bars = await self._ohlcv.get_bars(instrument_id, timeframe=tf, limit=bar_limit)
-        if len(bars) < 50:
-            raise ValueError("Se necesitan al menos 50 barras")
+        if len(bars) < MIN_SCAN_BARS:
+            raise ValueError(f"Se necesitan al menos {MIN_SCAN_BARS} barras")
 
         def _as_ts(value: object) -> str:
             return value.isoformat() if hasattr(value, "isoformat") else str(value)

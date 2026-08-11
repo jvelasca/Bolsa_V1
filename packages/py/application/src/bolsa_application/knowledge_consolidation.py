@@ -5,11 +5,11 @@ Consolidation is always explicit. Never auto-promotes from a single good trial.
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Protocol, get_args
 
 from bolsa_domain.entities.hypothesis import Hypothesis
 from bolsa_domain.entities.hypothesis_belief import HypothesisBelief
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
+from bolsa_domain.entities.knowledge_node import KnowledgeNode, KnowledgeStage
 from bolsa_domain.entities.research_evidence import ResearchEvidence
 
 MATH_VERSION_CONSOLIDATION_V0 = "consolidation_lab_v0"
@@ -19,9 +19,8 @@ MIN_BELIEF = 0.55
 MAX_CI_WIDTH = 0.40
 MIN_KNOWLEDGE_CONFIDENCE = 0.40
 
-ALLOWED_STAGES = frozenset(
-    {"CANDIDATE", "EMERGING", "ACCEPTED", "CANONICAL", "DEPRECATED"}
-)
+# Fuente canónica de stages en dominio (no duplicar literales).
+ALLOWED_STAGES = frozenset(get_args(KnowledgeStage))
 
 
 class _HypRepo(Protocol):
