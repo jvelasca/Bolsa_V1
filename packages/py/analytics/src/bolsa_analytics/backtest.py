@@ -250,10 +250,16 @@ def run_backtest(
     spread_bps: int = 0,
     cost_v2: CostModelV2Config | None = None,
     strategy_definition: dict[str, Any] | None = None,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> BacktestEngineResult:
     """Ejecuta un backtest H0 sobre ``bars`` con preset o ``strategy_definition``.
 
     Si ``cost_v2`` está enabled, ajusta slippage/spread por barra; si no, usa bps fijos.
+
+    ``execution_model`` fija la política de fill. Único valor soportado: ``next_open``
+    (inmutable para 1D, D1): una señal calculada al cierre de la barra ``t`` se ejecuta
+    al precio de apertura de la barra ``t+1`` (``open[t+1]``). Si la señal cae en la
+    última barra, no se ejecuta. Esto elimina el look-ahead/same-bar (P0.1).
     """
     if not bars:
         raise ValueError("No hay barras OHLCV para el backtest")
@@ -311,21 +317,31 @@ def run_backtest(
     total_commission = 0.0
 
     for i, bar in enumerate(bars):
-        mid = bar.close
-        kind = signal_by_index.get(i)
+        kind = signal_by_index.get(i - 1)
         signal: Literal["buy", "sell"] | None = None
         reason: dict[str, Any] | None = None
+        signal_index = i - 1
         if kind == "entry_long":
             signal = "buy"
             reason = explain_signal_at_bar(
-                strategy_def, index=i, context=context, closes=closes, side="entries"
+                strategy_def,
+                index=signal_index,
+                context=context,
+                closes=closes,
+                side="entries",
             )
         elif kind == "exit":
             signal = "sell"
             reason = explain_signal_at_bar(
-                strategy_def, index=i, context=context, closes=closes, side="exits"
+                strategy_def,
+                index=signal_index,
+                context=context,
+                closes=closes,
+                side="exits",
             )
 
+        fill_price = float(bar.open if bar.open is not None else bar.close)
+        close_price = float(bar.close)
         bar_costs = _bar_costs(
             resolved_costs,
             cost_v2=cost_v2,
@@ -334,7 +350,7 @@ def run_backtest(
         )
 
         if signal == "buy" and shares == 0:
-            fill = _buy_fill_price(mid, bar_costs)
+            fill = _buy_fill_price(fill_price, bar_costs)
             cost_per_share = fill * (1.0 + _bps_frac(bar_costs.commission_bps))
             quantity = int(cash // cost_per_share) if cost_per_share > 0 else 0
             if quantity > 0:
@@ -344,7 +360,7 @@ def run_backtest(
                 shares = float(quantity)
                 total_commission += commission
                 open_entry_cost = notional + commission
-                equity_after = cash + shares * mid
+                equity_after = cash + shares * close_price
                 trades.append(
                     BacktestTradeResult(
                         type="buy",
@@ -357,7 +373,7 @@ def run_backtest(
                     )
                 )
         elif signal == "sell" and shares > 0:
-            fill = _sell_fill_price(mid, bar_costs)
+            fill = _sell_fill_price(fill_price, bar_costs)
             notional = shares * fill
             commission = _commission(notional, bar_costs)
             cash += notional - commission
@@ -381,7 +397,7 @@ def run_backtest(
             )
 
         equity_curve.append(
-            BacktestEquityPoint(timestamp=bar.timestamp, equity=cash + shares * mid),
+            BacktestEquityPoint(timestamp=bar.timestamp, equity=cash + shares * close_price),
         )
 
     final_equity = cash + shares * bars[-1].close
