@@ -1,6 +1,6 @@
-import type { ResearchTrialDto } from '@bolsa/shared';
+import type { ResearchTrialDto } from "@bolsa/shared";
 
-export type OosEvidenceKind = 'none' | 'holdout' | 'walkforward' | 'cpcv';
+export type OosEvidenceKind = "none" | "holdout" | "walkforward" | "cpcv";
 
 /** Compact OOS / walk-forward / CPCV signal for the pre-paper checklist. */
 export type OosEvidence = {
@@ -14,7 +14,7 @@ export type OosEvidence = {
   walkForwardEfficiency?: number;
   oosCv?: number;
   positiveOosFoldShare?: number;
-  wfeSource?: 'lab_score' | 'sharpe';
+  wfeSource?: "lab_score" | "sharpe";
   /** Lab EdgeReport lite (P3.M). */
   credibility?: number;
   edgeBand?: string;
@@ -28,9 +28,16 @@ export type OosEvidence = {
   strategyId?: string;
 };
 
-function edgeFieldsFromBlocks(blocks: Record<string, unknown>): Pick<
+function edgeFieldsFromBlocks(
+  blocks: Record<string, unknown>,
+): Pick<
   OosEvidence,
-  'credibility' | 'edgeBand' | 'monteCarloPValue' | 'dsr' | 'pbo' | 'persistedEdgeReportId'
+  | "credibility"
+  | "edgeBand"
+  | "monteCarloPValue"
+  | "dsr"
+  | "pbo"
+  | "persistedEdgeReportId"
 > {
   const er = asRecord(blocks.edgeReport);
   const pboBlock = asRecord(blocks.pbo);
@@ -40,7 +47,7 @@ function edgeFieldsFromBlocks(blocks: Record<string, unknown>): Pick<
   const suite = er ? asRecord(er.suite) : null;
   return {
     credibility: asFiniteNumber(er?.credibility),
-    edgeBand: typeof er?.band === 'string' ? er.band : undefined,
+    edgeBand: typeof er?.band === "string" ? er.band : undefined,
     monteCarloPValue: asFiniteNumber(suite?.monteCarloPValue),
     dsr: asFiniteNumber(suite?.dsr),
     pbo:
@@ -49,20 +56,24 @@ function edgeFieldsFromBlocks(blocks: Record<string, unknown>): Pick<
       asFiniteNumber(lab?.pbo) ??
       asFiniteNumber(er?.pbo),
     persistedEdgeReportId:
-      typeof er?.persistedEdgeReportId === 'string' ? er.persistedEdgeReportId : undefined,
+      typeof er?.persistedEdgeReportId === "string"
+        ? er.persistedEdgeReportId
+        : undefined,
   };
 }
 
-const SESSION_KEY = 'bolsa-optimize-oos-evidence-v1';
+const SESSION_KEY = "bolsa-optimize-oos-evidence-v1";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
-  return value != null && typeof value === 'object' && !Array.isArray(value)
+  return value != null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
 }
 
 function asFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 /** Read OOS / WF blocks from a research trial (optimize ledger). */
@@ -70,7 +81,7 @@ export function extractOosEvidenceFromTrial(
   trial?: ResearchTrialDto | null,
 ): OosEvidence {
   const blocks = asRecord(trial?.blocks ?? null);
-  if (!blocks) return { kind: 'none' };
+  if (!blocks) return { kind: "none" };
 
   const edgeExtra = edgeFieldsFromBlocks(blocks);
 
@@ -80,7 +91,7 @@ export function extractOosEvidenceFromTrial(
     if (meanOosScore != null) {
       const lab = asRecord(blocks.labEvidence);
       return {
-        kind: 'cpcv',
+        kind: "cpcv",
         meanOosScore,
         stdOosScore: asFiniteNumber(cpcv.stdOosScore),
         pathCount: asFiniteNumber(cpcv.pathCount),
@@ -89,7 +100,7 @@ export function extractOosEvidenceFromTrial(
         walkForwardEfficiency: asFiniteNumber(cpcv.walkForwardEfficiency),
         oosCv: asFiniteNumber(cpcv.oosCv),
         positiveOosFoldShare: asFiniteNumber(cpcv.positiveOosFoldShare),
-        wfeSource: lab?.wfeSource === 'sharpe' ? 'sharpe' : 'lab_score',
+        wfeSource: lab?.wfeSource === "sharpe" ? "sharpe" : "lab_score",
         ...edgeExtra,
       };
     }
@@ -101,7 +112,7 @@ export function extractOosEvidenceFromTrial(
     if (meanOosScore != null) {
       const lab = asRecord(blocks.labEvidence);
       return {
-        kind: 'walkforward',
+        kind: "walkforward",
         meanOosScore,
         stdOosScore: asFiniteNumber(wf.stdOosScore),
         nFolds: asFiniteNumber(wf.nFolds) ?? asFiniteNumber(wf.foldCount),
@@ -109,7 +120,7 @@ export function extractOosEvidenceFromTrial(
         walkForwardEfficiency: asFiniteNumber(wf.walkForwardEfficiency),
         oosCv: asFiniteNumber(wf.oosCv),
         positiveOosFoldShare: asFiniteNumber(wf.positiveOosFoldShare),
-        wfeSource: lab?.wfeSource === 'sharpe' ? 'sharpe' : 'lab_score',
+        wfeSource: lab?.wfeSource === "sharpe" ? "sharpe" : "lab_score",
         ...edgeExtra,
       };
     }
@@ -120,7 +131,7 @@ export function extractOosEvidenceFromTrial(
     const oosScore = asFiniteNumber(oos.score);
     if (oosScore != null) {
       return {
-        kind: 'holdout',
+        kind: "holdout",
         oosScore,
         oosReturnPct: asFiniteNumber(oos.totalReturnPct),
         ...edgeExtra,
@@ -128,7 +139,7 @@ export function extractOosEvidenceFromTrial(
     }
   }
 
-  return { kind: 'none' };
+  return { kind: "none" };
 }
 
 /** Build evidence from an optimize API result (session stash after save/adopt). */
@@ -161,19 +172,30 @@ export function extractOosEvidenceFromOptimizeResult(result: {
     };
   } | null;
   pbo?: { pbo?: number } | null;
-  baseline?: { oosMetrics?: { score?: number; totalReturnPct?: number } | null };
-  trials?: Array<{ oosMetrics?: { score?: number; totalReturnPct?: number } | null }>;
+  baseline?: {
+    oosMetrics?: { score?: number; totalReturnPct?: number } | null;
+  };
+  trials?: Array<{
+    oosMetrics?: { score?: number; totalReturnPct?: number } | null;
+  }>;
 }): OosEvidence {
   const edgeExtra: Pick<
     OosEvidence,
-    'credibility' | 'edgeBand' | 'monteCarloPValue' | 'dsr' | 'pbo' | 'persistedEdgeReportId'
+    | "credibility"
+    | "edgeBand"
+    | "monteCarloPValue"
+    | "dsr"
+    | "pbo"
+    | "persistedEdgeReportId"
   > = {};
   if (result.edgeReport) {
     edgeExtra.credibility = result.edgeReport.credibility;
     edgeExtra.edgeBand = result.edgeReport.band;
-    edgeExtra.monteCarloPValue = result.edgeReport.suite?.monteCarloPValue ?? undefined;
+    edgeExtra.monteCarloPValue =
+      result.edgeReport.suite?.monteCarloPValue ?? undefined;
     edgeExtra.dsr = result.edgeReport.suite?.dsr ?? undefined;
-    edgeExtra.persistedEdgeReportId = result.edgeReport.persistedEdgeReportId ?? undefined;
+    edgeExtra.persistedEdgeReportId =
+      result.edgeReport.persistedEdgeReportId ?? undefined;
   }
   edgeExtra.pbo =
     result.pbo?.pbo ??
@@ -183,57 +205,72 @@ export function extractOosEvidenceFromOptimizeResult(result: {
   const cpcv = result.cpcv;
   if (cpcv && Number.isFinite(cpcv.meanOosScore)) {
     return {
-      kind: 'cpcv',
+      kind: "cpcv",
       meanOosScore: cpcv.meanOosScore,
       stdOosScore: cpcv.stdOosScore,
       pathCount: cpcv.pathCount,
       nFolds: cpcv.pathCount,
       oosScore: cpcv.meanOosScore,
       walkForwardEfficiency:
-        cpcv.walkForwardEfficiency != null && Number.isFinite(cpcv.walkForwardEfficiency)
+        cpcv.walkForwardEfficiency != null &&
+        Number.isFinite(cpcv.walkForwardEfficiency)
           ? cpcv.walkForwardEfficiency
           : undefined,
-      oosCv: cpcv.oosCv != null && Number.isFinite(cpcv.oosCv) ? cpcv.oosCv : undefined,
+      oosCv:
+        cpcv.oosCv != null && Number.isFinite(cpcv.oosCv)
+          ? cpcv.oosCv
+          : undefined,
       positiveOosFoldShare:
-        cpcv.positiveOosFoldShare != null && Number.isFinite(cpcv.positiveOosFoldShare)
+        cpcv.positiveOosFoldShare != null &&
+        Number.isFinite(cpcv.positiveOosFoldShare)
           ? cpcv.positiveOosFoldShare
           : undefined,
-      wfeSource: 'lab_score',
+      wfeSource: "lab_score",
       ...edgeExtra,
     };
   }
   const wf = result.walkForward;
   if (wf && Number.isFinite(wf.meanOosScore)) {
     return {
-      kind: 'walkforward',
+      kind: "walkforward",
       meanOosScore: wf.meanOosScore,
       stdOosScore: wf.stdOosScore,
       nFolds: wf.nFolds,
       oosScore: wf.meanOosScore,
       walkForwardEfficiency:
-        wf.walkForwardEfficiency != null && Number.isFinite(wf.walkForwardEfficiency)
+        wf.walkForwardEfficiency != null &&
+        Number.isFinite(wf.walkForwardEfficiency)
           ? wf.walkForwardEfficiency
           : undefined,
-      oosCv: wf.oosCv != null && Number.isFinite(wf.oosCv) ? wf.oosCv : undefined,
+      oosCv:
+        wf.oosCv != null && Number.isFinite(wf.oosCv) ? wf.oosCv : undefined,
       positiveOosFoldShare:
-        wf.positiveOosFoldShare != null && Number.isFinite(wf.positiveOosFoldShare)
+        wf.positiveOosFoldShare != null &&
+        Number.isFinite(wf.positiveOosFoldShare)
           ? wf.positiveOosFoldShare
           : undefined,
-      wfeSource: 'lab_score',
+      wfeSource: "lab_score",
       ...edgeExtra,
     };
   }
-  const trialOos = result.trials?.[0]?.oosMetrics ?? result.baseline?.oosMetrics;
-  if (trialOos && typeof trialOos.score === 'number' && Number.isFinite(trialOos.score)) {
+  const trialOos =
+    result.trials?.[0]?.oosMetrics ?? result.baseline?.oosMetrics;
+  if (
+    trialOos &&
+    typeof trialOos.score === "number" &&
+    Number.isFinite(trialOos.score)
+  ) {
     return {
-      kind: 'holdout',
+      kind: "holdout",
       oosScore: trialOos.score,
       oosReturnPct:
-        typeof trialOos.totalReturnPct === 'number' ? trialOos.totalReturnPct : undefined,
+        typeof trialOos.totalReturnPct === "number"
+          ? trialOos.totalReturnPct
+          : undefined,
       ...edgeExtra,
     };
   }
-  return { kind: 'none' };
+  return { kind: "none" };
 }
 
 /**
@@ -242,20 +279,28 @@ export function extractOosEvidenceFromOptimizeResult(result: {
  * multipath evidence to bare hold-out just because the row has last-path oosMetrics.
  */
 export function buildOosEvidenceForAdopt(
-  result: Parameters<typeof extractOosEvidenceFromOptimizeResult>[0] | null | undefined,
-  row?: { oosMetrics?: { score?: number; totalReturnPct?: number } | null } | null,
+  result:
+    | Parameters<typeof extractOosEvidenceFromOptimizeResult>[0]
+    | null
+    | undefined,
+  row?: {
+    oosMetrics?: { score?: number; totalReturnPct?: number } | null;
+  } | null,
 ): OosEvidence {
-  const fromResult = result ? extractOosEvidenceFromOptimizeResult(result) : { kind: 'none' as const };
-  if (fromResult.kind === 'walkforward' || fromResult.kind === 'cpcv') {
+  const fromResult = result
+    ? extractOosEvidenceFromOptimizeResult(result)
+    : { kind: "none" as const };
+  if (fromResult.kind === "walkforward" || fromResult.kind === "cpcv") {
     return fromResult;
   }
   const rowScore = row?.oosMetrics?.score;
   if (rowScore != null && Number.isFinite(rowScore)) {
     return {
-      kind: 'holdout',
+      kind: "holdout",
       oosScore: rowScore,
       oosReturnPct:
-        row?.oosMetrics?.totalReturnPct != null && Number.isFinite(row.oosMetrics.totalReturnPct)
+        row?.oosMetrics?.totalReturnPct != null &&
+        Number.isFinite(row.oosMetrics.totalReturnPct)
           ? row.oosMetrics.totalReturnPct
           : fromResult.oosReturnPct,
       credibility: fromResult.credibility,
@@ -269,8 +314,11 @@ export function buildOosEvidenceForAdopt(
   return fromResult;
 }
 
-export function stashOosEvidenceForStrategy(strategyId: string, evidence: OosEvidence): void {
-  if (typeof sessionStorage === 'undefined' || evidence.kind === 'none') return;
+export function stashOosEvidenceForStrategy(
+  strategyId: string,
+  evidence: OosEvidence,
+): void {
+  if (typeof sessionStorage === "undefined" || evidence.kind === "none") return;
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     const map = raw ? (JSON.parse(raw) as Record<string, OosEvidence>) : {};
@@ -281,14 +329,16 @@ export function stashOosEvidenceForStrategy(strategyId: string, evidence: OosEvi
   }
 }
 
-export function readStashedOosEvidence(strategyId?: string | null): OosEvidence | null {
-  if (!strategyId || typeof sessionStorage === 'undefined') return null;
+export function readStashedOosEvidence(
+  strategyId?: string | null,
+): OosEvidence | null {
+  if (!strategyId || typeof sessionStorage === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const map = JSON.parse(raw) as Record<string, OosEvidence>;
     const evidence = map[strategyId];
-    return evidence?.kind && evidence.kind !== 'none' ? evidence : null;
+    return evidence?.kind && evidence.kind !== "none" ? evidence : null;
   } catch {
     return null;
   }
@@ -300,15 +350,15 @@ export function resolveOosEvidence(opts: {
   strategyId?: string | null;
 }): OosEvidence {
   const fromTrial = extractOosEvidenceFromTrial(opts.trial);
-  if (fromTrial.kind !== 'none') return fromTrial;
-  return readStashedOosEvidence(opts.strategyId) ?? { kind: 'none' };
+  if (fromTrial.kind !== "none") return fromTrial;
+  return readStashedOosEvidence(opts.strategyId) ?? { kind: "none" };
 }
 
 /** Map checklist evidence → deploy body snapshot (P7). */
 export function oosEvidenceToPaperLabSnapshot(
   evidence: OosEvidence,
   opts?: { sourceBacktestRunId?: string | null; trialId?: string | null },
-): import('@bolsa/shared').PaperLabEvidenceSnapshot {
+): import("@bolsa/shared").PaperLabEvidenceSnapshot {
   return {
     kind: evidence.kind,
     oosScore: evidence.oosScore,
@@ -328,6 +378,6 @@ export function oosEvidenceToPaperLabSnapshot(
     persistedEdgeReportId: evidence.persistedEdgeReportId,
     trialId: opts?.trialId ?? undefined,
     sourceBacktestRunId: opts?.sourceBacktestRunId ?? undefined,
-    note: 'Lab provenance at paper deploy — not a production gate, Belief, or auto-live.',
+    note: "Lab provenance at paper deploy — not a production gate, Belief, or auto-live.",
   };
 }

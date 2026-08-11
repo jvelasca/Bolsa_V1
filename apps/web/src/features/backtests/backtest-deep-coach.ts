@@ -22,10 +22,10 @@ import type {
   ProfileHorizon,
   RiskTolerance,
   StrategyPresetCategory,
-} from '@bolsa/shared';
-import type { ExplorePresetRow } from '@/features/backtests/backtest-explore-value';
-import type { CoachAuditResultV1 } from '@/features/backtests/coach-dual-audit';
-import { preferredCategoriesForHorizon } from '@/features/backtests/coach-profile-policy';
+} from "@bolsa/shared";
+import type { ExplorePresetRow } from "@/features/backtests/backtest-explore-value";
+import type { CoachAuditResultV1 } from "@/features/backtests/coach-dual-audit";
+import { preferredCategoriesForHorizon } from "@/features/backtests/coach-profile-policy";
 
 export type DeepCoachContext = {
   symbol: string;
@@ -44,7 +44,7 @@ export type DeepCoachContext = {
    * - in_sample_only (default): techo ★ ≤ 3 (no declarar “lista para paper”)
    * - lab_validated: permite ★ 4–5 si el score lo sostiene
    */
-  evidenceLevel?: 'in_sample_only' | 'lab_validated';
+  evidenceLevel?: "in_sample_only" | "lab_validated";
   /**
    * Peso del sesgo futuro / tramo reciente (default 0.42).
    * El resto de componentes se reescala para sumar 1.
@@ -85,13 +85,13 @@ export type RankTechnicalOptions = {
 
 /** Hechos tipados para LLM / persistencia — el narrador no inventa fuera de esto. */
 export type CoachFactsV1 = {
-  schemaVersion: '1.0.0';
+  schemaVersion: "1.0.0";
   symbol: string;
   timeframe: string;
   periodLabel?: string;
   horizon: ProfileHorizon;
   riskTolerance?: RiskTolerance | null;
-  evidenceLevel: 'in_sample_only' | 'lab_validated';
+  evidenceLevel: "in_sample_only" | "lab_validated";
   starCeiling: 3 | 5;
   buyHoldReturnPct: number | null;
   okCount: number;
@@ -149,20 +149,29 @@ function clamp01(n: number): number {
 }
 
 function horizonFromTimeframe(tf: string): ProfileHorizon {
-  if (tf === '1m' || tf === '5m' || tf === '15m' || tf === '30m' || tf === '1h') {
-    return 'intraday';
+  if (
+    tf === "1m" ||
+    tf === "5m" ||
+    tf === "15m" ||
+    tf === "30m" ||
+    tf === "1h"
+  ) {
+    return "intraday";
   }
-  if (tf === '4h' || tf === '1d') return 'swing';
-  if (tf === '1wk') return 'position';
-  return 'swing';
+  if (tf === "4h" || tf === "1d") return "swing";
+  if (tf === "1wk") return "position";
+  return "swing";
 }
 
-function preferredCategories(horizon: ProfileHorizon): StrategyPresetCategory[] {
+function preferredCategories(
+  horizon: ProfileHorizon,
+): StrategyPresetCategory[] {
   return preferredCategoriesForHorizon(horizon);
 }
 
 function tradesPerHundredBars(row: ExplorePresetRow): number | null {
-  if (row.tradeCount == null || row.barCount == null || row.barCount <= 0) return null;
+  if (row.tradeCount == null || row.barCount == null || row.barCount <= 0)
+    return null;
   return (row.tradeCount / row.barCount) * 100;
 }
 
@@ -171,7 +180,13 @@ function activityFit(row: ExplorePresetRow, horizon: ProfileHorizon): number {
   if (tpb == null) return 0.55;
   // Expected intensity by horizon (heuristic).
   const ideal =
-    horizon === 'intraday' ? 8 : horizon === 'swing' ? 2.5 : horizon === 'position' ? 0.8 : 0.35;
+    horizon === "intraday"
+      ? 8
+      : horizon === "swing"
+        ? 2.5
+        : horizon === "position"
+          ? 0.8
+          : 0.35;
   const ratio = tpb / ideal;
   if (ratio <= 0) return 0.2;
   // Peak near 1.0; too many trades = overtrading for that horizon.
@@ -185,13 +200,13 @@ function riskFit(
   softCapOverride?: number | null,
 ): number {
   const dd = Math.abs(row.maxDrawdownPct ?? 25);
-  const tol = risk ?? 'moderate';
+  const tol = risk ?? "moderate";
   const softCap =
     softCapOverride != null && Number.isFinite(softCapOverride)
       ? softCapOverride
-      : tol === 'low'
+      : tol === "low"
         ? 12
-        : tol === 'high'
+        : tol === "high"
           ? 35
           : 20;
   let fit = 0.2;
@@ -219,7 +234,9 @@ function edgeQuality(row: ExplorePresetRow): number {
   // Excess manda más: el usuario ve vs B&H; no coronar “tranquila pero perdedora”.
   const excessScore = clamp01(0.5 + excess / 35);
   const sharpeScore =
-    sharpe == null || !Number.isFinite(sharpe) ? 0.45 : clamp01(0.5 + sharpe / 2.5);
+    sharpe == null || !Number.isFinite(sharpe)
+      ? 0.45
+      : clamp01(0.5 + sharpe / 2.5);
   const retScore = clamp01(0.45 + ret / 55);
   return excessScore * 0.45 + sharpeScore * 0.3 + retScore * 0.25;
 }
@@ -267,7 +284,10 @@ export function thirdPeriodReturns(
  * La aceleración solo suma si el reciente ya es ≥ 0 (evita crowning de “rebote
  * tras desplome” — caso BBVA: #1 mala con 2ª/3ª buenas).
  */
-export function futureTrendBias(row: ExplorePresetRow, ctx: DeepCoachContext): {
+export function futureTrendBias(
+  row: ExplorePresetRow,
+  ctx: DeepCoachContext,
+): {
   bias: number;
   earlyReturnPct: number | null;
   midReturnPct: number | null;
@@ -288,9 +308,7 @@ export function futureTrendBias(row: ExplorePresetRow, ctx: DeepCoachContext): {
     const accelLateVsEarly = clamp01(0.5 + (thirds.late - thirds.early) / 40);
     // Aceleración solo como bonus si el reciente no es negativo.
     const accelBonus =
-      thirds.late >= 0
-        ? accelLateVsMid * 0.12 + accelLateVsEarly * 0.08
-        : 0;
+      thirds.late >= 0 ? accelLateVsMid * 0.12 + accelLateVsEarly * 0.08 : 0;
     const latePenalty =
       thirds.late < 0 ? Math.min(0.4, Math.abs(thirds.late) / 35) : 0;
     return {
@@ -314,9 +332,9 @@ export function futureTrendBias(row: ExplorePresetRow, ctx: DeepCoachContext): {
 
 /** Techo de estrellas según evidencia (in-sample → máx 3). */
 export function starCeilingForEvidence(
-  evidenceLevel: DeepCoachContext['evidenceLevel'] = 'in_sample_only',
+  evidenceLevel: DeepCoachContext["evidenceLevel"] = "in_sample_only",
 ): 3 | 5 {
-  return evidenceLevel === 'lab_validated' ? 5 : 3;
+  return evidenceLevel === "lab_validated" ? 5 : 3;
 }
 
 /**
@@ -360,7 +378,12 @@ export function resolveCoachScoreWeights(futureWeight?: number): {
 } {
   const future = Math.min(
     0.65,
-    Math.max(0.25, Number.isFinite(futureWeight) ? Number(futureWeight) : DEFAULT_SCORE_WEIGHTS.future),
+    Math.max(
+      0.25,
+      Number.isFinite(futureWeight)
+        ? Number(futureWeight)
+        : DEFAULT_SCORE_WEIGHTS.future,
+    ),
   );
   const restScale = (1 - future) / (1 - DEFAULT_SCORE_WEIGHTS.future);
   return {
@@ -376,7 +399,10 @@ export function resolveCoachScoreWeights(futureWeight?: number): {
  * Score 0–100: sesgo futuro (tramo reciente) + riesgo + edge vs B&H.
  * Prefiere `row.periodReturns` (fijado al cerrar el run) frente a recompute desde equity map.
  */
-export function scoreTechnicalFit(row: ExplorePresetRow, ctx: DeepCoachContext): number {
+export function scoreTechnicalFit(
+  row: ExplorePresetRow,
+  ctx: DeepCoachContext,
+): number {
   const horizon = ctx.horizon ?? horizonFromTimeframe(String(ctx.timeframe));
   const { bias: future } = futureTrendBias(row, ctx);
   const w = resolveCoachScoreWeights(ctx.futureWeight);
@@ -424,30 +450,32 @@ function scoreReasons(
     );
     if (future.lateReturnPct + 2 < future.earlyReturnPct) {
       reasons.push(
-        'Cuidado: el tramo reciente empeora vs el histórico temprano — no anclarse al resultado total del periodo.',
+        "Cuidado: el tramo reciente empeora vs el histórico temprano — no anclarse al resultado total del periodo.",
       );
     } else if (future.lateReturnPct > future.midReturnPct + 2) {
       reasons.push(
-        'El tramo reciente acelera vs la ventana media: mejor señal operativa hacia delante que el total del backtest.',
+        "El tramo reciente acelera vs la ventana media: mejor señal operativa hacia delante que el total del backtest.",
       );
     }
   } else {
     reasons.push(
-      'Sin curva de equity en 3 ventanas: estrellas más cautas (fallback suave) hasta abrir el detalle.',
+      "Sin curva de equity en 3 ventanas: estrellas más cautas (fallback suave) hasta abrir el detalle.",
     );
   }
   if (future.usedSoftFallback) {
     reasons.push(
-      'Aviso: ranking sin tercios fijados — menos fiable; re-ejecuta Probar + coach si persiste.',
+      "Aviso: ranking sin tercios fijados — menos fiable; re-ejecuta Probar + coach si persiste.",
     );
   }
   const dd = row.maxDrawdownPct;
   if (dd != null) {
-    reasons.push(`Drawdown ${(dd).toFixed(1)}% vs perfil de riesgo (${ctx.riskTolerance ?? 'moderate'}).`);
+    reasons.push(
+      `Drawdown ${dd.toFixed(1)}% vs perfil de riesgo (${ctx.riskTolerance ?? "moderate"}).`,
+    );
   }
   if ((row.totalReturnPct ?? 0) > 15 && (future.lateReturnPct ?? 0) < 0) {
     reasons.push(
-      'Rentabilidad total alta pero tramo reciente negativo: el pasado lejano no justifica priorizarla a futuro.',
+      "Rentabilidad total alta pero tramo reciente negativo: el pasado lejano no justifica priorizarla a futuro.",
     );
   }
   return reasons;
@@ -461,7 +489,9 @@ function scoreReasons(
  * Dedup del lote coach: por strategyDefinitionId si existe (Mejores Lab),
  * si no por strategyType (genéricas).
  */
-export function dedupeExploreRowsByStrategyType(rows: ExplorePresetRow[]): ExplorePresetRow[] {
+export function dedupeExploreRowsByStrategyType(
+  rows: ExplorePresetRow[],
+): ExplorePresetRow[] {
   const byKey = new Map<string, ExplorePresetRow>();
   for (const row of rows) {
     const key = row.strategyDefinitionId
@@ -529,7 +559,10 @@ export function isStrictlyDominatedBy(
   return allGe && anyGt;
 }
 
-function beatsBuyHold(row: ExplorePresetRow, late: number | null | undefined): boolean {
+function beatsBuyHold(
+  row: ExplorePresetRow,
+  late: number | null | undefined,
+): boolean {
   return (row.excessReturnPct ?? -1) >= 0 && (late == null || late >= 0);
 }
 
@@ -588,7 +621,9 @@ export function pickDiversifiedTop<
   };
 
   // Pass 1: best unused category, non-flagged
-  take((item) => !item.qualityFlagged && !usedCategories.has(item.row.category));
+  take(
+    (item) => !item.qualityFlagged && !usedCategories.has(item.row.category),
+  );
   // Pass 2: fill with non-flagged by score order
   take((item) => !item.qualityFlagged);
   // Pass 3: only if still short — flagged last resort
@@ -603,7 +638,7 @@ export function rankTechnicalRecommendations(
   limitOrOpts: number | RankTechnicalOptions = 3,
 ): TechnicalRecommendation[] {
   const opts: RankTechnicalOptions =
-    typeof limitOrOpts === 'number' ? { limit: limitOrOpts } : limitOrOpts;
+    typeof limitOrOpts === "number" ? { limit: limitOrOpts } : limitOrOpts;
   const limit = opts.limit ?? 3;
   const diversify = opts.diversifyCategories !== false;
   const minLate = opts.minLateReturnPct ?? -12;
@@ -611,46 +646,45 @@ export function rankTechnicalRecommendations(
 
   const ceiling = starCeilingForEvidence(ctx.evidenceLevel);
   const ok = dedupeExploreRowsByStrategyType(
-    rows.filter((r) => r.status === 'ok' && r.labPass !== 'lab_carry'),
+    rows.filter((r) => r.status === "ok" && r.labPass !== "lab_carry"),
   );
-  const ranked = ok
-    .map((row) => {
-      const future = futureTrendBias(row, ctx);
-      let score = scoreTechnicalFit(row, ctx);
-      // Soft fallback: mild penalty so stamped thirds dominate when comparable
-      if (future.usedSoftFallback) score = Math.max(0, score - 8);
-      const qualityFlagged = isQualityFlagged(
-        {
-          lateReturnPct: future.lateReturnPct,
-          row,
-          usedSoftFallback: future.usedSoftFallback,
-        },
-        minLate,
-        minExcess,
-      );
-      if (qualityFlagged) score = Math.max(0, score - 18);
-      const starsInfo = scoreToStars(score, { ceiling });
-      const reasons = scoreReasons(row, ctx, score, future, starsInfo);
-      if (qualityFlagged) {
-        reasons.push(
-          `Suelo de calidad: tramo reciente o vs B&H flojos (umbrales ${minLate}% / ${minExcess}%).`,
-        );
-      }
-      return {
-        rank: 0,
-        row,
-        score,
-        stars: starsInfo.stars,
-        starsCapped: starsInfo.capped,
-        futureBias: future.bias,
-        earlyReturnPct: future.earlyReturnPct,
-        midReturnPct: future.midReturnPct,
+  const ranked = ok.map((row) => {
+    const future = futureTrendBias(row, ctx);
+    let score = scoreTechnicalFit(row, ctx);
+    // Soft fallback: mild penalty so stamped thirds dominate when comparable
+    if (future.usedSoftFallback) score = Math.max(0, score - 8);
+    const qualityFlagged = isQualityFlagged(
+      {
         lateReturnPct: future.lateReturnPct,
+        row,
         usedSoftFallback: future.usedSoftFallback,
-        qualityFlagged,
-        reasons,
-      };
-    });
+      },
+      minLate,
+      minExcess,
+    );
+    if (qualityFlagged) score = Math.max(0, score - 18);
+    const starsInfo = scoreToStars(score, { ceiling });
+    const reasons = scoreReasons(row, ctx, score, future, starsInfo);
+    if (qualityFlagged) {
+      reasons.push(
+        `Suelo de calidad: tramo reciente o vs B&H flojos (umbrales ${minLate}% / ${minExcess}%).`,
+      );
+    }
+    return {
+      rank: 0,
+      row,
+      score,
+      stars: starsInfo.stars,
+      starsCapped: starsInfo.capped,
+      futureBias: future.bias,
+      earlyReturnPct: future.earlyReturnPct,
+      midReturnPct: future.midReturnPct,
+      lateReturnPct: future.lateReturnPct,
+      usedSoftFallback: future.usedSoftFallback,
+      qualityFlagged,
+      reasons,
+    };
+  });
 
   // Dominancia solo para trampas (excess/total negativos): p. ej. rebote tras desplome.
   for (const item of ranked) {
@@ -667,7 +701,7 @@ export function rankTechnicalRecommendations(
       item.score = Math.max(0, item.score - 22);
       item.qualityFlagged = true;
       item.reasons.push(
-        'Dominada por otra candidata (mejor en reciente, vs B&H y total).',
+        "Dominada por otra candidata (mejor en reciente, vs B&H y total).",
       );
     }
   }
@@ -685,7 +719,7 @@ export function inferRegimeShift(
   rows: ExplorePresetRow[],
   equityByRunId?: Record<string, BacktestEquityPointDto[] | undefined>,
 ): RegimeHalfInsight | undefined {
-  const ok = rows.filter((r) => r.status === 'ok' && r.runId);
+  const ok = rows.filter((r) => r.status === "ok" && r.runId);
   const scored: {
     row: ExplorePresetRow;
     early: number;
@@ -700,7 +734,12 @@ export function inferRegimeShift(
         return eq?.length ? thirdPeriodReturns(eq) : null;
       })();
     if (!thirds) continue;
-    scored.push({ row, early: thirds.early, mid: thirds.mid, late: thirds.late });
+    scored.push({
+      row,
+      early: thirds.early,
+      mid: thirds.mid,
+      late: thirds.late,
+    });
   }
   if (scored.length < 2) return undefined;
 
@@ -715,7 +754,9 @@ export function inferRegimeShift(
     : `«${lateBest.row.label}» lidera de forma estable en las ventanas — régimen relativo coherente para esa familia AT.`;
 
   return {
-    label: shifted ? 'Cambio de régimen detectado' : 'Régimen relativamente estable',
+    label: shifted
+      ? "Cambio de régimen detectado"
+      : "Régimen relativamente estable",
     earlyBest: earlyBest.row,
     lateBest: lateBest.row,
     shifted,
@@ -741,15 +782,15 @@ function buildOutlook(
     );
   } else if (regime && !regime.shifted && regime.lateBest) {
     lines.push(
-      `La continuidad 1ª→2ª mitad refuerza vigilar la misma familia; invalidación si el drawdown rompe el perfil (${ctx.riskTolerance ?? 'moderate'}).`,
+      `La continuidad 1ª→2ª mitad refuerza vigilar la misma familia; invalidación si el drawdown rompe el perfil (${ctx.riskTolerance ?? "moderate"}).`,
     );
   } else {
     lines.push(
-      'Sin curvas de equity en caché no se parte el periodo: conviene abrir el detalle de las 3 recomendadas y comparar operaciones recientes vs tempranas.',
+      "Sin curvas de equity en caché no se parte el periodo: conviene abrir el detalle de las 3 recomendadas y comparar operaciones recientes vs tempranas.",
     );
   }
   lines.push(
-    'Falsador: si el precio deja el contexto (tendencia↔rango) que justifica la familia elegida, dejar de insistir en la misma regla aunque el backtest total siga en verde.',
+    "Falsador: si el precio deja el contexto (tendencia↔rango) que justifica la familia elegida, dejar de insistir en la misma regla aunque el backtest total siga en verde.",
   );
   return lines;
 }
@@ -769,17 +810,17 @@ export function buildDeepTechnicalCoachNote(
     ctx.riskTolerance ? `riesgo ${ctx.riskTolerance}` : null,
   ]
     .filter(Boolean)
-    .join(' · ');
+    .join(" · ");
 
-  const ok = rows.filter((r) => r.status === 'ok');
+  const ok = rows.filter((r) => r.status === "ok");
   if (ok.length === 0) {
     return {
       headline: `${ctx.symbol}: sin resultados útiles para análisis técnico del lote.`,
-      analysis: ['Revisa sync OHLCV y vuelve a lanzar la batería.'],
+      analysis: ["Revisa sync OHLCV y vuelve a lanzar la batería."],
       recommendations: [],
-      outlook: ['Sincronizar el valor y repetir genéricas.'],
+      outlook: ["Sincronizar el valor y repetir genéricas."],
       disclaimer:
-        'Análisis local heurístico. No es consejo de inversión ni predicción de precios.',
+        "Análisis local heurístico. No es consejo de inversión ni predicción de precios.",
       contextLabel,
     };
   }
@@ -794,17 +835,17 @@ export function buildDeepTechnicalCoachNote(
   const ceiling = starCeilingForEvidence(ctx.evidenceLevel);
   const analysis: string[] = [
     `Criterio principal: sesgo de tendencia futura (nivel del tercio reciente), no el máximo beneficio histórico.`,
-    `Evidencia del lote: ${ctx.evidenceLevel === 'lab_validated' ? 'lab validada' : 'solo in-sample'} · techo ★${ceiling}.`,
+    `Evidencia del lote: ${ctx.evidenceLevel === "lab_validated" ? "lab validada" : "solo in-sample"} · techo ★${ceiling}.`,
     top
       ? `Top futuro: «${top.row.label}» · ${top.stars}/5 estrellas (${top.score}/100)${
-          top.starsCapped ? ' (tope por evidencia)' : ''
+          top.starsCapped ? " (tope por evidencia)" : ""
         }${
           byReturn && byReturn.strategyType !== top.row.strategyType
             ? ` — «${byReturn.label}» ganó más en total (${(byReturn.totalReturnPct ?? 0).toFixed(1)}%) pero no manda a futuro.`
-            : '.'
+            : "."
         }`
-      : 'Sin recomendación.',
-    `Escala ${ctx.timeframe} → horizonte «${horizon}»; familias preferidas: ${preferredCategories(horizon).join(', ')}.`,
+      : "Sin recomendación.",
+    `Escala ${ctx.timeframe} → horizonte «${horizon}»; familias preferidas: ${preferredCategories(horizon).join(", ")}.`,
   ];
   if (regime) {
     analysis.push(regime.narrative);
@@ -812,13 +853,16 @@ export function buildDeepTechnicalCoachNote(
 
   const familyCounts = new Map<string, number>();
   for (const r of recommendations) {
-    familyCounts.set(r.row.categoryLabel, (familyCounts.get(r.row.categoryLabel) ?? 0) + 1);
+    familyCounts.set(
+      r.row.categoryLabel,
+      (familyCounts.get(r.row.categoryLabel) ?? 0) + 1,
+    );
   }
   if (familyCounts.size > 0) {
     analysis.push(
       `Top-3 por familias: ${[...familyCounts.entries()]
         .map(([k, v]) => `${k}×${v}`)
-        .join(', ')}.`,
+        .join(", ")}.`,
     );
   }
 
@@ -832,8 +876,8 @@ export function buildDeepTechnicalCoachNote(
     outlook: buildOutlook(recommendations, regime, ctx),
     disclaimer:
       ceiling <= 3
-        ? 'Motor AT local (hechos + techo ★3 in-sample). La lectura IA es narrador, no oráculo. No es consejo de inversión.'
-        : 'Motor AT local + evidencia lab. La lectura IA narra hechos; no declara edge futuro. No es consejo de inversión.',
+        ? "Motor AT local (hechos + techo ★3 in-sample). La lectura IA es narrador, no oráculo. No es consejo de inversión."
+        : "Motor AT local + evidencia lab. La lectura IA narra hechos; no declara edge futuro. No es consejo de inversión.",
     contextLabel,
   };
 }
@@ -856,17 +900,17 @@ export function composeDeepTechnicalCoachNote(opts: {
     ctx.riskTolerance ? `riesgo ${ctx.riskTolerance}` : null,
   ]
     .filter(Boolean)
-    .join(' · ');
+    .join(" · ");
 
-  const ok = rows.filter((r) => r.status === 'ok');
+  const ok = rows.filter((r) => r.status === "ok");
   if (ok.length === 0) {
     return {
       headline: `${ctx.symbol}: sin resultados útiles para análisis técnico del lote.`,
-      analysis: ['Revisa sync OHLCV y vuelve a lanzar la batería.'],
+      analysis: ["Revisa sync OHLCV y vuelve a lanzar la batería."],
       recommendations: [],
-      outlook: ['Sincronizar el valor y repetir genéricas.'],
+      outlook: ["Sincronizar el valor y repetir genéricas."],
       disclaimer:
-        'Análisis local heurístico. No es consejo de inversión ni predicción de precios.',
+        "Análisis local heurístico. No es consejo de inversión ni predicción de precios.",
       contextLabel,
       audit,
     };
@@ -881,40 +925,45 @@ export function composeDeepTechnicalCoachNote(opts: {
 
   const analysis: string[] = [
     `Criterio: ranking local (A) + auditor heurístico (B) + gate. Sesgo a futuro = nivel del tramo reciente.`,
-    `Evidencia: ${ctx.evidenceLevel === 'lab_validated' ? 'lab validada' : 'solo in-sample'} · techo ★${ceiling}${
-      audit ? ` · confianza «${audit.confidence}»` : ''
+    `Evidencia: ${ctx.evidenceLevel === "lab_validated" ? "lab validada" : "solo in-sample"} · techo ★${ceiling}${
+      audit ? ` · confianza «${audit.confidence}»` : ""
     }.`,
     top
       ? `Top futuro: «${top.row.label}» · ${top.stars}/5 (${top.score}/100)${
-          top.starsCapped ? ' (tope evidencia)' : ''
+          top.starsCapped ? " (tope evidencia)" : ""
         }${
           byReturn && byReturn.strategyType !== top.row.strategyType
             ? ` — «${byReturn.label}» ganó más en total pero no manda a futuro.`
-            : '.'
+            : "."
         }`
-      : 'Sin recomendación tras auditoría (vetos / challenge).',
-    `Escala ${ctx.timeframe} → horizonte «${horizon}»; familias: ${preferredCategories(horizon).join(', ')}.`,
+      : "Sin recomendación tras auditoría (vetos / challenge).",
+    `Escala ${ctx.timeframe} → horizonte «${horizon}»; familias: ${preferredCategories(horizon).join(", ")}.`,
   ];
   if (audit?.shadowDisagreement && audit.shadowTopType) {
     analysis.push(
       `Discrepancia shadow A2: preferiría «${audit.shadowTopType}» — el gate no corona a ciegas.`,
     );
   }
-  const vetos = audit?.findings.filter((f) => f.action === 'veto') ?? [];
+  const vetos = audit?.findings.filter((f) => f.action === "veto") ?? [];
   if (vetos.length > 0) {
-    analysis.push(`Auditor B vetó: ${vetos.map((v) => `${v.strategyType} (${v.code})`).join(', ')}.`);
+    analysis.push(
+      `Auditor B vetó: ${vetos.map((v) => `${v.strategyType} (${v.code})`).join(", ")}.`,
+    );
   }
   if (regime) analysis.push(regime.narrative);
 
   const familyCounts = new Map<string, number>();
   for (const r of recommendations) {
-    familyCounts.set(r.row.categoryLabel, (familyCounts.get(r.row.categoryLabel) ?? 0) + 1);
+    familyCounts.set(
+      r.row.categoryLabel,
+      (familyCounts.get(r.row.categoryLabel) ?? 0) + 1,
+    );
   }
   if (familyCounts.size > 0) {
     analysis.push(
       `Top-3 por familias: ${[...familyCounts.entries()]
         .map(([k, v]) => `${k}×${v}`)
-        .join(', ')}.`,
+        .join(", ")}.`,
     );
   }
 
@@ -928,8 +977,8 @@ export function composeDeepTechnicalCoachNote(opts: {
     outlook: buildOutlook(recommendations, regime, ctx),
     disclaimer:
       ceiling <= 3
-        ? 'Motor AT local + auditor B (techo ★3 in-sample). La IA puede vetar tipado; no es oráculo. No es consejo de inversión.'
-        : 'Motor AT local + evidencia lab + auditor B. No declara edge futuro. No es consejo de inversión.',
+        ? "Motor AT local + auditor B (techo ★3 in-sample). La IA puede vetar tipado; no es oráculo. No es consejo de inversión."
+        : "Motor AT local + evidencia lab + auditor B. No declara edge futuro. No es consejo de inversión.",
     contextLabel,
     audit,
   };
@@ -942,12 +991,14 @@ export function buildCoachFacts(
 ): CoachFactsV1 {
   const built = note ?? buildDeepTechnicalCoachNote(rows, ctx);
   const horizon = ctx.horizon ?? horizonFromTimeframe(String(ctx.timeframe));
-  const evidenceLevel = ctx.evidenceLevel ?? 'in_sample_only';
-  const ok = rows.filter((r) => r.status === 'ok');
+  const evidenceLevel = ctx.evidenceLevel ?? "in_sample_only";
+  const ok = rows.filter((r) => r.status === "ok");
   const buyHold =
-    ok.map((r) => r.buyHoldReturnPct).find((v) => v != null && Number.isFinite(v)) ?? null;
+    ok
+      .map((r) => r.buyHoldReturnPct)
+      .find((v) => v != null && Number.isFinite(v)) ?? null;
   return {
-    schemaVersion: '1.0.0',
+    schemaVersion: "1.0.0",
     symbol: ctx.symbol,
     timeframe: String(ctx.timeframe),
     periodLabel: ctx.periodLabel,
@@ -961,7 +1012,8 @@ export function buildCoachFacts(
       earlyBestLabel: built.regime?.earlyBest?.label,
       lateBestLabel: built.regime?.lateBest?.label,
       shifted: built.regime?.shifted ?? false,
-      narrative: built.regime?.narrative ?? 'Sin ventanas de equity suficientes.',
+      narrative:
+        built.regime?.narrative ?? "Sin ventanas de equity suficientes.",
     },
     recommendations: built.recommendations.map((r) => ({
       rank: r.rank,
@@ -1007,68 +1059,84 @@ export type LlmDeepCoachPayload = {
   };
 };
 
-const LLM_AUDIT_ACTIONS = new Set(['veto', 'downgrade', 'confirm', 'note']);
+const LLM_AUDIT_ACTIONS = new Set(["veto", "downgrade", "confirm", "note"]);
 
 /** Valida/sanea payload LLM del coach; null si estructura corrupta (Auditoría 2). */
-export function sanitizeLlmDeepCoachPayload(raw: unknown): LlmDeepCoachPayload | null {
+export function sanitizeLlmDeepCoachPayload(
+  raw: unknown,
+): LlmDeepCoachPayload | null {
   if (raw == null) return null;
-  if (typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (typeof raw !== "object" || Array.isArray(raw)) return null;
   const o = raw as Record<string, unknown>;
   const out: LlmDeepCoachPayload = {};
 
-  if ('headline' in o) {
-    if (o.headline != null && typeof o.headline !== 'string') return null;
-    if (typeof o.headline === 'string') out.headline = o.headline;
+  if ("headline" in o) {
+    if (o.headline != null && typeof o.headline !== "string") return null;
+    if (typeof o.headline === "string") out.headline = o.headline;
   }
-  if ('regimeNarrative' in o) {
-    if (o.regimeNarrative != null && typeof o.regimeNarrative !== 'string') return null;
-    if (typeof o.regimeNarrative === 'string') out.regimeNarrative = o.regimeNarrative;
+  if ("regimeNarrative" in o) {
+    if (o.regimeNarrative != null && typeof o.regimeNarrative !== "string")
+      return null;
+    if (typeof o.regimeNarrative === "string")
+      out.regimeNarrative = o.regimeNarrative;
   }
-  if ('disclaimer' in o) {
-    if (o.disclaimer != null && typeof o.disclaimer !== 'string') return null;
-    if (typeof o.disclaimer === 'string') out.disclaimer = o.disclaimer;
+  if ("disclaimer" in o) {
+    if (o.disclaimer != null && typeof o.disclaimer !== "string") return null;
+    if (typeof o.disclaimer === "string") out.disclaimer = o.disclaimer;
   }
-  for (const key of ['analysis', 'outlook'] as const) {
+  for (const key of ["analysis", "outlook"] as const) {
     if (!(key in o) || o[key] == null) continue;
-    if (!Array.isArray(o[key]) || !o[key].every((x) => typeof x === 'string')) return null;
+    if (!Array.isArray(o[key]) || !o[key].every((x) => typeof x === "string"))
+      return null;
     out[key] = o[key] as string[];
   }
-  if ('recommendations' in o && o.recommendations != null) {
+  if ("recommendations" in o && o.recommendations != null) {
     if (!Array.isArray(o.recommendations)) return null;
-    const recs: NonNullable<LlmDeepCoachPayload['recommendations']> = [];
+    const recs: NonNullable<LlmDeepCoachPayload["recommendations"]> = [];
     for (const item of o.recommendations) {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+      if (!item || typeof item !== "object" || Array.isArray(item)) return null;
       const r = item as Record<string, unknown>;
-      if (r.score != null && typeof r.score !== 'number') return null;
-      if (r.reasons != null && (!Array.isArray(r.reasons) || !r.reasons.every((x) => typeof x === 'string'))) {
+      if (r.score != null && typeof r.score !== "number") return null;
+      if (
+        r.reasons != null &&
+        (!Array.isArray(r.reasons) ||
+          !r.reasons.every((x) => typeof x === "string"))
+      ) {
         return null;
       }
       recs.push({
-        label: typeof r.label === 'string' ? r.label : undefined,
-        strategyType: typeof r.strategyType === 'string' ? r.strategyType : undefined,
-        score: typeof r.score === 'number' ? r.score : undefined,
+        label: typeof r.label === "string" ? r.label : undefined,
+        strategyType:
+          typeof r.strategyType === "string" ? r.strategyType : undefined,
+        score: typeof r.score === "number" ? r.score : undefined,
         reasons: Array.isArray(r.reasons) ? (r.reasons as string[]) : undefined,
       });
     }
     out.recommendations = recs;
   }
-  if ('audit' in o && o.audit != null) {
-    if (typeof o.audit !== 'object' || Array.isArray(o.audit)) return null;
+  if ("audit" in o && o.audit != null) {
+    if (typeof o.audit !== "object" || Array.isArray(o.audit)) return null;
     const audit = o.audit as Record<string, unknown>;
     if (audit.findings != null) {
       if (!Array.isArray(audit.findings)) return null;
-      const findings: NonNullable<NonNullable<LlmDeepCoachPayload['audit']>['findings']> = [];
+      const findings: NonNullable<
+        NonNullable<LlmDeepCoachPayload["audit"]>["findings"]
+      > = [];
       for (const f of audit.findings) {
-        if (!f || typeof f !== 'object' || Array.isArray(f)) return null;
+        if (!f || typeof f !== "object" || Array.isArray(f)) return null;
         const row = f as Record<string, unknown>;
-        if (row.action != null && (typeof row.action !== 'string' || !LLM_AUDIT_ACTIONS.has(row.action))) {
+        if (
+          row.action != null &&
+          (typeof row.action !== "string" || !LLM_AUDIT_ACTIONS.has(row.action))
+        ) {
           return null;
         }
         findings.push({
-          strategyType: typeof row.strategyType === 'string' ? row.strategyType : undefined,
-          action: typeof row.action === 'string' ? row.action : undefined,
-          code: typeof row.code === 'string' ? row.code : undefined,
-          reason: typeof row.reason === 'string' ? row.reason : undefined,
+          strategyType:
+            typeof row.strategyType === "string" ? row.strategyType : undefined,
+          action: typeof row.action === "string" ? row.action : undefined,
+          code: typeof row.code === "string" ? row.code : undefined,
+          reason: typeof row.reason === "string" ? row.reason : undefined,
         });
       }
       out.audit = { findings };
@@ -1094,7 +1162,9 @@ export function mergeLlmIntoDeepCoach(
       ? [...llm.analysis, ...local.analysis.slice(0, 2)]
       : local.analysis;
   const outlook =
-    Array.isArray(llm.outlook) && llm.outlook.length > 0 ? llm.outlook : local.outlook;
+    Array.isArray(llm.outlook) && llm.outlook.length > 0
+      ? llm.outlook
+      : local.outlook;
   const regime = local.regime
     ? {
         ...local.regime,
@@ -1102,7 +1172,7 @@ export function mergeLlmIntoDeepCoach(
       }
     : llm.regimeNarrative
       ? {
-          label: 'Lectura de régimen (IA)',
+          label: "Lectura de régimen (IA)",
           shifted: true,
           narrative: llm.regimeNarrative,
         }

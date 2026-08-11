@@ -1,9 +1,17 @@
-import type { BacktestRunResponseDto, BacktestStrategyType } from '@bolsa/shared';
-import { api } from '@/lib/api';
-import type { ResolvedBacktestWindow } from '@/features/backtests/backtest-period';
-import { LIST_AUTO_MAX_INSTRUMENTS } from '@/features/backtests/backtest-list-auto';
+import type {
+  BacktestRunResponseDto,
+  BacktestStrategyType,
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
+import { LIST_AUTO_MAX_INSTRUMENTS } from "@/features/backtests/backtest-list-auto";
 
-export type BatchRankRowStatus = 'pending' | 'running' | 'ok' | 'error' | 'skipped';
+export type BatchRankRowStatus =
+  | "pending"
+  | "running"
+  | "ok"
+  | "error"
+  | "skipped";
 
 export type BatchRankRow = {
   instrumentId: string;
@@ -21,7 +29,12 @@ export type BatchRankRow = {
   excessReturnPct?: number | null;
 };
 
-export type BatchSortKey = 'sharpe' | 'return' | 'drawdown' | 'trades' | 'excess';
+export type BatchSortKey =
+  | "sharpe"
+  | "return"
+  | "drawdown"
+  | "trades"
+  | "excess";
 
 export type BatchRunParams = {
   instrumentIds: string[];
@@ -37,7 +50,9 @@ export type BatchRunParams = {
   maxInstruments?: number;
   onProgress?: (rows: BatchRankRow[], done: number, total: number) => void;
   /** Seed detail cache as each OK run finishes (avoids empty detail after prune). */
-  onRunComplete?: (detail: import('@bolsa/shared').BacktestRunDetailDto) => void;
+  onRunComplete?: (
+    detail: import("@bolsa/shared").BacktestRunDetailDto,
+  ) => void;
   signal?: AbortSignal;
 };
 
@@ -47,24 +62,29 @@ function metricNum(
 ): number | null {
   if (!metrics) return null;
   const v = metrics[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-export function sortBatchRows(rows: BatchRankRow[], sort: BatchSortKey): BatchRankRow[] {
-  const ok = rows.filter((row) => row.status === 'ok');
-  const rest = rows.filter((row) => row.status !== 'ok');
+export function sortBatchRows(
+  rows: BatchRankRow[],
+  sort: BatchSortKey,
+): BatchRankRow[] {
+  const ok = rows.filter((row) => row.status === "ok");
+  const rest = rows.filter((row) => row.status !== "ok");
   const ranked = [...ok].sort((a, b) => {
-    if (sort === 'return') {
+    if (sort === "return") {
       return (b.totalReturnPct ?? -Infinity) - (a.totalReturnPct ?? -Infinity);
     }
-    if (sort === 'excess') {
-      return (b.excessReturnPct ?? -Infinity) - (a.excessReturnPct ?? -Infinity);
+    if (sort === "excess") {
+      return (
+        (b.excessReturnPct ?? -Infinity) - (a.excessReturnPct ?? -Infinity)
+      );
     }
-    if (sort === 'drawdown') {
+    if (sort === "drawdown") {
       // Lower drawdown is better (less negative magnitude as pct stored positive in UI often)
       return (a.maxDrawdownPct ?? Infinity) - (b.maxDrawdownPct ?? Infinity);
     }
-    if (sort === 'trades') {
+    if (sort === "trades") {
       return (b.tradeCount ?? 0) - (a.tradeCount ?? 0);
     }
     const sa = a.sharpeRatio;
@@ -80,7 +100,9 @@ export function sortBatchRows(rows: BatchRankRow[], sort: BatchSortKey): BatchRa
 }
 
 /** Sequential multi-instrument backtests (Phase C MVP — no batch API). */
-export async function runBacktestBatch(params: BatchRunParams): Promise<BatchRankRow[]> {
+export async function runBacktestBatch(
+  params: BatchRunParams,
+): Promise<BatchRankRow[]> {
   const max = params.maxInstruments ?? LIST_AUTO_MAX_INSTRUMENTS;
   const ids = params.instrumentIds.slice(0, max);
   const rows: BatchRankRow[] = ids.map((id) => {
@@ -88,8 +110,8 @@ export async function runBacktestBatch(params: BatchRunParams): Promise<BatchRan
     return {
       instrumentId: id,
       symbol: label?.symbol ?? id.slice(0, 8),
-      name: label?.name ?? '',
-      status: 'pending' as const,
+      name: label?.name ?? "",
+      status: "pending" as const,
     };
   });
 
@@ -99,8 +121,8 @@ export async function runBacktestBatch(params: BatchRunParams): Promise<BatchRan
   for (let i = 0; i < rows.length; i += 1) {
     if (params.signal?.aborted) {
       for (let j = i; j < rows.length; j += 1) {
-        if (rows[j]!.status === 'pending') {
-          rows[j] = { ...rows[j]!, status: 'skipped', error: 'Cancelado' };
+        if (rows[j]!.status === "pending") {
+          rows[j] = { ...rows[j]!, status: "skipped", error: "Cancelado" };
         }
       }
       params.onProgress?.([...rows], i, total);
@@ -108,7 +130,7 @@ export async function runBacktestBatch(params: BatchRunParams): Promise<BatchRan
     }
 
     const row = rows[i]!;
-    rows[i] = { ...row, status: 'running' };
+    rows[i] = { ...row, status: "running" };
     params.onProgress?.([...rows], i, total);
 
     try {
@@ -125,7 +147,7 @@ export async function runBacktestBatch(params: BatchRunParams): Promise<BatchRan
       });
       rows[i] = {
         ...row,
-        status: 'ok',
+        status: "ok",
         runId: result.data.id,
         symbol: result.data.symbol || row.symbol,
         name: result.data.name || row.name,
@@ -133,15 +155,15 @@ export async function runBacktestBatch(params: BatchRunParams): Promise<BatchRan
         maxDrawdownPct: result.data.maxDrawdownPct,
         tradeCount: result.data.tradeCount,
         winCount: result.data.winCount,
-        sharpeRatio: metricNum(result.metrics, 'sharpeRatio'),
-        buyHoldReturnPct: metricNum(result.metrics, 'buyHoldReturnPct'),
-        excessReturnPct: metricNum(result.metrics, 'excessReturnPct'),
+        sharpeRatio: metricNum(result.metrics, "sharpeRatio"),
+        buyHoldReturnPct: metricNum(result.metrics, "buyHoldReturnPct"),
+        excessReturnPct: metricNum(result.metrics, "excessReturnPct"),
       };
       params.onRunComplete?.(result.data);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Error al ejecutar la prueba';
-      rows[i] = { ...row, status: 'error', error: message };
+        error instanceof Error ? error.message : "Error al ejecutar la prueba";
+      rows[i] = { ...row, status: "error", error: message };
     }
 
     params.onProgress?.([...rows], i + 1, total);

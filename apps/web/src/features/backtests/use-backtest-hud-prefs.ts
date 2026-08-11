@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState } from "react";
 import {
   BACKTEST_CURSOR_FIELD_OPTIONS,
   BACKTEST_GLOBAL_FIELD_OPTIONS,
@@ -11,18 +11,23 @@ import {
   type BacktestGlobalFieldId,
   type BacktestHudPrefs,
   type BacktestTemporalFieldId,
-} from '@/features/backtests/backtest-hud-prefs';
+} from "@/features/backtests/backtest-hud-prefs";
 
 export function useBacktestHudPrefs() {
-  const [prefs, setPrefs] = useState<BacktestHudPrefs>(() => loadBacktestHudPrefs());
+  const [prefs, setPrefs] = useState<BacktestHudPrefs>(() =>
+    loadBacktestHudPrefs(),
+  );
 
-  const commit = useCallback((updater: (current: BacktestHudPrefs) => BacktestHudPrefs) => {
-    setPrefs((current) => {
-      const next = updater(current);
-      saveBacktestHudPrefs(next);
-      return next;
-    });
-  }, []);
+  const commit = useCallback(
+    (updater: (current: BacktestHudPrefs) => BacktestHudPrefs) => {
+      setPrefs((current) => {
+        const next = updater(current);
+        saveBacktestHudPrefs(next);
+        return next;
+      });
+    },
+    [],
+  );
 
   const toggleGlobalFavorite = useCallback(
     (id: BacktestGlobalFieldId) => {

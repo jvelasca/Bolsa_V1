@@ -1,25 +1,30 @@
-import type { BacktestRunDetailDto } from '@bolsa/shared';
-import type { OosEvidence } from '@/features/backtests/backtest-oos-evidence';
+import type { BacktestRunDetailDto } from "@bolsa/shared";
+import type { OosEvidence } from "@/features/backtests/backtest-oos-evidence";
 import {
   classifyWfe,
   formatWfe,
   walkForwardStabilityFlags,
   wfeBandLabel,
-} from '@/features/backtests/backtest-walk-forward-metrics';
-import { classifyPbo, formatPbo, pboBandLabel, PBO_WARN } from '@/features/backtests/backtest-pbo';
+} from "@/features/backtests/backtest-walk-forward-metrics";
+import {
+  classifyPbo,
+  formatPbo,
+  pboBandLabel,
+  PBO_WARN,
+} from "@/features/backtests/backtest-pbo";
 
 export type PaperCheckId =
-  | 'has_trades'
-  | 'beats_buy_hold'
-  | 'drawdown_ok'
-  | 'sample_size'
-  | 'saved_strategy'
-  | 'oos_validation'
-  | 'edge_report'
-  | 'pbo'
-  | 'ack_insample';
+  | "has_trades"
+  | "beats_buy_hold"
+  | "drawdown_ok"
+  | "sample_size"
+  | "saved_strategy"
+  | "oos_validation"
+  | "edge_report"
+  | "pbo"
+  | "ack_insample";
 
-export type PaperCheckStatus = 'pass' | 'warn' | 'fail' | 'info';
+export type PaperCheckStatus = "pass" | "warn" | "fail" | "info";
 
 export type PaperCheck = {
   id: PaperCheckId;
@@ -47,33 +52,38 @@ const MAX_DD_WARN = 35;
 const MIN_BARS = 200;
 const MIN_TRADES = 4;
 
-function buildOosValidationCheck(evidence: OosEvidence | null | undefined): PaperCheck {
-  const kind = evidence?.kind ?? 'none';
+function buildOosValidationCheck(
+  evidence: OosEvidence | null | undefined,
+): PaperCheck {
+  const kind = evidence?.kind ?? "none";
 
-  if (kind === 'none') {
+  if (kind === "none") {
     return {
-      id: 'oos_validation',
-      status: 'warn',
-      label: 'Validación fuera de muestra',
+      id: "oos_validation",
+      status: "warn",
+      label: "Validación fuera de muestra",
       detail:
-        'Este run no trae hold-out, walk-forward ni CPCV. En Optimizar, reserva OOS o activa WF/CPCV antes de paper.',
+        "Este run no trae hold-out, walk-forward ni CPCV. En Optimizar, reserva OOS o activa WF/CPCV antes de paper.",
       requiresAck: true,
     };
   }
 
-  if (kind === 'walkforward' || kind === 'cpcv') {
+  if (kind === "walkforward" || kind === "cpcv") {
     const mean = evidence!.meanOosScore ?? evidence!.oosScore ?? 0;
     const std = evidence!.stdOosScore ?? 0;
-    const folds = kind === 'cpcv' ? evidence!.pathCount ?? evidence!.nFolds : evidence!.nFolds;
+    const folds =
+      kind === "cpcv"
+        ? (evidence!.pathCount ?? evidence!.nFolds)
+        : evidence!.nFolds;
     const foldLabel =
-      kind === 'cpcv'
+      kind === "cpcv"
         ? folds != null
           ? `${folds} paths`
-          : 'paths CPCV'
+          : "paths CPCV"
         : folds != null
           ? `${folds} pliegues`
-          : 'pliegues';
-    const label = kind === 'cpcv' ? 'CPCV ligero OOS' : 'Walk-forward OOS';
+          : "pliegues";
+    const label = kind === "cpcv" ? "CPCV ligero OOS" : "Walk-forward OOS";
     const wfe = evidence!.walkForwardEfficiency;
     const band = classifyWfe(wfe);
     const flags = walkForwardStabilityFlags({
@@ -84,33 +94,41 @@ function buildOosValidationCheck(evidence: OosEvidence | null | undefined): Pape
     const wfePart =
       wfe != null
         ? ` · WFE ${formatWfe(wfe)} (${wfeBandLabel(band)}, lab score)`
-        : '';
+        : "";
     const cvPart =
       evidence!.oosCv != null && Number.isFinite(evidence!.oosCv)
         ? ` · CV ${evidence!.oosCv.toFixed(2)}`
-        : '';
-    const meanLine = `Media OOS ${mean.toFixed(2)}${std > 0 ? ` ± ${std.toFixed(2)}` : ''}${wfePart}${cvPart}`;
+        : "";
+    const meanLine = `Media OOS ${mean.toFixed(2)}${std > 0 ? ` ± ${std.toFixed(2)}` : ""}${wfePart}${cvPart}`;
 
-    if (mean < 0 || flags.weakWfe || flags.fewPositiveFolds || flags.unstableCv) {
+    if (
+      mean < 0 ||
+      flags.weakWfe ||
+      flags.fewPositiveFolds ||
+      flags.unstableCv
+    ) {
       const reasons: string[] = [];
-      if (mean < 0) reasons.push('media OOS negativa');
-      if (flags.weakWfe) reasons.push('WFE < 0.5');
-      if (flags.fewPositiveFolds) reasons.push(kind === 'cpcv' ? 'pocos paths OOS≥0' : 'pocos pliegues OOS≥0');
-      if (flags.unstableCv) reasons.push('OOS inestable (CV alto)');
+      if (mean < 0) reasons.push("media OOS negativa");
+      if (flags.weakWfe) reasons.push("WFE < 0.5");
+      if (flags.fewPositiveFolds)
+        reasons.push(
+          kind === "cpcv" ? "pocos paths OOS≥0" : "pocos pliegues OOS≥0",
+        );
+      if (flags.unstableCv) reasons.push("OOS inestable (CV alto)");
       return {
-        id: 'oos_validation',
-        status: 'warn',
+        id: "oos_validation",
+        status: "warn",
         label,
-        detail: `${meanLine} (${foldLabel}). Aviso: ${reasons.join('; ')}. Paper solo como experimento.`,
+        detail: `${meanLine} (${foldLabel}). Aviso: ${reasons.join("; ")}. Paper solo como experimento.`,
         requiresAck: true,
       };
     }
     return {
-      id: 'oos_validation',
-      status: 'pass',
+      id: "oos_validation",
+      status: "pass",
       label,
       detail:
-        kind === 'cpcv'
+        kind === "cpcv"
           ? `${meanLine} en ${foldLabel}. CPCV ligero (purge/embargo en barras) — no es PBO ni garantía de edge.`
           : `${meanLine} en ${foldLabel}. No es garantía de edge.`,
     };
@@ -119,20 +137,22 @@ function buildOosValidationCheck(evidence: OosEvidence | null | undefined): Pape
   // holdout
   const score = evidence!.oosScore ?? 0;
   const ret =
-    evidence!.oosReturnPct != null ? ` · retorno OOS ${evidence!.oosReturnPct.toFixed(1)}%` : '';
+    evidence!.oosReturnPct != null
+      ? ` · retorno OOS ${evidence!.oosReturnPct.toFixed(1)}%`
+      : "";
   if (score < 0) {
     return {
-      id: 'oos_validation',
-      status: 'warn',
-      label: 'Hold-out OOS',
+      id: "oos_validation",
+      status: "warn",
+      label: "Hold-out OOS",
       detail: `Score OOS ${score.toFixed(2)}${ret} en negativo. El tramo reservado no confirma el IS.`,
       requiresAck: true,
     };
   }
   return {
-    id: 'oos_validation',
-    status: 'pass',
-    label: 'Hold-out OOS',
+    id: "oos_validation",
+    status: "pass",
+    label: "Hold-out OOS",
     detail: `Score OOS ${score.toFixed(2)}${ret}. Un solo corte — no es walk-forward.`,
   };
 }
@@ -144,101 +164,101 @@ export function buildPaperGate(input: PaperGateInput): PaperGateResult {
 
   if (detail.tradeCount <= 0) {
     checks.push({
-      id: 'has_trades',
-      status: 'fail',
-      label: 'Hay operaciones',
-      detail: 'Sin compras/ventas no hay nada que desplegar en paper.',
+      id: "has_trades",
+      status: "fail",
+      label: "Hay operaciones",
+      detail: "Sin compras/ventas no hay nada que desplegar en paper.",
     });
   } else if (detail.tradeCount < MIN_TRADES) {
     checks.push({
-      id: 'has_trades',
-      status: 'warn',
-      label: 'Muestra de operaciones',
+      id: "has_trades",
+      status: "warn",
+      label: "Muestra de operaciones",
       detail: `Solo ${detail.tradeCount} ops (recomendado ≥ ${MIN_TRADES}). El paper será ruidoso.`,
       requiresAck: true,
     });
   } else {
     checks.push({
-      id: 'has_trades',
-      status: 'pass',
-      label: 'Hay operaciones',
+      id: "has_trades",
+      status: "pass",
+      label: "Hay operaciones",
       detail: `${detail.tradeCount} operaciones · ${detail.winCount} a favor.`,
     });
   }
 
   if (excessReturnPct == null) {
     checks.push({
-      id: 'beats_buy_hold',
-      status: 'warn',
-      label: 'Vs buy & hold',
-      detail: 'Sin baseline claro. Revisa el periodo y vuelve a probar.',
+      id: "beats_buy_hold",
+      status: "warn",
+      label: "Vs buy & hold",
+      detail: "Sin baseline claro. Revisa el periodo y vuelve a probar.",
       requiresAck: true,
     });
   } else if (excessReturnPct <= 0) {
     checks.push({
-      id: 'beats_buy_hold',
-      status: 'warn',
-      label: 'Vs buy & hold',
+      id: "beats_buy_hold",
+      status: "warn",
+      label: "Vs buy & hold",
       detail: `No bate comprar y mantener (${excessReturnPct.toFixed(1)} pp). Paper solo como experimento.`,
       requiresAck: true,
     });
   } else {
     checks.push({
-      id: 'beats_buy_hold',
-      status: 'pass',
-      label: 'Vs buy & hold',
+      id: "beats_buy_hold",
+      status: "pass",
+      label: "Vs buy & hold",
       detail: `Exceso +${excessReturnPct.toFixed(1)} pp in-sample (no garantiza fuera de muestra).`,
     });
   }
 
   if (detail.maxDrawdownPct >= MAX_DD_WARN) {
     checks.push({
-      id: 'drawdown_ok',
-      status: 'warn',
-      label: 'Drawdown',
+      id: "drawdown_ok",
+      status: "warn",
+      label: "Drawdown",
       detail: `Peor caída ${detail.maxDrawdownPct.toFixed(1)}% (≥ ${MAX_DD_WARN}%). Revisa si toleras ese riesgo en paper.`,
       requiresAck: true,
     });
   } else {
     checks.push({
-      id: 'drawdown_ok',
-      status: 'pass',
-      label: 'Drawdown',
+      id: "drawdown_ok",
+      status: "pass",
+      label: "Drawdown",
       detail: `Peor caída ${detail.maxDrawdownPct.toFixed(1)}% dentro del umbral suave.`,
     });
   }
 
   if (detail.barCount < MIN_BARS) {
     checks.push({
-      id: 'sample_size',
-      status: 'warn',
-      label: 'Tamaño de muestra',
+      id: "sample_size",
+      status: "warn",
+      label: "Tamaño de muestra",
       detail: `${detail.barCount} barras (< ${MIN_BARS}). Preferible historial largo antes de paper.`,
       requiresAck: true,
     });
   } else {
     checks.push({
-      id: 'sample_size',
-      status: 'pass',
-      label: 'Tamaño de muestra',
+      id: "sample_size",
+      status: "pass",
+      label: "Tamaño de muestra",
       detail: `${detail.barCount} barras · ${detail.firstDate} → ${detail.lastDate}.`,
     });
   }
 
   if (!detail.strategyDefinitionId) {
     checks.push({
-      id: 'saved_strategy',
-      status: 'fail',
-      label: 'Estrategia guardada',
+      id: "saved_strategy",
+      status: "fail",
+      label: "Estrategia guardada",
       detail:
-        'Sin StrategyDefinition vinculada el API no puede crear paper. Guarda/adopta la estrategia desde Optimizar o Mis estrategias y vuelve a probar.',
+        "Sin StrategyDefinition vinculada el API no puede crear paper. Guarda/adopta la estrategia desde Optimizar o Mis estrategias y vuelve a probar.",
     });
   } else {
     checks.push({
-      id: 'saved_strategy',
-      status: 'pass',
-      label: 'Estrategia guardada',
-      detail: 'Hay definición persistida vinculada al run.',
+      id: "saved_strategy",
+      status: "pass",
+      label: "Estrategia guardada",
+      detail: "Hay definición persistida vinculada al run.",
     });
   }
 
@@ -247,19 +267,21 @@ export function buildPaperGate(input: PaperGateInput): PaperGateResult {
 
   const edge = oosEvidence;
   if (edge?.credibility != null || edge?.edgeBand != null) {
-    const band = edge.edgeBand ?? 'n/d';
-    const cred = edge.credibility != null ? edge.credibility.toFixed(1) : 'n/d';
+    const band = edge.edgeBand ?? "n/d";
+    const cred = edge.credibility != null ? edge.credibility.toFixed(1) : "n/d";
     const mc =
-      edge.monteCarloPValue != null ? ` · MC p=${edge.monteCarloPValue.toFixed(3)}` : '';
-    const dsr = edge.dsr != null ? ` · DSR ${edge.dsr.toFixed(2)}` : '';
+      edge.monteCarloPValue != null
+        ? ` · MC p=${edge.monteCarloPValue.toFixed(3)}`
+        : "";
+    const dsr = edge.dsr != null ? ` · DSR ${edge.dsr.toFixed(2)}` : "";
     const weak =
-      band === 'luck' ||
+      band === "luck" ||
       (edge.monteCarloPValue != null && edge.monteCarloPValue > 0.05) ||
       (edge.dsr != null && edge.dsr < 0.5);
     checks.push({
-      id: 'edge_report',
-      status: weak ? 'warn' : 'pass',
-      label: 'EdgeReport lab (lite)',
+      id: "edge_report",
+      status: weak ? "warn" : "pass",
+      label: "EdgeReport lab (lite)",
       detail: weak
         ? `Credibility ${cred} · banda ${band}${mc}${dsr}. Señal débil / no skill — paper solo como experimento.`
         : `Credibility ${cred} · banda ${band}${mc}${dsr}. Suite lab (no auto-live; edge_reports lite si Optimizar persistió).`,
@@ -267,11 +289,11 @@ export function buildPaperGate(input: PaperGateInput): PaperGateResult {
     });
   } else {
     checks.push({
-      id: 'edge_report',
-      status: 'info',
-      label: 'EdgeReport lab (lite)',
+      id: "edge_report",
+      status: "info",
+      label: "EdgeReport lab (lite)",
       detail:
-        'Sin suite MC/DSR del laboratorio. Tras Optimizar con OOS/WF/CPCV y ≥3 ops del campeón se genera automáticamente.',
+        "Sin suite MC/DSR del laboratorio. Tras Optimizar con OOS/WF/CPCV y ≥3 ops del campeón se genera automáticamente.",
     });
   }
 
@@ -279,45 +301,47 @@ export function buildPaperGate(input: PaperGateInput): PaperGateResult {
     const band = classifyPbo(edge.pbo);
     const weak = edge.pbo >= PBO_WARN;
     checks.push({
-      id: 'pbo',
-      status: weak ? 'warn' : 'pass',
-      label: 'PBO (CSCV lab)',
+      id: "pbo",
+      status: weak ? "warn" : "pass",
+      label: "PBO (CSCV lab)",
       detail: weak
         ? `PBO ${formatPbo(edge.pbo)} (${pboBandLabel(band)}). El proceso IS≈azar OOS — paper solo como experimento.`
         : `PBO ${formatPbo(edge.pbo)} (${pboBandLabel(band)}). CSCV lab sobre scores; no es PBO de eventos completo.`,
       requiresAck: weak || undefined,
     });
-  } else if (oosEvidence?.kind === 'cpcv') {
+  } else if (oosEvidence?.kind === "cpcv") {
     checks.push({
-      id: 'pbo',
-      status: 'info',
-      label: 'PBO (CSCV lab)',
-      detail: 'CPCV sin PBO calculado (hace falta S par ≥4 y ≥2 candidatos).',
+      id: "pbo",
+      status: "info",
+      label: "PBO (CSCV lab)",
+      detail: "CPCV sin PBO calculado (hace falta S par ≥4 y ≥2 candidatos).",
     });
   }
 
-  const hasOosPass = oosCheck.status === 'pass';
+  const hasOosPass = oosCheck.status === "pass";
   if (hasOosPass) {
     checks.push({
-      id: 'ack_insample',
-      status: 'info',
-      label: 'Paper sigue siendo simulación',
+      id: "ack_insample",
+      status: "info",
+      label: "Paper sigue siendo simulación",
       detail:
-        'Hay señal OOS/WF del laboratorio, pero el paper no es dinero real ni gate de producción.',
+        "Hay señal OOS/WF del laboratorio, pero el paper no es dinero real ni gate de producción.",
       requiresAck: true,
     });
   } else {
     checks.push({
-      id: 'ack_insample',
-      status: 'info',
-      label: 'Solo evidencia in-sample (o OOS débil)',
+      id: "ack_insample",
+      status: "info",
+      label: "Solo evidencia in-sample (o OOS débil)",
       detail:
-        'Este resultado de prueba no sustituye una validación OOS/WF sólida. No es luz verde para dinero real.',
+        "Este resultado de prueba no sustituye una validación OOS/WF sólida. No es luz verde para dinero real.",
       requiresAck: true,
     });
   }
 
-  const hardBlockers = checks.filter((c) => c.status === 'fail').map((c) => c.id);
+  const hardBlockers = checks
+    .filter((c) => c.status === "fail")
+    .map((c) => c.id);
 
   return {
     checks,

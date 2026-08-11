@@ -1,16 +1,16 @@
 /** Period presets for the “Probar estrategia” wizard (Phase A) + DÍA D (as-of). */
 
-export type PeriodPreset = 'all' | '1y' | '3y' | '5y' | 'custom';
+export type PeriodPreset = "all" | "1y" | "3y" | "5y" | "custom";
 
 /** Default for IA / research: max synced history (better than a single year). */
-export const DEFAULT_PERIOD_PRESET: PeriodPreset = 'all';
+export const DEFAULT_PERIOD_PRESET: PeriodPreset = "all";
 
 export const PERIOD_PRESET_OPTIONS: { value: PeriodPreset; label: string }[] = [
-  { value: 'all', label: 'Todo el historial (recomendado IA)' },
-  { value: '5y', label: 'Últimos 5 años' },
-  { value: '3y', label: 'Últimos 3 años' },
-  { value: '1y', label: 'Último año (corto — solo humo rápido)' },
-  { value: 'custom', label: 'Personalizado' },
+  { value: "all", label: "Todo el historial (recomendado IA)" },
+  { value: "5y", label: "Últimos 5 años" },
+  { value: "3y", label: "Últimos 3 años" },
+  { value: "1y", label: "Último año (corto — solo humo rápido)" },
+  { value: "custom", label: "Personalizado" },
 ];
 
 export function isoDateUTC(d: Date): string {
@@ -24,7 +24,7 @@ export function todayIsoDate(): string {
 /** Fecha D efectiva: diaD válida, o hoy. Nunca futura. */
 export function effectiveDiaD(diaD: string | null | undefined): string {
   const today = todayIsoDate();
-  const raw = typeof diaD === 'string' ? diaD.trim() : '';
+  const raw = typeof diaD === "string" ? diaD.trim() : "";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return today;
   return raw > today ? today : raw;
 }
@@ -54,12 +54,12 @@ export function resolveBacktestWindow(
   const today = todayIsoDate();
   const cutFuture = asOf < today;
 
-  if (preset === 'all') {
+  if (preset === "all") {
     if (cutFuture) return { dateTo: asOf, limit: 10_000 };
     return { limit: 10_000 };
   }
 
-  if (preset === 'custom') {
+  if (preset === "custom") {
     const to =
       customTo && customTo <= asOf
         ? customTo
@@ -76,7 +76,7 @@ export function resolveBacktestWindow(
   }
 
   const asOfDateObj = new Date(`${asOf}T12:00:00.000Z`);
-  const years = preset === '1y' ? 1 : preset === '3y' ? 3 : 5;
+  const years = preset === "1y" ? 1 : preset === "3y" ? 3 : 5;
   asOfDateObj.setUTCFullYear(asOfDateObj.getUTCFullYear() - years);
   return {
     dateFrom: isoDateUTC(asOfDateObj),

@@ -1,11 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   buyHoldReturnFromSeries,
   filterBarsToBacktestWindow,
   trailingYearReturns,
   trailingYearStartIndex,
-} from '@/features/backtests/backtest-buy-hold';
-import type { BacktestEquityPointDto, OhlcvBarDto } from '@bolsa/shared';
+} from "@/features/backtests/backtest-buy-hold";
+import type { BacktestEquityPointDto, OhlcvBarDto } from "@bolsa/shared";
 
 function bar(day: string, close: number): OhlcvBarDto {
   return {
@@ -40,27 +40,29 @@ function dailySeries(
   return { bars, equity };
 }
 
-describe('buyHoldReturnFromSeries', () => {
-  it('calcula % primera→última vela', () => {
-    expect(buyHoldReturnFromSeries([bar('2020-01-01', 100), bar('2024-01-01', 150)])).toBe(50);
+describe("buyHoldReturnFromSeries", () => {
+  it("calcula % primera→última vela", () => {
+    expect(
+      buyHoldReturnFromSeries([bar("2020-01-01", 100), bar("2024-01-01", 150)]),
+    ).toBe(50);
   });
 });
 
-describe('filterBarsToBacktestWindow', () => {
+describe("filterBarsToBacktestWindow", () => {
   const bars = [
-    bar('2020-01-01', 10),
-    bar('2022-06-01', 20),
-    bar('2024-01-01', 30),
+    bar("2020-01-01", 10),
+    bar("2022-06-01", 20),
+    bar("2024-01-01", 30),
   ];
 
-  it('sin fechas → serie completa', () => {
+  it("sin fechas → serie completa", () => {
     expect(filterBarsToBacktestWindow(bars, { limit: 10_000 })).toHaveLength(3);
   });
 
-  it('recorta por dateFrom/dateTo', () => {
+  it("recorta por dateFrom/dateTo", () => {
     const sliced = filterBarsToBacktestWindow(bars, {
-      dateFrom: '2021-01-01',
-      dateTo: '2023-12-31',
+      dateFrom: "2021-01-01",
+      dateTo: "2023-12-31",
       limit: 10_000,
     });
     expect(sliced).toHaveLength(1);
@@ -68,8 +70,8 @@ describe('filterBarsToBacktestWindow', () => {
   });
 });
 
-describe('trailingYearStartIndex', () => {
-  it('null si la serie es más corta que ~1 año', () => {
+describe("trailingYearStartIndex", () => {
+  it("null si la serie es más corta que ~1 año", () => {
     const ts = Array.from({ length: 100 }, (_, i) => {
       const d = new Date(Date.UTC(2024, 0, 1 + i));
       return d.toISOString();
@@ -77,7 +79,7 @@ describe('trailingYearStartIndex', () => {
     expect(trailingYearStartIndex(ts)).toBeNull();
   });
 
-  it('apunta cerca de hace 365 días', () => {
+  it("apunta cerca de hace 365 días", () => {
     const ts = Array.from({ length: 500 }, (_, i) => {
       const d = new Date(Date.UTC(2023, 0, 1 + i));
       return d.toISOString();
@@ -90,16 +92,16 @@ describe('trailingYearStartIndex', () => {
   });
 });
 
-describe('trailingYearReturns', () => {
-  it('null sin suficiente historial', () => {
-    const { bars, equity } = dailySeries('2024-01-01', 60, () => 100);
+describe("trailingYearReturns", () => {
+  it("null sin suficiente historial", () => {
+    const { bars, equity } = dailySeries("2024-01-01", 60, () => 100);
     expect(trailingYearReturns(equity, bars)).toBeNull();
   });
 
-  it('estrategia, B&H y Δ en los últimos ~12m', () => {
+  it("estrategia, B&H y Δ en los últimos ~12m", () => {
     // Precio/equity planos 2 años, luego +20% en el último tramo de equity
     // y +10% en precio → Δ ≈ +10pp sobre la ventana trailing.
-    const { bars, equity } = dailySeries('2023-01-01', 800, (i) => {
+    const { bars, equity } = dailySeries("2023-01-01", 800, (i) => {
       if (i < 435) return 100;
       return 100 + ((i - 435) / (799 - 435)) * 10; // close → 110
     });

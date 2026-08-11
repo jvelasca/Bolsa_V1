@@ -1,5 +1,5 @@
-import type { BacktestEquityPointDto, OhlcvBarDto } from '@bolsa/shared';
-import type { ResolvedBacktestWindow } from '@/features/backtests/backtest-period';
+import type { BacktestEquityPointDto, OhlcvBarDto } from "@bolsa/shared";
+import type { ResolvedBacktestWindow } from "@/features/backtests/backtest-period";
 
 /** Day key for comparing run window vs OHLCV timestamps. */
 function dayKey(timestamp: string): string {
@@ -27,11 +27,14 @@ export function buyHoldReturnFromBars(
 }
 
 /** Buy & hold % first→last close of a bar series (no costs). */
-export function buyHoldReturnFromSeries(bars: OhlcvBarDto[] | undefined): number | null {
+export function buyHoldReturnFromSeries(
+  bars: OhlcvBarDto[] | undefined,
+): number | null {
   if (!bars || bars.length < 2) return null;
   const first = bars[0]!.close;
   const last = bars[bars.length - 1]!.close;
-  if (!(first > 0) || !Number.isFinite(first) || !Number.isFinite(last)) return null;
+  if (!(first > 0) || !Number.isFinite(first) || !Number.isFinite(last))
+    return null;
   return ((last - first) / first) * 100;
 }
 
@@ -46,7 +49,8 @@ export function trailingYearStartIndex(
   timestamps: readonly string[] | undefined,
   endIndex = (timestamps?.length ?? 1) - 1,
 ): number | null {
-  if (!timestamps?.length || endIndex < 1 || endIndex >= timestamps.length) return null;
+  if (!timestamps?.length || endIndex < 1 || endIndex >= timestamps.length)
+    return null;
   const endMs = Date.parse(timestamps[endIndex]!);
   if (!Number.isFinite(endMs)) return null;
   const cutoff = endMs - TRAILING_YEAR_MS;
@@ -86,7 +90,8 @@ export function trailingYearReturns(
   if (start == null) return null;
   const fromEq = equity[start]!.equity;
   const toEq = equity[end]!.equity;
-  if (!(fromEq > 0) || !Number.isFinite(fromEq) || !Number.isFinite(toEq)) return null;
+  if (!(fromEq > 0) || !Number.isFinite(fromEq) || !Number.isFinite(toEq))
+    return null;
   const strategyPct = ((toEq - fromEq) / fromEq) * 100;
   const from = equity[start]!.timestamp;
   const to = equity[end]!.timestamp;
@@ -125,6 +130,7 @@ export function excessReturnPct(
   strategyReturnPct: number,
   buyHoldReturnPct: number | null | undefined,
 ): number | null {
-  if (buyHoldReturnPct == null || !Number.isFinite(buyHoldReturnPct)) return null;
+  if (buyHoldReturnPct == null || !Number.isFinite(buyHoldReturnPct))
+    return null;
   return strategyReturnPct - buyHoldReturnPct;
 }

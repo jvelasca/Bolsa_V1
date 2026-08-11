@@ -1,6 +1,6 @@
 /** Split prefs for Backtesting hub (wizard ↔ resultado ↔ secciones). */
 
-export const BACKTEST_LAYOUT_STORAGE_KEY = 'bolsa-backtest-layout-v4';
+export const BACKTEST_LAYOUT_STORAGE_KEY = "bolsa-backtest-layout-v4";
 
 export const MIN_WIZARD_WIDTH_PCT = 18;
 export const MAX_WIZARD_WIDTH_PCT = 60;
@@ -55,7 +55,10 @@ export function clampWizardWidthPct(value: number): number {
 }
 
 export function clampWizardStackHeightPct(value: number): number {
-  return Math.min(MAX_WIZARD_STACK_HEIGHT_PCT, Math.max(MIN_WIZARD_STACK_HEIGHT_PCT, value));
+  return Math.min(
+    MAX_WIZARD_STACK_HEIGHT_PCT,
+    Math.max(MIN_WIZARD_STACK_HEIGHT_PCT, value),
+  );
 }
 
 export function clampChartHeightPct(value: number): number {
@@ -67,7 +70,10 @@ export function clampEquityWidthPct(value: number): number {
 }
 
 export function clampHeaderHeightPct(value: number): number {
-  return Math.min(MAX_HEADER_HEIGHT_PCT, Math.max(MIN_HEADER_HEIGHT_PCT, value));
+  return Math.min(
+    MAX_HEADER_HEIGHT_PCT,
+    Math.max(MIN_HEADER_HEIGHT_PCT, value),
+  );
 }
 
 export function clampBottomEquityHeightPct(value: number): number {
@@ -80,9 +86,9 @@ export function clampBottomEquityHeightPct(value: number): number {
 function migrateFromPrevious(): Partial<BacktestSplitLayoutPrefs> | null {
   try {
     for (const key of [
-      'bolsa-backtest-layout-v3',
-      'bolsa-backtest-layout-v2',
-      'bolsa-backtest-layout-v1',
+      "bolsa-backtest-layout-v3",
+      "bolsa-backtest-layout-v2",
+      "bolsa-backtest-layout-v1",
     ]) {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
@@ -102,12 +108,13 @@ function migrateFromPrevious(): Partial<BacktestSplitLayoutPrefs> | null {
 }
 
 export function loadBacktestSplitLayout(): BacktestSplitLayoutPrefs {
-  if (typeof window === 'undefined') return DEFAULT_BACKTEST_SPLIT_LAYOUT;
+  if (typeof window === "undefined") return DEFAULT_BACKTEST_SPLIT_LAYOUT;
   try {
     const raw = localStorage.getItem(BACKTEST_LAYOUT_STORAGE_KEY);
-    const parsed = (raw
-      ? (JSON.parse(raw) as Partial<BacktestSplitLayoutPrefs>)
-      : migrateFromPrevious()) ?? {};
+    const parsed =
+      (raw
+        ? (JSON.parse(raw) as Partial<BacktestSplitLayoutPrefs>)
+        : migrateFromPrevious()) ?? {};
     return {
       wizardWidthPct: clampWizardWidthPct(
         parsed.wizardWidthPct ?? DEFAULT_WIZARD_WIDTH_PCT,
@@ -134,7 +141,7 @@ export function loadBacktestSplitLayout(): BacktestSplitLayoutPrefs {
 }
 
 export function saveBacktestSplitLayout(prefs: BacktestSplitLayoutPrefs): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === "undefined") return;
   try {
     localStorage.setItem(BACKTEST_LAYOUT_STORAGE_KEY, JSON.stringify(prefs));
   } catch {
