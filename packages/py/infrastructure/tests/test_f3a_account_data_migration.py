@@ -16,6 +16,9 @@ from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_infrastructure.database.account_migration import run_account_data_migration
 from bolsa_infrastructure.database.models import (
     InvestmentAccountRow,
@@ -25,8 +28,6 @@ from bolsa_infrastructure.database.models import (
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

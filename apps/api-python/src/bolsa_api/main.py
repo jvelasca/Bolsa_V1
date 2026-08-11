@@ -18,6 +18,14 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
+from bolsa_api.api.v1.router import api_v1_router
+from bolsa_api.logging_redact import install_log_redact
+from bolsa_api.middleware.auth import AuthMiddleware
+from bolsa_api.middleware.rate_limit import RateLimitMiddleware
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.account_migration import run_account_data_migration
 from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
@@ -27,14 +35,6 @@ from bolsa_infrastructure.database.session import (
     create_session_factory,
 )
 from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
-from bolsa_api.api.v1.router import api_v1_router
-from bolsa_api.logging_redact import install_log_redact
-from bolsa_api.middleware.auth import AuthMiddleware
-from bolsa_api.middleware.rate_limit import RateLimitMiddleware
 
 
 @asynccontextmanager

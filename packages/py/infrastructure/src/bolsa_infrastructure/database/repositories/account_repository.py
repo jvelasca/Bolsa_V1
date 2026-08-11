@@ -1,6 +1,10 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import delete, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from bolsa_domain.account_settings import (
     AccountSettings,
     default_account_settings,
@@ -8,10 +12,6 @@ from bolsa_domain.account_settings import (
     settings_to_dict,
 )
 from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
-from sqlalchemy import delete, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from bolsa_infrastructure.database.models import (
     ConfidenceStateRow,
     DecisionMemoryRow,
@@ -440,6 +440,12 @@ class SqlAlchemyAccountRepository:
         portfolio_rows = (await self._session.execute(portfolios_stmt)).scalars().all()
         legacy_ids = [p.legacy_portfolio_id for p in portfolio_rows if p.legacy_portfolio_id]
 
+        # Orden de borrado respeta las FK:
+        #   positions/transactions -> portfolios (legacy)
+        #   ledger_entries        -> investment_portfolios
+        #   investment_portfolios -> portfolios (legacy)
+        # Por eso se borran primero los hijos, luego investment_portfolios y por
+        # último las portfolios legacy (evita ForeignKeyViolation).
         for legacy_id in legacy_ids:
             await self._session.execute(
                 delete(PositionRow).where(PositionRow.portfolio_id == legacy_id),
@@ -447,17 +453,18 @@ class SqlAlchemyAccountRepository:
             await self._session.execute(
                 delete(TransactionRow).where(TransactionRow.portfolio_id == legacy_id),
             )
-            await self._session.execute(delete(PortfolioRow).where(PortfolioRow.id == legacy_id))
 
-        await self._session.execute(
-            delete(PendingOrderRow).where(PendingOrderRow.account_id == account_id),
-        )
         await self._session.execute(
             delete(LedgerEntryRow).where(LedgerEntryRow.account_id == account_id),
         )
         await self._session.execute(
+            delete(PendingOrderRow).where(PendingOrderRow.account_id == account_id),
+        )
+        await self._session.execute(
             delete(InvestmentPortfolioRow).where(InvestmentPortfolioRow.account_id == account_id),
         )
+        for legacy_id in legacy_ids:
+            await self._session.execute(delete(PortfolioRow).where(PortfolioRow.id == legacy_id))
 
         # Referencias sueltas (sin FK): desvincular, conservar filas de auditoría cognitiva
         for model in (
