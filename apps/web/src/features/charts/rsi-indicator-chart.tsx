@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ColorType,
   createChart,
@@ -7,10 +13,10 @@ import {
   LineStyle,
   type IChartApi,
   type ISeriesApi,
-} from 'lightweight-charts';
-import type { ChartInstanceConfig, IndicatorPointDto } from '@bolsa/shared';
-import { indicatorToLineSeries } from '@/features/charts/chart-utils';
-import { cn } from '@/lib/utils';
+} from "lightweight-charts";
+import type { ChartInstanceConfig, IndicatorPointDto } from "@bolsa/shared";
+import { indicatorToLineSeries } from "@/features/charts/chart-utils";
+import { cn } from "@/lib/utils";
 
 interface RsiIndicatorChartProps {
   indicators: IndicatorPointDto[];
@@ -20,20 +26,24 @@ interface RsiIndicatorChartProps {
 
 const MIN_HEIGHT = 72;
 
-export function RsiIndicatorChart({ indicators, config, className }: RsiIndicatorChartProps) {
+export function RsiIndicatorChart({
+  indicators,
+  config,
+  className,
+}: RsiIndicatorChartProps) {
   const { colors, grid, cursor } = config;
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const rsiRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const overboughtRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const oversoldRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const rsiRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const overboughtRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const oversoldRef = useRef<ISeriesApi<"Line"> | null>(null);
 
   const [layoutReady, setLayoutReady] = useState(false);
   const [chartHeight, setChartHeight] = useState(0);
 
   const applySeriesData = useCallback(() => {
     if (!rsiRef.current || !chartRef.current) return;
-    const series = indicatorToLineSeries(indicators, 'rsi14');
+    const series = indicatorToLineSeries(indicators, "rsi14");
     rsiRef.current.setData(series);
     if (series.length > 0) {
       const refLines = series.map((point) => ({ time: point.time, value: 70 }));
@@ -73,7 +83,7 @@ export function RsiIndicatorChart({ indicators, config, className }: RsiIndicato
       width: container.clientWidth || undefined,
       height: chartHeight,
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
+        background: { type: ColorType.Solid, color: "transparent" },
         textColor: colors.textColor,
       },
       grid: {
@@ -81,7 +91,10 @@ export function RsiIndicatorChart({ indicators, config, className }: RsiIndicato
         horzLines: { visible: grid.showHorizontal, color: colors.gridColor },
       },
       crosshair: {
-        mode: cursor.mode === 'magnet' ? CrosshairMode.Magnet : CrosshairMode.Normal,
+        mode:
+          cursor.mode === "magnet"
+            ? CrosshairMode.Magnet
+            : CrosshairMode.Normal,
       },
       rightPriceScale: {
         borderColor: colors.gridColor,
@@ -97,31 +110,31 @@ export function RsiIndicatorChart({ indicators, config, className }: RsiIndicato
     rsiRef.current = chart.addSeries(LineSeries, {
       color: colors.rsi14Color,
       lineWidth: 2,
-      title: 'RSI 14',
-      priceScaleId: 'right',
+      title: "RSI 14",
+      priceScaleId: "right",
     });
 
     overboughtRef.current = chart.addSeries(LineSeries, {
-      color: 'rgba(239, 68, 68, 0.45)',
+      color: "rgba(239, 68, 68, 0.45)",
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
-      priceScaleId: 'right',
+      priceScaleId: "right",
       crosshairMarkerVisible: false,
       lastValueVisible: false,
       priceLineVisible: false,
     });
 
     oversoldRef.current = chart.addSeries(LineSeries, {
-      color: 'rgba(34, 197, 94, 0.45)',
+      color: "rgba(34, 197, 94, 0.45)",
       lineWidth: 1,
       lineStyle: LineStyle.Dashed,
-      priceScaleId: 'right',
+      priceScaleId: "right",
       crosshairMarkerVisible: false,
       lastValueVisible: false,
       priceLineVisible: false,
     });
 
-    chart.priceScale('right').applyOptions({
+    chart.priceScale("right").applyOptions({
       autoScale: true,
       scaleMargins: { top: 0.05, bottom: 0.05 },
     });
@@ -158,7 +171,7 @@ export function RsiIndicatorChart({ indicators, config, className }: RsiIndicato
     chart.applyOptions({
       height: chartHeight,
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
+        background: { type: ColorType.Solid, color: "transparent" },
         textColor: colors.textColor,
       },
       grid: {
@@ -170,7 +183,12 @@ export function RsiIndicatorChart({ indicators, config, className }: RsiIndicato
   }, [chartHeight, colors, grid]);
 
   return (
-    <div className={cn('flex min-h-0 flex-col border-t border-border bg-muted/10', className)}>
+    <div
+      className={cn(
+        "flex min-h-0 flex-col border-t border-border bg-muted/10",
+        className,
+      )}
+    >
       <div className="flex shrink-0 items-center px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         RSI (14)
       </div>

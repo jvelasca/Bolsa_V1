@@ -1,18 +1,20 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
-import type { ChartIndicatorInstance, OhlcvBarDto } from '@bolsa/shared';
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import type { ChartIndicatorInstance, OhlcvBarDto } from "@bolsa/shared";
 import {
   resolveOverlayRenderSeries,
   resolveSubRenderSeries,
-} from '@/features/charts/indicator-compute';
+} from "@/features/charts/indicator-compute";
 
 const fixtureDir = join(
   dirname(fileURLToPath(import.meta.url)),
-  '../../../../../packages/py/analytics/tests/fixtures',
+  "../../../../../packages/py/analytics/tests/fixtures",
 );
-const golden = JSON.parse(readFileSync(join(fixtureDir, 'indicator_golden.json'), 'utf8')) as {
+const golden = JSON.parse(
+  readFileSync(join(fixtureDir, "indicator_golden.json"), "utf8"),
+) as {
   bars: OhlcvBarDto[];
   barsExtended?: OhlcvBarDto[];
   cases: Array<{
@@ -24,7 +26,10 @@ const golden = JSON.parse(readFileSync(join(fixtureDir, 'indicator_golden.json')
   }>;
 };
 
-function instanceFor(definitionId: string, parameters: Record<string, number>): ChartIndicatorInstance {
+function instanceFor(
+  definitionId: string,
+  parameters: Record<string, number>,
+): ChartIndicatorInstance {
   return {
     instanceId: `test-${definitionId}`,
     definitionId,
@@ -40,16 +45,16 @@ function resolveSeries(instance: ChartIndicatorInstance, bars: OhlcvBarDto[]) {
 }
 
 function barsForCase(testCase: (typeof golden.cases)[number]): OhlcvBarDto[] {
-  if (testCase.barsRef === 'extended') {
+  if (testCase.barsRef === "extended") {
     if (!golden.barsExtended?.length) {
-      throw new Error('barsExtended missing in indicator_golden.json');
+      throw new Error("barsExtended missing in indicator_golden.json");
     }
     return golden.barsExtended;
   }
   return golden.bars;
 }
 
-describe('indicator compute golden parity (TS chart vs fixture)', () => {
+describe("indicator compute golden parity (TS chart vs fixture)", () => {
   for (const testCase of golden.cases) {
     it(`${testCase.definitionId}/${testCase.lineKey} ${JSON.stringify(testCase.parameters)}`, () => {
       const instance = instanceFor(testCase.definitionId, testCase.parameters);
@@ -58,8 +63,13 @@ describe('indicator compute golden parity (TS chart vs fixture)', () => {
       expect(line).toBeDefined();
       expect(line!.points).toHaveLength(testCase.points.length);
       for (let i = 0; i < testCase.points.length; i += 1) {
-        expect(String(line!.points[i]!.time)).toBe(testCase.points[i]!.timestamp);
-        expect(line!.points[i]!.value).toBeCloseTo(testCase.points[i]!.value!, 9);
+        expect(String(line!.points[i]!.time)).toBe(
+          testCase.points[i]!.timestamp,
+        );
+        expect(line!.points[i]!.value).toBeCloseTo(
+          testCase.points[i]!.value!,
+          9,
+        );
       }
     });
   }

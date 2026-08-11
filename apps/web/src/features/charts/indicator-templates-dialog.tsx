@@ -1,29 +1,36 @@
-import { useEffect, useState } from 'react';
-import type { IndicatorTemplate } from '@bolsa/shared';
-import { instanceLabel, presetLabel, templateItemLabel } from '@bolsa/shared';
-import { findIndicatorPreset } from '@bolsa/shared';
-import { Copy, LayoutTemplate, Plus, Save, Trash2, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores/ui-store';
-import { useActiveChartTab, useWorkspaceStore } from '@/stores/workspace-store';
-import { requestChartReflow } from '@/features/charts/chart-utils';
+import { useEffect, useState } from "react";
+import type { IndicatorTemplate } from "@bolsa/shared";
+import { instanceLabel, presetLabel, templateItemLabel } from "@bolsa/shared";
+import { findIndicatorPreset } from "@bolsa/shared";
+import { Copy, LayoutTemplate, Plus, Save, Trash2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
+import { useActiveChartTab, useWorkspaceStore } from "@/stores/workspace-store";
+import { requestChartReflow } from "@/features/charts/chart-utils";
 
 export function IndicatorTemplatesDialog() {
   const open = useUiStore((s) => s.indicatorTemplatesOpen);
   const close = useUiStore((s) => s.closeIndicatorTemplates);
   const activeTab = useActiveChartTab();
 
-  const templates = useWorkspaceStore((s) => s.workspace.indicatorTemplates ?? []);
+  const templates = useWorkspaceStore(
+    (s) => s.workspace.indicatorTemplates ?? [],
+  );
   const presets = useWorkspaceStore((s) => s.workspace.indicatorPresets ?? []);
   const addTemplate = useWorkspaceStore((s) => s.addIndicatorTemplate);
   const updateTemplate = useWorkspaceStore((s) => s.updateIndicatorTemplate);
   const removeTemplate = useWorkspaceStore((s) => s.removeIndicatorTemplate);
-  const duplicateTemplate = useWorkspaceStore((s) => s.duplicateIndicatorTemplate);
+  const duplicateTemplate = useWorkspaceStore(
+    (s) => s.duplicateIndicatorTemplate,
+  );
   const applyTemplate = useWorkspaceStore((s) => s.applyIndicatorTemplate);
-  const createFromChart = useWorkspaceStore((s) => s.createIndicatorTemplateFromChart);
+  const createFromChart = useWorkspaceStore(
+    (s) => s.createIndicatorTemplateFromChart,
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = templates.find((t) => t.id === selectedId) ?? templates[0] ?? null;
+  const selected =
+    templates.find((t) => t.id === selectedId) ?? templates[0] ?? null;
 
   const chartInstances = activeTab?.indicatorInstances ?? [];
   const activeTemplateId = activeTab?.activeIndicatorTemplateId;
@@ -31,10 +38,10 @@ export function IndicatorTemplatesDialog() {
   useEffect(() => {
     if (!open) return;
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') close();
+      if (event.key === "Escape") close();
     }
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [close, open]);
 
   if (!open) return null;
@@ -48,7 +55,7 @@ export function IndicatorTemplatesDialog() {
 
   function saveFromChart() {
     if (!activeTab || chartInstances.length === 0) return;
-    const label = activeTab.label || 'Gráfico';
+    const label = activeTab.label || "Gráfico";
     const created = createFromChart(activeTab.id, `Plantilla ${label}`);
     setSelectedId(created.id);
   }
@@ -76,11 +83,15 @@ export function IndicatorTemplatesDialog() {
               Plantillas de indicadores
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Aplica un conjunto al gráfico de {activeTab?.label ?? '—'} o guarda el actual como
-              plantilla
+              Aplica un conjunto al gráfico de {activeTab?.label ?? "—"} o
+              guarda el actual como plantilla
             </p>
           </div>
-          <button type="button" onClick={close} className="rounded p-1 hover:bg-accent">
+          <button
+            type="button"
+            onClick={close}
+            className="rounded p-1 hover:bg-accent"
+          >
             <X className="h-4 w-4" />
           </button>
         </header>
@@ -95,10 +106,10 @@ export function IndicatorTemplatesDialog() {
                 <span
                   key={instance.instanceId}
                   className={cn(
-                    'rounded px-1.5 py-0.5 text-[10px]',
+                    "rounded px-1.5 py-0.5 text-[10px]",
                     instance.visible
-                      ? 'bg-primary/15 text-primary'
-                      : 'bg-muted text-muted-foreground line-through',
+                      ? "bg-primary/15 text-primary"
+                      : "bg-muted text-muted-foreground line-through",
                   )}
                 >
                   {instanceLabel(instance)}
@@ -139,14 +150,17 @@ export function IndicatorTemplatesDialog() {
                     type="button"
                     onClick={() => setSelectedId(template.id)}
                     className={cn(
-                      'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent',
-                      selected?.id === template.id && 'bg-accent text-primary',
-                      activeTemplateId === template.id && 'ring-1 ring-primary/40',
+                      "w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent",
+                      selected?.id === template.id && "bg-accent text-primary",
+                      activeTemplateId === template.id &&
+                        "ring-1 ring-primary/40",
                     )}
                   >
                     {template.name}
                     {template.builtin && (
-                      <span className="ml-1 text-[9px] text-muted-foreground">· sistema</span>
+                      <span className="ml-1 text-[9px] text-muted-foreground">
+                        · sistema
+                      </span>
                     )}
                   </button>
                 </li>
@@ -185,7 +199,12 @@ export function IndicatorTemplatesDialog() {
                       title="Eliminar"
                       className="rounded p-1.5 text-destructive hover:bg-destructive/10"
                       onClick={() => {
-                        if (!window.confirm(`¿Eliminar plantilla "${selected.name}"?`)) return;
+                        if (
+                          !window.confirm(
+                            `¿Eliminar plantilla "${selected.name}"?`,
+                          )
+                        )
+                          return;
                         removeTemplate(selected.id);
                         setSelectedId(null);
                       }}
@@ -196,12 +215,16 @@ export function IndicatorTemplatesDialog() {
                 </div>
 
                 <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Indicadores incluidos ({selected.presetIds?.length ?? selected.items?.length ?? 0})
+                  Indicadores incluidos (
+                  {selected.presetIds?.length ?? selected.items?.length ?? 0})
                 </p>
                 <ul className="mb-4 max-h-48 space-y-1 overflow-auto text-xs">
-                  {(selected.presetIds?.length ?? 0) === 0 && (selected.items?.length ?? 0) === 0 && (
-                    <li className="text-muted-foreground">Sin indicadores — edita o duplica otra.</li>
-                  )}
+                  {(selected.presetIds?.length ?? 0) === 0 &&
+                    (selected.items?.length ?? 0) === 0 && (
+                      <li className="text-muted-foreground">
+                        Sin indicadores — edita o duplica otra.
+                      </li>
+                    )}
                   {selected.presetIds?.map((presetId) => {
                     const preset = findIndicatorPreset(presets, presetId);
                     return (
@@ -220,7 +243,9 @@ export function IndicatorTemplatesDialog() {
                     >
                       {templateItemLabel(item)}
                       {!item.visible && (
-                        <span className="ml-1 text-muted-foreground">(oculto)</span>
+                        <span className="ml-1 text-muted-foreground">
+                          (oculto)
+                        </span>
                       )}
                     </li>
                   ))}
@@ -228,22 +253,29 @@ export function IndicatorTemplatesDialog() {
 
                 <button
                   type="button"
-                  disabled={!activeTab || (selected.presetIds?.length ?? selected.items?.length ?? 0) === 0}
+                  disabled={
+                    !activeTab ||
+                    (selected.presetIds?.length ??
+                      selected.items?.length ??
+                      0) === 0
+                  }
                   className="w-full rounded bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
                   onClick={() => applyToChart(selected)}
                 >
-                  Aplicar al gráfico{activeTab ? ` (${activeTab.label})` : ''}
+                  Aplicar al gráfico{activeTab ? ` (${activeTab.label})` : ""}
                 </button>
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Selecciona una plantilla o guarda los indicadores actuales del gráfico.
+                Selecciona una plantilla o guarda los indicadores actuales del
+                gráfico.
               </p>
             )}
 
             {!activeTab && (
               <p className="mt-3 text-xs text-amber-500">
-                Abre un instrumento en el gráfico para aplicar o guardar plantillas.
+                Abre un instrumento en el gráfico para aplicar o guardar
+                plantillas.
               </p>
             )}
           </div>

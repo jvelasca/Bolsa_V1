@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
-import { DEFAULT_INDICATOR_TEMPLATE_FAVORITES } from '@bolsa/shared';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { useCallback } from "react";
+import { DEFAULT_INDICATOR_TEMPLATE_FAVORITES } from "@bolsa/shared";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function useChartIndicatorTemplateFavorites() {
   const favorites = useWorkspaceStore(
@@ -8,7 +8,9 @@ export function useChartIndicatorTemplateFavorites() {
       s.workspace.chartToolbarGlobal?.indicatorTemplateFavorites ??
       DEFAULT_INDICATOR_TEMPLATE_FAVORITES,
   );
-  const toggleInWorkspace = useWorkspaceStore((s) => s.toggleIndicatorTemplateFavorite);
+  const toggleInWorkspace = useWorkspaceStore(
+    (s) => s.toggleIndicatorTemplateFavorite,
+  );
 
   const toggleFavorite = useCallback(
     (templateId: string) => {

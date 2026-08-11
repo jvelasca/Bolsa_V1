@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ColorType,
   createChart,
@@ -7,26 +14,45 @@ import {
   LineStyle,
   type IChartApi,
   type ISeriesApi,
-} from 'lightweight-charts';
-import { ZoomIn, ZoomOut } from 'lucide-react';
-import type { ChartIndicatorInstance, ChartInstanceConfig, IndicatorPointDto, OhlcvBarDto } from '@bolsa/shared';
-import { colorForInstance, instanceDisplayName, isAiScoreIndicator } from '@bolsa/shared';
-import { resolveSubRenderSeries, buildIndicatorBarsFingerprint } from '@/features/charts/indicator-compute';
-import { IndicatorPanelChrome } from '@/features/charts/indicator-panel-chrome';
+} from "lightweight-charts";
+import { ZoomIn, ZoomOut } from "lucide-react";
+import type {
+  ChartIndicatorInstance,
+  ChartInstanceConfig,
+  IndicatorPointDto,
+  OhlcvBarDto,
+} from "@bolsa/shared";
+import {
+  colorForInstance,
+  instanceDisplayName,
+  isAiScoreIndicator,
+} from "@bolsa/shared";
+import {
+  resolveSubRenderSeries,
+  buildIndicatorBarsFingerprint,
+} from "@/features/charts/indicator-compute";
+import { IndicatorPanelChrome } from "@/features/charts/indicator-panel-chrome";
 import {
   clampScaleZoom,
   marginsForZoom,
   PRICE_SCALE_MIN_WIDTH_PX,
   stepScaleZoom,
-} from '@/features/charts/chart-scale-utils';
-import { attachChartScaleDrag, attachChartScaleInteraction, type ChartScaleZoomHandlers } from '@/features/charts/chart-scale-wheel';
-import { observeStableSize } from '@/features/charts/chart-stable-resize';
-import { attachChartHorizontalWheel, getChartSyncHub } from '@/features/charts/chart-time-sync';
-import { attachChartTimePan } from '@/features/charts/chart-time-pan';
-import { barTimeToChartTime } from '@/features/charts/chart-utils';
-import { useUiStore } from '@/stores/ui-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { cn } from '@/lib/utils';
+} from "@/features/charts/chart-scale-utils";
+import {
+  attachChartScaleDrag,
+  attachChartScaleInteraction,
+  type ChartScaleZoomHandlers,
+} from "@/features/charts/chart-scale-wheel";
+import { observeStableSize } from "@/features/charts/chart-stable-resize";
+import {
+  attachChartHorizontalWheel,
+  getChartSyncHub,
+} from "@/features/charts/chart-time-sync";
+import { attachChartTimePan } from "@/features/charts/chart-time-pan";
+import { barTimeToChartTime } from "@/features/charts/chart-utils";
+import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { cn } from "@/lib/utils";
 
 interface SubIndicatorPanelProps {
   chartSyncId: string;
@@ -71,18 +97,22 @@ export function SubIndicatorPanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const lineRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const anchorRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const extraRefs = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
-  const overboughtRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const oversoldRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const anchorRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const extraRefs = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  const overboughtRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const oversoldRef = useRef<ISeriesApi<"Line"> | null>(null);
   const scaleZoomRef = useRef(scaleZoom);
   const chartHeightRef = useRef(0);
   const layoutReadyRef = useRef(false);
 
-  const setSelectedIndicator = useUiStore((s) => s.setSelectedIndicatorInstanceId);
+  const setSelectedIndicator = useUiStore(
+    (s) => s.setSelectedIndicatorInstanceId,
+  );
   const selectedIndicatorId = useUiStore((s) => s.selectedIndicatorInstanceId);
-  const indicatorPresets = useWorkspaceStore((s) => s.workspace.indicatorPresets ?? []);
+  const indicatorPresets = useWorkspaceStore(
+    (s) => s.workspace.indicatorPresets ?? [],
+  );
 
   const [layoutReady, setLayoutReady] = useState(false);
   const [chartHeight, setChartHeight] = useState(
@@ -92,10 +122,14 @@ export function SubIndicatorPanel({
   const lineColor = colorForInstance(instance);
   const panelTitle = instanceDisplayName(instance, indicatorPresets);
   const lineWidth = instance.lineWidth ?? 2;
-  const showChart = instance.visible && (fillHeight || panelHeight > COLLAPSED_HEADER_PX);
+  const showChart =
+    instance.visible && (fillHeight || panelHeight > COLLAPSED_HEADER_PX);
   const isSelected = selectedIndicatorId === instance.instanceId;
 
-  const barsFingerprint = useMemo(() => buildIndicatorBarsFingerprint(bars), [bars]);
+  const barsFingerprint = useMemo(
+    () => buildIndicatorBarsFingerprint(bars),
+    [bars],
+  );
   const instanceParamsKey = useMemo(
     () => JSON.stringify(instance.parameters),
     [instance.parameters],
@@ -123,12 +157,14 @@ export function SubIndicatorPanel({
     onScaleZoomChange?.(clampScaleZoom(next));
   };
 
-  const scaleHandlersRef = useRef<ChartScaleZoomHandlers>({ onVerticalZoom: () => {} });
+  const scaleHandlersRef = useRef<ChartScaleZoomHandlers>({
+    onVerticalZoom: () => {},
+  });
   scaleHandlersRef.current = {
     onVerticalZoom: (direction) => {
       const next = stepScaleZoom(scaleZoomRef.current, direction);
       scaleZoomRef.current = next;
-      chartRef.current?.priceScale('right').applyOptions({
+      chartRef.current?.priceScale("right").applyOptions({
         minimumWidth: PRICE_SCALE_MIN_WIDTH_PX,
         scaleMargins: marginsForZoom(next),
       });
@@ -175,7 +211,7 @@ export function SubIndicatorPanel({
           color: lineColor,
           lineWidth: 1,
           title: spec.title,
-          priceScaleId: 'right',
+          priceScaleId: "right",
           lastValueVisible: false,
           priceLineVisible: false,
         });
@@ -185,14 +221,29 @@ export function SubIndicatorPanel({
     });
 
     if (main && main.points.length > 0) {
-      if (instance.definitionId === 'rsi' || instance.definitionId === 'stoch') {
-        const refLines = main.points.map((point) => ({ time: point.time, value: 70 }));
-        const refLow = main.points.map((point) => ({ time: point.time, value: 30 }));
+      if (
+        instance.definitionId === "rsi" ||
+        instance.definitionId === "stoch"
+      ) {
+        const refLines = main.points.map((point) => ({
+          time: point.time,
+          value: 70,
+        }));
+        const refLow = main.points.map((point) => ({
+          time: point.time,
+          value: 30,
+        }));
         overboughtRef.current?.setData(refLines);
         oversoldRef.current?.setData(refLow);
       } else if (isAiScoreIndicator(instance.definitionId)) {
-        const refHigh = main.points.map((point) => ({ time: point.time, value: 75 }));
-        const refMid = main.points.map((point) => ({ time: point.time, value: 60 }));
+        const refHigh = main.points.map((point) => ({
+          time: point.time,
+          value: 75,
+        }));
+        const refMid = main.points.map((point) => ({
+          time: point.time,
+          value: 60,
+        }));
         overboughtRef.current?.setData(refHigh);
         oversoldRef.current?.setData(refMid);
       } else {
@@ -206,11 +257,11 @@ export function SubIndicatorPanel({
 
     if (main && main.points.length > 0) {
       requestAnimationFrame(() => {
-        getChartSyncHub(chartSyncId).broadcastFrom('main');
+        getChartSyncHub(chartSyncId).broadcastFrom("main");
       });
     } else if (bars.length > 0) {
       requestAnimationFrame(() => {
-        getChartSyncHub(chartSyncId).broadcastFrom('main');
+        getChartSyncHub(chartSyncId).broadcastFrom("main");
       });
     }
   }, [bars, chartSyncId, instance.definitionId, lineColor, renderSeries]);
@@ -224,7 +275,10 @@ export function SubIndicatorPanel({
       container,
       (width, nextHeight) => {
         const height = Math.max(MIN_HEIGHT, nextHeight);
-        if (Math.abs(height - chartHeightRef.current) < 2 && layoutReadyRef.current) {
+        if (
+          Math.abs(height - chartHeightRef.current) < 2 &&
+          layoutReadyRef.current
+        ) {
           const chart = chartRef.current;
           if (chart && width > 0) chart.applyOptions({ width });
           return;
@@ -245,7 +299,8 @@ export function SubIndicatorPanel({
   }, [fillHeight, panelHeight, showChart]);
 
   useEffect(() => {
-    if (!showChart || !layoutReady || !containerRef.current || chartHeight <= 0) return;
+    if (!showChart || !layoutReady || !containerRef.current || chartHeight <= 0)
+      return;
     const extraOverlaySeriesRef = extraRefs.current;
     const container = containerRef.current;
     const chart = createChart(container, {
@@ -253,7 +308,7 @@ export function SubIndicatorPanel({
       width: container.clientWidth || undefined,
       height: chartHeight,
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
+        background: { type: ColorType.Solid, color: "transparent" },
         textColor: colors.textColor,
       },
       grid: {
@@ -261,7 +316,10 @@ export function SubIndicatorPanel({
         horzLines: { visible: grid.showHorizontal, color: colors.gridColor },
       },
       crosshair: {
-        mode: cursor.mode === 'magnet' ? CrosshairMode.Magnet : CrosshairMode.Normal,
+        mode:
+          cursor.mode === "magnet"
+            ? CrosshairMode.Magnet
+            : CrosshairMode.Normal,
       },
       rightPriceScale: {
         borderColor: colors.gridColor,
@@ -278,7 +336,7 @@ export function SubIndicatorPanel({
     });
 
     anchorRef.current = chart.addSeries(LineSeries, {
-      color: 'transparent',
+      color: "transparent",
       lineWidth: 1,
       visible: false,
       lastValueVisible: false,
@@ -290,45 +348,45 @@ export function SubIndicatorPanel({
       color: lineColor,
       lineWidth: lineWidth as 1 | 2 | 3 | 4,
       title: panelTitle,
-      priceScaleId: 'right',
+      priceScaleId: "right",
       lastValueVisible: instance.showLastValue === true,
       priceLineVisible: false,
     });
 
-    if (instance.definitionId === 'rsi' || instance.definitionId === 'stoch') {
+    if (instance.definitionId === "rsi" || instance.definitionId === "stoch") {
       overboughtRef.current = chart.addSeries(LineSeries, {
-        color: 'rgba(239, 68, 68, 0.45)',
+        color: "rgba(239, 68, 68, 0.45)",
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
-        priceScaleId: 'right',
+        priceScaleId: "right",
         crosshairMarkerVisible: false,
         lastValueVisible: false,
         priceLineVisible: false,
       });
       oversoldRef.current = chart.addSeries(LineSeries, {
-        color: 'rgba(34, 197, 94, 0.45)',
+        color: "rgba(34, 197, 94, 0.45)",
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
-        priceScaleId: 'right',
+        priceScaleId: "right",
         crosshairMarkerVisible: false,
         lastValueVisible: false,
         priceLineVisible: false,
       });
     } else if (isAiScoreIndicator(instance.definitionId)) {
       overboughtRef.current = chart.addSeries(LineSeries, {
-        color: 'rgba(16, 185, 129, 0.45)',
+        color: "rgba(16, 185, 129, 0.45)",
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
-        priceScaleId: 'right',
+        priceScaleId: "right",
         crosshairMarkerVisible: false,
         lastValueVisible: false,
         priceLineVisible: false,
       });
       oversoldRef.current = chart.addSeries(LineSeries, {
-        color: 'rgba(245, 158, 11, 0.45)',
+        color: "rgba(245, 158, 11, 0.45)",
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
-        priceScaleId: 'right',
+        priceScaleId: "right",
         crosshairMarkerVisible: false,
         lastValueVisible: false,
         priceLineVisible: false,
@@ -360,13 +418,14 @@ export function SubIndicatorPanel({
     return getChartSyncHub(chartSyncId).register({
       id: instance.instanceId,
       chart: chartRef.current,
-      kind: 'sub',
+      kind: "sub",
       series: lineRef.current,
     });
   }, [chartReady, chartSyncId, instance.instanceId]);
 
   useEffect(() => {
-    if (!showChart || !chartReady || !panelRef.current || !containerRef.current) return;
+    if (!showChart || !chartReady || !panelRef.current || !containerRef.current)
+      return;
 
     const plotWidth = () =>
       Math.max(1, containerRef.current!.clientWidth - PRICE_SCALE_MIN_WIDTH_PX);
@@ -383,16 +442,20 @@ export function SubIndicatorPanel({
       handlers: scaleHandlersRef,
     });
 
-    const cancelTimeWheel = attachChartHorizontalWheel(containerRef.current, chartSyncId, {
-      sourcePaneId: instance.instanceId,
-      getAnchorLogical: (clientX) => {
-        const chart = chartRef.current;
-        const el = containerRef.current;
-        if (!chart || !el) return null;
-        const x = clientX - el.getBoundingClientRect().left;
-        return chart.timeScale().coordinateToLogical(x);
+    const cancelTimeWheel = attachChartHorizontalWheel(
+      containerRef.current,
+      chartSyncId,
+      {
+        sourcePaneId: instance.instanceId,
+        getAnchorLogical: (clientX) => {
+          const chart = chartRef.current;
+          const el = containerRef.current;
+          if (!chart || !el) return null;
+          const x = clientX - el.getBoundingClientRect().left;
+          return chart.timeScale().coordinateToLogical(x);
+        },
       },
-    });
+    );
 
     const cancelTimePan = attachChartTimePan({
       hitTarget: containerRef.current,
@@ -428,7 +491,7 @@ export function SubIndicatorPanel({
         rightOffset: Math.round(grid.rightMarginPct),
       },
     });
-    chart.priceScale('right').applyOptions({
+    chart.priceScale("right").applyOptions({
       minimumWidth: PRICE_SCALE_MIN_WIDTH_PX,
       scaleMargins: marginsForZoom(scaleZoom),
     });
@@ -438,14 +501,23 @@ export function SubIndicatorPanel({
       title: panelTitle,
       lastValueVisible: instance.showLastValue === true,
     });
-  }, [colors.gridColor, grid.rightMarginPct, instance, lineColor, lineWidth, panelTitle, scaleZoom, showChart]);
+  }, [
+    colors.gridColor,
+    grid.rightMarginPct,
+    instance,
+    lineColor,
+    lineWidth,
+    panelTitle,
+    scaleZoom,
+    showChart,
+  ]);
 
   const zoomControls = showChart ? (
     <div className="flex items-center gap-0.5 border-l border-border/50 pl-1">
       <button
         type="button"
         title="Alejar eje Y (pulsar en la escala derecha y arrastrar, o rueda con botón pulsado)"
-        onClick={() => setScaleZoom(stepScaleZoom(scaleZoom, 'out'))}
+        onClick={() => setScaleZoom(stepScaleZoom(scaleZoom, "out"))}
         className="rounded p-0.5 hover:bg-accent"
       >
         <ZoomOut className="h-3 w-3" />
@@ -456,7 +528,7 @@ export function SubIndicatorPanel({
       <button
         type="button"
         title="Acercar eje Y (pulsar en la escala derecha y arrastrar, o rueda con botón pulsado)"
-        onClick={() => setScaleZoom(stepScaleZoom(scaleZoom, 'in'))}
+        onClick={() => setScaleZoom(stepScaleZoom(scaleZoom, "in"))}
         className="rounded p-0.5 hover:bg-accent"
       >
         <ZoomIn className="h-3 w-3" />
@@ -468,9 +540,11 @@ export function SubIndicatorPanel({
     <div
       ref={panelRef}
       className={cn(
-        'flex flex-col border-b border-border bg-muted/5',
-        fillHeight || !instance.visible ? 'min-h-0 h-full overflow-hidden' : 'shrink-0',
-        isSelected && 'outline outline-1 -outline-offset-1 outline-primary/40',
+        "flex flex-col border-b border-border bg-muted/5",
+        fillHeight || !instance.visible
+          ? "min-h-0 h-full overflow-hidden"
+          : "shrink-0",
+        isSelected && "outline outline-1 -outline-offset-1 outline-primary/40",
         className,
       )}
       style={

@@ -1,6 +1,6 @@
-import { AlertTriangle, CheckCircle2, Info, Sparkles } from 'lucide-react';
-import type { DraftIndicatorFromPromptResultDto } from '@bolsa/shared';
-import { cn } from '@/lib/utils';
+import { AlertTriangle, CheckCircle2, Info, Sparkles } from "lucide-react";
+import type { DraftIndicatorFromPromptResultDto } from "@bolsa/shared";
+import { cn } from "@/lib/utils";
 
 interface IndicatorDraftFeedbackProps {
   draft: DraftIndicatorFromPromptResultDto;
@@ -8,18 +8,21 @@ interface IndicatorDraftFeedbackProps {
 }
 
 function confidenceTone(confidence: number): string {
-  if (confidence >= 0.72) return 'bg-emerald-500';
-  if (confidence >= 0.55) return 'bg-amber-500';
-  return 'bg-destructive';
+  if (confidence >= 0.72) return "bg-emerald-500";
+  if (confidence >= 0.55) return "bg-amber-500";
+  return "bg-destructive";
 }
 
 function confidenceLabel(confidence: number): string {
-  if (confidence >= 0.72) return 'Alta';
-  if (confidence >= 0.55) return 'Moderada';
-  return 'Baja';
+  if (confidence >= 0.72) return "Alta";
+  if (confidence >= 0.55) return "Moderada";
+  return "Baja";
 }
 
-export function IndicatorDraftFeedback({ draft, compact }: IndicatorDraftFeedbackProps) {
+export function IndicatorDraftFeedback({
+  draft,
+  compact,
+}: IndicatorDraftFeedbackProps) {
   const feedback = draft.feedback;
   const summary = feedback?.summary ?? draft.explanation;
   const confidencePct = Math.round(draft.confidence * 100);
@@ -30,8 +33,12 @@ export function IndicatorDraftFeedback({ draft, compact }: IndicatorDraftFeedbac
         <div className="flex items-start gap-2">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
           <div className="min-w-0 space-y-1">
-            <p className="text-xs font-medium text-foreground">Lo que entendí</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">{summary}</p>
+            <p className="text-xs font-medium text-foreground">
+              Lo que entendí
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {summary}
+            </p>
           </div>
         </div>
       </div>
@@ -45,7 +52,10 @@ export function IndicatorDraftFeedback({ draft, compact }: IndicatorDraftFeedbac
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div
-            className={cn('h-full rounded-full transition-all', confidenceTone(draft.confidence))}
+            className={cn(
+              "h-full rounded-full transition-all",
+              confidenceTone(draft.confidence),
+            )}
             style={{ width: `${confidencePct}%` }}
           />
         </div>
@@ -53,7 +63,9 @@ export function IndicatorDraftFeedback({ draft, compact }: IndicatorDraftFeedbac
 
       {feedback?.detectedSignals && feedback.detectedSignals.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-foreground">Señales en tu mensaje</p>
+          <p className="text-xs font-medium text-foreground">
+            Señales en tu mensaje
+          </p>
           <ul className="flex flex-wrap gap-1.5">
             {feedback.detectedSignals.map((signal) => (
               <li
@@ -62,7 +74,9 @@ export function IndicatorDraftFeedback({ draft, compact }: IndicatorDraftFeedbac
                 title={signal.detail}
               >
                 <span className="text-muted-foreground">{signal.label}: </span>
-                <span className="font-medium text-foreground">{signal.detail ?? '—'}</span>
+                <span className="font-medium text-foreground">
+                  {signal.detail ?? "—"}
+                </span>
               </li>
             ))}
           </ul>
@@ -85,16 +99,18 @@ export function IndicatorDraftFeedback({ draft, compact }: IndicatorDraftFeedbac
 
       {feedback?.alternatives && feedback.alternatives.length > 1 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-foreground">Alternativas consideradas</p>
+          <p className="text-xs font-medium text-foreground">
+            Alternativas consideradas
+          </p>
           <ul className="space-y-1 text-[11px]">
             {feedback.alternatives.map((alt) => (
               <li
                 key={alt.definitionId}
                 className={cn(
-                  'flex items-center justify-between rounded border px-2 py-1',
+                  "flex items-center justify-between rounded border px-2 py-1",
                   alt.selected
-                    ? 'border-primary/40 bg-primary/5 font-medium'
-                    : 'border-border text-muted-foreground',
+                    ? "border-primary/40 bg-primary/5 font-medium"
+                    : "border-border text-muted-foreground",
                 )}
               >
                 <span>{alt.label}</span>
@@ -117,7 +133,9 @@ export function IndicatorDraftFeedback({ draft, compact }: IndicatorDraftFeedbac
           </span>
         )}
         {!compact && feedback?.ambiguous && (
-          <span className="text-amber-700 dark:text-amber-300">Interpretación ambigua</span>
+          <span className="text-amber-700 dark:text-amber-300">
+            Interpretación ambigua
+          </span>
         )}
       </div>
     </div>

@@ -1,6 +1,12 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import type { ChartTimeframe, ChartSeriesType } from '@bolsa/shared';
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
+import type { ChartTimeframe, ChartSeriesType } from "@bolsa/shared";
 import {
   drawingHasLinkedOrder,
   isVirtualListId,
@@ -8,47 +14,65 @@ import {
   resolveChartToolbarForTab,
   normalizeChartToolbarGlobalConfig,
   strategyTop1ToChartIndicators,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { instrumentForQuickTrade } from '@/features/charts/chart-quick-trade-buttons';
-import { ChartDrawingEditPopover } from '@/features/charts/chart-drawing-edit-popover';
-import { ChartDrawingTemplatesDialog } from '@/features/charts/chart-drawing-templates-dialog';
-import { IndicatorInstanceConfigDialog } from '@/features/charts/indicator-instance-config-dialog';
-import { ChartDrawingSidebar } from '@/features/charts/chart-drawing-sidebar';
-import { isShapeDrawTool } from '@/features/charts/chart-draw-tool-utils';
-import { ChartInspectorPanel } from '@/features/charts/chart-inspector-panel';
-import { ChartToolbarGlobalBar } from '@/features/charts/chart-toolbar-global-bar';
-import { ChartToolbarChartBar } from '@/features/charts/chart-toolbar-chart-bar';
-import { ChartFinalistTop1EmptyBanner } from '@/features/charts/chart-finalist-top1-switch';
-import { OhlcvChart } from '@/features/charts/ohlcv-chart';
-import { ChartIndicatorStack } from '@/features/charts/chart-indicator-stack';
-import { subPanelInstancesAll, overlayManagementInstances } from '@/features/charts/indicator-compute';
-import { requestChartReflow } from '@/features/charts/chart-utils';
-import { chartPerfDebug } from '@/features/charts/chart-perf-debug';
-import { clampScaleZoom } from '@/features/charts/chart-scale-utils';
-import { cn } from '@/lib/utils';
-import { useInstrumentDataFreshness, invalidateInstrumentDataStatus } from '@/features/instruments/use-instrument-data-freshness';
-import { useUiStore } from '@/stores/ui-store';
-import { useActiveChartTab, useWorkspaceStore } from '@/stores/workspace-store';
-import { useTradingUiStore } from '@/stores/trading-ui-store';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { instrumentForQuickTrade } from "@/features/charts/chart-quick-trade-buttons";
+import { ChartDrawingEditPopover } from "@/features/charts/chart-drawing-edit-popover";
+import { ChartDrawingTemplatesDialog } from "@/features/charts/chart-drawing-templates-dialog";
+import { IndicatorInstanceConfigDialog } from "@/features/charts/indicator-instance-config-dialog";
+import { ChartDrawingSidebar } from "@/features/charts/chart-drawing-sidebar";
+import { isShapeDrawTool } from "@/features/charts/chart-draw-tool-utils";
+import { ChartInspectorPanel } from "@/features/charts/chart-inspector-panel";
+import { ChartToolbarGlobalBar } from "@/features/charts/chart-toolbar-global-bar";
+import { ChartToolbarChartBar } from "@/features/charts/chart-toolbar-chart-bar";
+import { ChartFinalistTop1EmptyBanner } from "@/features/charts/chart-finalist-top1-switch";
+import { OhlcvChart } from "@/features/charts/ohlcv-chart";
+import { ChartIndicatorStack } from "@/features/charts/chart-indicator-stack";
+import {
+  subPanelInstancesAll,
+  overlayManagementInstances,
+} from "@/features/charts/indicator-compute";
+import { requestChartReflow } from "@/features/charts/chart-utils";
+import { chartPerfDebug } from "@/features/charts/chart-perf-debug";
+import { clampScaleZoom } from "@/features/charts/chart-scale-utils";
+import { cn } from "@/lib/utils";
+import {
+  useInstrumentDataFreshness,
+  invalidateInstrumentDataStatus,
+} from "@/features/instruments/use-instrument-data-freshness";
+import { useUiStore } from "@/stores/ui-store";
+import { useActiveChartTab, useWorkspaceStore } from "@/stores/workspace-store";
+import { useTradingUiStore } from "@/stores/trading-ui-store";
 
 export function ChartWorkspacePage() {
   const activeTab = useActiveChartTab();
-  const openInstrumentSyncDialog = useUiStore((s) => s.openInstrumentSyncDialog);
+  const openInstrumentSyncDialog = useUiStore(
+    (s) => s.openInstrumentSyncDialog,
+  );
   const chartInspectorOpen = useWorkspaceStore(
     (s) => s.workspace.layout.chartInspectorOpen ?? false,
   );
   const toggleChartInspector = useWorkspaceStore((s) => s.toggleChartInspector);
-  const toggleChartInspectorShortcut = useWorkspaceStore((s) => s.toggleChartInspectorShortcut);
+  const toggleChartInspectorShortcut = useWorkspaceStore(
+    (s) => s.toggleChartInspectorShortcut,
+  );
   const addDrawing = useWorkspaceStore((s) => s.addChartDrawing);
   const removeDrawing = useWorkspaceStore((s) => s.removeChartDrawing);
   const updateDrawing = useWorkspaceStore((s) => s.updateChartDrawing);
   const updateChartTimeframe = useWorkspaceStore((s) => s.updateChartTimeframe);
-  const updateChartSeriesType = useWorkspaceStore((s) => s.updateChartSeriesType);
-  const indicatorTemplates = useWorkspaceStore((s) => s.workspace.indicatorTemplates ?? []);
-  const chartListContext = useWorkspaceStore((s) => s.workspace.chartListContext);
+  const updateChartSeriesType = useWorkspaceStore(
+    (s) => s.updateChartSeriesType,
+  );
+  const indicatorTemplates = useWorkspaceStore(
+    (s) => s.workspace.indicatorTemplates ?? [],
+  );
+  const chartListContext = useWorkspaceStore(
+    (s) => s.workspace.chartListContext,
+  );
   const listConfig = useWorkspaceStore((s) => s.workspace.list);
-  const chartToolbarGlobalRaw = useWorkspaceStore((s) => s.workspace.chartToolbarGlobal);
+  const chartToolbarGlobalRaw = useWorkspaceStore(
+    (s) => s.workspace.chartToolbarGlobal,
+  );
   const chartToolbarGlobal = useMemo(
     () => normalizeChartToolbarGlobalConfig(chartToolbarGlobalRaw),
     [chartToolbarGlobalRaw],
@@ -57,24 +81,42 @@ export function ChartWorkspacePage() {
     () => resolveChartToolbarForTab(chartToolbarGlobal, activeTab?.toolbar),
     [chartToolbarGlobal, activeTab?.toolbar],
   );
-  const openChartGlobalBarSettings = useUiStore((s) => s.openChartGlobalBarSettings);
-  const openChartDataBarSettings = useUiStore((s) => s.openChartDataBarSettings);
+  const openChartGlobalBarSettings = useUiStore(
+    (s) => s.openChartGlobalBarSettings,
+  );
+  const openChartDataBarSettings = useUiStore(
+    (s) => s.openChartDataBarSettings,
+  );
   const openIndicatorConfig = useUiStore((s) => s.openIndicatorConfig);
   const openOrderDialog = useTradingUiStore((s) => s.openOrderDialog);
-  const updateIndicatorInstance = useWorkspaceStore((s) => s.updateIndicatorInstance);
+  const updateIndicatorInstance = useWorkspaceStore(
+    (s) => s.updateIndicatorInstance,
+  );
   const updateChartConfig = useWorkspaceStore((s) => s.updateChartConfig);
-  const updateChartPricePanelHeight = useWorkspaceStore((s) => s.updateChartPricePanelHeight);
+  const updateChartPricePanelHeight = useWorkspaceStore(
+    (s) => s.updateChartPricePanelHeight,
+  );
   const setSubPanelWeights = useWorkspaceStore((s) => s.setSubPanelWeights);
-  const removeIndicatorInstance = useWorkspaceStore((s) => s.removeIndicatorInstance);
-  const reorderIndicatorInstances = useWorkspaceStore((s) => s.reorderIndicatorInstances);
+  const removeIndicatorInstance = useWorkspaceStore(
+    (s) => s.removeIndicatorInstance,
+  );
+  const reorderIndicatorInstances = useWorkspaceStore(
+    (s) => s.reorderIndicatorInstances,
+  );
   const tool = useUiStore((s) => s.chartDrawTool);
   const openIndicatorsCatalog = useUiStore((s) => s.openIndicatorsCatalog);
-  const applyIndicatorTemplate = useWorkspaceStore((s) => s.applyIndicatorTemplate);
+  const applyIndicatorTemplate = useWorkspaceStore(
+    (s) => s.applyIndicatorTemplate,
+  );
   const setShowFinalistTop1Indicators = useWorkspaceStore(
     (s) => s.setShowFinalistTop1Indicators,
   );
-  const syncFinalistTop1Indicators = useWorkspaceStore((s) => s.syncFinalistTop1Indicators);
-  const setFinalistTop1DefaultForAll = useWorkspaceStore((s) => s.setFinalistTop1DefaultForAll);
+  const syncFinalistTop1Indicators = useWorkspaceStore(
+    (s) => s.syncFinalistTop1Indicators,
+  );
+  const setFinalistTop1DefaultForAll = useWorkspaceStore(
+    (s) => s.setFinalistTop1DefaultForAll,
+  );
   const finalistTop1DefaultOn = useWorkspaceStore((s) =>
     Boolean(s.workspace.preferences.finalistTop1DefaultOn),
   );
@@ -104,35 +146,39 @@ export function ChartWorkspacePage() {
   const queryClient = useQueryClient();
   const instrumentId = activeTab?.instrumentId;
   const chartConfig = activeTab?.chart;
-  const timeframe = activeTab?.timeframe ?? '1d';
-  const seriesType = activeTab?.seriesType ?? 'candles';
-  const activeTemplateName =
-    indicatorTemplates.find((t) => t.id === activeTab?.activeIndicatorTemplateId)?.name;
+  const timeframe = activeTab?.timeframe ?? "1d";
+  const seriesType = activeTab?.seriesType ?? "candles";
+  const activeTemplateName = indicatorTemplates.find(
+    (t) => t.id === activeTab?.activeIndicatorTemplateId,
+  )?.name;
 
   const chartListLabel = useMemo(() => {
     if (!chartListContext) return undefined;
     if (isVirtualListId(chartListContext.listId)) {
-      return VIRTUAL_LIST_LABELS[chartListContext.listId as keyof typeof VIRTUAL_LIST_LABELS];
+      return VIRTUAL_LIST_LABELS[
+        chartListContext.listId as keyof typeof VIRTUAL_LIST_LABELS
+      ];
     }
-    if (listConfig.apiListId === chartListContext.listId) return listConfig.name;
+    if (listConfig.apiListId === chartListContext.listId)
+      return listConfig.name;
     return listConfig.name || chartListContext.listId;
   }, [chartListContext, listConfig.apiListId, listConfig.name]);
 
-  const { status: dataStatus, isSyncing: dataSyncing } = useInstrumentDataFreshness(
-    instrumentId,
-    timeframe,
-  );
+  const { status: dataStatus, isSyncing: dataSyncing } =
+    useInstrumentDataFreshness(instrumentId, timeframe);
 
   const indicatorSignature = useMemo(
     () =>
       activeTab?.indicatorInstances
-        .map((item) => `${item.instanceId}:${item.visible}:${item.presetId ?? ''}`)
-        .join('|') ?? '',
+        .map(
+          (item) => `${item.instanceId}:${item.visible}:${item.presetId ?? ""}`,
+        )
+        .join("|") ?? "",
     [activeTab?.indicatorInstances],
   );
 
   const ohlcvQuery = useQuery({
-    queryKey: ['ohlcv', instrumentId, timeframe],
+    queryKey: ["ohlcv", instrumentId, timeframe],
     queryFn: () => api.getOhlcv(instrumentId!, 500, timeframe),
     enabled: Boolean(instrumentId),
     staleTime: 60_000,
@@ -140,7 +186,7 @@ export function ChartWorkspacePage() {
   });
 
   const indicatorsQuery = useQuery({
-    queryKey: ['indicators', instrumentId, timeframe],
+    queryKey: ["indicators", instrumentId, timeframe],
     queryFn: () => api.getIndicators(instrumentId!, 500, timeframe),
     enabled: Boolean(instrumentId),
     staleTime: 60_000,
@@ -148,14 +194,14 @@ export function ChartWorkspacePage() {
   });
 
   const instrumentQuery = useQuery({
-    queryKey: ['instrument', instrumentId],
+    queryKey: ["instrument", instrumentId],
     queryFn: () => api.getInstrument(instrumentId!),
     enabled: Boolean(instrumentId),
     staleTime: 60_000,
   });
 
   const strategyTopQuery = useQuery({
-    queryKey: ['instrument-strategy-top', instrumentId, timeframe],
+    queryKey: ["instrument-strategy-top", instrumentId, timeframe],
     queryFn: () => api.getInstrumentStrategyTop(instrumentId!, timeframe),
     enabled: Boolean(instrumentId),
     staleTime: 60_000,
@@ -168,7 +214,7 @@ export function ChartWorkspacePage() {
   }, [strategyTopQuery.data?.data?.slots]);
 
   const strategyDefQuery = useQuery({
-    queryKey: ['strategy-definition', top1Slot?.strategyDefinitionId],
+    queryKey: ["strategy-definition", top1Slot?.strategyDefinitionId],
     queryFn: () => api.getStrategy(top1Slot!.strategyDefinitionId!),
     enabled: Boolean(top1Slot?.strategyDefinitionId),
     staleTime: 60_000,
@@ -181,7 +227,8 @@ export function ChartWorkspacePage() {
         slot: top1Slot,
         definition: strategyDefQuery.data?.data
           ? {
-              indicatorSpecs: strategyDefQuery.data.data.definition?.indicatorSpecs ?? [],
+              indicatorSpecs:
+                strategyDefQuery.data.data.definition?.indicatorSpecs ?? [],
               presetKey:
                 strategyDefQuery.data.data.definition?.presetKey ??
                 strategyDefQuery.data.data.presetKey,
@@ -199,7 +246,7 @@ export function ChartWorkspacePage() {
     () =>
       top1Chart.specs
         .map((s) => `${s.definitionId}:${JSON.stringify(s.parameters ?? {})}`)
-        .join('|'),
+        .join("|"),
     [top1Chart.specs],
   );
 
@@ -221,7 +268,11 @@ export function ChartWorkspacePage() {
   const onFinalistTop1Change = useCallback(
     (next: boolean) => {
       if (!activeTab?.id) return;
-      setShowFinalistTop1Indicators(next, next ? top1Chart.specs : undefined, activeTab.id);
+      setShowFinalistTop1Indicators(
+        next,
+        next ? top1Chart.specs : undefined,
+        activeTab.id,
+      );
       requestChartReflow();
     },
     [activeTab?.id, setShowFinalistTop1Indicators, top1Chart.specs],
@@ -246,15 +297,15 @@ export function ChartWorkspacePage() {
 
   const finalistTop1Title = useMemo(() => {
     if (!instrumentId) {
-      return 'Selecciona un instrumento para ver el Finalista TOP #1';
+      return "Selecciona un instrumento para ver el Finalista TOP #1";
     }
     if (strategyTopQuery.isLoading || strategyDefQuery.isLoading) {
-      return 'Cargando Finalista TOP #1…';
+      return "Cargando Finalista TOP #1…";
     }
     if (!top1Available) {
-      return 'Sin Finalista TOP #1 con indicadores para este valor y timeframe';
+      return "Sin Finalista TOP #1 con indicadores para este valor y timeframe";
     }
-    const label = top1Chart.label ? ` (${top1Chart.label})` : '';
+    const label = top1Chart.label ? ` (${top1Chart.label})` : "";
     return `Este gráfico: indicadores del Finalista TOP #1${label} · mismo timeframe`;
   }, [
     instrumentId,
@@ -265,7 +316,7 @@ export function ChartWorkspacePage() {
   ]);
 
   const finalistTop1AllTitle =
-    'Todos los gráficos: activa Finalista TOP #1 en las pestañas abiertas y en las que abras después. Luego puedes apagarlo en un valor concreto.';
+    "Todos los gráficos: activa Finalista TOP #1 en las pestañas abiertas y en las que abras después. Luego puedes apagarlo en un valor concreto.";
 
   const onTimeframeChange = useCallback(
     (next: ChartTimeframe) => {
@@ -299,9 +350,13 @@ export function ChartWorkspacePage() {
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Delete' && event.key !== 'Backspace') return;
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
       const target = event.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
         return;
       }
       if (!selectedId || !activeTab) return;
@@ -310,7 +365,7 @@ export function ChartWorkspacePage() {
 
       if (drawingHasLinkedOrder(drawing)) {
         const ok = window.confirm(
-          'Este dibujo tiene una orden asociada. ¿Eliminar el dibujo de todos modos?',
+          "Este dibujo tiene una orden asociada. ¿Eliminar el dibujo de todos modos?",
         );
         if (!ok) return;
       }
@@ -320,18 +375,24 @@ export function ChartWorkspacePage() {
       setSelectedId(null);
       setDrawingEditorOpen(null);
     }
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [activeTab, removeDrawing, selectedId, setDrawingEditorOpen, setSelectedId]);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    activeTab,
+    removeDrawing,
+    selectedId,
+    setDrawingEditorOpen,
+    setSelectedId,
+  ]);
 
   useLayoutEffect(() => {
     if (!activeTab) return;
-    chartPerfDebug('reflow:tab-change', {
+    chartPerfDebug("reflow:tab-change", {
       tabId: activeTab.id,
       instrumentId: activeTab.instrumentId,
       timeframe: activeTab.timeframe,
     });
-    requestChartReflow('tab-change');
+    requestChartReflow("tab-change");
     // Deps por campo del tab: animar solo al cambiar id/instrument/timeframe. Usar el
     // objeto `activeTab` entero re-dispararía por cambios no relacionados (dibujos/overlays).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,7 +402,7 @@ export function ChartWorkspacePage() {
   const indicators = indicatorsQuery.data?.data ?? [];
   const chartInitialLoading = ohlcvQuery.isLoading && bars.length === 0;
 
-  const dataStatusInvalidatedRef = useRef('');
+  const dataStatusInvalidatedRef = useRef("");
   useEffect(() => {
     if (!instrumentId || bars.length === 0) return;
     const token = `${instrumentId}:${timeframe}:${bars.length}`;
@@ -352,7 +413,7 @@ export function ChartWorkspacePage() {
 
   const needsSync =
     Boolean(instrumentId && activeTab) &&
-    timeframe === '1d' &&
+    timeframe === "1d" &&
     !ohlcvQuery.isLoading &&
     !ohlcvQuery.isFetching &&
     bars.length === 0;
@@ -372,23 +433,35 @@ export function ChartWorkspacePage() {
 
   useEffect(() => {
     if (!activeTab || chartInitialLoading) return;
-    chartPerfDebug('reflow:ohlcv-ready', { tabId: activeTab.id, bars: bars.length });
-    requestChartReflow('ohlcv-ready');
+    chartPerfDebug("reflow:ohlcv-ready", {
+      tabId: activeTab.id,
+      bars: bars.length,
+    });
+    requestChartReflow("ohlcv-ready");
     // Deps por campo de tab + bars.length; se evita el objeto `activeTab` completo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab?.id, activeTab?.instrumentId, chartInitialLoading, ohlcvQuery.dataUpdatedAt, bars.length]);
+  }, [
+    activeTab?.id,
+    activeTab?.instrumentId,
+    chartInitialLoading,
+    ohlcvQuery.dataUpdatedAt,
+    bars.length,
+  ]);
 
   useEffect(() => {
     if (!activeTab) return;
-    chartPerfDebug('reflow:indicators', { tabId: activeTab.id, signature: indicatorSignature });
-    requestChartReflow('indicators');
+    chartPerfDebug("reflow:indicators", {
+      tabId: activeTab.id,
+      signature: indicatorSignature,
+    });
+    requestChartReflow("indicators");
     // Deps por campo de tab + firma de indicadores; se evita el objeto `activeTab` completo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab?.id, indicatorSignature]);
 
   useEffect(() => {
     if (ohlcvQuery.isFetching && bars.length > 0) {
-      chartPerfDebug('ohlcv:background-fetch', { instrumentId, timeframe });
+      chartPerfDebug("ohlcv:background-fetch", { instrumentId, timeframe });
     }
   }, [ohlcvQuery.isFetching, bars.length, instrumentId, timeframe]);
 
@@ -400,18 +473,21 @@ export function ChartWorkspacePage() {
     );
   }
 
-  const emptyData = !chartInitialLoading && !ohlcvQuery.isFetching && bars.length === 0;
+  const emptyData =
+    !chartInitialLoading && !ohlcvQuery.isFetching && bars.length === 0;
   const chartTab = activeTab;
-  const overlayIndicators = overlayManagementInstances(chartTab.indicatorInstances);
+  const overlayIndicators = overlayManagementInstances(
+    chartTab.indicatorInstances,
+  );
   const subIndicators = subPanelInstancesAll(chartTab.indicatorInstances);
 
   function moveIndicatorInGroup(
     instanceId: string,
-    direction: 'up' | 'down',
+    direction: "up" | "down",
     group: typeof chartTab.indicatorInstances,
   ) {
     const index = group.findIndex((item) => item.instanceId === instanceId);
-    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (index < 0 || targetIndex < 0 || targetIndex >= group.length) return;
     reorderIndicatorInstances(
       group[index]!.instanceId,
@@ -421,14 +497,20 @@ export function ChartWorkspacePage() {
     requestChartReflow();
   }
 
-  function moveSubIndicator(instanceId: string, direction: 'up' | 'down') {
+  function moveSubIndicator(instanceId: string, direction: "up" | "down") {
     moveIndicatorInGroup(instanceId, direction, subIndicators);
   }
 
   function toggleIndicatorHidden(instanceId: string) {
-    const current = chartTab.indicatorInstances.find((item) => item.instanceId === instanceId);
+    const current = chartTab.indicatorInstances.find(
+      (item) => item.instanceId === instanceId,
+    );
     if (!current) return;
-    updateIndicatorInstance(instanceId, { visible: !current.visible }, chartTab.id);
+    updateIndicatorInstance(
+      instanceId,
+      { visible: !current.visible },
+      chartTab.id,
+    );
     requestChartReflow();
   }
 
@@ -470,7 +552,7 @@ export function ChartWorkspacePage() {
         finalistTop1={{
           checked: finalistTop1DefaultOn,
           title: finalistTop1AllTitle,
-          scope: 'all',
+          scope: "all",
           onCheckedChange: onFinalistTop1AllChange,
         }}
         onQuickBuy={() => {
@@ -501,7 +583,7 @@ export function ChartWorkspacePage() {
         finalistTop1={{
           checked: showTop1,
           title: finalistTop1Title,
-          scope: 'chart',
+          scope: "chart",
           onCheckedChange: onFinalistTop1Change,
         }}
         instrument={instrumentQuery.data?.data}
@@ -517,12 +599,16 @@ export function ChartWorkspacePage() {
         onOpenSettings={openChartDataBarSettings}
       />
       {ohlcvQuery.isError && (
-        <p className="shrink-0 text-sm text-destructive">No se pudo cargar el histórico OHLCV.</p>
+        <p className="shrink-0 text-sm text-destructive">
+          No se pudo cargar el histórico OHLCV.
+        </p>
       )}
       {emptyData && (
         <p className="shrink-0 text-sm text-amber-400">
           Sin datos OHLCV para {timeframe.toUpperCase()}
-          {timeframe === '1d' ? '. Sincroniza el histórico desde el panel de datos.' : ' (se cachea en BD para backtests).'}
+          {timeframe === "1d"
+            ? ". Sincroniza el histórico desde el panel de datos."
+            : " (se cachea en BD para backtests)."}
         </p>
       )}
       <div className="relative flex min-h-0 w-full flex-1 overflow-hidden">
@@ -531,12 +617,16 @@ export function ChartWorkspacePage() {
           <ChartIndicatorStack
             chartSyncId={chartTab.id}
             pricePanelHeightPct={chartTab.pricePanelHeightPct}
-            onPricePanelHeightPctChange={(pct) => updateChartPricePanelHeight(pct, chartTab.id)}
+            onPricePanelHeightPctChange={(pct) =>
+              updateChartPricePanelHeight(pct, chartTab.id)
+            }
             subIndicators={subIndicators}
             bars={bars}
             apiIndicators={indicators}
             chartConfig={chartConfig}
-            onConfigure={(instanceId) => openIndicatorConfig(chartTab.id, instanceId)}
+            onConfigure={(instanceId) =>
+              openIndicatorConfig(chartTab.id, instanceId)
+            }
             onToggleHidden={toggleIndicatorHidden}
             onDelete={deleteIndicator}
             onMoveSubIndicator={moveSubIndicator}
@@ -554,7 +644,9 @@ export function ChartWorkspacePage() {
                     isLoading={chartInitialLoading}
                     instrumentId={instrumentId}
                     symbol={activeTab.label}
-                    onOpenSyncDialog={() => openInstrumentSyncDialog(instrumentId!, activeTab.label)}
+                    onOpenSyncDialog={() =>
+                      openInstrumentSyncDialog(instrumentId!, activeTab.label)
+                    }
                     bars={bars}
                     indicators={indicators}
                     indicatorInstances={activeTab.indicatorInstances}
@@ -562,29 +654,36 @@ export function ChartWorkspacePage() {
                     onPriceScaleZoomChange={setPriceScaleZoom}
                     onVolumeScaleZoomChange={(scaleZoom) => {
                       const volume = chartTab.indicatorInstances.find(
-                        (item) => item.definitionId === 'volume',
+                        (item) => item.definitionId === "volume",
                       );
-                      if (volume) setSubIndicatorScaleZoom(volume.instanceId, scaleZoom);
+                      if (volume)
+                        setSubIndicatorScaleZoom(volume.instanceId, scaleZoom);
                     }}
                     drawings={activeTab.drawings}
                     drawTool={tool}
                     chartTimeframe={timeframe}
                     selectedDrawingId={selectedId}
-                    onAddDrawing={(drawing) => addDrawing(drawing, activeTab.id)}
+                    onAddDrawing={(drawing) =>
+                      addDrawing(drawing, activeTab.id)
+                    }
                     onUpdateDrawing={(drawingId, patch) =>
                       updateDrawing(drawingId, patch, activeTab.id)
                     }
                     onSelectDrawing={setSelectedId}
                     onDrawingAdded={handleDrawingAdded}
                     onDrawingDragEnd={flushDrawingSave}
-                    onOpenDrawingEditor={(drawingId) => setDrawingEditorOpen(drawingId)}
+                    onOpenDrawingEditor={(drawingId) =>
+                      setDrawingEditorOpen(drawingId)
+                    }
                     onConfigureIndicator={(instanceId) =>
                       openIndicatorConfig(chartTab.id, instanceId)
                     }
                     drawingsLayerHidden={activeTab.drawingsLayerHidden}
                     drawingsLayerLocked={activeTab.drawingsLayerLocked}
                   />
-                  {showTop1EmptyBanner ? <ChartFinalistTop1EmptyBanner /> : null}
+                  {showTop1EmptyBanner ? (
+                    <ChartFinalistTop1EmptyBanner />
+                  ) : null}
                 </div>
                 {editorDrawing && (
                   <ChartDrawingEditPopover
@@ -601,7 +700,7 @@ export function ChartWorkspacePage() {
           <button
             type="button"
             aria-label="Cerrar inspector"
-            className={cn('chart-inspector-backdrop is-open')}
+            className={cn("chart-inspector-backdrop is-open")}
             onClick={toggleChartInspector}
           />
         )}

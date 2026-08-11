@@ -1,9 +1,9 @@
-import type { IndicatorPointDto, OhlcvBarDto } from '@bolsa/shared';
-import type { Time } from 'lightweight-charts';
+import type { IndicatorPointDto, OhlcvBarDto } from "@bolsa/shared";
+import type { Time } from "lightweight-charts";
 import {
   chartPerfRecordReflowEvent,
   chartPerfRecordReflowRequest,
-} from '@/features/charts/chart-perf-analyzer';
+} from "@/features/charts/chart-perf-analyzer";
 
 export interface ChartCandle {
   time: Time;
@@ -23,15 +23,15 @@ export interface ChartVolumeBar {
 }
 
 export const CHART_THEME = {
-  upColor: '#22c55e',
-  downColor: '#ef4444',
-  gridColor: 'rgba(148, 163, 184, 0.2)',
-  textColor: '#94a3b8',
-  volumeUpColor: 'rgba(34, 197, 94, 0.5)',
-  volumeDownColor: 'rgba(239, 68, 68, 0.5)',
-  sma20Color: '#38bdf8',
-  sma50Color: '#a78bfa',
-  ema20Color: '#fbbf24',
+  upColor: "#22c55e",
+  downColor: "#ef4444",
+  gridColor: "rgba(148, 163, 184, 0.2)",
+  textColor: "#94a3b8",
+  volumeUpColor: "rgba(34, 197, 94, 0.5)",
+  volumeDownColor: "rgba(239, 68, 68, 0.5)",
+  sma20Color: "#38bdf8",
+  sma50Color: "#a78bfa",
+  ema20Color: "#fbbf24",
 } as const;
 
 export function barTimeToChartTime(timestamp: string): Time {
@@ -46,10 +46,10 @@ export function barTimeToChartTime(timestamp: string): Time {
 }
 
 export function chartTimeToDate(time: Time): Date {
-  if (typeof time === 'number') {
+  if (typeof time === "number") {
     return new Date(time * 1000);
   }
-  if (typeof time === 'string') {
+  if (typeof time === "string") {
     if (/^\d{4}-\d{2}-\d{2}$/.test(time)) {
       return new Date(`${time}T12:00:00`);
     }
@@ -59,23 +59,26 @@ export function chartTimeToDate(time: Time): Date {
 }
 
 /** Etiqueta del eje temporal: «jue 18 jun' 26 16:00». */
-export function formatChartTimeAxisLabel(time: Time, showTime: boolean): string {
+export function formatChartTimeAxisLabel(
+  time: Time,
+  showTime: boolean,
+): string {
   const date = chartTimeToDate(time);
   const weekday = date
-    .toLocaleDateString('es-ES', { weekday: 'short' })
-    .replace(/\.$/, '')
+    .toLocaleDateString("es-ES", { weekday: "short" })
+    .replace(/\.$/, "")
     .toLowerCase();
   const day = date.getDate();
   const month = date
-    .toLocaleDateString('es-ES', { month: 'short' })
-    .replace(/\.$/, '')
+    .toLocaleDateString("es-ES", { month: "short" })
+    .replace(/\.$/, "")
     .toLowerCase();
   const year = String(date.getFullYear()).slice(-2);
   let label = `${weekday} ${day} ${month}' ${year}`;
   if (showTime) {
-    const hours = date.toLocaleTimeString('es-ES', {
-      hour: '2-digit',
-      minute: '2-digit',
+    const hours = date.toLocaleTimeString("es-ES", {
+      hour: "2-digit",
+      minute: "2-digit",
       hour12: false,
     });
     label += ` ${hours}`;
@@ -93,14 +96,18 @@ export function barsToChartSeries(bars: OhlcvBarDto[]): ChartCandle[] {
   }));
 }
 
-export function barsToCloseLineSeries(bars: OhlcvBarDto[]): { time: Time; value: number }[] {
+export function barsToCloseLineSeries(
+  bars: OhlcvBarDto[],
+): { time: Time; value: number }[] {
   return bars.map((bar) => ({
     time: barTimeToChartTime(bar.timestamp),
     value: bar.close,
   }));
 }
 
-export function barsToTypicalPriceLineSeries(bars: OhlcvBarDto[]): { time: Time; value: number }[] {
+export function barsToTypicalPriceLineSeries(
+  bars: OhlcvBarDto[],
+): { time: Time; value: number }[] {
   return bars.map((bar) => ({
     time: barTimeToChartTime(bar.timestamp),
     value: (bar.high + bar.low + bar.close) / 3,
@@ -143,7 +150,7 @@ export function barsToCloseColumnSeries(
 
 function applyColorAlpha(color: string, alpha: number): string {
   const clamped = Math.min(1, Math.max(0, alpha));
-  if (color.startsWith('#') && color.length === 7) {
+  if (color.startsWith("#") && color.length === 7) {
     const r = Number.parseInt(color.slice(1, 3), 16);
     const g = Number.parseInt(color.slice(3, 5), 16);
     const b = Number.parseInt(color.slice(5, 7), 16);
@@ -161,7 +168,8 @@ export function barsToHeikinAshiSeries(bars: OhlcvBarDto[]): ChartCandle[] {
   for (let i = 0; i < bars.length; i++) {
     const bar = bars[i]!;
     const haClose = (bar.open + bar.high + bar.low + bar.close) / 4;
-    const haOpen = i === 0 ? (bar.open + bar.close) / 2 : (prevOpen + prevClose) / 2;
+    const haOpen =
+      i === 0 ? (bar.open + bar.close) / 2 : (prevOpen + prevClose) / 2;
     const haHigh = Math.max(bar.high, haOpen, haClose);
     const haLow = Math.min(bar.low, haOpen, haClose);
     result.push({
@@ -196,7 +204,8 @@ export function barsToVolumeCandleSeries(
   return bars.map((bar) => {
     const bullish = bar.close >= bar.open;
     const base = bullish ? upColor : downColor;
-    const ratio = maxVol > minVol ? (bar.volume - minVol) / (maxVol - minVol) : 1;
+    const ratio =
+      maxVol > minVol ? (bar.volume - minVol) / (maxVol - minVol) : 1;
     const alpha = 0.28 + 0.72 * ratio;
     const tinted = applyColorAlpha(base, alpha);
     return {
@@ -226,7 +235,7 @@ export function barsToVolumeSeries(
 
 export function indicatorToLineSeries(
   points: IndicatorPointDto[],
-  key: 'sma20' | 'sma50' | 'ema20' | 'rsi14',
+  key: "sma20" | "sma50" | "ema20" | "rsi14",
 ): { time: Time; value: number }[] {
   return points
     .filter((point) => point[key] != null)
@@ -263,29 +272,33 @@ export function summarizeBars(bars: OhlcvBarDto[]) {
 }
 
 export function formatPrice(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return '—';
+  if (value == null || Number.isNaN(value)) return "—";
   return `${value.toFixed(2)} €`;
 }
 
 /** Precio OHLC en la barra del gráfico (3 decimales, sin símbolo €). */
 export function formatChartBarPrice(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return '—';
+  if (value == null || Number.isNaN(value)) return "—";
   return value.toFixed(3);
 }
 
-export function barIntraChange(bar: OhlcvBarDto): { delta: number; pct: number } | null {
+export function barIntraChange(
+  bar: OhlcvBarDto,
+): { delta: number; pct: number } | null {
   if (!bar.open || bar.open === 0) return null;
   const delta = bar.close - bar.open;
   return { delta, pct: (delta / bar.open) * 100 };
 }
 
 /** Δ cierre−apertura de la vela: «+0,055 (+0,14 %)». */
-export function formatBarIntraChangeLabel(bar: OhlcvBarDto): { text: string; isUp: boolean } | null {
+export function formatBarIntraChangeLabel(
+  bar: OhlcvBarDto,
+): { text: string; isUp: boolean } | null {
   const change = barIntraChange(bar);
   if (!change) return null;
   const isUp = change.delta >= 0;
-  const deltaSign = change.delta > 0 ? '+' : '';
-  const pctSign = change.pct > 0 ? '+' : '';
+  const deltaSign = change.delta > 0 ? "+" : "";
+  const pctSign = change.pct > 0 ? "+" : "";
   return {
     text: `${deltaSign}${change.delta.toFixed(3)} (${pctSign}${change.pct.toFixed(2)}%)`,
     isUp,
@@ -293,14 +306,17 @@ export function formatBarIntraChangeLabel(bar: OhlcvBarDto): { text: string; isU
 }
 
 export function formatPct(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return '—';
-  const sign = value > 0 ? '+' : '';
+  if (value == null || Number.isNaN(value)) return "—";
+  const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
 }
 
 /** Precio para campos de coordenadas (sin símbolo €, decimales acotados). */
-export function formatCoordinatePrice(value: number | null | undefined, decimals = 4): string {
-  if (value == null || Number.isNaN(value)) return '';
+export function formatCoordinatePrice(
+  value: number | null | undefined,
+  decimals = 4,
+): string {
+  if (value == null || Number.isNaN(value)) return "";
   return value.toFixed(decimals);
 }
 
@@ -309,10 +325,10 @@ export function parseCoordinatePrice(value: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export const CHART_REFLOW_EVENT = 'bolsa:chart-reflow';
-export const CHART_ZOOM_EVENT = 'bolsa:chart-zoom';
+export const CHART_REFLOW_EVENT = "bolsa:chart-reflow";
+export const CHART_ZOOM_EVENT = "bolsa:chart-zoom";
 
-export type ChartZoomAction = 'in' | 'out' | 'reset';
+export type ChartZoomAction = "in" | "out" | "reset";
 
 let reflowRaf: number | null = null;
 
@@ -326,7 +342,10 @@ export function requestChartReflow(source?: string) {
   });
 }
 
-export function requestChartZoom(action: ChartZoomAction, chartSyncId?: string) {
+export function requestChartZoom(
+  action: ChartZoomAction,
+  chartSyncId?: string,
+) {
   window.dispatchEvent(
     new CustomEvent(CHART_ZOOM_EVENT, { detail: { action, chartSyncId } }),
   );

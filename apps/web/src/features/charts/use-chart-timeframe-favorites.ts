@@ -1,17 +1,20 @@
-import { useCallback } from 'react';
+import { useCallback } from "react";
 import {
   DEFAULT_CHART_TIMEFRAME_FAVORITES,
   toggleChartTimeframeFavoriteList,
   type ChartTimeframe,
-} from '@bolsa/shared';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@bolsa/shared";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function useChartTimeframeFavorites() {
   const favorites = useWorkspaceStore(
     (s) =>
-      s.workspace.chartToolbarGlobal?.timeframeFavorites ?? DEFAULT_CHART_TIMEFRAME_FAVORITES,
+      s.workspace.chartToolbarGlobal?.timeframeFavorites ??
+      DEFAULT_CHART_TIMEFRAME_FAVORITES,
   );
-  const toggleInWorkspace = useWorkspaceStore((s) => s.toggleChartTimeframeFavorite);
+  const toggleInWorkspace = useWorkspaceStore(
+    (s) => s.toggleChartTimeframeFavorite,
+  );
 
   const toggleFavorite = useCallback(
     (timeframe: ChartTimeframe) => {

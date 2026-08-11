@@ -1,16 +1,19 @@
-import { useCallback } from 'react';
+import { useCallback } from "react";
 import {
   DEFAULT_CHART_SERIES_TYPE_FAVORITES,
   type ChartSeriesType,
-} from '@bolsa/shared';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@bolsa/shared";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function useChartSeriesTypeFavorites() {
   const favorites = useWorkspaceStore(
     (s) =>
-      s.workspace.chartToolbarGlobal?.seriesTypeFavorites ?? DEFAULT_CHART_SERIES_TYPE_FAVORITES,
+      s.workspace.chartToolbarGlobal?.seriesTypeFavorites ??
+      DEFAULT_CHART_SERIES_TYPE_FAVORITES,
   );
-  const toggleInWorkspace = useWorkspaceStore((s) => s.toggleChartSeriesTypeFavorite);
+  const toggleInWorkspace = useWorkspaceStore(
+    (s) => s.toggleChartSeriesTypeFavorite,
+  );
 
   const toggleFavorite = useCallback(
     (seriesType: ChartSeriesType) => {

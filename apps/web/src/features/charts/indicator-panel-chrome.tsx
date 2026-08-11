@@ -1,6 +1,13 @@
-import { ChevronDown, ChevronUp, Eye, EyeOff, Settings2, Trash2 } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import {
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  EyeOff,
+  Settings2,
+  Trash2,
+} from "lucide-react";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface IndicatorPanelChromeProps {
   title: string;
@@ -36,8 +43,8 @@ export function IndicatorPanelChrome({
   return (
     <div
       className={cn(
-        'flex h-[1.625rem] shrink-0 items-center gap-0.5 border-b border-border/60 bg-muted/20 px-2',
-        hidden && 'opacity-55',
+        "flex h-[1.625rem] shrink-0 items-center gap-0.5 border-b border-border/60 bg-muted/20 px-2",
+        hidden && "opacity-55",
         className,
       )}
       onDoubleClick={(event) => {
@@ -51,7 +58,9 @@ export function IndicatorPanelChrome({
           {title}
         </span>
         {subtitle && (
-          <span className="truncate text-[10px] leading-none text-muted-foreground">{subtitle}</span>
+          <span className="truncate text-[10px] leading-none text-muted-foreground">
+            {subtitle}
+          </span>
         )}
         {hidden && (
           <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase text-muted-foreground">
@@ -73,11 +82,15 @@ export function IndicatorPanelChrome({
       </button>
       <button
         type="button"
-        title={hidden ? 'Mostrar indicador' : 'Ocultar indicador'}
+        title={hidden ? "Mostrar indicador" : "Ocultar indicador"}
         onClick={onToggleHidden}
         className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
       >
-        {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+        {hidden ? (
+          <Eye className="h-3.5 w-3.5" />
+        ) : (
+          <EyeOff className="h-3.5 w-3.5" />
+        )}
       </button>
       <button
         type="button"

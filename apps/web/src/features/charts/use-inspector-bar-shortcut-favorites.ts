@@ -1,11 +1,12 @@
-import { useCallback } from 'react';
+import { useCallback } from "react";
 import {
   DEFAULT_CHART_INSPECTOR_BAR_SHORTCUT_FAVORITES,
   type ChartInspectorBarShortcutId,
-} from '@bolsa/shared';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@bolsa/shared";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
-const EMPTY_INSPECTOR_BAR_SHORTCUT_FAVORITES: ChartInspectorBarShortcutId[] = [];
+const EMPTY_INSPECTOR_BAR_SHORTCUT_FAVORITES: ChartInspectorBarShortcutId[] =
+  [];
 
 export function useInspectorBarShortcutFavorites() {
   const favorites = useWorkspaceStore(

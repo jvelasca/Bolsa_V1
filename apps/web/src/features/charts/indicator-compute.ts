@@ -1,4 +1,8 @@
-import type { ChartIndicatorInstance, IndicatorPointDto, OhlcvBarDto } from '@bolsa/shared';
+import type {
+  ChartIndicatorInstance,
+  IndicatorPointDto,
+  OhlcvBarDto,
+} from "@bolsa/shared";
 import {
   computeAiGlobalScoreSeries,
   computeBarDataQualitySeries,
@@ -9,15 +13,18 @@ import {
   findIndicatorDefinition,
   legacyApiKeyForInstance,
   STYLE_PARAMETER_IDS,
-} from '@bolsa/shared';
-import { barTimeToChartTime, indicatorToLineSeries } from '@/features/charts/chart-utils';
-import type { Time } from 'lightweight-charts';
+} from "@bolsa/shared";
+import {
+  barTimeToChartTime,
+  indicatorToLineSeries,
+} from "@/features/charts/chart-utils";
+import type { Time } from "lightweight-charts";
 
 const INDICATOR_RENDER_CACHE_MAX = 128;
 const SPEC_SERIES_CACHE_MAX = 96;
 
 function barsFingerprint(bars: OhlcvBarDto[]): string {
-  if (bars.length === 0) return '0';
+  if (bars.length === 0) return "0";
   const first = bars[0]!;
   const last = bars[bars.length - 1]!;
   return `${bars.length}:${first.timestamp}:${first.close}:${last.timestamp}:${last.close}`;
@@ -28,17 +35,22 @@ export function buildIndicatorBarsFingerprint(bars: OhlcvBarDto[]): string {
   return barsFingerprint(bars);
 }
 
-function dataParamsKey(parameters: Record<string, number | boolean | string>): string {
+function dataParamsKey(
+  parameters: Record<string, number | boolean | string>,
+): string {
   const filtered = Object.fromEntries(
     Object.entries(parameters).filter(
-      ([key]) => !STYLE_PARAMETER_IDS.includes(key as (typeof STYLE_PARAMETER_IDS)[number]),
+      ([key]) =>
+        !STYLE_PARAMETER_IDS.includes(
+          key as (typeof STYLE_PARAMETER_IDS)[number],
+        ),
     ),
   );
   return dataParametersKey(filtered);
 }
 
 function specSeriesCacheKey(
-  panel: 'overlay' | 'sub',
+  panel: "overlay" | "sub",
   definitionId: string,
   parameters: Record<string, number | boolean | string>,
   bars: OhlcvBarDto[],
@@ -51,7 +63,7 @@ function specSeriesCacheKey(
     dataParamsKey(parameters),
     barsFingerprint(bars),
     apiPointsFingerprint(apiPoints, apiKey),
-  ].join('|');
+  ].join("|");
 }
 
 const specSeriesCache = new Map<string, IndicatorRenderSeries[]>();
@@ -93,7 +105,10 @@ function readSpecCache(key: string): IndicatorRenderSeries[] | undefined {
   return hit;
 }
 
-function writeSpecCache(key: string, value: IndicatorRenderSeries[]): IndicatorRenderSeries[] {
+function writeSpecCache(
+  key: string,
+  value: IndicatorRenderSeries[],
+): IndicatorRenderSeries[] {
   if (specSeriesCache.has(key)) specSeriesCache.delete(key);
   specSeriesCache.set(key, value);
   while (specSeriesCache.size > SPEC_SERIES_CACHE_MAX) {
@@ -105,7 +120,7 @@ function writeSpecCache(key: string, value: IndicatorRenderSeries[]): IndicatorR
 }
 
 function withSpecSeriesCache(
-  panel: 'overlay' | 'sub',
+  panel: "overlay" | "sub",
   instance: ChartIndicatorInstance,
   bars: OhlcvBarDto[],
   apiPoints: IndicatorPointDto[],
@@ -125,8 +140,11 @@ function withSpecSeriesCache(
   return writeSpecCache(key, compute());
 }
 
-function apiPointsFingerprint(apiPoints: IndicatorPointDto[], apiKey: string | null): string {
-  if (!apiKey || apiPoints.length === 0) return '0';
+function apiPointsFingerprint(
+  apiPoints: IndicatorPointDto[],
+  apiKey: string | null,
+): string {
+  if (!apiKey || apiPoints.length === 0) return "0";
   const last = apiPoints[apiPoints.length - 1]!;
   return `${apiKey}:${apiPoints.length}:${last.timestamp}`;
 }
@@ -135,18 +153,18 @@ function instanceCacheKey(
   instance: ChartIndicatorInstance,
   bars: OhlcvBarDto[],
   apiPoints: IndicatorPointDto[],
-  panel: 'overlay' | 'sub',
+  panel: "overlay" | "sub",
 ): string {
   const apiKey = legacyApiKeyForInstance(instance);
   return [
     panel,
     instance.instanceId,
     instance.definitionId,
-    instance.visible ? '1' : '0',
+    instance.visible ? "1" : "0",
     JSON.stringify(instance.parameters),
     barsFingerprint(bars),
     apiPointsFingerprint(apiPoints, apiKey),
-  ].join('|');
+  ].join("|");
 }
 
 const overlayRenderCache = new Map<string, IndicatorRenderSeries[]>();
@@ -286,7 +304,11 @@ function computeAtr(bars: OhlcvBarDto[], period: number): (number | null)[] {
     const bar = bars[i]!;
     const prev = bars[i - 1];
     const tr = prev
-      ? Math.max(bar.high - bar.low, Math.abs(bar.high - prev.close), Math.abs(bar.low - prev.close))
+      ? Math.max(
+          bar.high - bar.low,
+          Math.abs(bar.high - prev.close),
+          Math.abs(bar.low - prev.close),
+        )
       : bar.high - bar.low;
     if (i + 1 < period) {
       out.push(null);
@@ -298,7 +320,11 @@ function computeAtr(bars: OhlcvBarDto[], period: number): (number | null)[] {
         const b = bars[j]!;
         const p = bars[j - 1];
         const t = p
-          ? Math.max(b.high - b.low, Math.abs(b.high - p.close), Math.abs(b.low - p.close))
+          ? Math.max(
+              b.high - b.low,
+              Math.abs(b.high - p.close),
+              Math.abs(b.low - p.close),
+            )
           : b.high - b.low;
         sum += t;
       }
@@ -327,7 +353,10 @@ function computeCci(bars: OhlcvBarDto[], period: number): (number | null)[] {
   return out;
 }
 
-function computeStochK(bars: OhlcvBarDto[], kPeriod: number): (number | null)[] {
+function computeStochK(
+  bars: OhlcvBarDto[],
+  kPeriod: number,
+): (number | null)[] {
   const out: (number | null)[] = [];
   for (let i = 0; i < bars.length; i += 1) {
     if (i + 1 < kPeriod) {
@@ -344,7 +373,10 @@ function computeStochK(bars: OhlcvBarDto[], kPeriod: number): (number | null)[] 
 }
 
 /** Williams %R = -100 * (HH - Close) / (HH - LL). */
-function computeWilliamsR(bars: OhlcvBarDto[], period: number): (number | null)[] {
+function computeWilliamsR(
+  bars: OhlcvBarDto[],
+  period: number,
+): (number | null)[] {
   const out: (number | null)[] = [];
   for (let i = 0; i < bars.length; i += 1) {
     if (i + 1 < period) {
@@ -393,7 +425,11 @@ function computeStdDev(closes: number[], period: number): (number | null)[] {
 function computeDonchian(
   bars: OhlcvBarDto[],
   period: number,
-): { upper: (number | null)[]; mid: (number | null)[]; lower: (number | null)[] } {
+): {
+  upper: (number | null)[];
+  mid: (number | null)[];
+  lower: (number | null)[];
+} {
   const upper: (number | null)[] = [];
   const mid: (number | null)[] = [];
   const lower: (number | null)[] = [];
@@ -429,7 +465,11 @@ function wilderSmooth(values: number[], period: number): (number | null)[] {
 function computeAdx(
   bars: OhlcvBarDto[],
   period: number,
-): { adx: (number | null)[]; plusDi: (number | null)[]; minusDi: (number | null)[] } {
+): {
+  adx: (number | null)[];
+  plusDi: (number | null)[];
+  minusDi: (number | null)[];
+} {
   const n = bars.length;
   const plusDm = Array(n).fill(0) as number[];
   const minusDm = Array(n).fill(0) as number[];
@@ -495,7 +535,10 @@ function computeAdx(
   return { adx, plusDi, minusDi };
 }
 
-function smaOfSeries(values: (number | null)[], period: number): (number | null)[] {
+function smaOfSeries(
+  values: (number | null)[],
+  period: number,
+): (number | null)[] {
   const out: (number | null)[] = [];
   for (let i = 0; i < values.length; i += 1) {
     if (i + 1 < period) {
@@ -573,7 +616,8 @@ function computeSuperTrend(
     }
     const close = bars[i]!.close;
     if (i > 0 && finalUb[i - 1] != null && close > finalUb[i - 1]!) trend = 1;
-    else if (i > 0 && finalLb[i - 1] != null && close < finalLb[i - 1]!) trend = -1;
+    else if (i > 0 && finalLb[i - 1] != null && close < finalLb[i - 1]!)
+      trend = -1;
     result[i] = trend === 1 ? (finalLb[i] ?? null) : (finalUb[i] ?? null);
   }
   return result;
@@ -716,7 +760,10 @@ function computeAlligator(bars: OhlcvBarDto[]): {
   return { jaw, teeth, lips };
 }
 
-function computeBearsPower(bars: OhlcvBarDto[], period: number): (number | null)[] {
+function computeBearsPower(
+  bars: OhlcvBarDto[],
+  period: number,
+): (number | null)[] {
   const ema = computeEma(
     bars.map((b) => b.close),
     period,
@@ -724,7 +771,10 @@ function computeBearsPower(bars: OhlcvBarDto[], period: number): (number | null)
   return bars.map((b, i) => (ema[i] == null ? null : b.low - ema[i]!));
 }
 
-function computeBullsPower(bars: OhlcvBarDto[], period: number): (number | null)[] {
+function computeBullsPower(
+  bars: OhlcvBarDto[],
+  period: number,
+): (number | null)[] {
   const ema = computeEma(
     bars.map((b) => b.close),
     period,
@@ -732,7 +782,11 @@ function computeBullsPower(bars: OhlcvBarDto[], period: number): (number | null)
   return bars.map((b, i) => (ema[i] == null ? null : b.high - ema[i]!));
 }
 
-function computePsar(bars: OhlcvBarDto[], step = 0.02, maxAf = 0.2): (number | null)[] {
+function computePsar(
+  bars: OhlcvBarDto[],
+  step = 0.02,
+  maxAf = 0.2,
+): (number | null)[] {
   const n = bars.length;
   if (n === 0) return [];
   const result: (number | null)[] = Array(n).fill(null);
@@ -786,16 +840,26 @@ function computeFractals(bars: OhlcvBarDto[]): {
     const lows = [0, 1, 2, 3, 4].map((o) => bars[i - 2 + o]!.low);
     const hi = bars[i]!.high;
     const lo = bars[i]!.low;
-    if (hi === Math.max(...highs) && highs.filter((h) => h === hi).length === 1) up[i] = hi;
-    if (lo === Math.min(...lows) && lows.filter((l) => l === lo).length === 1) down[i] = lo;
+    if (hi === Math.max(...highs) && highs.filter((h) => h === hi).length === 1)
+      up[i] = hi;
+    if (lo === Math.min(...lows) && lows.filter((l) => l === lo).length === 1)
+      down[i] = lo;
   }
   return { up, down };
 }
 
-function midpointHl(bars: OhlcvBarDto[], period: number, index: number): number | null {
+function midpointHl(
+  bars: OhlcvBarDto[],
+  period: number,
+  index: number,
+): number | null {
   if (index + 1 < period) return null;
   const window = bars.slice(index - period + 1, index + 1);
-  return (Math.max(...window.map((b) => b.high)) + Math.min(...window.map((b) => b.low))) / 2;
+  return (
+    (Math.max(...window.map((b) => b.high)) +
+      Math.min(...window.map((b) => b.low))) /
+    2
+  );
 }
 
 function computeIchimoku(
@@ -838,7 +902,9 @@ function computeMacdLine(
 ): (number | null)[] {
   const fastEma = computeEma(closes, fast);
   const slowEma = computeEma(closes, slow);
-  return fastEma.map((f, i) => (f != null && slowEma[i] != null ? f - slowEma[i]! : null));
+  return fastEma.map((f, i) =>
+    f != null && slowEma[i] != null ? f - slowEma[i]! : null,
+  );
 }
 
 function seriesFromComputed(
@@ -858,7 +924,11 @@ function computeBollinger(
   closes: number[],
   period: number,
   stdDev: number,
-): { mid: (number | null)[]; upper: (number | null)[]; lower: (number | null)[] } {
+): {
+  mid: (number | null)[];
+  upper: (number | null)[];
+  lower: (number | null)[];
+} {
   const mid = computeSma(closes, period);
   const upper: (number | null)[] = [];
   const lower: (number | null)[] = [];
@@ -883,13 +953,13 @@ function computeOverlayRenderSeries(
   bars: OhlcvBarDto[],
   apiPoints: IndicatorPointDto[],
 ): IndicatorRenderSeries[] {
-  return withSpecSeriesCache('overlay', instance, bars, apiPoints, () => {
+  return withSpecSeriesCache("overlay", instance, bars, apiPoints, () => {
     if (!instance.visible) return [];
     const apiKey = legacyApiKeyForInstance(instance);
     if (apiKey && apiPoints.length > 0) {
       return [
         {
-          key: 'main',
+          key: "main",
           title: instance.definitionId,
           points: indicatorToLineSeries(apiPoints, apiKey),
         },
@@ -899,71 +969,146 @@ function computeOverlayRenderSeries(
     const closes = bars.map((bar) => bar.close);
     const period = Number(instance.parameters.period);
 
-    if (instance.definitionId === 'sma' && Number.isFinite(period)) {
-      return [{ key: 'main', title: 'SMA', points: seriesFromComputed(bars, computeSma(closes, period)) }];
+    if (instance.definitionId === "sma" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "SMA",
+          points: seriesFromComputed(bars, computeSma(closes, period)),
+        },
+      ];
     }
-    if (instance.definitionId === 'ema' && Number.isFinite(period)) {
-      return [{ key: 'main', title: 'EMA', points: seriesFromComputed(bars, computeEma(closes, period)) }];
+    if (instance.definitionId === "ema" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "EMA",
+          points: seriesFromComputed(bars, computeEma(closes, period)),
+        },
+      ];
     }
-    if (instance.definitionId === 'wma' && Number.isFinite(period)) {
-      return [{ key: 'main', title: 'WMA', points: seriesFromComputed(bars, computeWma(closes, period)) }];
+    if (instance.definitionId === "wma" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "WMA",
+          points: seriesFromComputed(bars, computeWma(closes, period)),
+        },
+      ];
     }
-    if (instance.definitionId === 'bb' && Number.isFinite(period)) {
+    if (instance.definitionId === "bb" && Number.isFinite(period)) {
       const stdDev = Number(instance.parameters.stdDev ?? 2);
       const bands = computeBollinger(closes, period, stdDev);
       return [
-        { key: 'upper', title: 'BB sup', points: seriesFromComputed(bars, bands.upper), dashed: true },
-        { key: 'mid', title: 'BB', points: seriesFromComputed(bars, bands.mid) },
-        { key: 'lower', title: 'BB inf', points: seriesFromComputed(bars, bands.lower), dashed: true },
+        {
+          key: "upper",
+          title: "BB sup",
+          points: seriesFromComputed(bars, bands.upper),
+          dashed: true,
+        },
+        {
+          key: "mid",
+          title: "BB",
+          points: seriesFromComputed(bars, bands.mid),
+        },
+        {
+          key: "lower",
+          title: "BB inf",
+          points: seriesFromComputed(bars, bands.lower),
+          dashed: true,
+        },
       ];
     }
-    if (instance.definitionId === 'dc' && Number.isFinite(period)) {
+    if (instance.definitionId === "dc" && Number.isFinite(period)) {
       const channel = computeDonchian(bars, period);
       return [
-        { key: 'upper', title: 'DC sup', points: seriesFromComputed(bars, channel.upper), dashed: true },
-        { key: 'mid', title: 'DC', points: seriesFromComputed(bars, channel.mid) },
-        { key: 'lower', title: 'DC inf', points: seriesFromComputed(bars, channel.lower), dashed: true },
+        {
+          key: "upper",
+          title: "DC sup",
+          points: seriesFromComputed(bars, channel.upper),
+          dashed: true,
+        },
+        {
+          key: "mid",
+          title: "DC",
+          points: seriesFromComputed(bars, channel.mid),
+        },
+        {
+          key: "lower",
+          title: "DC inf",
+          points: seriesFromComputed(bars, channel.lower),
+          dashed: true,
+        },
       ];
     }
-    if (instance.definitionId === 'st') {
+    if (instance.definitionId === "st") {
       const atrPeriod = Number(instance.parameters.atrPeriod ?? 10);
       const multiplier = Number(instance.parameters.multiplier ?? 3);
       if (Number.isFinite(atrPeriod) && Number.isFinite(multiplier)) {
         return [
           {
-            key: 'main',
-            title: 'ST',
-            points: seriesFromComputed(bars, computeSuperTrend(bars, atrPeriod, multiplier)),
+            key: "main",
+            title: "ST",
+            points: seriesFromComputed(
+              bars,
+              computeSuperTrend(bars, atrPeriod, multiplier),
+            ),
           },
         ];
       }
     }
-    if (instance.definitionId === 'vwap') {
-      return [{ key: 'main', title: 'VWAP', points: seriesFromComputed(bars, computeVwap(bars)) }];
+    if (instance.definitionId === "vwap") {
+      return [
+        {
+          key: "main",
+          title: "VWAP",
+          points: seriesFromComputed(bars, computeVwap(bars)),
+        },
+      ];
     }
-    if (instance.definitionId === 'sar') {
+    if (instance.definitionId === "sar") {
       const step = Number(instance.parameters.step ?? 0.02);
       const maxAf = Number(instance.parameters.maxAf ?? 0.2);
       if (Number.isFinite(step) && Number.isFinite(maxAf)) {
-        return [{ key: 'main', title: 'SAR', points: seriesFromComputed(bars, computePsar(bars, step, maxAf)) }];
+        return [
+          {
+            key: "main",
+            title: "SAR",
+            points: seriesFromComputed(bars, computePsar(bars, step, maxAf)),
+          },
+        ];
       }
     }
-    if (instance.definitionId === 'ali') {
+    if (instance.definitionId === "ali") {
       const { jaw, teeth, lips } = computeAlligator(bars);
       return [
-        { key: 'jaw', title: 'Jaw', points: seriesFromComputed(bars, jaw), dashed: true },
-        { key: 'teeth', title: 'Teeth', points: seriesFromComputed(bars, teeth) },
-        { key: 'lips', title: 'Lips', points: seriesFromComputed(bars, lips), dashed: true },
+        {
+          key: "jaw",
+          title: "Jaw",
+          points: seriesFromComputed(bars, jaw),
+          dashed: true,
+        },
+        {
+          key: "teeth",
+          title: "Teeth",
+          points: seriesFromComputed(bars, teeth),
+        },
+        {
+          key: "lips",
+          title: "Lips",
+          points: seriesFromComputed(bars, lips),
+          dashed: true,
+        },
       ];
     }
-    if (instance.definitionId === 'fr') {
+    if (instance.definitionId === "fr") {
       const { up, down } = computeFractals(bars);
       return [
-        { key: 'up', title: 'FR↑', points: seriesFromComputed(bars, up) },
-        { key: 'down', title: 'FR↓', points: seriesFromComputed(bars, down) },
+        { key: "up", title: "FR↑", points: seriesFromComputed(bars, up) },
+        { key: "down", title: "FR↓", points: seriesFromComputed(bars, down) },
       ];
     }
-    if (instance.definitionId === 'ich') {
+    if (instance.definitionId === "ich") {
       const tenkanPeriod = Number(instance.parameters.tenkanPeriod ?? 9);
       const kijunPeriod = Number(instance.parameters.kijunPeriod ?? 26);
       const senkouBPeriod = Number(instance.parameters.senkouBPeriod ?? 52);
@@ -982,11 +1127,34 @@ function computeOverlayRenderSeries(
           displacement,
         );
         return [
-          { key: 'tenkan', title: 'Tenkan', points: seriesFromComputed(bars, tenkan) },
-          { key: 'kijun', title: 'Kijun', points: seriesFromComputed(bars, kijun) },
-          { key: 'spanA', title: 'Span A', points: seriesFromComputed(bars, spanA), dashed: true },
-          { key: 'spanB', title: 'Span B', points: seriesFromComputed(bars, spanB), dashed: true },
-          { key: 'chikou', title: 'Chikou', points: seriesFromComputed(bars, chikou), dashed: true },
+          {
+            key: "tenkan",
+            title: "Tenkan",
+            points: seriesFromComputed(bars, tenkan),
+          },
+          {
+            key: "kijun",
+            title: "Kijun",
+            points: seriesFromComputed(bars, kijun),
+          },
+          {
+            key: "spanA",
+            title: "Span A",
+            points: seriesFromComputed(bars, spanA),
+            dashed: true,
+          },
+          {
+            key: "spanB",
+            title: "Span B",
+            points: seriesFromComputed(bars, spanB),
+            dashed: true,
+          },
+          {
+            key: "chikou",
+            title: "Chikou",
+            points: seriesFromComputed(bars, chikou),
+            dashed: true,
+          },
         ];
       }
     }
@@ -999,7 +1167,7 @@ export function resolveOverlayRenderSeries(
   bars: OhlcvBarDto[],
   apiPoints: IndicatorPointDto[],
 ): IndicatorRenderSeries[] {
-  const key = instanceCacheKey(instance, bars, apiPoints, 'overlay');
+  const key = instanceCacheKey(instance, bars, apiPoints, "overlay");
   const cached = readRenderCache(overlayRenderCache, key);
   if (cached) return cached;
   return writeRenderCache(
@@ -1023,218 +1191,356 @@ function computeSubRenderSeries(
   bars: OhlcvBarDto[],
   apiPoints: IndicatorPointDto[],
 ): IndicatorRenderSeries[] {
-  return withSpecSeriesCache('sub', instance, bars, apiPoints, () => {
-  if (!instance.visible) return [];
-  const apiKey = legacyApiKeyForInstance(instance);
-  if (apiKey && apiPoints.length > 0) {
-    return [
-      {
-        key: 'main',
-        title: instance.definitionId,
-        points: indicatorToLineSeries(apiPoints, apiKey),
-      },
-    ];
-  }
-
-  const closes = bars.map((bar) => bar.close);
-  const period = Number(instance.parameters.period);
-
-  if (instance.definitionId === 'rsi' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'RSI', points: seriesFromComputed(bars, computeRsi(closes, period)) }];
-  }
-  if (instance.definitionId === 'atr' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'ATR', points: seriesFromComputed(bars, computeAtr(bars, period)) }];
-  }
-  if (instance.definitionId === 'cci' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'CCI', points: seriesFromComputed(bars, computeCci(bars, period)) }];
-  }
-  if (instance.definitionId === 'stoch') {
-    const kPeriod = Number(instance.parameters.kPeriod ?? 14);
-    if (Number.isFinite(kPeriod)) {
-      return [{ key: 'main', title: 'Stoch %K', points: seriesFromComputed(bars, computeStochK(bars, kPeriod)) }];
-    }
-  }
-  if (instance.definitionId === 'willr' && Number.isFinite(period)) {
-    return [{ key: 'main', title: '%R', points: seriesFromComputed(bars, computeWilliamsR(bars, period)) }];
-  }
-  if (instance.definitionId === 'mom' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'MOM', points: seriesFromComputed(bars, computeMomentum(closes, period)) }];
-  }
-  if (instance.definitionId === 'sd' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'SD', points: seriesFromComputed(bars, computeStdDev(closes, period)) }];
-  }
-  if (instance.definitionId === 'adx' && Number.isFinite(period)) {
-    const { adx, plusDi, minusDi } = computeAdx(bars, period);
-    return [
-      { key: 'main', title: 'ADX', points: seriesFromComputed(bars, adx) },
-      { key: 'plus_di', title: '+DI', points: seriesFromComputed(bars, plusDi), dashed: true },
-      { key: 'minus_di', title: '−DI', points: seriesFromComputed(bars, minusDi), dashed: true },
-    ];
-  }
-  if (instance.definitionId === 'srsi') {
-    const rsiPeriod = Number(instance.parameters.rsiPeriod ?? 14);
-    const stochPeriod = Number(instance.parameters.stochPeriod ?? 14);
-    const kPeriod = Number(instance.parameters.kPeriod ?? 3);
-    const dPeriod = Number(instance.parameters.dPeriod ?? 3);
-    if (
-      Number.isFinite(rsiPeriod) &&
-      Number.isFinite(stochPeriod) &&
-      Number.isFinite(kPeriod) &&
-      Number.isFinite(dPeriod)
-    ) {
-      const { k, d } = computeStochRsi(closes, rsiPeriod, stochPeriod, kPeriod, dPeriod);
+  return withSpecSeriesCache("sub", instance, bars, apiPoints, () => {
+    if (!instance.visible) return [];
+    const apiKey = legacyApiKeyForInstance(instance);
+    if (apiKey && apiPoints.length > 0) {
       return [
-        { key: 'main', title: 'StochRSI %K', points: seriesFromComputed(bars, k) },
-        { key: 'signal', title: '%D', points: seriesFromComputed(bars, d), dashed: true },
+        {
+          key: "main",
+          title: instance.definitionId,
+          points: indicatorToLineSeries(apiPoints, apiKey),
+        },
       ];
     }
-  }
-  if (instance.definitionId === 'obv') {
-    return [{ key: 'main', title: 'OBV', points: seriesFromComputed(bars, computeObv(bars)) }];
-  }
-  if (instance.definitionId === 'roc' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'ROC', points: seriesFromComputed(bars, computeRoc(closes, period)) }];
-  }
-  if (instance.definitionId === 'mfi' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'MFI', points: seriesFromComputed(bars, computeMfi(bars, period)) }];
-  }
-  if (instance.definitionId === 'aroon' && Number.isFinite(period)) {
-    const { up, down } = computeAroon(bars, period);
-    return [
-      { key: 'up', title: 'Aroon↑', points: seriesFromComputed(bars, up) },
-      { key: 'down', title: 'Aroon↓', points: seriesFromComputed(bars, down), dashed: true },
-    ];
-  }
-  if (instance.definitionId === 'bears' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'Bears', points: seriesFromComputed(bars, computeBearsPower(bars, period)) }];
-  }
-  if (instance.definitionId === 'bulls' && Number.isFinite(period)) {
-    return [{ key: 'main', title: 'Bulls', points: seriesFromComputed(bars, computeBullsPower(bars, period)) }];
-  }
-  if (instance.definitionId === 'macd') {
-    const fast = Number(instance.parameters.fastPeriod ?? 12);
-    const slow = Number(instance.parameters.slowPeriod ?? 26);
-    if (Number.isFinite(fast) && Number.isFinite(slow)) {
-      return [{ key: 'main', title: 'MACD', points: seriesFromComputed(bars, computeMacdLine(closes, fast, slow)) }];
-    }
-  }
-  if (instance.definitionId === 'strategy_hybrid_score_v1') {
-    const warmupBars = Number(instance.parameters.warmupBars ?? 50);
-    const showComponents = instance.parameters.showComponents === true;
-    const showMinScoreLine = instance.parameters.showMinScoreLine !== false;
-    const showGateLine = instance.parameters.showGateLine !== false;
-    const minScore = Number(instance.parameters.minScore ?? 60);
-    const gatePresetKey = String(instance.parameters.gatePresetKey ?? '').trim() || null;
-    const ratingSeries = computeTechnicalRatingSeries(bars, warmupBars);
-    const series: IndicatorRenderSeries[] = [
-      {
-        key: 'main',
-        title: 'Score estrategia',
-        points: seriesFromComputed(bars, ratingSeries),
-      },
-    ];
-    if (showComponents) {
-      series.push(
+
+    const closes = bars.map((bar) => bar.close);
+    const period = Number(instance.parameters.period);
+
+    if (instance.definitionId === "rsi" && Number.isFinite(period)) {
+      return [
         {
-          key: 'trend',
-          title: 'Tendencia',
-          points: seriesFromComputed(
-            bars,
-            computeTechnicalRatingComponentSeries(bars, 'trend', warmupBars),
-          ),
+          key: "main",
+          title: "RSI",
+          points: seriesFromComputed(bars, computeRsi(closes, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "atr" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "ATR",
+          points: seriesFromComputed(bars, computeAtr(bars, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "cci" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "CCI",
+          points: seriesFromComputed(bars, computeCci(bars, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "stoch") {
+      const kPeriod = Number(instance.parameters.kPeriod ?? 14);
+      if (Number.isFinite(kPeriod)) {
+        return [
+          {
+            key: "main",
+            title: "Stoch %K",
+            points: seriesFromComputed(bars, computeStochK(bars, kPeriod)),
+          },
+        ];
+      }
+    }
+    if (instance.definitionId === "willr" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "%R",
+          points: seriesFromComputed(bars, computeWilliamsR(bars, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "mom" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "MOM",
+          points: seriesFromComputed(bars, computeMomentum(closes, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "sd" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "SD",
+          points: seriesFromComputed(bars, computeStdDev(closes, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "adx" && Number.isFinite(period)) {
+      const { adx, plusDi, minusDi } = computeAdx(bars, period);
+      return [
+        { key: "main", title: "ADX", points: seriesFromComputed(bars, adx) },
+        {
+          key: "plus_di",
+          title: "+DI",
+          points: seriesFromComputed(bars, plusDi),
           dashed: true,
         },
         {
-          key: 'momentum',
-          title: 'Momentum',
-          points: seriesFromComputed(
-            bars,
-            computeTechnicalRatingComponentSeries(bars, 'momentum', warmupBars),
-          ),
+          key: "minus_di",
+          title: "−DI",
+          points: seriesFromComputed(bars, minusDi),
           dashed: true,
         },
-      );
+      ];
     }
-    const mainPoints = series[0]?.points ?? [];
-    if (showMinScoreLine && mainPoints.length > 0 && Number.isFinite(minScore)) {
-      series.push({
-        key: 'minScore',
-        title: 'Umbral',
-        points: mainPoints.map((point) => ({ time: point.time, value: minScore })),
-        dashed: true,
-      });
+    if (instance.definitionId === "srsi") {
+      const rsiPeriod = Number(instance.parameters.rsiPeriod ?? 14);
+      const stochPeriod = Number(instance.parameters.stochPeriod ?? 14);
+      const kPeriod = Number(instance.parameters.kPeriod ?? 3);
+      const dPeriod = Number(instance.parameters.dPeriod ?? 3);
+      if (
+        Number.isFinite(rsiPeriod) &&
+        Number.isFinite(stochPeriod) &&
+        Number.isFinite(kPeriod) &&
+        Number.isFinite(dPeriod)
+      ) {
+        const { k, d } = computeStochRsi(
+          closes,
+          rsiPeriod,
+          stochPeriod,
+          kPeriod,
+          dPeriod,
+        );
+        return [
+          {
+            key: "main",
+            title: "StochRSI %K",
+            points: seriesFromComputed(bars, k),
+          },
+          {
+            key: "signal",
+            title: "%D",
+            points: seriesFromComputed(bars, d),
+            dashed: true,
+          },
+        ];
+      }
     }
-    if (showGateLine && gatePresetKey) {
-      const gateSeries = computeGatePassSeriesFromPreset(bars, gatePresetKey);
-      series.push({
-        key: 'gate',
-        title: 'Gate',
-        points: seriesFromComputed(bars, gateSeries),
-        dashed: true,
-      });
-    }
-    return series;
-  }
-  if (instance.definitionId === 'technical_rating_v1') {
-    const warmupBars = Number(instance.parameters.warmupBars ?? 50);
-    const showComponents = instance.parameters.showComponents === true;
-    const series: IndicatorRenderSeries[] = [
-      {
-        key: 'main',
-        title: 'Rating IA',
-        points: seriesFromComputed(bars, computeTechnicalRatingSeries(bars, warmupBars)),
-      },
-    ];
-    if (showComponents) {
-      series.push(
+    if (instance.definitionId === "obv") {
+      return [
         {
-          key: 'trend',
-          title: 'Tendencia',
-          points: seriesFromComputed(
-            bars,
-            computeTechnicalRatingComponentSeries(bars, 'trend', warmupBars),
-          ),
-          dashed: true,
+          key: "main",
+          title: "OBV",
+          points: seriesFromComputed(bars, computeObv(bars)),
         },
-        {
-          key: 'momentum',
-          title: 'Momentum',
-          points: seriesFromComputed(
-            bars,
-            computeTechnicalRatingComponentSeries(bars, 'momentum', warmupBars),
-          ),
-          dashed: true,
-        },
-      );
+      ];
     }
-    return series;
-  }
-  if (instance.definitionId === 'bar_data_quality_v1') {
-    const gapLookback = Number(instance.parameters.gapLookback ?? 90);
-    return [
-      {
-        key: 'main',
-        title: 'Datos',
-        points: seriesFromComputed(bars, computeBarDataQualitySeries(bars, gapLookback)),
-      },
-    ];
-  }
-  if (instance.definitionId === 'ai_global_score_v1') {
-    const setupWeight = Number(instance.parameters.setupWeight ?? 70);
-    const dataWeight = Number(instance.parameters.dataWeight ?? 30);
-    const warmupBars = Number(instance.parameters.warmupBars ?? 50);
-    return [
-      {
-        key: 'main',
-        title: 'Global IA',
-        points: seriesFromComputed(
-          bars,
-          computeAiGlobalScoreSeries(bars, setupWeight, dataWeight, warmupBars),
-        ),
-      },
-    ];
-  }
-  return [];
+    if (instance.definitionId === "roc" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "ROC",
+          points: seriesFromComputed(bars, computeRoc(closes, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "mfi" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "MFI",
+          points: seriesFromComputed(bars, computeMfi(bars, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "aroon" && Number.isFinite(period)) {
+      const { up, down } = computeAroon(bars, period);
+      return [
+        { key: "up", title: "Aroon↑", points: seriesFromComputed(bars, up) },
+        {
+          key: "down",
+          title: "Aroon↓",
+          points: seriesFromComputed(bars, down),
+          dashed: true,
+        },
+      ];
+    }
+    if (instance.definitionId === "bears" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "Bears",
+          points: seriesFromComputed(bars, computeBearsPower(bars, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "bulls" && Number.isFinite(period)) {
+      return [
+        {
+          key: "main",
+          title: "Bulls",
+          points: seriesFromComputed(bars, computeBullsPower(bars, period)),
+        },
+      ];
+    }
+    if (instance.definitionId === "macd") {
+      const fast = Number(instance.parameters.fastPeriod ?? 12);
+      const slow = Number(instance.parameters.slowPeriod ?? 26);
+      if (Number.isFinite(fast) && Number.isFinite(slow)) {
+        return [
+          {
+            key: "main",
+            title: "MACD",
+            points: seriesFromComputed(
+              bars,
+              computeMacdLine(closes, fast, slow),
+            ),
+          },
+        ];
+      }
+    }
+    if (instance.definitionId === "strategy_hybrid_score_v1") {
+      const warmupBars = Number(instance.parameters.warmupBars ?? 50);
+      const showComponents = instance.parameters.showComponents === true;
+      const showMinScoreLine = instance.parameters.showMinScoreLine !== false;
+      const showGateLine = instance.parameters.showGateLine !== false;
+      const minScore = Number(instance.parameters.minScore ?? 60);
+      const gatePresetKey =
+        String(instance.parameters.gatePresetKey ?? "").trim() || null;
+      const ratingSeries = computeTechnicalRatingSeries(bars, warmupBars);
+      const series: IndicatorRenderSeries[] = [
+        {
+          key: "main",
+          title: "Score estrategia",
+          points: seriesFromComputed(bars, ratingSeries),
+        },
+      ];
+      if (showComponents) {
+        series.push(
+          {
+            key: "trend",
+            title: "Tendencia",
+            points: seriesFromComputed(
+              bars,
+              computeTechnicalRatingComponentSeries(bars, "trend", warmupBars),
+            ),
+            dashed: true,
+          },
+          {
+            key: "momentum",
+            title: "Momentum",
+            points: seriesFromComputed(
+              bars,
+              computeTechnicalRatingComponentSeries(
+                bars,
+                "momentum",
+                warmupBars,
+              ),
+            ),
+            dashed: true,
+          },
+        );
+      }
+      const mainPoints = series[0]?.points ?? [];
+      if (
+        showMinScoreLine &&
+        mainPoints.length > 0 &&
+        Number.isFinite(minScore)
+      ) {
+        series.push({
+          key: "minScore",
+          title: "Umbral",
+          points: mainPoints.map((point) => ({
+            time: point.time,
+            value: minScore,
+          })),
+          dashed: true,
+        });
+      }
+      if (showGateLine && gatePresetKey) {
+        const gateSeries = computeGatePassSeriesFromPreset(bars, gatePresetKey);
+        series.push({
+          key: "gate",
+          title: "Gate",
+          points: seriesFromComputed(bars, gateSeries),
+          dashed: true,
+        });
+      }
+      return series;
+    }
+    if (instance.definitionId === "technical_rating_v1") {
+      const warmupBars = Number(instance.parameters.warmupBars ?? 50);
+      const showComponents = instance.parameters.showComponents === true;
+      const series: IndicatorRenderSeries[] = [
+        {
+          key: "main",
+          title: "Rating IA",
+          points: seriesFromComputed(
+            bars,
+            computeTechnicalRatingSeries(bars, warmupBars),
+          ),
+        },
+      ];
+      if (showComponents) {
+        series.push(
+          {
+            key: "trend",
+            title: "Tendencia",
+            points: seriesFromComputed(
+              bars,
+              computeTechnicalRatingComponentSeries(bars, "trend", warmupBars),
+            ),
+            dashed: true,
+          },
+          {
+            key: "momentum",
+            title: "Momentum",
+            points: seriesFromComputed(
+              bars,
+              computeTechnicalRatingComponentSeries(
+                bars,
+                "momentum",
+                warmupBars,
+              ),
+            ),
+            dashed: true,
+          },
+        );
+      }
+      return series;
+    }
+    if (instance.definitionId === "bar_data_quality_v1") {
+      const gapLookback = Number(instance.parameters.gapLookback ?? 90);
+      return [
+        {
+          key: "main",
+          title: "Datos",
+          points: seriesFromComputed(
+            bars,
+            computeBarDataQualitySeries(bars, gapLookback),
+          ),
+        },
+      ];
+    }
+    if (instance.definitionId === "ai_global_score_v1") {
+      const setupWeight = Number(instance.parameters.setupWeight ?? 70);
+      const dataWeight = Number(instance.parameters.dataWeight ?? 30);
+      const warmupBars = Number(instance.parameters.warmupBars ?? 50);
+      return [
+        {
+          key: "main",
+          title: "Global IA",
+          points: seriesFromComputed(
+            bars,
+            computeAiGlobalScoreSeries(
+              bars,
+              setupWeight,
+              dataWeight,
+              warmupBars,
+            ),
+          ),
+        },
+      ];
+    }
+    return [];
   });
 }
 
@@ -1243,7 +1549,7 @@ export function resolveSubRenderSeries(
   bars: OhlcvBarDto[],
   apiPoints: IndicatorPointDto[],
 ): IndicatorRenderSeries[] {
-  const key = instanceCacheKey(instance, bars, apiPoints, 'sub');
+  const key = instanceCacheKey(instance, bars, apiPoints, "sub");
   const cached = readRenderCache(subRenderCache, key);
   if (cached) return cached;
   return writeRenderCache(
@@ -1262,15 +1568,21 @@ export function resolveSubLineSeries(
   return resolveSubRenderSeries(instance, bars, apiPoints)[0]?.points ?? [];
 }
 
-export function hasVolumeInstance(instances: ChartIndicatorInstance[]): boolean {
-  return instances.some((item) => item.definitionId === 'volume' && item.visible);
+export function hasVolumeInstance(
+  instances: ChartIndicatorInstance[],
+): boolean {
+  return instances.some(
+    (item) => item.definitionId === "volume" && item.visible,
+  );
 }
 
-export function overlayTrendInstances(instances: ChartIndicatorInstance[]): ChartIndicatorInstance[] {
+export function overlayTrendInstances(
+  instances: ChartIndicatorInstance[],
+): ChartIndicatorInstance[] {
   return instances.filter((item) => {
-    if (!item.visible || item.definitionId === 'volume') return false;
+    if (!item.visible || item.definitionId === "volume") return false;
     const def = findIndicatorDefinition(item.definitionId);
-    return def?.panel === 'overlay';
+    return def?.panel === "overlay";
   });
 }
 
@@ -1279,21 +1591,25 @@ export function overlayManagementInstances(
 ): ChartIndicatorInstance[] {
   return instances.filter((item) => {
     const def = findIndicatorDefinition(item.definitionId);
-    return def?.panel === 'overlay';
+    return def?.panel === "overlay";
   });
 }
 
-export function subPanelInstancesAll(instances: ChartIndicatorInstance[]): ChartIndicatorInstance[] {
+export function subPanelInstancesAll(
+  instances: ChartIndicatorInstance[],
+): ChartIndicatorInstance[] {
   return instances.filter((item) => {
     const def = findIndicatorDefinition(item.definitionId);
-    return def?.panel === 'sub';
+    return def?.panel === "sub";
   });
 }
 
-export function subPanelInstances(instances: ChartIndicatorInstance[]): ChartIndicatorInstance[] {
+export function subPanelInstances(
+  instances: ChartIndicatorInstance[],
+): ChartIndicatorInstance[] {
   return instances.filter((item) => {
     if (!item.visible) return false;
     const def = findIndicatorDefinition(item.definitionId);
-    return def?.panel === 'sub';
+    return def?.panel === "sub";
   });
 }

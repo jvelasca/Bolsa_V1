@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import type { IndicatorPreset } from '@bolsa/shared';
+import { useEffect, useState } from "react";
+import type { IndicatorPreset } from "@bolsa/shared";
 import {
   colorForInstance,
   findIndicatorDefinition,
   normalizeParameters,
   presetDerivedHint,
-} from '@bolsa/shared';
-import { Trash2, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { FieldRow, inputClassName } from '@/components/ui/dialog';
-import { IndicatorParametersForm } from '@/features/charts/indicator-parameters-form';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@bolsa/shared";
+import { Trash2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FieldRow, inputClassName } from "@/components/ui/dialog";
+import { IndicatorParametersForm } from "@/features/charts/indicator-parameters-form";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 interface IndicatorPresetEditorPanelProps {
   preset: IndicatorPreset;
@@ -33,7 +33,9 @@ export function IndicatorPresetEditorPanel({
   const [name, setName] = useState(preset.name);
   const [parameters, setParameters] = useState({ ...preset.parameters });
   const [lineWidth, setLineWidth] = useState(preset.lineWidth ?? 2);
-  const [showLastValue, setShowLastValue] = useState(preset.showLastValue === true);
+  const [showLastValue, setShowLastValue] = useState(
+    preset.showLastValue === true,
+  );
 
   useEffect(() => {
     setName(preset.name);
@@ -45,7 +47,7 @@ export function IndicatorPresetEditorPanel({
   if (!definition) return null;
 
   const previewInstance = {
-    instanceId: 'preview',
+    instanceId: "preview",
     presetId: preset.id,
     definitionId: preset.definitionId,
     parameters,
@@ -71,7 +73,8 @@ export function IndicatorPresetEditorPanel({
   }
 
   function handleDelete() {
-    if (!window.confirm(`¿Eliminar el preset "${preset.name}" del catálogo?`)) return;
+    if (!window.confirm(`¿Eliminar el preset "${preset.name}" del catálogo?`))
+      return;
     removePreset(preset.id);
     save();
     onClose();
@@ -84,7 +87,11 @@ export function IndicatorPresetEditorPanel({
           <p className="text-sm font-medium">Editar preset personal</p>
           {derived && <p className="text-[11px] text-primary/80">{derived}</p>}
         </div>
-        <button type="button" className="rounded p-1 hover:bg-accent" onClick={onClose}>
+        <button
+          type="button"
+          className="rounded p-1 hover:bg-accent"
+          onClick={onClose}
+        >
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -141,7 +148,13 @@ export function IndicatorPresetEditorPanel({
       </label>
 
       <div className="flex flex-wrap justify-between gap-2 pt-1">
-        <Button type="button" variant="outline" size="sm" className="text-destructive" onClick={handleDelete}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="text-destructive"
+          onClick={handleDelete}
+        >
           <Trash2 className="mr-1.5 h-3.5 w-3.5" />
           Eliminar preset
         </Button>

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ColorType,
   createChart,
@@ -9,8 +16,15 @@ import {
   type IChartApi,
   type ISeriesApi,
   type Time,
-} from 'lightweight-charts';
-import type { ChartDrawTool, ChartDrawing, ChartIndicatorInstance, ChartInstanceConfig, IndicatorPointDto, OhlcvBarDto } from '@bolsa/shared';
+} from "lightweight-charts";
+import type {
+  ChartDrawTool,
+  ChartDrawing,
+  ChartIndicatorInstance,
+  ChartInstanceConfig,
+  IndicatorPointDto,
+  OhlcvBarDto,
+} from "@bolsa/shared";
 import {
   chartSeriesUsesSyntheticTime,
   colorForInstance,
@@ -22,22 +36,34 @@ import {
   type ChartSeriesType,
   type ChartSeriesTypeParams,
   type ChartTimeframe,
-} from '@bolsa/shared';
-import { RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { formatSyncError, useInstrumentSync } from '@/features/instruments/use-instrument-sync';
-import { ChartDrawingsLayer } from '@/features/charts/chart-drawings-layer';
-import { ChartCrosshairMeasure } from '@/features/charts/chart-crosshair-measure';
-import { ChartCursorStyleOverlay } from '@/features/charts/chart-cursor-style-overlay';
-import { ChartTimeAxisLabel } from '@/features/charts/chart-time-axis-label';
-import { blocksChartPan, blocksChartPointerPan, canInteractWithDrawings, shouldHideNativeCrosshair, usesCustomChartCursor } from '@/features/charts/chart-draw-tool-utils';
+} from "@bolsa/shared";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import {
+  formatSyncError,
+  useInstrumentSync,
+} from "@/features/instruments/use-instrument-sync";
+import { ChartDrawingsLayer } from "@/features/charts/chart-drawings-layer";
+import { ChartCrosshairMeasure } from "@/features/charts/chart-crosshair-measure";
+import { ChartCursorStyleOverlay } from "@/features/charts/chart-cursor-style-overlay";
+import { ChartTimeAxisLabel } from "@/features/charts/chart-time-axis-label";
+import {
+  blocksChartPan,
+  blocksChartPointerPan,
+  canInteractWithDrawings,
+  shouldHideNativeCrosshair,
+  usesCustomChartCursor,
+} from "@/features/charts/chart-draw-tool-utils";
 import {
   hasVolumeInstance,
   overlayTrendInstances,
   resolveOverlayRenderSeries,
-} from '@/features/charts/indicator-compute';
-import { findOverlayInstanceAtPixel, type OverlaySeriesHitEntry } from '@/features/charts/chart-indicator-hit';
+} from "@/features/charts/indicator-compute";
+import {
+  findOverlayInstanceAtPixel,
+  type OverlaySeriesHitEntry,
+} from "@/features/charts/chart-indicator-hit";
 import {
   barsToVolumeSeries,
   barTimeToChartTime,
@@ -45,7 +71,7 @@ import {
   formatChartTimeAxisLabel,
   hasChartData,
   indicatorToLineSeries,
-} from './chart-utils';
+} from "./chart-utils";
 import {
   applyMainPriceSeriesColors,
   createMainPriceSeries,
@@ -53,20 +79,29 @@ import {
   setMainPriceSeriesData,
   type ChartMainPriceSeries,
   type MainSeriesEngineKind,
-} from '@/features/charts/chart-main-series';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/features/charts/chart-main-series";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 import {
   clampPricePanOffset,
   priceMarginsForZoom,
   PRICE_SCALE_MIN_WIDTH_PX,
   stepScaleZoom,
   volumeMarginsForZoom,
-} from '@/features/charts/chart-scale-utils';
-import { attachChartPricePan, type ChartPricePanHandlers } from '@/features/charts/chart-price-pan';
-import { attachChartScaleInteraction, type ChartScaleZoomHandlers } from '@/features/charts/chart-scale-wheel';
-import { observeStableSize } from '@/features/charts/chart-stable-resize';
-import { attachChartHorizontalWheel, getChartSyncHub } from '@/features/charts/chart-time-sync';
-import { useChartCursorStore } from '@/stores/chart-cursor-store';
+} from "@/features/charts/chart-scale-utils";
+import {
+  attachChartPricePan,
+  type ChartPricePanHandlers,
+} from "@/features/charts/chart-price-pan";
+import {
+  attachChartScaleInteraction,
+  type ChartScaleZoomHandlers,
+} from "@/features/charts/chart-scale-wheel";
+import { observeStableSize } from "@/features/charts/chart-stable-resize";
+import {
+  attachChartHorizontalWheel,
+  getChartSyncHub,
+} from "@/features/charts/chart-time-sync";
+import { useChartCursorStore } from "@/stores/chart-cursor-store";
 
 interface OhlcvChartProps {
   bars: OhlcvBarDto[];
@@ -91,7 +126,10 @@ interface OhlcvChartProps {
   onVolumeScaleZoomChange?: (scaleZoom: number) => void;
   onOpenSyncDialog?: () => void;
   onAddDrawing?: (drawing: ChartDrawing) => void;
-  onUpdateDrawing?: (drawingId: string, patch: import('@bolsa/shared').ChartDrawingVertexPatch) => void;
+  onUpdateDrawing?: (
+    drawingId: string,
+    patch: import("@bolsa/shared").ChartDrawingVertexPatch,
+  ) => void;
   onSelectDrawing?: (id: string | null) => void;
   onDrawingAdded?: (drawingId: string) => void;
   onDrawingDragEnd?: () => void;
@@ -124,9 +162,9 @@ export function OhlcvChart({
   indicatorInstances,
   config,
   drawings = [],
-  drawTool = 'select',
-  chartTimeframe = '1d',
-  seriesType: seriesTypeProp = 'candles',
+  drawTool = "select",
+  chartTimeframe = "1d",
+  seriesType: seriesTypeProp = "candles",
   seriesTypeParams: seriesTypeParamsProp,
   selectedDrawingId = null,
   isLoading = false,
@@ -151,10 +189,17 @@ export function OhlcvChart({
   const configuredHeight = display.height;
   const instanceMode = indicatorInstances !== undefined;
   const overlayRenderByInstance = useMemo(() => {
-    if (!instanceMode) return new Map<string, ReturnType<typeof resolveOverlayRenderSeries>>();
-    const map = new Map<string, ReturnType<typeof resolveOverlayRenderSeries>>();
+    if (!instanceMode)
+      return new Map<string, ReturnType<typeof resolveOverlayRenderSeries>>();
+    const map = new Map<
+      string,
+      ReturnType<typeof resolveOverlayRenderSeries>
+    >();
     for (const instance of overlayTrendInstances(indicatorInstances ?? [])) {
-      map.set(instance.instanceId, resolveOverlayRenderSeries(instance, bars, indicators));
+      map.set(
+        instance.instanceId,
+        resolveOverlayRenderSeries(instance, bars, indicators),
+      );
     }
     return map;
   }, [instanceMode, indicators, bars, indicatorInstances]);
@@ -165,9 +210,11 @@ export function OhlcvChart({
   const seriesTypeParams = normalizeChartSeriesTypeParams(seriesTypeParamsProp);
   const usesSyntheticTime = chartSeriesUsesSyntheticTime(seriesType);
   const mainSeriesEngine = resolveMainSeriesEngine(seriesType);
-  const drawingEnabled = Boolean(onAddDrawing && onSelectDrawing && onUpdateDrawing);
+  const drawingEnabled = Boolean(
+    onAddDrawing && onSelectDrawing && onUpdateDrawing,
+  );
   const isDrawingMode = blocksChartPan(drawTool);
-  const crosshairMagnet = drawTool === 'crosshair' || cursor.mode === 'magnet';
+  const crosshairMagnet = drawTool === "crosshair" || cursor.mode === "magnet";
   const hideNativeCrosshair = shouldHideNativeCrosshair(drawTool);
   const showTimeAxisLabel = config.cursor.showTimeAxisLabel ?? true;
   const drawingCapturesPointerRef = useRef(false);
@@ -184,7 +231,9 @@ export function OhlcvChart({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
+  const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(
+    null,
+  );
   const bindChartContainer = useCallback((node: HTMLDivElement | null) => {
     containerRef.current = node;
     setChartContainer(node);
@@ -192,14 +241,14 @@ export function OhlcvChart({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mainSeriesRef = useRef<ChartMainPriceSeries | null>(null);
-  const mainSeriesEngineRef = useRef<MainSeriesEngineKind>('candlestick');
+  const mainSeriesEngineRef = useRef<MainSeriesEngineKind>("candlestick");
   const seriesTypeParamsRef = useRef(seriesTypeParams);
   seriesTypeParamsRef.current = seriesTypeParams;
-  const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null);
-  const sma20Ref = useRef<ISeriesApi<'Line'> | null>(null);
-  const sma50Ref = useRef<ISeriesApi<'Line'> | null>(null);
-  const ema20Ref = useRef<ISeriesApi<'Line'> | null>(null);
-  const overlaySeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+  const volumeRef = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const sma20Ref = useRef<ISeriesApi<"Line"> | null>(null);
+  const sma50Ref = useRef<ISeriesApi<"Line"> | null>(null);
+  const ema20Ref = useRef<ISeriesApi<"Line"> | null>(null);
+  const overlaySeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
   const overlaySeriesDataRef = useRef(new Map<string, OverlaySeriesHitEntry>());
   const priceScaleZoomRef = useRef(config.grid.priceScaleZoom ?? 1);
   const volumeScaleZoomRef = useRef(1);
@@ -216,7 +265,7 @@ export function OhlcvChart({
   }, [seriesType, seriesTypeParams]);
 
   const volumeInstance = indicatorInstances?.find(
-    (item) => item.definitionId === 'volume',
+    (item) => item.definitionId === "volume",
   );
   const priceScaleZoom = config.grid.priceScaleZoom ?? 1;
   const volumeScaleZoom = volumeInstance?.scaleZoom ?? 1;
@@ -238,12 +287,14 @@ export function OhlcvChart({
     topMarginPctRef.current = grid.topMarginPct;
   }, [grid.topMarginPct]);
 
-  const scaleHandlersRef = useRef<ChartScaleZoomHandlers>({ onVerticalZoom: () => {} });
+  const scaleHandlersRef = useRef<ChartScaleZoomHandlers>({
+    onVerticalZoom: () => {},
+  });
   scaleHandlersRef.current = {
     onVerticalZoom: (direction) => {
       const next = stepScaleZoom(priceScaleZoomRef.current, direction);
       priceScaleZoomRef.current = next;
-      chartRef.current?.priceScale('right').applyOptions({
+      chartRef.current?.priceScale("right").applyOptions({
         scaleMargins: priceMarginsForZoom(
           next,
           showVolumeRef.current,
@@ -260,7 +311,7 @@ export function OhlcvChart({
         ? (direction) => {
             const next = stepScaleZoom(volumeScaleZoomRef.current, direction);
             volumeScaleZoomRef.current = next;
-            chartRef.current?.priceScale('volume').applyOptions({
+            chartRef.current?.priceScale("volume").applyOptions({
               scaleMargins: volumeMarginsForZoom(next),
             });
           }
@@ -291,7 +342,7 @@ export function OhlcvChart({
       pricePanOffsetRef.current = clampPricePanOffset(
         pricePanOffsetRef.current + delta * 0.85,
       );
-      chartRef.current?.priceScale('right').applyOptions({
+      chartRef.current?.priceScale("right").applyOptions({
         scaleMargins: priceMarginsForZoom(
           priceScaleZoomRef.current,
           showVolumeRef.current,
@@ -349,13 +400,13 @@ export function OhlcvChart({
       ema20Ref.current?.setData([]);
     } else if (indicators.length > 0) {
       sma20Ref.current?.setData(
-        display.showSma20 ? indicatorToLineSeries(indicators, 'sma20') : [],
+        display.showSma20 ? indicatorToLineSeries(indicators, "sma20") : [],
       );
       sma50Ref.current?.setData(
-        display.showSma50 ? indicatorToLineSeries(indicators, 'sma50') : [],
+        display.showSma50 ? indicatorToLineSeries(indicators, "sma50") : [],
       );
       ema20Ref.current?.setData(
-        display.showEma20 ? indicatorToLineSeries(indicators, 'ema20') : [],
+        display.showEma20 ? indicatorToLineSeries(indicators, "ema20") : [],
       );
     } else {
       sma20Ref.current?.setData([]);
@@ -375,14 +426,16 @@ export function OhlcvChart({
         }
       }
       overlays.forEach((instance, index) => {
-        const renderSeries = overlayRenderByInstance.get(instance.instanceId) ?? [];
+        const renderSeries =
+          overlayRenderByInstance.get(instance.instanceId) ?? [];
         for (const spec of renderSeries) {
           const seriesKey = `${instance.instanceId}:${spec.key}`;
           let series = map.get(seriesKey);
           if (!series) {
             series = chartRef.current!.addSeries(LineSeries, {
               color: colorForInstance(instance, index),
-              lineWidth: (instance.lineWidth ?? (spec.key === 'mid' || spec.key === 'main' ? 2 : 1)) as
+              lineWidth: (instance.lineWidth ??
+                (spec.key === "mid" || spec.key === "main" ? 2 : 1)) as
                 | 1
                 | 2
                 | 3
@@ -413,7 +466,7 @@ export function OhlcvChart({
       shouldFitContentRef.current = false;
       if (chartSyncId) {
         requestAnimationFrame(() => {
-          getChartSyncHub(chartSyncId).broadcastFrom('main');
+          getChartSyncHub(chartSyncId).broadcastFrom("main");
         });
       }
     }
@@ -488,7 +541,8 @@ export function OhlcvChart({
           chart.applyOptions({ width, height });
         }
 
-        const ready = width > 0 && (fillContainer ? height > 0 : nextHeight > 0);
+        const ready =
+          width > 0 && (fillContainer ? height > 0 : nextHeight > 0);
         if (fillContainer) {
           if (ready && !layoutReadyRef.current) {
             layoutReadyRef.current = true;
@@ -516,9 +570,12 @@ export function OhlcvChart({
     const chart = createChart(container, {
       autoSize: false,
       width: container.clientWidth || undefined,
-      height: Math.max(MIN_CHART_HEIGHT, chartHeightRef.current || resolvedHeight),
+      height: Math.max(
+        MIN_CHART_HEIGHT,
+        chartHeightRef.current || resolvedHeight,
+      ),
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
+        background: { type: ColorType.Solid, color: "transparent" },
         textColor: colors.textColor,
       },
       grid: {
@@ -534,8 +591,9 @@ export function OhlcvChart({
         horzLine: { visible: !hideNativeCrosshair, labelVisible: false },
       },
       localization: {
-        locale: 'es-ES',
-        timeFormatter: (time: Time) => formatChartTimeAxisLabel(time, isIntraday),
+        locale: "es-ES",
+        timeFormatter: (time: Time) =>
+          formatChartTimeAxisLabel(time, isIntraday),
       },
       rightPriceScale: {
         borderColor: colors.gridColor,
@@ -555,7 +613,12 @@ export function OhlcvChart({
       },
       handleScroll: isDrawingMode
         ? false
-        : { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: true, vertTouchDrag: false },
+        : {
+            mouseWheel: false,
+            pressedMouseMove: false,
+            horzTouchDrag: true,
+            vertTouchDrag: false,
+          },
       handleScale: isDrawingMode
         ? false
         : {
@@ -574,10 +637,10 @@ export function OhlcvChart({
 
     if (showVolume) {
       const volume = chart.addSeries(HistogramSeries, {
-        priceFormat: { type: 'volume' },
-        priceScaleId: 'volume',
+        priceFormat: { type: "volume" },
+        priceScaleId: "volume",
       });
-      chart.priceScale('volume').applyOptions({
+      chart.priceScale("volume").applyOptions({
         scaleMargins: volumeMarginsForZoom(volumeScaleZoom),
       });
       volumeRef.current = volume;
@@ -587,7 +650,7 @@ export function OhlcvChart({
       sma20Ref.current = chart.addSeries(LineSeries, {
         color: colors.sma20Color,
         lineWidth: 2,
-        title: 'SMA20',
+        title: "SMA20",
         visible: display.showSma20,
         lastValueVisible: false,
         priceLineVisible: false,
@@ -595,7 +658,7 @@ export function OhlcvChart({
       sma50Ref.current = chart.addSeries(LineSeries, {
         color: colors.sma50Color,
         lineWidth: 2,
-        title: 'SMA50',
+        title: "SMA50",
         visible: display.showSma50,
         lastValueVisible: false,
         priceLineVisible: false,
@@ -603,7 +666,7 @@ export function OhlcvChart({
       ema20Ref.current = chart.addSeries(LineSeries, {
         color: colors.ema20Color,
         lineWidth: 2,
-        title: 'EMA20',
+        title: "EMA20",
         visible: display.showEma20,
         lastValueVisible: false,
         priceLineVisible: false,
@@ -620,7 +683,7 @@ export function OhlcvChart({
       chart.remove();
       chartRef.current = null;
       mainSeriesRef.current = null;
-      mainSeriesEngineRef.current = 'candlestick';
+      mainSeriesEngineRef.current = "candlestick";
       volumeRef.current = null;
       sma20Ref.current = null;
       sma50Ref.current = null;
@@ -652,20 +715,27 @@ export function OhlcvChart({
   }, []);
 
   useEffect(() => {
-    if (!chartReady || !chartRef.current || !mainSeriesRef.current || !chartSyncId) return;
+    if (
+      !chartReady ||
+      !chartRef.current ||
+      !mainSeriesRef.current ||
+      !chartSyncId
+    )
+      return;
     return getChartSyncHub(chartSyncId).register({
-      id: 'main',
+      id: "main",
       chart: chartRef.current,
-      kind: 'main',
+      kind: "main",
       series: mainSeriesRef.current,
     });
   }, [chartReady, chartSyncId]);
 
   useEffect(() => {
-    if (!chartReady || !containerRef.current || !chartSyncId || isDrawingMode) return;
+    if (!chartReady || !containerRef.current || !chartSyncId || isDrawingMode)
+      return;
     return attachChartHorizontalWheel(containerRef.current, chartSyncId, {
       isDisabled: () => isDrawingMode,
-      sourcePaneId: 'main',
+      sourcePaneId: "main",
       getAnchorLogical: (clientX) => {
         const chart = chartRef.current;
         const el = containerRef.current;
@@ -678,7 +748,13 @@ export function OhlcvChart({
 
   const handleConfigureIndicatorAtPoint = useCallback(
     (clientX: number, clientY: number) => {
-      if (!onConfigureIndicator || !instanceMode || !chartRef.current || !chartContainer) return;
+      if (
+        !onConfigureIndicator ||
+        !instanceMode ||
+        !chartRef.current ||
+        !chartContainer
+      )
+        return;
       const instanceId = findOverlayInstanceAtPixel(
         chartRef.current,
         chartContainer,
@@ -698,8 +774,8 @@ export function OhlcvChart({
     const onDblClick = (event: MouseEvent) => {
       handleConfigureIndicatorAtPoint(event.clientX, event.clientY);
     };
-    chartContainer.addEventListener('dblclick', onDblClick);
-    return () => chartContainer.removeEventListener('dblclick', onDblClick);
+    chartContainer.addEventListener("dblclick", onDblClick);
+    return () => chartContainer.removeEventListener("dblclick", onDblClick);
   }, [
     chartContainer,
     drawTool,
@@ -710,11 +786,16 @@ export function OhlcvChart({
   ]);
 
   const panInteractionDisabled =
-    blocksChartPan(drawTool) ||
-    drawTool === 'crosshair';
+    blocksChartPan(drawTool) || drawTool === "crosshair";
 
   useEffect(() => {
-    if (!chartReady || !wrapperRef.current || !containerRef.current || panInteractionDisabled) return;
+    if (
+      !chartReady ||
+      !wrapperRef.current ||
+      !containerRef.current ||
+      panInteractionDisabled
+    )
+      return;
 
     const cancelPan = attachChartPricePan({
       hitTarget: containerRef.current,
@@ -757,7 +838,9 @@ export function OhlcvChart({
         return;
       }
       const bar =
-        bars.find((item) => barTimeToChartTime(item.timestamp) === param.time) ?? null;
+        bars.find(
+          (item) => barTimeToChartTime(item.timestamp) === param.time,
+        ) ?? null;
       useChartCursorStore.getState().setHoveredBar(instrumentId, bar);
     };
 
@@ -772,7 +855,7 @@ export function OhlcvChart({
     chart.applyOptions({
       height: resolvedHeight,
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
+        background: { type: ColorType.Solid, color: "transparent" },
         textColor: colors.textColor,
       },
       grid: {
@@ -788,8 +871,9 @@ export function OhlcvChart({
         horzLine: { visible: !hideNativeCrosshair, labelVisible: false },
       },
       localization: {
-        locale: 'es-ES',
-        timeFormatter: (time: Time) => formatChartTimeAxisLabel(time, isIntraday),
+        locale: "es-ES",
+        timeFormatter: (time: Time) =>
+          formatChartTimeAxisLabel(time, isIntraday),
       },
       rightPriceScale: {
         borderColor: colors.gridColor,
@@ -809,7 +893,12 @@ export function OhlcvChart({
       },
       handleScroll: isDrawingMode
         ? false
-        : { mouseWheel: false, pressedMouseMove: false, horzTouchDrag: true, vertTouchDrag: false },
+        : {
+            mouseWheel: false,
+            pressedMouseMove: false,
+            horzTouchDrag: true,
+            vertTouchDrag: false,
+          },
       handleScale: isDrawingMode
         ? false
         : {
@@ -820,16 +909,20 @@ export function OhlcvChart({
     });
 
     if (showVolume && volumeRef.current) {
-      chart.priceScale('volume').applyOptions({
+      chart.priceScale("volume").applyOptions({
         scaleMargins: volumeMarginsForZoom(volumeScaleZoom),
       });
     }
 
     if (mainSeriesRef.current) {
-      applyMainPriceSeriesColors(mainSeriesRef.current, mainSeriesEngineRef.current, {
-        upColor: colors.upColor,
-        downColor: colors.downColor,
-      });
+      applyMainPriceSeriesColors(
+        mainSeriesRef.current,
+        mainSeriesEngineRef.current,
+        {
+          upColor: colors.upColor,
+          downColor: colors.downColor,
+        },
+      );
     }
 
     sma20Ref.current?.applyOptions({
@@ -873,9 +966,9 @@ export function OhlcvChart({
     <div
       ref={wrapperRef}
       className={cn(
-        'relative w-full',
-        fillContainer && 'h-full min-h-0',
-        drawTool === 'crosshair' && 'cursor-crosshair',
+        "relative w-full",
+        fillContainer && "h-full min-h-0",
+        drawTool === "crosshair" && "cursor-crosshair",
       )}
       style={fillContainer ? undefined : { height: resolvedHeight }}
     >
@@ -888,8 +981,8 @@ export function OhlcvChart({
       {showEmptyMessage && (
         <div className="pointer-events-auto absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-background/90 p-4 text-center text-sm text-muted-foreground">
           <p>
-            Sin datos OHLCV{symbol ? ` para ${symbol}` : ''}. Sincroniza el instrumento para cargar
-            histórico.
+            Sin datos OHLCV{symbol ? ` para ${symbol}` : ""}. Sincroniza el
+            instrumento para cargar histórico.
           </p>
           {instrumentId && (
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -899,18 +992,32 @@ export function OhlcvChart({
                 disabled={syncMutation.isPending}
                 onClick={() => void syncMutation.mutate()}
               >
-                <RefreshCw className={cn('mr-1 h-4 w-4', syncMutation.isPending && 'animate-spin')} />
-                {syncMutation.isPending ? 'Sincronizando…' : 'Sincronizar Yahoo'}
+                <RefreshCw
+                  className={cn(
+                    "mr-1 h-4 w-4",
+                    syncMutation.isPending && "animate-spin",
+                  )}
+                />
+                {syncMutation.isPending
+                  ? "Sincronizando…"
+                  : "Sincronizar Yahoo"}
               </Button>
               {onOpenSyncDialog && (
-                <Button type="button" size="sm" variant="outline" onClick={onOpenSyncDialog}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onOpenSyncDialog}
+                >
                   Más opciones…
                 </Button>
               )}
             </div>
           )}
           {syncMutation.isError && (
-            <p className="text-xs text-destructive">{formatSyncError(syncMutation.error)}</p>
+            <p className="text-xs text-destructive">
+              {formatSyncError(syncMutation.error)}
+            </p>
           )}
         </div>
       )}
@@ -922,27 +1029,33 @@ export function OhlcvChart({
           showTime={isIntraday}
         />
       )}
-      {drawingEnabled && chartReady && hasChartData(bars) && usesCustomChartCursor(drawTool) && (
-        <ChartCursorStyleOverlay
-          chart={chartRef.current}
-          series={mainSeriesRef.current}
-          container={chartContainer}
-          height={resolvedHeight}
-          tool={drawTool}
-          color={drawToolColor}
-          onPlaceArrowMarker={drawTool === 'arrow' ? onAddDrawing : undefined}
-        />
-      )}
-      {drawingEnabled && chartReady && hasChartData(bars) && drawTool === 'crosshair' && (
-        <ChartCrosshairMeasure
-          chart={chartRef.current}
-          series={mainSeriesRef.current}
-          container={chartContainer}
-          height={resolvedHeight}
-          bars={bars}
-          active
-        />
-      )}
+      {drawingEnabled &&
+        chartReady &&
+        hasChartData(bars) &&
+        usesCustomChartCursor(drawTool) && (
+          <ChartCursorStyleOverlay
+            chart={chartRef.current}
+            series={mainSeriesRef.current}
+            container={chartContainer}
+            height={resolvedHeight}
+            tool={drawTool}
+            color={drawToolColor}
+            onPlaceArrowMarker={drawTool === "arrow" ? onAddDrawing : undefined}
+          />
+        )}
+      {drawingEnabled &&
+        chartReady &&
+        hasChartData(bars) &&
+        drawTool === "crosshair" && (
+          <ChartCrosshairMeasure
+            chart={chartRef.current}
+            series={mainSeriesRef.current}
+            container={chartContainer}
+            height={resolvedHeight}
+            bars={bars}
+            active
+          />
+        )}
       {drawingEnabled && chartReady && hasChartData(bars) && (
         <ChartDrawingsLayer
           chart={chartRef.current}
@@ -960,7 +1073,9 @@ export function OhlcvChart({
           onDrawingDragEnd={onDrawingDragEnd}
           onOpenDrawingEditor={onOpenDrawingEditor}
           onBackgroundDoubleClick={
-            onConfigureIndicator && instanceMode ? handleConfigureIndicatorAtPoint : undefined
+            onConfigureIndicator && instanceMode
+              ? handleConfigureIndicatorAtPoint
+              : undefined
           }
           onInteractionCaptureChange={(captures) => {
             drawingCapturesPointerRef.current = captures;
