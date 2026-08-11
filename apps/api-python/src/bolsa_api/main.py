@@ -5,9 +5,12 @@ Arranque:
     # o: python -m bolsa_api.main
 
 Responsabilidades:
-    - Lifespan: engine SQLAlchemy, session factory, evaluators de alertas (precio + estrategia).
+    - Lifespan: engine SQLAlchemy, session factory, migraciones Alembic (F3b).
     - Middleware: CORS + auth opcional (APP_PASSWORD).
     - Router v1 bajo prefijo /api.
+
+Los workers/schedulers/crons ya no viven aquí (F3a/D3): se ejecutan en el
+proceso dedicado ``python -m bolsa_api.workers.scheduler_worker``.
 
 Ver docs/API_REFERENCE.md y docs/ONBOARDING.md.
 """
@@ -15,6 +18,14 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
+from bolsa_api.api.v1.router import api_v1_router
+from bolsa_api.logging_redact import install_log_redact
+from bolsa_api.middleware.auth import AuthMiddleware
+from bolsa_api.middleware.rate_limit import RateLimitMiddleware
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
 from bolsa_infrastructure.database.migrations import ensure_migrated
@@ -23,24 +34,6 @@ from bolsa_infrastructure.database.session import (
     create_session_factory,
 )
 from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
-from bolsa_api.api.v1.router import api_v1_router
-from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
-from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
-from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluator
-from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_opinion_worker
-from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
-from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
-from bolsa_api.background.optimization_worker import start_optimization_worker
-from bolsa_api.background.scan_worker import start_scan_worker
-from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
-from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
-from bolsa_api.logging_redact import install_log_redact
-from bolsa_api.middleware.auth import AuthMiddleware
-from bolsa_api.middleware.rate_limit import RateLimitMiddleware
 
 
 @asynccontextmanager
@@ -54,63 +47,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.session_factory = create_session_factory(engine)
     configure_ai_governance_proxy()
     _warn_if_routes_missing(app)
-    settings = get_settings()
-    evaluator_task = start_daily_alert_evaluator(app.state.session_factory)
-    signal_alert_task = start_signal_alert_evaluator(app.state.session_factory)
-    tracker_schedule_task = start_tracker_schedule_worker(app.state.session_factory)
-    fa_weekly_task = start_fa_weekly_worker(app.state.session_factory)
-    core_r_cron_task = start_core_r_cron_worker(app.state.session_factory)
-    estudio_eod_task = start_estudio_eod_opinion_worker(app.state.session_factory)
-    auto_sync_task = start_auto_sync_worker(app.state.session_factory)
-    index_subscribe_task = start_index_subscribe_worker(app.state.session_factory)
-    scan_worker_task: asyncio.Task[None] | None = None
-    optimization_worker_task: asyncio.Task[None] | None = None
-    if settings.scan_queue_backend.lower() != "arq":
-        scan_worker_task = start_scan_worker(app.state.session_factory)
-        optimization_worker_task = start_optimization_worker(app.state.session_factory)
-    else:
-        import logging
-
-        logging.getLogger("uvicorn.error").info(
-            "SCAN_QUEUE_BACKEND=arq — workers inline desactivados; ejecuta bolsa-arq-worker",
-        )
+    # F3a (D3): los workers/schedulers/crons ya NO se lanzan aquí. Viven en el
+    # proceso dedicado `python -m bolsa_api.workers.scheduler_worker`
+    # (P0.4: evitar duplicación de crons con `--workers N`).
     try:
         yield
     finally:
-        if scan_worker_task is not None:
-            scan_worker_task.cancel()
-        if optimization_worker_task is not None:
-            optimization_worker_task.cancel()
-        index_subscribe_task.cancel()
-        auto_sync_task.cancel()
-        signal_alert_task.cancel()
-        if tracker_schedule_task is not None:
-            tracker_schedule_task.cancel()
-        if fa_weekly_task is not None:
-            fa_weekly_task.cancel()
-        if core_r_cron_task is not None:
-            core_r_cron_task.cancel()
-        if estudio_eod_task is not None:
-            estudio_eod_task.cancel()
-        evaluator_task.cancel()
-        tasks = [index_subscribe_task, auto_sync_task, signal_alert_task, evaluator_task]
-        if tracker_schedule_task is not None:
-            tasks.append(tracker_schedule_task)
-        if fa_weekly_task is not None:
-            tasks.append(fa_weekly_task)
-        if core_r_cron_task is not None:
-            tasks.append(core_r_cron_task)
-        if estudio_eod_task is not None:
-            tasks.append(estudio_eod_task)
-        if scan_worker_task is not None:
-            tasks.insert(0, scan_worker_task)
-        if optimization_worker_task is not None:
-            tasks.insert(0, optimization_worker_task)
-        for task in tasks:
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
         if settings.scan_queue_backend.lower() == "arq":
             await close_scan_job_arq_pool()
         dispose_llm_call_audit_engine()

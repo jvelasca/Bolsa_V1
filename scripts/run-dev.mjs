@@ -360,6 +360,21 @@ const MAX_WEB_QUICK_RESTARTS = 3;
 webChild = startWebChild();
 children.push(webChild);
 
+const schedulerChild = spawn(
+  python,
+  ['-m', 'bolsa_api.workers.scheduler_worker'],
+  {
+    cwd: apiDir,
+    stdio: ['inherit', 'pipe', 'pipe'],
+    env: { ...process.env, PYTHONPATH: join(apiDir, 'src') },
+    shell: false,
+  },
+);
+children.push(schedulerChild);
+logInfo('dev', 'Scheduler worker (crons/evaluators) en proceso dedicado (D3)');
+tee(schedulerChild.stdout, 'stdout', log);
+tee(schedulerChild.stderr, 'stderr', log);
+
 const arqChild =
   SCAN_QUEUE_BACKEND === 'arq'
     ? spawn(python, ['-m', 'bolsa_api.workers.arq_worker'], {
