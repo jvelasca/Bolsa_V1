@@ -22,9 +22,11 @@ async def test_list_lists_syncs_ibex_only_if_present() -> None:
     repo = MagicMock()
     repo.sync_ibex_catalog_list_if_present = AsyncMock(return_value=None)
     repo.list_all = AsyncMock(return_value=[])
+    repo.ensure_estudio_list = AsyncMock()
     repo.ensure_ibex_catalog_list = AsyncMock()
     await ListInstrumentLists(repo).execute()
     repo.sync_ibex_catalog_list_if_present.assert_awaited_once()
+    repo.ensure_estudio_list.assert_awaited_once()
     repo.ensure_ibex_catalog_list.assert_not_awaited()
 
 
@@ -33,11 +35,13 @@ async def test_list_lists_uses_sync_indices_when_provided() -> None:
     repo = MagicMock()
     repo.list_all = AsyncMock(return_value=[])
     repo.sync_ibex_catalog_list_if_present = AsyncMock()
+    repo.ensure_estudio_list = AsyncMock()
     sync = MagicMock()
     sync.execute = AsyncMock(return_value=[])
     await ListInstrumentLists(repo, sync_indices=sync).execute()
     sync.execute.assert_awaited_once()
     repo.sync_ibex_catalog_list_if_present.assert_not_awaited()
+    repo.ensure_estudio_list.assert_awaited_once()
 
 
 @pytest.mark.asyncio
