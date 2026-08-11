@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import type { IChartApi, Time } from 'lightweight-charts';
-import type { OhlcvBarDto } from '@bolsa/shared';
-import { formatPct, formatPrice } from '@/features/charts/chart-utils';
-import { horzTimeToString, type ChartPriceSeries } from '@/features/charts/chart-drawing-utils';
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import type { IChartApi, Time } from "lightweight-charts";
+import type { OhlcvBarDto } from "@bolsa/shared";
+import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import {
+  horzTimeToString,
+  type ChartPriceSeries,
+} from "@/features/charts/chart-drawing-utils";
 
 interface ChartCrosshairMeasureProps {
   chart: IChartApi | null;
@@ -38,7 +41,10 @@ function formatDuration(ms: number): string {
   return `${days} d`;
 }
 
-function estimateVisibleBarCount(chart: IChartApi, bars: OhlcvBarDto[]): number {
+function estimateVisibleBarCount(
+  chart: IChartApi,
+  bars: OhlcvBarDto[],
+): number {
   const range = chart.timeScale().getVisibleLogicalRange();
   if (!range) return bars.length;
   return Math.max(1, Math.round(range.to - range.from));
@@ -48,7 +54,7 @@ function axisLabel(
   x: number,
   y: number,
   lines: string[],
-  align: 'left' | 'center' | 'right',
+  align: "left" | "center" | "right",
 ): React.ReactNode {
   const lineHeight = 12;
   const padding = 6;
@@ -56,17 +62,23 @@ function axisLabel(
   const boxW = Math.min(180, maxLen * 6.4 + padding * 2);
   const boxH = lines.length * lineHeight + padding * 2;
   const tx =
-    align === 'left' ? x + 8 : align === 'right' ? x - boxW - 8 : x - boxW / 2;
+    align === "left" ? x + 8 : align === "right" ? x - boxW - 8 : x - boxW / 2;
   const ty = y - boxH / 2;
 
   return (
-    <foreignObject x={tx} y={ty} width={boxW} height={boxH} className="overflow-visible">
+    <foreignObject
+      x={tx}
+      y={ty}
+      width={boxW}
+      height={boxH}
+      className="overflow-visible"
+    >
       <div
         className="box-border flex h-full w-full flex-col justify-center rounded px-1.5 py-1 text-[10px] font-medium leading-[12px] shadow-md"
         style={{
-          backgroundColor: 'hsl(var(--popover))',
-          color: 'hsl(var(--popover-foreground))',
-          border: '1px solid hsl(var(--border))',
+          backgroundColor: "hsl(var(--popover))",
+          color: "hsl(var(--popover-foreground))",
+          border: "1px solid hsl(var(--border))",
         }}
       >
         {lines.map((line) => (
@@ -128,7 +140,8 @@ export function ChartCrosshairMeasure({
     (clientX: number, clientY: number): MeasurePoint | null => {
       if (!chart || !series) return null;
       const bounds =
-        layerRef.current?.getBoundingClientRect() ?? container?.getBoundingClientRect();
+        layerRef.current?.getBoundingClientRect() ??
+        container?.getBoundingClientRect();
       if (!bounds) return null;
       const x = clientX - bounds.left;
       const y = clientY - bounds.top;
@@ -181,7 +194,9 @@ export function ChartCrosshairMeasure({
     const priceDelta = cursor.price - anchor.price;
     const pricePct = anchor.price !== 0 ? (priceDelta / anchor.price) * 100 : 0;
     const barCount = countBarsBetween(bars, anchor.time, cursor.time);
-    const visibleBars = chart ? estimateVisibleBarCount(chart, bars) : bars.length;
+    const visibleBars = chart
+      ? estimateVisibleBarCount(chart, bars)
+      : bars.length;
     const timePct = visibleBars > 0 ? (barCount / visibleBars) * 100 : 0;
     const duration = formatDuration(
       Math.abs(parseBarTime(cursor.time) - parseBarTime(anchor.time)),
@@ -224,13 +239,13 @@ export function ChartCrosshairMeasure({
             `H · ${barCount} velas · ${duration}`,
             `Δt ${timePct.toFixed(1)}% del rango visible`,
           ],
-          'center',
+          "center",
         )}
         {axisLabel(
           Math.min(right + 4, width - 8),
           midY,
           [`V · Δ ${formatPrice(priceDelta)}`, `Δ ${formatPct(pricePct)}`],
-          'right',
+          "right",
         )}
       </>
     );
@@ -240,14 +255,23 @@ export function ChartCrosshairMeasure({
     <div
       ref={layerRef}
       className="absolute inset-0 z-[11] cursor-crosshair"
-      style={{ height, pointerEvents: 'auto' }}
+      style={{ height, pointerEvents: "auto" }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
-      <svg className="pointer-events-none h-full w-full" width={width} height={height}>
+      <svg
+        className="pointer-events-none h-full w-full"
+        width={width}
+        height={height}
+      >
         {preview && (
-          <g stroke="#14b8a6" strokeWidth={1} strokeDasharray="5 4" strokeOpacity={0.75}>
+          <g
+            stroke="#14b8a6"
+            strokeWidth={1}
+            strokeDasharray="5 4"
+            strokeOpacity={0.75}
+          >
             <line x1={hover.x} y1={0} x2={hover.x} y2={height} />
             <line x1={0} y1={hover.y} x2={width} y2={hover.y} />
           </g>
@@ -259,7 +283,12 @@ export function ChartCrosshairMeasure({
           </g>
         )}
         {showMeasure && cursor && (
-          <g stroke="#14b8a6" strokeWidth={1} strokeDasharray="4 3" strokeOpacity={0.55}>
+          <g
+            stroke="#14b8a6"
+            strokeWidth={1}
+            strokeDasharray="4 3"
+            strokeOpacity={0.55}
+          >
             <line x1={cursor.x} y1={0} x2={cursor.x} y2={height} />
             <line x1={0} y1={cursor.y} x2={width} y2={cursor.y} />
           </g>

@@ -1,5 +1,5 @@
-import { useEffect, useReducer, useState } from 'react';
-import type { IChartApi, Time } from 'lightweight-charts';
+import { useEffect, useReducer, useState } from "react";
+import type { IChartApi, Time } from "lightweight-charts";
 import {
   DEFAULT_CHART_DRAW_COLOR,
   DEFAULT_DOT_HALO_RADIUS,
@@ -7,16 +7,16 @@ import {
   semanticIdForDrawingType,
   type ChartDrawTool,
   type ChartDrawing,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 import {
   horzTimeToString,
   markerRotation,
   type ChartPriceSeries,
-} from '@/features/charts/chart-drawing-utils';
+} from "@/features/charts/chart-drawing-utils";
 import {
   isCursorArrowTool,
   usesCustomChartCursor,
-} from '@/features/charts/chart-draw-tool-utils';
+} from "@/features/charts/chart-draw-tool-utils";
 
 interface ChartCursorStyleOverlayProps {
   chart: IChartApi | null;
@@ -69,20 +69,23 @@ export function ChartCursorStyleOverlay({
   }, [active, chart]);
 
   useEffect(() => {
-    if (!chart || !series || tool !== 'arrow' || !onPlaceArrowMarker) return;
+    if (!chart || !series || tool !== "arrow" || !onPlaceArrowMarker) return;
 
-    const handler = (param: { point?: { x: number; y: number }; time?: Time }) => {
+    const handler = (param: {
+      point?: { x: number; y: number };
+      time?: Time;
+    }) => {
       if (!param.point || param.time == null) return;
       const price = series.coordinateToPrice(param.point.y);
       if (price == null) return;
       const time = horzTimeToString(param.time);
       onPlaceArrowMarker({
         id: newChartDrawingId(),
-        type: 'arrow-marker',
+        type: "arrow-marker",
         point: { time, price },
-        direction: 'up',
+        direction: "up",
         color,
-        semanticId: semanticIdForDrawingType('arrow-marker'),
+        semanticId: semanticIdForDrawingType("arrow-marker"),
       });
     };
 
@@ -100,7 +103,7 @@ export function ChartCursorStyleOverlay({
       style={{ height }}
     >
       <svg className="h-full w-full" width={width} height={height}>
-        {tool === 'cross' && (
+        {tool === "cross" && (
           <g
             stroke={color}
             strokeWidth={1.25}
@@ -111,10 +114,17 @@ export function ChartCursorStyleOverlay({
             <line x1={0} y1={pos.y} x2={width} y2={pos.y} />
           </g>
         )}
-        {tool === 'dot' && (
-          <circle cx={pos.x} cy={pos.y} r={4} fill={color} stroke={color} strokeWidth={1} />
+        {tool === "dot" && (
+          <circle
+            cx={pos.x}
+            cy={pos.y}
+            r={4}
+            fill={color}
+            stroke={color}
+            strokeWidth={1}
+          />
         )}
-        {tool === 'dot-halo' && (
+        {tool === "dot-halo" && (
           <g>
             <circle
               cx={pos.x}
@@ -131,7 +141,7 @@ export function ChartCursorStyleOverlay({
         )}
         {isCursorArrowTool(tool) && (
           <g
-            transform={`translate(${pos.x}, ${pos.y}) rotate(${markerRotation('up')})`}
+            transform={`translate(${pos.x}, ${pos.y}) rotate(${markerRotation("up")})`}
             fill={color}
           >
             <path d="M0,-10 L-6,4 L0,0 L6,4 Z" />

@@ -4,12 +4,12 @@
  * Si no hay FA, dispara búsqueda Yahoo e informa del estado.
  */
 
-import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
-import { useEnsureInstrumentFundamentals } from '@/features/instruments/use-ensure-instrument-fundamentals';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { Loader2 } from "lucide-react";
+import { useEnsureInstrumentFundamentals } from "@/features/instruments/use-ensure-instrument-fundamentals";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Props = {
   instrumentId: string;
@@ -17,10 +17,10 @@ type Props = {
 };
 
 function tone(score100: number | null): string {
-  if (score100 == null) return 'text-muted-foreground';
-  if (score100 >= 70) return 'text-emerald-700 dark:text-emerald-300';
-  if (score100 >= 45) return 'text-amber-800 dark:text-amber-200';
-  return 'text-destructive';
+  if (score100 == null) return "text-muted-foreground";
+  if (score100 >= 70) return "text-emerald-700 dark:text-emerald-300";
+  if (score100 >= 45) return "text-amber-800 dark:text-amber-200";
+  return "text-destructive";
 }
 
 /** Pierna Composite ∈ [-1,+1] → display 0..100. */
@@ -47,54 +47,60 @@ function ScoreChip({
       to={to}
       title={title}
       className={cn(
-        'inline-flex h-[1.375rem] shrink-0 items-center gap-1 rounded border border-border/70 bg-background/60 px-1.5 text-[10px] font-medium hover:border-primary/40 hover:bg-accent',
+        "inline-flex h-[1.375rem] shrink-0 items-center gap-1 rounded border border-border/70 bg-background/60 px-1.5 text-[10px] font-medium hover:border-primary/40 hover:bg-accent",
         tone(score100),
-        busy && 'opacity-80',
+        busy && "opacity-80",
       )}
     >
       <span className="text-muted-foreground">{label}</span>
       {busy ? (
-        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" aria-hidden />
+        <Loader2
+          className="h-3 w-3 animate-spin text-muted-foreground"
+          aria-hidden
+        />
       ) : (
-        <span className="tabular-nums">{score100 != null ? score100 : '—'}</span>
+        <span className="tabular-nums">
+          {score100 != null ? score100 : "—"}
+        </span>
       )}
     </Link>
   );
 }
 
 export function ChartAnalysisScoreButtons({ instrumentId, className }: Props) {
-  const {
-    card,
-    status,
-    statusLabel,
-    isRefreshing,
-  } = useEnsureInstrumentFundamentals(instrumentId);
+  const { card, status, statusLabel, isRefreshing } =
+    useEnsureInstrumentFundamentals(instrumentId);
 
   const compositeQuery = useQuery({
-    queryKey: ['instrument-composite', instrumentId, 'swing', 'neutral'],
+    queryKey: ["instrument-composite", instrumentId, "swing", "neutral"],
     queryFn: () =>
-      api.getInstrumentComposite(instrumentId, { horizon: 'swing', regime: 'neutral' }),
-    enabled: Boolean(instrumentId) && status === 'ready',
+      api.getInstrumentComposite(instrumentId, {
+        horizon: "swing",
+        regime: "neutral",
+      }),
+    enabled: Boolean(instrumentId) && status === "ready",
     staleTime: 60_000,
   });
 
   const fundScore = card?.scoreDisplay100 ?? null;
-  const techLeg = compositeQuery.data?.data?.legs?.find((l) => l.key === 'technical');
+  const techLeg = compositeQuery.data?.data?.legs?.find(
+    (l) => l.key === "technical",
+  );
   const techScore = legToDisplay100(techLeg?.score ?? null);
-  const faBusy = status === 'loading' || status === 'refreshing';
+  const faBusy = status === "loading" || status === "refreshing";
 
   const base = `/backtests?instrumentId=${encodeURIComponent(instrumentId)}`;
 
   const faTitle =
-    status === 'refreshing' || status === 'loading'
+    status === "refreshing" || status === "loading"
       ? statusLabel
-      : status === 'empty' || status === 'error'
+      : status === "empty" || status === "error"
         ? statusLabel
-        : 'Análisis fundamental (Score_FUND) → Backtesting';
+        : "Análisis fundamental (Score_FUND) → Backtesting";
 
   return (
     <div
-      className={cn('flex shrink-0 flex-col items-end gap-0.5', className)}
+      className={cn("flex shrink-0 flex-col items-end gap-0.5", className)}
       role="group"
       aria-label="Scores análisis técnico y fundamental"
     >
@@ -106,7 +112,7 @@ export function ChartAnalysisScoreButtons({ instrumentId, className }: Props) {
           title={
             techLeg?.method
               ? `Análisis técnico (${techLeg.method}) → Backtesting`
-              : 'Análisis técnico → Backtesting'
+              : "Análisis técnico → Backtesting"
           }
         />
         <ScoreChip
@@ -117,15 +123,22 @@ export function ChartAnalysisScoreButtons({ instrumentId, className }: Props) {
           busy={faBusy}
         />
       </div>
-      {(status === 'refreshing' || status === 'empty' || status === 'error') && statusLabel ? (
+      {(status === "refreshing" || status === "empty" || status === "error") &&
+      statusLabel ? (
         <p
           className={cn(
-            'max-w-[14rem] truncate text-[9px] leading-tight',
-            status === 'error' ? 'text-destructive' : 'text-muted-foreground',
+            "max-w-[14rem] truncate text-[9px] leading-tight",
+            status === "error" ? "text-destructive" : "text-muted-foreground",
           )}
           title={statusLabel}
         >
-          {isRefreshing ? 'Actualizando FA…' : status === 'empty' ? 'FA sin datos' : status === 'error' ? 'FA error' : statusLabel}
+          {isRefreshing
+            ? "Actualizando FA…"
+            : status === "empty"
+              ? "FA sin datos"
+              : status === "error"
+                ? "FA error"
+                : statusLabel}
         </p>
       ) : null}
     </div>

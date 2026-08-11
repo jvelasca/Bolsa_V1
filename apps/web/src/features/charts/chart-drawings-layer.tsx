@@ -1,5 +1,12 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { IChartApi } from 'lightweight-charts';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
+import type { IChartApi } from "lightweight-charts";
 import {
   DEFAULT_CHART_DRAW_COLOR,
   DEFAULT_DOT_HALO_RADIUS,
@@ -29,8 +36,8 @@ import {
   type ChartDrawingPoint,
   type ChartDrawingVertexPatch,
   type ChartMarkerDirection,
-} from '@bolsa/shared';
-import type { OhlcvBarDto } from '@bolsa/shared';
+} from "@bolsa/shared";
+import type { OhlcvBarDto } from "@bolsa/shared";
 import {
   channelParallelEnd,
   drawingPointToChartTime,
@@ -56,15 +63,22 @@ import {
   wholeDrawingPatch,
   pitchforkRays,
   type ChartPriceSeries,
-} from '@/features/charts/chart-drawing-utils';
-import { THREE_POINT_DRAW_TOOLS, TWO_POINT_DRAW_TOOLS } from '@/features/charts/chart-drawing-tools';
-import { canInteractWithDrawings, isShapeDrawTool, shouldCaptureDrawingPointer } from '@/features/charts/chart-draw-tool-utils';
+} from "@/features/charts/chart-drawing-utils";
+import {
+  THREE_POINT_DRAW_TOOLS,
+  TWO_POINT_DRAW_TOOLS,
+} from "@/features/charts/chart-drawing-tools";
+import {
+  canInteractWithDrawings,
+  isShapeDrawTool,
+  shouldCaptureDrawingPointer,
+} from "@/features/charts/chart-draw-tool-utils";
 import {
   computeRegressionLine,
   defaultInfoLineLabel,
   lineAngleDegrees,
-} from '@/features/charts/chart-drawing-regression';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/features/charts/chart-drawing-regression";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 interface ChartDrawingsLayerProps {
   chart: IChartApi | null;
@@ -89,11 +103,16 @@ interface ChartDrawingsLayerProps {
   onInteractionCaptureChange?: (captures: boolean) => void;
 }
 
-type VertexKey = 'p1' | 'p2' | 'p3';
+type VertexKey = "p1" | "p2" | "p3";
 
-function getVertexPoint(drawing: ChartDrawing, key: VertexKey): ChartDrawingPoint | undefined {
-  if (key === 'p3') {
-    return drawing.type === 'channel' || drawing.type === 'pitchfork' ? drawing.p3 : undefined;
+function getVertexPoint(
+  drawing: ChartDrawing,
+  key: VertexKey,
+): ChartDrawingPoint | undefined {
+  if (key === "p3") {
+    return drawing.type === "channel" || drawing.type === "pitchfork"
+      ? drawing.p3
+      : undefined;
   }
   if (!isPointLineDrawing(drawing)) {
     return undefined;
@@ -103,20 +122,22 @@ function getVertexPoint(drawing: ChartDrawing, key: VertexKey): ChartDrawingPoin
 
 function markerPoint(drawing: ChartDrawing): ChartDrawingPoint | undefined {
   if (
-    drawing.type === 'cross-marker' ||
-    drawing.type === 'dot-marker' ||
-    drawing.type === 'dot-halo-marker' ||
-    drawing.type === 'arrow-marker' ||
-    drawing.type === 'arrow-circle-marker' ||
-    drawing.type === 'text-label' ||
-    drawing.type === 'hray'
+    drawing.type === "cross-marker" ||
+    drawing.type === "dot-marker" ||
+    drawing.type === "dot-halo-marker" ||
+    drawing.type === "arrow-marker" ||
+    drawing.type === "arrow-circle-marker" ||
+    drawing.type === "text-label" ||
+    drawing.type === "hray"
   ) {
     return drawing.point;
   }
   return undefined;
 }
 
-function textOnChart(drawing: Extract<ChartDrawing, { type: 'text-label' }>): string {
+function textOnChart(
+  drawing: Extract<ChartDrawing, { type: "text-label" }>,
+): string {
   return drawing.label?.trim() || drawing.text?.trim() || DEFAULT_TEXT_LABEL;
 }
 
@@ -144,7 +165,10 @@ export function ChartDrawingsLayer({
   const stepRef = useRef(0);
   const [draftStart, setDraftStart] = useState<ChartDrawingPoint | null>(null);
   const [draftEnd, setDraftEnd] = useState<ChartDrawingPoint | null>(null);
-  const [dragRect, setDragRect] = useState<{ start: ChartDrawingPoint; end: ChartDrawingPoint } | null>(null);
+  const [dragRect, setDragRect] = useState<{
+    start: ChartDrawingPoint;
+    end: ChartDrawingPoint;
+  } | null>(null);
   const [hoverPoint, setHoverPoint] = useState<ChartDrawingPoint | null>(null);
   const dragVertexRef = useRef<{ id: string; key: VertexKey } | null>(null);
   const dragHlineRef = useRef<string | null>(null);
@@ -158,41 +182,59 @@ export function ChartDrawingsLayer({
   } | null>(null);
   const pendingDragRef = useRef<{
     mode:
-      | { kind: 'vertex'; id: string; key: VertexKey }
-      | { kind: 'marker'; id: string }
-      | { kind: 'hline'; id: string }
-      | { kind: 'vline'; id: string }
-      | { kind: 'whole'; id: string; snapshot: ChartDrawing; anchor: ChartDrawingPoint };
+      | { kind: "vertex"; id: string; key: VertexKey }
+      | { kind: "marker"; id: string }
+      | { kind: "hline"; id: string }
+      | { kind: "vline"; id: string }
+      | {
+          kind: "whole";
+          id: string;
+          snapshot: ChartDrawing;
+          anchor: ChartDrawingPoint;
+        };
     startX: number;
     startY: number;
     pointerId: number;
     target: HTMLDivElement;
   } | null>(null);
   const arrowDraftRef = useRef<ChartDrawingPoint | null>(null);
-  const arrowDraftToolRef = useRef<'arrow' | 'arrow-circle'>('arrow');
-  const [arrowDraftEnd, setArrowDraftEnd] = useState<ChartDrawingPoint | null>(null);
+  const arrowDraftToolRef = useRef<"arrow" | "arrow-circle">("arrow");
+  const [arrowDraftEnd, setArrowDraftEnd] = useState<ChartDrawingPoint | null>(
+    null,
+  );
   const brushDraftRef = useRef<ChartDrawingPoint[] | null>(null);
-  const [brushDraftPoints, setBrushDraftPoints] = useState<ChartDrawingPoint[]>([]);
+  const [brushDraftPoints, setBrushDraftPoints] = useState<ChartDrawingPoint[]>(
+    [],
+  );
   const layerRef = useRef<HTMLDivElement>(null);
   const draggedRef = useRef(false);
-  const dragTextSizeRef = useRef<{ id: string; startY: number; startSize: number } | null>(null);
+  const dragTextSizeRef = useRef<{
+    id: string;
+    startY: number;
+    startSize: number;
+  } | null>(null);
   const [inlineTextEditId, setInlineTextEditId] = useState<string | null>(null);
-  const [inlineTextDraft, setInlineTextDraft] = useState('');
+  const [inlineTextDraft, setInlineTextDraft] = useState("");
   const [hoveringDrawing, setHoveringDrawing] = useState(false);
   const [interactionDragging, setInteractionDragging] = useState(false);
 
   const activeTemplateId = useWorkspaceStore(
     (s) => s.workspace.activeDrawingTemplateByTool?.[tool] ?? null,
   );
-  const drawingTemplates = useWorkspaceStore((s) => s.workspace.drawingTemplates);
+  const drawingTemplates = useWorkspaceStore(
+    (s) => s.workspace.drawingTemplates,
+  );
 
   const activeTemplatePatch = useMemo(() => {
     if (!activeTemplateId) return null;
-    const pool = drawingTemplates?.length ? drawingTemplates : DEFAULT_DRAWING_TEMPLATES;
+    const pool = drawingTemplates?.length
+      ? drawingTemplates
+      : DEFAULT_DRAWING_TEMPLATES;
     const template = pool.find((item) => item.id === activeTemplateId);
     if (!template) return null;
     const drawingType = drawingTypeForTool(tool);
-    if (drawingType && !templateMatchesDrawingType(template, drawingType)) return null;
+    if (drawingType && !templateMatchesDrawingType(template, drawingType))
+      return null;
     return stylePatchFromTemplate(template);
   }, [activeTemplateId, drawingTemplates, tool]);
 
@@ -200,12 +242,18 @@ export function ChartDrawingsLayer({
     (s) => s.workspace.chartToolbarGlobal?.lastDrawStyleByTool?.[tool],
   );
   const resolvedStyle = useMemo(
-    () => resolveDrawToolStyle(tool, { memory: lastStyleMemory, templatePatch: activeTemplatePatch }),
+    () =>
+      resolveDrawToolStyle(tool, {
+        memory: lastStyleMemory,
+        templatePatch: activeTemplatePatch,
+      }),
     [activeTemplatePatch, lastStyleMemory, tool],
   );
-  const rememberDrawStyleFromDrawing = useWorkspaceStore((s) => s.rememberDrawStyleFromDrawing);
+  const rememberDrawStyleFromDrawing = useWorkspaceStore(
+    (s) => s.rememberDrawStyleFromDrawing,
+  );
 
-  const newDrawingBase = (drawingType?: ChartDrawing['type']) => {
+  const newDrawingBase = (drawingType?: ChartDrawing["type"]) => {
     const semanticId = drawingType
       ? semanticIdForDrawingType(drawingType)
       : semanticIdForDrawTool(tool);
@@ -219,7 +267,9 @@ export function ChartDrawingsLayer({
   const toPx = useCallback(
     (point: ChartDrawingPoint): { x: number; y: number } | null => {
       if (!chart || !series) return null;
-      const x = chart.timeScale().timeToCoordinate(drawingPointToChartTime(point.time));
+      const x = chart
+        .timeScale()
+        .timeToCoordinate(drawingPointToChartTime(point.time));
       const y = series.priceToCoordinate(point.price);
       if (x == null || y == null) return null;
       return { x, y };
@@ -231,7 +281,8 @@ export function ChartDrawingsLayer({
     (clientX: number, clientY: number): ChartDrawingPoint | null => {
       if (!chart || !series) return null;
       const bounds =
-        layerRef.current?.getBoundingClientRect() ?? container?.getBoundingClientRect();
+        layerRef.current?.getBoundingClientRect() ??
+        container?.getBoundingClientRect();
       if (!bounds) return null;
       const x = clientX - bounds.left;
       const y = clientY - bounds.top;
@@ -246,7 +297,8 @@ export function ChartDrawingsLayer({
   const layerPointerPx = useCallback(
     (clientX: number, clientY: number): { px: number; py: number } | null => {
       const bounds =
-        layerRef.current?.getBoundingClientRect() ?? container?.getBoundingClientRect();
+        layerRef.current?.getBoundingClientRect() ??
+        container?.getBoundingClientRect();
       if (!bounds) return null;
       return { px: clientX - bounds.left, py: clientY - bounds.top };
     },
@@ -255,11 +307,23 @@ export function ChartDrawingsLayer({
 
   const hitTestDrawingsAt = useCallback(
     (px: number, py: number, hitThreshold = 10): string | null => {
-      const containerW = layerRef.current?.clientWidth ?? container?.clientWidth ?? 2000;
+      const containerW =
+        layerRef.current?.clientWidth ?? container?.clientWidth ?? 2000;
       for (let i = drawings.length - 1; i >= 0; i -= 1) {
         const candidate = drawings[i]!;
         if (!isDrawingVisible(candidate)) continue;
-        if (hitTestDrawing(candidate, px, py, toPx, hitThreshold, containerW, chart, series)) {
+        if (
+          hitTestDrawing(
+            candidate,
+            px,
+            py,
+            toPx,
+            hitThreshold,
+            containerW,
+            chart,
+            series,
+          )
+        ) {
           return candidate.id;
         }
       }
@@ -298,10 +362,16 @@ export function ChartDrawingsLayer({
   }, [tool]);
 
   useEffect(() => {
-    if (!chart || !canInteractWithDrawings(tool) || drawings.length === 0) return;
+    if (!chart || !canInteractWithDrawings(tool) || drawings.length === 0)
+      return;
 
     const handler = (param: { point?: { x: number; y: number } }) => {
-      if (pendingDragRef.current || dragVertexRef.current || dragWholeRef.current) return;
+      if (
+        pendingDragRef.current ||
+        dragVertexRef.current ||
+        dragWholeRef.current
+      )
+        return;
       if (!param.point) {
         onSelect(null);
         return;
@@ -311,7 +381,9 @@ export function ChartDrawingsLayer({
       for (let i = drawings.length - 1; i >= 0; i -= 1) {
         const drawing = drawings[i]!;
         if (!isDrawingVisible(drawing)) continue;
-        if (hitTestDrawing(drawing, x, y, toPx, 10, containerW, chart, series)) {
+        if (
+          hitTestDrawing(drawing, x, y, toPx, 10, containerW, chart, series)
+        ) {
           onSelect(drawing.id);
           return;
         }
@@ -324,7 +396,7 @@ export function ChartDrawingsLayer({
   }, [chart, container, drawings, onSelect, series, tool, toPx]);
 
   useEffect(() => {
-    if ((tool !== 'cross' && tool !== 'select') || !container || layerHidden) {
+    if ((tool !== "cross" && tool !== "select") || !container || layerHidden) {
       setHoveringDrawing(false);
       return;
     }
@@ -336,23 +408,29 @@ export function ChartDrawingsLayer({
         return;
       }
       const hitId = hitTestDrawingsAt(coords.px, coords.py, 12);
-      const vertexHit = findDrawingVertexHit(drawings, coords.px, coords.py, toPx, {
-        threshold: 16,
-        chart,
-        series,
-        containerWidth: container.clientWidth,
-        priorityDrawingId: selectedId,
-      });
+      const vertexHit = findDrawingVertexHit(
+        drawings,
+        coords.px,
+        coords.py,
+        toPx,
+        {
+          threshold: 16,
+          chart,
+          series,
+          containerWidth: container.clientWidth,
+          priorityDrawingId: selectedId,
+        },
+      );
       setHoveringDrawing(Boolean(hitId || vertexHit));
     };
 
     const onLeave = () => setHoveringDrawing(false);
 
-    container.addEventListener('mousemove', onMove);
-    container.addEventListener('mouseleave', onLeave);
+    container.addEventListener("mousemove", onMove);
+    container.addEventListener("mouseleave", onLeave);
     return () => {
-      container.removeEventListener('mousemove', onMove);
-      container.removeEventListener('mouseleave', onLeave);
+      container.removeEventListener("mousemove", onMove);
+      container.removeEventListener("mouseleave", onLeave);
     };
   }, [
     chart,
@@ -372,13 +450,13 @@ export function ChartDrawingsLayer({
     if (!pending) return;
     const { mode, pointerId, target } = pending;
     setInteractionDragging(true);
-    if (mode.kind === 'vertex') {
+    if (mode.kind === "vertex") {
       dragVertexRef.current = { id: mode.id, key: mode.key };
-    } else if (mode.kind === 'marker') {
+    } else if (mode.kind === "marker") {
       dragMarkerRef.current = mode.id;
-    } else if (mode.kind === 'hline') {
+    } else if (mode.kind === "hline") {
       dragHlineRef.current = mode.id;
-    } else if (mode.kind === 'vline') {
+    } else if (mode.kind === "vline") {
       dragVlineRef.current = mode.id;
     } else {
       dragWholeRef.current = {
@@ -401,41 +479,66 @@ export function ChartDrawingsLayer({
     onDrawingDragEnd?.();
   };
 
-  const finishTwoPoint = (toolType: ChartDrawTool, start: ChartDrawingPoint, end: ChartDrawingPoint) => {
-    if (toolType === 'regression') {
+  const finishTwoPoint = (
+    toolType: ChartDrawTool,
+    start: ChartDrawingPoint,
+    end: ChartDrawingPoint,
+  ) => {
+    if (toolType === "regression") {
       const fitted = computeRegressionLine(bars, start, end);
       placeDrawing({
-        ...newDrawingBase('regression'),
-        type: 'regression',
+        ...newDrawingBase("regression"),
+        type: "regression",
         p1: fitted?.p1 ?? start,
         p2: fitted?.p2 ?? end,
       });
-    } else if (toolType === 'info-line') {
-      const base = newDrawingBase('info-line');
+    } else if (toolType === "info-line") {
+      const base = newDrawingBase("info-line");
       placeDrawing({
         ...base,
-        type: 'info-line',
+        type: "info-line",
         p1: start,
         p2: end,
         label: defaultInfoLineLabel(start, end),
       });
-    } else if (toolType === 'ext-line') {
-      placeDrawing({ ...newDrawingBase('ext-line'), type: 'ext-line', p1: start, p2: end });
-    } else if (toolType === 'trend-angle') {
-      placeDrawing({ ...newDrawingBase('trend-angle'), type: 'trend-angle', p1: start, p2: end });
+    } else if (toolType === "ext-line") {
+      placeDrawing({
+        ...newDrawingBase("ext-line"),
+        type: "ext-line",
+        p1: start,
+        p2: end,
+      });
+    } else if (toolType === "trend-angle") {
+      placeDrawing({
+        ...newDrawingBase("trend-angle"),
+        type: "trend-angle",
+        p1: start,
+        p2: end,
+      });
     } else if (
-      toolType === 'line' ||
-      toolType === 'ray' ||
-      toolType === 'fibonacci' ||
-      toolType === 'fib-trend-ext' ||
-      toolType === 'fib-time-zone' ||
-      toolType === 'gann-fan' ||
-      toolType === 'gann-grid'
+      toolType === "line" ||
+      toolType === "ray" ||
+      toolType === "fibonacci" ||
+      toolType === "fib-trend-ext" ||
+      toolType === "fib-time-zone" ||
+      toolType === "gann-fan" ||
+      toolType === "gann-grid"
     ) {
-      placeDrawing({ ...newDrawingBase(toolType), type: toolType, p1: start, p2: end });
-    } else if (toolType === 'gann-square') {
-      const p2 = chart && series ? snapGannSquareP2(start, end, chart, series) : end;
-      placeDrawing({ ...newDrawingBase('gann-square'), type: 'gann-square', p1: start, p2 });
+      placeDrawing({
+        ...newDrawingBase(toolType),
+        type: toolType,
+        p1: start,
+        p2: end,
+      });
+    } else if (toolType === "gann-square") {
+      const p2 =
+        chart && series ? snapGannSquareP2(start, end, chart, series) : end;
+      placeDrawing({
+        ...newDrawingBase("gann-square"),
+        type: "gann-square",
+        p1: start,
+        p2,
+      });
     }
 
     setDraftStart(null);
@@ -445,7 +548,7 @@ export function ChartDrawingsLayer({
   };
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (tool === 'crosshair') return;
+    if (tool === "crosshair") return;
     if (!chart || !series || event.button !== 0) return;
     if (layerLocked && !canInteractWithDrawings(tool)) return;
 
@@ -472,16 +575,21 @@ export function ChartDrawingsLayer({
       });
 
       if (vertexHit) {
-        const target = drawings.find((drawing) => drawing.id === vertexHit.drawingId);
+        const target = drawings.find(
+          (drawing) => drawing.id === vertexHit.drawingId,
+        );
         onSelect(vertexHit.drawingId);
         if (target && !target.locked && !layerLocked) {
           event.preventDefault();
           event.stopPropagation();
           setInteractionDragging(true);
           event.currentTarget.setPointerCapture(event.pointerId);
-          if (vertexHit.kind === 'vertex') {
-            dragVertexRef.current = { id: vertexHit.drawingId, key: vertexHit.key };
-          } else if (vertexHit.kind === 'hline') {
+          if (vertexHit.kind === "vertex") {
+            dragVertexRef.current = {
+              id: vertexHit.drawingId,
+              key: vertexHit.key,
+            };
+          } else if (vertexHit.kind === "hline") {
             dragHlineRef.current = vertexHit.drawingId;
           } else {
             dragVlineRef.current = vertexHit.drawingId;
@@ -508,10 +616,14 @@ export function ChartDrawingsLayer({
 
       const point = pointerToPoint(event.clientX, event.clientY);
 
-      if (selected.type === 'text-label') {
+      if (selected.type === "text-label") {
         const textPx = toPx(selected.point);
         const fontSize = selected.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
-        if (textPx && py >= textPx.y + fontSize - 4 && py <= textPx.y + fontSize + 14) {
+        if (
+          textPx &&
+          py >= textPx.y + fontSize - 4 &&
+          py <= textPx.y + fontSize + 14
+        ) {
           setInteractionDragging(true);
           event.currentTarget.setPointerCapture(event.pointerId);
           dragTextSizeRef.current = {
@@ -524,13 +636,13 @@ export function ChartDrawingsLayer({
       }
 
       if (
-        selected.type === 'cross-marker' ||
-        selected.type === 'dot-marker' ||
-        selected.type === 'dot-halo-marker' ||
-        selected.type === 'arrow-marker' ||
-        selected.type === 'arrow-circle-marker' ||
-        selected.type === 'text-label' ||
-        selected.type === 'hray'
+        selected.type === "cross-marker" ||
+        selected.type === "dot-marker" ||
+        selected.type === "dot-halo-marker" ||
+        selected.type === "arrow-marker" ||
+        selected.type === "arrow-circle-marker" ||
+        selected.type === "text-label" ||
+        selected.type === "hray"
       ) {
         setInteractionDragging(true);
         event.currentTarget.setPointerCapture(event.pointerId);
@@ -543,7 +655,7 @@ export function ChartDrawingsLayer({
       setInteractionDragging(true);
       event.currentTarget.setPointerCapture(event.pointerId);
       pendingDragRef.current = {
-        mode: { kind: 'whole', id: hitId, snapshot: selected, anchor: point },
+        mode: { kind: "whole", id: hitId, snapshot: selected, anchor: point },
         startX: px,
         startY: py,
         pointerId: event.pointerId,
@@ -555,16 +667,17 @@ export function ChartDrawingsLayer({
     const point = pointerToPoint(event.clientX, event.clientY);
     if (!point) return;
 
-    if (tool === 'text') {
-      const base = newDrawingBase('text-label');
+    if (tool === "text") {
+      const base = newDrawingBase("text-label");
       const content = DEFAULT_TEXT_LABEL;
       const drawing = {
         ...base,
-        type: 'text-label' as const,
+        type: "text-label" as const,
         point,
         label: content,
         text: content,
-        fontSize: base.fontSize ?? resolvedStyle.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
+        fontSize:
+          base.fontSize ?? resolvedStyle.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
       };
       placeDrawing(drawing);
       onSelect(drawing.id);
@@ -573,34 +686,34 @@ export function ChartDrawingsLayer({
       return;
     }
 
-    if (tool === 'arrow-up') {
+    if (tool === "arrow-up") {
       placeDrawing({
-        ...newDrawingBase('arrow-marker'),
-        type: 'arrow-marker',
+        ...newDrawingBase("arrow-marker"),
+        type: "arrow-marker",
         point,
-        direction: 'up',
+        direction: "up",
       });
       return;
     }
 
-    if (tool === 'arrow-down') {
+    if (tool === "arrow-down") {
       placeDrawing({
-        ...newDrawingBase('arrow-marker'),
-        type: 'arrow-marker',
+        ...newDrawingBase("arrow-marker"),
+        type: "arrow-marker",
         point,
-        direction: 'down',
+        direction: "down",
       });
       return;
     }
 
-    if (tool === 'brush' || tool === 'highlighter') {
+    if (tool === "brush" || tool === "highlighter") {
       brushDraftRef.current = [point];
       setBrushDraftPoints([point]);
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
 
-    if (tool === 'arrow-circle') {
+    if (tool === "arrow-circle") {
       arrowDraftToolRef.current = tool;
       arrowDraftRef.current = point;
       setArrowDraftEnd(point);
@@ -608,24 +721,32 @@ export function ChartDrawingsLayer({
       return;
     }
 
-    if (tool === 'hray') {
-      placeDrawing({ ...newDrawingBase('hray'), type: 'hray', point });
+    if (tool === "hray") {
+      placeDrawing({ ...newDrawingBase("hray"), type: "hray", point });
       return;
     }
 
-    if (tool === 'rectangle') {
+    if (tool === "rectangle") {
       setDragRect({ start: point, end: point });
       event.currentTarget.setPointerCapture(event.pointerId);
       return;
     }
 
-    if (tool === 'vline') {
-      placeDrawing({ ...newDrawingBase('vline'), type: 'vline', time: point.time });
+    if (tool === "vline") {
+      placeDrawing({
+        ...newDrawingBase("vline"),
+        type: "vline",
+        time: point.time,
+      });
       return;
     }
 
-    if (tool === 'hline') {
-      placeDrawing({ ...newDrawingBase('hline'), type: 'hline', price: point.price });
+    if (tool === "hline") {
+      placeDrawing({
+        ...newDrawingBase("hline"),
+        type: "hline",
+        price: point.price,
+      });
       return;
     }
 
@@ -640,7 +761,7 @@ export function ChartDrawingsLayer({
       return;
     }
 
-    if (tool === 'channel') {
+    if (tool === "channel") {
       if (stepRef.current === 0) {
         setDraftStart(point);
         setDraftEnd(point);
@@ -650,12 +771,13 @@ export function ChartDrawingsLayer({
         stepRef.current = 2;
       } else if (stepRef.current === 2 && draftStart && draftEnd) {
         placeDrawing({
-          ...newDrawingBase('channel'),
-          type: 'channel',
+          ...newDrawingBase("channel"),
+          type: "channel",
           p1: draftStart,
           p2: draftEnd,
           p3: point,
-          fillOpacity: resolvedStyle.fillOpacity ?? DEFAULT_CHANNEL_FILL_OPACITY,
+          fillOpacity:
+            resolvedStyle.fillOpacity ?? DEFAULT_CHANNEL_FILL_OPACITY,
         });
         stepRef.current = 0;
         setDraftStart(null);
@@ -664,7 +786,7 @@ export function ChartDrawingsLayer({
       return;
     }
 
-    if (tool === 'pitchfork') {
+    if (tool === "pitchfork") {
       if (stepRef.current === 0) {
         setDraftStart(point);
         setDraftEnd(point);
@@ -674,8 +796,8 @@ export function ChartDrawingsLayer({
         stepRef.current = 2;
       } else if (stepRef.current === 2 && draftStart && draftEnd) {
         placeDrawing({
-          ...newDrawingBase('pitchfork'),
-          type: 'pitchfork',
+          ...newDrawingBase("pitchfork"),
+          type: "pitchfork",
           p1: draftStart,
           p2: draftEnd,
           p3: point,
@@ -694,7 +816,7 @@ export function ChartDrawingsLayer({
     const moveX = moveCoords?.px ?? event.nativeEvent.offsetX;
     const moveY = moveCoords?.py ?? event.nativeEvent.offsetY;
 
-    if (pendingDragRef.current?.mode.kind === 'whole') {
+    if (pendingDragRef.current?.mode.kind === "whole") {
       const pending = pendingDragRef.current;
       if (Math.hypot(moveX - pending.startX, moveY - pending.startY) >= 6) {
         activatePendingDrag();
@@ -705,19 +827,36 @@ export function ChartDrawingsLayer({
     if (dragTextSizeRef.current) {
       const { id, startY, startSize } = dragTextSizeRef.current;
       const delta = moveY - startY;
-      const nextSize = Math.max(8, Math.min(72, Math.round(startSize + delta * 0.35)));
+      const nextSize = Math.max(
+        8,
+        Math.min(72, Math.round(startSize + delta * 0.35)),
+      );
       onUpdate(id, { fontSize: nextSize, templateId: undefined });
       draggedRef.current = true;
       return;
     }
 
-    if (dragVertexRef.current || dragWholeRef.current || dragMarkerRef.current || dragHlineRef.current || dragVlineRef.current || dragHrayRef.current) {
+    if (
+      dragVertexRef.current ||
+      dragWholeRef.current ||
+      dragMarkerRef.current ||
+      dragHlineRef.current ||
+      dragVlineRef.current ||
+      dragHrayRef.current
+    ) {
       draggedRef.current = true;
     }
 
     if (dragWholeRef.current && point && chart && series) {
       const { id, snapshot, anchor } = dragWholeRef.current;
-      const patch = wholeDrawingPatch(snapshot, anchor, point, chart, series, toPx);
+      const patch = wholeDrawingPatch(
+        snapshot,
+        anchor,
+        point,
+        chart,
+        series,
+        toPx,
+      );
       if (Object.keys(patch).length > 0) {
         onUpdate(id, patch);
       }
@@ -760,7 +899,11 @@ export function ChartDrawingsLayer({
       const last = brushDraftRef.current[brushDraftRef.current.length - 1]!;
       const lastPx = toPx(last);
       const curPx = toPx(point);
-      if (lastPx && curPx && Math.hypot(curPx.x - lastPx.x, curPx.y - lastPx.y) >= 3) {
+      if (
+        lastPx &&
+        curPx &&
+        Math.hypot(curPx.x - lastPx.x, curPx.y - lastPx.y) >= 3
+      ) {
         const next = [...brushDraftRef.current, point];
         brushDraftRef.current = next;
         setBrushDraftPoints(next);
@@ -768,13 +911,17 @@ export function ChartDrawingsLayer({
       return;
     }
 
-    if (tool === 'rectangle' && dragRect && point) {
+    if (tool === "rectangle" && dragRect && point) {
       setDragRect({ start: dragRect.start, end: point });
       return;
     }
 
     if (point) setHoverPoint(point);
-    if (draftStart && (TWO_POINT_DRAW_TOOLS.includes(tool) || THREE_POINT_DRAW_TOOLS.includes(tool))) {
+    if (
+      draftStart &&
+      (TWO_POINT_DRAW_TOOLS.includes(tool) ||
+        THREE_POINT_DRAW_TOOLS.includes(tool))
+    ) {
       setDraftEnd(point);
     }
   };
@@ -782,21 +929,23 @@ export function ChartDrawingsLayer({
   const finishArrow = (start: ChartDrawingPoint, end: ChartDrawingPoint) => {
     const a = toPx(start);
     const b = toPx(end);
-    let direction: ChartMarkerDirection = 'up';
+    let direction: ChartMarkerDirection = "up";
     if (a && b) {
       direction = markerDirectionFromDelta(b.x - a.x, b.y - a.y);
     }
     const markerType =
-      arrowDraftToolRef.current === 'arrow-circle' ? 'arrow-circle-marker' : 'arrow-marker';
+      arrowDraftToolRef.current === "arrow-circle"
+        ? "arrow-circle-marker"
+        : "arrow-marker";
     const base = {
       ...newDrawingBase(markerType),
       point: start,
       direction,
     };
-    if (arrowDraftToolRef.current === 'arrow-circle') {
-      placeDrawing({ ...base, type: 'arrow-circle-marker' });
+    if (arrowDraftToolRef.current === "arrow-circle") {
+      placeDrawing({ ...base, type: "arrow-circle-marker" });
     } else {
-      placeDrawing({ ...base, type: 'arrow-marker' });
+      placeDrawing({ ...base, type: "arrow-marker" });
     }
     arrowDraftRef.current = null;
     setArrowDraftEnd(null);
@@ -809,7 +958,9 @@ export function ChartDrawingsLayer({
     }
 
     if (dragTextSizeRef.current) {
-      const drawing = drawings.find((d) => d.id === dragTextSizeRef.current?.id);
+      const drawing = drawings.find(
+        (d) => d.id === dragTextSizeRef.current?.id,
+      );
       if (drawing) rememberDrawStyleFromDrawing(drawing);
       dragTextSizeRef.current = null;
       setInteractionDragging(false);
@@ -819,12 +970,12 @@ export function ChartDrawingsLayer({
       return;
     }
 
-    if ((tool === 'brush' || tool === 'highlighter') && brushDraftRef.current) {
+    if ((tool === "brush" || tool === "highlighter") && brushDraftRef.current) {
       const points = brushDraftRef.current;
       if (points.length >= 2) {
         placeDrawing({
-          ...newDrawingBase('brush-stroke'),
-          type: 'brush-stroke',
+          ...newDrawingBase("brush-stroke"),
+          type: "brush-stroke",
           points,
         });
       }
@@ -834,7 +985,7 @@ export function ChartDrawingsLayer({
       return;
     }
 
-    if (arrowDraftRef.current && tool === 'arrow-circle') {
+    if (arrowDraftRef.current && tool === "arrow-circle") {
       const point = pointerToPoint(event.clientX, event.clientY);
       if (point) {
         finishArrow(arrowDraftRef.current, point);
@@ -880,12 +1031,12 @@ export function ChartDrawingsLayer({
 
     draggedRef.current = false;
 
-    if (tool !== 'rectangle' || !dragRect) return;
+    if (tool !== "rectangle" || !dragRect) return;
     const { p1, p2 } = normalizeRect(dragRect.start, dragRect.end);
     if (p1.time !== p2.time || p1.price !== p2.price) {
       placeDrawing({
-        ...newDrawingBase('rectangle'),
-        type: 'rectangle',
+        ...newDrawingBase("rectangle"),
+        type: "rectangle",
         p1,
         p2,
         fillOpacity: resolvedStyle.fillOpacity ?? DEFAULT_RECT_FILL_OPACITY,
@@ -904,7 +1055,7 @@ export function ChartDrawingsLayer({
       dashed?: boolean;
       extendRay?: boolean;
       extendBoth?: boolean;
-      lineStyle?: import('@bolsa/shared').ChartLineStyle;
+      lineStyle?: import("@bolsa/shared").ChartLineStyle;
     } = {},
   ) => {
     const w = container?.clientWidth ?? 2000;
@@ -919,10 +1070,12 @@ export function ChartDrawingsLayer({
       seg = a && b ? { x1: a.x, y1: a.y, x2: b.x, y2: b.y } : null;
     }
     if (!seg) return null;
-    const dash = options.dashed ? '4 4' : strokeDasharray(options.lineStyle ?? 'solid');
+    const dash = options.dashed
+      ? "4 4"
+      : strokeDasharray(options.lineStyle ?? "solid");
     return (
       <line
-        key={`${p1.time}-${p2.time}-${options.extendRay ? 'r' : options.extendBoth ? 'e' : 's'}`}
+        key={`${p1.time}-${p2.time}-${options.extendRay ? "r" : options.extendBoth ? "e" : "s"}`}
         x1={seg.x1}
         y1={seg.y1}
         x2={seg.x2}
@@ -934,7 +1087,10 @@ export function ChartDrawingsLayer({
     );
   };
 
-  const renderVLine = (drawing: Extract<ChartDrawing, { type: 'vline' }>, selected: boolean) => {
+  const renderVLine = (
+    drawing: Extract<ChartDrawing, { type: "vline" }>,
+    selected: boolean,
+  ) => {
     if (!chart) return null;
     const x = timeToPixelX(chart, drawing.time);
     if (x == null) return null;
@@ -954,7 +1110,10 @@ export function ChartDrawingsLayer({
     );
   };
 
-  const renderHLine = (drawing: Extract<ChartDrawing, { type: 'hline' }>, selected: boolean) => {
+  const renderHLine = (
+    drawing: Extract<ChartDrawing, { type: "hline" }>,
+    selected: boolean,
+  ) => {
     if (!series) return null;
     const y = priceToPixelY(series, drawing.price);
     if (y == null) return null;
@@ -974,7 +1133,10 @@ export function ChartDrawingsLayer({
     );
   };
 
-  const renderHRay = (drawing: Extract<ChartDrawing, { type: 'hray' }>, selected: boolean) => {
+  const renderHRay = (
+    drawing: Extract<ChartDrawing, { type: "hray" }>,
+    selected: boolean,
+  ) => {
     const anchor = toPx(drawing.point);
     if (!anchor) return null;
     const w = container?.clientWidth ?? 2000;
@@ -995,7 +1157,10 @@ export function ChartDrawingsLayer({
     );
   };
 
-  const renderFibonacci = (drawing: Extract<ChartDrawing, { type: 'fibonacci' }>, selected: boolean) => {
+  const renderFibonacci = (
+    drawing: Extract<ChartDrawing, { type: "fibonacci" }>,
+    selected: boolean,
+  ) => {
     const { t1, t2 } = fibTimeSpan(drawing.p1, drawing.p2);
     const left = toPx({ time: t1, price: drawing.p1.price });
     const right = toPx({ time: t2, price: drawing.p2.price });
@@ -1032,7 +1197,7 @@ export function ChartDrawingsLayer({
   };
 
   const renderFibTrendExt = (
-    drawing: Extract<ChartDrawing, { type: 'fib-trend-ext' }>,
+    drawing: Extract<ChartDrawing, { type: "fib-trend-ext" }>,
     selected: boolean,
   ) => {
     const { t1, t2 } = fibTimeSpan(drawing.p1, drawing.p2);
@@ -1060,7 +1225,7 @@ export function ChartDrawingsLayer({
                 stroke={drawing.color}
                 strokeWidth={selected ? 2 : 1.5}
                 opacity={isExt ? 1 : 0.75}
-                strokeDasharray={isExt ? '4 3' : undefined}
+                strokeDasharray={isExt ? "4 3" : undefined}
               />
               <text x={x2 + 4} y={y + 4} fill={drawing.color} fontSize={10}>
                 {pct}
@@ -1073,7 +1238,7 @@ export function ChartDrawingsLayer({
   };
 
   const renderFibTimeZone = (
-    drawing: Extract<ChartDrawing, { type: 'fib-time-zone' }>,
+    drawing: Extract<ChartDrawing, { type: "fib-time-zone" }>,
     selected: boolean,
   ) => {
     const xs = fibTimeZoneLineXs(drawing.p1, drawing.p2, toPx);
@@ -1091,13 +1256,23 @@ export function ChartDrawingsLayer({
     return (
       <g key={drawing.id} stroke={drawing.color} strokeWidth={width}>
         {xs.map((x, index) => (
-          <line key={index} x1={x} y1={top} x2={x} y2={bottom} opacity={index <= 1 ? 0.9 : 0.7} />
+          <line
+            key={index}
+            x1={x}
+            y1={top}
+            x2={x}
+            y2={bottom}
+            opacity={index <= 1 ? 0.9 : 0.7}
+          />
         ))}
       </g>
     );
   };
 
-  const renderGannFan = (drawing: Extract<ChartDrawing, { type: 'gann-fan' }>, selected: boolean) => {
+  const renderGannFan = (
+    drawing: Extract<ChartDrawing, { type: "gann-fan" }>,
+    selected: boolean,
+  ) => {
     const color = drawing.color;
     const width = selected ? 2 : drawingLineWidth(drawing);
     const rays = gannFanRays(drawing, toPx);
@@ -1105,13 +1280,23 @@ export function ChartDrawingsLayer({
     return (
       <g key={drawing.id} stroke={color} strokeWidth={width}>
         {rays.map((seg, index) => (
-          <line key={index} x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2} opacity={index === 4 ? 1 : 0.75} />
+          <line
+            key={index}
+            x1={seg.x1}
+            y1={seg.y1}
+            x2={seg.x2}
+            y2={seg.y2}
+            opacity={index === 4 ? 1 : 0.75}
+          />
         ))}
       </g>
     );
   };
 
-  const renderGannGrid = (drawing: Extract<ChartDrawing, { type: 'gann-grid' }>, selected: boolean) => {
+  const renderGannGrid = (
+    drawing: Extract<ChartDrawing, { type: "gann-grid" }>,
+    selected: boolean,
+  ) => {
     const bounds = gannGridPixelBounds(drawing, toPx);
     if (!bounds) return null;
     const { left, top, right, bottom } = bounds;
@@ -1124,9 +1309,25 @@ export function ChartDrawingsLayer({
     return (
       <g key={drawing.id}>
         {fillOpacity > 0 && (
-          <rect x={left} y={top} width={w} height={h} fill={color} fillOpacity={fillOpacity} stroke="none" />
+          <rect
+            x={left}
+            y={top}
+            width={w}
+            height={h}
+            fill={color}
+            fillOpacity={fillOpacity}
+            stroke="none"
+          />
         )}
-        <rect x={left} y={top} width={w} height={h} stroke={color} strokeWidth={width} fill="none" />
+        <rect
+          x={left}
+          y={top}
+          width={w}
+          height={h}
+          stroke={color}
+          strokeWidth={width}
+          fill="none"
+        />
         {Array.from({ length: GANN_GRID_DIVISIONS - 1 }, (_, i) => {
           const t = (i + 1) / GANN_GRID_DIVISIONS;
           const x = left + w * t;
@@ -1143,7 +1344,7 @@ export function ChartDrawingsLayer({
   };
 
   const renderGannSquare = (
-    drawing: Extract<ChartDrawing, { type: 'gann-square' }>,
+    drawing: Extract<ChartDrawing, { type: "gann-square" }>,
     selected: boolean,
   ) => {
     if (!chart || !series) return null;
@@ -1188,7 +1389,10 @@ export function ChartDrawingsLayer({
     );
   };
 
-  const renderChannel = (drawing: Extract<ChartDrawing, { type: 'channel' }>, selected: boolean) => {
+  const renderChannel = (
+    drawing: Extract<ChartDrawing, { type: "channel" }>,
+    selected: boolean,
+  ) => {
     const p4 = channelParallelEnd(drawing.p1, drawing.p2, drawing.p3);
     const color = drawing.color;
     const width = selected ? 2 : drawingLineWidth(drawing);
@@ -1208,13 +1412,30 @@ export function ChartDrawingsLayer({
             stroke="none"
           />
         )}
-        <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={width} />
-        <line x1={c.x} y1={c.y} x2={d.x} y2={d.y} stroke={color} strokeWidth={width} />
+        <line
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          stroke={color}
+          strokeWidth={width}
+        />
+        <line
+          x1={c.x}
+          y1={c.y}
+          x2={d.x}
+          y2={d.y}
+          stroke={color}
+          strokeWidth={width}
+        />
       </g>
     );
   };
 
-  const renderPitchfork = (drawing: Extract<ChartDrawing, { type: 'pitchfork' }>, selected: boolean) => {
+  const renderPitchfork = (
+    drawing: Extract<ChartDrawing, { type: "pitchfork" }>,
+    selected: boolean,
+  ) => {
     if (!chart || !series) return null;
     const color = drawing.color;
     const width = selected ? 2 : drawingLineWidth(drawing);
@@ -1229,7 +1450,10 @@ export function ChartDrawingsLayer({
     );
   };
 
-  const renderTextLabel = (drawing: Extract<ChartDrawing, { type: 'text-label' }>, selected: boolean) => {
+  const renderTextLabel = (
+    drawing: Extract<ChartDrawing, { type: "text-label" }>,
+    selected: boolean,
+  ) => {
     if (inlineTextEditId === drawing.id) return null;
     const px = toPx(drawing.point);
     if (!px) return null;
@@ -1247,7 +1471,7 @@ export function ChartDrawingsLayer({
         dominantBaseline="hanging"
         textAnchor="start"
         paintOrder="stroke fill"
-        stroke={selected ? '#facc15' : 'hsl(var(--background))'}
+        stroke={selected ? "#facc15" : "hsl(var(--background))"}
         strokeWidth={selected ? 1.25 : 3}
       >
         {content}
@@ -1255,17 +1479,22 @@ export function ChartDrawingsLayer({
     );
   };
 
-  const renderBrushStroke = (drawing: Extract<ChartDrawing, { type: 'brush-stroke' }>, selected: boolean) => {
-    const width = selected ? (drawing.lineWidth ?? DEFAULT_LINE_WIDTH) + 0.5 : drawing.lineWidth ?? DEFAULT_LINE_WIDTH;
+  const renderBrushStroke = (
+    drawing: Extract<ChartDrawing, { type: "brush-stroke" }>,
+    selected: boolean,
+  ) => {
+    const width = selected
+      ? (drawing.lineWidth ?? DEFAULT_LINE_WIDTH) + 0.5
+      : (drawing.lineWidth ?? DEFAULT_LINE_WIDTH);
     const opacity = drawing.strokeOpacity ?? DEFAULT_BRUSH_STROKE_OPACITY;
     const path = drawing.points
       .map((point, index) => {
         const px = toPx(point);
         if (!px) return null;
-        return `${index === 0 ? 'M' : 'L'} ${px.x} ${px.y}`;
+        return `${index === 0 ? "M" : "L"} ${px.x} ${px.y}`;
       })
       .filter((segment): segment is string => segment != null)
-      .join(' ');
+      .join(" ");
     if (!path) return null;
     return (
       <path
@@ -1282,7 +1511,7 @@ export function ChartDrawingsLayer({
   };
 
   const renderCrossMarker = (
-    drawing: Extract<ChartDrawing, { type: 'cross-marker' }>,
+    drawing: Extract<ChartDrawing, { type: "cross-marker" }>,
     selected: boolean,
   ) => {
     const px = toPx(drawing.point);
@@ -1298,7 +1527,7 @@ export function ChartDrawingsLayer({
   };
 
   const renderDotMarker = (
-    drawing: Extract<ChartDrawing, { type: 'dot-marker' }>,
+    drawing: Extract<ChartDrawing, { type: "dot-marker" }>,
     selected: boolean,
   ) => {
     const px = toPx(drawing.point);
@@ -1310,14 +1539,14 @@ export function ChartDrawingsLayer({
         cy={px.y}
         r={selected ? 5 : 4}
         fill={drawing.color}
-        stroke={selected ? '#facc15' : drawing.color}
+        stroke={selected ? "#facc15" : drawing.color}
         strokeWidth={selected ? 1.5 : 0}
       />
     );
   };
 
   const renderArrowMarker = (
-    drawing: Extract<ChartDrawing, { type: 'arrow-marker' }>,
+    drawing: Extract<ChartDrawing, { type: "arrow-marker" }>,
     selected: boolean,
   ) => {
     const px = toPx(drawing.point);
@@ -1329,13 +1558,17 @@ export function ChartDrawingsLayer({
         transform={`translate(${px.x}, ${px.y}) rotate(${rotation})`}
         fill={drawing.color}
       >
-        <path d="M0,-10 L-6,4 L0,0 L6,4 Z" stroke={selected ? '#facc15' : 'none'} strokeWidth={1} />
+        <path
+          d="M0,-10 L-6,4 L0,0 L6,4 Z"
+          stroke={selected ? "#facc15" : "none"}
+          strokeWidth={1}
+        />
       </g>
     );
   };
 
   const renderArrowCircleMarker = (
-    drawing: Extract<ChartDrawing, { type: 'arrow-circle-marker' }>,
+    drawing: Extract<ChartDrawing, { type: "arrow-circle-marker" }>,
     selected: boolean,
   ) => {
     const px = toPx(drawing.point);
@@ -1350,14 +1583,18 @@ export function ChartDrawingsLayer({
           strokeWidth={selected ? 2 : 1.5}
         />
         <g transform={`rotate(${rotation})`} fill={drawing.color}>
-          <path d="M0,-7 L-4,3 L0,0 L4,3 Z" stroke={selected ? '#facc15' : 'none'} strokeWidth={1} />
+          <path
+            d="M0,-7 L-4,3 L0,0 L4,3 Z"
+            stroke={selected ? "#facc15" : "none"}
+            strokeWidth={1}
+          />
         </g>
       </g>
     );
   };
 
   const renderDotHaloMarker = (
-    drawing: Extract<ChartDrawing, { type: 'dot-halo-marker' }>,
+    drawing: Extract<ChartDrawing, { type: "dot-halo-marker" }>,
     selected: boolean,
   ) => {
     const px = toPx(drawing.point);
@@ -1381,7 +1618,7 @@ export function ChartDrawingsLayer({
           cy={px.y}
           r={dotR}
           fill={drawing.color}
-          stroke={selected ? '#facc15' : drawing.color}
+          stroke={selected ? "#facc15" : drawing.color}
           strokeWidth={selected ? 1.5 : 0}
         />
       </g>
@@ -1420,11 +1657,16 @@ export function ChartDrawingsLayer({
   const commitInlineTextEdit = () => {
     if (!inlineTextEditId) return;
     const value = inlineTextDraft.trim() || DEFAULT_TEXT_LABEL;
-    onUpdate(inlineTextEditId, { label: value, text: value, templateId: undefined });
+    onUpdate(inlineTextEditId, {
+      label: value,
+      text: value,
+      templateId: undefined,
+    });
     const drawing = drawings.find((d) => d.id === inlineTextEditId);
-    if (drawing) rememberDrawStyleFromDrawing({ ...drawing, label: value, text: value });
+    if (drawing)
+      rememberDrawStyleFromDrawing({ ...drawing, label: value, text: value });
     setInlineTextEditId(null);
-    setInlineTextDraft('');
+    setInlineTextDraft("");
   };
 
   const renderDrawing = (drawing: ChartDrawing) => {
@@ -1432,31 +1674,51 @@ export function ChartDrawingsLayer({
     const selected = drawing.id === selectedId;
     const width = drawingLineWidth(drawing);
     const style = drawingLineStyle(drawing);
-    if (drawing.type === 'cross-marker') return renderCrossMarker(drawing, selected);
-    if (drawing.type === 'dot-marker') return renderDotMarker(drawing, selected);
-    if (drawing.type === 'dot-halo-marker') return renderDotHaloMarker(drawing, selected);
-    if (drawing.type === 'arrow-marker') return renderArrowMarker(drawing, selected);
-    if (drawing.type === 'arrow-circle-marker') return renderArrowCircleMarker(drawing, selected);
-    if (drawing.type === 'hline') return renderHLine(drawing, selected);
-    if (drawing.type === 'hray') return renderHRay(drawing, selected);
-    if (drawing.type === 'vline') return renderVLine(drawing, selected);
-    if (drawing.type === 'line') {
+    if (drawing.type === "cross-marker")
+      return renderCrossMarker(drawing, selected);
+    if (drawing.type === "dot-marker")
+      return renderDotMarker(drawing, selected);
+    if (drawing.type === "dot-halo-marker")
+      return renderDotHaloMarker(drawing, selected);
+    if (drawing.type === "arrow-marker")
+      return renderArrowMarker(drawing, selected);
+    if (drawing.type === "arrow-circle-marker")
+      return renderArrowCircleMarker(drawing, selected);
+    if (drawing.type === "hline") return renderHLine(drawing, selected);
+    if (drawing.type === "hray") return renderHRay(drawing, selected);
+    if (drawing.type === "vline") return renderVLine(drawing, selected);
+    if (drawing.type === "line") {
       return (
         <g key={drawing.id}>
-          {renderLine(drawing.p1, drawing.p2, drawing.color, width, { lineStyle: style })}
-          {renderLineLabel(drawing.p1, drawing.p2, drawing.label ?? drawing.text, drawing.color)}
+          {renderLine(drawing.p1, drawing.p2, drawing.color, width, {
+            lineStyle: style,
+          })}
+          {renderLineLabel(
+            drawing.p1,
+            drawing.p2,
+            drawing.label ?? drawing.text,
+            drawing.color,
+          )}
         </g>
       );
     }
-    if (drawing.type === 'ext-line') {
+    if (drawing.type === "ext-line") {
       return (
         <g key={drawing.id}>
-          {renderLine(drawing.p1, drawing.p2, drawing.color, width, { extendBoth: true, lineStyle: style })}
-          {renderLineLabel(drawing.p1, drawing.p2, drawing.label ?? drawing.text, drawing.color)}
+          {renderLine(drawing.p1, drawing.p2, drawing.color, width, {
+            extendBoth: true,
+            lineStyle: style,
+          })}
+          {renderLineLabel(
+            drawing.p1,
+            drawing.p2,
+            drawing.label ?? drawing.text,
+            drawing.color,
+          )}
         </g>
       );
     }
-    if (drawing.type === 'info-line') {
+    if (drawing.type === "info-line") {
       const mid = {
         time: drawing.p1.time,
         price: (drawing.p1.price + drawing.p2.price) / 2,
@@ -1464,49 +1726,76 @@ export function ChartDrawingsLayer({
       const labelPx = toPx(mid);
       return (
         <g key={drawing.id}>
-          {renderLine(drawing.p1, drawing.p2, drawing.color, width, { lineStyle: style })}
+          {renderLine(drawing.p1, drawing.p2, drawing.color, width, {
+            lineStyle: style,
+          })}
           {labelPx && (
-            <text x={labelPx.x + 6} y={labelPx.y - 4} fill={drawing.color} fontSize={10}>
+            <text
+              x={labelPx.x + 6}
+              y={labelPx.y - 4}
+              fill={drawing.color}
+              fontSize={10}
+            >
               {drawing.label}
             </text>
           )}
         </g>
       );
     }
-    if (drawing.type === 'trend-angle') {
+    if (drawing.type === "trend-angle") {
       const angle = lineAngleDegrees(drawing.p1, drawing.p2);
       const labelPx = toPx(drawing.p1);
       const chartLabel = drawing.label?.trim() || drawing.text?.trim();
       return (
         <g key={drawing.id}>
-          {renderLine(drawing.p1, drawing.p2, drawing.color, width, { lineStyle: style })}
+          {renderLine(drawing.p1, drawing.p2, drawing.color, width, {
+            lineStyle: style,
+          })}
           {labelPx && (
-            <text x={labelPx.x + 6} y={labelPx.y - 6} fill={drawing.color} fontSize={10}>
+            <text
+              x={labelPx.x + 6}
+              y={labelPx.y - 6}
+              fill={drawing.color}
+              fontSize={10}
+            >
               {chartLabel || `${angle.toFixed(1)}°`}
             </text>
           )}
         </g>
       );
     }
-    if (drawing.type === 'regression') {
+    if (drawing.type === "regression") {
       return (
         <g key={drawing.id}>
           {renderLine(drawing.p1, drawing.p2, drawing.color, width, {
-            lineStyle: style === 'solid' ? 'dashed' : style,
+            lineStyle: style === "solid" ? "dashed" : style,
           })}
-          {renderLineLabel(drawing.p1, drawing.p2, drawing.label ?? drawing.text, drawing.color)}
+          {renderLineLabel(
+            drawing.p1,
+            drawing.p2,
+            drawing.label ?? drawing.text,
+            drawing.color,
+          )}
         </g>
       );
     }
-    if (drawing.type === 'ray') {
+    if (drawing.type === "ray") {
       return (
         <g key={drawing.id}>
-          {renderLine(drawing.p1, drawing.p2, drawing.color, width, { extendRay: true, lineStyle: style })}
-          {renderLineLabel(drawing.p1, drawing.p2, drawing.label ?? drawing.text, drawing.color)}
+          {renderLine(drawing.p1, drawing.p2, drawing.color, width, {
+            extendRay: true,
+            lineStyle: style,
+          })}
+          {renderLineLabel(
+            drawing.p1,
+            drawing.p2,
+            drawing.label ?? drawing.text,
+            drawing.color,
+          )}
         </g>
       );
     }
-    if (drawing.type === 'rectangle') {
+    if (drawing.type === "rectangle") {
       const a = toPx(drawing.p1);
       const b = toPx(drawing.p2);
       if (!a || !b) return null;
@@ -1528,22 +1817,34 @@ export function ChartDrawingsLayer({
         />
       );
     }
-    if (drawing.type === 'fibonacci') return renderFibonacci(drawing, selected);
-    if (drawing.type === 'fib-trend-ext') return renderFibTrendExt(drawing, selected);
-    if (drawing.type === 'fib-time-zone') return renderFibTimeZone(drawing, selected);
-    if (drawing.type === 'gann-fan') return renderGannFan(drawing, selected);
-    if (drawing.type === 'gann-grid') return renderGannGrid(drawing, selected);
-    if (drawing.type === 'gann-square') return renderGannSquare(drawing, selected);
-    if (drawing.type === 'channel') return renderChannel(drawing, selected);
-    if (drawing.type === 'pitchfork') return renderPitchfork(drawing, selected);
-    if (drawing.type === 'text-label') return renderTextLabel(drawing, selected);
-    if (drawing.type === 'brush-stroke') return renderBrushStroke(drawing, selected);
+    if (drawing.type === "fibonacci") return renderFibonacci(drawing, selected);
+    if (drawing.type === "fib-trend-ext")
+      return renderFibTrendExt(drawing, selected);
+    if (drawing.type === "fib-time-zone")
+      return renderFibTimeZone(drawing, selected);
+    if (drawing.type === "gann-fan") return renderGannFan(drawing, selected);
+    if (drawing.type === "gann-grid") return renderGannGrid(drawing, selected);
+    if (drawing.type === "gann-square")
+      return renderGannSquare(drawing, selected);
+    if (drawing.type === "channel") return renderChannel(drawing, selected);
+    if (drawing.type === "pitchfork") return renderPitchfork(drawing, selected);
+    if (drawing.type === "text-label")
+      return renderTextLabel(drawing, selected);
+    if (drawing.type === "brush-stroke")
+      return renderBrushStroke(drawing, selected);
     return null;
   };
 
   const renderVertexHandle = (cx: number, cy: number, key: string) => (
     <g key={key}>
-      <circle cx={cx} cy={cy} r={8} fill="hsl(var(--background))" fillOpacity={0.85} stroke="none" />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={8}
+        fill="hsl(var(--background))"
+        fillOpacity={0.85}
+        stroke="none"
+      />
       <circle
         cx={cx}
         cy={cy}
@@ -1558,27 +1859,28 @@ export function ChartDrawingsLayer({
   const renderVertices = (drawing: ChartDrawing) => {
     if (drawing.id !== selectedId) return null;
 
-    if (drawing.type === 'hline' && series) {
+    if (drawing.type === "hline" && series) {
       const y = priceToPixelY(series, drawing.price);
-      const containerW = container?.clientWidth ?? layerRef.current?.clientWidth ?? 2000;
+      const containerW =
+        container?.clientWidth ?? layerRef.current?.clientWidth ?? 2000;
       if (y == null) return null;
-      return renderVertexHandle(containerW / 2, y, 'hline-handle');
+      return renderVertexHandle(containerW / 2, y, "hline-handle");
     }
 
-    if (drawing.type === 'vline' && chart) {
+    if (drawing.type === "vline" && chart) {
       const x = timeToPixelX(chart, drawing.time);
       if (x == null) return null;
-      return renderVertexHandle(x, height / 2, 'vline-handle');
+      return renderVertexHandle(x, height / 2, "vline-handle");
     }
 
-    if (drawing.type === 'text-label') {
+    if (drawing.type === "text-label") {
       const px = toPx(drawing.point);
       if (!px) return null;
       const fontSize = drawing.fontSize ?? DEFAULT_TEXT_FONT_SIZE;
       return (
         <>
-          {renderVertexHandle(px.x, px.y, 'text-anchor')}
-          {renderVertexHandle(px.x + 48, px.y + fontSize, 'text-size')}
+          {renderVertexHandle(px.x, px.y, "text-anchor")}
+          {renderVertexHandle(px.x + 48, px.y + fontSize, "text-size")}
         </>
       );
     }
@@ -1587,7 +1889,7 @@ export function ChartDrawingsLayer({
     if (marker) {
       const px = toPx(marker);
       if (!px) return null;
-      return renderVertexHandle(px.x, px.y, 'marker-handle');
+      return renderVertexHandle(px.x, px.y, "marker-handle");
     }
 
     return drawingVertices(drawing).map((key) => {
@@ -1602,16 +1904,21 @@ export function ChartDrawingsLayer({
   const renderDraft = () => {
     const draftColor = resolvedStyle.color ?? DEFAULT_CHART_DRAW_COLOR;
     const draftLineWidth = resolvedStyle.lineWidth ?? DEFAULT_LINE_WIDTH;
-    const draftFillOpacity = resolvedStyle.fillOpacity ?? DEFAULT_RECT_FILL_OPACITY;
-    const draftStrokeOpacity = resolvedStyle.strokeOpacity ?? DEFAULT_BRUSH_STROKE_OPACITY;
+    const draftFillOpacity =
+      resolvedStyle.fillOpacity ?? DEFAULT_RECT_FILL_OPACITY;
+    const draftStrokeOpacity =
+      resolvedStyle.strokeOpacity ?? DEFAULT_BRUSH_STROKE_OPACITY;
 
-    if (tool === 'arrow-circle' && arrowDraftRef.current && arrowDraftEnd) {
+    if (tool === "arrow-circle" && arrowDraftRef.current && arrowDraftEnd) {
       const a = toPx(arrowDraftRef.current);
       const b = toPx(arrowDraftEnd);
       if (!a || !b) return null;
       const direction = markerDirectionFromDelta(b.x - a.x, b.y - a.y);
       return (
-        <g transform={`translate(${a.x}, ${a.y}) rotate(${markerRotation(direction)})`} opacity={0.7}>
+        <g
+          transform={`translate(${a.x}, ${a.y}) rotate(${markerRotation(direction)})`}
+          opacity={0.7}
+        >
           <path d="M0,-10 L-6,4 L0,0 L6,4 Z" fill={draftColor} />
           <line
             x1={0}
@@ -1625,7 +1932,7 @@ export function ChartDrawingsLayer({
       );
     }
 
-    if (tool === 'rectangle' && dragRect) {
+    if (tool === "rectangle" && dragRect) {
       const { p1, p2 } = normalizeRect(dragRect.start, dragRect.end);
       const a = toPx(p1);
       const b = toPx(p2);
@@ -1644,15 +1951,18 @@ export function ChartDrawingsLayer({
       );
     }
 
-    if ((tool === 'brush' || tool === 'highlighter') && brushDraftPoints.length >= 2) {
+    if (
+      (tool === "brush" || tool === "highlighter") &&
+      brushDraftPoints.length >= 2
+    ) {
       const path = brushDraftPoints
         .map((point, index) => {
           const px = toPx(point);
           if (!px) return null;
-          return `${index === 0 ? 'M' : 'L'} ${px.x} ${px.y}`;
+          return `${index === 0 ? "M" : "L"} ${px.x} ${px.y}`;
         })
         .filter((segment): segment is string => segment != null)
-        .join(' ');
+        .join(" ");
       if (!path) return null;
       return (
         <path
@@ -1668,26 +1978,38 @@ export function ChartDrawingsLayer({
     }
 
     if (!draftStart || !draftEnd) {
-      if (tool === 'pitchfork' && draftStart && stepRef.current === 1) {
-        return renderLine(draftStart, hoverPoint ?? draftStart, draftColor, draftLineWidth, {
-          dashed: true,
-        });
+      if (tool === "pitchfork" && draftStart && stepRef.current === 1) {
+        return renderLine(
+          draftStart,
+          hoverPoint ?? draftStart,
+          draftColor,
+          draftLineWidth,
+          {
+            dashed: true,
+          },
+        );
       }
       return null;
     }
 
-    if (tool === 'fibonacci' && draftStart && draftEnd) {
+    if (tool === "fibonacci" && draftStart && draftEnd) {
       return renderFibonacci(
-        { id: 'draft', type: 'fibonacci', p1: draftStart, p2: draftEnd, color: draftColor },
+        {
+          id: "draft",
+          type: "fibonacci",
+          p1: draftStart,
+          p2: draftEnd,
+          color: draftColor,
+        },
         false,
       );
     }
 
-    if (tool === 'fib-trend-ext' && draftStart && draftEnd) {
+    if (tool === "fib-trend-ext" && draftStart && draftEnd) {
       return renderFibTrendExt(
         {
-          id: 'draft',
-          type: 'fib-trend-ext',
+          id: "draft",
+          type: "fib-trend-ext",
           p1: draftStart,
           p2: draftEnd,
           color: draftColor,
@@ -1696,11 +2018,11 @@ export function ChartDrawingsLayer({
       );
     }
 
-    if (tool === 'fib-time-zone' && draftStart && draftEnd) {
+    if (tool === "fib-time-zone" && draftStart && draftEnd) {
       return renderFibTimeZone(
         {
-          id: 'draft',
-          type: 'fib-time-zone',
+          id: "draft",
+          type: "fib-time-zone",
           p1: draftStart,
           p2: draftEnd,
           color: draftColor,
@@ -1709,18 +2031,24 @@ export function ChartDrawingsLayer({
       );
     }
 
-    if (tool === 'gann-fan' && draftStart && draftEnd) {
+    if (tool === "gann-fan" && draftStart && draftEnd) {
       return renderGannFan(
-        { id: 'draft', type: 'gann-fan', p1: draftStart, p2: draftEnd, color: draftColor },
+        {
+          id: "draft",
+          type: "gann-fan",
+          p1: draftStart,
+          p2: draftEnd,
+          color: draftColor,
+        },
         false,
       );
     }
 
-    if (tool === 'gann-grid' && draftStart && draftEnd) {
+    if (tool === "gann-grid" && draftStart && draftEnd) {
       return renderGannGrid(
         {
-          id: 'draft',
-          type: 'gann-grid',
+          id: "draft",
+          type: "gann-grid",
           p1: draftStart,
           p2: draftEnd,
           color: draftColor,
@@ -1730,12 +2058,12 @@ export function ChartDrawingsLayer({
       );
     }
 
-    if (tool === 'gann-square' && draftStart && draftEnd && chart && series) {
+    if (tool === "gann-square" && draftStart && draftEnd && chart && series) {
       const p2 = snapGannSquareP2(draftStart, draftEnd, chart, series);
       return renderGannSquare(
         {
-          id: 'draft',
-          type: 'gann-square',
+          id: "draft",
+          type: "gann-square",
           p1: draftStart,
           p2,
           color: draftColor,
@@ -1747,31 +2075,45 @@ export function ChartDrawingsLayer({
 
     if (TWO_POINT_DRAW_TOOLS.includes(tool)) {
       const dashed = true;
-      if (tool === 'ext-line') {
+      if (tool === "ext-line") {
         return renderLine(draftStart, draftEnd, draftColor, draftLineWidth, {
           dashed,
           extendBoth: true,
         });
       }
-      if (tool === 'ray') {
+      if (tool === "ray") {
         return renderLine(draftStart, draftEnd, draftColor, draftLineWidth, {
           dashed,
           extendRay: true,
         });
       }
-      return renderLine(draftStart, draftEnd, draftColor, draftLineWidth, { dashed });
+      return renderLine(draftStart, draftEnd, draftColor, draftLineWidth, {
+        dashed,
+      });
     }
 
-    if (tool === 'channel') {
+    if (tool === "channel") {
       if (stepRef.current >= 1) {
-        const base = renderLine(draftStart, draftEnd, draftColor, draftLineWidth, {
-          dashed: true,
-        });
+        const base = renderLine(
+          draftStart,
+          draftEnd,
+          draftColor,
+          draftLineWidth,
+          {
+            dashed: true,
+          },
+        );
         if (stepRef.current === 2 && hoverPoint) {
           const p4 = channelParallelEnd(draftStart, draftEnd, hoverPoint);
-          const parallel = renderLine(hoverPoint, p4, draftColor, draftLineWidth, {
-            dashed: true,
-          });
+          const parallel = renderLine(
+            hoverPoint,
+            p4,
+            draftColor,
+            draftLineWidth,
+            {
+              dashed: true,
+            },
+          );
           return (
             <g>
               {base}
@@ -1783,15 +2125,21 @@ export function ChartDrawingsLayer({
       }
     }
 
-    if (tool === 'pitchfork' && chart && series && stepRef.current >= 1) {
-      const base = renderLine(draftStart, draftEnd, draftColor, draftLineWidth, {
-        dashed: true,
-      });
+    if (tool === "pitchfork" && chart && series && stepRef.current >= 1) {
+      const base = renderLine(
+        draftStart,
+        draftEnd,
+        draftColor,
+        draftLineWidth,
+        {
+          dashed: true,
+        },
+      );
       if (stepRef.current === 2 && hoverPoint) {
         const preview = renderPitchfork(
           {
-            id: 'draft',
-            type: 'pitchfork',
+            id: "draft",
+            type: "pitchfork",
             p1: draftStart,
             p2: draftEnd,
             p3: hoverPoint,
@@ -1819,9 +2167,11 @@ export function ChartDrawingsLayer({
       for (let i = drawings.length - 1; i >= 0; i -= 1) {
         const drawing = drawings[i]!;
         if (!isDrawingVisible(drawing)) continue;
-        if (hitTestDrawing(drawing, px, py, toPx, 12, containerW, chart, series)) {
+        if (
+          hitTestDrawing(drawing, px, py, toPx, 12, containerW, chart, series)
+        ) {
           onSelect(drawing.id);
-          if (drawing.type === 'text-label') {
+          if (drawing.type === "text-label") {
             setInlineTextEditId(drawing.id);
             setInlineTextDraft(textOnChart(drawing));
             return true;
@@ -1832,7 +2182,16 @@ export function ChartDrawingsLayer({
       }
       return false;
     },
-    [chart, container, drawings, onOpenDrawingEditor, onSelect, series, tool, toPx],
+    [
+      chart,
+      container,
+      drawings,
+      onOpenDrawingEditor,
+      onSelect,
+      series,
+      tool,
+      toPx,
+    ],
   );
 
   useEffect(() => {
@@ -1850,11 +2209,21 @@ export function ChartDrawingsLayer({
       onBackgroundDoubleClick?.(event.clientX, event.clientY);
     };
 
-    container.addEventListener('dblclick', onDblClick);
-    return () => container.removeEventListener('dblclick', onDblClick);
-  }, [container, handleDoubleClick, layerPointerPx, onBackgroundDoubleClick, tool]);
+    container.addEventListener("dblclick", onDblClick);
+    return () => container.removeEventListener("dblclick", onDblClick);
+  }, [
+    container,
+    handleDoubleClick,
+    layerPointerPx,
+    onBackgroundDoubleClick,
+    tool,
+  ]);
 
-  const capturePointer = shouldCaptureDrawingPointer(tool, hoveringDrawing, interactionDragging);
+  const capturePointer = shouldCaptureDrawingPointer(
+    tool,
+    hoveringDrawing,
+    interactionDragging,
+  );
 
   useEffect(() => {
     onInteractionCaptureChange?.(layerHidden ? false : capturePointer);
@@ -1870,7 +2239,7 @@ export function ChartDrawingsLayer({
       className="absolute inset-0 z-10"
       style={{
         height,
-        pointerEvents: capturePointer ? 'auto' : 'none',
+        pointerEvents: capturePointer ? "auto" : "none",
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -1884,7 +2253,7 @@ export function ChartDrawingsLayer({
         }
       }}
     >
-      <svg className="h-full w-full" style={{ pointerEvents: 'none' }}>
+      <svg className="h-full w-full" style={{ pointerEvents: "none" }}>
         {drawings.map((drawing) => (
           <g key={drawing.id}>
             {renderDrawing(drawing)}
@@ -1894,50 +2263,51 @@ export function ChartDrawingsLayer({
         {renderDraft()}
       </svg>
 
-      {inlineTextEditId && (() => {
-        const drawing = drawings.find(
-          (item): item is Extract<ChartDrawing, { type: 'text-label' }> =>
-            item.id === inlineTextEditId && item.type === 'text-label',
-        );
-        if (!drawing) return null;
-        const px = toPx(drawing.point);
-        if (!px) return null;
-        return (
-          <textarea
-            className="absolute z-20 min-w-[8rem] resize-none rounded border border-primary bg-card/95 px-1 py-0.5 text-foreground shadow-md outline-none"
-            style={{
-              left: px.x,
-              top: px.y,
-              fontSize: drawing.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
-              color: drawing.color,
-            }}
-            value={inlineTextDraft}
-            autoFocus
-            rows={2}
-            onChange={(event) => setInlineTextDraft(event.target.value)}
-            onBlur={commitInlineTextEdit}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                commitInlineTextEdit();
-              }
-              if (event.key === 'Escape') {
-                setInlineTextEditId(null);
-                setInlineTextDraft('');
-              }
-            }}
-            onPointerDown={(event) => event.stopPropagation()}
-          />
-        );
-      })()}
+      {inlineTextEditId &&
+        (() => {
+          const drawing = drawings.find(
+            (item): item is Extract<ChartDrawing, { type: "text-label" }> =>
+              item.id === inlineTextEditId && item.type === "text-label",
+          );
+          if (!drawing) return null;
+          const px = toPx(drawing.point);
+          if (!px) return null;
+          return (
+            <textarea
+              className="absolute z-20 min-w-[8rem] resize-none rounded border border-primary bg-card/95 px-1 py-0.5 text-foreground shadow-md outline-none"
+              style={{
+                left: px.x,
+                top: px.y,
+                fontSize: drawing.fontSize ?? DEFAULT_TEXT_FONT_SIZE,
+                color: drawing.color,
+              }}
+              value={inlineTextDraft}
+              autoFocus
+              rows={2}
+              onChange={(event) => setInlineTextDraft(event.target.value)}
+              onBlur={commitInlineTextEdit}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  commitInlineTextEdit();
+                }
+                if (event.key === "Escape") {
+                  setInlineTextEditId(null);
+                  setInlineTextDraft("");
+                }
+              }}
+              onPointerDown={(event) => event.stopPropagation()}
+            />
+          );
+        })()}
 
       {canInteractWithDrawings(tool) &&
         selectedId &&
         !inlineTextEditId &&
         (() => {
           const drawing = drawings.find(
-            (item): item is Extract<ChartDrawing, { type: 'text-label' }> =>
-              item.id === selectedId && item.type === 'text-label',
+            (item): item is Extract<ChartDrawing, { type: "text-label" }> =>
+              item.id === selectedId && item.type === "text-label",
           );
           if (!drawing) return null;
           const px = toPx(drawing.point);
@@ -1954,7 +2324,10 @@ export function ChartDrawingsLayer({
                 value={drawing.color}
                 className="h-5 w-5 cursor-pointer border-0 bg-transparent p-0"
                 onChange={(event) =>
-                  onUpdate(drawing.id, { color: event.target.value, templateId: undefined })
+                  onUpdate(drawing.id, {
+                    color: event.target.value,
+                    templateId: undefined,
+                  })
                 }
               />
               <input

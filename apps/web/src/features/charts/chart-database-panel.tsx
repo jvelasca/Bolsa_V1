@@ -1,57 +1,65 @@
-import type { ReactNode } from 'react';
-import type { ChartTimeframe, DatabaseSummaryDto, InstrumentDataStatusDto } from '@bolsa/shared';
+import type { ReactNode } from "react";
+import type {
+  ChartTimeframe,
+  DatabaseSummaryDto,
+  InstrumentDataStatusDto,
+} from "@bolsa/shared";
 
 function formatBarDate(iso: string | null, timeframe: ChartTimeframe) {
-  if (!iso) return '—';
-  const isDaily = timeframe === '1d' || iso.length === 10;
+  if (!iso) return "—";
+  const isDaily = timeframe === "1d" || iso.length === 10;
   const d = isDaily ? new Date(`${iso.slice(0, 10)}T12:00:00`) : new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   if (isDaily) {
-    return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   }
-  return d.toLocaleString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return d.toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
 function formatDateTime(iso: string | null) {
-  if (!iso) return '—';
+  if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
+  return d.toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
 }
 
 function formatNumber(value: number) {
-  return value.toLocaleString('es-ES');
+  return value.toLocaleString("es-ES");
 }
 
 export const DATA_STATUS_LABELS: Record<string, string> = {
-  current: 'Actualizados en BD',
-  stale: 'Desactualizados',
-  empty: 'Sin datos en BD',
-  error: 'Error de sincronización',
-  gap_detected: 'Con huecos recientes',
-  syncing: 'Sincronizando…',
+  current: "Actualizados en BD",
+  stale: "Desactualizados",
+  empty: "Sin datos en BD",
+  error: "Error de sincronización",
+  gap_detected: "Con huecos recientes",
+  syncing: "Sincronizando…",
 };
 
 export const DATA_STATUS_COLORS: Record<string, string> = {
-  current: 'text-emerald-400',
-  stale: 'text-amber-400',
-  empty: 'text-red-400',
-  error: 'text-red-400',
-  gap_detected: 'text-amber-400',
-  syncing: 'text-sky-400',
+  current: "text-emerald-400",
+  stale: "text-amber-400",
+  empty: "text-red-400",
+  error: "text-red-400",
+  gap_detected: "text-amber-400",
+  syncing: "text-sky-400",
 };
 
 function DetailRow({
@@ -66,7 +74,12 @@ function DetailRow({
   return (
     <div className="flex items-start justify-between gap-4 py-1.5 text-sm">
       <dt className="shrink-0 text-muted-foreground">{label}</dt>
-      <dd className={valueClassName ?? 'text-right font-medium tabular-nums text-foreground'}>
+      <dd
+        className={
+          valueClassName ??
+          "text-right font-medium tabular-nums text-foreground"
+        }
+      >
         {value}
       </dd>
     </div>
@@ -101,26 +114,37 @@ export function ChartDatabaseInstrumentTab({
   symbol?: string;
   dbSummary?: DatabaseSummaryDto;
 }) {
-  const statusColor = DATA_STATUS_COLORS[status.freshnessStatus] ?? 'text-foreground';
+  const statusColor =
+    DATA_STATUS_COLORS[status.freshnessStatus] ?? "text-foreground";
 
   return (
     <div className="space-y-5">
-      <PanelSection title={symbol ? `Instrumento · ${symbol}` : 'Instrumento activo'}>
-        <DetailRow label="Timeframe en gráfico" value={timeframe.toUpperCase()} />
+      <PanelSection
+        title={symbol ? `Instrumento · ${symbol}` : "Instrumento activo"}
+      >
+        <DetailRow
+          label="Timeframe en gráfico"
+          value={timeframe.toUpperCase()}
+        />
         <DetailRow
           label="Estado de frescura"
-          value={DATA_STATUS_LABELS[status.freshnessStatus] ?? status.freshnessStatus}
+          value={
+            DATA_STATUS_LABELS[status.freshnessStatus] ?? status.freshnessStatus
+          }
           valueClassName={`text-right font-medium ${statusColor}`}
         />
-        <DetailRow label="Barras en BD (activo)" value={formatNumber(status.barCount)} />
+        <DetailRow
+          label="Barras en BD (activo)"
+          value={formatNumber(status.barCount)}
+        />
         <DetailRow
           label="Última vela"
           value={formatBarDate(status.lastBarDate, timeframe)}
         />
-        {timeframe === '1d' && (
+        {timeframe === "1d" && (
           <DetailRow
             label="Última sesión esperada"
-            value={formatBarDate(status.expectedLastBarDate, '1d')}
+            value={formatBarDate(status.expectedLastBarDate, "1d")}
           />
         )}
       </PanelSection>
@@ -138,10 +162,13 @@ export function ChartDatabaseInstrumentTab({
       )}
 
       <PanelSection title="Sincronización 1D">
-        <DetailRow label="Último sync" value={formatDateTime(status.lastSyncAt)} />
+        <DetailRow
+          label="Último sync"
+          value={formatDateTime(status.lastSyncAt)}
+        />
         <DetailRow
           label="Resultado"
-          value={status.lastSyncStatus ?? '—'}
+          value={status.lastSyncStatus ?? "—"}
           valueClassName="text-right font-medium capitalize text-foreground"
         />
       </PanelSection>
@@ -157,13 +184,18 @@ export function ChartDatabaseServerTab({
   loadingDb?: boolean;
 }) {
   if (loadingDb) {
-    return <p className="text-sm text-muted-foreground">Conectando con PostgreSQL…</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Conectando con PostgreSQL…
+      </p>
+    );
   }
 
   if (!dbSummary) {
     return (
       <p className="text-sm text-muted-foreground">
-        No se pudo cargar el resumen del servidor. Comprueba que la API esté en marcha.
+        No se pudo cargar el resumen del servidor. Comprueba que la API esté en
+        marcha.
       </p>
     );
   }
@@ -173,8 +205,8 @@ export function ChartDatabaseServerTab({
       <PanelSection title="Conexión">
         <DetailRow
           label="Estado"
-          value={dbSummary.connected ? 'Conectado' : 'Sin conexión'}
-          valueClassName={`text-right font-medium ${dbSummary.connected ? 'text-emerald-400' : 'text-red-400'}`}
+          value={dbSummary.connected ? "Conectado" : "Sin conexión"}
+          valueClassName={`text-right font-medium ${dbSummary.connected ? "text-emerald-400" : "text-red-400"}`}
         />
         <DetailRow
           label="Mensaje"
@@ -196,21 +228,25 @@ export function ChartDatabaseServerTab({
   );
 }
 
-export function ChartDatabaseQualityTab({ status }: { status: InstrumentDataStatusDto }) {
+export function ChartDatabaseQualityTab({
+  status,
+}: {
+  status: InstrumentDataStatusDto;
+}) {
   return (
     <div className="space-y-5">
       <PanelSection title="Integridad de datos">
         <DetailRow
           label="Huecos detectados"
           value={status.gapCount}
-          valueClassName={`text-right font-medium tabular-nums ${status.gapCount > 0 ? 'text-amber-400' : 'text-foreground'}`}
+          valueClassName={`text-right font-medium tabular-nums ${status.gapCount > 0 ? "text-amber-400" : "text-foreground"}`}
         />
         <DetailRow
           label="Desviación cierre XTB"
           value={
             status.xtbVsCloseDeviationPct != null
               ? `${status.xtbVsCloseDeviationPct.toFixed(2)} %`
-              : '—'
+              : "—"
           }
         />
         <DetailRow
@@ -245,7 +281,8 @@ export function ChartDatabaseQualityTab({ status }: { status: InstrumentDataStat
 
       {status.sanityWarnings.length === 0 && !status.lastSyncError && (
         <p className="text-sm text-muted-foreground">
-          No hay incidencias de calidad registradas para este instrumento y timeframe.
+          No hay incidencias de calidad registradas para este instrumento y
+          timeframe.
         </p>
       )}
     </div>
@@ -262,20 +299,34 @@ export function ChartDatabaseActivityTab({
   dbSummary?: DatabaseSummaryDto;
 }) {
   const intradayFrames =
-    dbSummary?.instrumentOhlcv.filter((row) => row.timeframe !== '1d') ?? [];
+    dbSummary?.instrumentOhlcv.filter((row) => row.timeframe !== "1d") ?? [];
 
   return (
     <div className="space-y-5">
       <PanelSection title="Última actividad de sync">
-        <DetailRow label="Timeframe consultado" value={timeframe.toUpperCase()} />
-        <DetailRow label="Estado actual" value={DATA_STATUS_LABELS[status.freshnessStatus] ?? status.freshnessStatus} />
-        <DetailRow label="Último sync 1D" value={formatDateTime(status.lastSyncAt)} />
+        <DetailRow
+          label="Timeframe consultado"
+          value={timeframe.toUpperCase()}
+        />
+        <DetailRow
+          label="Estado actual"
+          value={
+            DATA_STATUS_LABELS[status.freshnessStatus] ?? status.freshnessStatus
+          }
+        />
+        <DetailRow
+          label="Último sync 1D"
+          value={formatDateTime(status.lastSyncAt)}
+        />
         <DetailRow
           label="Resultado sync"
-          value={status.lastSyncStatus ?? '—'}
+          value={status.lastSyncStatus ?? "—"}
           valueClassName="text-right font-medium capitalize text-foreground"
         />
-        <DetailRow label="Barras tras sync" value={formatNumber(status.barCount)} />
+        <DetailRow
+          label="Barras tras sync"
+          value={formatNumber(status.barCount)}
+        />
       </PanelSection>
 
       {intradayFrames.length > 0 && (
@@ -288,17 +339,20 @@ export function ChartDatabaseActivityTab({
             />
           ))}
           <p className="pt-1 text-xs text-muted-foreground">
-            Los timeframes intradía se almacenan en BD para backtests y se reutilizan al cambiar la
-            escala del gráfico.
+            Los timeframes intradía se almacenan en BD para backtests y se
+            reutilizan al cambiar la escala del gráfico.
           </p>
         </PanelSection>
       )}
 
       <section className="rounded-md border border-dashed border-border bg-muted/10 p-3">
-        <p className="text-xs font-medium text-foreground">Historial detallado</p>
+        <p className="text-xs font-medium text-foreground">
+          Historial detallado
+        </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          El registro completo de sincronizaciones por instrumento estará disponible en una próxima
-          versión (cola de sync, reintentos y reparación de huecos).
+          El registro completo de sincronizaciones por instrumento estará
+          disponible en una próxima versión (cola de sync, reintentos y
+          reparación de huecos).
         </p>
       </section>
     </div>

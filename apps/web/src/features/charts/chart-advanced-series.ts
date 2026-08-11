@@ -1,6 +1,9 @@
-import type { ChartSeriesTypeParams, OhlcvBarDto } from '@bolsa/shared';
-import type { Time } from 'lightweight-charts';
-import { type ChartCandle, barTimeToChartTime } from '@/features/charts/chart-utils';
+import type { ChartSeriesTypeParams, OhlcvBarDto } from "@bolsa/shared";
+import type { Time } from "lightweight-charts";
+import {
+  type ChartCandle,
+  barTimeToChartTime,
+} from "@/features/charts/chart-utils";
 
 export const DEFAULT_LINE_BREAK_LINES = 3;
 export const DEFAULT_POINT_AND_FIGURE_REVERSAL = 3;
@@ -19,21 +22,31 @@ export function defaultPriceBoxSize(bars: OhlcvBarDto[]): number {
   return Math.max(0.01, Number((avg * 0.005).toFixed(4)));
 }
 
-export function resolveRenkoBrickSize(bars: OhlcvBarDto[], params?: ChartSeriesTypeParams): number {
+export function resolveRenkoBrickSize(
+  bars: OhlcvBarDto[],
+  params?: ChartSeriesTypeParams,
+): number {
   const raw = params?.renkoBrickSize;
   if (raw != null && raw > 0) return raw;
   return defaultPriceBoxSize(bars);
 }
 
-export function resolvePointAndFigureBox(bars: OhlcvBarDto[], params?: ChartSeriesTypeParams): number {
+export function resolvePointAndFigureBox(
+  bars: OhlcvBarDto[],
+  params?: ChartSeriesTypeParams,
+): number {
   const raw = params?.pointAndFigureBox;
   if (raw != null && raw > 0) return raw;
   return defaultPriceBoxSize(bars);
 }
 
-export function resolvePointAndFigureReversal(params?: ChartSeriesTypeParams): number {
+export function resolvePointAndFigureReversal(
+  params?: ChartSeriesTypeParams,
+): number {
   const raw = params?.pointAndFigureReversal;
-  return raw != null && raw >= 1 ? Math.floor(raw) : DEFAULT_POINT_AND_FIGURE_REVERSAL;
+  return raw != null && raw >= 1
+    ? Math.floor(raw)
+    : DEFAULT_POINT_AND_FIGURE_REVERSAL;
 }
 
 export function resolveLineBreakLines(params?: ChartSeriesTypeParams): number {
@@ -64,7 +77,7 @@ class SyntheticTimeAssigner {
 
     const base = barTimeToChartTime(this.bars[barIndex]!.timestamp);
     let unix =
-      typeof base === 'string'
+      typeof base === "string"
         ? Math.floor(Date.parse(base) / 1000) + this.seq
         : (base as number) + this.seq;
 
@@ -120,7 +133,14 @@ export function barsToRenkoSeries(
       while (price >= brickClose + brickSize) {
         const open = brickClose;
         brickClose += brickSize;
-        pushCandle(result, nextTime.at(i), open, brickClose, upColor, downColor);
+        pushCandle(
+          result,
+          nextTime.at(i),
+          open,
+          brickClose,
+          upColor,
+          downColor,
+        );
         direction = 1;
       }
       if (direction === 1 && price <= brickClose - 2 * brickSize) {
@@ -128,7 +148,14 @@ export function barsToRenkoSeries(
         while (price <= brickClose - brickSize) {
           const open = brickClose;
           brickClose -= brickSize;
-          pushCandle(result, nextTime.at(i), open, brickClose, upColor, downColor);
+          pushCandle(
+            result,
+            nextTime.at(i),
+            open,
+            brickClose,
+            upColor,
+            downColor,
+          );
         }
       }
     }
@@ -137,7 +164,14 @@ export function barsToRenkoSeries(
       while (price <= brickClose - brickSize) {
         const open = brickClose;
         brickClose -= brickSize;
-        pushCandle(result, nextTime.at(i), open, brickClose, upColor, downColor);
+        pushCandle(
+          result,
+          nextTime.at(i),
+          open,
+          brickClose,
+          upColor,
+          downColor,
+        );
         direction = -1;
       }
       if (direction === -1 && price >= brickClose + 2 * brickSize) {
@@ -145,7 +179,14 @@ export function barsToRenkoSeries(
         while (price >= brickClose + brickSize) {
           const open = brickClose;
           brickClose += brickSize;
-          pushCandle(result, nextTime.at(i), open, brickClose, upColor, downColor);
+          pushCandle(
+            result,
+            nextTime.at(i),
+            open,
+            brickClose,
+            upColor,
+            downColor,
+          );
         }
       }
     }
@@ -153,8 +194,18 @@ export function barsToRenkoSeries(
 
   if (result.length === 0) {
     const open = brickClose - (direction === -1 ? brickSize : 0);
-    const close = direction === -1 ? brickClose : brickClose + (direction === 1 ? 0 : brickSize);
-    pushCandle(result, nextTime.at(0), open, close || bars[0]!.close, upColor, downColor);
+    const close =
+      direction === -1
+        ? brickClose
+        : brickClose + (direction === 1 ? 0 : brickSize);
+    pushCandle(
+      result,
+      nextTime.at(0),
+      open,
+      close || bars[0]!.close,
+      upColor,
+      downColor,
+    );
   }
 
   return result;
@@ -189,7 +240,14 @@ export function barsToLineBreakSeries(
     low: first.low,
     bullish: first.close >= first.open,
   });
-  pushCandle(result, nextTime.at(0), first.open, first.close, upColor, downColor);
+  pushCandle(
+    result,
+    nextTime.at(0),
+    first.open,
+    first.close,
+    upColor,
+    downColor,
+  );
 
   for (let i = 1; i < bars.length; i++) {
     const close = bars[i]!.close;
@@ -213,8 +271,21 @@ export function barsToLineBreakSeries(
           wickColor: upColor,
         };
       } else {
-        blocks.push({ open: last.close, close, high: close, low: last.close, bullish: true });
-        pushCandle(result, nextTime.at(i), last.close, close, upColor, downColor);
+        blocks.push({
+          open: last.close,
+          close,
+          high: close,
+          low: last.close,
+          bullish: true,
+        });
+        pushCandle(
+          result,
+          nextTime.at(i),
+          last.close,
+          close,
+          upColor,
+          downColor,
+        );
       }
     } else if (close < refLow) {
       if (!last.bullish) {
@@ -231,8 +302,21 @@ export function barsToLineBreakSeries(
           wickColor: downColor,
         };
       } else {
-        blocks.push({ open: last.close, close, high: last.close, low: close, bullish: false });
-        pushCandle(result, nextTime.at(i), last.close, close, upColor, downColor);
+        blocks.push({
+          open: last.close,
+          close,
+          high: last.close,
+          low: close,
+          bullish: false,
+        });
+        pushCandle(
+          result,
+          nextTime.at(i),
+          last.close,
+          close,
+          upColor,
+          downColor,
+        );
       }
     } else if (last.bullish && close > last.close) {
       last.close = close;
@@ -294,7 +378,14 @@ export function barsToKagiSeries(
         continue;
       }
       if (extreme - close >= reversalAt(extreme)) {
-        pushCandle(result, nextTime.at(legBarIndex), legStart, extreme, upColor, downColor);
+        pushCandle(
+          result,
+          nextTime.at(legBarIndex),
+          legStart,
+          extreme,
+          upColor,
+          downColor,
+        );
         direction = -1;
         legStart = extreme;
         extreme = close;
@@ -303,7 +394,14 @@ export function barsToKagiSeries(
     } else if (close <= extreme) {
       extreme = close;
     } else if (close - extreme >= reversalAt(extreme)) {
-      pushCandle(result, nextTime.at(legBarIndex), legStart, extreme, upColor, downColor);
+      pushCandle(
+        result,
+        nextTime.at(legBarIndex),
+        legStart,
+        extreme,
+        upColor,
+        downColor,
+      );
       direction = 1;
       legStart = extreme;
       extreme = close;
@@ -311,7 +409,14 @@ export function barsToKagiSeries(
     }
   }
 
-  pushCandle(result, nextTime.at(legBarIndex), legStart, extreme, upColor, downColor);
+  pushCandle(
+    result,
+    nextTime.at(legBarIndex),
+    legStart,
+    extreme,
+    upColor,
+    downColor,
+  );
   return result;
 }
 
@@ -345,14 +450,28 @@ export function barsToPointAndFigureSeries(
       while (price >= state.high + boxSize) {
         const open = state.high;
         state.high += boxSize;
-        pushCandle(result, nextTime.at(i), open, state.high, upColor, downColor);
+        pushCandle(
+          result,
+          nextTime.at(i),
+          open,
+          state.high,
+          upColor,
+          downColor,
+        );
       }
       if (price <= state.high - reversalBoxes * boxSize) {
         state = { bullish: false, high: state.high, low: state.high - boxSize };
         while (price <= state.low - boxSize) {
           const open = state.low;
           state.low -= boxSize;
-          pushCandle(result, nextTime.at(i), open, state.low, upColor, downColor);
+          pushCandle(
+            result,
+            nextTime.at(i),
+            open,
+            state.low,
+            upColor,
+            downColor,
+          );
         }
       }
     } else {
@@ -366,7 +485,14 @@ export function barsToPointAndFigureSeries(
         while (price >= state.high + boxSize) {
           const open = state.high;
           state.high += boxSize;
-          pushCandle(result, nextTime.at(i), open, state.high, upColor, downColor);
+          pushCandle(
+            result,
+            nextTime.at(i),
+            open,
+            state.high,
+            upColor,
+            downColor,
+          );
         }
       }
     }

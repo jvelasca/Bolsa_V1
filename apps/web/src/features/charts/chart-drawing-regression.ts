@@ -1,5 +1,5 @@
-import type { OhlcvBarDto } from '@bolsa/shared';
-import type { ChartDrawingPoint } from '@bolsa/shared';
+import type { OhlcvBarDto } from "@bolsa/shared";
+import type { ChartDrawingPoint } from "@bolsa/shared";
 
 function parseBarTime(time: string): number {
   if (time.length === 10) return new Date(`${time}T12:00:00`).getTime();
@@ -55,14 +55,20 @@ export function computeRegressionLine(
   };
 }
 
-export function defaultInfoLineLabel(p1: ChartDrawingPoint, p2: ChartDrawingPoint): string {
+export function defaultInfoLineLabel(
+  p1: ChartDrawingPoint,
+  p2: ChartDrawingPoint,
+): string {
   const delta = p2.price - p1.price;
   const pct = p1.price !== 0 ? (delta / p1.price) * 100 : 0;
-  const sign = delta >= 0 ? '+' : '';
+  const sign = delta >= 0 ? "+" : "";
   return `${sign}${delta.toFixed(2)} (${sign}${pct.toFixed(2)}%)`;
 }
 
-export function lineAngleDegrees(p1: ChartDrawingPoint, p2: ChartDrawingPoint): number {
+export function lineAngleDegrees(
+  p1: ChartDrawingPoint,
+  p2: ChartDrawingPoint,
+): number {
   const t1 = parseBarTime(p1.time);
   const t2 = parseBarTime(p2.time);
   const dx = t2 - t1 || 1;

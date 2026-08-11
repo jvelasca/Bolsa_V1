@@ -1,7 +1,7 @@
-import { ChevronDown, type LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { ChevronDown, type LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 
 /** Botón de acceso directo en la barra (sin menú). */
 export function ChartBarZoneChipButton({
@@ -30,11 +30,13 @@ export function ChartBarZoneChipButton({
       disabled={disabled}
       onClick={onActivate}
       className={cn(
-        'inline-flex h-[1.375rem] shrink-0 items-center rounded px-1.5 text-[11px] font-medium leading-none',
-        'hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40',
-        children ? 'min-w-0 justify-start overflow-hidden' : 'min-w-[2.25rem] justify-center tabular-nums',
-        isActive && 'bg-accent text-primary ring-1 ring-primary/40',
-        !isActive && 'text-muted-foreground hover:text-foreground',
+        "inline-flex h-[1.375rem] shrink-0 items-center rounded px-1.5 text-[11px] font-medium leading-none",
+        "hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40",
+        children
+          ? "min-w-0 justify-start overflow-hidden"
+          : "min-w-[2.25rem] justify-center tabular-nums",
+        isActive && "bg-accent text-primary ring-1 ring-primary/40",
+        !isActive && "text-muted-foreground hover:text-foreground",
         className,
         buttonClassName,
       )}
@@ -71,9 +73,13 @@ export function ChartBarZoneIconAnchor({
     <div
       ref={containerRef}
       className={cn(
-        'relative h-[1.375rem] shrink-0',
-        hasBadge ? 'min-w-[1.375rem]' : showMenu ? 'w-[1.625rem]' : 'w-[1.375rem]',
-        showMenu && hasBadge && 'pr-1',
+        "relative h-[1.375rem] shrink-0",
+        hasBadge
+          ? "min-w-[1.375rem]"
+          : showMenu
+            ? "w-[1.625rem]"
+            : "w-[1.375rem]",
+        showMenu && hasBadge && "pr-1",
       )}
     >
       <button
@@ -83,10 +89,10 @@ export function ChartBarZoneIconAnchor({
           if (showMenu) onOpenMenu();
         }}
         className={cn(
-          'flex h-[1.375rem] max-w-full items-center rounded transition-colors hover:bg-accent',
-          hasBadge ? 'gap-0.5 px-1' : 'w-[1.375rem] justify-center',
-          isMenuOpen && 'bg-accent text-primary ring-1 ring-primary/40',
-          !isMenuOpen && 'text-primary',
+          "flex h-[1.375rem] max-w-full items-center rounded transition-colors hover:bg-accent",
+          hasBadge ? "gap-0.5 px-1" : "w-[1.375rem] justify-center",
+          isMenuOpen && "bg-accent text-primary ring-1 ring-primary/40",
+          !isMenuOpen && "text-primary",
         )}
       >
         <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -107,8 +113,8 @@ export function ChartBarZoneIconAnchor({
             onOpenMenu();
           }}
           className={cn(
-            'absolute bottom-0 right-0 z-20 flex h-2.5 w-2.5 items-center justify-center rounded-tl-sm border border-border/60 bg-card/95 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground',
-            isMenuOpen && 'bg-accent text-primary',
+            "absolute bottom-0 right-0 z-20 flex h-2.5 w-2.5 items-center justify-center rounded-tl-sm border border-border/60 bg-card/95 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground",
+            isMenuOpen && "bg-accent text-primary",
           )}
         >
           <ChevronDown className="h-1.5 w-1.5" strokeWidth={3} />

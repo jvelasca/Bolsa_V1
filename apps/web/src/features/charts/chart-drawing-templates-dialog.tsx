@@ -1,34 +1,43 @@
-import { useMemo, useState } from 'react';
-import type { ChartDrawingTemplate } from '@bolsa/shared';
+import { useMemo, useState } from "react";
+import type { ChartDrawingTemplate } from "@bolsa/shared";
 import {
   CHART_DRAWING_TYPE_LABELS,
   TEMPLATE_ASSIGNABLE_TOOLS,
   drawingTypeForTool,
   templateMatchesDrawingType,
-} from '@bolsa/shared';
-import { Copy, Plus, Trash2, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores/ui-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { ChartDrawingPropertiesPanel } from '@/features/charts/chart-drawing-properties-panel';
-import { DRAWING_TOOL_CATALOG } from '@/features/charts/chart-drawing-tools';
+} from "@bolsa/shared";
+import { Copy, Plus, Trash2, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { ChartDrawingPropertiesPanel } from "@/features/charts/chart-drawing-properties-panel";
+import { DRAWING_TOOL_CATALOG } from "@/features/charts/chart-drawing-tools";
 
 export function ChartDrawingTemplatesDialog() {
   const open = useUiStore((s) => s.drawingTemplatesOpen);
   const close = useUiStore((s) => s.closeDrawingTemplates);
   const tool = useUiStore((s) => s.chartDrawTool);
 
-  const templates = useWorkspaceStore((s) => s.workspace.drawingTemplates ?? []);
-  const activeByTool = useWorkspaceStore((s) => s.workspace.activeDrawingTemplateByTool ?? {});
+  const templates = useWorkspaceStore(
+    (s) => s.workspace.drawingTemplates ?? [],
+  );
+  const activeByTool = useWorkspaceStore(
+    (s) => s.workspace.activeDrawingTemplateByTool ?? {},
+  );
   const addTemplate = useWorkspaceStore((s) => s.addDrawingTemplate);
   const updateTemplate = useWorkspaceStore((s) => s.updateDrawingTemplate);
   const removeTemplate = useWorkspaceStore((s) => s.removeDrawingTemplate);
-  const duplicateTemplate = useWorkspaceStore((s) => s.duplicateDrawingTemplate);
-  const setActiveTemplateForTool = useWorkspaceStore((s) => s.setActiveDrawingTemplateForTool);
+  const duplicateTemplate = useWorkspaceStore(
+    (s) => s.duplicateDrawingTemplate,
+  );
+  const setActiveTemplateForTool = useWorkspaceStore(
+    (s) => s.setActiveDrawingTemplateForTool,
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const selected = templates.find((t) => t.id === selectedId) ?? templates[0] ?? null;
+  const selected =
+    templates.find((t) => t.id === selectedId) ?? templates[0] ?? null;
 
   const toolLabel = useMemo(() => {
     const def = DRAWING_TOOL_CATALOG.find((item) => item.id === tool);
@@ -51,10 +60,15 @@ export function ChartDrawingTemplatesDialog() {
           <div>
             <h2 className="text-sm font-semibold">Plantillas gráficas</h2>
             <p className="text-xs text-muted-foreground">
-              Estilo XTB: define estilo, texto, coordenadas y visibilidad por plantilla
+              Estilo XTB: define estilo, texto, coordenadas y visibilidad por
+              plantilla
             </p>
           </div>
-          <button type="button" onClick={close} className="rounded p-1 hover:bg-accent">
+          <button
+            type="button"
+            onClick={close}
+            className="rounded p-1 hover:bg-accent"
+          >
             <X className="h-4 w-4" />
           </button>
         </header>
@@ -81,8 +95,8 @@ export function ChartDrawingTemplatesDialog() {
                     type="button"
                     onClick={() => setSelectedId(template.id)}
                     className={cn(
-                      'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent',
-                      selected?.id === template.id && 'bg-accent text-primary',
+                      "w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent",
+                      selected?.id === template.id && "bg-accent text-primary",
                     )}
                   >
                     <span
@@ -91,7 +105,9 @@ export function ChartDrawingTemplatesDialog() {
                     />
                     {template.name}
                     {template.builtin && (
-                      <span className="ml-1 text-[9px] text-muted-foreground">· sistema</span>
+                      <span className="ml-1 text-[9px] text-muted-foreground">
+                        · sistema
+                      </span>
                     )}
                   </button>
                 </li>
@@ -108,7 +124,9 @@ export function ChartDrawingTemplatesDialog() {
                     value={selected.name}
                     disabled={selected.builtin}
                     onChange={(e) =>
-                      updateTemplate(selected.id, { name: e.target.value.trim() || selected.name })
+                      updateTemplate(selected.id, {
+                        name: e.target.value.trim() || selected.name,
+                      })
                     }
                   />
                   <button
@@ -128,7 +146,12 @@ export function ChartDrawingTemplatesDialog() {
                       title="Eliminar"
                       className="rounded p-1.5 text-destructive hover:bg-destructive/10"
                       onClick={() => {
-                        if (!window.confirm(`¿Eliminar plantilla "${selected.name}"?`)) return;
+                        if (
+                          !window.confirm(
+                            `¿Eliminar plantilla "${selected.name}"?`,
+                          )
+                        )
+                          return;
                         removeTemplate(selected.id);
                         setSelectedId(null);
                       }}
@@ -146,17 +169,21 @@ export function ChartDrawingTemplatesDialog() {
                     value={selected.drawingTypes}
                     disabled={selected.builtin}
                     onChange={(e) => {
-                      const drawingTypes = Array.from(e.target.selectedOptions).map(
+                      const drawingTypes = Array.from(
+                        e.target.selectedOptions,
+                      ).map(
                         (opt) => opt.value,
-                      ) as ChartDrawingTemplate['drawingTypes'];
+                      ) as ChartDrawingTemplate["drawingTypes"];
                       updateTemplate(selected.id, { drawingTypes });
                     }}
                   >
-                    {Object.entries(CHART_DRAWING_TYPE_LABELS).map(([type, label]) => (
-                      <option key={type} value={type}>
-                        {label}
-                      </option>
-                    ))}
+                    {Object.entries(CHART_DRAWING_TYPE_LABELS).map(
+                      ([type, label]) => (
+                        <option key={type} value={type}>
+                          {label}
+                        </option>
+                      ),
+                    )}
                   </select>
                   <span className="text-[10px] text-muted-foreground">
                     Vacío = todos los tipos. Ctrl+clic para varios.
@@ -170,7 +197,9 @@ export function ChartDrawingTemplatesDialog() {
                 />
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">Selecciona o crea una plantilla.</p>
+              <p className="text-sm text-muted-foreground">
+                Selecciona o crea una plantilla.
+              </p>
             )}
           </div>
         </div>
@@ -183,7 +212,7 @@ export function ChartDrawingTemplatesDialog() {
               </span>
               <select
                 className="rounded border border-border bg-background px-2 py-1.5"
-                value={activeTemplateId ?? ''}
+                value={activeTemplateId ?? ""}
                 onChange={(e) =>
                   setActiveTemplateForTool(tool, e.target.value || null)
                 }

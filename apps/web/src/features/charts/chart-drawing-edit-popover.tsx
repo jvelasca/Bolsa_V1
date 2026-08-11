@@ -1,9 +1,13 @@
-import type { ChartDrawing } from '@bolsa/shared';
-import { CHART_DRAWING_TYPE_LABELS, DEFAULT_DRAWING_TEMPLATES, drawingHasLinkedOrder } from '@bolsa/shared';
-import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { ChartDrawingPropertiesPanel } from '@/features/charts/chart-drawing-properties-panel';
+import type { ChartDrawing } from "@bolsa/shared";
+import {
+  CHART_DRAWING_TYPE_LABELS,
+  DEFAULT_DRAWING_TEMPLATES,
+  drawingHasLinkedOrder,
+} from "@bolsa/shared";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { ChartDrawingPropertiesPanel } from "@/features/charts/chart-drawing-properties-panel";
 
 interface ChartDrawingEditPopoverProps {
   chartId: string;
@@ -34,7 +38,7 @@ export function ChartDrawingEditPopover({
   return (
     <div
       className={cn(
-        'absolute left-3 top-14 z-20 w-64 rounded-md border border-border bg-card p-3 text-sm shadow-lg',
+        "absolute left-3 top-14 z-20 w-64 rounded-md border border-border bg-card p-3 text-sm shadow-lg",
         className,
       )}
       onPointerDown={(event) => event.stopPropagation()}
@@ -44,7 +48,9 @@ export function ChartDrawingEditPopover({
           <p className="font-medium leading-tight">
             {CHART_DRAWING_TYPE_LABELS[drawing.type] ?? drawing.type}
           </p>
-          <p className="text-[10px] text-muted-foreground">Doble clic · 4 pestañas</p>
+          <p className="text-[10px] text-muted-foreground">
+            Doble clic · 4 pestañas
+          </p>
         </div>
         <button
           type="button"
@@ -61,9 +67,11 @@ export function ChartDrawingEditPopover({
         drawing={drawing}
         templates={templates}
         compact
-        initialTab={drawing.type === 'text-label' ? 'text' : 'style'}
+        initialTab={drawing.type === "text-label" ? "text" : "style"}
         onUpdateDrawing={(patch) => updateDrawing(drawing.id, patch, chartId)}
-        onApplyTemplate={(templateId) => applyDrawingTemplate(drawing.id, templateId, chartId)}
+        onApplyTemplate={(templateId) =>
+          applyDrawingTemplate(drawing.id, templateId, chartId)
+        }
       />
 
       <button
@@ -73,7 +81,7 @@ export function ChartDrawingEditPopover({
           if (
             drawingHasLinkedOrder(drawing) &&
             !window.confirm(
-              'Este dibujo tiene una orden asociada. ¿Eliminar el dibujo de todos modos?',
+              "Este dibujo tiene una orden asociada. ¿Eliminar el dibujo de todos modos?",
             )
           ) {
             return;

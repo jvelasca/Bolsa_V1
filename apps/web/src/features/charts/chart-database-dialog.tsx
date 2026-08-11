@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import type { ChartTimeframe, InstrumentDataStatusDto } from '@bolsa/shared';
-import { RefreshCw } from 'lucide-react';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import type { ChartTimeframe, InstrumentDataStatusDto } from "@bolsa/shared";
+import { RefreshCw } from "lucide-react";
 import {
   ChartDatabaseActivityTab,
   ChartDatabaseInstrumentTab,
@@ -9,12 +9,12 @@ import {
   ChartDatabaseServerTab,
   DATA_STATUS_COLORS,
   DATA_STATUS_LABELS,
-} from '@/features/charts/chart-database-panel';
-import { Dialog, DialogTabs } from '@/components/ui/dialog';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+} from "@/features/charts/chart-database-panel";
+import { Dialog, DialogTabs } from "@/components/ui/dialog";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
-type DatabaseDialogTab = 'instrument' | 'server' | 'quality' | 'activity';
+type DatabaseDialogTab = "instrument" | "server" | "quality" | "activity";
 
 interface ChartDatabaseDialogProps {
   open: boolean;
@@ -37,16 +37,17 @@ export function ChartDatabaseDialog({
   syncing,
   onSync,
 }: ChartDatabaseDialogProps) {
-  const [tab, setTab] = useState<DatabaseDialogTab>('instrument');
+  const [tab, setTab] = useState<DatabaseDialogTab>("instrument");
 
   const dbSummaryQuery = useQuery({
-    queryKey: ['database-summary', instrumentId],
+    queryKey: ["database-summary", instrumentId],
     queryFn: () => api.getDatabaseSummary(instrumentId),
     enabled: open,
     staleTime: 30_000,
   });
 
-  const statusColor = DATA_STATUS_COLORS[status.freshnessStatus] ?? 'text-foreground';
+  const statusColor =
+    DATA_STATUS_COLORS[status.freshnessStatus] ?? "text-foreground";
 
   return (
     <Dialog
@@ -62,11 +63,13 @@ export function ChartDatabaseDialog({
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-muted/20 px-3 py-2">
         <div className="min-w-0">
-          <p className={cn('text-sm font-semibold', statusColor)}>
-            {DATA_STATUS_LABELS[status.freshnessStatus] ?? status.freshnessStatus}
+          <p className={cn("text-sm font-semibold", statusColor)}>
+            {DATA_STATUS_LABELS[status.freshnessStatus] ??
+              status.freshnessStatus}
           </p>
           <p className="text-xs text-muted-foreground">
-            {status.barCount.toLocaleString('es-ES')} barras en el timeframe activo
+            {status.barCount.toLocaleString("es-ES")} barras en el timeframe
+            activo
           </p>
         </div>
         {onSync && (
@@ -76,24 +79,26 @@ export function ChartDatabaseDialog({
             onClick={onSync}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent disabled:opacity-50"
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', syncing && 'animate-spin')} />
-            {syncing ? 'Sincronizando…' : 'Sincronizar 1D'}
+            <RefreshCw
+              className={cn("h-3.5 w-3.5", syncing && "animate-spin")}
+            />
+            {syncing ? "Sincronizando…" : "Sincronizar 1D"}
           </button>
         )}
       </div>
 
       <DialogTabs
         tabs={[
-          { id: 'instrument', label: 'Instrumento' },
-          { id: 'activity', label: 'Actividad' },
-          { id: 'server', label: 'Servidor' },
-          { id: 'quality', label: 'Calidad' },
+          { id: "instrument", label: "Instrumento" },
+          { id: "activity", label: "Actividad" },
+          { id: "server", label: "Servidor" },
+          { id: "quality", label: "Calidad" },
         ]}
         active={tab}
         onChange={(id) => setTab(id as DatabaseDialogTab)}
       />
 
-      {tab === 'instrument' && (
+      {tab === "instrument" && (
         <ChartDatabaseInstrumentTab
           status={status}
           timeframe={timeframe}
@@ -101,20 +106,20 @@ export function ChartDatabaseDialog({
           dbSummary={dbSummaryQuery.data?.data}
         />
       )}
-      {tab === 'activity' && (
+      {tab === "activity" && (
         <ChartDatabaseActivityTab
           status={status}
           timeframe={timeframe}
           dbSummary={dbSummaryQuery.data?.data}
         />
       )}
-      {tab === 'server' && (
+      {tab === "server" && (
         <ChartDatabaseServerTab
           dbSummary={dbSummaryQuery.data?.data}
           loadingDb={dbSummaryQuery.isLoading}
         />
       )}
-      {tab === 'quality' && <ChartDatabaseQualityTab status={status} />}
+      {tab === "quality" && <ChartDatabaseQualityTab status={status} />}
     </Dialog>
   );
 }

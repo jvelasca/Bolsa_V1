@@ -1,11 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { createPortal } from 'react-dom';
-import { ChevronDown, Eraser, LayoutTemplate, Star, Trash2 } from 'lucide-react';
-import type { ChartDrawTool } from '@bolsa/shared';
-import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores/ui-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { ChartDrawingGlobalToggles } from '@/features/charts/chart-drawing-global-toggles';
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
+import {
+  ChevronDown,
+  Eraser,
+  LayoutTemplate,
+  Star,
+  Trash2,
+} from "lucide-react";
+import type { ChartDrawTool } from "@bolsa/shared";
+import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { ChartDrawingGlobalToggles } from "@/features/charts/chart-drawing-global-toggles";
 import {
   DRAWING_TOOL_CATALOG,
   DRAWING_TOOL_GROUPS,
@@ -19,11 +25,11 @@ import {
   toolBelongsToGroup,
   type DrawingRailFamilyBlock,
   type DrawingToolGroupId,
-} from '@/features/charts/chart-drawing-tools';
-import { useDrawToolFavorites } from '@/features/charts/use-draw-tool-favorites';
-import { ChartDrawToolStyleBar } from '@/features/charts/chart-draw-tool-style-bar';
-import { CHART_ZONE_DROPDOWN_PANEL_CLASS } from '@/features/charts/chart-bar-zone-styles';
-import { isShapeDrawTool } from '@/features/charts/chart-draw-tool-utils';
+} from "@/features/charts/chart-drawing-tools";
+import { useDrawToolFavorites } from "@/features/charts/use-draw-tool-favorites";
+import { ChartDrawToolStyleBar } from "@/features/charts/chart-draw-tool-style-bar";
+import { CHART_ZONE_DROPDOWN_PANEL_CLASS } from "@/features/charts/chart-bar-zone-styles";
+import { isShapeDrawTool } from "@/features/charts/chart-draw-tool-utils";
 
 function DrawingToolFlyout({
   openGroup,
@@ -61,7 +67,7 @@ function DrawingToolFlyout({
         aria-modal="true"
         aria-label={DRAWING_TOOL_GROUPS.find((g) => g.id === openGroup)?.label}
         className={cn(
-          'fixed z-[203] max-h-[min(50vh,20rem)] min-w-[11rem] overflow-y-auto py-1',
+          "fixed z-[203] max-h-[min(50vh,20rem)] min-w-[11rem] overflow-y-auto py-1",
           CHART_ZONE_DROPDOWN_PANEL_CLASS,
         )}
         style={{ top: flyoutPos.top, left: flyoutPos.left }}
@@ -70,62 +76,71 @@ function DrawingToolFlyout({
         <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
           {DRAWING_TOOL_GROUPS.find((g) => g.id === openGroup)?.label}
         </p>
-        {flyoutItems.map(({ id, label, icon: Icon, available, hint }) => {        const toolId = id as ChartDrawTool;
-        const favorited = isFavorite(toolId);
+        {flyoutItems.map(({ id, label, icon: Icon, available, hint }) => {
+          const toolId = id as ChartDrawTool;
+          const favorited = isFavorite(toolId);
 
-        return (
-          <div
-            key={id}
-            className={cn(
-              'flex items-center gap-1 rounded px-1 hover:bg-accent',
-              tool === toolId && available && 'bg-accent/60',
-              !available && 'opacity-50',
-            )}
-          >
-            <button
-              type="button"
-              disabled={!available || !isActiveDrawTool(toolId)}
-              title={available ? label : hint ?? label}
-              onPointerDown={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                if (available && isActiveDrawTool(toolId)) {
-                  pickTool(toolId);
-                }
-              }}
+          return (
+            <div
+              key={id}
               className={cn(
-                'flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-xs',
-                tool === toolId && available && 'font-medium text-primary',
+                "flex items-center gap-1 rounded px-1 hover:bg-accent",
+                tool === toolId && available && "bg-accent/60",
+                !available && "opacity-50",
               )}
             >
-              <Icon className="h-3.5 w-3.5 shrink-0" />
-              <span>{label}</span>
-              {!available && (
-                <span className="ml-auto text-[10px] text-muted-foreground">Próx.</span>
-              )}
-            </button>
-            {isActiveDrawTool(toolId) && (
               <button
                 type="button"
-                title={favorited ? 'Quitar chip de la barra' : 'Añadir chip en la barra'}
+                disabled={!available || !isActiveDrawTool(toolId)}
+                title={available ? label : (hint ?? label)}
                 onPointerDown={(event) => {
                   event.preventDefault();
                   event.stopPropagation();
-                  toggleFavorite(toolId);
+                  if (available && isActiveDrawTool(toolId)) {
+                    pickTool(toolId);
+                  }
                 }}
-                className="rounded p-1 hover:bg-background/80"
+                className={cn(
+                  "flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-xs",
+                  tool === toolId && available && "font-medium text-primary",
+                )}
               >
-                <Star
-                  className={cn(
-                    'h-3.5 w-3.5',
-                    favorited ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground',
-                  )}
-                />
+                <Icon className="h-3.5 w-3.5 shrink-0" />
+                <span>{label}</span>
+                {!available && (
+                  <span className="ml-auto text-[10px] text-muted-foreground">
+                    Próx.
+                  </span>
+                )}
               </button>
-            )}
-          </div>
-        );
-      })}
+              {isActiveDrawTool(toolId) && (
+                <button
+                  type="button"
+                  title={
+                    favorited
+                      ? "Quitar chip de la barra"
+                      : "Añadir chip en la barra"
+                  }
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    toggleFavorite(toolId);
+                  }}
+                  className="rounded p-1 hover:bg-background/80"
+                >
+                  <Star
+                    className={cn(
+                      "h-3.5 w-3.5",
+                      favorited
+                        ? "fill-amber-400 text-amber-400"
+                        : "text-muted-foreground",
+                    )}
+                  />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </>,
     document.body,
@@ -136,8 +151,8 @@ function RailSeparator({ strong = false }: { strong?: boolean }) {
   return (
     <div
       className={cn(
-        'my-0.5 shrink-0 rounded-full bg-border',
-        strong ? 'h-0.5 w-7' : 'h-px w-6',
+        "my-0.5 shrink-0 rounded-full bg-border",
+        strong ? "h-0.5 w-7" : "h-px w-6",
       )}
       aria-hidden
     />
@@ -170,7 +185,10 @@ function ToolRailButton({
   return (
     <div
       ref={containerRef}
-      className={cn('relative shrink-0', hasBadge ? 'h-10 w-8 sm:w-9' : 'h-8 w-8')}
+      className={cn(
+        "relative shrink-0",
+        hasBadge ? "h-10 w-8 sm:w-9" : "h-8 w-8",
+      )}
     >
       <button
         type="button"
@@ -181,8 +199,9 @@ function ToolRailButton({
           onActivate();
         }}
         className={cn(
-          'flex h-full w-full flex-col items-center justify-center gap-0 rounded transition-colors hover:bg-accent',
-          (isMenuOpen || isActive) && 'bg-accent text-primary ring-1 ring-primary/40',
+          "flex h-full w-full flex-col items-center justify-center gap-0 rounded transition-colors hover:bg-accent",
+          (isMenuOpen || isActive) &&
+            "bg-accent text-primary ring-1 ring-primary/40",
         )}
       >
         <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -203,8 +222,8 @@ function ToolRailButton({
             onOpenMenu();
           }}
           className={cn(
-            'absolute bottom-0 right-0 z-10 flex h-3 w-3 items-center justify-center rounded-tl-sm border border-border/60 bg-card/95 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground',
-            isMenuOpen && 'bg-accent text-primary',
+            "absolute bottom-0 right-0 z-10 flex h-3 w-3 items-center justify-center rounded-tl-sm border border-border/60 bg-card/95 text-muted-foreground shadow-sm hover:bg-accent hover:text-foreground",
+            isMenuOpen && "bg-accent text-primary",
           )}
         >
           <ChevronDown className="h-2 w-2" strokeWidth={3} />
@@ -239,8 +258,15 @@ function GroupRailButton({
   onActivate: () => void;
   onOpenMenu: () => void;
 }) {
-  const displayTool = groupButtonIconTool(groupId, activeTool, lastByGroup, favorites);
-  const displayDef = displayTool ? findDrawingToolDefinition(displayTool) : undefined;
+  const displayTool = groupButtonIconTool(
+    groupId,
+    activeTool,
+    lastByGroup,
+    favorites,
+  );
+  const displayDef = displayTool
+    ? findDrawingToolDefinition(displayTool)
+    : undefined;
   const Icon = displayDef?.icon ?? FallbackIcon;
   const isActive = isGroupRailToolActive(groupId, activeTool, favorites);
   const badgeLabel =
@@ -279,7 +305,9 @@ function FamilyRailBlock({
   lastByGroup: Partial<Record<DrawingToolGroupId, ChartDrawTool>>;
   favorites: ChartDrawTool[];
   isFlyoutOpenFor: (groupId: DrawingToolGroupId, anchorKey: string) => boolean;
-  railBtnRefs: React.MutableRefObject<Partial<Record<string, HTMLDivElement | null>>>;
+  railBtnRefs: React.MutableRefObject<
+    Partial<Record<string, HTMLDivElement | null>>
+  >;
   onActivateGroup: (groupId: DrawingToolGroupId) => void;
   onPickTool: (tool: ChartDrawTool) => void;
   onToggleGroupMenu: (groupId: DrawingToolGroupId, anchorKey: string) => void;
@@ -316,7 +344,9 @@ function FamilyRailBlock({
             key={favoriteTool}
             title={def.label}
             icon={def.icon}
-            badgeLabel={activeTool === favoriteTool ? def.shortLabel : undefined}
+            badgeLabel={
+              activeTool === favoriteTool ? def.shortLabel : undefined
+            }
             isActive={activeTool === favoriteTool}
             isMenuOpen={isFlyoutOpenFor(block.groupId, anchorKey)}
             showMenu={block.showMenu}
@@ -361,49 +391,66 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
   const removeDrawing = useWorkspaceStore((s) => s.removeChartDrawing);
   const clearDrawings = useWorkspaceStore((s) => s.clearChartDrawings);
   const openTemplates = useUiStore((s) => s.openDrawingTemplates);
-  const toggleLayerHidden = useWorkspaceStore((s) => s.toggleChartDrawingsLayerHidden);
-  const toggleLayerLocked = useWorkspaceStore((s) => s.toggleChartDrawingsLayerLocked);
+  const toggleLayerHidden = useWorkspaceStore(
+    (s) => s.toggleChartDrawingsLayerHidden,
+  );
+  const toggleLayerLocked = useWorkspaceStore(
+    (s) => s.toggleChartDrawingsLayerLocked,
+  );
   const updateChartConfig = useWorkspaceStore((s) => s.updateChartConfig);
 
-  const activeTab = useWorkspaceStore((s) => s.workspace.charts.find((t) => t.id === chartId));
+  const activeTab = useWorkspaceStore((s) =>
+    s.workspace.charts.find((t) => t.id === chartId),
+  );
   const chartConfig = activeTab?.chart;
   const layerHidden = activeTab?.drawingsLayerHidden === true;
   const layerLocked = activeTab?.drawingsLayerLocked === true;
-  const magnetOn = chartConfig?.cursor.mode === 'magnet';
+  const magnetOn = chartConfig?.cursor.mode === "magnet";
 
   const activeTemplateId = useWorkspaceStore(
     (s) => s.workspace.activeDrawingTemplateByTool?.[tool],
   );
   const activeTemplateName = useWorkspaceStore((s) =>
     activeTemplateId
-      ? s.workspace.drawingTemplates?.find((t) => t.id === activeTemplateId)?.name
+      ? s.workspace.drawingTemplates?.find((t) => t.id === activeTemplateId)
+          ?.name
       : undefined,
   );
   const drawingCount = activeTab?.drawings.length ?? 0;
 
   const { favorites, toggleFavorite, isFavorite } = useDrawToolFavorites();
-  const familyBlocks = useMemo(() => drawingRailFamilyBlocks(favorites), [favorites]);
-  const cursorBlock = familyBlocks.find((block) => block.groupId === 'cursor');
-  const toolFamilyBlocks = familyBlocks.filter((block) => block.groupId !== 'cursor');
+  const familyBlocks = useMemo(
+    () => drawingRailFamilyBlocks(favorites),
+    [favorites],
+  );
+  const cursorBlock = familyBlocks.find((block) => block.groupId === "cursor");
+  const toolFamilyBlocks = familyBlocks.filter(
+    (block) => block.groupId !== "cursor",
+  );
 
   const [openFlyout, setOpenFlyout] = useState<{
     groupId: DrawingToolGroupId;
     anchorKey: string;
   } | null>(null);
-  const [flyoutPos, setFlyoutPos] = useState<{ top: number; left: number } | null>(null);
+  const [flyoutPos, setFlyoutPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const flyoutRef = useRef<HTMLDivElement>(null);
-  const railBtnRefs = useRef<Partial<Record<string, HTMLDivElement | null>>>({});
+  const railBtnRefs = useRef<Partial<Record<string, HTMLDivElement | null>>>(
+    {},
+  );
 
   const closeFlyout = () => setOpenFlyout(null);
 
   useEffect(() => {
     if (!openFlyout) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeFlyout();
+      if (event.key === "Escape") closeFlyout();
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [openFlyout]);
 
   useEffect(() => {
@@ -415,11 +462,11 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
       setFlyoutPos({ top: rect.top, left: rect.right + 4 });
     };
     reposition();
-    window.addEventListener('resize', reposition);
-    window.addEventListener('scroll', reposition, true);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
     return () => {
-      window.removeEventListener('resize', reposition);
-      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
     };
   }, [openFlyout]);
   const pickTool = (id: ChartDrawTool) => {
@@ -467,18 +514,27 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
   };
 
   return (
-    <div ref={rootRef} className="chart-drawing-sidebar relative z-40 flex shrink-0">
+    <div
+      ref={rootRef}
+      className="chart-drawing-sidebar relative z-40 flex shrink-0"
+    >
       <aside
         className={cn(
-          'chart-drawing-sidebar-rail flex w-9 flex-col items-center gap-1 border-r border-border bg-card/40 py-1 sm:w-10',
-          openFlyout && 'relative z-[202]',
+          "chart-drawing-sidebar-rail flex w-9 flex-col items-center gap-1 border-r border-border bg-card/40 py-1 sm:w-10",
+          openFlyout && "relative z-[202]",
         )}
       >
-        {cursorBlock && <FamilyRailBlock block={cursorBlock} {...familyBlockProps} />}
+        {cursorBlock && (
+          <FamilyRailBlock block={cursorBlock} {...familyBlockProps} />
+        )}
 
         <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden px-0.5">
           {toolFamilyBlocks.map((block) => (
-            <FamilyRailBlock key={block.groupId} block={block} {...familyBlockProps} />
+            <FamilyRailBlock
+              key={block.groupId}
+              block={block}
+              {...familyBlockProps}
+            />
           ))}
         </div>
 
@@ -489,7 +545,7 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
           onMagnetToggle={() =>
             updateChartConfig({
               chartId,
-              cursor: { mode: magnetOn ? 'crosshair' : 'magnet' },
+              cursor: { mode: magnetOn ? "crosshair" : "magnet" },
             })
           }
           drawingsHidden={layerHidden}
@@ -502,11 +558,15 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
 
         <button
           type="button"
-          title={activeTemplateName ? `Plantilla: ${activeTemplateName}` : 'Plantillas gráficas'}
+          title={
+            activeTemplateName
+              ? `Plantilla: ${activeTemplateName}`
+              : "Plantillas gráficas"
+          }
           onClick={openTemplates}
           className={cn(
-            'flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-accent',
-            activeTemplateName && 'text-primary ring-1 ring-primary/40',
+            "flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-accent",
+            activeTemplateName && "text-primary ring-1 ring-primary/40",
           )}
         >
           <LayoutTemplate className="h-3.5 w-3.5" />
@@ -530,7 +590,8 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
           title="Limpiar todos los dibujos"
           disabled={drawingCount === 0}
           onClick={() => {
-            if (!window.confirm('¿Eliminar todos los dibujos de esta pestaña?')) return;
+            if (!window.confirm("¿Eliminar todos los dibujos de esta pestaña?"))
+              return;
             clearDrawings(chartId);
             setSelectedId(null);
           }}
@@ -539,13 +600,11 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
           <Eraser className="h-3.5 w-3.5" />
         </button>
       </aside>
-
       {isShapeDrawTool(tool) && !openFlyout && (
         <div className="absolute left-9 top-1 z-20 sm:left-10">
           <ChartDrawToolStyleBar tool={tool} />
         </div>
       )}
-
       {openFlyout && flyoutPos && (
         <DrawingToolFlyout
           openGroup={openFlyout.groupId}
@@ -557,6 +616,7 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
           isFavorite={isFavorite}
           toggleFavorite={toggleFavorite}
         />
-      )}    </div>
+      )}{" "}
+    </div>
   );
 }

@@ -1,10 +1,10 @@
-import type { ChartInstanceConfig } from '@bolsa/shared';
-import { Magnet } from 'lucide-react';
+import type { ChartInstanceConfig } from "@bolsa/shared";
+import { Magnet } from "lucide-react";
 
-import { checkboxClassName, inputClassName } from '@/components/ui/dialog';
-import { requestChartReflow } from '@/features/charts/chart-utils';
-import { cn } from '@/lib/utils';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { checkboxClassName, inputClassName } from "@/components/ui/dialog";
+import { requestChartReflow } from "@/features/charts/chart-utils";
+import { cn } from "@/lib/utils";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 function ChartColorInput({
   value,
@@ -13,7 +13,7 @@ function ChartColorInput({
   value: string;
   onChange: (value: string) => void;
 }) {
-  const pickerValue = value.startsWith('#') ? value : '#22c55e';
+  const pickerValue = value.startsWith("#") ? value : "#22c55e";
   return (
     <div className="flex items-center gap-2">
       <input
@@ -55,10 +55,10 @@ export function ChartCanvasStylesPanel({
   const resetChartConfig = useWorkspaceStore((s) => s.resetChartConfig);
 
   function patch(partial: {
-    grid?: Partial<ChartInstanceConfig['grid']>;
-    cursor?: Partial<ChartInstanceConfig['cursor']>;
-    colors?: Partial<ChartInstanceConfig['colors']>;
-    display?: Partial<ChartInstanceConfig['display']>;
+    grid?: Partial<ChartInstanceConfig["grid"]>;
+    cursor?: Partial<ChartInstanceConfig["cursor"]>;
+    colors?: Partial<ChartInstanceConfig["colors"]>;
+    display?: Partial<ChartInstanceConfig["display"]>;
   }) {
     updateChartConfig({
       chartId,
@@ -76,7 +76,9 @@ export function ChartCanvasStylesPanel({
             type="checkbox"
             className={checkboxClassName}
             checked={config.grid.showHorizontal}
-            onChange={(e) => patch({ grid: { showHorizontal: e.target.checked } })}
+            onChange={(e) =>
+              patch({ grid: { showHorizontal: e.target.checked } })
+            }
           />
           Líneas horizontales
         </label>
@@ -85,7 +87,9 @@ export function ChartCanvasStylesPanel({
             type="checkbox"
             className={checkboxClassName}
             checked={config.grid.showVertical}
-            onChange={(e) => patch({ grid: { showVertical: e.target.checked } })}
+            onChange={(e) =>
+              patch({ grid: { showVertical: e.target.checked } })
+            }
           />
           Líneas verticales
         </label>
@@ -96,15 +100,22 @@ export function ChartCanvasStylesPanel({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            title={config.cursor.mode === 'magnet' ? 'Imán activo' : 'Imán desactivado'}
+            title={
+              config.cursor.mode === "magnet"
+                ? "Imán activo"
+                : "Imán desactivado"
+            }
             onClick={() =>
               patch({
-                cursor: { mode: config.cursor.mode === 'magnet' ? 'crosshair' : 'magnet' },
+                cursor: {
+                  mode:
+                    config.cursor.mode === "magnet" ? "crosshair" : "magnet",
+                },
               })
             }
             className={cn(
-              'flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent',
-              config.cursor.mode === 'magnet' && 'bg-accent text-primary',
+              "flex h-7 w-7 items-center justify-center rounded border border-border text-muted-foreground hover:bg-accent",
+              config.cursor.mode === "magnet" && "bg-accent text-primary",
             )}
           >
             <Magnet className="h-3.5 w-3.5" />
@@ -115,7 +126,9 @@ export function ChartCanvasStylesPanel({
               className={inputClassName}
               value={config.cursor.mode}
               onChange={(e) =>
-                patch({ cursor: { mode: e.target.value as 'crosshair' | 'magnet' } })
+                patch({
+                  cursor: { mode: e.target.value as "crosshair" | "magnet" },
+                })
               }
             >
               <option value="crosshair">Libre (crosshair)</option>
@@ -128,7 +141,9 @@ export function ChartCanvasStylesPanel({
             type="checkbox"
             className={checkboxClassName}
             checked={config.cursor.showOhlcInTooltip}
-            onChange={(e) => patch({ cursor: { showOhlcInTooltip: e.target.checked } })}
+            onChange={(e) =>
+              patch({ cursor: { showOhlcInTooltip: e.target.checked } })
+            }
           />
           OHLC en tooltip del gráfico
         </label>
@@ -137,7 +152,9 @@ export function ChartCanvasStylesPanel({
             type="checkbox"
             className={checkboxClassName}
             checked={config.cursor.showTimeAxisLabel ?? true}
-            onChange={(e) => patch({ cursor: { showTimeAxisLabel: e.target.checked } })}
+            onChange={(e) =>
+              patch({ cursor: { showTimeAxisLabel: e.target.checked } })
+            }
           />
           Etiqueta de fecha en eje temporal (X)
         </label>
@@ -153,7 +170,9 @@ export function ChartCanvasStylesPanel({
             max={30}
             className={inputClassName}
             value={config.grid.topMarginPct}
-            onChange={(e) => patch({ grid: { topMarginPct: Number(e.target.value) } })}
+            onChange={(e) =>
+              patch({ grid: { topMarginPct: Number(e.target.value) } })
+            }
           />
         </label>
         <label className="flex flex-col gap-1 text-xs">
@@ -164,7 +183,9 @@ export function ChartCanvasStylesPanel({
             max={30}
             className={inputClassName}
             value={config.grid.rightMarginPct}
-            onChange={(e) => patch({ grid: { rightMarginPct: Number(e.target.value) } })}
+            onChange={(e) =>
+              patch({ grid: { rightMarginPct: Number(e.target.value) } })
+            }
           />
         </label>
         {showFixedHeight && (
@@ -177,7 +198,9 @@ export function ChartCanvasStylesPanel({
               step={20}
               className={inputClassName}
               value={config.display.height}
-              onChange={(e) => patch({ display: { height: Number(e.target.value) } })}
+              onChange={(e) =>
+                patch({ display: { height: Number(e.target.value) } })
+              }
             />
           </label>
         )}
@@ -187,15 +210,15 @@ export function ChartCanvasStylesPanel({
         <SectionTitle>Colores</SectionTitle>
         {(
           [
-            ['Velas alcistas', 'upColor'],
-            ['Velas bajistas', 'downColor'],
-            ['Cuadrícula', 'gridColor'],
-            ['Volumen alcista', 'volumeUpColor'],
-            ['Volumen bajista', 'volumeDownColor'],
-            ['SMA 20', 'sma20Color'],
-            ['SMA 50', 'sma50Color'],
-            ['EMA 20', 'ema20Color'],
-            ['RSI 14', 'rsi14Color'],
+            ["Velas alcistas", "upColor"],
+            ["Velas bajistas", "downColor"],
+            ["Cuadrícula", "gridColor"],
+            ["Volumen alcista", "volumeUpColor"],
+            ["Volumen bajista", "volumeDownColor"],
+            ["SMA 20", "sma20Color"],
+            ["SMA 50", "sma50Color"],
+            ["EMA 20", "ema20Color"],
+            ["RSI 14", "rsi14Color"],
           ] as const
         ).map(([label, key]) => (
           <label key={key} className="flex flex-col gap-1 text-xs">
@@ -211,16 +234,17 @@ export function ChartCanvasStylesPanel({
       <section className="space-y-2">
         <SectionTitle>Indicadores en canvas</SectionTitle>
         <p className="text-[10px] text-muted-foreground">
-          Toggles rápidos del gráfico. Para más control usa Capas o el catálogo de indicadores.
+          Toggles rápidos del gráfico. Para más control usa Capas o el catálogo
+          de indicadores.
         </p>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
-              ['Volumen', 'showVolume'],
-              ['SMA 20', 'showSma20'],
-              ['SMA 50', 'showSma50'],
-              ['EMA 20', 'showEma20'],
-              ['RSI 14 (panel)', 'showRsi14'],
+              ["Volumen", "showVolume"],
+              ["SMA 20", "showSma20"],
+              ["SMA 50", "showSma50"],
+              ["EMA 20", "showEma20"],
+              ["RSI 14 (panel)", "showRsi14"],
             ] as const
           ).map(([label, key]) => (
             <label key={key} className="flex items-center gap-2 text-xs">
@@ -228,7 +252,9 @@ export function ChartCanvasStylesPanel({
                 type="checkbox"
                 className={checkboxClassName}
                 checked={config.display[key]}
-                onChange={(e) => patch({ display: { [key]: e.target.checked } })}
+                onChange={(e) =>
+                  patch({ display: { [key]: e.target.checked } })
+                }
               />
               {label}
             </label>
