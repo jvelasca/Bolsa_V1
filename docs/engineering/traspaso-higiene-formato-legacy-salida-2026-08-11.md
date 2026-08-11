@@ -1,7 +1,7 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `1081809` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `75f6595` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
 > Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-18) y los próximos dominios.
@@ -77,9 +77,11 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 18 | `5bec6ed` | backtests/library + estudio/ibex/tests sueltos (CIERRE dominio hub/chart/misc) | 11 |
 | 19 | `689c294` | features/accounts (PRIMER sub-lote del resto de apps/web/src, fuera de backtests) | 17 |
 | 20 | `1081809` | features/workspace (sub-lote resto de apps/web/src, fuera de backtests) | 7 |
+| 21 | `75f6595` | features/config + platform (sub-lote resto de apps/web/src, fuera de backtests) | 14 |
 
-**Total formateado hasta aquí: 234 ficheros** con diff real en 20 commits propios de formateo (210 de `features/backtests`
-en lotes 1-18 + 17 de `features/accounts` en lote 19 + 7 de `features/workspace` en lote 20). Todos con batería
+**Total formateado hasta aquí: 248 ficheros** con diff real en 21 commits propios de formateo (210 de `features/backtests`
+en lotes 1-18 + 17 de `features/accounts` lote 19 + 7 de `features/workspace` lote 20 + 14 de `features/config`+`platform`
+lote 21). Todos con batería
 `typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17 y 18, área Coach/TOP).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
@@ -107,22 +109,23 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 - ~~ **`library`/`estudio`/`ibex`/tests sueltos** (cierre del dominio `hub`/`chart`/`misc`) ~~ **HECHO (lote 18, `5bec6ed`)**: `chart-strategy-bridge.test.ts`, `drawing-replay-parity.test.ts`, `signal-evaluate-parity.test.ts`, `library-nav.ts`(+test), `library-strategy-buckets.ts`(+test), `estudio-list.test.ts`, `estudio-personal-list.test.ts`, `ibex35-operativa-audit.ts`(+test) = **11 files (+360/−295 solo formato)**. Sin falsos positivos EOL (los 11 con diff real). Área Coach/TOP (test:coach 26/186 ✅). **Con esto el dominio `hub`/`chart`/`misc` queda CERRADO (lotes 15-18).**
 - ~~ **`accounts`** (primer sub-lote del **resto de `apps/web/src`**, fuera de `features/backtests`) ~~ **HECHO (lote 19, `689c294`)**: todos los `.ts`/`.tsx` de `features/accounts` = **17 files (+973/−656 solo formato)**: `account-detail-panel`, `account-investor-profile-select`, `account-scope-selector`, `account-settings-dialog`, `account-settings-panel`, `account-wizard-capital-step`, `account-wizard-commissions-step`, `account-wizard-identity-step`, `account-wizard-review-step`, `account-wizard-tax-step`, `accounts-page`, `create-account-wizard-dialog`, `investor-profile-panel`, `investor-profile-picker`, `paper-lab-evidence`(+test), `use-active-account`. Sin falsos positivos EOL (los 17 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
 - ~~ **`workspace`** ~~ **HECHO (lote 20, `1081809`)**: todos los `.ts`/`.tsx` de `features/workspace` = **7 files (+107/−78 solo formato)**: `use-visualization-workspace-sync`, `visualization-workspace-sync`, `workspace-auto-save`, `workspace-bootstrap`, `workspace-picker-dialog`, `workspace-remote-sync`, `workspace-ui-bridge-register`. Sin falsos positivos EOL (los 7 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
+- ~~ **`config` + `platform`** ~~ **HECHO (lote 21, `75f6595`)**: todos los `.ts`/`.tsx` de `features/config` + `features/platform` = **14 files (+601/−443 solo formato)**: `config`: `database-config-panel`, `notification-prefs`(+test), `notifications-settings-panel`, `platform-config-dialog`; `platform`: `mandate-tenure-pnl`(+test), `operating-mandate`(+test), `operating-mandate-sync`, `product-universe`(+test), `strategy-adoption`, `universe-chip`. Sin falsos positivos EOL (los 14 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
 > **Nota de método para el siguiente hilo (relevo):** `optimize` restantes (10, `9853e79`), `strategy-matrix` restantes
 > (14, `6f8c668`), `hub` (15, `6c32b06`), `chart` (16, `a42587e`), `misc`/motores (17, `da2f7d9`) y cierre
 > `library`/`estudio`/`ibex` (18, `5bec6ed`) ya están HECHOS. **El dominio `hub`/`chart`/`misc` está CERRADO y
-> `features/backtests` queda COMPLETO.** **Lote 19 hecho (`689c294`): `features/accounts`, 17 files.** **Lote 20 hecho
-> (`1081809`): `features/workspace`, 7 files.** Tras lotes 19-20, el `prettier --check` amplio (excl. `features/backtests`)
-> marca **395 files** desincronizados restantes.
+> `features/backtests` queda COMPLETO.** **Lote 19 (`689c294`): `features/accounts`. Lote 20 (`1081809`):
+> `features/workspace`. Lote 21 (`75f6595`): `features/config`+`platform`.** Tras los lotes 19-21, el `prettier --check`
+> amplio (excl. `features/backtests`) marca **381 files** desincronizados restantes.
 > Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
 >
 > **Siguiente: otro dominio del resto de `apps/web/src`** (fuera de `features/backtests`, que queda completo) por
 > sub-lotes, con el mismo protocolo de 8 pasos (features de otros dominios —charts, instruments, trading, settings,
-> screeners, research, platform, config—, lib, stores, components/ui, layout, etc.), ejecutando `prettier --check` por
+> screeners, research—, lib, stores, components/ui, layout, etc.), ejecutando `prettier --check` por
 > sub-lote y verificando el `git diff --cached --numstat` (paso 4). Correr `test:coach` cuando el sub-lote toque área
-> Coach/TOP. `features/accounts` (lote 19) y `features/workspace` (lote 20) ya hechos.
+> Coach/TOP. `features/accounts` (19), `features/workspace` (20) y `features/config`+`platform` (21) ya hechos.
 
 
 ## 6. Documentos fuente de verdad / índices
