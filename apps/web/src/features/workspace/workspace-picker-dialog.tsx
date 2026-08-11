@@ -10,7 +10,7 @@
  * Store: `useWorkspaceStore` (`createWorkspace`, `duplicateWorkspace`, …).
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   Check,
   Copy,
@@ -19,13 +19,13 @@ import {
   Plus,
   Star,
   Trash2,
-} from 'lucide-react';
-import { Dialog, FieldRow, inputClassName } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores/ui-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "lucide-react";
+import { Dialog, FieldRow, inputClassName } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
-type DraftMode = 'idle' | 'create' | 'rename' | 'duplicate';
+type DraftMode = "idle" | "create" | "rename" | "duplicate";
 
 export function WorkspacePickerDialog() {
   const open = useUiStore((s) => s.workspacePickerOpen);
@@ -44,41 +44,45 @@ export function WorkspacePickerDialog() {
   const saveToServer = useWorkspaceStore((s) => s.saveToServer);
   const exportJson = useWorkspaceStore((s) => s.exportJson);
   const setOpenOnStartup = useWorkspaceStore((s) => s.setOpenOnStartup);
-  const openOnStartup = useWorkspaceStore((s) => s.workspace.preferences.openOnStartup);
+  const openOnStartup = useWorkspaceStore(
+    (s) => s.workspace.preferences.openOnStartup,
+  );
   const autoSave = useWorkspaceStore((s) => s.workspace.preferences.autoSave);
   const setAutoSave = useWorkspaceStore((s) => s.setAutoSave);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draftMode, setDraftMode] = useState<DraftMode>('idle');
-  const [draftName, setDraftName] = useState('');
+  const [draftMode, setDraftMode] = useState<DraftMode>("idle");
+  const [draftName, setDraftName] = useState("");
   const [renameId, setRenameId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
-      setDraftMode('idle');
-      setDraftName('');
+      setDraftMode("idle");
+      setDraftName("");
       setRenameId(null);
       setError(null);
     }
   }, [open]);
 
   function startCreate() {
-    setDraftMode('create');
-    setDraftName('Nuevo espacio');
+    setDraftMode("create");
+    setDraftName("Nuevo espacio");
     setRenameId(null);
     setError(null);
   }
 
   function startDuplicate() {
-    setDraftMode('duplicate');
-    setDraftName(`${activeName.replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, '').trim()} (copia)`);
+    setDraftMode("duplicate");
+    setDraftName(
+      `${activeName.replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, "").trim()} (copia)`,
+    );
     setRenameId(null);
     setError(null);
   }
 
   function startRename(id: string, current: string) {
-    setDraftMode('rename');
+    setDraftMode("rename");
     setRenameId(id);
     setDraftName(current);
     setError(null);
@@ -87,25 +91,27 @@ export function WorkspacePickerDialog() {
   async function submitDraft() {
     const name = draftName.trim();
     if (!name) {
-      setError('Indica un nombre.');
+      setError("Indica un nombre.");
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      if (draftMode === 'create') {
+      if (draftMode === "create") {
         await createWorkspace(name);
         close();
-      } else if (draftMode === 'duplicate') {
+      } else if (draftMode === "duplicate") {
         await duplicateWorkspace(name);
         close();
-      } else if (draftMode === 'rename' && renameId) {
+      } else if (draftMode === "rename" && renameId) {
         await renameWorkspaceById(renameId, name);
-        setDraftMode('idle');
+        setDraftMode("idle");
         setRenameId(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo completar la acción');
+      setError(
+        err instanceof Error ? err.message : "No se pudo completar la acción",
+      );
     } finally {
       setBusy(false);
     }
@@ -118,20 +124,25 @@ export function WorkspacePickerDialog() {
       await switchWorkspace(id);
       close();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo cambiar de espacio');
+      setError(
+        err instanceof Error ? err.message : "No se pudo cambiar de espacio",
+      );
     } finally {
       setBusy(false);
     }
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!window.confirm(`¿Eliminar «${name}»? Esta acción no se puede deshacer.`)) return;
+    if (
+      !window.confirm(`¿Eliminar «${name}»? Esta acción no se puede deshacer.`)
+    )
+      return;
     setBusy(true);
     setError(null);
     try {
       await deleteWorkspaceById(id);
     } catch {
-      setError('No se pudo eliminar el espacio de trabajo.');
+      setError("No se pudo eliminar el espacio de trabajo.");
     } finally {
       setBusy(false);
     }
@@ -177,7 +188,9 @@ export function WorkspacePickerDialog() {
           </span>
         </label>
         {isDirty ? (
-          <span className="text-amber-500">Cambios sin guardar en el activo</span>
+          <span className="text-amber-500">
+            Cambios sin guardar en el activo
+          </span>
         ) : null}
       </div>
 
@@ -192,27 +205,27 @@ export function WorkspacePickerDialog() {
         )}
         {summaries.map((item) => {
           const isActive = item.id === activeId;
-          const renaming = draftMode === 'rename' && renameId === item.id;
+          const renaming = draftMode === "rename" && renameId === item.id;
           return (
             <div
               key={item.id}
               className={cn(
-                'rounded-lg border px-3 py-2',
-                isActive ? 'border-primary/50 bg-primary/5' : 'border-border',
+                "rounded-lg border px-3 py-2",
+                isActive ? "border-primary/50 bg-primary/5" : "border-border",
               )}
             >
               {renaming ? (
                 <div className="flex flex-wrap items-center gap-2">
                   <input
-                    className={cn(inputClassName, 'min-w-0 flex-1')}
+                    className={cn(inputClassName, "min-w-0 flex-1")}
                     value={draftName}
                     autoFocus
                     disabled={busy}
                     onChange={(e) => setDraftName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') void submitDraft();
-                      if (e.key === 'Escape') {
-                        setDraftMode('idle');
+                      if (e.key === "Enter") void submitDraft();
+                      if (e.key === "Escape") {
+                        setDraftMode("idle");
                         setRenameId(null);
                       }
                     }}
@@ -230,7 +243,7 @@ export function WorkspacePickerDialog() {
                     disabled={busy}
                     className="rounded-md border border-border px-2.5 py-1.5 text-xs"
                     onClick={() => {
-                      setDraftMode('idle');
+                      setDraftMode("idle");
                       setRenameId(null);
                     }}
                   >
@@ -244,7 +257,7 @@ export function WorkspacePickerDialog() {
                     disabled={busy || isActive}
                     className="flex min-w-0 flex-1 items-center gap-2 text-left text-sm disabled:cursor-default"
                     onClick={() => void handleSwitch(item.id)}
-                    title={isActive ? 'Espacio activo' : 'Abrir este espacio'}
+                    title={isActive ? "Espacio activo" : "Abrir este espacio"}
                   >
                     {item.isDefault && (
                       <Star
@@ -253,10 +266,12 @@ export function WorkspacePickerDialog() {
                       />
                     )}
                     <span className="truncate font-medium">{item.name}</span>
-                    {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                    {isActive && (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    )}
                   </button>
                   <span className="hidden text-[10px] text-muted-foreground sm:inline">
-                    {new Date(item.updatedAt).toLocaleDateString('es-ES')}
+                    {new Date(item.updatedAt).toLocaleDateString("es-ES")}
                   </span>
                   <button
                     type="button"
@@ -285,17 +300,19 @@ export function WorkspacePickerDialog() {
         })}
       </div>
 
-      {(draftMode === 'create' || draftMode === 'duplicate') && (
+      {(draftMode === "create" || draftMode === "duplicate") && (
         <div className="mt-4 space-y-3 rounded-lg border border-border p-3">
           <p className="text-sm font-medium">
-            {draftMode === 'create' ? 'Nuevo espacio (en blanco)' : 'Duplicar espacio activo'}
+            {draftMode === "create"
+              ? "Nuevo espacio (en blanco)"
+              : "Duplicar espacio activo"}
           </p>
           <FieldRow
             label="Nombre"
             hint={
-              draftMode === 'create'
-                ? 'Sin gráficos ni listas del actual'
-                : 'Copia gráficos, listas y dibujos del activo'
+              draftMode === "create"
+                ? "Sin gráficos ni listas del actual"
+                : "Copia gráficos, listas y dibujos del activo"
             }
           >
             <input
@@ -305,7 +322,7 @@ export function WorkspacePickerDialog() {
               disabled={busy}
               onChange={(e) => setDraftName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') void submitDraft();
+                if (e.key === "Enter") void submitDraft();
               }}
             />
           </FieldRow>
@@ -316,13 +333,13 @@ export function WorkspacePickerDialog() {
               className="rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground disabled:opacity-50"
               onClick={() => void submitDraft()}
             >
-              {draftMode === 'create' ? 'Crear' : 'Duplicar'}
+              {draftMode === "create" ? "Crear" : "Duplicar"}
             </button>
             <button
               type="button"
               disabled={busy}
               className="rounded-md border border-border px-3 py-1.5 text-sm"
-              onClick={() => setDraftMode('idle')}
+              onClick={() => setDraftMode("idle")}
             >
               Cancelar
             </button>
@@ -335,7 +352,7 @@ export function WorkspacePickerDialog() {
       <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
         <button
           type="button"
-          disabled={busy || draftMode !== 'idle'}
+          disabled={busy || draftMode !== "idle"}
           className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
           onClick={startCreate}
         >
@@ -344,7 +361,7 @@ export function WorkspacePickerDialog() {
         </button>
         <button
           type="button"
-          disabled={busy || draftMode !== 'idle' || !activeId}
+          disabled={busy || draftMode !== "idle" || !activeId}
           className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
           onClick={startDuplicate}
         >
@@ -367,7 +384,7 @@ export function WorkspacePickerDialog() {
           className="ml-auto rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90 disabled:opacity-50"
           onClick={() => void saveToServer()}
         >
-          {isSaving ? 'Guardando…' : 'Guardar actual'}
+          {isSaving ? "Guardando…" : "Guardar actual"}
         </button>
       </div>
     </Dialog>

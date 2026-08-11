@@ -1,8 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
-import { reconcileVisualizadosToOpenCharts } from '@/features/trading/lists-tab/use-chart-visualization-sync';
-import { useVisualizationStore } from '@/stores/visualization-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { reconcileVisualizadosToOpenCharts } from "@/features/trading/lists-tab/use-chart-visualization-sync";
+import { useVisualizationStore } from "@/stores/visualization-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /**
  * Persiste Visualizados (= pestañas abiertas) en el workspace.
@@ -12,7 +12,9 @@ import { useWorkspaceStore } from '@/stores/workspace-store';
 export function useVisualizationWorkspaceSync() {
   const hydrated = useWorkspaceStore((state) => state.hydrated);
   const workspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const persistedEntries = useWorkspaceStore((state) => state.workspace.list.visualizationEntries);
+  const persistedEntries = useWorkspaceStore(
+    (state) => state.workspace.list.visualizationEntries,
+  );
   const updateListConfig = useWorkspaceStore((state) => state.updateListConfig);
   const save = useWorkspaceStore((state) => state.save);
   const entries = useVisualizationStore((state) => state.entries);
@@ -49,5 +51,12 @@ export function useVisualizationWorkspaceSync() {
     }, 600);
 
     return () => window.clearTimeout(timer);
-  }, [entries, hydrated, persistedEntries, save, updateListConfig, workspaceId]);
+  }, [
+    entries,
+    hydrated,
+    persistedEntries,
+    save,
+    updateListConfig,
+    workspaceId,
+  ]);
 }

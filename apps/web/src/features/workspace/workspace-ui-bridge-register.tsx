@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
-import { registerWorkspaceUiBridge } from '@/stores/workspace-ui-bridge';
-import { useUiStore } from '@/stores/ui-store';
+import { useEffect } from "react";
+import { registerWorkspaceUiBridge } from "@/stores/workspace-ui-bridge";
+import { useUiStore } from "@/stores/ui-store";
 
 /** Enlaza ui-store con workspace-store vía bridge (sin import circular). */
 export function WorkspaceUiBridgeRegister() {
@@ -11,9 +11,12 @@ export function WorkspaceUiBridgeRegister() {
         useUiStore.getState().chartInspectorActiveShortcutKey,
       setChartInspectorActiveShortcutKey: (key) =>
         useUiStore.getState().setChartInspectorActiveShortcutKey(key),
-      setChartInspectorNav: (request) => useUiStore.getState().setChartInspectorNav(request),
-      focusDrawing: (drawingId) => useUiStore.getState().focusDrawing(drawingId),
-      setOpenDrawingEditorId: (id) => useUiStore.getState().setOpenDrawingEditorId(id),
+      setChartInspectorNav: (request) =>
+        useUiStore.getState().setChartInspectorNav(request),
+      focusDrawing: (drawingId) =>
+        useUiStore.getState().focusDrawing(drawingId),
+      setOpenDrawingEditorId: (id) =>
+        useUiStore.getState().setOpenDrawingEditorId(id),
     });
   }, []);
 

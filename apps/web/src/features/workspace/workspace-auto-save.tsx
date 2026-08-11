@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { useEffect, useRef } from "react";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /** Intenta guardar dibujos al cerrar la pestaña o la aplicación. */
 export function WorkspaceAutoSave() {
@@ -14,11 +14,11 @@ export function WorkspaceAutoSave() {
     const flush = () => {
       useWorkspaceStore.getState().flushWorkspaceOnUnload();
     };
-    window.addEventListener('beforeunload', flush);
-    window.addEventListener('pagehide', flush);
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
     return () => {
-      window.removeEventListener('beforeunload', flush);
-      window.removeEventListener('pagehide', flush);
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
     };
   }, []);
 

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { useEffect, useRef } from "react";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /** Carga espacios de trabajo desde la API al arrancar la sesión. */
 export function WorkspaceBootstrap() {
