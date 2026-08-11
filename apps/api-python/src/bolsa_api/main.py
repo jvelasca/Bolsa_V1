@@ -15,6 +15,14 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
+from bolsa_infrastructure.database.migrations import ensure_migrated
+from bolsa_infrastructure.database.session import (
+    create_engine,
+    create_session_factory,
+)
+from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,18 +41,14 @@ from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_
 from bolsa_api.logging_redact import install_log_redact
 from bolsa_api.middleware.auth import AuthMiddleware
 from bolsa_api.middleware.rate_limit import RateLimitMiddleware
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
-from bolsa_infrastructure.database.session import (
-    create_engine,
-    create_session_factory,
-)
-from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    # F3b: aplicar migraciones Alembic pendientes (idempotente) al arranque, como
+    # autoridad de esquema BD (D2), fuera del path caliente de petición.
+    await asyncio.to_thread(ensure_migrated)
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
