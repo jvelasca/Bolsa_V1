@@ -156,6 +156,7 @@ DO UPDATE` **por barra** + `flush` final → N+1.
 | 2026-08-12 | CI: `--ignore` de `test_health/auth/ai_authoring` en `quality` (defecto preexistente → unblock pipeline); mypy gate `F4+F5b` (16 files, exit 0).                                                                                                     |
 | 2026-08-12 | Batería verde: ruff 0 · mypy gate 16 ✓ · pytest 451 + 27 + 222 + 57 + 340 ✓ · smoke bulk upsert ✓.                                                                                                                                                   |
 | 2026-08-12 | Cierre F5b: traspaso + engineering-index + texto exacto siguiente hilo.                                                                                                                                                                              |
+| 2026-08-12 | Merge F5b: PR #35 fast-forward a `stage/f1-*` (base ahora `302e306` = tip F5b) y mergeado. Rama `stage/f5b-*` = `302e306` (mismo commit). `stage/f1-*` es la rama base viva para los próximos fases del hilo.                                        |
 
 ## 7. Protocolo recurrente (obligatorio en TODOS los hilos)
 
