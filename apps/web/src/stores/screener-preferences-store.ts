@@ -1,21 +1,21 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { TrackerScheduleKind, PositionExecutionMode } from '@bolsa/shared';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { TrackerScheduleKind, PositionExecutionMode } from "@bolsa/shared";
 import {
   DEFAULT_SCAN_RESULTS_FAVORITE_COLUMN_IDS,
   defaultScanResultsColumnLayout,
   type ScanResultsColumnId,
   type ScanResultsColumnLayoutItem,
   type ScanResultsSortState,
-} from '@/lib/scan-results-column-layout';
+} from "@/lib/scan-results-column-layout";
 import {
   DEFAULT_SCREENER_SPLIT_LAYOUT,
   type ScreenerSplitLayoutPrefs,
-} from '@/lib/screener-split-layout';
+} from "@/lib/screener-split-layout";
 import {
   defaultScanRunnerConfig,
   type ScanRunnerConfig,
-} from '@/features/screeners/scan-runner-form';
+} from "@/features/screeners/scan-runner-form";
 
 interface TrackerSavePrefs {
   scheduleKind: TrackerScheduleKind;
@@ -30,28 +30,28 @@ interface PositionPanelPrefs {
 }
 
 export type ScreenerPanelId =
-  | 'trackers'
-  | 'fa-screener'
-  | 'paper-d'
-  | 'fa-weekly'
-  | 'saved-strategies'
-  | 'ai-assistant'
-  | 'execution'
-  | 'position'
-  | 'events'
-  | 'pipeline'
-  | 'jobs'
-  | 'history';
+  | "trackers"
+  | "fa-screener"
+  | "paper-d"
+  | "fa-weekly"
+  | "saved-strategies"
+  | "ai-assistant"
+  | "execution"
+  | "position"
+  | "events"
+  | "pipeline"
+  | "jobs"
+  | "history";
 
-export type ScreenerMobileView = 'workflow' | 'tools';
+export type ScreenerMobileView = "workflow" | "tools";
 
 export const DEFAULT_SCREENER_PANELS: Record<ScreenerPanelId, boolean> = {
   trackers: true,
-  'fa-screener': true,
-  'paper-d': true,
-  'fa-weekly': false,
-  'saved-strategies': false,
-  'ai-assistant': false,
+  "fa-screener": true,
+  "paper-d": true,
+  "fa-weekly": false,
+  "saved-strategies": false,
+  "ai-assistant": false,
   execution: false,
   position: false,
   events: false,
@@ -92,7 +92,9 @@ interface ScreenerPreferencesState {
   patchSplitLayout: (patch: Partial<ScreenerSplitLayoutPrefs>) => void;
   setScanResultsColumnLayout: (layout: ScanResultsColumnLayoutItem[]) => void;
   setScanResultsSort: (sort: ScanResultsSortState | null) => void;
-  setScanResultsFavoriteColumnIds: (favoriteColumnIds: ScanResultsColumnId[]) => void;
+  setScanResultsFavoriteColumnIds: (
+    favoriteColumnIds: ScanResultsColumnId[],
+  ) => void;
 }
 
 export const useScreenerPreferencesStore = create<ScreenerPreferencesState>()(
@@ -102,17 +104,17 @@ export const useScreenerPreferencesStore = create<ScreenerPreferencesState>()(
       runInBackground: false,
       lastExecutionPolicyId: null,
       trackerSave: {
-        scheduleKind: 'manual',
-        defaultPolicyId: '',
+        scheduleKind: "manual",
+        defaultPolicyId: "",
       },
       positionPanel: {
-        mode: 'exit_strategy',
+        mode: "exit_strategy",
         executeTrades: false,
-        exitStrategyId: '',
-        executionPolicyId: '',
+        exitStrategyId: "",
+        executionPolicyId: "",
       },
       layout: {
-        mobileView: 'workflow',
+        mobileView: "workflow",
         panels: { ...DEFAULT_SCREENER_PANELS },
         split: { ...DEFAULT_SCREENER_SPLIT_LAYOUT },
       },
@@ -123,18 +125,21 @@ export const useScreenerPreferencesStore = create<ScreenerPreferencesState>()(
           hasBreakdown: true,
           hasDataQuality: true,
         }),
-        sort: { columnId: 'globalScore', direction: 'desc' },
+        sort: { columnId: "globalScore", direction: "desc" },
         favoriteColumnIds: [...DEFAULT_SCAN_RESULTS_FAVORITE_COLUMN_IDS],
       },
       patchScanConfig: (patch) =>
         set((state) => ({ scanConfig: { ...state.scanConfig, ...patch } })),
       setScanConfig: (scanConfig) => set({ scanConfig }),
       setRunInBackground: (runInBackground) => set({ runInBackground }),
-      setLastExecutionPolicyId: (lastExecutionPolicyId) => set({ lastExecutionPolicyId }),
+      setLastExecutionPolicyId: (lastExecutionPolicyId) =>
+        set({ lastExecutionPolicyId }),
       patchTrackerSave: (patch) =>
         set((state) => ({ trackerSave: { ...state.trackerSave, ...patch } })),
       patchPositionPanel: (patch) =>
-        set((state) => ({ positionPanel: { ...state.positionPanel, ...patch } })),
+        set((state) => ({
+          positionPanel: { ...state.positionPanel, ...patch },
+        })),
       setMobileView: (mobileView) =>
         set((state) => ({ layout: { ...state.layout, mobileView } })),
       togglePanel: (panelId) =>
@@ -143,7 +148,9 @@ export const useScreenerPreferencesStore = create<ScreenerPreferencesState>()(
             ...state.layout,
             panels: {
               ...state.layout.panels,
-              [panelId]: !(state.layout.panels[panelId] ?? DEFAULT_SCREENER_PANELS[panelId]),
+              [panelId]: !(
+                state.layout.panels[panelId] ?? DEFAULT_SCREENER_PANELS[panelId]
+              ),
             },
           },
         })),
@@ -175,9 +182,11 @@ export const useScreenerPreferencesStore = create<ScreenerPreferencesState>()(
         })),
     }),
     {
-      name: 'bolsa-screener-preferences',
+      name: "bolsa-screener-preferences",
       merge: (persisted, current) => {
-        const stored = persisted as Partial<ScreenerPreferencesState> | undefined;
+        const stored = persisted as
+          | Partial<ScreenerPreferencesState>
+          | undefined;
         if (!stored) return current;
         return {
           ...current,
@@ -200,8 +209,10 @@ export const useScreenerPreferencesStore = create<ScreenerPreferencesState>()(
           },
           scanResultsTable: {
             columnLayout:
-              stored.scanResultsTable?.columnLayout ?? current.scanResultsTable.columnLayout,
-            sort: stored.scanResultsTable?.sort ?? current.scanResultsTable.sort,
+              stored.scanResultsTable?.columnLayout ??
+              current.scanResultsTable.columnLayout,
+            sort:
+              stored.scanResultsTable?.sort ?? current.scanResultsTable.sort,
             favoriteColumnIds:
               stored.scanResultsTable?.favoriteColumnIds ??
               current.scanResultsTable.favoriteColumnIds,
@@ -220,21 +231,23 @@ export function reconcileScanConfig(
 ): ScanRunnerConfig {
   let listId = config.listId;
   if (lists.length > 0 && listId && !lists.some((list) => list.id === listId)) {
-    const ibex = lists.find((list) => list.name?.includes('IBEX') || list.id.includes('ibex'));
+    const ibex = lists.find(
+      (list) => list.name?.includes("IBEX") || list.id.includes("ibex"),
+    );
     listId = ibex?.id ?? lists[0]?.id ?? listId;
   }
   if (lists.length > 0 && !listId) {
-    listId = lists.find((l) => l.id)?.id ?? '';
+    listId = lists.find((l) => l.id)?.id ?? "";
   }
 
   let savedStrategyId = config.savedStrategyId;
   if (
-    config.scanSource === 'saved' &&
+    config.scanSource === "saved" &&
     strategies.length > 0 &&
     savedStrategyId &&
     !strategies.some((s) => s.id === savedStrategyId)
   ) {
-    savedStrategyId = '';
+    savedStrategyId = "";
   }
 
   return { ...config, listId, savedStrategyId };

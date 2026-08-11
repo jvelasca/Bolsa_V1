@@ -6,10 +6,10 @@
  * @see docs/engineering/research-radar-unification-2026-07-31.md §3b
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { ScanHitDto, ScanRunResultDto } from '@bolsa/shared';
-import { isAlarmSafeMode } from '@/features/screeners/tracker-alarms';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { ScanHitDto, ScanRunResultDto } from "@bolsa/shared";
+import { isAlarmSafeMode } from "@/features/screeners/tracker-alarms";
 
 export type TrackerAlarmInboxItem = {
   id: string;
@@ -81,7 +81,7 @@ function hitToItem(
     symbol: hit.symbol,
     signalKind: hit.signal.kind,
     price:
-      typeof hit.signal.price === 'number' && Number.isFinite(hit.signal.price)
+      typeof hit.signal.price === "number" && Number.isFinite(hit.signal.price)
         ? hit.signal.price
         : null,
     mode: meta.mode,
@@ -89,7 +89,8 @@ function hitToItem(
     listId: meta.listId,
     timeframe: meta.timeframe,
     strategyDefinitionId:
-      typeof hit.signal.strategyDefinitionId === 'string' && hit.signal.strategyDefinitionId.trim()
+      typeof hit.signal.strategyDefinitionId === "string" &&
+      hit.signal.strategyDefinitionId.trim()
         ? hit.signal.strategyDefinitionId.trim()
         : null,
     createdAt: meta.createdAt,
@@ -131,7 +132,10 @@ export const useTrackerAlarmInboxStore = create<TrackerAlarmInboxState>()(
           const fresh = incoming.filter((i) => !existingIds.has(i.id));
           return {
             items: [...fresh, ...s.items].slice(0, MAX_ITEMS),
-            ingestedScanIds: [result.scanId, ...s.ingestedScanIds].slice(0, MAX_INGESTED),
+            ingestedScanIds: [result.scanId, ...s.ingestedScanIds].slice(
+              0,
+              MAX_INGESTED,
+            ),
           };
         });
         return incoming.length;
@@ -139,7 +143,9 @@ export const useTrackerAlarmInboxStore = create<TrackerAlarmInboxState>()(
       ack: (id) => {
         const at = new Date().toISOString();
         set((s) => ({
-          items: s.items.map((i) => (i.id === id ? { ...i, ackedAt: i.ackedAt ?? at } : i)),
+          items: s.items.map((i) =>
+            i.id === id ? { ...i, ackedAt: i.ackedAt ?? at } : i,
+          ),
         }));
       },
       ackAllForAccount: (accountId) => {
@@ -157,7 +163,7 @@ export const useTrackerAlarmInboxStore = create<TrackerAlarmInboxState>()(
       },
     }),
     {
-      name: 'bolsa-tracker-alarm-inbox-v1',
+      name: "bolsa-tracker-alarm-inbox-v1",
       partialize: (s) => ({
         items: s.items,
         ingestedScanIds: s.ingestedScanIds,

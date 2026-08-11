@@ -3,13 +3,13 @@
  * Persistido en localStorage vía notification-prefs helpers.
  */
 
-import { create } from 'zustand';
+import { create } from "zustand";
 import {
   defaultNotificationPrefs,
   loadNotificationPrefs,
   saveNotificationPrefs,
   type NotificationPrefs,
-} from '@/features/config/notification-prefs';
+} from "@/features/config/notification-prefs";
 
 interface NotificationPrefsState extends NotificationPrefs {
   hydrate: () => void;
@@ -17,15 +17,17 @@ interface NotificationPrefsState extends NotificationPrefs {
   reset: () => void;
 }
 
-export const useNotificationPrefsStore = create<NotificationPrefsState>((set, get) => ({
-  ...loadNotificationPrefs(),
-  hydrate: () => set({ ...loadNotificationPrefs() }),
-  setPrefs: (patch) => {
-    const next = saveNotificationPrefs({ ...get(), ...patch });
-    set({ ...next });
-  },
-  reset: () => {
-    const next = saveNotificationPrefs(defaultNotificationPrefs());
-    set({ ...next });
-  },
-}));
+export const useNotificationPrefsStore = create<NotificationPrefsState>(
+  (set, get) => ({
+    ...loadNotificationPrefs(),
+    hydrate: () => set({ ...loadNotificationPrefs() }),
+    setPrefs: (patch) => {
+      const next = saveNotificationPrefs({ ...get(), ...patch });
+      set({ ...next });
+    },
+    reset: () => {
+      const next = saveNotificationPrefs(defaultNotificationPrefs());
+      set({ ...next });
+    },
+  }),
+);

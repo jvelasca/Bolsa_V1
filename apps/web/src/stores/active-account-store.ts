@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface ActiveAccountState {
   activeAccountId: string | null;
@@ -12,7 +12,7 @@ export const useActiveAccountStore = create<ActiveAccountState>()(
       activeAccountId: null,
       setActiveAccountId: (id) => set({ activeAccountId: id }),
     }),
-    { name: 'bolsa-active-account' },
+    { name: "bolsa-active-account" },
   ),
 );
 

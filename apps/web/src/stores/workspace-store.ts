@@ -14,8 +14,8 @@
  * @see docs/WORKSPACE_PERSISTENCE.md
  * @see apps/web/src/features/workspace/workspace-picker-dialog.tsx
  */
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import {
   DEFAULT_CHART_CONFIG,
   DEFAULT_LIST_CONFIG,
@@ -132,8 +132,8 @@ import {
   normalizeParameters,
   newIndicatorInstanceId,
   seedIndicatorInstancesFromDisplay,
-} from '@bolsa/shared';
-import { api, ApiError } from '@/lib/api';
+} from "@bolsa/shared";
+import { api, ApiError } from "@/lib/api";
 import {
   attachActiveTabListSnapshot,
   mergeWorkspaceChartState,
@@ -142,35 +142,35 @@ import {
   totalChartDrawings,
   totalSnapshotDrawings,
   workspaceTimestamp,
-} from '@/lib/chart-list-snapshot';
-import { dedupeChartTabsByInstrument } from '@/lib/chart-tab-uniqueness';
+} from "@/lib/chart-list-snapshot";
+import { dedupeChartTabsByInstrument } from "@/lib/chart-tab-uniqueness";
 import {
   readDrawToolFavoritesLocal,
   writeDrawToolFavoritesLocal,
-} from '@/lib/draw-tool-favorites-storage';
+} from "@/lib/draw-tool-favorites-storage";
 import {
   applyDrawToolSessionToUi,
   drawToolSessionFromUi,
   readDrawToolSessionLocal,
-} from '@/lib/draw-tool-session-storage';
+} from "@/lib/draw-tool-session-storage";
 import {
   membershipFingerprint,
   reconcileWorkspaceChartMembership,
   resolveValidSourceListIdForTab,
   type ChartListMembershipSnapshot,
-} from '@/lib/chart-list-membership';
+} from "@/lib/chart-list-membership";
 import {
   buildWorkspacePayload,
   DEFAULT_DOCK_LAYOUT,
   readLegacyDockFromStorage,
   readLegacyWorkspaceFromStorage,
-} from '@/lib/workspace-payload';
-import { getWorkspaceUiBridge } from '@/stores/workspace-ui-bridge';
+} from "@/lib/workspace-payload";
+import { getWorkspaceUiBridge } from "@/stores/workspace-ui-bridge";
 import {
   createInspectorNavRequest,
   inspectorNavigateKey,
   type ChartInspectorNavigateInput,
-} from '@/features/charts/chart-inspector-nav';
+} from "@/features/charts/chart-inspector-nav";
 
 let chartTabIdSeq = 0;
 
@@ -200,32 +200,40 @@ function findDrawingTemplate(
 }
 
 const STYLE_MEMORY_KEYS = [
-  'color',
-  'lineWidth',
-  'lineStyle',
-  'fillOpacity',
-  'strokeOpacity',
-  'fontSize',
+  "color",
+  "lineWidth",
+  "lineStyle",
+  "fillOpacity",
+  "strokeOpacity",
+  "fontSize",
 ] as const;
 
 function patchHasStyleMemory(patch: ChartDrawingVertexPatch): boolean {
   return STYLE_MEMORY_KEYS.some((key) => key in patch);
 }
 
-function styleMemoryFromPatch(patch: ChartDrawingVertexPatch): DrawToolStyleMemory {
+function styleMemoryFromPatch(
+  patch: ChartDrawingVertexPatch,
+): DrawToolStyleMemory {
   const memory: DrawToolStyleMemory = {};
-  if ('color' in patch && patch.color) memory.color = patch.color;
-  if ('lineWidth' in patch && patch.lineWidth != null) memory.lineWidth = patch.lineWidth;
-  if ('lineStyle' in patch && patch.lineStyle) memory.lineStyle = patch.lineStyle;
-  if ('fillOpacity' in patch && patch.fillOpacity != null) memory.fillOpacity = patch.fillOpacity;
-  if ('strokeOpacity' in patch && patch.strokeOpacity != null) {
+  if ("color" in patch && patch.color) memory.color = patch.color;
+  if ("lineWidth" in patch && patch.lineWidth != null)
+    memory.lineWidth = patch.lineWidth;
+  if ("lineStyle" in patch && patch.lineStyle)
+    memory.lineStyle = patch.lineStyle;
+  if ("fillOpacity" in patch && patch.fillOpacity != null)
+    memory.fillOpacity = patch.fillOpacity;
+  if ("strokeOpacity" in patch && patch.strokeOpacity != null) {
     memory.strokeOpacity = patch.strokeOpacity;
   }
-  if ('fontSize' in patch && patch.fontSize != null) memory.fontSize = patch.fontSize;
+  if ("fontSize" in patch && patch.fontSize != null)
+    memory.fontSize = patch.fontSize;
   return memory;
 }
 
-function applyLocalDrawToolFavorites(workspace: WorkspaceDocument): WorkspaceDocument {
+function applyLocalDrawToolFavorites(
+  workspace: WorkspaceDocument,
+): WorkspaceDocument {
   const localFavorites = readDrawToolFavoritesLocal();
   if (!localFavorites?.length) return workspace;
   return {
@@ -237,11 +245,14 @@ function applyLocalDrawToolFavorites(workspace: WorkspaceDocument): WorkspaceDoc
   };
 }
 
-function applyLocalDrawToolSession(workspace: WorkspaceDocument): WorkspaceDocument {
+function applyLocalDrawToolSession(
+  workspace: WorkspaceDocument,
+): WorkspaceDocument {
   const local = readDrawToolSessionLocal();
   const global = workspace.chartToolbarGlobal;
   const chartDrawTool = local?.chartDrawTool ?? global?.activeDrawTool;
-  const lastDrawToolByGroup = local?.lastDrawToolByGroup ?? global?.lastDrawToolByGroup;
+  const lastDrawToolByGroup =
+    local?.lastDrawToolByGroup ?? global?.lastDrawToolByGroup;
   if (local) {
     applyDrawToolSessionToUi(local);
   } else if (chartDrawTool) {
@@ -277,7 +288,10 @@ function flushDrawingAutoSave(get: () => WorkspaceState, immediate = false) {
 }
 
 /** Un solo timer de guardado en servidor — evita duplicar con WorkspaceAutoSave. */
-function requestWorkspaceAutoSave(get: () => WorkspaceState, immediate = false) {
+function requestWorkspaceAutoSave(
+  get: () => WorkspaceState,
+  immediate = false,
+) {
   const state = get();
   if (!state.hydrated || !state.workspace.preferences.autoSave) return;
 
@@ -300,7 +314,10 @@ function requestWorkspaceAutoSave(get: () => WorkspaceState, immediate = false) 
 }
 
 /** @deprecated Usa requestWorkspaceAutoSave */
-function scheduleWorkspaceServerSave(get: () => WorkspaceState, immediate = false) {
+function scheduleWorkspaceServerSave(
+  get: () => WorkspaceState,
+  immediate = false,
+) {
   requestWorkspaceAutoSave(get, immediate);
 }
 
@@ -340,7 +357,10 @@ function mergeListConfigPatch(
     ...current,
     ...patch,
     columnLayoutsByListId: patch.columnLayoutsByListId
-      ? { ...(current.columnLayoutsByListId ?? {}), ...patch.columnLayoutsByListId }
+      ? {
+          ...(current.columnLayoutsByListId ?? {}),
+          ...patch.columnLayoutsByListId,
+        }
       : current.columnLayoutsByListId,
     sortByListId: patch.sortByListId
       ? { ...(current.sortByListId ?? {}), ...patch.sortByListId }
@@ -348,7 +368,9 @@ function mergeListConfigPatch(
   };
 }
 
-function buildBackupWorkspaceDoc(backup: ChartPersistBackup): WorkspaceDocument {
+function buildBackupWorkspaceDoc(
+  backup: ChartPersistBackup,
+): WorkspaceDocument {
   return normalizeWorkspace({
     charts: backup.charts,
     activeChartId: backup.activeChartId,
@@ -372,7 +394,9 @@ function buildBackupWorkspaceDoc(backup: ChartPersistBackup): WorkspaceDocument 
   });
 }
 
-function prepareWorkspaceForSave(workspace: WorkspaceDocument): WorkspaceDocument {
+function prepareWorkspaceForSave(
+  workspace: WorkspaceDocument,
+): WorkspaceDocument {
   const session = drawToolSessionFromUi();
   const prepared = syncSnapshotsFromCharts(
     attachActiveTabListSnapshot(
@@ -391,7 +415,9 @@ function prepareWorkspaceForSave(workspace: WorkspaceDocument): WorkspaceDocumen
   return prepared;
 }
 
-function chartPersistBackupFrom(workspace: WorkspaceDocument): ChartPersistBackup {
+function chartPersistBackupFrom(
+  workspace: WorkspaceDocument,
+): ChartPersistBackup {
   return {
     charts: workspace.charts,
     activeChartId: workspace.activeChartId,
@@ -403,7 +429,8 @@ function chartPersistBackupFrom(workspace: WorkspaceDocument): ChartPersistBacku
     indicatorFavoritesByListId: workspace.indicatorFavoritesByListId,
     defaultIndicatorTemplateId: workspace.defaultIndicatorTemplateId,
     preferences: {
-      newChartTemplateChartId: workspace.preferences.newChartTemplateChartId ?? null,
+      newChartTemplateChartId:
+        workspace.preferences.newChartTemplateChartId ?? null,
     },
     chartInspectorOpen: workspace.layout.chartInspectorOpen,
     list: workspace.list,
@@ -411,7 +438,7 @@ function chartPersistBackupFrom(workspace: WorkspaceDocument): ChartPersistBacku
   };
 }
 
-const WORKSPACE_META_KEY = 'bolsa-workspace-meta';
+const WORKSPACE_META_KEY = "bolsa-workspace-meta";
 
 function writeChartPersistBackupSync(
   activeWorkspaceId: string | null,
@@ -421,7 +448,10 @@ function writeChartPersistBackupSync(
   try {
     const raw = localStorage.getItem(WORKSPACE_META_KEY);
     const parsed = raw
-      ? (JSON.parse(raw) as { state?: Record<string, unknown>; version?: number })
+      ? (JSON.parse(raw) as {
+          state?: Record<string, unknown>;
+          version?: number;
+        })
       : {};
     localStorage.setItem(
       WORKSPACE_META_KEY,
@@ -451,7 +481,9 @@ function appendPresetToPersonalTemplate(
   );
 }
 
-function cloneChartConfig(config: ChartInstanceConfig = DEFAULT_CHART_CONFIG): ChartInstanceConfig {
+function cloneChartConfig(
+  config: ChartInstanceConfig = DEFAULT_CHART_CONFIG,
+): ChartInstanceConfig {
   return {
     ...config,
     id: config.id === DEFAULT_CHART_CONFIG.id ? newChartTabId() : config.id,
@@ -466,8 +498,13 @@ function openDrawingEditorId(): string | null {
   return getWorkspaceUiBridge().getOpenDrawingEditorId();
 }
 
-function finalizeChartWorkspace(workspace: WorkspaceDocument): WorkspaceDocument {
-  const deduped = dedupeChartTabsByInstrument(workspace.charts, workspace.activeChartId);
+function finalizeChartWorkspace(
+  workspace: WorkspaceDocument,
+): WorkspaceDocument {
+  const deduped = dedupeChartTabsByInstrument(
+    workspace.charts,
+    workspace.activeChartId,
+  );
   return syncSnapshotsFromCharts(
     attachActiveTabListSnapshot(
       {
@@ -543,7 +580,9 @@ function createChartTabForInstrument(
   label: string,
   options?: { sourceListId?: string },
 ): ChartTabState {
-  const global = normalizeChartToolbarGlobalConfig(workspace.chartToolbarGlobal);
+  const global = normalizeChartToolbarGlobalConfig(
+    workspace.chartToolbarGlobal,
+  );
   let tab = newDefaultChartTab(
     instrumentId,
     label,
@@ -556,13 +595,17 @@ function createChartTabForInstrument(
 
   const templateTab = resolveNewChartTemplateTab(workspace);
   if (templateTab) {
-    tab = applyChartNewTabSeed(tab, extractChartNewTabSeed(templateTab), cloneChartConfig);
+    tab = applyChartNewTabSeed(
+      tab,
+      extractChartNewTabSeed(templateTab),
+      cloneChartConfig,
+    );
     if (workspace.preferences.finalistTop1DefaultOn) {
       tab = {
         ...tab,
         showFinalistTop1Indicators: true,
         indicatorInstances: tab.indicatorInstances.filter(
-          (instance) => instance.origin !== 'finalist-top1',
+          (instance) => instance.origin !== "finalist-top1",
         ),
       };
     }
@@ -571,7 +614,9 @@ function createChartTabForInstrument(
 
   const defaultTemplateId = workspace.defaultIndicatorTemplateId;
   if (defaultTemplateId) {
-    const template = workspace.indicatorTemplates?.find((item) => item.id === defaultTemplateId);
+    const template = workspace.indicatorTemplates?.find(
+      (item) => item.id === defaultTemplateId,
+    );
     if (template) {
       const instances = instancesFromTemplate(
         template,
@@ -585,22 +630,41 @@ function createChartTabForInstrument(
       ...tab,
       showFinalistTop1Indicators: true,
       indicatorInstances: tab.indicatorInstances.filter(
-        (instance) => instance.origin !== 'finalist-top1',
+        (instance) => instance.origin !== "finalist-top1",
       ),
     };
   }
   return tab;
 }
 
-function normalizeChartTab(raw: Partial<ChartTabState>, fallback?: ChartInstanceConfig): ChartTabState {
+function normalizeChartTab(
+  raw: Partial<ChartTabState>,
+  fallback?: ChartInstanceConfig,
+): ChartTabState {
   const chartBase = {
     ...DEFAULT_CHART_CONFIG,
     ...fallback,
     ...raw.chart,
-    grid: { ...DEFAULT_CHART_CONFIG.grid, ...fallback?.grid, ...raw.chart?.grid },
-    cursor: { ...DEFAULT_CHART_CONFIG.cursor, ...fallback?.cursor, ...raw.chart?.cursor },
-    colors: { ...DEFAULT_CHART_CONFIG.colors, ...fallback?.colors, ...raw.chart?.colors },
-    display: { ...DEFAULT_CHART_CONFIG.display, ...fallback?.display, ...raw.chart?.display },
+    grid: {
+      ...DEFAULT_CHART_CONFIG.grid,
+      ...fallback?.grid,
+      ...raw.chart?.grid,
+    },
+    cursor: {
+      ...DEFAULT_CHART_CONFIG.cursor,
+      ...fallback?.cursor,
+      ...raw.chart?.cursor,
+    },
+    colors: {
+      ...DEFAULT_CHART_CONFIG.colors,
+      ...fallback?.colors,
+      ...raw.chart?.colors,
+    },
+    display: {
+      ...DEFAULT_CHART_CONFIG.display,
+      ...fallback?.display,
+      ...raw.chart?.display,
+    },
   };
   const indicatorInstances =
     Array.isArray(raw.indicatorInstances) && raw.indicatorInstances.length > 0
@@ -611,11 +675,13 @@ function normalizeChartTab(raw: Partial<ChartTabState>, fallback?: ChartInstance
     display: mergeDisplayFromInstances(chartBase.display, indicatorInstances),
   };
   const timeframe =
-    raw.timeframe && isChartTimeframe(raw.timeframe) ? raw.timeframe : DEFAULT_CHART_TIMEFRAME;
+    raw.timeframe && isChartTimeframe(raw.timeframe)
+      ? raw.timeframe
+      : DEFAULT_CHART_TIMEFRAME;
   return {
     id: raw.id ?? chart.id ?? newChartTabId(),
-    instrumentId: raw.instrumentId ?? '',
-    label: raw.label ?? 'Gráfico',
+    instrumentId: raw.instrumentId ?? "",
+    label: raw.label ?? "Gráfico",
     timeframe,
     seriesType: normalizeChartSeriesType(raw.seriesType),
     seriesTypeParams: normalizeChartSeriesTypeParams(raw.seriesTypeParams),
@@ -632,8 +698,8 @@ function normalizeChartTab(raw: Partial<ChartTabState>, fallback?: ChartInstance
 
 const DEFAULT_WORKSPACE: WorkspaceDocument = {
   version: 1,
-  id: 'default',
-  name: 'Espacio de trabajo',
+  id: "default",
+  name: "Espacio de trabajo",
   updatedAt: new Date().toISOString(),
   layout: {
     listPanelOpen: true,
@@ -641,7 +707,7 @@ const DEFAULT_WORKSPACE: WorkspaceDocument = {
     rightPanelOpen: true,
     rightPanelSizePct: DEFAULT_RIGHT_PANEL_SIZE_PCT,
     chartInspectorOpen: false,
-    activeRoute: '/trading',
+    activeRoute: "/trading",
   },
   preferences: {
     autoSave: true,
@@ -660,7 +726,7 @@ const DEFAULT_WORKSPACE: WorkspaceDocument = {
   chartToolbarGlobal: normalizeChartToolbarGlobalConfig(),
 };
 
-const LEGACY_TIMEFRAME_FAVORITES_KEY = 'bolsa-chart-timeframe-favorites';
+const LEGACY_TIMEFRAME_FAVORITES_KEY = "bolsa-chart-timeframe-favorites";
 
 function readLegacyTimeframeFavorites(): ChartTimeframe[] | undefined {
   try {
@@ -668,14 +734,20 @@ function readLegacyTimeframeFavorites(): ChartTimeframe[] | undefined {
     if (!raw) return undefined;
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return undefined;
-    const valid = parsed.filter((item): item is ChartTimeframe => isChartTimeframe(String(item)));
+    const valid = parsed.filter((item): item is ChartTimeframe =>
+      isChartTimeframe(String(item)),
+    );
     return valid.length > 0 ? valid : undefined;
   } catch {
     return undefined;
   }
 }
 
-function normalizeWorkspace(raw: Partial<WorkspaceDocument> & { chart?: ChartInstanceConfig } | undefined): WorkspaceDocument {
+function normalizeWorkspace(
+  raw:
+    | (Partial<WorkspaceDocument> & { chart?: ChartInstanceConfig })
+    | undefined,
+): WorkspaceDocument {
   if (!raw) return DEFAULT_WORKSPACE;
 
   let charts: ChartTabState[] = [];
@@ -684,19 +756,23 @@ function normalizeWorkspace(raw: Partial<WorkspaceDocument> & { chart?: ChartIns
   } else if (raw.chart) {
     charts = [
       normalizeChartTab({
-        id: 'main',
-        instrumentId: '',
-        label: 'Gráfico',
+        id: "main",
+        instrumentId: "",
+        label: "Gráfico",
         chart: raw.chart,
       }),
     ];
   }
 
-  const dedupedCharts = dedupeChartTabsByInstrument(charts, raw.activeChartId ?? null);
+  const dedupedCharts = dedupeChartTabsByInstrument(
+    charts,
+    raw.activeChartId ?? null,
+  );
   charts = dedupedCharts.charts;
 
   const activeChartId =
-    dedupedCharts.activeChartId && charts.some((tab) => tab.id === dedupedCharts.activeChartId)
+    dedupedCharts.activeChartId &&
+    charts.some((tab) => tab.id === dedupedCharts.activeChartId)
       ? dedupedCharts.activeChartId
       : (charts[0]?.id ?? null);
 
@@ -709,15 +785,19 @@ function normalizeWorkspace(raw: Partial<WorkspaceDocument> & { chart?: ChartIns
       ...raw.layout,
       listPanelSizePct: Math.max(
         MIN_LIST_PANEL_SIZE_PCT,
-        raw.layout?.listPanelSizePct ?? DEFAULT_WORKSPACE.layout.listPanelSizePct,
+        raw.layout?.listPanelSizePct ??
+          DEFAULT_WORKSPACE.layout.listPanelSizePct,
       ),
       rightPanelSizePct: Math.max(
         MIN_RIGHT_PANEL_SIZE_PCT,
-        raw.layout?.rightPanelSizePct ?? DEFAULT_WORKSPACE.layout.rightPanelSizePct,
+        raw.layout?.rightPanelSizePct ??
+          DEFAULT_WORKSPACE.layout.rightPanelSizePct,
       ),
-      rightPanelOpen: raw.layout?.rightPanelOpen ?? DEFAULT_WORKSPACE.layout.rightPanelOpen,
+      rightPanelOpen:
+        raw.layout?.rightPanelOpen ?? DEFAULT_WORKSPACE.layout.rightPanelOpen,
       chartInspectorOpen:
-        raw.layout?.chartInspectorOpen ?? DEFAULT_WORKSPACE.layout.chartInspectorOpen,
+        raw.layout?.chartInspectorOpen ??
+        DEFAULT_WORKSPACE.layout.chartInspectorOpen,
     },
     preferences: {
       ...DEFAULT_WORKSPACE.preferences,
@@ -736,12 +816,15 @@ function normalizeWorkspace(raw: Partial<WorkspaceDocument> & { chart?: ChartIns
     indicatorTemplates: normalizeIndicatorTemplates(raw.indicatorTemplates),
     indicatorPresets: normalizeIndicatorPresets(raw.indicatorPresets),
     defaultIndicatorTemplateId: raw.defaultIndicatorTemplateId ?? null,
-    indicatorFavoritesByListId: normalizeIndicatorFavoritesByListId(raw.indicatorFavoritesByListId),
+    indicatorFavoritesByListId: normalizeIndicatorFavoritesByListId(
+      raw.indicatorFavoritesByListId,
+    ),
     chartToolbarGlobal: normalizeChartToolbarGlobalConfig(
       {
         ...raw.chartToolbarGlobal,
         timeframeFavorites:
-          raw.chartToolbarGlobal?.timeframeFavorites ?? readLegacyTimeframeFavorites(),
+          raw.chartToolbarGlobal?.timeframeFavorites ??
+          readLegacyTimeframeFavorites(),
       },
       raw.chartDataStrip ?? raw.chartToolbarGlobal?.chartDefaults,
     ),
@@ -756,7 +839,10 @@ function normalizeWorkspace(raw: Partial<WorkspaceDocument> & { chart?: ChartIns
         }
         return byList;
       })(),
-      columnLayout: normalizeColumnLayout(raw.list?.columnLayout, raw.list?.columns),
+      columnLayout: normalizeColumnLayout(
+        raw.list?.columnLayout,
+        raw.list?.columns,
+      ),
       columns: visibleListColumns(
         normalizeColumnLayout(raw.list?.columnLayout, raw.list?.columns),
       ),
@@ -779,16 +865,19 @@ function normalizeWorkspace(raw: Partial<WorkspaceDocument> & { chart?: ChartIns
 interface ChartPersistBackup {
   charts: ChartTabState[];
   activeChartId: string | null;
-  chartStateByListInstrument?: WorkspaceDocument['chartStateByListInstrument'];
-  chartListContext?: WorkspaceDocument['chartListContext'];
-  chartToolbarGlobal?: WorkspaceDocument['chartToolbarGlobal'];
-  indicatorTemplates?: WorkspaceDocument['indicatorTemplates'];
-  indicatorPresets?: WorkspaceDocument['indicatorPresets'];
-  indicatorFavoritesByListId?: WorkspaceDocument['indicatorFavoritesByListId'];
-  defaultIndicatorTemplateId?: WorkspaceDocument['defaultIndicatorTemplateId'];
-  preferences?: Pick<WorkspaceDocument['preferences'], 'newChartTemplateChartId'>;
+  chartStateByListInstrument?: WorkspaceDocument["chartStateByListInstrument"];
+  chartListContext?: WorkspaceDocument["chartListContext"];
+  chartToolbarGlobal?: WorkspaceDocument["chartToolbarGlobal"];
+  indicatorTemplates?: WorkspaceDocument["indicatorTemplates"];
+  indicatorPresets?: WorkspaceDocument["indicatorPresets"];
+  indicatorFavoritesByListId?: WorkspaceDocument["indicatorFavoritesByListId"];
+  defaultIndicatorTemplateId?: WorkspaceDocument["defaultIndicatorTemplateId"];
+  preferences?: Pick<
+    WorkspaceDocument["preferences"],
+    "newChartTemplateChartId"
+  >;
   chartInspectorOpen?: boolean;
-  list?: WorkspaceDocument['list'];
+  list?: WorkspaceDocument["list"];
   updatedAt: string;
 }
 
@@ -855,7 +944,11 @@ interface WorkspaceState {
   setOpenOnStartup: (enabled: boolean) => void;
   toggleNewChartTemplatePin: () => void;
   openChartTab: (instrumentId: string, label: string) => string;
-  focusInstrumentFromList: (listId: string, instrumentId: string, label: string) => string;
+  focusInstrumentFromList: (
+    listId: string,
+    instrumentId: string,
+    label: string,
+  ) => string;
   /** Abre/enfoca varios gráficos en un solo update (evita races de autoguardado). */
   focusInstrumentsFromList: (
     listId: string,
@@ -866,24 +959,26 @@ interface WorkspaceState {
   /** Cierra en un solo update todas las pestañas de los instrumentos dados (evita races de autosave). */
   closeChartTabsForInstruments: (instrumentIds: ReadonlyArray<string>) => void;
   /** Reordena pestañas: primero `orderedInstrumentIds` (izq→der), luego el resto en orden previo. */
-  reorderChartTabsByInstrumentIds: (orderedInstrumentIds: ReadonlyArray<string>) => void;
+  reorderChartTabsByInstrumentIds: (
+    orderedInstrumentIds: ReadonlyArray<string>,
+  ) => void;
   selectChartTab: (chartId: string) => void;
   duplicateActiveChart: () => void;
   updateChartConfig: (patch: {
     chartId?: string;
-    grid?: Partial<ChartInstanceConfig['grid']>;
-    cursor?: Partial<ChartInstanceConfig['cursor']>;
-    colors?: Partial<ChartInstanceConfig['colors']>;
-    display?: Partial<ChartInstanceConfig['display']>;
+    grid?: Partial<ChartInstanceConfig["grid"]>;
+    cursor?: Partial<ChartInstanceConfig["cursor"]>;
+    colors?: Partial<ChartInstanceConfig["colors"]>;
+    display?: Partial<ChartInstanceConfig["display"]>;
   }) => void;
   updateChartTimeframe: (timeframe: ChartTimeframe, chartId?: string) => void;
   setChartDisplayFlags: (
-    patch: Partial<ChartInstanceConfig['display']>,
+    patch: Partial<ChartInstanceConfig["display"]>,
     chartId?: string,
   ) => void;
   addIndicatorInstance: (
     definitionId: string,
-    parameters?: ChartIndicatorInstance['parameters'],
+    parameters?: ChartIndicatorInstance["parameters"],
     chartId?: string,
   ) => boolean;
   /**
@@ -894,7 +989,10 @@ interface WorkspaceState {
    */
   setShowFinalistTop1Indicators: (
     enabled: boolean,
-    specs?: Array<{ definitionId: string; parameters: Record<string, number | boolean | string> }>,
+    specs?: Array<{
+      definitionId: string;
+      parameters: Record<string, number | boolean | string>;
+    }>,
     chartId?: string,
   ) => void;
   /**
@@ -905,17 +1003,34 @@ interface WorkspaceState {
   setFinalistTop1DefaultForAll: (enabled: boolean) => void;
   /** Re-aplica specs TOP #1 sin cambiar el flag (p. ej. al cambiar instrumento/TF con switch ON). */
   syncFinalistTop1Indicators: (
-    specs: Array<{ definitionId: string; parameters: Record<string, number | boolean | string> }>,
+    specs: Array<{
+      definitionId: string;
+      parameters: Record<string, number | boolean | string>;
+    }>,
     chartId?: string,
   ) => void;
   updateIndicatorInstance: (
     instanceId: string,
-    patch: Partial<Pick<ChartIndicatorInstance, 'parameters' | 'visible' | 'scaleZoom' | 'showLastValue' | 'lineWidth'>>,
+    patch: Partial<
+      Pick<
+        ChartIndicatorInstance,
+        "parameters" | "visible" | "scaleZoom" | "showLastValue" | "lineWidth"
+      >
+    >,
     chartId?: string,
   ) => string | null;
-  duplicateIndicatorInstance: (instanceId: string, chartId?: string) => string | null;
-  togglePresetOnChart: (presetId: string, chartId?: string) => 'added' | 'removed' | 'failed';
-  togglePresetVisibilityOnChart: (presetId: string, chartId?: string) => boolean;
+  duplicateIndicatorInstance: (
+    instanceId: string,
+    chartId?: string,
+  ) => string | null;
+  togglePresetOnChart: (
+    presetId: string,
+    chartId?: string,
+  ) => "added" | "removed" | "failed";
+  togglePresetVisibilityOnChart: (
+    presetId: string,
+    chartId?: string,
+  ) => boolean;
   togglePresetInTemplate: (templateId: string, presetId: string) => void;
   swapChartInstanceToPreset: (
     instanceId: string,
@@ -925,19 +1040,34 @@ interface WorkspaceState {
   forkPresetToPersonal: (
     sourcePresetId: string,
     name: string,
-    patch?: Partial<Pick<IndicatorPreset, 'parameters' | 'lineWidth' | 'showLastValue'>>,
+    patch?: Partial<
+      Pick<IndicatorPreset, "parameters" | "lineWidth" | "showLastValue">
+    >,
   ) => string | null;
-  forkInstanceToPersonalPreset: (instanceId: string, name: string, chartId?: string) => string | null;
+  forkInstanceToPersonalPreset: (
+    instanceId: string,
+    name: string,
+    chartId?: string,
+  ) => string | null;
   removeIndicatorPreset: (presetId: string) => void;
-  updateIndicatorPreset: (presetId: string, patch: Partial<IndicatorPreset>) => void;
-  duplicateUserIndicatorPreset: (presetId: string, name?: string) => string | null;
+  updateIndicatorPreset: (
+    presetId: string,
+    patch: Partial<IndicatorPreset>,
+  ) => void;
+  duplicateUserIndicatorPreset: (
+    presetId: string,
+    name?: string,
+  ) => string | null;
   createAiIndicatorVariant: (options: {
     definitionId: string;
     name: string;
-    parameters?: ChartIndicatorInstance['parameters'];
+    parameters?: ChartIndicatorInstance["parameters"];
     lineWidth?: number;
   }) => string | null;
-  addIndicatorPresetFromDraft: (preset: IndicatorPreset, name?: string) => string | null;
+  addIndicatorPresetFromDraft: (
+    preset: IndicatorPreset,
+    name?: string,
+  ) => string | null;
   setDefaultIndicatorTemplate: (templateId: string | null) => void;
   removeIndicatorInstance: (instanceId: string, chartId?: string) => void;
   reorderIndicatorInstances: (
@@ -947,80 +1077,121 @@ interface WorkspaceState {
   ) => void;
   toggleIndicatorOnChart: (
     definitionId: string,
-    parameters?: ChartIndicatorInstance['parameters'],
+    parameters?: ChartIndicatorInstance["parameters"],
     chartId?: string,
-  ) => 'added' | 'removed' | 'failed';
+  ) => "added" | "removed" | "failed";
   setIndicatorInstanceParameters: (
     instanceId: string,
-    parameters: ChartIndicatorInstance['parameters'],
+    parameters: ChartIndicatorInstance["parameters"],
     chartId?: string,
   ) => boolean;
   resetChartConfig: (chartId?: string) => void;
   addChartDrawing: (drawing: ChartDrawing, chartId?: string) => void;
-  updateChartDrawing: (drawingId: string, patch: ChartDrawingVertexPatch, chartId?: string) => void;
+  updateChartDrawing: (
+    drawingId: string,
+    patch: ChartDrawingVertexPatch,
+    chartId?: string,
+  ) => void;
   removeChartDrawing: (drawingId: string, chartId?: string) => void;
   clearChartDrawings: (chartId?: string) => void;
   flushDrawingSave: () => void;
   addDrawingTemplate: () => ChartDrawingTemplate;
-  updateDrawingTemplate: (templateId: string, patch: Partial<ChartDrawingTemplate>) => void;
+  updateDrawingTemplate: (
+    templateId: string,
+    patch: Partial<ChartDrawingTemplate>,
+  ) => void;
   removeDrawingTemplate: (templateId: string) => void;
   duplicateDrawingTemplate: (templateId: string) => ChartDrawingTemplate | null;
-  setActiveDrawingTemplateForTool: (tool: ChartDrawTool, templateId: string | null) => void;
-  applyDrawingTemplate: (drawingId: string, templateId: string, chartId?: string) => void;
+  setActiveDrawingTemplateForTool: (
+    tool: ChartDrawTool,
+    templateId: string | null,
+  ) => void;
+  applyDrawingTemplate: (
+    drawingId: string,
+    templateId: string,
+    chartId?: string,
+  ) => void;
   getIndicatorFavoritesForList: (listId: string) => IndicatorFavoriteRef[];
   toggleIndicatorFavorite: (listId: string, ref: IndicatorFavoriteRef) => void;
-  toggleIndicatorByFavorite: (listId: string, ref: IndicatorFavoriteRef, chartId?: string) => void;
+  toggleIndicatorByFavorite: (
+    listId: string,
+    ref: IndicatorFavoriteRef,
+    chartId?: string,
+  ) => void;
   addIndicatorTemplate: () => IndicatorTemplate;
-  updateIndicatorTemplate: (templateId: string, patch: Partial<IndicatorTemplate>) => void;
+  updateIndicatorTemplate: (
+    templateId: string,
+    patch: Partial<IndicatorTemplate>,
+  ) => void;
   removeIndicatorTemplate: (templateId: string) => void;
   duplicateIndicatorTemplate: (templateId: string) => IndicatorTemplate | null;
   applyIndicatorTemplate: (templateId: string, chartId?: string) => void;
-  createIndicatorTemplateFromChart: (chartId: string, name?: string) => IndicatorTemplate;
+  createIndicatorTemplateFromChart: (
+    chartId: string,
+    name?: string,
+  ) => IndicatorTemplate;
   updateListConfig: (patch: Partial<ListPanelConfig>) => void;
   resetListConfig: () => void;
   updateChartToolbarGlobal: (patch: Partial<ChartToolbarGlobalConfig>) => void;
   toggleChartTimeframeFavorite: (timeframe: ChartTimeframe) => void;
   toggleChartSeriesTypeFavorite: (seriesType: ChartSeriesType) => void;
   toggleIndicatorTemplateFavorite: (templateId: string) => void;
-  toggleInspectorBarShortcutFavorite: (shortcutId: ChartInspectorBarShortcutId) => void;
+  toggleInspectorBarShortcutFavorite: (
+    shortcutId: ChartInspectorBarShortcutId,
+  ) => void;
   toggleDrawToolFavorite: (tool: ChartDrawTool) => void;
-  rememberDrawStyleForTool: (tool: ChartDrawTool, patch: DrawToolStyleMemory) => void;
-  rememberDrawStyleFromDrawing: (drawing: ChartDrawing, sourceTool?: ChartDrawTool) => void;
+  rememberDrawStyleForTool: (
+    tool: ChartDrawTool,
+    patch: DrawToolStyleMemory,
+  ) => void;
+  rememberDrawStyleFromDrawing: (
+    drawing: ChartDrawing,
+    sourceTool?: ChartDrawTool,
+  ) => void;
   toggleChartDrawingsLayerHidden: (chartId?: string) => void;
   toggleChartDrawingsLayerLocked: (chartId?: string) => void;
-  updateChartSeriesType: (seriesType: ChartSeriesType, chartId?: string) => void;
+  updateChartSeriesType: (
+    seriesType: ChartSeriesType,
+    chartId?: string,
+  ) => void;
   updateChartSeriesTypeParams: (
     patch: Partial<ChartSeriesTypeParams>,
     chartId?: string,
   ) => void;
   toggleInstrumentFieldFavorite: (field: ChartInstrumentBarField) => void;
   toggleCursorFieldFavorite: (field: ChartCursorBarField) => void;
-  updateChartToolbarForChart: (chartId: string, patch: ChartToolbarChartOverrides | null) => void;
+  updateChartToolbarForChart: (
+    chartId: string,
+    patch: ChartToolbarChartOverrides | null,
+  ) => void;
   updateChartPricePanelHeight: (pct: number, chartId?: string) => void;
-  setSubPanelWeights: (weights: Record<string, number>, chartId?: string) => void;
+  setSubPanelWeights: (
+    weights: Record<string, number>,
+    chartId?: string,
+  ) => void;
   resetChartToolbarForChart: (chartId: string) => void;
   setChartListMembership: (membership: ChartListMembershipSnapshot) => void;
   syncChartListMembership: (membership: ChartListMembershipSnapshot) => void;
 }
 
 function downloadJson(filename: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
+  const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
 }
 
-function applyServerWorkspace(
-  record: {
-    id: string;
-    name: string;
-    document: WorkspaceDocument;
-    dockLayout: TradingDockLayoutPrefs | null;
-  },
-): Pick<WorkspaceState, 'workspace' | 'activeWorkspaceId' | 'isDirty'> {
+function applyServerWorkspace(record: {
+  id: string;
+  name: string;
+  document: WorkspaceDocument;
+  dockLayout: TradingDockLayoutPrefs | null;
+}): Pick<WorkspaceState, "workspace" | "activeWorkspaceId" | "isDirty"> {
   const workspace = normalizeWorkspace(record.document);
   workspace.id = record.id;
   workspace.name = record.name;
@@ -1043,7 +1214,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       recents: [],
       getActiveChartTab: () => {
         const { charts, activeChartId } = get().workspace;
-        return charts.find((tab) => tab.id === activeChartId) ?? charts[0] ?? null;
+        return (
+          charts.find((tab) => tab.id === activeChartId) ?? charts[0] ?? null
+        );
       },
       setListPanelOpen: (open) =>
         set((state) => ({
@@ -1066,7 +1239,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           },
           isDirty: !state.workspace.preferences.autoSave,
         }));
-        if (get().workspace.preferences.autoSave) scheduleWorkspaceServerSave(get);
+        if (get().workspace.preferences.autoSave)
+          scheduleWorkspaceServerSave(get);
       },
       setRightPanelOpen: (open) =>
         set((state) => ({
@@ -1089,7 +1263,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           },
           isDirty: !state.workspace.preferences.autoSave,
         }));
-        if (get().workspace.preferences.autoSave) scheduleWorkspaceServerSave(get);
+        if (get().workspace.preferences.autoSave)
+          scheduleWorkspaceServerSave(get);
       },
       setChartInspectorOpen: (open) =>
         set((state) => {
@@ -1112,19 +1287,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         flushDrawingAutoSave(get, true);
       },
       openChartInspector: (target) => {
-        getWorkspaceUiBridge().setChartInspectorNav(createInspectorNavRequest(target));
+        getWorkspaceUiBridge().setChartInspectorNav(
+          createInspectorNavRequest(target),
+        );
         get().setChartInspectorOpen(true);
       },
       toggleChartInspectorShortcut: (target) => {
         const key = inspectorNavigateKey(target);
         const open = get().workspace.layout.chartInspectorOpen ?? false;
-        const activeKey = getWorkspaceUiBridge().getChartInspectorActiveShortcutKey();
+        const activeKey =
+          getWorkspaceUiBridge().getChartInspectorActiveShortcutKey();
         if (open && activeKey === key) {
           get().setChartInspectorOpen(false);
           return;
         }
         getWorkspaceUiBridge().setChartInspectorActiveShortcutKey(key);
-        getWorkspaceUiBridge().setChartInspectorNav(createInspectorNavRequest(target));
+        getWorkspaceUiBridge().setChartInspectorNav(
+          createInspectorNavRequest(target),
+        );
         get().setChartInspectorOpen(true);
       },
       resetPanelLayout: () =>
@@ -1144,7 +1324,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         })),
       rename: (name) =>
         set((state) => ({
-          workspace: { ...state.workspace, name, updatedAt: new Date().toISOString() },
+          workspace: {
+            ...state.workspace,
+            name,
+            updatedAt: new Date().toISOString(),
+          },
           isDirty: true,
         })),
       markDirty: () => set({ isDirty: true }),
@@ -1164,7 +1348,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const legacyDoc = readLegacyWorkspaceFromStorage();
             const legacyDock = readLegacyDockFromStorage();
             const created = await api.createWorkspace({
-              name: legacyDoc?.name ?? 'Espacio de trabajo',
+              name: legacyDoc?.name ?? "Espacio de trabajo",
               document: legacyDoc ?? DEFAULT_WORKSPACE,
               dockLayout: legacyDock ?? DEFAULT_DOCK_LAYOUT,
               isDefault: true,
@@ -1249,7 +1433,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             set({ hydrated: true });
           }
           if (err instanceof ApiError) {
-            console.warn('Workspace bootstrap:', err.message);
+            console.warn("Workspace bootstrap:", err.message);
           }
         }
       },
@@ -1270,7 +1454,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         try {
           const prepared = prepareWorkspaceForSave(get().workspace);
           const backup = chartPersistBackupFrom(prepared);
-          writeChartPersistBackupSync(get().activeWorkspaceId, get().recents, backup);
+          writeChartPersistBackupSync(
+            get().activeWorkspaceId,
+            get().recents,
+            backup,
+          );
           // No sustituir `workspace` aquí: un set intermedio + await permite que un
           // sync/merge deje menos pestañas al volver. Solo enviamos `prepared`.
           const payload = buildWorkspacePayload(prepared);
@@ -1324,7 +1512,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (!state.hydrated || !state.activeWorkspaceId) return;
         const prepared = prepareWorkspaceForSave(state.workspace);
         const backup = chartPersistBackupFrom(prepared);
-        writeChartPersistBackupSync(state.activeWorkspaceId, state.recents, backup);
+        writeChartPersistBackupSync(
+          state.activeWorkspaceId,
+          state.recents,
+          backup,
+        );
         const payload = buildWorkspacePayload(prepared);
         api.updateWorkspaceKeepalive(state.activeWorkspaceId, {
           name: prepared.name,
@@ -1349,13 +1541,17 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             totalChartDrawings(local.charts) +
             totalSnapshotDrawings(local.chartStateByListInstrument);
           const serverTs = detail.data.updatedAt ?? serverBase.updatedAt;
-          if (serverDrawings <= localDrawings && serverTs <= local.updatedAt) return;
+          if (serverDrawings <= localDrawings && serverTs <= local.updatedAt)
+            return;
 
           // Preferir el set de pestañas local en pulls en background (este dispositivo).
           const merged = mergeWorkspaceChartState(local, serverBase);
           merged.id = local.id;
           merged.name = local.name;
-          if (local.activeChartId && merged.charts.some((t) => t.id === local.activeChartId)) {
+          if (
+            local.activeChartId &&
+            merged.charts.some((t) => t.id === local.activeChartId)
+          ) {
             merged.activeChartId = local.activeChartId;
           }
           set({
@@ -1369,13 +1565,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       switchWorkspace: async (workspaceId) => {
         const { isDirty, activeWorkspaceId } = get();
         if (workspaceId === activeWorkspaceId) return;
-        if (isDirty && !window.confirm('Hay cambios sin guardar. ¿Cambiar de espacio de trabajo?')) {
+        if (
+          isDirty &&
+          !window.confirm(
+            "Hay cambios sin guardar. ¿Cambiar de espacio de trabajo?",
+          )
+        ) {
           return;
         }
         const detail = await api.getWorkspace(workspaceId);
         set({
           ...applyServerWorkspace(detail.data),
-          recents: [workspaceId, ...get().recents.filter((id) => id !== workspaceId)].slice(0, 8),
+          recents: [
+            workspaceId,
+            ...get().recents.filter((id) => id !== workspaceId),
+          ].slice(0, 8),
         });
       },
       createWorkspace: async (name) => {
@@ -1396,7 +1600,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const prepared = prepareWorkspaceForSave(get().workspace);
         const newName =
           name?.trim() ||
-          `${prepared.name.replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, '').trim()} (copia)`;
+          `${prepared.name.replace(/\s*\(copia(?:\s+\d+)?\)\s*$/i, "").trim()} (copia)`;
         const cloneDoc = normalizeWorkspace({
           ...prepared,
           name: newName,
@@ -1422,7 +1626,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       renameWorkspaceById: async (workspaceId, name) => {
         const trimmed = name.trim();
         if (!trimmed) return;
-        const response = await api.updateWorkspace(workspaceId, { name: trimmed });
+        const response = await api.updateWorkspace(workspaceId, {
+          name: trimmed,
+        });
         if (workspaceId === get().activeWorkspaceId) {
           set((state) => ({
             workspace: {
@@ -1439,7 +1645,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (!id) return;
         if (
           get().isDirty &&
-          !window.confirm('Hay cambios sin guardar. ¿Recargar el espacio desde el servidor?')
+          !window.confirm(
+            "Hay cambios sin guardar. ¿Recargar el espacio desde el servidor?",
+          )
         ) {
           return;
         }
@@ -1463,7 +1671,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       exportJson: () => {
         const { workspace } = get();
-        downloadJson(`${workspace.name.replace(/\s+/g, '-').toLowerCase()}.bolsa-workspace.json`, workspace);
+        downloadJson(
+          `${workspace.name.replace(/\s+/g, "-").toLowerCase()}.bolsa-workspace.json`,
+          workspace,
+        );
         set({ isDirty: false });
       },
       reload: () => {
@@ -1481,7 +1692,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            preferences: { ...state.workspace.preferences, openOnStartup: enabled },
+            preferences: {
+              ...state.workspace.preferences,
+              openOnStartup: enabled,
+            },
           },
           isDirty: true,
         })),
@@ -1489,7 +1703,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const activeId = get().workspace.activeChartId;
         if (!activeId) return;
         set((state) => {
-          const current = state.workspace.preferences.newChartTemplateChartId ?? null;
+          const current =
+            state.workspace.preferences.newChartTemplateChartId ?? null;
           const nextId = current === activeId ? null : activeId;
           return {
             workspace: {
@@ -1506,7 +1721,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         scheduleWorkspaceSettingsPersist(get, set);
       },
       openChartTab: (instrumentId, label) => {
-        const existing = get().workspace.charts.find((tab) => tab.instrumentId === instrumentId);
+        const existing = get().workspace.charts.find(
+          (tab) => tab.instrumentId === instrumentId,
+        );
         if (existing) {
           set((state) => ({
             workspace: finalizeChartWorkspace({
@@ -1518,7 +1735,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }));
           return existing.id;
         }
-        const nextTab = createChartTabForInstrument(get().workspace, instrumentId, label);
+        const nextTab = createChartTabForInstrument(
+          get().workspace,
+          instrumentId,
+          label,
+        );
         set((state) => ({
           workspace: finalizeChartWorkspace({
             ...state.workspace,
@@ -1533,21 +1754,35 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         return nextTab.id;
       },
       focusInstrumentFromList: (listId, instrumentId, label) => {
-        let activeTabId = '';
+        let activeTabId = "";
         set((state) => {
-          let workspace = attachActiveTabListSnapshot(state.workspace, openDrawingEditorId());
-          const existingIndex = workspace.charts.findIndex((tab) => tab.instrumentId === instrumentId);
+          let workspace = attachActiveTabListSnapshot(
+            state.workspace,
+            openDrawingEditorId(),
+          );
+          const existingIndex = workspace.charts.findIndex(
+            (tab) => tab.instrumentId === instrumentId,
+          );
           let charts = [...workspace.charts];
           let activeChartId = workspace.activeChartId;
 
           if (existingIndex >= 0) {
             const existing = charts[existingIndex]!;
-            charts[existingIndex] = { ...existing, label, sourceListId: listId };
+            charts[existingIndex] = {
+              ...existing,
+              label,
+              sourceListId: listId,
+            };
             activeChartId = charts[existingIndex]!.id;
           } else {
-            const baseTab = createChartTabForInstrument(workspace, instrumentId, label, {
-              sourceListId: listId,
-            });
+            const baseTab = createChartTabForInstrument(
+              workspace,
+              instrumentId,
+              label,
+              {
+                sourceListId: listId,
+              },
+            );
             charts = [...charts, baseTab];
             activeChartId = baseTab.id;
           }
@@ -1558,7 +1793,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             activeChartId,
             chartListContext: { listId, instrumentId },
           });
-          activeTabId = activeChartId ?? '';
+          activeTabId = activeChartId ?? "";
           return {
             workspace,
             // Siempre dirty: con autoSave no marcar dirty permitía que un sync/PUT
@@ -1576,10 +1811,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       focusInstrumentsFromList: (listId, items) => {
         if (!items.length) return;
         set((state) => {
-          let workspace = attachActiveTabListSnapshot(state.workspace, openDrawingEditorId());
+          let workspace = attachActiveTabListSnapshot(
+            state.workspace,
+            openDrawingEditorId(),
+          );
           let charts = [...workspace.charts];
           let activeChartId = workspace.activeChartId;
-          let lastInstrumentId = '';
+          let lastInstrumentId = "";
 
           for (const item of items) {
             if (!item.instrumentId) continue;
@@ -1636,7 +1874,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         flushDrawingAutoSave(get, true);
       },
       closeChartTab: (chartId) => {
-        const closing = get().workspace.charts.find((tab) => tab.id === chartId);
+        const closing = get().workspace.charts.find(
+          (tab) => tab.id === chartId,
+        );
         set((state) => {
           const workspace = finalizeChartWorkspace(state.workspace);
           const closingTab = workspace.charts.find((tab) => tab.id === chartId);
@@ -1647,7 +1887,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               : workspace.activeChartId;
           const ctx = workspace.chartListContext;
           const chartListContext =
-            ctx?.instrumentId === closingTab?.instrumentId ? null : workspace.chartListContext;
+            ctx?.instrumentId === closingTab?.instrumentId
+              ? null
+              : workspace.chartListContext;
           const purged = pruneOrphanChartSnapshots({
             ...workspace,
             charts,
@@ -1658,11 +1900,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               newChartTemplateChartId:
                 closingTab?.id === workspace.preferences.newChartTemplateChartId
                   ? null
-                  : workspace.preferences.newChartTemplateChartId ?? null,
+                  : (workspace.preferences.newChartTemplateChartId ?? null),
             },
             updatedAt: new Date().toISOString(),
           });
-          const next = reconcileWorkspaceChartMembership(purged, state.chartListMembership);
+          const next = reconcileWorkspaceChartMembership(
+            purged,
+            state.chartListMembership,
+          );
           return {
             workspace: syncSnapshotsFromCharts(next),
             isDirty: true,
@@ -1670,7 +1915,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         });
         if (closing) {
           const editorId = getWorkspaceUiBridge().getOpenDrawingEditorId();
-          if (editorId && closing.drawings.some((drawing) => drawing.id === editorId)) {
+          if (
+            editorId &&
+            closing.drawings.some((drawing) => drawing.id === editorId)
+          ) {
             getWorkspaceUiBridge().setOpenDrawingEditorId(null);
           }
         }
@@ -1698,10 +1946,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             : (charts.at(-1)?.id ?? null);
           const ctx = workspace.chartListContext;
           const chartListContext =
-            ctx?.instrumentId && remove.has(ctx.instrumentId) ? null : workspace.chartListContext;
+            ctx?.instrumentId && remove.has(ctx.instrumentId)
+              ? null
+              : workspace.chartListContext;
           const templateId = workspace.preferences.newChartTemplateChartId;
           const templateClosed =
-            Boolean(templateId) && closingTabs.some((tab) => tab.id === templateId);
+            Boolean(templateId) &&
+            closingTabs.some((tab) => tab.id === templateId);
           const purged = pruneOrphanChartSnapshots({
             ...workspace,
             charts,
@@ -1711,11 +1962,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               ...workspace.preferences,
               newChartTemplateChartId: templateClosed
                 ? null
-                : workspace.preferences.newChartTemplateChartId ?? null,
+                : (workspace.preferences.newChartTemplateChartId ?? null),
             },
             updatedAt: new Date().toISOString(),
           });
-          const next = reconcileWorkspaceChartMembership(purged, state.chartListMembership);
+          const next = reconcileWorkspaceChartMembership(
+            purged,
+            state.chartListMembership,
+          );
           return {
             workspace: syncSnapshotsFromCharts(next),
             isDirty: true,
@@ -1724,7 +1978,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const editorId = getWorkspaceUiBridge().getOpenDrawingEditorId();
         if (
           editorId &&
-          closingTabs.some((tab) => tab.drawings.some((drawing) => drawing.id === editorId))
+          closingTabs.some((tab) =>
+            tab.drawings.some((drawing) => drawing.id === editorId),
+          )
         ) {
           getWorkspaceUiBridge().setOpenDrawingEditorId(null);
         }
@@ -1740,7 +1996,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const selected: typeof charts = [];
           const rest: typeof charts = [];
           for (const tab of charts) {
-            if (tab.instrumentId && rank.has(tab.instrumentId)) selected.push(tab);
+            if (tab.instrumentId && rank.has(tab.instrumentId))
+              selected.push(tab);
             else rest.push(tab);
           }
           selected.sort((a, b) => {
@@ -1761,7 +2018,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       selectChartTab: (chartId) =>
         set((state) => {
-          const tab = state.workspace.charts.find((item) => item.id === chartId);
+          const tab = state.workspace.charts.find(
+            (item) => item.id === chartId,
+          );
           if (!tab) {
             return {
               workspace: { ...state.workspace, activeChartId: chartId },
@@ -1771,7 +2030,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const membership = state.chartListMembership;
           const listId = membership
             ? resolveValidSourceListIdForTab(state.workspace, tab, membership)
-            : tab.sourceListId ?? state.workspace.chartListContext?.listId ?? null;
+            : (tab.sourceListId ??
+              state.workspace.chartListContext?.listId ??
+              null);
           const workspace = finalizeChartWorkspace({
             ...state.workspace,
             activeChartId: chartId,
@@ -1827,7 +2088,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   ...tab,
                   chart: {
                     ...nextChart,
-                    display: mergeDisplayFromInstances(nextChart.display, indicatorInstances),
+                    display: mergeDisplayFromInstances(
+                      nextChart.display,
+                      indicatorInstances,
+                    ),
                   },
                   indicatorInstances,
                 };
@@ -1860,12 +2124,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               charts: state.workspace.charts.map((tab) => {
                 if (tab.id !== targetId) return tab;
                 const nextDisplay = { ...tab.chart.display, ...patch };
-                const indicatorInstances = seedIndicatorInstancesFromDisplay(nextDisplay);
+                const indicatorInstances =
+                  seedIndicatorInstancesFromDisplay(nextDisplay);
                 return {
                   ...tab,
                   chart: {
                     ...tab.chart,
-                    display: mergeDisplayFromInstances(nextDisplay, indicatorInstances),
+                    display: mergeDisplayFromInstances(
+                      nextDisplay,
+                      indicatorInstances,
+                    ),
                   },
                   indicatorInstances,
                 };
@@ -1881,7 +2149,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const targetId = chartId ?? get().workspace.activeChartId;
         if (!targetId) return false;
         const tab = get().workspace.charts.find((item) => item.id === targetId);
-        if (!tab || hasDuplicateInstance(tab.indicatorInstances, definitionId, params)) {
+        if (
+          !tab ||
+          hasDuplicateInstance(tab.indicatorInstances, definitionId, params)
+        ) {
           return false;
         }
         set((state) => ({
@@ -1905,7 +2176,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 indicatorInstances,
                 chart: {
                   ...item.chart,
-                  display: mergeDisplayFromInstances(item.chart.display, indicatorInstances),
+                  display: mergeDisplayFromInstances(
+                    item.chart.display,
+                    indicatorInstances,
+                  ),
                 },
               };
             }),
@@ -1918,7 +2192,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const targetId = chartId ?? get().workspace.activeChartId;
         if (!targetId) return;
         set((state) => {
-          const tab = state.workspace.charts.find((item) => item.id === targetId);
+          const tab = state.workspace.charts.find(
+            (item) => item.id === targetId,
+          );
           if (!tab) return state;
 
           const desired = specs ?? [];
@@ -1927,7 +2203,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           for (const spec of desired) {
             const definition = findIndicatorDefinition(spec.definitionId);
             if (!definition) continue;
-            const params = normalizeParameters(definition, spec.parameters ?? {});
+            const params = normalizeParameters(
+              definition,
+              spec.parameters ?? {},
+            );
             const key = instanceSpecKey(definition.id, params);
             desiredKeys.add(key);
             toAdd.push({
@@ -1935,25 +2214,30 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               definitionId: spec.definitionId,
               parameters: params,
               visible: true,
-              origin: 'finalist-top1',
+              origin: "finalist-top1",
             });
           }
 
           const existingTop = tab.indicatorInstances.filter(
-            (inst) => inst.origin === 'finalist-top1',
+            (inst) => inst.origin === "finalist-top1",
           );
           const existingKeys = new Set(
-            existingTop.map((inst) => instanceSpecKey(inst.definitionId, inst.parameters)),
+            existingTop.map((inst) =>
+              instanceSpecKey(inst.definitionId, inst.parameters),
+            ),
           );
           const sameSpecs =
             desiredKeys.size === existingKeys.size &&
             [...desiredKeys].every((k) => existingKeys.has(k));
-          if (tab.showFinalistTop1Indicators === enabled && (!enabled || sameSpecs)) {
+          if (
+            tab.showFinalistTop1Indicators === enabled &&
+            (!enabled || sameSpecs)
+          ) {
             return state;
           }
 
           let indicatorInstances = tab.indicatorInstances.filter(
-            (inst) => inst.origin !== 'finalist-top1',
+            (inst) => inst.origin !== "finalist-top1",
           );
           if (enabled) {
             for (const instance of toAdd) {
@@ -2001,10 +2285,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       setFinalistTop1DefaultForAll: (enabled) => {
         set((state) => {
-          const prevDefault = Boolean(state.workspace.preferences.finalistTop1DefaultOn);
+          const prevDefault = Boolean(
+            state.workspace.preferences.finalistTop1DefaultOn,
+          );
           const chartsUnchanged =
             prevDefault === enabled &&
-            state.workspace.charts.every((tab) => Boolean(tab.showFinalistTop1Indicators) === enabled);
+            state.workspace.charts.every(
+              (tab) => Boolean(tab.showFinalistTop1Indicators) === enabled,
+            );
           if (chartsUnchanged) return state;
 
           const charts = state.workspace.charts.map((tab) => {
@@ -2013,14 +2301,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               return { ...tab, showFinalistTop1Indicators: true };
             }
             if (!tab.showFinalistTop1Indicators) {
-              const hasTop = tab.indicatorInstances.some((inst) => inst.origin === 'finalist-top1');
+              const hasTop = tab.indicatorInstances.some(
+                (inst) => inst.origin === "finalist-top1",
+              );
               if (!hasTop) return tab;
             }
             const indicatorInstances = tab.indicatorInstances.filter(
-              (inst) => inst.origin !== 'finalist-top1',
+              (inst) => inst.origin !== "finalist-top1",
             );
             return {
-              ...mapTabIndicators(tab, indicatorInstances, tab.activeIndicatorTemplateId),
+              ...mapTabIndicators(
+                tab,
+                indicatorInstances,
+                tab.activeIndicatorTemplateId,
+              ),
               showFinalistTop1Indicators: false,
             };
           });
@@ -2040,51 +2334,70 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       toggleIndicatorOnChart: (definitionId, parameters, chartId) => {
         const definition = findIndicatorDefinition(definitionId);
-        if (!definition) return 'failed';
+        if (!definition) return "failed";
         const params = normalizeParameters(definition, parameters ?? {});
         const targetId = chartId ?? get().workspace.activeChartId;
-        if (!targetId) return 'failed';
+        if (!targetId) return "failed";
         const tab = get().workspace.charts.find((item) => item.id === targetId);
-        if (!tab) return 'failed';
-        const existing = findInstanceBySpec(tab.indicatorInstances, definitionId, params);
+        if (!tab) return "failed";
+        const existing = findInstanceBySpec(
+          tab.indicatorInstances,
+          definitionId,
+          params,
+        );
         if (existing) {
           get().removeIndicatorInstance(existing.instanceId, targetId);
-          return 'removed';
+          return "removed";
         }
-        return get().addIndicatorInstance(definitionId, params, targetId) ? 'added' : 'failed';
+        return get().addIndicatorInstance(definitionId, params, targetId)
+          ? "added"
+          : "failed";
       },
       setIndicatorInstanceParameters: (instanceId, parameters, chartId) => {
         const targetId = chartId ?? get().workspace.activeChartId;
         if (!targetId) return false;
         const tab = get().workspace.charts.find((item) => item.id === targetId);
         if (!tab) return false;
-        const current = tab.indicatorInstances.find((item) => item.instanceId === instanceId);
+        const current = tab.indicatorInstances.find(
+          (item) => item.instanceId === instanceId,
+        );
         if (!current) return false;
         const definition = findIndicatorDefinition(current.definitionId);
         if (!definition) return false;
         const params = normalizeParameters(definition, parameters);
-        const others = tab.indicatorInstances.filter((item) => item.instanceId !== instanceId);
-        if (hasDuplicateInstance(others, current.definitionId, params)) return false;
+        const others = tab.indicatorInstances.filter(
+          (item) => item.instanceId !== instanceId,
+        );
+        if (hasDuplicateInstance(others, current.definitionId, params))
+          return false;
         set((state) => ({
           workspace: finalizeChartWorkspace({
             ...state.workspace,
             charts: state.workspace.charts.map((chartTab) => {
               if (chartTab.id !== targetId) return chartTab;
-              const indicatorInstances = chartTab.indicatorInstances.map((instance) => {
-                if (instance.instanceId !== instanceId) return instance;
-                return {
-                  ...instance,
-                  instanceId: newIndicatorInstanceId(instance.definitionId, params),
-                  parameters: params,
-                };
-              });
+              const indicatorInstances = chartTab.indicatorInstances.map(
+                (instance) => {
+                  if (instance.instanceId !== instanceId) return instance;
+                  return {
+                    ...instance,
+                    instanceId: newIndicatorInstanceId(
+                      instance.definitionId,
+                      params,
+                    ),
+                    parameters: params,
+                  };
+                },
+              );
               return {
                 ...chartTab,
                 activeIndicatorTemplateId: null,
                 indicatorInstances,
                 chart: {
                   ...chartTab.chart,
-                  display: mergeDisplayFromInstances(chartTab.chart.display, indicatorInstances),
+                  display: mergeDisplayFromInstances(
+                    chartTab.chart.display,
+                    indicatorInstances,
+                  ),
                 },
               };
             }),
@@ -2098,16 +2411,23 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => {
           const targetId = chartId ?? state.workspace.activeChartId;
           if (!targetId) return state;
-          const tab = state.workspace.charts.find((item) => item.id === targetId);
+          const tab = state.workspace.charts.find(
+            (item) => item.id === targetId,
+          );
           if (!tab) return state;
-          const current = tab.indicatorInstances.find((item) => item.instanceId === instanceId);
+          const current = tab.indicatorInstances.find(
+            (item) => item.instanceId === instanceId,
+          );
           if (!current) return state;
           if (patch.parameters) {
             const definition = findIndicatorDefinition(current.definitionId);
             if (!definition) return state;
             const params = normalizeParameters(definition, patch.parameters);
-            const others = tab.indicatorInstances.filter((item) => item.instanceId !== instanceId);
-            if (hasDuplicateInstance(others, current.definitionId, params)) return state;
+            const others = tab.indicatorInstances.filter(
+              (item) => item.instanceId !== instanceId,
+            );
+            if (hasDuplicateInstance(others, current.definitionId, params))
+              return state;
           }
           const nextScaleZoom =
             patch.scaleZoom != null
@@ -2121,27 +2441,35 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               ...state.workspace,
               charts: state.workspace.charts.map((chartTab) => {
                 if (chartTab.id !== targetId) return chartTab;
-                const indicatorInstances = chartTab.indicatorInstances.map((instance) => {
-                  if (instance.instanceId !== instanceId) return instance;
-                  const nextParams = patch.parameters
-                    ? normalizeParameters(definition, patch.parameters)
-                    : instance.parameters;
-                  const dataChanged =
-                    patch.parameters != null &&
-                    dataParametersKey(instance.parameters) !== dataParametersKey(nextParams);
-                  const nextInstanceId = dataChanged
-                    ? newIndicatorInstanceId(instance.definitionId, nextParams)
-                    : instance.instanceId;
-                  const next = {
-                    ...instance,
-                    ...patch,
-                    ...(nextScaleZoom != null ? { scaleZoom: nextScaleZoom } : {}),
-                    parameters: nextParams,
-                    instanceId: nextInstanceId,
-                  };
-                  resultId = next.instanceId;
-                  return next;
-                });
+                const indicatorInstances = chartTab.indicatorInstances.map(
+                  (instance) => {
+                    if (instance.instanceId !== instanceId) return instance;
+                    const nextParams = patch.parameters
+                      ? normalizeParameters(definition, patch.parameters)
+                      : instance.parameters;
+                    const dataChanged =
+                      patch.parameters != null &&
+                      dataParametersKey(instance.parameters) !==
+                        dataParametersKey(nextParams);
+                    const nextInstanceId = dataChanged
+                      ? newIndicatorInstanceId(
+                          instance.definitionId,
+                          nextParams,
+                        )
+                      : instance.instanceId;
+                    const next = {
+                      ...instance,
+                      ...patch,
+                      ...(nextScaleZoom != null
+                        ? { scaleZoom: nextScaleZoom }
+                        : {}),
+                      parameters: nextParams,
+                      instanceId: nextInstanceId,
+                    };
+                    resultId = next.instanceId;
+                    return next;
+                  },
+                );
                 const rebalanced =
                   patch.visible !== undefined && isSubPanelInstance(current)
                     ? adjustSubPanelWeightsAfterVisibilityChange(
@@ -2156,7 +2484,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   indicatorInstances: rebalanced,
                   chart: {
                     ...chartTab.chart,
-                    display: mergeDisplayFromInstances(chartTab.chart.display, rebalanced),
+                    display: mergeDisplayFromInstances(
+                      chartTab.chart.display,
+                      rebalanced,
+                    ),
                   },
                 };
               }),
@@ -2171,21 +2502,31 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => {
           const targetId = chartId ?? state.workspace.activeChartId;
           if (!targetId) return state;
-          const tab = state.workspace.charts.find((item) => item.id === targetId);
+          const tab = state.workspace.charts.find(
+            (item) => item.id === targetId,
+          );
           if (!tab) return state;
-          const index = tab.indicatorInstances.findIndex((item) => item.instanceId === instanceId);
+          const index = tab.indicatorInstances.findIndex(
+            (item) => item.instanceId === instanceId,
+          );
           if (index < 0) return state;
           const source = tab.indicatorInstances[index]!;
           const clone: ChartIndicatorInstance = {
             ...source,
-            instanceId: newIndicatorInstanceId(source.definitionId, source.parameters),
+            instanceId: newIndicatorInstanceId(
+              source.definitionId,
+              source.parameters,
+            ),
             visible: source.visible,
           };
           newId = clone.instanceId;
           let indicatorInstances = [...tab.indicatorInstances];
           indicatorInstances.splice(index + 1, 0, clone);
           if (isSubPanelInstance(clone)) {
-            indicatorInstances = assignSubPanelWeightOnAdd(indicatorInstances, clone.instanceId);
+            indicatorInstances = assignSubPanelWeightOnAdd(
+              indicatorInstances,
+              clone.instanceId,
+            );
           }
           return {
             workspace: finalizeChartWorkspace({
@@ -2198,7 +2539,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   indicatorInstances,
                   chart: {
                     ...chartTab.chart,
-                    display: mergeDisplayFromInstances(chartTab.chart.display, indicatorInstances),
+                    display: mergeDisplayFromInstances(
+                      chartTab.chart.display,
+                      indicatorInstances,
+                    ),
                   },
                 };
               }),
@@ -2211,15 +2555,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       togglePresetOnChart: (presetId, chartId) => {
         const presets = get().workspace.indicatorPresets ?? [];
         const preset = findIndicatorPreset(presets, presetId);
-        if (!preset) return 'failed';
+        if (!preset) return "failed";
         const targetId = chartId ?? get().workspace.activeChartId;
-        if (!targetId) return 'failed';
+        if (!targetId) return "failed";
         const tab = get().workspace.charts.find((item) => item.id === targetId);
-        if (!tab) return 'failed';
+        if (!tab) return "failed";
         const existing = findInstanceByPreset(tab.indicatorInstances, presetId);
         if (existing) {
           get().removeIndicatorInstance(existing.instanceId, targetId);
-          return 'removed';
+          return "removed";
         }
         const instance = instanceFromPreset(preset);
         set((state) => ({
@@ -2227,27 +2571,35 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             ...state.workspace,
             charts: state.workspace.charts.map((chartTab) => {
               if (chartTab.id !== targetId) return chartTab;
-              const indicatorInstances = [...chartTab.indicatorInstances, instance];
+              const indicatorInstances = [
+                ...chartTab.indicatorInstances,
+                instance,
+              ];
               return {
                 ...chartTab,
                 activeIndicatorTemplateId: null,
                 indicatorInstances,
                 chart: {
                   ...chartTab.chart,
-                  display: mergeDisplayFromInstances(chartTab.chart.display, indicatorInstances),
+                  display: mergeDisplayFromInstances(
+                    chartTab.chart.display,
+                    indicatorInstances,
+                  ),
                 },
               };
             }),
           }),
           isDirty: true,
         }));
-        return 'added';
+        return "added";
       },
       togglePresetVisibilityOnChart: (presetId, chartId) => {
         const targetId = chartId ?? get().workspace.activeChartId;
         if (!targetId) return false;
         const tab = get().workspace.charts.find((item) => item.id === targetId);
-        const existing = tab ? findInstanceByPreset(tab.indicatorInstances, presetId) : undefined;
+        const existing = tab
+          ? findInstanceByPreset(tab.indicatorInstances, presetId)
+          : undefined;
         if (!existing) return false;
         const nextId = get().updateIndicatorInstance(
           existing.instanceId,
@@ -2285,7 +2637,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorPresets: [...(state.workspace.indicatorPresets ?? []), forked],
+            indicatorPresets: [
+              ...(state.workspace.indicatorPresets ?? []),
+              forked,
+            ],
             indicatorTemplates: appendPresetToPersonalTemplate(
               state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES,
               forked.id,
@@ -2301,7 +2656,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorPresets: [...(state.workspace.indicatorPresets ?? []), preset],
+            indicatorPresets: [
+              ...(state.workspace.indicatorPresets ?? []),
+              preset,
+            ],
             indicatorTemplates: appendPresetToPersonalTemplate(
               state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES,
               preset.id,
@@ -2314,14 +2672,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       addIndicatorPresetFromDraft: (preset, name) => {
         const nextPreset: IndicatorPreset = {
           ...preset,
-          id: preset.id.startsWith('draft-') ? newIndicatorPresetId() : preset.id,
+          id: preset.id.startsWith("draft-")
+            ? newIndicatorPresetId()
+            : preset.id,
           name: name?.trim() || preset.name,
           locked: false,
         };
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorPresets: [...(state.workspace.indicatorPresets ?? []), nextPreset],
+            indicatorPresets: [
+              ...(state.workspace.indicatorPresets ?? []),
+              nextPreset,
+            ],
             indicatorTemplates: appendPresetToPersonalTemplate(
               state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES,
               nextPreset.id,
@@ -2335,7 +2698,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         const targetId = chartId ?? get().workspace.activeChartId;
         if (!targetId) return null;
         const tab = get().workspace.charts.find((item) => item.id === targetId);
-        const instance = tab?.indicatorInstances.find((item) => item.instanceId === instanceId);
+        const instance = tab?.indicatorInstances.find(
+          (item) => item.instanceId === instanceId,
+        );
         if (!instance) return null;
         const preset = presetFromInstance(instance, name, {
           derivedFromPresetId: instance.presetId,
@@ -2343,7 +2708,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorPresets: [...(state.workspace.indicatorPresets ?? []), preset],
+            indicatorPresets: [
+              ...(state.workspace.indicatorPresets ?? []),
+              preset,
+            ],
             indicatorTemplates: appendPresetToPersonalTemplate(
               state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES,
               preset.id,
@@ -2355,7 +2723,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       removeIndicatorPreset: (presetId) =>
         set((state) => {
-          const preset = findIndicatorPreset(state.workspace.indicatorPresets ?? [], presetId);
+          const preset = findIndicatorPreset(
+            state.workspace.indicatorPresets ?? [],
+            presetId,
+          );
           if (!preset || preset.locked) return state;
           return {
             workspace: {
@@ -2363,9 +2734,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               indicatorPresets: (state.workspace.indicatorPresets ?? []).filter(
                 (item) => item.id !== presetId,
               ),
-              indicatorTemplates: (state.workspace.indicatorTemplates ?? []).map((template) => ({
+              indicatorTemplates: (
+                state.workspace.indicatorTemplates ?? []
+              ).map((template) => ({
                 ...template,
-                presetIds: (template.presetIds ?? []).filter((id) => id !== presetId),
+                presetIds: (template.presetIds ?? []).filter(
+                  (id) => id !== presetId,
+                ),
               })),
             },
             isDirty: true,
@@ -2373,14 +2748,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }),
       updateIndicatorPreset: (presetId, patch) =>
         set((state) => {
-          const current = findIndicatorPreset(state.workspace.indicatorPresets ?? [], presetId);
+          const current = findIndicatorPreset(
+            state.workspace.indicatorPresets ?? [],
+            presetId,
+          );
           if (!current || current.locked) return state;
           const definition = findIndicatorDefinition(current.definitionId);
-          const parameters = patch.parameters && definition
-            ? normalizeParameters(definition, { ...current.parameters, ...patch.parameters })
-            : patch.parameters
-              ? { ...current.parameters, ...patch.parameters }
-              : current.parameters;
+          const parameters =
+            patch.parameters && definition
+              ? normalizeParameters(definition, {
+                  ...current.parameters,
+                  ...patch.parameters,
+                })
+              : patch.parameters
+                ? { ...current.parameters, ...patch.parameters }
+                : current.parameters;
           const nextPreset = {
             ...current,
             ...patch,
@@ -2389,8 +2771,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           return {
             workspace: finalizeChartWorkspace({
               ...state.workspace,
-              indicatorPresets: (state.workspace.indicatorPresets ?? []).map((preset) =>
-                preset.id === presetId ? nextPreset : preset,
+              indicatorPresets: (state.workspace.indicatorPresets ?? []).map(
+                (preset) => (preset.id === presetId ? nextPreset : preset),
               ),
               charts: state.workspace.charts.map((tab) => ({
                 ...tab,
@@ -2400,7 +2782,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                     ...instance,
                     parameters: { ...nextPreset.parameters },
                     lineWidth: nextPreset.lineWidth ?? instance.lineWidth,
-                    showLastValue: nextPreset.showLastValue ?? instance.showLastValue,
+                    showLastValue:
+                      nextPreset.showLastValue ?? instance.showLastValue,
                   };
                 }),
               })),
@@ -2416,7 +2799,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorPresets: [...(state.workspace.indicatorPresets ?? []), copy],
+            indicatorPresets: [
+              ...(state.workspace.indicatorPresets ?? []),
+              copy,
+            ],
             indicatorTemplates: appendPresetToPersonalTemplate(
               state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES,
               copy.id,
@@ -2434,12 +2820,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         if (!targetId) return null;
         let resultId: string | null = null;
         set((state) => {
-          const tab = state.workspace.charts.find((item) => item.id === targetId);
+          const tab = state.workspace.charts.find(
+            (item) => item.id === targetId,
+          );
           if (!tab) return state;
           const nextInstance = instanceFromPreset(preset);
           resultId = nextInstance.instanceId;
           const indicatorInstances = [
-            ...tab.indicatorInstances.filter((item) => item.instanceId !== instanceId),
+            ...tab.indicatorInstances.filter(
+              (item) => item.instanceId !== instanceId,
+            ),
             nextInstance,
           ];
           return {
@@ -2453,7 +2843,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   indicatorInstances,
                   chart: {
                     ...chartTab.chart,
-                    display: mergeDisplayFromInstances(chartTab.chart.display, indicatorInstances),
+                    display: mergeDisplayFromInstances(
+                      chartTab.chart.display,
+                      indicatorInstances,
+                    ),
                   },
                 };
               }),
@@ -2480,12 +2873,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               ...state.workspace,
               charts: state.workspace.charts.map((tab) => {
                 if (tab.id !== targetId) return tab;
-                const removed = tab.indicatorInstances.find((item) => item.instanceId === instanceId);
+                const removed = tab.indicatorInstances.find(
+                  (item) => item.instanceId === instanceId,
+                );
                 let indicatorInstances = tab.indicatorInstances.filter(
                   (item) => item.instanceId !== instanceId,
                 );
                 if (removed && isSubPanelInstance(removed) && removed.visible) {
-                  const remainingCount = visibleSubPanelInstances(indicatorInstances).length;
+                  const remainingCount =
+                    visibleSubPanelInstances(indicatorInstances).length;
                   const removedWeight =
                     removed.subPanelWeight ??
                     (remainingCount > 0 ? 100 / (remainingCount + 1) : 100);
@@ -2509,7 +2905,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   indicatorInstances,
                   chart: {
                     ...tab.chart,
-                    display: mergeDisplayFromInstances(nextDisplay, indicatorInstances),
+                    display: mergeDisplayFromInstances(
+                      nextDisplay,
+                      indicatorInstances,
+                    ),
                   },
                 };
               }),
@@ -2527,8 +2926,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               charts: state.workspace.charts.map((tab) => {
                 if (tab.id !== targetId) return tab;
                 const instances = [...tab.indicatorInstances];
-                const from = instances.findIndex((item) => item.instanceId === fromInstanceId);
-                const to = instances.findIndex((item) => item.instanceId === toInstanceId);
+                const from = instances.findIndex(
+                  (item) => item.instanceId === fromInstanceId,
+                );
+                const to = instances.findIndex(
+                  (item) => item.instanceId === toInstanceId,
+                );
                 if (from < 0 || to < 0 || from === to) return tab;
                 const [moved] = instances.splice(from, 1);
                 instances.splice(to, 0, moved!);
@@ -2538,7 +2941,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   indicatorInstances: instances,
                   chart: {
                     ...tab.chart,
-                    display: mergeDisplayFromInstances(tab.chart.display, instances),
+                    display: mergeDisplayFromInstances(
+                      tab.chart.display,
+                      instances,
+                    ),
                   },
                 };
               }),
@@ -2559,7 +2965,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 return {
                   ...tab,
                   chart,
-                  indicatorInstances: seedIndicatorInstancesFromDisplay(chart.display),
+                  indicatorInstances: seedIndicatorInstancesFromDisplay(
+                    chart.display,
+                  ),
                 };
               }),
             }),
@@ -2573,7 +2981,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const workspace = finalizeChartWorkspace({
             ...state.workspace,
             charts: state.workspace.charts.map((tab) =>
-              tab.id !== targetId ? tab : { ...tab, drawings: [...tab.drawings, drawing] },
+              tab.id !== targetId
+                ? tab
+                : { ...tab, drawings: [...tab.drawings, drawing] },
             ),
           });
           return {
@@ -2583,7 +2993,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           };
         });
         const { activeWorkspaceId, recents, workspace } = get();
-        writeChartPersistBackupSync(activeWorkspaceId, recents, chartPersistBackupFrom(workspace));
+        writeChartPersistBackupSync(
+          activeWorkspaceId,
+          recents,
+          chartPersistBackupFrom(workspace),
+        );
         flushDrawingAutoSave(get, true);
       },
       updateChartDrawing: (drawingId, patch, chartId) => {
@@ -2593,7 +3007,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => {
           const targetId = chartId ?? state.workspace.activeChartId;
           if (!targetId) return state;
-          const tab = state.workspace.charts.find((item) => item.id === targetId);
+          const tab = state.workspace.charts.find(
+            (item) => item.id === targetId,
+          );
           const drawing = tab?.drawings.find((item) => item.id === drawingId);
           if (drawing && patchHasStyleMemory(patch)) {
             styleTool = drawToolForDrawing(drawing);
@@ -2622,7 +3038,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           get().rememberDrawStyleForTool(styleTool, stylePatch);
         }
         const { activeWorkspaceId, recents, workspace } = get();
-        writeChartPersistBackupSync(activeWorkspaceId, recents, chartPersistBackupFrom(workspace));
+        writeChartPersistBackupSync(
+          activeWorkspaceId,
+          recents,
+          chartPersistBackupFrom(workspace),
+        );
         flushDrawingAutoSave(get, true);
       },
       removeChartDrawing: (drawingId, chartId) => {
@@ -2634,7 +3054,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             charts: state.workspace.charts.map((tab) =>
               tab.id !== targetId
                 ? tab
-                : { ...tab, drawings: tab.drawings.filter((d) => d.id !== drawingId) },
+                : {
+                    ...tab,
+                    drawings: tab.drawings.filter((d) => d.id !== drawingId),
+                  },
             ),
           });
           return {
@@ -2644,7 +3067,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           };
         });
         const { activeWorkspaceId, recents, workspace } = get();
-        writeChartPersistBackupSync(activeWorkspaceId, recents, chartPersistBackupFrom(workspace));
+        writeChartPersistBackupSync(
+          activeWorkspaceId,
+          recents,
+          chartPersistBackupFrom(workspace),
+        );
         flushDrawingAutoSave(get, true);
       },
       clearChartDrawings: (chartId) => {
@@ -2664,7 +3091,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           };
         });
         const { activeWorkspaceId, recents, workspace } = get();
-        writeChartPersistBackupSync(activeWorkspaceId, recents, chartPersistBackupFrom(workspace));
+        writeChartPersistBackupSync(
+          activeWorkspaceId,
+          recents,
+          chartPersistBackupFrom(workspace),
+        );
         flushDrawingAutoSave(get, true);
       },
       flushDrawingSave: () => {
@@ -2675,7 +3106,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            drawingTemplates: [...(state.workspace.drawingTemplates ?? []), template],
+            drawingTemplates: [
+              ...(state.workspace.drawingTemplates ?? []),
+              template,
+            ],
           },
           isDirty: true,
         }));
@@ -2685,33 +3119,44 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            drawingTemplates: (state.workspace.drawingTemplates ?? []).map((template) => {
-              if (template.id !== templateId) return template;
-              return {
-                ...template,
-                ...patch,
-                style: patch.style ? { ...template.style, ...patch.style } : template.style,
-                text: patch.text ? { ...template.text, ...patch.text } : template.text,
-                coordinates: patch.coordinates
-                  ? { ...template.coordinates, ...patch.coordinates }
-                  : template.coordinates,
-                visibility: patch.visibility
-                  ? { ...template.visibility, ...patch.visibility }
-                  : template.visibility,
-              };
-            }),
+            drawingTemplates: (state.workspace.drawingTemplates ?? []).map(
+              (template) => {
+                if (template.id !== templateId) return template;
+                return {
+                  ...template,
+                  ...patch,
+                  style: patch.style
+                    ? { ...template.style, ...patch.style }
+                    : template.style,
+                  text: patch.text
+                    ? { ...template.text, ...patch.text }
+                    : template.text,
+                  coordinates: patch.coordinates
+                    ? { ...template.coordinates, ...patch.coordinates }
+                    : template.coordinates,
+                  visibility: patch.visibility
+                    ? { ...template.visibility, ...patch.visibility }
+                    : template.visibility,
+                };
+              },
+            ),
           },
           isDirty: true,
         })),
       removeDrawingTemplate: (templateId) =>
         set((state) => {
-          const target = state.workspace.drawingTemplates?.find((t) => t.id === templateId);
+          const target = state.workspace.drawingTemplates?.find(
+            (t) => t.id === templateId,
+          );
           if (!target || target.builtin) return state;
           const activeDrawingTemplateByTool = {
             ...(state.workspace.activeDrawingTemplateByTool ?? {}),
           };
-          for (const [tool, id] of Object.entries(activeDrawingTemplateByTool)) {
-            if (id === templateId) delete activeDrawingTemplateByTool[tool as ChartDrawTool];
+          for (const [tool, id] of Object.entries(
+            activeDrawingTemplateByTool,
+          )) {
+            if (id === templateId)
+              delete activeDrawingTemplateByTool[tool as ChartDrawTool];
           }
           return {
             workspace: {
@@ -2725,7 +3170,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           };
         }),
       duplicateDrawingTemplate: (templateId) => {
-        const source = get().workspace.drawingTemplates?.find((t) => t.id === templateId);
+        const source = get().workspace.drawingTemplates?.find(
+          (t) => t.id === templateId,
+        );
         if (!source) return null;
         const copy: ChartDrawingTemplate = {
           ...source,
@@ -2741,7 +3188,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            drawingTemplates: [...(state.workspace.drawingTemplates ?? []), copy],
+            drawingTemplates: [
+              ...(state.workspace.drawingTemplates ?? []),
+              copy,
+            ],
           },
           isDirty: true,
         }));
@@ -2757,7 +3207,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           };
           if (templateId) {
             activeDrawingTemplateByTool[tool] = templateId;
-            const template = findDrawingTemplate(state.workspace.drawingTemplates, templateId);
+            const template = findDrawingTemplate(
+              state.workspace.drawingTemplates,
+              templateId,
+            );
             if (template) {
               lastDrawStyleByTool[tool] = styleMemoryFromTemplate(template);
             }
@@ -2783,9 +3236,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => {
           const targetId = chartId ?? state.workspace.activeChartId;
           if (!targetId) return state;
-          const tab = state.workspace.charts.find((item) => item.id === targetId);
+          const tab = state.workspace.charts.find(
+            (item) => item.id === targetId,
+          );
           const drawing = tab?.drawings.find((item) => item.id === drawingId);
-          const template = findDrawingTemplate(state.workspace.drawingTemplates, templateId);
+          const template = findDrawingTemplate(
+            state.workspace.drawingTemplates,
+            templateId,
+          );
           if (!tab || !drawing || !template) return state;
           const patch = drawingPatchFromTemplate(drawing, template);
           return {
@@ -2809,7 +3267,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         });
         flushDrawingAutoSave(get, true);
       },
-      getIndicatorFavoritesForList: (listId) => getListIndicatorFavorites(get().workspace, listId),
+      getIndicatorFavoritesForList: (listId) =>
+        getListIndicatorFavorites(get().workspace, listId),
       toggleIndicatorFavorite: (listId, ref) =>
         set((state) => {
           const current = getListIndicatorFavorites(state.workspace, listId);
@@ -2817,7 +3276,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const exists = current.some((item) => favoriteRefKey(item) === key);
           const next = exists
             ? current.filter((item) => favoriteRefKey(item) !== key)
-            : [...current, { definitionId: ref.definitionId, parameters: { ...ref.parameters }, ...(ref.shortLabel ? { shortLabel: ref.shortLabel } : {}) }];
+            : [
+                ...current,
+                {
+                  definitionId: ref.definitionId,
+                  parameters: { ...ref.parameters },
+                  ...(ref.shortLabel ? { shortLabel: ref.shortLabel } : {}),
+                },
+              ];
           const favorites =
             next.length > 0
               ? next
@@ -2858,7 +3324,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorTemplates: [...(state.workspace.indicatorTemplates ?? []), template],
+            indicatorTemplates: [
+              ...(state.workspace.indicatorTemplates ?? []),
+              template,
+            ],
           },
           isDirty: true,
         }));
@@ -2868,32 +3337,36 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorTemplates: (state.workspace.indicatorTemplates ?? []).map((template) => {
-              if (template.id !== templateId) return template;
-              return {
-                ...template,
-                ...patch,
-                items: patch.items
-                  ? patch.items.map((item) => ({
-                      ...item,
-                      parameters: { ...item.parameters },
-                    }))
-                  : template.items,
-              };
-            }),
+            indicatorTemplates: (state.workspace.indicatorTemplates ?? []).map(
+              (template) => {
+                if (template.id !== templateId) return template;
+                return {
+                  ...template,
+                  ...patch,
+                  items: patch.items
+                    ? patch.items.map((item) => ({
+                        ...item,
+                        parameters: { ...item.parameters },
+                      }))
+                    : template.items,
+                };
+              },
+            ),
           },
           isDirty: true,
         })),
       removeIndicatorTemplate: (templateId) =>
         set((state) => {
-          const target = state.workspace.indicatorTemplates?.find((t) => t.id === templateId);
+          const target = state.workspace.indicatorTemplates?.find(
+            (t) => t.id === templateId,
+          );
           if (!target || target.locked || target.builtin) return state;
           return {
             workspace: {
               ...state.workspace,
-              indicatorTemplates: (state.workspace.indicatorTemplates ?? []).filter(
-                (t) => t.id !== templateId,
-              ),
+              indicatorTemplates: (
+                state.workspace.indicatorTemplates ?? []
+              ).filter((t) => t.id !== templateId),
               charts: state.workspace.charts.map((tab) =>
                 tab.activeIndicatorTemplateId === templateId
                   ? { ...tab, activeIndicatorTemplateId: null }
@@ -2904,7 +3377,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           };
         }),
       duplicateIndicatorTemplate: (templateId) => {
-        const source = get().workspace.indicatorTemplates?.find((t) => t.id === templateId);
+        const source = get().workspace.indicatorTemplates?.find(
+          (t) => t.id === templateId,
+        );
         if (!source) return null;
         const copy: IndicatorTemplate = {
           ...source,
@@ -2912,7 +3387,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           name: `${source.name} (copia)`,
           locked: false,
           builtin: false,
-          source: 'custom',
+          source: "custom",
           presetIds: [...(source.presetIds ?? [])],
           items: source.items?.map((item) => ({
             ...item,
@@ -2922,7 +3397,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorTemplates: [...(state.workspace.indicatorTemplates ?? []), copy],
+            indicatorTemplates: [
+              ...(state.workspace.indicatorTemplates ?? []),
+              copy,
+            ],
           },
           isDirty: true,
         }));
@@ -2963,16 +3441,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       createIndicatorTemplateFromChart: (chartId, name) => {
         const tab = get().workspace.charts.find((item) => item.id === chartId);
         const instances = tab?.indicatorInstances ?? [];
-        const presets = get().workspace.indicatorPresets ?? DEFAULT_SYSTEM_PRESETS;
+        const presets =
+          get().workspace.indicatorPresets ?? DEFAULT_SYSTEM_PRESETS;
         const template = indicatorTemplateFromInstances(
           instances,
-          name?.trim() || 'Plantilla del gráfico',
+          name?.trim() || "Plantilla del gráfico",
           presets,
         );
         set((state) => ({
           workspace: {
             ...state.workspace,
-            indicatorTemplates: [...(state.workspace.indicatorTemplates ?? []), template],
+            indicatorTemplates: [
+              ...(state.workspace.indicatorTemplates ?? []),
+              template,
+            ],
           },
           isDirty: true,
         }));
@@ -3017,7 +3499,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               chartVisibilityDefaults: patch.chartVisibilityDefaults
                 ? {
                     ...DEFAULT_CHART_TOOLBAR_GLOBAL_CONFIG.chartVisibilityDefaults,
-                    ...state.workspace.chartToolbarGlobal?.chartVisibilityDefaults,
+                    ...state.workspace.chartToolbarGlobal
+                      ?.chartVisibilityDefaults,
                     ...patch.chartVisibilityDefaults,
                   }
                 : state.workspace.chartToolbarGlobal?.chartVisibilityDefaults,
@@ -3031,7 +3514,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 ? normalizeChartSeriesTypeFavorites(patch.seriesTypeFavorites)
                 : state.workspace.chartToolbarGlobal?.seriesTypeFavorites,
               instrumentFieldFavorites: patch.instrumentFieldFavorites
-                ? normalizeChartInstrumentFieldFavorites(patch.instrumentFieldFavorites)
+                ? normalizeChartInstrumentFieldFavorites(
+                    patch.instrumentFieldFavorites,
+                  )
                 : state.workspace.chartToolbarGlobal?.instrumentFieldFavorites,
               cursorFieldFavorites: patch.cursorFieldFavorites
                 ? normalizeChartCursorFieldFavorites(patch.cursorFieldFavorites)
@@ -3039,15 +3524,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               indicatorTemplateFavorites: patch.indicatorTemplateFavorites
                 ? normalizeIndicatorTemplateFavorites(
                     patch.indicatorTemplateFavorites,
-                    (state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES).map(
-                      (t) => t.id,
-                    ),
+                    (
+                      state.workspace.indicatorTemplates ??
+                      DEFAULT_INDICATOR_TEMPLATES
+                    ).map((t) => t.id),
                   )
-                : state.workspace.chartToolbarGlobal?.indicatorTemplateFavorites,
+                : state.workspace.chartToolbarGlobal
+                    ?.indicatorTemplateFavorites,
               inspectorBarShortcutFavorites:
                 patch.inspectorBarShortcutFavorites !== undefined
-                  ? normalizeInspectorBarShortcutFavorites(patch.inspectorBarShortcutFavorites)
-                  : state.workspace.chartToolbarGlobal?.inspectorBarShortcutFavorites,
+                  ? normalizeInspectorBarShortcutFavorites(
+                      patch.inspectorBarShortcutFavorites,
+                    )
+                  : state.workspace.chartToolbarGlobal
+                      ?.inspectorBarShortcutFavorites,
             }),
           },
           isDirty: true,
@@ -3096,9 +3586,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
       toggleIndicatorTemplateFavorite: (templateId) => {
         set((state) => {
-          const validIds = (state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES).map(
-            (t) => t.id,
-          );
+          const validIds = (
+            state.workspace.indicatorTemplates ?? DEFAULT_INDICATOR_TEMPLATES
+          ).map((t) => t.id);
           const current = normalizeIndicatorTemplateFavorites(
             state.workspace.chartToolbarGlobal?.indicatorTemplateFavorites,
             validIds,
@@ -3123,7 +3613,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const current = normalizeInspectorBarShortcutFavorites(
             state.workspace.chartToolbarGlobal?.inspectorBarShortcutFavorites,
           );
-          const next = toggleInspectorBarShortcutFavoriteList(current, shortcutId);
+          const next = toggleInspectorBarShortcutFavoriteList(
+            current,
+            shortcutId,
+          );
           return {
             workspace: {
               ...state.workspace,
@@ -3146,7 +3639,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             IMPLEMENTED_DRAW_TOOLS,
           );
           const next = toggleDrawToolFavoriteList(current, drawTool);
-          nextFavorites = normalizeDrawToolFavorites(next, IMPLEMENTED_DRAW_TOOLS);
+          nextFavorites = normalizeDrawToolFavorites(
+            next,
+            IMPLEMENTED_DRAW_TOOLS,
+          );
           return {
             workspace: {
               ...state.workspace,
@@ -3165,7 +3661,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       rememberDrawStyleForTool: (tool, patch) => {
         if (!patch || Object.keys(patch).length === 0) return;
         const state = get();
-        const prev = state.workspace.chartToolbarGlobal?.lastDrawStyleByTool ?? {};
+        const prev =
+          state.workspace.chartToolbarGlobal?.lastDrawStyleByTool ?? {};
         const merged = mergeDrawToolStyleMemory(prev[tool], patch);
         const current = prev[tool];
         if (
@@ -3279,7 +3776,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const current = normalizeChartInstrumentFieldFavorites(
             state.workspace.chartToolbarGlobal?.instrumentFieldFavorites,
           );
-          const next = toggleBarZoneFavoriteList(current, field, CHART_INSTRUMENT_BAR_ANCHOR);
+          const next = toggleBarZoneFavoriteList(
+            current,
+            field,
+            CHART_INSTRUMENT_BAR_ANCHOR,
+          );
           return {
             workspace: {
               ...state.workspace,
@@ -3299,7 +3800,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const current = normalizeChartCursorFieldFavorites(
             state.workspace.chartToolbarGlobal?.cursorFieldFavorites,
           );
-          const next = toggleBarZoneFavoriteList(current, field, CHART_CURSOR_BAR_ANCHOR);
+          const next = toggleBarZoneFavoriteList(
+            current,
+            field,
+            CHART_CURSOR_BAR_ANCHOR,
+          );
           return {
             workspace: {
               ...state.workspace,
@@ -3331,13 +3836,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                             ...tab.toolbar,
                             ...patch,
                             visibility: patch.visibility
-                              ? { ...tab.toolbar?.visibility, ...patch.visibility }
+                              ? {
+                                  ...tab.toolbar?.visibility,
+                                  ...patch.visibility,
+                                }
                               : tab.toolbar?.visibility,
                             layout: patch.layout
                               ? { ...tab.toolbar?.layout, ...patch.layout }
                               : tab.toolbar?.layout,
                             appearance: patch.appearance
-                              ? { ...tab.toolbar?.appearance, ...patch.appearance }
+                              ? {
+                                  ...tab.toolbar?.appearance,
+                                  ...patch.appearance,
+                                }
                               : tab.toolbar?.appearance,
                           }),
                   },
@@ -3415,7 +3926,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => {
           if (
             state.chartListMembership &&
-            membershipFingerprint(state.chartListMembership) === membershipFingerprint(membership)
+            membershipFingerprint(state.chartListMembership) ===
+              membershipFingerprint(membership)
           ) {
             return state;
           }
@@ -3425,8 +3937,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state) => {
           const sameMembership =
             state.chartListMembership &&
-            membershipFingerprint(state.chartListMembership) === membershipFingerprint(membership);
-          const workspace = reconcileWorkspaceChartMembership(state.workspace, membership);
+            membershipFingerprint(state.chartListMembership) ===
+              membershipFingerprint(membership);
+          const workspace = reconcileWorkspaceChartMembership(
+            state.workspace,
+            membership,
+          );
           const workspaceChanged = workspace !== state.workspace;
           if (sameMembership && !workspaceChanged) return state;
           return {
@@ -3439,7 +3955,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }),
     }),
     {
-      name: 'bolsa-workspace-meta',
+      name: "bolsa-workspace-meta",
       partialize: (state) => ({
         activeWorkspaceId: state.activeWorkspaceId,
         recents: state.recents,

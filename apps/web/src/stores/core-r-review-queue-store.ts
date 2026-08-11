@@ -11,8 +11,8 @@
  * @see docs/UI_PREFS_LOCALSTORAGE.md
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import {
   type CoreRAction,
   type CoreRReport,
@@ -21,12 +21,12 @@ import {
   coreRNeedsAction,
   listCoreRActionRows,
   readCoreRReport,
-} from '@/features/backtests/core-r-judgment';
+} from "@/features/backtests/core-r-judgment";
 
-export const CORE_R_REVIEW_QUEUE_KEY = 'bolsa-core-r-review-queue-v1';
+export const CORE_R_REVIEW_QUEUE_KEY = "bolsa-core-r-review-queue-v1";
 export const CORE_R_REVIEW_QUEUE_MAX = 40;
 
-export type CoreRReviewQueueStatus = 'open' | 'done';
+export type CoreRReviewQueueStatus = "open" | "done";
 
 export type CoreRReviewQueueItem = {
   id: string;
@@ -70,7 +70,7 @@ function itemKey(listId: string, instrumentId: string): string {
 export function primaryCoreRAction(
   actions: ReadonlyArray<CoreRAction>,
 ): CoreRAction | null {
-  const withHref = actions.find((a) => a.href && a.id !== 'none');
+  const withHref = actions.find((a) => a.href && a.id !== "none");
   return withHref ?? null;
 }
 
@@ -87,13 +87,13 @@ export const useCoreRReviewQueueStore = create<CoreRReviewQueueState>()(
         ];
         if (actionRows.length === 0) return 0;
 
-        const timeframe = report?.timeframe ?? '1d';
+        const timeframe = report?.timeframe ?? "1d";
         const now = new Date().toISOString();
         let added = 0;
         set((s) => {
           const openKeys = new Set(
             s.items
-              .filter((i) => i.status === 'open')
+              .filter((i) => i.status === "open")
               .map((i) => itemKey(i.listId, i.instrumentId)),
           );
           const next = [...s.items];
@@ -112,12 +112,12 @@ export const useCoreRReviewQueueStore = create<CoreRReviewQueueState>()(
               actions: row.actions,
               timeframe,
               enqueuedAt: now,
-              status: 'open',
+              status: "open",
             });
             added += 1;
           }
-          const open = next.filter((i) => i.status === 'open');
-          const done = next.filter((i) => i.status === 'done');
+          const open = next.filter((i) => i.status === "open");
+          const done = next.filter((i) => i.status === "done");
           const trimmed = [...open, ...done].slice(0, CORE_R_REVIEW_QUEUE_MAX);
           return { items: trimmed };
         });
@@ -126,17 +126,17 @@ export const useCoreRReviewQueueStore = create<CoreRReviewQueueState>()(
       dismiss: (id) =>
         set((s) => ({
           items: s.items.map((i) =>
-            i.id === id ? { ...i, status: 'done' as const } : i,
+            i.id === id ? { ...i, status: "done" as const } : i,
           ),
         })),
       dismissOpen: (listId) => {
         let n = 0;
         set((s) => ({
           items: s.items.map((i) => {
-            if (i.status !== 'open') return i;
+            if (i.status !== "open") return i;
             if (listId && i.listId !== listId) return i;
             n += 1;
-            return { ...i, status: 'done' as const };
+            return { ...i, status: "done" as const };
           }),
         }));
         return n;
@@ -146,23 +146,24 @@ export const useCoreRReviewQueueStore = create<CoreRReviewQueueState>()(
         if (!instrumentId) return 0;
         set((s) => ({
           items: s.items.map((i) => {
-            if (i.status !== 'open' || i.instrumentId !== instrumentId) return i;
+            if (i.status !== "open" || i.instrumentId !== instrumentId)
+              return i;
             n += 1;
-            return { ...i, status: 'done' as const };
+            return { ...i, status: "done" as const };
           }),
         }));
         return n;
       },
       clearDone: () =>
-        set((s) => ({ items: s.items.filter((i) => i.status !== 'done') })),
+        set((s) => ({ items: s.items.filter((i) => i.status !== "done") })),
       clearList: (listId) =>
         set((s) => ({ items: s.items.filter((i) => i.listId !== listId) })),
       openForList: (listId) =>
-        get().items.filter((i) => i.listId === listId && i.status === 'open'),
+        get().items.filter((i) => i.listId === listId && i.status === "open"),
       openCount: (listId) => {
         const items = get().items;
-        if (!listId) return items.filter((i) => i.status === 'open').length;
-        return items.filter((i) => i.listId === listId && i.status === 'open')
+        if (!listId) return items.filter((i) => i.status === "open").length;
+        return items.filter((i) => i.listId === listId && i.status === "open")
           .length;
       },
     }),

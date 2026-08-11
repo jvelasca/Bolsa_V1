@@ -1,5 +1,5 @@
-import { createRandomId } from '@bolsa/shared';
-import { create } from 'zustand';
+import { createRandomId } from "@bolsa/shared";
+import { create } from "zustand";
 
 export interface AlertToast {
   id: string;
@@ -10,17 +10,20 @@ export interface AlertToast {
 
 export type AlertToastAction =
   | {
-      type: 'open_help_backtesting_monitor';
+      type: "open_help_backtesting_monitor";
       label?: string;
     }
   | {
-      type: 'open_asesor_opiniones';
+      type: "open_asesor_opiniones";
       label?: string;
     };
 
 interface AlertsState {
   toasts: AlertToast[];
-  pushToast: (message: string, opts?: { action?: AlertToastAction | null }) => void;
+  pushToast: (
+    message: string,
+    opts?: { action?: AlertToastAction | null },
+  ) => void;
   dismissToast: (id: string) => void;
 }
 

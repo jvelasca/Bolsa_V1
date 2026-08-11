@@ -3,24 +3,28 @@
  * Publicado desde Lista AUTO / CORE-R / Actualizar selección.
  */
 
-import { create } from 'zustand';
-import type { EstudioProcessLaneId } from '@/features/trading/estudio-process-status';
+import { create } from "zustand";
+import type { EstudioProcessLaneId } from "@/features/trading/estudio-process-status";
 import {
   ESTUDIO_PROCESS_RUNNING_EVENT,
   type EstudioProcessRunningDetail,
-} from '@/features/trading/estudio-process-status';
+} from "@/features/trading/estudio-process-status";
 
 type State = {
   instrumentId: string | null;
   lane: EstudioProcessLaneId | null;
-  setRunning: (instrumentId: string | null, lane: EstudioProcessLaneId | null) => void;
+  setRunning: (
+    instrumentId: string | null,
+    lane: EstudioProcessLaneId | null,
+  ) => void;
   clear: () => void;
 };
 
 function normalizeLane(
-  lane: EstudioProcessRunningDetail['lane'],
+  lane: EstudioProcessRunningDetail["lane"],
 ): EstudioProcessLaneId | null {
-  if (lane === 'vigilance' || lane === 'freshness' || lane === 'rediscover') return lane;
+  if (lane === "vigilance" || lane === "freshness" || lane === "rediscover")
+    return lane;
   return null;
 }
 
@@ -44,8 +48,11 @@ export function wireEstudioProcessRunningEvents(): () => void {
       useEstudioProcessRunningStore.getState().clear();
       return;
     }
-    useEstudioProcessRunningStore.getState().setRunning(detail.instrumentId, lane);
+    useEstudioProcessRunningStore
+      .getState()
+      .setRunning(detail.instrumentId, lane);
   };
   window.addEventListener(ESTUDIO_PROCESS_RUNNING_EVENT, onEvent);
-  return () => window.removeEventListener(ESTUDIO_PROCESS_RUNNING_EVENT, onEvent);
+  return () =>
+    window.removeEventListener(ESTUDIO_PROCESS_RUNNING_EVENT, onEvent);
 }

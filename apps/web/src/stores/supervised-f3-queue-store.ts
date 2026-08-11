@@ -15,8 +15,8 @@
  * @see PAPER_PATH_SUPERVISED
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type {
   AssessmentV1,
   EvidenceAssessmentV1,
@@ -25,7 +25,7 @@ import type {
   NewsAssessmentV1,
   RecommendationV1,
   TechnicalAssessmentV1,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 
 export type SupervisedProposePayload = RecommendationV1 & {
   technicalAssessment?: TechnicalAssessmentV1;
@@ -41,19 +41,19 @@ export type SupervisedProposePayload = RecommendationV1 & {
   /** Estrategia / señal de origen (Finalistas / Radar) para tenure Mandato. */
   strategyOrSignalRef?: string | null;
   strategyLabel?: string | null;
-  decisionSession?: import('@bolsa/shared').DecisionSessionV1;
-  weightContext?: import('@bolsa/shared').WeightContextV1;
+  decisionSession?: import("@bolsa/shared").DecisionSessionV1;
+  weightContext?: import("@bolsa/shared").WeightContextV1;
   combinedScore?: number;
 };
 
 export type SupervisedQueueOrigin =
-  | 'scan'
-  | 'finalists'
-  | 'chart'
-  | 'manual'
-  | 'alarm'
-  | 'operativa'
-  | 'asesor';
+  | "scan"
+  | "finalists"
+  | "chart"
+  | "manual"
+  | "alarm"
+  | "operativa"
+  | "asesor";
 
 export type SupervisedEnqueueMeta = {
   scanId?: string;
@@ -73,10 +73,13 @@ export interface SupervisedQueueItem {
 interface SupervisedF3QueueState {
   items: SupervisedQueueItem[];
   activeId: string | null;
-  enqueue: (payload: SupervisedProposePayload, meta?: SupervisedEnqueueMeta) => string;
+  enqueue: (
+    payload: SupervisedProposePayload,
+    meta?: SupervisedEnqueueMeta,
+  ) => string;
   enqueueMany: (
     payloads: SupervisedProposePayload[],
-    meta?: Omit<SupervisedEnqueueMeta, 'symbol'>,
+    meta?: Omit<SupervisedEnqueueMeta, "symbol">,
   ) => number;
   remove: (id: string) => void;
   /** ADR-024: quitar de Estudio → saca propuestas abiertas de ese instrumento. */
@@ -87,35 +90,37 @@ interface SupervisedF3QueueState {
 }
 
 export function resolveSupervisedQueueOrigin(
-  item: Pick<SupervisedQueueItem, 'origin' | 'scanId' | 'payload'>,
+  item: Pick<SupervisedQueueItem, "origin" | "scanId" | "payload">,
 ): SupervisedQueueOrigin {
   if (item.origin) return item.origin;
-  if (item.payload.source === 'finalists') return 'finalists';
-  if (item.scanId?.startsWith('finalists:')) return 'finalists';
-  if (item.payload.source === 'chart') return 'chart';
-  if (item.payload.source === 'alarm') return 'alarm';
-  if (item.payload.source === 'operativa') return 'operativa';
-  if (item.payload.source === 'asesor_alarma') return 'asesor';
-  if (item.scanId) return 'scan';
-  return 'manual';
+  if (item.payload.source === "finalists") return "finalists";
+  if (item.scanId?.startsWith("finalists:")) return "finalists";
+  if (item.payload.source === "chart") return "chart";
+  if (item.payload.source === "alarm") return "alarm";
+  if (item.payload.source === "operativa") return "operativa";
+  if (item.payload.source === "asesor_alarma") return "asesor";
+  if (item.scanId) return "scan";
+  return "manual";
 }
 
-export function supervisedQueueOriginLabel(origin: SupervisedQueueOrigin): string {
+export function supervisedQueueOriginLabel(
+  origin: SupervisedQueueOrigin,
+): string {
   switch (origin) {
-    case 'finalists':
-      return 'Finalistas';
-    case 'scan':
-      return 'Scan';
-    case 'chart':
-      return 'Gráfico';
-    case 'alarm':
-      return 'Alarma Radar';
-    case 'operativa':
-      return 'Operativa';
-    case 'asesor':
-      return 'Asesor';
+    case "finalists":
+      return "Finalistas";
+    case "scan":
+      return "Scan";
+    case "chart":
+      return "Gráfico";
+    case "alarm":
+      return "Alarma Radar";
+    case "operativa":
+      return "Operativa";
+    case "asesor":
+      return "Asesor";
     default:
-      return 'Manual';
+      return "Manual";
   }
 }
 
@@ -192,20 +197,20 @@ export const useSupervisedF3QueueStore = create<SupervisedF3QueueState>()(
         return s.items.find((i) => i.id === s.activeId) ?? s.items[0] ?? null;
       },
     }),
-    { name: 'bolsa-supervised-f3-queue' },
+    { name: "bolsa-supervised-f3-queue" },
   ),
 );
 
 export type OpenHelpAiPlatformOpts = {
   /** Scroll/focus al panel Supervisado F3 en Ayuda → Plataforma IA. */
-  panel?: 'supervised-f3';
+  panel?: "supervised-f3";
 };
 
 /** Abre Ayuda → Plataforma IA (escuchado por AppHelpMenu). */
 export function openHelpAiPlatform(opts?: OpenHelpAiPlatformOpts) {
   window.dispatchEvent(
-    new CustomEvent('bolsa:open-help', {
-      detail: { section: 'ai', panel: opts?.panel },
+    new CustomEvent("bolsa:open-help", {
+      detail: { section: "ai", panel: opts?.panel },
     }),
   );
 }

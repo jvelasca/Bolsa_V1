@@ -1,58 +1,60 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   resolveSupervisedQueueOrigin,
   supervisedQueueOriginLabel,
-} from '@/stores/supervised-f3-queue-store';
+} from "@/stores/supervised-f3-queue-store";
 
-describe('resolveSupervisedQueueOrigin', () => {
-  it('prefers explicit origin', () => {
+describe("resolveSupervisedQueueOrigin", () => {
+  it("prefers explicit origin", () => {
     expect(
       resolveSupervisedQueueOrigin({
-        origin: 'finalists',
-        scanId: 'scan-1',
-        payload: { source: 'x' } as never,
+        origin: "finalists",
+        scanId: "scan-1",
+        payload: { source: "x" } as never,
       }),
-    ).toBe('finalists');
+    ).toBe("finalists");
   });
 
-  it('detects finalists from payload.source or legacy scanId prefix', () => {
+  it("detects finalists from payload.source or legacy scanId prefix", () => {
     expect(
       resolveSupervisedQueueOrigin({
-        payload: { source: 'finalists' } as never,
+        payload: { source: "finalists" } as never,
       }),
-    ).toBe('finalists');
+    ).toBe("finalists");
     expect(
       resolveSupervisedQueueOrigin({
-        scanId: 'finalists:inst-1',
+        scanId: "finalists:inst-1",
         payload: {} as never,
       }),
-    ).toBe('finalists');
+    ).toBe("finalists");
   });
 
-  it('labels scan vs manual', () => {
+  it("labels scan vs manual", () => {
     expect(
       resolveSupervisedQueueOrigin({
-        scanId: 'abc',
+        scanId: "abc",
         payload: {} as never,
       }),
-    ).toBe('scan');
-    expect(resolveSupervisedQueueOrigin({ payload: {} as never })).toBe('manual');
-    expect(supervisedQueueOriginLabel('finalists')).toBe('Finalistas');
-    expect(supervisedQueueOriginLabel('scan')).toBe('Scan');
+    ).toBe("scan");
+    expect(resolveSupervisedQueueOrigin({ payload: {} as never })).toBe(
+      "manual",
+    );
+    expect(supervisedQueueOriginLabel("finalists")).toBe("Finalistas");
+    expect(supervisedQueueOriginLabel("scan")).toBe("Scan");
   });
 
-  it('resolves alarm origin from source or meta', () => {
+  it("resolves alarm origin from source or meta", () => {
     expect(
       resolveSupervisedQueueOrigin({
-        origin: 'alarm',
+        origin: "alarm",
         payload: {} as never,
       }),
-    ).toBe('alarm');
+    ).toBe("alarm");
     expect(
       resolveSupervisedQueueOrigin({
-        payload: { source: 'alarm' } as never,
+        payload: { source: "alarm" } as never,
       }),
-    ).toBe('alarm');
-    expect(supervisedQueueOriginLabel('alarm')).toBe('Alarma Radar');
+    ).toBe("alarm");
+    expect(supervisedQueueOriginLabel("alarm")).toBe("Alarma Radar");
   });
 });

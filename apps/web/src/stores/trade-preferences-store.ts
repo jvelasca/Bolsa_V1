@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface TradePreferencesState {
   confirmBeforeTrade: boolean;
@@ -12,6 +12,6 @@ export const useTradePreferencesStore = create<TradePreferencesState>()(
       confirmBeforeTrade: true,
       setConfirmBeforeTrade: (value) => set({ confirmBeforeTrade: value }),
     }),
-    { name: 'bolsa-trade-preferences' },
+    { name: "bolsa-trade-preferences" },
   ),
 );

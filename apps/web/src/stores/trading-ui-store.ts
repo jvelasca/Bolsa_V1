@@ -1,7 +1,7 @@
-import type { InstrumentWithMetaDto } from '@bolsa/shared';
-import { create } from 'zustand';
+import type { InstrumentWithMetaDto } from "@bolsa/shared";
+import { create } from "zustand";
 
-export type { PendingOrder } from '@/features/trading/use-pending-orders';
+export type { PendingOrder } from "@/features/trading/use-pending-orders";
 
 interface TradingUiState {
   expandedInstrumentIds: Record<string, boolean>;
@@ -32,12 +32,14 @@ export const useTradingUiStore = create<TradingUiState>((set, get) => ({
       },
     })),
 
-  isExpanded: (instrumentId) => Boolean(get().expandedInstrumentIds[instrumentId]),
+  isExpanded: (instrumentId) =>
+    Boolean(get().expandedInstrumentIds[instrumentId]),
 
   openOrderDialog: (instrument) => set({ orderInstrument: instrument }),
   closeOrderDialog: () => set({ orderInstrument: null }),
   openInfoDialog: (instrument) => set({ infoInstrument: instrument }),
   closeInfoDialog: () => set({ infoInstrument: null }),
-  openListMembershipDialog: (instrument) => set({ listMembershipInstrument: instrument }),
+  openListMembershipDialog: (instrument) =>
+    set({ listMembershipInstrument: instrument }),
   closeListMembershipDialog: () => set({ listMembershipInstrument: null }),
 }));

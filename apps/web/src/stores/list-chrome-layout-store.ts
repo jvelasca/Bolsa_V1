@@ -4,22 +4,22 @@
  *
  * localStorage: `bolsa-list-chrome-layout-v1`
  */
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type {
   ListColumnId,
   ListColumnLayoutItem,
   ListHubColumnId,
   ListHubColumnLayoutItem,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 import {
   clampListColumnWidth,
   clampListRowActionsWidth,
   DEFAULT_LIST_COLUMN_WIDTHS,
   DEFAULT_LIST_HUB_COLUMN_WIDTHS,
   clampListHubColumnWidth,
-} from '@bolsa/shared';
-import { clampListHubRowActionsWidth } from '@/lib/list-hub-column-layout';
+} from "@bolsa/shared";
+import { clampListHubRowActionsWidth } from "@/lib/list-hub-column-layout";
 
 type WidthMap = Partial<Record<string, number>>;
 
@@ -32,8 +32,15 @@ interface ListChromeLayoutState {
   hubRowActionsWidth: number | null;
   hubSeeded: boolean;
 
-  seedListWidthsIfNeeded: (listId: string, serverLayout: ListColumnLayoutItem[]) => void;
-  setListColumnWidth: (listId: string, columnId: ListColumnId, width: number) => void;
+  seedListWidthsIfNeeded: (
+    listId: string,
+    serverLayout: ListColumnLayoutItem[],
+  ) => void;
+  setListColumnWidth: (
+    listId: string,
+    columnId: ListColumnId,
+    width: number,
+  ) => void;
   seedRowActionsIfNeeded: (serverWidth: number) => void;
   setRowActionsWidth: (width: number) => void;
 
@@ -92,11 +99,16 @@ export const useListChromeLayoutStore = create<ListChromeLayoutState>()(
         if (get().hubSeeded) return;
         const hubWidths: WidthMap = {};
         for (const column of serverLayout) {
-          hubWidths[column.id] = clampListHubColumnWidth(column.width, column.id);
+          hubWidths[column.id] = clampListHubColumnWidth(
+            column.width,
+            column.id,
+          );
         }
         set({
           hubWidths,
-          hubRowActionsWidth: clampListHubRowActionsWidth(serverRowActionsWidth),
+          hubRowActionsWidth: clampListHubRowActionsWidth(
+            serverRowActionsWidth,
+          ),
           hubSeeded: true,
         });
       },
@@ -114,7 +126,7 @@ export const useListChromeLayoutStore = create<ListChromeLayoutState>()(
         set({ hubRowActionsWidth: clampListHubRowActionsWidth(width) });
       },
     }),
-    { name: 'bolsa-list-chrome-layout-v1' },
+    { name: "bolsa-list-chrome-layout-v1" },
   ),
 );
 
@@ -143,7 +155,10 @@ export function mergeHubColumnWidths(
   if (!hubSeeded) return serverLayout;
   return serverLayout.map((column) => ({
     ...column,
-    width: clampListHubColumnWidth(hubWidths[column.id] ?? column.width, column.id),
+    width: clampListHubColumnWidth(
+      hubWidths[column.id] ?? column.width,
+      column.id,
+    ),
   }));
 }
 
@@ -153,7 +168,9 @@ export function resolveLocalHubRowActionsWidth(serverWidth: number): number {
 }
 
 /** Anchos por defecto al persistir orden/visibilidad en el servidor (sin chrome del PC). */
-export function layoutForServerSync(layout: ListColumnLayoutItem[]): ListColumnLayoutItem[] {
+export function layoutForServerSync(
+  layout: ListColumnLayoutItem[],
+): ListColumnLayoutItem[] {
   return layout.map((column) => ({
     ...column,
     width: DEFAULT_LIST_COLUMN_WIDTHS[column.id] ?? column.width,

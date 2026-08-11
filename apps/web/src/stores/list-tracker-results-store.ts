@@ -1,6 +1,6 @@
-import type { ScanRunResultDto } from '@bolsa/shared';
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import type { ScanRunResultDto } from "@bolsa/shared";
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface CachedTrackerResult {
   result: ScanRunResultDto;
@@ -33,6 +33,6 @@ export const useListTrackerResultsStore = create<ListTrackerResultsState>()(
           return { byTrackerId: next };
         }),
     }),
-    { name: 'bolsa-list-tracker-results' },
+    { name: "bolsa-list-tracker-results" },
   ),
 );

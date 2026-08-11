@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { resolveApiBaseUrl } from '@/lib/api-base-url';
-import { clearVisualizationSession } from '@/stores/visualization-store';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { resolveApiBaseUrl } from "@/lib/api-base-url";
+import { clearVisualizationSession } from "@/stores/visualization-store";
 
 const API_URL = resolveApiBaseUrl();
 const AUTH_STATUS_TIMEOUT_MS = 8_000;
@@ -23,7 +23,9 @@ async function fetchAuthStatus(): Promise<Response> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AUTH_STATUS_TIMEOUT_MS);
   try {
-    return await fetch(`${API_URL}/api/auth/status`, { signal: controller.signal });
+    return await fetch(`${API_URL}/api/auth/status`, {
+      signal: controller.signal,
+    });
   } finally {
     clearTimeout(timeout);
   }
@@ -36,7 +38,8 @@ export const useAuthStore = create<AuthState>()(
       authEnabled: false,
       isHydrated: false,
       bootstrapError: null,
-      setSession: (token, authEnabled) => set({ token, authEnabled, bootstrapError: null }),
+      setSession: (token, authEnabled) =>
+        set({ token, authEnabled, bootstrapError: null }),
       clearSession: () => {
         clearVisualizationSession();
         set({ token: null });
@@ -63,11 +66,14 @@ export const useAuthStore = create<AuthState>()(
             return false;
           }
 
-          const body = (await response.json()) as { data: { authEnabled: boolean } };
+          const body = (await response.json()) as {
+            data: { authEnabled: boolean };
+          };
           set({ authEnabled: body.data.authEnabled, bootstrapError: null });
           return body.data.authEnabled;
         } catch (error) {
-          const timedOut = error instanceof DOMException && error.name === 'AbortError';
+          const timedOut =
+            error instanceof DOMException && error.name === "AbortError";
           set({
             authEnabled: false,
             bootstrapError: timedOut
@@ -79,23 +85,32 @@ export const useAuthStore = create<AuthState>()(
       },
       login: async (password: string) => {
         const response = await fetch(`${API_URL}/api/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password }),
         });
         if (!response.ok) {
-          const body = (await response.json().catch(() => null)) as { detail?: string } | null;
-          throw new Error(body?.detail ?? 'Contraseña incorrecta');
+          const body = (await response.json().catch(() => null)) as {
+            detail?: string;
+          } | null;
+          throw new Error(body?.detail ?? "Contraseña incorrecta");
         }
         const body = (await response.json()) as {
           data: { token: string; authEnabled: boolean };
         };
-        set({ token: body.data.token, authEnabled: body.data.authEnabled, bootstrapError: null });
+        set({
+          token: body.data.token,
+          authEnabled: body.data.authEnabled,
+          bootstrapError: null,
+        });
       },
     }),
     {
-      name: 'bolsa-auth',
-      partialize: (state) => ({ token: state.token, authEnabled: state.authEnabled }),
+      name: "bolsa-auth",
+      partialize: (state) => ({
+        token: state.token,
+        authEnabled: state.authEnabled,
+      }),
       onRehydrateStorage: () => () => {
         useAuthStore.setState({ isHydrated: true });
       },

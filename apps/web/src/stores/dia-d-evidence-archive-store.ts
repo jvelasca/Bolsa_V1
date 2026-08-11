@@ -6,11 +6,11 @@
  * @see features/trading/dia-d-evidence-archive-io.ts
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { DiaDSessionEvidenceV1 } from '@/features/trading/dia-d-session-evidence';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { DiaDSessionEvidenceV1 } from "@/features/trading/dia-d-session-evidence";
 
-export const DIA_D_EVIDENCE_ARCHIVE_KEY = 'bolsa-dia-d-evidence-archive-v1';
+export const DIA_D_EVIDENCE_ARCHIVE_KEY = "bolsa-dia-d-evidence-archive-v1";
 export const DIA_D_EVIDENCE_ARCHIVE_MAX = 30;
 
 export type DiaDEvidenceArchiveItem = {
@@ -33,7 +33,7 @@ export type DiaDEvidenceArchiveItem = {
 type DiaDEvidenceArchiveState = {
   items: DiaDEvidenceArchiveItem[];
   save: (
-    item: Omit<DiaDEvidenceArchiveItem, 'id' | 'savedAt'> & {
+    item: Omit<DiaDEvidenceArchiveItem, "id" | "savedAt"> & {
       id?: string;
       savedAt?: string;
     },

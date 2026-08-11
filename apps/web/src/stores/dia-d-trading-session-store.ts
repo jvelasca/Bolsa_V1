@@ -10,23 +10,23 @@
  * @see docs/engineering/dual-universes-lab-trading-design-2026-08-02.md
  */
 
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-export type DiaDTradingMode = 'manual' | 'semi' | 'auto';
+export type DiaDTradingMode = "manual" | "semi" | "auto";
 
 export type DiaDGateDecision = {
   tradeId: string;
   timestamp: string;
   side: string;
   price: number;
-  action: 'accept' | 'reject';
+  action: "accept" | "reject";
   decidedAt: string;
 };
 
 export type DiaDTradingSession = {
   /** Universo de producto (U5): siempre lab para verificación. */
-  universe: 'lab';
+  universe: "lab";
   instrumentId: string;
   symbol: string;
   strategyDefinitionId: string;
@@ -50,17 +50,17 @@ type DiaDTradingSessionState = {
   enterSession: (
     session: Omit<
       DiaDTradingSession,
-      'mode' | 'autoRunId' | 'gateDecisions' | 'fullBleedMovie' | 'universe'
+      "mode" | "autoRunId" | "gateDecisions" | "fullBleedMovie" | "universe"
     > & {
       mode?: DiaDTradingMode;
       fullBleedMovie?: boolean;
-      universe?: 'lab';
+      universe?: "lab";
     },
   ) => void;
   setMode: (mode: DiaDTradingMode) => void;
   setAutoRunId: (autoRunId: string | null) => void;
   setFullBleedMovie: (fullBleed: boolean) => void;
-  addGateDecision: (decision: Omit<DiaDGateDecision, 'decidedAt'>) => void;
+  addGateDecision: (decision: Omit<DiaDGateDecision, "decidedAt">) => void;
   clearGateDecisions: () => void;
   exitSession: () => void;
 };
@@ -72,7 +72,7 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
       enterSession: (input) =>
         set({
           session: {
-            universe: 'lab',
+            universe: "lab",
             instrumentId: input.instrumentId,
             symbol: input.symbol,
             strategyDefinitionId: input.strategyDefinitionId,
@@ -80,7 +80,7 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
             rank: input.rank,
             diaD: input.diaD,
             endDate: input.endDate,
-            mode: input.mode ?? 'auto',
+            mode: input.mode ?? "auto",
             autoRunId: null,
             gateDecisions: [],
             fullBleedMovie: input.fullBleedMovie ?? false,
@@ -91,7 +91,9 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
       setAutoRunId: (autoRunId) =>
         set((s) => (s.session ? { session: { ...s.session, autoRunId } } : s)),
       setFullBleedMovie: (fullBleedMovie) =>
-        set((s) => (s.session ? { session: { ...s.session, fullBleedMovie } } : s)),
+        set((s) =>
+          s.session ? { session: { ...s.session, fullBleedMovie } } : s,
+        ),
       addGateDecision: (decision) =>
         set((s) => {
           if (!s.session) return s;
@@ -99,7 +101,9 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
             ...decision,
             decidedAt: new Date().toISOString(),
           };
-          const without = s.session.gateDecisions.filter((d) => d.tradeId !== decision.tradeId);
+          const without = s.session.gateDecisions.filter(
+            (d) => d.tradeId !== decision.tradeId,
+          );
           return {
             session: { ...s.session, gateDecisions: [...without, next] },
           };
@@ -111,18 +115,20 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
       exitSession: () => set({ session: null }),
     }),
     {
-      name: 'bolsa-dia-d-trading-session-v1',
+      name: "bolsa-dia-d-trading-session-v1",
       partialize: (s) => {
         if (!s.session) return { session: null };
         const { fullBleedMovie: _omit, ...rest } = s.session;
-        return { session: { ...rest, universe: 'lab' as const, fullBleedMovie: false } };
+        return {
+          session: { ...rest, universe: "lab" as const, fullBleedMovie: false },
+        };
       },
       merge: (persisted, current) => {
         const stored = (persisted ?? {}) as Partial<DiaDTradingSessionState>;
         const session = stored.session
           ? {
               ...stored.session,
-              universe: 'lab' as const,
+              universe: "lab" as const,
               gateDecisions: Array.isArray(stored.session.gateDecisions)
                 ? stored.session.gateDecisions
                 : [],
@@ -136,7 +142,7 @@ export const useDiaDTradingSessionStore = create<DiaDTradingSessionState>()(
 );
 
 export const DIA_D_MODE_LABELS: Record<DiaDTradingMode, string> = {
-  manual: 'Manual',
-  semi: 'Semi',
-  auto: 'Auto',
+  manual: "Manual",
+  semi: "Semi",
+  auto: "Auto",
 };

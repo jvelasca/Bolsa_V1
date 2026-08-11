@@ -4,7 +4,7 @@
  * Evita import circular: workspace no importa ui-store directamente.
  * El registro ocurre una vez al arrancar (`WorkspaceUiBridgeRegister`).
  */
-import type { ChartInspectorNavigateRequest } from '@/features/charts/chart-inspector-nav';
+import type { ChartInspectorNavigateRequest } from "@/features/charts/chart-inspector-nav";
 
 export interface WorkspaceUiBridge {
   getOpenDrawingEditorId: () => string | null;
