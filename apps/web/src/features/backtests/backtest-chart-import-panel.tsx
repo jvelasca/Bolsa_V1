@@ -1,16 +1,22 @@
-import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   BACKTEST_STRATEGIES,
   serializeChartTabToStrategyDraft,
   type BacktestStrategyType,
   type ChartStrategySetupDraft,
-} from '@bolsa/shared';
-import { cn } from '@/lib/utils';
-import { buttonVariants } from '@/components/ui/button';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useActiveChartTab } from '@/stores/workspace-store';
+} from "@bolsa/shared";
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useActiveChartTab } from "@/stores/workspace-store";
 
 export interface ChartSetupImportActions {
   onApply: (draft: ChartStrategySetupDraft) => void;
@@ -35,12 +41,14 @@ export function BacktestChartImportPanel({
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Gráfico activo</CardTitle>
-          <CardDescription>Abre un instrumento en Trading para importar su setup.</CardDescription>
+          <CardDescription>
+            Abre un instrumento en Trading para importar su setup.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Link
             to="/trading"
-            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             Ir a Trading
           </Link>
@@ -49,7 +57,7 @@ export function BacktestChartImportPanel({
     );
   }
 
-  const saveName = `${activeTab.label} · ${draft?.inferredPresetKey ?? 'setup'}`;
+  const saveName = `${activeTab.label} · ${draft?.inferredPresetKey ?? "setup"}`;
 
   return (
     <Card>
@@ -63,7 +71,9 @@ export function BacktestChartImportPanel({
         {draft && (
           <>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Indicadores</p>
+              <p className="text-xs font-medium text-muted-foreground">
+                Indicadores
+              </p>
               {draft.indicatorLabels.length === 0 ? (
                 <p className="text-muted-foreground">Ninguno visible</p>
               ) : (
@@ -77,8 +87,12 @@ export function BacktestChartImportPanel({
 
             {draft.inferredPresetKey && (
               <p className="text-xs text-primary">
-                Preset detectado:{' '}
-                {BACKTEST_STRATEGIES[draft.inferredPresetKey as BacktestStrategyType].label}
+                Preset detectado:{" "}
+                {
+                  BACKTEST_STRATEGIES[
+                    draft.inferredPresetKey as BacktestStrategyType
+                  ].label
+                }
               </p>
             )}
 
@@ -105,7 +119,7 @@ export function BacktestChartImportPanel({
                 disabled={isSaving || draft.indicatorSpecs.length === 0}
                 onClick={() => onSaveStrategy(draft, saveName)}
               >
-                {isSaving ? 'Guardando…' : 'Guardar estrategia'}
+                {isSaving ? "Guardando…" : "Guardar estrategia"}
               </Button>
             </div>
           </>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from "react";
 import {
   AreaSeries,
   ColorType,
@@ -10,21 +10,21 @@ import {
   type ISeriesApi,
   type SeriesMarker,
   type Time,
-} from 'lightweight-charts';
-import type { BacktestEquityPointDto, BacktestTradeDto } from '@bolsa/shared';
-import { barTimeToChartTime } from '@/features/charts/chart-utils';
-import { observeStableSize } from '@/features/charts/chart-stable-resize';
+} from "lightweight-charts";
+import type { BacktestEquityPointDto, BacktestTradeDto } from "@bolsa/shared";
+import { barTimeToChartTime } from "@/features/charts/chart-utils";
+import { observeStableSize } from "@/features/charts/chart-stable-resize";
 import {
   marginsForZoom,
   PRICE_SCALE_MIN_WIDTH_PX,
   stepScaleZoom,
-} from '@/features/charts/chart-scale-utils';
+} from "@/features/charts/chart-scale-utils";
 import {
   attachChartScaleDrag,
   attachChartScaleInteraction,
   type ChartScaleZoomHandlers,
-} from '@/features/charts/chart-scale-wheel';
-import { cn } from '@/lib/utils';
+} from "@/features/charts/chart-scale-wheel";
+import { cn } from "@/lib/utils";
 
 interface BacktestEquityChartProps {
   points: BacktestEquityPointDto[];
@@ -35,28 +35,38 @@ interface BacktestEquityChartProps {
   /** Movie sync: only draw equity up to this bar (inclusive). */
   untilTimestamp?: string | null;
   /** Fixed px height, or fill the parent (ResizeObserver). */
-  height?: number | 'fill';
+  height?: number | "fill";
   className?: string;
 }
 
 function chartTimeKey(time: Time): string {
-  return typeof time === 'object' ? `${time.year}-${time.month}-${time.day}` : String(time);
+  return typeof time === "object"
+    ? `${time.year}-${time.month}-${time.day}`
+    : String(time);
 }
 
 /** lightweight-charts requires strictly ascending unique times. */
 function toOrderedLineData(
   points: BacktestEquityPointDto[],
 ): Array<{ time: Time; value: number; timestamp: string }> {
-  const byTime = new Map<string, { time: Time; value: number; timestamp: string }>();
+  const byTime = new Map<
+    string,
+    { time: Time; value: number; timestamp: string }
+  >();
   for (const point of points) {
     const time = barTimeToChartTime(point.timestamp) as Time;
-    byTime.set(chartTimeKey(time), { time, value: point.equity, timestamp: point.timestamp });
+    byTime.set(chartTimeKey(time), {
+      time,
+      value: point.equity,
+      timestamp: point.timestamp,
+    });
   }
   return [...byTime.values()].sort((a, b) => {
     const ka = chartTimeKey(a.time);
     const kb = chartTimeKey(b.time);
     if (ka === kb) return 0;
-    if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
+    if (typeof a.time === "number" && typeof b.time === "number")
+      return a.time - b.time;
     return ka < kb ? -1 : 1;
   });
 }
@@ -85,23 +95,25 @@ export function BacktestEquityChart({
   height = 220,
   className,
 }: BacktestEquityChartProps) {
-  const fillParent = height === 'fill';
+  const fillParent = height === "fill";
   const shellRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const lineRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const baselineRef = useRef<ISeriesApi<'Line'> | null>(null);
-  const ddRef = useRef<ISeriesApi<'Area'> | null>(null);
+  const lineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const baselineRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const ddRef = useRef<ISeriesApi<"Area"> | null>(null);
   const [measuredHeight, setMeasuredHeight] = useState(200);
   const chartHeight = fillParent ? measuredHeight : height;
   const scaleZoomRef = useRef(1);
-  const scaleHandlersRef = useRef<ChartScaleZoomHandlers>({ onVerticalZoom: () => {} });
+  const scaleHandlersRef = useRef<ChartScaleZoomHandlers>({
+    onVerticalZoom: () => {},
+  });
 
   scaleHandlersRef.current = {
     onVerticalZoom: (direction) => {
       const next = stepScaleZoom(scaleZoomRef.current, direction);
       scaleZoomRef.current = next;
-      chartRef.current?.priceScale('right').applyOptions({
+      chartRef.current?.priceScale("right").applyOptions({
         minimumWidth: PRICE_SCALE_MIN_WIDTH_PX,
         scaleMargins: marginsForZoom(next),
       });
@@ -130,20 +142,24 @@ export function BacktestEquityChart({
       width: Math.max(1, container.clientWidth),
       height: Math.max(120, chartHeight),
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#94a3b8',
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: "#94a3b8",
         fontSize: 11,
       },
       grid: {
-        vertLines: { color: 'rgba(148, 163, 184, 0.12)' },
-        horzLines: { color: 'rgba(148, 163, 184, 0.12)' },
+        vertLines: { color: "rgba(148, 163, 184, 0.12)" },
+        horzLines: { color: "rgba(148, 163, 184, 0.12)" },
       },
       rightPriceScale: {
         borderVisible: false,
         minimumWidth: PRICE_SCALE_MIN_WIDTH_PX,
         scaleMargins: marginsForZoom(scaleZoomRef.current),
       },
-      timeScale: { borderVisible: false, fixLeftEdge: true, fixRightEdge: true },
+      timeScale: {
+        borderVisible: false,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+      },
       crosshair: { mode: CrosshairMode.Magnet },
       handleScroll: false,
       handleScale: {
@@ -155,14 +171,14 @@ export function BacktestEquityChart({
     });
 
     const line = chart.addSeries(LineSeries, {
-      color: '#38bdf8',
+      color: "#38bdf8",
       lineWidth: 2,
       priceLineVisible: false,
       lastValueVisible: true,
     });
 
     const baseline = chart.addSeries(LineSeries, {
-      color: 'rgba(148, 163, 184, 0.45)',
+      color: "rgba(148, 163, 184, 0.45)",
       lineWidth: 1,
       lineStyle: 2,
       priceLineVisible: false,
@@ -171,19 +187,19 @@ export function BacktestEquityChart({
     });
 
     const dd = chart.addSeries(AreaSeries, {
-      topColor: 'rgba(239, 68, 68, 0.28)',
-      bottomColor: 'rgba(239, 68, 68, 0.02)',
-      lineColor: '#f87171',
+      topColor: "rgba(239, 68, 68, 0.28)",
+      bottomColor: "rgba(239, 68, 68, 0.02)",
+      lineColor: "#f87171",
       lineWidth: 1,
-      priceScaleId: 'dd',
+      priceScaleId: "dd",
       priceLineVisible: false,
       lastValueVisible: true,
       crosshairMarkerVisible: false,
     });
-    chart.priceScale('right').applyOptions({
+    chart.priceScale("right").applyOptions({
       scaleMargins: { top: 0.08, bottom: 0.32 },
     });
-    chart.priceScale('dd').applyOptions({
+    chart.priceScale("dd").applyOptions({
       scaleMargins: { top: 0.72, bottom: 0.02 },
       borderVisible: false,
     });
@@ -247,7 +263,11 @@ export function BacktestEquityChart({
     const firstTime = lineData[0]?.time;
     const lastTime = lineData[lineData.length - 1]?.time;
     // Same timestamp twice crashes LWC ("data must be asc ordered by time").
-    if (firstTime != null && lastTime != null && chartTimeKey(firstTime) !== chartTimeKey(lastTime)) {
+    if (
+      firstTime != null &&
+      lastTime != null &&
+      chartTimeKey(firstTime) !== chartTimeKey(lastTime)
+    ) {
       baseline.setData([
         { time: firstTime, value: initialCash },
         { time: lastTime, value: initialCash },
@@ -258,7 +278,9 @@ export function BacktestEquityChart({
       baseline.setData([]);
     }
 
-    const tradeByTime = new Map(trades.map((trade) => [trade.timestamp, trade]));
+    const tradeByTime = new Map(
+      trades.map((trade) => [trade.timestamp, trade]),
+    );
     const markers: SeriesMarker<Time>[] = [];
     const markerTimes = new Set<string>();
     for (const point of lineData) {
@@ -270,10 +292,20 @@ export function BacktestEquityChart({
       const focused = focusTimestamp === point.timestamp;
       markers.push({
         time: point.time,
-        position: trade.type === 'buy' ? 'belowBar' : 'aboveBar',
-        color: focused ? '#fbbf24' : trade.type === 'buy' ? '#22c55e' : '#ef4444',
-        shape: trade.type === 'buy' ? 'arrowUp' : 'arrowDown',
-        text: focused ? (trade.type === 'buy' ? 'B★' : 'S★') : trade.type === 'buy' ? 'B' : 'S',
+        position: trade.type === "buy" ? "belowBar" : "aboveBar",
+        color: focused
+          ? "#fbbf24"
+          : trade.type === "buy"
+            ? "#22c55e"
+            : "#ef4444",
+        shape: trade.type === "buy" ? "arrowUp" : "arrowDown",
+        text: focused
+          ? trade.type === "buy"
+            ? "B★"
+            : "S★"
+          : trade.type === "buy"
+            ? "B"
+            : "S",
       });
     }
     createSeriesMarkers(line, markers);
@@ -286,7 +318,9 @@ export function BacktestEquityChart({
     if (focusTimestamp) {
       const focusedPoint =
         lineData.find((point) => point.timestamp === focusTimestamp) ??
-        [...lineData].reverse().find((point) => point.timestamp <= focusTimestamp);
+        [...lineData]
+          .reverse()
+          .find((point) => point.timestamp <= focusTimestamp);
       if (focusedPoint) {
         chart.setCrosshairPosition(focusedPoint.value, focusedPoint.time, line);
       }
@@ -310,7 +344,8 @@ export function BacktestEquityChart({
   if (points.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-        Curva de patrimonio no disponible (run anterior a BT-4). Ejecuta una simulación nueva.
+        Curva de patrimonio no disponible (run anterior a BT-4). Ejecuta una
+        simulación nueva.
       </p>
     );
   }
@@ -319,8 +354,8 @@ export function BacktestEquityChart({
     <div
       ref={containerRef}
       className={cn(
-        'w-full overflow-hidden rounded-lg border border-border bg-card/40',
-        fillParent && 'h-full min-h-0',
+        "w-full overflow-hidden rounded-lg border border-border bg-card/40",
+        fillParent && "h-full min-h-0",
         className,
       )}
       style={fillParent ? undefined : { height }}

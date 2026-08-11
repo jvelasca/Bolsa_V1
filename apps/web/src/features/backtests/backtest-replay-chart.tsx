@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   CandlestickSeries,
   ColorType,
@@ -12,35 +19,40 @@ import {
   type MouseEventParams,
   type SeriesMarker,
   type Time,
-} from 'lightweight-charts';
-import { Pause, Play, RotateCcw, SkipBack, SkipForward } from 'lucide-react';
-import type { BacktestRunDetailDto, BacktestTradeDto, DrawingReplayMarkerDto, OhlcvBarDto } from '@bolsa/shared';
+} from "lightweight-charts";
+import { Pause, Play, RotateCcw, SkipBack, SkipForward } from "lucide-react";
+import type {
+  BacktestRunDetailDto,
+  BacktestTradeDto,
+  DrawingReplayMarkerDto,
+  OhlcvBarDto,
+} from "@bolsa/shared";
 import {
   BacktestCursorPanel,
   type BacktestCursorSnapshot,
-} from '@/features/backtests/backtest-cursor-panel';
-import { formatDateDdMmYyyy } from '@/features/backtests/backtest-date-format';
+} from "@/features/backtests/backtest-cursor-panel";
+import { formatDateDdMmYyyy } from "@/features/backtests/backtest-date-format";
 import type {
   BacktestCursorFieldId,
   BacktestCursorPanelPos,
-} from '@/features/backtests/backtest-hud-prefs';
+} from "@/features/backtests/backtest-hud-prefs";
 import {
   openPositionAt,
   unrealizedFromEntry,
-} from '@/features/backtests/backtest-movie-stats';
+} from "@/features/backtests/backtest-movie-stats";
 import {
   barsToChartSeries,
   barTimeToChartTime,
   CHART_THEME,
   formatPrice,
-} from '@/features/charts/chart-utils';
-import { observeStableSize } from '@/features/charts/chart-stable-resize';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+} from "@/features/charts/chart-utils";
+import { observeStableSize } from "@/features/charts/chart-stable-resize";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 function snapshotFromBar(
   bar: OhlcvBarDto,
-  trades: BacktestRunDetailDto['trades'],
+  trades: BacktestRunDetailDto["trades"],
 ): BacktestCursorSnapshot {
   const open = openPositionAt(trades, bar.timestamp);
   const base: BacktestCursorSnapshot = {
@@ -88,11 +100,16 @@ interface BacktestReplayChartProps {
   /** When true, show the full window with all trade arrows first (Phase B). */
   initialShowAll?: boolean;
   /** Fixed px height, or fill the parent (ResizeObserver). */
-  height?: number | 'fill';
+  height?: number | "fill";
   /** Last visible bar timestamp — drives live ops list / equity movie sync. */
   onReplayCursorChange?: (
     timestamp: string | null,
-    meta: { playing: boolean; atEnd: boolean; barIndex: number; barTotal: number },
+    meta: {
+      playing: boolean;
+      atEnd: boolean;
+      barIndex: number;
+      barTotal: number;
+    },
   ) => void;
   /** Stats / balance HUD en la misma fila que el transporte (wrap si no cabe). */
   movieHud?: ReactNode;
@@ -116,7 +133,10 @@ function dayKey(timestamp: string): string {
   return timestamp.slice(0, 10);
 }
 
-function barsInRunWindow(bars: OhlcvBarDto[], detail: BacktestRunDetailDto): OhlcvBarDto[] {
+function barsInRunWindow(
+  bars: OhlcvBarDto[],
+  detail: BacktestRunDetailDto,
+): OhlcvBarDto[] {
   const from = dayKey(detail.firstDate);
   const to = dayKey(detail.lastDate);
   const inWindow = bars.filter((bar) => {
@@ -127,7 +147,10 @@ function barsInRunWindow(bars: OhlcvBarDto[], detail: BacktestRunDetailDto): Ohl
 }
 
 /** Exact match, else last bar at or before timestamp, else 0. */
-export function indexForTimestamp(bars: OhlcvBarDto[], timestamp: string): number {
+export function indexForTimestamp(
+  bars: OhlcvBarDto[],
+  timestamp: string,
+): number {
   const exact = bars.findIndex((bar) => bar.timestamp === timestamp);
   if (exact >= 0) return exact;
   let best = -1;
@@ -157,7 +180,7 @@ export function BacktestReplayChart({
   pauseTrades,
 }: BacktestReplayChartProps) {
   const runBars = useMemo(() => barsInRunWindow(bars, detail), [bars, detail]);
-  const fillParent = height === 'fill';
+  const fillParent = height === "fill";
   const [measuredHeight, setMeasuredHeight] = useState(280);
   const chartHeight = fillParent ? measuredHeight : height;
 
@@ -171,10 +194,13 @@ export function BacktestReplayChart({
     [initialShowAll],
   );
 
-  const [visibleCount, setVisibleCount] = useState(() => startCount(runBars.length));
+  const [visibleCount, setVisibleCount] = useState(() =>
+    startCount(runBars.length),
+  );
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState<ReplaySpeed>(1);
-  const [cursorSnapshot, setCursorSnapshot] = useState<BacktestCursorSnapshot | null>(null);
+  const [cursorSnapshot, setCursorSnapshot] =
+    useState<BacktestCursorSnapshot | null>(null);
 
   const shellRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -185,7 +211,7 @@ export function BacktestReplayChart({
   const tradesRef = useRef(proposalTrades);
   tradesRef.current = proposalTrades;
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   const markersCacheRef = useRef<SeriesMarker<Time>[]>([]);
   const prevVisibleCountRef = useRef(0);
@@ -270,8 +296,8 @@ export function BacktestReplayChart({
       width: Math.max(1, container.clientWidth),
       height: Math.max(160, chartHeight),
       layout: {
-        background: { type: ColorType.Solid, color: 'transparent' },
-        textColor: '#94a3b8',
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor: "#94a3b8",
         fontSize: 11,
       },
       grid: {
@@ -281,13 +307,13 @@ export function BacktestReplayChart({
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false },
       localization: {
-        locale: 'es-ES',
+        locale: "es-ES",
         timeFormatter: (time: Time) => {
-          if (typeof time === 'string') return formatDateDdMmYyyy(time);
-          if (typeof time === 'number') {
+          if (typeof time === "string") return formatDateDdMmYyyy(time);
+          if (typeof time === "number") {
             return formatDateDdMmYyyy(new Date(time * 1000).toISOString());
           }
-          return `${String(time.day).padStart(2, '0')}/${String(time.month).padStart(2, '0')}/${time.year}`;
+          return `${String(time.day).padStart(2, "0")}/${String(time.month).padStart(2, "0")}/${time.year}`;
         },
         priceFormatter: (price: number) => formatPrice(price),
       },
@@ -298,16 +324,16 @@ export function BacktestReplayChart({
           labelVisible: true,
           width: 1,
           style: LineStyle.Solid,
-          color: 'rgba(56, 189, 248, 0.65)',
-          labelBackgroundColor: '#0f172a',
+          color: "rgba(56, 189, 248, 0.65)",
+          labelBackgroundColor: "#0f172a",
         },
         horzLine: {
           visible: true,
           labelVisible: true,
           width: 1,
           style: LineStyle.Solid,
-          color: 'rgba(56, 189, 248, 0.65)',
-          labelBackgroundColor: '#0f172a',
+          color: "rgba(56, 189, 248, 0.65)",
+          labelBackgroundColor: "#0f172a",
         },
       },
     });
@@ -339,7 +365,10 @@ export function BacktestReplayChart({
 
       const logical = chart.timeScale().coordinateToLogical(param.point.x);
       if (logical == null) return;
-      const idx = Math.max(0, Math.min(runBarsRef.current.length - 1, Math.round(logical)));
+      const idx = Math.max(
+        0,
+        Math.min(runBarsRef.current.length - 1, Math.round(logical)),
+      );
       const bar = runBarsRef.current[idx];
       if (!bar) return;
       setCursorSnapshot(snapshotFromBar(bar, tradesRef.current));
@@ -386,20 +415,20 @@ export function BacktestReplayChart({
           const focused = focusTimestamp === bar.timestamp;
           markers.push({
             time: barTimeToChartTime(bar.timestamp) as Time,
-            position: trade.type === 'buy' ? 'belowBar' : 'aboveBar',
+            position: trade.type === "buy" ? "belowBar" : "aboveBar",
             color: focused
-              ? '#fbbf24'
-              : trade.type === 'buy'
+              ? "#fbbf24"
+              : trade.type === "buy"
                 ? CHART_THEME.upColor
                 : CHART_THEME.downColor,
-            shape: trade.type === 'buy' ? 'arrowUp' : 'arrowDown',
+            shape: trade.type === "buy" ? "arrowUp" : "arrowDown",
             text: focused
-              ? trade.type === 'buy'
-                ? 'B★'
-                : 'S★'
-              : trade.type === 'buy'
-                ? 'B'
-                : 'S',
+              ? trade.type === "buy"
+                ? "B★"
+                : "S★"
+              : trade.type === "buy"
+                ? "B"
+                : "S",
           });
         }
         const drawings = drawingByTime.get(bar.timestamp);
@@ -407,10 +436,10 @@ export function BacktestReplayChart({
           for (const marker of drawings) {
             markers.push({
               time: barTimeToChartTime(marker.timestamp) as Time,
-              position: marker.direction === 'up' ? 'belowBar' : 'aboveBar',
-              color: marker.direction === 'up' ? '#a855f7' : '#f59e0b',
-              shape: 'circle',
-              text: marker.direction === 'up' ? '↑' : '↓',
+              position: marker.direction === "up" ? "belowBar" : "aboveBar",
+              color: marker.direction === "up" ? "#a855f7" : "#f59e0b",
+              shape: "circle",
+              text: marker.direction === "up" ? "↑" : "↓",
             });
           }
         }
@@ -474,7 +503,10 @@ export function BacktestReplayChart({
 
     const prev = prevVisibleCountRef.current;
     const canIncremental =
-      playingRef.current && prev > 0 && clampedCount > prev && clampedCount - prev <= 8;
+      playingRef.current &&
+      prev > 0 &&
+      clampedCount > prev &&
+      clampedCount - prev <= 8;
 
     const showAllRevealed = () => {
       // Critical: scrollToRealTime zooms to ~2 candles. Show the full movie so far.
@@ -497,10 +529,13 @@ export function BacktestReplayChart({
             ...markersCacheRef.current,
             {
               time: barTimeToChartTime(bar.timestamp) as Time,
-              position: trade.type === 'buy' ? 'belowBar' : 'aboveBar',
-              color: trade.type === 'buy' ? CHART_THEME.upColor : CHART_THEME.downColor,
-              shape: trade.type === 'buy' ? 'arrowUp' : 'arrowDown',
-              text: trade.type === 'buy' ? 'B' : 'S',
+              position: trade.type === "buy" ? "belowBar" : "aboveBar",
+              color:
+                trade.type === "buy"
+                  ? CHART_THEME.upColor
+                  : CHART_THEME.downColor,
+              shape: trade.type === "buy" ? "arrowUp" : "arrowDown",
+              text: trade.type === "buy" ? "B" : "S",
             },
           ];
         }
@@ -511,10 +546,10 @@ export function BacktestReplayChart({
               ...markersCacheRef.current,
               {
                 time: barTimeToChartTime(marker.timestamp) as Time,
-                position: marker.direction === 'up' ? 'belowBar' : 'aboveBar',
-                color: marker.direction === 'up' ? '#a855f7' : '#f59e0b',
-                shape: 'circle',
-                text: marker.direction === 'up' ? '↑' : '↓',
+                position: marker.direction === "up" ? "belowBar" : "aboveBar",
+                color: marker.direction === "up" ? "#a855f7" : "#f59e0b",
+                shape: "circle",
+                text: marker.direction === "up" ? "↑" : "↓",
               },
             ];
           }
@@ -533,7 +568,10 @@ export function BacktestReplayChart({
       if (markersRef.current) {
         markersRef.current.setMarkers(markersCacheRef.current);
       } else {
-        markersRef.current = createSeriesMarkers(series, markersCacheRef.current);
+        markersRef.current = createSeriesMarkers(
+          series,
+          markersCacheRef.current,
+        );
       }
       showAllRevealed();
     }
@@ -594,7 +632,9 @@ export function BacktestReplayChart({
           for (let i = current; i < target; i += 1) {
             const bar = runBarsRef.current[i];
             if (!bar) continue;
-            const trade = tradesRef.current.find((t) => t.timestamp === bar.timestamp);
+            const trade = tradesRef.current.find(
+              (t) => t.timestamp === bar.timestamp,
+            );
             if (trade && !gatedTradeIdsRef.current.has(trade.id)) {
               gatedTradeIdsRef.current.add(trade.id);
               setPlaying(false);
@@ -621,7 +661,9 @@ export function BacktestReplayChart({
   const step = useCallback(
     (delta: number) => {
       setPlaying(false);
-      setVisibleCount((current) => Math.max(1, Math.min(runBars.length, current + delta)));
+      setVisibleCount((current) =>
+        Math.max(1, Math.min(runBars.length, current + delta)),
+      );
     },
     [runBars.length],
   );
@@ -629,7 +671,8 @@ export function BacktestReplayChart({
   if (runBars.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-        No hay barras OHLCV en el período del run ({detail.firstDate} → {detail.lastDate}).
+        No hay barras OHLCV en el período del run ({detail.firstDate} →{" "}
+        {detail.lastDate}).
       </p>
     );
   }
@@ -648,11 +691,19 @@ export function BacktestReplayChart({
               variant="outline"
               className="h-8 w-8 p-0"
               aria-label={
-                playing ? 'Pausar replay' : atEnd ? 'Reproducir desde el inicio' : 'Reproducir replay'
+                playing
+                  ? "Pausar replay"
+                  : atEnd
+                    ? "Reproducir desde el inicio"
+                    : "Reproducir replay"
               }
               onClick={togglePlay}
             >
-              {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              {playing ? (
+                <Pause className="h-4 w-4" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
             </Button>
             <Button
               type="button"
@@ -705,7 +756,9 @@ export function BacktestReplayChart({
                 value={speed}
                 aria-label="Velocidad de reproducción"
                 className="h-8 rounded-md border border-border bg-background px-1.5 text-foreground"
-                onChange={(event) => setSpeed(Number(event.target.value) as ReplaySpeed)}
+                onChange={(event) =>
+                  setSpeed(Number(event.target.value) as ReplaySpeed)
+                }
               >
                 {REPLAY_SPEEDS.map((value) => (
                   <option key={value} value={value}>
@@ -718,7 +771,9 @@ export function BacktestReplayChart({
         </div>
 
         {movieHud ? (
-          <div className="min-w-0 flex-1 basis-[min(100%,22rem)]">{movieHud}</div>
+          <div className="min-w-0 flex-1 basis-[min(100%,22rem)]">
+            {movieHud}
+          </div>
         ) : (
           <span className="ml-auto text-base font-semibold tabular-nums text-foreground">
             {formatDateDdMmYyyy(lastVisibleTimestamp)}
@@ -731,7 +786,7 @@ export function BacktestReplayChart({
         min={1}
         max={runBars.length}
         value={clampedCount}
-        className={cn('w-full accent-sky-500')}
+        className={cn("w-full accent-sky-500")}
         aria-label="Posición del replay"
         onChange={(event) => {
           setPlaying(false);

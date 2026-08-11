@@ -1,13 +1,19 @@
-import { GripVertical } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { BacktestFavoritesMenu } from '@/features/backtests/backtest-favorites-menu';
+import { GripVertical } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
+import { BacktestFavoritesMenu } from "@/features/backtests/backtest-favorites-menu";
 import {
   BACKTEST_CURSOR_FIELD_OPTIONS,
   type BacktestCursorFieldId,
   type BacktestCursorPanelPos,
-} from '@/features/backtests/backtest-hud-prefs';
-import { formatPct, formatPrice } from '@/features/charts/chart-utils';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/backtest-hud-prefs";
+import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { cn } from "@/lib/utils";
 
 export type BacktestCursorSnapshot = {
   dateLabel: string;
@@ -40,18 +46,18 @@ function Row({
 }: {
   label: string;
   value: string;
-  tone?: 'good' | 'bad' | 'neutral';
+  tone?: "good" | "bad" | "neutral";
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3 text-[11px] leading-snug">
       <span className="text-muted-foreground">{label}</span>
       <span
         className={cn(
-          'tabular-nums font-medium',
-          tone === 'good' && 'text-emerald-400',
-          tone === 'bad' && 'text-rose-400',
-          tone === 'neutral' && 'text-foreground',
-          !tone && 'text-foreground',
+          "tabular-nums font-medium",
+          tone === "good" && "text-emerald-400",
+          tone === "bad" && "text-rose-400",
+          tone === "neutral" && "text-foreground",
+          !tone && "text-foreground",
         )}
       >
         {value}
@@ -115,11 +121,11 @@ export function BacktestCursorPanel({
         return next;
       });
     };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
     return () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
   }, [boundsRef, clampToBounds, dragging, onPositionChange]);
 
@@ -130,7 +136,8 @@ export function BacktestCursorPanel({
     const ro = new ResizeObserver(() => {
       setLocalPos((current) => {
         const next = clampToBounds(current.x, current.y);
-        if (next.x !== current.x || next.y !== current.y) onPositionChange(next);
+        if (next.x !== current.x || next.y !== current.y)
+          onPositionChange(next);
         return next;
       });
     });
@@ -139,26 +146,28 @@ export function BacktestCursorPanel({
   }, [boundsRef, clampToBounds, onPositionChange]);
 
   const changePct =
-    snapshot?.open != null &&
-    snapshot.open > 0 &&
-    snapshot.close != null
+    snapshot?.open != null && snapshot.open > 0 && snapshot.close != null
       ? ((snapshot.close - snapshot.open) / snapshot.open) * 100
       : null;
 
   const pnlTone =
-    snapshot?.pnl == null ? undefined : snapshot.pnl >= 0 ? ('good' as const) : ('bad' as const);
+    snapshot?.pnl == null
+      ? undefined
+      : snapshot.pnl >= 0
+        ? ("good" as const)
+        : ("bad" as const);
 
   return (
     <div
       ref={panelRef}
       className={cn(
-        'absolute z-30 w-[200px] rounded-lg border bg-slate-950/94 shadow-xl backdrop-blur-sm',
+        "absolute z-30 w-[200px] rounded-lg border bg-slate-950/94 shadow-xl backdrop-blur-sm",
         snapshot?.inPosition
           ? (snapshot.pnl ?? 0) >= 0
-            ? 'border-emerald-400/40'
-            : 'border-rose-400/40'
-          : 'border-sky-400/35',
-        dragging && 'cursor-grabbing',
+            ? "border-emerald-400/40"
+            : "border-rose-400/40"
+          : "border-sky-400/35",
+        dragging && "cursor-grabbing",
       )}
       style={{ left: localPos.x, top: localPos.y }}
       onPointerDown={(event) => event.stopPropagation()}
@@ -166,7 +175,7 @@ export function BacktestCursorPanel({
       <div
         className="flex cursor-grab items-center gap-1 border-b border-border/50 px-1.5 py-1 active:cursor-grabbing"
         onPointerDown={(event) => {
-          if ((event.target as HTMLElement).closest('button')) return;
+          if ((event.target as HTMLElement).closest("button")) return;
           const bounds = boundsRef.current;
           if (!bounds) return;
           const boundsRect = bounds.getBoundingClientRect();
@@ -178,7 +187,10 @@ export function BacktestCursorPanel({
           event.preventDefault();
         }}
       >
-        <GripVertical className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <GripVertical
+          className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
         <p className="min-w-0 flex-1 truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
           Vela · posición
         </p>
@@ -199,59 +211,63 @@ export function BacktestCursorPanel({
           </p>
         ) : (
           <>
-            {show('date') && (
+            {show("date") && (
               <p className="text-[12px] font-semibold tabular-nums text-sky-200">
                 {snapshot.dateLabel}
               </p>
             )}
-            {show('price') && <Row label="Precio" value={formatPrice(snapshot.price)} />}
-            {show('position') && (
+            {show("price") && (
+              <Row label="Precio" value={formatPrice(snapshot.price)} />
+            )}
+            {show("position") && (
               <Row
                 label="Posición"
-                value={snapshot.inPosition ? 'Comprado' : 'Sin posición'}
-                tone={snapshot.inPosition ? 'good' : 'neutral'}
+                value={snapshot.inPosition ? "Comprado" : "Sin posición"}
+                tone={snapshot.inPosition ? "good" : "neutral"}
               />
             )}
-            {show('entryPrice') && snapshot.inPosition && snapshot.entryPrice != null && (
-              <Row label="Compra" value={formatPrice(snapshot.entryPrice)} />
-            )}
-            {show('pnl') && snapshot.inPosition && snapshot.pnl != null && (
+            {show("entryPrice") &&
+              snapshot.inPosition &&
+              snapshot.entryPrice != null && (
+                <Row label="Compra" value={formatPrice(snapshot.entryPrice)} />
+              )}
+            {show("pnl") && snapshot.inPosition && snapshot.pnl != null && (
               <Row
                 label="Beneficio"
-                value={`${snapshot.pnl >= 0 ? '+' : ''}${formatPrice(snapshot.pnl)}${
+                value={`${snapshot.pnl >= 0 ? "+" : ""}${formatPrice(snapshot.pnl)}${
                   snapshot.pnlPct != null
-                    ? ` · ${snapshot.pnlPct >= 0 ? '+' : ''}${snapshot.pnlPct.toFixed(1)}%`
-                    : ''
+                    ? ` · ${snapshot.pnlPct >= 0 ? "+" : ""}${snapshot.pnlPct.toFixed(1)}%`
+                    : ""
                 }`}
                 tone={pnlTone}
               />
             )}
-            {show('open') && snapshot.open != null && (
+            {show("open") && snapshot.open != null && (
               <Row label="O" value={formatPrice(snapshot.open)} />
             )}
-            {show('high') && snapshot.high != null && (
+            {show("high") && snapshot.high != null && (
               <Row label="H" value={formatPrice(snapshot.high)} />
             )}
-            {show('low') && snapshot.low != null && (
+            {show("low") && snapshot.low != null && (
               <Row label="L" value={formatPrice(snapshot.low)} />
             )}
-            {show('close') && snapshot.close != null && (
+            {show("close") && snapshot.close != null && (
               <Row label="C" value={formatPrice(snapshot.close)} />
             )}
-            {show('changePct') && changePct != null && (
+            {show("changePct") && changePct != null && (
               <Row
                 label="Δ vela"
                 value={formatPct(changePct)}
-                tone={changePct >= 0 ? 'good' : 'bad'}
+                tone={changePct >= 0 ? "good" : "bad"}
               />
             )}
-            {show('volume') && (
+            {show("volume") && (
               <Row
                 label="Vol"
                 value={
                   snapshot.volume != null && Number.isFinite(snapshot.volume)
-                    ? snapshot.volume.toLocaleString('es-ES')
-                    : '—'
+                    ? snapshot.volume.toLocaleString("es-ES")
+                    : "—"
                 }
               />
             )}

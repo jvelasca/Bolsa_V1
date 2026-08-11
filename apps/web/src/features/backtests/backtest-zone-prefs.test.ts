@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 
 import {
   BACKTEST_HISTORY_MAX_DEFAULT,
@@ -9,22 +9,22 @@ import {
   clampHistoryMaxKept,
   clampListHeightPx,
   clampSelectBatchSize,
-} from '@/features/backtests/backtest-zone-prefs';
+} from "@/features/backtests/backtest-zone-prefs";
 
-describe('clampHistoryMaxKept', () => {
-  it('defaults invalid values to 20', () => {
+describe("clampHistoryMaxKept", () => {
+  it("defaults invalid values to 20", () => {
     expect(clampHistoryMaxKept(Number.NaN)).toBe(BACKTEST_HISTORY_MAX_DEFAULT);
   });
 
-  it('clamps to [5, 100]', () => {
+  it("clamps to [5, 100]", () => {
     expect(clampHistoryMaxKept(1)).toBe(5);
     expect(clampHistoryMaxKept(20)).toBe(20);
     expect(clampHistoryMaxKept(999)).toBe(100);
   });
 });
 
-describe('clampSelectBatchSize', () => {
-  it('defaults and clamps to [1, 20]', () => {
+describe("clampSelectBatchSize", () => {
+  it("defaults and clamps to [1, 20]", () => {
     expect(clampSelectBatchSize(Number.NaN)).toBe(MATRIX_SELECT_BATCH_DEFAULT);
     expect(clampSelectBatchSize(0)).toBe(1);
     expect(clampSelectBatchSize(8)).toBe(8);
@@ -32,8 +32,8 @@ describe('clampSelectBatchSize', () => {
   });
 });
 
-describe('clampListHeightPx', () => {
-  it('defaults and clamps to [MIN, MAX]', () => {
+describe("clampListHeightPx", () => {
+  it("defaults and clamps to [MIN, MAX]", () => {
     expect(clampListHeightPx(Number.NaN)).toBe(MATRIX_LIST_HEIGHT_DEFAULT);
     expect(clampListHeightPx(1)).toBe(MATRIX_LIST_HEIGHT_MIN);
     expect(clampListHeightPx(280)).toBe(280);

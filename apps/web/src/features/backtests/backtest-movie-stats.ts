@@ -1,4 +1,4 @@
-import type { BacktestTradeDto } from '@bolsa/shared';
+import type { BacktestTradeDto } from "@bolsa/shared";
 
 export type ClosedRoundTrip = {
   entry: BacktestTradeDto;
@@ -29,11 +29,11 @@ function pairRoundTrips(trades: BacktestTradeDto[]): ClosedRoundTrip[] {
   const trips: ClosedRoundTrip[] = [];
   let open: BacktestTradeDto | null = null;
   for (const trade of trades) {
-    if (trade.type === 'buy') {
+    if (trade.type === "buy") {
       open = trade;
       continue;
     }
-    if (trade.type === 'sell' && open) {
+    if (trade.type === "sell" && open) {
       const qty = Math.min(open.quantity, trade.quantity);
       const pnl = (trade.price - open.price) * qty;
       trips.push({ entry: open, exit: trade, pnl });
@@ -54,8 +54,8 @@ export function openPositionAt(
       : trades.filter((trade) => trade.timestamp <= untilTimestamp);
   let open: BacktestTradeDto | null = null;
   for (const trade of visible) {
-    if (trade.type === 'buy') open = trade;
-    if (trade.type === 'sell') open = null;
+    if (trade.type === "buy") open = trade;
+    if (trade.type === "sell") open = null;
   }
   return open;
 }
@@ -66,7 +66,8 @@ export function unrealizedFromEntry(
 ): { pnl: number; pct: number } {
   const qty = entry.quantity;
   const pnl = (markPrice - entry.price) * qty;
-  const pct = entry.price > 0 ? ((markPrice - entry.price) / entry.price) * 100 : 0;
+  const pct =
+    entry.price > 0 ? ((markPrice - entry.price) / entry.price) * 100 : 0;
   return { pnl, pct };
 }
 
@@ -102,8 +103,8 @@ export function computeMovieTradeStats(
 
   return {
     opsCount: visible.length,
-    buyCount: visible.filter((t) => t.type === 'buy').length,
-    sellCount: visible.filter((t) => t.type === 'sell').length,
+    buyCount: visible.filter((t) => t.type === "buy").length,
+    sellCount: visible.filter((t) => t.type === "sell").length,
     closedCount: roundTrips.length,
     winners,
     losers,

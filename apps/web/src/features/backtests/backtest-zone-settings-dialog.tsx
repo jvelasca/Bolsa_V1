@@ -1,9 +1,13 @@
-import { Settings2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Settings2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
-import { PAPER_PATH_LAB, PAPER_PATH_RADAR, PAPER_PATHS_COMPARE } from '@/features/settings/paper-paths-copy';
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import {
+  PAPER_PATH_LAB,
+  PAPER_PATH_RADAR,
+  PAPER_PATHS_COMPARE,
+} from "@/features/settings/paper-paths-copy";
 import {
   BACKTEST_HISTORY_MAX_MAX,
   BACKTEST_HISTORY_MAX_MIN,
@@ -14,7 +18,7 @@ import {
   loadBacktestZonePrefs,
   saveBacktestZonePrefs,
   type BacktestZonePrefs,
-} from '@/features/backtests/backtest-zone-prefs';
+} from "@/features/backtests/backtest-zone-prefs";
 
 type Props = {
   open: boolean;
@@ -22,7 +26,11 @@ type Props = {
   onSaved: (prefs: BacktestZonePrefs) => void;
 };
 
-export function BacktestZoneSettingsDialog({ open, onOpenChange, onSaved }: Props) {
+export function BacktestZoneSettingsDialog({
+  open,
+  onOpenChange,
+  onSaved,
+}: Props) {
   const [historyMaxKept, setHistoryMaxKept] = useState(
     () => loadBacktestZonePrefs().historyMaxKept,
   );
@@ -66,7 +74,8 @@ export function BacktestZoneSettingsDialog({ open, onOpenChange, onSaved }: Prop
           <label className="block text-sm">
             <span className="font-medium">Máximo de pruebas anteriores</span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
-              Afecta la pestaña Pruebas anteriores. Si se supera, se borran las más antiguas de la BD.
+              Afecta la pestaña Pruebas anteriores. Si se supera, se borran las
+              más antiguas de la BD.
             </span>
             <input
               type="number"
@@ -77,17 +86,23 @@ export function BacktestZoneSettingsDialog({ open, onOpenChange, onSaved }: Prop
               className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm tabular-nums"
             />
             <span className="mt-1 block text-[11px] text-muted-foreground">
-              Rango {BACKTEST_HISTORY_MAX_MIN}–{BACKTEST_HISTORY_MAX_MAX} · por defecto 20
+              Rango {BACKTEST_HISTORY_MAX_MIN}–{BACKTEST_HISTORY_MAX_MAX} · por
+              defecto 20
             </span>
           </label>
         </section>
 
         <section className="space-y-2 border-t border-border pt-4">
-          <h4 className="text-sm font-semibold text-foreground">Matriz (Probar)</h4>
+          <h4 className="text-sm font-semibold text-foreground">
+            Matriz (Probar)
+          </h4>
           <label className="block text-sm">
-            <span className="font-medium">Altura del listado de estrategias</span>
+            <span className="font-medium">
+              Altura del listado de estrategias
+            </span>
             <span className="mt-0.5 block text-xs text-muted-foreground">
-              También se puede arrastrar el borde inferior de la matriz en Probar.
+              También se puede arrastrar el borde inferior de la matriz en
+              Probar.
             </span>
             <input
               type="number"
@@ -105,14 +120,20 @@ export function BacktestZoneSettingsDialog({ open, onOpenChange, onSaved }: Prop
         </section>
 
         <section className="space-y-2 border-t border-border pt-4">
-          <h4 className="text-sm font-semibold text-foreground">Recordatorios</h4>
+          <h4 className="text-sm font-semibold text-foreground">
+            Recordatorios
+          </h4>
           <ul className="space-y-1.5 text-xs text-muted-foreground">
             <li>
-              <span className="font-medium text-foreground">{PAPER_PATH_LAB.shortTitle}:</span>{' '}
+              <span className="font-medium text-foreground">
+                {PAPER_PATH_LAB.shortTitle}:
+              </span>{" "}
               {PAPER_PATH_LAB.blurb}
             </li>
             <li>
-              <span className="font-medium text-foreground">{PAPER_PATH_RADAR.modeLabel}:</span>{' '}
+              <span className="font-medium text-foreground">
+                {PAPER_PATH_RADAR.modeLabel}:
+              </span>{" "}
               {PAPER_PATH_RADAR.warnLine}
             </li>
             <li>{PAPER_PATHS_COMPARE}</li>
@@ -120,7 +141,12 @@ export function BacktestZoneSettingsDialog({ open, onOpenChange, onSaved }: Prop
         </section>
 
         <div className="flex justify-end gap-2 border-t border-border pt-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
             Cancelar
           </Button>
           <Button type="button" size="sm" onClick={handleSave}>
@@ -132,7 +158,11 @@ export function BacktestZoneSettingsDialog({ open, onOpenChange, onSaved }: Prop
   );
 }
 
-export function BacktestZoneSettingsButton({ onClick }: { onClick: () => void }) {
+export function BacktestZoneSettingsButton({
+  onClick,
+}: {
+  onClick: () => void;
+}) {
   return (
     <Button
       type="button"

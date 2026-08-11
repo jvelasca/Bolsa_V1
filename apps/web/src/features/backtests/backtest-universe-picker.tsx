@@ -9,22 +9,23 @@
  * @see backtest-list-member-fa.ts
  */
 
-import { instrumentMatchesSearchQuery, type InstrumentWithMetaDto } from '@bolsa/shared';
-import { LayoutList, Search, Shapes } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import {
+  instrumentMatchesSearchQuery,
+  type InstrumentWithMetaDto,
+} from "@bolsa/shared";
+import { LayoutList, Search, Shapes } from "lucide-react";
+import { useMemo, useState } from "react";
 
-import { LIST_AUTO_BATCH_SIZE } from '@/features/backtests/backtest-list-auto';
+import { LIST_AUTO_BATCH_SIZE } from "@/features/backtests/backtest-list-auto";
 import {
   listMemberStatusClass,
   type ListMemberBacktestStatus,
-} from '@/features/backtests/backtest-list-member-status';
-import {
-  type ListMemberFaChipView,
-} from '@/features/backtests/backtest-list-member-fa';
-import { rankCatalogInstrument } from '@/lib/search-ranking';
-import { cn } from '@/lib/utils';
+} from "@/features/backtests/backtest-list-member-status";
+import { type ListMemberFaChipView } from "@/features/backtests/backtest-list-member-fa";
+import { rankCatalogInstrument } from "@/lib/search-ranking";
+import { cn } from "@/lib/utils";
 
-export type BacktestUniverseMode = 'single' | 'list';
+export type BacktestUniverseMode = "single" | "list";
 
 type ListOption = {
   id: string;
@@ -76,13 +77,13 @@ export function BacktestUniversePicker({
   listStatusLoading,
   onOpenListMember,
 }: Props) {
-  const [query, setQuery] = useState('');
-  const [listFilter, setListFilter] = useState('');
+  const [query, setQuery] = useState("");
+  const [listFilter, setListFilter] = useState("");
 
   const sortedInstruments = useMemo(
     () =>
       [...instruments].sort((a, b) =>
-        a.symbol.localeCompare(b.symbol, 'es', { sensitivity: 'base' }),
+        a.symbol.localeCompare(b.symbol, "es", { sensitivity: "base" }),
       ),
     [instruments],
   );
@@ -104,22 +105,23 @@ export function BacktestUniversePicker({
   const filteredMembers = useMemo(() => {
     const q = listFilter.trim().toLowerCase();
     const sorted = [...listMembers].sort((a, b) => {
-      const scoreDiff = (b.status?.rankScore ?? -1) - (a.status?.rankScore ?? -1);
+      const scoreDiff =
+        (b.status?.rankScore ?? -1) - (a.status?.rankScore ?? -1);
       if (scoreDiff !== 0) return scoreDiff;
-      return a.symbol.localeCompare(b.symbol, 'es', { sensitivity: 'base' });
+      return a.symbol.localeCompare(b.symbol, "es", { sensitivity: "base" });
     });
     if (!q) return sorted;
     return sorted.filter(
       (m) =>
         m.symbol.toLowerCase().includes(q) ||
-        (m.name ?? '').toLowerCase().includes(q) ||
-        (m.status?.primary ?? '').toLowerCase().includes(q) ||
-        (m.fa?.primary ?? '').toLowerCase().includes(q) ||
-        (m.fa?.secondary ?? '').toLowerCase().includes(q),
+        (m.name ?? "").toLowerCase().includes(q) ||
+        (m.status?.primary ?? "").toLowerCase().includes(q) ||
+        (m.fa?.primary ?? "").toLowerCase().includes(q) ||
+        (m.fa?.secondary ?? "").toLowerCase().includes(q),
     );
   }, [listMembers, listFilter]);
 
-  const showDropdown = mode === 'single' && query.trim().length > 0;
+  const showDropdown = mode === "single" && query.trim().length > 0;
 
   const statusCounts = useMemo(() => {
     let withTop = 0;
@@ -133,7 +135,7 @@ export function BacktestUniversePicker({
 
   function pickInstrument(item: InstrumentWithMetaDto) {
     onInstrumentIdChange(item.id);
-    setQuery('');
+    setQuery("");
   }
 
   return (
@@ -145,8 +147,8 @@ export function BacktestUniversePicker({
       >
         {(
           [
-            { id: 'single' as const, label: 'Valor', icon: Shapes },
-            { id: 'list' as const, label: 'Lista valores', icon: LayoutList },
+            { id: "single" as const, label: "Valor", icon: Shapes },
+            { id: "list" as const, label: "Lista valores", icon: LayoutList },
           ] as const
         ).map(({ id, label, icon: Icon }) => (
           <button
@@ -155,10 +157,10 @@ export function BacktestUniversePicker({
             role="tab"
             aria-selected={mode === id}
             className={cn(
-              'inline-flex items-center justify-center gap-1 rounded px-2 py-1.5 text-[11px] font-medium transition-colors',
+              "inline-flex items-center justify-center gap-1 rounded px-2 py-1.5 text-[11px] font-medium transition-colors",
               mode === id
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
             )}
             onClick={() => onModeChange(id)}
           >
@@ -168,11 +170,11 @@ export function BacktestUniversePicker({
         ))}
       </div>
 
-      {mode === 'single' ? (
+      {mode === "single" ? (
         <div className="space-y-1.5">
           <p className="text-[10px] leading-snug text-muted-foreground">
-            Busca solo en valores ya importados en tu BD (nombre o ticker, parcial o completo). No
-            consulta Yahoo.
+            Busca solo en valores ya importados en tu BD (nombre o ticker,
+            parcial o completo). No consulta Yahoo.
           </p>
 
           <div className="relative">
@@ -197,7 +199,8 @@ export function BacktestUniversePicker({
             >
               {searchHits.length === 0 ? (
                 <p className="px-2 py-1.5 text-muted-foreground">
-                  Sin resultados en BD. Impórtalo desde Instrumentos o la watchlist.
+                  Sin resultados en BD. Impórtalo desde Instrumentos o la
+                  watchlist.
                 </p>
               ) : (
                 searchHits.map((item) => (
@@ -207,15 +210,17 @@ export function BacktestUniversePicker({
                     role="option"
                     aria-selected={item.id === instrumentId}
                     className={cn(
-                      'flex w-full px-2 py-1 text-left hover:bg-accent',
-                      item.id === instrumentId && 'bg-accent/60',
+                      "flex w-full px-2 py-1 text-left hover:bg-accent",
+                      item.id === instrumentId && "bg-accent/60",
                     )}
                     onClick={() => pickInstrument(item)}
                   >
                     <span className="font-medium">{item.symbol}</span>
                     <span className="ml-2 truncate text-muted-foreground">
                       {item.name}
-                      {item.isin ? <span className="ml-1 opacity-70">· {item.isin}</span> : null}
+                      {item.isin ? (
+                        <span className="ml-1 opacity-70">· {item.isin}</span>
+                      ) : null}
                     </span>
                   </button>
                 ))
@@ -230,8 +235,12 @@ export function BacktestUniversePicker({
 
           {selectedInstrument && !showDropdown && (
             <p className="rounded border border-border/70 bg-muted/20 px-2 py-1 text-[11px]">
-              <span className="font-medium text-foreground">{selectedInstrument.symbol}</span>
-              <span className="ml-1.5 text-muted-foreground">{selectedInstrument.name}</span>
+              <span className="font-medium text-foreground">
+                {selectedInstrument.symbol}
+              </span>
+              <span className="ml-1.5 text-muted-foreground">
+                {selectedInstrument.name}
+              </span>
             </p>
           )}
 
@@ -259,7 +268,7 @@ export function BacktestUniversePicker({
               value={listId}
               onChange={(e) => {
                 onListIdChange(e.target.value);
-                setListFilter('');
+                setListFilter("");
               }}
               className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
             >
@@ -276,15 +285,17 @@ export function BacktestUniversePicker({
               {listInstrumentCount} valor(es)
               {listInstrumentCount > LIST_AUTO_BATCH_SIZE
                 ? ` · Play pedirá confirmación · ${Math.ceil(listInstrumentCount / LIST_AUTO_BATCH_SIZE)} tandas de ~${LIST_AUTO_BATCH_SIZE} (todos los valores)`
-                : ''}
+                : ""}
               {statusCounts.total > 0
                 ? ` · ${statusCounts.withTop} con Finalistas · ${statusCounts.pending} pendientes`
-                : ''}
-              {onOpenListMember ? ' · clic para abrir en Valor' : ''}
+                : ""}
+              {onOpenListMember ? " · clic para abrir en Valor" : ""}
             </p>
           )}
           {listsLoading && (
-            <p className="text-[10px] font-normal text-muted-foreground">Cargando listas…</p>
+            <p className="text-[10px] font-normal text-muted-foreground">
+              Cargando listas…
+            </p>
           )}
 
           {listId ? (
@@ -306,12 +317,14 @@ export function BacktestUniversePicker({
                 aria-label="Valores de la lista con estado"
               >
                 {listMembersLoading && listMembers.length === 0 ? (
-                  <p className="px-2 py-1.5 text-muted-foreground">Cargando valores…</p>
+                  <p className="px-2 py-1.5 text-muted-foreground">
+                    Cargando valores…
+                  </p>
                 ) : filteredMembers.length === 0 ? (
                   <p className="px-2 py-1.5 text-muted-foreground">
                     {listFilter.trim()
-                      ? 'Sin coincidencias en esta lista.'
-                      : 'Esta lista no tiene valores.'}
+                      ? "Sin coincidencias en esta lista."
+                      : "Esta lista no tiene valores."}
                   </p>
                 ) : (
                   filteredMembers.map((m) => {
@@ -327,10 +340,10 @@ export function BacktestUniversePicker({
                         title="Abrir en pestaña Valor"
                         disabled={!onOpenListMember}
                         className={cn(
-                          'flex w-full flex-col gap-0.5 border-b border-border/40 px-2 py-1.5 text-left last:border-0',
-                          onOpenListMember && 'hover:bg-accent/70',
-                          selected && 'bg-accent/70',
-                          !onOpenListMember && 'cursor-default',
+                          "flex w-full flex-col gap-0.5 border-b border-border/40 px-2 py-1.5 text-left last:border-0",
+                          onOpenListMember && "hover:bg-accent/70",
+                          selected && "bg-accent/70",
+                          !onOpenListMember && "cursor-default",
                         )}
                         onClick={() => onOpenListMember?.(m.id)}
                       >
@@ -339,19 +352,21 @@ export function BacktestUniversePicker({
                             {m.symbol}
                           </span>
                           {m.name ? (
-                            <span className="min-w-0 truncate text-muted-foreground">{m.name}</span>
+                            <span className="min-w-0 truncate text-muted-foreground">
+                              {m.name}
+                            </span>
                           ) : null}
                           {fa ? (
                             <span
                               className={cn(
-                                'ml-auto shrink-0 text-[10px] font-medium tabular-nums',
+                                "ml-auto shrink-0 text-[10px] font-medium tabular-nums",
                                 fa.toneClass,
                               )}
                               title={fa.secondary}
                             >
                               {fa.primary}
                               <span className="font-normal text-muted-foreground">
-                                {' '}
+                                {" "}
                                 · {fa.secondary}
                               </span>
                             </span>
@@ -360,19 +375,26 @@ export function BacktestUniversePicker({
                         {status ? (
                           <span
                             className={cn(
-                              'min-w-0 truncate text-[10px] leading-snug',
+                              "min-w-0 truncate text-[10px] leading-snug",
                               listMemberStatusClass(status.tone),
                             )}
                           >
                             {status.primary}
                             {status.secondary ? (
-                              <span className="text-muted-foreground"> · {status.secondary}</span>
+                              <span className="text-muted-foreground">
+                                {" "}
+                                · {status.secondary}
+                              </span>
                             ) : null}
                           </span>
                         ) : listStatusLoading ? (
-                          <span className="text-[10px] text-muted-foreground">Cargando estado…</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Cargando estado…
+                          </span>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground">Sin Finalistas</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            Sin Finalistas
+                          </span>
                         )}
                       </button>
                     );

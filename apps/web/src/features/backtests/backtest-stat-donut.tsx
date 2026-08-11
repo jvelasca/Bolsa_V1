@@ -28,13 +28,18 @@ export function BacktestStatDonut({
   return (
     <div className="flex items-center gap-1.5" title={title}>
       <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          aria-hidden
+        >
           <circle
             cx={size / 2}
             cy={size / 2}
             r={r}
             fill="none"
-            stroke={total > 0 ? '#f43f5e' : 'rgba(148,163,184,0.25)'}
+            stroke={total > 0 ? "#f43f5e" : "rgba(148,163,184,0.25)"}
             strokeWidth={stroke}
           />
           {total > 0 && posLen > 0 && (
@@ -58,11 +63,11 @@ export function BacktestStatDonut({
       </div>
       <div className="min-w-0 text-[11px] leading-tight">
         <p className="tabular-nums text-emerald-400">
-          {positiveCaption}{' '}
+          {positiveCaption}{" "}
           <span className="text-emerald-300/90">({posPct}%)</span>
         </p>
         <p className="tabular-nums text-rose-400">
-          {negativeCaption}{' '}
+          {negativeCaption}{" "}
           <span className="text-rose-300/90">({negPct}%)</span>
         </p>
       </div>

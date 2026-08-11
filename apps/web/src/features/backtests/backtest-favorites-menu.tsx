@@ -1,8 +1,8 @@
-import { MoreHorizontal, Star } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import type { BacktestHudFieldOption } from '@/features/backtests/backtest-hud-prefs';
-import { cn } from '@/lib/utils';
+import { MoreHorizontal, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import type { BacktestHudFieldOption } from "@/features/backtests/backtest-hud-prefs";
+import { cn } from "@/lib/utils";
 
 type Props<T extends string> = {
   title: string;
@@ -12,7 +12,7 @@ type Props<T extends string> = {
   onToggleFavorite: (id: T) => void;
   className?: string;
   /** Align menu to the right edge of the button (bars). */
-  align?: 'left' | 'right';
+  align?: "left" | "right";
 };
 
 /** (…) menu with star favorites — same philosophy as chart / list hubs. */
@@ -23,7 +23,7 @@ export function BacktestFavoritesMenu<T extends string>({
   favorites,
   onToggleFavorite,
   className,
-  align = 'right',
+  align = "right",
 }: Props<T>) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -36,7 +36,7 @@ export function BacktestFavoritesMenu<T extends string>({
     if (!rect) return;
     const width = 220;
     const left =
-      align === 'right'
+      align === "right"
         ? Math.max(8, rect.right - width)
         : Math.min(rect.left, window.innerWidth - width - 8);
     setPos({ top: rect.bottom + 4, left });
@@ -46,25 +46,25 @@ export function BacktestFavoritesMenu<T extends string>({
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === "Escape") setOpen(false);
     };
     const onReposition = () => {
       const rect = buttonRef.current?.getBoundingClientRect();
       if (!rect) return;
       const width = 220;
       const left =
-        align === 'right'
+        align === "right"
           ? Math.max(8, rect.right - width)
           : Math.min(rect.left, window.innerWidth - width - 8);
       setPos({ top: rect.bottom + 4, left });
     };
-    document.addEventListener('keydown', onKey);
-    window.addEventListener('resize', onReposition);
-    window.addEventListener('scroll', onReposition, true);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onReposition);
+    window.addEventListener("scroll", onReposition, true);
     return () => {
-      document.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', onReposition);
-      window.removeEventListener('scroll', onReposition, true);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onReposition);
+      window.removeEventListener("scroll", onReposition, true);
     };
   }, [align, open]);
 
@@ -85,7 +85,10 @@ export function BacktestFavoritesMenu<T extends string>({
               style={{ top: pos.top, left: pos.left, width: 220 }}
               onPointerDown={(event) => event.stopPropagation()}
             >
-              <p className="px-2 py-1 text-[10px] font-medium text-muted-foreground" title={hint}>
+              <p
+                className="px-2 py-1 text-[10px] font-medium text-muted-foreground"
+                title={hint}
+              >
                 {title}
               </p>
               {hint && (
@@ -94,13 +97,17 @@ export function BacktestFavoritesMenu<T extends string>({
                 </p>
               )}
               {options.map((option) => {
-                const favorited = favoriteSet.has(option.id) || Boolean(option.locked);
+                const favorited =
+                  favoriteSet.has(option.id) || Boolean(option.locked);
                 return (
                   <div
                     key={option.id}
                     className="flex items-center gap-1 rounded px-1 hover:bg-accent"
                   >
-                    <span className="min-w-0 flex-1 px-2 py-1 text-left text-xs" title={option.hint}>
+                    <span
+                      className="min-w-0 flex-1 px-2 py-1 text-left text-xs"
+                      title={option.hint}
+                    >
                       {option.label}
                     </span>
                     <button
@@ -108,18 +115,20 @@ export function BacktestFavoritesMenu<T extends string>({
                       disabled={option.locked}
                       title={
                         option.locked
-                          ? 'Siempre visible'
+                          ? "Siempre visible"
                           : favorited
-                            ? 'Quitar de favoritos'
-                            : 'Añadir a favoritos'
+                            ? "Quitar de favoritos"
+                            : "Añadir a favoritos"
                       }
                       className="rounded p-1 hover:bg-background/80 disabled:opacity-40"
                       onClick={() => onToggleFavorite(option.id)}
                     >
                       <Star
                         className={cn(
-                          'h-3.5 w-3.5',
-                          favorited ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground',
+                          "h-3.5 w-3.5",
+                          favorited
+                            ? "fill-amber-400 text-amber-400"
+                            : "text-muted-foreground",
                         )}
                       />
                     </button>
@@ -133,7 +142,7 @@ export function BacktestFavoritesMenu<T extends string>({
       : null;
 
   return (
-    <div className={cn('relative shrink-0', className)}>
+    <div className={cn("relative shrink-0", className)}>
       <button
         ref={buttonRef}
         type="button"

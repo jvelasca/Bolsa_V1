@@ -1,6 +1,6 @@
 /** Preferencias de zona Backtesting (localStorage). */
 
-import type { StrategyMatrixFilter } from '@/features/backtests/backtest-strategy-matrix';
+import type { StrategyMatrixFilter } from "@/features/backtests/backtest-strategy-matrix";
 import {
   DEFAULT_STRATEGY_MATRIX_COLUMN_LAYOUT,
   DEFAULT_STRATEGY_MATRIX_FAVORITE_COLUMN_IDS,
@@ -10,9 +10,9 @@ import {
   type StrategyMatrixColumnId,
   type StrategyMatrixColumnLayoutItem,
   type StrategyMatrixSortState,
-} from '@/features/backtests/strategy-matrix-column-layout';
+} from "@/features/backtests/strategy-matrix-column-layout";
 
-export const BACKTEST_ZONE_PREFS_KEY = 'bolsa-backtest-zone-prefs-v1';
+export const BACKTEST_ZONE_PREFS_KEY = "bolsa-backtest-zone-prefs-v1";
 
 export const BACKTEST_HISTORY_MAX_DEFAULT = 20;
 export const BACKTEST_HISTORY_MAX_MIN = 5;
@@ -69,17 +69,17 @@ export function clampListHeightPx(value: number): number {
 }
 
 function normalizeStrategyFilter(raw: unknown): StrategyMatrixFilter {
-  if (raw === 'saved') return 'mine';
+  if (raw === "saved") return "mine";
   if (
-    raw === 'preset' ||
-    raw === 'optimized' ||
-    raw === 'mine' ||
-    raw === 'all' ||
-    raw === 'finalists'
+    raw === "preset" ||
+    raw === "optimized" ||
+    raw === "mine" ||
+    raw === "all" ||
+    raw === "finalists"
   ) {
     return raw;
   }
-  return 'all';
+  return "all";
 }
 
 export function defaultStrategyMatrixTablePrefs(): StrategyMatrixTablePrefs {
@@ -87,7 +87,7 @@ export function defaultStrategyMatrixTablePrefs(): StrategyMatrixTablePrefs {
     columnLayout: DEFAULT_STRATEGY_MATRIX_COLUMN_LAYOUT.map((c) => ({ ...c })),
     sort: null,
     favoriteColumnIds: [...DEFAULT_STRATEGY_MATRIX_FAVORITE_COLUMN_IDS],
-    filter: 'all',
+    filter: "all",
     selectBatchSize: MATRIX_SELECT_BATCH_DEFAULT,
     listHeightPx: MATRIX_LIST_HEIGHT_DEFAULT,
   };
@@ -103,12 +103,14 @@ function normalizeStrategyMatrixPrefs(
     favoriteColumnIds: normalizeStrategyMatrixFavorites(raw.favoriteColumnIds),
     filter: normalizeStrategyFilter(raw.filter),
     selectBatchSize: clampSelectBatchSize(
-      typeof raw.selectBatchSize === 'number'
+      typeof raw.selectBatchSize === "number"
         ? raw.selectBatchSize
         : MATRIX_SELECT_BATCH_DEFAULT,
     ),
     listHeightPx: clampListHeightPx(
-      typeof raw.listHeightPx === 'number' ? raw.listHeightPx : MATRIX_LIST_HEIGHT_DEFAULT,
+      typeof raw.listHeightPx === "number"
+        ? raw.listHeightPx
+        : MATRIX_LIST_HEIGHT_DEFAULT,
     ),
   };
 }
@@ -121,11 +123,12 @@ const DEFAULTS: BacktestZonePrefs = {
 export function loadBacktestZonePrefs(): BacktestZonePrefs {
   try {
     const raw = localStorage.getItem(BACKTEST_ZONE_PREFS_KEY);
-    if (!raw) return { ...DEFAULTS, strategyMatrix: defaultStrategyMatrixTablePrefs() };
+    if (!raw)
+      return { ...DEFAULTS, strategyMatrix: defaultStrategyMatrixTablePrefs() };
     const parsed = JSON.parse(raw) as Partial<BacktestZonePrefs>;
     return {
       historyMaxKept: clampHistoryMaxKept(
-        typeof parsed.historyMaxKept === 'number'
+        typeof parsed.historyMaxKept === "number"
           ? parsed.historyMaxKept
           : DEFAULTS.historyMaxKept,
       ),
@@ -165,9 +168,11 @@ export function patchStrategyMatrixTablePrefs(
     ...patch,
     columnLayout: patch.columnLayout ?? current.strategyMatrix.columnLayout,
     sort: patch.sort !== undefined ? patch.sort : current.strategyMatrix.sort,
-    favoriteColumnIds: patch.favoriteColumnIds ?? current.strategyMatrix.favoriteColumnIds,
+    favoriteColumnIds:
+      patch.favoriteColumnIds ?? current.strategyMatrix.favoriteColumnIds,
     filter: patch.filter ?? current.strategyMatrix.filter,
-    selectBatchSize: patch.selectBatchSize ?? current.strategyMatrix.selectBatchSize,
+    selectBatchSize:
+      patch.selectBatchSize ?? current.strategyMatrix.selectBatchSize,
     listHeightPx: patch.listHeightPx ?? current.strategyMatrix.listHeightPx,
   });
   saveBacktestZonePrefs({ ...current, strategyMatrix: nextMatrix });
