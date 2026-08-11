@@ -488,8 +488,19 @@ class ExecuteTrade:
         price: float,
         account_id: str | None = None,
         portfolio_id: str | None = None,
+        idempotency_key: str | None = None,
     ) -> TradeResult:
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
+        # M4: doble POST con la misma idempotency_key → una sola transacción.
+        # Devuelve la transacción original (misma shape) con un summary fresco, sin duplicar.
+        if idempotency_key:
+            existing = await self._portfolio_repo.find_transaction_by_idempotency(
+                scope.legacy_portfolio_id,
+                idempotency_key,
+            )
+            if existing is not None:
+                summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
+                return TradeResult(transaction=existing, summary=summary)
         settings = scope.account.settings or settings_from_dict(None)
         from decimal import Decimal
 
@@ -507,6 +518,7 @@ class ExecuteTrade:
             price=price,
             legacy_portfolio_id=scope.legacy_portfolio_id,
             fee_amount=fees.total,
+            idempotency_key=idempotency_key,
         )
         amount = -result.transaction.total if trade_type == "buy" else result.transaction.total
         # M3: balance_after = cash real grabado por el repo (ya incluye comisiones),

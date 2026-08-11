@@ -2,6 +2,7 @@
 
 from typing import Annotated
 
+from bolsa_application.accounts import ExecuteTrade
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,7 +24,6 @@ from bolsa_api.schemas.portfolio import (
     TradeResponseDto,
     TransactionsResponseDto,
 )
-from bolsa_application.accounts import ExecuteTrade
 
 router = APIRouter()
 
@@ -93,21 +93,19 @@ async def execute_trade(
 
     try:
 
-        if body.type not in ("buy", "sell"):
-
-            raise HTTPException(status_code=400, detail="Invalid trade request")
-
         result = await use_case.execute(
 
             instrument_id=body.instrument_id,
 
-            trade_type=body.type,  # type: ignore[arg-type]
+            trade_type=body.type,
 
             quantity=body.quantity,
 
             price=body.price,
 
             account_id=account_id,
+
+            idempotency_key=body.idempotency_key,
 
         )
 

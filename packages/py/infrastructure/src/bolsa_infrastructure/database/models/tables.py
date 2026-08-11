@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -162,6 +163,9 @@ class PositionRow(Base):
 
 class TransactionRow(Base):
     __tablename__ = "transactions"
+    __table_args__ = (
+        UniqueConstraint("portfolio_id", "idempotency_key", name="transactions_portfolio_id_idempotency_key_key"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     portfolio_id: Mapped[str] = mapped_column("portfolio_id", ForeignKey("portfolios.id"))
@@ -171,6 +175,7 @@ class TransactionRow(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     total: Mapped[Decimal] = mapped_column(Numeric(18, 6))
     executed_at: Mapped[datetime] = mapped_column("executed_at", DateTime(timezone=True))
+    idempotency_key: Mapped[str | None] = mapped_column("idempotency_key", String, nullable=True)
 
     portfolio: Mapped[PortfolioRow] = relationship(back_populates="transactions")
     instrument: Mapped[InstrumentRow] = relationship()

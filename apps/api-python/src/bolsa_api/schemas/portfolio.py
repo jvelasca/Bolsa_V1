@@ -1,5 +1,7 @@
 """DTOs HTTP de cartera / posiciones."""
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -61,9 +63,10 @@ class TradeRequestDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     instrument_id: str = Field(alias="instrumentId")
-    type: str
-    quantity: float
-    price: float
+    type: Literal["buy", "sell"]
+    quantity: float = Field(gt=0, allow_inf_nan=False)
+    price: float = Field(gt=0, allow_inf_nan=False)
+    idempotency_key: str | None = Field(default=None, alias="idempotencyKey")
 
 
 class TradeResponseDto(BaseModel):

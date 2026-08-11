@@ -178,6 +178,36 @@ class SqlAlchemyPortfolioRepository:
             for row in rows
         ]
 
+    async def find_transaction_by_idempotency(
+        self,
+        legacy_portfolio_id: str,
+        idempotency_key: str,
+    ) -> Transaction | None:
+        """Devuelve la transacción ya grabada para (cartera, idempotency_key), si existe."""
+        portfolio = await self._resolve_portfolio(legacy_portfolio_id)
+        stmt = (
+            select(TransactionRow)
+            .where(
+                TransactionRow.portfolio_id == portfolio.id,
+                TransactionRow.idempotency_key == idempotency_key,
+            )
+            .options(selectinload(TransactionRow.instrument))
+            .limit(1)
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        return Transaction(
+            id=row.id,
+            type=row.type,  # type: ignore[arg-type]
+            instrument_id=row.instrument_id,
+            symbol=row.instrument.symbol,
+            quantity=float(row.quantity),
+            price=float(row.price),
+            total=float(row.total),
+            executed_at=row.executed_at.isoformat(),
+        )
+
     async def execute_trade(
         self,
         *,
@@ -187,6 +217,7 @@ class SqlAlchemyPortfolioRepository:
         price: float,
         legacy_portfolio_id: str | None = None,
         fee_amount: float = 0.0,
+        idempotency_key: str | None = None,
     ) -> TradeResult:
         if quantity <= 0:
             raise ValueError("La cantidad debe ser mayor que cero")
@@ -245,6 +276,7 @@ class SqlAlchemyPortfolioRepository:
             price=Decimal(str(price)),
             total=total,
             executed_at=now,
+            idempotency_key=idempotency_key,
         )
         self._session.add(transaction)
 

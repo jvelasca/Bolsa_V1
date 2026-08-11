@@ -183,10 +183,12 @@ model Transaction {
   price        Decimal         @db.Decimal(18, 6)
   total        Decimal         @db.Decimal(18, 6)
   executedAt   DateTime        @default(now()) @map("executed_at")
+  idempotencyKey String?       @map("idempotency_key")
 
   portfolio  Portfolio  @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   instrument Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
 
+  @@unique([portfolioId, idempotencyKey])
   @@index([portfolioId, executedAt(sort: Desc)])
   @@map("transactions")
 }
