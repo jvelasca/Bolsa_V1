@@ -1,7 +1,7 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `882082c` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `ce981e7` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
 > Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-18) y los próximos dominios.
@@ -85,11 +85,14 @@ formatee masivamente el estilo antiguo en el diff editorial).
 | 26 | `465137a` | lib sub-batch A (apps/web/src/lib, 18 de 35, sub-lote resto de apps/web/src) | 18 |
 | 27 | `0b8f04b` | lib sub-batch B (apps/web/src/lib, 17 de 35, CIERRE dominio lib) | 17 |
 | 28 | `882082c` | features/screeners (sub-lote resto de apps/web/src, CIERRE dominio screeners) | 27 |
+| 29 | `998ed1d` | features/charts sub-batch A (sub-lote resto de apps/web/src) | 29 |
+| 30 | `87e47e5` | features/charts sub-batch B (sub-lote resto de apps/web/src) | 29 |
+| 31 | `ce981e7` | features/charts sub-batch C (sub-lote resto de apps/web/src, CIERRE dominio charts) | 29 |
 
-**Total formateado hasta aquí: 406 ficheros** con diff real en 28 commits propios de formateo (210 de `features/backtests`
+**Total formateado hasta aquí: 493 ficheros** con diff real en 31 commits propios de formateo (210 de `features/backtests`
 en lotes 1-18 + 17 `accounts` lote 19 + 7 `workspace` lote 20 + 14 `config`+`platform` lote 21 + 10 `research` lote 22
-+ 25 `settings` lote 23 + 30 `instruments` lote 24 + 31 `stores` lote 25 + 18 `lib` sub-batch A lote 26 + 17 `lib` sub-batch B lote 27 + 27 `screeners` lote 28). Todos con batería
-`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17 y 18, área Coach/TOP).
++ 25 `settings` lote 23 + 30 `instruments` lote 24 + 31 `stores` lote 25 + 18 `lib` sub-batch A lote 26 + 17 `lib` sub-batch B lote 27 + 27 `screeners` lote 28 + 29 `charts` sub-batch A lote 29 + 29 `charts` sub-batch B lote 30 + 29 `charts` sub-batch C lote 31). Todos con batería
+`typecheck ✅ · lint 0e ✅ · test 140/707 ✅ · build ✅` (+ `test:coach` 26/186 ✅ en los lotes 14, 17, 18, 30 y 31, área Coach/TOP).
 
 **Hallazgo de método (lotes 3, 4 y 5):** varios ficheros que `prettier --check` reporta `[warn]` son **falsos positivos
 EOL** (contenido normalizado idéntico a HEAD). Se detectan porque **no aparecen en `git diff --cached --numstat`**
@@ -124,6 +127,9 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 - ~~ **`lib` sub-batch A** ~~ **HECHO (lote 26, `465137a`)**: primer sub-lote (18 de 35) de `apps/web/src/lib` = **18 files (+1299/−897 solo formato)**: `api-base-url`, `api`(+808/−574, el más grande), `chart-list-membership`(+test), `chart-list-snapshot`, `chart-tab-uniqueness`(+test), `close-chart-on-list-removal`, `datetime-input`, `default-lists`, `draw-tool-favorites-storage`, `draw-tool-session-storage`, `instrument-search.test`, `list-carousel-config`, `list-column-layout`, `list-hub-column-layout`, `list-selection-guard`, `list-sort-with-recommendation.test`. Sin falsos positivos EOL (los 18 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP.
 - ~~ **`lib` sub-batch B** ~~ **HECHO (lote 27, `0b8f04b`)**: segundo sub-lote (17 de 35) de `apps/web/src/lib` = **17 files (+518/−388 solo formato)**: `list-sort-with-recommendation`, `list-sync`(+test), `list-utils`, `query-client`, `query-invalidation`, `routes`, `scan-results-column-layout`(+test), `screener-split-layout`(+test), `scroll-list-instrument-into-view`(+test), `search-ranking`, `use-media-query`, `utils`, `workspace-payload`. Sin falsos positivos EOL (los 17 con diff real; solo `'→"` + line-wrapping). No es área Coach/TOP. **Con esto el dominio `lib` queda CERRADO (lotes 26-27, 35 files).**
 - ~~ **`screeners`** ~~ **HECHO (lote 28, `882082c`)**: todos los `.ts`/`.tsx` de `features/screeners` = **27 files (+2431/−1621 solo formato)**: `execution-policies-panel`, `fa-weekly-pipeline-panel`, `fundamental-screener-panel`, `open-hit-in-trading`, `paper-d-propose-panel`, `platform-events-panel`, `position-policies-panel`, `saved-strategies-panel`, `scan-jobs-panel`, `scan-results-panel`, `scan-results-table`, `scan-runner-form`, `screener-collapsible-section`, `screener-hub-layout`, `screener-mobile-view-tabs`, `screener-panel-shell`, `screener-pipeline-panel`, `screener-workflow-steps`, `screeners-hub`, `screeners-page`, `strategy-draft-feedback`, `strategy-prompt-assistant-panel`, `tracker-alarms`(+test), `tracker-helpers`, `trackers-panel`, `use-screener-nav-badge`. Sin falsos positivos EOL (los 27 con diff real; los 27 del dominio en el glob). No es área Coach/TOP. **Con esto el dominio `screeners` queda CERRADO (lote 28, 27 files).**
+- ~~ **`charts` sub-batch A** ~~ **HECHO (lote 29, `998ed1d`)**: primer sub-lote (29 de 87) de `features/charts` por orden alfabético = **29 files (+2784/−1540 solo formato)**: `ai-indicators-panel`, `chart-advanced-series`(+test), `chart-analysis-score-buttons`, `chart-bar-zone-picker`, `chart-bar-zone-rail-button`, `chart-bar-zone-styles`, `chart-canvas-styles-panel`, `chart-crosshair-measure`, `chart-cursor-style-overlay`, `chart-cursor-zone`, `chart-data-bar-settings-dialog`, `chart-database-dialog`, `chart-database-panel`, `chart-data-status-badge`, `chart-draw-style-memory.test`, `chart-draw-tool-style-bar`, `chart-draw-tool-utils`(+test), `chart-drawing-edit-popover`, `chart-drawing-global-toggles`, `chart-drawing-properties-panel`, `chart-drawing-rail.test`, `chart-drawing-regression`, `chart-drawing-sidebar`, `chart-drawing-templates-dialog`, `chart-drawing-tools`, `chart-drawing-utils`, `chart-drawings-layer`. Sin falsos positivos EOL (los 29 con diff real). No es área Coach/TOP.
+- ~~ **`charts` sub-batch B** ~~ **HECHO (lote 30, `87e47e5`)**: segundo sub-lote (29 de 87) de `features/charts` = **29 files (+1148/−759 solo formato)**: `chart-finalist-top1-switch`, `chart-global-bar-settings-dialog`, `chart-indicator-hit`, `chart-indicators-bar`, `chart-indicator-stack`, `chart-indicator-template-zone`, `chart-inspector-bar-shortcut-nav`, `chart-inspector-nav`, `chart-inspector-panel`, `chart-inspector-shortcut-button`, `chart-instrument-ai-button`, `chart-instrument-zone`, `chart-main-series`, `chart-new-chart-template-pin-button`, `chart-overlay-indicators-zone`, `chart-perf-analyzer`, `chart-perf-debug`, `chart-price-pan`, `chart-quick-trade-buttons`, `chart-scale-utils`, `chart-scale-wheel`, `chart-series-style-panel`, `chart-series-type-zone`, `chart-stable-resize`, `chart-time-axis-label`, `chart-timeframe-bar`, `chart-time-pan`, `chart-time-sync`(+test). Sin falsos positivos EOL (los 29 con diff real). Área potencial Coach/TOP (test:coach 26/186 ✅).
+- ~~ **`charts` sub-batch C** ~~ **HECHO (lote 31, `ce981e7`)**: tercer y último sub-lote (29 de 87) de `features/charts` = **29 files (+2178/−1134 solo formato)**: `chart-toolbar-chart-bar`, `chart-toolbar-global-bar`, `chart-toolbar-settings-fields`, `chart-trading-view-url`, `chart-utils`(+test), `chart-workspace-page`, `indicator-compute`(+`indicator-compute-parity.test`), `indicator-draft-feedback`, `indicator-instance-config-dialog`, `indicator-panel-chrome`, `indicator-parameters-form`, `indicator-preset-editor-panel`, `indicator-prompt-assistant-panel`, `indicator-templates-dialog`, `indicators-catalog-dialog`, `ohlcv-chart`(+test), `rsi-indicator-chart`, `strategy-top1-chart-indicators.test`, `sub-indicator-panel`, `use-chart-bar-zone-favorites`, `use-chart-indicator-template-favorites`, `use-chart-series-type-favorites`, `use-chart-timeframe-favorites`, `use-drawing-alerts-monitor`, `use-draw-tool-favorites`, `use-inspector-bar-shortcut-favorites`. Sin falsos positivos EOL (los 29 con diff real). **Con esto el dominio `charts` queda CERRADO (lotes 29-31, 87 files).** Área Coach/TOP (test:coach 26/186 ✅).
 
 > Cuando se acabe `features/backtests`, seguir con el **resto de `apps/web/src`** por sub-lotes, con el mismo protocolo.
 
@@ -133,16 +139,17 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 > `features/backtests` queda COMPLETO.** Lotes 19-28 del resto de `apps/web/src`: **`accounts` (19, `689c294`),
 > `workspace` (20, `1081809`), `config`+`platform` (21, `75f6595`), `research` (22, `cbd0fff`), `settings` (23,
 > `4300674`), `instruments` (24, `e38be2d`), `stores` (25, `110667b`), `lib` sub-batch A (26, `465137a`),
-> `lib` sub-batch B (27, `0b8f04b`), `screeners` (28, `882082c`, cierre de dominio).** Tras los lotes 19-28, el `prettier --check` amplio (excl. `features/backtests`) marca **222 files**
-> desincronizados restantes (406 formateados en 28 commits).
+> `lib` sub-batch B (27, `0b8f04b`), `screeners` (28, `882082c`, cierre de dominio), `charts` sub-batch A (29, `998ed1d`),
+> `charts` sub-batch B (30, `87e47e5`), `charts` sub-batch C (31, `ce981e7`, cierre de dominio).** Tras los lotes 19-31, el `prettier --check` amplio (excl. `features/backtests`) marca **135 files**
+> desincronizados restantes (493 formateados en 31 commits).
 > Recomendar arrancar el siguiente sub-lote por un dominio con pocos archivos y sin mezclar dominios:
 >
 > **Siguiente: otro dominio del resto de `apps/web/src`** (fuera de `features/backtests`, que queda completo) por
-> sub-lotes, con el mismo protocolo de 8 pasos (features de otros dominios —charts, trading, auxiliares
+> sub-lotes, con el mismo protocolo de 8 pasos (features de otros dominios —trading, auxiliares
 > alerts/auth/ai/help—, components/ui, layout, etc.), ejecutando `prettier --check` por
 > sub-lote y verificando el `git diff --cached --numstat` (paso 4). Correr `test:coach` cuando el sub-lote toque área
-> Coach/TOP (revisar `features/charts`). Hechos: `accounts` (19), `workspace` (20), `config`+`platform` (21), `research` (22), `settings` (23),
-> `instruments` (24), `stores` (25), `lib` sub-batch A (26), `lib` sub-batch B (27, cierre de dominio), `screeners` (28, cierre de dominio).
+> Coach/TOP (revisar `features/trading`). Hechos: `accounts` (19), `workspace` (20), `config`+`platform` (21), `research` (22), `settings` (23),
+> `instruments` (24), `stores` (25), `lib` sub-batch A (26), `lib` sub-batch B (27, cierre de dominio), `screeners` (28, cierre de dominio), `charts` (29-31, cierre de dominio).
 
 
 ## 6. Documentos fuente de verdad / índices
