@@ -4,12 +4,12 @@
  * No es PnL mark-to-market: flujo neto = ventas − compras de los fills enlazados.
  */
 
-import type { TransactionDto } from '@bolsa/shared';
+import type { TransactionDto } from "@bolsa/shared";
 import {
   listMandateTenures,
   listTradeLinksForMandate,
   type MandateTenure,
-} from '@/features/platform/operating-mandate';
+} from "@/features/platform/operating-mandate";
 
 export type MandateTenureCashflow = {
   tenureId: string;
@@ -36,7 +36,7 @@ export function computeTenureCashflow(
     tradeCount += 1;
     const notional = Number(tx.total);
     if (!Number.isFinite(notional)) continue;
-    if (tx.type === 'buy') buyNotional += notional;
+    if (tx.type === "buy") buyNotional += notional;
     else sellNotional += notional;
   }
   return {
@@ -70,6 +70,6 @@ export function buildMandatePnlReport(opts: {
 }
 
 export function formatMandateCashflow(n: number): string {
-  const sign = n > 0 ? '+' : '';
+  const sign = n > 0 ? "+" : "";
   return `${sign}${n.toFixed(2)}`;
 }

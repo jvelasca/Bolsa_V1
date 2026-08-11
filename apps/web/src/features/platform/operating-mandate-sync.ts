@@ -3,7 +3,7 @@
  * localStorage = cache offline; BD = SoT multi-dispositivo.
  */
 
-import { api } from '@/lib/api';
+import { api } from "@/lib/api";
 import {
   MANDATE_TRADE_LINKS_ENGINE,
   MANDATE_TENURES_ENGINE,
@@ -14,7 +14,7 @@ import {
   writeMandateTradeLinkStore,
   type MandateTenure,
   type MandateTradeLink,
-} from '@/features/platform/operating-mandate';
+} from "@/features/platform/operating-mandate";
 
 let syncTimer: ReturnType<typeof setTimeout> | null = null;
 const hydratedAccounts = new Set<string>();
@@ -23,7 +23,10 @@ function tenuresForAccount(accountId: string): MandateTenure[] {
   const store = readMandateTenureStore();
   const out: MandateTenure[] = [];
   for (const [key, rows] of Object.entries(store.byKey)) {
-    if (key.endsWith(`::${accountId}`) || rows.some((r) => r.accountId === accountId)) {
+    if (
+      key.endsWith(`::${accountId}`) ||
+      rows.some((r) => r.accountId === accountId)
+    ) {
       out.push(...rows.filter((r) => r.accountId === accountId));
     }
   }
@@ -31,11 +34,15 @@ function tenuresForAccount(accountId: string): MandateTenure[] {
 }
 
 function linksForAccount(accountId: string): MandateTradeLink[] {
-  return readMandateTradeLinkStore().links.filter((l) => l.accountId === accountId);
+  return readMandateTradeLinkStore().links.filter(
+    (l) => l.accountId === accountId,
+  );
 }
 
 /** Pull BD → localStorage (merge por id; BD gana en conflicto). */
-export async function hydrateMandateFromServer(accountId: string): Promise<void> {
+export async function hydrateMandateFromServer(
+  accountId: string,
+): Promise<void> {
   if (!accountId) return;
   try {
     const res = await api.getAccountMandates(accountId);
@@ -59,11 +66,12 @@ export async function hydrateMandateFromServer(accountId: string): Promise<void>
         strategyLabelSnapshot: t.strategyLabelSnapshot ?? null,
         effectiveFrom: t.effectiveFrom,
         effectiveTo: t.effectiveTo ?? null,
-        actor: t.actor as MandateTenure['actor'],
-        reason: t.reason as MandateTenure['reason'],
+        actor: t.actor as MandateTenure["actor"],
+        reason: t.reason as MandateTenure["reason"],
         sourceTopId: t.sourceTopId ?? null,
         sourceTopVersion: t.sourceTopVersion ?? null,
-        evidenceLevel: (t.evidenceLevel as MandateTenure['evidenceLevel']) ?? null,
+        evidenceLevel:
+          (t.evidenceLevel as MandateTenure["evidenceLevel"]) ?? null,
       };
       byKey[key] = [...(byKey[key] ?? []), row];
     }
@@ -102,7 +110,9 @@ export async function pushMandateToServer(accountId: string): Promise<void> {
 }
 
 /** Debounce push tras mutaciones locales. */
-export function scheduleMandatePush(accountId: string | null | undefined): void {
+export function scheduleMandatePush(
+  accountId: string | null | undefined,
+): void {
   if (!accountId) return;
   if (syncTimer) clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {

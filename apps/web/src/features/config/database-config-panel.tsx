@@ -1,8 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, RefreshCw, Trash2 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api, ApiError } from '@/lib/api';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, RefreshCw, Trash2 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { api, ApiError } from "@/lib/api";
+import { useState } from "react";
 
 export function DatabaseConfigPanel() {
   const queryClient = useQueryClient();
@@ -10,25 +16,27 @@ export function DatabaseConfigPanel() {
   const [error, setError] = useState<string | null>(null);
 
   const summaryQuery = useQuery({
-    queryKey: ['database-summary'],
+    queryKey: ["database-summary"],
     queryFn: () => api.getDatabaseSummary(),
   });
 
   const orphansQuery = useQuery({
-    queryKey: ['database-orphans'],
+    queryKey: ["database-orphans"],
     queryFn: () => api.getOrphanInstruments(100),
   });
 
   const closedAccountsQuery = useQuery({
-    queryKey: ['database-closed-accounts'],
+    queryKey: ["database-closed-accounts"],
     queryFn: () => api.getClosedSimulatedAccounts(100),
   });
 
   async function invalidateDbQueries() {
-    await queryClient.invalidateQueries({ queryKey: ['database-summary'] });
-    await queryClient.invalidateQueries({ queryKey: ['database-orphans'] });
-    await queryClient.invalidateQueries({ queryKey: ['database-closed-accounts'] });
-    await queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    await queryClient.invalidateQueries({ queryKey: ["database-summary"] });
+    await queryClient.invalidateQueries({ queryKey: ["database-orphans"] });
+    await queryClient.invalidateQueries({
+      queryKey: ["database-closed-accounts"],
+    });
+    await queryClient.invalidateQueries({ queryKey: ["accounts"] });
   }
 
   const purgeMutation = useMutation({
@@ -39,12 +47,12 @@ export function DatabaseConfigPanel() {
         `Purga valores: ${res.data.purgedIds.length} eliminados, ${res.data.skipped.length} omitidos (de ${res.data.scanned} revisados).`,
       );
       await invalidateDbQueries();
-      await queryClient.invalidateQueries({ queryKey: ['lists'] });
-      await queryClient.invalidateQueries({ queryKey: ['instruments'] });
+      await queryClient.invalidateQueries({ queryKey: ["lists"] });
+      await queryClient.invalidateQueries({ queryKey: ["instruments"] });
     },
     onError: (err) => {
       setMessage(null);
-      setError(err instanceof ApiError ? err.message : 'No se pudo purgar');
+      setError(err instanceof ApiError ? err.message : "No se pudo purgar");
     },
   });
 
@@ -52,12 +60,12 @@ export function DatabaseConfigPanel() {
     mutationFn: (id: string) => api.deleteInstrument(id, false),
     onSuccess: async () => {
       setError(null);
-      setMessage('Instrumento eliminado de BD.');
+      setMessage("Instrumento eliminado de BD.");
       await invalidateDbQueries();
     },
     onError: (err) => {
       setMessage(null);
-      setError(err instanceof ApiError ? err.message : 'No se pudo eliminar');
+      setError(err instanceof ApiError ? err.message : "No se pudo eliminar");
     },
   });
 
@@ -72,7 +80,11 @@ export function DatabaseConfigPanel() {
     },
     onError: (err) => {
       setMessage(null);
-      setError(err instanceof ApiError ? err.message : 'No se pudieron purgar las demos');
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudieron purgar las demos",
+      );
     },
   });
 
@@ -80,12 +92,14 @@ export function DatabaseConfigPanel() {
     mutationFn: (id: string) => api.deleteAccount(id),
     onSuccess: async () => {
       setError(null);
-      setMessage('Cuenta demo eliminada de BD.');
+      setMessage("Cuenta demo eliminada de BD.");
       await invalidateDbQueries();
     },
     onError: (err) => {
       setMessage(null);
-      setError(err instanceof ApiError ? err.message : 'No se pudo eliminar la cuenta');
+      setError(
+        err instanceof ApiError ? err.message : "No se pudo eliminar la cuenta",
+      );
     },
   });
 
@@ -100,7 +114,8 @@ export function DatabaseConfigPanel() {
           <div>
             <CardTitle>Estado de PostgreSQL</CardTitle>
             <CardDescription>
-              Conteos por tabla, valores huérfanos y demos cerradas pendientes de purga.
+              Conteos por tabla, valores huérfanos y demos cerradas pendientes
+              de purga.
             </CardDescription>
           </div>
           <button
@@ -128,19 +143,26 @@ export function DatabaseConfigPanel() {
               <p>
                 <span
                   className={
-                    summary.connected ? 'font-medium text-emerald-600' : 'font-medium text-destructive'
+                    summary.connected
+                      ? "font-medium text-emerald-600"
+                      : "font-medium text-destructive"
                   }
                 >
-                  {summary.connected ? 'Conectado' : 'Sin conexión'}
+                  {summary.connected ? "Conectado" : "Sin conexión"}
                 </span>
-                <span className="text-muted-foreground"> · {summary.message}</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {summary.message}
+                </span>
               </p>
               <div className="scroll-area max-h-56 overflow-auto rounded border border-border">
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 bg-muted/80">
                     <tr>
                       <th className="px-2 py-1.5 font-medium">Tabla</th>
-                      <th className="px-2 py-1.5 text-right font-medium">Filas</th>
+                      <th className="px-2 py-1.5 text-right font-medium">
+                        Filas
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -148,7 +170,9 @@ export function DatabaseConfigPanel() {
                       <tr key={row.table} className="border-t border-border/60">
                         <td className="px-2 py-1">
                           <span className="text-foreground">{row.label}</span>
-                          <span className="ml-1 text-muted-foreground">({row.table})</span>
+                          <span className="ml-1 text-muted-foreground">
+                            ({row.table})
+                          </span>
                         </td>
                         <td className="px-2 py-1 text-right tabular-nums">
                           {row.count.toLocaleString()}
@@ -167,10 +191,10 @@ export function DatabaseConfigPanel() {
         <CardHeader>
           <CardTitle>Valores huérfanos</CardTitle>
           <CardDescription>
-            Instrumentos que no están a ninguna lista persistente. Con{' '}
-            <span className="text-foreground">scope=listas</span> la cola ya no los actualiza, pero
-            OHLCV y ficha siguen ocupando espacio hasta purgarlos. No se borran si tienen posición u
-            orden pendiente.
+            Instrumentos que no están a ninguna lista persistente. Con{" "}
+            <span className="text-foreground">scope=listas</span> la cola ya no
+            los actualiza, pero OHLCV y ficha siguen ocupando espacio hasta
+            purgarlos. No se borran si tienen posición u orden pendiente.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -183,11 +207,13 @@ export function DatabaseConfigPanel() {
           {orphans && (
             <>
               <p className="text-xs text-muted-foreground">
-                {orphans.orphans.length} candidato(s) ·{' '}
+                {orphans.orphans.length} candidato(s) ·{" "}
                 {orphans.totalOhlcvBars.toLocaleString()} velas asociadas
               </p>
               {orphans.orphans.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No hay huérfanos ahora mismo.</p>
+                <p className="text-xs text-muted-foreground">
+                  No hay huérfanos ahora mismo.
+                </p>
               ) : (
                 <ul className="scroll-area max-h-48 space-y-1 overflow-auto rounded border border-border p-2">
                   {orphans.orphans.map((o) => (
@@ -197,7 +223,10 @@ export function DatabaseConfigPanel() {
                     >
                       <span className="min-w-0 truncate">
                         <span className="font-medium">{o.symbol}</span>
-                        <span className="text-muted-foreground"> · {o.name}</span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {o.name}
+                        </span>
                         <span className="ml-1 text-muted-foreground">
                           ({o.ohlcvBarCount.toLocaleString()} velas)
                         </span>
@@ -237,13 +266,16 @@ export function DatabaseConfigPanel() {
                   }
                 }}
               >
-                {purgeMutation.isPending ? 'Purgando…' : 'Purgar huérfanos (lote)'}
+                {purgeMutation.isPending
+                  ? "Purgando…"
+                  : "Purgar huérfanos (lote)"}
               </button>
             </>
           )}
           <p className="text-xs text-muted-foreground">
-            Quitar un valor de la última lista personalizada también ofrece esta purga. Las listas de
-            catálogo no se editan. Detalle: Ayuda → Datos de mercado / Watchlist.
+            Quitar un valor de la última lista personalizada también ofrece esta
+            purga. Las listas de catálogo no se editan. Detalle: Ayuda → Datos
+            de mercado / Watchlist.
           </p>
         </CardContent>
       </Card>
@@ -252,9 +284,10 @@ export function DatabaseConfigPanel() {
         <CardHeader>
           <CardTitle>Demos cerradas</CardTitle>
           <CardDescription>
-            Cerrar una cuenta demo la deja en BD (ledger e historial). Eliminar (aquí o en la ficha
-            de cuenta) borra la fila y sus carteras, posiciones, transacciones, ledger y órdenes.
-            Los perfiles inversor del catálogo se conservan; las referencias cognitivas sueltas se
+            Cerrar una cuenta demo la deja en BD (ledger e historial). Eliminar
+            (aquí o en la ficha de cuenta) borra la fila y sus carteras,
+            posiciones, transacciones, ledger y órdenes. Los perfiles inversor
+            del catálogo se conservan; las referencias cognitivas sueltas se
             desvinculan (no se borran).
           </CardDescription>
         </CardHeader>
@@ -268,7 +301,7 @@ export function DatabaseConfigPanel() {
           {closed && (
             <>
               <p className="text-xs text-muted-foreground">
-                {closed.accounts.length} demo(s) cerrada(s) ·{' '}
+                {closed.accounts.length} demo(s) cerrada(s) ·{" "}
                 {closed.totalLedgerEntries.toLocaleString()} asientos de ledger
               </p>
               {closed.accounts.length === 0 ? (
@@ -285,8 +318,9 @@ export function DatabaseConfigPanel() {
                       <span className="min-w-0 truncate">
                         <span className="font-medium">{a.name}</span>
                         <span className="text-muted-foreground">
-                          {' '}
-                          · {a.currency} · {a.ledgerEntryCount} ledger · {a.positionCount} pos.
+                          {" "}
+                          · {a.currency} · {a.ledgerEntryCount} ledger ·{" "}
+                          {a.positionCount} pos.
                         </span>
                       </span>
                       <button
@@ -313,7 +347,9 @@ export function DatabaseConfigPanel() {
               <button
                 type="button"
                 className="rounded bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-                disabled={purgeClosedMutation.isPending || !closed.accounts.length}
+                disabled={
+                  purgeClosedMutation.isPending || !closed.accounts.length
+                }
                 onClick={() => {
                   if (
                     window.confirm(
@@ -324,15 +360,22 @@ export function DatabaseConfigPanel() {
                   }
                 }}
               >
-                {purgeClosedMutation.isPending ? 'Purgando…' : 'Purgar demos cerradas (lote)'}
+                {purgeClosedMutation.isPending
+                  ? "Purgando…"
+                  : "Purgar demos cerradas (lote)"}
               </button>
             </>
           )}
-          {message && <p className="text-xs text-emerald-700 dark:text-emerald-400">{message}</p>}
+          {message && (
+            <p className="text-xs text-emerald-700 dark:text-emerald-400">
+              {message}
+            </p>
+          )}
           {error && <p className="text-xs text-destructive">{error}</p>}
           <p className="text-xs text-muted-foreground">
-            Solo cuentas <span className="text-foreground">simuladas</span> ya cerradas. Paper/live
-            no se purgan aquí. Flujo: Cuentas → cerrar → purgar en BD (o Eliminar en la ficha).
+            Solo cuentas <span className="text-foreground">simuladas</span> ya
+            cerradas. Paper/live no se purgan aquí. Flujo: Cuentas → cerrar →
+            purgar en BD (o Eliminar en la ficha).
           </p>
         </CardContent>
       </Card>

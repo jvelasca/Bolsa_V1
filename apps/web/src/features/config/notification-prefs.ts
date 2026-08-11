@@ -6,7 +6,7 @@
  * @see docs/engineering/audit-pack-estudio-asesor-canales-2026-08-04.md
  */
 
-export const NOTIFICATION_PREFS_KEY = 'bolsa-notification-prefs-v1';
+export const NOTIFICATION_PREFS_KEY = "bolsa-notification-prefs-v1";
 
 export type NotificationPrefs = {
   /** Toast in-app al detectar Alarmas Estudio nuevas. */
@@ -28,7 +28,7 @@ export function defaultNotificationPrefs(): NotificationPrefs {
   return {
     alarmaToastEnabled: true,
     alarmaEmailEnabled: false,
-    alarmaEmail: '',
+    alarmaEmail: "",
     dailyDigestEnabled: false,
     dailyDigestPdfEnabled: false,
   };
@@ -43,19 +43,26 @@ function isValidEmailLoose(value: string): boolean {
 
 export function normalizeNotificationPrefs(raw: unknown): NotificationPrefs {
   const d = defaultNotificationPrefs();
-  if (!raw || typeof raw !== 'object') return d;
+  if (!raw || typeof raw !== "object") return d;
   const o = raw as Partial<NotificationPrefs>;
-  const email = typeof o.alarmaEmail === 'string' ? o.alarmaEmail.trim() : d.alarmaEmail;
+  const email =
+    typeof o.alarmaEmail === "string" ? o.alarmaEmail.trim() : d.alarmaEmail;
   return {
     alarmaToastEnabled:
-      typeof o.alarmaToastEnabled === 'boolean' ? o.alarmaToastEnabled : d.alarmaToastEnabled,
+      typeof o.alarmaToastEnabled === "boolean"
+        ? o.alarmaToastEnabled
+        : d.alarmaToastEnabled,
     alarmaEmailEnabled:
-      typeof o.alarmaEmailEnabled === 'boolean' ? o.alarmaEmailEnabled : d.alarmaEmailEnabled,
+      typeof o.alarmaEmailEnabled === "boolean"
+        ? o.alarmaEmailEnabled
+        : d.alarmaEmailEnabled,
     alarmaEmail: email,
     dailyDigestEnabled:
-      typeof o.dailyDigestEnabled === 'boolean' ? o.dailyDigestEnabled : d.dailyDigestEnabled,
+      typeof o.dailyDigestEnabled === "boolean"
+        ? o.dailyDigestEnabled
+        : d.dailyDigestEnabled,
     dailyDigestPdfEnabled:
-      typeof o.dailyDigestPdfEnabled === 'boolean'
+      typeof o.dailyDigestPdfEnabled === "boolean"
         ? o.dailyDigestPdfEnabled
         : d.dailyDigestPdfEnabled,
   };
@@ -71,7 +78,9 @@ export function loadNotificationPrefs(): NotificationPrefs {
   }
 }
 
-export function saveNotificationPrefs(prefs: NotificationPrefs): NotificationPrefs {
+export function saveNotificationPrefs(
+  prefs: NotificationPrefs,
+): NotificationPrefs {
   const next = normalizeNotificationPrefs(prefs);
   try {
     localStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(next));
@@ -81,7 +90,9 @@ export function saveNotificationPrefs(prefs: NotificationPrefs): NotificationPre
   return next;
 }
 
-export function notificationEmailReady(prefs: NotificationPrefs = loadNotificationPrefs()): boolean {
+export function notificationEmailReady(
+  prefs: NotificationPrefs = loadNotificationPrefs(),
+): boolean {
   return prefs.alarmaEmailEnabled && isValidEmailLoose(prefs.alarmaEmail);
 }
 

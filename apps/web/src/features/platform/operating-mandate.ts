@@ -9,33 +9,33 @@
  *
  * @see docs/adr/020-operating-mandate-tenure.md
  */
-export const MANDATE_TENURES_KEY = 'bolsa-mandate-tenures-v1';
-export const MANDATE_TENURES_ENGINE = 'mandate-tenures-v1' as const;
+export const MANDATE_TENURES_KEY = "bolsa-mandate-tenures-v1";
+export const MANDATE_TENURES_ENGINE = "mandate-tenures-v1" as const;
 
-export const MANDATE_TRADE_LINKS_KEY = 'bolsa-mandate-trade-links-v1';
-export const MANDATE_TRADE_LINKS_ENGINE = 'mandate-trade-links-v1' as const;
+export const MANDATE_TRADE_LINKS_KEY = "bolsa-mandate-trade-links-v1";
+export const MANDATE_TRADE_LINKS_ENGINE = "mandate-trade-links-v1" as const;
 
-export type MandateActor = 'user' | 'coach' | 'core_r' | 'system';
+export type MandateActor = "user" | "coach" | "core_r" | "system";
 export type MandateReason =
-  | 'adopt'
-  | 'switch'
-  | 'propose_accepted'
-  | 'obsolete'
-  | 'manual';
+  | "adopt"
+  | "switch"
+  | "propose_accepted"
+  | "obsolete"
+  | "manual";
 
 export const MANDATE_ACTOR_LABELS: Record<MandateActor, string> = {
-  user: 'Usuario',
-  coach: 'Coach',
-  core_r: 'CORE-R',
-  system: 'Sistema',
+  user: "Usuario",
+  coach: "Coach",
+  core_r: "CORE-R",
+  system: "Sistema",
 };
 
 export const MANDATE_REASON_LABELS: Record<MandateReason, string> = {
-  adopt: 'Adoptar',
-  switch: 'Cambio',
-  propose_accepted: 'Propuesta aceptada',
-  obsolete: 'Obsoleto',
-  manual: 'Manual',
+  adopt: "Adoptar",
+  switch: "Cambio",
+  propose_accepted: "Propuesta aceptada",
+  obsolete: "Obsoleto",
+  manual: "Manual",
 };
 
 export type MandateTenure = {
@@ -52,7 +52,7 @@ export type MandateTenure = {
   reason: MandateReason;
   sourceTopId?: string | null;
   sourceTopVersion?: number | null;
-  evidenceLevel?: 'in_sample_only' | 'lab_validated' | null;
+  evidenceLevel?: "in_sample_only" | "lab_validated" | null;
 };
 
 export type MandateTenureStore = {
@@ -112,13 +112,13 @@ export function mandateKey(instrumentId: string, accountId: string): string {
 }
 
 function schedulePush(accountId: string): void {
-  void import('@/features/platform/operating-mandate-sync').then((m) => {
+  void import("@/features/platform/operating-mandate-sync").then((m) => {
     m.scheduleMandatePush(accountId);
   });
 }
 
 function newTenureId(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
   }
   return `mt-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -129,12 +129,12 @@ export function emptyMandateTenureStore(): MandateTenureStore {
 }
 
 export function readMandateTenureStore(): MandateTenureStore {
-  if (typeof localStorage === 'undefined') return emptyMandateTenureStore();
+  if (typeof localStorage === "undefined") return emptyMandateTenureStore();
   try {
     const raw = localStorage.getItem(MANDATE_TENURES_KEY);
     if (!raw) return emptyMandateTenureStore();
     const parsed = JSON.parse(raw) as MandateTenureStore;
-    if (!parsed || typeof parsed !== 'object' || !parsed.byKey) {
+    if (!parsed || typeof parsed !== "object" || !parsed.byKey) {
       return emptyMandateTenureStore();
     }
     return { engine: MANDATE_TENURES_ENGINE, byKey: parsed.byKey };
@@ -144,7 +144,7 @@ export function readMandateTenureStore(): MandateTenureStore {
 }
 
 export function writeMandateTenureStore(store: MandateTenureStore): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === "undefined") return;
   localStorage.setItem(
     MANDATE_TENURES_KEY,
     JSON.stringify({ engine: MANDATE_TENURES_ENGINE, byKey: store.byKey }),
@@ -157,8 +157,11 @@ export function listMandateTenures(
   accountId: string | null | undefined,
 ): MandateTenure[] {
   if (!accountId) return [];
-  const rows = readMandateTenureStore().byKey[mandateKey(instrumentId, accountId)] ?? [];
-  return [...rows].sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+  const rows =
+    readMandateTenureStore().byKey[mandateKey(instrumentId, accountId)] ?? [];
+  return [...rows].sort((a, b) =>
+    a.effectiveFrom.localeCompare(b.effectiveFrom),
+  );
 }
 
 export function getOpenMandateTenure(
@@ -189,7 +192,7 @@ export function applyMandateChange(input: {
     reason?: MandateReason;
     sourceTopId?: string | null;
     sourceTopVersion?: number | null;
-    evidenceLevel?: 'in_sample_only' | 'lab_validated' | null;
+    evidenceLevel?: "in_sample_only" | "lab_validated" | null;
   } | null;
   at?: string;
 }): { closed: MandateTenure | null; opened: MandateTenure | null } {
@@ -205,7 +208,8 @@ export function applyMandateChange(input: {
     if (prev) {
       const sameStrategy =
         input.open &&
-        (prev.strategyDefinitionId ?? null) === (input.open.strategyDefinitionId ?? null);
+        (prev.strategyDefinitionId ?? null) ===
+          (input.open.strategyDefinitionId ?? null);
       if (sameStrategy && input.open) {
         return { closed: null, opened: prev };
       }
@@ -216,7 +220,8 @@ export function applyMandateChange(input: {
 
   let opened: MandateTenure | null = null;
   if (input.open) {
-    const reason: MandateReason = input.open.reason ?? (closed ? 'switch' : 'adopt');
+    const reason: MandateReason =
+      input.open.reason ?? (closed ? "switch" : "adopt");
     opened = {
       id: newTenureId(),
       accountId: input.accountId,
@@ -226,7 +231,7 @@ export function applyMandateChange(input: {
       strategyLabelSnapshot: input.open.strategyLabelSnapshot ?? null,
       effectiveFrom: at,
       effectiveTo: null,
-      actor: input.open.actor ?? 'user',
+      actor: input.open.actor ?? "user",
       reason,
       sourceTopId: input.open.sourceTopId ?? null,
       sourceTopVersion: input.open.sourceTopVersion ?? null,
@@ -261,16 +266,17 @@ export function seedMandateFromAdoption(input: {
       strategyDefinitionId: input.strategyDefinitionId,
       strategyLabelSnapshot: input.strategyLabel,
       timeframe: input.timeframe,
-      actor: 'system',
-      reason: 'adopt',
+      actor: "system",
+      reason: "adopt",
     },
   });
   return opened;
 }
 
-export function summarizeMandateChurn(
-  opts?: { accountId?: string | null; instrumentId?: string | null },
-): MandateChurnSummary {
+export function summarizeMandateChurn(opts?: {
+  accountId?: string | null;
+  instrumentId?: string | null;
+}): MandateChurnSummary {
   const store = readMandateTenureStore();
   const byActor: Record<MandateActor, number> = {
     user: 0,
@@ -283,7 +289,7 @@ export function summarizeMandateChurn(
   let totalChanges = 0;
 
   for (const [key, rows] of Object.entries(store.byKey)) {
-    const [instrumentId, accountId] = key.split('::');
+    const [instrumentId, accountId] = key.split("::");
     if (opts?.accountId && accountId !== opts.accountId) continue;
     if (opts?.instrumentId && instrumentId !== opts.instrumentId) continue;
     for (const row of rows) {
@@ -298,12 +304,14 @@ export function summarizeMandateChurn(
 }
 
 /** Tenures abiertos de una cuenta (revisión 5b en Coach rail). */
-export function listOpenMandateTenures(accountId: string | null | undefined): MandateTenure[] {
+export function listOpenMandateTenures(
+  accountId: string | null | undefined,
+): MandateTenure[] {
   if (!accountId) return [];
   const store = readMandateTenureStore();
   const out: MandateTenure[] = [];
   for (const [key, rows] of Object.entries(store.byKey)) {
-    const [, acc] = key.split('::');
+    const [, acc] = key.split("::");
     if (acc !== accountId) continue;
     for (const row of rows) {
       if (row.effectiveTo == null) out.push(row);
@@ -317,12 +325,13 @@ export function emptyMandateTradeLinkStore(): MandateTradeLinkStore {
 }
 
 export function readMandateTradeLinkStore(): MandateTradeLinkStore {
-  if (typeof localStorage === 'undefined') return emptyMandateTradeLinkStore();
+  if (typeof localStorage === "undefined") return emptyMandateTradeLinkStore();
   try {
     const raw = localStorage.getItem(MANDATE_TRADE_LINKS_KEY);
     if (!raw) return emptyMandateTradeLinkStore();
     const parsed = JSON.parse(raw) as MandateTradeLinkStore;
-    if (!parsed || !Array.isArray(parsed.links)) return emptyMandateTradeLinkStore();
+    if (!parsed || !Array.isArray(parsed.links))
+      return emptyMandateTradeLinkStore();
     return { engine: MANDATE_TRADE_LINKS_ENGINE, links: parsed.links };
   } catch {
     return emptyMandateTradeLinkStore();
@@ -330,7 +339,7 @@ export function readMandateTradeLinkStore(): MandateTradeLinkStore {
 }
 
 export function writeMandateTradeLinkStore(store: MandateTradeLinkStore): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === "undefined") return;
   localStorage.setItem(
     MANDATE_TRADE_LINKS_KEY,
     JSON.stringify({ engine: MANDATE_TRADE_LINKS_ENGINE, links: store.links }),
@@ -352,7 +361,9 @@ export function linkTradeToMandate(input: {
   if (!tenureId) return null;
 
   const store = readMandateTradeLinkStore();
-  const existing = store.links.find((l) => l.transactionId === input.transactionId);
+  const existing = store.links.find(
+    (l) => l.transactionId === input.transactionId,
+  );
   if (existing) return existing;
 
   const link: MandateTradeLink = {
@@ -369,7 +380,9 @@ export function linkTradeToMandate(input: {
   return link;
 }
 
-export function listTradeLinksForMandate(mandateTenureId: string): MandateTradeLink[] {
+export function listTradeLinksForMandate(
+  mandateTenureId: string,
+): MandateTradeLink[] {
   return readMandateTradeLinkStore().links.filter(
     (l) => l.mandateTenureId === mandateTenureId,
   );

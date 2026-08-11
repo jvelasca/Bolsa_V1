@@ -15,31 +15,31 @@ import {
   seedMandateFromAdoption,
   type MandateActor,
   type MandateReason,
-} from '@/features/platform/operating-mandate';
+} from "@/features/platform/operating-mandate";
 
-export const STRATEGY_ADOPTION_KEY = 'bolsa-strategy-adoption-v1';
-export const STRATEGY_ADOPTION_ENGINE = 'strategy-adoption-v1' as const;
+export const STRATEGY_ADOPTION_KEY = "bolsa-strategy-adoption-v1";
+export const STRATEGY_ADOPTION_ENGINE = "strategy-adoption-v1" as const;
 
 export type StrategyAdoptionState =
-  | 'none'
-  | 'candidata'
-  | 'adoptada'
-  | 'propuesta'
-  | 'obsoleta';
+  | "none"
+  | "candidata"
+  | "adoptada"
+  | "propuesta"
+  | "obsoleta";
 
 export const STRATEGY_ADOPTION_LABELS: Record<StrategyAdoptionState, string> = {
-  none: 'Sin adopción',
-  candidata: 'Candidata',
-  adoptada: 'Adoptada',
-  propuesta: 'Propuesta',
-  obsoleta: 'Obsoleta',
+  none: "Sin adopción",
+  candidata: "Candidata",
+  adoptada: "Adoptada",
+  propuesta: "Propuesta",
+  obsoleta: "Obsoleta",
 };
 
 export type StrategyAdoptionRecord = {
   engine: typeof STRATEGY_ADOPTION_ENGINE;
   instrumentId: string;
   accountId: string;
-  state: Exclude<StrategyAdoptionState, 'none'>;
+  state: Exclude<StrategyAdoptionState, "none">;
   strategyDefinitionId?: string | null;
   strategyLabel?: string | null;
   timeframe?: string | null;
@@ -55,19 +55,19 @@ export function adoptionKey(instrumentId: string, accountId: string): string {
 }
 
 export function readAdoptionStore(): StrategyAdoptionStore {
-  if (typeof localStorage === 'undefined') return {};
+  if (typeof localStorage === "undefined") return {};
   try {
     const raw = localStorage.getItem(STRATEGY_ADOPTION_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as StrategyAdoptionStore;
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
     return {};
   }
 }
 
 export function writeAdoptionStore(store: StrategyAdoptionStore): void {
-  if (typeof localStorage === 'undefined') return;
+  if (typeof localStorage === "undefined") return;
   localStorage.setItem(STRATEGY_ADOPTION_KEY, JSON.stringify(store));
   notifyMandateStoreListeners();
 }
@@ -79,7 +79,7 @@ export function getAdoption(
   if (!accountId) return null;
   const rec = readAdoptionStore()[adoptionKey(instrumentId, accountId)] ?? null;
   if (
-    rec?.state === 'adoptada' &&
+    rec?.state === "adoptada" &&
     rec.strategyDefinitionId &&
     !rec.mandateTenureId
   ) {
@@ -109,13 +109,13 @@ export function getAdoptionState(
   instrumentId: string,
   accountId: string | null | undefined,
 ): StrategyAdoptionState {
-  return getAdoption(instrumentId, accountId)?.state ?? 'none';
+  return getAdoption(instrumentId, accountId)?.state ?? "none";
 }
 
 export function setAdoption(input: {
   instrumentId: string;
   accountId: string;
-  state: Exclude<StrategyAdoptionState, 'none'>;
+  state: Exclude<StrategyAdoptionState, "none">;
   strategyDefinitionId?: string | null;
   strategyLabel?: string | null;
   timeframe?: string | null;
@@ -123,11 +123,11 @@ export function setAdoption(input: {
   reason?: MandateReason;
   sourceTopId?: string | null;
   sourceTopVersion?: number | null;
-  evidenceLevel?: 'in_sample_only' | 'lab_validated' | null;
+  evidenceLevel?: "in_sample_only" | "lab_validated" | null;
 }): StrategyAdoptionRecord {
   let mandateTenureId: string | null = null;
 
-  if (input.state === 'adoptada') {
+  if (input.state === "adoptada") {
     const { opened } = applyMandateChange({
       instrumentId: input.instrumentId,
       accountId: input.accountId,
@@ -135,7 +135,7 @@ export function setAdoption(input: {
         strategyDefinitionId: input.strategyDefinitionId,
         strategyLabelSnapshot: input.strategyLabel,
         timeframe: input.timeframe,
-        actor: input.actor ?? 'user',
+        actor: input.actor ?? "user",
         reason: input.reason,
         sourceTopId: input.sourceTopId,
         sourceTopVersion: input.sourceTopVersion,
@@ -143,14 +143,17 @@ export function setAdoption(input: {
       },
     });
     mandateTenureId = opened?.id ?? null;
-  } else if (input.state === 'obsoleta') {
+  } else if (input.state === "obsoleta") {
     applyMandateChange({
       instrumentId: input.instrumentId,
       accountId: input.accountId,
       open: null,
       // reason obsolete is implicit by closing without reopen
     });
-  } else if (input.state === 'propuesta' && input.reason === 'propose_accepted') {
+  } else if (
+    input.state === "propuesta" &&
+    input.reason === "propose_accepted"
+  ) {
     const { opened } = applyMandateChange({
       instrumentId: input.instrumentId,
       accountId: input.accountId,
@@ -158,8 +161,8 @@ export function setAdoption(input: {
         strategyDefinitionId: input.strategyDefinitionId,
         strategyLabelSnapshot: input.strategyLabel,
         timeframe: input.timeframe,
-        actor: input.actor ?? 'user',
-        reason: 'propose_accepted',
+        actor: input.actor ?? "user",
+        reason: "propose_accepted",
         sourceTopId: input.sourceTopId,
         sourceTopVersion: input.sourceTopVersion,
         evidenceLevel: input.evidenceLevel,
