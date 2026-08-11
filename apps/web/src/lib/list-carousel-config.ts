@@ -1,5 +1,5 @@
-import type { InstrumentListSummaryDto, ListPanelConfig } from '@bolsa/shared';
-import { isVirtualListId } from '@bolsa/shared';
+import type { InstrumentListSummaryDto, ListPanelConfig } from "@bolsa/shared";
+import { isVirtualListId } from "@bolsa/shared";
 
 export function isListPinnedInCarousel(
   listId: string,

@@ -10,7 +10,7 @@ export interface DateParts {
 }
 
 function pad2(value: number): string {
-  return String(value).padStart(2, '0');
+  return String(value).padStart(2, "0");
 }
 
 export function formatDateInputValue(date: Date): string {
@@ -56,7 +56,10 @@ export function addMonths(view: YearMonth, delta: number): YearMonth {
 export function buildMonthGrid(year: number, month: number): (number | null)[] {
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: (number | null)[] = Array.from({ length: firstWeekday }, () => null);
+  const cells: (number | null)[] = Array.from(
+    { length: firstWeekday },
+    () => null,
+  );
   for (let day = 1; day <= daysInMonth; day += 1) {
     cells.push(day);
   }
@@ -66,19 +69,19 @@ export function buildMonthGrid(year: number, month: number): (number | null)[] {
   return cells;
 }
 
-export const WEEKDAY_LABELS_ES = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const;
+export const WEEKDAY_LABELS_ES = ["L", "M", "X", "J", "V", "S", "D"] as const;
 
 export const MONTH_LABELS_ES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
 ] as const;

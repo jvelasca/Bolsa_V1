@@ -1,7 +1,10 @@
-import type { ChartDrawTool } from '@bolsa/shared';
-import { IMPLEMENTED_DRAW_TOOLS, normalizeDrawToolFavorites } from '@bolsa/shared';
+import type { ChartDrawTool } from "@bolsa/shared";
+import {
+  IMPLEMENTED_DRAW_TOOLS,
+  normalizeDrawToolFavorites,
+} from "@bolsa/shared";
 
-const STORAGE_KEY = 'bolsa-draw-tool-favorites';
+const STORAGE_KEY = "bolsa-draw-tool-favorites";
 
 export function readDrawToolFavoritesLocal(): ChartDrawTool[] | null {
   try {

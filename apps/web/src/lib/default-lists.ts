@@ -1,13 +1,17 @@
-import type { InstrumentListSummaryDto, InstrumentWithMetaDto, PositionDto } from '@bolsa/shared';
+import type {
+  InstrumentListSummaryDto,
+  InstrumentWithMetaDto,
+  PositionDto,
+} from "@bolsa/shared";
 import {
   VIRTUAL_LIST_LABELS,
   VIRTUAL_LIST_PENDING_ORDERS,
   VIRTUAL_LIST_PORTFOLIO,
   VIRTUAL_LIST_VISUALIZATION,
   type VirtualListId,
-} from '@bolsa/shared';
-import type { PendingOrderDto } from '@bolsa/shared';
-import type { VisualizationSessionEntry } from '@/stores/visualization-store';
+} from "@bolsa/shared";
+import type { PendingOrderDto } from "@bolsa/shared";
+import type { VisualizationSessionEntry } from "@/stores/visualization-store";
 
 export function buildVirtualListSummaries(
   portfolioCount: number,
@@ -19,21 +23,21 @@ export function buildVirtualListSummaries(
     {
       id: VIRTUAL_LIST_PORTFOLIO,
       name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_PORTFOLIO],
-      source: 'virtual',
+      source: "virtual",
       itemCount: portfolioCount,
       updatedAt: now,
     },
     {
       id: VIRTUAL_LIST_PENDING_ORDERS,
       name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_PENDING_ORDERS],
-      source: 'virtual',
+      source: "virtual",
       itemCount: pendingCount,
       updatedAt: now,
     },
     {
       id: VIRTUAL_LIST_VISUALIZATION,
       name: VIRTUAL_LIST_LABELS[VIRTUAL_LIST_VISUALIZATION],
-      source: 'virtual',
+      source: "virtual",
       itemCount: visualizationCount,
       updatedAt: now,
     },
@@ -66,9 +70,9 @@ export function positionToListItem(
     symbol: position.symbol,
     yahooSymbol: position.symbol,
     name: position.name,
-    exchange: 'BME',
-    country: 'ES',
-    currency: 'EUR',
+    exchange: "BME",
+    country: "ES",
+    currency: "EUR",
     sector: null,
     isActive: true,
     meta: {
@@ -92,9 +96,9 @@ export function pendingOrderToListItem(
     symbol: order.symbol,
     yahooSymbol: order.symbol,
     name: order.symbol,
-    exchange: 'BME',
-    country: 'ES',
-    currency: 'EUR',
+    exchange: "BME",
+    country: "ES",
+    currency: "EUR",
     sector: null,
     isActive: true,
     meta: {
@@ -106,7 +110,9 @@ export function pendingOrderToListItem(
   };
 }
 
-export function resolveVirtualListId(id: string | undefined): VirtualListId | null {
+export function resolveVirtualListId(
+  id: string | undefined,
+): VirtualListId | null {
   if (
     id === VIRTUAL_LIST_PORTFOLIO ||
     id === VIRTUAL_LIST_PENDING_ORDERS ||
@@ -129,9 +135,9 @@ export function visualizationEntryToListItem(
     symbol: entry.symbol,
     yahooSymbol: entry.symbol,
     name: entry.name,
-    exchange: '—',
-    country: '—',
-    currency: 'EUR',
+    exchange: "—",
+    country: "—",
+    currency: "EUR",
     sector: null,
     isActive: true,
     meta: {

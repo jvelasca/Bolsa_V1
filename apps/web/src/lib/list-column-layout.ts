@@ -1,4 +1,8 @@
-import type { ListColumnId, ListColumnLayoutItem, ListPanelConfig } from '@bolsa/shared';
+import type {
+  ListColumnId,
+  ListColumnLayoutItem,
+  ListPanelConfig,
+} from "@bolsa/shared";
 import {
   ALL_LIST_COLUMNS,
   clampListColumnWidth,
@@ -6,12 +10,13 @@ import {
   normalizeColumnLayout,
   resolveListRowActionsWidth,
   visibleListColumns,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 
 export const LIST_ROW_EXPAND_WIDTH_PX = 28;
 /** Ancho fijo de la columna de check (cabecera y filas alineadas). */
 export const LIST_ROW_SELECT_WIDTH_PX = 18;
-export const DEFAULT_LIST_ROW_ACTIONS_WIDTH_PX = resolveListRowActionsWidth(undefined);
+export const DEFAULT_LIST_ROW_ACTIONS_WIDTH_PX =
+  resolveListRowActionsWidth(undefined);
 
 /** Gutter izquierdo: check opcional + expand/chevron. */
 export function listRowLeftGutterWidthPx(selectEnabled: boolean): number {
@@ -24,48 +29,57 @@ export const LIST_HEADER_GRIP_INSET_PX = 14;
 
 export function isNumericListColumn(columnId: ListColumnId): boolean {
   return (
-    columnId === 'lastClose' ||
-    columnId === 'changePct' ||
-    columnId === 'ioScore' ||
-    columnId === 'taScore' ||
-    columnId === 'faScore' ||
-    columnId === 'dictamenStars'
+    columnId === "lastClose" ||
+    columnId === "changePct" ||
+    columnId === "ioScore" ||
+    columnId === "taScore" ||
+    columnId === "faScore" ||
+    columnId === "dictamenStars"
   );
 }
 
 export function isCenteredListColumn(columnId: ListColumnId): boolean {
   return (
-    columnId === 'syncStatus' ||
-    columnId === 'processStatus' ||
-    columnId === 'dictamenStars'
+    columnId === "syncStatus" ||
+    columnId === "processStatus" ||
+    columnId === "dictamenStars"
   );
 }
 
 export function listColumnContentClass(
   columnId: ListColumnId,
-  variant: 'header' | 'data',
+  variant: "header" | "data",
 ): string {
   const parts = [listColumnCellClass(columnId), columnAlignClass(columnId)];
-  if (!isCenteredListColumn(columnId)) parts.push('pl-4');
-  if (isNumericListColumn(columnId)) parts.push('tabular-nums');
-  if (variant === 'header' && isNumericListColumn(columnId)) parts.push('font-medium');
-  if (variant === 'data' && columnId === 'symbol') parts.push('text-xs font-semibold');
-  if (variant === 'data' && columnId === 'name') parts.push('text-muted-foreground');
-  if (isCenteredListColumn(columnId)) parts.push('flex justify-center');
-  return parts.join(' ');
+  if (!isCenteredListColumn(columnId)) parts.push("pl-4");
+  if (isNumericListColumn(columnId)) parts.push("tabular-nums");
+  if (variant === "header" && isNumericListColumn(columnId))
+    parts.push("font-medium");
+  if (variant === "data" && columnId === "symbol")
+    parts.push("text-xs font-semibold");
+  if (variant === "data" && columnId === "name")
+    parts.push("text-muted-foreground");
+  if (isCenteredListColumn(columnId)) parts.push("flex justify-center");
+  return parts.join(" ");
 }
 
-export function getVisibleColumnLayout(layout: ListColumnLayoutItem[]): ListColumnLayoutItem[] {
+export function getVisibleColumnLayout(
+  layout: ListColumnLayoutItem[],
+): ListColumnLayoutItem[] {
   return layout.filter((column) => column.visible);
 }
 
-function flexibleColumnId(visibleColumns: ListColumnLayoutItem[]): ListColumnId | null {
-  if (visibleColumns.some((column) => column.id === 'name')) return 'name';
+function flexibleColumnId(
+  visibleColumns: ListColumnLayoutItem[],
+): ListColumnId | null {
+  if (visibleColumns.some((column) => column.id === "name")) return "name";
   return visibleColumns.at(-1)?.id ?? null;
 }
 
-export function buildListRowDataGridTemplate(visibleColumns: ListColumnLayoutItem[]): string {
-  if (visibleColumns.length === 0) return 'minmax(0, 1fr)';
+export function buildListRowDataGridTemplate(
+  visibleColumns: ListColumnLayoutItem[],
+): string {
+  if (visibleColumns.length === 0) return "minmax(0, 1fr)";
   const flexId = flexibleColumnId(visibleColumns);
   return visibleColumns
     .map((column) =>
@@ -73,7 +87,7 @@ export function buildListRowDataGridTemplate(visibleColumns: ListColumnLayoutIte
         ? `minmax(${column.width}px, 1fr)`
         : `minmax(0, ${column.width}px)`,
     )
-    .join(' ');
+    .join(" ");
 }
 
 export function buildListRowGridTemplate(
@@ -87,7 +101,9 @@ export function buildListRowGridTemplate(
   return `${LIST_ROW_EXPAND_WIDTH_PX}px ${buildListRowDataGridTemplate(visibleColumns)} ${actionsWidth}px`;
 }
 
-export function resolveListRowActionsWidthFromConfig(listConfig: ListPanelConfig): number {
+export function resolveListRowActionsWidthFromConfig(
+  listConfig: ListPanelConfig,
+): number {
   return resolveListRowActionsWidth(listConfig.rowActionsWidth);
 }
 
@@ -125,7 +141,9 @@ export function resizeColumnInLayout(
   width: number,
 ): ListColumnLayoutItem[] {
   return layout.map((column) =>
-    column.id === columnId ? { ...column, width: clampListColumnWidth(width) } : column,
+    column.id === columnId
+      ? { ...column, width: clampListColumnWidth(width) }
+      : column,
   );
 }
 
@@ -156,33 +174,37 @@ export function toggleColumnInLayout(
 
 export function columnAlignClass(columnId: ListColumnId): string {
   if (
-    columnId === 'syncStatus' ||
-    columnId === 'processStatus' ||
-    columnId === 'dictamenStars'
+    columnId === "syncStatus" ||
+    columnId === "processStatus" ||
+    columnId === "dictamenStars"
   ) {
-    return 'text-center';
+    return "text-center";
   }
-  if (columnId === 'symbol' || columnId === 'name' || columnId === 'recStance') {
-    return 'text-left';
+  if (
+    columnId === "symbol" ||
+    columnId === "name" ||
+    columnId === "recStance"
+  ) {
+    return "text-left";
   }
-  return 'text-right';
+  return "text-right";
 }
 
 /** Padding horizontal por columna para separar etiquetas (p. ej. nombre ↔ barras). */
 export function listColumnCellClass(columnId: ListColumnId): string {
   switch (columnId) {
-    case 'symbol':
-      return 'px-1.5';
-    case 'name':
-      return 'px-2 pr-3';
-    case 'syncStatus':
-    case 'processStatus':
-      return 'px-1 text-center';
-    case 'lastLabAt':
-    case 'lastCoreRAt':
-      return 'px-1.5';
+    case "symbol":
+      return "px-1.5";
+    case "name":
+      return "px-2 pr-3";
+    case "syncStatus":
+    case "processStatus":
+      return "px-1 text-center";
+    case "lastLabAt":
+    case "lastCoreRAt":
+      return "px-1.5";
     default:
-      return 'px-2';
+      return "px-2";
   }
 }
 
@@ -190,7 +212,9 @@ export function resolveListFavoriteColumnIds(
   listConfig: ListPanelConfig,
   listId: string,
 ): ListColumnId[] {
-  return listConfig.favoriteColumnIdsByListId?.[listId] ?? ['symbol', 'lastClose'];
+  return (
+    listConfig.favoriteColumnIdsByListId?.[listId] ?? ["symbol", "lastClose"]
+  );
 }
 
 export function patchListFavoriteColumn(

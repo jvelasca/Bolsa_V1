@@ -3,7 +3,7 @@
  * Un valor puede estar en varias listas; la pestaña es única y se reutiliza al abrir.
  */
 
-import type { ChartTabState } from '@bolsa/shared';
+import type { ChartTabState } from "@bolsa/shared";
 
 export function dedupeChartTabsByInstrument(
   charts: ChartTabState[],
@@ -13,7 +13,7 @@ export function dedupeChartTabsByInstrument(
   const seen = new Map<string, number>(); // instrumentId → index in kept
 
   for (const tab of charts) {
-    const instrumentId = tab.instrumentId?.trim() ?? '';
+    const instrumentId = tab.instrumentId?.trim() ?? "";
     if (!instrumentId) {
       kept.push(tab);
       continue;

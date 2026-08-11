@@ -12,8 +12,12 @@ import {
   VIRTUAL_LIST_PENDING_ORDERS,
   VIRTUAL_LIST_PORTFOLIO,
   VIRTUAL_LIST_VISUALIZATION,
-} from '@bolsa/shared';
-import type { ChartListContext, ChartTabState, WorkspaceDocument } from '@bolsa/shared';
+} from "@bolsa/shared";
+import type {
+  ChartListContext,
+  ChartTabState,
+  WorkspaceDocument,
+} from "@bolsa/shared";
 
 export interface VirtualListMembership {
   visualization: ReadonlySet<string>;
@@ -64,7 +68,7 @@ function collectCandidateListIds(
   }
   for (const key of Object.keys(workspace.chartStateByListInstrument ?? {})) {
     if (!key.endsWith(`::${tab.instrumentId}`)) continue;
-    push(key.slice(0, key.indexOf('::')));
+    push(key.slice(0, key.indexOf("::")));
   }
   push(workspace.list?.apiListId ?? workspace.list?.id);
 
@@ -111,9 +115,9 @@ export function resolvePreferredListIdForInstrument(
   const containing = membership.listMeta.filter((list) =>
     membership.api[list.id]?.has(instrumentId),
   );
-  const custom = containing.find((list) => list.source === 'custom');
+  const custom = containing.find((list) => list.source === "custom");
   if (custom) return custom.id;
-  const catalog = containing.find((list) => list.source === 'catalog');
+  const catalog = containing.find((list) => list.source === "catalog");
   if (catalog) return catalog.id;
   return containing[0]?.id ?? null;
 }
@@ -154,11 +158,17 @@ export function resolveChartListContext(
   workspace: WorkspaceDocument,
   membership: ChartListMembershipSnapshot | null,
 ): ChartListContext | null {
-  const activeTab = workspace.charts.find((tab) => tab.id === workspace.activeChartId);
+  const activeTab = workspace.charts.find(
+    (tab) => tab.id === workspace.activeChartId,
+  );
   if (!activeTab) return null;
   if (!membership) return workspace.chartListContext ?? null;
 
-  const listId = resolveValidSourceListIdForTab(workspace, activeTab, membership);
+  const listId = resolveValidSourceListIdForTab(
+    workspace,
+    activeTab,
+    membership,
+  );
   return listId ? { listId, instrumentId: activeTab.instrumentId } : null;
 }
 
@@ -170,19 +180,29 @@ export function reconcileWorkspaceChartMembership(
 
   let chartsChanged = false;
   const charts = workspace.charts.map((tab) => {
-    const nextListId = resolveValidSourceListIdForTab(workspace, tab, membership);
+    const nextListId = resolveValidSourceListIdForTab(
+      workspace,
+      tab,
+      membership,
+    );
     const sourceListId = nextListId ?? undefined;
     if (tab.sourceListId === sourceListId) return tab;
     chartsChanged = true;
     return { ...tab, sourceListId };
   });
 
-  const workspaceForContext = chartsChanged ? { ...workspace, charts } : workspace;
-  const chartListContext = resolveChartListContext(workspaceForContext, membership);
+  const workspaceForContext = chartsChanged
+    ? { ...workspace, charts }
+    : workspace;
+  const chartListContext = resolveChartListContext(
+    workspaceForContext,
+    membership,
+  );
   const prevCtx = workspace.chartListContext;
   const contextSame =
     (prevCtx?.listId ?? null) === (chartListContext?.listId ?? null) &&
-    (prevCtx?.instrumentId ?? null) === (chartListContext?.instrumentId ?? null);
+    (prevCtx?.instrumentId ?? null) ===
+      (chartListContext?.instrumentId ?? null);
 
   if (!chartsChanged && contextSame) return workspace;
   return {
@@ -192,15 +212,22 @@ export function reconcileWorkspaceChartMembership(
   };
 }
 
-export function membershipFingerprint(snapshot: ChartListMembershipSnapshot): string {
+export function membershipFingerprint(
+  snapshot: ChartListMembershipSnapshot,
+): string {
   const apiParts = Object.keys(snapshot.api)
     .sort()
-    .map((listId) => `${listId}:${[...(snapshot.api[listId] ?? [])].sort().join(',')}`);
+    .map(
+      (listId) =>
+        `${listId}:${[...(snapshot.api[listId] ?? [])].sort().join(",")}`,
+    );
   const virtual = [
-    [...snapshot.virtual.visualization].sort().join(','),
-    [...snapshot.virtual.portfolio].sort().join(','),
-    [...snapshot.virtual.pendingOrders].sort().join(','),
-  ].join('|');
-  const meta = snapshot.listMeta.map((list) => `${list.id}:${list.source}`).join(',');
-  return `${apiParts.join(';')}|${virtual}|${meta}`;
+    [...snapshot.virtual.visualization].sort().join(","),
+    [...snapshot.virtual.portfolio].sort().join(","),
+    [...snapshot.virtual.pendingOrders].sort().join(","),
+  ].join("|");
+  const meta = snapshot.listMeta
+    .map((list) => `${list.id}:${list.source}`)
+    .join(",");
+  return `${apiParts.join(";")}|${virtual}|${meta}`;
 }

@@ -8,15 +8,15 @@ export function resolveApiBaseUrl(): string {
   const configured = import.meta.env.VITE_API_URL?.trim();
   if (configured) {
     if (
-      typeof window !== 'undefined' &&
-      configured.includes('localhost') &&
-      window.location.hostname !== 'localhost' &&
-      window.location.hostname !== '127.0.0.1'
+      typeof window !== "undefined" &&
+      configured.includes("localhost") &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1"
     ) {
-      return '';
+      return "";
     }
-    return configured.replace(/\/$/, '');
+    return configured.replace(/\/$/, "");
   }
-  if (import.meta.env.DEV) return '';
-  return 'http://localhost:8000';
+  if (import.meta.env.DEV) return "";
+  return "http://localhost:8000";
 }
