@@ -297,7 +297,13 @@ class SqlAlchemyPortfolioRepository:
             summary=summary,
         )
 
-    async def deduct_cash(self, legacy_portfolio_id: str, amount: float) -> float:
+    async def deduct_cash(
+        self,
+        legacy_portfolio_id: str,
+        amount: float,
+        *,
+        allow_partial: bool = False,
+    ) -> float:
         if amount <= 0:
             portfolio = await self.get_summary(legacy_portfolio_id)
             return portfolio.portfolio.cash
@@ -308,9 +314,14 @@ class SqlAlchemyPortfolioRepository:
         )
         if row is None:
             raise ValueError("Cartera no encontrada")
-        fee = Decimal(str(amount))
-        fee = min(fee, row.cash)
-        row.cash -= fee
+        debit = Decimal(str(amount))
+        if debit > row.cash and not allow_partial:
+            raise ValueError(
+                f"Efectivo insuficiente. Necesario: {float(debit):.2f} € · Disponible: {float(row.cash):.2f} €",
+            )
+        if allow_partial:
+            debit = min(debit, row.cash)
+        row.cash -= debit
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return float(row.cash)

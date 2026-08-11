@@ -371,16 +371,34 @@ class ApplyCustodyFees:
         if not charge_legacy_id:
             return False
 
-        balance_after = await self._portfolio_repo.deduct_cash(charge_legacy_id, fee_amount)
+        # Custodia descuenta del cash de una única cartera el cargo calculado
+        # sobre el patrimonio total (por definición el cargo puede superar el
+        # cash disponible). allow_partial: True descarta lo que haya, de forma
+        # explícita (nunca en silencio) y trazada en el ledger con el importe real.
+        pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
+        cash_before = pre_summary.portfolio.cash
+        balance_after = await self._portfolio_repo.deduct_cash(
+            charge_legacy_id,
+            fee_amount,
+            allow_partial=True,
+        )
+        charged = cash_before - balance_after
+        if charged < 0:
+            charged = 0.0
         period = now.strftime("%Y")
+        description = f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
+        if charged < fee_amount:
+            description += (
+                f" · cargo parcial por saldo (aplicado {charged:.2f} € de {fee_amount:.2f} €)"
+            )
         await self._ledger_repo.append_custody_fee(
             account_id=scope.account.id,
             portfolio_id=charge_portfolio_id,
-            amount=fee_amount,
+            amount=charged,
             currency=scope.account.currency,
             balance_after=balance_after,
             reference_id=f"custody-{period}",
-            description=f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f}",
+            description=description,
         )
         await self._account_repo.touch_activity(scope.account.id)
         return True
