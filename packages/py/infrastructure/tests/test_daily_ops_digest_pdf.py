@@ -51,7 +51,7 @@ def _bundle(*, many_trades: bool = False):
                 )
             )
     week = []
-    for i, day in enumerate(range(29, 36)):
+    for i in range(29, 36):
         # 2026-07-29 … 2026-08-04 approx via iso strings
         d = f"2026-08-{i + 1:02d}"
         week.append(

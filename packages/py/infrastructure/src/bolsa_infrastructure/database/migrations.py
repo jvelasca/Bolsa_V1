@@ -14,11 +14,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
-from alembic import command
 from bolsa_infrastructure.config import get_settings
 
 _INFRA_ROOT = Path(__file__).resolve().parents[3]

@@ -2,6 +2,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     PortfolioSummary,
@@ -10,10 +14,6 @@ from bolsa_domain.entities.portfolio import (
     Transaction,
 )
 from bolsa_domain.value_objects.timeframe import TimeFrame
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
     OhlcvBarRow,
