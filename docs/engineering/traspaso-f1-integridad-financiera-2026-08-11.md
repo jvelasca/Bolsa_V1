@@ -3,9 +3,9 @@
 > **Padre:** [engineering-index-2026-08-03.md](./engineering-index-2026-08-03.md) §5 (sub-entrada del Plan F1).
 > **Fuentes de verdad (leer primero):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) (mapa P0/P1/P2 + D0–D5) · [plan-f1-integridad-financiera-2026-08-11.md](./plan-f1-integridad-financiera-2026-08-11.md) (M1–M5, documento de trabajo).
 > **Checkpoint git:** tag anotado `audit-checkpoint-2026-08-11` (HEAD `2683c49` · árbol con docs sin commitear). **Punto de retroceso.**
-> **Rama de ejecución a crear:** `stage/f1-integridad-financiera-2026-08-11` (desde el checkpoint).
+> **Rama de ejecución:** `stage/f1-integridad-financiera-2026-08-11` (**CREADA desde `7edb3d1`**, decisión del usuario; no desde el checkpoint) · remota `origin/stage/f1-integridad-financiera-2026-08-11`.
 > **Regla del hilo:** NO se toca código fuera de F1. Cada micro-cambio atómico se valida con la batería (ruff+mypy+pytest) antes de commit. Commit + push por paso aprobado. Si algo falla → volver al checkpoint.
-> **Estado:** TRASPASO LISTO PARA LLENAR con la ejecución del hilo F1.
+> **Estado:** F1 EN CURSO. M1 (`3d093cb`) y M2 (`113e27a`) COMMIT+push aprobados. M3 EN CURSO. Ver §5 y §7.
 
 ---
 
@@ -73,11 +73,14 @@ Garantizar que **ninguna operación mutante sobre cartera/cuenta/ledger pueda de
 
 ## 7. Registro
 
-| Fecha      | Acción                                                                                                                                                    |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-11 | Traspaso creado tras leer los 3 docs fuente de verdad y verificar el código (estado git: HEAD `2683c49` = checkpoint, tag ok, sin rama F1 aún).           |
-| 2026-08-11 | **M2 resuelta = Opción B** (acordada con el usuario en el chat de traspaso): `allow_partial` explícito, usuario→ValueError, custodia→parcial documentado. |
-| 2026-08-11 | Listo para abrir el chat F1 nuevo y crear la rama `stage/f1-integridad-financiera-2026-08-11` + implementar M1.                                           |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                                                         |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Traspaso creado tras leer los 3 docs fuente de verdad y verificar el código (estado git: HEAD `2683c49` = checkpoint, tag ok, sin rama F1 aún).                                                                                                                                                                                                |
+| 2026-08-11 | **M2 resuelta = Opción B** (acordada con el usuario en el chat de traspaso): `allow_partial` explícito, usuario→ValueError, custodia→parcial documentado.                                                                                                                                                                                      |
+| 2026-08-11 | Rama `stage/f1-integridad-financiera-2026-08-11` creada **desde `7edb3d1`** (decisión del usuario; incluye traspaso+plan+auditoría).                                                                                                                                                                                                           |
+| 2026-08-11 | **M1 commit+push `3d093cb`** — `with_for_update()` en `execute_trade` (portfolio+position), `deduct_cash`, `add_cash`, `transfer_cash` (lock determinista por id). Ruff✓ · mypy✓ · pytest 257✓.                                                                                                                                                |
+| 2026-08-11 | **M2 commit+push `113e27a`** — `deduct_cash(allow_partial: bool=False)`; usuario→ValueError; `ApplyCustodyFees` con `allow_partial=True` registra importe real + `balance_after` real + descripción de cargo parcial. Test `test_deduct_cash_allow_partial.py` (3, DB-requeridos, skip sin PG). Ruff✓ · pytest 260✓ · mypy sin errores nuevos. |
+| 2026-08-11 | M3 EN CURSO — `ExecuteTrade.execute` debe usar `summary.portfolio.cash` del repo como `balance_after` (eliminar recálculo manual de `trade_balance`). Deuda mypy pre-existente en `accounts.py` (no-untyped `execute`), gate mypy es `continue-on-error: true`.                                                                                |
 
 ---
 
@@ -91,3 +94,50 @@ Garantizar que **ninguna operación mutante sobre cartera/cuenta/ledger pueda de
 4. El texto exacto de traspaso del próximo hilo se entrega al usuario **de forma explícita en el propio chat** (block de pegado), no solo guardado en el doc.
 
 **Este documento, §8, es el ancla normativa** para "preparar el siguiente hilo con su texto exacto".
+
+---
+
+## 9. Texto exacto de traspaso — siguiente hilo (F1, continúa en M3)
+
+> Pegha este bloque en un chat NUEVO si este hilo se satura. Arranca en M3 sobre la rama ya creada. No renegociar D0–D5 ni M2 (Opción B).
+
+```text
+Texto de traspaso → nuevo chat (F1 — Integridad financiera, continuación M3/M4/M5)
+
+Lee docs/engineering/traspaso-f1-integridad-financiera-2026-08-11.md (documento de
+trabajo, ya actualizado con el progreso de ejecución) y sus fuentes [plan-f1-2026-08-11.md]
+y [audit-consolidado-internas-externas-2026-08-11.md]. Trabaja SOBRE ESE CONTEXTO y NO
+toques nada fuera del alcance.
+
+ESTADO git (verificado): rama stage/f1-integridad-financiera-2026-08-11 (local, rastrea
+origin). HEAD en el último commit aprobado. M1=3d093cb (with_for_update) y M2=113e27a
+(deduct_cash allow_partial) COMMIT+push aprobados. M3 SIGUIENTE.
+
+Checkpoint de retroceso: tag audit-checkpoint-2026-08-11 (2683c49). Si un paso falla,
+volver al checkpoint.
+
+Decisiones pactadas (NO renegociar): D0 orden F1→F2→F3b→F5a→(F3a+F4+F5b). D1 backtest
+→F2. D2 Alembic única autoridad BD (nunca db push). D4 auth diferida. D5 solo F1–F5.
+M2 RESUELTA = Opción B: deduct_cash tiene allow_partial:bool=False (usuario→ValueError;
+solo custodia usa True→parcial explícito en ledger; nunca en silencio).
+
+FICHEROS NUCLEO ya modificados por mí (M1+M2): portfolio_repository.py (execute_trade/
+deduct_cash/add_cash/transfer_cash con with_for_update) y accounts.py (ApplyCustodyFees
+registra importe real parcial). Nuevo test test_deduct_cash_allow_partial.py.
+
+PENDIENTE (orden, aprobación previa a cada commit):
+- M3 ExecuteTrade.execute usa saldo real del repo (summary.portfolio.cash) como
+  balance_after, elimina recálculo manual de trade_balance.
+- M4 idempotencia idempotency_key UNIQUE(account_id,key) vía Alembic (solo si columna
+  nueva, nunca db push) + TradeRequestDto estricto (Literal buy/sell, gt=0, rechaza
+  NaN/Inf/neg → 422) en POST /api/portfolio/trade.
+- M5 suite invariantes contables (cash>=0, qty>=0, reconcile ledger, anti-doble-gasto
+  bajo concurrencia). Según convenga integrar el test DB de M2 en la suite.
+
+Deuda técnico conocida: mypy gate es continue-on-error:true (P1.6); hay no-untyped
+execute() pre-existentes en accounts.py — NO es regresión de F1, no tocar fuera de alcance.
+
+Protocolo (innegociable): NO tocar código fuera de F1. Batería por cambio (ruff+mypy+
+pytest). Commit atómico+push por paso aprobado. Al terminar F1: pnpm test + CI green +
+cero regresiones. Al saturarse o acabar, preparar siguiente hilo con su texto exacto.
+```
