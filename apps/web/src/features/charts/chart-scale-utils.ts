@@ -36,7 +36,10 @@ export function priceMarginsForZoom(
   };
 }
 
-export function volumeMarginsForZoom(zoom: number): { top: number; bottom: number } {
+export function volumeMarginsForZoom(zoom: number): {
+  top: number;
+  bottom: number;
+} {
   const height = 0.2 / zoom;
   return {
     top: Math.min(0.92, Math.max(0.48, 1 - height)),
@@ -44,7 +47,10 @@ export function volumeMarginsForZoom(zoom: number): { top: number; bottom: numbe
   };
 }
 
-export function stepScaleZoom(current: number, direction: 'in' | 'out'): number {
-  const delta = direction === 'in' ? 0.12 : -0.12;
+export function stepScaleZoom(
+  current: number,
+  direction: "in" | "out",
+): number {
+  const delta = direction === "in" ? 0.12 : -0.12;
   return clampScaleZoom(current + delta);
 }

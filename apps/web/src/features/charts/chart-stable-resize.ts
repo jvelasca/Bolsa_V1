@@ -17,7 +17,8 @@ export function observeStableSize(
     const { width, height } = element.getBoundingClientRect();
     const w = Math.floor(width);
     const h = Math.floor(height);
-    if (Math.abs(w - lastW) < minDelta && Math.abs(h - lastH) < minDelta) return;
+    if (Math.abs(w - lastW) < minDelta && Math.abs(h - lastH) < minDelta)
+      return;
     lastW = w;
     lastH = h;
     onSize(w, h);

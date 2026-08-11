@@ -1,4 +1,4 @@
-import { PRICE_SCALE_HIT_WIDTH_PX } from '@/features/charts/chart-scale-utils';
+import { PRICE_SCALE_HIT_WIDTH_PX } from "@/features/charts/chart-scale-utils";
 
 const AXIS_LOCK_PX = 5;
 
@@ -24,9 +24,9 @@ export function attachChartTimePan({
 
   const endDrag = () => {
     dragging = false;
-    window.removeEventListener('pointermove', onWindowMove);
-    window.removeEventListener('pointerup', onWindowUp);
-    window.removeEventListener('pointercancel', onWindowUp);
+    window.removeEventListener("pointermove", onWindowMove);
+    window.removeEventListener("pointerup", onWindowUp);
+    window.removeEventListener("pointercancel", onWindowUp);
   };
 
   const onWindowMove = (event: PointerEvent) => {
@@ -61,16 +61,16 @@ export function attachChartTimePan({
     startX = event.clientX;
     lastX = event.clientX;
 
-    window.addEventListener('pointermove', onWindowMove);
-    window.addEventListener('pointerup', onWindowUp);
-    window.addEventListener('pointercancel', onWindowUp);
+    window.addEventListener("pointermove", onWindowMove);
+    window.addEventListener("pointerup", onWindowUp);
+    window.addEventListener("pointercancel", onWindowUp);
   };
 
   const capture = { capture: true };
-  captureTarget.addEventListener('pointerdown', onPointerDown, capture);
+  captureTarget.addEventListener("pointerdown", onPointerDown, capture);
 
   return () => {
     endDrag();
-    captureTarget.removeEventListener('pointerdown', onPointerDown, capture);
+    captureTarget.removeEventListener("pointerdown", onPointerDown, capture);
   };
 }

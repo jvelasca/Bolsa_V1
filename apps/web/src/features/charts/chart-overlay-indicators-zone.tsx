@@ -1,15 +1,19 @@
-import type { ChartIndicatorInstance } from '@bolsa/shared';
-import { colorForInstance, findIndicatorDefinition, instanceLabel } from '@bolsa/shared';
-import { Eye, EyeOff, Settings2, Trash2 } from 'lucide-react';
+import type { ChartIndicatorInstance } from "@bolsa/shared";
+import {
+  colorForInstance,
+  findIndicatorDefinition,
+  instanceLabel,
+} from "@bolsa/shared";
+import { Eye, EyeOff, Settings2, Trash2 } from "lucide-react";
 
 import {
   CHART_BAR_ZONE_CHIP_CLASS,
   CHART_BAR_ZONE_LABEL_CLASS,
   CHART_BAR_ZONE_ROW_CLASS,
   CHART_BAR_ZONE_SCROLL_ROW_CLASS,
-} from '@/features/charts/chart-bar-zone-styles';
-import { useUiStore } from '@/stores/ui-store';
-import { cn } from '@/lib/utils';
+} from "@/features/charts/chart-bar-zone-styles";
+import { useUiStore } from "@/stores/ui-store";
+import { cn } from "@/lib/utils";
 
 interface ChartOverlayIndicatorsZoneProps {
   instances: ChartIndicatorInstance[];
@@ -35,7 +39,7 @@ export function ChartOverlayIndicatorsZone({
 
   return (
     <div
-      className={cn(CHART_BAR_ZONE_ROW_CLASS, 'min-w-0 flex-1', className)}
+      className={cn(CHART_BAR_ZONE_ROW_CLASS, "min-w-0 flex-1", className)}
       title="Indicadores dibujados sobre el precio de este gráfico. Clic para seleccionar; pulsar y arrastrar en la escala Y derecha ajusta el zoom vertical."
     >
       <span className={CHART_BAR_ZONE_LABEL_CLASS}>
@@ -44,7 +48,9 @@ export function ChartOverlayIndicatorsZone({
       </span>
       <div
         className={cn(
-          wrapChips ? 'flex min-w-0 flex-1 flex-wrap items-center gap-0.5' : CHART_BAR_ZONE_SCROLL_ROW_CLASS,
+          wrapChips
+            ? "flex min-w-0 flex-1 flex-wrap items-center gap-0.5"
+            : CHART_BAR_ZONE_SCROLL_ROW_CLASS,
         )}
       >
         {instances.map((instance, index) => {
@@ -56,17 +62,20 @@ export function ChartOverlayIndicatorsZone({
             <div
               key={instance.instanceId}
               className={cn(
-                'group flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5',
+                "group flex shrink-0 items-center gap-0.5 rounded border px-1 py-0.5",
                 isSelected
-                  ? 'border-primary/60 bg-primary/10'
-                  : 'border-transparent hover:border-border hover:bg-accent/40',
-                !instance.visible && 'opacity-50',
+                  ? "border-primary/60 bg-primary/10"
+                  : "border-transparent hover:border-border hover:bg-accent/40",
+                !instance.visible && "opacity-50",
               )}
             >
               <button
                 type="button"
-                className={cn(CHART_BAR_ZONE_CHIP_CLASS, 'max-w-[9rem] gap-1 border-0 px-1 py-0')}
-                title={`${instanceLabel(instance)} — ${def?.panel === 'overlay' ? 'Superpuesto al precio' : 'Volumen'}. Doble clic para configurar.`}
+                className={cn(
+                  CHART_BAR_ZONE_CHIP_CLASS,
+                  "max-w-[9rem] gap-1 border-0 px-1 py-0",
+                )}
+                title={`${instanceLabel(instance)} — ${def?.panel === "overlay" ? "Superpuesto al precio" : "Volumen"}. Doble clic para configurar.`}
                 onClick={() => setSelectedId(instance.instanceId)}
                 onDoubleClick={(event) => {
                   event.preventDefault();
@@ -90,7 +99,7 @@ export function ChartOverlayIndicatorsZone({
               </button>
               <button
                 type="button"
-                title={instance.visible ? 'Ocultar' : 'Mostrar'}
+                title={instance.visible ? "Ocultar" : "Mostrar"}
                 onClick={() => onToggleHidden(instance.instanceId)}
                 className="rounded p-0.5 text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100"
               >
@@ -115,8 +124,8 @@ export function ChartOverlayIndicatorsZone({
           type="button"
           className={cn(
             CHART_BAR_ZONE_CHIP_CLASS,
-            'shrink-0 border-dashed',
-            selectedId == null && 'border-primary/50 bg-primary/5',
+            "shrink-0 border-dashed",
+            selectedId == null && "border-primary/50 bg-primary/5",
           )}
           title="Seleccionar eje de precio (pulsar y arrastrar en escala derecha = zoom vertical)"
           onClick={() => setSelectedId(null)}

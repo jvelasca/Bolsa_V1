@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import type { ChartToolbarGlobalConfig } from '@bolsa/shared';
+import { useEffect, useState } from "react";
+import type { ChartToolbarGlobalConfig } from "@bolsa/shared";
 import {
   CHART_TOOLBAR_GLOBAL_VISIBILITY_LABELS,
   normalizeChartToolbarGlobalConfig,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 
-import { Button } from '@/components/ui/button';
-import { Dialog, FieldRow, checkboxClassName } from '@/components/ui/dialog';
-import { ChartNewChartTemplatePinButton } from '@/features/charts/chart-new-chart-template-pin-button';
-import { ColorField } from '@/features/charts/chart-toolbar-settings-fields';
-import { useUiStore } from '@/stores/ui-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+import { Button } from "@/components/ui/button";
+import { Dialog, FieldRow, checkboxClassName } from "@/components/ui/dialog";
+import { ChartNewChartTemplatePinButton } from "@/features/charts/chart-new-chart-template-pin-button";
+import { ColorField } from "@/features/charts/chart-toolbar-settings-fields";
+import { useUiStore } from "@/stores/ui-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /** Configuración exclusiva de la barra global del workspace. */
 export function ChartGlobalBarSettingsDialog() {
@@ -56,12 +56,16 @@ export function ChartGlobalBarSettingsDialog() {
       className="max-w-lg"
     >
       <section className="mb-4 space-y-2">
-        <p className="text-xs font-medium text-foreground">Elementos visibles</p>
+        <p className="text-xs font-medium text-foreground">
+          Elementos visibles
+        </p>
         <div className="grid grid-cols-2 gap-1.5">
-          {(Object.keys(CHART_TOOLBAR_GLOBAL_VISIBILITY_LABELS) as Array<
-            keyof typeof CHART_TOOLBAR_GLOBAL_VISIBILITY_LABELS
-          >)
-            .filter((key) => key !== 'settingsButton')
+          {(
+            Object.keys(CHART_TOOLBAR_GLOBAL_VISIBILITY_LABELS) as Array<
+              keyof typeof CHART_TOOLBAR_GLOBAL_VISIBILITY_LABELS
+            >
+          )
+            .filter((key) => key !== "settingsButton")
             .map((key) => (
               <label key={key} className="flex items-center gap-2 text-xs">
                 <input
@@ -71,7 +75,10 @@ export function ChartGlobalBarSettingsDialog() {
                   onChange={() =>
                     setDraft((prev) => ({
                       ...prev,
-                      visibility: { ...prev.visibility, [key]: !prev.visibility[key] },
+                      visibility: {
+                        ...prev.visibility,
+                        [key]: !prev.visibility[key],
+                      },
                     }))
                   }
                 />
@@ -82,11 +89,13 @@ export function ChartGlobalBarSettingsDialog() {
       </section>
 
       <section className="mb-4 space-y-2">
-        <p className="text-xs font-medium text-foreground">Plantilla para gráficos nuevos</p>
+        <p className="text-xs font-medium text-foreground">
+          Plantilla para gráficos nuevos
+        </p>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          El icono de plantilla junto a Indicadores fija el gráfico activo como referencia. Los
-          valores nuevos copiarán su configuración mientras esté activo; si no, usarán los defaults
-          del workspace.
+          El icono de plantilla junto a Indicadores fija el gráfico activo como
+          referencia. Los valores nuevos copiarán su configuración mientras esté
+          activo; si no, usarán los defaults del workspace.
         </p>
         <ChartNewChartTemplatePinButton />
       </section>

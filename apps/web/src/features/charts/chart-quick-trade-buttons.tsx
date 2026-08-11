@@ -1,4 +1,8 @@
-import type { InstrumentDto, InstrumentWithMetaDto, OhlcvBarDto } from '@bolsa/shared';
+import type {
+  InstrumentDto,
+  InstrumentWithMetaDto,
+  OhlcvBarDto,
+} from "@bolsa/shared";
 
 function barChangePct(bar: OhlcvBarDto): number | null {
   if (!bar.open) return null;

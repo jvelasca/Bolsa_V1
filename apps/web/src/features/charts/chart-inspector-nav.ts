@@ -1,33 +1,38 @@
 /** Modo principal del inspector lateral. */
-export type ChartInspectorMode = 'data' | 'config';
+export type ChartInspectorMode = "data" | "config";
 
 /** Bloques de lectura en modo Datos. */
 export type ChartInspectorDataSection =
-  | 'instrument'
-  | 'chart'
-  | 'candle'
-  | 'database'
-  | 'alerts';
+  | "instrument"
+  | "chart"
+  | "candle"
+  | "database"
+  | "alerts";
 
 /** Pestañas internas en modo Config. */
-export type ChartInspectorConfigSection = 'layers' | 'series' | 'objects' | 'styles' | 'context';
+export type ChartInspectorConfigSection =
+  | "layers"
+  | "series"
+  | "objects"
+  | "styles"
+  | "context";
 
 /** Subsección de capas (overlay / panel inferior). */
-export type ChartInspectorLayerSection = 'overlay' | 'sub';
+export type ChartInspectorLayerSection = "overlay" | "sub";
 
 /** @deprecated Usar ChartInspectorDataSection */
-export type ChartInspectorSummarySection = 'instrument' | 'chart';
+export type ChartInspectorSummarySection = "instrument" | "chart";
 
 /** @deprecated Usar ChartInspectorMode + secciones */
 export type ChartInspectorTab =
-  | 'summary'
-  | 'candle'
-  | 'context'
-  | 'layers'
-  | 'series'
-  | 'objects'
-  | 'styles'
-  | 'alerts';
+  | "summary"
+  | "candle"
+  | "context"
+  | "layers"
+  | "series"
+  | "objects"
+  | "styles"
+  | "alerts";
 
 export type ChartInspectorNavigateInput =
   | {
@@ -55,47 +60,73 @@ type LegacyInspectorNavigateInput = {
   instanceId?: string;
 };
 
-function legacyTabToNavigate(input: LegacyInspectorNavigateInput): Omit<
-  ChartInspectorNavigateRequest,
-  'nonce'
-> {
+function legacyTabToNavigate(
+  input: LegacyInspectorNavigateInput,
+): Omit<ChartInspectorNavigateRequest, "nonce"> {
   switch (input.tab) {
-    case 'summary':
+    case "summary":
       return {
-        mode: 'data',
-        dataSection: input.summarySection === 'chart' ? 'chart' : 'instrument',
+        mode: "data",
+        dataSection: input.summarySection === "chart" ? "chart" : "instrument",
         instanceId: input.instanceId,
       };
-    case 'candle':
-      return { mode: 'data', dataSection: 'candle', instanceId: input.instanceId };
-    case 'alerts':
-      return { mode: 'data', dataSection: 'alerts', instanceId: input.instanceId };
-    case 'context':
-      return { mode: 'config', configSection: 'context', instanceId: input.instanceId };
-    case 'layers':
+    case "candle":
       return {
-        mode: 'config',
-        configSection: 'layers',
+        mode: "data",
+        dataSection: "candle",
+        instanceId: input.instanceId,
+      };
+    case "alerts":
+      return {
+        mode: "data",
+        dataSection: "alerts",
+        instanceId: input.instanceId,
+      };
+    case "context":
+      return {
+        mode: "config",
+        configSection: "context",
+        instanceId: input.instanceId,
+      };
+    case "layers":
+      return {
+        mode: "config",
+        configSection: "layers",
         layerSection: input.layerSection,
         instanceId: input.instanceId,
       };
-    case 'series':
-      return { mode: 'config', configSection: 'series', instanceId: input.instanceId };
-    case 'objects':
-      return { mode: 'config', configSection: 'objects', instanceId: input.instanceId };
-    case 'styles':
-      return { mode: 'config', configSection: 'styles', instanceId: input.instanceId };
+    case "series":
+      return {
+        mode: "config",
+        configSection: "series",
+        instanceId: input.instanceId,
+      };
+    case "objects":
+      return {
+        mode: "config",
+        configSection: "objects",
+        instanceId: input.instanceId,
+      };
+    case "styles":
+      return {
+        mode: "config",
+        configSection: "styles",
+        instanceId: input.instanceId,
+      };
     default:
-      return { mode: 'data', dataSection: 'instrument' };
+      return { mode: "data", dataSection: "instrument" };
   }
 }
 
-export type ChartInspectorNavigateTarget = Omit<ChartInspectorNavigateRequest, 'nonce'>;
+export type ChartInspectorNavigateTarget = Omit<
+  ChartInspectorNavigateRequest,
+  "nonce"
+>;
 
 export function normalizeInspectorNavigateInput(
   input: ChartInspectorNavigateInput,
 ): ChartInspectorNavigateTarget {
-  if ('mode' in input) {
+  if ("mode" in input) {
     return {
       mode: input.mode,
       dataSection: input.dataSection,
@@ -116,7 +147,7 @@ export function inspectorNavigateKey(
   if (nav.configSection) parts.push(nav.configSection);
   if (nav.layerSection) parts.push(nav.layerSection);
   if (nav.instanceId) parts.push(nav.instanceId);
-  return parts.join(':');
+  return parts.join(":");
 }
 
 export function inspectorSectionElementId(
@@ -127,30 +158,30 @@ export function inspectorSectionElementId(
     | ChartInspectorSummarySection,
 ): string {
   switch (section) {
-    case 'instrument':
-      return 'inspector-data-instrument';
-    case 'chart':
-      return 'inspector-data-chart';
-    case 'candle':
-      return 'inspector-data-candle';
-    case 'database':
-      return 'inspector-data-database';
-    case 'alerts':
-      return 'inspector-data-alerts';
-    case 'overlay':
-      return 'inspector-layers-overlay';
-    case 'sub':
-      return 'inspector-layers-sub';
-    case 'layers':
-      return 'inspector-config-layers';
-    case 'series':
-      return 'inspector-config-series';
-    case 'objects':
-      return 'inspector-config-objects';
-    case 'styles':
-      return 'inspector-config-styles';
-    case 'context':
-      return 'inspector-config-context';
+    case "instrument":
+      return "inspector-data-instrument";
+    case "chart":
+      return "inspector-data-chart";
+    case "candle":
+      return "inspector-data-candle";
+    case "database":
+      return "inspector-data-database";
+    case "alerts":
+      return "inspector-data-alerts";
+    case "overlay":
+      return "inspector-layers-overlay";
+    case "sub":
+      return "inspector-layers-sub";
+    case "layers":
+      return "inspector-config-layers";
+    case "series":
+      return "inspector-config-series";
+    case "objects":
+      return "inspector-config-objects";
+    case "styles":
+      return "inspector-config-styles";
+    case "context":
+      return "inspector-config-context";
     default:
       return `inspector-${section}`;
   }

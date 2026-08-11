@@ -1,7 +1,7 @@
-import { useEffect, useReducer, useRef } from 'react';
-import type { IChartApi, Time } from 'lightweight-charts';
+import { useEffect, useReducer, useRef } from "react";
+import type { IChartApi, Time } from "lightweight-charts";
 
-import { formatChartTimeAxisLabel } from '@/features/charts/chart-utils';
+import { formatChartTimeAxisLabel } from "@/features/charts/chart-utils";
 
 interface ChartTimeAxisLabelProps {
   chart: IChartApi | null;
@@ -49,27 +49,35 @@ export function ChartTimeAxisLabel({
       const rect = container.getBoundingClientRect();
       const localX = event.clientX - rect.left;
       const localY = event.clientY - rect.top;
-      if (localX < 0 || localY < 0 || localX > rect.width || localY > rect.height) {
+      if (
+        localX < 0 ||
+        localY < 0 ||
+        localX > rect.width ||
+        localY > rect.height
+      ) {
         clear();
         return;
       }
       showAt(localX, chart.timeScale().coordinateToTime(localX));
     };
 
-    const onCrosshairMove = (param: { point?: { x: number; y: number }; time?: Time }) => {
+    const onCrosshairMove = (param: {
+      point?: { x: number; y: number };
+      time?: Time;
+    }) => {
       if (!param.point || param.time == null) return;
       showAt(param.point.x, param.time);
     };
 
-    container.addEventListener('mousemove', onMouseMove);
-    container.addEventListener('mouseleave', clear);
+    container.addEventListener("mousemove", onMouseMove);
+    container.addEventListener("mouseleave", clear);
     chart.subscribeCrosshairMove(onCrosshairMove);
     const onRangeChange = () => bump();
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
 
     return () => {
-      container.removeEventListener('mousemove', onMouseMove);
-      container.removeEventListener('mouseleave', clear);
+      container.removeEventListener("mousemove", onMouseMove);
+      container.removeEventListener("mouseleave", clear);
       chart.unsubscribeCrosshairMove(onCrosshairMove);
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
     };
@@ -84,10 +92,10 @@ export function ChartTimeAxisLabel({
       style={{
         left: label.x,
         bottom: 4,
-        transform: 'translateX(-50%)',
-        backgroundColor: 'hsl(var(--popover))',
-        color: 'hsl(var(--popover-foreground))',
-        border: '1px solid hsl(var(--border))',
+        transform: "translateX(-50%)",
+        backgroundColor: "hsl(var(--popover))",
+        color: "hsl(var(--popover-foreground))",
+        border: "1px solid hsl(var(--border))",
       }}
     >
       {label.text}

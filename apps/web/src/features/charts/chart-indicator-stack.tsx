@@ -1,6 +1,11 @@
-import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChartIndicatorInstance, ChartInstanceConfig, IndicatorPointDto, OhlcvBarDto } from '@bolsa/shared';
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ChartIndicatorInstance,
+  ChartInstanceConfig,
+  IndicatorPointDto,
+  OhlcvBarDto,
+} from "@bolsa/shared";
 import {
   clampPricePanelHeightPct,
   resolvePricePanelHeightPct,
@@ -9,14 +14,14 @@ import {
   serializeSubPanelWeights,
   subPanelFlexPoolHeightPx,
   adjustAdjacentSubPanelWeights,
-} from '@bolsa/shared';
-import { cn } from '@/lib/utils';
-import { PanelResizeHandle } from '@/components/layout/panel-resize-handle';
-import { shouldDisablePanelResize } from '@/features/charts/chart-draw-tool-utils';
-import { requestChartReflow } from '@/features/charts/chart-utils';
-import { ensureChartZoomBridge } from '@/features/charts/chart-time-sync';
-import { SubIndicatorPanel } from '@/features/charts/sub-indicator-panel';
-import { useUiStore } from '@/stores/ui-store';
+} from "@bolsa/shared";
+import { cn } from "@/lib/utils";
+import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
+import { shouldDisablePanelResize } from "@/features/charts/chart-draw-tool-utils";
+import { requestChartReflow } from "@/features/charts/chart-utils";
+import { ensureChartZoomBridge } from "@/features/charts/chart-time-sync";
+import { SubIndicatorPanel } from "@/features/charts/sub-indicator-panel";
+import { useUiStore } from "@/stores/ui-store";
 
 interface ChartIndicatorStackProps {
   mainChart: ReactNode;
@@ -31,7 +36,7 @@ interface ChartIndicatorStackProps {
   onConfigure: (instanceId: string) => void;
   onToggleHidden: (instanceId: string) => void;
   onDelete: (instanceId: string) => void;
-  onMoveSubIndicator: (instanceId: string, direction: 'up' | 'down') => void;
+  onMoveSubIndicator: (instanceId: string, direction: "up" | "down") => void;
   onSubIndicatorScaleZoom: (instanceId: string, scaleZoom: number) => void;
   className?: string;
 }
@@ -118,7 +123,8 @@ export function ChartIndicatorStack({
   }, [hasSubPanels, subIndicators.length]);
 
   const subGridLayout = useMemo(
-    () => resolveSubPanelGridLayout(subIndicators, liveWeights, subGridHeightPx),
+    () =>
+      resolveSubPanelGridLayout(subIndicators, liveWeights, subGridHeightPx),
     [subIndicators, liveWeights, subGridHeightPx],
   );
 
@@ -183,14 +189,20 @@ export function ChartIndicatorStack({
         onConfigure={() => onConfigure(instance.instanceId)}
         onToggleHidden={() => onToggleHidden(instance.instanceId)}
         onDelete={() => onDelete(instance.instanceId)}
-        onMoveUp={index > 0 ? () => onMoveSubIndicator(instance.instanceId, 'up') : undefined}
+        onMoveUp={
+          index > 0
+            ? () => onMoveSubIndicator(instance.instanceId, "up")
+            : undefined
+        }
         onMoveDown={
           index < subIndicators.length - 1
-            ? () => onMoveSubIndicator(instance.instanceId, 'down')
+            ? () => onMoveSubIndicator(instance.instanceId, "down")
             : undefined
         }
         scaleZoom={instance.scaleZoom ?? 1}
-        onScaleZoomChange={(next) => onSubIndicatorScaleZoom(instance.instanceId, next)}
+        onScaleZoomChange={(next) =>
+          onSubIndicatorScaleZoom(instance.instanceId, next)
+        }
       />,
     );
 
@@ -203,7 +215,9 @@ export function ChartIndicatorStack({
           orientation="horizontal"
           disabled={panelResizeDisabled}
           onDragStart={beginSubPanelDrag}
-          onDrag={(deltaPx) => adjustSubPanelPair(instance.instanceId, next.instanceId, deltaPx)}
+          onDrag={(deltaPx) =>
+            adjustSubPanelPair(instance.instanceId, next.instanceId, deltaPx)
+          }
           onDragEnd={commitSubPanelWeights}
         />,
       );
@@ -214,8 +228,8 @@ export function ChartIndicatorStack({
     <div
       ref={stackRef}
       className={cn(
-        'min-h-0 flex-1',
-        hasSubPanels ? 'grid' : 'flex flex-col',
+        "min-h-0 flex-1",
+        hasSubPanels ? "grid" : "flex flex-col",
         className,
       )}
       style={
@@ -226,8 +240,8 @@ export function ChartIndicatorStack({
     >
       <div
         className={cn(
-          'relative min-h-0 w-full min-h-[160px] overflow-hidden [contain:strict]',
-          !hasSubPanels && 'min-w-0 flex-1',
+          "relative min-h-0 w-full min-h-[160px] overflow-hidden [contain:strict]",
+          !hasSubPanels && "min-w-0 flex-1",
         )}
       >
         <div className="relative h-full w-full">{mainChart}</div>
@@ -247,8 +261,8 @@ export function ChartIndicatorStack({
               className="shrink-0 bg-muted/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
               title={
                 subGridLayout.scrollable
-                  ? 'Paneles inferiores. Desplázate para ver todos; arrastra entre ellos para repartir altura.'
-                  : 'Paneles inferiores. Arrastra entre ellos para repartir altura.'
+                  ? "Paneles inferiores. Desplázate para ver todos; arrastra entre ellos para repartir altura."
+                  : "Paneles inferiores. Arrastra entre ellos para repartir altura."
               }
             >
               Paneles inferiores
@@ -269,10 +283,10 @@ export function ChartIndicatorStack({
                   gridTemplateRows: subGridLayout.gridTemplateRows,
                   height: subGridLayout.scrollable
                     ? subGridLayout.contentHeightPx
-                    : '100%',
+                    : "100%",
                   minHeight: subGridLayout.scrollable
                     ? subGridLayout.contentHeightPx
-                    : '100%',
+                    : "100%",
                 }}
               >
                 {subPanelRows}

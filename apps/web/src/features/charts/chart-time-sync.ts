@@ -5,12 +5,15 @@ import type {
   MouseEventParams,
   SeriesType,
   Time,
-} from 'lightweight-charts';
-import { MismatchDirection } from 'lightweight-charts';
-import { PRICE_SCALE_HIT_WIDTH_PX } from '@/features/charts/chart-scale-utils';
-import { CHART_ZOOM_EVENT, type ChartZoomAction } from '@/features/charts/chart-utils';
+} from "lightweight-charts";
+import { MismatchDirection } from "lightweight-charts";
+import { PRICE_SCALE_HIT_WIDTH_PX } from "@/features/charts/chart-scale-utils";
+import {
+  CHART_ZOOM_EVENT,
+  type ChartZoomAction,
+} from "@/features/charts/chart-utils";
 
-export type ChartSyncPaneKind = 'main' | 'sub';
+export type ChartSyncPaneKind = "main" | "sub";
 
 export interface ChartSyncPane {
   id: string;
@@ -35,12 +38,15 @@ export const CHART_HORIZONTAL_ZOOM_FACTOR = 0.7;
  */
 export function zoomLogicalRange(
   range: LogicalRange,
-  action: Exclude<ChartZoomAction, 'reset'>,
+  action: Exclude<ChartZoomAction, "reset">,
   anchorLogical?: number | null,
 ): LogicalRange {
   const span = range.to - range.from;
   if (span <= 0) return range;
-  const factor = action === 'in' ? CHART_HORIZONTAL_ZOOM_FACTOR : 1 / CHART_HORIZONTAL_ZOOM_FACTOR;
+  const factor =
+    action === "in"
+      ? CHART_HORIZONTAL_ZOOM_FACTOR
+      : 1 / CHART_HORIZONTAL_ZOOM_FACTOR;
   const newSpan = span * factor;
   const anchor =
     anchorLogical != null && Number.isFinite(anchorLogical)
@@ -48,8 +54,8 @@ export function zoomLogicalRange(
       : (range.from + range.to) / 2;
   const ratio = Math.min(1, Math.max(0, (anchor - range.from) / span));
   return {
-    from: (anchor - ratio * newSpan) as LogicalRange['from'],
-    to: (anchor + (1 - ratio) * newSpan) as LogicalRange['to'],
+    from: (anchor - ratio * newSpan) as LogicalRange["from"],
+    to: (anchor + (1 - ratio) * newSpan) as LogicalRange["to"],
   };
 }
 
@@ -62,8 +68,8 @@ function seriesPriceAtTime(
   if (index == null) return null;
   const point = series.dataByIndex(index, MismatchDirection.NearestLeft);
   if (!point) return null;
-  if ('close' in point && typeof point.close === 'number') return point.close;
-  if ('value' in point && typeof point.value === 'number') return point.value;
+  if ("close" in point && typeof point.close === "number") return point.close;
+  if ("value" in point && typeof point.value === "number") return point.value;
   return null;
 }
 
@@ -79,7 +85,11 @@ class ChartSyncHub {
 
     const onLogicalChange = (range: LogicalRange | null) => {
       if (this.applying || !range) return;
-      if (this.lastLogicalRange && logicalRangesEqual(this.lastLogicalRange, range)) return;
+      if (
+        this.lastLogicalRange &&
+        logicalRangesEqual(this.lastLogicalRange, range)
+      )
+        return;
       this.applyLogicalRange(range, pane.id);
     };
 
@@ -96,7 +106,9 @@ class ChartSyncHub {
     pane.chart.subscribeCrosshairMove(onCrosshairMove);
 
     const cleanup = () => {
-      pane.chart.timeScale().unsubscribeVisibleLogicalRangeChange(onLogicalChange);
+      pane.chart
+        .timeScale()
+        .unsubscribeVisibleLogicalRangeChange(onLogicalChange);
       pane.chart.unsubscribeCrosshairMove(onCrosshairMove);
       this.panes.delete(pane.id);
       this.cleanups.delete(pane.id);
@@ -105,7 +117,7 @@ class ChartSyncHub {
     this.panes.set(pane.id, pane);
     this.cleanups.set(pane.id, cleanup);
 
-    const main = this.panes.get('main');
+    const main = this.panes.get("main");
     const range =
       this.lastLogicalRange ??
       main?.chart.timeScale().getVisibleLogicalRange() ??
@@ -171,10 +183,14 @@ class ChartSyncHub {
     this.applyLogicalRange(range, sourceId);
   }
 
-  applyHorizontalPanPixels(deltaPx: number, plotWidthPx: number, sourceId?: string) {
+  applyHorizontalPanPixels(
+    deltaPx: number,
+    plotWidthPx: number,
+    sourceId?: string,
+  ) {
     const leader =
       (sourceId ? this.panes.get(sourceId) : undefined) ??
-      this.panes.get('main') ??
+      this.panes.get("main") ??
       this.panes.values().next().value;
     if (!leader || plotWidthPx <= 0 || deltaPx === 0) return;
 
@@ -185,8 +201,8 @@ class ChartSyncHub {
     const span = range.to - range.from;
     const shift = (deltaPx / plotWidthPx) * span;
     const next: LogicalRange = {
-      from: (range.from - shift) as LogicalRange['from'],
-      to: (range.to - shift) as LogicalRange['to'],
+      from: (range.from - shift) as LogicalRange["from"],
+      to: (range.to - shift) as LogicalRange["to"],
     };
 
     timeScale.setVisibleLogicalRange(next);
@@ -200,12 +216,12 @@ class ChartSyncHub {
   ) {
     const leader =
       (sourceId ? this.panes.get(sourceId) : undefined) ??
-      this.panes.get('main') ??
+      this.panes.get("main") ??
       this.panes.values().next().value;
     if (!leader) return;
 
     const timeScale = leader.chart.timeScale();
-    if (action === 'reset') {
+    if (action === "reset") {
       timeScale.fitContent();
       const range = timeScale.getVisibleLogicalRange();
       if (range) this.applyLogicalRange(range, leader.id);
@@ -243,7 +259,9 @@ export function ensureChartZoomBridge() {
   zoomBridgeInstalled = true;
 
   window.addEventListener(CHART_ZOOM_EVENT, (event) => {
-    const detail = (event as CustomEvent<{ action: ChartZoomAction; chartSyncId?: string }>).detail;
+    const detail = (
+      event as CustomEvent<{ action: ChartZoomAction; chartSyncId?: string }>
+    ).detail;
     if (!detail?.action) return;
     if (detail.chartSyncId) {
       getChartSyncHub(detail.chartSyncId).applyZoomAction(detail.action);
@@ -272,7 +290,7 @@ export function attachChartHorizontalWheel(
     const rect = container.getBoundingClientRect();
     const onScale = event.clientX >= rect.right - PRICE_SCALE_HIT_WIDTH_PX;
     // Zoom vertical en escala con botón pulsado lo gestiona attachChartScaleInteraction.
-    if (onScale && (event.buttons & 1)) return;
+    if (onScale && event.buttons & 1) return;
 
     if (Math.abs(event.deltaY) < 0.5) return;
 
@@ -280,21 +298,21 @@ export function attachChartHorizontalWheel(
     event.stopPropagation();
     const anchor = options?.getAnchorLogical?.(event.clientX) ?? null;
     getChartSyncHub(chartSyncId).applyZoomAction(
-      event.deltaY < 0 ? 'in' : 'out',
+      event.deltaY < 0 ? "in" : "out",
       options?.sourcePaneId,
       anchor,
     );
   };
 
-  container.addEventListener('wheel', onWheel, { passive: false });
-  return () => container.removeEventListener('wheel', onWheel);
+  container.addEventListener("wheel", onWheel, { passive: false });
+  return () => container.removeEventListener("wheel", onWheel);
 }
 
 /** @deprecated Usar attachChartHorizontalWheel */
 export function attachChartTimeWheelSync(
   container: HTMLElement,
   chartSyncId: string,
-  sourcePaneId = 'main',
+  sourcePaneId = "main",
 ): () => void {
   void sourcePaneId;
   return attachChartHorizontalWheel(container, chartSyncId);

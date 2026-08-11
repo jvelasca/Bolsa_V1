@@ -1,16 +1,19 @@
-import type { IChartApi, ISeriesApi, Time } from 'lightweight-charts';
-import type { IndicatorLinePoint } from '@/features/charts/indicator-compute';
+import type { IChartApi, ISeriesApi, Time } from "lightweight-charts";
+import type { IndicatorLinePoint } from "@/features/charts/indicator-compute";
 
 const HIT_THRESHOLD_PX = 10;
 
 function timeToSortable(time: Time): number {
-  if (typeof time === 'number') return time;
-  if (typeof time === 'string') return Date.parse(time) / 1000;
+  if (typeof time === "number") return time;
+  if (typeof time === "string") return Date.parse(time) / 1000;
   const { year, month, day } = time;
   return Date.UTC(year, month - 1, day) / 1000;
 }
 
-function interpolateValueAtTime(points: IndicatorLinePoint[], target: Time): number | null {
+function interpolateValueAtTime(
+  points: IndicatorLinePoint[],
+  target: Time,
+): number | null {
   if (points.length === 0) return null;
   const t = timeToSortable(target);
   const first = timeToSortable(points[0]!.time);
@@ -23,14 +26,16 @@ function interpolateValueAtTime(points: IndicatorLinePoint[], target: Time): num
     if (t >= t0 && t <= t1) {
       if (t1 === t0) return points[i]!.value;
       const ratio = (t - t0) / (t1 - t0);
-      return points[i]!.value + ratio * (points[i + 1]!.value - points[i]!.value);
+      return (
+        points[i]!.value + ratio * (points[i + 1]!.value - points[i]!.value)
+      );
     }
   }
   return points[points.length - 1]!.value;
 }
 
 export interface OverlaySeriesHitEntry {
-  series: ISeriesApi<'Line'>;
+  series: ISeriesApi<"Line">;
   points: IndicatorLinePoint[];
 }
 
@@ -57,7 +62,7 @@ export function findOverlayInstanceAtPixel(
     if (lineY == null) continue;
     const dist = Math.abs(y - lineY);
     if (dist > HIT_THRESHOLD_PX) continue;
-    const instanceId = seriesKey.split(':')[0]!;
+    const instanceId = seriesKey.split(":")[0]!;
     if (!best || dist < best.dist) {
       best = { instanceId, dist };
     }

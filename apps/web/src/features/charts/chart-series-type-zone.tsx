@@ -4,11 +4,11 @@ import {
   findChartSeriesTypeOption,
   isChartSeriesTypeImplemented,
   type ChartSeriesType,
-} from '@bolsa/shared';
-import { ChartCandlestick } from 'lucide-react';
+} from "@bolsa/shared";
+import { ChartCandlestick } from "lucide-react";
 
-import { ChartBarZonePicker } from '@/features/charts/chart-bar-zone-picker';
-import { useChartSeriesTypeFavorites } from '@/features/charts/use-chart-series-type-favorites';
+import { ChartBarZonePicker } from "@/features/charts/chart-bar-zone-picker";
+import { useChartSeriesTypeFavorites } from "@/features/charts/use-chart-series-type-favorites";
 
 const SERIES_TYPE_OPTIONS = Object.fromEntries(
   Object.values(CHART_SERIES_TYPE_OPTIONS).map((option) => [
@@ -21,7 +21,10 @@ const SERIES_TYPE_OPTIONS = Object.fromEntries(
       hint: option.description ?? option.label,
     },
   ]),
-) as Record<ChartSeriesType, { id: ChartSeriesType; label: string; hint: string }>;
+) as Record<
+  ChartSeriesType,
+  { id: ChartSeriesType; label: string; hint: string }
+>;
 
 export function ChartSeriesTypeZone({
   seriesType,
@@ -32,7 +35,8 @@ export function ChartSeriesTypeZone({
   onSeriesTypeChange: (next: ChartSeriesType) => void;
   className?: string;
 }) {
-  const { favorites, toggleFavorite, isFavorite } = useChartSeriesTypeFavorites();
+  const { favorites, toggleFavorite, isFavorite } =
+    useChartSeriesTypeFavorites();
 
   return (
     <ChartBarZonePicker

@@ -1,9 +1,9 @@
-import { PRICE_SCALE_HIT_WIDTH_PX } from '@/features/charts/chart-scale-utils';
+import { PRICE_SCALE_HIT_WIDTH_PX } from "@/features/charts/chart-scale-utils";
 
 export interface ChartScaleZoomHandlers {
-  onVerticalZoom: (direction: 'in' | 'out') => void;
+  onVerticalZoom: (direction: "in" | "out") => void;
   onVerticalZoomCommit?: () => void;
-  onVolumeZoom?: (direction: 'in' | 'out') => void;
+  onVolumeZoom?: (direction: "in" | "out") => void;
   onVolumeZoomCommit?: () => void;
 }
 
@@ -18,8 +18,14 @@ function isOverRightScale(rect: DOMRect, clientX: number): boolean {
   return clientX >= rect.right - PRICE_SCALE_HIT_WIDTH_PX;
 }
 
-function isOverVolumeBand(rect: DOMRect, clientY: number, volumeBandPct: number): boolean {
-  return volumeBandPct > 0 && clientY >= rect.bottom - rect.height * volumeBandPct;
+function isOverVolumeBand(
+  rect: DOMRect,
+  clientY: number,
+  volumeBandPct: number,
+): boolean {
+  return (
+    volumeBandPct > 0 && clientY >= rect.bottom - rect.height * volumeBandPct
+  );
 }
 
 /**
@@ -44,21 +50,21 @@ export function attachChartScaleInteraction({
     event.stopPropagation();
 
     if (onVolume && handlers.current.onVolumeZoom) {
-      handlers.current.onVolumeZoom(event.deltaY < 0 ? 'in' : 'out');
+      handlers.current.onVolumeZoom(event.deltaY < 0 ? "in" : "out");
       handlers.current.onVolumeZoomCommit?.();
       return;
     }
 
     if (!onVolume) {
-      handlers.current.onVerticalZoom(event.deltaY < 0 ? 'in' : 'out');
+      handlers.current.onVerticalZoom(event.deltaY < 0 ? "in" : "out");
       handlers.current.onVerticalZoomCommit?.();
     }
   };
 
-  captureTarget.addEventListener('wheel', onWheel, { passive: false });
+  captureTarget.addEventListener("wheel", onWheel, { passive: false });
 
   return () => {
-    captureTarget.removeEventListener('wheel', onWheel);
+    captureTarget.removeEventListener("wheel", onWheel);
   };
 }
 
@@ -70,15 +76,15 @@ export function attachChartScaleDrag({
   hitTarget,
   captureTarget,
   handlers,
-}: Omit<ChartScaleInteractionOptions, 'volumeBandPct'>): () => void {
+}: Omit<ChartScaleInteractionOptions, "volumeBandPct">): () => void {
   let scalePointerDown = false;
   let lastPointerY = 0;
   let moved = false;
 
   const endWindowDrag = () => {
-    window.removeEventListener('pointermove', onWindowPointerMove);
-    window.removeEventListener('pointerup', onWindowPointerUp);
-    window.removeEventListener('pointercancel', onWindowPointerUp);
+    window.removeEventListener("pointermove", onWindowPointerMove);
+    window.removeEventListener("pointerup", onWindowPointerUp);
+    window.removeEventListener("pointercancel", onWindowPointerUp);
     if (scalePointerDown && moved) handlers.current.onVerticalZoomCommit?.();
     scalePointerDown = false;
     moved = false;
@@ -89,7 +95,7 @@ export function attachChartScaleDrag({
     const delta = event.clientY - lastPointerY;
     if (Math.abs(delta) < 2) return;
     event.preventDefault();
-    handlers.current.onVerticalZoom(delta < 0 ? 'in' : 'out');
+    handlers.current.onVerticalZoom(delta < 0 ? "in" : "out");
     lastPointerY = event.clientY;
     moved = true;
   };
@@ -105,16 +111,16 @@ export function attachChartScaleDrag({
     scalePointerDown = true;
     moved = false;
     lastPointerY = event.clientY;
-    window.addEventListener('pointermove', onWindowPointerMove);
-    window.addEventListener('pointerup', onWindowPointerUp);
-    window.addEventListener('pointercancel', onWindowPointerUp);
+    window.addEventListener("pointermove", onWindowPointerMove);
+    window.addEventListener("pointerup", onWindowPointerUp);
+    window.addEventListener("pointercancel", onWindowPointerUp);
   };
 
   const capture = { capture: true };
-  captureTarget.addEventListener('pointerdown', onPointerDown, capture);
+  captureTarget.addEventListener("pointerdown", onPointerDown, capture);
 
   return () => {
     endWindowDrag();
-    captureTarget.removeEventListener('pointerdown', onPointerDown, capture);
+    captureTarget.removeEventListener("pointerdown", onPointerDown, capture);
   };
 }

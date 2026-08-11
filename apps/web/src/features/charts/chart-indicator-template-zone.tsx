@@ -1,15 +1,12 @@
-import {
-  templateHasIndicators,
-  type IndicatorTemplate,
-} from '@bolsa/shared';
-import { LayoutTemplate } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { templateHasIndicators, type IndicatorTemplate } from "@bolsa/shared";
+import { LayoutTemplate } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ChartBarZonePicker } from '@/features/charts/chart-bar-zone-picker';
-import { ChartBarZoneIconAnchor } from '@/features/charts/chart-bar-zone-rail-button';
-import { CHART_BAR_ZONE_ROW_CLASS } from '@/features/charts/chart-bar-zone-styles';
-import { useChartIndicatorTemplateFavorites } from '@/features/charts/use-chart-indicator-template-favorites';
-import { cn } from '@/lib/utils';
+import { ChartBarZonePicker } from "@/features/charts/chart-bar-zone-picker";
+import { ChartBarZoneIconAnchor } from "@/features/charts/chart-bar-zone-rail-button";
+import { CHART_BAR_ZONE_ROW_CLASS } from "@/features/charts/chart-bar-zone-styles";
+import { useChartIndicatorTemplateFavorites } from "@/features/charts/use-chart-indicator-template-favorites";
+import { cn } from "@/lib/utils";
 
 function templateShortLabel(name: string): string {
   const trimmed = name.trim();
@@ -19,13 +16,19 @@ function templateShortLabel(name: string): string {
 
 function buildTemplateMenuGroups(templates: IndicatorTemplate[]): string[][] {
   const builtin = templates
-    .filter((template) => template.source === 'builtin' || template.locked)
+    .filter((template) => template.source === "builtin" || template.locked)
     .map((template) => template.id);
   const custom = templates
-    .filter((template) => !builtin.includes(template.id) && template.source === 'custom')
+    .filter(
+      (template) =>
+        !builtin.includes(template.id) && template.source === "custom",
+    )
     .map((template) => template.id);
   const other = templates
-    .filter((template) => !builtin.includes(template.id) && !custom.includes(template.id))
+    .filter(
+      (template) =>
+        !builtin.includes(template.id) && !custom.includes(template.id),
+    )
     .map((template) => template.id);
   return [builtin, custom, other].filter((group) => group.length > 0);
 }
@@ -43,16 +46,22 @@ export function ChartIndicatorTemplateZone({
 }) {
   const [emptyHint, setEmptyHint] = useState<string | null>(null);
   const hintTimerRef = useRef<number | null>(null);
-  const { favorites, toggleFavorite, isFavorite } = useChartIndicatorTemplateFavorites();
+  const { favorites, toggleFavorite, isFavorite } =
+    useChartIndicatorTemplateFavorites();
 
   const templateById = useMemo(
     () => new Map(templates.map((template) => [template.id, template])),
     [templates],
   );
 
-  const menuGroups = useMemo(() => buildTemplateMenuGroups(templates), [templates]);
+  const menuGroups = useMemo(
+    () => buildTemplateMenuGroups(templates),
+    [templates],
+  );
   const fallbackActiveId =
-    templates.find((template) => templateHasIndicators(template))?.id ?? templates[0]?.id ?? '';
+    templates.find((template) => templateHasIndicators(template))?.id ??
+    templates[0]?.id ??
+    "";
   const activeId = activeTemplateId ?? fallbackActiveId;
 
   const options = useMemo(
@@ -99,7 +108,10 @@ export function ChartIndicatorTemplateZone({
 
   if (templates.length === 0 || !activeId) {
     return (
-      <div className={cn(CHART_BAR_ZONE_ROW_CLASS, className)} title="Plantillas de indicadores">
+      <div
+        className={cn(CHART_BAR_ZONE_ROW_CLASS, className)}
+        title="Plantillas de indicadores"
+      >
         <ChartBarZoneIconAnchor
           icon={LayoutTemplate}
           title="Plantillas"
@@ -123,11 +135,16 @@ export function ChartIndicatorTemplateZone({
       isFavorite={isFavorite}
       onToggleFavorite={toggleFavorite}
       onSelectOption={tryApply}
-      getButtonLabel={(id) => templateShortLabel(templateById.get(id)?.name ?? '—')}
+      getButtonLabel={(id) =>
+        templateShortLabel(templateById.get(id)?.name ?? "—")
+      }
       isButtonVisible={(id) => Boolean(templateById.get(id))}
       trailing={
         emptyHint ? (
-          <span className="ml-1 shrink-0 text-[10px] text-amber-600 dark:text-amber-400" role="status">
+          <span
+            className="ml-1 shrink-0 text-[10px] text-amber-600 dark:text-amber-400"
+            role="status"
+          >
             {emptyHint}
           </span>
         ) : undefined

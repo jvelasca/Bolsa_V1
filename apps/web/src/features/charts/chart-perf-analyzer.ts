@@ -12,19 +12,19 @@
 import {
   getIndicatorSpecCacheStats,
   resetIndicatorSpecCacheStats,
-} from '@/features/charts/indicator-compute';
+} from "@/features/charts/indicator-compute";
 
 type CounterMap = Record<string, number>;
 
 type PerfLogType =
-  | 'reflow_req'
-  | 'reflow_evt'
-  | 'workspace_set'
-  | 'query_fetch'
-  | 'query_cache'
-  | 'debug'
-  | 'rollup'
-  | 'session';
+  | "reflow_req"
+  | "reflow_evt"
+  | "workspace_set"
+  | "query_fetch"
+  | "query_cache"
+  | "debug"
+  | "rollup"
+  | "session";
 
 interface PerfLogEntry {
   t: number;
@@ -83,8 +83,8 @@ interface PerfState {
   workspaceSetStack?: string;
 }
 
-const STORAGE_KEY = 'bolsa-debug-chart';
-const SESSION_STORAGE_KEY = 'bolsa-perf-last-session';
+const STORAGE_KEY = "bolsa-debug-chart";
+const SESSION_STORAGE_KEY = "bolsa-perf-last-session";
 const MAX_LOG_ENTRIES = 4000;
 
 const state: PerfState = {
@@ -114,7 +114,10 @@ let installed = false;
 
 function isVerboseDebug(): boolean {
   try {
-    return typeof window !== 'undefined' && window.localStorage?.getItem(STORAGE_KEY) === '1';
+    return (
+      typeof window !== "undefined" &&
+      window.localStorage?.getItem(STORAGE_KEY) === "1"
+    );
   } catch {
     return false;
   }
@@ -122,7 +125,7 @@ function isVerboseDebug(): boolean {
 
 function hudEnabled(): boolean {
   try {
-    return window.localStorage?.getItem(`${STORAGE_KEY}-hud`) === '1';
+    return window.localStorage?.getItem(`${STORAGE_KEY}-hud`) === "1";
   } catch {
     return false;
   }
@@ -145,10 +148,10 @@ function captureStack(skipFrames = 3): string | undefined {
     const stack = new Error().stack;
     if (!stack) return undefined;
     return stack
-      .split('\n')
+      .split("\n")
       .slice(skipFrames, skipFrames + 4)
       .map((line) => line.trim())
-      .join(' | ');
+      .join(" | ");
   } catch {
     return undefined;
   }
@@ -156,7 +159,11 @@ function captureStack(skipFrames = 3): string | undefined {
 
 function pushLog(
   type: PerfLogType,
-  options?: { source?: string; detail?: Record<string, unknown>; stack?: string },
+  options?: {
+    source?: string;
+    detail?: Record<string, unknown>;
+    stack?: string;
+  },
 ): void {
   if (!recording) return;
   if (sessionLog.length >= MAX_LOG_ENTRIES) {
@@ -181,7 +188,8 @@ function snapshotRollup(): void {
     reflowEvents: state.reflowEvents - rollupBaseline.reflowEvents,
     workspaceSets: state.workspaceSets - rollupBaseline.workspaceSets,
     queryFetches: state.queryFetches - rollupBaseline.queryFetches,
-    queryCacheUpdates: state.queryCacheUpdates - rollupBaseline.queryCacheUpdates,
+    queryCacheUpdates:
+      state.queryCacheUpdates - rollupBaseline.queryCacheUpdates,
     dropped: { ...droppedEntries },
   });
   rollupBaseline = { ...state, bySource: { ...state.bySource } };
@@ -194,14 +202,14 @@ function renderHud(): void {
   const ind = getIndicatorSpecCacheStats();
   const indTotal = ind.hits + ind.misses;
   const lines = [
-    recording ? '● REC bolsa-perf' : 'Bolsa chart perf',
+    recording ? "● REC bolsa-perf" : "Bolsa chart perf",
     `reflow: ${state.reflowRequests} (${(state.reflowRequests / sec).toFixed(1)}/s)`,
     `workspace: ${state.workspaceSets} (${(state.workspaceSets / sec).toFixed(1)}/s)`,
     `fetch: ${state.queryFetches} (${(state.queryFetches / sec).toFixed(1)}/s)`,
     `ind.cache: ${ind.hits}/${indTotal} hits`,
-    recording ? `log: ${sessionLog.length}` : 'bolsaPerfStart()',
+    recording ? `log: ${sessionLog.length}` : "bolsaPerfStart()",
   ];
-  hudNode.textContent = lines.join('\n');
+  hudNode.textContent = lines.join("\n");
 }
 
 function ensureHud(show: boolean): void {
@@ -213,9 +221,9 @@ function ensureHud(show: boolean): void {
     return;
   }
   if (hudNode) return;
-  hudNode = document.createElement('div');
+  hudNode = document.createElement("div");
   hudNode.style.cssText =
-    'position:fixed;bottom:8px;left:8px;z-index:99999;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.78);color:#9ef;font:11px/1.35 ui-monospace,monospace;white-space:pre;pointer-events:none;max-width:340px';
+    "position:fixed;bottom:8px;left:8px;z-index:99999;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.78);color:#9ef;font:11px/1.35 ui-monospace,monospace;white-space:pre;pointer-events:none;max-width:340px";
   document.body.appendChild(hudNode);
   renderHud();
   hudTimer = setInterval(renderHud, 1000);
@@ -267,22 +275,27 @@ function persistSession(report: PerfSessionReport): void {
 }
 
 function downloadSession(report: PerfSessionReport): void {
-  const stamp = report.capturedAt.replace(/[:.]/g, '-');
-  const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  const stamp = report.capturedAt.replace(/[:.]/g, "-");
+  const blob = new Blob([JSON.stringify(report, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
+  const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = `bolsa-perf-${stamp}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
 
-export function chartPerfDebug(event: string, detail?: Record<string, unknown>): void {
+export function chartPerfDebug(
+  event: string,
+  detail?: Record<string, unknown>,
+): void {
   if (!shouldTrack()) return;
   bump(state.bySource, event);
-  pushLog('debug', { source: event, detail });
+  pushLog("debug", { source: event, detail });
   if (isVerboseDebug()) {
-    console.debug(`[chart-perf] ${event}`, detail ?? '');
+    console.debug(`[chart-perf] ${event}`, detail ?? "");
   }
 }
 
@@ -291,13 +304,13 @@ export function chartPerfRecordReflowRequest(source?: string): void {
   state.reflowRequests += 1;
   state.lastReflowAt = Date.now();
   if (source) bump(state.bySource, `reflow:${source}`);
-  pushLog('reflow_req', { source });
+  pushLog("reflow_req", { source });
 }
 
 export function chartPerfRecordReflowEvent(): void {
   if (!shouldTrack()) return;
   state.reflowEvents += 1;
-  pushLog('reflow_evt');
+  pushLog("reflow_evt");
 }
 
 export function chartPerfRecordWorkspaceSet(): void {
@@ -307,25 +320,25 @@ export function chartPerfRecordWorkspaceSet(): void {
   const stack =
     recording && state.workspaceSets % 10 === 0 ? captureStack(5) : undefined;
   if (stack) state.workspaceSetStack = stack;
-  pushLog('workspace_set', stack ? { stack } : undefined);
+  pushLog("workspace_set", stack ? { stack } : undefined);
 }
 
 export function chartPerfRecordQueryFetch(key: string): void {
   if (!shouldTrack()) return;
   state.queryFetches += 1;
   bump(state.bySource, `fetch:${key}`);
-  pushLog('query_fetch', { source: key });
+  pushLog("query_fetch", { source: key });
 }
 
 export function chartPerfRecordQueryCacheUpdate(): void {
   if (!shouldTrack()) return;
   state.queryCacheUpdates += 1;
-  pushLog('query_cache');
+  pushLog("query_cache");
 }
 
 export function bolsaPerfStart(): void {
   if (recording) {
-    console.warn('[bolsa-perf] ya está grabando. Usa bolsaPerfStop() primero.');
+    console.warn("[bolsa-perf] ya está grabando. Usa bolsaPerfStop() primero.");
     return;
   }
   recording = true;
@@ -337,7 +350,7 @@ export function bolsaPerfStart(): void {
   bolsaPerfReset();
   rollupBaseline = { ...state, bySource: { ...state.bySource } };
 
-  pushLog('session', { detail: { action: 'start' } });
+  pushLog("session", { detail: { action: "start" } });
   snapshotRollup();
 
   if (rollupTimer) clearInterval(rollupTimer);
@@ -345,13 +358,15 @@ export function bolsaPerfStart(): void {
 
   ensureHud(true);
   console.info(
-    '[bolsa-perf] ● Grabando. Reproduce el parpadeo / carga CPU, luego ejecuta bolsaPerfStop()',
+    "[bolsa-perf] ● Grabando. Reproduce el parpadeo / carga CPU, luego ejecuta bolsaPerfStop()",
   );
 }
 
 export function bolsaPerfStop(): PerfSessionReport {
   if (!recording) {
-    console.warn('[bolsa-perf] no hay grabación activa. Ejecuta bolsaPerfStart() primero.');
+    console.warn(
+      "[bolsa-perf] no hay grabación activa. Ejecuta bolsaPerfStart() primero.",
+    );
     return lastSessionReport ?? buildSessionReport();
   }
 
@@ -360,7 +375,7 @@ export function bolsaPerfStop(): PerfSessionReport {
     clearInterval(rollupTimer);
     rollupTimer = null;
   }
-  pushLog('session', { detail: { action: 'stop' } });
+  pushLog("session", { detail: { action: "stop" } });
   snapshotRollup();
 
   const report = buildSessionReport();
@@ -368,18 +383,20 @@ export function bolsaPerfStop(): PerfSessionReport {
   persistSession(report);
   downloadSession(report);
 
-  console.group('[bolsa-perf] sesión guardada');
+  console.group("[bolsa-perf] sesión guardada");
   console.table({
     duración_s: (report.durationMs / 1000).toFixed(1),
     reflow_s: report.summary.reflowRequestsPerSec.toFixed(2),
     workspace_s: report.summary.workspaceSetsPerSec.toFixed(2),
     fetch_s: report.summary.queryFetchesPerSec.toFixed(2),
-    ind_cache_hit_pct: (report.summary.indicatorSpecCacheHitRate * 100).toFixed(1),
+    ind_cache_hit_pct: (report.summary.indicatorSpecCacheHitRate * 100).toFixed(
+      1,
+    ),
     entradas_log: report.summary.logEntries,
   });
-  console.log('Top sources:', report.topSources);
-  console.log('Archivo descargado + localStorage bolsa-perf-last-session');
-  console.log('Pega en el chat: bolsaPerfCopy() o el JSON del archivo');
+  console.log("Top sources:", report.topSources);
+  console.log("Archivo descargado + localStorage bolsa-perf-last-session");
+  console.log("Pega en el chat: bolsaPerfCopy() o el JSON del archivo");
   console.groupEnd();
 
   renderHud();
@@ -403,17 +420,21 @@ export function bolsaPerfLoadLast(): PerfSessionReport | null {
 export async function bolsaPerfCopy(): Promise<boolean> {
   const report = bolsaPerfExport();
   if (!report) {
-    console.warn('[bolsa-perf] no hay sesión. Ejecuta bolsaPerfStop() o bolsaPerfLoadLast().');
+    console.warn(
+      "[bolsa-perf] no hay sesión. Ejecuta bolsaPerfStop() o bolsaPerfLoadLast().",
+    );
     return false;
   }
   const text = JSON.stringify(report);
   try {
     await navigator.clipboard.writeText(text);
-    console.info(`[bolsa-perf] ${(text.length / 1024).toFixed(1)} KB copiados al portapapeles`);
+    console.info(
+      `[bolsa-perf] ${(text.length / 1024).toFixed(1)} KB copiados al portapapeles`,
+    );
     return true;
   } catch {
     console.log(text);
-    console.info('[bolsa-perf] no se pudo copiar; JSON impreso arriba');
+    console.info("[bolsa-perf] no se pudo copiar; JSON impreso arriba");
     return false;
   }
 }
@@ -424,7 +445,7 @@ export function bolsaPerfReport(): void {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 12);
 
-  console.group('[bolsa-perf] report en vivo');
+  console.group("[bolsa-perf] report en vivo");
   const indicatorCache = getIndicatorSpecCacheStats();
   console.table({
     grabando: recording,
@@ -437,8 +458,10 @@ export function bolsaPerfReport(): void {
     ind_cache_hit_pct: (indicatorCache.hitRate * 100).toFixed(1),
     logEntries: sessionLog.length,
   });
-  if (topSources.length > 0) console.log('Top sources:', Object.fromEntries(topSources));
-  if (state.workspaceSetStack) console.log('Stack workspace (muestra):', state.workspaceSetStack);
+  if (topSources.length > 0)
+    console.log("Top sources:", Object.fromEntries(topSources));
+  if (state.workspaceSetStack)
+    console.log("Stack workspace (muestra):", state.workspaceSetStack);
   console.groupEnd();
 }
 
@@ -460,7 +483,7 @@ export function bolsaPerfReset(): void {
 
 export function bolsaPerfHud(enabled: boolean): void {
   try {
-    if (enabled) window.localStorage.setItem(`${STORAGE_KEY}-hud`, '1');
+    if (enabled) window.localStorage.setItem(`${STORAGE_KEY}-hud`, "1");
     else window.localStorage.removeItem(`${STORAGE_KEY}-hud`);
   } catch {
     // ignore
@@ -511,10 +534,10 @@ export function installChartPerfAnalyzer(
 
   if (queryClient) {
     queryClient.getQueryCache().subscribe((event) => {
-      if (event.type !== 'updated') return;
+      if (event.type !== "updated") return;
       const query = event.query;
       if (!query) return;
-      if (event.action?.type === 'fetch') {
+      if (event.action?.type === "fetch") {
         chartPerfRecordQueryFetch(query.queryHash);
         return;
       }
@@ -525,6 +548,6 @@ export function installChartPerfAnalyzer(
   if (hudEnabled()) ensureHud(true);
 
   console.info(
-    '[bolsa-perf] listo. bolsaPerfStart() → usa la app → bolsaPerfStop() → bolsaPerfCopy() para pegar aquí',
+    "[bolsa-perf] listo. bolsaPerfStart() → usa la app → bolsaPerfStop() → bolsaPerfCopy() para pegar aquí",
   );
 }

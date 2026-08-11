@@ -12,4 +12,4 @@ export {
   chartPerfRecordReflowRequest,
   installChartPerfAnalyzer,
   type PerfSessionReport,
-} from '@/features/charts/chart-perf-analyzer';
+} from "@/features/charts/chart-perf-analyzer";
