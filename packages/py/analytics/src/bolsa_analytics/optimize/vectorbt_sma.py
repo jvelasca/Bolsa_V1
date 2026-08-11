@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Literal
 
 import numpy as np
 import vectorbt as vbt
@@ -15,6 +16,7 @@ ProgressCallback = Callable[[int, int, float | None], None]
 
 
 def _simulate_vectorbt_sma(
+    open: np.ndarray,
     close: np.ndarray,
     fast_period: int,
     slow_period: int,
@@ -26,12 +28,19 @@ def _simulate_vectorbt_sma(
 
     fast_ma = vbt.MA.run(close, fast_period)
     slow_ma = vbt.MA.run(close, slow_period)
-    entries = fast_ma.ma_crossed_above(slow_ma)
-    exits = fast_ma.ma_crossed_below(slow_ma)
+    entries = np.asarray(fast_ma.ma_crossed_above(slow_ma), dtype=bool)
+    exits = np.asarray(fast_ma.ma_crossed_below(slow_ma), dtype=bool)
+    # next_open: señal en t, llenar en open[t+1]. Se desplaza la señal un índice
+    # sobre el array de aperturas (fill en el open de la barra siguiente, sin look-ahead).
+    entries_fill = np.zeros_like(entries)
+    exits_fill = np.zeros_like(exits)
+    if entries.shape[0] > 1:
+        entries_fill[1:] = entries[:-1]
+        exits_fill[1:] = exits[:-1]
     portfolio = vbt.Portfolio.from_signals(
-        close,
-        entries,
-        exits,
+        open,
+        entries_fill,
+        exits_fill,
         init_cash=initial_cash,
         freq=freq,
     )
@@ -50,12 +59,17 @@ def run_vectorbt_sma_grid(
     max_trials: int = 200,
     timeframe: str = "1d",
     on_progress: ProgressCallback | None = None,
+    execution_model: Literal["next_open"] = "next_open",
 ) -> list[SmaGridTrial]:
     """Ejecuta ``vectorbt_sma_grid``."""
     if not bars:
         raise ValueError("bars must not be empty")
 
     close = np.asarray([bar.close for bar in bars], dtype=float)
+    open_prices = np.asarray(
+        [bar.open if bar.open is not None else bar.close for bar in bars],
+        dtype=float,
+    )
     freq = vectorbt_freq(timeframe)
     total = estimate_sma_grid_trial_total(fast_periods, slow_periods, max_trials=max_trials)
     trials: list[SmaGridTrial] = []
@@ -69,6 +83,7 @@ def run_vectorbt_sma_grid(
                 break
             try:
                 total_return, max_dd, trade_count = _simulate_vectorbt_sma(
+                    open_prices,
                     close,
                     fast,
                     slow,
