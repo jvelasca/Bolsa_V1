@@ -4,7 +4,7 @@
 > **Fuentes de verdad (leer primero):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) (hallazgo **P1.5** + D0/D5) · [ADR-003](../adr/003-python-backend-ai-platform.md) §2 (contrato objetivo `openapi.json → openapi-typescript + openapi-fetch → apps/web`) · [traspaso-f3b-alembic-data-epoch-2026-08-11.md](./traspaso-f3b-alembic-data-epoch-2026-08-11.md) (§9: siguiente fase).
 > **Rama de ejecución:** `stage/f5a-contratos-fe-be-2026-08-11` (desgajada desde `stage/f1-*`, tras merge de PR #31).
 > **Regla del hilo:** NO tocar código fuera del alcance F5a. Cambios validados con la batería antes del commit.
-> **Estado:** F5a **COMMITEADO (4 commits C1–C4, HEAD `164f692`)**. Batería **556 py✓ + web 707✓ · gates contract ✓**. Working tree limpio. Pendiente de **merge** del PR (fast-forward) en `stage/f1-*`. Ver §7/§8.
+> **Estado:** F5a **COMMITEADO (6 commits C1–C6, HEAD `dde9c32`)**. Batería **py + web ✓ · gates contract ✓**. Working tree limpio. Pendiente de **merge** del PR (fast-forward) en `stage/f1-*`. Ver §7/§8.
 
 ---
 
@@ -45,13 +45,16 @@ Resolver el **hallazgo P1.5 (drift silencioso FE/BE)**: los DTOs TypeScript se e
 | **E** | `apps/web/package.json`                      | scripts `contract:gen` y `contract:check`; devDependency `openapi-typescript@^7.13.0`.                                                                                                                                                                                                               |
 | **F** | `apps/web/src/api/contract-check.ts` (nuevo) | **Gate de tipos**: `HasNoMissingKeys<FE, Contract[BE]>` — para DTOs centinela (`BacktestRunDto`, `PortfolioSummaryDto`, `InvestmentAccountDto`) garantiza que ninguna clave del DTO-FE falte en el contrato. `const _guard: G = true` materializa TS2322 si hay drift.                               |
 
+| **G** | `.prettierignore` (nuevo) · `dump_openapi.py` (LF) · `sync-contract.mjs` (norm. CRLF) | **Corrección tras cierre (C5–C6):** el `openapi.json`/`schema.d.ts` commitado en C1/C2 tenía una serialización distinta a la del generador (array compacto/CRLF vs `json.dumps(indent=2)`+LF), por lo que el tree quedaba `M` y `contract:check` fallaba pese a estar commitado. `lint-staged` re-aplicaba `prettier --write` sobre `openapi.json` deshaciendo la forma canónica. Se añade `.prettierignore` (excluye los dos artefactos generados) y se fuerzan LF; ahora `contract:gen` regenera **byte-idéntico** (verif.) y el árbol queda limpio. |
+
 ## 5. Batería (aplicada)
 
 - **ruff** `apps/api-python/scripts/dump_openapi.py`: **0 errores**.
-- **mypy** `apps/api-python/scripts/dump_openapi.py`: **0 errores** (`ignore[import-untyped]` documentado en la línea del import; `bolsa_api` edictable sin `py.typed`).
-- **pytest**: aplic por `<root> apps/api-python/tests --ignore=integration` **11✓** · analytics **323✓** · application **222✓** → **556✓ · 0 fallos** (no se tocó infraestructura/repos/BD ni analytics/app; fase frontend-tooling + un script offline).
+- **mypy** `apps/api-python/scripts/dump_openapi.py`: **0 errores** (`ignore[import-untyped]` documentado; `bolsa_api` edictable sin `py.typed`).
+- **pytest `apps/api-python/tests`**: **27✓ · 0 fallos** (no se tocó infraestructura/repos/BD; fase frontend-tooling + un script offline).
 - **web**: `typecheck` **✓** (incluye el gate `contract-check.ts`) · `lint` **✓** · `test` **707✓** (140 ficheros).
 - **contract:check** gate: **✓ verde** cuando coinciden, y **verificado que FALLA** al inyectar drift en `openapi.json` (mensaje "el contrato ha cambiado", exit≠0) → restaurado sin diff.
+- **Regresión del gate (post-corrección C5–C6):** tras `contract:gen` en frío, `git status` queda **sin cambios** y `contract:check` **verde** → el contrato commitado es **reproducible byte-a-byte** por el generador.
 
 ### Hallazgos medidos (P1.5 con evidencia)
 
@@ -69,15 +72,16 @@ Resolver el **hallazgo P1.5 (drift silencioso FE/BE)**: los DTOs TypeScript se e
 
 ## 7. Registro
 
-| Fecha      | Acción                                                                                                                                                                     |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-11 | Merge PR #31 (F3b) en `stage/f1-*` (GitHub merge commit `014a207`; local fast-forward a `014a207`). Rama `stage/f5a-contratos-fe-be-2026-08-11` creada desde `stage/f1-*`. |
-| 2026-08-11 | A: `dump_openapi.py` offline. Volcado `openapi.json` (180 paths, 367 schemas) → `apps/web/api/openapi.json`.                                                               |
-| 2026-08-11 | C: `schema.d.ts` generado con `openapi-typescript@7.13.0` (paths + components + operations). Commitado.                                                                    |
-| 2026-08-11 | D–E: `sync-contract.mjs` + scripts `contract:gen`/`contract:check` en `apps/web`. Gate `contract:check` verificado (verde; falla ante drift → restaurado).                 |
-| 2026-08-11 | F: `contract-check.ts` gate de tipos (claves FE ⊆ contrato) para sentinelas `BacktestRunDto`/`PortfolioSummaryDto`/`InvestmentAccountDto`. Verificado `typecheck` verde.   |
-| 2026-08-11 | Batería: ruff✓ · mypy✓ · pytest api 11✓ + analytics 323✓ + app 222✓ = 556✓ · web typecheck✓ lint✓ test 707✓ · contract:check✓.                                             |
-| 2026-08-11 | **COMMITS + PR**: 4 commits atómicos C1–C4 en `stage/f5a-contratos-fe-be-2026-08-11` (C4 `164f692`). **PR abierto** → base `stage/f1-*`. Working tree limpio.              |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                                                                                    |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-11 | Merge PR #31 (F3b) en `stage/f1-*` (GitHub merge commit `014a207`; local fast-forward a `014a207`). Rama `stage/f5a-contratos-fe-be-2026-08-11` creada desde `stage/f1-*`.                                                                                                                                                                                                |
+| 2026-08-11 | A: `dump_openapi.py` offline. Volcado `openapi.json` (180 paths, 367 schemas) → `apps/web/api/openapi.json`.                                                                                                                                                                                                                                                              |
+| 2026-08-11 | C: `schema.d.ts` generado con `openapi-typescript@7.13.0` (paths + components + operations). Commitado.                                                                                                                                                                                                                                                                   |
+| 2026-08-11 | D–E: `sync-contract.mjs` + scripts `contract:gen`/`contract:check` en `apps/web`. Gate `contract:check` verificado (verde; falla ante drift → restaurado).                                                                                                                                                                                                                |
+| 2026-08-11 | F: `contract-check.ts` gate de tipos (claves FE ⊆ contrato) para sentinelas `BacktestRunDto`/`PortfolioSummaryDto`/`InvestmentAccountDto`. Verificado `typecheck` verde.                                                                                                                                                                                                  |
+| 2026-08-11 | Batería: ruff✓ · mypy✓ · pytest api 27✓ · web typecheck✓ lint✓ test 707✓ · contract:check✓.                                                                                                                                                                                                                                                                               |
+| 2026-08-11 | **CORRECCIÓN tras cierre (C5–C6)**: contrato commitado no era reproducible por el generador (serialización prettier/CRLF vs `json.dumps(indent=2)`+LF) → tree `M` + `contract:check` rojo. Añadido `.prettierignore` (excluye `openapi.json`/`schema.d.ts`), LF en dump, norm. CRLF en `--check`. Ahora `contract:gen` en frío deja tree limpio y `contract:check` verde. |
+| 2026-08-11 | **COMMITS + PR**: 6 commits atómicos C1–C6 en `stage/f5a-contratos-fe-be-2026-08-11` (C6 `dde9c32`) · C5 `d8fb5e2` (LF fixes) · C6 (`.prettierignore` + contrato canónico). **PR abierto** → base `stage/f1-*`. Working tree limpio.                                                                                                                                      |
 
 ## 8. Protocolo recurrente (obligatorio en TODOS los hilos)
 
@@ -89,20 +93,26 @@ Resolver el **hallazgo P1.5 (drift silencioso FE/BE)**: los DTOs TypeScript se e
 Texto de traspaso → nuevo chat (F5a completado — siguiente fase tras F5a)
 
 CONTEXTO INMEDIATO: F5a (Contratos FE/BE — OpenAPI fuente de verdad + gates de drift,
-hallazgo P1.5 / ADR-003) está COMPLETADO con 4 commits en rama
+hallazgo P1.5 / ADR-003) está COMPLETADO con 6 commits en rama
 stage/f5a-contratos-fe-be-2026-08-11 y PR #32 ABIERTO:
   - 4 commits atómicos C1..C4 (C4 `164f692`): dump_openapi.py + openapi.json versionado
     (fuente de verdad, 180 paths / 367 schemas) + schema.d.ts generado
     (openapi-typescript@7.13.0) + sync-contract.mjs (contract:gen/contract:check) +
     contract-check.ts (gate de tipos: claves FE ⊆ contrato).
+  - CORRECCIÓN tras cierre C5–C6 (C5 `d8fb5e2`, C6 HEAD `dde9c32`): el contrato commitado
+    en C1/C2 NO era reproducible por el generador (serialización prettier/CRLF vs
+    `json.dumps(indent=2)`+LF) → `lint-staged` re-aplicaba prettier sobre openapi.json.
+    Añadido `.prettierignore` (excluye openapi.json y schema.d.ts: artefactos generados),
+    LF en dump, normalización CRLF en --check. Ahora `contract:gen` en frío deja el árbol
+    limpio y `contract:check` verde (reproducible byte-a-byte).
   - PR #32 (https://github.com/jvelasca/Bolsa_V1/pull/32) → base stage/f1-integridad-financiera-2026-08-11.
   - Gates: `pnpm --filter @bolsa/web contract:check` (regenera openapi.json desde FastAPI via uv
     y falla si hay diff) ✓ · `contract:gen` regenera en sitio ✓ · `contract-check.ts`
     (compilación tipo: rompe typecheck si un DTO-FE centinela declara un campo ausente del OpenAPI).
   - Drift medido P1.5: BacktestRunDto.manifest FE (`manifest?: RunManifest`) no cabe en
     `manifest: object|null` del contrato; normalizaciones number↔integer / ?↔null.
-  - Batería: ruff✓ · mypy✓ (dump_openapi.py) · pytest api offline 11✓ + analytics 323✓ +
-    application 222✓ = 556✓ · web typecheck✓ (incl. contract-check) + lint✓ + test 707✓.
+  - Batería: ruff✓ · mypy✓ (dump_openapi.py) · pytest api-python 27✓ ·
+    web typecheck✓ (incl. contract-check) + lint✓ + test 707✓.
 
 ESTADO GIT (VERIFICADO, OJO): origin/stage/f1-* = `014a207` (F3b mergeado, PR #31). PR #32
 PENDIENTE DE MERGE. La rama LOCAL stage/f5a-* está adelantada respecto a origin/stage/f1-*;
