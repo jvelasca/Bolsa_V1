@@ -7,7 +7,9 @@
             "$ref": "#/components/schemas/InvestmentAccountDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AccountResponseDto",
         "type": "object"
       },
@@ -31,7 +33,10 @@
             "$ref": "#/components/schemas/TaxProfileDto"
           }
         },
-        "required": ["commission", "tax"],
+        "required": [
+          "commission",
+          "tax"
+        ],
         "title": "AccountSettingsDto",
         "type": "object"
       },
@@ -45,7 +50,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AccountSummariesResponseDto",
         "type": "object"
       },
@@ -123,7 +130,9 @@
             "$ref": "#/components/schemas/AccountSummaryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AccountSummaryResponseDto",
         "type": "object"
       },
@@ -137,7 +146,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AccountsResponseDto",
         "type": "object"
       },
@@ -149,7 +160,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AiEffectivenessResponseDto",
         "type": "object"
       },
@@ -202,7 +215,9 @@
             "$ref": "#/components/schemas/AiGovernanceStatusDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AiGovernanceStatusResponseDto",
         "type": "object"
       },
@@ -232,7 +247,11 @@
             "type": "string"
           }
         },
-        "required": ["subscriptionId", "channel", "ok"],
+        "required": [
+          "subscriptionId",
+          "channel",
+          "ok"
+        ],
         "title": "AlertChannelDispatchDto",
         "type": "object"
       },
@@ -263,7 +282,11 @@
             "type": "boolean"
           },
           "outcome": {
-            "enum": ["accepted", "rejected", "deferred"],
+            "enum": [
+              "accepted",
+              "rejected",
+              "deferred"
+            ],
             "title": "Outcome",
             "type": "string"
           },
@@ -311,7 +334,11 @@
             "type": "array"
           }
         },
-        "required": ["decisionId", "instrumentId", "outcome"],
+        "required": [
+          "decisionId",
+          "instrumentId",
+          "outcome"
+        ],
         "title": "AppendDecisionMemoryRequest",
         "type": "object"
       },
@@ -422,7 +449,10 @@
             "title": "Walkforwardefficiency"
           }
         },
-        "required": ["strategyOrSignalRef", "trialsN"],
+        "required": [
+          "strategyOrSignalRef",
+          "trialsN"
+        ],
         "title": "AppendEdgeReportRequest",
         "type": "object"
       },
@@ -521,7 +551,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AssignProfileResponseDto",
         "type": "object"
       },
@@ -532,7 +564,9 @@
             "type": "boolean"
           }
         },
-        "required": ["authEnabled"],
+        "required": [
+          "authEnabled"
+        ],
         "title": "AuthStatusDataDto",
         "type": "object"
       },
@@ -542,7 +576,9 @@
             "$ref": "#/components/schemas/AuthStatusDataDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "AuthStatusResponseDto",
         "type": "object"
       },
@@ -579,7 +615,10 @@
             "type": "string"
           }
         },
-        "required": ["context", "battery"],
+        "required": [
+          "context",
+          "battery"
+        ],
         "title": "BacktestCoachAnalyzeRequest",
         "type": "object"
       },
@@ -612,7 +651,9 @@
             "title": "Trialid"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "BacktestDetailResponseDto",
         "type": "object"
       },
@@ -627,7 +668,10 @@
             "type": "string"
           }
         },
-        "required": ["timestamp", "equity"],
+        "required": [
+          "timestamp",
+          "equity"
+        ],
         "title": "BacktestEquityPointDto",
         "type": "object"
       },
@@ -641,7 +685,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "BacktestListResponseDto",
         "type": "object"
       },
@@ -1107,7 +1153,9 @@
             "title": "Timeframe"
           }
         },
-        "required": ["instrumentId"],
+        "required": [
+          "instrumentId"
+        ],
         "title": "BacktestRunRequestDto",
         "type": "object"
       },
@@ -1264,7 +1312,12 @@
             "type": "integer"
           }
         },
-        "required": ["data", "total", "limit", "offset"],
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "BeliefHistoryListResponseDto",
         "type": "object"
       },
@@ -1281,7 +1334,9 @@
             "type": "string"
           }
         },
-        "required": ["file"],
+        "required": [
+          "file"
+        ],
         "title": "Body_upload_instrument_filing_api_instruments__instrument_id__filings_post",
         "type": "object"
       },
@@ -1291,7 +1346,9 @@
             "$ref": "#/components/schemas/CashMovementResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "CashMovementResponseDto",
         "type": "object"
       },
@@ -1416,7 +1473,10 @@
           },
           "mode": {
             "default": "auto",
-            "enum": ["auto", "manual"],
+            "enum": [
+              "auto",
+              "manual"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -1456,7 +1516,13 @@
           "verdict": {
             "anyOf": [
               {
-                "enum": ["hit", "miss", "neutral", "invalid", "skipped"],
+                "enum": [
+                  "hit",
+                  "miss",
+                  "neutral",
+                  "invalid",
+                  "skipped"
+                ],
                 "type": "string"
               },
               {
@@ -1536,7 +1602,10 @@
             "type": "integer"
           }
         },
-        "required": ["accounts", "totalLedgerEntries"],
+        "required": [
+          "accounts",
+          "totalLedgerEntries"
+        ],
         "title": "ClosedSimulatedAccountsDto",
         "type": "object"
       },
@@ -1546,7 +1615,9 @@
             "$ref": "#/components/schemas/ClosedSimulatedAccountsDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ClosedSimulatedAccountsResponseDto",
         "type": "object"
       },
@@ -1629,7 +1700,10 @@
             "type": "string"
           }
         },
-        "required": ["status", "message"],
+        "required": [
+          "status",
+          "message"
+        ],
         "title": "ComponentHealthDto",
         "type": "object"
       },
@@ -1647,7 +1721,11 @@
             "title": "Combinedscore"
           },
           "confidence": {
-            "enum": ["HIGH", "MEDIUM", "LOW"],
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
             "title": "Confidence",
             "type": "string"
           },
@@ -1692,7 +1770,11 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "ticker", "confidence"],
+        "required": [
+          "instrumentId",
+          "ticker",
+          "confidence"
+        ],
         "title": "CompositeChipDto",
         "type": "object"
       },
@@ -1706,7 +1788,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "CompositeChipListResponseDto",
         "type": "object"
       },
@@ -1727,7 +1811,10 @@
             "type": "array"
           }
         },
-        "required": ["bars", "specs"],
+        "required": [
+          "bars",
+          "specs"
+        ],
         "title": "ComputeIndicatorsRequestDto",
         "type": "object"
       },
@@ -1741,7 +1828,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ComputeIndicatorsResponseDto",
         "type": "object"
       },
@@ -1773,7 +1862,10 @@
             "title": "Sessionid"
           }
         },
-        "required": ["recommendation", "accountId"],
+        "required": [
+          "recommendation",
+          "accountId"
+        ],
         "title": "ConfirmIntentRequest",
         "type": "object"
       },
@@ -1785,7 +1877,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ConsolidationEligibilityResponseDto",
         "type": "object"
       },
@@ -1850,7 +1944,10 @@
             "type": "object"
           }
         },
-        "required": ["created", "report"],
+        "required": [
+          "created",
+          "report"
+        ],
         "title": "ConsolidationResultDto",
         "type": "object"
       },
@@ -1860,7 +1957,9 @@
             "$ref": "#/components/schemas/ConsolidationResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ConsolidationResultResponseDto",
         "type": "object"
       },
@@ -1901,7 +2000,9 @@
             "title": "Updatedat"
           }
         },
-        "required": ["accountId"],
+        "required": [
+          "accountId"
+        ],
         "title": "CoreRBundleDto",
         "type": "object"
       },
@@ -1912,7 +2013,9 @@
             "$ref": "#/components/schemas/CoreRBundleDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "CoreRBundleResponseDto",
         "type": "object"
       },
@@ -1935,7 +2038,10 @@
             "type": "string"
           }
         },
-        "required": ["listId", "rows"],
+        "required": [
+          "listId",
+          "rows"
+        ],
         "title": "CoreRReviewEvidenceRequest",
         "type": "object"
       },
@@ -1959,7 +2065,11 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "symbol", "verdict"],
+        "required": [
+          "instrumentId",
+          "symbol",
+          "verdict"
+        ],
         "title": "CoreRReviewEvidenceRow",
         "type": "object"
       },
@@ -2341,7 +2451,10 @@
             "title": "Webhookurl"
           }
         },
-        "required": ["name", "mode"],
+        "required": [
+          "name",
+          "mode"
+        ],
         "title": "CreateExecutionPolicyRequestDto",
         "type": "object"
       },
@@ -2471,7 +2584,9 @@
             "title": "Strategytag"
           }
         },
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "title": "CreateInvestmentAccountDto",
         "type": "object"
       },
@@ -2545,7 +2660,12 @@
             "title": "Suggestedpolicytemplateid"
           }
         },
-        "required": ["name", "horizon", "riskTolerance", "experience"],
+        "required": [
+          "name",
+          "horizon",
+          "riskTolerance",
+          "experience"
+        ],
         "title": "CreateInvestorProfileDto",
         "type": "object"
       },
@@ -2592,7 +2712,9 @@
             "title": "Source"
           }
         },
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "title": "CreateListRequestDto",
         "type": "object"
       },
@@ -2685,7 +2807,10 @@
             "type": "string"
           }
         },
-        "required": ["accountId", "instrumentId"],
+        "required": [
+          "accountId",
+          "instrumentId"
+        ],
         "title": "CreatePositionPolicyRequestDto",
         "type": "object"
       },
@@ -2721,7 +2846,11 @@
             "type": "number"
           }
         },
-        "required": ["instrumentId", "condition", "targetPrice"],
+        "required": [
+          "instrumentId",
+          "condition",
+          "targetPrice"
+        ],
         "title": "CreatePriceAlertRequestDto",
         "type": "object"
       },
@@ -2820,7 +2949,9 @@
             "title": "Webhookurl"
           }
         },
-        "required": ["instrumentId"],
+        "required": [
+          "instrumentId"
+        ],
         "title": "CreateSignalAlertSubscriptionRequestDto",
         "type": "object"
       },
@@ -2868,7 +2999,10 @@
             "title": "Timeframe"
           }
         },
-        "required": ["name", "presetKey"],
+        "required": [
+          "name",
+          "presetKey"
+        ],
         "title": "CreateStrategyFromPresetRequestDto",
         "type": "object"
       },
@@ -2973,7 +3107,11 @@
             "$ref": "#/components/schemas/TrackerUniverseDto"
           }
         },
-        "required": ["name", "strategyDefinitionId", "universe"],
+        "required": [
+          "name",
+          "strategyDefinitionId",
+          "universe"
+        ],
         "title": "CreateTrackerDefinitionRequestDto",
         "type": "object"
       },
@@ -3015,7 +3153,9 @@
             "type": "string"
           }
         },
-        "required": ["name"],
+        "required": [
+          "name"
+        ],
         "title": "CreateWorkspaceRequestDto",
         "type": "object"
       },
@@ -3057,7 +3197,10 @@
             "title": "Skippedreason"
           }
         },
-        "required": ["digestEnabled", "sent"],
+        "required": [
+          "digestEnabled",
+          "sent"
+        ],
         "title": "DailyOpsDigestNotifyDto",
         "type": "object"
       },
@@ -3067,7 +3210,9 @@
             "$ref": "#/components/schemas/DailyOpsDigestNotifyDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "DailyOpsDigestNotifyResponseDto",
         "type": "object"
       },
@@ -3083,7 +3228,10 @@
             "type": "string"
           }
         },
-        "required": ["status", "message"],
+        "required": [
+          "status",
+          "message"
+        ],
         "title": "DatabaseHealthDto",
         "type": "object"
       },
@@ -3112,7 +3260,12 @@
             "type": "array"
           }
         },
-        "required": ["connected", "message", "tables", "instrumentOhlcv"],
+        "required": [
+          "connected",
+          "message",
+          "tables",
+          "instrumentOhlcv"
+        ],
         "title": "DatabaseSummaryDto",
         "type": "object"
       },
@@ -3122,7 +3275,9 @@
             "$ref": "#/components/schemas/DatabaseSummaryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "DatabaseSummaryResponseDto",
         "type": "object"
       },
@@ -3141,7 +3296,11 @@
             "type": "string"
           }
         },
-        "required": ["table", "label", "count"],
+        "required": [
+          "table",
+          "label",
+          "count"
+        ],
         "title": "DatabaseTableCountDto",
         "type": "object"
       },
@@ -3189,7 +3348,11 @@
             "type": "string"
           }
         },
-        "required": ["horizon", "riskTolerance", "experience"],
+        "required": [
+          "horizon",
+          "riskTolerance",
+          "experience"
+        ],
         "title": "DeclaredProfileDto",
         "type": "object"
       },
@@ -3262,7 +3425,9 @@
             "title": "Note"
           }
         },
-        "required": ["amount"],
+        "required": [
+          "amount"
+        ],
         "title": "DepositCashDto",
         "type": "object"
       },
@@ -3390,7 +3555,9 @@
             "type": "string"
           }
         },
-        "required": ["prompt"],
+        "required": [
+          "prompt"
+        ],
         "title": "DraftIndicatorFromPromptRequestDto",
         "type": "object"
       },
@@ -3400,7 +3567,9 @@
             "$ref": "#/components/schemas/DraftIndicatorFromPromptResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "DraftIndicatorFromPromptResponseDto",
         "type": "object"
       },
@@ -3481,7 +3650,9 @@
             "type": "string"
           }
         },
-        "required": ["prompt"],
+        "required": [
+          "prompt"
+        ],
         "title": "DraftStrategyFromPromptRequestDto",
         "type": "object"
       },
@@ -3491,7 +3662,9 @@
             "$ref": "#/components/schemas/DraftStrategyFromPromptResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "DraftStrategyFromPromptResponseDto",
         "type": "object"
       },
@@ -3660,7 +3833,10 @@
             "type": "array"
           }
         },
-        "required": ["bars", "drawings"],
+        "required": [
+          "bars",
+          "drawings"
+        ],
         "title": "DrawingReplayRequestDto",
         "type": "object"
       },
@@ -3674,7 +3850,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "DrawingReplayResponseDto",
         "type": "object"
       },
@@ -3688,7 +3866,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "EnqueueStaleResponseDto",
         "type": "object"
       },
@@ -3731,7 +3911,10 @@
             "title": "Skippedreason"
           }
         },
-        "required": ["digestEnabled", "sent"],
+        "required": [
+          "digestEnabled",
+          "sent"
+        ],
         "title": "EstudioEodDigestNotifyDto",
         "type": "object"
       },
@@ -3777,7 +3960,12 @@
             "type": "boolean"
           }
         },
-        "required": ["enabled", "forced", "count", "data"],
+        "required": [
+          "enabled",
+          "forced",
+          "count",
+          "data"
+        ],
         "title": "EstudioEodOpinionBatchResponseDto",
         "type": "object"
       },
@@ -3807,7 +3995,11 @@
             "title": "Skippedreason"
           }
         },
-        "required": ["emailEnabled", "alarmaCount", "sent"],
+        "required": [
+          "emailEnabled",
+          "alarmaCount",
+          "sent"
+        ],
         "title": "EstudioEodOpinionEmailNotifyDto",
         "type": "object"
       },
@@ -3822,7 +4014,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "EvaluateAlertsResponseDto",
         "type": "object"
       },
@@ -3834,7 +4028,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "EvaluatePositionExitsResponseDto",
         "type": "object"
       },
@@ -3855,7 +4051,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "EvaluateSignalAlertsResponseDto",
         "type": "object"
       },
@@ -3912,7 +4110,10 @@
             "type": "string"
           }
         },
-        "required": ["definition", "bars"],
+        "required": [
+          "definition",
+          "bars"
+        ],
         "title": "EvaluateSignalsRequestDto",
         "type": "object"
       },
@@ -3926,7 +4127,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "EvaluateSignalsResponseDto",
         "type": "object"
       },
@@ -3938,7 +4141,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "EvaluateTrackerSchedulesResponseDto",
         "type": "object"
       },
@@ -3949,7 +4154,9 @@
             "type": "string"
           }
         },
-        "required": ["policyId"],
+        "required": [
+          "policyId"
+        ],
         "title": "ExecuteScanJobRequestDto",
         "type": "object"
       },
@@ -3963,7 +4170,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ExecutionPoliciesListResponseDto",
         "type": "object"
       },
@@ -4052,7 +4261,9 @@
             "$ref": "#/components/schemas/ExecutionPolicyDetailDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ExecutionPolicyResponseDto",
         "type": "object"
       },
@@ -4163,7 +4374,13 @@
             "type": "string"
           }
         },
-        "required": ["symbol", "yahooSymbol", "name", "exchange", "currency"],
+        "required": [
+          "symbol",
+          "yahooSymbol",
+          "name",
+          "exchange",
+          "currency"
+        ],
         "title": "ExternalInstrumentSearchHitDto",
         "type": "object"
       },
@@ -4220,7 +4437,12 @@
           },
           "horizon": {
             "default": "swing",
-            "enum": ["intraday", "swing", "position", "long_term"],
+            "enum": [
+              "intraday",
+              "swing",
+              "position",
+              "long_term"
+            ],
             "title": "Horizon",
             "type": "string"
           },
@@ -4262,7 +4484,13 @@
           },
           "regime": {
             "default": "neutral",
-            "enum": ["risk_on", "neutral", "risk_off", "crisis", "uncertain"],
+            "enum": [
+              "risk_on",
+              "neutral",
+              "risk_off",
+              "crisis",
+              "uncertain"
+            ],
             "title": "Regime",
             "type": "string"
           },
@@ -4275,7 +4503,10 @@
             "$ref": "#/components/schemas/PaperDUniverseBody"
           }
         },
-        "required": ["universe", "fundamentalGate"],
+        "required": [
+          "universe",
+          "fundamentalGate"
+        ],
         "title": "FaWeeklyPipelineBody",
         "type": "object"
       },
@@ -4309,7 +4540,11 @@
             "title": "Topk"
           }
         },
-        "required": ["instrumentId", "filingId", "question"],
+        "required": [
+          "instrumentId",
+          "filingId",
+          "question"
+        ],
         "title": "FilingAskRequest",
         "type": "object"
       },
@@ -4324,7 +4559,10 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "filingId"],
+        "required": [
+          "instrumentId",
+          "filingId"
+        ],
         "title": "FilingSummarizeRequest",
         "type": "object"
       },
@@ -4418,7 +4656,12 @@
             "type": "array"
           }
         },
-        "required": ["schemaVersion", "instrumentId", "ticker", "metadata"],
+        "required": [
+          "schemaVersion",
+          "instrumentId",
+          "ticker",
+          "metadata"
+        ],
         "title": "FundamentalCardDto",
         "type": "object"
       },
@@ -4436,7 +4679,11 @@
             "title": "Asofdate"
           },
           "confidence": {
-            "enum": ["HIGH", "MEDIUM", "LOW"],
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
             "title": "Confidence",
             "type": "string"
           },
@@ -4469,7 +4716,12 @@
           "pointInTime": {
             "anyOf": [
               {
-                "enum": ["live", "snapshot", "blocked", "reconstructed"],
+                "enum": [
+                  "live",
+                  "snapshot",
+                  "blocked",
+                  "reconstructed"
+                ],
                 "type": "string"
               },
               {
@@ -4509,7 +4761,12 @@
             "title": "Staledays"
           }
         },
-        "required": ["provider", "scoreVersion", "isStale", "confidence"],
+        "required": [
+          "provider",
+          "scoreVersion",
+          "isStale",
+          "confidence"
+        ],
         "title": "FundamentalCardMetadataDto",
         "type": "object"
       },
@@ -4519,7 +4776,9 @@
             "$ref": "#/components/schemas/FundamentalCardDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "FundamentalCardResponseDto",
         "type": "object"
       },
@@ -4537,7 +4796,11 @@
             "title": "Altmanz"
           },
           "confidence": {
-            "enum": ["HIGH", "MEDIUM", "LOW"],
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ],
             "title": "Confidence",
             "type": "string"
           },
@@ -4592,7 +4855,12 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "ticker", "confidence", "isStale"],
+        "required": [
+          "instrumentId",
+          "ticker",
+          "confidence",
+          "isStale"
+        ],
         "title": "FundamentalChipDto",
         "type": "object"
       },
@@ -4606,7 +4874,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "FundamentalChipListResponseDto",
         "type": "object"
       },
@@ -4618,7 +4888,9 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId"],
+        "required": [
+          "instrumentId"
+        ],
         "title": "FundamentalExplainRequest",
         "type": "object"
       },
@@ -4641,7 +4913,12 @@
             "type": "number"
           }
         },
-        "required": ["value", "quality", "growth", "risk"],
+        "required": [
+          "value",
+          "quality",
+          "growth",
+          "risk"
+        ],
         "title": "FundamentalPillarsDto",
         "type": "object"
       },
@@ -4706,7 +4983,10 @@
             "$ref": "#/components/schemas/FundamentalScreenerUniverseBody"
           }
         },
-        "required": ["universe", "fundamentalGate"],
+        "required": [
+          "universe",
+          "fundamentalGate"
+        ],
         "title": "FundamentalScreenerRunBody",
         "type": "object"
       },
@@ -4785,7 +5065,9 @@
             "$ref": "#/components/schemas/FxRateDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "FxRateResponseDto",
         "type": "object"
       },
@@ -4841,7 +5123,10 @@
             "type": "string"
           }
         },
-        "required": ["status", "timestamp"],
+        "required": [
+          "status",
+          "timestamp"
+        ],
         "title": "HealthResponseDto",
         "type": "object"
       },
@@ -4867,7 +5152,12 @@
             "type": "integer"
           }
         },
-        "required": ["data", "total", "limit", "offset"],
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "HypothesesListResponseDto",
         "type": "object"
       },
@@ -4972,7 +5262,9 @@
             "$ref": "#/components/schemas/HypothesisBeliefDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "HypothesisBeliefResponseDto",
         "type": "object"
       },
@@ -5011,7 +5303,10 @@
           },
           "kind": {
             "default": "hypothesis",
-            "enum": ["hypothesis", "anti"],
+            "enum": [
+              "hypothesis",
+              "anti"
+            ],
             "title": "Kind",
             "type": "string"
           },
@@ -5021,12 +5316,20 @@
           },
           "status": {
             "default": "open",
-            "enum": ["open", "paused", "abandoned", "consolidated"],
+            "enum": [
+              "open",
+              "paused",
+              "abandoned",
+              "consolidated"
+            ],
             "title": "Status",
             "type": "string"
           }
         },
-        "required": ["statement", "falsifiers"],
+        "required": [
+          "statement",
+          "falsifiers"
+        ],
         "title": "HypothesisCreateRequestDto",
         "type": "object"
       },
@@ -5036,7 +5339,9 @@
             "$ref": "#/components/schemas/HypothesisDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "HypothesisDetailResponseDto",
         "type": "object"
       },
@@ -5163,7 +5468,10 @@
           "kind": {
             "anyOf": [
               {
-                "enum": ["hypothesis", "anti"],
+                "enum": [
+                  "hypothesis",
+                  "anti"
+                ],
                 "type": "string"
               },
               {
@@ -5186,7 +5494,12 @@
           "status": {
             "anyOf": [
               {
-                "enum": ["open", "paused", "abandoned", "consolidated"],
+                "enum": [
+                  "open",
+                  "paused",
+                  "abandoned",
+                  "consolidated"
+                ],
                 "type": "string"
               },
               {
@@ -5216,7 +5529,9 @@
             ]
           }
         },
-        "required": ["created"],
+        "required": [
+          "created"
+        ],
         "title": "ImportInstrumentMetaDto",
         "type": "object"
       },
@@ -5278,7 +5593,12 @@
             "type": "integer"
           }
         },
-        "required": ["yahooSymbol", "symbol", "name", "exchange"],
+        "required": [
+          "yahooSymbol",
+          "symbol",
+          "name",
+          "exchange"
+        ],
         "title": "ImportInstrumentRequestDto",
         "type": "object"
       },
@@ -5291,7 +5611,10 @@
             "$ref": "#/components/schemas/ImportInstrumentMetaDto"
           }
         },
-        "required": ["data", "meta"],
+        "required": [
+          "data",
+          "meta"
+        ],
         "title": "ImportInstrumentResponseDto",
         "type": "object"
       },
@@ -5358,7 +5681,10 @@
             "type": "string"
           }
         },
-        "required": ["symbol", "yahooSymbol"],
+        "required": [
+          "symbol",
+          "yahooSymbol"
+        ],
         "title": "IndexConstituentMemberDto",
         "type": "object"
       },
@@ -5368,7 +5694,9 @@
             "$ref": "#/components/schemas/IndexConstituentDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "IndexConstituentsResponseDto",
         "type": "object"
       },
@@ -5501,7 +5829,13 @@
             "type": "string"
           }
         },
-        "required": ["id", "status", "payload", "createdAt", "updatedAt"],
+        "required": [
+          "id",
+          "status",
+          "payload",
+          "createdAt",
+          "updatedAt"
+        ],
         "title": "IndexSubscribeJobDto",
         "type": "object"
       },
@@ -5511,7 +5845,9 @@
             "$ref": "#/components/schemas/IndexSubscribeJobDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "IndexSubscribeJobResponseDto",
         "type": "object"
       },
@@ -5526,7 +5862,10 @@
             "type": "number"
           }
         },
-        "required": ["timestamp", "value"],
+        "required": [
+          "timestamp",
+          "value"
+        ],
         "title": "IndicatorLinePointDto",
         "type": "object"
       },
@@ -5544,7 +5883,10 @@
             "type": "array"
           }
         },
-        "required": ["key", "points"],
+        "required": [
+          "key",
+          "points"
+        ],
         "title": "IndicatorLineSeriesDto",
         "type": "object"
       },
@@ -5599,7 +5941,13 @@
             "type": "string"
           }
         },
-        "required": ["timestamp", "sma20", "sma50", "ema20", "rsi14"],
+        "required": [
+          "timestamp",
+          "sma20",
+          "sma50",
+          "ema20",
+          "rsi14"
+        ],
         "title": "IndicatorPointDto",
         "type": "object"
       },
@@ -5621,7 +5969,10 @@
             "title": "Smacross"
           }
         },
-        "required": ["rsiZone", "smaCross"],
+        "required": [
+          "rsiZone",
+          "smaCross"
+        ],
         "title": "IndicatorSignalsDto",
         "type": "object"
       },
@@ -5652,7 +6003,9 @@
             "type": "object"
           }
         },
-        "required": ["definitionId"],
+        "required": [
+          "definitionId"
+        ],
         "title": "IndicatorSpecDto",
         "type": "object"
       },
@@ -5694,7 +6047,12 @@
             "type": "string"
           }
         },
-        "required": ["definitionId", "parameters", "specKey", "lines"],
+        "required": [
+          "definitionId",
+          "parameters",
+          "specKey",
+          "lines"
+        ],
         "title": "IndicatorSpecSeriesDto",
         "type": "object"
       },
@@ -5704,7 +6062,9 @@
             "$ref": "#/components/schemas/IndicatorSignalsDto"
           }
         },
-        "required": ["signals"],
+        "required": [
+          "signals"
+        ],
         "title": "IndicatorsMetaDto",
         "type": "object"
       },
@@ -5721,7 +6081,10 @@
             "$ref": "#/components/schemas/IndicatorsMetaDto"
           }
         },
-        "required": ["data", "meta"],
+        "required": [
+          "data",
+          "meta"
+        ],
         "title": "IndicatorsResponseDto",
         "type": "object"
       },
@@ -5822,7 +6185,11 @@
           "gateStatus": {
             "anyOf": [
               {
-                "enum": ["PASS", "VETO", "WARNING"],
+                "enum": [
+                  "PASS",
+                  "VETO",
+                  "WARNING"
+                ],
                 "type": "string"
               },
               {
@@ -5862,7 +6229,11 @@
             "type": "array"
           },
           "source": {
-            "enum": ["on_demand", "eod_batch", "manual"],
+            "enum": [
+              "on_demand",
+              "eod_batch",
+              "manual"
+            ],
             "title": "Source",
             "type": "string"
           },
@@ -6010,7 +6381,9 @@
             "title": "Tascore"
           }
         },
-        "required": ["instrumentId"],
+        "required": [
+          "instrumentId"
+        ],
         "title": "InstrumentDailyOpinionHintDto",
         "type": "object"
       },
@@ -6024,7 +6397,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentDailyOpinionsListResponseDto",
         "type": "object"
       },
@@ -6140,7 +6515,9 @@
             "$ref": "#/components/schemas/InstrumentDataStatusDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentDataStatusResponseDto",
         "type": "object"
       },
@@ -6190,7 +6567,9 @@
             "$ref": "#/components/schemas/InstrumentDbInventoryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentDbInventoryResponseDto",
         "type": "object"
       },
@@ -6229,7 +6608,10 @@
             "$ref": "#/components/schemas/InstrumentDetailMetaDto"
           }
         },
-        "required": ["data", "meta"],
+        "required": [
+          "data",
+          "meta"
+        ],
         "title": "InstrumentDetailResponseDto",
         "type": "object"
       },
@@ -6386,7 +6768,13 @@
             "type": "string"
           }
         },
-        "required": ["id", "name", "source", "instrumentIds", "updatedAt"],
+        "required": [
+          "id",
+          "name",
+          "source",
+          "instrumentIds",
+          "updatedAt"
+        ],
         "title": "InstrumentListDetailDto",
         "type": "object"
       },
@@ -6404,7 +6792,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentListMembershipsResponseDto",
         "type": "object"
       },
@@ -6474,7 +6864,9 @@
             ]
           }
         },
-        "required": ["barCount"],
+        "required": [
+          "barCount"
+        ],
         "title": "InstrumentListMetaDto",
         "type": "object"
       },
@@ -6545,7 +6937,13 @@
             "type": "string"
           }
         },
-        "required": ["id", "name", "source", "itemCount", "updatedAt"],
+        "required": [
+          "id",
+          "name",
+          "source",
+          "itemCount",
+          "updatedAt"
+        ],
         "title": "InstrumentListSummaryDto",
         "type": "object"
       },
@@ -6559,7 +6957,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentListsResponseDto",
         "type": "object"
       },
@@ -6582,12 +6982,20 @@
             "type": "string"
           },
           "scope": {
-            "enum": ["estudio", "global", "trading"],
+            "enum": [
+              "estudio",
+              "global",
+              "trading"
+            ],
             "title": "Scope",
             "type": "string"
           },
           "source": {
-            "enum": ["user", "ai", "system"],
+            "enum": [
+              "user",
+              "ai",
+              "system"
+            ],
             "title": "Source",
             "type": "string"
           },
@@ -6626,7 +7034,9 @@
             ]
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentNarrativeResponseDto",
         "type": "object"
       },
@@ -6641,7 +7051,10 @@
             "type": "string"
           }
         },
-        "required": ["timeframe", "barCount"],
+        "required": [
+          "timeframe",
+          "barCount"
+        ],
         "title": "InstrumentOhlcvBreakdownDto",
         "type": "object"
       },
@@ -6682,7 +7095,11 @@
             "type": "string"
           }
         },
-        "required": ["timeframe", "source", "barCount"],
+        "required": [
+          "timeframe",
+          "source",
+          "barCount"
+        ],
         "title": "InstrumentOhlcvLayerDto",
         "type": "object"
       },
@@ -6716,7 +7133,9 @@
             "type": "array"
           }
         },
-        "required": ["ids"],
+        "required": [
+          "ids"
+        ],
         "title": "InstrumentQuotesRequestDto",
         "type": "object"
       },
@@ -6958,7 +7377,9 @@
             "$ref": "#/components/schemas/InstrumentRemovalPreviewDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentRemovalPreviewResponseDto",
         "type": "object"
       },
@@ -7047,7 +7468,13 @@
             "type": "integer"
           }
         },
-        "required": ["instrumentId", "symbol", "name", "trials", "kConsumed"],
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "trials",
+          "kConsumed"
+        ],
         "title": "InstrumentResearchSummaryDto",
         "type": "object"
       },
@@ -7057,7 +7484,9 @@
             "$ref": "#/components/schemas/InstrumentResearchSummaryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentResearchSummaryResponseDto",
         "type": "object"
       },
@@ -7078,7 +7507,10 @@
             "type": "array"
           }
         },
-        "required": ["catalog", "external"],
+        "required": [
+          "catalog",
+          "external"
+        ],
         "title": "InstrumentSearchResponseDto",
         "type": "object"
       },
@@ -7117,7 +7549,10 @@
             "type": "string"
           },
           "evidenceLevel": {
-            "enum": ["in_sample_only", "lab_validated"],
+            "enum": [
+              "in_sample_only",
+              "lab_validated"
+            ],
             "title": "Evidencelevel",
             "type": "string"
           },
@@ -7153,7 +7588,11 @@
             "type": "array"
           },
           "status": {
-            "enum": ["draft", "semifinal", "active"],
+            "enum": [
+              "draft",
+              "semifinal",
+              "active"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -7208,7 +7647,9 @@
             ]
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentStrategyTopResponseDto",
         "type": "object"
       },
@@ -7252,7 +7693,11 @@
             "title": "Maxdrawdownpct"
           },
           "rank": {
-            "enum": [1, 2, 3],
+            "enum": [
+              1,
+              2,
+              3
+            ],
             "title": "Rank",
             "type": "integer"
           },
@@ -7273,7 +7718,11 @@
           },
           "source": {
             "default": "coach",
-            "enum": ["coach", "user", "optimized"],
+            "enum": [
+              "coach",
+              "user",
+              "optimized"
+            ],
             "title": "Source",
             "type": "string"
           },
@@ -7326,7 +7775,12 @@
             "title": "Totalreturnpct"
           }
         },
-        "required": ["rank", "label", "stars", "score"],
+        "required": [
+          "rank",
+          "label",
+          "stars",
+          "score"
+        ],
         "title": "InstrumentStrategyTopSlotDto",
         "type": "object"
       },
@@ -7340,7 +7794,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentStrategyTopsListResponseDto",
         "type": "object"
       },
@@ -7374,7 +7830,12 @@
             "type": "string"
           }
         },
-        "required": ["provider", "status", "barsAdded", "syncedAt"],
+        "required": [
+          "provider",
+          "status",
+          "barsAdded",
+          "syncedAt"
+        ],
         "title": "InstrumentSyncLogEntryDto",
         "type": "object"
       },
@@ -7554,7 +8015,12 @@
             "title": "Xtbtimestamp"
           }
         },
-        "required": ["available", "message", "recommendation", "validatedAt"],
+        "required": [
+          "available",
+          "message",
+          "recommendation",
+          "validatedAt"
+        ],
         "title": "InstrumentXtbValidationDto",
         "type": "object"
       },
@@ -7564,7 +8030,9 @@
             "$ref": "#/components/schemas/InstrumentXtbValidationDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentXtbValidationResponseDto",
         "type": "object"
       },
@@ -7887,7 +8355,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InvestorProfileListResponseDto",
         "type": "object"
       },
@@ -7897,7 +8367,9 @@
             "$ref": "#/components/schemas/InvestorProfileDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InvestorProfileResponseDto",
         "type": "object"
       },
@@ -7910,7 +8382,9 @@
             "type": "boolean"
           }
         },
-        "required": ["enabled"],
+        "required": [
+          "enabled"
+        ],
         "title": "KillSwitchBody",
         "type": "object"
       },
@@ -7958,7 +8432,11 @@
             "title": "Updated"
           }
         },
-        "required": ["effective", "env", "runtimeMemory"],
+        "required": [
+          "effective",
+          "env",
+          "runtimeMemory"
+        ],
         "title": "KillSwitchResponse",
         "type": "object"
       },
@@ -7968,7 +8446,9 @@
             "$ref": "#/components/schemas/KnowledgeNodeDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "KnowledgeNodeDetailResponseDto",
         "type": "object"
       },
@@ -8084,7 +8564,12 @@
             "type": "integer"
           }
         },
-        "required": ["data", "total", "limit", "offset"],
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "KnowledgeNodesListResponseDto",
         "type": "object"
       },
@@ -8118,7 +8603,12 @@
             "type": "integer"
           }
         },
-        "required": ["instrumentId", "symbol", "trials", "kConsumed"],
+        "required": [
+          "instrumentId",
+          "symbol",
+          "trials",
+          "kConsumed"
+        ],
         "title": "LabByInstrumentDto",
         "type": "object"
       },
@@ -8137,7 +8627,11 @@
             "type": "integer"
           }
         },
-        "required": ["proposedBy", "trials", "kConsumed"],
+        "required": [
+          "proposedBy",
+          "trials",
+          "kConsumed"
+        ],
         "title": "LabByOriginDto",
         "type": "object"
       },
@@ -8156,7 +8650,11 @@
             "type": "integer"
           }
         },
-        "required": ["presetKey", "trials", "kConsumed"],
+        "required": [
+          "presetKey",
+          "trials",
+          "kConsumed"
+        ],
         "title": "LabByPresetDto",
         "type": "object"
       },
@@ -8171,7 +8669,10 @@
             "type": "integer"
           }
         },
-        "required": ["campaignId", "trials"],
+        "required": [
+          "campaignId",
+          "trials"
+        ],
         "title": "LabHealthCampaignDto",
         "type": "object"
       },
@@ -8251,7 +8752,10 @@
             "type": "integer"
           }
         },
-        "required": ["present", "pct"],
+        "required": [
+          "present",
+          "pct"
+        ],
         "title": "LabHealthMetricCoverageDto",
         "type": "object"
       },
@@ -8261,7 +8765,9 @@
             "$ref": "#/components/schemas/LabHealthDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "LabHealthResponseDto",
         "type": "object"
       },
@@ -8362,7 +8868,9 @@
             "$ref": "#/components/schemas/LaboratoryResearchSummaryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "LaboratoryResearchSummaryResponseDto",
         "type": "object"
       },
@@ -8515,7 +9023,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "LedgerResponseDto",
         "type": "object"
       },
@@ -8551,7 +9061,11 @@
             "type": "string"
           }
         },
-        "required": ["listId", "listName", "source"],
+        "required": [
+          "listId",
+          "listName",
+          "source"
+        ],
         "title": "ListMembershipRefDto",
         "type": "object"
       },
@@ -8565,7 +9079,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ListQuotesResponseDto",
         "type": "object"
       },
@@ -8575,7 +9091,9 @@
             "$ref": "#/components/schemas/LiveQuoteResponseDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "LiveQuoteEnvelopeDto",
         "type": "object"
       },
@@ -8589,7 +9107,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "LiveQuoteListResponseDto",
         "type": "object"
       },
@@ -8665,7 +9185,11 @@
             "type": "string"
           }
         },
-        "required": ["price", "timestamp", "source"],
+        "required": [
+          "price",
+          "timestamp",
+          "source"
+        ],
         "title": "LiveQuoteSourceDto",
         "type": "object"
       },
@@ -8677,7 +9201,9 @@
             "type": "string"
           }
         },
-        "required": ["password"],
+        "required": [
+          "password"
+        ],
         "title": "LoginRequestDto",
         "type": "object"
       },
@@ -8692,7 +9218,10 @@
             "type": "string"
           }
         },
-        "required": ["token", "authEnabled"],
+        "required": [
+          "token",
+          "authEnabled"
+        ],
         "title": "LoginResponseDataDto",
         "type": "object"
       },
@@ -8702,7 +9231,9 @@
             "$ref": "#/components/schemas/LoginResponseDataDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "LoginResponseDto",
         "type": "object"
       },
@@ -8724,7 +9255,10 @@
             "type": "array"
           }
         },
-        "required": ["tenures", "links"],
+        "required": [
+          "tenures",
+          "links"
+        ],
         "title": "MandateBundleDto",
         "type": "object"
       },
@@ -8735,7 +9269,9 @@
             "$ref": "#/components/schemas/MandateBundleDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "MandateBundleResponseDto",
         "type": "object"
       },
@@ -8904,7 +9440,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "MarketIndexCatalogResponseDto",
         "type": "object"
       },
@@ -8918,7 +9456,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "MarketIndicesSearchResponseDto",
         "type": "object"
       },
@@ -8945,7 +9485,13 @@
             "type": "string"
           }
         },
-        "required": ["id", "label", "enabled", "healthy", "message"],
+        "required": [
+          "id",
+          "label",
+          "enabled",
+          "healthy",
+          "message"
+        ],
         "title": "MarketProviderStatusDto",
         "type": "object"
       },
@@ -8959,7 +9505,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "MarketProvidersResponseDto",
         "type": "object"
       },
@@ -9032,7 +9580,12 @@
             "type": "integer"
           }
         },
-        "required": ["data", "total", "limit", "offset"],
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "MklSyncEventsListResponseDto",
         "type": "object"
       },
@@ -9074,7 +9627,13 @@
             "type": "boolean"
           }
         },
-        "required": ["synced", "dryRun", "event", "node", "factPayload"],
+        "required": [
+          "synced",
+          "dryRun",
+          "event",
+          "node",
+          "factPayload"
+        ],
         "title": "MklSyncResultDto",
         "type": "object"
       },
@@ -9084,7 +9643,9 @@
             "$ref": "#/components/schemas/MklSyncResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "MklSyncResultResponseDto",
         "type": "object"
       },
@@ -9110,7 +9671,10 @@
             "type": "string"
           }
         },
-        "required": ["id", "name"],
+        "required": [
+          "id",
+          "name"
+        ],
         "title": "NamedRefDto",
         "type": "object"
       },
@@ -9212,7 +9776,14 @@
             "type": "number"
           }
         },
-        "required": ["timestamp", "open", "high", "low", "close", "volume"],
+        "required": [
+          "timestamp",
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
         "title": "OhlcvBarInputDto",
         "type": "object"
       },
@@ -9227,7 +9798,10 @@
             "type": "string"
           }
         },
-        "required": ["timeframe", "count"],
+        "required": [
+          "timeframe",
+          "count"
+        ],
         "title": "OhlcvMetaDto",
         "type": "object"
       },
@@ -9244,7 +9818,10 @@
             "$ref": "#/components/schemas/OhlcvMetaDto"
           }
         },
-        "required": ["data", "meta"],
+        "required": [
+          "data",
+          "meta"
+        ],
         "title": "OhlcvResponseDto",
         "type": "object"
       },
@@ -9278,7 +9855,12 @@
             "type": "integer"
           }
         },
-        "required": ["totalReturnPct", "maxDrawdownPct", "tradeCount", "score"],
+        "required": [
+          "totalReturnPct",
+          "maxDrawdownPct",
+          "tradeCount",
+          "score"
+        ],
         "title": "OosMetricsDto",
         "type": "object"
       },
@@ -9406,7 +9988,9 @@
             "$ref": "#/components/schemas/OpinionTelemetryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "OpinionTelemetryResponseDto",
         "type": "object"
       },
@@ -9495,7 +10079,12 @@
             ]
           },
           "status": {
-            "enum": ["pending", "processing", "completed", "failed"],
+            "enum": [
+              "pending",
+              "processing",
+              "completed",
+              "failed"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -9537,7 +10126,9 @@
             "$ref": "#/components/schemas/OptimizationRunDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "OptimizationRunResponseDto",
         "type": "object"
       },
@@ -9551,7 +10142,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "OptimizationRunsListResponseDto",
         "type": "object"
       },
@@ -9771,7 +10364,9 @@
             "title": "Walkforwardfolds"
           }
         },
-        "required": ["instrumentId"],
+        "required": [
+          "instrumentId"
+        ],
         "title": "OptimizeSmaGridRequestDto",
         "type": "object"
       },
@@ -9792,7 +10387,9 @@
             "title": "Runid"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "OptimizeSmaGridResponseDto",
         "type": "object"
       },
@@ -9960,7 +10557,12 @@
             "type": "string"
           }
         },
-        "required": ["id", "symbol", "name", "ohlcvBarCount"],
+        "required": [
+          "id",
+          "symbol",
+          "name",
+          "ohlcvBarCount"
+        ],
         "title": "OrphanInstrumentDto",
         "type": "object"
       },
@@ -9978,7 +10580,10 @@
             "type": "integer"
           }
         },
-        "required": ["orphans", "totalOhlcvBars"],
+        "required": [
+          "orphans",
+          "totalOhlcvBars"
+        ],
         "title": "OrphanInstrumentsDto",
         "type": "object"
       },
@@ -9988,7 +10593,9 @@
             "$ref": "#/components/schemas/OrphanInstrumentsDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "OrphanInstrumentsResponseDto",
         "type": "object"
       },
@@ -10012,7 +10619,12 @@
           },
           "horizon": {
             "default": "swing",
-            "enum": ["intraday", "swing", "position", "long_term"],
+            "enum": [
+              "intraday",
+              "swing",
+              "position",
+              "long_term"
+            ],
             "title": "Horizon",
             "type": "string"
           },
@@ -10032,7 +10644,13 @@
           },
           "regime": {
             "default": "neutral",
-            "enum": ["risk_on", "neutral", "risk_off", "crisis", "uncertain"],
+            "enum": [
+              "risk_on",
+              "neutral",
+              "risk_off",
+              "crisis",
+              "uncertain"
+            ],
             "title": "Regime",
             "type": "string"
           },
@@ -10045,7 +10663,9 @@
             "$ref": "#/components/schemas/PaperDUniverseBody"
           }
         },
-        "required": ["universe"],
+        "required": [
+          "universe"
+        ],
         "title": "PaperDProposeBody",
         "type": "object"
       },
@@ -10150,7 +10770,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PendingOrdersResponseDto",
         "type": "object"
       },
@@ -10185,7 +10807,12 @@
             "type": "string"
           }
         },
-        "required": ["id", "type", "timestamp", "payload"],
+        "required": [
+          "id",
+          "type",
+          "timestamp",
+          "payload"
+        ],
         "title": "PlatformEventDto",
         "type": "object"
       },
@@ -10199,7 +10826,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PlatformEventsListResponseDto",
         "type": "object"
       },
@@ -10222,7 +10851,12 @@
             "type": "string"
           }
         },
-        "required": ["id", "name", "currency", "cash"],
+        "required": [
+          "id",
+          "name",
+          "currency",
+          "cash"
+        ],
         "title": "PortfolioDto",
         "type": "object"
       },
@@ -10272,7 +10906,9 @@
             "$ref": "#/components/schemas/PortfolioSummaryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PortfolioSummaryResponseDto",
         "type": "object"
       },
@@ -10372,7 +11008,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PositionPoliciesListResponseDto",
         "type": "object"
       },
@@ -10448,7 +11086,9 @@
             "$ref": "#/components/schemas/PositionPolicyDetailDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PositionPolicyResponseDto",
         "type": "object"
       },
@@ -10547,7 +11187,9 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId"],
+        "required": [
+          "instrumentId"
+        ],
         "title": "PredictRequest",
         "type": "object"
       },
@@ -10640,7 +11282,9 @@
             "$ref": "#/components/schemas/PriceAlertDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PriceAlertResponseDto",
         "type": "object"
       },
@@ -10655,7 +11299,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PriceAlertsResponseDto",
         "type": "object"
       },
@@ -10749,7 +11395,11 @@
           "action": {
             "anyOf": [
               {
-                "enum": ["recommend_long", "recommend_short", "wait"],
+                "enum": [
+                  "recommend_long",
+                  "recommend_short",
+                  "wait"
+                ],
                 "type": "string"
               },
               {
@@ -10760,7 +11410,12 @@
           },
           "horizon": {
             "default": "swing",
-            "enum": ["intraday", "swing", "position", "long_term"],
+            "enum": [
+              "intraday",
+              "swing",
+              "position",
+              "long_term"
+            ],
             "title": "Horizon",
             "type": "string"
           },
@@ -10844,7 +11499,10 @@
             "title": "Symbol"
           }
         },
-        "required": ["instrumentId", "suggestedQuantity"],
+        "required": [
+          "instrumentId",
+          "suggestedQuantity"
+        ],
         "title": "ProposeRecommendationRequest",
         "type": "object"
       },
@@ -10873,7 +11531,10 @@
             "type": "integer"
           }
         },
-        "required": ["deleted", "keep"],
+        "required": [
+          "deleted",
+          "keep"
+        ],
         "title": "PruneBacktestsResponseDto",
         "type": "object"
       },
@@ -10895,7 +11556,11 @@
             "type": "array"
           }
         },
-        "required": ["accountId", "name", "reasons"],
+        "required": [
+          "accountId",
+          "name",
+          "reasons"
+        ],
         "title": "PurgeClosedAccountSkippedDto",
         "type": "object"
       },
@@ -10918,7 +11583,9 @@
             "$ref": "#/components/schemas/PurgeClosedAccountsResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PurgeClosedAccountsResponseDto",
         "type": "object"
       },
@@ -10943,7 +11610,11 @@
             "type": "array"
           }
         },
-        "required": ["purgedIds", "skipped", "scanned"],
+        "required": [
+          "purgedIds",
+          "skipped",
+          "scanned"
+        ],
         "title": "PurgeClosedAccountsResultDto",
         "type": "object"
       },
@@ -10965,7 +11636,11 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "symbol", "reasons"],
+        "required": [
+          "instrumentId",
+          "symbol",
+          "reasons"
+        ],
         "title": "PurgeOrphanSkippedDto",
         "type": "object"
       },
@@ -10988,7 +11663,9 @@
             "$ref": "#/components/schemas/PurgeOrphansResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "PurgeOrphansResponseDto",
         "type": "object"
       },
@@ -11013,7 +11690,11 @@
             "type": "array"
           }
         },
-        "required": ["purgedIds", "skipped", "scanned"],
+        "required": [
+          "purgedIds",
+          "skipped",
+          "scanned"
+        ],
         "title": "PurgeOrphansResultDto",
         "type": "object"
       },
@@ -11039,7 +11720,9 @@
             "type": "string"
           }
         },
-        "required": ["instrumentIds"],
+        "required": [
+          "instrumentIds"
+        ],
         "title": "QueryInstrumentCompositeDto",
         "type": "object"
       },
@@ -11089,7 +11772,9 @@
             "type": "array"
           }
         },
-        "required": ["instrumentIds"],
+        "required": [
+          "instrumentIds"
+        ],
         "title": "QueryInstrumentDailyOpinionsDto",
         "type": "object"
       },
@@ -11105,7 +11790,9 @@
             "type": "array"
           }
         },
-        "required": ["instrumentIds"],
+        "required": [
+          "instrumentIds"
+        ],
         "title": "QueryInstrumentFundamentalsDto",
         "type": "object"
       },
@@ -11126,7 +11813,9 @@
             "type": "string"
           }
         },
-        "required": ["instrumentIds"],
+        "required": [
+          "instrumentIds"
+        ],
         "title": "QueryInstrumentStrategyTopsDto",
         "type": "object"
       },
@@ -11218,7 +11907,9 @@
             "$ref": "#/components/schemas/RemoveInstrumentFromListResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "RemoveInstrumentFromListResponseDto",
         "type": "object"
       },
@@ -11279,7 +11970,9 @@
             "$ref": "#/components/schemas/ResearchEvidenceDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ResearchEvidenceDetailResponseDto",
         "type": "object"
       },
@@ -11393,7 +12086,12 @@
             "type": "integer"
           }
         },
-        "required": ["data", "total", "limit", "offset"],
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "ResearchEvidenceListResponseDto",
         "type": "object"
       },
@@ -11459,7 +12157,9 @@
             "$ref": "#/components/schemas/ResearchTreeEdgeDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ResearchTreeEdgeDetailResponseDto",
         "type": "object"
       },
@@ -11562,7 +12262,12 @@
             "type": "integer"
           }
         },
-        "required": ["data", "total", "limit", "offset"],
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "ResearchTreeEdgesListResponseDto",
         "type": "object"
       },
@@ -11572,7 +12277,9 @@
             "$ref": "#/components/schemas/ResearchTrialDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ResearchTrialDetailResponseDto",
         "type": "object"
       },
@@ -11777,7 +12484,12 @@
             "type": "integer"
           }
         },
-        "required": ["data", "total", "limit", "offset"],
+        "required": [
+          "data",
+          "total",
+          "limit",
+          "offset"
+        ],
         "title": "ResearchTrialsListResponseDto",
         "type": "object"
       },
@@ -11792,7 +12504,9 @@
             "type": "array"
           }
         },
-        "required": ["hits"],
+        "required": [
+          "hits"
+        ],
         "title": "RouteSignalsRequestDto",
         "type": "object"
       },
@@ -11804,7 +12518,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "RouteSignalsResponseDto",
         "type": "object"
       },
@@ -11896,7 +12612,9 @@
             "title": "Notifyemailenabled"
           }
         },
-        "required": ["instrumentIds"],
+        "required": [
+          "instrumentIds"
+        ],
         "title": "RunEstudioEodOpinionBatchDto",
         "type": "object"
       },
@@ -11918,7 +12636,12 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "symbol", "name", "signal"],
+        "required": [
+          "instrumentId",
+          "symbol",
+          "name",
+          "signal"
+        ],
         "title": "ScanHitDto",
         "type": "object"
       },
@@ -12011,7 +12734,13 @@
             "type": "string"
           }
         },
-        "required": ["id", "status", "payload", "createdAt", "updatedAt"],
+        "required": [
+          "id",
+          "status",
+          "payload",
+          "createdAt",
+          "updatedAt"
+        ],
         "title": "ScanJobDto",
         "type": "object"
       },
@@ -12021,7 +12750,9 @@
             "$ref": "#/components/schemas/ScanJobDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ScanJobResponseDto",
         "type": "object"
       },
@@ -12035,7 +12766,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ScanJobsListResponseDto",
         "type": "object"
       },
@@ -12105,7 +12838,9 @@
             "$ref": "#/components/schemas/ScanUniverseDto"
           }
         },
-        "required": ["universe"],
+        "required": [
+          "universe"
+        ],
         "title": "ScanRunRequestDto",
         "type": "object"
       },
@@ -12115,7 +12850,9 @@
             "$ref": "#/components/schemas/ScanRunResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "ScanRunResponseDto",
         "type": "object"
       },
@@ -12208,7 +12945,10 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "reason"],
+        "required": [
+          "instrumentId",
+          "reason"
+        ],
         "title": "ScanSkippedInstrumentDto",
         "type": "object"
       },
@@ -12460,7 +13200,9 @@
             "$ref": "#/components/schemas/SignalAlertSubscriptionDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "SignalAlertSubscriptionResponseDto",
         "type": "object"
       },
@@ -12474,7 +13216,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "SignalAlertSubscriptionsResponseDto",
         "type": "object"
       },
@@ -12655,7 +13399,12 @@
             "type": "integer"
           }
         },
-        "required": ["totalReturnPct", "maxDrawdownPct", "tradeCount", "score"],
+        "required": [
+          "totalReturnPct",
+          "maxDrawdownPct",
+          "tradeCount",
+          "score"
+        ],
         "title": "SmaGridTrialDto",
         "type": "object"
       },
@@ -12732,7 +13481,9 @@
             "$ref": "#/components/schemas/StrategyDefinitionDetailDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "StrategyDefinitionResponseDto",
         "type": "object"
       },
@@ -12807,7 +13558,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "StrategyDefinitionsListResponseDto",
         "type": "object"
       },
@@ -12832,7 +13585,9 @@
             "type": "integer"
           }
         },
-        "required": ["indexKey"],
+        "required": [
+          "indexKey"
+        ],
         "title": "SubscribeMarketIndexRequestDto",
         "type": "object"
       },
@@ -12842,7 +13597,9 @@
             "$ref": "#/components/schemas/SubscribeMarketIndexResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "SubscribeMarketIndexResponseDto",
         "type": "object"
       },
@@ -12932,7 +13689,11 @@
             "type": "integer"
           }
         },
-        "required": ["total", "alreadyPresent", "imported"],
+        "required": [
+          "total",
+          "alreadyPresent",
+          "imported"
+        ],
         "title": "SubscribeProgressDto",
         "type": "object"
       },
@@ -12973,7 +13734,9 @@
             "title": "Updatedat"
           }
         },
-        "required": ["accountId"],
+        "required": [
+          "accountId"
+        ],
         "title": "SupervisedF3BundleDto",
         "type": "object"
       },
@@ -12983,7 +13746,9 @@
             "$ref": "#/components/schemas/SupervisedF3BundleDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "SupervisedF3BundleResponseDto",
         "type": "object"
       },
@@ -13038,7 +13803,12 @@
             "type": "string"
           }
         },
-        "required": ["status", "barsAdded", "syncedAt", "error"],
+        "required": [
+          "status",
+          "barsAdded",
+          "syncedAt",
+          "error"
+        ],
         "title": "SyncDetailDto",
         "type": "object"
       },
@@ -13085,7 +13855,11 @@
             "type": "string"
           }
         },
-        "required": ["status", "syncedAt", "error"],
+        "required": [
+          "status",
+          "syncedAt",
+          "error"
+        ],
         "title": "SyncMetaDto",
         "type": "object"
       },
@@ -13164,7 +13938,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "SyncQueueResponseDto",
         "type": "object"
       },
@@ -13194,7 +13970,9 @@
             "$ref": "#/components/schemas/SyncResultDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "SyncResponseDto",
         "type": "object"
       },
@@ -13242,7 +14020,10 @@
             "type": "string"
           }
         },
-        "required": ["barsAdded", "status"],
+        "required": [
+          "barsAdded",
+          "status"
+        ],
         "title": "SyncResultDto",
         "type": "object"
       },
@@ -13300,7 +14081,9 @@
             "$ref": "#/components/schemas/SyncSettingsDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "SyncSettingsResponseDto",
         "type": "object"
       },
@@ -13380,7 +14163,9 @@
             "$ref": "#/components/schemas/TaxReportSummaryDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "TaxReportResponseDto",
         "type": "object"
       },
@@ -13572,7 +14357,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "TrackerDefinitionDetailsListResponseDto",
         "type": "object"
       },
@@ -13582,7 +14369,9 @@
             "$ref": "#/components/schemas/TrackerDefinitionDetailDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "TrackerDefinitionResponseDto",
         "type": "object"
       },
@@ -13660,7 +14449,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "TrackerDefinitionsListResponseDto",
         "type": "object"
       },
@@ -13723,12 +14514,20 @@
             "type": "number"
           },
           "type": {
-            "enum": ["buy", "sell"],
+            "enum": [
+              "buy",
+              "sell"
+            ],
             "title": "Type",
             "type": "string"
           }
         },
-        "required": ["instrumentId", "type", "quantity", "price"],
+        "required": [
+          "instrumentId",
+          "type",
+          "quantity",
+          "price"
+        ],
         "title": "TradeRequestDto",
         "type": "object"
       },
@@ -13740,7 +14539,9 @@
             "type": "object"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "TradeResponseDto",
         "type": "object"
       },
@@ -13763,7 +14564,9 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId"],
+        "required": [
+          "instrumentId"
+        ],
         "title": "TrainRequest",
         "type": "object"
       },
@@ -13825,7 +14628,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "TransactionsResponseDto",
         "type": "object"
       },
@@ -13845,7 +14650,10 @@
             "$ref": "#/components/schemas/SignalAlertSubscriptionDto"
           }
         },
-        "required": ["subscription", "signal"],
+        "required": [
+          "subscription",
+          "signal"
+        ],
         "title": "TriggeredSignalAlertDto",
         "type": "object"
       },
@@ -13924,7 +14732,9 @@
             "$ref": "#/components/schemas/AccountSettingsDto"
           }
         },
-        "required": ["settings"],
+        "required": [
+          "settings"
+        ],
         "title": "UpdateAccountSettingsDto",
         "type": "object"
       },
@@ -14601,18 +15411,28 @@
           },
           "scope": {
             "default": "estudio",
-            "enum": ["estudio", "global", "trading"],
+            "enum": [
+              "estudio",
+              "global",
+              "trading"
+            ],
             "title": "Scope",
             "type": "string"
           },
           "source": {
             "default": "user",
-            "enum": ["user", "ai", "system"],
+            "enum": [
+              "user",
+              "ai",
+              "system"
+            ],
             "title": "Source",
             "type": "string"
           }
         },
-        "required": ["body"],
+        "required": [
+          "body"
+        ],
         "title": "UpsertInstrumentNarrativeDto",
         "type": "object"
       },
@@ -14643,7 +15463,10 @@
           },
           "evidenceLevel": {
             "default": "in_sample_only",
-            "enum": ["in_sample_only", "lab_validated"],
+            "enum": [
+              "in_sample_only",
+              "lab_validated"
+            ],
             "title": "Evidencelevel",
             "type": "string"
           },
@@ -14673,7 +15496,11 @@
           },
           "status": {
             "default": "semifinal",
-            "enum": ["draft", "semifinal", "active"],
+            "enum": [
+              "draft",
+              "semifinal",
+              "active"
+            ],
             "title": "Status",
             "type": "string"
           },
@@ -14694,7 +15521,10 @@
             "type": "string"
           }
         },
-        "required": ["instrumentId", "slots"],
+        "required": [
+          "instrumentId",
+          "slots"
+        ],
         "title": "UpsertInstrumentStrategyTopDto",
         "type": "object"
       },
@@ -14710,7 +15540,10 @@
             "type": "string"
           }
         },
-        "required": ["name", "definition"],
+        "required": [
+          "name",
+          "definition"
+        ],
         "title": "UpsertStrategyDefinitionRequestDto",
         "type": "object"
       },
@@ -14746,7 +15579,11 @@
             "type": "string"
           }
         },
-        "required": ["loc", "msg", "type"],
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
         "title": "ValidationError",
         "type": "object"
       },
@@ -14806,7 +15643,12 @@
             "title": "Walkforwardefficiency"
           }
         },
-        "required": ["index", "trainBarCount", "testBarCount", "isScore"],
+        "required": [
+          "index",
+          "trainBarCount",
+          "testBarCount",
+          "isScore"
+        ],
         "title": "WalkForwardFoldDto",
         "type": "object"
       },
@@ -14892,7 +15734,12 @@
             "title": "Walkforwardefficiency"
           }
         },
-        "required": ["nFolds", "meanOosScore", "stdOosScore", "foldCount"],
+        "required": [
+          "nFolds",
+          "meanOosScore",
+          "stdOosScore",
+          "foldCount"
+        ],
         "title": "WalkForwardSummaryDto",
         "type": "object"
       },
@@ -14914,7 +15761,9 @@
             "title": "Note"
           }
         },
-        "required": ["amount"],
+        "required": [
+          "amount"
+        ],
         "title": "WithdrawCashDto",
         "type": "object"
       },
@@ -14975,7 +15824,9 @@
             "$ref": "#/components/schemas/WorkspaceDetailDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "WorkspaceResponseDto",
         "type": "object"
       },
@@ -14998,7 +15849,12 @@
             "type": "string"
           }
         },
-        "required": ["id", "name", "isDefault", "updatedAt"],
+        "required": [
+          "id",
+          "name",
+          "isDefault",
+          "updatedAt"
+        ],
         "title": "WorkspaceSummaryDto",
         "type": "object"
       },
@@ -15012,7 +15868,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "WorkspacesListResponseDto",
         "type": "object"
       },
@@ -15039,7 +15897,13 @@
             "type": "string"
           }
         },
-        "required": ["symbol", "bid", "ask", "last", "timestamp"],
+        "required": [
+          "symbol",
+          "bid",
+          "ask",
+          "last",
+          "timestamp"
+        ],
         "title": "XtbQuoteDto",
         "type": "object"
       },
@@ -15053,7 +15917,9 @@
             "type": "array"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentListResponseDto",
         "type": "object"
       },
@@ -15063,7 +15929,9 @@
             "$ref": "#/components/schemas/InstrumentListDetailDto"
           }
         },
-        "required": ["data"],
+        "required": [
+          "data"
+        ],
         "title": "InstrumentListResponseDto",
         "type": "object"
       }
@@ -15120,7 +15988,9 @@
           }
         },
         "summary": "List Accounts",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       },
       "post": {
         "operationId": "create_account_api_accounts_post",
@@ -15157,7 +16027,9 @@
           }
         },
         "summary": "Create Account",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/summaries": {
@@ -15205,7 +16077,9 @@
           }
         },
         "summary": "List Account Summaries",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}": {
@@ -15238,7 +16112,9 @@
           }
         },
         "summary": "Delete Account",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       },
       "get": {
         "operationId": "get_account_api_accounts__account_id__get",
@@ -15276,7 +16152,9 @@
           }
         },
         "summary": "Get Account",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       },
       "patch": {
         "operationId": "update_account_api_accounts__account_id__patch",
@@ -15324,7 +16202,9 @@
           }
         },
         "summary": "Update Account",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/active-profile": {
@@ -15364,7 +16244,9 @@
           }
         },
         "summary": "Get Active Profile",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       },
       "put": {
         "operationId": "assign_active_profile_api_accounts__account_id__active_profile_put",
@@ -15412,7 +16294,9 @@
           }
         },
         "summary": "Assign Active Profile",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       }
     },
     "/api/accounts/{account_id}/close": {
@@ -15452,7 +16336,9 @@
           }
         },
         "summary": "Close Account",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/core-r": {
@@ -15492,7 +16378,9 @@
           }
         },
         "summary": "Get Account Core R",
-        "tags": ["core-r"]
+        "tags": [
+          "core-r"
+        ]
       },
       "put": {
         "description": "Push cliente → BD (localStorage = cache; BD = SoT).",
@@ -15541,7 +16429,9 @@
           }
         },
         "summary": "Sync Account Core R",
-        "tags": ["core-r"]
+        "tags": [
+          "core-r"
+        ]
       }
     },
     "/api/accounts/{account_id}/daily-ops-report": {
@@ -15620,7 +16510,9 @@
           }
         },
         "summary": "Get Daily Ops Report",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/daily-ops-report.pdf": {
@@ -15695,7 +16587,9 @@
           }
         },
         "summary": "Download Daily Ops Digest Pdf",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/daily-ops-report/email": {
@@ -15746,7 +16640,9 @@
           }
         },
         "summary": "Send Daily Ops Digest Email",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/deposits": {
@@ -15796,7 +16692,9 @@
           }
         },
         "summary": "Deposit Cash",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/ledger": {
@@ -15859,7 +16757,9 @@
           }
         },
         "summary": "List Ledger",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/make-default": {
@@ -15899,7 +16799,9 @@
           }
         },
         "summary": "Make Default Account",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/mandates": {
@@ -15955,7 +16857,9 @@
           }
         },
         "summary": "Get Account Mandates",
-        "tags": ["mandates"]
+        "tags": [
+          "mandates"
+        ]
       },
       "put": {
         "description": "Push cliente → BD (cache localStorage + SoT PostgreSQL).",
@@ -16004,7 +16908,9 @@
           }
         },
         "summary": "Sync Account Mandates",
-        "tags": ["mandates"]
+        "tags": [
+          "mandates"
+        ]
       }
     },
     "/api/accounts/{account_id}/settings": {
@@ -16054,7 +16960,9 @@
           }
         },
         "summary": "Update Account Settings",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/summary": {
@@ -16094,7 +17002,9 @@
           }
         },
         "summary": "Get Account Summary",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/supervised-f3-queue": {
@@ -16134,7 +17044,9 @@
           }
         },
         "summary": "Get Account Supervised F3",
-        "tags": ["supervised-f3"]
+        "tags": [
+          "supervised-f3"
+        ]
       },
       "put": {
         "description": "Push cliente → BD (sessionStorage = cache; BD = SoT).",
@@ -16183,7 +17095,9 @@
           }
         },
         "summary": "Sync Account Supervised F3",
-        "tags": ["supervised-f3"]
+        "tags": [
+          "supervised-f3"
+        ]
       }
     },
     "/api/accounts/{account_id}/tax-report": {
@@ -16241,7 +17155,9 @@
           }
         },
         "summary": "Get Tax Report",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/accounts/{account_id}/withdrawals": {
@@ -16291,7 +17207,9 @@
           }
         },
         "summary": "Withdraw Cash",
-        "tags": ["accounts"]
+        "tags": [
+          "accounts"
+        ]
       }
     },
     "/api/ai/backtest-coach/analyze": {
@@ -16333,7 +17251,9 @@
           }
         },
         "summary": "Analyze Backtest Coach",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/core-r/review-evidence": {
@@ -16375,7 +17295,9 @@
           }
         },
         "summary": "Explain Core R Review Evidence",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/decision-memory": {
@@ -16414,7 +17336,9 @@
           }
         },
         "summary": "Append Decision Memory",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/decision-sessions": {
@@ -16491,7 +17415,9 @@
           }
         },
         "summary": "List Decision Sessions",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/decision-sessions/learning-summary": {
@@ -16569,7 +17495,9 @@
           }
         },
         "summary": "Decision Session Learning Summary",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/decision-sessions/{session_id}": {
@@ -16611,7 +17539,9 @@
           }
         },
         "summary": "Get Decision Session",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/decision-sessions/{session_id}/outcome": {
@@ -16664,7 +17594,9 @@
           }
         },
         "summary": "Close Decision Session Outcome",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/decision-sessions/{session_id}/replay": {
@@ -16707,7 +17639,9 @@
           }
         },
         "summary": "Get Decision Session Replay",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/dia-d/session-evidence": {
@@ -16749,7 +17683,9 @@
           }
         },
         "summary": "Explain Dia D Session Evidence",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/edge-reports": {
@@ -16788,7 +17724,9 @@
           }
         },
         "summary": "Append Edge Report",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/effectiveness": {
@@ -16847,7 +17785,9 @@
           }
         },
         "summary": "Ai Effectiveness",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/fundamentals/explain": {
@@ -16889,7 +17829,9 @@
           }
         },
         "summary": "Explain Instrument Fundamentals",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/fundamentals/filings/ask": {
@@ -16931,7 +17873,9 @@
           }
         },
         "summary": "Ask Instrument Filing",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/fundamentals/filings/summarize": {
@@ -16973,7 +17917,9 @@
           }
         },
         "summary": "Summarize Instrument Filing",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/intents/confirm": {
@@ -17015,7 +17961,9 @@
           }
         },
         "summary": "Confirm Intent",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/recommendations/propose": {
@@ -17057,7 +18005,9 @@
           }
         },
         "summary": "Propose Recommendation",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/status": {
@@ -17076,7 +18026,9 @@
           }
         },
         "summary": "Ai Governance Status",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/ai/trials": {
@@ -17115,7 +18067,9 @@
           }
         },
         "summary": "Append Trial",
-        "tags": ["ai"]
+        "tags": [
+          "ai"
+        ]
       }
     },
     "/api/alerts": {
@@ -17156,7 +18110,9 @@
           }
         },
         "summary": "List Alerts",
-        "tags": ["alerts"]
+        "tags": [
+          "alerts"
+        ]
       },
       "post": {
         "operationId": "create_alert_api_alerts_post",
@@ -17193,7 +18149,9 @@
           }
         },
         "summary": "Create Alert",
-        "tags": ["alerts"]
+        "tags": [
+          "alerts"
+        ]
       }
     },
     "/api/alerts/evaluate": {
@@ -17212,7 +18170,9 @@
           }
         },
         "summary": "Evaluate Alerts",
-        "tags": ["alerts"]
+        "tags": [
+          "alerts"
+        ]
       }
     },
     "/api/alerts/{alert_id}": {
@@ -17245,7 +18205,9 @@
           }
         },
         "summary": "Delete Alert",
-        "tags": ["alerts"]
+        "tags": [
+          "alerts"
+        ]
       }
     },
     "/api/alerts/{alert_id}/reactivate": {
@@ -17285,7 +18247,9 @@
           }
         },
         "summary": "Reactivate Alert",
-        "tags": ["alerts"]
+        "tags": [
+          "alerts"
+        ]
       }
     },
     "/api/auth/login": {
@@ -17324,7 +18288,9 @@
           }
         },
         "summary": "Login",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/auth/status": {
@@ -17343,7 +18309,9 @@
           }
         },
         "summary": "Auth Status",
-        "tags": ["auth"]
+        "tags": [
+          "auth"
+        ]
       }
     },
     "/api/backtests": {
@@ -17386,7 +18354,9 @@
           }
         },
         "summary": "List Backtests",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/optimize": {
@@ -17425,7 +18395,9 @@
           }
         },
         "summary": "Optimize Backtest",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/optimize/jobs": {
@@ -17464,7 +18436,9 @@
           }
         },
         "summary": "Enqueue Optimize Job",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/optimize/runs": {
@@ -17483,7 +18457,9 @@
           }
         },
         "summary": "List Optimize Runs",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/optimize/runs/{run_id}": {
@@ -17523,7 +18499,9 @@
           }
         },
         "summary": "Get Optimize Run",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/prune": {
@@ -17562,7 +18540,9 @@
           }
         },
         "summary": "Prune Backtests",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/run": {
@@ -17601,7 +18581,9 @@
           }
         },
         "summary": "Run Backtest",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/{run_id}": {
@@ -17641,7 +18623,9 @@
           }
         },
         "summary": "Get Backtest",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/backtests/{run_id}/deploy-paper": {
@@ -17691,7 +18675,9 @@
           }
         },
         "summary": "Deploy Backtest Paper Account",
-        "tags": ["backtests"]
+        "tags": [
+          "backtests"
+        ]
       }
     },
     "/api/core-r/cron/tick": {
@@ -17749,7 +18735,9 @@
           }
         },
         "summary": "Run Core R Cron Tick",
-        "tags": ["core-r"]
+        "tags": [
+          "core-r"
+        ]
       }
     },
     "/api/database/closed-accounts": {
@@ -17792,7 +18780,9 @@
           }
         },
         "summary": "List Closed Simulated Accounts",
-        "tags": ["database"]
+        "tags": [
+          "database"
+        ]
       }
     },
     "/api/database/closed-accounts/purge": {
@@ -17831,7 +18821,9 @@
           }
         },
         "summary": "Purge Closed Simulated Accounts",
-        "tags": ["database"]
+        "tags": [
+          "database"
+        ]
       }
     },
     "/api/database/orphans": {
@@ -17874,7 +18866,9 @@
           }
         },
         "summary": "List Orphan Instruments",
-        "tags": ["database"]
+        "tags": [
+          "database"
+        ]
       }
     },
     "/api/database/orphans/purge": {
@@ -17913,7 +18907,9 @@
           }
         },
         "summary": "Purge Orphan Instruments",
-        "tags": ["database"]
+        "tags": [
+          "database"
+        ]
       }
     },
     "/api/database/summary": {
@@ -17960,7 +18956,9 @@
           }
         },
         "summary": "Get Database Summary",
-        "tags": ["database"]
+        "tags": [
+          "database"
+        ]
       }
     },
     "/api/drawings/replay": {
@@ -17999,7 +18997,9 @@
           }
         },
         "summary": "Replay Drawings",
-        "tags": ["drawings"]
+        "tags": [
+          "drawings"
+        ]
       }
     },
     "/api/execution-policies": {
@@ -18040,7 +19040,9 @@
           }
         },
         "summary": "List Execution Policies",
-        "tags": ["execution-policies"]
+        "tags": [
+          "execution-policies"
+        ]
       },
       "post": {
         "operationId": "create_execution_policy_api_execution_policies_post",
@@ -18077,7 +19079,9 @@
           }
         },
         "summary": "Create Execution Policy",
-        "tags": ["execution-policies"]
+        "tags": [
+          "execution-policies"
+        ]
       }
     },
     "/api/execution-policies/{policy_id}": {
@@ -18110,7 +19114,9 @@
           }
         },
         "summary": "Delete Execution Policy",
-        "tags": ["execution-policies"]
+        "tags": [
+          "execution-policies"
+        ]
       },
       "get": {
         "operationId": "get_execution_policy_api_execution_policies__policy_id__get",
@@ -18148,7 +19154,9 @@
           }
         },
         "summary": "Get Execution Policy",
-        "tags": ["execution-policies"]
+        "tags": [
+          "execution-policies"
+        ]
       },
       "patch": {
         "operationId": "update_execution_policy_api_execution_policies__policy_id__patch",
@@ -18196,7 +19204,9 @@
           }
         },
         "summary": "Update Execution Policy",
-        "tags": ["execution-policies"]
+        "tags": [
+          "execution-policies"
+        ]
       }
     },
     "/api/execution-policies/{policy_id}/route": {
@@ -18246,7 +19256,9 @@
           }
         },
         "summary": "Route Signals Through Policy",
-        "tags": ["execution-policies"]
+        "tags": [
+          "execution-policies"
+        ]
       }
     },
     "/api/features/catalog": {
@@ -18267,7 +19279,9 @@
           }
         },
         "summary": "List Feature Catalog",
-        "tags": ["features"]
+        "tags": [
+          "features"
+        ]
       }
     },
     "/api/features/latest": {
@@ -18342,7 +19356,9 @@
           }
         },
         "summary": "Get Feature Latest",
-        "tags": ["features"]
+        "tags": [
+          "features"
+        ]
       }
     },
     "/api/health": {
@@ -18361,7 +19377,9 @@
           }
         },
         "summary": "Health Check",
-        "tags": ["health"]
+        "tags": [
+          "health"
+        ]
       }
     },
     "/api/indicators/compute": {
@@ -18400,7 +19418,9 @@
           }
         },
         "summary": "Compute Indicators",
-        "tags": ["indicators"]
+        "tags": [
+          "indicators"
+        ]
       }
     },
     "/api/indicators/draft-from-prompt": {
@@ -18439,7 +19459,9 @@
           }
         },
         "summary": "Draft Indicator From Prompt",
-        "tags": ["indicators"]
+        "tags": [
+          "indicators"
+        ]
       }
     },
     "/api/instrument-daily-opinions/eod-batch": {
@@ -18479,7 +19501,9 @@
           }
         },
         "summary": "Run Estudio Eod Opinion Batch",
-        "tags": ["instrument-daily-opinions"]
+        "tags": [
+          "instrument-daily-opinions"
+        ]
       }
     },
     "/api/instrument-daily-opinions/query": {
@@ -18518,7 +19542,9 @@
           }
         },
         "summary": "Query Instrument Daily Opinions",
-        "tags": ["instrument-daily-opinions"]
+        "tags": [
+          "instrument-daily-opinions"
+        ]
       }
     },
     "/api/instrument-daily-opinions/telemetry": {
@@ -18581,7 +19607,9 @@
           }
         },
         "summary": "Get Opinion Telemetry",
-        "tags": ["instrument-daily-opinions"]
+        "tags": [
+          "instrument-daily-opinions"
+        ]
       }
     },
     "/api/instrument-strategy-tops/query": {
@@ -18621,7 +19649,9 @@
           }
         },
         "summary": "Query Instrument Strategy Tops",
-        "tags": ["instrument-strategy-tops"]
+        "tags": [
+          "instrument-strategy-tops"
+        ]
       }
     },
     "/api/instruments": {
@@ -18640,7 +19670,9 @@
           }
         },
         "summary": "List Instruments",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/composite/query": {
@@ -18680,7 +19712,9 @@
           }
         },
         "summary": "Query Instrument Composite",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/fundamentals/query": {
@@ -18720,7 +19754,9 @@
           }
         },
         "summary": "Query Instrument Fundamentals",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/fundamentals/screener": {
@@ -18762,7 +19798,9 @@
           }
         },
         "summary": "Run Fundamental Screener",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/import": {
@@ -18801,7 +19839,9 @@
           }
         },
         "summary": "Import Instrument",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/live-quotes": {
@@ -18840,7 +19880,9 @@
           }
         },
         "summary": "Get Instrument Live Quotes",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/quotes": {
@@ -18879,7 +19921,9 @@
           }
         },
         "summary": "Get Instrument Quotes",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/search": {
@@ -18921,7 +19965,9 @@
           }
         },
         "summary": "Search Instruments",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}": {
@@ -18964,7 +20010,9 @@
           }
         },
         "summary": "Delete Instrument",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       },
       "get": {
         "operationId": "get_instrument_api_instruments__instrument_id__get",
@@ -19002,7 +20050,9 @@
           }
         },
         "summary": "Get Instrument",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/composite": {
@@ -19081,7 +20131,9 @@
           }
         },
         "summary": "Get Instrument Composite",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/daily-opinion": {
@@ -19148,7 +20200,9 @@
           }
         },
         "summary": "Get Instrument Daily Opinion",
-        "tags": ["instrument-daily-opinions"]
+        "tags": [
+          "instrument-daily-opinions"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/daily-opinions": {
@@ -19213,7 +20267,9 @@
           }
         },
         "summary": "List Instrument Daily Opinions",
-        "tags": ["instrument-daily-opinions"]
+        "tags": [
+          "instrument-daily-opinions"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/data-status": {
@@ -19263,7 +20319,9 @@
           }
         },
         "summary": "Get Instrument Data Status",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/db-inventory": {
@@ -19303,7 +20361,9 @@
           }
         },
         "summary": "Get Instrument Db Inventory",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/filings": {
@@ -19346,7 +20406,9 @@
           }
         },
         "summary": "List Instrument Filings",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       },
       "post": {
         "description": "F2b lite — sube PDF o TXT 10-K/10-Q. Extracto en disco; sin RAG.",
@@ -19397,7 +20459,9 @@
           }
         },
         "summary": "Upload Instrument Filing",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/filings/sec-fetch": {
@@ -19450,7 +20514,9 @@
           }
         },
         "summary": "Fetch Instrument Filing From Sec",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/filings/{filing_id}": {
@@ -19502,7 +20568,9 @@
           }
         },
         "summary": "Delete Instrument Filing",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/fundamentals": {
@@ -19559,7 +20627,9 @@
           }
         },
         "summary": "Get Instrument Fundamentals",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/indicators": {
@@ -19621,7 +20691,9 @@
           }
         },
         "summary": "Get Indicators",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/live-quote": {
@@ -19661,7 +20733,9 @@
           }
         },
         "summary": "Get Live Quote",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/narrative": {
@@ -19683,7 +20757,11 @@
             "required": false,
             "schema": {
               "default": "estudio",
-              "enum": ["estudio", "global", "trading"],
+              "enum": [
+                "estudio",
+                "global",
+                "trading"
+              ],
               "title": "Scope",
               "type": "string"
             }
@@ -19712,7 +20790,9 @@
           }
         },
         "summary": "Delete Instrument Narrative",
-        "tags": ["instrument-narratives"]
+        "tags": [
+          "instrument-narratives"
+        ]
       },
       "get": {
         "operationId": "get_instrument_narrative_api_instruments__instrument_id__narrative_get",
@@ -19732,7 +20812,11 @@
             "required": false,
             "schema": {
               "default": "estudio",
-              "enum": ["estudio", "global", "trading"],
+              "enum": [
+                "estudio",
+                "global",
+                "trading"
+              ],
               "title": "Scope",
               "type": "string"
             }
@@ -19761,7 +20845,9 @@
           }
         },
         "summary": "Get Instrument Narrative",
-        "tags": ["instrument-narratives"]
+        "tags": [
+          "instrument-narratives"
+        ]
       },
       "put": {
         "operationId": "upsert_instrument_narrative_api_instruments__instrument_id__narrative_put",
@@ -19809,7 +20895,9 @@
           }
         },
         "summary": "Upsert Instrument Narrative",
-        "tags": ["instrument-narratives"]
+        "tags": [
+          "instrument-narratives"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/ohlcv": {
@@ -19871,7 +20959,9 @@
           }
         },
         "summary": "Get Ohlcv",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/profile": {
@@ -19911,7 +21001,9 @@
           }
         },
         "summary": "Get Instrument Profile",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/removal-preview": {
@@ -19967,7 +21059,9 @@
           }
         },
         "summary": "Get Instrument Removal Preview",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/strategy-top": {
@@ -20019,7 +21113,9 @@
           }
         },
         "summary": "Delete Instrument Strategy Top",
-        "tags": ["instrument-strategy-tops"]
+        "tags": [
+          "instrument-strategy-tops"
+        ]
       },
       "get": {
         "operationId": "get_instrument_strategy_top_api_instruments__instrument_id__strategy_top_get",
@@ -20067,7 +21163,9 @@
           }
         },
         "summary": "Get Instrument Strategy Top",
-        "tags": ["instrument-strategy-tops"]
+        "tags": [
+          "instrument-strategy-tops"
+        ]
       },
       "put": {
         "operationId": "upsert_instrument_strategy_top_api_instruments__instrument_id__strategy_top_put",
@@ -20115,7 +21213,9 @@
           }
         },
         "summary": "Upsert Instrument Strategy Top",
-        "tags": ["instrument-strategy-tops"]
+        "tags": [
+          "instrument-strategy-tops"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/sync": {
@@ -20165,7 +21265,9 @@
           }
         },
         "summary": "Sync Instrument",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/instruments/{instrument_id}/validate-xtb": {
@@ -20205,7 +21307,9 @@
           }
         },
         "summary": "Validate Instrument Xtb",
-        "tags": ["instruments"]
+        "tags": [
+          "instruments"
+        ]
       }
     },
     "/api/investor-profiles": {
@@ -20224,7 +21328,9 @@
           }
         },
         "summary": "List Investor Profiles",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       },
       "post": {
         "operationId": "create_investor_profile_api_investor_profiles_post",
@@ -20261,7 +21367,9 @@
           }
         },
         "summary": "Create Investor Profile",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       }
     },
     "/api/investor-profiles/ensure-defaults": {
@@ -20281,7 +21389,9 @@
           }
         },
         "summary": "Ensure Default Profiles",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       }
     },
     "/api/investor-profiles/{profile_id}": {
@@ -20325,7 +21435,9 @@
           }
         },
         "summary": "Delete Investor Profile",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       },
       "get": {
         "operationId": "get_investor_profile_api_investor_profiles__profile_id__get",
@@ -20363,7 +21475,9 @@
           }
         },
         "summary": "Get Investor Profile",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       },
       "patch": {
         "operationId": "update_investor_profile_api_investor_profiles__profile_id__patch",
@@ -20411,7 +21525,9 @@
           }
         },
         "summary": "Update Investor Profile",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       }
     },
     "/api/investor-profiles/{profile_id}/refresh-observed": {
@@ -20468,7 +21584,9 @@
           }
         },
         "summary": "Refresh Observed Profile",
-        "tags": ["investor-profiles"]
+        "tags": [
+          "investor-profiles"
+        ]
       }
     },
     "/api/lists": {
@@ -20487,7 +21605,9 @@
           }
         },
         "summary": "List Lists",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       },
       "post": {
         "operationId": "create_list_api_lists_post",
@@ -20524,7 +21644,9 @@
           }
         },
         "summary": "Create List",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       }
     },
     "/api/lists/memberships": {
@@ -20544,7 +21666,9 @@
           }
         },
         "summary": "List Memberships",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       }
     },
     "/api/lists/{list_id}": {
@@ -20577,7 +21701,9 @@
           }
         },
         "summary": "Delete List",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       },
       "get": {
         "operationId": "get_list_api_lists__list_id__get",
@@ -20615,7 +21741,9 @@
           }
         },
         "summary": "Get List",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       },
       "patch": {
         "operationId": "update_list_api_lists__list_id__patch",
@@ -20663,7 +21791,9 @@
           }
         },
         "summary": "Update List",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       }
     },
     "/api/lists/{list_id}/instruments/{instrument_id}/remove": {
@@ -20722,7 +21852,9 @@
           }
         },
         "summary": "Remove Instrument From List",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       }
     },
     "/api/lists/{list_id}/quotes": {
@@ -20762,7 +21894,9 @@
           }
         },
         "summary": "Get List Quotes",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       }
     },
     "/api/lists/{list_id}/trackers": {
@@ -20802,7 +21936,9 @@
           }
         },
         "summary": "Get List Trackers",
-        "tags": ["lists"]
+        "tags": [
+          "lists"
+        ]
       }
     },
     "/api/market-indices/catalog": {
@@ -20821,7 +21957,9 @@
           }
         },
         "summary": "List Market Index Catalog",
-        "tags": ["market-indices"]
+        "tags": [
+          "market-indices"
+        ]
       }
     },
     "/api/market-indices/search": {
@@ -20875,7 +22013,9 @@
           }
         },
         "summary": "Search Market Indices",
-        "tags": ["market-indices"]
+        "tags": [
+          "market-indices"
+        ]
       }
     },
     "/api/market-indices/subscribe": {
@@ -20915,7 +22055,9 @@
           }
         },
         "summary": "Subscribe Market Index",
-        "tags": ["market-indices"]
+        "tags": [
+          "market-indices"
+        ]
       }
     },
     "/api/market-indices/subscribe/jobs": {
@@ -20954,7 +22096,9 @@
           }
         },
         "summary": "Enqueue Index Subscribe Job",
-        "tags": ["market-indices"]
+        "tags": [
+          "market-indices"
+        ]
       }
     },
     "/api/market-indices/subscribe/jobs/{job_id}": {
@@ -20994,7 +22138,9 @@
           }
         },
         "summary": "Get Index Subscribe Job",
-        "tags": ["market-indices"]
+        "tags": [
+          "market-indices"
+        ]
       }
     },
     "/api/market-indices/{index_key}/constituents": {
@@ -21034,7 +22180,9 @@
           }
         },
         "summary": "Get Index Constituents",
-        "tags": ["market-indices"]
+        "tags": [
+          "market-indices"
+        ]
       }
     },
     "/api/market/fx": {
@@ -21087,7 +22235,9 @@
           }
         },
         "summary": "Get Fx Rate",
-        "tags": ["market"]
+        "tags": [
+          "market"
+        ]
       }
     },
     "/api/market/providers": {
@@ -21106,7 +22256,9 @@
           }
         },
         "summary": "Get Market Providers",
-        "tags": ["market"]
+        "tags": [
+          "market"
+        ]
       }
     },
     "/api/paper-d/propose": {
@@ -21148,7 +22300,10 @@
           }
         },
         "summary": "Propose Paper D",
-        "tags": ["paper-d", "paper-d"]
+        "tags": [
+          "paper-d",
+          "paper-d"
+        ]
       }
     },
     "/api/paper-d/weekly-run": {
@@ -21190,7 +22345,10 @@
           }
         },
         "summary": "Run Fa Weekly Pipeline",
-        "tags": ["paper-d", "paper-d"]
+        "tags": [
+          "paper-d",
+          "paper-d"
+        ]
       }
     },
     "/api/pending-orders": {
@@ -21237,7 +22395,9 @@
           }
         },
         "summary": "List Pending Orders",
-        "tags": ["pending-orders"]
+        "tags": [
+          "pending-orders"
+        ]
       },
       "post": {
         "operationId": "create_pending_order_api_pending_orders_post",
@@ -21292,7 +22452,9 @@
           }
         },
         "summary": "Create Pending Order",
-        "tags": ["pending-orders"]
+        "tags": [
+          "pending-orders"
+        ]
       }
     },
     "/api/pending-orders/{order_id}": {
@@ -21341,7 +22503,9 @@
           }
         },
         "summary": "Delete Pending Order",
-        "tags": ["pending-orders"]
+        "tags": [
+          "pending-orders"
+        ]
       }
     },
     "/api/platform-events": {
@@ -21416,7 +22580,9 @@
           }
         },
         "summary": "List Platform Events",
-        "tags": ["platform-events"]
+        "tags": [
+          "platform-events"
+        ]
       }
     },
     "/api/portfolio": {
@@ -21463,7 +22629,9 @@
           }
         },
         "summary": "Get Portfolio",
-        "tags": ["portfolio"]
+        "tags": [
+          "portfolio"
+        ]
       }
     },
     "/api/portfolio/trade": {
@@ -21520,7 +22688,9 @@
           }
         },
         "summary": "Execute Trade",
-        "tags": ["portfolio"]
+        "tags": [
+          "portfolio"
+        ]
       }
     },
     "/api/portfolio/transactions": {
@@ -21579,7 +22749,9 @@
           }
         },
         "summary": "List Transactions",
-        "tags": ["portfolio"]
+        "tags": [
+          "portfolio"
+        ]
       }
     },
     "/api/position-policies": {
@@ -21626,7 +22798,9 @@
           }
         },
         "summary": "List Position Policies",
-        "tags": ["position-policies"]
+        "tags": [
+          "position-policies"
+        ]
       },
       "post": {
         "operationId": "create_position_policy_api_position_policies_post",
@@ -21663,7 +22837,9 @@
           }
         },
         "summary": "Create Position Policy",
-        "tags": ["position-policies"]
+        "tags": [
+          "position-policies"
+        ]
       }
     },
     "/api/position-policies/evaluate-exits": {
@@ -21723,7 +22899,9 @@
           }
         },
         "summary": "Evaluate Position Exits",
-        "tags": ["position-policies"]
+        "tags": [
+          "position-policies"
+        ]
       }
     },
     "/api/position-policies/lookup": {
@@ -21772,7 +22950,9 @@
           }
         },
         "summary": "Lookup Position Policy",
-        "tags": ["position-policies"]
+        "tags": [
+          "position-policies"
+        ]
       }
     },
     "/api/position-policies/{policy_id}": {
@@ -21805,7 +22985,9 @@
           }
         },
         "summary": "Delete Position Policy",
-        "tags": ["position-policies"]
+        "tags": [
+          "position-policies"
+        ]
       },
       "get": {
         "operationId": "get_position_policy_api_position_policies__policy_id__get",
@@ -21843,7 +23025,9 @@
           }
         },
         "summary": "Get Position Policy",
-        "tags": ["position-policies"]
+        "tags": [
+          "position-policies"
+        ]
       },
       "patch": {
         "operationId": "update_position_policy_api_position_policies__policy_id__patch",
@@ -21891,7 +23075,9 @@
           }
         },
         "summary": "Update Position Policy",
-        "tags": ["position-policies"]
+        "tags": [
+          "position-policies"
+        ]
       }
     },
     "/api/predictions": {
@@ -21968,7 +23154,9 @@
           }
         },
         "summary": "List Predictions",
-        "tags": ["predictions"]
+        "tags": [
+          "predictions"
+        ]
       }
     },
     "/api/predictions/models": {
@@ -21989,7 +23177,9 @@
           }
         },
         "summary": "List Prediction Models",
-        "tags": ["predictions"]
+        "tags": [
+          "predictions"
+        ]
       }
     },
     "/api/predictions/models/train": {
@@ -22031,7 +23221,9 @@
           }
         },
         "summary": "Train Direction Model Route",
-        "tags": ["predictions"]
+        "tags": [
+          "predictions"
+        ]
       }
     },
     "/api/predictions/predict": {
@@ -22072,7 +23264,9 @@
           }
         },
         "summary": "Predict",
-        "tags": ["predictions"]
+        "tags": [
+          "predictions"
+        ]
       }
     },
     "/api/research/dia-d-session-evidence": {
@@ -22112,7 +23306,9 @@
           }
         },
         "summary": "Persist Dia D Session Evidence",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/evidence": {
@@ -22174,7 +23370,12 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["A", "B", "C", "D"],
+                  "enum": [
+                    "A",
+                    "B",
+                    "C",
+                    "D"
+                  ],
                   "type": "string"
                 },
                 {
@@ -22231,7 +23432,9 @@
           }
         },
         "summary": "List Research Evidence",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/evidence/{evidence_id}": {
@@ -22271,7 +23474,9 @@
           }
         },
         "summary": "Get Research Evidence",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/hypotheses": {
@@ -22285,7 +23490,12 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["open", "paused", "abandoned", "consolidated"],
+                  "enum": [
+                    "open",
+                    "paused",
+                    "abandoned",
+                    "consolidated"
+                  ],
                   "type": "string"
                 },
                 {
@@ -22302,7 +23512,10 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["hypothesis", "anti"],
+                  "enum": [
+                    "hypothesis",
+                    "anti"
+                  ],
                   "type": "string"
                 },
                 {
@@ -22359,7 +23572,9 @@
           }
         },
         "summary": "List Hypotheses",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       },
       "post": {
         "operationId": "create_hypothesis_api_research_hypotheses_post",
@@ -22396,7 +23611,9 @@
           }
         },
         "summary": "Create Hypothesis",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/hypotheses/{hypothesis_id}": {
@@ -22436,7 +23653,9 @@
           }
         },
         "summary": "Get Hypothesis",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       },
       "patch": {
         "operationId": "update_hypothesis_api_research_hypotheses__hypothesis_id__patch",
@@ -22484,7 +23703,9 @@
           }
         },
         "summary": "Update Hypothesis",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/hypotheses/{hypothesis_id}/belief": {
@@ -22524,7 +23745,9 @@
           }
         },
         "summary": "Get Hypothesis Belief",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/hypotheses/{hypothesis_id}/belief/history": {
@@ -22587,7 +23810,9 @@
           }
         },
         "summary": "List Hypothesis Belief History",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/hypotheses/{hypothesis_id}/consolidate": {
@@ -22637,7 +23862,9 @@
           }
         },
         "summary": "Consolidate Hypothesis",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/hypotheses/{hypothesis_id}/consolidation": {
@@ -22687,7 +23914,9 @@
           }
         },
         "summary": "Get Consolidation Eligibility",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/instruments/{instrument_id}/summary": {
@@ -22727,7 +23956,9 @@
           }
         },
         "summary": "Get Instrument Research Summary",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/knowledge": {
@@ -22820,7 +24051,9 @@
           }
         },
         "summary": "List Knowledge Nodes",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/knowledge/{node_id}": {
@@ -22860,7 +24093,9 @@
           }
         },
         "summary": "Get Knowledge Node",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/knowledge/{node_id}/deprecate": {
@@ -22900,7 +24135,9 @@
           }
         },
         "summary": "Deprecate Knowledge Node",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/knowledge/{node_id}/mkl-sync": {
@@ -22963,7 +24200,9 @@
           }
         },
         "summary": "List Mkl Sync Events",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/knowledge/{node_id}/sync-mkl": {
@@ -23013,7 +24252,9 @@
           }
         },
         "summary": "Sync Knowledge To Mkl",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/lab-health": {
@@ -23033,7 +24274,9 @@
           }
         },
         "summary": "Get Lab Health",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/summary": {
@@ -23052,7 +24295,9 @@
           }
         },
         "summary": "Get Laboratory Research Summary",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/tree/edges": {
@@ -23196,7 +24441,9 @@
           }
         },
         "summary": "List Research Tree Edges",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       },
       "post": {
         "operationId": "create_research_tree_edge_api_research_tree_edges_post",
@@ -23233,7 +24480,9 @@
           }
         },
         "summary": "Create Research Tree Edge",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/tree/edges/{edge_id}": {
@@ -23273,7 +24522,9 @@
           }
         },
         "summary": "Soft Delete Research Tree Edge",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/trials": {
@@ -23479,7 +24730,10 @@
             "required": false,
             "schema": {
               "default": "desc",
-              "enum": ["asc", "desc"],
+              "enum": [
+                "asc",
+                "desc"
+              ],
               "title": "Sortdir",
               "type": "string"
             }
@@ -23531,7 +24785,9 @@
           }
         },
         "summary": "List Research Trials",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/trials/{trial_id}": {
@@ -23571,7 +24827,9 @@
           }
         },
         "summary": "Get Research Trial",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/research/trials/{trial_id}/hypothesis": {
@@ -23621,7 +24879,9 @@
           }
         },
         "summary": "Link Trial Hypothesis",
-        "tags": ["research"]
+        "tags": [
+          "research"
+        ]
       }
     },
     "/api/risk/kill-switch": {
@@ -23641,7 +24901,10 @@
           }
         },
         "summary": "Get Kill Switch",
-        "tags": ["risk", "risk"]
+        "tags": [
+          "risk",
+          "risk"
+        ]
       },
       "post": {
         "description": "Activa o desactiva el kill switch runtime (memoria + Redis si hay).",
@@ -23679,7 +24942,10 @@
           }
         },
         "summary": "Post Kill Switch",
-        "tags": ["risk", "risk"]
+        "tags": [
+          "risk",
+          "risk"
+        ]
       }
     },
     "/api/scans/jobs": {
@@ -23698,7 +24964,9 @@
           }
         },
         "summary": "List Scan Jobs",
-        "tags": ["scans"]
+        "tags": [
+          "scans"
+        ]
       },
       "post": {
         "operationId": "enqueue_scan_job_api_scans_jobs_post",
@@ -23735,7 +25003,9 @@
           }
         },
         "summary": "Enqueue Scan Job",
-        "tags": ["scans"]
+        "tags": [
+          "scans"
+        ]
       }
     },
     "/api/scans/jobs/{job_id}": {
@@ -23775,7 +25045,9 @@
           }
         },
         "summary": "Get Scan Job",
-        "tags": ["scans"]
+        "tags": [
+          "scans"
+        ]
       }
     },
     "/api/scans/jobs/{job_id}/execute": {
@@ -23825,7 +25097,9 @@
           }
         },
         "summary": "Execute Scan Job Hits",
-        "tags": ["execution-policies"]
+        "tags": [
+          "execution-policies"
+        ]
       }
     },
     "/api/scans/manifests/{scan_id}": {
@@ -23867,7 +25141,9 @@
           }
         },
         "summary": "Get Scan Manifest",
-        "tags": ["scans"]
+        "tags": [
+          "scans"
+        ]
       }
     },
     "/api/scans/run": {
@@ -23906,7 +25182,9 @@
           }
         },
         "summary": "Run Scan",
-        "tags": ["scans"]
+        "tags": [
+          "scans"
+        ]
       }
     },
     "/api/signal-alerts": {
@@ -23947,7 +25225,9 @@
           }
         },
         "summary": "List Signal Alerts",
-        "tags": ["signal-alerts"]
+        "tags": [
+          "signal-alerts"
+        ]
       },
       "post": {
         "operationId": "create_signal_alert_api_signal_alerts_post",
@@ -23984,7 +25264,9 @@
           }
         },
         "summary": "Create Signal Alert",
-        "tags": ["signal-alerts"]
+        "tags": [
+          "signal-alerts"
+        ]
       }
     },
     "/api/signal-alerts/evaluate": {
@@ -24003,7 +25285,9 @@
           }
         },
         "summary": "Evaluate Signal Alerts",
-        "tags": ["signal-alerts"]
+        "tags": [
+          "signal-alerts"
+        ]
       }
     },
     "/api/signal-alerts/{subscription_id}": {
@@ -24036,7 +25320,9 @@
           }
         },
         "summary": "Delete Signal Alert",
-        "tags": ["signal-alerts"]
+        "tags": [
+          "signal-alerts"
+        ]
       }
     },
     "/api/signal-alerts/{subscription_id}/reset-dedupe": {
@@ -24076,7 +25362,9 @@
           }
         },
         "summary": "Reset Signal Alert Dedupe",
-        "tags": ["signal-alerts"]
+        "tags": [
+          "signal-alerts"
+        ]
       }
     },
     "/api/signals/evaluate": {
@@ -24115,7 +25403,9 @@
           }
         },
         "summary": "Evaluate Signals",
-        "tags": ["signals"]
+        "tags": [
+          "signals"
+        ]
       }
     },
     "/api/strategies": {
@@ -24134,7 +25424,9 @@
           }
         },
         "summary": "List Strategies",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       },
       "post": {
         "operationId": "create_strategy_api_strategies_post",
@@ -24171,7 +25463,9 @@
           }
         },
         "summary": "Create Strategy",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       }
     },
     "/api/strategies/draft-from-prompt": {
@@ -24210,7 +25504,9 @@
           }
         },
         "summary": "Draft Strategy From Prompt",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       }
     },
     "/api/strategies/from-preset": {
@@ -24249,7 +25545,9 @@
           }
         },
         "summary": "Create Strategy From Preset",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       }
     },
     "/api/strategies/{strategy_id}": {
@@ -24282,7 +25580,9 @@
           }
         },
         "summary": "Delete Strategy",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       },
       "get": {
         "operationId": "get_strategy_api_strategies__strategy_id__get",
@@ -24320,7 +25620,9 @@
           }
         },
         "summary": "Get Strategy",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       },
       "patch": {
         "operationId": "update_strategy_api_strategies__strategy_id__patch",
@@ -24368,7 +25670,9 @@
           }
         },
         "summary": "Update Strategy",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       }
     },
     "/api/strategies/{strategy_id}/paper-account": {
@@ -24418,7 +25722,9 @@
           }
         },
         "summary": "Deploy Strategy Paper Account",
-        "tags": ["strategies"]
+        "tags": [
+          "strategies"
+        ]
       }
     },
     "/api/sync/queue": {
@@ -24437,7 +25743,9 @@
           }
         },
         "summary": "List Sync Queue",
-        "tags": ["sync"]
+        "tags": [
+          "sync"
+        ]
       }
     },
     "/api/sync/queue/enqueue-stale": {
@@ -24456,7 +25764,9 @@
           }
         },
         "summary": "Enqueue Stale Instruments",
-        "tags": ["sync"]
+        "tags": [
+          "sync"
+        ]
       }
     },
     "/api/sync/settings": {
@@ -24475,7 +25785,9 @@
           }
         },
         "summary": "Get Sync Settings",
-        "tags": ["sync"]
+        "tags": [
+          "sync"
+        ]
       },
       "patch": {
         "operationId": "update_sync_settings_api_sync_settings_patch",
@@ -24512,7 +25824,9 @@
           }
         },
         "summary": "Update Sync Settings",
-        "tags": ["sync"]
+        "tags": [
+          "sync"
+        ]
       }
     },
     "/api/trackers": {
@@ -24553,7 +25867,9 @@
           }
         },
         "summary": "List Trackers",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       },
       "post": {
         "operationId": "create_tracker_api_trackers_post",
@@ -24590,7 +25906,9 @@
           }
         },
         "summary": "Create Tracker",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       }
     },
     "/api/trackers/schedules/evaluate": {
@@ -24647,7 +25965,9 @@
           }
         },
         "summary": "Evaluate Tracker Schedules",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       }
     },
     "/api/trackers/{tracker_id}": {
@@ -24680,7 +26000,9 @@
           }
         },
         "summary": "Delete Tracker",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       },
       "get": {
         "operationId": "get_tracker_api_trackers__tracker_id__get",
@@ -24718,7 +26040,9 @@
           }
         },
         "summary": "Get Tracker",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       },
       "patch": {
         "operationId": "update_tracker_api_trackers__tracker_id__patch",
@@ -24766,7 +26090,9 @@
           }
         },
         "summary": "Update Tracker",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       }
     },
     "/api/trackers/{tracker_id}/scan": {
@@ -24806,7 +26132,9 @@
           }
         },
         "summary": "Run Tracker Scan",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       }
     },
     "/api/trackers/{tracker_id}/scan-jobs": {
@@ -24846,7 +26174,9 @@
           }
         },
         "summary": "Enqueue Tracker Scan Job",
-        "tags": ["trackers"]
+        "tags": [
+          "trackers"
+        ]
       }
     },
     "/api/workspaces": {
@@ -24865,7 +26195,9 @@
           }
         },
         "summary": "List Workspaces",
-        "tags": ["workspaces"]
+        "tags": [
+          "workspaces"
+        ]
       },
       "post": {
         "operationId": "create_workspace_api_workspaces_post",
@@ -24902,7 +26234,9 @@
           }
         },
         "summary": "Create Workspace",
-        "tags": ["workspaces"]
+        "tags": [
+          "workspaces"
+        ]
       }
     },
     "/api/workspaces/default": {
@@ -24921,7 +26255,9 @@
           }
         },
         "summary": "Get Default Workspace",
-        "tags": ["workspaces"]
+        "tags": [
+          "workspaces"
+        ]
       }
     },
     "/api/workspaces/{workspace_id}": {
@@ -24954,7 +26290,9 @@
           }
         },
         "summary": "Delete Workspace",
-        "tags": ["workspaces"]
+        "tags": [
+          "workspaces"
+        ]
       },
       "get": {
         "operationId": "get_workspace_api_workspaces__workspace_id__get",
@@ -24992,7 +26330,9 @@
           }
         },
         "summary": "Get Workspace",
-        "tags": ["workspaces"]
+        "tags": [
+          "workspaces"
+        ]
       },
       "put": {
         "operationId": "update_workspace_api_workspaces__workspace_id__put",
@@ -25040,7 +26380,9 @@
           }
         },
         "summary": "Update Workspace",
-        "tags": ["workspaces"]
+        "tags": [
+          "workspaces"
+        ]
       }
     }
   }

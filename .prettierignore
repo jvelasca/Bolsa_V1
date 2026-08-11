@@ -1,0 +1,6 @@
+# Artefactos generados del contrato FE/BE (P1.5 / ADR-003): su forma canonica
+# la produce el generador (FastAPI openapi + openapi-typescript), NO prettier.
+# Si prettier los reformatea, el gate `contract:check` y el diff contra el
+# generador se rompen (JSON compact de prettier vs `json.dumps(indent=2)` + LF).
+apps/web/api/openapi.json
+apps/web/src/api/schema.d.ts
