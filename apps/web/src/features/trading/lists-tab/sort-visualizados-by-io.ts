@@ -5,7 +5,7 @@
  * Mejor IO → índice menor (pestaña más a la izquierda).
  */
 
-import { computeIndiceOperativo } from '@/features/trading/operativa-index';
+import { computeIndiceOperativo } from "@/features/trading/operativa-index";
 
 export type IoSortRow = {
   instrumentId: string;
@@ -16,11 +16,11 @@ export type IoSortRow = {
 export function compareIoQuality(a: IoSortRow, b: IoSortRow): number {
   const ai = a.io;
   const bi = b.io;
-  if (ai == null && bi == null) return a.symbol.localeCompare(b.symbol, 'es');
+  if (ai == null && bi == null) return a.symbol.localeCompare(b.symbol, "es");
   if (ai == null) return 1;
   if (bi == null) return -1;
   if (bi !== ai) return bi - ai;
-  return a.symbol.localeCompare(b.symbol, 'es');
+  return a.symbol.localeCompare(b.symbol, "es");
 }
 
 export function buildIoSortRows(

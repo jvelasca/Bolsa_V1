@@ -3,18 +3,18 @@
  * DecisionSession learning del valor activo × cuenta — no es el dictamen diario.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { useAlertsStore } from '@/stores/alerts-store';
-import { cn } from '@/lib/utils';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { useAlertsStore } from "@/stores/alerts-store";
+import { cn } from "@/lib/utils";
 
 function formatShort(iso: string): string {
   try {
     return new Date(iso).toLocaleString(undefined, {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
     return iso.slice(0, 10);
@@ -22,7 +22,7 @@ function formatShort(iso: string): string {
 }
 
 function hitRateLabel(rate: number | null | undefined): string {
-  if (rate == null || !Number.isFinite(rate)) return '—';
+  if (rate == null || !Number.isFinite(rate)) return "—";
   return `${Math.round(rate * 100)}%`;
 }
 
@@ -42,7 +42,7 @@ export function OperativaOutcomesBlock({
   const enabled = Boolean(accountId && instrumentId);
 
   const learningQuery = useQuery({
-    queryKey: ['decision-learning', accountId, instrumentId],
+    queryKey: ["decision-learning", accountId, instrumentId],
     queryFn: () =>
       api.getDecisionSessionLearningSummary({
         accountId: accountId!,
@@ -54,7 +54,7 @@ export function OperativaOutcomesBlock({
   });
 
   const sessionsQuery = useQuery({
-    queryKey: ['decision-sessions', accountId, instrumentId],
+    queryKey: ["decision-sessions", accountId, instrumentId],
     queryFn: () =>
       api.listDecisionSessions({
         accountId: accountId!,
@@ -67,10 +67,14 @@ export function OperativaOutcomesBlock({
 
   const closeOutcome = useMutation({
     mutationFn: (sessionId: string) =>
-      api.closeDecisionSessionOutcome(sessionId, { mode: 'auto' }),
+      api.closeDecisionSessionOutcome(sessionId, { mode: "auto" }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['decision-sessions', accountId, instrumentId] });
-      void qc.invalidateQueries({ queryKey: ['decision-learning', accountId, instrumentId] });
+      void qc.invalidateQueries({
+        queryKey: ["decision-sessions", accountId, instrumentId],
+      });
+      void qc.invalidateQueries({
+        queryKey: ["decision-learning", accountId, instrumentId],
+      });
       pushToast(`Outcome cerrado · ${symbol}`);
     },
     onError: (e: Error) => {
@@ -83,7 +87,7 @@ export function OperativaOutcomesBlock({
 
   if (!accountId) {
     return (
-      <p className={cn('text-[10px] text-muted-foreground', className)}>
+      <p className={cn("text-[10px] text-muted-foreground", className)}>
         Sin cuenta activa para Learning.
       </p>
     );
@@ -91,7 +95,7 @@ export function OperativaOutcomesBlock({
 
   return (
     <div
-      className={cn('space-y-1.5 border-t border-border/50 pt-1.5', className)}
+      className={cn("space-y-1.5 border-t border-border/50 pt-1.5", className)}
       data-testid="operativa-outcomes"
     >
       <div className="space-y-0.5">
@@ -103,19 +107,26 @@ export function OperativaOutcomesBlock({
       </div>
 
       {learningQuery.isLoading ? (
-        <p className="text-[10px] text-muted-foreground">Cargando resultados…</p>
+        <p className="text-[10px] text-muted-foreground">
+          Cargando resultados…
+        </p>
       ) : learning ? (
-        <p className="text-[10px] text-muted-foreground" data-testid="operativa-learning-strip">
+        <p
+          className="text-[10px] text-muted-foreground"
+          data-testid="operativa-learning-strip"
+        >
           Cerradas {learning.sampleClosed}
-          {learning.matureScored != null ? ` · maduras ${learning.matureScored}` : ''}
-          {' · acierto '}
+          {learning.matureScored != null
+            ? ` · maduras ${learning.matureScored}`
+            : ""}
+          {" · acierto "}
           {hitRateLabel(learning.matureHitRate ?? learning.hitRate)}
           {learning.hits != null && learning.misses != null
             ? ` · H/M ${learning.hits}/${learning.misses}`
-            : ''}
+            : ""}
           {learning.prematureScored != null && learning.prematureScored > 0
             ? ` · prematuros ${learning.prematureScored}`
-            : ''}
+            : ""}
         </p>
       ) : (
         <p className="text-[10px] text-muted-foreground">Sin resumen aún.</p>
@@ -131,7 +142,7 @@ export function OperativaOutcomesBlock({
               <span className="min-w-0 truncate text-muted-foreground">
                 {formatShort(s.createdAt)} · {s.kind} · {s.status}
               </span>
-              {s.status === 'open' ? (
+              {s.status === "open" ? (
                 <button
                   type="button"
                   className="shrink-0 rounded border border-border px-1 py-0.5 text-primary hover:bg-accent disabled:opacity-50"
@@ -157,8 +168,8 @@ export function OperativaOutcomesBlock({
         className="w-full rounded border border-border px-1.5 py-1 text-[10px] text-primary hover:bg-accent"
         onClick={() => {
           window.dispatchEvent(
-            new CustomEvent('bolsa:open-help', {
-              detail: { section: 'value-analysis' },
+            new CustomEvent("bolsa:open-help", {
+              detail: { section: "value-analysis" },
             }),
           );
         }}

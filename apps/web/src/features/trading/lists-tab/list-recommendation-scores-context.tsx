@@ -3,21 +3,21 @@
  * Solo fetch cuando alguna columna de recomendación está visible.
  */
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import {
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
   RECOMMENDATION_OPTIONAL_LIST_COLUMNS,
   type InstrumentDailyOpinionStance,
   type ListColumnId,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 
-import { useInstrumentsHubScores } from '@/features/instruments/use-instruments-hub-scores';
+import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
 import {
   opinionByInstrumentId,
   useInstrumentDailyOpinions,
-} from '@/features/trading/use-instrument-daily-opinions';
-import { computeIndiceOperativo } from '@/features/trading/operativa-index';
-import { useListColumnLayoutContext } from '@/features/trading/lists-tab/list-column-layout-context';
+} from "@/features/trading/use-instrument-daily-opinions";
+import { computeIndiceOperativo } from "@/features/trading/operativa-index";
+import { useListColumnLayoutContext } from "@/features/trading/lists-tab/list-column-layout-context";
 
 export type ListRecommendationRow = {
   io: number | null;
@@ -40,18 +40,20 @@ const ListRecommendationScoresContext = createContext<Ctx>({
 
 function needsScoreColumns(visibleIds: ReadonlySet<ListColumnId>): boolean {
   return (
-    visibleIds.has('ioScore') ||
-    visibleIds.has('taScore') ||
-    visibleIds.has('faScore')
+    visibleIds.has("ioScore") ||
+    visibleIds.has("taScore") ||
+    visibleIds.has("faScore")
   );
 }
 
 function needsOpinionColumns(visibleIds: ReadonlySet<ListColumnId>): boolean {
-  return visibleIds.has('dictamenStars') || visibleIds.has('recStance');
+  return visibleIds.has("dictamenStars") || visibleIds.has("recStance");
 }
 
 export function isRecommendationListColumn(columnId: ListColumnId): boolean {
-  return (RECOMMENDATION_OPTIONAL_LIST_COLUMNS as readonly string[]).includes(columnId);
+  return (RECOMMENDATION_OPTIONAL_LIST_COLUMNS as readonly string[]).includes(
+    columnId,
+  );
 }
 
 export function ListRecommendationScoresProvider({
@@ -69,16 +71,22 @@ export function ListRecommendationScoresProvider({
   const wantScores = needsScoreColumns(visibleIds);
   const wantOpinions = needsOpinionColumns(visibleIds);
   const ids = useMemo(
-    () => (wantScores || wantOpinions ? [...new Set(instrumentIds.filter(Boolean))] : []),
+    () =>
+      wantScores || wantOpinions
+        ? [...new Set(instrumentIds.filter(Boolean))]
+        : [],
     [instrumentIds, wantScores, wantOpinions],
   );
 
-  const { faByInstrument, taByInstrument, scoresLoading } = useInstrumentsHubScores(
-    wantScores ? ids : [],
+  const { faByInstrument, taByInstrument, scoresLoading } =
+    useInstrumentsHubScores(wantScores ? ids : []);
+  const opinionsQuery = useInstrumentDailyOpinions(
+    wantOpinions ? ids : [],
+    [],
+    {
+      enabled: wantOpinions && ids.length > 0,
+    },
   );
-  const opinionsQuery = useInstrumentDailyOpinions(wantOpinions ? ids : [], [], {
-    enabled: wantOpinions && ids.length > 0,
-  });
   const opinionsById = useMemo(
     () => opinionByInstrumentId(opinionsQuery.data),
     [opinionsQuery.data],
@@ -101,7 +109,9 @@ export function ListRecommendationScoresProvider({
         fa: fa?.scoreDisplay100 ?? null,
         dictamenStars: opinion?.dictamenStars ?? null,
         stance,
-        stanceLabel: stance ? INSTRUMENT_DAILY_OPINION_STANCE_LABELS[stance] : null,
+        stanceLabel: stance
+          ? INSTRUMENT_DAILY_OPINION_STANCE_LABELS[stance]
+          : null,
       });
     }
     return map;
@@ -134,10 +144,15 @@ export function ListRecommendationScoresProvider({
 export function useListRecommendationRow(
   instrumentId: string,
 ): ListRecommendationRow | undefined {
-  return useContext(ListRecommendationScoresContext).byInstrument.get(instrumentId);
+  return useContext(ListRecommendationScoresContext).byInstrument.get(
+    instrumentId,
+  );
 }
 
-export function useListRecommendationScoresMap(): ReadonlyMap<string, ListRecommendationRow> {
+export function useListRecommendationScoresMap(): ReadonlyMap<
+  string,
+  ListRecommendationRow
+> {
   return useContext(ListRecommendationScoresContext).byInstrument;
 }
 

@@ -1,17 +1,17 @@
-import { VIRTUAL_LIST_LABELS, VIRTUAL_LIST_VISUALIZATION } from '@bolsa/shared';
-import { Dialog } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { useUiStore } from '@/stores/ui-store';
-import { useVisualizationStore } from '@/stores/visualization-store';
+import { VIRTUAL_LIST_LABELS, VIRTUAL_LIST_VISUALIZATION } from "@bolsa/shared";
+import { Dialog } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useUiStore } from "@/stores/ui-store";
+import { useVisualizationStore } from "@/stores/visualization-store";
 
 function formatWhen(iso: string) {
   try {
-    return new Date(iso).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+    return new Date(iso).toLocaleString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
   } catch {
     return iso;
@@ -19,9 +19,9 @@ function formatWhen(iso: string) {
 }
 
 const SOURCE_LABELS = {
-  search: 'Búsqueda',
-  list: 'Lista',
-  import: 'Importación',
+  search: "Búsqueda",
+  list: "Lista",
+  import: "Importación",
 } as const;
 
 export function VisualizationLogDialog() {
@@ -39,7 +39,8 @@ export function VisualizationLogDialog() {
       className="max-w-2xl"
     >
       <div className="mb-3 rounded border border-border/60 bg-muted/20 px-2 py-1.5 text-xs text-muted-foreground">
-        {entries.length} valor(es) en visualización · {log.length} evento(s) registrados
+        {entries.length} valor(es) en visualización · {log.length} evento(s)
+        registrados
       </div>
 
       {log.length === 0 ? (
@@ -65,11 +66,13 @@ export function VisualizationLogDialog() {
                   </td>
                   <td className="px-2 py-1.5">
                     <span className="font-medium">{entry.symbol}</span>
-                    <span className="ml-1 text-muted-foreground">{entry.name}</span>
+                    <span className="ml-1 text-muted-foreground">
+                      {entry.name}
+                    </span>
                   </td>
                   <td className="px-2 py-1.5">{SOURCE_LABELS[entry.source]}</td>
                   <td className="px-2 py-1.5 text-muted-foreground">
-                    {entry.searchQuery ?? '—'}
+                    {entry.searchQuery ?? "—"}
                   </td>
                 </tr>
               ))}

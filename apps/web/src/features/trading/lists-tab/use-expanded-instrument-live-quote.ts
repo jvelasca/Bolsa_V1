@@ -1,12 +1,17 @@
-import { useMemo } from 'react';
-import { useTradingUiStore } from '@/stores/trading-ui-store';
-import { useInstrumentLiveQuotesBatch } from '@/features/instruments/use-instrument-live-quotes-batch';
+import { useMemo } from "react";
+import { useTradingUiStore } from "@/stores/trading-ui-store";
+import { useInstrumentLiveQuotesBatch } from "@/features/instruments/use-instrument-live-quotes-batch";
 
 const EXPANDED_QUOTES_REFETCH_MS = 15_000;
 
 /** Cotización live compartida para filas expandidas en listas (una petición batch). */
-export function useExpandedInstrumentLiveQuote(instrumentId: string, expanded: boolean) {
-  const expandedInstrumentIds = useTradingUiStore((state) => state.expandedInstrumentIds);
+export function useExpandedInstrumentLiveQuote(
+  instrumentId: string,
+  expanded: boolean,
+) {
+  const expandedInstrumentIds = useTradingUiStore(
+    (state) => state.expandedInstrumentIds,
+  );
 
   const batchIds = useMemo(() => {
     if (!expanded) return [];

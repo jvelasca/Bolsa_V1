@@ -1,6 +1,9 @@
-import { Search } from 'lucide-react';
+import { Search } from "lucide-react";
 
-import type { ExternalInstrumentSearchHitDto, InstrumentWithMetaDto } from '@bolsa/shared';
+import type {
+  ExternalInstrumentSearchHitDto,
+  InstrumentWithMetaDto,
+} from "@bolsa/shared";
 
 /**
  * Caja de búsqueda del panel Valores: input + dropdown de resultados (catálogo / Yahoo).
@@ -57,7 +60,9 @@ export function ListSearchBox({
       {showDropdown && (
         <div className="scroll-area mt-1 max-h-36 overflow-auto rounded border border-border bg-background text-xs">
           {remoteSearchFetching && debouncedQuery.length >= 2 && (
-            <p className="px-2 py-1 text-muted-foreground">Buscando en Yahoo…</p>
+            <p className="px-2 py-1 text-muted-foreground">
+              Buscando en Yahoo…
+            </p>
           )}
           {!hasResults && !remoteSearchFetching && (
             <p className="px-2 py-1 text-muted-foreground">Sin resultados</p>
@@ -72,7 +77,9 @@ export function ListSearchBox({
               <span className="font-medium">{item.symbol}</span>
               <span className="ml-2 truncate text-muted-foreground">
                 {item.name}
-                {item.isin ? <span className="ml-1 opacity-70">· {item.isin}</span> : null}
+                {item.isin ? (
+                  <span className="ml-1 opacity-70">· {item.isin}</span>
+                ) : null}
               </span>
             </button>
           ))}

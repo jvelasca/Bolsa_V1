@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { api } from '@/lib/api';
+import { api } from "@/lib/api";
 import {
   membershipFingerprint,
   type ChartListMembershipSnapshot,
-} from '@/lib/chart-list-membership';
-import { useActiveAccountQueryKey } from '@/stores/active-account-store';
-import { usePendingOrders } from '@/features/trading/use-pending-orders';
-import { useVisualizationStore } from '@/stores/visualization-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/lib/chart-list-membership";
+import { useActiveAccountQueryKey } from "@/stores/active-account-store";
+import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { useVisualizationStore } from "@/stores/visualization-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 /**
  * Mantiene la membresía lista↔instrumento al día y reconcilia
@@ -21,16 +21,18 @@ export function useChartListMembershipSync() {
   const accountScope = useActiveAccountQueryKey();
   const { pendingOrders } = usePendingOrders();
   const visualizationEntries = useVisualizationStore((state) => state.entries);
-  const syncMembership = useWorkspaceStore((state) => state.syncChartListMembership);
+  const syncMembership = useWorkspaceStore(
+    (state) => state.syncChartListMembership,
+  );
 
   const listsQuery = useQuery({
-    queryKey: ['lists'],
+    queryKey: ["lists"],
     queryFn: api.getLists,
     staleTime: 30_000,
   });
 
   const membershipsQuery = useQuery({
-    queryKey: ['lists', 'memberships'],
+    queryKey: ["lists", "memberships"],
     queryFn: api.getListMemberships,
     staleTime: 30_000,
   });
@@ -39,26 +41,29 @@ export function useChartListMembershipSync() {
   const memberships = membershipsQuery.data?.data ?? null;
 
   const portfolioQuery = useQuery({
-    queryKey: ['portfolio', accountScope],
+    queryKey: ["portfolio", accountScope],
     queryFn: api.getPortfolio,
     staleTime: 15_000,
   });
 
   const membershipsSignature = useMemo(() => {
-    if (!memberships) return '';
+    if (!memberships) return "";
     return Object.keys(memberships)
       .sort()
-      .map((id) => `${id}:${(memberships[id] ?? []).join(',')}`)
-      .join('|');
+      .map((id) => `${id}:${(memberships[id] ?? []).join(",")}`)
+      .join("|");
   }, [memberships]);
 
   const pendingSignature = useMemo(
-    () => pendingOrders.map((order) => `${order.id}:${order.instrumentId}`).join('|'),
+    () =>
+      pendingOrders
+        .map((order) => `${order.id}:${order.instrumentId}`)
+        .join("|"),
     [pendingOrders],
   );
 
   const visualizationSignature = useMemo(
-    () => visualizationEntries.map((entry) => entry.instrumentId).join(','),
+    () => visualizationEntries.map((entry) => entry.instrumentId).join(","),
     [visualizationEntries],
   );
 
@@ -66,7 +71,7 @@ export function useChartListMembershipSync() {
     () =>
       (portfolioQuery.data?.data.positions ?? [])
         .map((position) => position.instrumentId)
-        .join(','),
+        .join(","),
     // dataUpdatedAt es señal de refresco: recalcular memberships al refrescar portfolio
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [portfolioQuery.dataUpdatedAt, portfolioQuery.data?.data.positions],
@@ -85,11 +90,17 @@ export function useChartListMembershipSync() {
       api,
       listMeta: apiLists.map((list) => ({ id: list.id, source: list.source })),
       virtual: {
-        visualization: new Set(visualizationEntries.map((entry) => entry.instrumentId)),
-        portfolio: new Set(
-          (portfolioQuery.data?.data.positions ?? []).map((position) => position.instrumentId),
+        visualization: new Set(
+          visualizationEntries.map((entry) => entry.instrumentId),
         ),
-        pendingOrders: new Set(pendingOrders.map((order) => order.instrumentId)),
+        portfolio: new Set(
+          (portfolioQuery.data?.data.positions ?? []).map(
+            (position) => position.instrumentId,
+          ),
+        ),
+        pendingOrders: new Set(
+          pendingOrders.map((order) => order.instrumentId),
+        ),
       },
     };
     // Las *Signature ya son los fingerprints estables de pendingOrders/portfolio/

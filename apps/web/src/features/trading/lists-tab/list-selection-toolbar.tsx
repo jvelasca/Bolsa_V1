@@ -6,7 +6,7 @@ import {
   ListMinus,
   ListPlus,
   RefreshCw,
-} from 'lucide-react';
+} from "lucide-react";
 
 /**
  * Barra de acciones sobre la selección del panel Valores (búsqueda/pestañas/Estudio).
@@ -52,7 +52,7 @@ export function ListSelectionToolbar({
       aria-label="Acciones sobre la selección"
     >
       <span className="mr-1 tabular-nums text-muted-foreground">
-        {count} seleccionado{count === 1 ? '' : 's'}
+        {count} seleccionado{count === 1 ? "" : "s"}
       </span>
       {!viewingEstudio ? (
         <button
@@ -61,16 +61,16 @@ export function ListSelectionToolbar({
           onClick={onAddToEstudio}
           title="Pasar la selección a Estudio (supervisión)"
         >
-          <ListPlus className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-          A Estudio
+          <ListPlus className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />A
+          Estudio
         </button>
       ) : null}
       <button
         type="button"
         className={
           viewingEstudio || viewingVisualizados
-            ? 'inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 font-semibold text-destructive hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-40'
-            : 'inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40'
+            ? "inline-flex items-center gap-1 rounded border border-destructive/40 bg-destructive/10 px-2 py-1.5 font-semibold text-destructive hover:bg-destructive/15 disabled:cursor-not-allowed disabled:opacity-40"
+            : "inline-flex items-center gap-1 rounded border border-border px-2 py-1.5 font-medium text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
         }
         onClick={onRemove}
         disabled={
@@ -82,18 +82,18 @@ export function ListSelectionToolbar({
         }
         title={
           viewingVisualizados
-            ? 'Cierra las pestañas de la selección (salen de Visualizados)'
+            ? "Cierra las pestañas de la selección (salen de Visualizados)"
             : viewingEstudio
-              ? 'Elimina de Estudio (sale de la cola de supervisión)'
-              : 'Quita la selección de Estudio'
+              ? "Elimina de Estudio (sale de la cola de supervisión)"
+              : "Quita la selección de Estudio"
         }
       >
         <ListMinus className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
         {viewingVisualizados
-          ? 'Quitar'
+          ? "Quitar"
           : viewingEstudio
-            ? 'Eliminar'
-            : 'Quitar'}
+            ? "Eliminar"
+            : "Quitar"}
       </button>
       {viewingVisualizados ? (
         <button
@@ -103,8 +103,11 @@ export function ListSelectionToolbar({
           onClick={onReorderByIo}
           title="Ordena pestañas por Índice Operativo (IO 0–100): mayor IO a la izquierda (#1 en Estudio = mejor IO). Usa caché de Operativa; si falta, carga en trozos pequeños."
         >
-          <ArrowDownWideNarrow className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
-          {sortingByIo ? 'IO…' : 'Por IO'}
+          <ArrowDownWideNarrow
+            className="h-3.5 w-3.5 shrink-0 opacity-70"
+            aria-hidden
+          />
+          {sortingByIo ? "IO…" : "Por IO"}
         </button>
       ) : null}
       {/* En Visualizados sobra: esa lista ya es el espejo de pestañas abiertas. */}
@@ -129,7 +132,7 @@ export function ListSelectionToolbar({
             onClick={() => onUpdateSelected({ rediscover: false })}
           >
             <RefreshCw className="h-3.5 w-3.5 opacity-70" aria-hidden />
-            {updatingSelected ? 'Actualizando…' : 'Actualizar'}
+            {updatingSelected ? "Actualizando…" : "Actualizar"}
           </button>
           <button
             type="button"

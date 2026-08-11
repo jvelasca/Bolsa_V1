@@ -7,16 +7,16 @@
  * @see docs/adr/024-estudio-supervision-universe.md
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from "react";
 
 import {
   useVisualizationStore,
   type VisualizationSessionEntry,
-} from '@/stores/visualization-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
+} from "@/stores/visualization-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 function entriesKey(entries: ReadonlyArray<{ instrumentId: string }>): string {
-  return [...new Set(entries.map((e) => e.instrumentId))].sort().join('|');
+  return [...new Set(entries.map((e) => e.instrumentId))].sort().join("|");
 }
 
 /**
@@ -40,7 +40,10 @@ export function reconcileVisualizadosToOpenCharts(): void {
       next.push({
         ...prev,
         symbol: tab.label || prev.symbol,
-        name: prev.name && prev.name !== prev.symbol ? prev.name : tab.label || prev.name,
+        name:
+          prev.name && prev.name !== prev.symbol
+            ? prev.name
+            : tab.label || prev.name,
         lastViewedAt: now,
       });
     } else {
@@ -68,14 +71,22 @@ export function reconcileVisualizadosToOpenCharts(): void {
 
 export function useChartVisualizationSync() {
   const charts = useWorkspaceStore((state) => state.workspace.charts);
-  const activeChartId = useWorkspaceStore((state) => state.workspace.activeChartId);
+  const activeChartId = useWorkspaceStore(
+    (state) => state.workspace.activeChartId,
+  );
   const hydrated = useWorkspaceStore((state) => state.hydrated);
 
   const openInstrumentKey = useMemo(
     () =>
-      [...new Set(charts.filter((t) => t.instrumentId).map((t) => t.instrumentId as string))]
+      [
+        ...new Set(
+          charts
+            .filter((t) => t.instrumentId)
+            .map((t) => t.instrumentId as string),
+        ),
+      ]
         .sort()
-        .join('|'),
+        .join("|"),
     [charts],
   );
 

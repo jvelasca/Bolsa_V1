@@ -1,9 +1,9 @@
-import type { WatchlistPanelTab } from '@bolsa/shared';
-import { LayoutGrid, ListTree } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { ListHubPanel } from '@/features/trading/lists-tab/list-hub-panel';
-import { ListValuesPanel } from '@/features/trading/lists-tab/list-values-panel';
+import type { WatchlistPanelTab } from "@bolsa/shared";
+import { LayoutGrid, ListTree } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { ListHubPanel } from "@/features/trading/lists-tab/list-hub-panel";
+import { ListValuesPanel } from "@/features/trading/lists-tab/list-values-panel";
 
 function WatchlistPanelTabs({
   tab,
@@ -20,8 +20,8 @@ function WatchlistPanelTabs({
     >
       {(
         [
-          { id: 'lists' as const, label: 'Listas', icon: ListTree },
-          { id: 'values' as const, label: 'Valores', icon: LayoutGrid },
+          { id: "lists" as const, label: "Listas", icon: ListTree },
+          { id: "values" as const, label: "Valores", icon: LayoutGrid },
         ] as const
       ).map(({ id, label, icon: Icon }) => (
         <button
@@ -30,10 +30,10 @@ function WatchlistPanelTabs({
           role="tab"
           aria-selected={tab === id}
           className={cn(
-            'inline-flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+            "inline-flex items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
             tab === id
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground',
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
           )}
           onClick={() => onChange(id)}
         >
@@ -49,7 +49,7 @@ export function WatchlistPanel() {
   const listConfig = useWorkspaceStore((state) => state.workspace.list);
   const updateListConfig = useWorkspaceStore((state) => state.updateListConfig);
   const save = useWorkspaceStore((state) => state.save);
-  const tab = listConfig.watchlistTab ?? 'values';
+  const tab = listConfig.watchlistTab ?? "values";
 
   function setTab(next: WatchlistPanelTab) {
     updateListConfig({ watchlistTab: next });
@@ -60,7 +60,7 @@ export function WatchlistPanel() {
     <div className="flex h-full min-h-0 flex-col">
       <WatchlistPanelTabs tab={tab} onChange={setTab} />
       <div className="min-h-0 flex-1 overflow-hidden">
-        {tab === 'lists' ? <ListHubPanel /> : <ListValuesPanel />}
+        {tab === "lists" ? <ListHubPanel /> : <ListValuesPanel />}
       </div>
     </div>
   );

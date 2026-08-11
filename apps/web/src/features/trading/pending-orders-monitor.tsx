@@ -1,30 +1,30 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { formatPrice } from '@/features/charts/chart-utils';
+import { useEffect, useMemo, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { formatPrice } from "@/features/charts/chart-utils";
 import {
   liveQuotesMap,
   useInstrumentLiveQuotesBatch,
-} from '@/features/instruments/use-instrument-live-quotes-batch';
-import { usePendingOrders } from '@/features/trading/use-pending-orders';
-import { useAlertsStore } from '@/stores/alerts-store';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { linkTradeToMandate } from '@/features/platform/operating-mandate';
-import { api } from '@/lib/api';
+} from "@/features/instruments/use-instrument-live-quotes-batch";
+import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { useAlertsStore } from "@/stores/alerts-store";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { linkTradeToMandate } from "@/features/platform/operating-mandate";
+import { api } from "@/lib/api";
 
 const EVALUATE_INTERVAL_MS = 15_000;
 
 function resolveQuotePrice(
-  data: import('@bolsa/shared').InstrumentLiveQuoteDto,
+  data: import("@bolsa/shared").InstrumentLiveQuoteDto,
 ): number | null {
   return data.xtb?.last ?? data.reference?.price ?? null;
 }
 
 function shouldExecuteOrder(
-  side: 'buy' | 'sell',
+  side: "buy" | "sell",
   marketPrice: number,
   limitPrice: number,
 ) {
-  if (side === 'buy') {
+  if (side === "buy") {
     return marketPrice <= limitPrice;
   }
   return marketPrice >= limitPrice;
@@ -37,7 +37,7 @@ export function PendingOrdersMonitor() {
   const { effectiveAccountId } = useActiveAccount();
   const processing = useRef<Set<string>>(new Set());
   const errorNotified = useRef<Set<string>>(new Set());
-  const orderSignature = pendingOrders.map((order) => order.id).join(',');
+  const orderSignature = pendingOrders.map((order) => order.id).join(",");
 
   const instrumentIds = useMemo(
     () => [...new Set(pendingOrders.map((order) => order.instrumentId))],
@@ -110,16 +110,19 @@ export function PendingOrdersMonitor() {
           await removePendingOrder(order.id);
           errorNotified.current.delete(order.id);
           pushToast(
-            `Orden ${order.side === 'buy' ? 'compra' : 'venta'} ${order.symbol} ejecutada @ ${formatPrice(order.limitPrice)}`,
+            `Orden ${order.side === "buy" ? "compra" : "venta"} ${order.symbol} ejecutada @ ${formatPrice(order.limitPrice)}`,
           );
-          void queryClient.invalidateQueries({ queryKey: ['portfolio'] });
-          void queryClient.invalidateQueries({ queryKey: ['transactions'] });
-          void queryClient.invalidateQueries({ queryKey: ['ledger'] });
-          void queryClient.invalidateQueries({ queryKey: ['account-summary'] });
+          void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
+          void queryClient.invalidateQueries({ queryKey: ["transactions"] });
+          void queryClient.invalidateQueries({ queryKey: ["ledger"] });
+          void queryClient.invalidateQueries({ queryKey: ["account-summary"] });
         } catch (error) {
           if (!errorNotified.current.has(order.id)) {
             errorNotified.current.add(order.id);
-            const message = error instanceof Error ? error.message : 'Error al ejecutar orden';
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Error al ejecutar orden";
             pushToast(`Orden ${order.symbol}: ${message}`);
           }
         } finally {

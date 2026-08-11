@@ -51,7 +51,8 @@ export function rankIndiceOperativo(
   const sorted = [...rows].sort((a, b) => {
     const ai = a.io;
     const bi = b.io;
-    if (ai == null && bi == null) return a.instrumentId.localeCompare(b.instrumentId);
+    if (ai == null && bi == null)
+      return a.instrumentId.localeCompare(b.instrumentId);
     if (ai == null) return 1;
     if (bi == null) return -1;
     if (bi !== ai) return bi - ai;

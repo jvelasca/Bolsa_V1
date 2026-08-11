@@ -10,13 +10,16 @@
  * @see docs/adr/024-estudio-supervision-universe.md
  */
 
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
 
-import type { ExternalInstrumentSearchHitDto, PositionDto } from '@bolsa/shared';
+import type {
+  ExternalInstrumentSearchHitDto,
+  PositionDto,
+} from "@bolsa/shared";
 import {
   ESTUDIO_LIST_ID,
   isVirtualListId,
@@ -26,76 +29,86 @@ import {
   VIRTUAL_LIST_PENDING_ORDERS,
   VIRTUAL_LIST_PORTFOLIO,
   VIRTUAL_LIST_VISUALIZATION,
-} from '@bolsa/shared';
+} from "@bolsa/shared";
 
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError } from "@/lib/api";
 
-import { ensureChartRoute } from '@/components/layout/chart-tab-bar';
-import { requestChartReflow } from '@/features/charts/chart-utils';
+import { ensureChartRoute } from "@/components/layout/chart-tab-bar";
+import { requestChartReflow } from "@/features/charts/chart-utils";
 import {
   buildVirtualListSummaries,
   pendingOrderToListItem,
   positionToListItem,
   resolveVirtualListId,
   visualizationEntryToListItem,
-} from '@/lib/default-lists';
+} from "@/lib/default-lists";
 import {
   listConfigForSelection,
   reconcileCarouselListIds,
   resolveSelectedListId,
-} from '@/lib/list-sync';
+} from "@/lib/list-sync";
 import {
   clearManualListSelectionIfChartChanged,
   getManualListSelection,
   setManualListSelection,
-} from '@/lib/list-selection-guard';
-import { resolvePreferredListIdForInstrument } from '@/lib/chart-list-membership';
-import { scrollListInstrumentToTop } from '@/lib/scroll-list-instrument-into-view';
-import { sortExternalSearchHits, rankCatalogInstrument } from '@/lib/search-ranking';
-import { instrumentMatchesSearchQuery } from '@bolsa/shared';
-import { formatPct, formatPrice } from '@/features/charts/chart-utils';
-import { sortInstrumentList } from '@/lib/list-utils';
-import { applyInstrumentSelection } from '@/features/trading/lists-tab/list-selection';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { useActiveAccountQueryKey } from '@/stores/active-account-store';
-import { usePendingOrders } from '@/features/trading/use-pending-orders';
-import { useVisualizationStore } from '@/stores/visualization-store';
-import { useEstudioMembershipStore } from '@/stores/estudio-membership-store';
+} from "@/lib/list-selection-guard";
+import { resolvePreferredListIdForInstrument } from "@/lib/chart-list-membership";
+import { scrollListInstrumentToTop } from "@/lib/scroll-list-instrument-into-view";
+import {
+  sortExternalSearchHits,
+  rankCatalogInstrument,
+} from "@/lib/search-ranking";
+import { instrumentMatchesSearchQuery } from "@bolsa/shared";
+import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { sortInstrumentList } from "@/lib/list-utils";
+import { applyInstrumentSelection } from "@/features/trading/lists-tab/list-selection";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { useActiveAccountQueryKey } from "@/stores/active-account-store";
+import { usePendingOrders } from "@/features/trading/use-pending-orders";
+import { useVisualizationStore } from "@/stores/visualization-store";
+import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 
-import { ListItemAccordion } from '@/features/trading/lists-tab/list-item-accordion';
-import { ListColumnHeader } from '@/features/trading/lists-tab/list-column-header';
-import { ListColumnLayoutProvider, useListColumnLayoutContext } from '@/features/trading/lists-tab/list-column-layout-context';
+import { ListItemAccordion } from "@/features/trading/lists-tab/list-item-accordion";
+import { ListColumnHeader } from "@/features/trading/lists-tab/list-column-header";
+import {
+  ListColumnLayoutProvider,
+  useListColumnLayoutContext,
+} from "@/features/trading/lists-tab/list-column-layout-context";
 import {
   ListRecommendationScoresProvider,
   useListRecommendationScoresMap,
-} from '@/features/trading/lists-tab/list-recommendation-scores-context';
-import { sortInstrumentListWithRecommendation } from '@/lib/list-sort-with-recommendation';
-import { PendingOrderListItem } from '@/features/trading/lists-tab/pending-order-list-item';
-import { ListCarousel } from '@/features/trading/lists-tab/list-carousel';
-import { ListSearchBox } from '@/features/trading/lists-tab/list-search-box';
-import { ListSelectionToolbar } from '@/features/trading/lists-tab/list-selection-toolbar';
-import { useListInstrumentKeyboardNav } from '@/features/trading/lists-tab/use-list-instrument-keyboard-nav';
+} from "@/features/trading/lists-tab/list-recommendation-scores-context";
+import { sortInstrumentListWithRecommendation } from "@/lib/list-sort-with-recommendation";
+import { PendingOrderListItem } from "@/features/trading/lists-tab/pending-order-list-item";
+import { ListCarousel } from "@/features/trading/lists-tab/list-carousel";
+import { ListSearchBox } from "@/features/trading/lists-tab/list-search-box";
+import { ListSelectionToolbar } from "@/features/trading/lists-tab/list-selection-toolbar";
+import { useListInstrumentKeyboardNav } from "@/features/trading/lists-tab/use-list-instrument-keyboard-nav";
 import {
   EstudioListSupervisionBanner,
   type EstudioBannerProgress,
-} from '@/features/trading/estudio-supervision-panel';
+} from "@/features/trading/estudio-supervision-panel";
 import {
   collectEstudioIdsNeedingUpdate,
   runEstudioInstrumentsUpdate,
-} from '@/features/trading/estudio-instruments-update';
+} from "@/features/trading/estudio-instruments-update";
 
 export function ListValuesPanel() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [importingYahoo, setImportingYahoo] = useState<string | null>(null);
   const [sortingByIo, setSortingByIo] = useState(false);
   const listScrollRef = useRef<HTMLDivElement>(null);
 
-  const focusInstrumentFromList = useWorkspaceStore((s) => s.focusInstrumentFromList);
-  const focusInstrumentsFromList = useWorkspaceStore((s) => s.focusInstrumentsFromList);
+  const focusInstrumentFromList = useWorkspaceStore(
+    (s) => s.focusInstrumentFromList,
+  );
+  const focusInstrumentsFromList = useWorkspaceStore(
+    (s) => s.focusInstrumentsFromList,
+  );
   const chartListMembership = useWorkspaceStore((s) => s.chartListMembership);
   const listConfig = useWorkspaceStore((s) => s.workspace.list);
   const updateListConfig = useWorkspaceStore((s) => s.updateListConfig);
@@ -105,13 +118,17 @@ export function ListValuesPanel() {
   const { pendingOrders } = usePendingOrders();
   const visualizationEntries = useVisualizationStore((s) => s.entries);
   const estudioMemberIds = useEstudioMembershipStore((s) => s.members);
-  const [selectedInstrumentIds, setSelectedInstrumentIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [selectedInstrumentIds, setSelectedInstrumentIds] = useState<
+    Set<string>
+  >(() => new Set());
   const selectionAnchorIndexRef = useRef<number | null>(null);
 
-  const activeInstrumentId = charts.find((tab) => tab.id === activeChartId)?.instrumentId;
-  const chartListContext = useWorkspaceStore((s) => s.workspace.chartListContext);
+  const activeInstrumentId = charts.find(
+    (tab) => tab.id === activeChartId,
+  )?.instrumentId;
+  const chartListContext = useWorkspaceStore(
+    (s) => s.workspace.chartListContext,
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 280);
@@ -120,27 +137,30 @@ export function ListValuesPanel() {
 
   const accountScope = useActiveAccountQueryKey();
 
-  const listsQuery = useQuery({ queryKey: ['lists'], queryFn: api.getLists });
+  const listsQuery = useQuery({ queryKey: ["lists"], queryFn: api.getLists });
   const portfolioQuery = useQuery({
-    queryKey: ['portfolio', accountScope],
+    queryKey: ["portfolio", accountScope],
     queryFn: api.getPortfolio,
     staleTime: 15_000,
   });
 
   const remoteSearchQuery = useQuery({
-    queryKey: ['instrument-search', debouncedQuery],
+    queryKey: ["instrument-search", debouncedQuery],
     queryFn: () => api.searchInstruments(debouncedQuery),
     enabled: debouncedQuery.length >= 2,
     staleTime: 30_000,
   });
 
-  const apiLists = useMemo(() => listsQuery.data?.data ?? [], [listsQuery.data?.data]);
+  const apiLists = useMemo(
+    () => listsQuery.data?.data ?? [],
+    [listsQuery.data?.data],
+  );
   const positions = useMemo(
     () => portfolioQuery.data?.data.positions ?? [],
     [portfolioQuery.data?.data.positions],
   );
   const pendingBuyOrders = useMemo(
-    () => pendingOrders.filter((order) => order.side === 'buy'),
+    () => pendingOrders.filter((order) => order.side === "buy"),
     [pendingOrders],
   );
 
@@ -185,7 +205,7 @@ export function ListValuesPanel() {
     activeVirtual === VIRTUAL_LIST_VISUALIZATION;
 
   const allInstrumentsQuery = useQuery({
-    queryKey: ['instruments'],
+    queryKey: ["instruments"],
     queryFn: api.getInstruments,
     enabled: needsFullCatalog,
     staleTime: 60_000,
@@ -208,7 +228,14 @@ export function ListValuesPanel() {
     }
     if (selectedListId === targetId) return;
     updateListConfig(listConfigForSelection(targetId, apiLists));
-  }, [activeChartId, chartListContext, listsQuery.isLoading, selectedListId, apiLists, updateListConfig]);
+  }, [
+    activeChartId,
+    chartListContext,
+    listsQuery.isLoading,
+    selectedListId,
+    apiLists,
+    updateListConfig,
+  ]);
 
   useEffect(() => {
     if (listsQuery.isLoading || !listsQuery.isSuccess) return;
@@ -249,17 +276,18 @@ export function ListValuesPanel() {
   }
 
   const quotesQuery = useQuery({
-    queryKey: ['list-quotes', selectedListId],
+    queryKey: ["list-quotes", selectedListId],
     queryFn: () => api.getListQuotes(selectedListId!),
     enabled: Boolean(selectedListId) && !activeVirtual,
     staleTime: 15_000,
   });
 
   const visualizationQuotesQuery = useQuery({
-    queryKey: ['visualization-quotes', openChartInstrumentIds],
+    queryKey: ["visualization-quotes", openChartInstrumentIds],
     queryFn: () => api.getInstrumentQuotes(openChartInstrumentIds),
     enabled:
-      activeVirtual === VIRTUAL_LIST_VISUALIZATION && openChartInstrumentIds.length > 0,
+      activeVirtual === VIRTUAL_LIST_VISUALIZATION &&
+      openChartInstrumentIds.length > 0,
     staleTime: 15_000,
   });
 
@@ -272,7 +300,7 @@ export function ListValuesPanel() {
   }, [visualizationQuotesQuery.data]);
 
   const listInstruments = useMemo(
-    () => (activeVirtual ? [] : quotesQuery.data?.data ?? []),
+    () => (activeVirtual ? [] : (quotesQuery.data?.data ?? [])),
     [activeVirtual, quotesQuery.data?.data],
   );
 
@@ -311,7 +339,8 @@ export function ListValuesPanel() {
 
   const selectableItems = useMemo(() => {
     if (activeVirtual === VIRTUAL_LIST_PENDING_ORDERS) return [];
-    if (activeVirtual === VIRTUAL_LIST_VISUALIZATION) return visualizationListItems;
+    if (activeVirtual === VIRTUAL_LIST_VISUALIZATION)
+      return visualizationListItems;
     if (activeVirtual === VIRTUAL_LIST_PORTFOLIO) return portfolioListItems;
     return listInstruments;
   }, [
@@ -329,13 +358,17 @@ export function ListValuesPanel() {
     const sortState = selectedListId
       ? listConfig.sortByListId?.[selectedListId]
       : undefined;
-    return sortInstrumentList(selectableItems, sortState).map((item) => item.id);
+    return sortInstrumentList(selectableItems, sortState).map(
+      (item) => item.id,
+    );
   }, [selectableItems, selectedListId, listConfig.sortByListId, activeVirtual]);
 
   const selectAllChecked =
-    selectableIds.length > 0 && selectableIds.every((id) => selectedInstrumentIds.has(id));
+    selectableIds.length > 0 &&
+    selectableIds.every((id) => selectedInstrumentIds.has(id));
   const selectAllIndeterminate =
-    selectableIds.some((id) => selectedInstrumentIds.has(id)) && !selectAllChecked;
+    selectableIds.some((id) => selectedInstrumentIds.has(id)) &&
+    !selectAllChecked;
   const selectionEnabled = activeVirtual !== VIRTUAL_LIST_PENDING_ORDERS;
 
   function toggleSelectAll() {
@@ -383,9 +416,8 @@ export function ListValuesPanel() {
   const viewingVisualizados = activeVirtual === VIRTUAL_LIST_VISUALIZATION;
   const viewingEstudio = selectedListId === ESTUDIO_LIST_ID;
   const [updatingSelected, setUpdatingSelected] = useState(false);
-  const [estudioProgress, setEstudioProgress] = useState<EstudioBannerProgress | null>(
-    null,
-  );
+  const [estudioProgress, setEstudioProgress] =
+    useState<EstudioBannerProgress | null>(null);
   const estudioAutoKickRef = useRef<string | null>(null);
 
   /**
@@ -398,7 +430,7 @@ export function ListValuesPanel() {
     if (ids.length === 0) return;
     if (opts.rediscover) {
       const ok = window.confirm(
-        `Redescubrir en ${ids.length} valor${ids.length === 1 ? '' : 'es'}: embudo completo y búsqueda de nuevas estrategias (proceso costoso; puede tardar). ¿Continuar?`,
+        `Redescubrir en ${ids.length} valor${ids.length === 1 ? "" : "es"}: embudo completo y búsqueda de nuevas estrategias (proceso costoso; puede tardar). ¿Continuar?`,
       );
       if (!ok) return;
     }
@@ -411,8 +443,8 @@ export function ListValuesPanel() {
           selectableItems.find((it) => it.id === id)?.symbol ?? id.slice(0, 8),
         onProgress: setEstudioProgress,
       });
-      void queryClient.invalidateQueries({ queryKey: ['list'] });
-      void queryClient.invalidateQueries({ queryKey: ['lists'] });
+      void queryClient.invalidateQueries({ queryKey: ["list"] });
+      void queryClient.invalidateQueries({ queryKey: ["lists"] });
     } finally {
       setUpdatingSelected(false);
       setEstudioProgress(null);
@@ -424,18 +456,23 @@ export function ListValuesPanel() {
     const byId = new Map(selectableItems.map((item) => [item.id, item]));
     const batch = [...selectedInstrumentIds]
       .map((id) => byId.get(id))
-      .filter((item): item is (typeof selectableItems)[number] => Boolean(item));
-    const { addToEstudioMembership } = await import('@/features/trading/estudio-membership');
+      .filter((item): item is (typeof selectableItems)[number] =>
+        Boolean(item),
+      );
+    const { addToEstudioMembership } =
+      await import("@/features/trading/estudio-membership");
     const { added, ids: addedIds } = await addToEstudioMembership(batch);
     if (added > 0) {
-      void queryClient.invalidateQueries({ queryKey: ['lists'] });
-      void queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
-      void queryClient.invalidateQueries({ queryKey: ['list'] });
-      void queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
+      void queryClient.invalidateQueries({ queryKey: ["lists"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["lists", "memberships"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["list"] });
+      void queryClient.invalidateQueries({ queryKey: ["list-quotes"] });
       updateListConfig({
         apiListId: ESTUDIO_LIST_ID,
-        name: 'Estudio',
-        source: 'api',
+        name: "Estudio",
+        source: "api",
       });
       setSelectedInstrumentIds(new Set());
       selectionAnchorIndexRef.current = null;
@@ -446,12 +483,12 @@ export function ListValuesPanel() {
         await runEstudioInstrumentsUpdate({
           instrumentIds: addedIds,
           rediscover: false,
-          phaseLabel: 'Alta Estudio',
+          phaseLabel: "Alta Estudio",
           symbolOf: (id) => symbolById.get(id) ?? id.slice(0, 8),
           onProgress: setEstudioProgress,
         });
-        void queryClient.invalidateQueries({ queryKey: ['list'] });
-        void queryClient.invalidateQueries({ queryKey: ['lists'] });
+        void queryClient.invalidateQueries({ queryKey: ["list"] });
+        void queryClient.invalidateQueries({ queryKey: ["lists"] });
       } finally {
         setUpdatingSelected(false);
         setEstudioProgress(null);
@@ -463,13 +500,11 @@ export function ListValuesPanel() {
     const ids = [...selectedInstrumentIds];
     if (viewingVisualizados) {
       // Un solo update: evita que el autosave reinyecte pestañas a medias.
-      const { closeOpenChartsForInstruments } = await import(
-        '@/lib/close-chart-on-list-removal'
-      );
+      const { closeOpenChartsForInstruments } =
+        await import("@/lib/close-chart-on-list-removal");
       closeOpenChartsForInstruments(ids);
-      const { reconcileVisualizadosToOpenCharts } = await import(
-        '@/features/trading/lists-tab/use-chart-visualization-sync'
-      );
+      const { reconcileVisualizadosToOpenCharts } =
+        await import("@/features/trading/lists-tab/use-chart-visualization-sync");
       reconcileVisualizadosToOpenCharts();
       setSelectedInstrumentIds(new Set());
       selectionAnchorIndexRef.current = null;
@@ -481,34 +516,32 @@ export function ListValuesPanel() {
         useEstudioMembershipStore.getState().contains(id),
       );
       if (inEstudio.length === 0) return;
-      const { removeFromEstudioMembership } = await import(
-        '@/features/trading/estudio-membership'
-      );
-      const { unsubscribeInstrumentFromSupervision } = await import(
-        '@/features/trading/estudio-supervision'
-      );
+      const { removeFromEstudioMembership } =
+        await import("@/features/trading/estudio-membership");
+      const { unsubscribeInstrumentFromSupervision } =
+        await import("@/features/trading/estudio-supervision");
       await removeFromEstudioMembership(inEstudio);
       unsubscribeInstrumentFromSupervision(inEstudio);
-      void queryClient.invalidateQueries({ queryKey: ['lists'] });
-      void queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
-      void queryClient.invalidateQueries({ queryKey: ['list'] });
-      void queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
+      void queryClient.invalidateQueries({ queryKey: ["lists"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["lists", "memberships"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["list"] });
+      void queryClient.invalidateQueries({ queryKey: ["list-quotes"] });
       setSelectedInstrumentIds(new Set());
       selectionAnchorIndexRef.current = null;
       return;
     }
-    const { removeFromEstudioMembership } = await import(
-      '@/features/trading/estudio-membership'
-    );
-    const { unsubscribeInstrumentFromSupervision } = await import(
-      '@/features/trading/estudio-supervision'
-    );
+    const { removeFromEstudioMembership } =
+      await import("@/features/trading/estudio-membership");
+    const { unsubscribeInstrumentFromSupervision } =
+      await import("@/features/trading/estudio-supervision");
     await removeFromEstudioMembership(ids);
     unsubscribeInstrumentFromSupervision(ids);
-    void queryClient.invalidateQueries({ queryKey: ['lists'] });
-    void queryClient.invalidateQueries({ queryKey: ['lists', 'memberships'] });
-    void queryClient.invalidateQueries({ queryKey: ['list'] });
-    void queryClient.invalidateQueries({ queryKey: ['list-quotes'] });
+    void queryClient.invalidateQueries({ queryKey: ["lists"] });
+    void queryClient.invalidateQueries({ queryKey: ["lists", "memberships"] });
+    void queryClient.invalidateQueries({ queryKey: ["list"] });
+    void queryClient.invalidateQueries({ queryKey: ["list-quotes"] });
     setSelectedInstrumentIds(new Set());
     selectionAnchorIndexRef.current = null;
   }
@@ -529,9 +562,14 @@ export function ListValuesPanel() {
     if (debouncedQuery.length >= 2 && remoteSearchQuery.data) {
       return {
         catalog: [...remoteSearchQuery.data.catalog].sort(
-          (a, b) => rankCatalogInstrument(b, debouncedQuery) - rankCatalogInstrument(a, debouncedQuery),
+          (a, b) =>
+            rankCatalogInstrument(b, debouncedQuery) -
+            rankCatalogInstrument(a, debouncedQuery),
         ),
-        external: sortExternalSearchHits(remoteSearchQuery.data.external, debouncedQuery),
+        external: sortExternalSearchHits(
+          remoteSearchQuery.data.external,
+          debouncedQuery,
+        ),
       };
     }
 
@@ -579,14 +617,13 @@ export function ListValuesPanel() {
     if (ids.length < 2) return;
     setSortingByIo(true);
     try {
-      const { orderInstrumentIdsByIo } = await import(
-        '@/features/trading/lists-tab/sort-visualizados-by-io'
-      );
+      const { orderInstrumentIdsByIo } =
+        await import("@/features/trading/lists-tab/sort-visualizados-by-io");
       const {
         collectCachedFaScores,
         collectCachedTaScores,
         fetchIoByInstrumentIds,
-      } = await import('@/features/trading/lists-tab/fetch-io-scores-for-sort');
+      } = await import("@/features/trading/lists-tab/fetch-io-scores-for-sort");
 
       const ioByInstrument = await fetchIoByInstrumentIds(
         ids,
@@ -596,8 +633,8 @@ export function ListValuesPanel() {
           queryComposite: (instrumentIds) =>
             api.queryInstrumentComposite({
               instrumentIds,
-              horizon: 'swing',
-              regime: 'neutral',
+              horizon: "swing",
+              regime: "neutral",
             }),
         },
         {
@@ -609,7 +646,7 @@ export function ListValuesPanel() {
       const scored = ids.filter((id) => ioByInstrument.get(id) != null).length;
       if (scored === 0) {
         window.alert(
-          'No hay Índice Operativo (IO) disponible para la selección. Espera a que Operativa cargue scores o sincroniza fundamentals.',
+          "No hay Índice Operativo (IO) disponible para la selección. Espera a que Operativa cargue scores o sincroniza fundamentals.",
         );
         return;
       }
@@ -626,7 +663,7 @@ export function ListValuesPanel() {
       window.alert(
         err instanceof ApiError
           ? err.message
-          : 'No se pudieron ordenar las pestañas por Índice Operativo.',
+          : "No se pudieron ordenar las pestañas por Índice Operativo.",
       );
     } finally {
       setSortingByIo(false);
@@ -635,34 +672,39 @@ export function ListValuesPanel() {
 
   async function visualizeFromSearch(
     instrument: (typeof allInstruments)[number],
-    options?: { searchQuery?: string; source?: 'search' | 'import' },
+    options?: { searchQuery?: string; source?: "search" | "import" },
   ) {
     // Abrir pestaña (Visualizados = espejo). Lista visible: Cartera → Estudio → resto.
     useVisualizationStore.getState().addInstrument(instrument, {
       searchQuery: options?.searchQuery,
-      source: options?.source ?? 'search',
+      source: options?.source ?? "search",
     });
     const preferredListId =
       (chartListMembership
-        ? resolvePreferredListIdForInstrument(instrument.id, chartListMembership)
+        ? resolvePreferredListIdForInstrument(
+            instrument.id,
+            chartListMembership,
+          )
         : null) ?? VIRTUAL_LIST_VISUALIZATION;
     updateListConfig(listConfigForSelection(preferredListId, apiLists));
     focusInstrumentFromList(preferredListId, instrument.id, instrument.symbol);
     ensureChartRoute(navigate);
     requestChartReflow();
-    const { reconcileVisualizadosToOpenCharts } = await import(
-      '@/features/trading/lists-tab/use-chart-visualization-sync'
-    );
+    const { reconcileVisualizadosToOpenCharts } =
+      await import("@/features/trading/lists-tab/use-chart-visualization-sync");
     reconcileVisualizadosToOpenCharts();
-    setQuery('');
+    setQuery("");
   }
 
   async function handleExternalHit(hit: ExternalInstrumentSearchHitDto) {
-    const searchIsin = looksLikeIsinQuery(query.trim()) ? normalizeIsin(query.trim()) : null;
+    const searchIsin = looksLikeIsinQuery(query.trim())
+      ? normalizeIsin(query.trim())
+      : null;
     const isin = hit.isin?.trim() || searchIsin || undefined;
 
     const match = allInstruments.find(
-      (item) => item.yahooSymbol.toUpperCase() === hit.yahooSymbol.toUpperCase(),
+      (item) =>
+        item.yahooSymbol.toUpperCase() === hit.yahooSymbol.toUpperCase(),
     );
 
     if (match) {
@@ -673,19 +715,19 @@ export function ListValuesPanel() {
             symbol: match.symbol,
             name: match.name,
             exchange: match.exchange,
-            currency: match.currency || 'EUR',
+            currency: match.currency || "EUR",
             sync: false,
             isin,
           });
-          await queryClient.invalidateQueries({ queryKey: ['instruments'] });
+          await queryClient.invalidateQueries({ queryKey: ["instruments"] });
         } catch (error) {
-          console.warn('No se pudo guardar el ISIN del activo', error);
+          console.warn("No se pudo guardar el ISIN del activo", error);
         }
       }
-      visualizeFromSearch(
-        isin && !match.isin ? { ...match, isin } : match,
-        { searchQuery: query.trim(), source: 'search' },
-      );
+      visualizeFromSearch(isin && !match.isin ? { ...match, isin } : match, {
+        searchQuery: query.trim(),
+        source: "search",
+      });
       return;
     }
 
@@ -696,23 +738,35 @@ export function ListValuesPanel() {
         symbol: hit.symbol,
         name: hit.name,
         exchange: hit.exchange,
-        currency: hit.currency || 'USD',
+        currency: hit.currency || "USD",
         sync: false,
         isin,
       });
-      await queryClient.invalidateQueries({ queryKey: ['instruments'] });
+      await queryClient.invalidateQueries({ queryKey: ["instruments"] });
       try {
-        visualizeFromSearch(result.data, { searchQuery: hit.yahooSymbol, source: 'import' });
+        visualizeFromSearch(result.data, {
+          searchQuery: hit.yahooSymbol,
+          source: "import",
+        });
       } catch (vizError) {
-        console.warn('No se pudo registrar la visualización del activo importado', vizError);
+        console.warn(
+          "No se pudo registrar la visualización del activo importado",
+          vizError,
+        );
         focusInstrument(result.data.id, result.data.symbol);
-        setQuery('');
+        setQuery("");
       }
       void api.syncInstrument(result.data.id, 5).then(() => {
-        void queryClient.invalidateQueries({ queryKey: ['instruments'] });
-        void queryClient.invalidateQueries({ queryKey: ['ohlcv', result.data.id] });
-        void queryClient.invalidateQueries({ queryKey: ['visualization-quotes'] });
-        void queryClient.invalidateQueries({ queryKey: ['instrument-profile', result.data.id] });
+        void queryClient.invalidateQueries({ queryKey: ["instruments"] });
+        void queryClient.invalidateQueries({
+          queryKey: ["ohlcv", result.data.id],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["visualization-quotes"],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["instrument-profile", result.data.id],
+        });
       });
     } catch (error) {
       const message =
@@ -720,7 +774,7 @@ export function ListValuesPanel() {
           ? error.message
           : error instanceof Error
             ? error.message
-            : 'No se pudo importar el activo';
+            : "No se pudo importar el activo";
       window.alert(`${hit.symbol} (${hit.exchange}): ${message}`);
     } finally {
       setImportingYahoo(null);
@@ -736,7 +790,9 @@ export function ListValuesPanel() {
       activeVirtual === VIRTUAL_LIST_PORTFOLIO
         ? portfolioListItems
         : activeVirtual === VIRTUAL_LIST_PENDING_ORDERS
-          ? pendingBuyOrders.map((o) => pendingOrderToListItem(o, allInstruments))
+          ? pendingBuyOrders.map((o) =>
+              pendingOrderToListItem(o, allInstruments),
+            )
           : activeVirtual === VIRTUAL_LIST_VISUALIZATION
             ? visualizationListItems
             : listInstruments;
@@ -751,7 +807,7 @@ export function ListValuesPanel() {
       );
     });
     if (inList) {
-      visualizeFromSearch(inList, { searchQuery: q, source: 'search' });
+      visualizeFromSearch(inList, { searchQuery: q, source: "search" });
       return;
     }
 
@@ -763,7 +819,7 @@ export function ListValuesPanel() {
           instrumentMatchesSearchQuery(item, q),
       );
     if (inCatalog) {
-      visualizeFromSearch(inCatalog, { searchQuery: q, source: 'search' });
+      visualizeFromSearch(inCatalog, { searchQuery: q, source: "search" });
       return;
     }
 
@@ -773,7 +829,7 @@ export function ListValuesPanel() {
       return;
     }
 
-    window.alert('No se encontró ningún activo con ese criterio.');
+    window.alert("No se encontró ningún activo con ese criterio.");
   }
 
   function selectList(listId: string) {
@@ -782,7 +838,7 @@ export function ListValuesPanel() {
       updateListConfig({
         apiListId: listId,
         name: VIRTUAL_LIST_LABELS[listId],
-        source: 'virtual',
+        source: "virtual",
       });
       save();
       return;
@@ -791,12 +847,17 @@ export function ListValuesPanel() {
     const selected = apiLists.find((list) => list.id === listId);
     if (!selected) return;
 
-    updateListConfig({ apiListId: selected.id, name: selected.name, source: 'api' });
+    updateListConfig({
+      apiListId: selected.id,
+      name: selected.name,
+      source: "api",
+    });
     save();
   }
 
   const showDropdown = query.trim().length > 0;
-  const hasResults = searchResults.catalog.length > 0 || searchResults.external.length > 0;
+  const hasResults =
+    searchResults.catalog.length > 0 || searchResults.external.length > 0;
 
   const isLoading =
     listsQuery.isLoading ||
@@ -812,8 +873,8 @@ export function ListValuesPanel() {
         .map((it) => it.id)
         .slice()
         .sort()
-        .join('|')
-    : '';
+        .join("|")
+    : "";
 
   /**
    * Al abrir Estudio: Actualizar automático de valores con vigilia/frescura vacía o caducada.
@@ -826,13 +887,13 @@ export function ListValuesPanel() {
     }
     if (isLoading) return;
     if (!estudioInstrumentIdsKey) return;
-    const ids = estudioInstrumentIdsKey.split('|').filter(Boolean);
+    const ids = estudioInstrumentIdsKey.split("|").filter(Boolean);
     const needing = collectEstudioIdsNeedingUpdate(ids);
     if (needing.length === 0) {
       estudioAutoKickRef.current = null;
       return;
     }
-    const key = needing.slice().sort().join('|');
+    const key = needing.slice().sort().join("|");
     if (estudioAutoKickRef.current === key) return;
     estudioAutoKickRef.current = key;
 
@@ -844,15 +905,15 @@ export function ListValuesPanel() {
         await runEstudioInstrumentsUpdate({
           instrumentIds: needing,
           rediscover: false,
-          phaseLabel: 'Actualizar',
+          phaseLabel: "Actualizar",
           symbolOf: (id) => symbolById.get(id) ?? id.slice(0, 8),
           onProgress: (p) => {
             if (!cancelled) setEstudioProgress(p);
           },
         });
         if (!cancelled) {
-          void queryClient.invalidateQueries({ queryKey: ['list'] });
-          void queryClient.invalidateQueries({ queryKey: ['lists'] });
+          void queryClient.invalidateQueries({ queryKey: ["list"] });
+          void queryClient.invalidateQueries({ queryKey: ["lists"] });
         }
       } finally {
         if (!cancelled) {
@@ -890,7 +951,10 @@ export function ListValuesPanel() {
         hasResults={hasResults}
         onSubmit={handleSearchSubmit}
         onSelectCatalog={(item) =>
-          visualizeFromSearch(item, { searchQuery: query.trim(), source: 'search' })
+          visualizeFromSearch(item, {
+            searchQuery: query.trim(),
+            source: "search",
+          })
         }
         onSelectExternal={(hit) => void handleExternalHit(hit)}
       />
@@ -909,100 +973,124 @@ export function ListValuesPanel() {
         <ListRecommendationScoresProvider
           instrumentIds={selectableItems.map((item) => item.id)}
         >
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {viewingEstudio && !isLoading && listInstruments.length > 0 ? (
-          <EstudioListSupervisionBanner progress={estudioProgress} />
-        ) : null}
-        <div ref={listScrollRef} className="scroll-area min-h-0 flex-1 overflow-auto">
-          {isLoading && <p className="p-2 text-xs text-muted-foreground">Cargando…</p>}
-          {isError && <p className="p-2 text-xs text-destructive">Error al cargar lista</p>}
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {viewingEstudio && !isLoading && listInstruments.length > 0 ? (
+              <EstudioListSupervisionBanner progress={estudioProgress} />
+            ) : null}
+            <div
+              ref={listScrollRef}
+              className="scroll-area min-h-0 flex-1 overflow-auto"
+            >
+              {isLoading && (
+                <p className="p-2 text-xs text-muted-foreground">Cargando…</p>
+              )}
+              {isError && (
+                <p className="p-2 text-xs text-destructive">
+                  Error al cargar lista
+                </p>
+              )}
 
-          {activeVirtual !== VIRTUAL_LIST_PENDING_ORDERS &&
-            !isLoading &&
-            (portfolioListItems.length > 0 ||
-              listInstruments.length > 0 ||
-              visualizationListItems.length > 0) && (
-              <ListColumnHeader
-                selectAllChecked={selectionEnabled ? selectAllChecked : undefined}
-                selectAllIndeterminate={selectionEnabled ? selectAllIndeterminate : undefined}
-                onSelectAllToggle={selectionEnabled ? toggleSelectAll : undefined}
-              />
-            )}
+              {activeVirtual !== VIRTUAL_LIST_PENDING_ORDERS &&
+                !isLoading &&
+                (portfolioListItems.length > 0 ||
+                  listInstruments.length > 0 ||
+                  visualizationListItems.length > 0) && (
+                  <ListColumnHeader
+                    selectAllChecked={
+                      selectionEnabled ? selectAllChecked : undefined
+                    }
+                    selectAllIndeterminate={
+                      selectionEnabled ? selectAllIndeterminate : undefined
+                    }
+                    onSelectAllToggle={
+                      selectionEnabled ? toggleSelectAll : undefined
+                    }
+                  />
+                )}
 
-        {activeVirtual === VIRTUAL_LIST_PORTFOLIO && !isLoading && positions.length === 0 && (
-          <p className="p-4 text-center text-xs text-muted-foreground">
-            Sin posiciones en cartera — ejecuta una compra desde el diálogo de operación.
-          </p>
-        )}
+              {activeVirtual === VIRTUAL_LIST_PORTFOLIO &&
+                !isLoading &&
+                positions.length === 0 && (
+                  <p className="p-4 text-center text-xs text-muted-foreground">
+                    Sin posiciones en cartera — ejecuta una compra desde el
+                    diálogo de operación.
+                  </p>
+                )}
 
-        {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS &&
-          !isLoading &&
-          pendingBuyOrders.length === 0 && (
-            <p className="p-4 text-center text-xs text-muted-foreground">
-              Sin compras pendientes — crea una orden limitada desde el diálogo de operación.
-            </p>
-          )}
+              {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS &&
+                !isLoading &&
+                pendingBuyOrders.length === 0 && (
+                  <p className="p-4 text-center text-xs text-muted-foreground">
+                    Sin compras pendientes — crea una orden limitada desde el
+                    diálogo de operación.
+                  </p>
+                )}
 
-        {viewingVisualizados && !isLoading && visualizationListItems.length === 0 && (
-          <p className="p-4 text-center text-xs text-muted-foreground">
-            Aquí solo aparecen los valores con pestaña de gráfico abierta. Busca arriba o
-            abre un valor; al cerrar la pestaña sale de Visualizados. Desde aquí puedes
-            «Pasar a Estudio».
-          </p>
-        )}
+              {viewingVisualizados &&
+                !isLoading &&
+                visualizationListItems.length === 0 && (
+                  <p className="p-4 text-center text-xs text-muted-foreground">
+                    Aquí solo aparecen los valores con pestaña de gráfico
+                    abierta. Busca arriba o abre un valor; al cerrar la pestaña
+                    sale de Visualizados. Desde aquí puedes «Pasar a Estudio».
+                  </p>
+                )}
 
-        {viewingEstudio && !isLoading && listInstruments.length === 0 && (
-          <p className="p-4 text-center text-xs text-muted-foreground">
-            Selecciona valores en Visualizados, IBEX u otra lista y pulsa «Pasar a Estudio».
-            Aquí viven los valores supervisables. Activa Supervisión ON en el banner.
-          </p>
-        )}
+              {viewingEstudio && !isLoading && listInstruments.length === 0 && (
+                <p className="p-4 text-center text-xs text-muted-foreground">
+                  Selecciona valores en Visualizados, IBEX u otra lista y pulsa
+                  «Pasar a Estudio». Aquí viven los valores supervisables.
+                  Activa Supervisión ON en el banner.
+                </p>
+              )}
 
-        {viewingVisualizados && !isLoading && visualizationListItems.length > 0 && (
-          <SortedVisualizationList
-            items={visualizationListItems}
-            activeInstrumentId={activeInstrumentId}
-            isListSource={isListSourceRow}
-            onOpenChart={focusInstrument}
-            selectedIds={selectedInstrumentIds}
-            onToggleSelect={handleSelectClick}
-          />
-        )}
+              {viewingVisualizados &&
+                !isLoading &&
+                visualizationListItems.length > 0 && (
+                  <SortedVisualizationList
+                    items={visualizationListItems}
+                    activeInstrumentId={activeInstrumentId}
+                    isListSource={isListSourceRow}
+                    onOpenChart={focusInstrument}
+                    selectedIds={selectedInstrumentIds}
+                    onToggleSelect={handleSelectClick}
+                  />
+                )}
 
-        {activeVirtual === VIRTUAL_LIST_PORTFOLIO && (
-          <PortfolioKeyboardList
-            items={portfolioListItems}
-            activeInstrumentId={activeInstrumentId}
-            isListSource={isListSourceRow}
-            onOpenChart={focusInstrument}
-            positions={positions}
-            allInstruments={allInstruments}
-            selectedIds={selectedInstrumentIds}
-            onToggleSelect={handleSelectClick}
-          />
-        )}
+              {activeVirtual === VIRTUAL_LIST_PORTFOLIO && (
+                <PortfolioKeyboardList
+                  items={portfolioListItems}
+                  activeInstrumentId={activeInstrumentId}
+                  isListSource={isListSourceRow}
+                  onOpenChart={focusInstrument}
+                  positions={positions}
+                  allInstruments={allInstruments}
+                  selectedIds={selectedInstrumentIds}
+                  onToggleSelect={handleSelectClick}
+                />
+              )}
 
-        {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS && (
-          <PendingOrdersKeyboardList
-            orders={pendingBuyOrders}
-            activeInstrumentId={activeInstrumentId}
-            onOpenChart={focusInstrument}
-          />
-        )}
+              {activeVirtual === VIRTUAL_LIST_PENDING_ORDERS && (
+                <PendingOrdersKeyboardList
+                  orders={pendingBuyOrders}
+                  activeInstrumentId={activeInstrumentId}
+                  onOpenChart={focusInstrument}
+                />
+              )}
 
-        {!activeVirtual && (
-          <SortedApiList
-            items={listInstruments}
-            processSubtitle={viewingEstudio}
-            activeInstrumentId={activeInstrumentId}
-            isListSource={isListSourceRow}
-            onOpenChart={focusInstrument}
-            selectedIds={selectedInstrumentIds}
-            onToggleSelect={handleSelectClick}
-          />
-        )}
-        </div>
-        </div>
+              {!activeVirtual && (
+                <SortedApiList
+                  items={listInstruments}
+                  processSubtitle={viewingEstudio}
+                  activeInstrumentId={activeInstrumentId}
+                  isListSource={isListSourceRow}
+                  onOpenChart={focusInstrument}
+                  selectedIds={selectedInstrumentIds}
+                  onToggleSelect={handleSelectClick}
+                />
+              )}
+            </div>
+          </div>
         </ListRecommendationScoresProvider>
       </ListColumnLayoutProvider>
 
@@ -1038,7 +1126,7 @@ function SortedApiList({
   selectedIds,
   onToggleSelect,
 }: {
-  items: import('@bolsa/shared').InstrumentWithMetaDto[];
+  items: import("@bolsa/shared").InstrumentWithMetaDto[];
   /** Estudio: resumen de procesos + barra al pulsar Actualizar. */
   processSubtitle?: boolean;
   activeInstrumentId: string | undefined;
@@ -1088,7 +1176,7 @@ function SortedVisualizationList({
   selectedIds,
   onToggleSelect,
 }: {
-  items: import('@bolsa/shared').InstrumentWithMetaDto[];
+  items: import("@bolsa/shared").InstrumentWithMetaDto[];
   activeInstrumentId: string | undefined;
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
@@ -1159,12 +1247,12 @@ function PortfolioKeyboardList({
   selectedIds,
   onToggleSelect,
 }: {
-  items: import('@bolsa/shared').InstrumentWithMetaDto[];
+  items: import("@bolsa/shared").InstrumentWithMetaDto[];
   activeInstrumentId: string | undefined;
   isListSource: (instrumentId: string) => boolean;
   onOpenChart: (instrumentId: string, symbol: string) => void;
   positions: PositionDto[];
-  allInstruments: import('@bolsa/shared').InstrumentWithMetaDto[];
+  allInstruments: import("@bolsa/shared").InstrumentWithMetaDto[];
   selectedIds: Set<string>;
   onToggleSelect: (
     instrumentId: string,
@@ -1176,7 +1264,12 @@ function PortfolioKeyboardList({
     },
   ) => void;
 }) {
-  useListInstrumentKeyboardNav(items, activeInstrumentId, onOpenChart, items.length > 0);
+  useListInstrumentKeyboardNav(
+    items,
+    activeInstrumentId,
+    onOpenChart,
+    items.length > 0,
+  );
   if (items.length === 0) return null;
   return (
     <>
@@ -1185,11 +1278,13 @@ function PortfolioKeyboardList({
         const pnl =
           pos.unrealizedPnl != null
             ? `${formatPrice(pos.unrealizedPnl)}${
-                pos.unrealizedPnlPct != null ? ` (${formatPct(pos.unrealizedPnlPct)})` : ''
+                pos.unrealizedPnlPct != null
+                  ? ` (${formatPct(pos.unrealizedPnlPct)})`
+                  : ""
               }`
             : null;
         const subtitle = `${pos.quantity} uds · coste ${formatPrice(pos.avgCost)}${
-          pnl ? ` · P&L ${pnl}` : ''
+          pnl ? ` · P&L ${pnl}` : ""
         }`;
         return (
           <ListItemAccordion
@@ -1213,7 +1308,7 @@ function PendingOrdersKeyboardList({
   activeInstrumentId,
   onOpenChart,
 }: {
-  orders: ReturnType<typeof usePendingOrders>['pendingOrders'];
+  orders: ReturnType<typeof usePendingOrders>["pendingOrders"];
   activeInstrumentId: string | undefined;
   onOpenChart: (instrumentId: string, symbol: string) => void;
 }) {
@@ -1225,7 +1320,12 @@ function PendingOrdersKeyboardList({
       })),
     [orders],
   );
-  useListInstrumentKeyboardNav(navItems, activeInstrumentId, onOpenChart, navItems.length > 0);
+  useListInstrumentKeyboardNav(
+    navItems,
+    activeInstrumentId,
+    onOpenChart,
+    navItems.length > 0,
+  );
   if (orders.length === 0) return null;
   return (
     <>

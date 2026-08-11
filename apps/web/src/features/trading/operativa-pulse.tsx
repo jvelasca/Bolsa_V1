@@ -5,56 +5,56 @@
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 import {
   estudioRankProgressPct,
   formatEstudioRankLabel,
-} from '@/features/trading/operativa-index';
+} from "@/features/trading/operativa-index";
 
 function scoreTone(score: number | null): string {
-  if (score == null) return 'text-muted-foreground';
-  if (score >= 70) return 'text-emerald-700 dark:text-emerald-300';
-  if (score >= 45) return 'text-amber-800 dark:text-amber-200';
-  return 'text-destructive';
+  if (score == null) return "text-muted-foreground";
+  if (score >= 70) return "text-emerald-700 dark:text-emerald-300";
+  if (score >= 45) return "text-amber-800 dark:text-amber-200";
+  return "text-destructive";
 }
 
 function scoreRingTone(score: number | null): string {
-  if (score == null) return 'text-muted-foreground/35';
-  if (score >= 70) return 'text-emerald-500';
-  if (score >= 45) return 'text-amber-500';
-  return 'text-rose-500';
+  if (score == null) return "text-muted-foreground/35";
+  if (score >= 70) return "text-emerald-500";
+  if (score >= 45) return "text-amber-500";
+  return "text-rose-500";
 }
 
 function scoreBand(score: number | null): string {
-  if (score == null) return 'Sin dato';
-  if (score >= 70) return 'Fuerte';
-  if (score >= 45) return 'Intermedio';
-  return 'Débil';
+  if (score == null) return "Sin dato";
+  if (score >= 70) return "Fuerte";
+  if (score >= 45) return "Intermedio";
+  return "Débil";
 }
 
-type GaugeKind = 'io' | 'ta' | 'fa';
+type GaugeKind = "io" | "ta" | "fa";
 
 const GAUGE_META: Record<
   GaugeKind,
   { short: string; caption: string; blurb: string }
 > = {
   io: {
-    short: 'IO',
-    caption: 'índice',
+    short: "IO",
+    caption: "índice",
     blurb:
-      'Índice operativo 0–100: atractivo relativo ahora (mezcla técnica + fundamental). Si hay alerta fundamental grave, se frena.',
+      "Índice operativo 0–100: atractivo relativo ahora (mezcla técnica + fundamental). Si hay alerta fundamental grave, se frena.",
   },
   ta: {
-    short: 'TA',
-    caption: 'técnico',
+    short: "TA",
+    caption: "técnico",
     blurb:
-      'Técnico: gráfico y momentum (velas, tendencia). Alto = el precio se comporta bien; bajo = presión bajista o ruido.',
+      "Técnico: gráfico y momentum (velas, tendencia). Alto = el precio se comporta bien; bajo = presión bajista o ruido.",
   },
   fa: {
-    short: 'FA',
-    caption: 'fundamental',
+    short: "FA",
+    caption: "fundamental",
     blurb:
-      'Fundamental: salud del negocio. Alto = empresa sólida; bajo o distress = más riesgo aunque el gráfico pinte bien.',
+      "Fundamental: salud del negocio. Alto = empresa sólida; bajo o distress = más riesgo aunque el gráfico pinte bien.",
   },
 };
 
@@ -73,15 +73,15 @@ function Gauge({
   const c = 2 * Math.PI * r;
   const dash = value == null ? 0 : (pct / 100) * c;
   const title = [
-    `${meta.short} (${meta.caption}): ${value ?? '—'} · ${scoreBand(value)}`,
+    `${meta.short} (${meta.caption}): ${value ?? "—"} · ${scoreBand(value)}`,
     meta.blurb,
-  ].join('\n');
+  ].join("\n");
 
   return (
     <div
       className={cn(
-        'flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-1 py-1',
-        emphasize && 'bg-muted/40 ring-1 ring-border/70',
+        "flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-1 py-1",
+        emphasize && "bg-muted/40 ring-1 ring-border/70",
       )}
       title={title}
     >
@@ -112,7 +112,7 @@ function Gauge({
           strokeDasharray={`${dash} ${c}`}
           transform="rotate(-90 28 28)"
           className={cn(
-            'transition-[stroke-dasharray] duration-500',
+            "transition-[stroke-dasharray] duration-500",
             scoreRingTone(value),
           )}
         />
@@ -121,19 +121,19 @@ function Gauge({
           y="31"
           textAnchor="middle"
           className={cn(
-            'fill-current font-semibold tabular-nums',
+            "fill-current font-semibold tabular-nums",
             scoreTone(value),
           )}
           style={{ fontSize: 13 }}
         >
-          {value ?? '—'}
+          {value ?? "—"}
         </text>
       </svg>
       <div className="text-center leading-tight">
         <p
           className={cn(
-            'text-[10px] font-bold tracking-wide',
-            emphasize ? 'text-foreground' : 'text-foreground/90',
+            "text-[10px] font-bold tracking-wide",
+            emphasize ? "text-foreground" : "text-foreground/90",
           )}
         >
           {meta.short}
@@ -141,7 +141,7 @@ function Gauge({
             {meta.caption}
           </span>
         </p>
-        <p className={cn('text-[9px] tabular-nums', scoreTone(value))}>
+        <p className={cn("text-[9px] tabular-nums", scoreTone(value))}>
           {scoreBand(value)}
         </p>
       </div>
@@ -171,12 +171,12 @@ export function OperativaPulseBlock({
   const rankLabel =
     rank != null && total > 0
       ? formatEstudioRankLabel(rank, total)
-      : 'Sin ranking en Estudio';
+      : "Sin ranking en Estudio";
 
   return (
     <div
       className={cn(
-        'space-y-2.5 rounded-lg border border-border/70 bg-gradient-to-b from-muted/35 to-transparent px-2 py-2',
+        "space-y-2.5 rounded-lg border border-border/70 bg-gradient-to-b from-muted/35 to-transparent px-2 py-2",
         className,
       )}
       data-testid="operativa-pulse"
@@ -203,7 +203,7 @@ export function OperativaPulseBlock({
           className="text-center text-[11px] font-medium text-foreground"
           data-testid="operativa-rank-label"
         >
-          {loading ? 'Calculando ranking…' : rankLabel}
+          {loading ? "Calculando ranking…" : rankLabel}
         </p>
         <div
           className="h-2 overflow-hidden rounded-full bg-muted"
@@ -219,9 +219,9 @@ export function OperativaPulseBlock({
           />
         </div>
         <p className="text-center text-[9px] leading-snug text-muted-foreground">
-          Compara este valor con los demás de tu lista{' '}
-          <span className="font-medium text-foreground/80">Estudio</span>
-          {' '}(#1 = mejor índice). No es una orden de compra.
+          Compara este valor con los demás de tu lista{" "}
+          <span className="font-medium text-foreground/80">Estudio</span> (#1 =
+          mejor índice). No es una orden de compra.
         </p>
       </div>
 
@@ -230,7 +230,9 @@ export function OperativaPulseBlock({
           <span className="underline-offset-2 group-open:underline">
             ¿Qué mirar? (básico)
           </span>
-          <span className="ml-1 text-muted-foreground">· avanzado al abrir</span>
+          <span className="ml-1 text-muted-foreground">
+            · avanzado al abrir
+          </span>
         </summary>
         <div className="mt-1.5 space-y-1.5 border-t border-border/40 pt-1.5 text-[10px] leading-snug text-muted-foreground">
           <p>
@@ -242,7 +244,8 @@ export function OperativaPulseBlock({
             <span className="font-semibold text-foreground">Avanzado — </span>
             IO = Composite 0–100 con suelo ≤40 si hay distress FA. Ranking solo
             entre miembros de Estudio. El dictamen de abajo traduce esto a una
-            postura (comprar / esperar / revisar), distinta de las ★ del TOP Lab.
+            postura (comprar / esperar / revisar), distinta de las ★ del TOP
+            Lab.
           </p>
         </div>
       </details>
@@ -262,17 +265,15 @@ export function OperativaPulseSummary({
 }) {
   if (rank == null || total <= 0) {
     return (
-      <span className={cn('tabular-nums', scoreTone(io))}>
-        IO {io ?? '—'}
-      </span>
+      <span className={cn("tabular-nums", scoreTone(io))}>IO {io ?? "—"}</span>
     );
   }
   return (
     <span className="truncate text-[10px] text-muted-foreground">
-      <span className={cn('font-semibold tabular-nums', scoreTone(io))}>
-        IO {io ?? '—'}
+      <span className={cn("font-semibold tabular-nums", scoreTone(io))}>
+        IO {io ?? "—"}
       </span>
-      {' · '}
+      {" · "}
       {rank}/{total}
     </span>
   );
