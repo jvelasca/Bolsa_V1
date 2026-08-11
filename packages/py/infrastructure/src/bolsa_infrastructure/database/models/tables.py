@@ -202,6 +202,7 @@ class BacktestRunRow(Base):
     commission_bps: Mapped[int] = mapped_column("commission_bps", Integer, default=0)
     slippage_bps: Mapped[int] = mapped_column("slippage_bps", Integer, default=0)
     manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    data_epoch: Mapped[str | None] = mapped_column("data_epoch", String, nullable=True)
     strategy_definition_id: Mapped[str | None] = mapped_column(
         "strategy_definition_id",
         ForeignKey("strategy_definitions.id"),
@@ -981,6 +982,7 @@ class ResearchTrialRow(Base):
     )
     fail_code: Mapped[str | None] = mapped_column("fail_code", String, nullable=True)
     manifest_ref: Mapped[dict | None] = mapped_column("manifest_ref", JSONB, nullable=True)
+    data_epoch: Mapped[str | None] = mapped_column("data_epoch", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
     instrument: Mapped[InstrumentRow] = relationship()
