@@ -3,14 +3,20 @@
  * Vive en Ayuda → Plataforma IA (no en Configuración editable).
  */
 
-import { useQuery } from '@tanstack/react-query';
-import type { EffectivenessSummaryV1 } from '@bolsa/shared';
-import { BAND_LABEL } from '@bolsa/shared';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { useQuery } from "@tanstack/react-query";
+import type { EffectivenessSummaryV1 } from "@bolsa/shared";
+import { BAND_LABEL } from "@bolsa/shared";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
-function BandBadge({ band }: { band: EffectivenessSummaryV1['band'] }) {
+function BandBadge({ band }: { band: EffectivenessSummaryV1["band"] }) {
   if (!band) {
     return (
       <span className="rounded border border-border px-2 py-0.5 text-[10px] uppercase text-muted-foreground">
@@ -19,13 +25,18 @@ function BandBadge({ band }: { band: EffectivenessSummaryV1['band'] }) {
     );
   }
   const cls =
-    band === 'skill'
-      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-      : band === 'luck'
-        ? 'border-red-500/40 bg-red-500/10 text-red-400'
-        : 'border-amber-500/40 bg-amber-500/10 text-amber-400';
+    band === "skill"
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+      : band === "luck"
+        ? "border-red-500/40 bg-red-500/10 text-red-400"
+        : "border-amber-500/40 bg-amber-500/10 text-amber-400";
   return (
-    <span className={cn('rounded border px-2 py-0.5 text-[10px] font-semibold uppercase', cls)}>
+    <span
+      className={cn(
+        "rounded border px-2 py-0.5 text-[10px] font-semibold uppercase",
+        cls,
+      )}
+    >
       {BAND_LABEL[band]}
     </span>
   );
@@ -34,7 +45,9 @@ function BandBadge({ band }: { band: EffectivenessSummaryV1['band'] }) {
 function Metric({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-md border border-border/70 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-0.5 text-sm font-medium text-foreground">{value}</p>
     </div>
   );
@@ -42,16 +55,16 @@ function Metric({ label, value }: { label: string; value: string | number }) {
 
 export function EffectivenessPanel({ compact }: { compact?: boolean }) {
   const pgQuery = useQuery({
-    queryKey: ['ai-effectiveness', 'pg'],
+    queryKey: ["ai-effectiveness", "pg"],
     queryFn: async () => (await api.getAiEffectiveness(false)).data,
     retry: 1,
   });
   const useDemo =
     pgQuery.isSuccess &&
-    (pgQuery.data.status === 'insufficient_data' ||
-      pgQuery.data.source === 'postgres_unavailable');
+    (pgQuery.data.status === "insufficient_data" ||
+      pgQuery.data.source === "postgres_unavailable");
   const demoQuery = useQuery({
-    queryKey: ['ai-effectiveness', 'demo'],
+    queryKey: ["ai-effectiveness", "demo"],
     queryFn: async () => (await api.getAiEffectiveness(true)).data,
     enabled: useDemo,
     retry: 1,
@@ -66,10 +79,11 @@ export function EffectivenessPanel({ compact }: { compact?: boolean }) {
       <CardHeader>
         <CardTitle>Efectividad (D7)</CardTitle>
         <CardDescription>
-          Skill vs luck · Decision Memory · Observed Profile. No reescribe Declared ni Policy.
-          {data?.source === 'postgres' ? ' · Fuente: PostgreSQL.' : null}
-          {data?.status === 'demo' || data?.source === 'demo'
-            ? ' · Vista ilustrativa (sin filas PG aún).'
+          Skill vs luck · Decision Memory · Observed Profile. No reescribe
+          Declared ni Policy.
+          {data?.source === "postgres" ? " · Fuente: PostgreSQL." : null}
+          {data?.status === "demo" || data?.source === "demo"
+            ? " · Vista ilustrativa (sin filas PG aún)."
             : null}
         </CardDescription>
       </CardHeader>
@@ -85,13 +99,19 @@ export function EffectivenessPanel({ compact }: { compact?: boolean }) {
         {data ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className={cn('text-sm text-foreground', compact && 'text-xs')}>{data.headline}</p>
+              <p
+                className={cn("text-sm text-foreground", compact && "text-xs")}
+              >
+                {data.headline}
+              </p>
               <BandBadge band={data.band} />
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Metric
                 label="Credibility"
-                value={data.credibility != null ? data.credibility.toFixed(1) : '—'}
+                value={
+                  data.credibility != null ? data.credibility.toFixed(1) : "—"
+                }
               />
               <Metric label="Trials N" value={data.trialsN} />
               <Metric
@@ -102,27 +122,30 @@ export function EffectivenessPanel({ compact }: { compact?: boolean }) {
             </div>
             {data.persistence ? (
               <p className="text-[10px] text-muted-foreground">
-                PG · memory {data.persistence.decisionMemoryCount} · trials{' '}
-                {data.persistence.trialCount} · edge {data.persistence.edgeReportCount} · open CFS{' '}
+                PG · memory {data.persistence.decisionMemoryCount} · trials{" "}
+                {data.persistence.trialCount} · edge{" "}
+                {data.persistence.edgeReportCount} · open CFS{" "}
                 {data.persistence.openConfidenceStates}
               </p>
             ) : null}
             {data.observed ? (
               <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs">
-                <p className="font-medium text-foreground">Observed (solo lectura)</p>
+                <p className="font-medium text-foreground">
+                  Observed (solo lectura)
+                </p>
                 <p className="mt-1 text-muted-foreground">
                   Trades muestra: {data.observed.sampleTradeCount}
                   {data.observed.disciplineScore != null
                     ? ` · disciplina ${data.observed.disciplineScore.toFixed(2)}`
-                    : ''}
+                    : ""}
                   {data.observed.impulsivityScore != null
                     ? ` · impulsividad ${data.observed.impulsivityScore.toFixed(2)}`
-                    : ''}
+                    : ""}
                 </p>
                 <p className="mt-1 text-muted-foreground">
-                  Divergencia Declared:{' '}
-                  {data.observed.divergesFromDeclared ? 'sí' : 'no'} · Policy:{' '}
-                  {data.observed.divergesFromPolicy ? 'sí' : 'no'}
+                  Divergencia Declared:{" "}
+                  {data.observed.divergesFromDeclared ? "sí" : "no"} · Policy:{" "}
+                  {data.observed.divergesFromPolicy ? "sí" : "no"}
                 </p>
                 {(data.observed.notes ?? []).slice(0, 2).map((n) => (
                   <p key={n} className="mt-0.5 text-muted-foreground">
@@ -132,7 +155,8 @@ export function EffectivenessPanel({ compact }: { compact?: boolean }) {
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                Sin Observed aún — se calculará desde operaciones (nunca escribe el cuestionario).
+                Sin Observed aún — se calculará desde operaciones (nunca escribe
+                el cuestionario).
               </p>
             )}
             {data.notes.length > 0 ? (

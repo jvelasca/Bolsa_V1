@@ -1,11 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
-import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { SettingsSection } from '@/features/settings/settings-section';
-import { EffectivenessPanel } from '@/features/settings/effectiveness-panel';
-import { SupervisedF3Panel } from '@/features/settings/supervised-f3-panel';
+import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { SettingsSection } from "@/features/settings/settings-section";
+import { EffectivenessPanel } from "@/features/settings/effectiveness-panel";
+import { SupervisedF3Panel } from "@/features/settings/supervised-f3-panel";
 import {
   AI_COGNITIVE_PHASES,
   AI_DECISION_PIPELINE,
@@ -24,28 +30,28 @@ import {
   type AiTrackItem,
   type AiTrackStatus,
   type AiWhereKind,
-} from '@/features/settings/ai-platform-tracker';
+} from "@/features/settings/ai-platform-tracker";
 
 const STATUS_CLASS: Record<AiTrackStatus, string> = {
-  done: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
-  partial: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
-  next: 'border-sky-500/40 bg-sky-500/10 text-sky-400',
-  planned: 'border-border bg-muted/30 text-muted-foreground',
-  blocked: 'border-red-500/40 bg-red-500/10 text-red-400',
+  done: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
+  partial: "border-amber-500/40 bg-amber-500/10 text-amber-400",
+  next: "border-sky-500/40 bg-sky-500/10 text-sky-400",
+  planned: "border-border bg-muted/30 text-muted-foreground",
+  blocked: "border-red-500/40 bg-red-500/10 text-red-400",
 };
 
 const WHERE_KIND_CLASS: Record<AiWhereKind, string> = {
-  local: 'border-sky-500/40 bg-sky-500/10 text-sky-400',
-  llm_optional: 'border-violet-500/40 bg-violet-500/10 text-violet-300',
-  deterministic: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400',
-  hybrid: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+  local: "border-sky-500/40 bg-sky-500/10 text-sky-400",
+  llm_optional: "border-violet-500/40 bg-violet-500/10 text-violet-300",
+  deterministic: "border-emerald-500/40 bg-emerald-500/10 text-emerald-400",
+  hybrid: "border-amber-500/40 bg-amber-500/10 text-amber-400",
 };
 
 function StatusBadge({ status }: { status: AiTrackStatus }) {
   return (
     <span
       className={cn(
-        'shrink-0 rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+        "shrink-0 rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
         STATUS_CLASS[status],
       )}
     >
@@ -75,7 +81,9 @@ function TrackList({ items }: { items: AiTrackItem[] }) {
               </p>
             ) : null}
             {item.docRef ? (
-              <p className="text-[10px] text-muted-foreground/80">{item.docRef}</p>
+              <p className="text-[10px] text-muted-foreground/80">
+                {item.docRef}
+              </p>
             ) : null}
           </div>
           <StatusBadge status={item.status} />
@@ -91,8 +99,8 @@ function WhereWeUseAiCard() {
       <CardHeader>
         <CardTitle>Dónde usamos IA</CardTitle>
         <CardDescription>
-          Aclara ranking local, LLM narrador, Lab determinista y Decision Engine. El LLM nunca escribe TOP ni
-          PnL.
+          Aclara ranking local, LLM narrador, Lab determinista y Decision
+          Engine. El LLM nunca escribe TOP ni PnL.
         </CardDescription>
       </CardHeader>
       <CardContent className="overflow-x-auto">
@@ -108,25 +116,32 @@ function WhereWeUseAiCard() {
           <tbody>
             {AI_WHERE_MAP.map((row) => (
               <tr key={row.id} className="border-b border-border/60 align-top">
-                <td className="py-2.5 pr-3 font-medium text-foreground">{row.surface}</td>
+                <td className="py-2.5 pr-3 font-medium text-foreground">
+                  {row.surface}
+                </td>
                 <td className="py-2.5 pr-3">
                   <span
                     className={cn(
-                      'inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                      "inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
                       WHERE_KIND_CLASS[row.kind],
                     )}
                   >
                     {AI_WHERE_KIND_LABEL[row.kind]}
                   </span>
                 </td>
-                <td className="py-2.5 pr-3 text-muted-foreground">{row.role}</td>
-                <td className="py-2.5 text-muted-foreground">{row.rankingOrOrders}</td>
+                <td className="py-2.5 pr-3 text-muted-foreground">
+                  {row.role}
+                </td>
+                <td className="py-2.5 text-muted-foreground">
+                  {row.rankingOrOrders}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="mt-3 text-[10px] text-muted-foreground/80">
-          Narración LLM Coach ON/OFF → rail del Asistente. CORE-P / CORE A / CORE B → objetivos abajo.
+          Narración LLM Coach ON/OFF → rail del Asistente. CORE-P / CORE A /
+          CORE B → objetivos abajo.
         </p>
       </CardContent>
     </Card>
@@ -135,14 +150,14 @@ function WhereWeUseAiCard() {
 
 function LiveRuntimeCard() {
   const statusQuery = useQuery({
-    queryKey: ['ai-status'],
+    queryKey: ["ai-status"],
     queryFn: async () => (await api.getAiStatus()).data,
     refetchInterval: 30_000,
     retry: 1,
   });
 
   const catalogQuery = useQuery({
-    queryKey: ['features-catalog'],
+    queryKey: ["features-catalog"],
     queryFn: async () => (await api.getFeatureCatalog()).data,
     staleTime: 60_000,
     retry: 1,
@@ -156,20 +171,26 @@ function LiveRuntimeCard() {
       <CardHeader>
         <CardTitle>Runtime en este entorno</CardTitle>
         <CardDescription>
-          Lectura en vivo de <code className="text-xs">GET /api/ai/status</code> y catálogo de features
+          Lectura en vivo de <code className="text-xs">GET /api/ai/status</code>{" "}
+          y catálogo de features
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {statusQuery.isLoading && <p className="text-muted-foreground">Consultando governance…</p>}
+        {statusQuery.isLoading && (
+          <p className="text-muted-foreground">Consultando governance…</p>
+        )}
         {statusQuery.isError && (
           <p className="text-destructive">
-            No se pudo leer /api/ai/status — ¿API en marcha con bolsa_ai arrancado?
+            No se pudo leer /api/ai/status — ¿API en marcha con bolsa_ai
+            arrancado?
           </p>
         )}
         {status && (
           <dl className="grid gap-2 sm:grid-cols-2">
             <div>
-              <dt className="text-xs text-muted-foreground">Modo / proveedor preferido</dt>
+              <dt className="text-xs text-muted-foreground">
+                Modo / proveedor preferido
+              </dt>
               <dd className="font-medium">
                 {status.mode} · {status.preferredProvider}
               </dd>
@@ -180,19 +201,37 @@ function LiveRuntimeCard() {
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Ollama</dt>
-              <dd className={status.ollamaAvailable ? 'text-emerald-400' : 'text-muted-foreground'}>
-                {status.ollamaAvailable ? 'Disponible' : 'No disponible'}
+              <dd
+                className={
+                  status.ollamaAvailable
+                    ? "text-emerald-400"
+                    : "text-muted-foreground"
+                }
+              >
+                {status.ollamaAvailable ? "Disponible" : "No disponible"}
               </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">OpenAI</dt>
-              <dd className={status.openaiAvailable ? 'text-emerald-400' : 'text-muted-foreground'}>
-                {status.openaiAvailable ? 'Disponible' : 'No configurado / offline'}
+              <dd
+                className={
+                  status.openaiAvailable
+                    ? "text-emerald-400"
+                    : "text-muted-foreground"
+                }
+              >
+                {status.openaiAvailable
+                  ? "Disponible"
+                  : "No configurado / offline"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-muted-foreground">Llamadas registradas (proceso)</dt>
-              <dd className="font-medium tabular-nums">{status.callsRecorded}</dd>
+              <dt className="text-xs text-muted-foreground">
+                Llamadas registradas (proceso)
+              </dt>
+              <dd className="font-medium tabular-nums">
+                {status.callsRecorded}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Producer</dt>
@@ -201,11 +240,11 @@ function LiveRuntimeCard() {
           </dl>
         )}
         <p className="text-xs text-muted-foreground">
-          Feature Registry (catálogo):{' '}
+          Feature Registry (catálogo):{" "}
           {catalogQuery.isError
-            ? 'error al cargar'
+            ? "error al cargar"
             : defCount == null
-              ? '…'
+              ? "…"
               : `${defCount} definiciones bootstrap`}
         </p>
       </CardContent>
@@ -219,14 +258,14 @@ export function AiPlatformSection({
 }: {
   compact?: boolean;
   /** Scroll al panel F3 tras Proponer desde Finalistas/chart/scan. */
-  focusPanel?: 'supervised-f3' | null;
+  focusPanel?: "supervised-f3" | null;
 }) {
   useEffect(() => {
-    if (focusPanel !== 'supervised-f3') return;
+    if (focusPanel !== "supervised-f3") return;
     const t = window.setTimeout(() => {
       document
-        .getElementById('supervised-f3-panel')
-        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        .getElementById("supervised-f3-panel")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
     return () => window.clearTimeout(t);
   }, [focusPanel]);
@@ -237,9 +276,11 @@ export function AiPlatformSection({
         <CardHeader>
           <CardTitle>Seguimiento plataforma IA</CardTitle>
           <CardDescription>
-            Información alineada con <code className="text-xs">{AI_TRACKER_SYNC.solutionDoc}</code> ·{' '}
-            {AI_TRACKER_SYNC.asOf}. Al avanzar F1–F6, actualiza el tracker TS y el encabezado del doc.
-            Los ajustes de sync/cuenta están en Configuración, no aquí.
+            Información alineada con{" "}
+            <code className="text-xs">{AI_TRACKER_SYNC.solutionDoc}</code> ·{" "}
+            {AI_TRACKER_SYNC.asOf}. Al avanzar F1–F6, actualiza el tracker TS y
+            el encabezado del doc. Los ajustes de sync/cuenta están en
+            Configuración, no aquí.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -248,7 +289,9 @@ export function AiPlatformSection({
             <p className="mt-1 text-muted-foreground">{AI_PRINCIPLE.body}</p>
           </div>
           <div className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
-            <p className="font-medium text-foreground">{AI_DECISION_PIPELINE.title}</p>
+            <p className="font-medium text-foreground">
+              {AI_DECISION_PIPELINE.title}
+            </p>
             <ol className="list-decimal space-y-1 pl-4 text-xs text-muted-foreground">
               {AI_DECISION_PIPELINE.steps.map((step) => (
                 <li key={step}>{step}</li>
@@ -259,12 +302,18 @@ export function AiPlatformSection({
                 <li key={rule}>{rule}</li>
               ))}
             </ul>
-            <p className="text-[10px] text-muted-foreground/80">{AI_DECISION_PIPELINE.docRef}</p>
+            <p className="text-[10px] text-muted-foreground/80">
+              {AI_DECISION_PIPELINE.docRef}
+            </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            RFCs: <code className="text-[10px]">{AI_TRACKER_SYNC.rfcIndex}</code> · Governance{' '}
-            <code className="text-[10px]">{AI_TRACKER_SYNC.governanceRfc}</code> · Features{' '}
-            <code className="text-[10px]">{AI_TRACKER_SYNC.featureRfc}</code> · Cognitive{' '}
+            RFCs:{" "}
+            <code className="text-[10px]">{AI_TRACKER_SYNC.rfcIndex}</code> ·
+            Governance{" "}
+            <code className="text-[10px]">{AI_TRACKER_SYNC.governanceRfc}</code>{" "}
+            · Features{" "}
+            <code className="text-[10px]">{AI_TRACKER_SYNC.featureRfc}</code> ·
+            Cognitive{" "}
             <code className="text-[10px]">{AI_TRACKER_SYNC.cognitiveRfc}</code>
           </p>
         </CardContent>
@@ -278,14 +327,16 @@ export function AiPlatformSection({
         <CardHeader>
           <CardTitle>Qué queremos conseguir</CardTitle>
           <CardDescription>
-            Capacidades de producto · badge Hecho / Parcial / Planificado. Congelados ≠ pendientes
-            accionables.
+            Capacidades de producto · badge Hecho / Parcial / Planificado.
+            Congelados ≠ pendientes accionables.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <TrackList items={AI_PRODUCT_GOALS} />
           <div className="rounded-md border border-sky-500/30 bg-sky-500/5 p-3">
-            <p className="text-sm font-medium text-foreground">Siguiente (accionable)</p>
+            <p className="text-sm font-medium text-foreground">
+              Siguiente (accionable)
+            </p>
             <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
               {AI_PRODUCT_NEXT.map((line) => (
                 <li key={line}>{line}</li>
@@ -293,7 +344,9 @@ export function AiPlatformSection({
             </ul>
           </div>
           <div className="rounded-md border border-border bg-muted/20 p-3">
-            <p className="text-sm font-medium text-foreground">Congelado (sin decisión)</p>
+            <p className="text-sm font-medium text-foreground">
+              Congelado (sin decisión)
+            </p>
             <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
               {AI_PRODUCT_FROZEN.map((line) => (
                 <li key={line}>{line}</li>
@@ -307,7 +360,8 @@ export function AiPlatformSection({
         <CardHeader>
           <CardTitle>Núcleo cognitivo (RFC-008)</CardTitle>
           <CardDescription>
-            Decision Engine — Profile / Policy / Evidence. Configuración → Perfil inversor.
+            Decision Engine — Profile / Policy / Evidence. Configuración →
+            Perfil inversor.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -322,7 +376,9 @@ export function AiPlatformSection({
       <Card>
         <CardHeader>
           <CardTitle>Fases de ejecución</CardTitle>
-          <CardDescription>Post-constitución — orden en AI_PLATFORM_SOLUTION §8</CardDescription>
+          <CardDescription>
+            Post-constitución — orden en AI_PLATFORM_SOLUTION §8
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <TrackList items={AI_EXECUTION_PHASES} />
@@ -348,7 +404,9 @@ export function AiPlatformSection({
             <ul className="space-y-2 text-sm">
               {AI_STACK_SUMMARY.map((row) => (
                 <li key={row.layer}>
-                  <span className="font-medium text-foreground">{row.layer}: </span>
+                  <span className="font-medium text-foreground">
+                    {row.layer}:{" "}
+                  </span>
                   <span className="text-muted-foreground">{row.choice}</span>
                 </li>
               ))}

@@ -4,15 +4,25 @@
  *
  * @see docs/WORKSPACE_PERSISTENCE.md
  */
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { checkboxClassName } from '@/components/ui/dialog';
-import { useUiStore } from '@/stores/ui-store';
-import { useTradingLayoutStore } from '@/stores/trading-layout-store';
-import { useWorkspaceStore } from '@/stores/workspace-store';
-import { SettingsSection } from '@/features/settings/settings-section';
-import { ChartNewChartTemplatePinButton } from '@/features/charts/chart-new-chart-template-pin-button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { checkboxClassName } from "@/components/ui/dialog";
+import { useUiStore } from "@/stores/ui-store";
+import { useTradingLayoutStore } from "@/stores/trading-layout-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+import { SettingsSection } from "@/features/settings/settings-section";
+import { ChartNewChartTemplatePinButton } from "@/features/charts/chart-new-chart-template-pin-button";
 
-export function GeneralSettingsSection({ compact = false }: { compact?: boolean }) {
+export function GeneralSettingsSection({
+  compact = false,
+}: {
+  compact?: boolean;
+}) {
   const workspace = useWorkspaceStore((s) => s.workspace);
   const setAutoSave = useWorkspaceStore((s) => s.setAutoSave);
   const setOpenOnStartup = useWorkspaceStore((s) => s.setOpenOnStartup);
@@ -25,7 +35,10 @@ export function GeneralSettingsSection({ compact = false }: { compact?: boolean 
         <CardHeader>
           <CardTitle>Espacio de trabajo</CardTitle>
           <CardDescription>
-            Activo: <span className="font-medium text-foreground">{workspace.name}</span>
+            Activo:{" "}
+            <span className="font-medium text-foreground">
+              {workspace.name}
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
@@ -48,8 +61,8 @@ export function GeneralSettingsSection({ compact = false }: { compact?: boolean 
             Preferido al arrancar (si no hay último activo en este dispositivo)
           </label>
           <p className="text-[11px] text-muted-foreground">
-            Al abrir la app se restaura el espacio activo guardado localmente; este flag solo actúa
-            como reserva (estrella en el gestor).
+            Al abrir la app se restaura el espacio activo guardado localmente;
+            este flag solo actúa como reserva (estrella en el gestor).
           </p>
           <button
             type="button"
@@ -59,11 +72,14 @@ export function GeneralSettingsSection({ compact = false }: { compact?: boolean 
             Gestionar espacios…
           </button>
           <div className="space-y-2 border-t border-border pt-4">
-            <p className="text-xs font-medium text-foreground">Plantilla para gráficos nuevos</p>
+            <p className="text-xs font-medium text-foreground">
+              Plantilla para gráficos nuevos
+            </p>
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Activa el icono de plantilla en el gráfico que quieras usar como referencia. Los
-              valores que abras después copiarán su configuración en vivo (indicadores, barra,
-              estilo). Desactívalo para volver a los defaults del workspace.
+              Activa el icono de plantilla en el gráfico que quieras usar como
+              referencia. Los valores que abras después copiarán su
+              configuración en vivo (indicadores, barra, estilo). Desactívalo
+              para volver a los defaults del workspace.
             </p>
             <ChartNewChartTemplatePinButton />
           </div>
@@ -73,17 +89,21 @@ export function GeneralSettingsSection({ compact = false }: { compact?: boolean 
       <Card>
         <CardHeader>
           <CardTitle>Interfaz</CardTitle>
-          <CardDescription>Paneles de Trading y opciones visuales</CardDescription>
+          <CardDescription>
+            Paneles de Trading y opciones visuales
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
           <p>
-            Tema oscuro activo. Tema claro y densidad de UI:{' '}
-            <span className="text-amber-500/90">pendiente</span> (fase posterior).
+            Tema oscuro activo. Tema claro y densidad de UI:{" "}
+            <span className="text-amber-500/90">pendiente</span> (fase
+            posterior).
           </p>
           <p>
-            El layout de paneles (watchlist / operaciones) y los anchos de columnas de Listas/Valores
-            se guardan en este dispositivo: escritorio y portátil no se pisan. También puedes
-            restablecer los paneles desde la barra superior (Trading).
+            El layout de paneles (watchlist / operaciones) y los anchos de
+            columnas de Listas/Valores se guardan en este dispositivo:
+            escritorio y portátil no se pisan. También puedes restablecer los
+            paneles desde la barra superior (Trading).
           </p>
           <button
             type="button"

@@ -2,24 +2,24 @@
  * Decision Replay — lista sesiones, timeline caja negra, cerrar Outcome.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import type { DecisionReplayStepV1 } from '@bolsa/shared';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import type { DecisionReplayStepV1 } from "@bolsa/shared";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 const STEP_ACCENT: Record<string, string> = {
-  context: 'border-sky-500/40',
-  assessments: 'border-emerald-500/40',
-  evidence: 'border-violet-500/40',
-  predictions: 'border-violet-500/30',
-  weights: 'border-amber-500/40',
-  runtime: 'border-orange-500/40',
-  recommendation: 'border-primary/50',
-  gate: 'border-rose-500/40',
-  execution: 'border-border',
-  outcome: 'border-muted-foreground/40',
+  context: "border-sky-500/40",
+  assessments: "border-emerald-500/40",
+  evidence: "border-violet-500/40",
+  predictions: "border-violet-500/30",
+  weights: "border-amber-500/40",
+  runtime: "border-orange-500/40",
+  recommendation: "border-primary/50",
+  gate: "border-rose-500/40",
+  execution: "border-border",
+  outcome: "border-muted-foreground/40",
 };
 
 function StepCard({ step }: { step: DecisionReplayStepV1 }) {
@@ -27,8 +27,8 @@ function StepCard({ step }: { step: DecisionReplayStepV1 }) {
   return (
     <li
       className={cn(
-        'rounded-md border-l-2 border border-border bg-muted/15 px-3 py-2',
-        STEP_ACCENT[step.stepId] ?? 'border-l-border',
+        "rounded-md border-l-2 border border-border bg-muted/15 px-3 py-2",
+        STEP_ACCENT[step.stepId] ?? "border-l-border",
       )}
     >
       <button
@@ -41,7 +41,9 @@ function StepCard({ step }: { step: DecisionReplayStepV1 }) {
           <p className="text-[11px] text-muted-foreground">{step.detail}</p>
         </div>
         {step.payload ? (
-          <span className="shrink-0 text-[10px] text-muted-foreground">{open ? '▼' : '▶'}</span>
+          <span className="shrink-0 text-[10px] text-muted-foreground">
+            {open ? "▼" : "▶"}
+          </span>
         ) : null}
       </button>
       {open && step.payload ? (
@@ -60,7 +62,9 @@ export function DecisionReplayPanel({
 } = {}) {
   const { effectiveAccountId } = useActiveAccount();
   const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(initialSessionId ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialSessionId ?? null,
+  );
   const [outcomeLog, setOutcomeLog] = useState<string | null>(null);
 
   useEffect(() => {
@@ -71,7 +75,7 @@ export function DecisionReplayPanel({
   }, [initialSessionId]);
 
   const listQuery = useQuery({
-    queryKey: ['decision-sessions', effectiveAccountId],
+    queryKey: ["decision-sessions", effectiveAccountId],
     queryFn: async () =>
       (
         await api.listDecisionSessions({
@@ -84,16 +88,16 @@ export function DecisionReplayPanel({
   });
 
   const replayQuery = useQuery({
-    queryKey: ['decision-replay', selectedId],
+    queryKey: ["decision-replay", selectedId],
     queryFn: async () => {
-      if (!selectedId) throw new Error('sin session');
+      if (!selectedId) throw new Error("sin session");
       return (await api.getDecisionSessionReplay(selectedId)).data;
     },
     enabled: Boolean(selectedId),
   });
 
   const learningQuery = useQuery({
-    queryKey: ['decision-learning', effectiveAccountId],
+    queryKey: ["decision-learning", effectiveAccountId],
     queryFn: async () =>
       (
         await api.getDecisionSessionLearningSummary({
@@ -106,19 +110,26 @@ export function DecisionReplayPanel({
 
   const closeOutcome = useMutation({
     mutationFn: async () => {
-      if (!selectedId) throw new Error('sin session');
-      return (await api.closeDecisionSessionOutcome(selectedId, { mode: 'auto' })).data;
+      if (!selectedId) throw new Error("sin session");
+      return (
+        await api.closeDecisionSessionOutcome(selectedId, { mode: "auto" })
+      ).data;
     },
     onSuccess: (data) => {
-      const v = data.outcome as { verdict?: string; returnPct?: number } | null | undefined;
+      const v = data.outcome as
+        | { verdict?: string; returnPct?: number }
+        | null
+        | undefined;
       setOutcomeLog(
         v
-          ? `Outcome ${v.verdict}${v.returnPct != null ? ` · ${v.returnPct}%` : ''} · session closed`
-          : 'Outcome registrado',
+          ? `Outcome ${v.verdict}${v.returnPct != null ? ` · ${v.returnPct}%` : ""} · session closed`
+          : "Outcome registrado",
       );
-      void queryClient.invalidateQueries({ queryKey: ['decision-sessions'] });
-      void queryClient.invalidateQueries({ queryKey: ['decision-replay', selectedId] });
-      void queryClient.invalidateQueries({ queryKey: ['decision-learning'] });
+      void queryClient.invalidateQueries({ queryKey: ["decision-sessions"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["decision-replay", selectedId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["decision-learning"] });
     },
     onError: (err: Error) => setOutcomeLog(err.message),
   });
@@ -127,9 +138,12 @@ export function DecisionReplayPanel({
   const selectedMeta = items.find((i) => i.sessionId === selectedId);
   const canClose =
     Boolean(selectedId) &&
-    selectedMeta?.status !== 'closed' &&
+    selectedMeta?.status !== "closed" &&
     !replayQuery.data?.steps.some(
-      (s) => s.stepId === 'outcome' && s.payload && (s.payload as { verdict?: string }).verdict,
+      (s) =>
+        s.stepId === "outcome" &&
+        s.payload &&
+        (s.payload as { verdict?: string }).verdict,
     );
 
   return (
@@ -155,11 +169,11 @@ export function DecisionReplayPanel({
           Learning · maduro {learningQuery.data.matureScored ?? 0}
           {learningQuery.data.matureHitRate != null
             ? ` · matureHitRate ${(learningQuery.data.matureHitRate * 100).toFixed(0)}%`
-            : ''}
+            : ""}
           {learningQuery.data.prematureScored
             ? ` · prematuros ${learningQuery.data.prematureScored}`
-            : ''}
-          {' · '}
+            : ""}
+          {" · "}
           total {learningQuery.data.hits}H / {learningQuery.data.misses}M
         </p>
       ) : null}
@@ -172,7 +186,8 @@ export function DecisionReplayPanel({
         </p>
       ) : items.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          Aún no hay DecisionSessions. Genera una en Ayuda → Plataforma IA → Supervisado F3.
+          Aún no hay DecisionSessions. Genera una en Ayuda → Plataforma IA →
+          Supervisado F3.
         </p>
       ) : (
         <ul className="max-h-36 space-y-1 overflow-y-auto text-[11px]">
@@ -181,8 +196,8 @@ export function DecisionReplayPanel({
               <button
                 type="button"
                 className={cn(
-                  'w-full rounded px-2 py-1.5 text-left hover:bg-accent',
-                  selectedId === item.sessionId && 'bg-accent',
+                  "w-full rounded px-2 py-1.5 text-left hover:bg-accent",
+                  selectedId === item.sessionId && "bg-accent",
                 )}
                 onClick={() => {
                   setSelectedId(item.sessionId);
@@ -193,9 +208,9 @@ export function DecisionReplayPanel({
                   {item.symbol ?? item.instrumentId}
                 </span>
                 <span className="text-muted-foreground">
-                  {' · '}
+                  {" · "}
                   {item.kind}/{item.status}
-                  {' · '}
+                  {" · "}
                   <code className="text-[10px]">{item.sessionId}</code>
                 </span>
               </button>
@@ -213,13 +228,16 @@ export function DecisionReplayPanel({
               disabled={!canClose || closeOutcome.isPending}
               onClick={() => closeOutcome.mutate()}
             >
-              {closeOutcome.isPending ? 'Evaluando…' : 'Cerrar Outcome (auto)'}
+              {closeOutcome.isPending ? "Evaluando…" : "Cerrar Outcome (auto)"}
             </button>
             <span className="text-[10px] text-muted-foreground">
-              Criterio v1.1: close en barra D1 +N del horizonte (si faltan días → premature_mtm)
+              Criterio v1.1: close en barra D1 +N del horizonte (si faltan días
+              → premature_mtm)
             </span>
           </div>
-          {outcomeLog ? <p className="text-[11px] text-foreground/80">{outcomeLog}</p> : null}
+          {outcomeLog ? (
+            <p className="text-[11px] text-foreground/80">{outcomeLog}</p>
+          ) : null}
           {replayQuery.isLoading ? (
             <p className="text-xs text-muted-foreground">Cargando replay…</p>
           ) : replayQuery.isError ? (
@@ -229,10 +247,11 @@ export function DecisionReplayPanel({
           ) : replayQuery.data ? (
             <>
               <p className="text-xs text-foreground">
-                Replay · {replayQuery.data.symbol ?? replayQuery.data.instrumentId}
+                Replay ·{" "}
+                {replayQuery.data.symbol ?? replayQuery.data.instrumentId}
                 {replayQuery.data.createdAt
                   ? ` · ${new Date(replayQuery.data.createdAt).toLocaleString()}`
-                  : ''}
+                  : ""}
               </p>
               <ol className="space-y-2">
                 {replayQuery.data.steps.map((step) => (

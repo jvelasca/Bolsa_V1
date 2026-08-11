@@ -10,8 +10,8 @@
  * @see docs/engineering/backtesting-funnel-handoff-2026-07-29.md
  */
 
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import type {
   AssessmentV1,
   EvidenceAssessmentV1,
@@ -19,46 +19,57 @@ import type {
   MacroAssessmentV1,
   NewsAssessmentV1,
   TechnicalAssessmentV1,
-} from '@bolsa/shared';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useActiveAccount } from '@/features/accounts/use-active-account';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+} from "@bolsa/shared";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import {
   resolveSupervisedQueueOrigin,
   supervisedQueueOriginLabel,
   type SupervisedProposePayload,
   useSupervisedF3QueueStore,
-} from '@/stores/supervised-f3-queue-store';
+} from "@/stores/supervised-f3-queue-store";
 import {
   demoBookAllowsExecute,
   loadDemoBookPrefs,
   suggestQuantityFromCash,
   type DemoBookCountryPrefer,
-} from '@/features/trading/demo-book-prefs';
+} from "@/features/trading/demo-book-prefs";
 import {
   inferHomeCountry,
   optimalScoreFromPayload,
   rankByOptimalThenGeo,
-} from '@/features/trading/demo-book-geo-rank';
-import { recordSemiConfirmMandate } from '@/features/trading/semi-confirm-mandate';
+} from "@/features/trading/demo-book-geo-rank";
+import { recordSemiConfirmMandate } from "@/features/trading/semi-confirm-mandate";
 import {
   conflictForActive,
   findHmConflicts,
-} from '@/features/trading/semi-hm-conflict';
-import { PAPER_PATH_SUPERVISED } from '@/features/settings/paper-paths-copy';
+} from "@/features/trading/semi-hm-conflict";
+import { PAPER_PATH_SUPERVISED } from "@/features/settings/paper-paths-copy";
 
 type ProposePayload = SupervisedProposePayload;
 
 function BiasBadge({ bias }: { bias: string }) {
   const cls =
-    bias === 'bullish'
-      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-      : bias === 'bearish'
-        ? 'border-red-500/40 bg-red-500/10 text-red-400'
-        : 'border-border bg-muted/40 text-muted-foreground';
+    bias === "bullish"
+      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+      : bias === "bearish"
+        ? "border-red-500/40 bg-red-500/10 text-red-400"
+        : "border-border bg-muted/40 text-muted-foreground";
   return (
-    <span className={cn('rounded border px-2 py-0.5 text-[10px] font-semibold uppercase', cls)}>
+    <span
+      className={cn(
+        "rounded border px-2 py-0.5 text-[10px] font-semibold uppercase",
+        cls,
+      )}
+    >
       {bias}
     </span>
   );
@@ -75,8 +86,12 @@ function ComponentBar({ label, value }: { label: string; value: number }) {
       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
         <div
           className={cn(
-            'h-full rounded-full',
-            value > 0.1 ? 'bg-emerald-500/70' : value < -0.1 ? 'bg-red-500/70' : 'bg-muted-foreground/40',
+            "h-full rounded-full",
+            value > 0.1
+              ? "bg-emerald-500/70"
+              : value < -0.1
+                ? "bg-red-500/70"
+                : "bg-muted-foreground/40",
           )}
           style={{ width: `${Math.max(4, pct)}%` }}
         />
@@ -113,14 +128,14 @@ function AssessmentBlock({
         {bias ? <BiasBadge bias={bias} /> : null}
         <span className="text-[10px] text-muted-foreground">
           score {score.toFixed(3)} · conf {confidence.toFixed(2)}
-          {coverage != null ? ` · cov ${coverage.toFixed(2)}` : ''}
-          {extra ? ` · ${extra}` : ''}
+          {coverage != null ? ` · cov ${coverage.toFixed(2)}` : ""}
+          {extra ? ` · ${extra}` : ""}
         </span>
       </div>
       {components ? (
         <div className="grid gap-2 sm:grid-cols-2">
           {Object.entries(components)
-            .filter(([, v]) => typeof v === 'number')
+            .filter(([, v]) => typeof v === "number")
             .slice(0, 4)
             .map(([k, v]) => (
               <ComponentBar key={k} label={k} value={v as number} />
@@ -135,7 +150,9 @@ function AssessmentBlock({
         </ul>
       ) : null}
       {warnings?.length ? (
-        <p className="text-[11px] text-amber-700 dark:text-amber-400">{warnings.join(' · ')}</p>
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+          {warnings.join(" · ")}
+        </p>
       ) : null}
     </div>
   );
@@ -143,9 +160,9 @@ function AssessmentBlock({
 
 export function SupervisedF3Panel() {
   const { account, effectiveAccountId } = useActiveAccount();
-  const [instrumentId, setInstrumentId] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const [price, setPrice] = useState('');
+  const [instrumentId, setInstrumentId] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [price, setPrice] = useState("");
   const [includeFund, setIncludeFund] = useState(true);
   const [includeMacro, setIncludeMacro] = useState(true);
   const [includeEvidence, setIncludeEvidence] = useState(true);
@@ -165,11 +182,13 @@ export function SupervisedF3Panel() {
   const clearQueue = useSupervisedF3QueueStore((s) => s.clear);
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const activeItem = queueItems.find((i) => i.id === activeId) ?? null;
-  const activeOrigin = activeItem ? resolveSupervisedQueueOrigin(activeItem) : null;
+  const activeOrigin = activeItem
+    ? resolveSupervisedQueueOrigin(activeItem)
+    : null;
   const canExecute = demoBookAllowsExecute(bookMode);
 
   const summaryQuery = useQuery({
-    queryKey: ['account-summary', effectiveAccountId],
+    queryKey: ["account-summary", effectiveAccountId],
     queryFn: () => api.getAccountSummary(effectiveAccountId!),
     enabled: Boolean(effectiveAccountId),
     staleTime: 15_000,
@@ -183,10 +202,10 @@ export function SupervisedF3Panel() {
       setCountryPrefer(p.countryPrefer);
     }
     refreshBookPrefs();
-    window.addEventListener('storage', refreshBookPrefs);
+    window.addEventListener("storage", refreshBookPrefs);
     const id = window.setInterval(refreshBookPrefs, 2000);
     return () => {
-      window.removeEventListener('storage', refreshBookPrefs);
+      window.removeEventListener("storage", refreshBookPrefs);
       window.clearInterval(id);
     };
   }, []);
@@ -197,10 +216,7 @@ export function SupervisedF3Panel() {
     if (item) {
       setPending(item.payload);
       setInstrumentId(item.payload.instrumentId);
-      const px =
-        item.payload.suggestedPrice ??
-        item.payload.lastClose ??
-        null;
+      const px = item.payload.suggestedPrice ?? item.payload.lastClose ?? null;
       if (px != null) setPrice(String(px));
       const book = loadDemoBookPrefs();
       if (px != null && cash > 0) {
@@ -224,7 +240,7 @@ export function SupervisedF3Panel() {
   );
 
   const instrumentsQuery = useQuery({
-    queryKey: ['instruments-brief'],
+    queryKey: ["instruments-brief"],
     queryFn: async () => (await api.getInstruments()).data,
     staleTime: 60_000,
   });
@@ -267,10 +283,7 @@ export function SupervisedF3Panel() {
     [instrumentsQuery.data],
   );
 
-  const hmConflicts = useMemo(
-    () => findHmConflicts(queueItems),
-    [queueItems],
-  );
+  const hmConflicts = useMemo(() => findHmConflicts(queueItems), [queueItems]);
   const activeHm = useMemo(
     () => conflictForActive(hmConflicts, activeId),
     [hmConflicts, activeId],
@@ -284,15 +297,19 @@ export function SupervisedF3Panel() {
 
   const propose = useMutation({
     mutationFn: async () => {
-      if (!instrumentId.trim()) throw new Error('Indica instrumentId');
+      if (!instrumentId.trim()) throw new Error("Indica instrumentId");
       const qty = Number(quantity);
-      if (!Number.isFinite(qty) || qty <= 0) throw new Error('Cantidad inválida');
+      if (!Number.isFinite(qty) || qty <= 0)
+        throw new Error("Cantidad inválida");
       const parsedPrice = price.trim() ? Number(price) : null;
       const res = await api.proposeRecommendation({
         instrumentId: instrumentId.trim(),
         accountId: effectiveAccountId ?? undefined,
         suggestedQuantity: qty,
-        suggestedPrice: parsedPrice != null && Number.isFinite(parsedPrice) ? parsedPrice : null,
+        suggestedPrice:
+          parsedPrice != null && Number.isFinite(parsedPrice)
+            ? parsedPrice
+            : null,
         includeFundamentals: includeFund,
         includeMacro,
         includeEvidence,
@@ -302,13 +319,13 @@ export function SupervisedF3Panel() {
     },
     onSuccess: (rec) => {
       setPending(rec);
-      enqueue(rec, { origin: 'manual' });
+      enqueue(rec, { origin: "manual" });
       if (rec.lastClose != null && !price.trim()) {
         setPrice(String(rec.lastClose));
       }
       const n = rec.assessments?.length ?? 1;
       setLog(
-        `${rec.recommendationId} · ${rec.action} · ${n} assessment(s) · ${rec.source ?? 'v1.1'}`,
+        `${rec.recommendationId} · ${rec.action} · ${n} assessment(s) · ${rec.source ?? "v1.1"}`,
       );
     },
     onError: (e: Error) => setLog(e.message),
@@ -316,15 +333,19 @@ export function SupervisedF3Panel() {
 
   const confirm = useMutation({
     mutationFn: async (execute: boolean) => {
-      if (!pending || !effectiveAccountId) throw new Error('Falta recommendation o cuenta');
+      if (!pending || !effectiveAccountId)
+        throw new Error("Falta recommendation o cuenta");
       if (execute && !demoBookAllowsExecute(loadDemoBookPrefs().mode)) {
-        throw new Error('Libro no está en SEMI: no se puede ejecutar. Cambia el modo en el rail Coach.');
+        throw new Error(
+          "Libro no está en SEMI: no se puede ejecutar. Cambia el modo en el rail Coach.",
+        );
       }
       const qty = Number(quantity);
       const parsedPrice = price.trim() ? Number(price) : null;
       const recommendation: ProposePayload = {
         ...pending,
-        suggestedQuantity: Number.isFinite(qty) && qty > 0 ? qty : pending.suggestedQuantity,
+        suggestedQuantity:
+          Number.isFinite(qty) && qty > 0 ? qty : pending.suggestedQuantity,
         suggestedPrice:
           parsedPrice != null && Number.isFinite(parsedPrice)
             ? parsedPrice
@@ -341,11 +362,11 @@ export function SupervisedF3Panel() {
       const intent = res.data.intent;
       const trade = res.data.trade;
       const sid = res.data.decisionSession?.sessionId;
-      let mandateNote = '';
+      let mandateNote = "";
       if (
         pending &&
         effectiveAccountId &&
-        (intent.status === 'executed' || intent.status === 'authorized')
+        (intent.status === "executed" || intent.status === "authorized")
       ) {
         const m = recordSemiConfirmMandate({
           accountId: effectiveAccountId,
@@ -354,16 +375,18 @@ export function SupervisedF3Panel() {
           trade,
         });
         if (m.mandateTenureId) {
-          mandateNote = ` · mandato=${m.mandateTenureId.slice(0, 8)}${m.linked ? '+link' : ''}`;
+          mandateNote = ` · mandato=${m.mandateTenureId.slice(0, 8)}${m.linked ? "+link" : ""}`;
         }
       }
       setLog(
         `Intent ${intent.intentId} · ${intent.status}` +
-          (trade ? ` · trade=${trade.status}${trade.reason ? ` (${trade.reason})` : ''}` : '') +
-          (sid ? ` · session=${sid}` : '') +
+          (trade
+            ? ` · trade=${trade.status}${trade.reason ? ` (${trade.reason})` : ""}`
+            : "") +
+          (sid ? ` · session=${sid}` : "") +
           mandateNote,
       );
-      if (intent.status === 'executed' || intent.status === 'authorized') {
+      if (intent.status === "executed" || intent.status === "authorized") {
         if (activeId) {
           removeFromQueue(activeId);
           setSelectedIds((prev) => {
@@ -380,13 +403,13 @@ export function SupervisedF3Panel() {
 
   const confirmSelected = useMutation({
     mutationFn: async () => {
-      if (!effectiveAccountId) throw new Error('Sin cuenta DEMO');
+      if (!effectiveAccountId) throw new Error("Sin cuenta DEMO");
       if (!demoBookAllowsExecute(loadDemoBookPrefs().mode)) {
-        throw new Error('Libro no está en SEMI');
+        throw new Error("Libro no está en SEMI");
       }
       const selected = new Set(selectedIds);
       const targets = rankedQueueItems.filter((i) => selected.has(i.id));
-      if (targets.length === 0) throw new Error('No hay propuestas marcadas');
+      if (targets.length === 0) throw new Error("No hay propuestas marcadas");
       const results: string[] = [];
       for (const item of targets) {
         const res = await api.confirmOrderIntent({
@@ -397,14 +420,14 @@ export function SupervisedF3Panel() {
         });
         const st = res.data.intent.status;
         let tag = `${item.symbol ?? item.payload.instrumentId.slice(0, 6)}:${st}`;
-        if (st === 'executed' || st === 'authorized') {
+        if (st === "executed" || st === "authorized") {
           const m = recordSemiConfirmMandate({
             accountId: effectiveAccountId,
             payload: item.payload,
             intentStatus: st,
             trade: res.data.trade,
           });
-          if (m.mandateTenureId) tag += '+M';
+          if (m.mandateTenureId) tag += "+M";
           removeFromQueue(item.id);
         }
         results.push(tag);
@@ -413,14 +436,16 @@ export function SupervisedF3Panel() {
     },
     onSuccess: (results) => {
       setSelectedIds(new Set());
-      setLog(`Lote SEMI · ${results.join(' · ')}`);
+      setLog(`Lote SEMI · ${results.join(" · ")}`);
       void summaryQuery.refetch();
     },
     onError: (e: Error) => setLog(e.message),
   });
 
   const ta = pending?.technicalAssessment as TechnicalAssessmentV1 | undefined;
-  const fa = pending?.fundamentalAssessment as FundamentalAssessmentV1 | undefined;
+  const fa = pending?.fundamentalAssessment as
+    | FundamentalAssessmentV1
+    | undefined;
   const ma = pending?.macroAssessment as MacroAssessmentV1 | undefined;
   const ea = pending?.evidenceAssessment as EvidenceAssessmentV1 | undefined;
   const na = pending?.newsAssessment as NewsAssessmentV1 | undefined;
@@ -430,10 +455,15 @@ export function SupervisedF3Panel() {
       <CardHeader>
         <CardTitle>{PAPER_PATH_SUPERVISED.shortTitle}</CardTitle>
         <CardDescription>
-          SEMI · Assessment(s) → Recommendation → Confirm. Cola: Finalistas, Radar, Scan, Gráfico.
-          {account ? ` Cuenta: ${account.name}.` : ' Selecciona una cuenta activa.'}
+          SEMI · Assessment(s) → Recommendation → Confirm. Cola: Finalistas,
+          Radar, Scan, Gráfico.
+          {account
+            ? ` Cuenta: ${account.name}.`
+            : " Selecciona una cuenta activa."}
           {` Modo libro: ${bookMode.toUpperCase()}.`}
-          {cash > 0 ? ` Cash: ${cash.toLocaleString('es-ES', { maximumFractionDigits: 0 })}.` : ''}
+          {cash > 0
+            ? ` Cash: ${cash.toLocaleString("es-ES", { maximumFractionDigits: 0 })}.`
+            : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -442,7 +472,7 @@ export function SupervisedF3Panel() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium">
                 Cola supervisada ({rankedQueueItems.length})
-                {selectedCount > 0 ? ` · ${selectedCount} marcadas` : ''}
+                {selectedCount > 0 ? ` · ${selectedCount} marcadas` : ""}
               </span>
               <div className="flex gap-2">
                 <button
@@ -464,7 +494,8 @@ export function SupervisedF3Panel() {
               </div>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Orden: óptimo → geo ({countryPrefer.replace('_', ' ')} · home {homeCountry})
+              Orden: óptimo → geo ({countryPrefer.replace("_", " ")} · home{" "}
+              {homeCountry})
             </p>
             <ul className="max-h-36 space-y-1 overflow-y-auto text-[11px]">
               {rankedQueueItems.map((item) => {
@@ -492,8 +523,8 @@ export function SupervisedF3Panel() {
                     <button
                       type="button"
                       className={cn(
-                        'min-w-0 flex-1 rounded px-2 py-1 text-left hover:bg-accent',
-                        item.id === activeId && 'bg-accent',
+                        "min-w-0 flex-1 rounded px-2 py-1 text-left hover:bg-accent",
+                        item.id === activeId && "bg-accent",
                       )}
                       onClick={() => setActive(item.id)}
                     >
@@ -501,11 +532,14 @@ export function SupervisedF3Panel() {
                         {item.symbol ?? item.payload.instrumentId.slice(0, 8)}
                       </span>
                       {country ? (
-                        <span className="text-muted-foreground"> · {country}</span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {country}
+                        </span>
                       ) : null}
-                      {' · '}
+                      {" · "}
                       {item.payload.action}
-                      {' · '}
+                      {" · "}
                       <span className="text-muted-foreground">
                         {supervisedQueueOriginLabel(origin)}
                       </span>
@@ -525,13 +559,13 @@ export function SupervisedF3Panel() {
               }
               title={
                 canExecute
-                  ? 'Ejecuta en DEMO las propuestas marcadas (SEMI)'
-                  : 'Pasa el libro a SEMI para ejecutar'
+                  ? "Ejecuta en DEMO las propuestas marcadas (SEMI)"
+                  : "Pasa el libro a SEMI para ejecutar"
               }
               onClick={() => confirmSelected.mutate()}
             >
               {confirmSelected.isPending
-                ? 'Ejecutando lote…'
+                ? "Ejecutando lote…"
                 : `Confirmar seleccionadas + ejecutar (${selectedCount})`}
             </button>
           </div>
@@ -540,8 +574,9 @@ export function SupervisedF3Panel() {
         {activeHm && pending ? (
           <div className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-2 space-y-2 text-[11px]">
             <p className="leading-snug text-foreground">
-              <strong>H ≠ M</strong> en {activeHm.symbol ?? activeHm.instrumentId.slice(0, 8)}:{' '}
-              Finalistas <strong>{activeHm.h.payload.action}</strong> vs Radar{' '}
+              <strong>H ≠ M</strong> en{" "}
+              {activeHm.symbol ?? activeHm.instrumentId.slice(0, 8)}: Finalistas{" "}
+              <strong>{activeHm.h.payload.action}</strong> vs Radar{" "}
               <strong>{activeHm.m.payload.action}</strong>. Elige cuál Confirm.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -563,23 +598,25 @@ export function SupervisedF3Panel() {
           </div>
         ) : null}
 
-        {activeOrigin === 'finalists' && pending && !activeHm ? (
+        {activeOrigin === "finalists" && pending && !activeHm ? (
           <p className="rounded-md border border-primary/35 bg-primary/5 px-3 py-2 text-[11px] leading-snug text-foreground">
-            <strong>H · Finalistas</strong> (Camino C / SEMI). Si el momento Radar discrepa,
-            elige en Confirm (aceptar, ajustar qty o rechazar). Siguiente: Confirmar + ejecutar.
+            <strong>H · Finalistas</strong> (Camino C / SEMI). Si el momento
+            Radar discrepa, elige en Confirm (aceptar, ajustar qty o rechazar).
+            Siguiente: Confirmar + ejecutar.
           </p>
         ) : null}
-        {activeOrigin === 'alarm' && pending && !activeHm ? (
+        {activeOrigin === "alarm" && pending && !activeHm ? (
           <p className="rounded-md border border-amber-500/35 bg-amber-500/5 px-3 py-2 text-[11px] leading-snug text-foreground">
-            <strong>M · Momento (Radar)</strong>. Contrasta con Finalistas del valor si los hay.
-            Tú decides en Confirm.
+            <strong>M · Momento (Radar)</strong>. Contrasta con Finalistas del
+            valor si los hay. Tú decides en Confirm.
           </p>
         ) : null}
 
         {!canExecute ? (
           <p className="rounded-md border border-border px-3 py-2 text-[11px] text-muted-foreground">
-            Libro en <strong>{bookMode.toUpperCase()}</strong>: puedes proponer e inspeccionar, pero
-            la ejecución DEMO solo en <strong>SEMI</strong> (rail Coach → Libro DEMO).
+            Libro en <strong>{bookMode.toUpperCase()}</strong>: puedes proponer
+            e inspeccionar, pero la ejecución DEMO solo en <strong>SEMI</strong>{" "}
+            (rail Coach → Libro DEMO).
           </p>
         ) : null}
 
@@ -594,7 +631,7 @@ export function SupervisedF3Panel() {
               {instrumentsForSelect.map((inst) => (
                 <option key={inst.id} value={inst.id}>
                   {inst.symbol}
-                  {inst.name ? ` — ${inst.name}` : ''}
+                  {inst.name ? ` — ${inst.name}` : ""}
                 </option>
               ))}
             </select>
@@ -608,7 +645,9 @@ export function SupervisedF3Panel() {
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Precio (vacío = último close)</span>
+            <span className="text-xs text-muted-foreground">
+              Precio (vacío = último close)
+            </span>
             <input
               className="rounded-md border border-border bg-background px-2 py-1.5"
               value={price}
@@ -658,7 +697,7 @@ export function SupervisedF3Panel() {
             disabled={propose.isPending || !effectiveAccountId || !instrumentId}
             onClick={() => propose.mutate()}
           >
-            {propose.isPending ? 'Evaluando…' : 'Proponer Recommendation'}
+            {propose.isPending ? "Evaluando…" : "Proponer Recommendation"}
           </button>
           <button
             type="button"
@@ -674,10 +713,14 @@ export function SupervisedF3Panel() {
             disabled={
               !pending ||
               confirm.isPending ||
-              pending.action === 'wait' ||
+              pending.action === "wait" ||
               !canExecute
             }
-            title={canExecute ? 'Ejecutar en DEMO (SEMI)' : 'Cambia a SEMI en Libro DEMO'}
+            title={
+              canExecute
+                ? "Ejecutar en DEMO (SEMI)"
+                : "Cambia a SEMI en Libro DEMO"
+            }
             onClick={() => confirm.mutate(true)}
           >
             Confirmar + ejecutar
@@ -747,10 +790,14 @@ export function SupervisedF3Panel() {
         {pending ? (
           <div className="rounded-md border border-dashed border-border px-3 py-2 text-xs space-y-1">
             <p>
-              <span className="font-medium text-foreground">Recommendation</span>
-              {' · '}
+              <span className="font-medium text-foreground">
+                Recommendation
+              </span>
+              {" · "}
               {pending.recommendationId} · <strong>{pending.action}</strong>
-              {pending.suggestedPrice != null ? ` @ ${pending.suggestedPrice}` : ''}
+              {pending.suggestedPrice != null
+                ? ` @ ${pending.suggestedPrice}`
+                : ""}
             </p>
             {pending.weightContext ? (
               <div className="rounded border border-border/60 bg-muted/30 px-2 py-1.5 space-y-1">
@@ -758,24 +805,29 @@ export function SupervisedF3Panel() {
                   Fusión Runtime
                   {pending.combinedScore != null
                     ? ` · score ${pending.combinedScore.toFixed(3)}`
-                    : ''}
+                    : ""}
                 </p>
                 <p className="text-muted-foreground">
-                  {pending.weightContext.horizon} · {pending.weightContext.regime}
-                  {' · '}v{pending.weightContext.ruleVersion}
+                  {pending.weightContext.horizon} ·{" "}
+                  {pending.weightContext.regime}
+                  {" · "}v{pending.weightContext.ruleVersion}
                 </p>
                 <p className="text-muted-foreground">
-                  TA {(pending.weightContext.weights.ta * 100).toFixed(0)}% · FUND{' '}
-                  {(pending.weightContext.weights.fund * 100).toFixed(0)}% · Macro{' '}
-                  {(pending.weightContext.weights.macro * 100).toFixed(0)}% · News{' '}
-                  {(pending.weightContext.weights.news * 100).toFixed(0)}%
+                  TA {(pending.weightContext.weights.ta * 100).toFixed(0)}% ·
+                  FUND {(pending.weightContext.weights.fund * 100).toFixed(0)}%
+                  · Macro{" "}
+                  {(pending.weightContext.weights.macro * 100).toFixed(0)}% ·
+                  News {(pending.weightContext.weights.news * 100).toFixed(0)}%
                 </p>
                 {pending.weightContext.rationale ? (
-                  <p className="text-[10px] text-muted-foreground/90">{pending.weightContext.rationale}</p>
+                  <p className="text-[10px] text-muted-foreground/90">
+                    {pending.weightContext.rationale}
+                  </p>
                 ) : null}
                 {pending.weightContext.missingAssessments?.length ? (
                   <p className="text-[10px] text-amber-700 dark:text-amber-400">
-                    Faltan: {pending.weightContext.missingAssessments.join(', ')} (peso
+                    Faltan:{" "}
+                    {pending.weightContext.missingAssessments.join(", ")} (peso
                     redistribuido)
                   </p>
                 ) : null}
@@ -783,11 +835,13 @@ export function SupervisedF3Panel() {
             ) : null}
             {pending.decisionSession?.sessionId ? (
               <p className="text-muted-foreground">
-                DecisionSession:{' '}
-                <code className="text-[10px]">{pending.decisionSession.sessionId}</code>
-                {' · '}
+                DecisionSession:{" "}
+                <code className="text-[10px]">
+                  {pending.decisionSession.sessionId}
+                </code>
+                {" · "}
                 {pending.decisionSession.kind}/{pending.decisionSession.status}
-                {' · '}
+                {" · "}
                 <button
                   type="button"
                   className="text-[10px] text-primary underline-offset-2 hover:underline"
@@ -795,9 +849,9 @@ export function SupervisedF3Panel() {
                     const sessionId = pending.decisionSession?.sessionId;
                     if (!sessionId) return;
                     window.dispatchEvent(
-                      new CustomEvent('bolsa:open-help', {
+                      new CustomEvent("bolsa:open-help", {
                         detail: {
-                          section: 'value-analysis',
+                          section: "value-analysis",
                           sessionId,
                         },
                       }),
@@ -811,20 +865,29 @@ export function SupervisedF3Panel() {
             {pending.policyGate?.status ? (
               <p className="text-muted-foreground">
                 Policy Gate: {pending.policyGate.status}
-                {pending.policyGate.message ? ` — ${pending.policyGate.message}` : ''}
+                {pending.policyGate.message
+                  ? ` — ${pending.policyGate.message}`
+                  : ""}
               </p>
             ) : null}
             {(pending.assessments as AssessmentV1[] | undefined)?.length ? (
               <p className="text-muted-foreground">
-                Assessments: {(pending.assessments as AssessmentV1[]).map((a) => a.type).join(', ')}
+                Assessments:{" "}
+                {(pending.assessments as AssessmentV1[])
+                  .map((a) => a.type)
+                  .join(", ")}
               </p>
             ) : null}
             {pending.decisionSession?.predictions?.length ? (
               <p className="text-muted-foreground">
-                Prediction: {pending.decisionSession.predictions.length} (no decide) ·{' '}
+                Prediction: {pending.decisionSession.predictions.length} (no
+                decide) ·{" "}
                 {String(
-                  (pending.decisionSession.predictions[0] as { modelId?: string })?.modelId ??
-                    'model',
+                  (
+                    pending.decisionSession.predictions[0] as {
+                      modelId?: string;
+                    }
+                  )?.modelId ?? "model",
                 )}
               </p>
             ) : null}
