@@ -1,7 +1,7 @@
 # M5/§M0.6.2 — Higiene de formato legacy (prettier) por lotes aislados — SALIDA / RELEVO
 
 **Fecha:** 2026-08-11 · **Rama:** `stage/estudio-membership-operativa-2026-08-04`
-**HEAD:** `4300674` (árbol limpio y sincronizado con `origin`)
+**HEAD:** `e498c68` (árbol limpio y sincronizado con `origin`)
 
 > Este documento es el **punto de entrada del siguiente hilo** que retome esta línea.
 > Consolida la estrategia, el protocolo de 8 pasos, el avance real (lotes 1-18) y los próximos dominios.
@@ -53,7 +53,7 @@ formatee masivamente el estilo antiguo en el diff editorial).
 > archivos del dominio. **Los commits `--no-verify` requieren la aprobación del usuario** en la tarjeta nativa de
 > auto-review (flujo ya validado para los 9 lotes).
 
-## 4. Estado de avance real (2026-08-11, HEAD `5bec6ed`)
+## 4. Estado de avance real (2026-08-11, HEAD `e498c68`)
 
 | Lote | Commit | Dominio | Ficheros con contenido real |
 |------|--------|---------|-----------------------------|
@@ -146,6 +146,7 @@ lógica por dominio funcional, cada uno **≤ ~30 archivos**:
 ## 6. Documentos fuente de verdad / índices
 
 - `docs/engineering/traspaso-higiene-formato-legacy-entrada-2026-08-10.md` (ENTRADA original; protocolo + estrategia).
+- `docs/engineering/relevo-higiene-formato-lotes-24-27-2026-08-11.md` (RELEVO del hilo: estado verificado HEAD `e498c68`, protocolo 8 pasos + encodificación, dominios pendientes, docs a tocar).
 - `docs/engineering/dev-continuation-plan-2026-08-09.md` (§7.6.i → registro detallado de cada lote).
 - `docs/engineering/engineering-index-2026-08-03.md` (índice; este documento anclado).
 - `docs/engineering/traspaso-m5-frontend-2026-08-10.md` (§7 nota de cierre M5).
