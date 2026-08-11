@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { BarChart3, Lock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuthStore } from '@/stores/auth-store';
+import { useState } from "react";
+import { BarChart3, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuthStore } from "@/stores/auth-store";
 
 export function LoginPage() {
   const login = useAuthStore((s) => s.login);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +17,7 @@ export function LoginPage() {
     try {
       await login(password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error de acceso');
+      setError(err instanceof Error ? err.message : "Error de acceso");
     } finally {
       setLoading(false);
     }
@@ -31,7 +31,9 @@ export function LoginPage() {
             <BarChart3 className="h-6 w-6 text-primary" />
           </div>
           <CardTitle className="text-xl">Bolsa V1</CardTitle>
-          <p className="text-sm text-muted-foreground">Plataforma de análisis bursátil</p>
+          <p className="text-sm text-muted-foreground">
+            Plataforma de análisis bursátil
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -53,8 +55,12 @@ export function LoginPage() {
               </div>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading || !password}>
-              {loading ? 'Accediendo…' : 'Acceder'}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || !password}
+            >
+              {loading ? "Accediendo…" : "Acceder"}
             </Button>
           </form>
         </CardContent>

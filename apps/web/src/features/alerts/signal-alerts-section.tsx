@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RotateCcw, Trash2, Zap } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RotateCcw, Trash2, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ALERT_CHANNEL_LABELS,
   BACKTEST_STRATEGIES,
@@ -11,40 +11,55 @@ import {
   type BacktestStrategyType,
   type SignalAlertSubscriptionDto,
   type SignalKind,
-} from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { formatPrice } from "@/features/charts/chart-utils";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
-type StrategySource = 'preset' | 'saved';
+type StrategySource = "preset" | "saved";
 
-const kindOptions: SignalKind[] = ['entry_long', 'exit', 'entry_short', 'watch'];
-const channelOptions: AlertChannelType[] = ['toast', 'webhook', 'email'];
+const kindOptions: SignalKind[] = [
+  "entry_long",
+  "exit",
+  "entry_short",
+  "watch",
+];
+const channelOptions: AlertChannelType[] = ["toast", "webhook", "email"];
 
 export function SignalAlertsSection() {
   const queryClient = useQueryClient();
-  const [instrumentId, setInstrumentId] = useState('');
-  const [strategySource, setStrategySource] = useState<StrategySource>('preset');
-  const [presetKey, setPresetKey] = useState<BacktestStrategyType>('sma_crossover');
-  const [savedStrategyId, setSavedStrategyId] = useState('');
-  const [note, setNote] = useState('');
-  const [kinds, setKinds] = useState<SignalKind[]>(['entry_long', 'exit']);
-  const [channels, setChannels] = useState<AlertChannelType[]>([...DEFAULT_ALERT_CHANNELS]);
-  const [webhookUrl, setWebhookUrl] = useState('');
-  const [emailTo, setEmailTo] = useState('');
+  const [instrumentId, setInstrumentId] = useState("");
+  const [strategySource, setStrategySource] =
+    useState<StrategySource>("preset");
+  const [presetKey, setPresetKey] =
+    useState<BacktestStrategyType>("sma_crossover");
+  const [savedStrategyId, setSavedStrategyId] = useState("");
+  const [note, setNote] = useState("");
+  const [kinds, setKinds] = useState<SignalKind[]>(["entry_long", "exit"]);
+  const [channels, setChannels] = useState<AlertChannelType[]>([
+    ...DEFAULT_ALERT_CHANNELS,
+  ]);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [emailTo, setEmailTo] = useState("");
 
   const instrumentsQuery = useQuery({
-    queryKey: ['instruments'],
+    queryKey: ["instruments"],
     queryFn: api.getInstruments,
   });
 
   const strategiesQuery = useQuery({
-    queryKey: ['strategies'],
+    queryKey: ["strategies"],
     queryFn: api.getStrategies,
   });
 
   const signalAlertsQuery = useQuery({
-    queryKey: ['signal-alerts'],
+    queryKey: ["signal-alerts"],
     queryFn: () => api.getSignalAlerts(),
     refetchInterval: 30_000,
   });
@@ -52,26 +67,29 @@ export function SignalAlertsSection() {
   const createMutation = useMutation({
     mutationFn: api.createSignalAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['signal-alerts'] });
-      setNote('');
+      void queryClient.invalidateQueries({ queryKey: ["signal-alerts"] });
+      setNote("");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: api.deleteSignalAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['signal-alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ["signal-alerts"] });
     },
   });
 
   const resetMutation = useMutation({
     mutationFn: api.resetSignalAlertDedupe,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['signal-alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ["signal-alerts"] });
     },
   });
 
-  const instruments = useMemo(() => instrumentsQuery.data?.data ?? [], [instrumentsQuery.data?.data]);
+  const instruments = useMemo(
+    () => instrumentsQuery.data?.data ?? [],
+    [instrumentsQuery.data?.data],
+  );
   const strategies = strategiesQuery.data?.data ?? [];
   const subscriptions = signalAlertsQuery.data?.data ?? [];
 
@@ -79,13 +97,18 @@ export function SignalAlertsSection() {
     () =>
       [...instruments]
         .sort((a, b) => a.symbol.localeCompare(b.symbol))
-        .map((item) => ({ id: item.id, label: `${item.symbol} — ${item.name}` })),
+        .map((item) => ({
+          id: item.id,
+          label: `${item.symbol} — ${item.name}`,
+        })),
     [instruments],
   );
 
   function toggleKind(kind: SignalKind) {
     setKinds((current) =>
-      current.includes(kind) ? current.filter((item) => item !== kind) : [...current, kind],
+      current.includes(kind)
+        ? current.filter((item) => item !== kind)
+        : [...current, kind],
     );
   }
 
@@ -102,18 +125,18 @@ export function SignalAlertsSection() {
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
     if (!instrumentId || kinds.length === 0) return;
-    if (strategySource === 'saved' && !savedStrategyId) return;
-    if (channels.includes('webhook') && !webhookUrl.trim()) return;
-    if (channels.includes('email') && !emailTo.trim()) return;
+    if (strategySource === "saved" && !savedStrategyId) return;
+    if (channels.includes("webhook") && !webhookUrl.trim()) return;
+    if (channels.includes("email") && !emailTo.trim()) return;
 
     createMutation.mutate({
       instrumentId,
       signalKinds: kinds,
       channels,
-      webhookUrl: channels.includes('webhook') ? webhookUrl.trim() : undefined,
-      emailTo: channels.includes('email') ? emailTo.trim() : undefined,
+      webhookUrl: channels.includes("webhook") ? webhookUrl.trim() : undefined,
+      emailTo: channels.includes("email") ? emailTo.trim() : undefined,
       note: note.trim() || undefined,
-      ...(strategySource === 'saved'
+      ...(strategySource === "saved"
         ? { strategyDefinitionId: savedStrategyId }
         : { presetKey }),
     });
@@ -127,7 +150,8 @@ export function SignalAlertsSection() {
           Alertas de estrategia
         </CardTitle>
         <CardDescription>
-          Señales en cierre de barra — toast en app, webhook JSON o email (SC-6).
+          Señales en cierre de barra — toast en app, webhook JSON o email
+          (SC-6).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -150,19 +174,23 @@ export function SignalAlertsSection() {
           </label>
 
           <fieldset className="space-y-2 md:col-span-2">
-            <legend className="text-xs font-medium text-muted-foreground">Estrategia</legend>
+            <legend className="text-xs font-medium text-muted-foreground">
+              Estrategia
+            </legend>
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="radio"
-                checked={strategySource === 'preset'}
-                onChange={() => setStrategySource('preset')}
+                checked={strategySource === "preset"}
+                onChange={() => setStrategySource("preset")}
               />
               Preset
             </label>
-            {strategySource === 'preset' && (
+            {strategySource === "preset" && (
               <select
                 value={presetKey}
-                onChange={(e) => setPresetKey(e.target.value as BacktestStrategyType)}
+                onChange={(e) =>
+                  setPresetKey(e.target.value as BacktestStrategyType)
+                }
                 className="ml-6 w-[calc(100%-1.5rem)] rounded-md border border-border bg-background px-2 py-1.5 text-sm"
               >
                 {Object.entries(BACKTEST_STRATEGIES).map(([key, meta]) => (
@@ -175,12 +203,12 @@ export function SignalAlertsSection() {
             <label className="flex items-center gap-2 text-sm">
               <input
                 type="radio"
-                checked={strategySource === 'saved'}
-                onChange={() => setStrategySource('saved')}
+                checked={strategySource === "saved"}
+                onChange={() => setStrategySource("saved")}
               />
               Guardada
             </label>
-            {strategySource === 'saved' && (
+            {strategySource === "saved" && (
               <select
                 value={savedStrategyId}
                 onChange={(e) => setSavedStrategyId(e.target.value)}
@@ -220,7 +248,10 @@ export function SignalAlertsSection() {
             </legend>
             <div className="flex flex-wrap gap-2">
               {channelOptions.map((channel) => (
-                <label key={channel} className="flex items-center gap-1 text-xs">
+                <label
+                  key={channel}
+                  className="flex items-center gap-1 text-xs"
+                >
                   <input
                     type="checkbox"
                     checked={channels.includes(channel)}
@@ -232,7 +263,7 @@ export function SignalAlertsSection() {
             </div>
           </fieldset>
 
-          {channels.includes('webhook') && (
+          {channels.includes("webhook") && (
             <label className="flex flex-col gap-1 text-xs md:col-span-2">
               Webhook URL
               <input
@@ -246,7 +277,7 @@ export function SignalAlertsSection() {
             </label>
           )}
 
-          {channels.includes('email') && (
+          {channels.includes("email") && (
             <label className="flex flex-col gap-1 text-xs md:col-span-2">
               Email destino
               <input
@@ -276,7 +307,7 @@ export function SignalAlertsSection() {
               disabled={createMutation.isPending || kinds.length === 0}
               className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
-              {createMutation.isPending ? 'Creando…' : 'Suscribir alerta'}
+              {createMutation.isPending ? "Creando…" : "Suscribir alerta"}
             </button>
             {createMutation.isError && (
               <span className="ml-3 text-xs text-red-400">
@@ -287,11 +318,15 @@ export function SignalAlertsSection() {
         </form>
 
         {signalAlertsQuery.isLoading && (
-          <p className="text-sm text-muted-foreground">Cargando suscripciones…</p>
+          <p className="text-sm text-muted-foreground">
+            Cargando suscripciones…
+          </p>
         )}
 
         {!signalAlertsQuery.isLoading && subscriptions.length === 0 && (
-          <p className="text-sm text-muted-foreground">No hay suscripciones activas.</p>
+          <p className="text-sm text-muted-foreground">
+            No hay suscripciones activas.
+          </p>
         )}
 
         {subscriptions.length > 0 && (
@@ -343,7 +378,7 @@ function SignalAlertRow({
   const strategyLabel =
     subscription.presetKey != null
       ? BACKTEST_STRATEGIES[subscription.presetKey].label
-      : (subscription.strategyDefinitionId?.slice(0, 8) ?? '—');
+      : (subscription.strategyDefinitionId?.slice(0, 8) ?? "—");
 
   return (
     <tr className="border-b border-border/60">
@@ -360,29 +395,38 @@ function SignalAlertRow({
       </td>
       <td className="py-2 pr-3 text-xs">{strategyLabel}</td>
       <td className="py-2 pr-3 text-xs">
-        {subscription.signalKinds.map((kind) => SIGNAL_KIND_LABELS[kind]).join(', ')}
+        {subscription.signalKinds
+          .map((kind) => SIGNAL_KIND_LABELS[kind])
+          .join(", ")}
       </td>
       <td className="py-2 pr-3 text-xs">
-        {subscription.channels.map((channel) => ALERT_CHANNEL_LABELS[channel]).join(', ')}
+        {subscription.channels
+          .map((channel) => ALERT_CHANNEL_LABELS[channel])
+          .join(", ")}
         {subscription.webhookUrl && (
-          <p className="truncate text-[10px] text-muted-foreground" title={subscription.webhookUrl}>
+          <p
+            className="truncate text-[10px] text-muted-foreground"
+            title={subscription.webhookUrl}
+          >
             {subscription.webhookUrl}
           </p>
         )}
         {subscription.emailTo && (
-          <p className="text-[10px] text-muted-foreground">{subscription.emailTo}</p>
+          <p className="text-[10px] text-muted-foreground">
+            {subscription.emailTo}
+          </p>
         )}
       </td>
       <td className="py-2 pr-3 text-xs text-muted-foreground">
         {subscription.lastTriggeredAt && subscription.lastSignalKind ? (
           <>
-            {SIGNAL_KIND_LABELS[subscription.lastSignalKind]} ·{' '}
+            {SIGNAL_KIND_LABELS[subscription.lastSignalKind]} ·{" "}
             {formatPrice(subscription.lastSignalPrice ?? 0)}
             <br />
-            {new Date(subscription.lastTriggeredAt).toLocaleString('es-ES')}
+            {new Date(subscription.lastTriggeredAt).toLocaleString("es-ES")}
           </>
         ) : (
-          '—'
+          "—"
         )}
       </td>
       <td className="py-2 text-right">

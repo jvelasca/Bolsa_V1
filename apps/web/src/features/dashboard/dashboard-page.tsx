@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   FlaskConical,
@@ -10,21 +10,27 @@ import {
   Settings2,
   TrendingUp,
   Wallet,
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { formatLedgerEntryLabel } from '@bolsa/shared';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { formatLedgerEntryLabel } from "@bolsa/shared";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   accountTypeShortLabel,
   useActivateAccount,
   useActiveAccount,
-} from '@/features/accounts/use-active-account';
-import { HELP_CONTENT_AS_OF } from '@/features/help/help-content-as-of';
-import { DataSyncSummaryCard } from '@/features/settings/data-sync-summary-card';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { useUiStore } from '@/stores/ui-store';
+} from "@/features/accounts/use-active-account";
+import { HELP_CONTENT_AS_OF } from "@/features/help/help-content-as-of";
+import { DataSyncSummaryCard } from "@/features/settings/data-sync-summary-card";
+import { formatPrice } from "@/features/charts/chart-utils";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useUiStore } from "@/stores/ui-store";
 
 function Metric({
   label,
@@ -35,32 +41,35 @@ function Metric({
   label: string;
   value: string;
   hint?: string;
-  tone?: 'positive' | 'negative';
+  tone?: "positive" | "negative";
 }) {
   return (
     <div className="rounded-md border border-border/60 bg-background/40 px-3 py-2">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
         className={cn(
-          'mt-0.5 text-lg font-semibold tabular-nums tracking-tight',
-          tone === 'positive' && 'text-emerald-400',
-          tone === 'negative' && 'text-red-400',
+          "mt-0.5 text-lg font-semibold tabular-nums tracking-tight",
+          tone === "positive" && "text-emerald-400",
+          tone === "negative" && "text-red-400",
         )}
       >
         {value}
       </p>
-      {hint ? <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p> : null}
+      {hint ? (
+        <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
 
 function ActiveAccountPanel() {
-  const { account, effectiveAccountId, accounts, isLoading } = useActiveAccount();
+  const { account, effectiveAccountId, accounts, isLoading } =
+    useActiveAccount();
   const activate = useActivateAccount();
   const openWizard = useUiStore((s) => s.openCreateAccountWizard);
 
   const summaryQuery = useQuery({
-    queryKey: ['account-summary', effectiveAccountId],
+    queryKey: ["account-summary", effectiveAccountId],
     queryFn: async () => {
       if (!effectiveAccountId) return null;
       return (await api.getAccountSummary(effectiveAccountId)).data;
@@ -70,7 +79,7 @@ function ActiveAccountPanel() {
   });
 
   const summary = summaryQuery.data;
-  const openAccounts = accounts.filter((a) => a.status === 'active');
+  const openAccounts = accounts.filter((a) => a.status === "active");
   const otherAccounts = openAccounts.filter((a) => a.id !== effectiveAccountId);
 
   return (
@@ -85,15 +94,20 @@ function ActiveAccountPanel() {
           ) : account ? (
             <>
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-xl font-semibold tracking-tight">{account.name}</h3>
+                <h3 className="truncate text-xl font-semibold tracking-tight">
+                  {account.name}
+                </h3>
                 <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                   {accountTypeShortLabel(account.type)}
                 </span>
-                <span className="text-sm text-muted-foreground">{account.currency}</span>
+                <span className="text-sm text-muted-foreground">
+                  {account.currency}
+                </span>
               </div>
               <p className="max-w-xl text-sm text-muted-foreground">
-                Con esta cuenta opera toda la app (Trading, barra inferior, órdenes e historial). Se
-                restaura al reabrir. El resto son cuentas disponibles para cambiar cuando quieras.
+                Con esta cuenta opera toda la app (Trading, barra inferior,
+                órdenes e historial). Se restaura al reabrir. El resto son
+                cuentas disponibles para cambiar cuando quieras.
               </p>
             </>
           ) : (
@@ -122,23 +136,33 @@ function ActiveAccountPanel() {
 
       {account && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          <Metric label="Patrimonio" value={summary ? formatPrice(summary.totalEquity) : '—'} />
-          <Metric label="Capital disponible" value={summary ? formatPrice(summary.cash) : '—'} />
+          <Metric
+            label="Patrimonio"
+            value={summary ? formatPrice(summary.totalEquity) : "—"}
+          />
+          <Metric
+            label="Capital disponible"
+            value={summary ? formatPrice(summary.cash) : "—"}
+          />
           <Metric
             label="Beneficio no realizado"
-            value={summary ? formatPrice(summary.totalUnrealizedPnl) : '—'}
+            value={summary ? formatPrice(summary.totalUnrealizedPnl) : "—"}
             tone={
               summary
                 ? summary.totalUnrealizedPnl >= 0
-                  ? 'positive'
-                  : 'negative'
+                  ? "positive"
+                  : "negative"
                 : undefined
             }
           />
           <Metric
             label="Posiciones abiertas"
-            value={summary ? String(summary.positionsCount) : '—'}
-            hint={summary ? `Margen libre ${formatPrice(summary.freeMargin)}` : undefined}
+            value={summary ? String(summary.positionsCount) : "—"}
+            hint={
+              summary
+                ? `Margen libre ${formatPrice(summary.freeMargin)}`
+                : undefined
+            }
           />
         </div>
       )}
@@ -220,7 +244,7 @@ function RecentLedgerCard() {
   const { account, effectiveAccountId } = useActiveAccount();
 
   const ledgerQuery = useQuery({
-    queryKey: ['ledger', effectiveAccountId],
+    queryKey: ["ledger", effectiveAccountId],
     queryFn: async () => {
       if (!effectiveAccountId) return [];
       return (await api.getAccountLedger(effectiveAccountId, 8)).data;
@@ -239,7 +263,7 @@ function RecentLedgerCard() {
             <CardDescription>
               {account
                 ? `Ledger de «${account.name}» (cuenta activa)`
-                : 'Ledger de la cuenta activa'}
+                : "Ledger de la cuenta activa"}
             </CardDescription>
           </div>
           <Link to="/history" className="text-xs text-primary hover:underline">
@@ -248,7 +272,9 @@ function RecentLedgerCard() {
         </div>
       </CardHeader>
       <CardContent>
-        {ledgerQuery.isLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+        {ledgerQuery.isLoading && (
+          <p className="text-sm text-muted-foreground">Cargando…</p>
+        )}
         {!ledgerQuery.isLoading && entries.length === 0 && (
           <p className="text-sm text-muted-foreground">
             Sin movimientos. Cuando operes o deposites, aparecerán aquí.
@@ -262,15 +288,20 @@ function RecentLedgerCard() {
                 className="flex items-center justify-between gap-2 border-b border-border/60 pb-2 last:border-0"
               >
                 <span className="min-w-0 truncate">
-                  <span className="font-medium">{formatLedgerEntryLabel(entry)}</span>
+                  <span className="font-medium">
+                    {formatLedgerEntryLabel(entry)}
+                  </span>
                   {entry.symbol ? (
-                    <span className="text-muted-foreground"> · {entry.symbol}</span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {entry.symbol}
+                    </span>
                   ) : null}
                 </span>
                 <span
                   className={cn(
-                    'shrink-0 tabular-nums',
-                    entry.amount >= 0 ? 'text-emerald-400' : 'text-red-400',
+                    "shrink-0 tabular-nums",
+                    entry.amount >= 0 ? "text-emerald-400" : "text-red-400",
                   )}
                 >
                   {formatPrice(entry.amount)}
@@ -293,7 +324,8 @@ function ResearchHighlights() {
             Investigación · sync {HELP_CONTENT_AS_OF}
           </h3>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Últimas mejoras: embudo Backtesting y motor de análisis fundamental (FIE).
+            Últimas mejoras: embudo Backtesting y motor de análisis fundamental
+            (FIE).
           </p>
         </div>
         <p className="text-[11px] text-muted-foreground">
@@ -317,35 +349,40 @@ function ResearchHighlights() {
               </Link>
             </div>
             <CardDescription>
-              Análisis técnico · Análisis fundamental · Play · Lista AUTO · Finalistas
+              Análisis técnico · Análisis fundamental · Play · Lista AUTO ·
+              Finalistas
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <ul className="list-disc space-y-1.5 pl-4">
               <li>
-                <span className="text-foreground">Análisis técnico</span>: gráfico, replay, equity y
-                trades (Detalle clásico, sin FA mezclado).
+                <span className="text-foreground">Análisis técnico</span>:
+                gráfico, replay, equity y trades (Detalle clásico, sin FA
+                mezclado).
               </li>
               <li>
-                <span className="text-foreground">Análisis fundamental</span>: Tarjeta Valor completa
-                (ratios, Composite, filings).
+                <span className="text-foreground">Análisis fundamental</span>:
+                Tarjeta Valor completa (ratios, Composite, filings).
               </li>
               <li>
-                <span className="text-foreground">Play</span>: genéricas → Coach → Lab → revalidar →
-                Finalistas (TOP solo si el Lab mejora).
+                <span className="text-foreground">Play</span>: genéricas → Coach
+                → Lab → revalidar → Finalistas (TOP solo si el Lab mejora).
               </li>
               <li>
-                <span className="text-foreground">Lista AUTO</span>: mismo ciclo × ticker; omitir si
-                Finalistas frescos; progreso en el footer de Trading.
+                <span className="text-foreground">Lista AUTO</span>: mismo ciclo
+                × ticker; omitir si Finalistas frescos; progreso en el footer de
+                Trading.
               </li>
               <li>
-                Finalistas: <span className="text-foreground">Checklist</span> = paper manual (A) ·{' '}
-                <span className="text-foreground">Proponer</span> = Supervisado F3 (C). Distintos.
+                Finalistas: <span className="text-foreground">Checklist</span> =
+                paper manual (A) ·{" "}
+                <span className="text-foreground">Proponer</span> = Supervisado
+                F3 (C). Distintos.
               </li>
             </ul>
             <p className="text-[11px] leading-relaxed">
-              No es predicción ni auto de producción. Paper D (execute) es otra puerta, off por
-              defecto.
+              No es predicción ni auto de producción. Paper D (execute) es otra
+              puerta, off por defecto.
             </p>
           </CardContent>
         </Card>
@@ -355,7 +392,9 @@ function ResearchHighlights() {
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Landmark className="h-5 w-5 text-primary" />
-                <CardTitle className="text-base">Análisis fundamental</CardTitle>
+                <CardTitle className="text-base">
+                  Análisis fundamental
+                </CardTitle>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Link
@@ -376,31 +415,39 @@ function ResearchHighlights() {
               </div>
             </div>
             <CardDescription>
-              FIE cerrado en código · fase prueba APP · Python calcula, LLM solo explica
+              FIE cerrado en código · fase prueba APP · Python calcula, LLM solo
+              explica
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-muted-foreground">
             <ul className="list-disc space-y-1.5 pl-4">
               <li>
-                <span className="text-foreground">Tarjeta Valor</span>: Score_FUND, Piotroski, ROIC,
-                Beneish, Graham, DCF bear/base/bull, CAPM/WACC, Composite.
+                <span className="text-foreground">Tarjeta Valor</span>:
+                Score_FUND, Piotroski, ROIC, Beneish, Graham, DCF
+                bear/base/bull, CAPM/WACC, Composite.
               </li>
               <li>
-                Filings (upload / SEC / RAG) para contexto —{' '}
-                <span className="text-foreground">no</span> alimentan Score_FUND ni el gate.
+                Filings (upload / SEC / RAG) para contexto —{" "}
+                <span className="text-foreground">no</span> alimentan Score_FUND
+                ni el gate.
               </li>
               <li>
-                Embudo FA: <span className="text-foreground">Screener FA</span> → whitelist →{' '}
-                <span className="text-foreground">Paper D</span> (propose dry-run; execute con env).
+                Embudo FA: <span className="text-foreground">Screener FA</span>{" "}
+                → whitelist → <span className="text-foreground">Paper D</span>{" "}
+                (propose dry-run; execute con env).
               </li>
               <li>
-                Yahoo: balance vía timeseries si el quoteSummary llega vacío; cobertura uneven en
-                bancos (null-if-incomplete).
+                Yahoo: balance vía timeseries si el quoteSummary llega vacío;
+                cobertura uneven en bancos (null-if-incomplete).
               </li>
             </ul>
             <p className="text-[11px] leading-relaxed">
-              Verificar: <code className="rounded bg-muted px-1">pnpm test:fa</code> · cobertura:{' '}
-              <code className="rounded bg-muted px-1">pnpm audit:fa:coverage</code>
+              Verificar:{" "}
+              <code className="rounded bg-muted px-1">pnpm test:fa</code> ·
+              cobertura:{" "}
+              <code className="rounded bg-muted px-1">
+                pnpm audit:fa:coverage
+              </code>
             </p>
           </CardContent>
         </Card>
@@ -414,43 +461,48 @@ function NextStepsCard() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Por dónde seguir</CardTitle>
-        <CardDescription>Flujo habitual: cuenta → trading → research → paper</CardDescription>
+        <CardDescription>
+          Flujo habitual: cuenta → trading → research → paper
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         <ol className="list-decimal space-y-2 pl-4">
           <li>
-            Confirma la <span className="text-foreground">cuenta activa</span> arriba (o en la barra
-            inferior).
+            Confirma la <span className="text-foreground">cuenta activa</span>{" "}
+            arriba (o en la barra inferior).
           </li>
           <li>
-            Abre{' '}
+            Abre{" "}
             <Link to="/trading" className="text-primary hover:underline">
               Trading
-            </Link>{' '}
+            </Link>{" "}
             para gráficos, listas y órdenes simuladas.
           </li>
           <li>
-            En{' '}
+            En{" "}
             <Link to="/backtests" className="text-primary hover:underline">
               Backtesting
             </Link>
-            : Play (o Lista AUTO) hasta Finalistas; revisa la{' '}
+            : Play (o Lista AUTO) hasta Finalistas; revisa la{" "}
             <span className="text-foreground">Tarjeta Valor</span> del ticker.
           </li>
           <li>
-            En{' '}
+            En{" "}
             <Link to="/screeners" className="text-primary hover:underline">
               Screeners
             </Link>
-            : Screener FA → whitelist → Paper D dry-run (execute solo con{' '}
-            <code className="rounded bg-muted px-1 text-[11px]">PAPER_D_EXECUTE=1</code>).
+            : Screener FA → whitelist → Paper D dry-run (execute solo con{" "}
+            <code className="rounded bg-muted px-1 text-[11px]">
+              PAPER_D_EXECUTE=1
+            </code>
+            ).
           </li>
           <li>
-            Revisa P&amp;L en{' '}
+            Revisa P&amp;L en{" "}
             <Link to="/operations" className="text-primary hover:underline">
               Operaciones
-            </Link>{' '}
-            o{' '}
+            </Link>{" "}
+            o{" "}
             <Link to="/accounts" className="text-primary hover:underline">
               Cuentas
             </Link>
@@ -466,7 +518,7 @@ export function OverviewPage() {
   const openConfig = useUiStore((s) => s.openPlatformConfig);
 
   const healthQuery = useQuery({
-    queryKey: ['health'],
+    queryKey: ["health"],
     queryFn: api.getHealth,
   });
 
@@ -476,7 +528,8 @@ export function OverviewPage() {
         <div className="max-w-2xl space-y-1">
           <h2 className="text-2xl font-semibold tracking-tight">Overview</h2>
           <p className="text-sm text-muted-foreground">
-            Cuenta activa, patrimonio y atajos a Trading, Backtesting y análisis fundamental.
+            Cuenta activa, patrimonio y atajos a Trading, Backtesting y análisis
+            fundamental.
           </p>
           {healthQuery.isError && (
             <p className="mt-2 text-sm text-destructive">
@@ -548,7 +601,7 @@ export function OverviewPage() {
             title="Configuración"
             description="Workspace, sync de datos y preferencias de la plataforma."
             icon={Settings2}
-            onClick={() => openConfig('general')}
+            onClick={() => openConfig("general")}
           />
         </div>
       </div>

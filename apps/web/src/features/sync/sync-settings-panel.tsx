@@ -1,39 +1,51 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
-import { api } from '@/lib/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
+import { api } from "@/lib/api";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
-export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) {
+export function SyncSettingsPanel({
+  embedded = false,
+}: {
+  embedded?: boolean;
+}) {
   const queryClient = useQueryClient();
 
   const settingsQuery = useQuery({
-    queryKey: ['sync-settings'],
+    queryKey: ["sync-settings"],
     queryFn: async () => (await api.getSyncSettings()).data,
   });
 
   const queueQuery = useQuery({
-    queryKey: ['sync-queue'],
+    queryKey: ["sync-queue"],
     queryFn: async () => (await api.getSyncQueue()).data,
     refetchInterval: 30_000,
   });
 
   const updateMutation = useMutation({
-    mutationFn: (patch: Parameters<typeof api.updateSyncSettings>[0]) => api.updateSyncSettings(patch),
+    mutationFn: (patch: Parameters<typeof api.updateSyncSettings>[0]) =>
+      api.updateSyncSettings(patch),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sync-settings'] });
-      void queryClient.invalidateQueries({ queryKey: ['sync-queue'] });
+      void queryClient.invalidateQueries({ queryKey: ["sync-settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["sync-queue"] });
     },
   });
 
   const enqueueMutation = useMutation({
     mutationFn: () => api.enqueueStaleInstruments(),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sync-queue'] }),
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: ["sync-queue"] }),
   });
 
   const settings = settingsQuery.data;
   const queue = queueQuery.data ?? [];
-  const pendingCount = queue.filter((item) => item.status === 'pending').length;
+  const pendingCount = queue.filter((item) => item.status === "pending").length;
 
   if (!settings) {
     const loading = (
@@ -73,12 +85,16 @@ export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) 
             className="rounded border border-border bg-background px-2 py-1"
             value={settings.scanIntervalMinutes}
             onChange={(e) =>
-              updateMutation.mutate({ scanIntervalMinutes: Number(e.target.value) })
+              updateMutation.mutate({
+                scanIntervalMinutes: Number(e.target.value),
+              })
             }
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">Pausa entre peticiones (s)</span>
+          <span className="text-muted-foreground">
+            Pausa entre peticiones (s)
+          </span>
           <input
             type="number"
             min={1}
@@ -98,11 +114,15 @@ export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) 
             max={20}
             className="rounded border border-border bg-background px-2 py-1"
             value={settings.maxRetries}
-            onChange={(e) => updateMutation.mutate({ maxRetries: Number(e.target.value) })}
+            onChange={(e) =>
+              updateMutation.mutate({ maxRetries: Number(e.target.value) })
+            }
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-muted-foreground">Backoff reintentos (min)</span>
+          <span className="text-muted-foreground">
+            Backoff reintentos (min)
+          </span>
           <input
             type="number"
             min={5}
@@ -110,21 +130,29 @@ export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) 
             className="rounded border border-border bg-background px-2 py-1"
             value={settings.retryBackoffMinutes}
             onChange={(e) =>
-              updateMutation.mutate({ retryBackoffMinutes: Number(e.target.value) })
+              updateMutation.mutate({
+                retryBackoffMinutes: Number(e.target.value),
+              })
             }
           />
         </label>
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="text-muted-foreground">Universo a mantener fresco</span>
+        <span className="text-muted-foreground">
+          Universo a mantener fresco
+        </span>
         <select
           className="rounded border border-border bg-background px-2 py-1"
-          value={settings.scope === 'all' ? 'stale' : settings.scope}
+          value={settings.scope === "all" ? "stale" : settings.scope}
           onChange={(e) => updateMutation.mutate({ scope: e.target.value })}
         >
-          <option value="lists">Solo valores en listas (recomendado / defecto)</option>
-          <option value="stale">Todos los instrumentos activos desfasados</option>
+          <option value="lists">
+            Solo valores en listas (recomendado / defecto)
+          </option>
+          <option value="stale">
+            Todos los instrumentos activos desfasados
+          </option>
         </select>
       </label>
 
@@ -132,16 +160,19 @@ export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) 
         <input
           type="checkbox"
           checked={settings.postMarketOnly}
-          onChange={(e) => updateMutation.mutate({ postMarketOnly: e.target.checked })}
+          onChange={(e) =>
+            updateMutation.mutate({ postMarketOnly: e.target.checked })
+          }
         />
         Solo procesar cola tras cierre de mercado (17:35 Madrid)
       </label>
 
       <p className="text-xs text-muted-foreground">
-        Por defecto solo se encolan valores que estánén en alguna lista (universo de rastreadores). El worker
-        procesa ~1 valor cada 15 s + la pausa entre peticiones, y Yahoo lleva su propio throttle — no satura
-        el proveedor. Si falla un sync, el ítem reintenta con backoff. XTB no escribe histórico; solo cotización
-        live / validación.
+        Por defecto solo se encolan valores que estánén en alguna lista
+        (universo de rastreadores). El worker procesa ~1 valor cada 15 s + la
+        pausa entre peticiones, y Yahoo lleva su propio throttle — no satura el
+        proveedor. Si falla un sync, el ítem reintenta con backoff. XTB no
+        escribe histórico; solo cotización live / validación.
       </p>
 
       <button
@@ -150,7 +181,9 @@ export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) 
         className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 hover:bg-accent"
         onClick={() => void enqueueMutation.mutateAsync()}
       >
-        <RefreshCw className={cn('h-4 w-4', enqueueMutation.isPending && 'animate-spin')} />
+        <RefreshCw
+          className={cn("h-4 w-4", enqueueMutation.isPending && "animate-spin")}
+        />
         Encolar valores desactualizados ahora
       </button>
 
@@ -172,7 +205,7 @@ export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) 
                   <td className="px-2 py-1">{item.status}</td>
                   <td className="px-2 py-1">{item.attempts}</td>
                   <td className="hidden px-2 py-1 sm:table-cell">
-                    {new Date(item.scheduledAt).toLocaleString('es-ES')}
+                    {new Date(item.scheduledAt).toLocaleString("es-ES")}
                   </td>
                 </tr>
               ))}
@@ -192,7 +225,8 @@ export function SyncSettingsPanel({ embedded = false }: { embedded?: boolean }) 
       <CardHeader>
         <CardTitle>Actualización automática de datos</CardTitle>
         <CardDescription>
-          Cola con reintentos espaciados para evitar límites de Yahoo. {pendingCount} en cola.
+          Cola con reintentos espaciados para evitar límites de Yahoo.{" "}
+          {pendingCount} en cola.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">{body}</CardContent>

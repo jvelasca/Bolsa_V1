@@ -1,16 +1,20 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
-import { formatSignalAlertToast, SIGNAL_KIND_LABELS, type AlertPriceSource } from '@bolsa/shared';
-import { api } from '@/lib/api';
-import { useAlertsStore } from '@/stores/alerts-store';
-import { formatPrice } from '@/features/charts/chart-utils';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+import {
+  formatSignalAlertToast,
+  SIGNAL_KIND_LABELS,
+  type AlertPriceSource,
+} from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { useAlertsStore } from "@/stores/alerts-store";
+import { formatPrice } from "@/features/charts/chart-utils";
 
 const DAILY_INTERVAL_MS = 20_000;
 const XTB_INTERVAL_MS = 10_000;
 
 const priceSourceLabels: Record<AlertPriceSource, string> = {
-  daily_close: 'cierre',
-  xtb_last: 'XTB',
+  daily_close: "cierre",
+  xtb_last: "XTB",
 };
 
 export function AlertsMonitor() {
@@ -20,18 +24,20 @@ export function AlertsMonitor() {
   const seenSignalTriggered = useRef<Set<string>>(new Set());
 
   const activeQuery = useQuery({
-    queryKey: ['alerts', 'active'],
+    queryKey: ["alerts", "active"],
     queryFn: () => api.getAlerts(true),
   });
 
   const signalAlertsQuery = useQuery({
-    queryKey: ['signal-alerts', 'active'],
+    queryKey: ["signal-alerts", "active"],
     queryFn: () => api.getSignalAlerts(true),
   });
 
   const activeAlerts = activeQuery.data?.data ?? [];
   const activeSignalAlerts = signalAlertsQuery.data?.data ?? [];
-  const hasXtbAlerts = activeAlerts.some((alert) => alert.priceSource === 'xtb_last');
+  const hasXtbAlerts = activeAlerts.some(
+    (alert) => alert.priceSource === "xtb_last",
+  );
   const evaluateIntervalMs = hasXtbAlerts ? XTB_INTERVAL_MS : DAILY_INTERVAL_MS;
 
   const evaluateMutation = useMutation({
@@ -42,13 +48,14 @@ export function AlertsMonitor() {
           continue;
         }
         seenPriceTriggered.current.add(alert.id);
-        const direction = alert.condition === 'above' ? 'superó' : 'cayó por debajo de';
+        const direction =
+          alert.condition === "above" ? "superó" : "cayó por debajo de";
         const source = priceSourceLabels[alert.priceSource];
         pushToast(
           `${alert.symbol} (${source}): ${direction} ${formatPrice(alert.targetPrice)} (precio ${formatPrice(alert.triggeredPrice ?? 0)})`,
         );
       }
-      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
   });
 
@@ -61,18 +68,18 @@ export function AlertsMonitor() {
           continue;
         }
         seenSignalTriggered.current.add(dedupeKey);
-        if (hit.subscription.channels.includes('toast')) {
+        if (hit.subscription.channels.includes("toast")) {
           pushToast(formatSignalAlertToast(hit, SIGNAL_KIND_LABELS));
         }
       }
       for (const dispatch of result.dispatches ?? []) {
         if (!dispatch.ok) {
           pushToast(
-            `Canal ${dispatch.channel} falló (${dispatch.subscriptionId.slice(0, 8)}): ${dispatch.error ?? 'error'}`,
+            `Canal ${dispatch.channel} falló (${dispatch.subscriptionId.slice(0, 8)}): ${dispatch.error ?? "error"}`,
           );
         }
       }
-      void queryClient.invalidateQueries({ queryKey: ['signal-alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ["signal-alerts"] });
     },
   });
 
@@ -82,7 +89,12 @@ export function AlertsMonitor() {
   // fetch/mutate). Meterlas como deps del setInterval reiniciaba el timer en
   // cada evaluate -> bucle infinito de GET/POST de alertas. Se accede a la
   // versión actual via refs y se conserva un intervalo estable.
-  const apiRef = useRef({ activeQuery, signalAlertsQuery, evaluateMutation, evaluateSignalMutation });
+  const apiRef = useRef({
+    activeQuery,
+    signalAlertsQuery,
+    evaluateMutation,
+    evaluateSignalMutation,
+  });
   apiRef.current = {
     activeQuery,
     signalAlertsQuery,
@@ -94,8 +106,12 @@ export function AlertsMonitor() {
     if (activeCount === 0) {
       return;
     }
-    const { activeQuery: aq, signalAlertsQuery: saq, evaluateMutation: em, evaluateSignalMutation: esm } =
-      apiRef.current;
+    const {
+      activeQuery: aq,
+      signalAlertsQuery: saq,
+      evaluateMutation: em,
+      evaluateSignalMutation: esm,
+    } = apiRef.current;
     void aq.refetch();
     void saq.refetch();
     void em.mutate();

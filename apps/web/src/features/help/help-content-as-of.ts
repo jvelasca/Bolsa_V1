@@ -63,4 +63,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = '2026-08-06' as const;
+export const HELP_CONTENT_AS_OF = "2026-08-06" as const;

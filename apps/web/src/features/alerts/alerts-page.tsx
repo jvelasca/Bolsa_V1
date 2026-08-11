@@ -1,89 +1,108 @@
-import type { AlertCondition, AlertPriceSource, PriceAlertDto } from '@bolsa/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, RotateCcw, Trash2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { api } from '@/lib/api';
-import { formatPrice } from '@/features/charts/chart-utils';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import { SignalAlertsSection } from '@/features/alerts/signal-alerts-section';
+import type {
+  AlertCondition,
+  AlertPriceSource,
+  PriceAlertDto,
+} from "@bolsa/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, RotateCcw, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { api } from "@/lib/api";
+import { formatPrice } from "@/features/charts/chart-utils";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+import { SignalAlertsSection } from "@/features/alerts/signal-alerts-section";
 
 const conditionLabels: Record<AlertCondition, string> = {
-  above: 'Por encima de',
-  below: 'Por debajo de',
+  above: "Por encima de",
+  below: "Por debajo de",
 };
 
 const priceSourceLabels: Record<AlertPriceSource, string> = {
-  daily_close: 'Cierre diario (Yahoo)',
-  xtb_last: 'XTB tiempo real',
+  daily_close: "Cierre diario (Yahoo)",
+  xtb_last: "XTB tiempo real",
 };
 
-type AlertFilter = 'active' | 'history' | 'all';
+type AlertFilter = "active" | "history" | "all";
 
 export function AlertsPage() {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const preselectedInstrumentId = searchParams.get('instrumentId') ?? '';
+  const preselectedInstrumentId = searchParams.get("instrumentId") ?? "";
 
   const [instrumentId, setInstrumentId] = useState(preselectedInstrumentId);
-  const [condition, setCondition] = useState<AlertCondition>('above');
-  const [priceSource, setPriceSource] = useState<AlertPriceSource>('daily_close');
-  const [targetPrice, setTargetPrice] = useState('');
-  const [note, setNote] = useState('');
-  const [filter, setFilter] = useState<AlertFilter>('active');
+  const [condition, setCondition] = useState<AlertCondition>("above");
+  const [priceSource, setPriceSource] =
+    useState<AlertPriceSource>("daily_close");
+  const [targetPrice, setTargetPrice] = useState("");
+  const [note, setNote] = useState("");
+  const [filter, setFilter] = useState<AlertFilter>("active");
 
   const instrumentsQuery = useQuery({
-    queryKey: ['instruments'],
+    queryKey: ["instruments"],
     queryFn: api.getInstruments,
   });
 
   const alertsQuery = useQuery({
-    queryKey: ['alerts'],
+    queryKey: ["alerts"],
     queryFn: () => api.getAlerts(),
     refetchInterval: 30_000,
   });
 
   const marketQuery = useQuery({
-    queryKey: ['market-providers'],
+    queryKey: ["market-providers"],
     queryFn: api.getMarketProviders,
     staleTime: 60_000,
   });
 
-  const xtbProvider = marketQuery.data?.data.find((provider) => provider.id === 'xtb');
+  const xtbProvider = marketQuery.data?.data.find(
+    (provider) => provider.id === "xtb",
+  );
   const xtbReady = Boolean(xtbProvider?.enabled && xtbProvider.healthy);
 
   const createMutation = useMutation({
     mutationFn: api.createAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
-      setTargetPrice('');
-      setNote('');
+      void queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      setTargetPrice("");
+      setNote("");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: api.deleteAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
   });
 
   const reactivateMutation = useMutation({
     mutationFn: api.reactivateAlert,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      void queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
   });
 
-  const instruments = useMemo(() => instrumentsQuery.data?.data ?? [], [instrumentsQuery.data?.data]);
-  const alerts = useMemo(() => alertsQuery.data?.data ?? [], [alertsQuery.data?.data]);
+  const instruments = useMemo(
+    () => instrumentsQuery.data?.data ?? [],
+    [instrumentsQuery.data?.data],
+  );
+  const alerts = useMemo(
+    () => alertsQuery.data?.data ?? [],
+    [alertsQuery.data?.data],
+  );
 
   const filteredAlerts = useMemo(() => {
-    if (filter === 'active') {
+    if (filter === "active") {
       return alerts.filter((alert) => alert.isActive);
     }
-    if (filter === 'history') {
+    if (filter === "history") {
       return alerts.filter((alert) => !alert.isActive);
     }
     return alerts;
@@ -93,13 +112,16 @@ export function AlertsPage() {
     () =>
       [...instruments]
         .sort((a, b) => a.symbol.localeCompare(b.symbol))
-        .map((item) => ({ id: item.id, label: `${item.symbol} — ${item.name}` })),
+        .map((item) => ({
+          id: item.id,
+          label: `${item.symbol} — ${item.name}`,
+        })),
     [instruments],
   );
 
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
-    const price = Number.parseFloat(targetPrice.replace(',', '.'));
+    const price = Number.parseFloat(targetPrice.replace(",", "."));
     if (!instrumentId || !Number.isFinite(price) || price <= 0) {
       return;
     }
@@ -120,7 +142,8 @@ export function AlertsPage() {
           Alertas de precio
         </h2>
         <p className="text-sm text-muted-foreground">
-          Notificaciones por cierre diario (Yahoo) o cotización XTB en tiempo real.
+          Notificaciones por cierre diario (Yahoo) o cotización XTB en tiempo
+          real.
         </p>
       </div>
 
@@ -132,7 +155,10 @@ export function AlertsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleCreate} className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+          <form
+            onSubmit={handleCreate}
+            className="grid gap-3 md:grid-cols-2 lg:grid-cols-5"
+          >
             <label className="flex flex-col gap-1 text-xs md:col-span-2">
               Instrumento
               <select
@@ -164,10 +190,14 @@ export function AlertsPage() {
               Fuente de precio
               <select
                 value={priceSource}
-                onChange={(e) => setPriceSource(e.target.value as AlertPriceSource)}
+                onChange={(e) =>
+                  setPriceSource(e.target.value as AlertPriceSource)
+                }
                 className="rounded border border-border bg-background px-2 py-1.5 text-sm"
               >
-                <option value="daily_close">{priceSourceLabels.daily_close}</option>
+                <option value="daily_close">
+                  {priceSourceLabels.daily_close}
+                </option>
                 <option value="xtb_last">{priceSourceLabels.xtb_last}</option>
               </select>
             </label>
@@ -192,10 +222,11 @@ export function AlertsPage() {
                 className="rounded border border-border bg-background px-2 py-1.5 text-sm"
               />
             </label>
-            {priceSource === 'xtb_last' && !xtbReady && (
+            {priceSource === "xtb_last" && !xtbReady && (
               <p className="text-xs text-amber-400 md:col-span-2 lg:col-span-5">
-                XTB no disponible ({xtbProvider?.message ?? 'sin bridge'}). La alerta se creará pero
-                no se evaluará hasta que el bridge esté activo.
+                XTB no disponible ({xtbProvider?.message ?? "sin bridge"}). La
+                alerta se creará pero no se evaluará hasta que el bridge esté
+                activo.
               </p>
             )}
             <div className="flex items-end md:col-span-2 lg:col-span-5">
@@ -204,7 +235,7 @@ export function AlertsPage() {
                 disabled={createMutation.isPending}
                 className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
               >
-                {createMutation.isPending ? 'Creando…' : 'Crear alerta'}
+                {createMutation.isPending ? "Creando…" : "Crear alerta"}
               </button>
               {createMutation.isError && (
                 <span className="ml-3 text-xs text-red-400">
@@ -222,15 +253,15 @@ export function AlertsPage() {
         <CardHeader>
           <CardTitle className="text-base">Alertas configuradas</CardTitle>
           <CardDescription>
-            {alerts.filter((a) => a.isActive).length} activas ·{' '}
+            {alerts.filter((a) => a.isActive).length} activas ·{" "}
             {alerts.filter((a) => !a.isActive).length} en historial
           </CardDescription>
           <div className="flex gap-1 pt-2">
             {(
               [
-                ['active', 'Activas'],
-                ['history', 'Historial'],
-                ['all', 'Todas'],
+                ["active", "Activas"],
+                ["history", "Historial"],
+                ["all", "Todas"],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -238,8 +269,10 @@ export function AlertsPage() {
                 type="button"
                 onClick={() => setFilter(value)}
                 className={cn(
-                  'rounded px-2 py-1 text-xs',
-                  filter === value ? 'bg-primary text-primary-foreground' : 'hover:bg-accent',
+                  "rounded px-2 py-1 text-xs",
+                  filter === value
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-accent",
                 )}
               >
                 {label}
@@ -253,7 +286,9 @@ export function AlertsPage() {
           )}
           {!alertsQuery.isLoading && filteredAlerts.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              {filter === 'history' ? 'No hay alertas disparadas.' : 'No hay alertas en esta vista.'}
+              {filter === "history"
+                ? "No hay alertas disparadas."
+                : "No hay alertas en esta vista."}
             </p>
           )}
           {filteredAlerts.length > 0 && (
@@ -307,22 +342,31 @@ function AlertRow({
   return (
     <tr className="border-b border-border/60">
       <td className="py-2 pr-3">
-        <Link to={`/instruments/${alert.instrumentId}`} className="font-medium hover:text-primary">
+        <Link
+          to={`/instruments/${alert.instrumentId}`}
+          className="font-medium hover:text-primary"
+        >
           {alert.symbol}
         </Link>
-        {alert.note && <p className="text-xs text-muted-foreground">{alert.note}</p>}
+        {alert.note && (
+          <p className="text-xs text-muted-foreground">{alert.note}</p>
+        )}
       </td>
-      <td className="py-2 pr-3 text-xs">{priceSourceLabels[alert.priceSource]}</td>
+      <td className="py-2 pr-3 text-xs">
+        {priceSourceLabels[alert.priceSource]}
+      </td>
       <td className="py-2 pr-3">{conditionLabels[alert.condition]}</td>
       <td className="py-2 pr-3">{formatPrice(alert.targetPrice)}</td>
       <td className="py-2 pr-3">
         <span
           className={cn(
-            'rounded px-1.5 py-0.5 text-xs',
-            alert.isActive ? 'bg-emerald-500/15 text-emerald-400' : 'bg-muted text-muted-foreground',
+            "rounded px-1.5 py-0.5 text-xs",
+            alert.isActive
+              ? "bg-emerald-500/15 text-emerald-400"
+              : "bg-muted text-muted-foreground",
           )}
         >
-          {alert.isActive ? 'Activa' : 'Disparada'}
+          {alert.isActive ? "Activa" : "Disparada"}
         </span>
       </td>
       <td className="py-2 pr-3 text-xs text-muted-foreground">
@@ -330,10 +374,10 @@ function AlertRow({
           <>
             {formatPrice(alert.triggeredPrice ?? 0)}
             <br />
-            {new Date(alert.triggeredAt).toLocaleString('es-ES')}
+            {new Date(alert.triggeredAt).toLocaleString("es-ES")}
           </>
         ) : (
-          '—'
+          "—"
         )}
       </td>
       <td className="py-2 text-right">

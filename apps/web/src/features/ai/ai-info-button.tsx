@@ -2,15 +2,15 @@
  * Botón compacto «IA» → diálogo informativo (qué hace / qué no / enlace Ayuda).
  */
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import {
   AI_INFO_SURFACES,
   type AiInfoSurfaceId,
-} from '@/features/ai/ai-info-catalog';
-import { openHelpAiPlatform } from '@/stores/supervised-f3-queue-store';
-import { cn } from '@/lib/utils';
+} from "@/features/ai/ai-info-catalog";
+import { openHelpAiPlatform } from "@/stores/supervised-f3-queue-store";
+import { cn } from "@/lib/utils";
 
 type Props = {
   surface: AiInfoSurfaceId;
@@ -19,7 +19,7 @@ type Props = {
   label?: string;
 };
 
-export function AiInfoButton({ surface, className, label = 'IA' }: Props) {
+export function AiInfoButton({ surface, className, label = "IA" }: Props) {
   const [open, setOpen] = useState(false);
   const info = AI_INFO_SURFACES[surface];
 
@@ -30,7 +30,7 @@ export function AiInfoButton({ surface, className, label = 'IA' }: Props) {
         variant="ghost"
         size="sm"
         className={cn(
-          'h-6 shrink-0 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground',
+          "h-6 shrink-0 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground",
           className,
         )}
         title={`Qué hace la IA aquí · ${info.title}`}

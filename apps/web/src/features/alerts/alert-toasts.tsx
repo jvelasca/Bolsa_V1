@@ -1,13 +1,13 @@
-import { Bell, X } from 'lucide-react';
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { openHelpBacktesting } from '@/features/backtests/core-r-status';
+import { Bell, X } from "lucide-react";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { openHelpBacktesting } from "@/features/backtests/core-r-status";
 import {
   useAlertsStore,
   type AlertToast,
   type AlertToastAction,
-} from '@/stores/alerts-store';
-import { cn } from '@/lib/utils';
+} from "@/stores/alerts-store";
+import { cn } from "@/lib/utils";
 
 const AUTO_DISMISS_MS = 12_000;
 
@@ -34,12 +34,12 @@ function runToastAction(
   action: AlertToastAction,
   navigate: ReturnType<typeof useNavigate>,
 ): void {
-  if (action.type === 'open_help_backtesting_monitor') {
-    openHelpBacktesting({ panel: 'monitor' });
+  if (action.type === "open_help_backtesting_monitor") {
+    openHelpBacktesting({ panel: "monitor" });
     return;
   }
-  if (action.type === 'open_asesor_opiniones') {
-    navigate('/research?tab=opiniones');
+  if (action.type === "open_asesor_opiniones") {
+    navigate("/research?tab=opiniones");
   }
 }
 
@@ -60,13 +60,15 @@ function AlertToastItem({
   const action = toast.action;
   const actionLabel =
     action?.label ??
-    (action?.type === 'open_asesor_opiniones' ? 'Ver Opiniones' : 'Abrir Monitor');
+    (action?.type === "open_asesor_opiniones"
+      ? "Ver Opiniones"
+      : "Abrir Monitor");
 
   return (
     <div
       className={cn(
-        'pointer-events-auto flex items-start gap-2 rounded-md border border-amber-500/40',
-        'bg-card/95 p-3 text-sm shadow-lg backdrop-blur',
+        "pointer-events-auto flex items-start gap-2 rounded-md border border-amber-500/40",
+        "bg-card/95 p-3 text-sm shadow-lg backdrop-blur",
       )}
     >
       <Bell className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
