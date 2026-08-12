@@ -32,41 +32,15 @@ jobs:
         run: uv run ruff check packages/py apps/api-python --config pyproject.toml
 
       - name: Mypy
-        # Deuda tipado preexistente en main (~450 errores). No bloquea merge;
-        # gate duro = Ruff + pytest + Mypy scoped per-fase (abajo).
-        continue-on-error: true
+        # P1.6 por fases COMPLETADO (2026-08-12): deuda preexistente (~448)
+        # limpiada en domain/market/infrastructure/apps-api-python. Gate
+        # BLOQUEANTE full-tree (0 errores); cualquier nuevo error rompe CI.
         run: >
           uv run mypy
           packages/py/domain/src
           packages/py/market/src
           packages/py/infrastructure/src
           apps/api-python/src
-          --follow-imports=silent
-
-      - name: Mypy — gate scoped F4+F5b (bloqueante)
-        # F4 (arquitectura Python): gate mypy duro SOLO sobre los ficheros nuevos/tocados
-        # en la fase que quedan tipo-limpios (P0.6 + ruff gates). El resto del árbol
-        # mantiene continue-on-error hasta su fase (P1.6 por fases, decisión pactada).
-        # + F5b (backend/seguridad): rate_limit (nuevo), health y ohlcv_repository
-        # quedan mypy-clean y se suman al gate.
-        run: >
-          uv run mypy
-          packages/py/domain/src/bolsa_domain/entities/market_event.py
-          packages/py/domain/src/bolsa_domain/value_objects/excerpt.py
-          packages/py/market/src/bolsa_market/news_snapshot.py
-          packages/py/market/src/bolsa_market/filing_store.py
-          packages/py/analytics/src/bolsa_analytics/knowledge/filing_summary.py
-          packages/py/analytics/src/bolsa_analytics/knowledge/news_assessment.py
-          packages/py/analytics/src/bolsa_analytics/cognitive/__init__.py
-          packages/py/infrastructure/alembic/env.py
-          packages/py/infrastructure/alembic/versions/001_timescaledb_extension.py
-          packages/py/infrastructure/src/bolsa_infrastructure/database/account_migration.py
-          packages/py/infrastructure/src/bolsa_infrastructure/database/migrations.py
-          packages/py/infrastructure/src/bolsa_infrastructure/database/repositories/portfolio_repository.py
-          apps/api-python/src/bolsa_api/api/v1/routes/portfolio.py
-          apps/api-python/src/bolsa_api/middleware/rate_limit.py
-          apps/api-python/src/bolsa_api/api/v1/routes/health.py
-          packages/py/infrastructure/src/bolsa_infrastructure/database/repositories/ohlcv_repository.py
           --follow-imports=silent
 
       - name: Pytest
