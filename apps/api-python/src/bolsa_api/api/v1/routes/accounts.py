@@ -108,7 +108,7 @@ async def create_account(
         )
         selected = ip.selected_policy_template_id or suggested
         profile_name = (ip.name or "").strip() or f"Perfil · {account.name}".strip()[:80]
-        profile = await CreateInvestorProfile(profile_store).execute(
+        profile = await CreateInvestorProfile(profile_store).execute(  # type: ignore[arg-type]
             name=profile_name,
             horizon=ip.horizon,
             objectives=list(ip.objectives),
@@ -126,7 +126,7 @@ async def create_account(
             raise HTTPException(status_code=400, detail="Perfil inversor no encontrado")
         await profile_store.assign_to_account(account.id, body.active_profile_id)
     else:
-        await EnsureDefaultInvestorProfile(profile_store).execute(account.id, account.name)
+        await EnsureDefaultInvestorProfile(profile_store).execute(account.id, account.name)  # type: ignore[arg-type]
     account = await get_get_account_use_case(session).execute(account.id)
     return AccountResponseDto(data=to_investment_account_dto(account))
 

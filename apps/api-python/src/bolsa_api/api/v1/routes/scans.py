@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_api.api.dependencies import (
     get_db_session,
     get_enqueue_scan_job_use_case,
@@ -29,7 +30,7 @@ from bolsa_api.schemas.scans import (
 from bolsa_api.schemas.signals_evaluate import SignalEventV1Dto
 from bolsa_application.scan_jobs import EnqueueScanJob, GetScanJob, ListScanJobs
 from bolsa_application.scan_manifests import GetScanManifest, PersistScanManifest
-from bolsa_application.scans import RunScan
+from bolsa_application.scans import RunScan, ScanRunResult
 from bolsa_domain.platform_kernel import (
     validate_kernel_timeframe,
     validate_scan_bar_limit,
@@ -52,7 +53,7 @@ def _validate_scan_request(body: ScanRunRequestDto) -> None:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-def _to_signal_dto(event) -> SignalEventV1Dto:
+def _to_signal_dto(event: SignalEventV1) -> SignalEventV1Dto:
     return SignalEventV1Dto(
         id=event.id,
         instrument_id=event.instrument_id,
@@ -68,7 +69,9 @@ def _to_signal_dto(event) -> SignalEventV1Dto:
     )
 
 
-def _run_result_dto(result, *, alarm_route: dict | None = None) -> ScanRunResultDto:
+def _run_result_dto(
+    result: ScanRunResult, *, alarm_route: dict[str, Any] | None = None
+) -> ScanRunResultDto:
     return ScanRunResultDto(
         scan_id=result.scan_id,
         scanned_count=result.scanned_count,

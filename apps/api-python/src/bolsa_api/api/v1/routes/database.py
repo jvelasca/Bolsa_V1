@@ -1,6 +1,6 @@
 """API: estado BD y purgas administrativas."""
 
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -119,7 +119,7 @@ async def purge_closed_simulated_accounts(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> PurgeClosedAccountsResponseDto:
     raw = await get_purge_closed_simulated_accounts_use_case(session).execute(limit=body.limit)
-    skipped_raw = raw.get("skipped") or []
+    skipped_raw = cast(list[object], raw.get("skipped") or [])
     skipped = [
         PurgeClosedAccountSkippedDto(
             account_id=str(item["accountId"]),
@@ -131,8 +131,8 @@ async def purge_closed_simulated_accounts(
     ]
     return PurgeClosedAccountsResponseDto(
         data=PurgeClosedAccountsResultDto(
-            purged_ids=list(raw.get("purgedIds") or []),
+            purged_ids=list(cast(list[str], raw.get("purgedIds") or [])),
             skipped=skipped,
-            scanned=int(raw.get("scanned") or 0),
+            scanned=int(cast(int, raw.get("scanned") or 0)),
         )
     )
