@@ -21,7 +21,10 @@ interface AuthState {
 
 async function fetchAuthStatus(): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), AUTH_STATUS_TIMEOUT_MS);
+  const timeout = window.setTimeout(
+    () => controller.abort(),
+    AUTH_STATUS_TIMEOUT_MS,
+  );
   try {
     return await fetch(`${API_URL}/api/auth/status`, {
       signal: controller.signal,

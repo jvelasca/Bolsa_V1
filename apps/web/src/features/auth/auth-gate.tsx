@@ -74,7 +74,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [bootAttempt, setBootAttempt] = useState(0);
 
   useEffect(() => {
-    const fallback = setTimeout(() => {
+    const fallback = window.setTimeout(() => {
       useAuthStore.getState().setHydrated();
     }, 2_000);
     return () => clearTimeout(fallback);

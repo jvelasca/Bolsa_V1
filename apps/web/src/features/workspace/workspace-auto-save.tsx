@@ -8,7 +8,7 @@ export function WorkspaceAutoSave() {
   const hydrated = useWorkspaceStore((s) => s.hydrated);
   const workspaceUpdatedAt = useWorkspaceStore((s) => s.workspace.updatedAt);
   const requestAutoSave = useWorkspaceStore((s) => s.requestAutoSave);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const flush = () => {
@@ -25,7 +25,7 @@ export function WorkspaceAutoSave() {
   useEffect(() => {
     if (!hydrated || !isDirty || !autoSave) return;
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
+    timerRef.current = window.setTimeout(() => {
       timerRef.current = null;
       requestAutoSave();
     }, 50);

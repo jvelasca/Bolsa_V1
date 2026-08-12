@@ -30,7 +30,7 @@ import {
 import { useAlertsStore } from "@/stores/alerts-store";
 import { getActiveAccountId } from "@/stores/active-account-store";
 
-let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let syncTimer: number | null = null;
 const hydratedAccounts = new Set<string>();
 let pushWired = false;
 
@@ -163,7 +163,7 @@ export function scheduleCoreRPush(accountId?: string | null): void {
   const id = accountId ?? getActiveAccountId();
   if (!id) return;
   if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
+  syncTimer = window.setTimeout(() => {
     void pushCoreRToServer(id);
   }, 450);
 }

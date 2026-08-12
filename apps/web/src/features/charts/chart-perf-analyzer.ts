@@ -104,12 +104,12 @@ let sessionStart = 0;
 let sessionLog: PerfLogEntry[] = [];
 let sessionRollups: PerfRollup[] = [];
 let droppedEntries: CounterMap = {};
-let rollupTimer: ReturnType<typeof setInterval> | null = null;
+let rollupTimer: number | null = null;
 let rollupBaseline: PerfState | null = null;
 let lastSessionReport: PerfSessionReport | null = null;
 
 let hudNode: HTMLDivElement | null = null;
-let hudTimer: ReturnType<typeof setInterval> | null = null;
+let hudTimer: number | null = null;
 let installed = false;
 
 function isVerboseDebug(): boolean {
@@ -226,7 +226,7 @@ function ensureHud(show: boolean): void {
     "position:fixed;bottom:8px;left:8px;z-index:99999;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,.78);color:#9ef;font:11px/1.35 ui-monospace,monospace;white-space:pre;pointer-events:none;max-width:340px";
   document.body.appendChild(hudNode);
   renderHud();
-  hudTimer = setInterval(renderHud, 1000);
+  hudTimer = window.setInterval(renderHud, 1000);
 }
 
 function buildSessionReport(): PerfSessionReport {
@@ -354,7 +354,7 @@ export function bolsaPerfStart(): void {
   snapshotRollup();
 
   if (rollupTimer) clearInterval(rollupTimer);
-  rollupTimer = setInterval(snapshotRollup, 1000);
+  rollupTimer = window.setInterval(snapshotRollup, 1000);
 
   ensureHud(true);
   console.info(

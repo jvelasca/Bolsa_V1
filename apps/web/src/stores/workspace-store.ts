@@ -183,9 +183,9 @@ function newChartTabId(): string {
     .slice(2, 8)}`;
 }
 
-let drawingAutoSaveTimer: ReturnType<typeof setTimeout> | null = null;
-let settingsPersistTimer: ReturnType<typeof setTimeout> | null = null;
-let workspaceServerSaveTimer: ReturnType<typeof setTimeout> | null = null;
+let drawingAutoSaveTimer: number | null = null;
+let settingsPersistTimer: number | null = null;
+let workspaceServerSaveTimer: number | null = null;
 let saveQueued = false;
 
 /** Debounce único para autosave al servidor (M7). */
@@ -281,7 +281,7 @@ function flushDrawingAutoSave(get: () => WorkspaceState, immediate = false) {
     requestWorkspaceAutoSave(get, true);
     return;
   }
-  drawingAutoSaveTimer = setTimeout(() => {
+  drawingAutoSaveTimer = window.setTimeout(() => {
     drawingAutoSaveTimer = null;
     requestWorkspaceAutoSave(get);
   }, 450);
@@ -305,7 +305,7 @@ function requestWorkspaceAutoSave(
     return;
   }
 
-  workspaceServerSaveTimer = setTimeout(() => {
+  workspaceServerSaveTimer = window.setTimeout(() => {
     workspaceServerSaveTimer = null;
     const current = get();
     if (!current.hydrated || !current.workspace.preferences.autoSave) return;
@@ -343,7 +343,7 @@ function scheduleWorkspaceSettingsPersist(
     run();
     return;
   }
-  settingsPersistTimer = setTimeout(() => {
+  settingsPersistTimer = window.setTimeout(() => {
     settingsPersistTimer = null;
     run();
   }, 500);

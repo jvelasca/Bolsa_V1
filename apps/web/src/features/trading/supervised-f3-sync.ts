@@ -12,7 +12,7 @@ import {
   useSupervisedF3QueueStore,
 } from "@/stores/supervised-f3-queue-store";
 
-let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let syncTimer: number | null = null;
 const hydratedAccounts = new Set<string>();
 let pushWired = false;
 let hydrating = false;
@@ -76,7 +76,7 @@ export function scheduleSupervisedF3Push(accountId?: string | null): void {
   const id = accountId ?? getActiveAccountId();
   if (!id) return;
   if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
+  syncTimer = window.setTimeout(() => {
     void pushSupervisedF3ToServer(id);
   }, 450);
 }

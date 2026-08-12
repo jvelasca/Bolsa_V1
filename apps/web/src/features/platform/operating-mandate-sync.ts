@@ -16,7 +16,7 @@ import {
   type MandateTradeLink,
 } from "@/features/platform/operating-mandate";
 
-let syncTimer: ReturnType<typeof setTimeout> | null = null;
+let syncTimer: number | null = null;
 const hydratedAccounts = new Set<string>();
 
 function tenuresForAccount(accountId: string): MandateTenure[] {
@@ -115,7 +115,7 @@ export function scheduleMandatePush(
 ): void {
   if (!accountId) return;
   if (syncTimer) clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
+  syncTimer = window.setTimeout(() => {
     void pushMandateToServer(accountId);
   }, 400);
 }
