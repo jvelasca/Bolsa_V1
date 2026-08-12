@@ -4,6 +4,7 @@ import {
   chartPerfRecordReflowEvent,
   chartPerfRecordReflowRequest,
 } from "@/features/charts/chart-perf-analyzer";
+import { formatDateWith } from "@/lib/format";
 
 export interface ChartCandle {
   time: Time;
@@ -64,13 +65,11 @@ export function formatChartTimeAxisLabel(
   showTime: boolean,
 ): string {
   const date = chartTimeToDate(time);
-  const weekday = date
-    .toLocaleDateString("es-ES", { weekday: "short" })
+  const weekday = formatDateWith(date, { weekday: "short" })
     .replace(/\.$/, "")
     .toLowerCase();
   const day = date.getDate();
-  const month = date
-    .toLocaleDateString("es-ES", { month: "short" })
+  const month = formatDateWith(date, { month: "short" })
     .replace(/\.$/, "")
     .toLowerCase();
   const year = String(date.getFullYear()).slice(-2);

@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/format";
 
 export function SyncSettingsPanel({
   embedded = false,
@@ -205,7 +206,7 @@ export function SyncSettingsPanel({
                   <td className="px-2 py-1">{item.status}</td>
                   <td className="px-2 py-1">{item.attempts}</td>
                   <td className="hidden px-2 py-1 sm:table-cell">
-                    {new Date(item.scheduledAt).toLocaleString("es-ES")}
+                    {formatDateTime(item.scheduledAt)}
                   </td>
                 </tr>
               ))}

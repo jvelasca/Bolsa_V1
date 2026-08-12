@@ -41,6 +41,7 @@ import {
   strategyUpsertFromScanConfig,
   type ScanRunnerConfig,
 } from "@/features/screeners/scan-runner-form";
+import { formatDateTimeCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -71,13 +72,7 @@ const ORIGIN_LABELS: Record<StrategyOrigin, string> = {
 function formatUpdatedAt(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTimeCompact(date);
 }
 
 function duplicateName(base: string, existing: Set<string>): string {

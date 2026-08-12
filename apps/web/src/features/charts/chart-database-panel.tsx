@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { formatDateWith, formatDateTimeWith, formatNumber } from "@/lib/format";
 import type {
   ChartTimeframe,
   DatabaseSummaryDto,
@@ -11,13 +12,13 @@ function formatBarDate(iso: string | null, timeframe: ChartTimeframe) {
   const d = isDaily ? new Date(`${iso.slice(0, 10)}T12:00:00`) : new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   if (isDaily) {
-    return d.toLocaleDateString("es-ES", {
+    return formatDateWith(d, {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
   }
-  return d.toLocaleString("es-ES", {
+  return formatDateTimeWith(d, {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -30,7 +31,7 @@ function formatDateTime(iso: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("es-ES", {
+  return formatDateTimeWith(d, {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -38,10 +39,6 @@ function formatDateTime(iso: string | null) {
     minute: "2-digit",
     second: "2-digit",
   });
-}
-
-function formatNumber(value: number) {
-  return value.toLocaleString("es-ES");
 }
 
 export const DATA_STATUS_LABELS: Record<string, string> = {

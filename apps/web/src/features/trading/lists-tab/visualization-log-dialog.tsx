@@ -1,12 +1,13 @@
 import { VIRTUAL_LIST_LABELS, VIRTUAL_LIST_VISUALIZATION } from "@bolsa/shared";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { formatDateTimeWith } from "@/lib/format";
 import { useUiStore } from "@/stores/ui-store";
 import { useVisualizationStore } from "@/stores/visualization-store";
 
 function formatWhen(iso: string) {
   try {
-    return new Date(iso).toLocaleString("es-ES", {
+    return formatDateTimeWith(iso, {
       day: "2-digit",
       month: "short",
       hour: "2-digit",

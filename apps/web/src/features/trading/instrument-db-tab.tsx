@@ -15,6 +15,7 @@ import {
   useInstrumentSync,
 } from "@/features/instruments/use-instrument-sync";
 import { api } from "@/lib/api";
+import { formatDateTimeCompact, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const XTB_RECOMMENDATION_LABELS: Record<string, string> = {
@@ -35,13 +36,7 @@ function formatDateTime(iso: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTimeCompact(d);
 }
 
 function SectionTitle({ children }: { children: string }) {
@@ -95,7 +90,7 @@ function OhlcvLayersTable({
               <td className="px-2 py-1">{layer.timeframe.toUpperCase()}</td>
               <td className="px-2 py-1">{layer.source}</td>
               <td className="px-2 py-1 text-right tabular-nums">
-                {layer.barCount.toLocaleString("es-ES")}
+                {formatNumber(layer.barCount)}
               </td>
               <td className="px-2 py-1 text-right tabular-nums">
                 {layer.firstDate ?? "—"}

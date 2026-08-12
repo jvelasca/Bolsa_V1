@@ -23,6 +23,7 @@ import {
   maxIso,
   readEstudioLaneStamp,
 } from "@/features/trading/estudio-lane-stamps";
+import { formatDateTimeWith } from "@/lib/format";
 import { useCoreRReviewQueueStore } from "@/stores/core-r-review-queue-store";
 
 export type EstudioProcessLaneId = "vigilance" | "freshness" | "rediscover";
@@ -95,7 +96,7 @@ function formatShortAt(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("es-ES", {
+  return formatDateTimeWith(d, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",

@@ -18,6 +18,7 @@ import {
 } from "@/features/trading/estudio-process-status";
 import { useEstudioProcessRunningStore } from "@/stores/estudio-process-running-store";
 import { useEffect, useState } from "react";
+import { formatDateTime } from "@/lib/format";
 
 const ICONS: Record<EstudioProcessLaneId, typeof Activity> = {
   vigilance: Activity,
@@ -151,7 +152,7 @@ export function ListProcessTimestampCell({
   return (
     <span
       className={cn("text-[10px] tabular-nums text-foreground/80", className)}
-      title={iso ? new Date(iso).toLocaleString("es-ES") : "Sin registro"}
+      title={iso ? formatDateTime(iso) : "Sin registro"}
     >
       {text}
     </span>

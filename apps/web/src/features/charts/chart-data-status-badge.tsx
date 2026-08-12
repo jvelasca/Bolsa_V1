@@ -5,6 +5,7 @@ import type {
   InstrumentDataStatusDto,
 } from "@bolsa/shared";
 import { ChartDatabaseDialog } from "@/features/charts/chart-database-dialog";
+import { formatDate, formatDateTimeWith } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const FLASH_MS = 5000;
@@ -15,13 +16,9 @@ function formatStatusDate(iso: string | null, timeframe: ChartTimeframe) {
   const d = isDaily ? new Date(`${iso.slice(0, 10)}T12:00:00`) : new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   if (isDaily) {
-    return d.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+    return formatDate(d);
   }
-  return d.toLocaleString("es-ES", {
+  return formatDateTimeWith(d, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",

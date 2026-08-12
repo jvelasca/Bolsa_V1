@@ -13,6 +13,7 @@ import {
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useActiveAccountStore } from "@/stores/active-account-store";
 
@@ -85,7 +86,7 @@ function RealizedTable({ report }: { report: TaxReportSummaryDto }) {
               className="border-b border-border/50 hover:bg-accent/20"
             >
               <td className="px-2 py-2 whitespace-nowrap text-xs text-muted-foreground">
-                {new Date(line.executedAt).toLocaleDateString("es-ES")}
+                {formatDate(line.executedAt)}
               </td>
               <td className="px-2 py-2 font-medium">{line.symbol}</td>
               <td className="px-2 py-2 text-right tabular-nums">

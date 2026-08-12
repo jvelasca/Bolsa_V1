@@ -11,6 +11,7 @@ import {
 import { ApiError, api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/format";
 import {
   formatStrategyScopeBadge,
   MINE_STRATEGY_ORIGIN_LABELS,
@@ -337,11 +338,11 @@ export function BacktestLibraryStrategyRow({
                 <span className="font-medium text-foreground">
                   Actualizado:
                 </span>{" "}
-                {new Date(detail.updatedAt).toLocaleString("es-ES")}
+                {formatDateTime(detail.updatedAt)}
               </p>
               <p>
                 <span className="font-medium text-foreground">Creado:</span>{" "}
-                {new Date(detail.createdAt).toLocaleString("es-ES")}
+                {formatDateTime(detail.createdAt)}
               </p>
               {detail.instrumentIds.length > 0 ? (
                 <p>

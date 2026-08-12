@@ -7,6 +7,7 @@ import {
 } from "@/features/backtests/backtest-period";
 import { BacktestChartImportPanel } from "@/features/backtests/backtest-chart-import-panel";
 import type { UniverseMode } from "@/features/backtests/backtest-hub-nav";
+import { formatNumber } from "@/lib/format";
 
 interface BacktestWizardAdvancedOptionsProps {
   periodPreset: PeriodPreset;
@@ -55,7 +56,7 @@ export function BacktestWizardAdvancedOptions({
   onSaveStrategy,
   isSaving,
 }: BacktestWizardAdvancedOptionsProps) {
-  const cashDisplay = Number(initialCash || 0).toLocaleString("es-ES");
+  const cashDisplay = formatNumber(Number(initialCash || 0));
   return (
     <details className="rounded-md border border-border/60 bg-muted/15">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-2.5 py-1.5 text-[11px] text-muted-foreground marker:content-none [&::-webkit-details-marker]:hidden">

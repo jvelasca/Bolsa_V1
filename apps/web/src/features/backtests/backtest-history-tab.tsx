@@ -5,8 +5,9 @@
 import { Link } from "react-router-dom";
 import { BACKTEST_STRATEGIES, type BacktestRunDto } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { formatPct } from "@/features/charts/chart-utils";
+import { formatDateTimeWith } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type Props = {
   runs: BacktestRunDto[];
@@ -109,7 +110,7 @@ export function BacktestHistoryTab({
                     {formatPct(run.totalReturnPct)}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {new Date(run.createdAt).toLocaleString("es-ES", {
+                    {formatDateTimeWith(run.createdAt, {
                       day: "2-digit",
                       month: "short",
                       hour: "2-digit",

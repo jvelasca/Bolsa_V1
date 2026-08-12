@@ -9,6 +9,7 @@ import { formatPrice } from "@/features/charts/chart-utils";
 import { InstrumentAnalysisSummary } from "@/features/trading/instrument-analysis-summary";
 import { InstrumentDbTab } from "@/features/trading/instrument-db-tab";
 import { api } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
 import { useTradingUiStore } from "@/stores/trading-ui-store";
 
 type InfoTabId = "basic" | "analysis" | "dividends" | "financials" | "database";
@@ -186,7 +187,7 @@ export function InstrumentInfoDialog() {
         <p className="mt-4 text-[10px] text-muted-foreground">
           Datos orientativos desde Yahoo Finance
           {profile?.fetchedAt
-            ? ` · actualizado ${new Date(profile.fetchedAt).toLocaleString("es-ES")}`
+            ? ` · actualizado ${formatDateTime(profile.fetchedAt)}`
             : ""}
           .
         </p>

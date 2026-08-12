@@ -13,6 +13,7 @@ import {
   type SignalKind,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { formatDateTime } from "@/lib/format";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
   Card,
@@ -423,7 +424,7 @@ function SignalAlertRow({
             {SIGNAL_KIND_LABELS[subscription.lastSignalKind]} ·{" "}
             {formatPrice(subscription.lastSignalPrice ?? 0)}
             <br />
-            {new Date(subscription.lastTriggeredAt).toLocaleString("es-ES")}
+            {formatDateTime(subscription.lastTriggeredAt)}
           </>
         ) : (
           "—"

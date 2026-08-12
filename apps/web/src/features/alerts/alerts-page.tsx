@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/format";
 import { SignalAlertsSection } from "@/features/alerts/signal-alerts-section";
 
 const conditionLabels: Record<AlertCondition, string> = {
@@ -374,7 +375,7 @@ function AlertRow({
           <>
             {formatPrice(alert.triggeredPrice ?? 0)}
             <br />
-            {new Date(alert.triggeredAt).toLocaleString("es-ES")}
+            {formatDateTime(alert.triggeredAt)}
           </>
         ) : (
           "—"

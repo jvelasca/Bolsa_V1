@@ -69,6 +69,7 @@ import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-stra
 import { PAPER_PATH_MONITOR } from "@/features/settings/paper-paths-copy";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { api } from "@/lib/api";
+import { formatDateTimeShort } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   primaryCoreRAction,
@@ -626,11 +627,7 @@ export function StrategyMonitorPanel({
               </span>
               {schedPrefs.lastTickAt ? (
                 <span title={schedPrefs.lastTickAt}>
-                  · último{" "}
-                  {new Date(schedPrefs.lastTickAt).toLocaleString("es-ES", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
+                  · último {formatDateTimeShort(schedPrefs.lastTickAt)}
                 </span>
               ) : null}
             </div>
@@ -906,7 +903,7 @@ export function StrategyMonitorPanel({
                           {" · "}
                           Proponer:{" "}
                           {row.lastPropose
-                            ? `${row.lastPropose.payload.action} (${new Date(row.lastPropose.enqueuedAt).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" })})`
+                            ? `${row.lastPropose.payload.action} (${formatDateTimeShort(row.lastPropose.enqueuedAt)})`
                             : "aún no (Camino C desde Finalistas)"}
                         </p>
                       </div>

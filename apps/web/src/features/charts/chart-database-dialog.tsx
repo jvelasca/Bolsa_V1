@@ -12,6 +12,7 @@ import {
 } from "@/features/charts/chart-database-panel";
 import { Dialog, DialogTabs } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type DatabaseDialogTab = "instrument" | "server" | "quality" | "activity";
@@ -68,8 +69,7 @@ export function ChartDatabaseDialog({
               status.freshnessStatus}
           </p>
           <p className="text-xs text-muted-foreground">
-            {status.barCount.toLocaleString("es-ES")} barras en el timeframe
-            activo
+            {formatNumber(status.barCount)} barras en el timeframe activo
           </p>
         </div>
         {onSync && (

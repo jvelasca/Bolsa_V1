@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { IndicatorPromptAssistantPanel } from "@/features/charts/indicator-prompt-assistant-panel";
+import { formatDateWith } from "@/lib/format";
 
 interface AiIndicatorsPanelProps {
   presets: IndicatorPreset[];
@@ -58,7 +59,7 @@ export function AiIndicatorsPanel({
     if (!definition) return;
     const name =
       variantName.trim() ||
-      `${definition.shortLabel} · ${new Date().toLocaleDateString("es-ES", { day: "2-digit", month: "short" })}`;
+      `${definition.shortLabel} · ${formatDateWith(new Date(), { day: "2-digit", month: "short" })}`;
     const presetId = createAiVariant({
       definitionId: selectedMotorId,
       name,

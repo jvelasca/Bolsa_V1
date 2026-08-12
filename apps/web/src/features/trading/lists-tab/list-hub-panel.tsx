@@ -18,6 +18,7 @@ import {
   positionToListItem,
   visualizationEntryToListItem,
 } from "@/lib/default-lists";
+import { formatDateWith } from "@/lib/format";
 import { resolveListColumnLayout } from "@/lib/list-column-layout";
 import {
   patchToggleCarouselList,
@@ -320,7 +321,7 @@ export function ListHubPanel() {
   const freezeCopyMutation = useMutation({
     mutationFn: async (list: InstrumentListSummaryDto) => {
       const detail = await api.getList(list.id);
-      const day = new Date().toLocaleDateString("es-ES", {
+      const day = formatDateWith(new Date(), {
         day: "2-digit",
         month: "short",
       });

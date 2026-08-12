@@ -5,6 +5,12 @@
  * @see docs/engineering/instruments-hub-2026-07-31.md
  */
 
+import {
+  formatDate,
+  formatDateTimeCompact,
+  formatDateTimeWith,
+} from "@/lib/format";
+
 export type InstrumentsHubColumnId =
   | "symbol"
   | "price"
@@ -310,13 +316,7 @@ export function formatInstrumentLastBarLabel(opts: {
     const d = new Date(bar);
     if (!Number.isNaN(d.getTime())) {
       return {
-        primary: d.toLocaleString("es-ES", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        primary: formatDateTimeCompact(d),
         sortKey: d.toISOString(),
       };
     }
@@ -326,11 +326,7 @@ export function formatInstrumentLastBarLabel(opts: {
     const d = new Date(`${bar.slice(0, 10)}T12:00:00`);
     const dateLabel = Number.isNaN(d.getTime())
       ? bar.slice(0, 10)
-      : d.toLocaleDateString("es-ES", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        });
+      : formatDate(d);
     let timeLabel: string | undefined;
     if (sync) {
       const s = new Date(sync);
@@ -344,7 +340,7 @@ export function formatInstrumentLastBarLabel(opts: {
     return {
       primary: timeLabel ? `${dateLabel} · ${timeLabel}` : dateLabel,
       secondary: sync
-        ? `Sync ${new Date(sync).toLocaleString("es-ES", {
+        ? `Sync ${formatDateTimeWith(new Date(sync), {
             day: "2-digit",
             month: "short",
             hour: "2-digit",
@@ -359,7 +355,7 @@ export function formatInstrumentLastBarLabel(opts: {
   return {
     primary: Number.isNaN(s.getTime())
       ? sync!
-      : s.toLocaleString("es-ES", {
+      : formatDateTimeWith(s, {
           day: "2-digit",
           month: "short",
           hour: "2-digit",

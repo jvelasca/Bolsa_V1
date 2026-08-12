@@ -13,6 +13,7 @@ import {
   type BacktestCursorPanelPos,
 } from "@/features/backtests/backtest-hud-prefs";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type BacktestCursorSnapshot = {
@@ -266,7 +267,7 @@ export function BacktestCursorPanel({
                 label="Vol"
                 value={
                   snapshot.volume != null && Number.isFinite(snapshot.volume)
-                    ? snapshot.volume.toLocaleString("es-ES")
+                    ? formatNumber(snapshot.volume)
                     : "—"
                 }
               />

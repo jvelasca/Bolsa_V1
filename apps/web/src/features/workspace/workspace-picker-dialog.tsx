@@ -21,6 +21,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Dialog, FieldRow, inputClassName } from "@/components/ui/dialog";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -271,7 +272,7 @@ export function WorkspacePickerDialog() {
                     )}
                   </button>
                   <span className="hidden text-[10px] text-muted-foreground sm:inline">
-                    {new Date(item.updatedAt).toLocaleDateString("es-ES")}
+                    {formatDate(item.updatedAt)}
                   </span>
                   <button
                     type="button"

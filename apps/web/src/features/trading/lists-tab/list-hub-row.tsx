@@ -16,6 +16,7 @@ import {
   History,
   Trash2,
 } from "lucide-react";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { checkboxClassName } from "@/components/ui/dialog";
 import { IconButton } from "@/components/ui/icon-button";
@@ -33,11 +34,7 @@ function formatLastSynced(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(d);
 }
 
 function listTypeLabel(list: InstrumentListSummaryDto): string {

@@ -3,6 +3,7 @@ import type {
   InstrumentWithMetaDto,
   ListDataFreshnessStatus,
 } from "@bolsa/shared";
+import { formatDate, formatDateTimeWith, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type SyncVisualState = "current" | "stale" | "empty" | "error" | "partial";
@@ -30,18 +31,14 @@ function formatShortDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  return d.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDate(d);
 }
 
 function formatSyncAt(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("es-ES", {
+  return formatDateTimeWith(d, {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -65,7 +62,7 @@ function buildTooltip(
             : "Sincronización parcial",
     `Última vela: ${formatShortDate(item.meta.lastBarDate)}`,
     `Esperada: ${formatShortDate(item.meta.expectedLastBarDate)}`,
-    `Barras 1D: ${item.meta.barCount.toLocaleString("es-ES")}`,
+    `Barras 1D: ${formatNumber(item.meta.barCount)}`,
     `Último sync: ${formatSyncAt(item.meta.lastSync?.syncedAt)} (${item.meta.lastSync?.status ?? "—"})`,
   ];
   if (item.meta.lastSync?.error) {

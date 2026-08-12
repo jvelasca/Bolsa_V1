@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { api } from "@/lib/api";
+import { formatNumber0 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
   resolveSupervisedQueueOrigin,
@@ -461,9 +462,7 @@ export function SupervisedF3Panel() {
             ? ` Cuenta: ${account.name}.`
             : " Selecciona una cuenta activa."}
           {` Modo libro: ${bookMode.toUpperCase()}.`}
-          {cash > 0
-            ? ` Cash: ${cash.toLocaleString("es-ES", { maximumFractionDigits: 0 })}.`
-            : ""}
+          {cash > 0 ? ` Cash: ${formatNumber0(cash)}.` : ""}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">

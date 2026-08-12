@@ -1,12 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-
-function formatFxRate(rate: number) {
-  return rate.toLocaleString("es-ES", {
-    minimumFractionDigits: 4,
-    maximumFractionDigits: 6,
-  });
-}
+import { formatFxRate } from "@/lib/format";
 
 export function useTradeNotional(
   instrumentCurrency: string,

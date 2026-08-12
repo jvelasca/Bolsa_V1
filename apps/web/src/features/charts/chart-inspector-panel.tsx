@@ -32,6 +32,7 @@ import {
   SlidersHorizontal,
   ChartCandlestick,
 } from "lucide-react";
+import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useChartCursorStore } from "@/stores/chart-cursor-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -531,7 +532,7 @@ export function ChartInspectorPanel({
                 <DetailRow label="Timeframe" value={timeframe.toUpperCase()} />
                 <DetailRow
                   label="Velas cargadas"
-                  value={barsCount.toLocaleString("es-ES")}
+                  value={formatNumber(barsCount)}
                 />
                 <DetailRow
                   label="Plantilla ind."
@@ -585,7 +586,7 @@ export function ChartInspectorPanel({
                   />
                   <DetailRow
                     label="Barras BD"
-                    value={dataStatus.barCount.toLocaleString("es-ES")}
+                    value={formatNumber(dataStatus.barCount)}
                   />
                 </dl>
               </section>
@@ -635,7 +636,7 @@ export function ChartInspectorPanel({
                   />
                   <DetailRow
                     label="Volumen"
-                    value={activeBar.volume.toLocaleString("es-ES")}
+                    value={formatNumber(activeBar.volume)}
                   />
                 </dl>
               ) : (

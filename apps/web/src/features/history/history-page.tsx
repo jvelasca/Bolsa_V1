@@ -14,18 +14,13 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
+import { formatDateTimeCompact } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type HistoryTab = "ledger" | "trades";
 
 function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTimeCompact(iso);
 }
 
 function ledgerTypeLabel(entry: LedgerEntryDto): string {
