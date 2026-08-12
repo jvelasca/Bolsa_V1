@@ -3410,6 +3410,7 @@
       "DepositCashDto": {
         "properties": {
           "amount": {
+            "exclusiveMinimum": 0.0,
             "title": "Amount",
             "type": "number"
           },
@@ -15746,6 +15747,7 @@
       "WithdrawCashDto": {
         "properties": {
           "amount": {
+            "exclusiveMinimum": 0.0,
             "title": "Amount",
             "type": "number"
           },
