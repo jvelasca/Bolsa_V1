@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class DeclaredProfileDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     horizon: str
     objectives: list[str] = Field(default_factory=list)
@@ -17,7 +17,7 @@ class DeclaredProfileDto(BaseModel):
 
 
 class InvestorProfileDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     profile_id: str = Field(alias="profileId")
     name: str

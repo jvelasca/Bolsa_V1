@@ -17,6 +17,7 @@ Ver docs/API_REFERENCE.md y docs/ONBOARDING.md.
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +27,7 @@ from bolsa_api.api.v1.router import api_v1_router
 from bolsa_api.logging_redact import install_log_redact
 from bolsa_api.middleware.auth import AuthMiddleware
 from bolsa_api.middleware.rate_limit import RateLimitMiddleware
-from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.config import Settings, get_settings
 from bolsa_infrastructure.database.account_migration import run_account_data_migration
 from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
 from bolsa_infrastructure.database.migrations import ensure_migrated
@@ -70,7 +71,7 @@ def _route_path_exists(app: FastAPI, full_path: str) -> bool:
     """True if a route is mounted — without building the OpenAPI schema (~0.5s+)."""
     from fastapi.routing import APIRoute
 
-    def walk(routes: list, prefix: str = "") -> bool:
+    def walk(routes: list[Any], prefix: str = "") -> bool:
         for route in routes:
             if isinstance(route, APIRoute):
                 if f"{prefix}{route.path}" == full_path:
@@ -102,14 +103,14 @@ def _warn_if_routes_missing(app: FastAPI) -> None:
         )
 
 
-def _cors_origins(settings) -> list[str]:
+def _cors_origins(settings: Settings) -> list[str]:
     raw = settings.cors_origin.strip()
     if not raw:
         return []
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
-def _cors_origin_regex(settings) -> str | None:
+def _cors_origin_regex(settings: Settings) -> str | None:
     if settings.environment != "development":
         return None
     # LAN dev: http://192.168.x.x:5173, http://10.x.x.x:5173, etc.

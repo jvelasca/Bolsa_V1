@@ -85,7 +85,7 @@ async def list_workspaces(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WorkspacesListResponseDto:
     repo = get_workspace_repository(session)
-    items = await ListWorkspaces(repo).execute()
+    items = await ListWorkspaces(repo).execute()  # type: ignore[no-untyped-call]
     return WorkspacesListResponseDto(data=[_to_summary_dto(item) for item in items])
 
 
@@ -94,7 +94,7 @@ async def get_default_workspace(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> WorkspaceResponseDto:
     repo = get_workspace_repository(session)
-    record = await GetDefaultWorkspace(repo).execute()
+    record = await GetDefaultWorkspace(repo).execute()  # type: ignore[no-untyped-call]
     if record is None:
         created = await CreateWorkspace(repo).execute(
             name="Espacio de trabajo",

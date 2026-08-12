@@ -20,7 +20,7 @@ SourceLiteral = Literal["on_demand", "eod_batch", "manual"]
 
 
 class InstrumentDailyOpinionDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -132,7 +132,7 @@ class RunEstudioEodOpinionBatchDto(BaseModel):
 
 
 class EstudioEodOpinionEmailNotifyDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     email_enabled: bool = Field(alias="emailEnabled")
     alarma_count: int = Field(alias="alarmaCount")
@@ -143,7 +143,7 @@ class EstudioEodOpinionEmailNotifyDto(BaseModel):
 class EstudioEodDigestNotifyDto(BaseModel):
     """R3/R4 — resultado envío digest operativo tras eod-batch."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     digest_enabled: bool = Field(alias="digestEnabled")
     sent: bool
@@ -153,7 +153,7 @@ class EstudioEodDigestNotifyDto(BaseModel):
 
 
 class EstudioEodOpinionBatchResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     enabled: bool
     forced: bool
@@ -170,7 +170,7 @@ class EstudioEodOpinionBatchResponseDto(BaseModel):
 class OpinionTelemetryDto(BaseModel):
     """A0 — acierto dictamen (proxy 5d)."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     schema_version: str = Field(alias="schemaVersion")
     as_of: str = Field(alias="asOf")

@@ -1,7 +1,20 @@
+from __future__ import annotations
+
 from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING, cast
 
 from fastapi import Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+if TYPE_CHECKING:
+    from bolsa_application.daily_ops_report import GetDailyOpsReport
+    from bolsa_application.fa_weekly_pipeline import RunFaWeeklyPipeline
+    from bolsa_application.get_instrument_composite import GetInstrumentComposite
+    from bolsa_application.paper_d_propose import ProposePaperDPlan
+    from bolsa_application.run_fundamental_screener import RunFundamentalScreener
+    from bolsa_infrastructure.database.repositories.prediction_repository import (
+        SqlAlchemyPredictionRepository,
+    )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_application.account_lifecycle import (
@@ -228,7 +241,7 @@ from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
-    return request.app.state.session_factory
+    return cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)
 
 
 async def get_db_session(
@@ -293,7 +306,7 @@ def get_list_ledger_use_case(session: AsyncSession) -> ListLedgerEntries:
     return ListLedgerEntries(get_ledger_repository(session))
 
 
-def get_daily_ops_report_use_case(session: AsyncSession):
+def get_daily_ops_report_use_case(session: AsyncSession) -> GetDailyOpsReport:
     """R1 — resumen operativo diario."""
     from bolsa_application.daily_ops_report import GetDailyOpsReport
     from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
@@ -509,20 +522,20 @@ def get_instrument_profile_use_case(session: AsyncSession) -> GetInstrumentProfi
 def get_instrument_fundamentals_use_case(session: AsyncSession) -> GetInstrumentFundamentals:
     return GetInstrumentFundamentals(
         get_instrument_repository(session),
-        get_ohlcv_bars_use_case(session),
+        get_ohlcv_bars_use_case(session),  # type: ignore[arg-type]
     )
 
 
-def get_instrument_composite_use_case(session: AsyncSession):
+def get_instrument_composite_use_case(session: AsyncSession) -> GetInstrumentComposite:
     from bolsa_application.get_instrument_composite import GetInstrumentComposite
 
     return GetInstrumentComposite(
         get_instrument_repository(session),
-        get_ohlcv_bars_use_case(session),
+        get_ohlcv_bars_use_case(session),  # type: ignore[arg-type]
     )
 
 
-def get_run_fundamental_screener_use_case(session: AsyncSession):
+def get_run_fundamental_screener_use_case(session: AsyncSession) -> RunFundamentalScreener:
     from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
     from bolsa_application.run_fundamental_screener import RunFundamentalScreener
 
@@ -534,7 +547,7 @@ def get_run_fundamental_screener_use_case(session: AsyncSession):
     )
 
 
-def get_propose_paper_d_use_case(session: AsyncSession):
+def get_propose_paper_d_use_case(session: AsyncSession) -> ProposePaperDPlan:
     from bolsa_application.paper_d_propose import ProposePaperDPlan
 
     return ProposePaperDPlan(
@@ -545,7 +558,7 @@ def get_propose_paper_d_use_case(session: AsyncSession):
     )
 
 
-def get_run_fa_weekly_pipeline_use_case(session: AsyncSession):
+def get_run_fa_weekly_pipeline_use_case(session: AsyncSession) -> RunFaWeeklyPipeline:
     from bolsa_application.fa_weekly_pipeline import RunFaWeeklyPipeline
 
     return RunFaWeeklyPipeline(
@@ -944,7 +957,7 @@ def get_cognitive_repository(session: AsyncSession) -> SqlAlchemyCognitiveReposi
     return SqlAlchemyCognitiveRepository(session)
 
 
-def get_prediction_repository(session: AsyncSession):
+def get_prediction_repository(session: AsyncSession) -> SqlAlchemyPredictionRepository:
     from bolsa_infrastructure.database.repositories.prediction_repository import (
         SqlAlchemyPredictionRepository,
     )
@@ -971,7 +984,7 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         event_bus=get_platform_event_bus(session),
         event_calendar=get_shared_market_event_calendar(),
         cognitive_store=get_cognitive_repository(session),
-        profile_store=get_investor_profile_repository(session),
+        profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
     )
 
 

@@ -1,10 +1,12 @@
 """DTOs HTTP de políticas de posición."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class PositionPolicySummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     account_id: str = Field(alias="accountId")
@@ -17,7 +19,7 @@ class PositionPolicySummaryDto(BaseModel):
 
 
 class PositionPolicyDetailDto(PositionPolicySummaryDto):
-    definition: dict
+    definition: dict[str, Any]
 
 
 class PositionPoliciesListResponseDto(BaseModel):
@@ -47,7 +49,7 @@ class UpdatePositionPolicyRequestDto(BaseModel):
 
 
 class PositionExitEvalResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     account_id: str = Field(alias="accountId")
     instrument_id: str = Field(alias="instrumentId")
@@ -56,10 +58,10 @@ class PositionExitEvalResultDto(BaseModel):
     policy_id: str | None = Field(default=None, alias="policyId")
     mode: str | None = None
     status: str
-    signal: dict | None = None
-    action: dict | None = None
+    signal: dict[str, Any] | None = None
+    action: dict[str, Any] | None = None
     reason: str | None = None
 
 
 class EvaluatePositionExitsResponseDto(BaseModel):
-    data: dict
+    data: dict[str, Any]

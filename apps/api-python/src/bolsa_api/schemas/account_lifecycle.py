@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ClosedSimulatedAccountDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     name: str
@@ -20,7 +20,7 @@ class ClosedSimulatedAccountDto(BaseModel):
 
 
 class ClosedSimulatedAccountsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     accounts: list[ClosedSimulatedAccountDto]
     total_ledger_entries: int = Field(alias="totalLedgerEntries")
@@ -31,13 +31,13 @@ class ClosedSimulatedAccountsResponseDto(BaseModel):
 
 
 class PurgeClosedAccountsRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     limit: int = Field(default=50, ge=1, le=200)
 
 
 class PurgeClosedAccountSkippedDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     account_id: str = Field(alias="accountId")
     name: str
@@ -45,7 +45,7 @@ class PurgeClosedAccountSkippedDto(BaseModel):
 
 
 class PurgeClosedAccountsResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     purged_ids: list[str] = Field(alias="purgedIds")
     skipped: list[PurgeClosedAccountSkippedDto]

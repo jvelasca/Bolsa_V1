@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class DatabaseTableCountDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     table: str
     label: str
@@ -12,14 +12,14 @@ class DatabaseTableCountDto(BaseModel):
 
 
 class InstrumentOhlcvBreakdownDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     timeframe: str
     bar_count: int = Field(alias="barCount")
 
 
 class DatabaseSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     connected: bool
     message: str

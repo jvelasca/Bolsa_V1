@@ -47,9 +47,9 @@ def _to_dto(row: InstrumentStrategyTopRecord) -> InstrumentStrategyTopDto:
         symbol=row.symbol,
         timeframe=row.timeframe,
         period_label=row.period_label,
-        status=row.status,  # type: ignore[arg-type]
+        status=row.status,
         version=row.version,
-        evidence_level=row.evidence_level,  # type: ignore[arg-type]
+        evidence_level=row.evidence_level,
         slots=[_slot_to_dto(s) for s in row.slots],
         coach_headline=row.coach_headline,
         coach_facts=row.coach_facts,

@@ -14,7 +14,7 @@ class DrawingReplayRequestDto(BaseModel):
 
 
 class DrawingReplayMarkerDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     drawing_id: str = Field(alias="drawingId")

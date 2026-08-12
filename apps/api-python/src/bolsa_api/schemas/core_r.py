@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class CoreRBundleDto(BaseModel):
     """Estado CORE-R de una cuenta (queue / reports / scheduler)."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     account_id: str = Field(alias="accountId")
     queue: list[dict[str, Any]] = Field(default_factory=list)
@@ -31,7 +31,7 @@ class CoreRBundleResponseDto(BaseModel):
 class SyncCoreRBundleDto(BaseModel):
     """Payload PUT para sincronizar bundle desde el cliente."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     queue: list[dict[str, Any]] = Field(default_factory=list)
     reports: dict[str, Any] = Field(default_factory=dict)

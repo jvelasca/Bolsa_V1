@@ -1,6 +1,6 @@
 """API: alertas de precio (CRUD + evaluate)."""
 
-from typing import Annotated
+from typing import Annotated, Literal, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,9 +73,9 @@ async def create_alert(
     try:
         alert = await CreatePriceAlert(repo).execute(
             instrument_id=body.instrument_id,
-            condition=body.condition,
+            condition=cast(Literal["above", "below"], body.condition),
             target_price=body.target_price,
-            price_source=body.price_source,
+            price_source=cast(Literal["daily_close", "xtb_last"], body.price_source),
             note=body.note,
         )
     except ValueError as exc:

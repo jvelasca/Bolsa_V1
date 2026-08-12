@@ -14,7 +14,7 @@ class LoginRequestDto(BaseModel):
 
 
 class LoginResponseDataDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     token: str
     auth_enabled: bool = Field(alias="authEnabled")
@@ -25,7 +25,7 @@ class LoginResponseDto(BaseModel):
 
 
 class AuthStatusDataDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     auth_enabled: bool = Field(alias="authEnabled")
 

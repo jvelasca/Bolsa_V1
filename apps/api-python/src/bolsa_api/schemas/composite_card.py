@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CompositeChipDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     ticker: str
@@ -21,7 +21,7 @@ class CompositeChipDto(BaseModel):
 
 
 class QueryInstrumentCompositeDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_ids: list[str] = Field(alias="instrumentIds", min_length=1, max_length=40)
     horizon: str = "swing"

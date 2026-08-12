@@ -153,7 +153,7 @@ async def run_backtest(
     try:
         result = await use_case.execute(
             instrument_id=body.instrument_id,
-            strategy_type=body.strategy_type,  # type: ignore[arg-type]
+            strategy_type=body.strategy_type,
             strategy_definition_id=body.strategy_definition_id,
             initial_cash=body.initial_cash or 10000,
             limit=body.limit,

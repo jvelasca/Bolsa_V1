@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ListMembershipRefDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     list_id: str = Field(alias="listId")
     list_name: str = Field(alias="listName")
@@ -14,7 +14,7 @@ class ListMembershipRefDto(BaseModel):
 
 
 class NamedRefDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     name: str
@@ -22,7 +22,7 @@ class NamedRefDto(BaseModel):
 
 
 class InstrumentRemovalPreviewDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -52,13 +52,13 @@ class InstrumentRemovalPreviewResponseDto(BaseModel):
 
 
 class RemoveInstrumentFromListRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     purge_if_orphan: bool = Field(alias="purgeIfOrphan", default=False)
 
 
 class RemoveInstrumentFromListResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     list_id: str = Field(alias="listId")
     instrument_id: str = Field(alias="instrumentId")
@@ -74,13 +74,13 @@ class RemoveInstrumentFromListResponseDto(BaseModel):
 
 
 class DeleteInstrumentRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     force: bool = False
 
 
 class OrphanInstrumentDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     symbol: str
@@ -89,7 +89,7 @@ class OrphanInstrumentDto(BaseModel):
 
 
 class OrphanInstrumentsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     orphans: list[OrphanInstrumentDto]
     total_ohlcv_bars: int = Field(alias="totalOhlcvBars")
@@ -100,13 +100,13 @@ class OrphanInstrumentsResponseDto(BaseModel):
 
 
 class PurgeOrphansRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     limit: int = Field(default=50, ge=1, le=200)
 
 
 class PurgeOrphanSkippedDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -114,7 +114,7 @@ class PurgeOrphanSkippedDto(BaseModel):
 
 
 class PurgeOrphansResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     purged_ids: list[str] = Field(alias="purgedIds")
     skipped: list[PurgeOrphanSkippedDto]

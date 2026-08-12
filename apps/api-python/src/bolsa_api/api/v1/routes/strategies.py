@@ -113,7 +113,7 @@ async def create_strategy_from_preset(
     use_case: CreateStrategyFromPreset = get_create_strategy_from_preset_use_case(session)
     record = await use_case.execute(
         name=body.name,
-        preset_key=body.preset_key,  # type: ignore[arg-type]
+        preset_key=body.preset_key,
         timeframe=body.timeframe or "1d",
         commission_bps=body.commission_bps or 0,
         slippage_bps=body.slippage_bps or 0,

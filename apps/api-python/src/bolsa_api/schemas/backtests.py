@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class BacktestRunDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -28,11 +28,11 @@ class BacktestRunDto(BaseModel):
     commission_bps: int | None = Field(default=None, alias="commissionBps")
     slippage_bps: int | None = Field(default=None, alias="slippageBps")
     strategy_definition_id: str | None = Field(default=None, alias="strategyDefinitionId")
-    manifest: dict | None = None
+    manifest: dict[str, Any] | None = None
 
 
 class BacktestTradeDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     type: str
@@ -40,7 +40,7 @@ class BacktestTradeDto(BaseModel):
     price: float
     quantity: float
     equity_after: float = Field(alias="equityAfter")
-    reason: dict | None = None
+    reason: dict[str, Any] | None = None
 
 
 class BacktestEquityPointDto(BaseModel):
@@ -64,18 +64,18 @@ class PruneBacktestsRequestDto(BaseModel):
 
 
 class PruneBacktestsResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     deleted: int
     keep: int
 
 
 class BacktestDetailResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: BacktestRunDetailDto
     trial_id: str | None = Field(default=None, alias="trialId")
-    metrics: dict | None = None
+    metrics: dict[str, Any] | None = None
 
 
 class BacktestRunRequestDto(BaseModel):
@@ -93,13 +93,13 @@ class BacktestRunRequestDto(BaseModel):
     slippage_bps: int | None = Field(default=None, alias="slippageBps")
     spread_bps: int | None = Field(default=None, alias="spreadBps")
     # P9 — optional lab provenance for adopt→H0 trial.blocks (not re-validation).
-    lab_evidence: dict | None = Field(default=None, alias="labEvidence")
+    lab_evidence: dict[str, Any] | None = Field(default=None, alias="labEvidence")
     # P2.B — optional link to scientific hypothesis.
     hypothesis_id: str | None = Field(default=None, alias="hypothesisId")
 
 
 class OosMetricsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     total_return_pct: float = Field(alias="totalReturnPct")
     max_drawdown_pct: float = Field(alias="maxDrawdownPct")
@@ -111,7 +111,7 @@ class OosMetricsDto(BaseModel):
 class SmaGridTrialDto(BaseModel):
     """Optimize trial (SMA / RSI / MACD). Param fields are family-dependent."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     fast_period: int | None = Field(default=None, alias="fastPeriod")
     slow_period: int | None = Field(default=None, alias="slowPeriod")
@@ -153,7 +153,7 @@ class OptimizeSmaGridRequestDto(BaseModel):
 
 
 class WalkForwardFoldDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     index: int
     train_bar_count: int = Field(alias="trainBarCount")
@@ -168,7 +168,7 @@ class WalkForwardFoldDto(BaseModel):
 
 
 class WalkForwardSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     n_folds: int = Field(alias="nFolds")
     mode: str = "expanding"
@@ -188,7 +188,7 @@ class WalkForwardSummaryDto(BaseModel):
 
 
 class CpcvPathDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     index: int
     test_group_indices: list[int] = Field(alias="testGroupIndices")
@@ -204,7 +204,7 @@ class CpcvPathDto(BaseModel):
 
 
 class CpcvSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     n_groups: int = Field(alias="nGroups")
     n_test_groups: int = Field(alias="nTestGroups")
@@ -229,7 +229,7 @@ class CpcvSummaryDto(BaseModel):
 
 
 class OptimizeSmaGridResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     bar_count: int = Field(alias="barCount")
@@ -249,7 +249,7 @@ class OptimizeSmaGridResultDto(BaseModel):
 
 
 class OptimizeSmaGridResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: OptimizeSmaGridResultDto
     run_id: str | None = Field(default=None, alias="runId")
@@ -259,7 +259,7 @@ OptimizationRunStatus = Literal["pending", "processing", "completed", "failed"]
 
 
 class OptimizationRunDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")

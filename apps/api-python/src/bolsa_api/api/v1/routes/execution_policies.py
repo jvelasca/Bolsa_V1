@@ -34,7 +34,11 @@ from bolsa_application.execution_policies import (
     ListExecutionPolicies,
     UpdateExecutionPolicy,
 )
-from bolsa_application.execution_router import ExecuteScanJobHits, ExecutionRouter
+from bolsa_application.execution_router import (
+    ExecuteScanJobHits,
+    ExecutionActionResult,
+    ExecutionRouter,
+)
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 router = APIRouter()
@@ -63,7 +67,7 @@ def _detail(record: ExecutionPolicyRecord) -> ExecutionPolicyDetailDto:
     )
 
 
-def _action_dto(action) -> ExecutionActionResultDto:
+def _action_dto(action: ExecutionActionResult) -> ExecutionActionResultDto:
     dispatches = None
     if action.dispatches:
         dispatches = [

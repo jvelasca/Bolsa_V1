@@ -26,14 +26,14 @@ class ScanRunRequestDto(BaseModel):
 
 
 class ScanSkippedInstrumentDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     reason: str
 
 
 class ScanHitDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -42,7 +42,7 @@ class ScanHitDto(BaseModel):
 
 
 class ScanRunResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     scan_id: str = Field(alias="scanId")
     scanned_count: int = Field(alias="scannedCount")
@@ -61,7 +61,7 @@ class ScanRunResponseDto(BaseModel):
 
 
 class ScanJobDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     status: str

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,7 +71,7 @@ async def list_investor_profiles(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileListResponseDto:
     store = get_investor_profile_repository(session)
-    rows = await ListInvestorProfiles(store).execute()
+    rows = await ListInvestorProfiles(store).execute()  # type: ignore[arg-type]
     return InvestorProfileListResponseDto(data=[_to_dto(r) for r in rows])
 
 
@@ -84,8 +84,8 @@ async def ensure_default_profiles(
     accounts = await get_list_accounts_use_case(session).execute()
     missing = [(a.id, a.name) for a in accounts if not a.active_profile_id]
     if missing:
-        await EnsureDefaultsForAccounts(store).execute(missing)
-    rows = await ListInvestorProfiles(store).execute()
+        await EnsureDefaultsForAccounts(store).execute(missing)  # type: ignore[arg-type]
+    rows = await ListInvestorProfiles(store).execute()  # type: ignore[arg-type]
     return InvestorProfileListResponseDto(data=[_to_dto(r) for r in rows])
 
 
@@ -95,7 +95,7 @@ async def get_investor_profile(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileResponseDto:
     store = get_investor_profile_repository(session)
-    row = await GetInvestorProfile(store).execute(profile_id)
+    row = await GetInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
     if row is None:
         raise HTTPException(status_code=404, detail="Perfil no encontrado")
     return InvestorProfileResponseDto(data=_to_dto(row))
@@ -115,7 +115,7 @@ async def create_investor_profile(
         experience=body.experience,
     )
     selected = body.selected_policy_template_id or suggested
-    row = await CreateInvestorProfile(store).execute(
+    row = await CreateInvestorProfile(store).execute(  # type: ignore[arg-type]
         name=body.name,
         horizon=body.horizon,
         objectives=body.objectives,
@@ -136,7 +136,7 @@ async def update_investor_profile(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileResponseDto:
     store = get_investor_profile_repository(session)
-    kwargs: dict = {}
+    kwargs: dict[str, Any] = {}
     if body.name is not None:
         kwargs["name"] = body.name
     if body.horizon is not None:
@@ -157,7 +157,7 @@ async def update_investor_profile(
         kwargs["max_acceptable_loss_pct"] = data["max_acceptable_loss_pct"]
     if "notes" in data:
         kwargs["notes"] = data["notes"]
-    row = await UpdateInvestorProfile(store).execute(profile_id, **kwargs)
+    row = await UpdateInvestorProfile(store).execute(profile_id, **kwargs)  # type: ignore[arg-type]
     if row is None:
         raise HTTPException(status_code=404, detail="Perfil no encontrado")
     return InvestorProfileResponseDto(data=_to_dto(row))
@@ -169,7 +169,7 @@ async def delete_investor_profile(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, bool]:
     store = get_investor_profile_repository(session)
-    ok = await DeleteInvestorProfile(store).execute(profile_id)
+    ok = await DeleteInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
     if not ok:
         raise HTTPException(status_code=404, detail="Perfil no encontrado")
     return {"ok": True}
@@ -195,7 +195,7 @@ async def refresh_observed_profile(
         }
         for m in memories
     ]
-    row = await RefreshObservedProfile(store).execute(profile_id, memory_payloads=payloads)
+    row = await RefreshObservedProfile(store).execute(profile_id, memory_payloads=payloads)  # type: ignore[arg-type]
     if row is None:
         raise HTTPException(status_code=404, detail="Perfil no encontrado")
     return InvestorProfileResponseDto(data=_to_dto(row))
@@ -209,7 +209,7 @@ async def assign_active_profile(
 ) -> AssignProfileResponseDto:
     store = get_investor_profile_repository(session)
     try:
-        pid = await AssignInvestorProfileToAccount(store).execute(account_id, body.profile_id)
+        pid = await AssignInvestorProfileToAccount(store).execute(account_id, body.profile_id)  # type: ignore[arg-type]
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AssignProfileResponseDto(

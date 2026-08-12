@@ -37,7 +37,7 @@ router = APIRouter()
 
 
 class AiGovernanceStatusDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     preferred_provider: str = Field(alias="preferredProvider")
     ollama_available: bool = Field(alias="ollamaAvailable")
@@ -609,7 +609,7 @@ async def analyze_backtest_coach(body: BacktestCoachAnalyzeRequest) -> dict[str,
 
 
 class FundamentalExplainRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId", min_length=1)
 
@@ -636,7 +636,7 @@ async def explain_instrument_fundamentals(
 
 
 class DiaDSessionEvidenceRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     mode: str
     symbol: str
@@ -662,7 +662,7 @@ async def explain_dia_d_session_evidence(body: DiaDSessionEvidenceRequest) -> di
 
 
 class CoreRReviewEvidenceRow(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -671,7 +671,7 @@ class CoreRReviewEvidenceRow(BaseModel):
 
 
 class CoreRReviewEvidenceRequest(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     list_id: str = Field(alias="listId")
     timeframe: str = "1d"

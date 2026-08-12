@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_api.api.dependencies import (
     get_create_signal_alert_use_case,
     get_db_session,
@@ -70,7 +71,7 @@ def _dispatch_dto(item: AlertChannelDispatchResult) -> AlertChannelDispatchDto:
     )
 
 
-def _signal_dto(event) -> SignalEventV1Dto:
+def _signal_dto(event: SignalEventV1) -> SignalEventV1Dto:
     return SignalEventV1Dto(
         id=event.id,
         instrument_id=event.instrument_id,

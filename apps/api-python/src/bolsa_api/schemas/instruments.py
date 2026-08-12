@@ -1,12 +1,14 @@
 """DTOs HTTP de instrumentos / catálogo."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from bolsa_api.schemas.market import SyncResultDto
 
 
 class SyncMetaDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     status: str
     synced_at: str = Field(alias="syncedAt")
@@ -14,7 +16,7 @@ class SyncMetaDto(BaseModel):
 
 
 class SyncDetailDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     status: str
     bars_added: int = Field(alias="barsAdded")
@@ -23,7 +25,7 @@ class SyncDetailDto(BaseModel):
 
 
 class InstrumentDataStatusDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     timeframe: str
     last_bar_date: str | None = Field(alias="lastBarDate", default=None)
@@ -44,7 +46,7 @@ class InstrumentDataStatusResponseDto(BaseModel):
 
 
 class InstrumentDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     symbol: str
@@ -59,7 +61,7 @@ class InstrumentDto(BaseModel):
 
 
 class PriceSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     last_close: float = Field(alias="lastClose")
     previous_close: float | None = Field(alias="previousClose")
@@ -73,7 +75,7 @@ class PriceSummaryDto(BaseModel):
 
 
 class InstrumentDetailMetaDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     last_sync: SyncDetailDto | None = Field(alias="lastSync", default=None)
     price_summary: PriceSummaryDto | None = Field(alias="priceSummary", default=None)
@@ -85,7 +87,7 @@ class InstrumentDetailResponseDto(BaseModel):
 
 
 class OhlcvBarDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     timestamp: str
     open: float
@@ -98,7 +100,7 @@ class OhlcvBarDto(BaseModel):
 
 
 class OhlcvMetaDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     timeframe: str
     count: int
@@ -110,7 +112,7 @@ class OhlcvResponseDto(BaseModel):
 
 
 class IndicatorPointDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     timestamp: str
     sma20: float | None
@@ -120,7 +122,7 @@ class IndicatorPointDto(BaseModel):
 
 
 class IndicatorSignalsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     rsi_zone: str = Field(alias="rsiZone")
     sma_cross: str | None = Field(alias="smaCross")
@@ -136,7 +138,7 @@ class IndicatorsResponseDto(BaseModel):
 
 
 class InstrumentListMetaDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     bar_count: int = Field(alias="barCount")
     last_sync: SyncMetaDto | None = Field(alias="lastSync", default=None)
@@ -148,7 +150,7 @@ class InstrumentListMetaDto(BaseModel):
 
 
 class InstrumentWithMetaDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     symbol: str
@@ -164,13 +166,13 @@ class InstrumentWithMetaDto(BaseModel):
 
 
 class InstrumentQuotesRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     ids: list[str] = Field(min_length=1, max_length=200)
 
 
 class InstrumentProfileResponseDto(BaseModel):
-    data: dict | None = None
+    data: dict[str, Any] | None = None
 
 
 class InstrumentListResponseDto(BaseModel):
@@ -178,7 +180,7 @@ class InstrumentListResponseDto(BaseModel):
 
 
 class ExternalInstrumentSearchHitDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     symbol: str
     yahoo_symbol: str = Field(alias="yahooSymbol")
@@ -189,14 +191,14 @@ class ExternalInstrumentSearchHitDto(BaseModel):
 
 
 class InstrumentSearchResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     catalog: list[InstrumentWithMetaDto]
     external: list[ExternalInstrumentSearchHitDto]
 
 
 class ImportInstrumentRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     yahoo_symbol: str = Field(alias="yahooSymbol", min_length=1, max_length=32)
     symbol: str = Field(min_length=1, max_length=16)
@@ -209,7 +211,7 @@ class ImportInstrumentRequestDto(BaseModel):
 
 
 class ImportInstrumentMetaDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     created: bool
     sync: SyncResultDto | None = None
@@ -221,7 +223,7 @@ class ImportInstrumentResponseDto(BaseModel):
 
 
 class InstrumentOhlcvLayerDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     timeframe: str
     source: str
@@ -231,7 +233,7 @@ class InstrumentOhlcvLayerDto(BaseModel):
 
 
 class InstrumentSyncLogEntryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     provider: str
     status: str
@@ -241,7 +243,7 @@ class InstrumentSyncLogEntryDto(BaseModel):
 
 
 class InstrumentAppDataCountsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     positions: int
     transactions: int
@@ -253,7 +255,7 @@ class InstrumentAppDataCountsDto(BaseModel):
 
 
 class InstrumentRecordDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     symbol: str
@@ -268,11 +270,11 @@ class InstrumentRecordDto(BaseModel):
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
     profile_fetched_at: str | None = Field(alias="profileFetchedAt", default=None)
-    last_xtb_validation: dict | None = Field(alias="lastXtbValidation", default=None)
+    last_xtb_validation: dict[str, Any] | None = Field(alias="lastXtbValidation", default=None)
 
 
 class InstrumentDbInventoryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument: InstrumentRecordDto
     ohlcv_layers: list[InstrumentOhlcvLayerDto] = Field(alias="ohlcvLayers")
@@ -286,7 +288,7 @@ class InstrumentDbInventoryResponseDto(BaseModel):
 
 
 class InstrumentXtbValidationDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     available: bool
     message: str

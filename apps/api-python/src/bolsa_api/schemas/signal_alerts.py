@@ -6,7 +6,7 @@ from bolsa_api.schemas.signals_evaluate import SignalEventV1Dto
 
 
 class SignalAlertSubscriptionDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -50,7 +50,7 @@ class CreateSignalAlertSubscriptionRequestDto(BaseModel):
 
 
 class AlertChannelDispatchDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     subscription_id: str = Field(alias="subscriptionId")
     channel: str
@@ -59,7 +59,7 @@ class AlertChannelDispatchDto(BaseModel):
 
 
 class TriggeredSignalAlertDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     subscription: SignalAlertSubscriptionDto
     signal: SignalEventV1Dto

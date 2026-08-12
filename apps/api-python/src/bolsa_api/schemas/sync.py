@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class SyncSettingsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     auto_sync_enabled: bool = Field(alias="autoSyncEnabled")
     scan_interval_minutes: int = Field(alias="scanIntervalMinutes")
@@ -17,7 +17,7 @@ class SyncSettingsDto(BaseModel):
 
 
 class UpdateSyncSettingsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     auto_sync_enabled: bool | None = Field(alias="autoSyncEnabled", default=None)
     scan_interval_minutes: int | None = Field(
@@ -43,7 +43,7 @@ class SyncSettingsResponseDto(BaseModel):
 
 
 class SyncQueueItemDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")

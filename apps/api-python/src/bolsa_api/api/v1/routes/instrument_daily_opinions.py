@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -54,7 +54,7 @@ def _to_dto(row: InstrumentDailyOpinionRecord) -> InstrumentDailyOpinionDto:
         instrument_id=row.instrument_id,
         account_id=row.account_id,
         as_of_bar_date=row.as_of_bar_date.isoformat(),
-        stance=row.stance,  # type: ignore[arg-type]
+        stance=row.stance,
         dictamen_stars=row.dictamen_stars,
         strategy_stars=row.strategy_stars,
         io_score=row.io_score,
@@ -62,10 +62,10 @@ def _to_dto(row: InstrumentDailyOpinionRecord) -> InstrumentDailyOpinionDto:
         ta_score=row.ta_score,
         distress=row.distress,
         reasons=list(row.reasons),
-        gate_status=row.gate_status,  # type: ignore[arg-type]
+        gate_status=row.gate_status,
         top_id=row.top_id,
         top_version=row.top_version,
-        source=row.source,  # type: ignore[arg-type]
+        source=row.source,
         engine_version=row.engine_version,
         idempotency_key=row.idempotency_key,
         computed_at=_iso(row.computed_at),
@@ -235,7 +235,7 @@ async def run_estudio_eod_opinion_batch(
         email_enabled=body.notify_email_enabled,
     )
 
-    digest_meta: dict | None = None
+    digest_meta: dict[str, Any] | None = None
     want_digest = body.notify_digest_enabled is not None or bool(
         settings.daily_ops_digest_email_enabled
     )

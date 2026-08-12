@@ -248,9 +248,9 @@ def _to_mkl_event_dto(row: MklSyncEvent) -> MklSyncEventDto:
 
 def _consolidation_use_case(session: AsyncSession) -> ConsolidateHypothesis:
     return ConsolidateHypothesis(
-        get_hypothesis_repository(session),
+        get_hypothesis_repository(session),  # type: ignore[arg-type]
         get_hypothesis_belief_repository(session),
-        get_research_evidence_repository(session),
+        get_research_evidence_repository(session),  # type: ignore[arg-type]
         get_knowledge_node_repository(session),
         get_research_tree_repository(session),
     )
@@ -476,9 +476,9 @@ async def get_consolidation_eligibility(
     ] = False,
 ) -> ConsolidationEligibilityResponseDto:
     use_case = EvaluateConsolidation(
-        get_hypothesis_repository(session),
+        get_hypothesis_repository(session),  # type: ignore[arg-type]
         get_hypothesis_belief_repository(session),
-        get_research_evidence_repository(session),
+        get_research_evidence_repository(session),  # type: ignore[arg-type]
         get_knowledge_node_repository(session),
     )
     report = await use_case.execute(

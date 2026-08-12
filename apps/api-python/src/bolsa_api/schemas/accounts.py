@@ -1,10 +1,12 @@
 """DTOs HTTP de cuentas de trading/DEMO."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class CommissionProfileDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     preset_id: str = Field(alias="presetId")
     label: str
@@ -17,7 +19,7 @@ class CommissionProfileDto(BaseModel):
 
 
 class TaxProfileDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     jurisdiction: str
     cost_basis_method: str = Field(alias="costBasisMethod")
@@ -28,7 +30,7 @@ class TaxProfileDto(BaseModel):
 
 
 class AccountSettingsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     commission: CommissionProfileDto
     tax: TaxProfileDto
@@ -36,7 +38,7 @@ class AccountSettingsDto(BaseModel):
 
 
 class InvestmentAccountDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     user_id: str | None = Field(alias="userId")
@@ -57,11 +59,11 @@ class InvestmentAccountDto(BaseModel):
     last_activity_at: str | None = Field(alias="lastActivityAt")
     strategy_definition_id: str | None = Field(default=None, alias="strategyDefinitionId")
     source_backtest_run_id: str | None = Field(default=None, alias="sourceBacktestRunId")
-    lab_evidence: dict | None = Field(default=None, alias="labEvidence")
+    lab_evidence: dict[str, Any] | None = Field(default=None, alias="labEvidence")
 
 
 class InvestmentPortfolioDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     account_id: str = Field(alias="accountId")
@@ -74,7 +76,7 @@ class InvestmentPortfolioDto(BaseModel):
 
 
 class AccountSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     account: InvestmentAccountDto
     default_portfolio: InvestmentPortfolioDto = Field(alias="defaultPortfolio")
@@ -90,7 +92,7 @@ class AccountSummaryDto(BaseModel):
 
 
 class LedgerEntryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     account_id: str = Field(alias="accountId")
@@ -184,7 +186,7 @@ class LedgerResponseDto(BaseModel):
 
 
 class RealizedGainLineDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -201,7 +203,7 @@ class RealizedGainLineDto(BaseModel):
 
 
 class UnrealizedGainLineDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -214,7 +216,7 @@ class UnrealizedGainLineDto(BaseModel):
 
 
 class TaxReportSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     account_id: str = Field(alias="accountId")
     currency: str
@@ -255,7 +257,7 @@ class WithdrawCashDto(BaseModel):
 
 
 class CashMovementResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     account_id: str = Field(alias="accountId")
@@ -285,7 +287,7 @@ class SendDailyOpsDigestDto(BaseModel):
 
 
 class DailyOpsDigestNotifyDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     digest_enabled: bool = Field(alias="digestEnabled")
     sent: bool
