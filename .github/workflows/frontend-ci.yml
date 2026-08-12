@@ -46,6 +46,14 @@ jobs:
       - name: Build shared
         run: pnpm --filter @bolsa/shared build
 
+      - name: Typecheck shared
+        run: pnpm --filter @bolsa/shared typecheck
+
+      - name: Test shared
+        # Paquete @bolsa/shared: ejecuta sus propios tests (vitest, node) que
+        # antes quedaban huerfanos (sin script 'test' propio) — hallazgo P2.6.
+        run: pnpm --filter @bolsa/shared test
+
       - name: Typecheck
         run: pnpm --filter @bolsa/web typecheck
 
