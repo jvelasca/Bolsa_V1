@@ -15,6 +15,8 @@ from bolsa_market.indices.remote_market_constituents import (
     fetch_stoxx50e_members,
     fetch_yfiua_members,
 )
+from bolsa_market.indices.remote_market_constituents import RemoteMember as RemoteIntlMember
+from bolsa_market.indices.wikipedia_constituents import RemoteMember as WikipediaMember
 from bolsa_market.indices.wikipedia_constituents import fetch_sp100_members, fetch_sp500_members
 
 
@@ -116,7 +118,7 @@ def _bundle(
 
 def _from_remote(
 
-    remote: tuple,
+    remote: tuple[RemoteIntlMember | WikipediaMember, ...],
 
     *,
 

@@ -92,6 +92,12 @@ def compute_piotroski_f(
     if not all((balance_curr, balance_prev, income_curr, income_prev, cashflow_curr)):
         return None, None
 
+    assert balance_curr is not None
+    assert balance_prev is not None
+    assert income_curr is not None
+    assert income_prev is not None
+    assert cashflow_curr is not None
+
     ta_c = _first_present(balance_curr, "totalAssets")
     ta_p = _first_present(balance_prev, "totalAssets")
     tca_c = _first_present(balance_curr, "totalCurrentAssets")
