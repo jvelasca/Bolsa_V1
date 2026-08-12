@@ -7,7 +7,7 @@
 > **Rama de ejecución:** `stage/f5a-openapi-fetch-2026-08-12` (desde base `d25d71f` = tip PR #51 en
 > `stage/f1-integridad-financiera-2026-08-11`).
 > **Regla del hilo:** NO tocar código fuera del alcance de la fase. Batería por paso.
-> **Estado:** **COMMITEADO + PR #52 ABIERTO** (commit `a302f22`). Batería local VERDE. CI: `scan` ✓, `quality`/`battery` pendientes.
+> **Estado:** **COMPLETADO + MERGEADO 2026-08-12** (PR #52 merged, base `stage/f1-*` → `cd6bf35`; working tree limpio). CI: `battery`/`quality`/`scan` VERDES.
 
 ---
 
@@ -62,6 +62,7 @@ como cliente íntegro, **sin** reconciliar DTOs campo-a-campo ni fidelidad de ti
 | 2026-08-12 | Subagente (ejecución pesada) reescribe `api.ts` con openapi-fetch 0.17.0. Batería del subagente: typecheck 0 · lint 0 · test 714 ✓ · shared 0.                                                        |
 | 2026-08-12 | Verificación independiente del hilo principal: typecheck ✓ · lint 0 (2 warnings pre-existentes) · test **714/141** · shared ✓ · **contract:check VERDE** · árbol limpio (solo 3 ficheros en alcance). |
 | 2026-08-12 | Commit `a302f22` y **PR #52 abierto** → base `stage/f1-*`. CI: `scan` ✓, `quality`/`battery` en curso.                                                                                                |
+| 2026-08-12 | Battery/quality/scan **VERDES** en PR #52. Commit docs `cfebdcb`. **PR #52 MERGED** (merge commit `cd6bf35` en `stage/f1-*`); base viva ahora `cd6bf35`, working tree limpio.                         |
 
 ## 6. Deuda / fuera de alcance (sin resolver aquí)
 
