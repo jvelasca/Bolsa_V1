@@ -185,21 +185,21 @@ class SqlAlchemyMandateRepository:
             }
             if not fields["instrument_id"]:
                 continue
-            existing = await self._session.get(MandateTradeLinkRow, tx_id)
-            if existing is None:
+            existing_link = await self._session.get(MandateTradeLinkRow, tx_id)
+            if existing_link is None:
                 self._session.add(MandateTradeLinkRow(transaction_id=tx_id, **fields))
             else:
                 for k, v in fields.items():
-                    setattr(existing, k, v)
+                    setattr(existing_link, k, v)
 
         existing_links = (
             await self._session.execute(
                 select(MandateTradeLinkRow).where(MandateTradeLinkRow.account_id == account_id)
             )
         ).scalars().all()
-        for row in existing_links:
-            if row.transaction_id not in incoming_tx:
-                await self._session.delete(row)
+        for link_row in existing_links:
+            if link_row.transaction_id not in incoming_tx:
+                await self._session.delete(link_row)
 
         await self._session.commit()
         return (

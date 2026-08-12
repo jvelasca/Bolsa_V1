@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from datetime import UTC, datetime
 from typing import Any
 
@@ -94,7 +95,7 @@ class SqlAlchemyHypothesisRepository:
         hypothesis_id: str,
         *,
         statement: str | None = None,
-        falsifiers: list[dict[str, Any]] | None = None,
+        falsifiers: builtins.list[dict[str, Any]] | None = None,
         kind: str | None = None,
         domain: str | None = None,
         context: dict[str, Any] | None = None,

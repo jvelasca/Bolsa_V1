@@ -3,6 +3,7 @@ from typing import Any
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.expression import ColumnElement
 
 from bolsa_domain.entities.research_tree import ResearchTreeEdge
 from bolsa_infrastructure.database.models import ResearchTreeEdgeRow
@@ -82,7 +83,7 @@ class SqlAlchemyResearchTreeRepository:
         limit: int = 100,
         offset: int = 0,
     ) -> tuple[list[ResearchTreeEdge], int]:
-        filters = []
+        filters: list[ColumnElement[bool]] = []
         if not include_deleted:
             filters.append(ResearchTreeEdgeRow.deleted_at.is_(None))
         if from_ref_type:

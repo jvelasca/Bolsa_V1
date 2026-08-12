@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from sqlalchemy import Float, and_, asc, cast, desc, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.expression import ColumnElement
 
 from bolsa_domain.entities.research_trial import ResearchTrial
 from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
@@ -111,7 +112,7 @@ class SqlAlchemyResearchTrialRepository:
         await self._session.flush()
         return self._map(row)
 
-    def _metric_float(self, key: str):
+    def _metric_float(self, key: str) -> ColumnElement[float]:
         return cast(ResearchTrialRow.is_metrics[key].as_string(), Float)
 
     async def list_trials(
@@ -348,7 +349,7 @@ class SqlAlchemyResearchTrialRepository:
             "byOrigin": by_origin,
         }
 
-    def _metric_present(self, key: str):
+    def _metric_present(self, key: str) -> ColumnElement[bool]:
         raw = ResearchTrialRow.is_metrics[key].as_string()
         return and_(raw.isnot(None), raw != "null", raw != "")
 
