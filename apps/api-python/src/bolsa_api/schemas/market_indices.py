@@ -1,11 +1,13 @@
 """DTOs HTTP de índices y constitutivos."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class IndexHitDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -41,7 +43,7 @@ class MarketIndicesSearchResponseDto(BaseModel):
 
 class CatalogIndexEntryDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -77,7 +79,7 @@ class MarketIndexCatalogResponseDto(BaseModel):
 
 class IndexConstituentMemberDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -93,7 +95,7 @@ class IndexConstituentMemberDto(BaseModel):
 
 class IndexConstituentDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -123,7 +125,7 @@ class IndexConstituentsResponseDto(BaseModel):
 
 class SubscribeMarketIndexRequestDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -139,7 +141,7 @@ class SubscribeMarketIndexRequestDto(BaseModel):
 
 class SubscribeProgressDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -161,7 +163,7 @@ class SubscribeProgressDto(BaseModel):
 
 class SubscribeMarketIndexResultDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -195,7 +197,7 @@ class SubscribeMarketIndexResponseDto(BaseModel):
 
 class IndexSubscribeJobDto(BaseModel):
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
 
 
@@ -203,9 +205,9 @@ class IndexSubscribeJobDto(BaseModel):
 
     status: str
 
-    payload: dict
+    payload: dict[str, Any]
 
-    result: dict | None = None
+    result: dict[str, Any] | None = None
 
     error: str | None = None
 

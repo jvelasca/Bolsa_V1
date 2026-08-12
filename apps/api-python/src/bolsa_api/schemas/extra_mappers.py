@@ -1,5 +1,7 @@
 """Mappers auxiliares dominio ↔ DTO (extras)."""
 
+from typing import Any
+
 from bolsa_api.schemas.backtests import (
     BacktestEquityPointDto,
     BacktestRunDetailDto,
@@ -21,7 +23,7 @@ from bolsa_api.schemas.portfolio import (
     PositionDto,
     TransactionDto,
 )
-from bolsa_application.optimize import OptimizeSmaGridResult
+from bolsa_application.optimize import OptimizeGridTrial, OptimizeSmaGridResult
 from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
 from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
 from bolsa_domain.value_objects.market import InstrumentLiveQuote, MarketProviderStatus, SyncResult
@@ -121,7 +123,7 @@ def to_transaction_dto(transaction: Transaction) -> TransactionDto:
     )
 
 
-def to_trade_response_data(result: TradeResult) -> dict:
+def to_trade_response_data(result: TradeResult) -> dict[str, Any]:
     return {
         "transaction": to_transaction_dto(result.transaction).model_dump(by_alias=True),
         "summary": to_portfolio_summary_dto(result.summary).model_dump(by_alias=True),
@@ -154,7 +156,7 @@ def to_backtest_run_dto(run: BacktestRun) -> BacktestRunDto:
     )
 
 
-def _equity_curve_from_manifest(manifest: dict | None) -> list[BacktestEquityPointDto]:
+def _equity_curve_from_manifest(manifest: dict[str, Any] | None) -> list[BacktestEquityPointDto]:
     if not manifest:
         return []
     outputs = manifest.get("outputs")
@@ -174,7 +176,7 @@ def _equity_curve_from_manifest(manifest: dict | None) -> list[BacktestEquityPoi
     return points
 
 
-def _trade_reasons_from_manifest(manifest: dict | None) -> list[dict | None]:
+def _trade_reasons_from_manifest(manifest: dict[str, Any] | None) -> list[dict[str, Any] | None]:
     if not manifest:
         return []
     outputs = manifest.get("outputs")
@@ -207,7 +209,7 @@ def to_backtest_detail_dto(run: BacktestRunDetail) -> BacktestRunDetailDto:
     )
 
 
-def _to_sma_grid_trial_dto(trial) -> SmaGridTrialDto:
+def _to_sma_grid_trial_dto(trial: OptimizeGridTrial) -> SmaGridTrialDto:
     params = getattr(trial, "params", None) or {}
     oos = getattr(trial, "oos_metrics", None)
     return SmaGridTrialDto(

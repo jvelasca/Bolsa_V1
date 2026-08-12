@@ -127,7 +127,7 @@ async def run_scan(
             universe_instrument_ids=body.universe.instrument_ids,
             strategy_definition_id=body.strategy_definition_id,
             definition=body.definition,
-            preset_key=body.preset_key,  # type: ignore[arg-type]
+            preset_key=body.preset_key,
             timeframe=body.timeframe,
             bar_limit=body.bar_limit,
             max_results=body.max_results,

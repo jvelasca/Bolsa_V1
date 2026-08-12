@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class SyncResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     bars_added: int = Field(alias="barsAdded")
     status: str
@@ -20,7 +20,7 @@ class SyncResponseDto(BaseModel):
 
 
 class LiveQuoteSourceDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     price: float
     timestamp: str
@@ -36,7 +36,7 @@ class XtbQuoteDto(BaseModel):
 
 
 class LiveQuoteResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -67,7 +67,7 @@ class MarketProvidersResponseDto(BaseModel):
 
 
 class FxRateDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     from_currency: str = Field(alias="from")
     to_currency: str = Field(alias="to")

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class PriceAlertDto(BaseModel):
     """Alerta de precio persistida (activa o disparada)."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -40,7 +40,7 @@ class PriceAlertResponseDto(BaseModel):
 class CreatePriceAlertRequestDto(BaseModel):
     """Alta de alerta de precio."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     condition: str

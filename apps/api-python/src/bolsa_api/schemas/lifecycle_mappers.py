@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from bolsa_api.schemas.instrument_lifecycle import (
     InstrumentRemovalPreviewDto,
     ListMembershipRefDto,
@@ -100,5 +102,5 @@ def to_purge_orphans_result_dto(raw: dict[str, object]) -> PurgeOrphansResultDto
     return PurgeOrphansResultDto(
         purged_ids=[str(x) for x in purged_ids] if isinstance(purged_ids, list) else [],
         skipped=skipped,
-        scanned=int(raw.get("scanned") or 0),
+        scanned=int(cast(int, raw.get("scanned") or 0)),
     )

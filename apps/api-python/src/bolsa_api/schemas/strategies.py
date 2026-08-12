@@ -1,10 +1,12 @@
 """DTOs HTTP de definiciones de estrategia."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class StrategyDefinitionSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     name: str
@@ -18,7 +20,7 @@ class StrategyDefinitionSummaryDto(BaseModel):
 
 
 class StrategyDefinitionDetailDto(StrategyDefinitionSummaryDto):
-    definition: dict
+    definition: dict[str, Any]
 
 
 class StrategyDefinitionsListResponseDto(BaseModel):
@@ -43,14 +45,14 @@ class UpsertStrategyDefinitionRequestDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     name: str
-    definition: dict
+    definition: dict[str, Any]
 
 
 class UpdateStrategyDefinitionRequestDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     name: str | None = None
-    definition: dict | None = None
+    definition: dict[str, Any] | None = None
 
 
 class DraftStrategyFromPromptRequestDto(BaseModel):
@@ -61,7 +63,7 @@ class DraftStrategyFromPromptRequestDto(BaseModel):
 
 
 class DraftStrategyFromPromptResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     draft_kind: str = Field(alias="draftKind")
     preset_key: str = Field(alias="presetKey")
@@ -69,12 +71,12 @@ class DraftStrategyFromPromptResultDto(BaseModel):
     suggested_name: str = Field(alias="suggestedName")
     confidence: float
     explanation: str
-    definition: dict
+    definition: dict[str, Any]
     engine: str
     validated: bool
     gate_preset_key: str | None = Field(default=None, alias="gatePresetKey")
     min_score: float | None = Field(default=None, alias="minScore")
-    feedback: dict | None = None
+    feedback: dict[str, Any] | None = None
 
 
 class DraftStrategyFromPromptResponseDto(BaseModel):

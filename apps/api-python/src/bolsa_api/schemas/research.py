@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ResearchTrialDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -30,7 +30,7 @@ class ResearchTrialDto(BaseModel):
 
 
 class ResearchTrialsListResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: list[ResearchTrialDto]
     total: int
@@ -43,7 +43,7 @@ class ResearchTrialDetailResponseDto(BaseModel):
 
 
 class InstrumentResearchSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -63,7 +63,7 @@ class InstrumentResearchSummaryResponseDto(BaseModel):
 
 
 class LabByInstrumentDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     symbol: str
@@ -73,7 +73,7 @@ class LabByInstrumentDto(BaseModel):
 
 
 class LabByPresetDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     preset_key: str = Field(alias="presetKey")
     trials: int
@@ -81,7 +81,7 @@ class LabByPresetDto(BaseModel):
 
 
 class LabByOriginDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     proposed_by: str = Field(alias="proposedBy")
     trials: int
@@ -89,7 +89,7 @@ class LabByOriginDto(BaseModel):
 
 
 class LaboratoryResearchSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     total_trials: int = Field(alias="totalTrials")
     total_k: int = Field(alias="totalK")
@@ -108,14 +108,14 @@ class LaboratoryResearchSummaryResponseDto(BaseModel):
 
 
 class LabHealthMetricCoverageDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     present: int
     pct: float
 
 
 class LabHealthCampaignDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     campaign_id: str = Field(alias="campaignId")
     trials: int
@@ -124,7 +124,7 @@ class LabHealthCampaignDto(BaseModel):
 class LabHealthDto(BaseModel):
     """Q0.1 — sanidad del ledger (cobertura métricas / zero-trades / campañas)."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     total_trials: int = Field(alias="totalTrials")
     coverage: dict[str, LabHealthMetricCoverageDto]
@@ -154,7 +154,7 @@ EvidenceLevelParam = Literal["A", "B", "C", "D"]
 
 
 class ResearchEvidenceDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -170,7 +170,7 @@ class ResearchEvidenceDto(BaseModel):
 
 
 class ResearchEvidenceListResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: list[ResearchEvidenceDto]
     total: int
@@ -202,7 +202,7 @@ HypothesisStatusParam = Literal["open", "paused", "abandoned", "consolidated"]
 
 
 class HypothesisDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     kind: str
@@ -244,7 +244,7 @@ class HypothesisDetailResponseDto(BaseModel):
 
 
 class HypothesesListResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: list[HypothesisDto]
     total: int
@@ -259,7 +259,7 @@ class LinkTrialHypothesisRequestDto(BaseModel):
 
 
 class HypothesisBeliefDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     hypothesis_id: str = Field(alias="hypothesisId")
@@ -283,7 +283,7 @@ class HypothesisBeliefResponseDto(BaseModel):
 
 
 class BeliefHistoryEntryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     hypothesis_id: str = Field(alias="hypothesisId")
@@ -300,7 +300,7 @@ class BeliefHistoryEntryDto(BaseModel):
 
 
 class BeliefHistoryListResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: list[BeliefHistoryEntryDto]
     total: int
@@ -314,7 +314,7 @@ KnowledgeStageParam = Literal[
 
 
 class KnowledgeNodeDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     hypothesis_id: str = Field(alias="hypothesisId")
@@ -337,7 +337,7 @@ class KnowledgeNodeDetailResponseDto(BaseModel):
 
 
 class KnowledgeNodesListResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: list[KnowledgeNodeDto]
     total: int
@@ -359,7 +359,7 @@ class ConsolidationRequestDto(BaseModel):
 
 
 class ConsolidationResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     created: bool
     node: KnowledgeNodeDto | None = None
@@ -375,7 +375,7 @@ class ConsolidationEligibilityResponseDto(BaseModel):
 
 
 class ResearchTreeEdgeDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     from_ref_type: str = Field(alias="fromRefType")
@@ -406,7 +406,7 @@ class ResearchTreeEdgeDetailResponseDto(BaseModel):
 
 
 class ResearchTreeEdgesListResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: list[ResearchTreeEdgeDto]
     total: int
@@ -422,7 +422,7 @@ class MklSyncRequestDto(BaseModel):
 
 
 class MklSyncEventDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     knowledge_node_id: str = Field(alias="knowledgeNodeId")
@@ -434,7 +434,7 @@ class MklSyncEventDto(BaseModel):
 
 
 class MklSyncResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     synced: bool
     dry_run: bool = Field(alias="dryRun")
@@ -448,7 +448,7 @@ class MklSyncResultResponseDto(BaseModel):
 
 
 class MklSyncEventsListResponseDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: list[MklSyncEventDto]
     total: int

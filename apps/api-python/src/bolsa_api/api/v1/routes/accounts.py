@@ -1,7 +1,7 @@
 """API: cuentas DEMO/trading (CRUD + resumen)."""
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -236,7 +236,7 @@ async def get_daily_ops_report(
         str | None,
         Query(alias="instrumentIds", description="IDs Estudio separados por coma"),
     ] = None,
-) -> dict:
+) -> dict[str, Any]:
     """R1 — resumen operativo del día (preview web; email = R3)."""
     from datetime import date as date_cls
 

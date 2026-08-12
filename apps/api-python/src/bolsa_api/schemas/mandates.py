@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class MandateTenureDto(BaseModel):
     """Tramo de mandato (estrategia×instrumento×cuenta) abierto o cerrado."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     account_id: str = Field(alias="accountId")
@@ -31,7 +31,7 @@ class MandateTenureDto(BaseModel):
 class MandateTradeLinkDto(BaseModel):
     """Vínculo fill/transacción → tenure (flujo enlazado, no MTM)."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     transaction_id: str = Field(alias="transactionId")
     mandate_tenure_id: str = Field(alias="mandateTenureId")
@@ -44,7 +44,7 @@ class MandateTradeLinkDto(BaseModel):
 class MandateBundleDto(BaseModel):
     """Bundle tenures + links de una cuenta."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     tenures: list[MandateTenureDto]
     links: list[MandateTradeLinkDto]
@@ -53,7 +53,7 @@ class MandateBundleDto(BaseModel):
 class MandateBundleResponseDto(BaseModel):
     """Respuesta GET envuelta en ``data``."""
 
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     data: MandateBundleDto
 

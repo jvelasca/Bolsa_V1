@@ -1,5 +1,7 @@
 """DTOs HTTP de trackers (Ayuda / Config)."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -11,7 +13,7 @@ class TrackerUniverseDto(BaseModel):
 
 
 class TrackerDefinitionSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     name: str
@@ -26,7 +28,7 @@ class TrackerDefinitionSummaryDto(BaseModel):
 
 
 class TrackerDefinitionDetailDto(TrackerDefinitionSummaryDto):
-    definition: dict
+    definition: dict[str, Any]
 
 
 class TrackerDefinitionsListResponseDto(BaseModel):
@@ -52,9 +54,9 @@ class CreateTrackerDefinitionRequestDto(BaseModel):
     bar_limit: int = Field(default=500, alias="barLimit")
     max_results: int = Field(default=100, alias="maxResults")
     evaluation_mode: str = Field(default="bar_close", alias="evaluationMode")
-    rank_by: dict | None = Field(default=None, alias="rankBy")
+    rank_by: dict[str, Any] | None = Field(default=None, alias="rankBy")
     default_execution_policy_id: str | None = Field(default=None, alias="defaultExecutionPolicyId")
-    schedule: dict | None = None
+    schedule: dict[str, Any] | None = None
     origin: str = "manual"
     source_prompt: str | None = Field(default=None, alias="sourcePrompt")
     enabled: bool = True
@@ -71,16 +73,16 @@ class UpdateTrackerDefinitionRequestDto(BaseModel):
     bar_limit: int | None = Field(default=None, alias="barLimit")
     max_results: int | None = Field(default=None, alias="maxResults")
     evaluation_mode: str | None = Field(default=None, alias="evaluationMode")
-    rank_by: dict | None = Field(default=None, alias="rankBy")
+    rank_by: dict[str, Any] | None = Field(default=None, alias="rankBy")
     default_execution_policy_id: str | None = Field(default=None, alias="defaultExecutionPolicyId")
-    schedule: dict | None = None
+    schedule: dict[str, Any] | None = None
     origin: str | None = None
     source_prompt: str | None = Field(default=None, alias="sourcePrompt")
     enabled: bool | None = None
 
 
 class TrackerScheduleRunResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     tracker_id: str = Field(alias="trackerId")
     tracker_name: str = Field(alias="trackerName")
@@ -91,4 +93,4 @@ class TrackerScheduleRunResultDto(BaseModel):
 
 
 class EvaluateTrackerSchedulesResponseDto(BaseModel):
-    data: dict
+    data: dict[str, Any]

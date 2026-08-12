@@ -37,9 +37,9 @@ def _to_dto(row: InstrumentNarrativeRecord) -> InstrumentNarrativeDto:
     return InstrumentNarrativeDto(
         id=row.id,
         instrument_id=row.instrument_id,
-        scope=row.scope,  # type: ignore[arg-type]
+        scope=row.scope,
         body=row.body,
-        source=row.source,  # type: ignore[arg-type]
+        source=row.source,
         version=row.version,
         created_at=_iso(row.created_at),
         updated_at=_iso(row.updated_at),

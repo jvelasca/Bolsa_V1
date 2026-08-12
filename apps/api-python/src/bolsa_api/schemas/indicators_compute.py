@@ -11,7 +11,7 @@ class IndicatorSpecDto(BaseModel):
 
 
 class OhlcvBarInputDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     timestamp: str
     open: float
@@ -41,7 +41,7 @@ class IndicatorLineSeriesDto(BaseModel):
 
 
 class IndicatorSpecSeriesDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     definition_id: str = Field(alias="definitionId")
     parameters: dict[str, int | float | bool | str]

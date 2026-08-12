@@ -1,10 +1,12 @@
 """DTOs HTTP de políticas de ejecución."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExecutionPolicySummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     name: str
@@ -19,7 +21,7 @@ class ExecutionPolicySummaryDto(BaseModel):
 
 
 class ExecutionPolicyDetailDto(ExecutionPolicySummaryDto):
-    definition: dict
+    definition: dict[str, Any]
 
 
 class ExecutionPoliciesListResponseDto(BaseModel):
@@ -62,22 +64,22 @@ class UpdateExecutionPolicyRequestDto(BaseModel):
 
 
 class ExecutionActionResultDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     signal_kind: str = Field(alias="signalKind")
     status: str
     reason: str | None = None
     transaction_id: str | None = Field(default=None, alias="transactionId")
-    dispatches: list[dict] | None = None
+    dispatches: list[dict[str, Any]] | None = None
 
 
 class RouteSignalsRequestDto(BaseModel):
-    hits: list[dict]
+    hits: list[dict[str, Any]]
 
 
 class RouteSignalsResponseDto(BaseModel):
-    data: dict
+    data: dict[str, Any]
 
 
 class ExecuteScanJobRequestDto(BaseModel):

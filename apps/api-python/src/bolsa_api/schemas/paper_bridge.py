@@ -1,5 +1,7 @@
 """DTOs HTTP del puente paper (broker futuro / D)."""
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -9,4 +11,4 @@ class DeployPaperAccountRequestDto(BaseModel):
     initial_deposit: float | None = Field(default=None, alias="initialDeposit")
     account_name: str | None = Field(default=None, alias="accountName")
     source_backtest_run_id: str | None = Field(default=None, alias="sourceBacktestRunId")
-    lab_evidence: dict | None = Field(default=None, alias="labEvidence")
+    lab_evidence: dict[str, Any] | None = Field(default=None, alias="labEvidence")

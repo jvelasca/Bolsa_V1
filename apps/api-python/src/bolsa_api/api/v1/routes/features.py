@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 class FeatureDefDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     feature_id: str = Field(alias="featureId")
     feature_key: str = Field(alias="featureKey")
@@ -28,7 +28,7 @@ class FeatureDefDto(BaseModel):
 
 
 class FeatureSetDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     feature_set_id: str = Field(alias="featureSetId")
     version: str
@@ -38,7 +38,7 @@ class FeatureSetDto(BaseModel):
 
 
 class FeatureSnapshotDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     feature_set_id: str = Field(alias="featureSetId")

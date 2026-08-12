@@ -3,7 +3,7 @@
 Endpoints bajo /api/instruments*. Los DTOs Pydantic viven en bolsa_api.schemas.
 Los casos de uso se inyectan vía bolsa_api.api.dependencies.
 """
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
@@ -87,7 +87,7 @@ def _parse_timeframe(value: str) -> TimeFrame:
 
 
 class SyncRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     years_back: int | None = Field(alias="yearsBack", default=5, ge=1, le=30)
 
@@ -221,7 +221,7 @@ class FundamentalScreenerRunBody(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     universe: FundamentalScreenerUniverseBody
-    fundamental_gate: dict = Field(alias="fundamentalGate")
+    fundamental_gate: dict[str, Any] = Field(alias="fundamentalGate")
     refresh_stale: bool = Field(default=True, alias="refreshStale")
     max_results: int = Field(default=100, alias="maxResults", ge=1, le=500)
     persist: FundamentalScreenerPersistBody | None = None
@@ -231,7 +231,7 @@ class FundamentalScreenerRunBody(BaseModel):
 async def run_fundamental_screener(
     body: FundamentalScreenerRunBody,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> dict:
+) -> dict[str, Any]:
     """
     F4 — Screener FA: universo × gate → lista blanca (sin timing técnico).
     Opcional: persistir hits en lista snapshot.
@@ -349,7 +349,7 @@ async def get_instrument_composite(
     horizon: Annotated[str, Query()] = "swing",
     regime: Annotated[str, Query()] = "neutral",
     as_of: Annotated[str | None, Query(alias="asOf")] = None,
-) -> dict:
+) -> dict[str, Any]:
     """
     F3 — Composite Investment Score (Monitor).
     Piernas TA+FUND+régimen+liquidez+perfil; portfolio constraints stub.
@@ -373,7 +373,7 @@ async def get_instrument_composite(
 async def list_instrument_filings(
     instrument_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> dict:
+) -> dict[str, Any]:
     """F2b lite — lista metadatos de filings en disco (no toca Score_FUND)."""
     from bolsa_application.instrument_filings import InstrumentFilingsService
 
@@ -389,7 +389,7 @@ async def upload_instrument_filing(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     file: Annotated[UploadFile, File(...)],
     kind: Annotated[str, Form()] = "10-K",
-) -> dict:
+) -> dict[str, Any]:
     """F2b lite — sube PDF o TXT 10-K/10-Q. Extracto en disco; sin RAG."""
     from bolsa_application.instrument_filings import InstrumentFilingsService
     from bolsa_market.filing_store import ALLOWED_KINDS
@@ -417,7 +417,7 @@ async def fetch_instrument_filing_from_sec(
     instrument_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     kind: Annotated[str, Query()] = "10-K",
-) -> dict:
+) -> dict[str, Any]:
     """
     F2b+ — descarga el último 10-K/10-Q desde SEC EDGAR al almacén local.
     Solo tickers US. No altera Score_FUND. Sin RAG.
@@ -443,7 +443,7 @@ async def delete_instrument_filing(
     instrument_id: str,
     filing_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> dict:
+) -> dict[str, Any]:
     """F2b lite — elimina filing del almacén local."""
     from bolsa_application.instrument_filings import InstrumentFilingsService
 

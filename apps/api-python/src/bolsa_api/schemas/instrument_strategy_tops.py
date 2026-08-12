@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class InstrumentStrategyTopSlotDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     rank: Literal[1, 2, 3]
     label: str
@@ -26,7 +26,7 @@ class InstrumentStrategyTopSlotDto(BaseModel):
 
 
 class InstrumentStrategyTopDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     artifact_type: str = Field(default="ART-INSTRUMENT-TOP", alias="artifactType")
     schema_version: str = Field(default="1.0.0", alias="schemaVersion")

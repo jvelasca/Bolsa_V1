@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class FundamentalPillarsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     value: float
     quality: float
@@ -17,7 +17,7 @@ class FundamentalPillarsDto(BaseModel):
 
 
 class FundamentalCardMetadataDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     provider: str
     source_version: str | None = Field(default=None, alias="sourceVersion")
@@ -35,7 +35,7 @@ class FundamentalCardMetadataDto(BaseModel):
 
 
 class FundamentalCardDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     schema_version: str = Field(alias="schemaVersion")
     instrument_id: str = Field(alias="instrumentId")
@@ -57,7 +57,7 @@ class FundamentalCardResponseDto(BaseModel):
 
 
 class FundamentalChipDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_id: str = Field(alias="instrumentId")
     ticker: str
@@ -71,7 +71,7 @@ class FundamentalChipDto(BaseModel):
 
 
 class QueryInstrumentFundamentalsDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     instrument_ids: list[str] = Field(alias="instrumentIds", min_length=1, max_length=80)
 

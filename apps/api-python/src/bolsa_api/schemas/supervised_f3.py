@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class SupervisedF3BundleDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     account_id: str = Field(alias="accountId")
     items: list[dict[str, Any]] = Field(default_factory=list)
@@ -24,7 +24,7 @@ class SupervisedF3BundleResponseDto(BaseModel):
 
 
 class SyncSupervisedF3BundleDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     items: list[dict[str, Any]] = Field(default_factory=list)
     active_id: str | None = Field(default=None, alias="activeId")

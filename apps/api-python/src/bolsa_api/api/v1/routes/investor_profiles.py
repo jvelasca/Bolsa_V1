@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,7 +136,7 @@ async def update_investor_profile(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileResponseDto:
     store = get_investor_profile_repository(session)
-    kwargs: dict = {}
+    kwargs: dict[str, Any] = {}
     if body.name is not None:
         kwargs["name"] = body.name
     if body.horizon is not None:

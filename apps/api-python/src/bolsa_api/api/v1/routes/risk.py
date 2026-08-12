@@ -10,6 +10,8 @@ memoria de proceso y Redis (best-effort).
 
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
@@ -33,7 +35,7 @@ class KillSwitchResponse(BaseModel):
     runtimeMemory: bool
     redis: bool | None = None
     paperDExecuteEnv: bool = False
-    updated: dict | None = None
+    updated: dict[str, Any] | None = None
 
 
 @router.get("/kill-switch", response_model=KillSwitchResponse)

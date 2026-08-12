@@ -1,6 +1,6 @@
 """DTOs HTTP de cartera / posiciones."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,7 +13,7 @@ class PortfolioDto(BaseModel):
 
 
 class PositionDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     instrument_id: str = Field(alias="instrumentId")
@@ -28,7 +28,7 @@ class PositionDto(BaseModel):
 
 
 class PortfolioSummaryDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     portfolio: PortfolioDto
     positions: list[PositionDto]
@@ -43,7 +43,7 @@ class PortfolioSummaryResponseDto(BaseModel):
 
 
 class TransactionDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
     id: str
     type: str
@@ -70,4 +70,4 @@ class TradeRequestDto(BaseModel):
 
 
 class TradeResponseDto(BaseModel):
-    data: dict
+    data: dict[str, Any]
