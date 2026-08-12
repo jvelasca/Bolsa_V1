@@ -1,6 +1,6 @@
 """Contrato/Puerto de repositorio para instrumentos y su log de sincronización (Protocol)."""
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from bolsa_domain.entities.instrument import Instrument
 
@@ -55,4 +55,4 @@ class InstrumentRepository(Protocol):
 
     async def get_last_sync_detail(self, instrument_id: str) -> SyncLogDetail | None: ...
 
-    async def get_fundamentals(self, instrument_id: str) -> dict | None: ...
+    async def get_fundamentals(self, instrument_id: str) -> dict[str, Any] | None: ...

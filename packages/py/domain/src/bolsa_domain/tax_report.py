@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
+
+from bolsa_domain.entities.account import LedgerEntry
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +74,7 @@ def _sort_tx(transactions: list[TaxReportTransaction]) -> list[TaxReportTransact
 
 
 def _fifo_realized(transactions: list[TaxReportTransaction]) -> list[RealizedGainLine]:
-    lots: dict[str, list[dict]] = {}
+    lots: dict[str, list[dict[str, Any]]] = {}
     lines: list[RealizedGainLine] = []
 
     for tx in _sort_tx(transactions):
@@ -188,7 +191,7 @@ def _period_label(year: int, start_month: int) -> str:
     return f"Ejercicio {year}/{(year + 1) % 100:02d}"
 
 
-def map_ledger_fees_to_transactions(entries) -> dict[str, float]:
+def map_ledger_fees_to_transactions(entries: list[LedgerEntry]) -> dict[str, float]:
     result: dict[str, float] = {}
     for entry in entries:
         if entry.type != "fee" or not entry.reference_id:
