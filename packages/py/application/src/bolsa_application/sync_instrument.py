@@ -22,7 +22,11 @@ from bolsa_market.ingest import OhlcvBarIngest
 from bolsa_market.ohlcv_consolidation import plan_daily_consolidation
 from bolsa_market.sanity import run_sanity_checks
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
-from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
+from bolsa_market.yahoo_client import (
+    YahooSymbolNotFoundError,
+    get_yahoo_finance_client,
+    normalize_yahoo_error,
+)
 
 
 def resolve_sync_date_range(
@@ -164,6 +168,9 @@ class SyncInstrumentDailyBars:
             )
         except Exception as exc:
             message = normalize_yahoo_error(exc)
+            # Un símbolo que Yahoo no reconoce (404) es una condición permanente:
+            # no merece backoff/retry infinito en la cola de auto-sync.
+            permanent = isinstance(exc, YahooSymbolNotFoundError)
             await self._sync_logs.create_log(
                 instrument_id,
                 provider="yahoo",
@@ -171,7 +178,12 @@ class SyncInstrumentDailyBars:
                 bars_added=0,
                 error=message,
             )
-            return SyncResult(bars_added=0, status="failed", error=message)
+            return SyncResult(
+                bars_added=0,
+                status="failed",
+                error=message,
+                retryable=not permanent,
+            )
 
     async def _refresh_yahoo_metadata(self, instrument_id: str, yahoo_symbol: str) -> None:
         if isinstance(self._instruments, SqlAlchemyInstrumentRepository):
