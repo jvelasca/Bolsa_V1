@@ -21,8 +21,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+import sys
 from typing import Any
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.account_migration import run_account_data_migration
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
@@ -35,9 +39,6 @@ from bolsa_api.background.optimization_worker import start_optimization_worker
 from bolsa_api.background.scan_worker import start_scan_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.account_migration import run_account_data_migration
-from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -108,9 +109,19 @@ def run() -> None:
     engine: AsyncEngine = create_engine(settings)
     session_factory = create_session_factory(engine)
 
+    # En Windows, asyncio.run() usa ProactorEventLoop por defecto, incompatible
+    # con psycopg async. Forzar SelectorEventLoop (mismo motivo que win_loop.py,
+    # que uvicorn usa en run_dev.py). Ver https://sqlalche.me/e/20/rvf5
+    loop: asyncio.AbstractEventLoop
+    if sys.platform == "win32":
+        loop = asyncio.SelectorEventLoop()
+    else:
+        loop = asyncio.new_event_loop()
+
     logger.info("Scheduler worker iniciado")
     try:
-        asyncio.run(_run_scheduler(session_factory, engine))
+        with asyncio.Runner(loop_factory=lambda: loop) as runner:
+            runner.run(_run_scheduler(session_factory, engine))
     finally:
         logger.info("Scheduler worker detenido")
 
