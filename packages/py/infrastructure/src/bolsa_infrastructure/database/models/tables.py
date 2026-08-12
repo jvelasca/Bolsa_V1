@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -73,8 +74,8 @@ class InstrumentRow(Base):
     sector: Mapped[str | None] = mapped_column(String, nullable=True)
     type: Mapped[str] = mapped_column(INSTRUMENT_TYPE_ENUM, default="stock")
     is_active: Mapped[bool] = mapped_column("is_active", Boolean, default=True)
-    profile_snapshot: Mapped[dict | None] = mapped_column("profile_snapshot", JSONB, nullable=True)
-    last_xtb_validation: Mapped[dict | None] = mapped_column("last_xtb_validation", JSONB, nullable=True)
+    profile_snapshot: Mapped[dict[str, Any] | None] = mapped_column("profile_snapshot", JSONB, nullable=True)
+    last_xtb_validation: Mapped[dict[str, Any] | None] = mapped_column("last_xtb_validation", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
@@ -201,7 +202,7 @@ class BacktestRunRow(Base):
     data_version: Mapped[str | None] = mapped_column("data_version", String, nullable=True)
     commission_bps: Mapped[int] = mapped_column("commission_bps", Integer, default=0)
     slippage_bps: Mapped[int] = mapped_column("slippage_bps", Integer, default=0)
-    manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    manifest: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     data_epoch: Mapped[str | None] = mapped_column("data_epoch", String, nullable=True)
     strategy_definition_id: Mapped[str | None] = mapped_column(
         "strategy_definition_id",
@@ -220,7 +221,7 @@ class StrategyDefinitionRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String)
-    definition: Mapped[dict] = mapped_column(JSONB)
+    definition: Mapped[dict[str, Any]] = mapped_column(JSONB)
     preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
     origin: Mapped[str] = mapped_column(String, default="manual")
     timeframe: Mapped[str] = mapped_column(String, default="1d")
@@ -272,7 +273,7 @@ class InstrumentListRow(Base):
         nullable=True,
     )
     content_hash: Mapped[str | None] = mapped_column("content_hash", String, nullable=True)
-    membership_changelog: Mapped[dict | None] = mapped_column(
+    membership_changelog: Mapped[dict[str, Any] | None] = mapped_column(
         "membership_changelog",
         JSONB,
         nullable=True,
@@ -292,8 +293,8 @@ class IndexSubscribeJobRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     status: Mapped[str] = mapped_column(String, default="pending")
-    payload: Mapped[dict] = mapped_column(JSONB)
-    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
@@ -351,8 +352,8 @@ class SignalAlertSubscriptionRow(Base):
     )
     preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
     timeframe: Mapped[str] = mapped_column(String, default="1d")
-    signal_kinds: Mapped[list] = mapped_column("signal_kinds", JSONB, default=list)
-    channels: Mapped[list] = mapped_column(JSONB, default=list)
+    signal_kinds: Mapped[list[Any]] = mapped_column("signal_kinds", JSONB, default=list)
+    channels: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     webhook_url: Mapped[str | None] = mapped_column("webhook_url", String, nullable=True)
     email_to: Mapped[str | None] = mapped_column("email_to", String, nullable=True)
     is_active: Mapped[bool] = mapped_column("is_active", Boolean, default=True)
@@ -382,8 +383,8 @@ class ScanJobRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     status: Mapped[str] = mapped_column(String, default="pending")
-    payload: Mapped[dict] = mapped_column(JSONB)
-    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     cache_hits: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cache_misses: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -453,7 +454,7 @@ class ScanManifestRow(Base):
         ForeignKey("strategy_definitions.id"),
         nullable=True,
     )
-    manifest: Mapped[dict] = mapped_column(JSONB)
+    manifest: Mapped[dict[str, Any]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
     scan_job: Mapped["ScanJobRow | None"] = relationship(back_populates="scan_manifest")
@@ -470,7 +471,7 @@ class ExecutionPolicyRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String)
-    definition: Mapped[dict] = mapped_column(JSONB)
+    definition: Mapped[dict[str, Any]] = mapped_column(JSONB)
     mode: Mapped[str] = mapped_column(String)
     account_id: Mapped[str | None] = mapped_column(
         "account_id",
@@ -513,7 +514,7 @@ class PositionPolicyRow(Base):
         String,
         ForeignKey("instruments.id", ondelete="CASCADE"),
     )
-    definition: Mapped[dict] = mapped_column(JSONB)
+    definition: Mapped[dict[str, Any]] = mapped_column(JSONB)
     mode: Mapped[str] = mapped_column(String, default="manual")
     exit_strategy_definition_id: Mapped[str | None] = mapped_column(
         "exit_strategy_definition_id",
@@ -545,7 +546,7 @@ class PlatformEventRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     type: Mapped[str] = mapped_column(String)
-    payload: Mapped[dict] = mapped_column(JSONB)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
     correlation_id: Mapped[str | None] = mapped_column("correlation_id", String, nullable=True)
     user_id: Mapped[str | None] = mapped_column("user_id", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
@@ -562,9 +563,9 @@ class LlmCallRow(Base):
     prompt_template_id: Mapped[str] = mapped_column("prompt_template_id", String)
     prompt_rendered: Mapped[str] = mapped_column("prompt_rendered", Text)
     response_raw: Mapped[str | None] = mapped_column("response_raw", Text, nullable=True)
-    response_parsed: Mapped[dict | None] = mapped_column("response_parsed", JSONB, nullable=True)
+    response_parsed: Mapped[dict[str, Any] | None] = mapped_column("response_parsed", JSONB, nullable=True)
     validation_passed: Mapped[bool] = mapped_column("validation_passed", Boolean)
-    validation_errors: Mapped[list] = mapped_column("validation_errors", JSONB, default=list)
+    validation_errors: Mapped[list[Any]] = mapped_column("validation_errors", JSONB, default=list)
     elapsed_ms: Mapped[int] = mapped_column("elapsed_ms", Integer)
     cost_usd: Mapped[Decimal] = mapped_column("cost_usd", Numeric(12, 6), default=Decimal(0))
     status: Mapped[str] = mapped_column(String)
@@ -572,7 +573,7 @@ class LlmCallRow(Base):
     trace_id: Mapped[str] = mapped_column("trace_id", String)
     causation_id: Mapped[str | None] = mapped_column("causation_id", String, nullable=True)
     producer_version: Mapped[str] = mapped_column("producer_version", String)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
@@ -586,13 +587,13 @@ class DecisionMemoryRow(Base):
     instrument_id: Mapped[str] = mapped_column("instrument_id", String)
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
     outcome: Mapped[str] = mapped_column(String)
-    reasons: Mapped[list] = mapped_column(JSONB, default=list)
-    policy_rule_ids: Mapped[list] = mapped_column("policy_rule_ids", JSONB, default=list)
-    reevaluate_when: Mapped[list] = mapped_column("reevaluate_when", JSONB, default=list)
+    reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    policy_rule_ids: Mapped[list[Any]] = mapped_column("policy_rule_ids", JSONB, default=list)
+    reevaluate_when: Mapped[list[Any]] = mapped_column("reevaluate_when", JSONB, default=list)
     opportunity_intact: Mapped[bool] = mapped_column("opportunity_intact", Boolean)
     policy_id: Mapped[str | None] = mapped_column("policy_id", String, nullable=True)
     policy_version: Mapped[str | None] = mapped_column("policy_version", String, nullable=True)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
@@ -609,7 +610,7 @@ class DecisionSessionRow(Base):
     symbol: Mapped[str | None] = mapped_column(String, nullable=True)
     recommendation_id: Mapped[str | None] = mapped_column("recommendation_id", String, nullable=True)
     decision_id: Mapped[str | None] = mapped_column("decision_id", String, nullable=True)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
@@ -626,7 +627,7 @@ class ModelArtifactRow(Base):
     composition_hash: Mapped[str | None] = mapped_column("composition_hash", String, nullable=True)
     model_checksum: Mapped[str | None] = mapped_column("model_checksum", String, nullable=True)
     trained_at: Mapped[datetime | None] = mapped_column("trained_at", DateTime(timezone=True), nullable=True)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
@@ -644,7 +645,7 @@ class PredictionRow(Base):
     value: Mapped[float | None] = mapped_column(Float, nullable=True)
     confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     as_of: Mapped[datetime | None] = mapped_column("as_of", DateTime(timezone=True), nullable=True)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
@@ -661,7 +662,7 @@ class TrialRecordRow(Base):
     sharpe_is: Mapped[Decimal | None] = mapped_column("sharpe_is", Numeric(12, 4), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
@@ -679,9 +680,9 @@ class ConfidenceStateRow(Base):
     hint: Mapped[str] = mapped_column(String)
     expires_at: Mapped[datetime | None] = mapped_column("expires_at", DateTime(timezone=True), nullable=True)
     expired: Mapped[bool] = mapped_column(Boolean, default=False)
-    events: Mapped[list] = mapped_column(JSONB, default=list)
-    notes: Mapped[list] = mapped_column(JSONB, default=list)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    events: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    notes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
@@ -701,9 +702,9 @@ class EdgeReportRow(Base):
     credibility: Mapped[Decimal] = mapped_column(Numeric(8, 2))
     edge_score: Mapped[Decimal] = mapped_column("edge_score", Numeric(8, 2))
     band: Mapped[str] = mapped_column(String)
-    suite: Mapped[dict] = mapped_column(JSONB)
-    notes: Mapped[list] = mapped_column(JSONB, default=list)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    suite: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    notes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
@@ -712,7 +713,7 @@ class TrackerDefinitionRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String)
-    definition: Mapped[dict] = mapped_column(JSONB)
+    definition: Mapped[dict[str, Any]] = mapped_column(JSONB)
     strategy_definition_id: Mapped[str] = mapped_column(
         "strategy_definition_id",
         String,
@@ -741,8 +742,8 @@ class OptimizationRunRow(Base):
     instrument_id: Mapped[str] = mapped_column("instrument_id", ForeignKey("instruments.id", ondelete="CASCADE"))
     symbol: Mapped[str] = mapped_column(String)
     status: Mapped[str] = mapped_column(String, default="pending")
-    payload: Mapped[dict] = mapped_column(JSONB)
-    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     engine: Mapped[str | None] = mapped_column(String, nullable=True)
     best_score: Mapped[Decimal | None] = mapped_column(
@@ -773,8 +774,8 @@ class HypothesisRow(Base):
     kind: Mapped[str] = mapped_column(String, default="hypothesis")
     statement: Mapped[str] = mapped_column(Text)
     domain: Mapped[str | None] = mapped_column(String, nullable=True)
-    context: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    falsifiers: Mapped[list] = mapped_column(JSONB, default=list)
+    context: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    falsifiers: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     status: Mapped[str] = mapped_column(String, default="open")
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
@@ -798,10 +799,10 @@ class HypothesisBeliefRow(Base):
     evidence_weight: Mapped[Decimal] = mapped_column(
         "evidence_weight", Numeric(12, 4), default=Decimal(0)
     )
-    contexts_ok: Mapped[list] = mapped_column("contexts_ok", JSONB, default=list)
-    contexts_fail: Mapped[list] = mapped_column("contexts_fail", JSONB, default=list)
-    evidence_ids: Mapped[list] = mapped_column("evidence_ids", JSONB, default=list)
-    trial_ids: Mapped[list] = mapped_column("trial_ids", JSONB, default=list)
+    contexts_ok: Mapped[list[Any]] = mapped_column("contexts_ok", JSONB, default=list)
+    contexts_fail: Mapped[list[Any]] = mapped_column("contexts_fail", JSONB, default=list)
+    evidence_ids: Mapped[list[Any]] = mapped_column("evidence_ids", JSONB, default=list)
+    trial_ids: Mapped[list[Any]] = mapped_column("trial_ids", JSONB, default=list)
     math_version: Mapped[str] = mapped_column("math_version", String)
     last_reviewed_at: Mapped[datetime] = mapped_column(
         "last_reviewed_at", DateTime(timezone=True)
@@ -825,12 +826,12 @@ class KnowledgeNodeRow(Base):
     knowledge_confidence: Mapped[Decimal] = mapped_column(
         "knowledge_confidence", Numeric(8, 4)
     )
-    validity_context: Mapped[dict] = mapped_column(
+    validity_context: Mapped[dict[str, Any]] = mapped_column(
         "validity_context", JSONB, default=dict
     )
-    evidence_ids: Mapped[list] = mapped_column("evidence_ids", JSONB, default=list)
-    belief_snapshot: Mapped[dict] = mapped_column("belief_snapshot", JSONB)
-    consolidation_report: Mapped[dict] = mapped_column("consolidation_report", JSONB)
+    evidence_ids: Mapped[list[Any]] = mapped_column("evidence_ids", JSONB, default=list)
+    belief_snapshot: Mapped[dict[str, Any]] = mapped_column("belief_snapshot", JSONB)
+    consolidation_report: Mapped[dict[str, Any]] = mapped_column("consolidation_report", JSONB)
     math_version: Mapped[str] = mapped_column("math_version", String)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     consolidated_at: Mapped[datetime] = mapped_column(
@@ -852,7 +853,7 @@ class ResearchTreeEdgeRow(Base):
     to_ref_id: Mapped[str] = mapped_column("to_ref_id", String)
     edge_type: Mapped[str] = mapped_column("edge_type", String)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", DateTime(timezone=True), nullable=True
     )
@@ -870,9 +871,9 @@ class MklSyncEventRow(Base):
         ForeignKey("knowledge_nodes.id", ondelete="CASCADE"),
     )
     status: Mapped[str] = mapped_column(String)
-    fact_payload: Mapped[dict] = mapped_column("fact_payload", JSONB)
+    fact_payload: Mapped[dict[str, Any]] = mapped_column("fact_payload", JSONB)
     math_version: Mapped[str] = mapped_column("math_version", String)
-    notes: Mapped[list] = mapped_column(JSONB, default=list)
+    notes: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
@@ -898,7 +899,7 @@ class BeliefHistoryRow(Base):
     trigger_evidence_id: Mapped[str | None] = mapped_column(
         "trigger_evidence_id", String, nullable=True
     )
-    delta: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    delta: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     math_version: Mapped[str] = mapped_column("math_version", String)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
@@ -929,7 +930,7 @@ class ResearchEvidenceRow(Base):
     evidence_weight: Mapped[Decimal] = mapped_column(
         "evidence_weight", Numeric(8, 4), default=Decimal(0)
     )
-    summary: Mapped[dict] = mapped_column(JSONB)
+    summary: Mapped[dict[str, Any]] = mapped_column(JSONB)
     math_version: Mapped[str | None] = mapped_column("math_version", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
@@ -969,9 +970,9 @@ class ResearchTrialRow(Base):
     )
     preset_key: Mapped[str | None] = mapped_column("preset_key", String, nullable=True)
     strategy_name: Mapped[str | None] = mapped_column("strategy_name", String, nullable=True)
-    params: Mapped[dict] = mapped_column(JSONB)
-    blocks: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    is_metrics: Mapped[dict] = mapped_column("is_metrics", JSONB)
+    params: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    blocks: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    is_metrics: Mapped[dict[str, Any]] = mapped_column("is_metrics", JSONB)
     is_score: Mapped[Decimal | None] = mapped_column("is_score", Numeric(18, 6), nullable=True)
     k_contribution: Mapped[int] = mapped_column("k_contribution", Integer, default=1)
     proposed_by: Mapped[str] = mapped_column("proposed_by", String)
@@ -981,7 +982,7 @@ class ResearchTrialRow(Base):
         nullable=True,
     )
     fail_code: Mapped[str | None] = mapped_column("fail_code", String, nullable=True)
-    manifest_ref: Mapped[dict | None] = mapped_column("manifest_ref", JSONB, nullable=True)
+    manifest_ref: Mapped[dict[str, Any] | None] = mapped_column("manifest_ref", JSONB, nullable=True)
     data_epoch: Mapped[str | None] = mapped_column("data_epoch", String, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
@@ -1000,8 +1001,8 @@ class WorkspaceRow(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String)
-    document: Mapped[dict] = mapped_column(JSONB)
-    dock_layout: Mapped[dict | None] = mapped_column("dock_layout", JSONB, nullable=True)
+    document: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    dock_layout: Mapped[dict[str, Any] | None] = mapped_column("dock_layout", JSONB, nullable=True)
     is_default: Mapped[bool] = mapped_column("is_default", Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
@@ -1068,7 +1069,7 @@ class InvestorProfileRow(Base):
     version: Mapped[str] = mapped_column(String, default="1.0.0")
     user_id: Mapped[str | None] = mapped_column("user_id", String, nullable=True)
     horizon: Mapped[str] = mapped_column(String)
-    objectives: Mapped[list] = mapped_column(JSONB, default=list)
+    objectives: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     risk_tolerance: Mapped[str] = mapped_column("risk_tolerance", String)
     experience: Mapped[str] = mapped_column(String)
     max_acceptable_loss_pct: Mapped[Decimal | None] = mapped_column(
@@ -1081,7 +1082,7 @@ class InvestorProfileRow(Base):
     selected_policy_template_id: Mapped[str] = mapped_column(
         "selected_policy_template_id", String
     )
-    observed_json: Mapped[dict | None] = mapped_column("observed_json", JSONB, nullable=True)
+    observed_json: Mapped[dict[str, Any] | None] = mapped_column("observed_json", JSONB, nullable=True)
     updated_by: Mapped[str] = mapped_column("updated_by", String, default="user")
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
@@ -1108,7 +1109,7 @@ class InvestmentAccountRow(Base):
     )
     is_default: Mapped[bool] = mapped_column("is_default", Boolean, default=False)
     description: Mapped[str | None] = mapped_column(String, nullable=True)
-    settings_json: Mapped[dict | None] = mapped_column("settings_json", JSONB, nullable=True)
+    settings_json: Mapped[dict[str, Any] | None] = mapped_column("settings_json", JSONB, nullable=True)
     active_profile_id: Mapped[str | None] = mapped_column(
         "active_profile_id",
         String,
@@ -1214,9 +1215,9 @@ class InstrumentStrategyTopRow(Base):
     status: Mapped[str] = mapped_column(String, default="semifinal")
     version: Mapped[int] = mapped_column(Integer, default=1)
     evidence_level: Mapped[str] = mapped_column("evidence_level", String, default="in_sample_only")
-    slots: Mapped[list] = mapped_column(JSONB, default=list)
+    slots: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     coach_headline: Mapped[str | None] = mapped_column("coach_headline", Text, nullable=True)
-    coach_facts: Mapped[dict | None] = mapped_column("coach_facts", JSONB, nullable=True)
+    coach_facts: Mapped[dict[str, Any] | None] = mapped_column("coach_facts", JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True))
 
@@ -1240,7 +1241,7 @@ class InstrumentDailyOpinionRow(Base):
     fa_score: Mapped[float | None] = mapped_column("fa_score", Float, nullable=True)
     ta_score: Mapped[float | None] = mapped_column("ta_score", Float, nullable=True)
     distress: Mapped[bool] = mapped_column(Boolean, default=False)
-    reasons: Mapped[list] = mapped_column(JSONB, default=list)
+    reasons: Mapped[list[Any]] = mapped_column(JSONB, default=list)
     gate_status: Mapped[str | None] = mapped_column("gate_status", String, nullable=True)
     top_id: Mapped[str | None] = mapped_column("top_id", String, nullable=True)
     top_version: Mapped[int | None] = mapped_column("top_version", Integer, nullable=True)
@@ -1338,9 +1339,9 @@ class CoreRAccountStateRow(Base):
         ForeignKey("investment_accounts.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    queue_json: Mapped[list] = mapped_column("queue_json", JSONB, default=list)
-    reports_json: Mapped[dict] = mapped_column("reports_json", JSONB, default=dict)
-    scheduler_json: Mapped[dict] = mapped_column("scheduler_json", JSONB, default=dict)
+    queue_json: Mapped[list[Any]] = mapped_column("queue_json", JSONB, default=list)
+    reports_json: Mapped[dict[str, Any]] = mapped_column("reports_json", JSONB, default=dict)
+    scheduler_json: Mapped[dict[str, Any]] = mapped_column("scheduler_json", JSONB, default=dict)
     updated_at: Mapped[datetime] = mapped_column(
         "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
     )
@@ -1356,7 +1357,7 @@ class SupervisedF3AccountStateRow(Base):
         ForeignKey("investment_accounts.id", ondelete="CASCADE"),
         primary_key=True,
     )
-    queue_json: Mapped[list] = mapped_column("queue_json", JSONB, default=list)
+    queue_json: Mapped[list[Any]] = mapped_column("queue_json", JSONB, default=list)
     active_id: Mapped[str | None] = mapped_column("active_id", String, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
