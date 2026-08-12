@@ -41,11 +41,28 @@ type G3 = HasNoMissingKeys<
   import("@bolsa/shared").InvestmentAccountDto,
   Contract["InvestmentAccountDto"]
 >;
+/** P2.8: CoreR/SupervisedF3 blobs — clave top-level FE ⊆ contrato. */
+type G4 = HasNoMissingKeys<
+  import("@bolsa/shared").CoreRBundleDto,
+  Contract["CoreRBundleDto"]
+>;
+type G5 = HasNoMissingKeys<
+  import("@bolsa/shared").SupervisedF3BundleDto,
+  Contract["SupervisedF3BundleDto"]
+>;
 
 const _guard1: G1 = true;
 const _guard2: G2 = true;
 const _guard3: G3 = true;
+const _guard4: G4 = true;
+const _guard5: G5 = true;
 
 export {};
 /** Agregado meramente para que el compilador considere usadas las guardas. */
-export const contractContractSentinels = [_guard1, _guard2, _guard3] as const;
+export const contractContractSentinels = [
+  _guard1,
+  _guard2,
+  _guard3,
+  _guard4,
+  _guard5,
+] as const;
