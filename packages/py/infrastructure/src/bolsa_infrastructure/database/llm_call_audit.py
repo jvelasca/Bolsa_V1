@@ -36,8 +36,11 @@ def _get_session_factory() -> sessionmaker[Session]:
     with _LOCK:
         if _SESSION_FACTORY is None:
             settings = get_settings()
+            url = settings.database_url
+            if url is None:
+                raise RuntimeError("database_url not configured")
             _ENGINE = create_engine(
-                _sync_database_url(settings.database_url),
+                _sync_database_url(url),
                 pool_pre_ping=True,
                 pool_size=2,
             )

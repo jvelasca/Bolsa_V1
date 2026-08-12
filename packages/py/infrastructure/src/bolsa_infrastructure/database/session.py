@@ -11,6 +11,8 @@ from bolsa_infrastructure.config import Settings
 
 def create_engine(settings: Settings) -> AsyncEngine:
     url = settings.database_url
+    if url is None:
+        raise RuntimeError("database_url not configured")
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     return create_async_engine(url, pool_pre_ping=True)

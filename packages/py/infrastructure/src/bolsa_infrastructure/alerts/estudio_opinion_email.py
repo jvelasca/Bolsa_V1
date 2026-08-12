@@ -140,7 +140,7 @@ def send_estudio_alarma_email_sync(
 
     message = EmailMessage()
     message["Subject"] = f"[Bolsa] Estudio · {len(alarmas)} alarma(s)"
-    message["From"] = settings.smtp_from  # type: ignore[arg-type]
+    message["From"] = settings.smtp_from
     message["To"] = recipient
     message.set_content("\n".join(lines))
 

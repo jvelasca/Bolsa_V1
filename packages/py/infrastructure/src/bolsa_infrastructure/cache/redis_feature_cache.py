@@ -21,7 +21,7 @@ class RedisFeatureCache:
         *,
         ttl_seconds: float = 3600.0,
     ) -> None:
-        self._redis = redis.from_url(redis_url, decode_responses=True)
+        self._redis = redis.from_url(redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
         self.ttl_seconds = ttl_seconds
         self.hits = 0
         self.misses = 0

@@ -226,7 +226,7 @@ def send_daily_ops_digest_email_sync(
 
     message = EmailMessage()
     message["Subject"] = f"[Bolsa] Resumen operativo · {as_of} · {name}"
-    message["From"] = settings.smtp_from  # type: ignore[arg-type]
+    message["From"] = settings.smtp_from
     message["To"] = recipient
     message.set_content(plain)
     message.add_alternative(html_body, subtype="html")
