@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -334,13 +335,13 @@ class SqlAlchemyAccountRepository:
         await self._session.flush()
         return _account_from_row(row)
 
-    async def get_settings_json(self, account_id: str) -> dict | None:
+    async def get_settings_json(self, account_id: str) -> dict[str, Any] | None:
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
             raise ValueError("Cuenta no encontrada")
         return dict(row.settings_json) if row.settings_json else None
 
-    async def merge_settings_json(self, account_id: str, fragment: dict) -> dict:
+    async def merge_settings_json(self, account_id: str, fragment: dict[str, Any]) -> dict[str, Any]:
         """Fusiona claves en settings_json sin pasar por AccountSettings (F4 equityMarks)."""
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:

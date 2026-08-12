@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -175,7 +176,7 @@ class SqlAlchemyInstrumentRepository:
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
 
-    async def update_profile_snapshot(self, instrument_id: str, snapshot: dict) -> None:
+    async def update_profile_snapshot(self, instrument_id: str, snapshot: dict[str, Any]) -> None:
         stmt = select(InstrumentRow).where(InstrumentRow.id == instrument_id)
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
@@ -185,12 +186,12 @@ class SqlAlchemyInstrumentRepository:
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
 
-    async def get_profile_snapshot(self, instrument_id: str) -> dict | None:
+    async def get_profile_snapshot(self, instrument_id: str) -> dict[str, Any] | None:
         stmt = select(InstrumentRow.profile_snapshot).where(InstrumentRow.id == instrument_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_fundamentals(self, instrument_id: str) -> dict | None:
+    async def get_fundamentals(self, instrument_id: str) -> dict[str, Any] | None:
         snapshot = await self.get_profile_snapshot(instrument_id)
         return parse_fundamentals_from_profile_snapshot(snapshot)
 
@@ -206,7 +207,7 @@ class SqlAlchemyInstrumentRepository:
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
 
-    async def update_last_xtb_validation(self, instrument_id: str, payload: dict) -> None:
+    async def update_last_xtb_validation(self, instrument_id: str, payload: dict[str, Any]) -> None:
         stmt = select(InstrumentRow).where(InstrumentRow.id == instrument_id)
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
@@ -216,7 +217,7 @@ class SqlAlchemyInstrumentRepository:
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
 
-    async def get_last_xtb_validation(self, instrument_id: str) -> dict | None:
+    async def get_last_xtb_validation(self, instrument_id: str) -> dict[str, Any] | None:
         stmt = select(InstrumentRow.last_xtb_validation).where(InstrumentRow.id == instrument_id)
         result = await self._session.execute(stmt)
         value = result.scalar_one_or_none()
