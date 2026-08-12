@@ -29,10 +29,27 @@ function asItems(raw: unknown): SupervisedQueueItem[] {
   );
 }
 
+/**
+ * P2.8: serialización tipada → DTO de wire sin scattered `as unknown as`.
+ * El `payload` de un item es un blob abierto (propuesta Supervised con grafos
+ * web-only: RecommendationV1 + assessments); el wire lo guarda opaco. El cast
+ * queda confinado a este único punto de serialización (la frontera TS↔wire).
+ */
+function toF3ItemDto(item: SupervisedQueueItem) {
+  return {
+    id: item.id,
+    enqueuedAt: item.enqueuedAt,
+    scanId: item.scanId,
+    symbol: item.symbol,
+    origin: item.origin,
+    payload: item.payload as unknown as Record<string, unknown>,
+  };
+}
+
 function localBundle() {
   const s = useSupervisedF3QueueStore.getState();
   return {
-    items: s.items as unknown as Array<Record<string, unknown>>,
+    items: s.items.map(toF3ItemDto),
     activeId: s.activeId,
   };
 }

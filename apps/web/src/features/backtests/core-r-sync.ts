@@ -83,11 +83,9 @@ function asScheduler(raw: unknown): CoreRSchedulerPrefs | null {
 
 function localBundle() {
   return {
-    queue: useCoreRReviewQueueStore.getState().items as unknown as Array<
-      Record<string, unknown>
-    >,
-    reports: readAllCoreRReports() as unknown as Record<string, unknown>,
-    scheduler: loadCoreRSchedulerPrefs() as unknown as Record<string, unknown>,
+    queue: useCoreRReviewQueueStore.getState().items,
+    reports: readAllCoreRReports(),
+    scheduler: loadCoreRSchedulerPrefs(),
   };
 }
 

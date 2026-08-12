@@ -160,7 +160,7 @@ export const api = {
       context: string;
       battery: string;
       localSummary?: string;
-      facts?: Record<string, unknown> | null;
+      facts?: import("@bolsa/shared").CoachFactsV1Dto | null;
       mode?: "narrate" | "adversary";
     },
     init?: { signal?: AbortSignal },
@@ -1105,9 +1105,9 @@ export const api = {
   syncAccountCoreR: (
     accountId: string,
     body: {
-      queue: Array<Record<string, unknown>>;
-      reports: Record<string, unknown>;
-      scheduler: Record<string, unknown>;
+      queue: Array<import("@bolsa/shared").CoreRQueueItemDto>;
+      reports: import("@bolsa/shared").CoreRReportsMapDto;
+      scheduler: import("@bolsa/shared").CoreRSchedulerPrefsDto;
     },
   ) =>
     request<{ data: import("@bolsa/shared").CoreRBundleDto }>(
@@ -1123,7 +1123,7 @@ export const api = {
   syncAccountSupervisedF3: (
     accountId: string,
     body: {
-      items: Array<Record<string, unknown>>;
+      items: Array<import("@bolsa/shared").SupervisedF3QueueItemDto>;
       activeId?: string | null;
     },
   ) =>
@@ -1504,7 +1504,7 @@ export const api = {
     diaD: string;
     endDate: string;
     engine?: string;
-    evidence: Record<string, unknown>;
+    evidence: import("@bolsa/shared").DiaDSessionEvidenceV1Dto;
   }) =>
     request<{
       data: {

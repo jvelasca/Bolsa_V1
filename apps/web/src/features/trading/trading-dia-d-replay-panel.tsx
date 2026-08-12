@@ -633,7 +633,7 @@ export function TradingDiaDReplayPanel() {
           diaD: session.diaD,
           endDate: session.endDate,
           engine,
-          evidence: evidencePayload as unknown as Record<string, unknown>,
+          evidence: evidencePayload,
         });
         researchEvidenceId = res.data.id;
         apiOk = true;

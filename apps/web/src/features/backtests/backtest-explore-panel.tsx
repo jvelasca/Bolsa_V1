@@ -194,6 +194,17 @@ function localSummaryText(note: DeepTechnicalCoachNote): string {
     .join("\n");
 }
 
+/**
+ * P2.8: serialización tipada del blob-abierto de hechos Coach → Record de wire.
+ * El pipeline de coachFacts (policy/labEvidence/freshness/dualAudit...) es un
+ * blob abierto intencional que el BE guarda opaco; por ello convertimos a la
+ * representación de wire (Record<string, unknown>) en este único punto de
+ * serialización, confinando el cast a la frontera TS↔wire.
+ */
+function toCoachFactsRecord(facts: import("@bolsa/shared").CoachFactsV1Dto) {
+  return facts as unknown as Record<string, unknown>;
+}
+
 export function BacktestExploreRanking({
   rows,
   instrumentId,
@@ -508,7 +519,7 @@ export function BacktestExploreRanking({
           : null;
       const noteFacts = buildCoachFacts(rows, coachCtx, note);
       const baseFacts: Record<string, unknown> = {
-        ...(noteFacts as unknown as Record<string, unknown>),
+        ...toCoachFactsRecord(noteFacts),
         ...buildCoachProfileBindingFacts(policy),
         ...(adoptionFacts ?? {}),
         dualAudit: note.audit ?? null,
@@ -807,7 +818,7 @@ export function BacktestExploreRanking({
         context: localDeep.contextLabel,
         battery: batteryText(rows),
         localSummary: localSummaryText(localDeep),
-        facts: coachFacts as unknown as Record<string, unknown>,
+        facts: coachFacts,
       };
       try {
         const [narrate, adversary] = await Promise.all([
