@@ -7,8 +7,8 @@
 > **Rama de ejecución:** `stage/f5a-fidelidad-gate-2026-08-12` (desde base `d892b3f` = tip F5b-drift en
 > `stage/f1-integridad-financiera-2026-08-11`).
 > **Regla del hilo:** NO tocar código fuera del alcance de la fase. Batería por paso.
-> **Estado:** **COMPLETADO 2026-08-12** · `contract:check` verde · typecheck✓ · web typecheck✓ · lint 0
-> errores · shared typecheck✓. Working tree limpio.
+> **Estado:** **COMPLETADO + MERGEADO 2026-08-12** (`contract:check` verde · typecheck✓ · web typecheck✓ · lint 0
+> errores · shared typecheck✓). **PR #38 MERGED** (merge commit `bc51980` en `stage/f1-*`). Working tree limpio.
 
 ---
 
@@ -86,6 +86,7 @@ queda como **blindaje preventivo**.
 | 2026-08-12 | `contract-check.ts`: `CoversContract` + 11 sentinelas (G1–G11), cada uno validado en ambos sentidos. Batería: typecheck✓ · contract:check✓ · lint 0 errores.                                                                  |
 | 2026-08-12 | Probe de drift contrato→FE verificado positivo (G9 rompe con `driftProbe`) y restaurado. Cero gaps de claves en los sentinelas (los DTO-FE ya cubren todo lo que el BE emite).                                                |
 | 2026-08-12 | Docs: este traspaso + entrada en `engineering-index` §5 (hijo de F5a).                                                                                                                                                        |
+| 2026-08-12 | **PR #38 MERGED** en `stage/f1-*` (merge commit `bc51980`) · base viva `stage/f1-*` ahora en `bc51980`.                                                                                                                       |
 
 ## 7. Deuda / fuera de alcance (sin resolver aquí)
 
