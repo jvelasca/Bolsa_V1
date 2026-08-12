@@ -1,5 +1,6 @@
 """Entidad de dominio cuenta de inversión y cartera — sin dependencias externas."""
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +25,7 @@ class InvestmentAccount:
     last_activity_at: str | None
     active_profile_id: str | None = None
     # Lab evidence snapshot at paper deploy (settings_json.labEvidence).
-    lab_evidence: dict | None = None
+    lab_evidence: dict[str, Any] | None = None
 
 
 from bolsa_domain.account_settings import AccountSettings  # noqa: E402

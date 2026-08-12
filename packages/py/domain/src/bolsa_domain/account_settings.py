@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 CommissionPresetId = Literal["standard_es", "xtb_zero_stock", "ibkr_tiered", "custom", "none"]
 TaxJurisdiction = Literal["ES", "EU_OTHER", "US", "CUSTOM"]
@@ -197,7 +197,7 @@ def calculate_trade_fees(
     )
 
 
-def settings_to_dict(settings: AccountSettings) -> dict:
+def settings_to_dict(settings: AccountSettings) -> dict[str, Any]:
     return {
         "commission": {
             "presetId": settings.commission.preset_id,
@@ -221,7 +221,7 @@ def settings_to_dict(settings: AccountSettings) -> dict:
     }
 
 
-def settings_from_dict(data: dict | None) -> AccountSettings:
+def settings_from_dict(data: dict[str, Any] | None) -> AccountSettings:
     if not data:
         return default_account_settings()
     commission_raw = data.get("commission") or {}
