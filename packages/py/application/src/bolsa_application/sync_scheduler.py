@@ -164,11 +164,10 @@ class ProcessNextSyncQueueItem:
             return ProcessQueueResult(processed=True, instrument_id=item.instrument_id, status="failed")
 
         if result.status == "failed":
-            retry = True
             await self._scheduler.fail_item(
                 item.id,
                 error=result.error or "sync failed",
-                retry=retry,
+                retry=result.retryable,
                 backoff_minutes=settings.retry_backoff_minutes,
                 max_retries=settings.max_retries,
             )

@@ -1,7 +1,7 @@
 from datetime import UTC, date, datetime
 
 from bolsa_market.yahoo_chart import parse_chart_payload, parse_intraday_chart_payload
-from bolsa_market.yahoo_client import normalize_yahoo_error
+from bolsa_market.yahoo_client import YahooSymbolNotFoundError, normalize_yahoo_error
 
 
 def test_parse_chart_payload_maps_daily_bars() -> None:
@@ -133,6 +133,12 @@ def test_normalize_yahoo_error_rate_limit() -> None:
     message = normalize_yahoo_error(RuntimeError("429 Too Many Requests"))
     assert "429" in message
     assert "Espera" in message
+
+
+def test_normalize_yahoo_error_symbol_not_found() -> None:
+    message = normalize_yahoo_error(YahooSymbolNotFoundError("BP/.L (404)"))
+    assert "no encontró histórico" in message
+    assert "AENA.MC" in message
 
 
 def test_normalize_yahoo_error_circuit_open() -> None:

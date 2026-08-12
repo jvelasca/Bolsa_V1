@@ -48,9 +48,12 @@ async def _run_queue_item(session_factory: async_sessionmaker[AsyncSession]) -> 
             result = await get_process_sync_queue_use_case(session).execute()
             await session.commit()
             if result.processed and result.instrument_id:
-                level = logging.INFO if result.status != "failed" else logging.WARNING
+                # Los fallos ya quedan registrados en DB (queue.last_error +
+                # data_sync_logs). Para un símbolo permanentemente no-resoluble
+                # (p. ej. 404) el WARNING por cada intento es ruido: se usa INFO
+                # y el detalle del error se conserva en el mensaje.
                 logger.log(
-                    level,
+                    logging.INFO,
                     "Auto-sync cola: %s → %s%s",
                     result.instrument_id,
                     result.status,

@@ -29,8 +29,14 @@ class YahooRateLimitError(RuntimeError):
     """Yahoo Finance devolvió 429 tras agotar reintentos."""
 
 
+class YahooSymbolNotFoundError(RuntimeError):
+    """Yahoo no reconoce el símbolo (404): condición permanente, no reintentar."""
+
+
 def normalize_yahoo_error(exc: Exception) -> str:
     raw = str(exc)
+    if isinstance(exc, YahooSymbolNotFoundError):
+        return "Yahoo no encontró histórico para este símbolo. Revisa el ticker (ej. AENA.MC)."
     if isinstance(exc, YahooCircuitOpenError) or "circuit OPEN" in raw:
         return (
             "Yahoo Finance en cooldown (circuit breaker). "
@@ -218,6 +224,13 @@ class YahooFinanceClient:
                 if self._crumb:
                     params["crumb"] = self._crumb
                 continue
+
+            if response.status_code == 404:
+                # Símbolo no reconocido por Yahoo: condición permanente, no reintentar
+                # ni contar como fallo transitorio del provider (circuit breaker).
+                raise YahooSymbolNotFoundError(
+                    f"Yahoo no encontró histórico para el símbolo '{yahoo_symbol}' (404)"
+                )
 
             if response.status_code in RETRYABLE_STATUS:
                 last_error = YahooRateLimitError(

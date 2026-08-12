@@ -12,6 +12,9 @@ class SyncResult:
     bars_updated: int = 0
     bars_skipped: int = 0
     consolidation_notes: tuple[str, ...] = ()
+    # Si False, la condición es permanente (p. ej. Yahoo no encuentra histórico
+    # para el símbolo) y la cola de sync NO debe reintentarla con backoff.
+    retryable: bool = True
 
 
 @dataclass(frozen=True, slots=True)
