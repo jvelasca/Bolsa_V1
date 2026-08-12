@@ -1,12 +1,15 @@
 /**
  * Cliente HTTP del frontend hacia la API FastAPI (VITE_API_URL, default :8000).
  *
- * Punto único de integración web ↔ backend. Añade Authorization Bearer si hay
- * token en auth-store. Lanza ApiError en respuestas no OK.
+ * Punto único de integración web ↔ backend. Transporte openapi-fetch generado
+ * desde apps/web/api/openapi.json (contrato F5a). Añade Authorization Bearer si
+ * hay token en auth-store. Lanza ApiError en respuestas no OK.
  *
  * @see docs/API_REFERENCE.md — mapa de endpoints
  * @see packages/shared/src/types.ts — DTOs TypeScript (manual, no OpenAPI gen)
  */
+import createClient from "openapi-fetch";
+import type { paths } from "@/api/schema";
 import { getAuthToken } from "@/stores/auth-store";
 import { getActiveAccountId } from "@/stores/active-account-store";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
@@ -56,58 +59,84 @@ function formatApiErrorDetail(body: unknown): string | undefined {
   return undefined;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getAuthToken();
-  const accountId = getActiveAccountId();
-  const { headers: initHeaders, ...restInit } = init ?? {};
-  let response: Response;
-  try {
-    response = await fetch(`${API_URL}${path}`, {
-      ...restInit,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(accountId ? { "X-Account-Id": accountId } : {}),
-        ...initHeaders,
-      },
-    });
-  } catch (error) {
+type ClientResult = {
+  data?: unknown;
+  error?: unknown;
+  response: Response;
+};
+
+/**
+ * Cliente compartido openapi-fetch. El middleware onRequest inyecta las
+ * cabeceras de auth (Authorization, X-Account-Id) y Content-Type; las
+ * cabeceras ya presentes en el request (p. ej. X-Account-Id explícito de
+ * depositCash/withdrawCash) tienen prioridad y NO se sobreescriben — misma
+ * semántica que el request<T> manual. onError traduce los errores de red
+ * (TypeError) a ApiError con status 0.
+ */
+const client = createClient<paths>({
+  baseUrl: API_URL,
+});
+
+client.use({
+  onRequest({ request }) {
+    const token = getAuthToken();
+    if (token && !request.headers.has("Authorization")) {
+      request.headers.set("Authorization", `Bearer ${token}`);
+    }
+    if (!request.headers.has("X-Account-Id")) {
+      const accountId = getActiveAccountId();
+      if (accountId) request.headers.set("X-Account-Id", accountId);
+    }
+    if (!request.headers.has("Content-Type")) {
+      request.headers.set("Content-Type", "application/json");
+    }
+  },
+  onError({ error }) {
     if (error instanceof TypeError) {
       throw new ApiError(
         "No se pudo contactar con la API. Comprueba que el backend esté en marcha (puerto 8000 o lanzador «Bolsa: API Python + Web»).",
         0,
       );
     }
-    throw error;
-  }
+    return error as Error;
+  },
+});
 
-  if (response.status === 401) {
-    throw new ApiError("Sesión expirada o no autorizada", 401);
-  }
-
-  if (!response.ok) {
-    const body = await response.json().catch(() => null);
+/**
+ * Helper de desenvuelto: ejecuta la llamada openapi-fetch, propaga los errores
+ * de red (ya traducidos a ApiError por onError), lanza ApiError en respuestas
+ * no-OK (401 con mensaje específico; resto con formatApiErrorDetail) y devuelve
+ * `data` (incluidos 204 / body vacío → undefined), replicando request<T>.
+ */
+async function call<T>(fn: () => Promise<ClientResult>): Promise<T> {
+  const { data, error, response } = await fn();
+  if (error !== undefined) {
+    if (response.status === 401) {
+      throw new ApiError("Sesión expirada o no autorizada", 401);
+    }
     throw new ApiError(
-      formatApiErrorDetail(body) ?? response.statusText,
+      formatApiErrorDetail(error) ?? response.statusText,
       response.status,
     );
   }
+  return data as T;
+}
 
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  const text = await response.text();
-  if (!text) {
-    return undefined as T;
-  }
-
-  return JSON.parse(text) as T;
+/**
+ * D5 — fidelidad de tipos de valor (request body): el body de entrada (DTO
+ * @bolsa/shared, única fuente del call site) puede divergir del requestBody
+ * OpenAPI en optionality (p. ej. `localSummary?: string` vs `localSummary:
+ * string`) o en index-signature de objetos anidados (p. ej. `StrategyDefinitionV1`
+ * vs `{[x: string]: unknown}`). El wire format JSON es idéntico (`JSON.stringify`),
+ * así que el cast es benigno; la deuda de fuente de verdad se cierra en P2.6.
+ */
+function apiBody<T>(body: T): never {
+  return body as never;
 }
 
 export const api = {
   getHealth: () =>
-    request<{
+    call<{
       status: string;
       service: string;
       timestamp: string;
@@ -116,32 +145,29 @@ export const api = {
         string,
         { status: string; message: string; details?: Record<string, unknown> }
       >;
-    }>("/api/health"),
+    }>(() => client.GET("/api/health")),
 
   getRiskKillSwitch: () =>
-    request<{
+    call<{
       effective: boolean;
       env: boolean;
       runtimeMemory: boolean;
       redis: boolean | null;
       paperDExecuteEnv: boolean;
-    }>("/api/risk/kill-switch"),
+    }>(() => client.GET("/api/risk/kill-switch")),
 
   setRiskKillSwitch: (enabled: boolean) =>
-    request<{
+    call<{
       effective: boolean;
       env: boolean;
       runtimeMemory: boolean;
       redis: boolean | null;
       paperDExecuteEnv: boolean;
       updated?: { enabled: boolean; memory: boolean; redis: boolean };
-    }>("/api/risk/kill-switch", {
-      method: "POST",
-      body: JSON.stringify({ enabled }),
-    }),
+    }>(() => client.POST("/api/risk/kill-switch", { body: { enabled } })),
 
   getAiStatus: () =>
-    request<{
+    call<{
       data: {
         preferredProvider: string;
         ollamaAvailable: boolean;
@@ -151,7 +177,7 @@ export const api = {
         auditSink: string;
         producerVersion: string;
       };
-    }>("/api/ai/status"),
+    }>(() => client.GET("/api/ai/status")),
 
   /** Coach profundo de batería (AT + perfil/TF). LLM vía proxy; heuristic si no hay provider.
    * mode=adversary → auditor C (solo findings tipados). */
@@ -165,7 +191,7 @@ export const api = {
     },
     init?: { signal?: AbortSignal },
   ) =>
-    request<{
+    call<{
       data: {
         engine: string;
         payload: {
@@ -193,20 +219,17 @@ export const api = {
         model: string | null;
         validationErrors?: string[];
       };
-    }>("/api/ai/backtest-coach/analyze", {
-      method: "POST",
-      body: JSON.stringify(body),
-      signal: init?.signal,
-    }),
+    }>(() =>
+      client.POST("/api/ai/backtest-coach/analyze", {
+        body: apiBody(body),
+        signal: init?.signal,
+      }),
+    ),
 
   /** F1b — copiloto FA (Ollama o heurística). Solo interpreta el card; no recalcula. */
   explainInstrumentFundamentals: (instrumentId: string) =>
-    request<{ data: import("@bolsa/shared").FundamentalExplainResponseV1 }>(
-      "/api/ai/fundamentals/explain",
-      {
-        method: "POST",
-        body: JSON.stringify({ instrumentId }),
-      },
+    call<{ data: import("@bolsa/shared").FundamentalExplainResponseV1 }>(() =>
+      client.POST("/api/ai/fundamentals/explain", { body: { instrumentId } }),
     ),
 
   /** Evidence sesión C DÍA D — interpreta métricas; sin FA/Coach. */
@@ -231,7 +254,7 @@ export const api = {
     };
     gate: { accepted: number; rejected: number };
   }) =>
-    request<{
+    call<{
       data: {
         engine: string;
         payload: {
@@ -248,10 +271,9 @@ export const api = {
         model: string | null;
         evidence: Record<string, unknown>;
       };
-    }>("/api/ai/dia-d/session-evidence", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() =>
+      client.POST("/api/ai/dia-d/session-evidence", { body: apiBody(body) }),
+    ),
 
   /** Evidence cola CORE-R — interpreta veredictos; sin FA/Coach/overwrite TOP. */
   explainCoreRReviewEvidence: (body: {
@@ -264,7 +286,7 @@ export const api = {
       reason?: string;
     }>;
   }) =>
-    request<{
+    call<{
       data: {
         engine: string;
         payload: {
@@ -281,15 +303,16 @@ export const api = {
         model: string | null;
         evidence: Record<string, unknown>;
       };
-    }>("/api/ai/core-r/review-evidence", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() =>
+      client.POST("/api/ai/core-r/review-evidence", { body: apiBody(body) }),
+    ),
 
   /** F2b lite — lista filings locales (disco; no Score_FUND). */
   listInstrumentFilings: (instrumentId: string) =>
-    request<import("@bolsa/shared").InstrumentFilingListResponseV1>(
-      `/api/instruments/${instrumentId}/filings`,
+    call<import("@bolsa/shared").InstrumentFilingListResponseV1>(() =>
+      client.GET("/api/instruments/{instrument_id}/filings", {
+        params: { path: { instrument_id: instrumentId } },
+      }),
     ),
 
   uploadInstrumentFiling: async (
@@ -329,11 +352,12 @@ export const api = {
   },
 
   deleteInstrumentFiling: (instrumentId: string, filingId: string) =>
-    request<{ ok: boolean }>(
-      `/api/instruments/${instrumentId}/filings/${filingId}`,
-      {
-        method: "DELETE",
-      },
+    call<{ ok: boolean }>(() =>
+      client.DELETE("/api/instruments/{instrument_id}/filings/{filing_id}", {
+        params: {
+          path: { instrument_id: instrumentId, filing_id: filingId },
+        },
+      }),
     ),
 
   /** F2b+ — último 10-K/10-Q desde SEC EDGAR (solo tickers US). */
@@ -341,18 +365,20 @@ export const api = {
     instrumentId: string,
     kind: "10-K" | "10-Q" = "10-K",
   ) =>
-    request<import("@bolsa/shared").InstrumentFilingUploadResponseV1>(
-      `/api/instruments/${instrumentId}/filings/sec-fetch?kind=${encodeURIComponent(kind)}`,
-      { method: "POST" },
+    call<import("@bolsa/shared").InstrumentFilingUploadResponseV1>(() =>
+      client.POST("/api/instruments/{instrument_id}/filings/sec-fetch", {
+        params: { path: { instrument_id: instrumentId }, query: { kind } },
+      }),
     ),
 
   summarizeInstrumentFiling: (instrumentId: string, filingId: string) =>
-    request<{
+    call<{
       data: import("@bolsa/shared").InstrumentFilingSummarizeResponseV1;
-    }>("/api/ai/fundamentals/filings/summarize", {
-      method: "POST",
-      body: JSON.stringify({ instrumentId, filingId }),
-    }),
+    }>(() =>
+      client.POST("/api/ai/fundamentals/filings/summarize", {
+        body: { instrumentId, filingId },
+      }),
+    ),
 
   /** F2b++ — Q&A con retrieval TF-IDF local (sin vectores). */
   askInstrumentFiling: (
@@ -360,22 +386,24 @@ export const api = {
     filingId: string,
     question: string,
   ) =>
-    request<{ data: import("@bolsa/shared").InstrumentFilingAskResponseV1 }>(
-      "/api/ai/fundamentals/filings/ask",
-      {
-        method: "POST",
-        body: JSON.stringify({ instrumentId, filingId, question }),
-      },
+    call<{ data: import("@bolsa/shared").InstrumentFilingAskResponseV1 }>(() =>
+      client.POST("/api/ai/fundamentals/filings/ask", {
+        body: { instrumentId, filingId, question },
+      }),
     ),
 
   /** RFC-008 D7 — resumen Efectividad (demo=true = ilustrativo hasta PG Trials/Memory). */
   getAiEffectiveness: (demo = false) =>
-    request<{
+    call<{
       data: import("@bolsa/shared").EffectivenessSummaryV1;
-    }>(`/api/ai/effectiveness${demo ? "?demo=true" : ""}`),
+    }>(() =>
+      client.GET("/api/ai/effectiveness", {
+        params: demo ? { query: { demo: true } } : undefined,
+      }),
+    ),
 
   getFeatureCatalog: () =>
-    request<{
+    call<{
       data: {
         defs: Array<{
           featureId: string;
@@ -393,32 +421,26 @@ export const api = {
           memberCount?: number;
         }>;
       };
-    }>("/api/features/catalog"),
+    }>(() => client.GET("/api/features/catalog")),
 
   listPredictions: (params?: {
     instrumentId?: string;
     modelId?: string;
     limit?: number;
-  }) => {
-    const q = new URLSearchParams();
-    if (params?.instrumentId) q.set("instrumentId", params.instrumentId);
-    if (params?.modelId) q.set("modelId", params.modelId);
-    if (params?.limit != null) q.set("limit", String(params.limit));
-    const qs = q.toString();
-    return request<{ data: import("@bolsa/shared").PredictionV1[] }>(
-      `/api/predictions${qs ? `?${qs}` : ""}`,
-    );
-  },
+  }) =>
+    call<{ data: import("@bolsa/shared").PredictionV1[] }>(() =>
+      client.GET("/api/predictions", { params: { query: params } }),
+    ),
 
   listPredictionModels: () =>
-    request<{
+    call<{
       data: {
         models: import("@bolsa/shared").ModelArtifactV1[];
         lightgbmAvailable: boolean;
         defaultModelId: string;
         persistence?: string;
       };
-    }>("/api/predictions/models"),
+    }>(() => client.GET("/api/predictions/models")),
 
   predict: (body: {
     instrumentId: string;
@@ -427,12 +449,8 @@ export const api = {
     barLimit?: number;
     horizon?: string;
   }) =>
-    request<{ data: import("@bolsa/shared").PredictionV1 }>(
-      "/api/predictions/predict",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").PredictionV1 }>(() =>
+      client.POST("/api/predictions/predict", { body: apiBody(body) }),
     ),
 
   trainPredictionModel: (body: {
@@ -440,98 +458,80 @@ export const api = {
     timeframe?: string;
     barLimit?: number;
   }) =>
-    request<{ data: import("@bolsa/shared").ModelArtifactV1 }>(
-      "/api/predictions/models/train",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").ModelArtifactV1 }>(() =>
+      client.POST("/api/predictions/models/train", { body: apiBody(body) }),
     ),
 
   getInstruments: () =>
-    request<{ data: import("@bolsa/shared").InstrumentWithMetaDto[] }>(
-      "/api/instruments",
+    call<{ data: import("@bolsa/shared").InstrumentWithMetaDto[] }>(() =>
+      client.GET("/api/instruments"),
     ),
 
   getInstrumentQuotes: (ids: string[]) =>
-    request<{ data: import("@bolsa/shared").InstrumentWithMetaDto[] }>(
-      "/api/instruments/quotes",
-      {
-        method: "POST",
-        body: JSON.stringify({ ids }),
-      },
+    call<{ data: import("@bolsa/shared").InstrumentWithMetaDto[] }>(() =>
+      client.POST("/api/instruments/quotes", { body: { ids } }),
     ),
 
   getInstrumentProfile: (id: string) =>
-    request<{ data: import("@bolsa/shared").InstrumentProfileDto | null }>(
-      `/api/instruments/${id}/profile`,
+    call<{ data: import("@bolsa/shared").InstrumentProfileDto | null }>(() =>
+      client.GET("/api/instruments/{instrument_id}/profile", {
+        params: { path: { instrument_id: id } },
+      }),
     ),
 
-  getInstrumentFundamentals: (id: string, opts?: { asOf?: string }) => {
-    const qs = new URLSearchParams();
-    if (opts?.asOf) qs.set("asOf", opts.asOf);
-    const suffix = qs.toString() ? `?${qs}` : "";
-    return request<{ data: import("@bolsa/shared").FundamentalCardDto }>(
-      `/api/instruments/${id}/fundamentals${suffix}`,
-    );
-  },
+  getInstrumentFundamentals: (id: string, opts?: { asOf?: string }) =>
+    call<{ data: import("@bolsa/shared").FundamentalCardDto }>(() =>
+      client.GET("/api/instruments/{instrument_id}/fundamentals", {
+        params: {
+          path: { instrument_id: id },
+          query: opts?.asOf ? { asOf: opts.asOf } : undefined,
+        },
+      }),
+    ),
 
   /** F3 — Composite Investment Score (Monitor). */
   getInstrumentComposite: (
     id: string,
     opts?: { horizon?: string; regime?: string; asOf?: string },
-  ) => {
-    const qs = new URLSearchParams();
-    if (opts?.horizon) qs.set("horizon", opts.horizon);
-    if (opts?.regime) qs.set("regime", opts.regime);
-    if (opts?.asOf) qs.set("asOf", opts.asOf);
-    const suffix = qs.toString() ? `?${qs}` : "";
-    return request<{ data: import("@bolsa/shared").CompositeCardDto }>(
-      `/api/instruments/${id}/composite${suffix}`,
-    );
-  },
+  ) =>
+    call<{ data: import("@bolsa/shared").CompositeCardDto }>(() =>
+      client.GET("/api/instruments/{instrument_id}/composite", {
+        params: {
+          path: { instrument_id: id },
+          query: opts,
+        },
+      }),
+    ),
 
   /** F4 — Screener FA (universo × gate; sin TA). */
   runFundamentalScreener: (
     body: import("@bolsa/shared").FundamentalScreenerRunRequestV1,
   ) =>
-    request<{ data: import("@bolsa/shared").FundamentalScreenerRunResultV1 }>(
-      "/api/instruments/fundamentals/screener",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").FundamentalScreenerRunResultV1 }>(() =>
+      client.POST("/api/instruments/fundamentals/screener", {
+        body: apiBody(body),
+      }),
     ),
 
   /** Paper D — propose + execute opcional (Composite × universo). */
   proposePaperD: (body: import("@bolsa/shared").PaperDProposeRequestV1) =>
-    request<{ data: import("@bolsa/shared").PaperDProposeResultV1 }>(
-      "/api/paper-d/propose",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").PaperDProposeResultV1 }>(() =>
+      client.POST("/api/paper-d/propose", { body: apiBody(body) }),
     ),
 
   /** Pipeline semanal FA → whitelist → Paper D. */
   runFaWeeklyPipeline: (
     body: import("@bolsa/shared").FaWeeklyPipelineRequestV1,
   ) =>
-    request<{ data: import("@bolsa/shared").FaWeeklyPipelineResultV1 }>(
-      "/api/paper-d/weekly-run",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").FaWeeklyPipelineResultV1 }>(() =>
+      client.POST("/api/paper-d/weekly-run", { body: apiBody(body) }),
     ),
 
   queryInstrumentFundamentals: (body: { instrumentIds: string[] }) =>
-    request<{ data: import("@bolsa/shared").FundamentalChipDto[] }>(
-      "/api/instruments/fundamentals/query",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").FundamentalChipDto[] }>(() =>
+      client.POST("/api/instruments/fundamentals/query", {
+        body: apiBody(body),
+      }),
     ),
 
   /** Batch Composite chips (hub Instrumentos I2). Cap 40 ids/request. */
@@ -540,83 +540,74 @@ export const api = {
     horizon?: string;
     regime?: string;
   }) =>
-    request<{ data: import("@bolsa/shared").CompositeChipDto[] }>(
-      "/api/instruments/composite/query",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").CompositeChipDto[] }>(() =>
+      client.POST("/api/instruments/composite/query", { body: apiBody(body) }),
     ),
 
   getInstrumentDbInventory: (id: string) =>
-    request<{ data: import("@bolsa/shared").InstrumentDbInventoryDto }>(
-      `/api/instruments/${id}/db-inventory`,
+    call<{ data: import("@bolsa/shared").InstrumentDbInventoryDto }>(() =>
+      client.GET("/api/instruments/{instrument_id}/db-inventory", {
+        params: { path: { instrument_id: id } },
+      }),
     ),
 
   validateInstrumentXtb: (id: string) =>
-    request<{ data: import("@bolsa/shared").InstrumentXtbValidationDto }>(
-      `/api/instruments/${id}/validate-xtb`,
-      { method: "POST" },
+    call<{ data: import("@bolsa/shared").InstrumentXtbValidationDto }>(() =>
+      client.POST("/api/instruments/{instrument_id}/validate-xtb", {
+        params: { path: { instrument_id: id } },
+      }),
     ),
 
   searchInstruments: (q: string) =>
-    request<import("@bolsa/shared").InstrumentSearchResponseDto>(
-      `/api/instruments/search?q=${encodeURIComponent(q)}`,
+    call<import("@bolsa/shared").InstrumentSearchResponseDto>(() =>
+      client.GET("/api/instruments/search", { params: { query: { q } } }),
     ),
 
   computeIndicators: (
     body: import("@bolsa/shared").ComputeIndicatorsRequestDto,
   ) =>
-    request<import("@bolsa/shared").ComputeIndicatorsResponseDto>(
-      "/api/indicators/compute",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").ComputeIndicatorsResponseDto>(() =>
+      client.POST("/api/indicators/compute", { body: apiBody(body) }),
     ),
 
   replayDrawings: (body: import("@bolsa/shared").DrawingReplayRequestDto) =>
-    request<import("@bolsa/shared").DrawingReplayResponseDto>(
-      "/api/drawings/replay",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").DrawingReplayResponseDto>(() =>
+      client.POST("/api/drawings/replay", { body: apiBody(body) }),
     ),
 
   evaluateSignals: (body: import("@bolsa/shared").EvaluateSignalsRequestDto) =>
-    request<import("@bolsa/shared").EvaluateSignalsResponseDto>(
-      "/api/signals/evaluate",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").EvaluateSignalsResponseDto>(() =>
+      client.POST("/api/signals/evaluate", { body: apiBody(body) }),
     ),
 
   runScan: (body: import("@bolsa/shared").ScanRunRequestDto) =>
-    request<import("@bolsa/shared").ScanRunResponseDto>("/api/scans/run", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    call<import("@bolsa/shared").ScanRunResponseDto>(() =>
+      client.POST("/api/scans/run", { body: apiBody(body) }),
+    ),
 
   enqueueScanJob: (body: import("@bolsa/shared").ScanRunRequestDto) =>
-    request<import("@bolsa/shared").ScanJobResponseDto>("/api/scans/jobs", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    call<import("@bolsa/shared").ScanJobResponseDto>(() =>
+      client.POST("/api/scans/jobs", { body: apiBody(body) }),
+    ),
 
   getScanJob: (jobId: string) =>
-    request<import("@bolsa/shared").ScanJobResponseDto>(
-      `/api/scans/jobs/${jobId}`,
+    call<import("@bolsa/shared").ScanJobResponseDto>(() =>
+      client.GET("/api/scans/jobs/{job_id}", {
+        params: { path: { job_id: jobId } },
+      }),
     ),
 
   getScanManifest: (scanId: string) =>
-    request<import("@bolsa/shared").ScanManifestResponseDto>(
-      `/api/scans/manifests/${scanId}`,
+    call<import("@bolsa/shared").ScanManifestResponseDto>(() =>
+      client.GET("/api/scans/manifests/{scan_id}", {
+        params: { path: { scan_id: scanId } },
+      }),
     ),
 
   getScanJobs: () =>
-    request<import("@bolsa/shared").ScanJobsListResponseDto>("/api/scans/jobs"),
+    call<import("@bolsa/shared").ScanJobsListResponseDto>(() =>
+      client.GET("/api/scans/jobs"),
+    ),
 
   importInstrument: (body: {
     yahooSymbol: string;
@@ -628,16 +619,12 @@ export const api = {
     yearsBack?: number;
     isin?: string | null;
   }) =>
-    request<import("@bolsa/shared").ImportInstrumentResponseDto>(
-      "/api/instruments/import",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").ImportInstrumentResponseDto>(() =>
+      client.POST("/api/instruments/import", { body: apiBody(body) }),
     ),
 
   getInstrument: (id: string) =>
-    request<{
+    call<{
       data: import("@bolsa/shared").InstrumentDto;
       meta: {
         lastSync: {
@@ -648,18 +635,27 @@ export const api = {
         } | null;
         priceSummary: import("@bolsa/shared").PriceSummaryDto | null;
       };
-    }>(`/api/instruments/${id}`),
+    }>(() =>
+      client.GET("/api/instruments/{instrument_id}", {
+        params: { path: { instrument_id: id } },
+      }),
+    ),
 
   getOhlcv: (id: string, limit = 365, timeframe = "1d") =>
-    request<{
+    call<{
       data: import("@bolsa/shared").OhlcvBarDto[];
       meta: { timeframe: string; count: number };
-    }>(
-      `/api/instruments/${id}/ohlcv?limit=${limit}&timeframe=${encodeURIComponent(timeframe)}`,
+    }>(() =>
+      client.GET("/api/instruments/{instrument_id}/ohlcv", {
+        params: {
+          path: { instrument_id: id },
+          query: { limit, timeframe },
+        },
+      }),
     ),
 
   getIndicators: (id: string, limit = 365, timeframe = "1d") =>
-    request<{
+    call<{
       data: import("@bolsa/shared").IndicatorPointDto[];
       meta: {
         signals: {
@@ -667,95 +663,116 @@ export const api = {
           smaCross: "bullish" | "bearish" | null;
         };
       };
-    }>(
-      `/api/instruments/${id}/indicators?limit=${limit}&timeframe=${encodeURIComponent(timeframe)}`,
+    }>(() =>
+      client.GET("/api/instruments/{instrument_id}/indicators", {
+        params: {
+          path: { instrument_id: id },
+          query: { limit, timeframe },
+        },
+      }),
     ),
 
   getLiveQuote: (id: string) =>
-    request<{ data: import("@bolsa/shared").InstrumentLiveQuoteDto }>(
-      `/api/instruments/${id}/live-quote`,
+    call<{ data: import("@bolsa/shared").InstrumentLiveQuoteDto }>(() =>
+      client.GET("/api/instruments/{instrument_id}/live-quote", {
+        params: { path: { instrument_id: id } },
+      }),
     ),
 
   getInstrumentLiveQuotes: (ids: string[]) =>
-    request<{ data: import("@bolsa/shared").InstrumentLiveQuoteDto[] }>(
-      "/api/instruments/live-quotes",
-      { method: "POST", body: JSON.stringify({ ids }) },
+    call<{ data: import("@bolsa/shared").InstrumentLiveQuoteDto[] }>(() =>
+      client.POST("/api/instruments/live-quotes", { body: { ids } }),
     ),
 
   getDataStatus: (id: string, timeframe = "1d") =>
-    request<{ data: import("@bolsa/shared").InstrumentDataStatusDto }>(
-      `/api/instruments/${id}/data-status?timeframe=${encodeURIComponent(timeframe)}`,
+    call<{ data: import("@bolsa/shared").InstrumentDataStatusDto }>(() =>
+      client.GET("/api/instruments/{instrument_id}/data-status", {
+        params: {
+          path: { instrument_id: id },
+          query: { timeframe },
+        },
+      }),
     ),
 
-  getDatabaseSummary: (instrumentId?: string) => {
-    const query = instrumentId
-      ? `?instrumentId=${encodeURIComponent(instrumentId)}`
-      : "";
-    return request<{ data: import("@bolsa/shared").DatabaseSummaryDto }>(
-      `/api/database/summary${query}`,
-    );
-  },
+  getDatabaseSummary: (instrumentId?: string) =>
+    call<{ data: import("@bolsa/shared").DatabaseSummaryDto }>(() =>
+      client.GET("/api/database/summary", {
+        params: instrumentId ? { query: { instrumentId } } : undefined,
+      }),
+    ),
 
   getOrphanInstruments: (limit = 100) =>
-    request<{ data: import("@bolsa/shared").OrphanInstrumentsDto }>(
-      `/api/database/orphans?limit=${limit}`,
+    call<{ data: import("@bolsa/shared").OrphanInstrumentsDto }>(() =>
+      client.GET("/api/database/orphans", { params: { query: { limit } } }),
     ),
 
   purgeOrphanInstruments: (limit = 50) =>
-    request<{ data: import("@bolsa/shared").PurgeOrphansResultDto }>(
-      "/api/database/orphans/purge",
-      { method: "POST", body: JSON.stringify({ limit }) },
+    call<{ data: import("@bolsa/shared").PurgeOrphansResultDto }>(() =>
+      client.POST("/api/database/orphans/purge", { body: { limit } }),
     ),
 
   getClosedSimulatedAccounts: (limit = 100) =>
-    request<{ data: import("@bolsa/shared").ClosedSimulatedAccountsDto }>(
-      `/api/database/closed-accounts?limit=${limit}`,
+    call<{ data: import("@bolsa/shared").ClosedSimulatedAccountsDto }>(() =>
+      client.GET("/api/database/closed-accounts", {
+        params: { query: { limit } },
+      }),
     ),
 
   purgeClosedSimulatedAccounts: (limit = 50) =>
-    request<{ data: import("@bolsa/shared").PurgeClosedAccountsResultDto }>(
-      "/api/database/closed-accounts/purge",
-      { method: "POST", body: JSON.stringify({ limit }) },
+    call<{ data: import("@bolsa/shared").PurgeClosedAccountsResultDto }>(() =>
+      client.POST("/api/database/closed-accounts/purge", { body: { limit } }),
     ),
 
-  getInstrumentRemovalPreview: (id: string, excludingListId?: string) => {
-    const query = excludingListId
-      ? `?excludingListId=${encodeURIComponent(excludingListId)}`
-      : "";
-    return request<{
+  getInstrumentRemovalPreview: (id: string, excludingListId?: string) =>
+    call<{
       data: import("@bolsa/shared").InstrumentRemovalPreviewDto;
-    }>(`/api/instruments/${id}/removal-preview${query}`);
-  },
+    }>(() =>
+      client.GET("/api/instruments/{instrument_id}/removal-preview", {
+        params: {
+          path: { instrument_id: id },
+          query: excludingListId ? { excludingListId } : undefined,
+        },
+      }),
+    ),
 
   removeInstrumentFromList: (
     listId: string,
     instrumentId: string,
     body?: { purgeIfOrphan?: boolean },
   ) =>
-    request<{
+    call<{
       data: import("@bolsa/shared").RemoveInstrumentFromListResultDto;
-    }>(`/api/lists/${listId}/instruments/${instrumentId}/remove`, {
-      method: "POST",
-      body: JSON.stringify(body ?? {}),
-    }),
+    }>(() =>
+      client.POST("/api/lists/{list_id}/instruments/{instrument_id}/remove", {
+        params: { path: { list_id: listId, instrument_id: instrumentId } },
+        body: apiBody(body ?? {}),
+      }),
+    ),
 
   deleteInstrument: (id: string, force = false) =>
-    request<void>(`/api/instruments/${id}${force ? "?force=true" : ""}`, {
-      method: "DELETE",
-    }),
+    call<void>(() =>
+      client.DELETE("/api/instruments/{instrument_id}", {
+        params: {
+          path: { instrument_id: id },
+          query: force ? { force: true } : undefined,
+        },
+      }),
+    ),
 
   getMarketProviders: () =>
-    request<{ data: import("@bolsa/shared").MarketProviderStatusDto[] }>(
-      "/api/market/providers",
+    call<{ data: import("@bolsa/shared").MarketProviderStatusDto[] }>(() =>
+      client.GET("/api/market/providers"),
     ),
 
   getFxRate: (from: string, to: string) =>
-    request<{ data: import("@bolsa/shared").FxRateDto }>(
-      `/api/market/fx?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+    call<{ data: import("@bolsa/shared").FxRateDto }>(() =>
+      client.GET("/api/market/fx", {
+        params: { query: { from, to } },
+      }),
     ),
 
   syncInstrument: async (id: string, yearsBack = 5) => {
-    const result = await request<{
+    const result = await call<{
       data: {
         barsAdded: number;
         status: string;
@@ -765,10 +782,12 @@ export const api = {
         barsSkipped?: number;
         consolidationNotes?: string[];
       };
-    }>(`/api/instruments/${id}/sync`, {
-      method: "POST",
-      body: JSON.stringify({ yearsBack }),
-    });
+    }>(() =>
+      client.POST("/api/instruments/{instrument_id}/sync", {
+        params: { path: { instrument_id: id } },
+        body: { yearsBack },
+      }),
+    );
 
     if (result.data.status === "failed") {
       throw new ApiError(result.data.error ?? "Error de sincronización", 502);
@@ -778,83 +797,86 @@ export const api = {
   },
 
   getPortfolio: () =>
-    request<{ data: import("@bolsa/shared").PortfolioSummaryDto }>(
-      "/api/portfolio",
+    call<{ data: import("@bolsa/shared").PortfolioSummaryDto }>(() =>
+      client.GET("/api/portfolio"),
     ),
 
   updateAccount: (
     accountId: string,
     body: import("@bolsa/shared").UpdateInvestmentAccountRequestDto,
   ) =>
-    request<{ data: import("@bolsa/shared").InvestmentAccountDto }>(
-      `/api/accounts/${accountId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
+    call<{ data: import("@bolsa/shared").InvestmentAccountDto }>(() =>
+      client.PATCH("/api/accounts/{account_id}", {
+        params: { path: { account_id: accountId } },
+        body,
         headers: { "X-Account-Id": accountId },
-      },
+      }),
     ),
 
   setDefaultAccount: (accountId: string) =>
-    request<{ data: import("@bolsa/shared").InvestmentAccountDto }>(
-      `/api/accounts/${accountId}/make-default`,
-      { method: "POST", headers: { "X-Account-Id": accountId } },
+    call<{ data: import("@bolsa/shared").InvestmentAccountDto }>(() =>
+      client.POST("/api/accounts/{account_id}/make-default", {
+        params: { path: { account_id: accountId } },
+        headers: { "X-Account-Id": accountId },
+      }),
     ),
 
   closeAccount: (accountId: string) =>
-    request<{ data: import("@bolsa/shared").InvestmentAccountDto }>(
-      `/api/accounts/${accountId}/close`,
-      { method: "POST", headers: { "X-Account-Id": accountId } },
+    call<{ data: import("@bolsa/shared").InvestmentAccountDto }>(() =>
+      client.POST("/api/accounts/{account_id}/close", {
+        params: { path: { account_id: accountId } },
+        headers: { "X-Account-Id": accountId },
+      }),
     ),
 
   deleteAccount: (accountId: string) =>
-    request<void>(`/api/accounts/${accountId}`, {
-      method: "DELETE",
-      headers: { "X-Account-Id": accountId },
-    }),
+    call<void>(() =>
+      client.DELETE("/api/accounts/{account_id}", {
+        params: { path: { account_id: accountId } },
+        headers: { "X-Account-Id": accountId },
+      }),
+    ),
 
   getAccounts: (type?: import("@bolsa/shared").InvestmentAccountType) =>
-    request<{ data: import("@bolsa/shared").InvestmentAccountDto[] }>(
-      type ? `/api/accounts?type=${encodeURIComponent(type)}` : "/api/accounts",
+    call<{ data: import("@bolsa/shared").InvestmentAccountDto[] }>(() =>
+      client.GET("/api/accounts", {
+        params: type ? { query: { type } } : undefined,
+      }),
     ),
 
   createAccount: (
     body: import("@bolsa/shared").CreateInvestmentAccountRequestDto,
   ) =>
-    request<{ data: import("@bolsa/shared").InvestmentAccountDto }>(
-      "/api/accounts",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").InvestmentAccountDto }>(() =>
+      client.POST("/api/accounts", { body: apiBody(body) }),
     ),
 
   updateAccountSettings: (
     accountId: string,
     settings: import("@bolsa/shared").AccountSettings,
   ) =>
-    request<{ data: import("@bolsa/shared").InvestmentAccountDto }>(
-      `/api/accounts/${accountId}/settings`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ settings }),
-      },
+    call<{ data: import("@bolsa/shared").InvestmentAccountDto }>(() =>
+      client.PATCH("/api/accounts/{account_id}/settings", {
+        params: { path: { account_id: accountId } },
+        body: { settings },
+      }),
     ),
 
   listInvestorProfiles: () =>
-    request<{ data: import("@bolsa/shared").InvestorProfileV1[] }>(
-      "/api/investor-profiles",
+    call<{ data: import("@bolsa/shared").InvestorProfileV1[] }>(() =>
+      client.GET("/api/investor-profiles"),
     ),
 
   ensureDefaultInvestorProfiles: () =>
-    request<{ data: import("@bolsa/shared").InvestorProfileV1[] }>(
-      "/api/investor-profiles/ensure-defaults",
-      { method: "POST" },
+    call<{ data: import("@bolsa/shared").InvestorProfileV1[] }>(() =>
+      client.POST("/api/investor-profiles/ensure-defaults"),
     ),
 
   getInvestorProfile: (profileId: string) =>
-    request<{ data: import("@bolsa/shared").InvestorProfileV1 }>(
-      `/api/investor-profiles/${profileId}`,
+    call<{ data: import("@bolsa/shared").InvestorProfileV1 }>(() =>
+      client.GET("/api/investor-profiles/{profile_id}", {
+        params: { path: { profile_id: profileId } },
+      }),
     ),
 
   createInvestorProfile: (body: {
@@ -868,98 +890,114 @@ export const api = {
     suggestedPolicyTemplateId?: string | null;
     selectedPolicyTemplateId?: string | null;
   }) =>
-    request<{ data: import("@bolsa/shared").InvestorProfileV1 }>(
-      "/api/investor-profiles",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").InvestorProfileV1 }>(() =>
+      client.POST("/api/investor-profiles", { body: apiBody(body) }),
     ),
 
   updateInvestorProfile: (profileId: string, body: Record<string, unknown>) =>
-    request<{ data: import("@bolsa/shared").InvestorProfileV1 }>(
-      `/api/investor-profiles/${profileId}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").InvestorProfileV1 }>(() =>
+      client.PATCH("/api/investor-profiles/{profile_id}", {
+        params: { path: { profile_id: profileId } },
+        body,
+      }),
     ),
 
   deleteInvestorProfile: (profileId: string) =>
-    request<{ ok: boolean }>(`/api/investor-profiles/${profileId}`, {
-      method: "DELETE",
-    }),
+    call<{ ok: boolean }>(() =>
+      client.DELETE("/api/investor-profiles/{profile_id}", {
+        params: { path: { profile_id: profileId } },
+      }),
+    ),
 
   getInstrumentStrategyTop: (instrumentId: string, timeframe = "1d") =>
-    request<{ data: import("@bolsa/shared").InstrumentStrategyTopV1 | null }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top?timeframe=${encodeURIComponent(timeframe)}`,
+    call<{ data: import("@bolsa/shared").InstrumentStrategyTopV1 | null }>(() =>
+      client.GET("/api/instruments/{instrument_id}/strategy-top", {
+        params: {
+          path: { instrument_id: instrumentId },
+          query: { timeframe },
+        },
+      }),
     ),
 
   getInstrumentNarrative: (
     instrumentId: string,
     scope: import("@bolsa/shared").InstrumentNarrativeScope = "estudio",
   ) =>
-    request<{ data: import("@bolsa/shared").InstrumentNarrativeV1 | null }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative?scope=${encodeURIComponent(scope)}`,
+    call<{ data: import("@bolsa/shared").InstrumentNarrativeV1 | null }>(() =>
+      client.GET("/api/instruments/{instrument_id}/narrative", {
+        params: {
+          path: { instrument_id: instrumentId },
+          query: { scope },
+        },
+      }),
     ),
 
   upsertInstrumentNarrative: (
     instrumentId: string,
     body: import("@bolsa/shared").UpsertInstrumentNarrativeRequestV1,
   ) =>
-    request<{ data: import("@bolsa/shared").InstrumentNarrativeV1 }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative`,
-      { method: "PUT", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").InstrumentNarrativeV1 }>(() =>
+      client.PUT("/api/instruments/{instrument_id}/narrative", {
+        params: { path: { instrument_id: instrumentId } },
+        body: apiBody(body),
+      }),
     ),
 
   deleteInstrumentNarrative: (
     instrumentId: string,
     scope: import("@bolsa/shared").InstrumentNarrativeScope = "estudio",
   ) =>
-    request<{ data: import("@bolsa/shared").InstrumentNarrativeV1 | null }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/narrative?scope=${encodeURIComponent(scope)}`,
-      { method: "DELETE" },
+    call<{ data: import("@bolsa/shared").InstrumentNarrativeV1 | null }>(() =>
+      client.DELETE("/api/instruments/{instrument_id}/narrative", {
+        params: {
+          path: { instrument_id: instrumentId },
+          query: { scope },
+        },
+      }),
     ),
 
   queryInstrumentDailyOpinions: (
     body: import("@bolsa/shared").QueryInstrumentDailyOpinionsRequestV1,
   ) =>
-    request<{ data: import("@bolsa/shared").InstrumentDailyOpinionV1[] }>(
-      "/api/instrument-daily-opinions/query",
-      { method: "POST", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").InstrumentDailyOpinionV1[] }>(() =>
+      client.POST("/api/instrument-daily-opinions/query", {
+        body: apiBody(body),
+      }),
     ),
 
   getInstrumentDailyOpinion: (
     instrumentId: string,
     asOfBarDate?: string,
     forceRefresh = false,
-  ) => {
-    const params = new URLSearchParams();
-    if (asOfBarDate) params.set("asOfBarDate", asOfBarDate);
-    if (forceRefresh) params.set("forceRefresh", "true");
-    const q = params.toString();
-    return request<{
+  ) =>
+    call<{
       data: import("@bolsa/shared").InstrumentDailyOpinionV1[];
-    }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/daily-opinion${q ? `?${q}` : ""}`,
-    );
-  },
+    }>(() =>
+      client.GET("/api/instruments/{instrument_id}/daily-opinion", {
+        params: {
+          path: { instrument_id: instrumentId },
+          query: {
+            ...(asOfBarDate ? { asOfBarDate } : {}),
+            ...(forceRefresh ? { forceRefresh: true } : {}),
+          },
+        },
+      }),
+    ),
 
   listInstrumentDailyOpinions: (
     instrumentId: string,
     options?: { days?: number; ensureDays?: number },
-  ) => {
-    const params = new URLSearchParams();
-    if (options?.days != null) params.set("days", String(options.days));
-    if (options?.ensureDays != null)
-      params.set("ensureDays", String(options.ensureDays));
-    const q = params.toString();
-    return request<{
+  ) =>
+    call<{
       data: import("@bolsa/shared").InstrumentDailyOpinionV1[];
-    }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/daily-opinions${q ? `?${q}` : ""}`,
-    );
-  },
+    }>(() =>
+      client.GET("/api/instruments/{instrument_id}/daily-opinions", {
+        params: {
+          path: { instrument_id: instrumentId },
+          query: options ?? {},
+        },
+      }),
+    ),
 
   runInstrumentDailyOpinionEodBatch: (body: {
     instrumentIds: string[];
@@ -971,7 +1009,7 @@ export const api = {
     notifyDigestEnabled?: boolean | null;
     attachPdf?: boolean | null;
   }) =>
-    request<{
+    call<{
       enabled: boolean;
       forced: boolean;
       count: number;
@@ -989,10 +1027,11 @@ export const api = {
         asOf?: string | null;
         pdfAttached?: boolean;
       } | null;
-    }>("/api/instrument-daily-opinions/eod-batch", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() =>
+      client.POST("/api/instrument-daily-opinions/eod-batch", {
+        body: apiBody(body),
+      }),
+    ),
 
   /** R3 — envío manual digest HTML (Asesor → Diario). */
   sendDailyOpsDigestEmail: (
@@ -1005,7 +1044,7 @@ export const api = {
       attachPdf?: boolean | null;
     },
   ) =>
-    request<{
+    call<{
       data: {
         digestEnabled: boolean;
         sent: boolean;
@@ -1013,10 +1052,12 @@ export const api = {
         asOf?: string | null;
         pdfAttached?: boolean;
       };
-    }>(`/api/accounts/${accountId}/daily-ops-report/email`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() =>
+      client.POST("/api/accounts/{account_id}/daily-ops-report/email", {
+        params: { path: { account_id: accountId } },
+        body: apiBody(body),
+      }),
+    ),
 
   /** R4 — descarga PDF del resumen operativo. */
   downloadDailyOpsDigestPdf: async (
@@ -1046,15 +1087,8 @@ export const api = {
   getInstrumentDailyOpinionTelemetry: (opts?: {
     lookbackDays?: number;
     instrumentIds?: string[];
-  }) => {
-    const params = new URLSearchParams();
-    if (opts?.lookbackDays != null)
-      params.set("lookbackDays", String(opts.lookbackDays));
-    for (const id of opts?.instrumentIds ?? []) {
-      if (id) params.append("instrumentIds", id);
-    }
-    const q = params.toString();
-    return request<{
+  }) =>
+    call<{
       data: {
         schemaVersion: string;
         asOf: string;
@@ -1076,30 +1110,38 @@ export const api = {
         neutralBandPct: number;
         caveats: string[];
       };
-    }>(`/api/instrument-daily-opinions/telemetry${q ? `?${q}` : ""}`);
-  },
+    }>(() =>
+      client.GET("/api/instrument-daily-opinions/telemetry", {
+        params: { query: opts ?? {} },
+      }),
+    ),
 
-  getAccountMandates: (accountId: string, instrumentId?: string) => {
-    const q = instrumentId
-      ? `?instrumentId=${encodeURIComponent(instrumentId)}`
-      : "";
-    return request<{ data: import("@bolsa/shared").MandateBundleDto }>(
-      `/api/accounts/${encodeURIComponent(accountId)}/mandates${q}`,
-    );
-  },
+  getAccountMandates: (accountId: string, instrumentId?: string) =>
+    call<{ data: import("@bolsa/shared").MandateBundleDto }>(() =>
+      client.GET("/api/accounts/{account_id}/mandates", {
+        params: {
+          path: { account_id: accountId },
+          query: instrumentId ? { instrumentId } : undefined,
+        },
+      }),
+    ),
 
   syncAccountMandates: (
     accountId: string,
     body: import("@bolsa/shared").MandateBundleDto,
   ) =>
-    request<{ data: import("@bolsa/shared").MandateBundleDto }>(
-      `/api/accounts/${encodeURIComponent(accountId)}/mandates`,
-      { method: "PUT", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").MandateBundleDto }>(() =>
+      client.PUT("/api/accounts/{account_id}/mandates", {
+        params: { path: { account_id: accountId } },
+        body: apiBody(body),
+      }),
     ),
 
   getAccountCoreR: (accountId: string) =>
-    request<{ data: import("@bolsa/shared").CoreRBundleDto }>(
-      `/api/accounts/${encodeURIComponent(accountId)}/core-r`,
+    call<{ data: import("@bolsa/shared").CoreRBundleDto }>(() =>
+      client.GET("/api/accounts/{account_id}/core-r", {
+        params: { path: { account_id: accountId } },
+      }),
     ),
 
   syncAccountCoreR: (
@@ -1110,14 +1152,18 @@ export const api = {
       scheduler: import("@bolsa/shared").CoreRSchedulerPrefsDto;
     },
   ) =>
-    request<{ data: import("@bolsa/shared").CoreRBundleDto }>(
-      `/api/accounts/${encodeURIComponent(accountId)}/core-r`,
-      { method: "PUT", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").CoreRBundleDto }>(() =>
+      client.PUT("/api/accounts/{account_id}/core-r", {
+        params: { path: { account_id: accountId } },
+        body,
+      }),
     ),
 
   getAccountSupervisedF3: (accountId: string) =>
-    request<{ data: import("@bolsa/shared").SupervisedF3BundleDto }>(
-      `/api/accounts/${encodeURIComponent(accountId)}/supervised-f3-queue`,
+    call<{ data: import("@bolsa/shared").SupervisedF3BundleDto }>(() =>
+      client.GET("/api/accounts/{account_id}/supervised-f3-queue", {
+        params: { path: { account_id: accountId } },
+      }),
     ),
 
   syncAccountSupervisedF3: (
@@ -1127,77 +1173,87 @@ export const api = {
       activeId?: string | null;
     },
   ) =>
-    request<{ data: import("@bolsa/shared").SupervisedF3BundleDto }>(
-      `/api/accounts/${encodeURIComponent(accountId)}/supervised-f3-queue`,
-      { method: "PUT", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").SupervisedF3BundleDto }>(() =>
+      client.PUT("/api/accounts/{account_id}/supervised-f3-queue", {
+        params: { path: { account_id: accountId } },
+        body,
+      }),
     ),
 
   /** Ops: tick CORE-R servidor (informe BD + PnL DEMO). */
-  runCoreRCronTick: (force = false, includePnl = true) => {
-    const q = new URLSearchParams();
-    if (force) q.set("force", "true");
-    if (!includePnl) q.set("include_pnl", "false");
-    const qs = q.toString();
-    return request<{
+  runCoreRCronTick: (force = false, includePnl = true) =>
+    call<{
       data: {
         accounts: number;
         ticked: number;
         totalAdded: number;
         results: Array<Record<string, unknown>>;
       };
-    }>(`/api/core-r/cron/tick${qs ? `?${qs}` : ""}`, { method: "POST" });
-  },
+    }>(() =>
+      client.POST("/api/core-r/cron/tick", {
+        params: {
+          query: {
+            ...(force ? { force: true } : {}),
+            ...(!includePnl ? { include_pnl: false } : {}),
+          },
+        },
+      }),
+    ),
 
   queryInstrumentStrategyTops: (body: {
     instrumentIds: string[];
     timeframe?: string;
   }) =>
-    request<{ data: import("@bolsa/shared").InstrumentStrategyTopV1[] }>(
-      "/api/instrument-strategy-tops/query",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").InstrumentStrategyTopV1[] }>(() =>
+      client.POST("/api/instrument-strategy-tops/query", {
+        body: apiBody(body),
+      }),
     ),
 
   upsertInstrumentStrategyTop: (
     instrumentId: string,
     body: import("@bolsa/shared").UpsertInstrumentStrategyTopRequestV1,
   ) =>
-    request<{ data: import("@bolsa/shared").InstrumentStrategyTopV1 }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top`,
-      {
-        method: "PUT",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").InstrumentStrategyTopV1 }>(() =>
+      client.PUT("/api/instruments/{instrument_id}/strategy-top", {
+        params: { path: { instrument_id: instrumentId } },
+        body: apiBody(body),
+      }),
     ),
 
   deleteInstrumentStrategyTop: (instrumentId: string, timeframe = "1d") =>
-    request<{ ok: boolean }>(
-      `/api/instruments/${encodeURIComponent(instrumentId)}/strategy-top?timeframe=${encodeURIComponent(timeframe)}`,
-      { method: "DELETE" },
+    call<{ ok: boolean }>(() =>
+      client.DELETE("/api/instruments/{instrument_id}/strategy-top", {
+        params: {
+          path: { instrument_id: instrumentId },
+          query: { timeframe },
+        },
+      }),
     ),
 
   assignAccountProfile: (accountId: string, profileId: string | null) =>
-    request<{ data: { accountId: string; activeProfileId: string | null } }>(
-      `/api/accounts/${accountId}/active-profile`,
-      {
-        method: "PUT",
-        body: JSON.stringify({ profileId }),
-      },
+    call<{ data: { accountId: string; activeProfileId: string | null } }>(() =>
+      client.PUT("/api/accounts/{account_id}/active-profile", {
+        params: { path: { account_id: accountId } },
+        body: { profileId },
+      }),
     ),
 
   getAccountActiveProfile: (accountId: string) =>
-    request<{ data: import("@bolsa/shared").InvestorProfileV1 }>(
-      `/api/accounts/${accountId}/active-profile`,
+    call<{ data: import("@bolsa/shared").InvestorProfileV1 }>(() =>
+      client.GET("/api/accounts/{account_id}/active-profile", {
+        params: { path: { account_id: accountId } },
+      }),
     ),
 
   refreshInvestorProfileObserved: (profileId: string, accountId?: string) =>
-    request<{ data: import("@bolsa/shared").InvestorProfileV1 }>(
-      `/api/investor-profiles/${profileId}/refresh-observed${
-        accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""
-      }`,
-      { method: "POST" },
+    call<{ data: import("@bolsa/shared").InvestorProfileV1 }>(() =>
+      client.POST("/api/investor-profiles/{profile_id}/refresh-observed", {
+        params: {
+          path: { profile_id: profileId },
+          query: accountId ? { accountId } : undefined,
+        },
+      }),
     ),
 
   proposeRecommendation: (body: {
@@ -1215,7 +1271,7 @@ export const api = {
     horizon?: "intraday" | "swing" | "position" | "long_term";
     macro?: Record<string, unknown>;
   }) =>
-    request<{
+    call<{
       data: import("@bolsa/shared").RecommendationV1 & {
         technicalAssessment?: import("@bolsa/shared").TechnicalAssessmentV1;
         fundamentalAssessment?: import("@bolsa/shared").FundamentalAssessmentV1;
@@ -1235,35 +1291,34 @@ export const api = {
         weightContext?: import("@bolsa/shared").WeightContextV1;
         combinedScore?: number;
       };
-    }>("/api/ai/recommendations/propose", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() =>
+      client.POST("/api/ai/recommendations/propose", { body: apiBody(body) }),
+    ),
 
   getDecisionSession: (sessionId: string) =>
-    request<{ data: import("@bolsa/shared").DecisionSessionV1 }>(
-      `/api/ai/decision-sessions/${encodeURIComponent(sessionId)}`,
+    call<{ data: import("@bolsa/shared").DecisionSessionV1 }>(() =>
+      client.GET("/api/ai/decision-sessions/{session_id}", {
+        params: { path: { session_id: sessionId } },
+      }),
     ),
 
   getDecisionSessionReplay: (sessionId: string) =>
-    request<{ data: import("@bolsa/shared").DecisionReplayV1 }>(
-      `/api/ai/decision-sessions/${encodeURIComponent(sessionId)}/replay`,
+    call<{ data: import("@bolsa/shared").DecisionReplayV1 }>(() =>
+      client.GET("/api/ai/decision-sessions/{session_id}/replay", {
+        params: { path: { session_id: sessionId } },
+      }),
     ),
 
   listDecisionSessions: (params?: {
     accountId?: string;
     instrumentId?: string;
     limit?: number;
-  }) => {
-    const q = new URLSearchParams();
-    if (params?.accountId) q.set("accountId", params.accountId);
-    if (params?.instrumentId) q.set("instrumentId", params.instrumentId);
-    if (params?.limit != null) q.set("limit", String(params.limit));
-    const qs = q.toString();
-    return request<{
+  }) =>
+    call<{
       data: import("@bolsa/shared").DecisionSessionSummaryV1[];
-    }>(`/api/ai/decision-sessions${qs ? `?${qs}` : ""}`);
-  },
+    }>(() =>
+      client.GET("/api/ai/decision-sessions", { params: { query: params } }),
+    ),
 
   closeDecisionSessionOutcome: (
     sessionId: string,
@@ -1276,28 +1331,23 @@ export const api = {
       force?: boolean;
     },
   ) =>
-    request<{ data: import("@bolsa/shared").DecisionSessionV1 }>(
-      `/api/ai/decision-sessions/${encodeURIComponent(sessionId)}/outcome`,
-      {
-        method: "POST",
-        body: JSON.stringify(body ?? { mode: "auto" }),
-      },
+    call<{ data: import("@bolsa/shared").DecisionSessionV1 }>(() =>
+      client.POST("/api/ai/decision-sessions/{session_id}/outcome", {
+        params: { path: { session_id: sessionId } },
+        body: apiBody(body ?? { mode: "auto" }),
+      }),
     ),
 
   getDecisionSessionLearningSummary: (params?: {
     accountId?: string;
     instrumentId?: string;
     limit?: number;
-  }) => {
-    const q = new URLSearchParams();
-    if (params?.accountId) q.set("accountId", params.accountId);
-    if (params?.instrumentId) q.set("instrumentId", params.instrumentId);
-    if (params?.limit != null) q.set("limit", String(params.limit));
-    const qs = q.toString();
-    return request<{ data: import("@bolsa/shared").SessionLearningSummaryV1 }>(
-      `/api/ai/decision-sessions/learning-summary${qs ? `?${qs}` : ""}`,
-    );
-  },
+  }) =>
+    call<{ data: import("@bolsa/shared").SessionLearningSummaryV1 }>(() =>
+      client.GET("/api/ai/decision-sessions/learning-summary", {
+        params: { query: params },
+      }),
+    ),
 
   confirmOrderIntent: (body: {
     recommendation:
@@ -1307,7 +1357,7 @@ export const api = {
     execute?: boolean;
     sessionId?: string;
   }) =>
-    request<{
+    call<{
       data: {
         intent: import("@bolsa/shared").OrderIntentV1;
         trade: {
@@ -1317,77 +1367,92 @@ export const api = {
         } | null;
         decisionSession?: import("@bolsa/shared").DecisionSessionV1 | null;
       };
-    }>("/api/ai/intents/confirm", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() => client.POST("/api/ai/intents/confirm", { body: apiBody(body) })),
 
   getAccountSummary: (accountId: string) =>
-    request<{ data: import("@bolsa/shared").AccountSummaryDto }>(
-      `/api/accounts/${accountId}/summary`,
+    call<{ data: import("@bolsa/shared").AccountSummaryDto }>(() =>
+      client.GET("/api/accounts/{account_id}/summary", {
+        params: { path: { account_id: accountId } },
+      }),
     ),
 
   /** R1 — resumen operativo diario (Asesor → Diario). */
   getDailyOpsReport: (
     accountId: string,
     opts?: { asOf?: string; instrumentIds?: string[] },
-  ) => {
-    const q = new URLSearchParams();
-    if (opts?.asOf) q.set("asOf", opts.asOf);
-    if (opts?.instrumentIds?.length)
-      q.set("instrumentIds", opts.instrumentIds.join(","));
-    const qs = q.toString();
-    return request<import("@bolsa/shared").DailyOpsReportResponseV1>(
-      `/api/accounts/${accountId}/daily-ops-report${qs ? `?${qs}` : ""}`,
-    );
-  },
+  ) =>
+    call<import("@bolsa/shared").DailyOpsReportResponseV1>(() =>
+      client.GET("/api/accounts/{account_id}/daily-ops-report", {
+        params: {
+          path: { account_id: accountId },
+          // El contrato declara instrumentIds como string (comma-joined), igual
+          // al wire format del request<T> manual (join(",")).
+          query: {
+            ...(opts?.asOf ? { asOf: opts.asOf } : {}),
+            ...(opts?.instrumentIds?.length
+              ? { instrumentIds: opts.instrumentIds.join(",") }
+              : {}),
+          },
+        },
+      }),
+    ),
 
   getAccountSummaries: (type?: string) =>
-    request<{ data: import("@bolsa/shared").AccountSummaryDto[] }>(
-      type
-        ? `/api/accounts/summaries?type=${encodeURIComponent(type)}`
-        : "/api/accounts/summaries",
+    call<{ data: import("@bolsa/shared").AccountSummaryDto[] }>(() =>
+      client.GET("/api/accounts/summaries", {
+        params: type ? { query: { type } } : undefined,
+      }),
     ),
 
   getAccountLedger: (accountId: string, limit = 50, offset = 0) =>
-    request<{ data: import("@bolsa/shared").LedgerEntryDto[] }>(
-      `/api/accounts/${accountId}/ledger?limit=${limit}&offset=${offset}`,
+    call<{ data: import("@bolsa/shared").LedgerEntryDto[] }>(() =>
+      client.GET("/api/accounts/{account_id}/ledger", {
+        params: {
+          path: { account_id: accountId },
+          query: { limit, offset },
+        },
+      }),
     ),
 
   getTaxReport: (accountId: string, year?: number) =>
-    request<{ data: import("@bolsa/shared").TaxReportSummaryDto }>(
-      `/api/accounts/${accountId}/tax-report${year != null ? `?year=${year}` : ""}`,
+    call<{ data: import("@bolsa/shared").TaxReportSummaryDto }>(() =>
+      client.GET("/api/accounts/{account_id}/tax-report", {
+        params: {
+          path: { account_id: accountId },
+          query: year != null ? { year } : undefined,
+        },
+      }),
     ),
 
   depositCash: (
     accountId: string,
     body: import("@bolsa/shared").DepositCashRequestDto,
   ) =>
-    request<{ data: import("@bolsa/shared").CashMovementResultDto }>(
-      `/api/accounts/${accountId}/deposits`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
+    call<{ data: import("@bolsa/shared").CashMovementResultDto }>(() =>
+      client.POST("/api/accounts/{account_id}/deposits", {
+        params: { path: { account_id: accountId } },
+        body,
         headers: { "X-Account-Id": accountId },
-      },
+      }),
     ),
 
   withdrawCash: (
     accountId: string,
     body: import("@bolsa/shared").WithdrawCashRequestDto,
   ) =>
-    request<{ data: import("@bolsa/shared").CashMovementResultDto }>(
-      `/api/accounts/${accountId}/withdrawals`,
-      {
-        method: "POST",
-        body: JSON.stringify(body),
+    call<{ data: import("@bolsa/shared").CashMovementResultDto }>(() =>
+      client.POST("/api/accounts/{account_id}/withdrawals", {
+        params: { path: { account_id: accountId } },
+        body,
         headers: { "X-Account-Id": accountId },
-      },
+      }),
     ),
 
   getTransactions: (limit = 50) =>
-    request<{ data: import("@bolsa/shared").TransactionDto[] }>(
-      `/api/portfolio/transactions?limit=${limit}`,
+    call<{ data: import("@bolsa/shared").TransactionDto[] }>(() =>
+      client.GET("/api/portfolio/transactions", {
+        params: { query: { limit } },
+      }),
     ),
 
   executeTrade: (body: {
@@ -1396,30 +1461,28 @@ export const api = {
     quantity: number;
     price: number;
   }) =>
-    request<{
+    call<{
       data: {
         transaction: import("@bolsa/shared").TransactionDto;
         summary: import("@bolsa/shared").PortfolioSummaryDto;
       };
-    }>("/api/portfolio/trade", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() => client.POST("/api/portfolio/trade", { body: apiBody(body) })),
 
   getBacktests: (limit = 20) =>
-    request<{ data: import("@bolsa/shared").BacktestRunDto[] }>(
-      `/api/backtests?limit=${encodeURIComponent(String(limit))}`,
+    call<{ data: import("@bolsa/shared").BacktestRunDto[] }>(() =>
+      client.GET("/api/backtests", { params: { query: { limit } } }),
     ),
 
   pruneBacktests: (keep: number) =>
-    request<{ deleted: number; keep: number }>("/api/backtests/prune", {
-      method: "POST",
-      body: JSON.stringify({ keep }),
-    }),
+    call<{ deleted: number; keep: number }>(() =>
+      client.POST("/api/backtests/prune", { body: { keep } }),
+    ),
 
   getBacktest: (id: string) =>
-    request<{ data: import("@bolsa/shared").BacktestRunDetailDto }>(
-      `/api/backtests/${id}`,
+    call<{ data: import("@bolsa/shared").BacktestRunDetailDto }>(() =>
+      client.GET("/api/backtests/{run_id}", {
+        params: { path: { run_id: id } },
+      }),
     ),
 
   runBacktest: (
@@ -1440,59 +1503,39 @@ export const api = {
     },
     init?: { signal?: AbortSignal },
   ) =>
-    request<import("@bolsa/shared").BacktestRunResponseDto>(
-      "/api/backtests/run",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-        signal: init?.signal,
-      },
+    call<import("@bolsa/shared").BacktestRunResponseDto>(() =>
+      client.POST("/api/backtests/run", { body, signal: init?.signal }),
     ),
 
   getResearchTrials: (
     query: import("@bolsa/shared").ResearchTrialsQuery = {},
-  ) => {
-    const params = new URLSearchParams();
-    if (query.instrumentId) params.set("instrumentId", query.instrumentId);
-    if (query.proposedBy) params.set("proposedBy", query.proposedBy);
-    if (query.presetKey) params.set("presetKey", query.presetKey);
-    if (query.strategy) params.set("strategy", query.strategy);
-    if (query.strategyDefinitionId)
-      params.set("strategyDefinitionId", query.strategyDefinitionId);
-    if (query.optimizationRunId)
-      params.set("optimizationRunId", query.optimizationRunId);
-    if (query.backtestRunId) params.set("backtestRunId", query.backtestRunId);
-    if (query.failCode) params.set("failCode", query.failCode);
-    if (query.dateFrom) params.set("dateFrom", query.dateFrom);
-    if (query.dateTo) params.set("dateTo", query.dateTo);
-    if (query.sort) params.set("sort", query.sort);
-    if (query.sortDir) params.set("sortDir", query.sortDir);
-    if (query.limit != null) params.set("limit", String(query.limit));
-    if (query.offset != null) params.set("offset", String(query.offset));
-    const qs = params.toString();
-    return request<import("@bolsa/shared").ResearchTrialsListResponseDto>(
-      `/api/research/trials${qs ? `?${qs}` : ""}`,
-    );
-  },
+  ) =>
+    call<import("@bolsa/shared").ResearchTrialsListResponseDto>(() =>
+      client.GET("/api/research/trials", { params: { query } }),
+    ),
 
   getResearchTrial: (id: string) =>
-    request<import("@bolsa/shared").ResearchTrialDetailResponseDto>(
-      `/api/research/trials/${id}`,
+    call<import("@bolsa/shared").ResearchTrialDetailResponseDto>(() =>
+      client.GET("/api/research/trials/{trial_id}", {
+        params: { path: { trial_id: id } },
+      }),
     ),
 
   getInstrumentResearchSummary: (instrumentId: string) =>
-    request<{ data: import("@bolsa/shared").InstrumentResearchSummaryDto }>(
-      `/api/research/instruments/${instrumentId}/summary`,
+    call<{ data: import("@bolsa/shared").InstrumentResearchSummaryDto }>(() =>
+      client.GET("/api/research/instruments/{instrument_id}/summary", {
+        params: { path: { instrument_id: instrumentId } },
+      }),
     ),
 
   getLaboratoryResearchSummary: () =>
-    request<{ data: import("@bolsa/shared").LaboratoryResearchSummaryDto }>(
-      "/api/research/summary",
+    call<{ data: import("@bolsa/shared").LaboratoryResearchSummaryDto }>(() =>
+      client.GET("/api/research/summary"),
     ),
 
   getLabHealth: () =>
-    request<{ data: import("@bolsa/shared").LabHealthDto }>(
-      "/api/research/lab-health",
+    call<{ data: import("@bolsa/shared").LabHealthDto }>(() =>
+      client.GET("/api/research/lab-health"),
     ),
 
   /** Evidence sesión C DÍA D → Fase 2 research_evidence (source=dia_d_session). */
@@ -1506,7 +1549,7 @@ export const api = {
     engine?: string;
     evidence: import("@bolsa/shared").DiaDSessionEvidenceV1Dto;
   }) =>
-    request<{
+    call<{
       data: {
         id: string;
         instrumentId: string;
@@ -1516,299 +1559,314 @@ export const api = {
         summary: Record<string, unknown>;
         createdAt: string;
       };
-    }>("/api/research/dia-d-session-evidence", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() =>
+      client.POST("/api/research/dia-d-session-evidence", {
+        body: apiBody(body),
+      }),
+    ),
 
   optimizeBacktest: (body: import("@bolsa/shared").OptimizeSmaGridRequestDto) =>
-    request<import("@bolsa/shared").OptimizeSmaGridResponseDto>(
-      "/api/backtests/optimize",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").OptimizeSmaGridResponseDto>(() =>
+      client.POST("/api/backtests/optimize", { body: apiBody(body) }),
     ),
 
   enqueueOptimizeJob: (
     body: import("@bolsa/shared").OptimizeSmaGridRequestDto,
   ) =>
-    request<import("@bolsa/shared").OptimizationRunResponseDto>(
-      "/api/backtests/optimize/jobs",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").OptimizationRunResponseDto>(() =>
+      client.POST("/api/backtests/optimize/jobs", { body: apiBody(body) }),
     ),
 
   getOptimizeRun: (runId: string) =>
-    request<import("@bolsa/shared").OptimizationRunResponseDto>(
-      `/api/backtests/optimize/runs/${runId}`,
+    call<import("@bolsa/shared").OptimizationRunResponseDto>(() =>
+      client.GET("/api/backtests/optimize/runs/{run_id}", {
+        params: { path: { run_id: runId } },
+      }),
     ),
 
   getOptimizeRuns: () =>
-    request<import("@bolsa/shared").OptimizationRunsListResponseDto>(
-      "/api/backtests/optimize/runs",
+    call<import("@bolsa/shared").OptimizationRunsListResponseDto>(() =>
+      client.GET("/api/backtests/optimize/runs"),
     ),
 
   getStrategies: () =>
-    request<{ data: import("@bolsa/shared").StrategyDefinitionSummaryDto[] }>(
-      "/api/strategies",
+    call<{ data: import("@bolsa/shared").StrategyDefinitionSummaryDto[] }>(() =>
+      client.GET("/api/strategies"),
     ),
 
   getStrategy: (id: string) =>
-    request<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(
-      `/api/strategies/${id}`,
+    call<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(() =>
+      client.GET("/api/strategies/{strategy_id}", {
+        params: { path: { strategy_id: id } },
+      }),
     ),
 
   createStrategyFromPreset: (
     body: import("@bolsa/shared").CreateStrategyFromPresetDto,
   ) =>
-    request<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(
-      "/api/strategies/from-preset",
-      { method: "POST", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(() =>
+      client.POST("/api/strategies/from-preset", { body: apiBody(body) }),
     ),
 
   draftStrategyFromPrompt: (
     body: import("@bolsa/shared").DraftStrategyFromPromptRequestDto,
   ) =>
-    request<{ data: import("@bolsa/shared").DraftStrategyFromPromptResultDto }>(
-      "/api/strategies/draft-from-prompt",
-      { method: "POST", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").DraftStrategyFromPromptResultDto }>(
+      () =>
+        client.POST("/api/strategies/draft-from-prompt", {
+          body: apiBody(body),
+        }),
     ),
 
   draftIndicatorFromPrompt: (
     body: import("@bolsa/shared").DraftIndicatorFromPromptRequestDto,
   ) =>
-    request<{
+    call<{
       data: import("@bolsa/shared").DraftIndicatorFromPromptResultDto;
-    }>("/api/indicators/draft-from-prompt", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    }>(() =>
+      client.POST("/api/indicators/draft-from-prompt", { body: apiBody(body) }),
+    ),
 
   createStrategy: (body: import("@bolsa/shared").UpsertStrategyDefinitionDto) =>
-    request<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(
-      "/api/strategies",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(() =>
+      client.POST("/api/strategies", { body: apiBody(body) }),
     ),
 
   updateStrategy: (
     id: string,
     body: import("@bolsa/shared").UpdateStrategyDefinitionDto,
   ) =>
-    request<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(
-      `/api/strategies/${id}`,
-      { method: "PATCH", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").StrategyDefinitionDetailDto }>(() =>
+      client.PATCH("/api/strategies/{strategy_id}", {
+        params: { path: { strategy_id: id } },
+        body: apiBody(body),
+      }),
     ),
 
   deleteStrategy: (id: string) =>
-    request<void>(`/api/strategies/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/strategies/{strategy_id}", {
+        params: { path: { strategy_id: id } },
+      }),
+    ),
 
   getTrackers: (enabledOnly = false) =>
-    request<import("@bolsa/shared").TrackerDefinitionsListResponseDto>(
-      `/api/trackers${enabledOnly ? "?enabled_only=true" : ""}`,
+    call<import("@bolsa/shared").TrackerDefinitionsListResponseDto>(() =>
+      client.GET("/api/trackers", {
+        params: enabledOnly ? { query: { enabled_only: true } } : undefined,
+      }),
     ),
 
   getTracker: (id: string) =>
-    request<import("@bolsa/shared").TrackerDefinitionResponseDto>(
-      `/api/trackers/${id}`,
+    call<import("@bolsa/shared").TrackerDefinitionResponseDto>(() =>
+      client.GET("/api/trackers/{tracker_id}", {
+        params: { path: { tracker_id: id } },
+      }),
     ),
 
   createTracker: (body: import("@bolsa/shared").CreateTrackerDefinitionDto) =>
-    request<import("@bolsa/shared").TrackerDefinitionResponseDto>(
-      "/api/trackers",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").TrackerDefinitionResponseDto>(() =>
+      client.POST("/api/trackers", { body: apiBody(body) }),
     ),
 
   updateTracker: (
     id: string,
     body: import("@bolsa/shared").UpdateTrackerDefinitionDto,
   ) =>
-    request<import("@bolsa/shared").TrackerDefinitionResponseDto>(
-      `/api/trackers/${id}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").TrackerDefinitionResponseDto>(() =>
+      client.PATCH("/api/trackers/{tracker_id}", {
+        params: { path: { tracker_id: id } },
+        body: apiBody(body),
+      }),
     ),
 
   deleteTracker: (id: string) =>
-    request<void>(`/api/trackers/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/trackers/{tracker_id}", {
+        params: { path: { tracker_id: id } },
+      }),
+    ),
 
   runTrackerScan: (trackerId: string) =>
-    request<import("@bolsa/shared").ScanRunResponseDto>(
-      `/api/trackers/${trackerId}/scan`,
-      {
-        method: "POST",
-      },
+    call<import("@bolsa/shared").ScanRunResponseDto>(() =>
+      client.POST("/api/trackers/{tracker_id}/scan", {
+        params: { path: { tracker_id: trackerId } },
+      }),
     ),
 
   enqueueTrackerScanJob: (trackerId: string) =>
-    request<import("@bolsa/shared").ScanJobResponseDto>(
-      `/api/trackers/${trackerId}/scan-jobs`,
-      { method: "POST" },
+    call<import("@bolsa/shared").ScanJobResponseDto>(() =>
+      client.POST("/api/trackers/{tracker_id}/scan-jobs", {
+        params: { path: { tracker_id: trackerId } },
+      }),
     ),
 
   evaluateTrackerSchedules: (options?: {
     trackerId?: string;
     force?: boolean;
-  }) => {
-    const params = new URLSearchParams();
-    if (options?.trackerId) params.set("trackerId", options.trackerId);
-    if (options?.force) params.set("force", "true");
-    const query = params.toString();
-    return request<import("@bolsa/shared").EvaluateTrackerSchedulesResponseDto>(
-      `/api/trackers/schedules/evaluate${query ? `?${query}` : ""}`,
-      { method: "POST" },
-    );
-  },
+  }) =>
+    call<import("@bolsa/shared").EvaluateTrackerSchedulesResponseDto>(() =>
+      client.POST("/api/trackers/schedules/evaluate", {
+        params: { query: options },
+      }),
+    ),
 
   getExecutionPolicies: (enabledOnly = false) =>
-    request<import("@bolsa/shared").ExecutionPoliciesListResponseDto>(
-      `/api/execution-policies${enabledOnly ? "?enabled_only=true" : ""}`,
+    call<import("@bolsa/shared").ExecutionPoliciesListResponseDto>(() =>
+      client.GET("/api/execution-policies", {
+        params: enabledOnly ? { query: { enabled_only: true } } : undefined,
+      }),
     ),
 
   getExecutionPolicy: (id: string) =>
-    request<import("@bolsa/shared").ExecutionPolicyResponseDto>(
-      `/api/execution-policies/${id}`,
+    call<import("@bolsa/shared").ExecutionPolicyResponseDto>(() =>
+      client.GET("/api/execution-policies/{policy_id}", {
+        params: { path: { policy_id: id } },
+      }),
     ),
 
   createExecutionPolicy: (
     body: import("@bolsa/shared").CreateExecutionPolicyDto,
   ) =>
-    request<import("@bolsa/shared").ExecutionPolicyResponseDto>(
-      "/api/execution-policies",
-      { method: "POST", body: JSON.stringify(body) },
+    call<import("@bolsa/shared").ExecutionPolicyResponseDto>(() =>
+      client.POST("/api/execution-policies", { body: apiBody(body) }),
     ),
 
   updateExecutionPolicy: (
     id: string,
     body: import("@bolsa/shared").UpdateExecutionPolicyDto,
   ) =>
-    request<import("@bolsa/shared").ExecutionPolicyResponseDto>(
-      `/api/execution-policies/${id}`,
-      { method: "PATCH", body: JSON.stringify(body) },
+    call<import("@bolsa/shared").ExecutionPolicyResponseDto>(() =>
+      client.PATCH("/api/execution-policies/{policy_id}", {
+        params: { path: { policy_id: id } },
+        body,
+      }),
     ),
 
   deleteExecutionPolicy: (id: string) =>
-    request<void>(`/api/execution-policies/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/execution-policies/{policy_id}", {
+        params: { path: { policy_id: id } },
+      }),
+    ),
 
   routeSignalsThroughPolicy: (
     policyId: string,
     body: import("@bolsa/shared").RouteSignalsRequestDto,
   ) =>
-    request<import("@bolsa/shared").RouteSignalsResponseDto>(
-      `/api/execution-policies/${policyId}/route`,
-      { method: "POST", body: JSON.stringify(body) },
+    call<import("@bolsa/shared").RouteSignalsResponseDto>(() =>
+      client.POST("/api/execution-policies/{policy_id}/route", {
+        params: { path: { policy_id: policyId } },
+        body: apiBody(body),
+      }),
     ),
 
   executeScanJobHits: (
     jobId: string,
     body: import("@bolsa/shared").ExecuteScanJobRequestDto,
   ) =>
-    request<import("@bolsa/shared").RouteSignalsResponseDto>(
-      `/api/scans/jobs/${jobId}/execute`,
-      { method: "POST", body: JSON.stringify(body) },
+    call<import("@bolsa/shared").RouteSignalsResponseDto>(() =>
+      client.POST("/api/scans/jobs/{job_id}/execute", {
+        params: { path: { job_id: jobId } },
+        body,
+      }),
     ),
 
   getPositionPolicies: (accountId?: string) =>
-    request<import("@bolsa/shared").PositionPoliciesListResponseDto>(
-      `/api/position-policies${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ""}`,
+    call<import("@bolsa/shared").PositionPoliciesListResponseDto>(() =>
+      client.GET("/api/position-policies", {
+        params: accountId ? { query: { accountId } } : undefined,
+      }),
     ),
 
   lookupPositionPolicy: (accountId: string, instrumentId: string) =>
-    request<import("@bolsa/shared").PositionPolicyResponseDto>(
-      `/api/position-policies/lookup?accountId=${encodeURIComponent(accountId)}&instrumentId=${encodeURIComponent(instrumentId)}`,
+    call<import("@bolsa/shared").PositionPolicyResponseDto>(() =>
+      client.GET("/api/position-policies/lookup", {
+        params: { query: { accountId, instrumentId } },
+      }),
     ),
 
   createPositionPolicy: (
     body: import("@bolsa/shared").CreatePositionPolicyDto,
   ) =>
-    request<import("@bolsa/shared").PositionPolicyResponseDto>(
-      "/api/position-policies",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").PositionPolicyResponseDto>(() =>
+      client.POST("/api/position-policies", { body: apiBody(body) }),
     ),
 
   updatePositionPolicy: (
     id: string,
     body: import("@bolsa/shared").UpdatePositionPolicyDto,
   ) =>
-    request<import("@bolsa/shared").PositionPolicyResponseDto>(
-      `/api/position-policies/${id}`,
-      { method: "PATCH", body: JSON.stringify(body) },
+    call<import("@bolsa/shared").PositionPolicyResponseDto>(() =>
+      client.PATCH("/api/position-policies/{policy_id}", {
+        params: { path: { policy_id: id } },
+        body,
+      }),
     ),
 
   deletePositionPolicy: (id: string) =>
-    request<void>(`/api/position-policies/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/position-policies/{policy_id}", {
+        params: { path: { policy_id: id } },
+      }),
+    ),
 
   evaluatePositionExits: (
     accountId: string,
     options?: { executeTrades?: boolean; timeframe?: "1d" | "1wk" },
-  ) => {
-    const params = new URLSearchParams({ accountId });
-    if (options?.executeTrades) params.set("executeTrades", "true");
-    if (options?.timeframe) params.set("timeframe", options.timeframe);
-    return request<import("@bolsa/shared").EvaluatePositionExitsResponseDto>(
-      `/api/position-policies/evaluate-exits?${params.toString()}`,
-      { method: "POST" },
-    );
-  },
+  ) =>
+    call<import("@bolsa/shared").EvaluatePositionExitsResponseDto>(() =>
+      client.POST("/api/position-policies/evaluate-exits", {
+        params: { query: { accountId, ...(options ?? {}) } },
+      }),
+    ),
 
   getPlatformEvents: (
     options?: import("@bolsa/shared").ListPlatformEventsQuery,
-  ) => {
-    const params = new URLSearchParams();
-    if (options?.limit) params.set("limit", String(options.limit));
-    if (options?.type) params.set("type", options.type);
-    if (options?.correlationId)
-      params.set("correlationId", options.correlationId);
-    const query = params.toString();
-    return request<import("@bolsa/shared").PlatformEventsListResponseDto>(
-      `/api/platform-events${query ? `?${query}` : ""}`,
-    );
-  },
+  ) =>
+    call<import("@bolsa/shared").PlatformEventsListResponseDto>(() =>
+      client.GET("/api/platform-events", { params: { query: options } }),
+    ),
 
   deployStrategyPaperAccount: (
     strategyId: string,
     body: import("@bolsa/shared").DeployPaperAccountRequestDto = {},
   ) =>
-    request<import("@bolsa/shared").DeployPaperAccountResponseDto>(
-      `/api/strategies/${strategyId}/paper-account`,
-      { method: "POST", body: JSON.stringify(body) },
+    call<import("@bolsa/shared").DeployPaperAccountResponseDto>(() =>
+      client.POST("/api/strategies/{strategy_id}/paper-account", {
+        params: { path: { strategy_id: strategyId } },
+        body,
+      }),
     ),
 
   deployBacktestPaperAccount: (
     runId: string,
     body: import("@bolsa/shared").DeployPaperAccountRequestDto = {},
   ) =>
-    request<import("@bolsa/shared").DeployPaperAccountResponseDto>(
-      `/api/backtests/${runId}/deploy-paper`,
-      { method: "POST", body: JSON.stringify(body) },
+    call<import("@bolsa/shared").DeployPaperAccountResponseDto>(() =>
+      client.POST("/api/backtests/{run_id}/deploy-paper", {
+        params: { path: { run_id: runId } },
+        body,
+      }),
     ),
 
   searchMarketIndices: (q: string, limit = 12) =>
-    request<{ data: import("@bolsa/shared").MarketIndexHitDto[] }>(
-      `/api/market-indices/search?q=${encodeURIComponent(q)}&limit=${limit}`,
+    call<{ data: import("@bolsa/shared").MarketIndexHitDto[] }>(() =>
+      client.GET("/api/market-indices/search", {
+        params: { query: { q, limit } },
+      }),
     ),
 
   getMarketIndexCatalog: () =>
-    request<{ data: import("@bolsa/shared").CatalogIndexEntryDto[] }>(
-      "/api/market-indices/catalog",
+    call<{ data: import("@bolsa/shared").CatalogIndexEntryDto[] }>(() =>
+      client.GET("/api/market-indices/catalog"),
     ),
 
   getMarketIndexConstituents: (indexKey: string) =>
-    request<{ data: import("@bolsa/shared").IndexConstituentsDto }>(
-      `/api/market-indices/${encodeURIComponent(indexKey)}/constituents`,
+    call<{ data: import("@bolsa/shared").IndexConstituentsDto }>(() =>
+      client.GET("/api/market-indices/{index_key}/constituents", {
+        params: { path: { index_key: indexKey } },
+      }),
     ),
 
   subscribeMarketIndex: (body: {
@@ -1816,9 +1874,8 @@ export const api = {
     syncBars?: boolean;
     yearsBack?: number;
   }) =>
-    request<{ data: import("@bolsa/shared").SubscribeMarketIndexResultDto }>(
-      "/api/market-indices/subscribe",
-      { method: "POST", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").SubscribeMarketIndexResultDto }>(() =>
+      client.POST("/api/market-indices/subscribe", { body: apiBody(body) }),
     ),
 
   enqueueIndexSubscribeJob: (body: {
@@ -1826,38 +1883,47 @@ export const api = {
     syncBars?: boolean;
     yearsBack?: number;
   }) =>
-    request<{ data: import("@bolsa/shared").IndexSubscribeJobDto }>(
-      "/api/market-indices/subscribe/jobs",
-      { method: "POST", body: JSON.stringify(body) },
+    call<{ data: import("@bolsa/shared").IndexSubscribeJobDto }>(() =>
+      client.POST("/api/market-indices/subscribe/jobs", {
+        body: apiBody(body),
+      }),
     ),
 
   getIndexSubscribeJob: (jobId: string) =>
-    request<{ data: import("@bolsa/shared").IndexSubscribeJobDto }>(
-      `/api/market-indices/subscribe/jobs/${encodeURIComponent(jobId)}`,
+    call<{ data: import("@bolsa/shared").IndexSubscribeJobDto }>(() =>
+      client.GET("/api/market-indices/subscribe/jobs/{job_id}", {
+        params: { path: { job_id: jobId } },
+      }),
     ),
 
   getLists: () =>
-    request<{ data: import("@bolsa/shared").InstrumentListSummaryDto[] }>(
-      "/api/lists",
+    call<{ data: import("@bolsa/shared").InstrumentListSummaryDto[] }>(() =>
+      client.GET("/api/lists"),
     ),
 
   /** Batch listId → instrumentIds (evita N× getList en el shell). */
   getListMemberships: () =>
-    request<{ data: Record<string, string[]> }>("/api/lists/memberships"),
+    call<{ data: Record<string, string[]> }>(() =>
+      client.GET("/api/lists/memberships"),
+    ),
 
   getList: (id: string) =>
-    request<{ data: import("@bolsa/shared").InstrumentListDetailDto }>(
-      `/api/lists/${id}`,
+    call<{ data: import("@bolsa/shared").InstrumentListDetailDto }>(() =>
+      client.GET("/api/lists/{list_id}", { params: { path: { list_id: id } } }),
     ),
 
   getListQuotes: (id: string) =>
-    request<{ data: import("@bolsa/shared").InstrumentWithMetaDto[] }>(
-      `/api/lists/${id}/quotes`,
+    call<{ data: import("@bolsa/shared").InstrumentWithMetaDto[] }>(() =>
+      client.GET("/api/lists/{list_id}/quotes", {
+        params: { path: { list_id: id } },
+      }),
     ),
 
   getListTrackers: (listId: string) =>
-    request<{ data: import("@bolsa/shared").TrackerDefinitionDetailDto[] }>(
-      `/api/lists/${listId}/trackers`,
+    call<{ data: import("@bolsa/shared").TrackerDefinitionDetailDto[] }>(() =>
+      client.GET("/api/lists/{list_id}/trackers", {
+        params: { path: { list_id: listId } },
+      }),
     ),
 
   createList: (body: {
@@ -1866,29 +1932,30 @@ export const api = {
     source?: string;
     kind?: string;
   }) =>
-    request<{ data: import("@bolsa/shared").InstrumentListDetailDto }>(
-      "/api/lists",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").InstrumentListDetailDto }>(() =>
+      client.POST("/api/lists", { body: apiBody(body) }),
     ),
 
   updateList: (id: string, body: { name?: string; instrumentIds?: string[] }) =>
-    request<{ data: import("@bolsa/shared").InstrumentListDetailDto }>(
-      `/api/lists/${id}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").InstrumentListDetailDto }>(() =>
+      client.PATCH("/api/lists/{list_id}", {
+        params: { path: { list_id: id } },
+        body,
+      }),
     ),
 
   deleteList: (id: string) =>
-    request<void>(`/api/lists/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/lists/{list_id}", {
+        params: { path: { list_id: id } },
+      }),
+    ),
 
   getAlerts: (activeOnly = false) =>
-    request<{ data: import("@bolsa/shared").PriceAlertDto[] }>(
-      `/api/alerts${activeOnly ? "?activeOnly=true" : ""}`,
+    call<{ data: import("@bolsa/shared").PriceAlertDto[] }>(() =>
+      client.GET("/api/alerts", {
+        params: activeOnly ? { query: { activeOnly: true } } : undefined,
+      }),
     ),
 
   createAlert: (body: {
@@ -1898,73 +1965,78 @@ export const api = {
     targetPrice: number;
     note?: string;
   }) =>
-    request<{ data: import("@bolsa/shared").PriceAlertDto }>("/api/alerts", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    call<{ data: import("@bolsa/shared").PriceAlertDto }>(() =>
+      client.POST("/api/alerts", { body: apiBody(body) }),
+    ),
 
   deleteAlert: (id: string) =>
-    request<void>(`/api/alerts/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/alerts/{alert_id}", {
+        params: { path: { alert_id: id } },
+      }),
+    ),
 
   reactivateAlert: (id: string) =>
-    request<{ data: import("@bolsa/shared").PriceAlertDto }>(
-      `/api/alerts/${id}/reactivate`,
-      {
-        method: "POST",
-      },
+    call<{ data: import("@bolsa/shared").PriceAlertDto }>(() =>
+      client.POST("/api/alerts/{alert_id}/reactivate", {
+        params: { path: { alert_id: id } },
+      }),
     ),
 
   evaluateAlerts: () =>
-    request<{ data: import("@bolsa/shared").PriceAlertDto[] }>(
-      "/api/alerts/evaluate",
-      {
-        method: "POST",
-      },
+    call<{ data: import("@bolsa/shared").PriceAlertDto[] }>(() =>
+      client.POST("/api/alerts/evaluate"),
     ),
 
   getSignalAlerts: (activeOnly = false) =>
-    request<import("@bolsa/shared").SignalAlertSubscriptionsResponseDto>(
-      `/api/signal-alerts${activeOnly ? "?activeOnly=true" : ""}`,
+    call<import("@bolsa/shared").SignalAlertSubscriptionsResponseDto>(() =>
+      client.GET("/api/signal-alerts", {
+        params: activeOnly ? { query: { activeOnly: true } } : undefined,
+      }),
     ),
 
   createSignalAlert: (
     body: import("@bolsa/shared").CreateSignalAlertSubscriptionRequestDto,
   ) =>
-    request<import("@bolsa/shared").SignalAlertSubscriptionResponseDto>(
-      "/api/signal-alerts",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<import("@bolsa/shared").SignalAlertSubscriptionResponseDto>(() =>
+      client.POST("/api/signal-alerts", { body: apiBody(body) }),
     ),
 
   deleteSignalAlert: (id: string) =>
-    request<void>(`/api/signal-alerts/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/signal-alerts/{subscription_id}", {
+        params: { path: { subscription_id: id } },
+      }),
+    ),
 
   resetSignalAlertDedupe: (id: string) =>
-    request<import("@bolsa/shared").SignalAlertSubscriptionResponseDto>(
-      `/api/signal-alerts/${id}/reset-dedupe`,
-      { method: "POST" },
+    call<import("@bolsa/shared").SignalAlertSubscriptionResponseDto>(() =>
+      client.POST("/api/signal-alerts/{subscription_id}/reset-dedupe", {
+        params: { path: { subscription_id: id } },
+      }),
     ),
 
   evaluateSignalAlerts: () =>
-    request<import("@bolsa/shared").EvaluateSignalAlertsResponseDto>(
-      "/api/signal-alerts/evaluate",
-      {
-        method: "POST",
-      },
+    call<import("@bolsa/shared").EvaluateSignalAlertsResponseDto>(() =>
+      client.POST("/api/signal-alerts/evaluate"),
     ),
 
   getWorkspaces: () =>
-    request<{ data: import("@bolsa/shared").WorkspaceSummaryDto[] }>(
-      "/api/workspaces",
+    call<{ data: import("@bolsa/shared").WorkspaceSummaryDto[] }>(() =>
+      client.GET("/api/workspaces"),
     ),
 
   getDefaultWorkspace: () =>
-    request<{ data: WorkspaceDetailApi }>("/api/workspaces/default"),
+    call<{ data: WorkspaceDetailApi }>(() =>
+      client.GET("/api/workspaces/default"),
+    ),
 
   getWorkspace: (id: string) =>
-    request<{ data: WorkspaceDetailApi }>(`/api/workspaces/${id}`),
+    call<{ data: WorkspaceDetailApi }>(() =>
+      client.GET("/api/workspaces/{workspace_id}", {
+        params: { path: { workspace_id: id } },
+      }),
+    ),
 
   createWorkspace: (body: {
     name: string;
@@ -1972,10 +2044,9 @@ export const api = {
     dockLayout?: import("@bolsa/shared").TradingDockLayoutPrefs;
     isDefault?: boolean;
   }) =>
-    request<{ data: WorkspaceDetailApi }>("/api/workspaces", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    call<{ data: WorkspaceDetailApi }>(() =>
+      client.POST("/api/workspaces", { body: apiBody(body) }),
+    ),
 
   updateWorkspace: (
     id: string,
@@ -1986,13 +2057,19 @@ export const api = {
       isDefault?: boolean;
     },
   ) =>
-    request<{ data: WorkspaceDetailApi }>(`/api/workspaces/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(body),
-    }),
+    call<{ data: WorkspaceDetailApi }>(() =>
+      client.PUT("/api/workspaces/{workspace_id}", {
+        params: { path: { workspace_id: id } },
+        body: apiBody(body),
+      }),
+    ),
 
   deleteWorkspace: (id: string) =>
-    request<void>(`/api/workspaces/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/workspaces/{workspace_id}", {
+        params: { path: { workspace_id: id } },
+      }),
+    ),
 
   /** PUT con keepalive para guardar al cerrar pestaña / apagar PC. */
   updateWorkspaceKeepalive: (
@@ -2017,37 +2094,30 @@ export const api = {
   },
 
   getSyncSettings: () =>
-    request<{ data: import("@bolsa/shared").SyncSettingsDto }>(
-      "/api/sync/settings",
+    call<{ data: import("@bolsa/shared").SyncSettingsDto }>(() =>
+      client.GET("/api/sync/settings"),
     ),
 
   updateSyncSettings: (
     body: Partial<import("@bolsa/shared").SyncSettingsDto>,
   ) =>
-    request<{ data: import("@bolsa/shared").SyncSettingsDto }>(
-      "/api/sync/settings",
-      {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").SyncSettingsDto }>(() =>
+      client.PATCH("/api/sync/settings", { body: apiBody(body) }),
     ),
 
   getSyncQueue: () =>
-    request<{ data: import("@bolsa/shared").SyncQueueItemDto[] }>(
-      "/api/sync/queue",
+    call<{ data: import("@bolsa/shared").SyncQueueItemDto[] }>(() =>
+      client.GET("/api/sync/queue"),
     ),
 
   enqueueStaleInstruments: () =>
-    request<{ data: { scanned: number; enqueued: number } }>(
-      "/api/sync/queue/enqueue-stale",
-      {
-        method: "POST",
-      },
+    call<{ data: { scanned: number; enqueued: number } }>(() =>
+      client.POST("/api/sync/queue/enqueue-stale"),
     ),
 
   getPendingOrders: () =>
-    request<{ data: import("@bolsa/shared").PendingOrderDto[] }>(
-      "/api/pending-orders",
+    call<{ data: import("@bolsa/shared").PendingOrderDto[] }>(() =>
+      client.GET("/api/pending-orders"),
     ),
 
   createPendingOrder: (body: {
@@ -2059,16 +2129,16 @@ export const api = {
     limitPrice: number;
     expiryAt?: string | null;
   }) =>
-    request<{ data: import("@bolsa/shared").PendingOrderDto[] }>(
-      "/api/pending-orders",
-      {
-        method: "POST",
-        body: JSON.stringify(body),
-      },
+    call<{ data: import("@bolsa/shared").PendingOrderDto[] }>(() =>
+      client.POST("/api/pending-orders", { body: apiBody(body) }),
     ),
 
   deletePendingOrder: (id: string) =>
-    request<void>(`/api/pending-orders/${id}`, { method: "DELETE" }),
+    call<void>(() =>
+      client.DELETE("/api/pending-orders/{order_id}", {
+        params: { path: { order_id: id } },
+      }),
+    ),
 };
 
 type WorkspaceDetailApi = {
