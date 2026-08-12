@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -115,7 +116,7 @@ class SqlAlchemyKnowledgeNodeRepository:
 
     async def list_active_for_hypothesis(
         self, hypothesis_id: str
-    ) -> list[KnowledgeNode]:
+    ) -> builtins.list[KnowledgeNode]:
         stmt = select(KnowledgeNodeRow).where(
             KnowledgeNodeRow.hypothesis_id == hypothesis_id,
             KnowledgeNodeRow.stage.in_(_ACTIVE_STAGES),

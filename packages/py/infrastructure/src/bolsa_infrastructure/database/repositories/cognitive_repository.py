@@ -334,7 +334,7 @@ class SqlAlchemyCognitiveRepository:
             confidence=float(row.confidence),
             hint=row.hint,
             expired=row.expired,
-            events=events,  # type: ignore[arg-type]
+            events=events,
             notes=tuple(row.notes or []),
             created_at=_iso(row.created_at),
             updated_at=_iso(row.updated_at),

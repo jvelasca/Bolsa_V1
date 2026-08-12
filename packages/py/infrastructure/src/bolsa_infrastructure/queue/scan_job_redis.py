@@ -9,7 +9,7 @@ SCAN_JOBS_QUEUE_KEY = "bolsa:scan_jobs:pending"
 
 class ScanJobRedisQueue:
     def __init__(self, redis_url: str) -> None:
-        self._redis = aioredis.from_url(redis_url, decode_responses=True)
+        self._redis = aioredis.from_url(redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
 
     async def push(self, job_id: str) -> None:
         await self._redis.lpush(SCAN_JOBS_QUEUE_KEY, job_id)
@@ -19,7 +19,7 @@ class ScanJobRedisQueue:
         if result is None:
             return None
         _key, job_id = result
-        return job_id
+        return job_id if isinstance(job_id, str) else None
 
     async def ping(self) -> bool:
         try:

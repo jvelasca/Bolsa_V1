@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.models import InstrumentRow, SignalAlertSubscriptionRow
@@ -101,7 +102,7 @@ class SqlAlchemySignalAlertRepository:
     async def delete(self, subscription_id: str) -> bool:
         stmt = delete(SignalAlertSubscriptionRow).where(SignalAlertSubscriptionRow.id == subscription_id)
         result = await self._session.execute(stmt)
-        return result.rowcount > 0
+        return cast(CursorResult[Any], result).rowcount > 0
 
     async def mark_bar_triggered(
         self,

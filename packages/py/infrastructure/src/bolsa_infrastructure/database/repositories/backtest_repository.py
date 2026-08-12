@@ -22,7 +22,7 @@ class SqlAlchemyBacktestRepository:
             instrument_id=row.instrument_id,
             symbol=row.instrument.symbol,
             name=row.instrument.name,
-            strategy_type=row.strategy_type,  # type: ignore[arg-type]
+            strategy_type=row.strategy_type,
             initial_cash=float(row.initial_cash),
             final_equity=float(row.final_equity),
             total_return_pct=float(row.total_return_pct),

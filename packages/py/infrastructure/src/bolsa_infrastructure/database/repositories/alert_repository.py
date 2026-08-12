@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal, cast
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_infrastructure.database.models import InstrumentRow, PriceAlertRow
@@ -82,7 +83,7 @@ class SqlAlchemyAlertRepository:
     async def delete(self, alert_id: str) -> bool:
         stmt = delete(PriceAlertRow).where(PriceAlertRow.id == alert_id)
         result = await self._session.execute(stmt)
-        return result.rowcount > 0
+        return cast(CursorResult[Any], result).rowcount > 0
 
     async def mark_triggered(self, alert_id: str, *, price: float) -> PriceAlertRecord | None:
         now = datetime.now(UTC)
@@ -124,8 +125,8 @@ class SqlAlchemyAlertRepository:
             id=row.id,
             instrument_id=row.instrument_id,
             symbol=row.symbol,
-            condition=row.condition,
-            price_source=row.price_source,
+            condition=cast(AlertCondition, row.condition),
+            price_source=cast(AlertPriceSource, row.price_source),
             target_price=float(row.target_price),
             is_active=row.is_active,
             triggered_at=row.triggered_at.isoformat() if row.triggered_at else None,
