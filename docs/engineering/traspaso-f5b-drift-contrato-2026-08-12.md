@@ -5,7 +5,8 @@
 > **Rama de ejecución:** `stage/f5b-drift-contrato-2026-08-12` (desde base `01cb72a` = tip P2.8 en
 > `stage/f1-integridad-financiera-2026-08-11`).
 > **Regla del hilo:** NO tocar código fuera del alcance (solo el regen del contrato). Batería por paso.
-> **Estado:** **COMPLETADO 2026-08-12** (commit `9c3f643`). `contract:check` vuelve a **verde**. Working tree limpio.
+> **Estado:** **COMPLETADO + MERGEADO 2026-08-12** (commits `9c3f643`+`aabc3f1`). `contract:check` vuelve a
+> **verde**. PR #37 fast-forward a `stage/f1-*` → base viva `aabc3f1`. Working tree limpio.
 
 ---
 
@@ -52,12 +53,14 @@ prueba de que el contrato commitado es **reproducible byte-a-byte**.
 
 ## 5. Registro
 
-| Fecha      | Acción                                                                                                                                                                                    |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-12 | Rama `stage/f5b-drift-contrato-2026-08-12` desde `01cb72a` (tip P2.8). Confirmado `contract:check` ROJO (baseline, exit 1) y drift exacto (2 `exclusiveMinimum` ausentes).                |
-| 2026-08-12 | `contract:gen` → diff mínimo de 2 inserciones (`exclusiveMinimum: 0.0` en Deposit/Withdraw). `schema.d.ts` sin cambio.                                                                    |
-| 2026-08-12 | Batería verde: contract:check ✓ · typecheck ✓ · lint 0 errores ✓ · test **714✓ (141 f)** ✓.                                                                                               |
-| 2026-08-12 | Commit `9c3f643` ("chore(contract, F5b): regenerar openapi.json con exclusiveMinimum en Deposit/Withdraw"), 1 fichero +2. Tree limpio. `contract:check` verde post-commit (reproducible). |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                                                        |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-12 | Rama `stage/f5b-drift-contrato-2026-08-12` desde `01cb72a` (tip P2.8). Confirmado `contract:check` ROJO (baseline, exit 1) y drift exacto (2 `exclusiveMinimum` ausentes).                                                                                                                                                                    |
+| 2026-08-12 | `contract:gen` → diff mínimo de 2 inserciones (`exclusiveMinimum: 0.0` en Deposit/Withdraw). `schema.d.ts` sin cambio.                                                                                                                                                                                                                        |
+| 2026-08-12 | Batería verde: contract:check ✓ · typecheck ✓ · lint 0 errores ✓ · test **714✓ (141 f)** ✓.                                                                                                                                                                                                                                                   |
+| 2026-08-12 | Commit `9c3f643` ("chore(contract, F5b): regenerar openapi.json con exclusiveMinimum en Deposit/Withdraw"), 1 fichero +2. Tree limpio. `contract:check` verde post-commit (reproducible).                                                                                                                                                     |
+| 2026-08-12 | Docs: `traspaso-f5b-drift-contrato-2026-08-12.md` + entrada en `engineering-index` §5 (hijo de P2.8). Commit `aabc3f1`.                                                                                                                                                                                                                       |
+| 2026-08-12 | **MERGE PR #37**: push de la rama + `gh pr create` (#37) → base `stage/f1-*`. Fast-forward local `01cb72a → aabc3f1` + push de la base; GitHub marca #37 **MERGED** (mergeCommit `aabc3f1`). Base viva `stage/f1-integridad-financiera-2026-08-11` ahora en `aabc3f1`. Tree limpio. `contract:check` verde en la base y en ramas posteriores. |
 
 ## 6. Deuda / fuera de alcance (sin resolver aquí)
 
