@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,8 +24,8 @@ class WorkspaceRecord:
     id: str
     name: str
     is_default: bool
-    document: dict
-    dock_layout: dict | None
+    document: dict[str, Any]
+    dock_layout: dict[str, Any] | None
     created_at: str
     updated_at: str
 
@@ -85,8 +86,8 @@ class SqlAlchemyWorkspaceRepository:
         self,
         *,
         name: str,
-        document: dict,
-        dock_layout: dict | None = None,
+        document: dict[str, Any],
+        dock_layout: dict[str, Any] | None = None,
         is_default: bool = False,
     ) -> WorkspaceRecord:
         now = datetime.now(UTC)
@@ -111,8 +112,8 @@ class SqlAlchemyWorkspaceRepository:
         workspace_id: str,
         *,
         name: str | None = None,
-        document: dict | None = None,
-        dock_layout: dict | None = None,
+        document: dict[str, Any] | None = None,
+        dock_layout: dict[str, Any] | None = None,
         is_default: bool | None = None,
     ) -> WorkspaceRecord | None:
         stmt = select(WorkspaceRow).where(WorkspaceRow.id == workspace_id)

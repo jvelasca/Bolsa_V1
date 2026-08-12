@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -378,7 +379,7 @@ class SqlAlchemyListRepository:
 
         result = await self._session.execute(stmt)
 
-        return result.rowcount > 0
+        return cast(CursorResult[Any], result).rowcount > 0
 
     async def _find_by_name_ci(self, name: str) -> InstrumentListDetail | None:
         target = name.strip().casefold()

@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_domain.entities.position_policy import PositionPolicyRecord
@@ -116,4 +117,4 @@ class SqlAlchemyPositionPolicyRepository:
     async def delete_policy(self, policy_id: str) -> bool:
         stmt = delete(PositionPolicyRow).where(PositionPolicyRow.id == policy_id)
         result = await self._session.execute(stmt)
-        return result.rowcount > 0
+        return cast(CursorResult[Any], result).rowcount > 0

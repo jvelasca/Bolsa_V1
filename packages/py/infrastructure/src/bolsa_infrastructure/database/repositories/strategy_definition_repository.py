@@ -1,7 +1,8 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import delete, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
@@ -158,4 +159,4 @@ class SqlAlchemyStrategyDefinitionRepository:
         result = await self._session.execute(
             delete(StrategyDefinitionRow).where(StrategyDefinitionRow.id == definition_id),
         )
-        return result.rowcount > 0
+        return cast(CursorResult[Any], result).rowcount > 0
