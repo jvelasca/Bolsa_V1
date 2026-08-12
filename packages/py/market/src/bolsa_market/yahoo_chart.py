@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -12,7 +12,11 @@ from pydantic import ValidationError
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_market.ingest import OhlcvBarIngest
 from bolsa_market.ohlcv_quarantine import get_ohlcv_quarantine_stats
-from bolsa_market.yahoo_client import get_yahoo_finance_client, normalize_yahoo_error
+from bolsa_market.yahoo_client import (
+    YahooFinanceClient,
+    get_yahoo_finance_client,
+    normalize_yahoo_error,
+)
 
 YAHOO_INTERVAL_BY_TIMEFRAME: dict[TimeFrame, tuple[str, int]] = {
     # Rangos máximos validados contra Yahoo v8 chart (evitar 422).
@@ -141,14 +145,14 @@ def parse_intraday_chart_payload(payload: dict[str, Any], yahoo_symbol: str) -> 
 
 
 class YahooMarketDataProvider:
-    def __init__(self, client=None) -> None:
+    def __init__(self, client: YahooFinanceClient | None = None) -> None:
         self._client = client or get_yahoo_finance_client()
 
     async def fetch_daily_bars(
         self,
         yahoo_symbol: str,
-        from_date,
-        to_date,
+        from_date: date,
+        to_date: date,
     ) -> list[OhlcvBarIngest]:
         period1 = int(datetime(from_date.year, from_date.month, from_date.day, tzinfo=UTC).timestamp())
         period2 = int(

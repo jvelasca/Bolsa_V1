@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from typing import Any
 
 import httpx
 
@@ -58,10 +59,11 @@ def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
         except ValueError:
             try:
                 parsed = parsedate_to_datetime(retry_after)
-                return max(parsed.timestamp() - time.time(), 1.0)
+                if parsed is not None:
+                    return max(parsed.timestamp() - time.time(), 1.0)
             except (TypeError, ValueError, OSError):
                 pass
-    return min(90.0, 5.0 * (2**attempt))
+    return min(90.0, 5.0 * float(2**attempt))
 
 
 @dataclass
@@ -176,7 +178,7 @@ class YahooFinanceClient:
         period1: int,
         period2: int,
         interval: str = "1d",
-    ) -> dict:
+    ) -> dict[str, Any]:
         try:
             self.circuit.before_call()
         except YahooCircuitOpenError as exc:
@@ -236,7 +238,7 @@ class YahooFinanceClient:
                 self.circuit.record_failure()
                 raise RuntimeError(normalize_yahoo_error(exc)) from exc
 
-            payload = response.json()
+            payload: dict[str, Any] = response.json()
             chart_error = payload.get("chart", {}).get("error")
             if chart_error:
                 description = chart_error.get("description", str(chart_error))
@@ -256,7 +258,7 @@ class YahooFinanceClient:
             raise RuntimeError(normalize_yahoo_error(last_error)) from last_error
         raise RuntimeError(f"Yahoo no devolvió barras diarias para {yahoo_symbol}")
 
-    async def search_quotes(self, query: str, *, quotes_count: int = 10) -> list[dict]:
+    async def search_quotes(self, query: str, *, quotes_count: int = 10) -> list[dict[str, Any]]:
         normalized = query.strip()
         if not normalized:
             return []
@@ -279,7 +281,7 @@ class YahooFinanceClient:
         quotes = payload.get("quotes") or []
         return [q for q in quotes if isinstance(q, dict)]
 
-    async def fetch_news(self, query: str, *, news_count: int = 8) -> list[dict]:
+    async def fetch_news(self, query: str, *, news_count: int = 8) -> list[dict[str, Any]]:
         """Noticias Yahoo vía /v1/finance/search (newsCount)."""
         normalized = query.strip()
         if not normalized:
@@ -316,7 +318,7 @@ class YahooFinanceClient:
 
         client = await self._get_client()
         await self._ensure_crumb(client)
-        params: dict[str, str] = {"modules": "summaryProfile"}
+        params: dict[str, str | int] = {"modules": "summaryProfile"}
         if self._crumb:
             params["crumb"] = self._crumb
 
@@ -348,14 +350,14 @@ class YahooFinanceClient:
             "calendarEvents,balanceSheetHistory,incomeStatementHistory,"
             "cashflowStatementHistory"
         ),
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         normalized = yahoo_symbol.strip()
         if not normalized:
             return None
 
         client = await self._get_client()
         await self._ensure_crumb(client)
-        params: dict[str, str] = {"modules": modules}
+        params: dict[str, str | int] = {"modules": modules}
         if self._crumb:
             params["crumb"] = self._crumb
 
@@ -372,7 +374,7 @@ class YahooFinanceClient:
         results = payload.get("quoteSummary", {}).get("result") or []
         if not results:
             return None
-        modules_out = results[0]
+        modules_out: dict[str, Any] = results[0]
         try:
             from bolsa_market.yahoo_fundamentals_timeseries import (
                 ALL_TIMESERIES_TYPES,
@@ -395,7 +397,7 @@ class YahooFinanceClient:
         *,
         types: tuple[str, ...] | list[str],
         years: int = 5,
-    ) -> dict | None:
+    ) -> dict[str, Any] | None:
         """WS fundamentals-timeseries (annual* fields)."""
         import time as _time
 
@@ -430,7 +432,7 @@ class YahooFinanceClient:
             return None
         return payload
 
-    async def fetch_dividend_history(self, yahoo_symbol: str, *, years: int = 5) -> list[dict]:
+    async def fetch_dividend_history(self, yahoo_symbol: str, *, years: int = 5) -> list[dict[str, Any]]:
         normalized = yahoo_symbol.strip()
         if not normalized:
             return []
@@ -459,7 +461,7 @@ class YahooFinanceClient:
             return []
 
         dividends = (result[0].get("events") or {}).get("dividends") or {}
-        history: list[dict] = []
+        history: list[dict[str, Any]] = []
         for timestamp, event in dividends.items():
             if not isinstance(event, dict):
                 continue
