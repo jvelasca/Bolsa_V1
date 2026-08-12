@@ -10,8 +10,9 @@
 > protocolo 3 fases M5.
 > **Rama de ejecución:** `stage/p2.8-as-unknown-as-2026-08-12` (desde base `30a0804` = tip P2.1).
 > **Regla del hilo:** NO tocar código fuera del alcance P2.8. Batería por paso.
-> **Estado:** COMPLETADO 2026-08-12 (7 bridges serialización eliminados; 2 casts residuales confinados en
-> helpers nombrados; batería verde salvo `contract:check` por drift F5b heredado). Cierre + traspaso en §8.
+> **Estado:** COMPLETADO + MERGEADO 2026-08-12 (7 bridges serialización eliminados; 2 casts residuales
+> confinados en helpers nombrados; batería verde salvo `contract:check` por drift F5b heredado). PR #36
+> fast-forward a `stage/f1-*` → base viva `a66e268` (tip P2.8). Cierre + traspaso en §8.
 
 ---
 
@@ -195,14 +196,15 @@ cast ya no se dispersa y cada payload de shape fija se tipa exactamente.
 
 ## 7. Registro
 
-| Fecha      | Acción                                                                                                                                                                                                                                                                                        |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-12 | Diagnóstico P2.8 completado: 9 `as unknown as` únicos (7 serialización + 1 Prisma ajeno + 1 test ajeno); evidencia de blobs opacos BE; raíz estructural del cast.                                                                                                                             |
-| 2026-08-12 | Decisión usuario: **Opción A → sub-enfoque A1** (fidelidad FE 1:1 con wire; NO BE/OpenAPI). D-DTO=shared · D-CTRL=Sentinelas CoreR/SupervisedF3.                                                                                                                                              |
-| 2026-08-12 | **DTOs concretos** en `packages/shared`: `core-r-api.ts` (CoreRQueueItemDto/CoreRReportDto/CoreRReportsMapDto/CoreRSchedulerPrefsDto), `supervised-f3-api.ts` (SupervisedF3QueueItemDto), nuevos `dia-d-evidence-api.ts` (DiaDSessionEvidenceV1Dto) y `coach-facts-api.ts` (CoachFactsV1Dto). |
-| 2026-08-12 | **Cliente `api.ts`**: `syncAccountCoreR`/`syncAccountSupervisedF3`/`persistDiaDSessionEvidence`/`analyzeBacktestCoach` tipados con DTOs concretos (se quita `Record`).                                                                                                                        |
-| 2026-08-12 | **7 casts eliminados**: core-r-sync (#2#3#4 asignación directa), supervised-f3-sync (#1 vía `toF3ItemDto`), trading-dia-d-replay (#5), backtest-explore (#6 vía `toCoachFactsRecord`, #7 directo). Sentinelas G4/G5 en `contract-check.ts`.                                                   |
-| 2026-08-12 | **Batería**: shared typecheck✓ build✓ test 10✓ · web typecheck✓ lint 0 errores test 714✓ (141 f) build✓ · `contract:check` ROJO por drift F5b heredado (decisión `cd_exclude`, registrado como deuda).                                                                                        |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-12 | Diagnóstico P2.8 completado: 9 `as unknown as` únicos (7 serialización + 1 Prisma ajeno + 1 test ajeno); evidencia de blobs opacos BE; raíz estructural del cast.                                                                                                                                                            |
+| 2026-08-12 | Decisión usuario: **Opción A → sub-enfoque A1** (fidelidad FE 1:1 con wire; NO BE/OpenAPI). D-DTO=shared · D-CTRL=Sentinelas CoreR/SupervisedF3.                                                                                                                                                                             |
+| 2026-08-12 | **DTOs concretos** en `packages/shared`: `core-r-api.ts` (CoreRQueueItemDto/CoreRReportDto/CoreRReportsMapDto/CoreRSchedulerPrefsDto), `supervised-f3-api.ts` (SupervisedF3QueueItemDto), nuevos `dia-d-evidence-api.ts` (DiaDSessionEvidenceV1Dto) y `coach-facts-api.ts` (CoachFactsV1Dto).                                |
+| 2026-08-12 | **Cliente `api.ts`**: `syncAccountCoreR`/`syncAccountSupervisedF3`/`persistDiaDSessionEvidence`/`analyzeBacktestCoach` tipados con DTOs concretos (se quita `Record`).                                                                                                                                                       |
+| 2026-08-12 | **7 casts eliminados**: core-r-sync (#2#3#4 asignación directa), supervised-f3-sync (#1 vía `toF3ItemDto`), trading-dia-d-replay (#5), backtest-explore (#6 vía `toCoachFactsRecord`, #7 directo). Sentinelas G4/G5 en `contract-check.ts`.                                                                                  |
+| 2026-08-12 | **Batería**: shared typecheck✓ build✓ test 10✓ · web typecheck✓ lint 0 errores test 714✓ (141 f) build✓ · `contract:check` ROJO por drift F5b heredado (decisión `cd_exclude`, registrado como deuda).                                                                                                                       |
+| 2026-08-12 | Merge P2.8: PR #36 fast-forward a `stage/f1-*` (`96da863 → a66e268`, sin merge commit ni conflictos) y mergeado. `stage/f1-integridad-financiera-2026-08-11` (ahora `a66e268` = tip P2.8) es la rama base viva para las próximas fases del hilo. Validado: batería verde; `contract:check` rojo solo por drift F5b heredado. |
 
 ---
 
