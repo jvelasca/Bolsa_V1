@@ -603,9 +603,13 @@ class GetTaxReport:
                     transactions.append(tx)
         transactions.sort(key=lambda tx: tx.executed_at)
 
+        # F-AUD2/P2.1: el ledger del ejercicio fiscal se carga SIN techo físico.
+        # Antes limit=10_000 podía cortar entradas de fees de un ejercicio grande
+        # (rompiendo el mapeo fee->transacción). El filtro [fiscal_start, fiscal_end)
+        # ya lo acota a ese ejercicio; total_fees_for_account por separado sin límite.
         ledger_entries = await self._ledger_repo.list_for_account(
             scope.account.id,
-            limit=10_000,
+            limit=None,
             offset=0,
             executed_from=fiscal_start,
             executed_to=fiscal_end,

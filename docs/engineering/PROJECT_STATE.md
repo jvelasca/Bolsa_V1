@@ -67,9 +67,11 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ---
 
-## 4. Verificación de la Auditoría externa 1 (2026-08-19) contra el código real
+## 4. Verificación de las Auditorías externas (2026-08-19) contra el código real
 
 > Realizado por el agente coordinador el 2026-08-19. Para NO recrear trabajo ya hecho ni asumir hallazgos caducados.
+
+### Auditoría externa 1 (2026-08-19)
 
 ### Ya corregidos (no volver a tocar)
 
@@ -94,6 +96,37 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 ### Aún vigentes (hacen el plan)
 
 1. **Look-ahead en `chikou` (Ichimoku) y `fractals`** → F-IND-1/F-IND-2. `compute.py:824-825` (`chikou[index]=bars[index+displacement]`) y `:778-779` (fractals usa `bars[index±2]`). Correcto para visualización; NO como feature causal.
+
+### Auditoría externa 2 (2026-08-19, segunda ronda) — veredicto verificado
+
+> La 2ª auditoría confirma que los 18 bloques "🟢 CORREGIDO" de la 1ª están implementados (next_open, same-bar,
+> batería de causalidad, exclusión Chikou/fractales, `with_for_update`, scope por cuenta, idempotencia, CORS m.p.,
+> rate-limit Redis+XFF, fiscal sin `limit=10000` en transacciones). Deja una lista reducida; verificado contra código:
+
+- **P1.1 Atomicidad ExecuteTrade → ✅ RESUELTO**: `get_db_session` (`dependencies.py:270-280`) es la unidad de
+  trabajo: una AsyncSession por request, `commit()` al final / `rollback()` ante excepción. `ExecuteTrade.execute`
+  (`accounts.py:483-559`) NO hace commit/rollback propio; ejecuta `execute_trade` (portfolio) + `append_trade` +
+  `append_fee` (ledger) + `touch_activity` sobre la misma sesión → **una request = una transacción atómica**.
+- **P1.2 Concurrencia depósitos/retiros → ✅ RESUELTO**: `deduct_cash`/`add_cash` en `portfolio_repository.py`
+  usan `with_for_update=True` y validan el saldo **dentro del lock** (líneas 327-344, 391-406). Dos retiradas
+  concurrentes se serializan en la `PortfolioRow`; la 2ª ve cash decrementado y lanza "insuficiente". El pre-check
+  del use-case es solo mensaje amable; el check autoritativo es el del lock.
+- **P2.2 Fail-closed auth en producción → ✅ RESUELTO (F-SEG-1 `4b7a984`)**: `config.py:176-189` impide arrancar
+  con `ENVIRONMENT∈{prod,production}` si falta `APP_PASSWORD` o `APP_AUTH_SECRET` vacío/`bolsa-dev-secret`. La rama
+  del middleware `auth.py:29` (auth-off) es inalcanzable en prod.
+- **P2.1 `limit=10_000` del ledger fiscal → 🟡 CORREGIDO (commit de la respuesta)**: `GetTaxReport`
+  (`accounts.py:606`) pasa `limit=None` (antes `10_000`) cargando las entradas del ledger del ejercicio sin techo
+  físico; ya estaba acotado por `executed_from/executed_to` (rango fiscal). `total_fees_for_account` ya era sin
+  límite. **Fix en código de esta fase.**
+- **P2.3 Deuda README desactualizada → 🟡 CORREGIDO (commit de la respuesta)**: README ahora refleja el estado
+  real — quitados "Alembic baseline" (hecho F3a/F3b) y "OpenAPI client" (hecho F5a §6); quedan como pendientes
+  solo "transferencias entre carteras" (repo primitivo sin use-case/ruta) y "dividendos" (solo historial recopilado,
+  sin feature de pago/ledger).
+- **Punto 20 CI → ✅ CONFIRMADO Verde**: verificado vía `gh run list` en `stage/f1-*`: Python CI, Frontend CI,
+  Fase 2 scientific, Optimize lab y Gitleaks = `success` en los commits recientes de código.
+- **Observación Ichimoku**: el auditor confirma que NO debe cambiarse `chikou[index]=bars[ahead].close` (válido para
+  chart); la separación chart→Chikou ✅ / research→Chikou ❌ es la arquitectura correcta (ya implementada en
+  F-IND-1). No tocar.
 
 ---
 
@@ -177,3 +210,4 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 | 2026-08-19 | **P1.9 slice — commiteado/pusheado** (`939e477`): use-case `EnsureAccountInvestorProfile` + `DeclaredProfileInput` en `bolsa_application/investor_profiles.py`; `create_account` delega la lógica de perfil del inversor (crea/asigna/default). ruff/mypy ✓ · pytest api 56✓/164✓ · contract:check ✓.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 2026-08-19 | **P1.9 A4/B2 DIFERIDO (decisión usuario)**: `response_model` tipado en endpoints `dict[str,Any]` (13 en `ai_governance.py`, 3 en `accounts.py`: get_daily_ops_report/download_daily_ops_digest_pdf/delete_account) — **cambia el contrato OpenAPI, fuera de la regla D5**. Pendiente de decisión (hacerlo en commit aparte verificado con `contract:check`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-08-19 | **F-WORKER-1 CERRADO** (documental): retomado el subagente previo (`41c57061`, 12/08) vía transcript (`resume` no parado). **Evaluación confirmada**: el 404 de `BP/.L` es un registro de BD corrupto (`yahoo_symbol='BP/.L'`, slash literal; ticker válido `BP.L`) — NO un bug de mapping de código (el `yahoo_client` emite `chart/{yahoo_symbol}` fiel a lo almacenado). El fix de comportamiento (404 → `YahooSymbolNotFoundError` permanente, `retryable=False`, sin retry, WARNING→INFO) **ya estaba MERGED** (PR #43, `4a1dc69`, ancestro de HEAD verificado). Verificado en código actual (`yahoo_client.py:228-233` · `sync_instrument.py:171-186` · `sync_scheduler.py:166-179` · `auto_sync_worker.py:50-61`). **Acción residual manual (NO código)**: corregir el registro en BD a `BP.L` si se quiere dato real. Cierre documentado en `docs/engineering/traspaso-worker1-auto-sync-bp-2026-08-19.md` + `engineering-index` §5. |
+| 2026-08-19 | **Respuesta a Auditoría externa 2 — verificado + 2 fixes (P2.1/P2.3)**: verificada la 2ª auditoría contra código; **P1.1 atomicidad, P1.2 concurrencia retiros y P2.2 fail-closed prod ya resueltos** (evidencia en §4). **P2.1**: `GetTaxReport` `limit=10_000`→`limit=None` en el ledger fiscal (`accounts.py:606`, acotado por rango fiscal). **P2.3**: README refresh (quitados Alembic/OpenAPI de deuda; quedan transferencias/dividendos). CI verificada verde vía `gh run list`. Batería: ruff 0 · mypy 244 files 0 · pytest market+api 164✓ (flake preexistente pasa aislado) · application+domain 238✓ · contract:check OK.                                                                                                                                                                                                                                                                                                         |

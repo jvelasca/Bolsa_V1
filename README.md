@@ -133,4 +133,4 @@ docs/             → arquitectura, cutover, ADRs, engineering
 - **FA / FIE** ✓ código (Composite **v1.1** · CAPM Tarjeta v0 · cobertura Yahoo); **smoke UI / checklist APP** pendiente
 - **CORE-B Lab** ✓ v0.2 (meseta + familia por horizonte)
 - **Congelado:** auto-paper D execute · Lab UI P3–P9 / Belief · CORE-R multi-dispositivo
-- **Deuda:** Alembic baseline, transferencias, dividendos, OpenAPI client
+- **Deuda:** transferencias entre carteras (repo primitivo `transfer_cash` sin use-case/ruta API) · dividendos (solo se recopila historial en instrumento; sin feature de pago/ledger)
