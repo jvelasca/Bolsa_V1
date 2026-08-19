@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-5 del plan de refactor 2026-08-19 (CI Node.js 20 deprecado + opcional `.prettierrc`), ampliada a la **re-auditoría de deuda abierta/operativa** pactada en el hilo de re-auditoría 2026-08-20.
-> **Estado:** **COMPLETADO en `main`** (4 commits directos `3b9c139` + `da8a10c` + `9cad4bb` docs + `017b495` gitleaks v3, árbol limpio, `local main = origin/main = 017b495`).
+> **Estado:** **COMPLETADO en `main`** (5 commits directos: `3b9c139` + `da8a10c` + `017b495` código/CI, + `9cad4bb` + `b350f7a` docs; árbol limpio, `local main = origin/main = b350f7a`).
 > **AsOf:** 2026-08-20.
 
 ---
@@ -71,9 +71,9 @@ Del relevo R-1/2026-08-19 + F-WORKER-1, **siguen pendientes** (acciones manuales
 
 ## 7. Texto de traspaso (para el próximo chat)
 
-> CONTEXTO (2026-08-20): **R-5 (CI/higiene deuda operativa) COMPLETADO en `main`** — 2 commits directos (`3b9c139` fondo deuda: Node 22 en optimize-lab + 2 warnings lint + gitignore; `da8a10c` bump actions a majors Node-24), árbol limpio, `local main = origin/main = da8a10c`, CI verde.
+> CONTEXTO (2026-08-20): **R-5 (CI/higiene deuda operativa) COMPLETADO en `main`** — commits directos: `3b9c139` (fondo deuda: Node 22 en optimize-lab + 2 warnings lint + gitignore), `da8a10c` (bump actions a majors Node-24), `017b495` (gitleaks-action v2→v3), más docs `9cad4bb`+`b350f7a`. Árbol limpio, `local main = origin/main = b350f7a`, CI verde.
 >
-> **Hallazgo clave R-5:** la deprecación de Node 20 en CI NO era nuestro `node-version` (ya 22 en casi todo) sino **las acciones** corriendo internamente en Node 20. Se subieron a majors Node-24 (`checkout@v5`, `setup-node@v5`, `setup-python@v6`, `pnpm/action-setup@v5`) → **anotación eliminada**, CI verde en los 4 workflows. **`.prettierrc` NO se tocó** (obsoleto: la hygiene ya convirtió a comillas dobles; añadir singleQuote revertiría 500+ archivos).
+> **Hallazgo clave R-5:** la deprecación de Node 20 en CI NO era nuestro `node-version` (ya 22 en casi todo) sino **las acciones** corriendo internamente en Node 20. Se subieron a majors Node-24 (`checkout@v5`, `setup-node@v5`, `setup-python@v6`, `pnpm/action-setup@v5`) + `gitleaks-action@v3` (v2 dejaría de funcionar 2026-09-16) → **ninguna action sobre Node 20**, anotación eliminada, CI verde en los 4 workflows. **`.prettierrc` NO se tocó** (obsoleto: la hygiene ya convirtió a comillas dobles; añadir singleQuote revertiría 500+ archivos).
 >
 > **Hallazgo de auditoría adicional:** `.venv_backup_*/` y `.import_linter_cache/` eran artefactos locales no rastreados ni gitignoreados que inflaban `pnpm format:check` (~446 files). Fix: `.gitignore` + borrado del venv backup (661 MB).
 >
