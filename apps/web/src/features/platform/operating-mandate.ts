@@ -9,19 +9,16 @@
  *
  * @see docs/adr/020-operating-mandate-tenure.md
  */
+import type { MandateActorDto, MandateReasonDto } from "@bolsa/shared";
+
 export const MANDATE_TENURES_KEY = "bolsa-mandate-tenures-v1";
 export const MANDATE_TENURES_ENGINE = "mandate-tenures-v1" as const;
 
 export const MANDATE_TRADE_LINKS_KEY = "bolsa-mandate-trade-links-v1";
 export const MANDATE_TRADE_LINKS_ENGINE = "mandate-trade-links-v1" as const;
 
-export type MandateActor = "user" | "coach" | "core_r" | "system";
-export type MandateReason =
-  | "adopt"
-  | "switch"
-  | "propose_accepted"
-  | "obsolete"
-  | "manual";
+export type MandateActor = MandateActorDto;
+export type MandateReason = MandateReasonDto;
 
 export const MANDATE_ACTOR_LABELS: Record<MandateActor, string> = {
   user: "Usuario",
