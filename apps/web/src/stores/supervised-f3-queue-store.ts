@@ -18,57 +18,22 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
-  AssessmentV1,
-  EvidenceAssessmentV1,
-  FundamentalAssessmentV1,
-  MacroAssessmentV1,
-  NewsAssessmentV1,
-  RecommendationV1,
-  TechnicalAssessmentV1,
+  SupervisedEnqueueMetaDto,
+  SupervisedF3QueueItemDto,
+  SupervisedProposePayloadDto,
+  SupervisedQueueOriginDto,
 } from "@bolsa/shared";
 
-export type SupervisedProposePayload = RecommendationV1 & {
-  technicalAssessment?: TechnicalAssessmentV1;
-  fundamentalAssessment?: FundamentalAssessmentV1;
-  macroAssessment?: MacroAssessmentV1;
-  evidenceAssessment?: EvidenceAssessmentV1;
-  newsAssessment?: NewsAssessmentV1;
-  assessments?: AssessmentV1[];
-  decisionPackage?: Record<string, unknown>;
-  policyGate?: { status?: string; mode?: string; message?: string } | null;
-  lastClose?: number | null;
-  source?: string;
-  /** Estrategia / señal de origen (Finalistas / Radar) para tenure Mandato. */
-  strategyOrSignalRef?: string | null;
-  strategyLabel?: string | null;
-  decisionSession?: import("@bolsa/shared").DecisionSessionV1;
-  weightContext?: import("@bolsa/shared").WeightContextV1;
-  combinedScore?: number;
-};
-
-export type SupervisedQueueOrigin =
-  | "scan"
-  | "finalists"
-  | "chart"
-  | "manual"
-  | "alarm"
-  | "operativa"
-  | "asesor";
-
-export type SupervisedEnqueueMeta = {
-  scanId?: string;
-  symbol?: string;
-  origin?: SupervisedQueueOrigin;
-};
-
-export interface SupervisedQueueItem {
-  id: string;
-  enqueuedAt: string;
-  scanId?: string;
-  symbol?: string;
-  origin?: SupervisedQueueOrigin;
-  payload: SupervisedProposePayload;
-}
+/**
+ * P2.6 (R-2): tipos de datos de la cola movidos a su hogar canónico en
+ * `@bolsa/shared` (`supervised-f3-api`). Re-exportamos desde aquí para que todos
+ * los call-sites existentes (`supervised-f3-sync.ts`, `supervised-f3-panel.tsx`,
+ * `semi-hm-conflict.ts`, ...) sigan compilando SIN cambios en sus imports.
+ */
+export type SupervisedProposePayload = SupervisedProposePayloadDto;
+export type SupervisedQueueOrigin = SupervisedQueueOriginDto;
+export type SupervisedEnqueueMeta = SupervisedEnqueueMetaDto;
+export type SupervisedQueueItem = SupervisedF3QueueItemDto;
 
 interface SupervisedF3QueueState {
   items: SupervisedQueueItem[];

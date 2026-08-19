@@ -31,9 +31,10 @@ function asItems(raw: unknown): SupervisedQueueItem[] {
 
 /**
  * P2.8: serialización tipada → DTO de wire sin scattered `as unknown as`.
- * El `payload` de un item es un blob abierto (propuesta Supervised con grafos
- * web-only: RecommendationV1 + assessments); el wire lo guarda opaco. El cast
- * queda confinado a este único punto de serialización (la frontera TS↔wire).
+ * P2.6 (R-2): `SupervisedQueueItem` y `SupervisedF3QueueItemDto` son ahora el
+ * mismo tipo compartido (hogar canónico en @bolsa/shared), por lo que la
+ * asignación de `payload` es directa, sin cast. El wire sigue siendo un blob
+ * JSON opaco round-trip del BE: tipar no cambia el valor serializado.
  */
 function toF3ItemDto(item: SupervisedQueueItem) {
   return {
@@ -42,7 +43,7 @@ function toF3ItemDto(item: SupervisedQueueItem) {
     scanId: item.scanId,
     symbol: item.symbol,
     origin: item.origin,
-    payload: item.payload as unknown as Record<string, unknown>,
+    payload: item.payload,
   };
 }
 
