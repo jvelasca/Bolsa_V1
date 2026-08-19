@@ -53,8 +53,8 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ---------- | ------------------- |
 | **F-IND-1**    | Causality Layer: distinguir indicadores **causales vs visualización**; prohibir features no causales (chikou/fractals) en backtest/research | ✅ MERGED (79fa155)                | Medio      | v1                  |
 | **F-IND-2**    | Batería de tests de causalidad en CI (`feature_at_t` con/sin barra futura idéntico para todos los indicadores)                              | 🟢 COMMITED (09fb06b, pend. merge) | Bajo       | 🔵 **activa ahora** |
-| **F-FIN-1**    | `get_or_create_default_portfolio()` por nombre global → scope por cuenta (ADR-008)                                                          | 🟠 PENDIENTE                       | Alto       | v3                  |
-| **F-FIN-2**    | `GetTaxReport` `limit=10000` + sin filtro por año en SQL                                                                                    | 🟠 PENDIENTE                       | Medio      | v4                  |
+| **F-FIN-1**    | `get_or_create_default_portfolio()` por nombre global → scope por cuenta (ADR-008)                                                          | 🟢 COMMITED (f595761, pend. merge) | Alto       | v3                  |
+| **F-FIN-2**    | `GetTaxReport` `limit=10000` + sin filtro por año en SQL                                                                                    | 🟠 PENDIENTE                       | Medio      | 🔵 **activa ahora** |
 | **F-SEG-1**    | Fail-closed production + comparaciones constantes (`secrets.compare_digest`) — **auth JWT sigue diferida (D4)**                             | 🟠 PENDIENTE                       | Bajo       | v5                  |
 | **F-SEG-2**    | Auditoría historial git (repo público) + rotación de logs + tests negativos de redacción                                                    | 🟠 PENDIENTE                       | Bajo-Medio | v6                  |
 | **F-SEG-3**    | CORS mínimo privilegio + `X-Forwarded-For`/TrustedHost en rate-limit                                                                        | 🟡 PENDIENTE                       | Bajo       | v7                  |
@@ -80,17 +80,17 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - Drift contrato FE/BE → **corregido**: openapi-fetch + gate bidireccional (`contract-check.ts`).
 - Ciclo analytics↔market → **corregido** (F4).
 - Rate limit in-memory → **parcialmente corregido**: `RedisStore` con fallback. **Pendiente**: IP sin `X-Forwarded-For` (F-SEG-3).
+- Default global por nombre → **corregido** (F-FIN-1, `f595761`): `get_or_create_default_portfolio()` eliminado; scope fail-closed obligatorio por cuenta (`portfolio_repository.py:_resolve_portfolio`).
 
 ### Aún vigentes (hacen el plan)
 
 1. **Look-ahead en `chikou` (Ichimoku) y `fractals`** → F-IND-1/F-IND-2. `compute.py:824-825` (`chikou[index]=bars[index+displacement]`) y `:778-779` (fractals usa `bars[index±2]`). Correcto para visualización; NO como feature causal.
-2. **`get_or_create_default_portfolio()` global por nombre** → F-FIN-1 (`portfolio_repository.py:34-55`).
-3. **`GetTaxReport` `limit=10000` sin filtro por año** → F-FIN-2 (`accounts.py:589-603`).
-4. **Fail-closed production ausente** → F-SEG-1 (`config.py`, no valida `ENVIRONMENT=prod`+sin password).
-5. **Comparaciones `==` no constantes** → F-SEG-1 (`tokens.py:17`, `auth.py:42`).
-6. **Repo público + 155,8 MB de logs sin rotación** → F-SEG-2.
-7. **CORS `allow_methods=["*"]`/`allow_headers=["*"]`** → F-SEG-3.
-8. **Mojibake `workspace-store-core.ts`** (halzg encontrado por auditoría interna propia) → F-HLTH-1.
+2. **`GetTaxReport` `limit=10000` sin filtro por año** → F-FIN-2 (`accounts.py:589-603`).
+3. **Fail-closed production ausente** → F-SEG-1 (`config.py`, no valida `ENVIRONMENT=prod`+sin password).
+4. **Comparaciones `==` no constantes** → F-SEG-1 (`tokens.py:17`, `auth.py:42`).
+5. **Repo público + 155,8 MB de logs sin rotación** → F-SEG-2.
+6. **CORS `allow_methods=["*"]`/`allow_headers=["*"]`** → F-SEG-3.
+7. **Mojibake `workspace-store-core.ts`** (halzg encontrado por auditoría interna propia) → F-HLTH-1.
 
 ---
 
@@ -110,16 +110,17 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 ## 6. Texto de traspaso (pegable en el próximo chat)
 
 > CONTEXTO: Proyecto en ola de hardening pactada 2026-08-11, casi todo MERGED en
-> `stage/f1-integridad-financiera-2026-08-11` (HEAD `79fa155` = merge F-IND-1 · más `09fb06b` F-IND-2 commited, pend. push/merge). Árbol limpio. CI verde.
+> `stage/f1-integridad-financiera-2026-08-11` (HEAD `79fa155` = merge F-IND-1 · más `09fb06b` F-IND-2 commited y
+> `f595761` F-FIN-1 commited, pend. push/merge). Árbol limpio. CI verde.
 >
 > Estado vivo y deuda priorizada en `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO). Mapa de fases mergeadas en
 > `docs/engineering/engineering-index-2026-08-03.md` §5.
 >
-> F-IND-1 (Causality Layer) y F-IND-2 (batería de causalidad `feature_at_t` con/sin
-> barra futura en CI) **hechas** (ver §3).
+> F-IND-1 (Causality Layer), F-IND-2 (batería de causalidad `feature_at_t` con/sin
+> barra futura en CI) y F-FIN-1 (fail-closed del default de cartera por cuenta) **hechas** (ver §3).
 >
-> PRÓXIMA FASE pactada: **F-FIN-1** — `get_or_create_default_portfolio()` global por nombre → scope por cuenta
-> (ADR-008). Riesgo Alto (dinero). Después: F-FIN-2, F-SEG-1..3, F-HLTH-1, F-DEBT-1, F-WORKER-1 (ver §3).
+> PRÓXIMA FASE pactada: **F-FIN-2** — `GetTaxReport` `limit=10000` + sin filtro por año en SQL
+> (`accounts.py:589-603`). Riesgo Medio. Después: F-SEG-1..3, F-HLTH-1, F-DEBT-1, F-WORKER-1 (ver §3).
 >
 > Nota F-IND-1/2: la guardia de causalidad puede cambiar resultados de backtests que usen
 > chikou; documentado y ya respaldado por la batería F-IND-2 (no recalcular aún).
@@ -134,11 +135,12 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ## 7. Registro del plan 2026-08-19
 
-| Fecha      | Acción                                                                                                                                                                                                                                                                                                         |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-19 | Recibida Auditoría externa 1 (análisis cuantitativo/causalidad). Verificada contra el código real. Se detecta que gran parte ya está corregida (ola F1–F5a) y que el hueco real persiste en la causalidad de indicadores.                                                                                      |
-| 2026-08-19 | Pactado el plan profundo por fases (F-IND/F-FIN/F-SEG/F-HLTH/F-DEBT/F-WORKER) con orden por riesgo de dinero/verdad.                                                                                                                                                                                           |
-| 2026-08-19 | Creado este documento maestro como fuente única de estado y punto de entrada de relevos.                                                                                                                                                                                                                       |
-| 2026-08-19 | Decisiones del usuario: arrancar F-IND-1 · crear PROJECT_STATE.md (sí) · auth diferida (fail-closed + compare_digest solo en F-SEG-1).                                                                                                                                                                         |
-| 2026-08-19 | **F-IND-1 MERGED** (`79fa155`, merge): Causality Layer — metadatos causal/confirmationLag/visualizationOffset en indicator-universe + guardia `_NON_CAUSAL_OUTPUT_LINES` (chikou/fractals excluidas del backtest) + `validate_strategy_definition` rechaza no causales.                                        |
-| 2026-08-19 | **F-IND-2 COMMITED** (`09fb06b`, pend. push/merge): batería `test_causality_battery_ind_2.py` (34 tests) — `feature_at_t` con/sin barra futura idéntico para todos los indicadores; 31 causales estables + 2 canarios no causales (chikou/fractals) + guard de cobertura. ruff/mypy ✓ · pytest analytics 362✓. |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-19 | Recibida Auditoría externa 1 (análisis cuantitativo/causalidad). Verificada contra el código real. Se detecta que gran parte ya está corregida (ola F1–F5a) y que el hueco real persiste en la causalidad de indicadores.                                                                                                                                                                                                                                  |
+| 2026-08-19 | Pactado el plan profundo por fases (F-IND/F-FIN/F-SEG/F-HLTH/F-DEBT/F-WORKER) con orden por riesgo de dinero/verdad.                                                                                                                                                                                                                                                                                                                                       |
+| 2026-08-19 | Creado este documento maestro como fuente única de estado y punto de entrada de relevos.                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-08-19 | Decisiones del usuario: arrancar F-IND-1 · crear PROJECT_STATE.md (sí) · auth diferida (fail-closed + compare_digest solo en F-SEG-1).                                                                                                                                                                                                                                                                                                                     |
+| 2026-08-19 | **F-IND-1 MERGED** (`79fa155`, merge): Causality Layer — metadatos causal/confirmationLag/visualizationOffset en indicator-universe + guardia `_NON_CAUSAL_OUTPUT_LINES` (chikou/fractals excluidas del backtest) + `validate_strategy_definition` rechaza no causales.                                                                                                                                                                                    |
+| 2026-08-19 | **F-IND-2 COMMITED** (`09fb06b`, pend. push/merge): batería `test_causality_battery_ind_2.py` (34 tests) — `feature_at_t` con/sin barra futura idéntico para todos los indicadores; 31 causales estables + 2 canarios no causales (chikou/fractals) + guard de cobertura. ruff/mypy ✓ · pytest analytics 362✓.                                                                                                                                             |
+| 2026-08-19 | **F-FIN-1 COMMITED** (`f595761`, pend. push/merge): fail-closed del default de cartera. Eliminado `get_or_create_default_portfolio()` (default global por nombre); `_resolve_portfolio` exige `legacy_portfolio_id: str` y lanza `ValueError` si no existe — el scope a la cartera siempre viene resuelto por cuenta (ADR-008). Test anti-regresión `test_fin1_no_global_default_portfolio_by_name`. ruff/mypy ✓ · infra 49p · application 224p · api 29p. |
