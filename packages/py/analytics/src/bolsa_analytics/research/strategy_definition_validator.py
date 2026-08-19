@@ -62,6 +62,19 @@ def validate_strategy_definition(definition: dict[str, Any]) -> list[str]:
         if definition_id not in ALLOWED_INDICATOR_IDS:
             errors.append(f"indicador no permitido: {definition_id!r}")
 
+        parameters = spec.get("parameters") or {}
+        line = parameters.get("line") if isinstance(parameters, dict) else None
+        # F-IND-1: rechaza features no causales en backtest/research. La
+        # visualización/chart no usa este validador y puede dibujar chikou/fractals.
+        if definition_id == "ich" and line == "chikou":
+            errors.append(
+                "ich line=chikou no es causal: no puede usarse como feature en backtest/research"
+            )
+        if definition_id == "fr":
+            errors.append(
+                "fr (fractals) no es causal: no puede usarse como feature en backtest/research"
+            )
+
     for group_name in ("entries", "exits"):
         group = definition.get(group_name)
         if not group:
