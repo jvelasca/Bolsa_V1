@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
-from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_api.api.dependencies import (
     get_create_signal_alert_use_case,
     get_db_session,
@@ -24,7 +23,7 @@ from bolsa_api.schemas.signal_alerts import (
     SignalAlertSubscriptionsResponseDto,
     TriggeredSignalAlertDto,
 )
-from bolsa_api.schemas.signals_evaluate import SignalEventV1Dto
+from bolsa_api.schemas.signals_evaluate import to_signal_event_v1_dto
 from bolsa_application.signal_alerts import (
     CreateSignalAlertSubscription,
     DeleteSignalAlertSubscription,
@@ -68,22 +67,6 @@ def _dispatch_dto(item: AlertChannelDispatchResult) -> AlertChannelDispatchDto:
         channel=item.channel,
         ok=item.ok,
         error=item.error,
-    )
-
-
-def _signal_dto(event: SignalEventV1) -> SignalEventV1Dto:
-    return SignalEventV1Dto(
-        id=event.id,
-        instrument_id=event.instrument_id,
-        timestamp=event.timestamp,
-        kind=event.kind,
-        strategy_definition_id=event.strategy_definition_id,
-        strategy_version=event.strategy_version,
-        bar_index=event.bar_index,
-        price=event.price,
-        data_version=event.data_version,
-        indicator_snapshot_hash=event.indicator_snapshot_hash,
-        preset_key=event.preset_key,
     )
 
 
@@ -169,7 +152,7 @@ async def evaluate_signal_alerts(
         data=[
             TriggeredSignalAlertDto(
                 subscription=_subscription_dto(item.subscription),
-                signal=_signal_dto(item.signal),
+                signal=to_signal_event_v1_dto(item.signal),
                 dispatches=[_dispatch_dto(dispatch) for dispatch in item.dispatches],
             )
             for item in result.triggered

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,6 +13,7 @@ from bolsa_api.schemas.instrument_narratives import (
     InstrumentNarrativeResponseDto,
     UpsertInstrumentNarrativeDto,
 )
+from bolsa_api.schemas.mappers import to_iso
 from bolsa_application.instrument_narratives import (
     DeleteInstrumentNarrative,
     GetInstrumentNarrative,
@@ -27,12 +27,6 @@ from bolsa_infrastructure.database.repositories.instrument_narrative_repository 
 router = APIRouter()
 
 
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
-
-
 def _to_dto(row: InstrumentNarrativeRecord) -> InstrumentNarrativeDto:
     return InstrumentNarrativeDto(
         id=row.id,
@@ -41,8 +35,8 @@ def _to_dto(row: InstrumentNarrativeRecord) -> InstrumentNarrativeDto:
         body=row.body,
         source=row.source,
         version=row.version,
-        created_at=_iso(row.created_at),
-        updated_at=_iso(row.updated_at),
+        created_at=to_iso(row.created_at),
+        updated_at=to_iso(row.updated_at),
     )
 
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,6 +16,7 @@ from bolsa_api.schemas.instrument_strategy_tops import (
     QueryInstrumentStrategyTopsDto,
     UpsertInstrumentStrategyTopDto,
 )
+from bolsa_api.schemas.mappers import to_iso
 from bolsa_application.instrument_strategy_tops import (
     DeleteInstrumentStrategyTop,
     GetInstrumentStrategyTop,
@@ -28,12 +28,6 @@ from bolsa_infrastructure.database.repositories.instrument_strategy_top_reposito
 )
 
 router = APIRouter()
-
-
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _slot_to_dto(raw: dict[str, Any]) -> InstrumentStrategyTopSlotDto:
@@ -53,8 +47,8 @@ def _to_dto(row: InstrumentStrategyTopRecord) -> InstrumentStrategyTopDto:
         slots=[_slot_to_dto(s) for s in row.slots],
         coach_headline=row.coach_headline,
         coach_facts=row.coach_facts,
-        created_at=_iso(row.created_at),
-        updated_at=_iso(row.updated_at),
+        created_at=to_iso(row.created_at),
+        updated_at=to_iso(row.updated_at),
     )
 
 

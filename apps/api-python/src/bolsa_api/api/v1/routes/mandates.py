@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -16,6 +15,7 @@ from bolsa_api.schemas.mandates import (
     MandateTradeLinkDto,
     SyncMandateBundleDto,
 )
+from bolsa_api.schemas.mappers import to_iso
 from bolsa_infrastructure.database.repositories.mandate_repository import (
     MandateTenureRecord,
     MandateTradeLinkRecord,
@@ -23,12 +23,6 @@ from bolsa_infrastructure.database.repositories.mandate_repository import (
 )
 
 router = APIRouter()
-
-
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _tenure_dto(row: MandateTenureRecord) -> MandateTenureDto:
@@ -39,8 +33,8 @@ def _tenure_dto(row: MandateTenureRecord) -> MandateTenureDto:
         timeframe=row.timeframe,
         strategy_definition_id=row.strategy_definition_id,
         strategy_label_snapshot=row.strategy_label_snapshot,
-        effective_from=_iso(row.effective_from),
-        effective_to=_iso(row.effective_to) if row.effective_to else None,
+        effective_from=to_iso(row.effective_from),
+        effective_to=to_iso(row.effective_to) if row.effective_to else None,
         actor=row.actor,
         reason=row.reason,
         source_top_id=row.source_top_id,
@@ -55,7 +49,7 @@ def _link_dto(row: MandateTradeLinkRecord) -> MandateTradeLinkDto:
         mandate_tenure_id=row.mandate_tenure_id,
         instrument_id=row.instrument_id,
         account_id=row.account_id,
-        linked_at=_iso(row.linked_at),
+        linked_at=to_iso(row.linked_at),
         engine=row.engine,
     )
 

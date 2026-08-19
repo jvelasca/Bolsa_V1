@@ -1,5 +1,7 @@
 """Mappers principales dominio ↔ DTO HTTP."""
 
+from datetime import UTC, datetime
+
 from bolsa_analytics.indicators import IndicatorPoint, IndicatorSignals
 from bolsa_api.schemas.instruments import (
     IndicatorPointDto,
@@ -32,6 +34,13 @@ from bolsa_domain.repositories.instrument_repository import (
     SyncLogDetail,
 )
 from bolsa_domain.value_objects.price_summary import PriceSummary
+
+
+def to_iso(dt: datetime) -> str:
+    """Serializa un datetime al formato ISO-8601 UTC (sufijo ``Z``) usado en el wire."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def to_instrument_dto(item: InstrumentWithMeta) -> InstrumentWithMetaDto:

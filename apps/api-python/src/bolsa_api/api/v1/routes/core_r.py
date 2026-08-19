@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
@@ -10,16 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_db_session
 from bolsa_api.schemas.core_r import CoreRBundleDto, CoreRBundleResponseDto, SyncCoreRBundleDto
+from bolsa_api.schemas.mappers import to_iso
 from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 from bolsa_infrastructure.database.repositories.core_r_repository import SqlAlchemyCoreRRepository
 
 router = APIRouter()
-
-
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _empty_bundle(account_id: str) -> CoreRBundleDto:
@@ -50,7 +44,7 @@ async def get_account_core_r(
             queue=row.queue,
             reports=row.reports,
             scheduler=row.scheduler,
-            updated_at=_iso(row.updated_at),
+            updated_at=to_iso(row.updated_at),
         )
     )
 
@@ -81,7 +75,7 @@ async def sync_account_core_r(
             queue=row.queue,
             reports=row.reports,
             scheduler=row.scheduler,
-            updated_at=_iso(row.updated_at),
+            updated_at=to_iso(row.updated_at),
         )
     )
 

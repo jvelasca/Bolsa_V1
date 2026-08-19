@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_db_session
+from bolsa_api.schemas.mappers import to_iso
 from bolsa_api.schemas.supervised_f3 import (
     SupervisedF3BundleDto,
     SupervisedF3BundleResponseDto,
@@ -19,12 +19,6 @@ from bolsa_infrastructure.database.repositories.supervised_f3_repository import 
 )
 
 router = APIRouter()
-
-
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _empty(account_id: str) -> SupervisedF3BundleDto:
@@ -53,7 +47,7 @@ async def get_account_supervised_f3(
             account_id=account_id,
             items=row.queue,
             active_id=row.active_id,
-            updated_at=_iso(row.updated_at),
+            updated_at=to_iso(row.updated_at),
         )
     )
 
@@ -81,6 +75,6 @@ async def sync_account_supervised_f3(
             account_id=account_id,
             items=row.queue,
             active_id=row.active_id,
-            updated_at=_iso(row.updated_at),
+            updated_at=to_iso(row.updated_at),
         )
     )

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -20,6 +20,7 @@ from bolsa_api.schemas.instrument_daily_opinions import (
     QueryInstrumentDailyOpinionsDto,
     RunEstudioEodOpinionBatchDto,
 )
+from bolsa_api.schemas.mappers import to_iso
 from bolsa_application.daily_opinion_service import DailyOpinionService, OpinionHint
 from bolsa_application.daily_opinion_telemetry import DailyOpinionTelemetryService
 from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
@@ -42,12 +43,6 @@ from bolsa_infrastructure.database.repositories.ohlcv_repository import (
 router = APIRouter()
 
 
-def _iso(dt: datetime) -> str:
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC).isoformat().replace("+00:00", "Z")
-
-
 def _to_dto(row: InstrumentDailyOpinionRecord) -> InstrumentDailyOpinionDto:
     return InstrumentDailyOpinionDto(
         id=row.id,
@@ -68,9 +63,9 @@ def _to_dto(row: InstrumentDailyOpinionRecord) -> InstrumentDailyOpinionDto:
         source=row.source,
         engine_version=row.engine_version,
         idempotency_key=row.idempotency_key,
-        computed_at=_iso(row.computed_at),
-        created_at=_iso(row.created_at),
-        updated_at=_iso(row.updated_at),
+        computed_at=to_iso(row.computed_at),
+        created_at=to_iso(row.created_at),
+        updated_at=to_iso(row.updated_at),
     )
 
 

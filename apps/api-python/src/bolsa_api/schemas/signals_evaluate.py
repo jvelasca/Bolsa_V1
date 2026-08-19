@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_api.schemas.indicators_compute import OhlcvBarInputDto
 
 
@@ -34,3 +35,19 @@ class SignalEventV1Dto(BaseModel):
 
 class EvaluateSignalsResponseDto(BaseModel):
     data: list[SignalEventV1Dto]
+
+
+def to_signal_event_v1_dto(event: SignalEventV1) -> SignalEventV1Dto:
+    return SignalEventV1Dto(
+        id=event.id,
+        instrument_id=event.instrument_id,
+        timestamp=event.timestamp,
+        kind=event.kind,
+        strategy_definition_id=event.strategy_definition_id,
+        strategy_version=event.strategy_version,
+        bar_index=event.bar_index,
+        price=event.price,
+        data_version=event.data_version,
+        indicator_snapshot_hash=event.indicator_snapshot_hash,
+        preset_key=event.preset_key,
+    )

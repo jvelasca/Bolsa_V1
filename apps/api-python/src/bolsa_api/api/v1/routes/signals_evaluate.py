@@ -6,7 +6,7 @@ from bolsa_analytics.signals.strategy import StrategyBarInput, evaluate_strategy
 from bolsa_api.schemas.signals_evaluate import (
     EvaluateSignalsRequestDto,
     EvaluateSignalsResponseDto,
-    SignalEventV1Dto,
+    to_signal_event_v1_dto,
 )
 
 router = APIRouter()
@@ -36,20 +36,5 @@ async def evaluate_signals(body: EvaluateSignalsRequestDto) -> EvaluateSignalsRe
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return EvaluateSignalsResponseDto(
-        data=[
-            SignalEventV1Dto(
-                id=event.id,
-                instrument_id=event.instrument_id,
-                timestamp=event.timestamp,
-                kind=event.kind,
-                strategy_definition_id=event.strategy_definition_id,
-                strategy_version=event.strategy_version,
-                bar_index=event.bar_index,
-                price=event.price,
-                data_version=event.data_version,
-                indicator_snapshot_hash=event.indicator_snapshot_hash,
-                preset_key=event.preset_key,
-            )
-            for event in events
-        ],
+        data=[to_signal_event_v1_dto(event) for event in events],
     )
