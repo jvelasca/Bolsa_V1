@@ -16,7 +16,6 @@ from bolsa_api.api.dependencies import (
     get_research_trial_repository,
 )
 from bolsa_api.schemas.research import (
-    BeliefHistoryEntryDto,
     BeliefHistoryListResponseDto,
     ConsolidationEligibilityResponseDto,
     ConsolidationRequestDto,
@@ -25,18 +24,15 @@ from bolsa_api.schemas.research import (
     DiaDSessionEvidencePersistRequestDto,
     EvidenceLevelParam,
     HypothesesListResponseDto,
-    HypothesisBeliefDto,
     HypothesisBeliefResponseDto,
     HypothesisCreateRequestDto,
     HypothesisDetailResponseDto,
-    HypothesisDto,
     HypothesisKindParam,
     HypothesisStatusParam,
     HypothesisUpdateRequestDto,
     InstrumentResearchSummaryDto,
     InstrumentResearchSummaryResponseDto,
     KnowledgeNodeDetailResponseDto,
-    KnowledgeNodeDto,
     KnowledgeNodesListResponseDto,
     KnowledgeStageParam,
     LabByInstrumentDto,
@@ -49,22 +45,26 @@ from bolsa_api.schemas.research import (
     LaboratoryResearchSummaryDto,
     LaboratoryResearchSummaryResponseDto,
     LinkTrialHypothesisRequestDto,
-    MklSyncEventDto,
     MklSyncEventsListResponseDto,
     MklSyncRequestDto,
     MklSyncResultDto,
     MklSyncResultResponseDto,
     ResearchEvidenceDetailResponseDto,
-    ResearchEvidenceDto,
     ResearchEvidenceListResponseDto,
     ResearchTreeEdgeCreateRequestDto,
     ResearchTreeEdgeDetailResponseDto,
-    ResearchTreeEdgeDto,
     ResearchTreeEdgesListResponseDto,
     ResearchTrialDetailResponseDto,
-    ResearchTrialDto,
     ResearchTrialsListResponseDto,
     ResearchTrialSortParam,
+    to_belief_history_entry_dto,
+    to_hypothesis_belief_dto,
+    to_hypothesis_dto,
+    to_knowledge_node_dto,
+    to_mkl_sync_event_dto,
+    to_research_evidence_dto,
+    to_research_tree_edge_dto,
+    to_research_trial_dto,
 )
 from bolsa_application.belief_engine import GetHypothesisBelief, ListBeliefHistory
 from bolsa_application.hypotheses import (
@@ -99,151 +99,8 @@ from bolsa_application.research_trials import (
     GetResearchTrial,
     ListResearchTrials,
 )
-from bolsa_domain.entities.hypothesis import Hypothesis
-from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
-from bolsa_domain.entities.research_evidence import ResearchEvidence
-from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
-from bolsa_domain.entities.research_trial import ResearchTrial
 
 router = APIRouter()
-
-
-def _to_trial_dto(trial: ResearchTrial) -> ResearchTrialDto:
-    return ResearchTrialDto(
-        id=trial.id,
-        instrument_id=trial.instrument_id,
-        params=trial.params,
-        is_metrics=trial.is_metrics,
-        proposed_by=trial.proposed_by,
-        k_contribution=trial.k_contribution,
-        created_at=trial.created_at,
-        hypothesis_id=trial.hypothesis_id,
-        research_question_id=trial.research_question_id,
-        backtest_run_id=trial.backtest_run_id,
-        optimization_run_id=trial.optimization_run_id,
-        strategy_definition_id=trial.strategy_definition_id,
-        preset_key=trial.preset_key,
-        strategy_name=trial.strategy_name,
-        blocks=trial.blocks,
-        is_score=trial.is_score,
-        parent_trial_id=trial.parent_trial_id,
-        fail_code=trial.fail_code,
-        manifest_ref=trial.manifest_ref,
-    )
-
-
-def _to_evidence_dto(row: ResearchEvidence) -> ResearchEvidenceDto:
-    return ResearchEvidenceDto(
-        id=row.id,
-        instrument_id=row.instrument_id,
-        level=row.level,
-        source=row.source,
-        evidence_weight=row.evidence_weight,
-        summary=row.summary,
-        created_at=row.created_at,
-        trial_id=row.trial_id,
-        hypothesis_id=row.hypothesis_id,
-        edge_report_id=row.edge_report_id,
-        math_version=row.math_version,
-    )
-
-
-def _to_hypothesis_dto(row: Hypothesis) -> HypothesisDto:
-    return HypothesisDto(
-        id=row.id,
-        kind=row.kind,
-        statement=row.statement,
-        falsifiers=row.falsifiers,
-        status=row.status,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-        domain=row.domain,
-        context=row.context,
-    )
-
-
-def _to_belief_dto(row: HypothesisBelief) -> HypothesisBeliefDto:
-    return HypothesisBeliefDto(
-        id=row.id,
-        hypothesis_id=row.hypothesis_id,
-        belief=row.belief,
-        belief_ci_low=row.belief_ci_low,
-        belief_ci_high=row.belief_ci_high,
-        n_experiments=row.n_experiments,
-        evidence_weight=row.evidence_weight,
-        contexts_ok=row.contexts_ok,
-        contexts_fail=row.contexts_fail,
-        evidence_ids=row.evidence_ids,
-        trial_ids=row.trial_ids,
-        math_version=row.math_version,
-        last_reviewed_at=row.last_reviewed_at,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-    )
-
-
-def _to_belief_history_dto(row: BeliefHistoryEntry) -> BeliefHistoryEntryDto:
-    return BeliefHistoryEntryDto(
-        id=row.id,
-        hypothesis_id=row.hypothesis_id,
-        belief_id=row.belief_id,
-        belief=row.belief,
-        belief_ci_low=row.belief_ci_low,
-        belief_ci_high=row.belief_ci_high,
-        n_experiments=row.n_experiments,
-        evidence_weight=row.evidence_weight,
-        math_version=row.math_version,
-        created_at=row.created_at,
-        trigger_evidence_id=row.trigger_evidence_id,
-        delta=row.delta,
-    )
-
-
-def _to_knowledge_dto(row: KnowledgeNode) -> KnowledgeNodeDto:
-    return KnowledgeNodeDto(
-        id=row.id,
-        hypothesis_id=row.hypothesis_id,
-        stage=row.stage,
-        statement=row.statement,
-        knowledge_confidence=row.knowledge_confidence,
-        validity_context=row.validity_context,
-        evidence_ids=row.evidence_ids,
-        belief_snapshot=row.belief_snapshot,
-        consolidation_report=row.consolidation_report,
-        math_version=row.math_version,
-        consolidated_at=row.consolidated_at,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-        notes=row.notes,
-    )
-
-
-def _to_tree_edge_dto(row: ResearchTreeEdge) -> ResearchTreeEdgeDto:
-    return ResearchTreeEdgeDto(
-        id=row.id,
-        from_ref_type=row.from_ref_type,
-        from_ref_id=row.from_ref_id,
-        to_ref_type=row.to_ref_type,
-        to_ref_id=row.to_ref_id,
-        edge_type=row.edge_type,
-        created_at=row.created_at,
-        notes=row.notes,
-        payload=row.payload,
-        deleted_at=row.deleted_at,
-    )
-
-
-def _to_mkl_event_dto(row: MklSyncEvent) -> MklSyncEventDto:
-    return MklSyncEventDto(
-        id=row.id,
-        knowledge_node_id=row.knowledge_node_id,
-        status=row.status,
-        fact_payload=row.fact_payload,
-        math_version=row.math_version,
-        created_at=row.created_at,
-        notes=row.notes,
-    )
 
 
 def _consolidation_use_case(session: AsyncSession) -> ConsolidateHypothesis:
@@ -294,7 +151,7 @@ async def list_research_trials(
         offset=offset,
     )
     return ResearchTrialsListResponseDto(
-        data=[_to_trial_dto(t) for t in trials],
+        data=[to_research_trial_dto(t) for t in trials],
         total=total,
         limit=limit,
         offset=offset,
@@ -310,7 +167,7 @@ async def get_research_trial(
     trial = await use_case.execute(trial_id)
     if trial is None:
         raise HTTPException(status_code=404, detail="Research trial not found")
-    return ResearchTrialDetailResponseDto(data=_to_trial_dto(trial))
+    return ResearchTrialDetailResponseDto(data=to_research_trial_dto(trial))
 
 
 @router.patch(
@@ -333,7 +190,7 @@ async def link_trial_hypothesis(
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return ResearchTrialDetailResponseDto(data=_to_trial_dto(trial))
+    return ResearchTrialDetailResponseDto(data=to_research_trial_dto(trial))
 
 
 @router.get("/research/hypotheses", response_model=HypothesesListResponseDto)
@@ -352,7 +209,7 @@ async def list_hypotheses(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return HypothesesListResponseDto(
-        data=[_to_hypothesis_dto(r) for r in rows],
+        data=[to_hypothesis_dto(r) for r in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -379,7 +236,7 @@ async def create_hypothesis(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return HypothesisDetailResponseDto(data=_to_hypothesis_dto(row))
+    return HypothesisDetailResponseDto(data=to_hypothesis_dto(row))
 
 
 @router.get("/research/hypotheses/{hypothesis_id}", response_model=HypothesisDetailResponseDto)
@@ -391,7 +248,7 @@ async def get_hypothesis(
     row = await use_case.execute(hypothesis_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Hypothesis not found")
-    return HypothesisDetailResponseDto(data=_to_hypothesis_dto(row))
+    return HypothesisDetailResponseDto(data=to_hypothesis_dto(row))
 
 
 @router.get(
@@ -411,7 +268,7 @@ async def get_hypothesis_belief(
     )
     if belief is None:
         raise HTTPException(status_code=404, detail="Belief not found")
-    return HypothesisBeliefResponseDto(data=_to_belief_dto(belief))
+    return HypothesisBeliefResponseDto(data=to_hypothesis_belief_dto(belief))
 
 
 @router.get(
@@ -431,7 +288,7 @@ async def list_hypothesis_belief_history(
         hypothesis_id, limit=limit, offset=offset
     )
     return BeliefHistoryListResponseDto(
-        data=[_to_belief_history_dto(r) for r in rows],
+        data=[to_belief_history_entry_dto(r) for r in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -461,7 +318,7 @@ async def update_hypothesis(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if row is None:
         raise HTTPException(status_code=404, detail="Hypothesis not found")
-    return HypothesisDetailResponseDto(data=_to_hypothesis_dto(row))
+    return HypothesisDetailResponseDto(data=to_hypothesis_dto(row))
 
 
 @router.get(
@@ -514,7 +371,7 @@ async def consolidate_hypothesis(
     return ConsolidationResultResponseDto(
         data=ConsolidationResultDto(
             created=bool(result.get("created")),
-            node=None if node is None else _to_knowledge_dto(node),
+            node=None if node is None else to_knowledge_node_dto(node),
             report=result.get("report") or {},
         )
     )
@@ -539,7 +396,7 @@ async def list_knowledge_nodes(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return KnowledgeNodesListResponseDto(
-        data=[_to_knowledge_dto(r) for r in rows],
+        data=[to_knowledge_node_dto(r) for r in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -554,7 +411,7 @@ async def get_knowledge_node(
     row = await GetKnowledgeNode(get_knowledge_node_repository(session)).execute(node_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Knowledge node not found")
-    return KnowledgeNodeDetailResponseDto(data=_to_knowledge_dto(row))
+    return KnowledgeNodeDetailResponseDto(data=to_knowledge_node_dto(row))
 
 
 @router.post(
@@ -570,7 +427,7 @@ async def deprecate_knowledge_node(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Knowledge node not found")
-    return KnowledgeNodeDetailResponseDto(data=_to_knowledge_dto(row))
+    return KnowledgeNodeDetailResponseDto(data=to_knowledge_node_dto(row))
 
 
 @router.post(
@@ -600,8 +457,8 @@ async def sync_knowledge_to_mkl(
         data=MklSyncResultDto(
             synced=bool(result["synced"]),
             dry_run=bool(result["dryRun"]),
-            event=_to_mkl_event_dto(result["event"]),
-            node=_to_knowledge_dto(result["node"]),
+            event=to_mkl_sync_event_dto(result["event"]),
+            node=to_knowledge_node_dto(result["node"]),
             fact_payload=result["factPayload"],
         )
     )
@@ -624,7 +481,7 @@ async def list_mkl_sync_events(
         node_id, limit=limit, offset=offset
     )
     return MklSyncEventsListResponseDto(
-        data=[_to_mkl_event_dto(r) for r in rows],
+        data=[to_mkl_sync_event_dto(r) for r in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -658,7 +515,7 @@ async def list_research_tree_edges(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ResearchTreeEdgesListResponseDto(
-        data=[_to_tree_edge_dto(r) for r in rows],
+        data=[to_research_tree_edge_dto(r) for r in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -687,7 +544,7 @@ async def create_research_tree_edge(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return ResearchTreeEdgeDetailResponseDto(data=_to_tree_edge_dto(row))
+    return ResearchTreeEdgeDetailResponseDto(data=to_research_tree_edge_dto(row))
 
 
 @router.delete(
@@ -703,7 +560,7 @@ async def soft_delete_research_tree_edge(
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Research tree edge not found")
-    return ResearchTreeEdgeDetailResponseDto(data=_to_tree_edge_dto(row))
+    return ResearchTreeEdgeDetailResponseDto(data=to_research_tree_edge_dto(row))
 
 
 @router.get(
@@ -743,7 +600,7 @@ async def list_research_evidence(
         offset=offset,
     )
     return ResearchEvidenceListResponseDto(
-        data=[_to_evidence_dto(r) for r in rows],
+        data=[to_research_evidence_dto(r) for r in rows],
         total=total,
         limit=limit,
         offset=offset,
@@ -770,7 +627,7 @@ async def persist_dia_d_session_evidence(
     if row is None:
         raise HTTPException(status_code=400, detail="Invalid DÍA D evidence payload")
     await session.commit()
-    return ResearchEvidenceDetailResponseDto(data=_to_evidence_dto(row))
+    return ResearchEvidenceDetailResponseDto(data=to_research_evidence_dto(row))
 
 
 @router.get("/research/evidence/{evidence_id}", response_model=ResearchEvidenceDetailResponseDto)
@@ -782,7 +639,7 @@ async def get_research_evidence(
     row = await use_case.execute(evidence_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Research evidence not found")
-    return ResearchEvidenceDetailResponseDto(data=_to_evidence_dto(row))
+    return ResearchEvidenceDetailResponseDto(data=to_research_evidence_dto(row))
 
 
 @router.get("/research/summary", response_model=LaboratoryResearchSummaryResponseDto)

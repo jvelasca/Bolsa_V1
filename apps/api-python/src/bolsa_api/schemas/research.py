@@ -4,6 +4,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from bolsa_domain.entities.hypothesis import Hypothesis
+from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
+from bolsa_domain.entities.research_evidence import ResearchEvidence
+from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
+from bolsa_domain.entities.research_trial import ResearchTrial
+
 
 class ResearchTrialDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
@@ -454,3 +461,140 @@ class MklSyncEventsListResponseDto(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+def to_research_trial_dto(trial: ResearchTrial) -> ResearchTrialDto:
+    return ResearchTrialDto(
+        id=trial.id,
+        instrument_id=trial.instrument_id,
+        params=trial.params,
+        is_metrics=trial.is_metrics,
+        proposed_by=trial.proposed_by,
+        k_contribution=trial.k_contribution,
+        created_at=trial.created_at,
+        hypothesis_id=trial.hypothesis_id,
+        research_question_id=trial.research_question_id,
+        backtest_run_id=trial.backtest_run_id,
+        optimization_run_id=trial.optimization_run_id,
+        strategy_definition_id=trial.strategy_definition_id,
+        preset_key=trial.preset_key,
+        strategy_name=trial.strategy_name,
+        blocks=trial.blocks,
+        is_score=trial.is_score,
+        parent_trial_id=trial.parent_trial_id,
+        fail_code=trial.fail_code,
+        manifest_ref=trial.manifest_ref,
+    )
+
+
+def to_research_evidence_dto(row: ResearchEvidence) -> ResearchEvidenceDto:
+    return ResearchEvidenceDto(
+        id=row.id,
+        instrument_id=row.instrument_id,
+        level=row.level,
+        source=row.source,
+        evidence_weight=row.evidence_weight,
+        summary=row.summary,
+        created_at=row.created_at,
+        trial_id=row.trial_id,
+        hypothesis_id=row.hypothesis_id,
+        edge_report_id=row.edge_report_id,
+        math_version=row.math_version,
+    )
+
+
+def to_hypothesis_dto(row: Hypothesis) -> HypothesisDto:
+    return HypothesisDto(
+        id=row.id,
+        kind=row.kind,
+        statement=row.statement,
+        falsifiers=row.falsifiers,
+        status=row.status,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        domain=row.domain,
+        context=row.context,
+    )
+
+
+def to_hypothesis_belief_dto(row: HypothesisBelief) -> HypothesisBeliefDto:
+    return HypothesisBeliefDto(
+        id=row.id,
+        hypothesis_id=row.hypothesis_id,
+        belief=row.belief,
+        belief_ci_low=row.belief_ci_low,
+        belief_ci_high=row.belief_ci_high,
+        n_experiments=row.n_experiments,
+        evidence_weight=row.evidence_weight,
+        contexts_ok=row.contexts_ok,
+        contexts_fail=row.contexts_fail,
+        evidence_ids=row.evidence_ids,
+        trial_ids=row.trial_ids,
+        math_version=row.math_version,
+        last_reviewed_at=row.last_reviewed_at,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+def to_belief_history_entry_dto(row: BeliefHistoryEntry) -> BeliefHistoryEntryDto:
+    return BeliefHistoryEntryDto(
+        id=row.id,
+        hypothesis_id=row.hypothesis_id,
+        belief_id=row.belief_id,
+        belief=row.belief,
+        belief_ci_low=row.belief_ci_low,
+        belief_ci_high=row.belief_ci_high,
+        n_experiments=row.n_experiments,
+        evidence_weight=row.evidence_weight,
+        math_version=row.math_version,
+        created_at=row.created_at,
+        trigger_evidence_id=row.trigger_evidence_id,
+        delta=row.delta,
+    )
+
+
+def to_knowledge_node_dto(row: KnowledgeNode) -> KnowledgeNodeDto:
+    return KnowledgeNodeDto(
+        id=row.id,
+        hypothesis_id=row.hypothesis_id,
+        stage=row.stage,
+        statement=row.statement,
+        knowledge_confidence=row.knowledge_confidence,
+        validity_context=row.validity_context,
+        evidence_ids=row.evidence_ids,
+        belief_snapshot=row.belief_snapshot,
+        consolidation_report=row.consolidation_report,
+        math_version=row.math_version,
+        consolidated_at=row.consolidated_at,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        notes=row.notes,
+    )
+
+
+def to_research_tree_edge_dto(row: ResearchTreeEdge) -> ResearchTreeEdgeDto:
+    return ResearchTreeEdgeDto(
+        id=row.id,
+        from_ref_type=row.from_ref_type,
+        from_ref_id=row.from_ref_id,
+        to_ref_type=row.to_ref_type,
+        to_ref_id=row.to_ref_id,
+        edge_type=row.edge_type,
+        created_at=row.created_at,
+        notes=row.notes,
+        payload=row.payload,
+        deleted_at=row.deleted_at,
+    )
+
+
+def to_mkl_sync_event_dto(row: MklSyncEvent) -> MklSyncEventDto:
+    return MklSyncEventDto(
+        id=row.id,
+        knowledge_node_id=row.knowledge_node_id,
+        status=row.status,
+        fact_payload=row.fact_payload,
+        math_version=row.math_version,
+        created_at=row.created_at,
+        notes=row.notes,
+    )
