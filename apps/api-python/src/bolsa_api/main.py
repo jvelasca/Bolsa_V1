@@ -117,6 +117,17 @@ def _cors_origin_regex(settings: Settings) -> str | None:
     return r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d+)?"
 
 
+# F-SEG-3: mínimo privilegio CORS. No se usa `*` en métodos/headers; sólo el
+# subconjunto que el FE (apps/web/src/lib/api.ts / openapi-fetch) envía de verdad.
+_CORS_ALLOW_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+_CORS_ALLOW_HEADERS = [
+    "Content-Type",  # bodies JSON (y multipart/form-data para subida de filings)
+    "Authorization",  # Bearer token
+    "X-Account-Id",  # scoping por cuenta activa
+    "Accept",  # openapi-fetch serializa el media type solicitado
+]
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     install_log_redact()
@@ -135,19 +146,25 @@ def create_app() -> FastAPI:
     app.add_middleware(AuthMiddleware)
     # P1.8: rate-limit con store Redis (distribuido) si REDIS_URL configurado,
     # degradando a memoria cuando Redis no responde; desactivado en test.
+    # F-SEG-3: `trusted_proxies` (TRUSTED_PROXIES) determina si el rate-limit
+    # confía en `X-Forwarded-For` (ver get_client_ip en middleware/rate_limit.py).
     app.add_middleware(
         RateLimitMiddleware,
         enabled=settings.environment != "test",
         redis_url=settings.redis_url,
+        trusted_proxies=settings.trusted_proxies,
     )
 
+    # F-SEG-3: métodos/headers explícitos (mínimo privilegio). `allow_origin_regex`
+    # sólo se activa en development para LAN dev (Vite :5173); en prod se respeta
+    # `allow_origins` (cors_origin). `allow_credentials` se mantiene tal cual.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=_cors_origins(settings),
         allow_origin_regex=_cors_origin_regex(settings),
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=_CORS_ALLOW_METHODS,
+        allow_headers=_CORS_ALLOW_HEADERS,
     )
 
     app.include_router(api_v1_router, prefix="/api")

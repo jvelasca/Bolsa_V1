@@ -39,6 +39,10 @@ _FUNDAMENTALS_SEGMENT = "fundamentals"
 
 WINDOW_SECONDS = 60.0
 
+# F-SEG-3: separador aritmético aceptado por Starlette/Uvicorn para la cabecera
+# `X-Forwarded-For` (p. ej. `203.0.113.1, 70.41.3.18`).
+_FORWARDED_SEPARATOR = ","
+
 
 class RateLimitStore(Protocol):
     """Almacén de contadores por clave y ventana."""
@@ -136,9 +140,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         *,
         enabled: bool = True,
         redis_url: str | None = None,
+        trusted_proxies: str = "",
     ) -> None:
         super().__init__(app)
         self._enabled = enabled
+        self._trusted_proxies = trusted_proxies
         self._store: RateLimitStore
         redis = redis_url or ""
         if redis.strip():
@@ -172,7 +178,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if limit is None:
             return await call_next(request)
 
-        client = request.client.host if request.client else "unknown"
+        client = get_client_ip(request, self._trusted_proxies)
         key = f"{client}:{path.split('?')[0]}"
 
         if await self._store.check_and_tick(key, limit):
@@ -192,6 +198,44 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 def _path_has_segment(path: str, segment: str) -> bool:
     return segment in path.split("/")
+
+
+def _split_trusted_proxies(raw: str) -> set[str]:
+    """Normaliza `TRUSTED_PROXIES` (coma-separados) a un set de hosts/IPs."""
+    return {p.strip() for p in raw.split(",") if p.strip()}
+
+
+def _request_client_host(request: Request) -> str:
+    """IP real del peer inmediato (web server / proxy de borde)."""
+    return request.client.host if request.client else "unknown"
+
+
+def get_client_ip(request: Request, trusted_proxies: str = "") -> str:
+    """IP del cliente para rate-limit respetando `X-Forwarded-For` con confianza.
+
+    F-SEG-3 (anti-spoofing): el header `X-Forwarded-For` lo puede falsificar
+    cualquier cliente, así que sólo se confía en él cuando el *peer inmediato*
+    (``request.client.host``) es un proxy/host de confianza configurado en
+    ``TRUSTED_PROXIES``.
+
+    - Si el peer inmediato NO está en ``trusted_proxies`` (p. ej. dev/local sin
+      proxy, o un host no listado) → se devuelve ``client.host`` y se ignora el
+      header (un cliente externo no puede resetear su propio contador).
+    - Si el peer inmediato SÍ es de confianza → se usa la **primera** dirección de
+      ``X-Forwarded-For``, que es la que el cliente original dejó al entrar en la
+      cadena de proxies (cada proxy hace append de su par inmediato). Un peer de
+      confianza sobrescribe el header de cualquier cliente antes de reenviarlo.
+    - Si no hay header o está vacío desde un peer de confianza → se cae a
+      ``client.host`` (equivalente a un acceso directo en prod sin reverse proxy).
+    """
+    peer = _request_client_host(request)
+    if trusted_proxies and peer in _split_trusted_proxies(trusted_proxies):
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            first = forwarded.split(_FORWARDED_SEPARATOR, 1)[0].strip()
+            if first:
+                return first
+    return peer
 
 
 def _new_redis_client(redis_url: str) -> object:

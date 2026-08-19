@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     db_name: str = Field(default="bolsa_v1", validation_alias="DB_NAME")
     redis_url: str = "redis://localhost:6379/0"
     cors_origin: str = "http://localhost:5173"
+    # F-SEG-3: hosts/proxies de confianza que pueden añadir `X-Forwarded-For`.
+    # Coma-separados; si se deja vacío (default) el rate-limit ignora el header y usa
+    # `client.host` (comportamiento dev/local sin proxy, evita spoofing).
+    trusted_proxies: str = Field(default="", validation_alias="TRUSTED_PROXIES")
     api_host: str = "0.0.0.0"
     api_port: int = Field(default=8000, validation_alias="API_PYTHON_PORT")
     xtb_bridge_url: str | None = Field(default=None, validation_alias="XTB_BRIDGE_URL")
