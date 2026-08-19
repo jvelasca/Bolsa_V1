@@ -102,6 +102,12 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 > La 2ª auditoría confirma que los 18 bloques "🟢 CORREGIDO" de la 1ª están implementados (next_open, same-bar,
 > batería de causalidad, exclusión Chikou/fractales, `with_for_update`, scope por cuenta, idempotencia, CORS m.p.,
 > rate-limit Redis+XFF, fiscal sin `limit=10000` en transacciones). Deja una lista reducida; verificado contra código:
+>
+> **Causa de la "no-visibilidad":** el texto de la 2ª auditoría se contrastó a un estado anterior a la sincronización.
+> Los cierres de la respuesta (P1.9, F-WORKER-1, fix fiscal P2.1) y el resto vivían en `stage/f1-integridad-financiera-2026-08-11`,
+> 14 commits por delante de `main`. **El 2026-08-19 se sincronizó `stage → main` (fast-forward `7d41ca0..45fc724`, aprobado)**
+> para que la próxima lectura de `main` vea el estado real. Además, varios puntos (P1.1/P1.2/P2.2) requieren inspección de
+> código (`dependencies.py`, `portfolio_repository.py`, `config.py`), no solo lectura de GitHub.
 
 - **P1.1 Atomicidad ExecuteTrade → ✅ RESUELTO**: `get_db_session` (`dependencies.py:270-280`) es la unidad de
   trabajo: una AsyncSession por request, `commit()` al final / `rollback()` ante excepción. `ExecuteTrade.execute`
@@ -122,8 +128,11 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
   real — quitados "Alembic baseline" (hecho F3a/F3b) y "OpenAPI client" (hecho F5a §6); quedan como pendientes
   solo "transferencias entre carteras" (repo primitivo sin use-case/ruta) y "dividendos" (solo historial recopilado,
   sin feature de pago/ledger).
-- **Punto 20 CI → ✅ CONFIRMADO Verde**: verificado vía `gh run list` en `stage/f1-*`: Python CI, Frontend CI,
-  Fase 2 scientific, Optimize lab y Gitleaks = `success` en los commits recientes de código.
+- **Punto 20 CI → ✅ CONFIRMADO Verde en `main`**: verificado vía `gh run list`/`gh run watch` tras sincronizar
+  `stage → main` (`45fc724`). Todos los workflows en el nuevo tip de `main`: Python CI (quality: Ruff+Mypy+Pytest ✓),
+  Frontend CI (shared build/typecheck/test + web typecheck/lint/test/build ✓), Fase 2 scientific ✓, Optimize lab ✓ y
+  Gitleaks ✓. Aviso no-bloqueante de deprecación de Node.js 20 en actions (→ fase R-5 plan de refactor) y 2 warnings
+  React no-bloqueantes en `apps/web/src/features/backtests/backtests-page.tsx:1228,1231`.
 - **Observación Ichimoku**: el auditor confirma que NO debe cambiarse `chikou[index]=bars[ahead].close` (válido para
   chart); la separación chart→Chikou ✅ / research→Chikou ❌ es la arquitectura correcta (ya implementada en
   F-IND-1). No tocar.
@@ -145,9 +154,12 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ## 6. Texto de traspaso (pegable en el próximo chat)
 
-> CONTEXTO: Ola de hardening pactada 2026-08-11 **completada y MERGEADA a `main`** (`origin/main` = `94aee47`;
-> merge fast-forward `eb31a7d..94aee47` de toda la ola F1→F5a + la sub-ola F-IND-2/F-FIN-1/F-FIN-2/F-SEG-1/
-> F-SEG-2/F-SEG-3/F-HLTH-1). **F-DEBT-1 = P1.9 API thin COMPLETADO** en `stage/f1-integridad-financiera-2026-08-11`.
+> CONTEXTO: Ola de hardening pactada 2026-08-11 **completada y MERGEADA a `main`** (`origin/main` = `45fc724`;
+> fast-forward `7d41ca0..45fc724` **2026-08-19** de +14 commits que incluyen P1.9 API thin completo, cierre de
+> F-WORKER-1 y el fix fiscal de la respuesta a la Auditoría 2; previo `94aee47` = cierre de la sub-ola F1→F5a +
+> F-IND-2/F-FIN-1/F-FIN-2/F-SEG-1/F-SEG-2/F-SEG-3/F-HLTH-1). **`main` y `stage/f1-integridad-financiera-2026-08-11`
+> quedan sincronizados al mismo tip.** Árbol limpio. CI verde en `main` (Python, Frontend, scientific, optimize,
+> gitleaks) verificado vía `gh run watch`. Aviso no-bloqueante: Node.js 20 deprecado en actions → fase R-5 plan.
 > Árbol limpio. CI verde.
 >
 > Estado vivo y deuda priorizada en `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO). Mapa de fases mergeadas en
@@ -160,19 +172,23 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 > F-SEG-2 (rotación de logs + redacción de secretos), F-SEG-3 (CORS mínimo privilegio + `X-Forwarded-For`/
 > TrustedHost en rate-limit) y F-HLTH-1 (mojibake) **hechas y MERGEADAS a `main`** (ver §3).
 >
-> FASE ACTIVA: **F-DEBT-1 = P1.9 API thin COMPLETADO** (adelgazar endpoints FastAPI; proxies/serializaciones
-> delgados actuales = deuda de F4/F5b). **mypy ~450 ya cerrado (P1.6, `6a89f6c`)** · **P2.6 DTOs TS↔Py → F-DEBT-2**
-> (deuda futura). **Riesgo Medio → CERRADO.**
+> FASE ACTIVA: ola F1→F5a + F-IND-2/F-FIN/F-SEG/F-HLTH **COMPLETADA y MERGEADA a `main`**. **F-DEBT-1 = P1.9 API thin
+> COMPLETADO** (adelgazar endpoints FastAPI; `mypy ~450` cerrado P1.6) y **sincronizado a `main`** (`45fc724`). Resto
+> pendiente → **R-2** = F-DEBT-2 (P2.6 consolidar tipos web-only en `packages/shared`, gate D5 sin tocar wire).
 > **10 slices de P1.9 COMMITEADOS** (ver §3 F-DEBT-1 y `traspaso-p1.9-api-thin-2026-08-19.md`): scans/trackers,
 > blob-sync, instrument_daily_opinions, research, DTOs+DI ai_governance, use-cases propose/confirm, perfil inversor
 > create_account, y **A4-safe `response_model` tipado en `list_decision_sessions`** (`cbfac26`).
 > **A4/B2 restante = shape abierto (payload JSONB, `to_dict()` timelines, dicts LLM, `week`/`opinions` libres,
 > Response/204) — NO tipado**: tipar `response_model` ahí dropea claves en runtime (fuera de la regla D5). Si se
 > quiere en el futuro hacer el `regen_full` (cambio de contrato + revisión FE), es decisión explícita aparte.
+> **A4/B2 shape-abierto diferido → PLAN R-4** (requiere decisión de `regen_full`, nunca automático).
 >
-> SIGUIENTE (fuera del alcance de P1.9, requieren hilo propio): **F-WORKER-1 CERRADO** (auto-sync `BP/.L` —
-> ver `traspaso-worker1-auto-sync-bp-2026-08-19.md`) · **F-DEBT-2** (P2.6 consolidar tipos web-only en
-> `packages/shared`).
+> SIGUIENTE (plan de refactor 2026-08-19, subagentes aislados + aprobación por commit + relevo documentado):
+> **R-1** cierre de deuda operativa (GitHub secret scanning, `TRUSTED_PROXIES` prod, limpiar `logs/dev/*` ~150 MB,
+> corregir `BP/.L→BP.L` en BD) — documental, sin código funcional · **R-2** F-DEBT-2/P2.6 tipos web-only en
+> `packages/shared` · **R-3** fidelidad de valor de tipos + reconciliación ~87 DTOs wire (requiere `regen_full`,
+> decisión explícita) · **R-4** A4/B2 `response_model` (requiere `regen_full`) · **R-5** CI Node.js 20 deprecado
+> (bump actions). F-WORKER-1 **CERRADO** (auto-sync `BP/.L` — ver `traspaso-worker1-auto-sync-bp-2026-08-19.md`).
 >
 > Nota F-IND-1/2: la guardia de causalidad puede cambiar resultados de backtests que usen
 > chikou; documentado y ya respaldado por la batería F-IND-2 (no recalcular aún).
@@ -189,7 +205,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 ## 7. Registro del plan 2026-08-19
 
 | Fecha      | Acción                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
 | 2026-08-19 | Recibida Auditoría externa 1 (análisis cuantitativo/causalidad). Verificada contra el código real. Se detecta que gran parte ya está corregida (ola F1–F5a) y que el hueco real persiste en la causalidad de indicadores.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 2026-08-19 | Pactado el plan profundo por fases (F-IND/F-FIN/F-SEG/F-HLTH/F-DEBT/F-WORKER) con orden por riesgo de dinero/verdad.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | 2026-08-19 | Creado este documento maestro como fuente única de estado y punto de entrada de relevos.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -211,3 +227,4 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 | 2026-08-19 | **P1.9 A4/B2 DIFERIDO (decisión usuario)**: `response_model` tipado en endpoints `dict[str,Any]` (13 en `ai_governance.py`, 3 en `accounts.py`: get_daily_ops_report/download_daily_ops_digest_pdf/delete_account) — **cambia el contrato OpenAPI, fuera de la regla D5**. Pendiente de decisión (hacerlo en commit aparte verificado con `contract:check`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-08-19 | **F-WORKER-1 CERRADO** (documental): retomado el subagente previo (`41c57061`, 12/08) vía transcript (`resume` no parado). **Evaluación confirmada**: el 404 de `BP/.L` es un registro de BD corrupto (`yahoo_symbol='BP/.L'`, slash literal; ticker válido `BP.L`) — NO un bug de mapping de código (el `yahoo_client` emite `chart/{yahoo_symbol}` fiel a lo almacenado). El fix de comportamiento (404 → `YahooSymbolNotFoundError` permanente, `retryable=False`, sin retry, WARNING→INFO) **ya estaba MERGED** (PR #43, `4a1dc69`, ancestro de HEAD verificado). Verificado en código actual (`yahoo_client.py:228-233` · `sync_instrument.py:171-186` · `sync_scheduler.py:166-179` · `auto_sync_worker.py:50-61`). **Acción residual manual (NO código)**: corregir el registro en BD a `BP.L` si se quiere dato real. Cierre documentado en `docs/engineering/traspaso-worker1-auto-sync-bp-2026-08-19.md` + `engineering-index` §5. |
 | 2026-08-19 | **Respuesta a Auditoría externa 2 — verificado + 2 fixes (P2.1/P2.3)**: verificada la 2ª auditoría contra código; **P1.1 atomicidad, P1.2 concurrencia retiros y P2.2 fail-closed prod ya resueltos** (evidencia en §4). **P2.1**: `GetTaxReport` `limit=10_000`→`limit=None` en el ledger fiscal (`accounts.py:606`, acotado por rango fiscal). **P2.3**: README refresh (quitados Alembic/OpenAPI de deuda; quedan transferencias/dividendos). CI verificada verde vía `gh run list`. Batería: ruff 0 · mypy 244 files 0 · pytest market+api 164✓ (flake preexistente pasa aislado) · application+domain 238✓ · contract:check OK.                                                                                                                                                                                                                                                                                                         |
+| 2026-08-19 | **SINCRONIZACIÓN `stage → main` (aprobada)**: fast-forward `7d41ca0..45fc724` de 14 commits (P1.9 API thin completo 10 slices, cierre F-WORKER-1 documental, fix fiscal P2.1, README P2.3) mergeado a `main` y pusheado (`origin/main = origin/stage = 45fc724`). **CI `main` verificado vía `gh run watch`**: Python CI (Ruff/Mypy/Pytest ✓), Frontend CI (shared+web test/build ✓), Fase 2 scientific ✓, Optimize lab ✓, Gitleaks ✓. Aviso no-bloqueante Node.js 20 deprecado en actions (→ plan R-5) y 2 warnings React en `backtests-page.tsx:1228,1231`. Motivo: la 2ª auditoría no veía los cierres porque vivían en `stage`; la sincronización alinea `main` con el estado real para la próxima lectura. §4 punto 20 y §6 texto de traspaso actualizados.                                                                                                                                                                             |     |
