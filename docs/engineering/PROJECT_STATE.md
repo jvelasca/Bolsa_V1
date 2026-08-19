@@ -49,18 +49,18 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 > Orden por **riesgo de dinero / verdad de resultados** (no por severidad rotulada). Prioridad síntoma: **causalidad de indicadores** = único hueco serio de integridad que queda tras F2.
 
-| Código         | Objetivo                                                                                                                                    | Estado       | Riesgo     | Fracción            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ---------- | ------------------- |
-| **F-IND-1**    | Causality Layer: distinguir indicadores **causales vs visualización**; prohibir features no causales (chikou/fractals) en backtest/research | 🔴 PENDIENTE | Medio      | 🔵 **activa ahora** |
-| **F-IND-2**    | Batería de tests de causalidad en CI (`feature_at_t` con/sin barra futura idéntico para todos los indicadores)                              | 🔴 PENDIENTE | Bajo       | v2                  |
-| **F-FIN-1**    | `get_or_create_default_portfolio()` por nombre global → scope por cuenta (ADR-008)                                                          | 🟠 PENDIENTE | Alto       | v3                  |
-| **F-FIN-2**    | `GetTaxReport` `limit=10000` + sin filtro por año en SQL                                                                                    | 🟠 PENDIENTE | Medio      | v4                  |
-| **F-SEG-1**    | Fail-closed production + comparaciones constantes (`secrets.compare_digest`) — **auth JWT sigue diferida (D4)**                             | 🟠 PENDIENTE | Bajo       | v5                  |
-| **F-SEG-2**    | Auditoría historial git (repo público) + rotación de logs + tests negativos de redacción                                                    | 🟠 PENDIENTE | Bajo-Medio | v6                  |
-| **F-SEG-3**    | CORS mínimo privilegio + `X-Forwarded-For`/TrustedHost en rate-limit                                                                        | 🟡 PENDIENTE | Bajo       | v7                  |
-| **F-HLTH-1**   | Mojibake en `workspace-store-core.ts` (2 strings UI + ~26 JSDoc)                                                                            | 🟡 PENDIENTE | Bajo       | v8                  |
-| **F-DEBT-1**   | Deuda cierre ola: P1.9 API thin + P2.6 DTOs TS↔Py + mypy ~450 por fases                                                                     | 🟡 PENDIENTE | Medio      | v9                  |
-| **F-WORKER-1** | Warning auto-sync ticker `BP/.L` (Yahoo 404) — retomar subagente con `resume`                                                               | 🟡 ABIERTO   | Bajo       | v10                 |
+| Código         | Objetivo                                                                                                                                    | Estado                             | Riesgo     | Fracción            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ---------- | ------------------- |
+| **F-IND-1**    | Causality Layer: distinguir indicadores **causales vs visualización**; prohibir features no causales (chikou/fractals) en backtest/research | ✅ MERGED (79fa155)                | Medio      | v1                  |
+| **F-IND-2**    | Batería de tests de causalidad en CI (`feature_at_t` con/sin barra futura idéntico para todos los indicadores)                              | 🟢 COMMITED (09fb06b, pend. merge) | Bajo       | 🔵 **activa ahora** |
+| **F-FIN-1**    | `get_or_create_default_portfolio()` por nombre global → scope por cuenta (ADR-008)                                                          | 🟠 PENDIENTE                       | Alto       | v3                  |
+| **F-FIN-2**    | `GetTaxReport` `limit=10000` + sin filtro por año en SQL                                                                                    | 🟠 PENDIENTE                       | Medio      | v4                  |
+| **F-SEG-1**    | Fail-closed production + comparaciones constantes (`secrets.compare_digest`) — **auth JWT sigue diferida (D4)**                             | 🟠 PENDIENTE                       | Bajo       | v5                  |
+| **F-SEG-2**    | Auditoría historial git (repo público) + rotación de logs + tests negativos de redacción                                                    | 🟠 PENDIENTE                       | Bajo-Medio | v6                  |
+| **F-SEG-3**    | CORS mínimo privilegio + `X-Forwarded-For`/TrustedHost en rate-limit                                                                        | 🟡 PENDIENTE                       | Bajo       | v7                  |
+| **F-HLTH-1**   | Mojibake en `workspace-store-core.ts` (2 strings UI + ~26 JSDoc)                                                                            | 🟡 PENDIENTE                       | Bajo       | v8                  |
+| **F-DEBT-1**   | Deuda cierre ola: P1.9 API thin + P2.6 DTOs TS↔Py + mypy ~450 por fases                                                                     | 🟡 PENDIENTE                       | Medio      | v9                  |
+| **F-WORKER-1** | Warning auto-sync ticker `BP/.L` (Yahoo 404) — retomar subagente con `resume`                                                               | 🟡 ABIERTO                         | Bajo       | v10                 |
 
 **Anti-objetivos (freeze vigente):** sin features nuevas · sin reabrir Belief/H · sin tocar gobernanza IA ni dominio puro · auth JWT diferida (decisión D4) hasta decisión de exponer la app.
 
@@ -110,15 +110,19 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 ## 6. Texto de traspaso (pegable en el próximo chat)
 
 > CONTEXTO: Proyecto en ola de hardening pactada 2026-08-11, casi todo MERGED en
-> `stage/f1-integridad-financiera-2026-08-11` (HEAD `4ec0520`, merge PR #53 openapi-fetch). Árbol limpio. CI verde.
+> `stage/f1-integridad-financiera-2026-08-11` (HEAD `79fa155` = merge F-IND-1 · más `09fb06b` F-IND-2 commited, pend. push/merge). Árbol limpio. CI verde.
 >
 > Estado vivo y deuda priorizada en `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO). Mapa de fases mergeadas en
 > `docs/engineering/engineering-index-2026-08-03.md` §5.
 >
-> PRÓXIMA FASE pactada: **F-IND-1 (Causality Layer de indicadores)** — distinguir indicadores causales vs de
-> visualización y prohibir features no causales (chikou/fractals) en backtest/research. Es el único hueco serio de
-> integridad que queda tras F2. Aprobado por el usuario para arrancar. Después: F-IND-2, F-FIN-1, F-FIN-2,
-> F-SEG-1..3, F-HLTH-1, F-DEBT-1, F-WORKER-1 (ver §3).
+> F-IND-1 (Causality Layer) y F-IND-2 (batería de causalidad `feature_at_t` con/sin
+> barra futura en CI) **hechas** (ver §3).
+>
+> PRÓXIMA FASE pactada: **F-FIN-1** — `get_or_create_default_portfolio()` global por nombre → scope por cuenta
+> (ADR-008). Riesgo Alto (dinero). Después: F-FIN-2, F-SEG-1..3, F-HLTH-1, F-DEBT-1, F-WORKER-1 (ver §3).
+>
+> Nota F-IND-1/2: la guardia de causalidad puede cambiar resultados de backtests que usen
+> chikou; documentado y ya respaldado por la batería F-IND-2 (no recalcular aún).
 >
 > Regla: tipo de cambio = un subagente acotado + batería + aprobación por commit. No tocar código fuera del alcance
 > declarado. Auth JWT diferida (D4). NO reabrir Belief/H ni gobernanza IA.
@@ -130,9 +134,11 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ## 7. Registro del plan 2026-08-19
 
-| Fecha      | Acción                                                                                                                                                                                                                    |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-19 | Recibida Auditoría externa 1 (análisis cuantitativo/causalidad). Verificada contra el código real. Se detecta que gran parte ya está corregida (ola F1–F5a) y que el hueco real persiste en la causalidad de indicadores. |
-| 2026-08-19 | Pactado el plan profundo por fases (F-IND/F-FIN/F-SEG/F-HLTH/F-DEBT/F-WORKER) con orden por riesgo de dinero/verdad.                                                                                                      |
-| 2026-08-19 | Creado este documento maestro como fuente única de estado y punto de entrada de relevos.                                                                                                                                  |
-| 2026-08-19 | Decisiones del usuario: arrancar F-IND-1 · crear PROJECT_STATE.md (sí) · auth diferida (fail-closed + compare_digest solo en F-SEG-1).                                                                                    |
+| Fecha      | Acción                                                                                                                                                                                                                                                                                                         |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-19 | Recibida Auditoría externa 1 (análisis cuantitativo/causalidad). Verificada contra el código real. Se detecta que gran parte ya está corregida (ola F1–F5a) y que el hueco real persiste en la causalidad de indicadores.                                                                                      |
+| 2026-08-19 | Pactado el plan profundo por fases (F-IND/F-FIN/F-SEG/F-HLTH/F-DEBT/F-WORKER) con orden por riesgo de dinero/verdad.                                                                                                                                                                                           |
+| 2026-08-19 | Creado este documento maestro como fuente única de estado y punto de entrada de relevos.                                                                                                                                                                                                                       |
+| 2026-08-19 | Decisiones del usuario: arrancar F-IND-1 · crear PROJECT_STATE.md (sí) · auth diferida (fail-closed + compare_digest solo en F-SEG-1).                                                                                                                                                                         |
+| 2026-08-19 | **F-IND-1 MERGED** (`79fa155`, merge): Causality Layer — metadatos causal/confirmationLag/visualizationOffset en indicator-universe + guardia `_NON_CAUSAL_OUTPUT_LINES` (chikou/fractals excluidas del backtest) + `validate_strategy_definition` rechaza no causales.                                        |
+| 2026-08-19 | **F-IND-2 COMMITED** (`09fb06b`, pend. push/merge): batería `test_causality_battery_ind_2.py` (34 tests) — `feature_at_t` con/sin barra futura idéntico para todos los indicadores; 31 causales estables + 2 canarios no causales (chikou/fractals) + guard de cobertura. ruff/mypy ✓ · pytest analytics 362✓. |
