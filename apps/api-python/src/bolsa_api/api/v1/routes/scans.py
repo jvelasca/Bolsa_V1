@@ -1,7 +1,7 @@
 """API: escáneres y jobs en cola."""
 
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,25 +17,21 @@ from bolsa_api.api.dependencies import (
     get_scan_manifest_use_case,
 )
 from bolsa_api.schemas.scans import (
-    ScanHitDto,
-    ScanJobDto,
     ScanJobResponseDto,
     ScanJobsListResponseDto,
     ScanRunRequestDto,
     ScanRunResponseDto,
-    ScanRunResultDto,
-    ScanSkippedInstrumentDto,
+    to_scan_job_dto,
+    to_scan_run_result_dto,
 )
-from bolsa_api.schemas.signals_evaluate import to_signal_event_v1_dto
 from bolsa_application.scan_jobs import EnqueueScanJob, GetScanJob, ListScanJobs
 from bolsa_application.scan_manifests import GetScanManifest, PersistScanManifest
-from bolsa_application.scans import RunScan, ScanRunResult
+from bolsa_application.scans import RunScan
 from bolsa_domain.platform_kernel import (
     validate_kernel_timeframe,
     validate_scan_bar_limit,
     validate_scan_max_results,
 )
-from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -50,54 +46,6 @@ def _validate_scan_request(body: ScanRunRequestDto) -> None:
         validate_scan_max_results(body.max_results)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-def _run_result_dto(
-    result: ScanRunResult, *, alarm_route: dict[str, Any] | None = None
-) -> ScanRunResultDto:
-    return ScanRunResultDto(
-        scan_id=result.scan_id,
-        scanned_count=result.scanned_count,
-        hit_count=result.hit_count,
-        hits=[
-            ScanHitDto(
-                instrument_id=hit.instrument_id,
-                symbol=hit.symbol,
-                name=hit.name,
-                signal=to_signal_event_v1_dto(hit.signal),
-            )
-            for hit in result.hits
-        ],
-        skipped=[
-            ScanSkippedInstrumentDto(instrument_id=item.instrument_id, reason=item.reason)
-            for item in result.skipped
-        ],
-        strategy_definition_id=result.strategy_definition_id,
-        list_id=result.list_id,
-        timeframe=result.timeframe,
-        alarm_route=alarm_route,
-    )
-
-
-def _result_from_dict(raw: dict[str, Any]) -> ScanRunResultDto:
-    return ScanRunResultDto.model_validate(raw)
-
-
-def _job_dto(job: ScanJobRecord) -> ScanJobDto:
-    result = _result_from_dict(job.result) if job.result is not None else None
-    return ScanJobDto(
-        id=job.id,
-        status=job.status,
-        payload=job.payload,
-        result=result,
-        error=job.error,
-        cache_hits=job.cache_hits,
-        cache_misses=job.cache_misses,
-        tracker_definition_id=job.tracker_definition_id,
-        created_at=job.created_at,
-        updated_at=job.updated_at,
-        completed_at=job.completed_at,
-    )
 
 
 @router.post("/scans/run", response_model=ScanRunResponseDto)
@@ -121,7 +69,7 @@ async def run_scan(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    result_dto = _run_result_dto(result)
+    result_dto = to_scan_run_result_dto(result)
     persist: PersistScanManifest = get_persist_scan_manifest_use_case(session)
     result_dict = {
         **result_dto.model_dump(by_alias=True),
@@ -151,7 +99,7 @@ async def enqueue_scan_job(
         job = await use_case.execute(body.model_dump(by_alias=True, exclude_none=True))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return ScanJobResponseDto(data=_job_dto(job))
+    return ScanJobResponseDto(data=to_scan_job_dto(job))
 
 
 @router.get("/scans/jobs", response_model=ScanJobsListResponseDto)
@@ -160,7 +108,7 @@ async def list_scan_jobs(
 ) -> ScanJobsListResponseDto:
     use_case: ListScanJobs = get_list_scan_jobs_use_case(session)
     jobs = await use_case.execute(limit=20)
-    return ScanJobsListResponseDto(data=[_job_dto(job) for job in jobs])
+    return ScanJobsListResponseDto(data=[to_scan_job_dto(job) for job in jobs])
 
 
 @router.get("/scans/manifests/{scan_id}")
@@ -184,4 +132,4 @@ async def get_scan_job(
     job = await use_case.execute(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Scan job not found")
-    return ScanJobResponseDto(data=_job_dto(job))
+    return ScanJobResponseDto(data=to_scan_job_dto(job))

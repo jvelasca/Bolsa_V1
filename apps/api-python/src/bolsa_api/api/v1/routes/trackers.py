@@ -16,8 +16,12 @@ from bolsa_api.api.dependencies import (
     get_tracker_definition_use_case,
     get_update_tracker_use_case,
 )
-from bolsa_api.api.v1.routes.scans import _job_dto, _run_result_dto
-from bolsa_api.schemas.scans import ScanJobResponseDto, ScanRunResponseDto
+from bolsa_api.schemas.scans import (
+    ScanJobResponseDto,
+    ScanRunResponseDto,
+    to_scan_job_dto,
+    to_scan_run_result_dto,
+)
 from bolsa_api.schemas.trackers import (
     CreateTrackerDefinitionRequestDto,
     EvaluateTrackerSchedulesResponseDto,
@@ -201,7 +205,7 @@ async def run_tracker_scan(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ScanRunResponseDto(
-        data=_run_result_dto(outcome.scan, alarm_route=outcome.alarm_route),
+        data=to_scan_run_result_dto(outcome.scan, alarm_route=outcome.alarm_route),
     )
 
 
@@ -215,4 +219,4 @@ async def enqueue_tracker_scan_job(
         job = await use_case.execute(tracker_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return ScanJobResponseDto(data=_job_dto(job))
+    return ScanJobResponseDto(data=to_scan_job_dto(job))
