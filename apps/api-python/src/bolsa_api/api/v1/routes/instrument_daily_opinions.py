@@ -8,65 +8,28 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_api.api.dependencies import get_db_session
+from bolsa_api.api.dependencies import (
+    get_daily_opinion_service,
+    get_daily_opinion_telemetry_service,
+    get_db_session,
+)
 from bolsa_api.schemas.instrument_daily_opinions import (
     EstudioEodDigestNotifyDto,
     EstudioEodOpinionBatchResponseDto,
     EstudioEodOpinionEmailNotifyDto,
-    InstrumentDailyOpinionDto,
     InstrumentDailyOpinionsListResponseDto,
     OpinionTelemetryDto,
     OpinionTelemetryResponseDto,
     QueryInstrumentDailyOpinionsDto,
     RunEstudioEodOpinionBatchDto,
+    to_instrument_daily_opinion_dto,
 )
-from bolsa_api.schemas.mappers import to_iso
-from bolsa_application.daily_opinion_service import DailyOpinionService, OpinionHint
-from bolsa_application.daily_opinion_telemetry import DailyOpinionTelemetryService
+from bolsa_application.daily_opinion_service import OpinionHint
 from bolsa_infrastructure.alerts.daily_ops_digest_email import maybe_notify_daily_ops_digest
 from bolsa_infrastructure.alerts.estudio_opinion_email import maybe_notify_estudio_alarmas
 from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
-    InstrumentDailyOpinionRecord,
-    SqlAlchemyInstrumentDailyOpinionRepository,
-)
-from bolsa_infrastructure.database.repositories.instrument_repository import (
-    SqlAlchemyInstrumentRepository,
-)
-from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
-    SqlAlchemyInstrumentStrategyTopRepository,
-)
-from bolsa_infrastructure.database.repositories.ohlcv_repository import (
-    SqlAlchemyOhlcvRepository,
-)
 
 router = APIRouter()
-
-
-def _to_dto(row: InstrumentDailyOpinionRecord) -> InstrumentDailyOpinionDto:
-    return InstrumentDailyOpinionDto(
-        id=row.id,
-        instrument_id=row.instrument_id,
-        account_id=row.account_id,
-        as_of_bar_date=row.as_of_bar_date.isoformat(),
-        stance=row.stance,
-        dictamen_stars=row.dictamen_stars,
-        strategy_stars=row.strategy_stars,
-        io_score=row.io_score,
-        fa_score=row.fa_score,
-        ta_score=row.ta_score,
-        distress=row.distress,
-        reasons=list(row.reasons),
-        gate_status=row.gate_status,
-        top_id=row.top_id,
-        top_version=row.top_version,
-        source=row.source,
-        engine_version=row.engine_version,
-        idempotency_key=row.idempotency_key,
-        computed_at=to_iso(row.computed_at),
-        created_at=to_iso(row.created_at),
-        updated_at=to_iso(row.updated_at),
-    )
 
 
 def _parse_as_of(raw: str | None) -> date | None:
@@ -86,12 +49,7 @@ async def query_instrument_daily_opinions(
     body: QueryInstrumentDailyOpinionsDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InstrumentDailyOpinionsListResponseDto:
-    service = DailyOpinionService(
-        SqlAlchemyInstrumentDailyOpinionRepository(session),
-        SqlAlchemyInstrumentStrategyTopRepository(session),
-        SqlAlchemyOhlcvRepository(session),
-        SqlAlchemyInstrumentRepository(session),
-    )
+    service = get_daily_opinion_service(session)
     hints = [
         OpinionHint(
             instrument_id=h.instrument_id,
@@ -115,7 +73,9 @@ async def query_instrument_daily_opinions(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return InstrumentDailyOpinionsListResponseDto(data=[_to_dto(r) for r in rows])
+    return InstrumentDailyOpinionsListResponseDto(
+        data=[to_instrument_daily_opinion_dto(r) for r in rows]
+    )
 
 
 @router.get(
@@ -129,19 +89,16 @@ async def get_instrument_daily_opinion(
     force_refresh: Annotated[bool, Query(alias="forceRefresh")] = False,
 ) -> InstrumentDailyOpinionsListResponseDto:
     """Conveniencia single-id (sin hints → fail-closed EOD vía barras)."""
-    service = DailyOpinionService(
-        SqlAlchemyInstrumentDailyOpinionRepository(session),
-        SqlAlchemyInstrumentStrategyTopRepository(session),
-        SqlAlchemyOhlcvRepository(session),
-        SqlAlchemyInstrumentRepository(session),
-    )
+    service = get_daily_opinion_service(session)
     rows = await service.query(
         instrument_ids=[instrument_id],
         as_of_bar_date=_parse_as_of(as_of_bar_date),
         force_refresh=force_refresh,
         hints=[],
     )
-    return InstrumentDailyOpinionsListResponseDto(data=[_to_dto(r) for r in rows])
+    return InstrumentDailyOpinionsListResponseDto(
+        data=[to_instrument_daily_opinion_dto(r) for r in rows]
+    )
 
 
 @router.get(
@@ -155,18 +112,15 @@ async def list_instrument_daily_opinions(
     ensure_days: Annotated[int, Query(alias="ensureDays", ge=0, le=21)] = 0,
 ) -> InstrumentDailyOpinionsListResponseDto:
     """Historial de dictámenes (ascendente). `ensureDays` rellena laborables faltantes."""
-    service = DailyOpinionService(
-        SqlAlchemyInstrumentDailyOpinionRepository(session),
-        SqlAlchemyInstrumentStrategyTopRepository(session),
-        SqlAlchemyOhlcvRepository(session),
-        SqlAlchemyInstrumentRepository(session),
-    )
+    service = get_daily_opinion_service(session)
     rows = await service.history(
         instrument_id,
         days=days,
         ensure_days=ensure_days,
     )
-    return InstrumentDailyOpinionsListResponseDto(data=[_to_dto(r) for r in rows])
+    return InstrumentDailyOpinionsListResponseDto(
+        data=[to_instrument_daily_opinion_dto(r) for r in rows]
+    )
 
 
 @router.get(
@@ -184,10 +138,7 @@ async def get_opinion_telemetry(
         ids = [i.strip() for i in instrument_ids if isinstance(i, str) and i.strip()]
         if not ids:
             ids = None
-    service = DailyOpinionTelemetryService(
-        SqlAlchemyInstrumentDailyOpinionRepository(session),
-        SqlAlchemyOhlcvRepository(session),
-    )
+    service = get_daily_opinion_telemetry_service(session)
     tel = await service.compute(lookback_days=lookback_days, instrument_ids=ids)
     return OpinionTelemetryResponseDto(data=OpinionTelemetryDto.model_validate(tel.to_dict()))
 
@@ -211,12 +162,7 @@ async def run_estudio_eod_opinion_batch(
                 "Pasa force=true para una corrida manual (sin cron)."
             ),
         )
-    service = DailyOpinionService(
-        SqlAlchemyInstrumentDailyOpinionRepository(session),
-        SqlAlchemyInstrumentStrategyTopRepository(session),
-        SqlAlchemyOhlcvRepository(session),
-        SqlAlchemyInstrumentRepository(session),
-    )
+    service = get_daily_opinion_service(session)
     rows = await service.run_eod_batch(
         instrument_ids=body.instrument_ids,
         as_of_bar_date=_parse_as_of(body.as_of_bar_date),
@@ -259,7 +205,7 @@ async def run_estudio_eod_opinion_batch(
         enabled=enabled,
         forced=bool(body.force) or not enabled,
         count=len(rows),
-        data=[_to_dto(r) for r in rows],
+        data=[to_instrument_daily_opinion_dto(r) for r in rows],
         email_notify=EstudioEodOpinionEmailNotifyDto(
             email_enabled=bool(email_meta["email_enabled"]),
             alarma_count=int(email_meta["alarma_count"]),

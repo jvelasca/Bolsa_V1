@@ -55,6 +55,8 @@ from bolsa_application.backtests import (
     PruneBacktestRuns,
     RunAndSaveBacktest,
 )
+from bolsa_application.daily_opinion_service import DailyOpinionService
+from bolsa_application.daily_opinion_telemetry import DailyOpinionTelemetryService
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.execution_policies import (
     CreateExecutionPolicy,
@@ -181,8 +183,14 @@ from bolsa_infrastructure.database.repositories.hypothesis_belief_repository imp
 from bolsa_infrastructure.database.repositories.hypothesis_repository import (
     SqlAlchemyHypothesisRepository,
 )
+from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
+    SqlAlchemyInstrumentDailyOpinionRepository,
+)
 from bolsa_infrastructure.database.repositories.instrument_repository import (
     SqlAlchemyInstrumentRepository,
+)
+from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
+    SqlAlchemyInstrumentStrategyTopRepository,
 )
 from bolsa_infrastructure.database.repositories.investor_profile_repository import (
     SqlAlchemyInvestorProfileRepository,
@@ -336,9 +344,6 @@ def get_list_ledger_use_case(session: AsyncSession) -> ListLedgerEntries:
 def get_daily_ops_report_use_case(session: AsyncSession) -> GetDailyOpsReport:
     """R1 — resumen operativo diario."""
     from bolsa_application.daily_ops_report import GetDailyOpsReport
-    from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
-        SqlAlchemyInstrumentDailyOpinionRepository,
-    )
 
     return GetDailyOpsReport(
         get_get_account_summary_use_case(session),
@@ -1165,3 +1170,19 @@ def get_account_mandates_use_case(session: AsyncSession) -> GetAccountMandates:
 
 def get_sync_account_mandates_use_case(session: AsyncSession) -> SyncAccountMandates:
     return SyncAccountMandates(get_mandate_repository(session))
+
+
+def get_daily_opinion_service(session: AsyncSession) -> DailyOpinionService:
+    return DailyOpinionService(
+        SqlAlchemyInstrumentDailyOpinionRepository(session),
+        SqlAlchemyInstrumentStrategyTopRepository(session),
+        get_ohlcv_repository(session),
+        get_instrument_repository(session),
+    )
+
+
+def get_daily_opinion_telemetry_service(session: AsyncSession) -> DailyOpinionTelemetryService:
+    return DailyOpinionTelemetryService(
+        SqlAlchemyInstrumentDailyOpinionRepository(session),
+        get_ohlcv_repository(session),
+    )

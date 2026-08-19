@@ -6,6 +6,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from bolsa_api.schemas.mappers import to_iso
+from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
+    InstrumentDailyOpinionRecord,
+)
+
 StanceLiteral = Literal[
     "buy",
     "hold_watch",
@@ -195,4 +200,30 @@ class OpinionTelemetryDto(BaseModel):
 
 class OpinionTelemetryResponseDto(BaseModel):
     data: OpinionTelemetryDto
+
+
+def to_instrument_daily_opinion_dto(row: InstrumentDailyOpinionRecord) -> InstrumentDailyOpinionDto:
+    return InstrumentDailyOpinionDto(
+        id=row.id,
+        instrument_id=row.instrument_id,
+        account_id=row.account_id,
+        as_of_bar_date=row.as_of_bar_date.isoformat(),
+        stance=row.stance,
+        dictamen_stars=row.dictamen_stars,
+        strategy_stars=row.strategy_stars,
+        io_score=row.io_score,
+        fa_score=row.fa_score,
+        ta_score=row.ta_score,
+        distress=row.distress,
+        reasons=list(row.reasons),
+        gate_status=row.gate_status,
+        top_id=row.top_id,
+        top_version=row.top_version,
+        source=row.source,
+        engine_version=row.engine_version,
+        idempotency_key=row.idempotency_key,
+        computed_at=to_iso(row.computed_at),
+        created_at=to_iso(row.created_at),
+        updated_at=to_iso(row.updated_at),
+    )
 
