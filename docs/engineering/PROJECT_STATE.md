@@ -58,8 +58,8 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 | **F-SEG-1**    | Fail-closed production + comparaciones constantes (`secrets.compare_digest`) — **auth JWT sigue diferida (D4)**                             | 🟢 COMMITED (4b7a984, pend. merge) | Bajo       | v5                  |
 | **F-SEG-2**    | Auditoría historial git (repo público) + rotación de logs + tests negativos de redacción                                                    | 🟢 COMMITED (dcb8a37, pend. merge) | Bajo-Medio | v6                  |
 | **F-SEG-3**    | CORS mínimo privilegio + `X-Forwarded-For`/TrustedHost en rate-limit                                                                        | 🟢 COMMITED (e628ae3, pend. merge) | Bajo       | v7                  |
-| **F-HLTH-1**   | Mojibake en `workspace-store-core.ts` (2 strings UI + ~26 JSDoc)                                                                            | 🟠 PENDIENTE                       | Bajo       | 🔵 **activa ahora** |
-| **F-DEBT-1**   | Deuda cierre ola: P1.9 API thin + P2.6 DTOs TS↔Py + mypy ~450 por fases                                                                     | 🟡 PENDIENTE                       | Medio      | v9                  |
+| **F-HLTH-1**   | Mojibake en `workspace-store-core.ts` (2 strings UI + ~26 JSDoc)                                                                            | 🟢 COMMITED (2400a4b, pend. merge) | Bajo       | v8                  |
+| **F-DEBT-1**   | Deuda cierre ola: P1.9 API thin + P2.6 DTOs TS↔Py + mypy ~450 por fases                                                                     | 🟠 PENDIENTE                       | Medio      | 🔵 **activa ahora** |
 | **F-WORKER-1** | Warning auto-sync ticker `BP/.L` (Yahoo 404) — retomar subagente con `resume`                                                               | 🟡 ABIERTO                         | Bajo       | v10                 |
 
 **Anti-objetivos (freeze vigente):** sin features nuevas · sin reabrir Belief/H · sin tocar gobernanza IA ni dominio puro · auth JWT diferida (decisión D4) hasta decisión de exponer la app.
@@ -88,11 +88,11 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - Redacción de secretos en logs/repr → **corregido** (F-SEG-2, `dcb8a37`): `__repr__` de `config.py` redacta `app_password`/`app_auth_secret`/`db_password` + credenciales DSN; `logging_redact.py` +3 patrones (`.app_password`/`.app_auth_secret`/`.db_password`).
 - CORS `allow_methods=["*"]`/`allow_headers=["*"]` → **corregido** (F-SEG-3, `e628ae3`): `main.py` pasa a listas explícitas (`GET/POST/PUT/PATCH/DELETE/OPTIONS`; `Content-Type/Authorization/X-Account-Id/Accept`).
 - Rate-limit confiaba en `client.host` sin `X-Forwarded-For` → **corregido** (F-SEG-3, `e628ae3`): `get_client_ip()` en `rate_limit.py` usa la primera IP del `XFF` **solo** si el peer inmediato está en `TRUSTED_PROXIES` (config nueva, default vacío → dev/local sin proxy usa `client.host`; anti-spoofing).
+- Mojibake `workspace-store-core.ts` → **corregido** (F-HLTH-1, `2400a4b`): 2 strings UI (`Gráfico`) + ~28 JSDoc/comentarios en UTF-8 correcto; lógica intacta.
 
 ### Aún vigentes (hacen el plan)
 
 1. **Look-ahead en `chikou` (Ichimoku) y `fractals`** → F-IND-1/F-IND-2. `compute.py:824-825` (`chikou[index]=bars[index+displacement]`) y `:778-779` (fractals usa `bars[index±2]`). Correcto para visualización; NO como feature causal.
-2. **Mojibake `workspace-store-core.ts`** (halzg encontrado por auditoría interna propia) → F-HLTH-1.
 
 ---
 
@@ -113,19 +113,19 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 > CONTEXTO: Proyecto en ola de hardening pactada 2026-08-11, casi todo MERGED en
 > `stage/f1-integridad-financiera-2026-08-11` (HEAD `79fa155` = merge F-IND-1 · más `09fb06b` F-IND-2,
-> `f595761` F-FIN-1, `9a35405` F-FIN-2, `4b7a984` F-SEG-1, `dcb8a37` F-SEG-2 y `e628ae3` F-SEG-3 commited/pusheados, pend. merge). Árbol limpio. CI verde.
+> `f595761` F-FIN-1, `9a35405` F-FIN-2, `4b7a984` F-SEG-1, `dcb8a37` F-SEG-2, `e628ae3` F-SEG-3 y
+> `2400a4b` F-HLTH-1 commited/pusheados, pend. merge). Árbol limpio. CI verde.
 >
 > Estado vivo y deuda priorizada en `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO). Mapa de fases mergeadas en
 > `docs/engineering/engineering-index-2026-08-03.md` §5.
 >
 > F-IND-1 (Causality Layer), F-IND-2 (batería de causalidad), F-FIN-1 (fail-closed del default de cartera por
 > cuenta), F-FIN-2 (ejercicio fiscal en `GetTaxReport`), F-SEG-1 (fail-closed production + `compare_digest`),
-> F-SEG-2 (rotación de logs + redacción de secretos) y F-SEG-3 (CORS mínimo privilegio + `X-Forwarded-For`/
-> TrustedHost en rate-limit) **hechas** (ver §3).
+> F-SEG-2 (rotación de logs + redacción de secretos), F-SEG-3 (CORS mínimo privilegio + `X-Forwarded-For`/
+> TrustedHost en rate-limit) y F-HLTH-1 (mojibake) **hechas** (ver §3).
 >
-> PRÓXIMA FASE pactada: **F-HLTH-1** — Mojibake en `apps/web/src/stores/workspace-store-core.ts`
-> (2 strings UI + ~26 JSDoc). **Ámbito FE**: batería web (`pnpm --filter @bolsa/web typecheck` + `lint` + `build`).
-> Riesgo Bajo. Después: F-DEBT-1, F-WORKER-1 (ver §3).
+> PRÓXIMA FASE pactada: **F-DEBT-1** — Deuda cierre de ola: P1.9 API thin + P2.6 DTOs TS↔Py +
+> mypy ~450 por fases. **Riesgo Medio**. Después: F-WORKER-1 (ver §3).
 >
 > Nota F-IND-1/2: la guardia de causalidad puede cambiar resultados de backtests que usen
 > chikou; documentado y ya respaldado por la batería F-IND-2 (no recalcular aún).
@@ -153,3 +153,5 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 | 2026-08-19 | **F-SEG-1 COMMITED** (`4b7a984`, pusheado): fail-closed production + comparaciones constantes. `config.py` bloquea el arranque si `ENVIRONMENT=prod`/`production` sin `APP_PASSWORD` o con `APP_AUTH_SECRET` vacío/`bolsa-dev-secret` (fail-closed condicionado a prod para no romper dev/tests/CI). `tokens.py:17` y `routes/auth.py:42` de `==` → `secrets.compare_digest`. Test `test_config.py` +5 (prod sin password, secreto vacío, dev-secret, secreto real OK) + anti-regresión dev sin password. ruff/mypy ✓ · config/auth 14p · api 29p · infra 49p + app 224p + startup 5p.                                                                                                                                                                              |
 | 2026-08-19 | **F-SEG-2 COMMITED** (`dcb8a37`, pusheado): auditoría git + rotación de logs + redacción de secretos. Historial 417 commits auditado (solo valores dev `bolsa:bolsa_dev`/`bolsa-dev-secret` históricos, ya eliminados en HEAD; purga no ejecutada por protocolo; activar GitHub secret scanning). Rotación: `pruneStampedLogs()` en `logger.mjs` conserva 10 sesiones dev (`DEV_LOG_KEEP`), invocado en `run-dev.mjs`. Redacción: `__repr__` de `config.py` redacta `app_password`/`app_auth_secret`/`db_password` + credenciales DSN; `logging_redact.py` +3 patrones. +5 tests negativos (test_config ×3, test_q2_hygiene ×2). Batería: ruff 0 · node --check OK · config 15p ✓ · hygiene 3p ✓ · infra 57p ✓.                                                     |
 | 2026-08-19 | **F-SEG-3 COMMITED** (`e628ae3`, pusheado): CORS mínimo privilegio + rate-limit TrustedHost. `main.py`: `allow_methods`/`allow_headers` pasan de `*` a listas explícitas (`GET/POST/PUT/PATCH/DELETE/OPTIONS`; `Content-Type/Authorization/X-Account-Id/Accept`) según el contrato real del FE (verificado en `apps/web/src/lib/api.ts`). `rate_limit.py`: nueva `get_client_ip()` anti-spoofing — usa la primera IP de `X-Forwarded-For` **solo** si el peer inmediato está en `TRUSTED_PROXIES` (config nueva `trusted_proxies`, default vacío → dev/local sin proxy usa `client.host`); fallback `RedisStore`→`MemoryStore` intacto. +10 tests (`test_cors.py` ×5, `test_rate_limit.py` +5). Batería: ruff 0 · CORS/rate-limit/config 38p ✓ · API offline 47p ✓. |
+| 2026-08-19 | **F-HLTH-1 COMMITED** (`2400a4b`, pusheado): corregido mojibake en `apps/web/src/stores/workspace-store-core.ts` (patrón UTF-8→Latin-1). 2 strings UI `Gráfico` (labels por defecto de pestaña) + ~28 JSDoc/comentarios (último/gráficos/más/membresía/política/pestañas/próximo + →/—/…). Solo comentarios y strings de label; lógica intacta (verificado por diff). Hecho directo en el hilo sin subagente (fix acotado a un archivo). Batería web: typecheck 0 ✓ · lint 0 ✓ (2 warnings preexistentes ajenos) · build OK ✓.                                                                                                                                                                                                                                      |
+| 2026-08-19 | **F-DEBT-1 IMPLEMENTACIÓN PENDIENTE** (próxima fase, Riesgo Medio): deuda cierre de ola — P1.9 API thin + P2.6 DTOs TS↔Py + mypy ~450 por fases.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
