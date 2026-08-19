@@ -1,15 +1,15 @@
 ﻿/**
- * Estado del espacio de trabajo de trading â€” persistido en servidor (`/api/workspaces`).
+ * Estado del espacio de trabajo de trading — persistido en servidor (`/api/workspaces`).
  *
  * ## Producto (UI)
- * - Cabecera: chip con el nombre â†’ abre el gestor (`WorkspacePickerDialog`).
- * - Arranque: Ãºltimo `activeWorkspaceId` local; si no, espacio `isDefault` (preferido); si no, el primero.
- * - Nuevo = documento en blanco; Duplicar = clona el activo (grÃ¡ficos/listas/dibujos + dock).
+ * - Cabecera: chip con el nombre → abre el gestor (`WorkspacePickerDialog`).
+ * - Arranque: último `activeWorkspaceId` local; si no, espacio `isDefault` (preferido); si no, el primero.
+ * - Nuevo = documento en blanco; Duplicar = clona el activo (gráficos/listas/dibujos + dock).
  *
  * ## Persistencia
  * - Servidor: documento (`WorkspaceDocument`). `dockLayout` en API es legado (chrome por dispositivo).
  * - Local: `bolsa-workspace-meta` (`activeWorkspaceId`, `recents`, `chartPersistBackup`).
- * - Preferencias: `autoSave`, `openOnStartup` (â†’ `isDefault` al guardar).
+ * - Preferencias: `autoSave`, `openOnStartup` (→ `isDefault` al guardar).
  *
  * @see docs/WORKSPACE_PERSISTENCE.md
  * @see apps/web/src/features/workspace/workspace-picker-dialog.tsx
@@ -92,7 +92,7 @@ import type { ChartInspectorNavigateInput } from "@/features/charts/chart-inspec
 let chartTabIdSeq = 0;
 
 export function newChartTabId(): string {
-  // Date.now() solo no basta: Abrir grÃ¡ficos abre N tabs en el mismo ms y
+  // Date.now() solo no basta: Abrir gráficos abre N tabs en el mismo ms y
   // ids duplicados colapsan keys de React + el Map del saveToServer.
   chartTabIdSeq += 1;
   return `chart-${Date.now().toString(36)}-${chartTabIdSeq.toString(36)}-${Math.random()
@@ -104,7 +104,7 @@ let drawingAutoSaveTimer: number | null = null;
 let settingsPersistTimer: number | null = null;
 let workspaceServerSaveTimer: number | null = null;
 
-/** Debounce Ãºnico para autosave al servidor (M7). */
+/** Debounce único para autosave al servidor (M7). */
 export const WORKSPACE_AUTOSAVE_DEBOUNCE_MS = 1000;
 
 export function findDrawingTemplate(
@@ -206,7 +206,7 @@ export function flushDrawingAutoSave(
   }, 450);
 }
 
-/** Un solo timer de guardado en servidor â€” evita duplicar con WorkspaceAutoSave. */
+/** Un solo timer de guardado en servidor — evita duplicar con WorkspaceAutoSave. */
 export function requestWorkspaceAutoSave(
   get: () => WorkspaceState,
   immediate = false,
@@ -600,7 +600,7 @@ export function normalizeChartTab(
   return {
     id: raw.id ?? chart.id ?? newChartTabId(),
     instrumentId: raw.instrumentId ?? "",
-    label: raw.label ?? "GrÃ¡fico",
+    label: raw.label ?? "Gráfico",
     timeframe,
     seriesType: normalizeChartSeriesType(raw.seriesType),
     seriesTypeParams: normalizeChartSeriesTypeParams(raw.seriesTypeParams),
@@ -677,7 +677,7 @@ export function normalizeWorkspace(
       normalizeChartTab({
         id: "main",
         instrumentId: "",
-        label: "GrÃ¡fico",
+        label: "Gráfico",
         chart: raw.chart,
       }),
     ];
@@ -801,14 +801,14 @@ export interface ChartPersistBackup {
 }
 
 export interface WorkspaceState {
-  /** Documento del espacio activo (grÃ¡ficos, listas, preferenciasâ€¦). */
+  /** Documento del espacio activo (gráficos, listas, preferencias…). */
   workspace: WorkspaceDocument;
-  /** Id servidor del espacio activo; tambiÃ©n en `bolsa-workspace-meta`. */
+  /** Id servidor del espacio activo; también en `bolsa-workspace-meta`. */
   activeWorkspaceId: string | null;
   chartPersistBackup: ChartPersistBackup | null;
-  /** MembresÃ­a de listas en memoria (no se persiste). */
+  /** Membresía de listas en memoria (no se persiste). */
   chartListMembership: ChartListMembershipSnapshot | null;
-  /** CatÃ¡logo ligero para el gestor (chip / picker). */
+  /** Catálogo ligero para el gestor (chip / picker). */
   workspaceSummaries: WorkspaceSummaryDto[];
   hydrated: boolean;
   isDirty: boolean;
@@ -816,8 +816,8 @@ export interface WorkspaceState {
   recents: string[];
   getActiveChartTab: () => ChartTabState | null;
   /**
-   * Carga inicial: lista API â†’ elige activo local / preferido / primero;
-   * fusiona backup local de grÃ¡ficos si es mÃ¡s reciente.
+   * Carga inicial: lista API → elige activo local / preferido / primero;
+   * fusiona backup local de gráficos si es más reciente.
    */
   bootstrapWorkspaces: () => Promise<void>;
   refreshSummaries: () => Promise<void>;
@@ -830,9 +830,9 @@ export interface WorkspaceState {
   switchWorkspace: (workspaceId: string) => Promise<void>;
   /** Crea espacio en blanco (`DEFAULT_WORKSPACE`) y lo activa. */
   createWorkspace: (name: string) => Promise<void>;
-  /** Clona el documento activo (grÃ¡ficos/listas/dibujos + dock) en un espacio nuevo. */
+  /** Clona el documento activo (gráficos/listas/dibujos + dock) en un espacio nuevo. */
   duplicateWorkspace: (name?: string) => Promise<void>;
-  /** Renombra en servidor (activo o cualquier id del catÃ¡logo). */
+  /** Renombra en servidor (activo o cualquier id del catálogo). */
   renameWorkspaceById: (workspaceId: string, name: string) => Promise<void>;
   /** Recarga el espacio activo desde el servidor (descarta cambios locales si confirmas). */
   reloadActiveFromServer: () => Promise<void>;
@@ -857,8 +857,8 @@ export interface WorkspaceState {
   reload: () => void;
   setAutoSave: (enabled: boolean) => void;
   /**
-   * Marca el espacio como preferido al arrancar (`isDefault` en el prÃ³ximo save).
-   * Solo actÃºa si este dispositivo no tiene `activeWorkspaceId` vÃ¡lido.
+   * Marca el espacio como preferido al arrancar (`isDefault` en el próximo save).
+   * Solo actúa si este dispositivo no tiene `activeWorkspaceId` válido.
    */
   setOpenOnStartup: (enabled: boolean) => void;
   toggleNewChartTemplatePin: () => void;
@@ -868,16 +868,16 @@ export interface WorkspaceState {
     instrumentId: string,
     label: string,
   ) => string;
-  /** Abre/enfoca varios grÃ¡ficos en un solo update (evita races de autoguardado). */
+  /** Abre/enfoca varios gráficos en un solo update (evita races de autoguardado). */
   focusInstrumentsFromList: (
     listId: string,
     items: ReadonlyArray<{ instrumentId: string; label: string }>,
   ) => void;
   setDrawingEditorOpen: (drawingId: string | null) => void;
   closeChartTab: (chartId: string) => void;
-  /** Cierra en un solo update todas las pestaÃ±as de los instrumentos dados (evita races de autosave). */
+  /** Cierra en un solo update todas las pestañas de los instrumentos dados (evita races de autosave). */
   closeChartTabsForInstruments: (instrumentIds: ReadonlyArray<string>) => void;
-  /** Reordena pestaÃ±as: primero `orderedInstrumentIds` (izqâ†’der), luego el resto en orden previo. */
+  /** Reordena pestañas: primero `orderedInstrumentIds` (izq→der), luego el resto en orden previo. */
   reorderChartTabsByInstrumentIds: (
     orderedInstrumentIds: ReadonlyArray<string>,
   ) => void;
@@ -901,10 +901,10 @@ export interface WorkspaceState {
     chartId?: string,
   ) => boolean;
   /**
-   * Activa/desactiva el overlay Finalista TOP #1 en el grÃ¡fico.
+   * Activa/desactiva el overlay Finalista TOP #1 en el gráfico.
    * Si `enabled` y se pasan `specs`, sincroniza instancias `origin: 'finalist-top1'`.
    * Si `enabled===false`, limpia solo esas instancias (no toca manuales).
-   * No cambia `preferences.finalistTop1DefaultOn` (opt-in/out por grÃ¡fico).
+   * No cambia `preferences.finalistTop1DefaultOn` (opt-in/out por gráfico).
    */
   setShowFinalistTop1Indicators: (
     enabled: boolean,
@@ -915,9 +915,9 @@ export interface WorkspaceState {
     chartId?: string,
   ) => void;
   /**
-   * PolÃ­tica workspace: ON â†’ default para grÃ¡ficos nuevos + activa en todas las pestaÃ±as abiertas.
-   * OFF â†’ quita el default y limpia el overlay en todos los grÃ¡ficos.
-   * Cada grÃ¡fico puede desactivarse despuÃ©s con `setShowFinalistTop1Indicators(false, â€¦)`.
+   * Política workspace: ON → default para gráficos nuevos + activa en todas las pestañas abiertas.
+   * OFF → quita el default y limpia el overlay en todos los gráficos.
+   * Cada gráfico puede desactivarse después con `setShowFinalistTop1Indicators(false, …)`.
    */
   setFinalistTop1DefaultForAll: (enabled: boolean) => void;
   /** Re-aplica specs TOP #1 sin cambiar el flag (p. ej. al cambiar instrumento/TF con switch ON). */
