@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -984,6 +984,66 @@ def get_delete_execution_policy_use_case(session: AsyncSession) -> DeleteExecuti
 
 def get_cognitive_repository(session: AsyncSession) -> SqlAlchemyCognitiveRepository:
     return SqlAlchemyCognitiveRepository(session)
+
+
+class _EdgeReportAdapter:
+    """Un EDGE report lookup port que envuelve el CognitiveStore (record→domain)."""
+
+    def __init__(self, store: Any) -> None:
+        self._store = store
+
+    async def latest_edge_report(
+        self,
+        *,
+        strategy_or_signal_ref: str | None = None,
+        account_id: str | None = None,
+    ) -> Any:
+        from bolsa_application.cognitive_persistence import record_to_edge_report
+
+        rec = await self._store.latest_edge_report(
+            strategy_or_signal_ref=strategy_or_signal_ref,
+            account_id=account_id,
+        )
+        if rec is None and strategy_or_signal_ref and account_id:
+            # Fallback: último del account si no hay match por estrategia
+            rec = await self._store.latest_edge_report(account_id=account_id)
+        if rec is None:
+            return None
+        return record_to_edge_report(rec)
+
+
+def get_propose_recommendation_use_case(session: AsyncSession) -> Any:
+    """F3 propose — wiring completo del pipeline (ports flag-safe, sin cambio de wire)."""
+    from bolsa_application.propose_recommendation import ProposeRecommendationFromTa
+    from bolsa_application.shared_event_calendar import get_shared_market_event_calendar
+    from bolsa_market.macro_snapshot import YahooMacroSnapshotPort
+    from bolsa_market.news_snapshot import YahooNewsEventPort
+
+    instruments = get_instrument_repository(session)
+    calendar = get_shared_market_event_calendar()
+    cognitive = get_cognitive_repository(session)
+    return ProposeRecommendationFromTa(
+        get_ohlcv_repository(session),
+        get_feature_port(),
+        instruments,
+        fundamentals=instruments,
+        macro_port=YahooMacroSnapshotPort(),
+        edge_reports=_EdgeReportAdapter(cognitive),
+        event_calendar=calendar,
+        news_port=YahooNewsEventPort(calendar),
+        cognitive_store=cognitive,
+        prediction_store=get_prediction_repository(session),
+    )
+
+
+def get_confirm_intent_use_case(session: AsyncSession) -> Any:
+    """F3 confirm — wiring del ConfirmRecommendationIntent (execute_trade flag-safe)."""
+    from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+
+    return ConfirmRecommendationIntent(
+        cognitive_store=get_cognitive_repository(session),
+        execute_trade=get_execute_trade_use_case(session),
+    )
 
 
 def get_prediction_repository(session: AsyncSession) -> SqlAlchemyPredictionRepository:

@@ -334,30 +334,6 @@ async def append_edge_report(
     )
 
 
-class _EdgeReportAdapter:
-    def __init__(self, store: Any) -> None:
-        self._store = store
-
-    async def latest_edge_report(
-        self,
-        *,
-        strategy_or_signal_ref: str | None = None,
-        account_id: str | None = None,
-    ) -> Any:
-        from bolsa_application.cognitive_persistence import record_to_edge_report
-
-        rec = await self._store.latest_edge_report(
-            strategy_or_signal_ref=strategy_or_signal_ref,
-            account_id=account_id,
-        )
-        if rec is None and strategy_or_signal_ref and account_id:
-            # Fallback: último del account si no hay match por estrategia
-            rec = await self._store.latest_edge_report(account_id=account_id)
-        if rec is None:
-            return None
-        return record_to_edge_report(rec)
-
-
 @router.post("/ai/recommendations/propose")
 async def propose_recommendation(
     body: ProposeRecommendationRequest,
@@ -365,13 +341,9 @@ async def propose_recommendation(
 ) -> dict[str, Any]:
     """F3 — OHLCV → Assessments → DecisionRuntime → Recommendation."""
     from bolsa_api.api.dependencies import (
-        get_feature_port,
-        get_instrument_repository,
         get_investor_profile_repository,
-        get_ohlcv_repository,
-        get_prediction_repository,
+        get_propose_recommendation_use_case,
     )
-    from bolsa_application.propose_recommendation import ProposeRecommendationFromTa
 
     profile_ref = None
     policy_version = None
@@ -382,25 +354,7 @@ async def propose_recommendation(
             profile_ref = profile.id
             policy_version = profile.selected_policy_template_id
 
-    instruments = get_instrument_repository(session)
-    cognitive = get_cognitive_repository(session)
-    from bolsa_application.shared_event_calendar import get_shared_market_event_calendar
-    from bolsa_market.macro_snapshot import YahooMacroSnapshotPort
-    from bolsa_market.news_snapshot import YahooNewsEventPort
-
-    calendar = get_shared_market_event_calendar()
-    use_case = ProposeRecommendationFromTa(
-        get_ohlcv_repository(session),
-        get_feature_port(),
-        instruments,
-        fundamentals=instruments,
-        macro_port=YahooMacroSnapshotPort() if body.include_macro and body.macro is None else None,
-        edge_reports=_EdgeReportAdapter(cognitive),
-        event_calendar=calendar,
-        news_port=YahooNewsEventPort(calendar) if body.include_news else None,
-        cognitive_store=cognitive,
-        prediction_store=get_prediction_repository(session),
-    )
+    use_case = get_propose_recommendation_use_case(session)
     try:
         result = await use_case.execute(
             instrument_id=body.instrument_id,
@@ -433,13 +387,9 @@ async def confirm_intent(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session."""
-    from bolsa_api.api.dependencies import get_execute_trade_use_case
-    from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+    from bolsa_api.api.dependencies import get_confirm_intent_use_case
 
-    use_case = ConfirmRecommendationIntent(
-        cognitive_store=get_cognitive_repository(session),
-        execute_trade=get_execute_trade_use_case(session) if body.execute else None,
-    )
+    use_case = get_confirm_intent_use_case(session)
     result = await use_case.execute(
         recommendation_raw=body.recommendation,
         account_id=body.account_id,
