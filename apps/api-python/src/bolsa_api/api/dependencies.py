@@ -314,6 +314,15 @@ def get_create_account_use_case(session: AsyncSession) -> CreateSimulatedAccount
     return CreateSimulatedAccount(get_account_repository(session))
 
 
+def get_ensure_account_investor_profile_use_case(
+    session: AsyncSession,
+) -> Any:
+    """Wizard ART-PROFILE al crear cuenta (crea/asigna/default) sobre el profile store."""
+    from bolsa_application.investor_profiles import EnsureAccountInvestorProfile
+
+    return EnsureAccountInvestorProfile(get_investor_profile_repository(session))  # type: ignore[arg-type]
+
+
 def get_update_account_settings_use_case(session: AsyncSession) -> UpdateAccountSettings:
     return UpdateAccountSettings(get_account_repository(session))
 

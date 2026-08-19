@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from bolsa_analytics.cognitive.investor_profile import DeclaredInvestorProfile
@@ -10,6 +11,7 @@ from bolsa_analytics.cognitive.observe_profile import (
     observe_investor_profile,
     observed_to_dict,
 )
+from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_from_declared
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
 
@@ -127,6 +129,70 @@ class EnsureDefaultInvestorProfile:
             selected_policy_template_id="moderate",
             notes="Creado automáticamente al abrir la cuenta",
         )
+        await self._store.assign_to_account(account_id, profile.id)
+        return profile
+
+
+@dataclass(frozen=True, slots=True)
+class DeclaredProfileInput:
+    """Perfil declarado por el wizard al abrir la cuenta (sin depender del DTO HTTP)."""
+
+    name: str | None = None
+    horizon: str = "swing"
+    objectives: list[str] = field(default_factory=lambda: ["growth"])
+    risk_tolerance: str = "moderate"
+    experience: str = "intermediate"
+    max_acceptable_loss_pct: float | None = None
+    notes: str | None = None
+    suggested_policy_template_id: str | None = None
+    selected_policy_template_id: str | None = None
+
+
+class EnsureAccountInvestorProfile:
+    """Wizard ART-PROFILE al crear cuenta: crea perfil, asigna existente o default (3 ramas)."""
+
+    def __init__(self, store: InvestorProfileStore) -> None:
+        self._store = store
+
+    async def execute(
+        self,
+        *,
+        account_id: str,
+        account_name: str,
+        declared: DeclaredProfileInput | None = None,
+        active_profile_id: str | None = None,
+    ) -> InvestorProfileRecord:
+        if declared is not None:
+            suggested = (
+                declared.suggested_policy_template_id
+                or suggest_policy_template_from_declared(
+                    risk_tolerance=declared.risk_tolerance,
+                    horizon=declared.horizon,
+                    experience=declared.experience,
+                )
+            )
+            selected = declared.selected_policy_template_id or suggested
+            profile_name = (declared.name or "").strip() or f"Perfil · {account_name}".strip()[:80]
+            profile = await CreateInvestorProfile(self._store).execute(  # type: ignore[arg-type]
+                name=profile_name,
+                horizon=declared.horizon,
+                objectives=list(declared.objectives),
+                risk_tolerance=declared.risk_tolerance,
+                experience=declared.experience,
+                max_acceptable_loss_pct=declared.max_acceptable_loss_pct,
+                notes=declared.notes or "Creado con la cuenta (asistente Nueva demo)",
+                suggested_policy_template_id=suggested,
+                selected_policy_template_id=selected,
+            )
+        elif active_profile_id:
+            existing = await self._store.get(active_profile_id)
+            if existing is None:
+                raise ValueError("Perfil inversor no encontrado")
+            profile = existing
+        else:
+            profile = await EnsureDefaultInvestorProfile(self._store).execute(
+                account_id, account_name
+            )
         await self._store.assign_to_account(account_id, profile.id)
         return profile
 

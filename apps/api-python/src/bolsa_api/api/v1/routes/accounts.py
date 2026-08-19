@@ -15,7 +15,6 @@ from bolsa_api.api.dependencies import (
     get_deposit_cash_use_case,
     get_get_account_summary_use_case,
     get_get_account_use_case,
-    get_investor_profile_repository,
     get_list_account_summaries_use_case,
     get_list_accounts_use_case,
     get_list_ledger_use_case,
@@ -39,6 +38,7 @@ from bolsa_api.schemas.accounts import (
     AccountSummariesResponseDto,
     AccountSummaryResponseDto,
     CashMovementResponseDto,
+    CreateAccountInvestorProfileDto,
     CreateInvestmentAccountDto,
     DailyOpsDigestNotifyDto,
     DailyOpsDigestNotifyResponseDto,
@@ -50,7 +50,6 @@ from bolsa_api.schemas.accounts import (
     UpdateInvestmentAccountDto,
     WithdrawCashDto,
 )
-from bolsa_application.investor_profiles import EnsureDefaultInvestorProfile
 
 router = APIRouter()
 
@@ -95,38 +94,33 @@ async def create_account(
         commission_preset_id=body.commission_preset_id,
     )
     # ART-PROFILE: wizard puede crear/asignar; si no, moderate por defecto (Gate)
-    profile_store = get_investor_profile_repository(session)
-    if body.investor_profile is not None:
-        from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_from_declared
-        from bolsa_application.investor_profiles import CreateInvestorProfile
+    from bolsa_api.api.dependencies import get_ensure_account_investor_profile_use_case
 
-        ip = body.investor_profile
-        suggested = ip.suggested_policy_template_id or suggest_policy_template_from_declared(
-            risk_tolerance=ip.risk_tolerance,
-            horizon=ip.horizon,
-            experience=ip.experience,
-        )
-        selected = ip.selected_policy_template_id or suggested
-        profile_name = (ip.name or "").strip() or f"Perfil · {account.name}".strip()[:80]
-        profile = await CreateInvestorProfile(profile_store).execute(  # type: ignore[arg-type]
-            name=profile_name,
+    declared = None
+    if body.investor_profile is not None:
+        ip: CreateAccountInvestorProfileDto = body.investor_profile
+        from bolsa_application.investor_profiles import DeclaredProfileInput
+
+        declared = DeclaredProfileInput(
+            name=ip.name,
             horizon=ip.horizon,
             objectives=list(ip.objectives),
             risk_tolerance=ip.risk_tolerance,
             experience=ip.experience,
             max_acceptable_loss_pct=ip.max_acceptable_loss_pct,
-            notes=ip.notes or "Creado con la cuenta (asistente Nueva demo)",
-            suggested_policy_template_id=suggested,
-            selected_policy_template_id=selected,
+            notes=ip.notes,
+            suggested_policy_template_id=ip.suggested_policy_template_id,
+            selected_policy_template_id=ip.selected_policy_template_id,
         )
-        await profile_store.assign_to_account(account.id, profile.id)
-    elif body.active_profile_id:
-        existing = await profile_store.get(body.active_profile_id)
-        if existing is None:
-            raise HTTPException(status_code=400, detail="Perfil inversor no encontrado")
-        await profile_store.assign_to_account(account.id, body.active_profile_id)
-    else:
-        await EnsureDefaultInvestorProfile(profile_store).execute(account.id, account.name)  # type: ignore[arg-type]
+    try:
+        await get_ensure_account_investor_profile_use_case(session).execute(
+            account_id=account.id,
+            account_name=account.name,
+            declared=declared,
+            active_profile_id=body.active_profile_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     account = await get_get_account_use_case(session).execute(account.id)
     return AccountResponseDto(data=to_investment_account_dto(account))
 
