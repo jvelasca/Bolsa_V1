@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-5 del plan de refactor 2026-08-19 (CI Node.js 20 deprecado + opcional `.prettierrc`), ampliada a la **re-auditoría de deuda abierta/operativa** pactada en el hilo de re-auditoría 2026-08-20.
-> **Estado:** **COMPLETADO en `main`** (2 commits directos `3b9c139` + `da8a10c`, árbol limpio, `local main = origin/main = da8a10c`).
+> **Estado:** **COMPLETADO en `main`** (4 commits directos `3b9c139` + `da8a10c` + `9cad4bb` docs + `017b495` gitleaks v3, árbol limpio, `local main = origin/main = 017b495`).
 > **AsOf:** 2026-08-20.
 
 ---
@@ -36,7 +36,7 @@ Descubierto en la verificación CI del commit 1: la anotación de deprecación s
 **Notas:**
 
 - `actions/setup-node@v5` tiene un breaking change (auto-cache si hay `packageManager` en `package.json`). Se **mantiene `cache: 'pnpm'` explícito** que tiene precedencia y evita colisión con el auto-detect.
-- Se dejan sin tocar: `astral-sh/setup-uv@v5` (binario Rust, no action JS Node) y `gitleaks/gitleaks-action@v2` (no aparece en la anotación de deprecación).
+- **`gitleaks/gitleaks-action` `@v2` → `@v3` (`017b495`)**: descubierto al verificar el run de Gitleaks del commit de docs (`9cad4bb`); v2 corría internamente en Node 20 y mostraba la anotación de deprecación. `@v3` migra el runtime `node20`→`node24` (único cambio, sin cambios de inputs/outputs/comportamiento); **v2 dejaría de funcionar por completo el 2026-09-16** (Node 20 eliminado de runners). Tras esto **ninguna action del repo corre internamente sobre Node 20** (solo queda `astral-sh/setup-uv@v5`, binario Rust, no action JS node).
 
 ## 4. Batería CI (verificada en `origin/main` tras `da8a10c`)
 
