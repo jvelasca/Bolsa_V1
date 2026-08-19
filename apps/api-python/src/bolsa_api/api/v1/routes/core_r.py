@@ -7,11 +7,14 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_api.api.dependencies import get_db_session
+from bolsa_api.api.dependencies import (
+    get_account_core_r_state_use_case,
+    get_db_session,
+    get_sync_core_r_state_use_case,
+)
 from bolsa_api.schemas.core_r import CoreRBundleDto, CoreRBundleResponseDto, SyncCoreRBundleDto
 from bolsa_api.schemas.mappers import to_iso
 from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
-from bolsa_infrastructure.database.repositories.core_r_repository import SqlAlchemyCoreRRepository
 
 router = APIRouter()
 
@@ -34,8 +37,7 @@ async def get_account_core_r(
     account_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> CoreRBundleResponseDto:
-    repo = SqlAlchemyCoreRRepository(session)
-    row = await repo.get(account_id)
+    row = await get_account_core_r_state_use_case(session).execute(account_id)
     if row is None:
         return CoreRBundleResponseDto(data=_empty_bundle(account_id))
     return CoreRBundleResponseDto(
@@ -59,15 +61,11 @@ async def sync_account_core_r(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> CoreRBundleResponseDto:
     """Push cliente → BD (localStorage = cache; BD = SoT)."""
-    repo = SqlAlchemyCoreRRepository(session)
-    queue: list[dict[str, Any]] = [q for q in body.queue if isinstance(q, dict)][:40]
-    reports = body.reports if isinstance(body.reports, dict) else {}
-    scheduler = body.scheduler if isinstance(body.scheduler, dict) else {}
-    row = await repo.upsert(
+    row = await get_sync_core_r_state_use_case(session).execute(
         account_id,
-        queue=queue,
-        reports=reports,
-        scheduler=scheduler,
+        queue=body.queue,
+        reports=body.reports,
+        scheduler=body.scheduler,
     )
     return CoreRBundleResponseDto(
         data=CoreRBundleDto(

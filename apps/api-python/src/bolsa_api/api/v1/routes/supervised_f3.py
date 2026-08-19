@@ -2,20 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_api.api.dependencies import get_db_session
+from bolsa_api.api.dependencies import (
+    get_account_supervised_f3_state_use_case,
+    get_db_session,
+    get_sync_supervised_f3_state_use_case,
+)
 from bolsa_api.schemas.mappers import to_iso
 from bolsa_api.schemas.supervised_f3 import (
     SupervisedF3BundleDto,
     SupervisedF3BundleResponseDto,
     SyncSupervisedF3BundleDto,
-)
-from bolsa_infrastructure.database.repositories.supervised_f3_repository import (
-    SqlAlchemySupervisedF3Repository,
 )
 
 router = APIRouter()
@@ -38,8 +39,7 @@ async def get_account_supervised_f3(
     account_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SupervisedF3BundleResponseDto:
-    repo = SqlAlchemySupervisedF3Repository(session)
-    row = await repo.get(account_id)
+    row = await get_account_supervised_f3_state_use_case(session).execute(account_id)
     if row is None:
         return SupervisedF3BundleResponseDto(data=_empty(account_id))
     return SupervisedF3BundleResponseDto(
@@ -62,14 +62,11 @@ async def sync_account_supervised_f3(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SupervisedF3BundleResponseDto:
     """Push cliente → BD (sessionStorage = cache; BD = SoT)."""
-    repo = SqlAlchemySupervisedF3Repository(session)
-    items: list[dict[str, Any]] = [q for q in body.items if isinstance(q, dict)][:40]
-    active_id = body.active_id if isinstance(body.active_id, str) else None
-    if active_id and not any(i.get("id") == active_id for i in items):
-        active_id = items[0].get("id") if items else None
-        if not isinstance(active_id, str):
-            active_id = None
-    row = await repo.upsert(account_id, queue=items, active_id=active_id)
+    row = await get_sync_supervised_f3_state_use_case(session).execute(
+        account_id,
+        items=body.items,
+        active_id=body.active_id,
+    )
     return SupervisedF3BundleResponseDto(
         data=SupervisedF3BundleDto(
             account_id=account_id,

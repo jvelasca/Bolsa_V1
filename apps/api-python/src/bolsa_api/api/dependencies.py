@@ -17,6 +17,14 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
+from bolsa_application.account_blob_state import (
+    GetAccountCoreRState,
+    GetAccountMandates,
+    GetAccountSupervisedF3State,
+    SyncAccountCoreRState,
+    SyncAccountMandates,
+    SyncAccountSupervisedF3State,
+)
 from bolsa_application.account_lifecycle import (
     ListClosedSimulatedAccounts,
     PurgeClosedSimulatedAccounts,
@@ -163,6 +171,7 @@ from bolsa_infrastructure.database.repositories.backtest_repository import (
 from bolsa_infrastructure.database.repositories.cognitive_repository import (
     SqlAlchemyCognitiveRepository,
 )
+from bolsa_infrastructure.database.repositories.core_r_repository import SqlAlchemyCoreRRepository
 from bolsa_infrastructure.database.repositories.execution_policy_repository import (
     SqlAlchemyExecutionPolicyRepository,
 )
@@ -183,6 +192,9 @@ from bolsa_infrastructure.database.repositories.knowledge_node_repository import
 )
 from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlchemyLedgerRepository
 from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
+from bolsa_infrastructure.database.repositories.mandate_repository import (
+    SqlAlchemyMandateRepository,
+)
 from bolsa_infrastructure.database.repositories.mkl_sync_repository import (
     SqlAlchemyMklSyncRepository,
 )
@@ -224,6 +236,9 @@ from bolsa_infrastructure.database.repositories.signal_alert_repository import (
 from bolsa_infrastructure.database.repositories.strategy_definition_repository import (
     SqlAlchemyStrategyDefinitionRepository,
 )
+from bolsa_infrastructure.database.repositories.supervised_f3_repository import (
+    SqlAlchemySupervisedF3Repository,
+)
 from bolsa_infrastructure.database.repositories.sync_log_repository import (
     SqlAlchemySyncLogRepository,
 )
@@ -263,6 +278,18 @@ def get_account_repository(session: AsyncSession) -> SqlAlchemyAccountRepository
 
 def get_ledger_repository(session: AsyncSession) -> SqlAlchemyLedgerRepository:
     return SqlAlchemyLedgerRepository(session)
+
+
+def get_core_r_repository(session: AsyncSession) -> SqlAlchemyCoreRRepository:
+    return SqlAlchemyCoreRRepository(session)
+
+
+def get_supervised_f3_repository(session: AsyncSession) -> SqlAlchemySupervisedF3Repository:
+    return SqlAlchemySupervisedF3Repository(session)
+
+
+def get_mandate_repository(session: AsyncSession) -> SqlAlchemyMandateRepository:
+    return SqlAlchemyMandateRepository(session)
 
 
 def get_account_id_header(
@@ -311,9 +338,6 @@ def get_daily_ops_report_use_case(session: AsyncSession) -> GetDailyOpsReport:
     from bolsa_application.daily_ops_report import GetDailyOpsReport
     from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
         SqlAlchemyInstrumentDailyOpinionRepository,
-    )
-    from bolsa_infrastructure.database.repositories.supervised_f3_repository import (
-        SqlAlchemySupervisedF3Repository,
     )
 
     return GetDailyOpsReport(
@@ -1115,3 +1139,29 @@ def get_delete_pending_order_use_case(session: AsyncSession) -> DeletePendingOrd
         get_pending_order_repository(session),
         get_account_repository(session),
     )
+
+
+def get_account_core_r_state_use_case(session: AsyncSession) -> GetAccountCoreRState:
+    return GetAccountCoreRState(get_core_r_repository(session))
+
+
+def get_sync_core_r_state_use_case(session: AsyncSession) -> SyncAccountCoreRState:
+    return SyncAccountCoreRState(get_core_r_repository(session))
+
+
+def get_account_supervised_f3_state_use_case(
+    session: AsyncSession,
+) -> GetAccountSupervisedF3State:
+    return GetAccountSupervisedF3State(get_supervised_f3_repository(session))
+
+
+def get_sync_supervised_f3_state_use_case(session: AsyncSession) -> SyncAccountSupervisedF3State:
+    return SyncAccountSupervisedF3State(get_supervised_f3_repository(session))
+
+
+def get_account_mandates_use_case(session: AsyncSession) -> GetAccountMandates:
+    return GetAccountMandates(get_mandate_repository(session))
+
+
+def get_sync_account_mandates_use_case(session: AsyncSession) -> SyncAccountMandates:
+    return SyncAccountMandates(get_mandate_repository(session))

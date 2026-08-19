@@ -7,7 +7,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_api.api.dependencies import get_db_session
+from bolsa_api.api.dependencies import (
+    get_account_mandates_use_case,
+    get_db_session,
+    get_sync_account_mandates_use_case,
+)
 from bolsa_api.schemas.mandates import (
     MandateBundleDto,
     MandateBundleResponseDto,
@@ -19,7 +23,6 @@ from bolsa_api.schemas.mappers import to_iso
 from bolsa_infrastructure.database.repositories.mandate_repository import (
     MandateTenureRecord,
     MandateTradeLinkRecord,
-    SqlAlchemyMandateRepository,
 )
 
 router = APIRouter()
@@ -63,13 +66,13 @@ async def get_account_mandates(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     instrument_id: str | None = Query(default=None, alias="instrumentId"),
 ) -> MandateBundleResponseDto:
-    repo = SqlAlchemyMandateRepository(session)
-    tenures = await repo.list_tenures(account_id, instrument_id=instrument_id)
-    links = await repo.list_links(account_id, instrument_id=instrument_id)
+    bundle = await get_account_mandates_use_case(session).execute(
+        account_id, instrument_id=instrument_id
+    )
     return MandateBundleResponseDto(
         data=MandateBundleDto(
-            tenures=[_tenure_dto(t) for t in tenures],
-            links=[_link_dto(link) for link in links],
+            tenures=[_tenure_dto(t) for t in bundle.tenures],
+            links=[_link_dto(link) for link in bundle.links],
         )
     )
 
@@ -84,15 +87,14 @@ async def sync_account_mandates(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> MandateBundleResponseDto:
     """Push cliente → BD (cache localStorage + SoT PostgreSQL)."""
-    repo = SqlAlchemyMandateRepository(session)
-    tenures, links = await repo.sync_account(
+    bundle = await get_sync_account_mandates_use_case(session).execute(
         account_id,
-        [t.model_dump(by_alias=True) for t in body.tenures],
-        [link.model_dump(by_alias=True) for link in body.links],
+        tenures=[t.model_dump(by_alias=True) for t in body.tenures],
+        links=[link.model_dump(by_alias=True) for link in body.links],
     )
     return MandateBundleResponseDto(
         data=MandateBundleDto(
-            tenures=[_tenure_dto(t) for t in tenures],
-            links=[_link_dto(link) for link in links],
+            tenures=[_tenure_dto(t) for t in bundle.tenures],
+            links=[_link_dto(link) for link in bundle.links],
         )
     )
