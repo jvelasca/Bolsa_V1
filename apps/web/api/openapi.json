@@ -16585,9 +16585,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Daily Ops Report Api Accounts  Account Id  Daily Ops Report Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17326,9 +17324,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Analyze Backtest Coach Api Ai Backtest Coach Analyze Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17370,9 +17366,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Explain Core R Review Evidence Api Ai Core R Review Evidence Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17568,9 +17562,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Decision Session Learning Summary Api Ai Decision Sessions Learning Summary Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17612,9 +17604,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Decision Session Api Ai Decision Sessions  Session Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17667,9 +17657,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Close Decision Session Outcome Api Ai Decision Sessions  Session Id  Outcome Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17712,9 +17700,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Decision Session Replay Api Ai Decision Sessions  Session Id  Replay Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17756,9 +17742,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Explain Dia D Session Evidence Api Ai Dia D Session Evidence Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17902,9 +17886,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Explain Instrument Fundamentals Api Ai Fundamentals Explain Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17946,9 +17928,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Ask Instrument Filing Api Ai Fundamentals Filings Ask Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -17990,9 +17970,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Summarize Instrument Filing Api Ai Fundamentals Filings Summarize Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -18034,9 +18012,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Confirm Intent Api Ai Intents Confirm Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },
@@ -18078,9 +18054,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Propose Recommendation Api Ai Recommendations Propose Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AiEffectivenessResponseDto"
                 }
               }
             },

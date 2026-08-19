@@ -50,6 +50,7 @@ from bolsa_api.schemas.accounts import (
     UpdateInvestmentAccountDto,
     WithdrawCashDto,
 )
+from bolsa_api.schemas.ai_governance import AiEffectivenessResponseDto
 
 router = APIRouter()
 
@@ -218,7 +219,7 @@ async def get_account_summary(
     return AccountSummaryResponseDto(data=to_account_summary_dto(summary))
 
 
-@router.get("/accounts/{account_id}/daily-ops-report")
+@router.get("/accounts/{account_id}/daily-ops-report", response_model=AiEffectivenessResponseDto)
 async def get_daily_ops_report(
     account_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],

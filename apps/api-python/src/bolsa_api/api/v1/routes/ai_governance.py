@@ -202,7 +202,7 @@ async def list_decision_sessions(
     )
 
 
-@router.get("/ai/decision-sessions/learning-summary")
+@router.get("/ai/decision-sessions/learning-summary", response_model=AiEffectivenessResponseDto)
 async def decision_session_learning_summary(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: Annotated[str | None, Query(alias="accountId")] = None,
@@ -221,7 +221,7 @@ async def decision_session_learning_summary(
     return {"data": data}
 
 
-@router.get("/ai/decision-sessions/{session_id}")
+@router.get("/ai/decision-sessions/{session_id}", response_model=AiEffectivenessResponseDto)
 async def get_decision_session(
     session_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -235,7 +235,7 @@ async def get_decision_session(
     return {"data": rec.payload or {"sessionId": rec.id, "kind": rec.kind, "status": rec.status}}
 
 
-@router.get("/ai/decision-sessions/{session_id}/replay")
+@router.get("/ai/decision-sessions/{session_id}/replay", response_model=AiEffectivenessResponseDto)
 async def get_decision_session_replay(
     session_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -253,7 +253,7 @@ async def get_decision_session_replay(
     return {"data": replay.to_dict()}
 
 
-@router.post("/ai/decision-sessions/{session_id}/outcome")
+@router.post("/ai/decision-sessions/{session_id}/outcome", response_model=AiEffectivenessResponseDto)
 async def close_decision_session_outcome(
     session_id: str,
     body: CloseSessionOutcomeRequest,
@@ -336,7 +336,7 @@ async def append_edge_report(
     )
 
 
-@router.post("/ai/recommendations/propose")
+@router.post("/ai/recommendations/propose", response_model=AiEffectivenessResponseDto)
 async def propose_recommendation(
     body: ProposeRecommendationRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -383,7 +383,7 @@ async def propose_recommendation(
     return {"data": result.to_dict()}
 
 
-@router.post("/ai/intents/confirm")
+@router.post("/ai/intents/confirm", response_model=AiEffectivenessResponseDto)
 async def confirm_intent(
     body: ConfirmIntentRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -401,7 +401,7 @@ async def confirm_intent(
     return {"data": result}
 
 
-@router.post("/ai/backtest-coach/analyze")
+@router.post("/ai/backtest-coach/analyze", response_model=AiEffectivenessResponseDto)
 async def analyze_backtest_coach(body: BacktestCoachAnalyzeRequest) -> dict[str, Any]:
     """
     Coach profundo de batería de backtests (AT + perfil/TF).
@@ -459,7 +459,7 @@ async def analyze_backtest_coach(body: BacktestCoachAnalyzeRequest) -> dict[str,
     }
 
 
-@router.post("/ai/fundamentals/explain")
+@router.post("/ai/fundamentals/explain", response_model=AiEffectivenessResponseDto)
 async def explain_instrument_fundamentals(
     body: FundamentalExplainRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -480,7 +480,7 @@ async def explain_instrument_fundamentals(
     return {"data": result}
 
 
-@router.post("/ai/dia-d/session-evidence")
+@router.post("/ai/dia-d/session-evidence", response_model=AiEffectivenessResponseDto)
 async def explain_dia_d_session_evidence(body: DiaDSessionEvidenceRequest) -> dict[str, Any]:
     """
     Informe Evidence sesión C (DÍA D). Solo interpreta métricas ya calculadas.
@@ -492,7 +492,7 @@ async def explain_dia_d_session_evidence(body: DiaDSessionEvidenceRequest) -> di
     return {"data": result}
 
 
-@router.post("/ai/core-r/review-evidence")
+@router.post("/ai/core-r/review-evidence", response_model=AiEffectivenessResponseDto)
 async def explain_core_r_review_evidence(body: CoreRReviewEvidenceRequest) -> dict[str, Any]:
     """
     Informe Evidence cola CORE-R. Solo interpreta veredictos ya calculados.
@@ -504,7 +504,7 @@ async def explain_core_r_review_evidence(body: CoreRReviewEvidenceRequest) -> di
     return {"data": result}
 
 
-@router.post("/ai/fundamentals/filings/summarize")
+@router.post("/ai/fundamentals/filings/summarize", response_model=AiEffectivenessResponseDto)
 async def summarize_instrument_filing(
     body: FilingSummarizeRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -527,7 +527,7 @@ async def summarize_instrument_filing(
     return {"data": result}
 
 
-@router.post("/ai/fundamentals/filings/ask")
+@router.post("/ai/fundamentals/filings/ask", response_model=AiEffectivenessResponseDto)
 async def ask_instrument_filing(
     body: FilingAskRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],

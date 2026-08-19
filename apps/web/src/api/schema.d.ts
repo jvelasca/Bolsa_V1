@@ -8998,9 +8998,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9472,9 +9470,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9507,9 +9503,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9608,9 +9602,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9641,9 +9633,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9678,9 +9668,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9711,9 +9699,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9746,9 +9732,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9847,9 +9831,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9882,9 +9864,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9917,9 +9897,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9952,9 +9930,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
@@ -9987,9 +9963,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AiEffectivenessResponseDto"];
                 };
             };
             /** @description Validation Error */
