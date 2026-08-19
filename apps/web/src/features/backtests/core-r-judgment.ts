@@ -21,65 +21,31 @@ import type { FullCycleSettleReason } from "@/features/backtests/backtest-list-a
 import type { ListAutoChangeKind } from "@/features/backtests/backtest-list-auto-board";
 import { strategyMonitorChecklistHref } from "@/features/backtests/strategy-monitor";
 import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
+import type {
+  CoreRAction,
+  CoreRDualAuditSnap,
+  CoreRJudgment,
+  CoreROosSnap,
+  CoreRPaperPnlSnap,
+  CoreRReport,
+  CoreRReportRow,
+  CoreRVerdict,
+} from "@bolsa/shared";
+
+export type {
+  CoreRAction,
+  CoreRActionId,
+  CoreRDualAuditSnap,
+  CoreRJudgment,
+  CoreROosSnap,
+  CoreRPaperPnlSnap,
+  CoreRReport,
+  CoreRReportRow,
+  CoreRVerdict,
+} from "@bolsa/shared";
 
 export const CORE_R_ENGINE = "core-r-v0";
 export const CORE_R_REPORT_KEY = "bolsa-core-r-report-v1";
-
-export type CoreRVerdict =
-  | "keep"
-  | "fresh_ok"
-  | "review_lab"
-  | "consider_replace"
-  | "profile_mismatch"
-  | "skipped_weak";
-
-export type CoreRActionId =
-  | "lab"
-  | "checklist"
-  | "propose_f3"
-  | "finalists"
-  | "none";
-
-export type CoreRAction = {
-  id: CoreRActionId;
-  label: string;
-  href?: string;
-};
-
-export type CoreRJudgment = {
-  engine: typeof CORE_R_ENGINE;
-  verdict: CoreRVerdict;
-  reason: string;
-  actions: CoreRAction[];
-};
-
-export type CoreRDualAuditSnap = {
-  confidence?: string | null;
-  softWeak?: boolean | null;
-  challenge?: {
-    passed?: boolean;
-    checks?: ReadonlyArray<{ code?: string; passed?: boolean }>;
-  } | null;
-};
-
-/** Señales OOS / EdgeReport para degradación temporal (CORE-R v1.1). */
-export type CoreROosSnap = {
-  kind?: string | null;
-  pbo?: number | null;
-  credibility?: number | null;
-  oosReturnPct?: number | null;
-  edgeBand?: string | null;
-};
-
-/** PnL live de cuenta DEMO/paper vinculada al TOP (CORE-R v1.2). */
-export type CoreRPaperPnlSnap = {
-  accountId: string;
-  /** (equity − initialDeposit) / initialDeposit × 100 */
-  returnPct: number;
-  totalUnrealizedPnl: number;
-  totalEquity: number;
-  initialDeposit: number;
-};
 
 export type CoreRJudgeInput = {
   settleReason: FullCycleSettleReason;
@@ -95,24 +61,6 @@ export type CoreRJudgeInput = {
   instrumentId: string;
   timeframe: string;
   symbol?: string;
-};
-
-export type CoreRReportRow = {
-  instrumentId: string;
-  symbol: string;
-  verdict: CoreRVerdict;
-  reason: string;
-  actions: CoreRAction[];
-  settleReason?: FullCycleSettleReason;
-  change?: ListAutoChangeKind;
-};
-
-export type CoreRReport = {
-  engine: typeof CORE_R_ENGINE;
-  listId: string;
-  timeframe: string;
-  at: string;
-  rows: CoreRReportRow[];
 };
 
 export function coreRVerdictLabel(v: CoreRVerdict): string {

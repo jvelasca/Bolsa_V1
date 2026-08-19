@@ -12,6 +12,10 @@
 
 import type { FullCycleSettleReason } from "@/features/backtests/backtest-list-auto";
 import type { CoreRJudgment } from "@/features/backtests/core-r-judgment";
+import type { ListAutoChangeKind } from "@bolsa/shared";
+
+/** Δ Finalistas respecto al TOP previo al ciclo de ese ticker (hogar: @bolsa/shared). */
+export type { ListAutoChangeKind } from "@bolsa/shared";
 
 export type ListAutoRowPhase =
   | "queued"
@@ -21,9 +25,6 @@ export type ListAutoRowPhase =
   | "omitted"
   | "skipped"
   | "aborted";
-
-/** Δ Finalistas respecto al TOP previo al ciclo de ese ticker. */
-export type ListAutoChangeKind = "unknown" | "changed" | "same" | "new";
 
 export type ListAutoBoardRow = {
   instrumentId: string;

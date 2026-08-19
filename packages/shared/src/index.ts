@@ -54,6 +54,7 @@ export * from "./daily-ops-report.js";
 export * from "./opinion-channel-map.js";
 export * from "./operating-mandate.js";
 export * from "./core-r-api.js";
+export * from "./core-r-judgment.js";
 export * from "./supervised-f3-api.js";
 export * from "./dia-d-evidence-api.js";
 export * from "./coach-facts-api.js";

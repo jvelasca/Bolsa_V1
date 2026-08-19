@@ -39,13 +39,8 @@ export const LIST_AUTO_HARD_MAX = 500;
 /** Confirmación extra aunque `listAutoSkipOverCapConfirm` esté ON. */
 export const LIST_AUTO_EXTRA_CONFIRM_AT = 200;
 
-/** Motivo de cierre de un ciclo 1-valor dentro de la campaña. */
-export type FullCycleSettleReason =
-  | "saved"
-  | "skip_lab"
-  | "skip_finalists"
-  /** Datos de entrada iguales al stamp de Finalistas → no re-analizar. */
-  | "skip_fresh";
+/** Motivo de cierre de un ciclo 1-valor dentro de la campaña (hogar: @bolsa/shared). */
+export type { FullCycleSettleReason } from "@bolsa/shared";
 
 /** Estado mutable de la campaña (fuente de verdad en ref de página). */
 export type ListAutoCampaign = {

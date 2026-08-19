@@ -4,17 +4,36 @@
  * P2.8: el wire (blob opaco versionado del BE) no cambia; aquí declaramos la
  * *forma concreta* que el FE serializa/lee, para que `core-r-sync.ts` no
  * necesite `as unknown as`. Las formas son re-declaraciones de los tipos web;
- * el traslado a un único hogar de tipos queda como deuda P2.6.
+ * el traslado a un único hogar de tipos (P2.6) se resuelve al importar aquí los
+ * tipos ricos de `core-r-judgment`.
  */
 
+import type {
+  CoreRActionId,
+  CoreRVerdict,
+  FullCycleSettleReason,
+  ListAutoChangeKind,
+} from "./core-r-judgment.js";
+
+/**
+ * P2.6 (F-DEBT-2): los campos que representan verdict/actions se alinean al
+ * tipo rico de `core-r-judgment`. D5: el wire es un blob opaco round-trip del
+ * BE y este no garantiza los literales de la union, así que TODO campo
+ * verdict/action mantiene `| string` de seguridad (que en unions de literales
+ * de string colapsa a `string`); el tipo rico solo documenta la forma canónica.
+ */
 export type CoreRQueueItemDto = {
   id: string;
   listId: string;
   instrumentId: string;
   symbol: string;
-  verdict: string;
+  verdict: CoreRVerdict | string;
   reason: string;
-  actions: Array<{ id: string; label: string; href?: string }>;
+  actions: Array<{
+    id: CoreRActionId | string;
+    label: string;
+    href?: string;
+  }>;
   timeframe: string;
   enqueuedAt: string;
   status: string;
@@ -34,11 +53,15 @@ export type CoreRSchedulerPrefsDto = {
 export type CoreRReportRowDto = {
   instrumentId: string;
   symbol: string;
-  verdict: string;
+  verdict: CoreRVerdict | string;
   reason: string;
-  actions: Array<{ id: string; label: string; href?: string }>;
-  settleReason?: string;
-  change?: string;
+  actions: Array<{
+    id: CoreRActionId | string;
+    label: string;
+    href?: string;
+  }>;
+  settleReason?: FullCycleSettleReason | string;
+  change?: ListAutoChangeKind | string;
 };
 
 export type CoreRReportDto = {
