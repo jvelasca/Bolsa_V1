@@ -297,3 +297,28 @@ async def test_concurrent_buys_no_double_spend() -> None:
     assert cash >= 0.0
     assert qty == 10.0  # solo una de las compras aplicó
     await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_fin1_no_global_default_portfolio_by_name(db_session) -> None:
+    """F-FIN-1: fail-closed — sin scope de cartera NO se resuelve ningún default global.
+
+    Antes, `get_or_create_default_portfolio()` resolvía SIEMPRE la cartera por nombre
+    ("Cartera principal"), un riesgo de dinero ajeno en el modelo multi-cuenta. Ahora:
+    - El método global por nombre YA NO EXISTE en el repositorio.
+    - `_resolve_portfolio` exige un id de cartera real (no nullable): con un
+      id inexistente lanza ValueError en vez de crear/resolver una cartera por defecto.
+    """
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    repo = SqlAlchemyPortfolioRepository(db_session)
+
+    # 1) El default global por nombre fue eliminado del API del repositorio.
+    assert not hasattr(repo, "get_or_create_default_portfolio")
+
+    # 2) Resolver una cartera con id inexistente falla explícitamente (fail-closed).
+    with pytest.raises(ValueError, match="Cartera no encontrada"):
+        await repo.get_summary("no-existe-cartera")
+

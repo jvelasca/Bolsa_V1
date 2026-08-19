@@ -23,49 +23,26 @@ from bolsa_infrastructure.database.models import (
 )
 from bolsa_infrastructure.ids import new_id
 
-DEFAULT_PORTFOLIO_NAME = "Cartera principal"
-INITIAL_CASH = Decimal(100000)
-
 
 class SqlAlchemyPortfolioRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get_or_create_default_portfolio(self) -> Portfolio:
-        stmt = select(PortfolioRow).where(PortfolioRow.name == DEFAULT_PORTFOLIO_NAME)
-        result = await self._session.execute(stmt)
-        row = result.scalar_one_or_none()
+    async def _resolve_portfolio(self, legacy_portfolio_id: str) -> Portfolio:
+        # F-IND-1/F-FIN-1: NO existe un "default global por nombre". El scope a la
+        # cartera SIEMPRE viene resuelto por cuenta (via AccountScope.legacy_portfolio_id
+        # en account_repository). Si un call-site omite el scope, fallamos en lugar de
+        # resolver silenciosamente una cartera que podría pertenecer a otra cuenta
+        # (fail-closed): nunca tocamos dinero ajeno.
+        row = await self._session.get(PortfolioRow, legacy_portfolio_id)
         if row is None:
-            now = datetime.now(UTC)
-            row = PortfolioRow(
-                id=new_id(),
-                name=DEFAULT_PORTFOLIO_NAME,
-                currency="EUR",
-                cash=INITIAL_CASH,
-                created_at=now,
-                updated_at=now,
-            )
-            self._session.add(row)
-            await self._session.flush()
+            raise ValueError("Cartera no encontrada")
         return Portfolio(
             id=row.id,
             name=row.name,
             currency=row.currency,
             cash=float(row.cash),
         )
-
-    async def _resolve_portfolio(self, legacy_portfolio_id: str | None) -> Portfolio:
-        if legacy_portfolio_id:
-            row = await self._session.get(PortfolioRow, legacy_portfolio_id)
-            if row is None:
-                raise ValueError("Cartera no encontrada")
-            return Portfolio(
-                id=row.id,
-                name=row.name,
-                currency=row.currency,
-                cash=float(row.cash),
-            )
-        return await self.get_or_create_default_portfolio()
 
     async def _latest_closes(self, instrument_ids: list[str]) -> dict[str, float]:
         """Latest D1 close per instrument — one query for the whole set."""
@@ -93,7 +70,7 @@ class SqlAlchemyPortfolioRepository:
         closes = await self._latest_closes([instrument_id])
         return closes.get(instrument_id)
 
-    async def get_summary(self, legacy_portfolio_id: str | None = None) -> PortfolioSummary:
+    async def get_summary(self, legacy_portfolio_id: str) -> PortfolioSummary:
         portfolio = await self._resolve_portfolio(legacy_portfolio_id)
         stmt = (
             select(PositionRow)
@@ -152,7 +129,8 @@ class SqlAlchemyPortfolioRepository:
     async def list_transactions(
         self,
         limit: int = 50,
-        legacy_portfolio_id: str | None = None,
+        *,
+        legacy_portfolio_id: str,
     ) -> list[Transaction]:
         portfolio = await self._resolve_portfolio(legacy_portfolio_id)
         stmt = (
@@ -215,7 +193,7 @@ class SqlAlchemyPortfolioRepository:
         trade_type: Literal["buy", "sell"],
         quantity: float,
         price: float,
-        legacy_portfolio_id: str | None = None,
+        legacy_portfolio_id: str,
         fee_amount: float = 0.0,
         idempotency_key: str | None = None,
     ) -> TradeResult:
