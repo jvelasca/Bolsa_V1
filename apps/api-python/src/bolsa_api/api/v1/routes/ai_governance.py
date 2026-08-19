@@ -21,7 +21,7 @@ from bolsa_analytics.cognitive import (
     build_memory_entry,
     observe_investor_profile,
 )
-from bolsa_api.api.dependencies import get_db_session
+from bolsa_api.api.dependencies import get_cognitive_repository, get_db_session
 from bolsa_api.schemas.ai_governance import (
     AiEffectivenessResponseDto,
     AiGovernanceStatusDto,
@@ -44,9 +44,6 @@ from bolsa_application.cognitive_persistence import (
     PersistDecisionMemory,
     PersistEdgeReport,
     PersistTrial,
-)
-from bolsa_infrastructure.database.repositories.cognitive_repository import (
-    SqlAlchemyCognitiveRepository,
 )
 
 router = APIRouter()
@@ -135,7 +132,7 @@ async def ai_effectiveness(
         return AiEffectivenessResponseDto(data=_demo_effectiveness())
     from bolsa_api.api.dependencies import get_investor_profile_repository
 
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     profile_store = get_investor_profile_repository(session)
     try:
         data = await LoadEffectivenessFromStore(store, profile_store).execute(
@@ -154,7 +151,7 @@ async def append_decision_memory(
     body: AppendDecisionMemoryRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     rec = await PersistDecisionMemory(store).execute(
         decision_id=body.decision_id,
         instrument_id=body.instrument_id,
@@ -179,7 +176,7 @@ async def list_decision_sessions(
     instrument_id: Annotated[str | None, Query(alias="instrumentId")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 40,
 ) -> dict[str, Any]:
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     rows = await store.list_decision_sessions(
         limit=limit,
         account_id=account_id,
@@ -213,7 +210,7 @@ async def decision_session_learning_summary(
     """Hit-rate agregado de Outcomes (no ajusta WeightRules). Debe ir antes de /{session_id}."""
     from bolsa_application.close_decision_session_outcome import LoadSessionLearningSummary
 
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     data = await LoadSessionLearningSummary(store).execute(
         account_id=account_id,
         instrument_id=instrument_id,
@@ -227,7 +224,7 @@ async def get_decision_session(
     session_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     rec = await store.get_decision_session(session_id)
     if rec is None:
         from fastapi import HTTPException
@@ -246,7 +243,7 @@ async def get_decision_session_replay(
 
     from bolsa_analytics.cognitive import build_decision_replay
 
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     rec = await store.get_decision_session(session_id)
     if rec is None or not rec.payload:
         raise HTTPException(status_code=404, detail="DecisionSession no encontrada")
@@ -266,7 +263,7 @@ async def close_decision_session_outcome(
     from bolsa_api.api.dependencies import get_ohlcv_repository
     from bolsa_application.close_decision_session_outcome import CloseDecisionSessionOutcome
 
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     use_case = CloseDecisionSessionOutcome(store, ohlcv=get_ohlcv_repository(session))
     try:
         payload = await use_case.execute(
@@ -290,7 +287,7 @@ async def append_trial(
     body: AppendTrialRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     rec = await PersistTrial(store).execute(
         log_id=body.log_id,
         strategy_family_ref=body.strategy_family_ref,
@@ -310,7 +307,7 @@ async def append_edge_report(
     body: AppendEdgeReportRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AiEffectivenessResponseDto:
-    store = SqlAlchemyCognitiveRepository(session)
+    store = get_cognitive_repository(session)
     suite = StatisticalSuiteResult(
         trials_n=body.trials_n,
         walk_forward_efficiency=body.walk_forward_efficiency,
@@ -368,7 +365,6 @@ async def propose_recommendation(
 ) -> dict[str, Any]:
     """F3 — OHLCV → Assessments → DecisionRuntime → Recommendation."""
     from bolsa_api.api.dependencies import (
-        get_cognitive_repository,
         get_feature_port,
         get_instrument_repository,
         get_investor_profile_repository,
@@ -437,7 +433,7 @@ async def confirm_intent(
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session."""
-    from bolsa_api.api.dependencies import get_cognitive_repository, get_execute_trade_use_case
+    from bolsa_api.api.dependencies import get_execute_trade_use_case
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
     use_case = ConfirmRecommendationIntent(
