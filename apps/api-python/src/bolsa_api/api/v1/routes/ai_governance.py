@@ -33,10 +33,12 @@ from bolsa_api.schemas.ai_governance import (
     CloseSessionOutcomeRequest,
     ConfirmIntentRequest,
     CoreRReviewEvidenceRequest,
+    DecisionSessionSummaryDto,
     DiaDSessionEvidenceRequest,
     FilingAskRequest,
     FilingSummarizeRequest,
     FundamentalExplainRequest,
+    ListDecisionSessionsResponseDto,
     ProposeRecommendationRequest,
 )
 from bolsa_application.cognitive_persistence import (
@@ -169,35 +171,35 @@ async def append_decision_memory(
     )
 
 
-@router.get("/ai/decision-sessions")
+@router.get("/ai/decision-sessions", response_model=ListDecisionSessionsResponseDto)
 async def list_decision_sessions(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: Annotated[str | None, Query(alias="accountId")] = None,
     instrument_id: Annotated[str | None, Query(alias="instrumentId")] = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 40,
-) -> dict[str, Any]:
+) -> ListDecisionSessionsResponseDto:
     store = get_cognitive_repository(session)
     rows = await store.list_decision_sessions(
         limit=limit,
         account_id=account_id,
         instrument_id=instrument_id,
     )
-    return {
-        "data": [
-            {
-                "sessionId": r.id,
-                "kind": r.kind,
-                "status": r.status,
-                "instrumentId": r.instrument_id,
-                "symbol": r.symbol,
-                "accountId": r.account_id,
-                "recommendationId": r.recommendation_id,
-                "decisionId": r.decision_id,
-                "createdAt": r.created_at,
-            }
+    return ListDecisionSessionsResponseDto(
+        data=[
+            DecisionSessionSummaryDto(
+                session_id=r.id,
+                kind=r.kind,
+                status=r.status,
+                instrument_id=r.instrument_id,
+                symbol=r.symbol,
+                account_id=r.account_id,
+                recommendation_id=r.recommendation_id,
+                decision_id=r.decision_id,
+                created_at=r.created_at,
+            )
             for r in rows
         ]
-    }
+    )
 
 
 @router.get("/ai/decision-sessions/learning-summary")

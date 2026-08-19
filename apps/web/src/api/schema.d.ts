@@ -4403,6 +4403,27 @@ export interface components {
             /** Table */
             table: string;
         };
+        /** DecisionSessionSummaryDto */
+        DecisionSessionSummaryDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Createdat */
+            createdAt: string;
+            /** Decisionid */
+            decisionId?: string | null;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Kind */
+            kind: string;
+            /** Recommendationid */
+            recommendationId?: string | null;
+            /** Sessionid */
+            sessionId: string;
+            /** Status */
+            status: string;
+            /** Symbol */
+            symbol?: string | null;
+        };
         /** DeclaredProfileDto */
         DeclaredProfileDto: {
             /** Experience */
@@ -6321,6 +6342,11 @@ export interface components {
         LinkTrialHypothesisRequestDto: {
             /** Hypothesisid */
             hypothesisId?: string | null;
+        };
+        /** ListDecisionSessionsResponseDto */
+        ListDecisionSessionsResponseDto: {
+            /** Data */
+            data: components["schemas"]["DecisionSessionSummaryDto"][];
         };
         /** ListMembershipRefDto */
         ListMembershipRefDto: {
@@ -9549,9 +9575,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ListDecisionSessionsResponseDto"];
                 };
             };
             /** @description Validation Error */

@@ -3304,6 +3304,83 @@
         "title": "DatabaseTableCountDto",
         "type": "object"
       },
+      "DecisionSessionSummaryDto": {
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "recommendationId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendationid"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "sessionId",
+          "kind",
+          "status",
+          "instrumentId",
+          "createdAt"
+        ],
+        "title": "DecisionSessionSummaryDto",
+        "type": "object"
+      },
       "DeclaredProfileDto": {
         "properties": {
           "experience": {
@@ -9045,6 +9122,22 @@
           }
         },
         "title": "LinkTrialHypothesisRequestDto",
+        "type": "object"
+      },
+      "ListDecisionSessionsResponseDto": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSessionSummaryDto"
+            },
+            "title": "Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ListDecisionSessionsResponseDto",
         "type": "object"
       },
       "ListMembershipRefDto": {
@@ -17397,9 +17490,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Decision Sessions Api Ai Decision Sessions Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ListDecisionSessionsResponseDto"
                 }
               }
             },

@@ -171,3 +171,21 @@ class FilingAskRequest(BaseModel):
     filing_id: str = Field(alias="filingId")
     question: str = Field(min_length=1, max_length=800)
     top_k: int | None = Field(default=None, alias="topK", ge=1, le=8)
+
+
+class DecisionSessionSummaryDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    session_id: str = Field(alias="sessionId")
+    kind: str
+    status: str
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str | None = Field(default=None, alias="symbol")
+    account_id: str | None = Field(default=None, alias="accountId")
+    recommendation_id: str | None = Field(default=None, alias="recommendationId")
+    decision_id: str | None = Field(default=None, alias="decisionId")
+    created_at: str = Field(alias="createdAt")
+
+
+class ListDecisionSessionsResponseDto(BaseModel):
+    data: list[DecisionSessionSummaryDto]
