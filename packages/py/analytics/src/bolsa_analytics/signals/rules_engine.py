@@ -45,13 +45,39 @@ def _spec_key(raw: dict[str, Any]) -> str:
     return instance_spec_key(spec.definition_id, spec.parameters)
 
 
+# Resolución de series de indicador: solamente las claves causales se cablean en el
+# evaluador de señales backtest/research (F-IND-1). Las salidas no causales (que
+# dependen de datos futuros) o no soportadas devuelven `None` para que la regla
+# simplemente no dispare, sin look-ahead. La visualización/chart NO pasa por aquí y
+# no se ve afectada.
+_NON_CAUSAL_OUTPUT_LINES: dict[str, frozenset[str]] = {
+    "ich": frozenset({"chikou"}),
+}
+
+
 def _series_for_spec(
     bars: list[OhlcvBar],
     closes: list[float],
     definition_id: str,
     parameters: dict[str, Any],
 ) -> list[float | None] | None:
-    """Resuelve una serie de indicador por `definition_id` (presets v2 incl. dc/adx/ich/vwap/st)."""
+    """Resuelve una serie de indicador por `definition_id` (presets v2 incl. dc/adx/ich/vwap/st).
+
+    GUARDIA DE CAUSALIDAD (F-IND-1): este método solo se usa para backtest/research
+    (el chart no pasa por aquí). Las salidas que dependen de datos futuros
+    (`ich:chikou`, fractals `fr`) devuelven `None` y quedan fuera del feature set de
+    señales. Fractals (`fr`) no se cablean en esta fase.
+    """
+    if definition_id == "fr":
+        return None
+
+    if definition_id in _NON_CAUSAL_OUTPUT_LINES:
+        line = str(parameters.get("line") or "main")
+        if line in _NON_CAUSAL_OUTPUT_LINES[definition_id]:
+            # p. ej. ich:chikou usa `bars[i+displacement].close` (datos futuros) →
+            # no puede usarse como feature de señal en backtest.
+            return None
+
     try:
         period = int(parameters.get("period", 14))
     except (TypeError, ValueError):
@@ -148,7 +174,9 @@ def build_indicator_context(
     return context
 
 
-def _value_at(context: dict[str, list[float | None]], spec: dict[str, Any], index: int) -> float | None:
+def _value_at(
+    context: dict[str, list[float | None]], spec: dict[str, Any], index: int
+) -> float | None:
     series = context.get(_spec_key(spec))
     if series is None or index >= len(series):
         return None
@@ -543,7 +571,9 @@ def evaluate_rules_signals(
         raise ValueError("timestamps and closes length mismatch")
 
     resolved = enrich_definition_with_preset_rules(definition)
-    if not rule_group_has_rules(resolved.get("entries")) and not rule_group_has_rules(resolved.get("exits")):
+    if not rule_group_has_rules(resolved.get("entries")) and not rule_group_has_rules(
+        resolved.get("exits")
+    ):
         raise ValueError("StrategyDefinitionV1 has no rules in entries or exits")
 
     bars = [
@@ -560,12 +590,16 @@ def evaluate_rules_signals(
 
     for index, timestamp in enumerate(timestamps):
         entry_kind = (
-            evaluate_rules_bar(resolved, index=index, context=resolved_context, closes=closes, side="entries")
+            evaluate_rules_bar(
+                resolved, index=index, context=resolved_context, closes=closes, side="entries"
+            )
             if "entries" in sides
             else None
         )
         exit_kind = (
-            evaluate_rules_bar(resolved, index=index, context=resolved_context, closes=closes, side="exits")
+            evaluate_rules_bar(
+                resolved, index=index, context=resolved_context, closes=closes, side="exits"
+            )
             if "exits" in sides
             else None
         )
