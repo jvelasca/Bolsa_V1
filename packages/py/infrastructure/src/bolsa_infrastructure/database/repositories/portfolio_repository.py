@@ -128,9 +128,10 @@ class SqlAlchemyPortfolioRepository:
 
     async def list_transactions(
         self,
-        limit: int = 50,
-        *,
         legacy_portfolio_id: str,
+        *,
+        limit: int | None = 50,
+        executed_before: datetime | None = None,
     ) -> list[Transaction]:
         portfolio = await self._resolve_portfolio(legacy_portfolio_id)
         stmt = (
@@ -138,8 +139,14 @@ class SqlAlchemyPortfolioRepository:
             .where(TransactionRow.portfolio_id == portfolio.id)
             .options(selectinload(TransactionRow.instrument))
             .order_by(TransactionRow.executed_at.desc())
-            .limit(limit)
         )
+        if executed_before is not None:
+            # F-FIN-2: el cómputo fiscal necesita TODAS las transacciones hasta el fin
+            # del ejercicio (incluye carry-in de compras previas para FIFO/avg) pero no
+            # los ejercicios futuros. Filtrar aquí evita traer años innecesarios.
+            stmt = stmt.where(TransactionRow.executed_at < executed_before)
+        if limit is not None:
+            stmt = stmt.limit(limit)
         result = await self._session.execute(stmt)
         rows = result.scalars().all()
         return [

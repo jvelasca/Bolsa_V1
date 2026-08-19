@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_domain.entities.account import LedgerEntry
@@ -185,6 +185,20 @@ def _is_in_fiscal_year(iso_date: str, year: int, start_month: int) -> bool:
     return calendar_year == year + 1
 
 
+def fiscal_year_range(year: int, start_month: int) -> tuple[datetime, datetime]:
+    """Devuelve [inicio, fin) del ejercicio fiscal ``year`` como datetimes UTC.
+
+    Replica la semántica de ``_is_in_fiscal_year``: si ``start_month == 1`` el
+    ejercicio coincide con el año natural; en otro caso, comienza el día 1 de
+    ``start_month`` del año y termina el día 1 de ``start_month`` de ``year + 1``.
+    Es la fuente canónica del rango que los repos aplican en SQL, de modo que el
+    filtro en BD y el predicado de dominio jamás divergen.
+    """
+    start = datetime(year, start_month, 1, tzinfo=UTC)
+    end = datetime(year + 1, start_month, 1, tzinfo=UTC)
+    return start, end
+
+
 def _period_label(year: int, start_month: int) -> str:
     if start_month == 1:
         return f"Año natural {year}"
@@ -240,7 +254,14 @@ def build_tax_report(
     total_gains = sum(line.realized_gain for line in realized_lines if line.realized_gain >= 0)
     total_losses = sum(line.realized_gain for line in realized_lines if line.realized_gain < 0)
     net_realized_gain = total_gains + total_losses
-    fees_paid_total = sum(tx.fee_amount for tx in report_tx)
+    # F-FIN-2: Fees del EJERCICIO, no de todo el historial. `report_tx` puede incluir
+    # transacciones de ejercicios anteriores (carry-in de lots FIFO/avg) cuyo fee no
+    # pertenece al año pedido.
+    fees_paid_total = sum(
+        tx.fee_amount
+        for tx in report_tx
+        if _is_in_fiscal_year(tx.executed_at, year, fiscal_year_start_month)
+    )
 
     unrealized_lines = positions or []
     total_unrealized_gain = (

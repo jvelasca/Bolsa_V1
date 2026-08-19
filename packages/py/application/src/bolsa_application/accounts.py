@@ -15,6 +15,7 @@ from bolsa_domain.tax_report import (
     TaxReportTransaction,
     UnrealizedGainLine,
     build_tax_report,
+    fiscal_year_range,
     map_ledger_fees_to_transactions,
 )
 from bolsa_infrastructure.database.repositories.account_repository import (
@@ -581,14 +582,20 @@ class GetTaxReport:
         tax = settings.tax
 
         portfolios = await self._account_repo.list_portfolios(account_id)
+        # F-FIN-2: ejercicio fiscal [inicio, fin) — canonical en dominio (fiscal_year_range).
+        # Las transacciones se cargan SOLO hasta el fin del ejercicio (incluye carry-in
+        # de compras previas para FIFO/avg, excluye años futuros) SIN techo truncante
+        # (antes limit=10000 cortaba las compras antiguas y rompía el cost basis).
+        fiscal_start, fiscal_end = fiscal_year_range(year, tax.fiscal_year_start_month)
         transactions: list[Transaction] = []
         seen_ids: set[str] = set()
         for portfolio in portfolios:
             if not portfolio.legacy_portfolio_id:
                 continue
             batch = await self._portfolio_repo.list_transactions(
-                limit=10_000,
                 legacy_portfolio_id=portfolio.legacy_portfolio_id,
+                limit=None,
+                executed_before=fiscal_end,
             )
             for tx in batch:
                 if tx.id not in seen_ids:
@@ -600,9 +607,15 @@ class GetTaxReport:
             scope.account.id,
             limit=10_000,
             offset=0,
+            executed_from=fiscal_start,
+            executed_to=fiscal_end,
         )
         fees_by_tx = map_ledger_fees_to_transactions(ledger_entries)
-        total_ledger_fees = await self._ledger_repo.total_fees_for_account(scope.account.id)
+        total_ledger_fees = await self._ledger_repo.total_fees_for_account(
+            scope.account.id,
+            executed_from=fiscal_start,
+            executed_to=fiscal_end,
+        )
 
         report_tx = [
             TaxReportTransaction(

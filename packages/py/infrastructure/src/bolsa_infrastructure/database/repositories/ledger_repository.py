@@ -114,6 +114,8 @@ class SqlAlchemyLedgerRepository:
         limit: int = 50,
         offset: int = 0,
         portfolio_id: str | None = None,
+        executed_from: datetime | None = None,
+        executed_to: datetime | None = None,
     ) -> list[LedgerEntry]:
         stmt = (
             select(LedgerEntryRow)
@@ -125,6 +127,11 @@ class SqlAlchemyLedgerRepository:
         )
         if portfolio_id is not None:
             stmt = stmt.where(LedgerEntryRow.portfolio_id == portfolio_id)
+        if executed_from is not None:
+            # F-FIN-2: acotar el ledger al ejercicio fiscal (fees del año).
+            stmt = stmt.where(LedgerEntryRow.executed_at >= executed_from)
+        if executed_to is not None:
+            stmt = stmt.where(LedgerEntryRow.executed_at < executed_to)
         rows = (await self._session.execute(stmt)).scalars().all()
         return [
             _entry_from_row(row, row.instrument.symbol if row.instrument else None)
@@ -184,11 +191,21 @@ class SqlAlchemyLedgerRepository:
         await self._session.flush()
         return _entry_from_row(row)
 
-    async def total_fees_for_account(self, account_id: str) -> float:
+    async def total_fees_for_account(
+        self,
+        account_id: str,
+        *,
+        executed_from: datetime | None = None,
+        executed_to: datetime | None = None,
+    ) -> float:
         stmt = select(LedgerEntryRow.amount).where(
             LedgerEntryRow.account_id == account_id,
             LedgerEntryRow.type == "fee",
         )
+        if executed_from is not None:
+            stmt = stmt.where(LedgerEntryRow.executed_at >= executed_from)
+        if executed_to is not None:
+            stmt = stmt.where(LedgerEntryRow.executed_at < executed_to)
         amounts = (await self._session.execute(stmt)).scalars().all()
         return sum(abs(float(amount)) for amount in amounts)
 
