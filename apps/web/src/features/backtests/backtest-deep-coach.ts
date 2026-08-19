@@ -1194,7 +1194,7 @@ export function equityMapFromDetails(
   const map: Record<string, BacktestEquityPointDto[] | undefined> = {};
   for (const d of details) {
     if (!d?.id) continue;
-    map[d.id] = d.equityCurve;
+    map[d.id] = d.equityCurve ?? undefined;
   }
   return map;
 }

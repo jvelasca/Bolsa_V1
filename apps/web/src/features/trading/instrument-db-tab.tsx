@@ -418,7 +418,7 @@ export function InstrumentDbTab({
         />
         <InventoryRow
           label="Perfil Yahoo en BD"
-          value={formatDateTime(inventory.instrument.profileFetchedAt)}
+          value={formatDateTime(inventory.instrument.profileFetchedAt ?? null)}
         />
       </section>
 
