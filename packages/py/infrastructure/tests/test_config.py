@@ -59,6 +59,64 @@ def test_secret_real_aceptado_si_hay_password() -> None:
         assert s.app_auth_secret == "UN-SECRETO-ALEATORIO"
 
 
+# F-SEG-1: fail-closed production.
+
+
+def test_prod_sin_password_falla() -> None:
+    with _env_cleanup("APP_PASSWORD", "APP_AUTH_SECRET", "ENVIRONMENT"):
+        with pytest.raises(ValueError, match="ENVIRONMENT=production exige APP_PASSWORD"):
+            Settings(
+                _env_file=None,
+                environment="production",
+                APP_PASSWORD=None,
+                APP_AUTH_SECRET="",
+            )
+
+
+def test_prod_con_password_sin_secreto_falla() -> None:
+    # En prod, con APP_PASSWORD activa y secreto vacío: lo rechaza la rama de
+    # "APP_PASSWORD activa requiere APP_AUTH_SECRET" (F2·6). El fail-closed prod
+    # añade además el bloqueo de arranque cuando NO hay password (test previo).
+    with _env_cleanup("APP_PASSWORD", "APP_AUTH_SECRET", "ENVIRONMENT"):
+        with pytest.raises(ValueError, match="APP_PASSWORD activa requiere APP_AUTH_SECRET"):
+            Settings(
+                _env_file=None,
+                environment="prod",
+                APP_PASSWORD="x",
+                APP_AUTH_SECRET="   ",
+            )
+
+
+def test_prod_con_secreto_devel_rechazado() -> None:
+    with _env_cleanup("APP_PASSWORD", "APP_AUTH_SECRET", "ENVIRONMENT"):
+        with pytest.raises(ValueError, match="bolsa-dev-secret"):
+            Settings(
+                _env_file=None,
+                environment="production",
+                APP_PASSWORD="x",
+                APP_AUTH_SECRET="bolsa-dev-secret",
+            )
+
+
+def test_prod_con_password_y_secreto_real_ok() -> None:
+    with _env_cleanup("APP_PASSWORD", "APP_AUTH_SECRET", "ENVIRONMENT"):
+        s = Settings(
+            _env_file=None,
+            environment="production",
+            APP_PASSWORD="x",
+            APP_AUTH_SECRET="UN-SECRETO-ALEATORIO",
+        )
+        assert s.environment == "production"
+
+
+def test_dev_sin_password_sigue_ok_no_rompe() -> None:
+    # Regresión: el fail-closed NO debe activarse en development (tests/CI/dev corren
+    # así por defecto sin password).
+    with _env_cleanup("APP_PASSWORD", "APP_AUTH_SECRET", "ENVIRONMENT"):
+        s = Settings(_env_file=None, environment="development", APP_PASSWORD=None, APP_AUTH_SECRET="")
+        assert s.app_auth_secret == ""
+
+
 class _EnvCleanup:
     """Context manager: garantiza que las variables no se cuelen de pytest env."""
 

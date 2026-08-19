@@ -1,4 +1,5 @@
 import hashlib
+import secrets
 
 from bolsa_infrastructure.config import Settings
 
@@ -14,4 +15,5 @@ def verify_access_token(settings: Settings, token: str) -> bool:
         return True
     if not token:
         return False
-    return token == create_access_token(settings)
+    # F-SEG-1: comparación de token en tiempo constante para evitar timing attacks.
+    return secrets.compare_digest(token, create_access_token(settings))

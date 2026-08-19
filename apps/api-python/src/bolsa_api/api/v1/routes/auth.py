@@ -1,5 +1,7 @@
 """API: autenticación / estado de sesión."""
 
+import secrets
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,7 +41,7 @@ async def login(body: LoginRequestDto) -> LoginResponseDto:
     settings = get_settings()
     auth_enabled = bool(settings.app_password)
 
-    if auth_enabled and body.password != settings.app_password:
+    if auth_enabled and not secrets.compare_digest(body.password, settings.app_password or ""):
         raise HTTPException(status_code=401, detail="Contraseña incorrecta")
 
     token = create_access_token(settings)

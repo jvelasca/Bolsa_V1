@@ -165,6 +165,24 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "APP_AUTH_SECRET no puedes ser 'bolsa-dev-secret' con APP_PASSWORD: usa un secreto aleatorio"
                 )
+        # F-SEG-1: fail-closed production. Fuera de dev/test/local/staging la app es
+        # producción: NO debe arrancar con autenticación desactivada ni con secretos
+        # de desarrollo conocidos. Esto convierte el antiguo aviso "degraded" de
+        # /health en un bloqueo real de arranque.
+        if self.environment.strip().lower() in {"prod", "production"}:
+            if not self.app_password:
+                raise ValueError(
+                    "ENVIRONMENT=production exige APP_PASSWORD (autenticación no puede desactivarse en producción)"
+                )
+            secret = (self.app_auth_secret or "").strip()
+            if not secret:
+                raise ValueError(
+                    "ENVIRONMENT=production exige APP_AUTH_SECRET (secreto de firma) no vacío"
+                )
+            if secret == "bolsa-dev-secret":
+                raise ValueError(
+                    "APP_AUTH_SECRET no puedes ser 'bolsa-dev-secret' en producción: usa un secreto aleatorio"
+                )
         return self
 
     @field_validator("database_url")
