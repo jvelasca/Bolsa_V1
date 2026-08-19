@@ -1,8 +1,14 @@
-import type { TechnicalRatingBreakdownV1, DataQualityBreakdownV1 } from './hybrid-strategy.js';
-import type { ChartTimeframe } from './chart-timeframes.js';
-import type { IndicatorSpec, StrategyDefinitionV1 } from './research-platform.js';
-import type { SignalEventV1 } from './signal-events.js';
-import type { BacktestStrategyType } from './types.js';
+import type {
+  TechnicalRatingBreakdownV1,
+  DataQualityBreakdownV1,
+} from "./hybrid-strategy.js";
+import type { ChartTimeframe } from "./chart-timeframes.js";
+import type {
+  IndicatorSpec,
+  StrategyDefinitionV1,
+} from "./research-platform.js";
+import type { SignalEventV1 } from "./signal-events.js";
+import type { BacktestStrategyType } from "./types.js";
 
 /** Spec de job de scan (alineación screeners/señales). */
 export interface ScanJobSpecV1 {
@@ -10,14 +16,14 @@ export interface ScanJobSpecV1 {
   strategyDefinitionId: string;
   universe: { listId?: string; instrumentIds?: string[] };
   timeframe: ChartTimeframe;
-  mode: 'bar_close' | 'realtime';
-  rankBy?: { indicatorSpec: IndicatorSpec; direction: 'asc' | 'desc' };
+  mode: "bar_close" | "realtime";
+  rankBy?: { indicatorSpec: IndicatorSpec; direction: "asc" | "desc" };
   maxResults?: number;
 }
 
 export interface ScanUniverseDto {
-  listId?: string;
-  instrumentIds?: string[];
+  listId?: string | null;
+  instrumentIds?: string[] | null;
 }
 
 export interface ScanRunRequestDto {
@@ -54,10 +60,10 @@ export interface ScanRunResultDto {
   hitCount: number;
   hits: ScanHitDto[];
   skipped: ScanSkippedInstrumentDto[];
-  strategyDefinitionId?: string;
-  listId?: string;
+  strategyDefinitionId?: string | null;
+  listId?: string | null;
   timeframe: ChartTimeframe;
-  scanMode?: 'classic' | 'hybrid';
+  scanMode?: "classic" | "hybrid";
   scorerVersion?: string;
   /** Instrumentos con fundamentales refrescados desde Yahoo pre-scan (P14). */
   fundamentalsRefreshedCount?: number;
@@ -79,7 +85,7 @@ export interface ScanRunResponseDto {
   data: ScanRunResultDto;
 }
 
-export type ScanJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type ScanJobStatus = "pending" | "processing" | "completed" | "failed";
 
 export interface ScanJobDto {
   id: string;
@@ -103,9 +109,9 @@ export interface ScanJobsListResponseDto {
   data: ScanJobDto[];
 }
 
-export const SIGNAL_KIND_LABELS: Record<SignalEventV1['kind'], string> = {
-  entry_long: 'Entrada long',
-  entry_short: 'Entrada short',
-  exit: 'Salida',
-  watch: 'Vigilar',
+export const SIGNAL_KIND_LABELS: Record<SignalEventV1["kind"], string> = {
+  entry_long: "Entrada long",
+  entry_short: "Entrada short",
+  exit: "Salida",
+  watch: "Vigilar",
 };

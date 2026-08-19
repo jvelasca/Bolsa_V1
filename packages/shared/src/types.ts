@@ -1,18 +1,18 @@
-export type MarketDataProviderId = 'yahoo' | 'xtb';
+export type MarketDataProviderId = "yahoo" | "xtb";
 
-export type Timeframe = '1m' | '5m' | '15m' | '1h' | '1d';
+export type Timeframe = "1m" | "5m" | "15m" | "1h" | "1d";
 
-export type InstrumentType = 'stock';
+export type InstrumentType = "stock";
 
-export type SyncStatus = 'success' | 'partial' | 'failed';
+export type SyncStatus = "success" | "partial" | "failed";
 
 export type DataFreshnessStatus =
-  | 'current'
-  | 'stale'
-  | 'empty'
-  | 'error'
-  | 'gap_detected'
-  | 'syncing';
+  | "current"
+  | "stale"
+  | "empty"
+  | "error"
+  | "gap_detected"
+  | "syncing";
 
 export interface InstrumentDataStatusDto {
   timeframe: string;
@@ -98,7 +98,7 @@ export interface OhlcvBarDto {
   source: MarketDataProviderId;
 }
 
-export type ListDataFreshnessStatus = 'current' | 'stale' | 'empty' | 'error';
+export type ListDataFreshnessStatus = "current" | "stale" | "empty" | "error";
 
 export interface InstrumentListMetaDto {
   barCount: number;
@@ -179,7 +179,7 @@ export interface InstrumentRecordDto {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  profileFetchedAt: string | null;
+  profileFetchedAt?: string | null;
   lastXtbValidation?: InstrumentXtbValidationDto | null;
 }
 
@@ -192,10 +192,10 @@ export interface InstrumentDbInventoryDto {
 }
 
 export type InstrumentXtbRecommendation =
-  | 'aligned'
-  | 'review'
-  | 'unavailable'
-  | 'no_db_reference';
+  | "aligned"
+  | "review"
+  | "unavailable"
+  | "no_db_reference";
 
 export interface InstrumentXtbValidationDto {
   available: boolean;
@@ -236,7 +236,7 @@ export interface IndicatorPointDto {
   rsi14: number | null;
 }
 
-export type TransactionType = 'buy' | 'sell';
+export type TransactionType = "buy" | "sell";
 
 export interface PortfolioDto {
   id: string;
@@ -278,9 +278,10 @@ export interface PortfolioSummaryDto {
   totalEquity: number;
 }
 
-export type BacktestStrategyType = import('./strategy-presets.js').BacktestStrategyType;
+export type BacktestStrategyType =
+  import("./strategy-presets.js").BacktestStrategyType;
 
-export type { StrategyPresetCategory } from './strategy-presets.js';
+export type { StrategyPresetCategory } from "./strategy-presets.js";
 
 export {
   BACKTEST_STRATEGIES,
@@ -291,7 +292,7 @@ export {
   presetRuleGroups,
   presetIndicatorSpecs,
   presetsByCategory,
-} from './strategy-presets.js';
+} from "./strategy-presets.js";
 
 export interface BacktestTradeDto {
   id: string;
@@ -336,18 +337,18 @@ export interface BacktestRunDto {
   lastDate: string;
   createdAt: string;
   /** H0 — contrato research platform */
-  timeframe?: string;
-  dataVersion?: string;
-  commissionBps?: number;
-  slippageBps?: number;
-  manifest?: import('./research-platform.js').RunManifest;
-  strategyDefinitionId?: string;
+  timeframe?: string | null;
+  dataVersion?: string | null;
+  commissionBps?: number | null;
+  slippageBps?: number | null;
+  manifest?: import("./research-platform.js").RunManifest | null;
+  strategyDefinitionId?: string | null;
 }
 
 export interface BacktestRunDetailDto extends BacktestRunDto {
   trades: BacktestTradeDto[];
   /** Serie patrimonio por barra (desde manifest.outputs o runs nuevos). */
-  equityCurve?: BacktestEquityPointDto[];
+  equityCurve?: BacktestEquityPointDto[] | null;
 }
 
 /** Respuesta POST /backtests/run — ADR-016 Fase 1 */
@@ -357,11 +358,10 @@ export interface BacktestRunResponseDto {
   metrics?: Record<string, number | string | null>;
 }
 
-
 export interface LiveQuoteSourceDto {
   price: number;
   timestamp: string;
-  source: 'db' | 'live';
+  source: "db" | "live";
 }
 
 export interface XtbQuoteDto {
@@ -375,10 +375,10 @@ export interface XtbQuoteDto {
 export interface InstrumentListSummaryDto {
   id: string;
   name: string;
-  source: 'catalog' | 'custom' | string;
+  source: "catalog" | "custom" | string;
   itemCount: number;
   updatedAt: string;
-  kind?: 'personal' | 'linked_universe' | 'snapshot' | string | null;
+  kind?: "personal" | "linked_universe" | "snapshot" | string | null;
   universeCode?: string | null;
   lastSyncedAt?: string | null;
   contentHash?: string | null;
@@ -387,10 +387,10 @@ export interface InstrumentListSummaryDto {
 export interface InstrumentListDetailDto {
   id: string;
   name: string;
-  source: 'catalog' | 'custom' | string;
+  source: "catalog" | "custom" | string;
   instrumentIds: string[];
   updatedAt: string;
-  kind?: 'personal' | 'linked_universe' | 'snapshot' | string | null;
+  kind?: "personal" | "linked_universe" | "snapshot" | string | null;
   universeCode?: string | null;
   lastSyncedAt?: string | null;
   contentHash?: string | null;
@@ -430,8 +430,8 @@ export interface MarketProviderStatusDto {
   mode?: string | null;
 }
 
-export type AlertCondition = 'above' | 'below';
-export type AlertPriceSource = 'daily_close' | 'xtb_last';
+export type AlertCondition = "above" | "below";
+export type AlertPriceSource = "daily_close" | "xtb_last";
 
 export interface PriceAlertDto {
   id: string;
@@ -555,7 +555,7 @@ export interface PurgeClosedAccountsResultDto {
 }
 
 export const TIMEFRAMES = {
-  DAILY: '1d' as const,
+  DAILY: "1d" as const,
 } as const;
 
 export const DEFAULT_TIMEFRAME: Timeframe = TIMEFRAMES.DAILY;
