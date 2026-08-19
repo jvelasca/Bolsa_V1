@@ -1225,10 +1225,14 @@ export function BacktestsPage() {
 
   useEffect(() => {
     return () => {
-      batchAbortRef.current?.abort();
+      // Snapshotear batchAbortRef.current a una variable local (sugerencia de autofix) REGRESIONARÍA: el ref
+      // nace como null en el primer render y solo se asigna al iniciar un batch; en unmount queremos abortar
+      // el AbortController vigente, no el del montaje. Leer el ref en cleanup es deliberado, por eso se
+      // desactiva react-hooks/exhaustive-deps en estas dos líneas concretas (refs no-DOM).
+      batchAbortRef.current?.abort(); // eslint-disable-line react-hooks/exhaustive-deps
       // Si Lista AUTO sigue activa (keep-alive en PlatformShell), no abortar explore.
       if (useListAutoActivityStore.getState().active) return;
-      exploreAbortRef.current?.abort();
+      exploreAbortRef.current?.abort(); // eslint-disable-line react-hooks/exhaustive-deps
     };
   }, []);
 

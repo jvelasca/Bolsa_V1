@@ -19,9 +19,11 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.import_linter_cache/
 *.egg-info/
 .venv/
 venv/
+.venv_backup_*/
 
 # Prisma
 packages/database/prisma/migrations/**/migration_lock.toml
