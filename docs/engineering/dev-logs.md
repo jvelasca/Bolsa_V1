@@ -6,14 +6,14 @@ Directorio local para desarrollo y para que el agente/CI inspecten estado. Conte
 
 ## Estructura
 
-| Carpeta | Contenido |
-|---------|-----------|
-| `api/` | Logs del backend (si se activan) |
-| `web/` | Logs del frontend (si se activan) |
-| `dev/` | Salida combinada de `pnpm dev` / `pnpm dev:log` |
-| `tests/` | Resultados de `pnpm test:log` (`latest.log`) |
-| `agent/` | Resúmenes JSON legibles por el agente |
-| `startup/` | Timeline de arranque (`latest.json`) |
+| Carpeta    | Contenido                                       |
+| ---------- | ----------------------------------------------- |
+| `api/`     | Logs del backend (si se activan)                |
+| `web/`     | Logs del frontend (si se activan)               |
+| `dev/`     | Salida combinada de `pnpm dev` / `pnpm dev:log` |
+| `tests/`   | Resultados de `pnpm test:log` (`latest.log`)    |
+| `agent/`   | Resúmenes JSON legibles por el agente           |
+| `startup/` | Timeline de arranque (`latest.json`)            |
 
 ## Archivos útiles (agente / diagnóstico)
 
@@ -40,4 +40,7 @@ pnpm doctor         # diagnóstico (puertos, Docker, PG)
 ## Git
 
 `.gitignore` ignora `logs/**` y conserva solo `logs/**/.gitkeep`.  
+Rotación: cada `pnpm dev` conserva solo las `DEV_LOG_KEEP` sesiones `dev` más recientes
+(`logs/dev/dev-*.log`; default 10, ajustable por entorno) y poda las más antiguas — las
+demás carpetas de `logs/` sólo guardan los archivos `latest` + el sello de la última sesión.
 Arranque del stack: [DEV_STARTUP.md](../DEV_STARTUP.md) · [docker.md](../docker.md).

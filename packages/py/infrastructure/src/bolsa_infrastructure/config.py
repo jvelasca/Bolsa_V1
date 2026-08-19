@@ -193,6 +193,39 @@ class Settings(BaseSettings):
             value = value.split("?", 1)[0]
         return value
 
+    def __repr__(self) -> str:
+        # F-SEG-2: un `repr(Settings)` accidental en un log/traceback no debe exponer
+        # el secreto de firma, la contraseña de acceso ni las credenciales de la BD.
+        fields = {f for f in self.__class__.model_fields}
+        redacted = {
+            "app_password": "********",
+            "app_auth_secret": "********",
+            "db_password": "********",
+        }
+        pieces = []
+        for field in sorted(fields):
+            if field in redacted:
+                pieces.append(f"{field}={redacted[field]}")
+                continue
+            value = getattr(self, field, None)
+            if field == "database_url" and isinstance(value, str):
+                value = _redact_dsn_credentials(value)
+            pieces.append(f"{field}={value!r}")
+        return f"Settings({', '.join(pieces)})"
+
+
+def _redact_dsn_credentials(url: str) -> str:
+    """Oculta `user:pass@` de un DSN (p. ej. `bolsa:s3cr3t@`) dejando host/puerto/DB."""
+    for scheme in ("postgresql+psycopg://", "postgresql://"):
+        if url.startswith(scheme):
+            rest = url[len(scheme) :]
+            if "@" in rest:
+                auth, host = rest.split("@", 1)
+                user = auth.split(":", 1)[0]
+                return f"{scheme}{user}:***@{host}"
+            return url
+    return url
+
 
 @lru_cache
 def get_settings() -> Settings:

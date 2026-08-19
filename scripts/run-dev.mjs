@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import os from 'node:os';
-import { ensureLogDirs, logError, logInfo, ROOT, writeAgentLog } from './lib/logger.mjs';
+import { ensureLogDirs, logError, logInfo, pruneStampedLogs, ROOT, writeAgentLog } from './lib/logger.mjs';
 import { ensurePortFree, freePort } from './lib/ports.mjs';
 import { spawnPnpm } from './lib/pnpm.mjs';
 import { resolvePython } from './lib/python.mjs';
@@ -48,6 +48,11 @@ const XTB_BRIDGE_AUTOSTART = process.env.XTB_BRIDGE_AUTOSTART !== '0';
 const SCAN_QUEUE_BACKEND = (process.env.SCAN_QUEUE_BACKEND ?? 'postgres').toLowerCase();
 
 ensureLogDirs();
+
+// F-SEG-2: rotación por retención — conservar solo las sesiones `dev` más
+// recientes. Sin esta poda `logs/dev/dev-*.log` acumula ~155,8 MB (uno por cada
+// `pnpm dev`). `DEV_LOG_KEEP` permite ajustar el número de sesiones a conservar.
+pruneStampedLogs('dev', 'dev-', Number(process.env.DEV_LOG_KEEP ?? 10));
 
 const timeline = new StartupTimeline();
 timeline.mark('init');

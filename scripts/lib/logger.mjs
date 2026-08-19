@@ -1,8 +1,36 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = new URL('../..', import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1');
 const LOGS_DIR = join(ROOT, 'logs');
+
+/**
+ * Rotación por retención de los logs con sello por sesión (p. ej. `logs/dev/dev-<ISO>.log`).
+ * Cada `pnpm dev` crea un fichero nuevo y sin esta limpieza los lanzamientos antiguos se
+ * acumulan indefinidamente (F-SEG-2: ~155,8 MB). Se conservan los `keep` más recientes y se
+ * eliminan los más viejos; nunca toca `.gitkeep` ni ficheros fuera del patrón.
+ */
+export function pruneStampedLogs(subdir, prefix, keep) {
+  const dir = join(LOGS_DIR, subdir);
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isFile() && e.name.startsWith(prefix))
+      .map((e) => ({ name: e.name, full: join(dir, e.name), mtimeMs: statSync(join(dir, e.name)).mtimeMs }));
+  } catch {
+    return 0;
+  }
+  if (entries.length <= keep) return 0;
+  const toRemove = entries.sort((a, b) => b.mtimeMs - a.mtimeMs).slice(keep);
+  for (const entry of toRemove) {
+    try {
+      rmSync(entry.full, { force: true });
+    } catch {
+      /* best-effort: un fichero en uso no debe tumbar el arranque */
+    }
+  }
+  return toRemove.length;
+}
 
 export function ensureLogDirs() {
   for (const sub of ['api', 'web', 'tests', 'agent', 'dev']) {

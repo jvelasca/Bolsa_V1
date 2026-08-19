@@ -117,6 +117,58 @@ def test_dev_sin_password_sigue_ok_no_rompe() -> None:
         assert s.app_auth_secret == ""
 
 
+# F-SEG-2: redacción — un `repr(Settings)` o un error de validación no debe exponer
+# el valor real de la password, el secreto de firma ni las credenciales de la BD.
+
+
+def test_repr_no_expone_password_ni_secret() -> None:
+    real_password = "P4ssw0rd-SUPERSECRET-OK9"  # noqa: S105
+    real_secret = "Sk-REAL-SIGNING-SECRET-7f6e"  # noqa: S105
+    with _env_cleanup("APP_PASSWORD", "APP_AUTH_SECRET", "DATABASE_URL", "DB_PASSWORD"):
+        s = Settings(
+            _env_file=None,
+            APP_PASSWORD=real_password,
+            APP_AUTH_SECRET=real_secret,
+            DATABASE_URL=None,
+            DB_PASSWORD="db-secret-x",
+        )
+    rendered = repr(s)
+    assert real_password not in rendered
+    assert real_secret not in rendered
+    assert "app_password=********" in rendered
+    assert "app_auth_secret=********" in rendered
+
+
+def test_repr_redacta_credenciales_db() -> None:
+    with _env_cleanup("DATABASE_URL", "APP_PASSWORD", "APP_AUTH_SECRET"):
+        s = Settings(
+            _env_file=None,
+            DATABASE_URL=None,
+            DB_PASSWORD="db-s3cr3t",
+        )
+    rendered = repr(s)
+    assert "db-s3cr3t" not in rendered
+    assert "bolsa:***@localhost" in rendered
+    assert "bolsa:db-s3cr3t@localhost" not in rendered
+
+
+def test_error_validacion_no_filtra_secreto_real() -> None:
+    # Cuando falla la validación, el secreto real aportado por el usuario no debe
+    # aparecer ni en la excepción ni en su mensaje (salvo el valor dev conocido
+    # "bolsa-dev-secret", que ya es público por diseño).
+    real_secret = "Sk-REAL-SIGNING-SECRET-9d2e"  # noqa: S105
+    with _env_cleanup("APP_PASSWORD", "APP_AUTH_SECRET", "ENVIRONMENT"):
+        with pytest.raises(ValueError) as excinfo:
+            Settings(
+                _env_file=None,
+                environment="production",
+                APP_PASSWORD=None,
+                APP_AUTH_SECRET=real_secret,
+            )
+    rendered = str(excinfo.value)
+    assert real_secret not in rendered
+
+
 class _EnvCleanup:
     """Context manager: garantiza que las variables no se cuelen de pytest env."""
 
