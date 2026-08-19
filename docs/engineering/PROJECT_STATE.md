@@ -49,18 +49,19 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 > Orden por **riesgo de dinero / verdad de resultados** (no por severidad rotulada). Prioridad síntoma: **causalidad de indicadores** = único hueco serio de integridad que queda tras F2.
 
-| Código         | Objetivo                                                                                                                                    | Estado                             | Riesgo     | Fracción            |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ---------- | ------------------- |
-| **F-IND-1**    | Causality Layer: distinguir indicadores **causales vs visualización**; prohibir features no causales (chikou/fractals) en backtest/research | ✅ MERGED (79fa155)                | Medio      | v1                  |
-| **F-IND-2**    | Batería de tests de causalidad en CI (`feature_at_t` con/sin barra futura idéntico para todos los indicadores)                              | 🟢 COMMITED (09fb06b, pend. merge) | Bajo       | 🔵 **activa ahora** |
-| **F-FIN-1**    | `get_or_create_default_portfolio()` por nombre global → scope por cuenta (ADR-008)                                                          | 🟢 COMMITED (f595761, pend. merge) | Alto       | v3                  |
-| **F-FIN-2**    | `GetTaxReport` `limit=10000` + sin filtro por año en SQL                                                                                    | 🟢 COMMITED (9a35405, pend. merge) | Medio      | v4                  |
-| **F-SEG-1**    | Fail-closed production + comparaciones constantes (`secrets.compare_digest`) — **auth JWT sigue diferida (D4)**                             | 🟢 COMMITED (4b7a984, pend. merge) | Bajo       | v5                  |
-| **F-SEG-2**    | Auditoría historial git (repo público) + rotación de logs + tests negativos de redacción                                                    | 🟢 COMMITED (dcb8a37, pend. merge) | Bajo-Medio | v6                  |
-| **F-SEG-3**    | CORS mínimo privilegio + `X-Forwarded-For`/TrustedHost en rate-limit                                                                        | 🟢 COMMITED (e628ae3, pend. merge) | Bajo       | v7                  |
-| **F-HLTH-1**   | Mojibake en `workspace-store-core.ts` (2 strings UI + ~26 JSDoc)                                                                            | 🟢 COMMITED (2400a4b, pend. merge) | Bajo       | v8                  |
-| **F-DEBT-1**   | Deuda cierre ola: P1.9 API thin + P2.6 DTOs TS↔Py + mypy ~450 por fases                                                                     | 🟠 PENDIENTE                       | Medio      | 🔵 **activa ahora** |
-| **F-WORKER-1** | Warning auto-sync ticker `BP/.L` (Yahoo 404) — retomar subagente con `resume`                                                               | 🟡 ABIERTO                         | Bajo       | v10                 |
+| Código         | Objetivo                                                                                                                                                                 | Estado                             | Riesgo     | Fracción            |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------- | ---------- | ------------------- |
+| **F-IND-1**    | Causality Layer: distinguir indicadores **causales vs visualización**; prohibir features no causales (chikou/fractals) en backtest/research                              | ✅ MERGED (79fa155)                | Medio      | v1                  |
+| **F-IND-2**    | Batería de tests de causalidad en CI (`feature_at_t` con/sin barra futura idéntico para todos los indicadores)                                                           | 🟢 COMMITED (09fb06b, pend. merge) | Bajo       | 🔵 **activa ahora** |
+| **F-FIN-1**    | `get_or_create_default_portfolio()` por nombre global → scope por cuenta (ADR-008)                                                                                       | 🟢 COMMITED (f595761, pend. merge) | Alto       | v3                  |
+| **F-FIN-2**    | `GetTaxReport` `limit=10000` + sin filtro por año en SQL                                                                                                                 | 🟢 COMMITED (9a35405, pend. merge) | Medio      | v4                  |
+| **F-SEG-1**    | Fail-closed production + comparaciones constantes (`secrets.compare_digest`) — **auth JWT sigue diferida (D4)**                                                          | 🟢 COMMITED (4b7a984, pend. merge) | Bajo       | v5                  |
+| **F-SEG-2**    | Auditoría historial git (repo público) + rotación de logs + tests negativos de redacción                                                                                 | 🟢 COMMITED (dcb8a37, pend. merge) | Bajo-Medio | v6                  |
+| **F-SEG-3**    | CORS mínimo privilegio + `X-Forwarded-For`/TrustedHost en rate-limit                                                                                                     | 🟢 COMMITED (e628ae3, pend. merge) | Bajo       | v7                  |
+| **F-HLTH-1**   | Mojibake en `workspace-store-core.ts` (2 strings UI + ~26 JSDoc)                                                                                                         | 🟢 COMMITED (2400a4b, pend. merge) | Bajo       | v8                  |
+| **F-DEBT-1**   | P1.9 API thin (adelgazar endpoints FastAPI). **mypy ~450 ya cerrado (P1.6, `6a89f6c`)**; P2.6 DTOs TS↔Py → F-DEBT-2 (deuda futura)                                       | 🟠 PENDIENTE                       | Medio      | 🔵 **activa ahora** |
+| **F-DEBT-2**   | (Deuda futura) P2.6 DTOs TS↔Py: consolidar tipos web-only (`RecommendationV1`/`CoreRVerdict`/`RunManifest`/`execution-policies`/`tax-report`, etc.) en `packages/shared` | 🟡 PENDIENTE                       | Bajo-Medio | v10                 |
+| **F-WORKER-1** | Warning auto-sync ticker `BP/.L` (Yahoo 404) — retomar subagente con `resume`                                                                                            | 🟡 ABIERTO                         | Bajo       | v10                 |
 
 **Anti-objetivos (freeze vigente):** sin features nuevas · sin reabrir Belief/H · sin tocar gobernanza IA ni dominio puro · auth JWT diferida (decisión D4) hasta decisión de exponer la app.
 
@@ -124,8 +125,9 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 > F-SEG-2 (rotación de logs + redacción de secretos), F-SEG-3 (CORS mínimo privilegio + `X-Forwarded-For`/
 > TrustedHost en rate-limit) y F-HLTH-1 (mojibake) **hechas** (ver §3).
 >
-> PRÓXIMA FASE pactada: **F-DEBT-1** — Deuda cierre de ola: P1.9 API thin + P2.6 DTOs TS↔Py +
-> mypy ~450 por fases. **Riesgo Medio**. Después: F-WORKER-1 (ver §3).
+> PRÓXIMA FASE pactada: **F-DEBT-1 = P1.9 API thin** (adelgazar endpoints FastAPI; proxies/serializaciones
+> delgados actuales = deuda de F4/F5b). **Alcance exclusivo: SOLO P1.9**. **mypy ~450 ya cerrado (P1.6, `6a89f6c`)**
+> y **P2.6 DTOs TS↔Py → F-DEBT-2** (deuda futura). **Riesgo Medio**. Después: F-WORKER-1 · F-DEBT-2 (ver §3).
 >
 > Nota F-IND-1/2: la guardia de causalidad puede cambiar resultados de backtests que usen
 > chikou; documentado y ya respaldado por la batería F-IND-2 (no recalcular aún).
