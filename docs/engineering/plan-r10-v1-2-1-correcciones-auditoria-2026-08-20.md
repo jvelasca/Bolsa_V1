@@ -146,6 +146,14 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 **Corrección:** `stamp_duty_buy_pct ge=0`, `dividend_withholding_pct ge=0`, `capital_gains_tax_pct ge=0` (si no None), `fiscal_year_start_month` en `[1,12]` (por `model_validator(mode="after")`), todos `allow_inf_nan=False`. **NO cambiar `wire`** (alias/`populate_by_name` intactos). Conservar `model_config` y los `# type: ignore[typeddict-unknown-key]`.
 **Criterio:** tests de DTO en `test_schemas_accounts.py` (valores absurdos → `ValidationError`; límites válidos pasan); ruff 0 · mypy 0 (schemas+tests) · pytest zona; sin migración.
 
+**Manifiesto verificado (2026-08-20):**
+
+- **DTO:** `TaxProfileDto` = `apps/api-python/src/bolsa_api/schemas/accounts.py:42-50`. Campos: `jurisdiction: str`, `cost_basis_method: str`, `stamp_duty_buy_pct: float`, `dividend_withholding_pct: float`, `capital_gains_tax_pct: float|None`, `fiscal_year_start_month: int`. Sin constraints hoy.
+- **Restricciones firmes:** NO cambiar el wire — conservar `model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)` con su `# type: ignore[typeddict-unknown-key]`, y los `alias` (`costBasisMethod`, `stampDutyBuyPct`, `dividendWithholdingPct`, `capitalGainsTaxPct`, `fiscalYearStartMonth`). `jurisdiction`/`cost_basis_method` quedan sin restricción.
+- **Tests:** `apps/api-python/tests/test_schemas_accounts.py` (usa `pytest.raises(ValidationError)`, `overrides`, import de DTOs). Añadir tests de `TaxProfileDto`: negativos/NaN/Inf en los 3 pct → `ValidationError`; `fiscal_year_start_month` fuera de [1,12] → `ValidationError`; límites válidos (0, y pct None) pasan; alias y populate_by_name intactos (wire-serialization).
+- **¿Alcance de contrato?** `TaxProfileDto` es DTO de request del endpoint de perfil de cuenta. Añadir constraints Pydantic NO cambia el JSON wire (solo validación) → **sin regen de `openapi.json`/`schema.d.ts`** salvo que `contract:gen` lo pida y solo añada `minimum`, en cuyo caso NO comitear drift colateral (documentar). `contract:check` preexistente rojo por baseline F4 (no F2a).
+- **Sin migración.** Nivel de riesgo bajo.
+
 ### 🟡 FASE F2b — R-10.2b: comparación idempotente exacta, sin tolerancia (P2)
 
 **Problema:** `_cash_movement_payload_matches` (`accounts.py:302`) y `_trade_payload_matches` (`:337-345`) usan `Decimal("0.01")`.

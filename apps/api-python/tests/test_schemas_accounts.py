@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from bolsa_api.schemas.accounts import (
     CommissionProfileDto,
     CreateInvestmentAccountDto,
+    TaxProfileDto,
 )
 
 
@@ -156,3 +157,93 @@ def test_commission_wire_serializes_by_alias() -> None:
     dumped = dto.model_dump(by_alias=True)
     assert dumped["stockCommissionMin"] == 1
     assert dumped["stockCommissionMax"] == 29
+
+
+def _min_tax_fields(**overrides: object) -> dict[str, object]:
+    base: dict[str, object] = {
+        "jurisdiction": "US",
+        "cost_basis_method": "fifo",
+        "stamp_duty_buy_pct": 0.0,
+        "dividend_withholding_pct": 0,
+        "capital_gains_tax_pct": None,
+        "fiscal_year_start_month": 1,
+    }
+    base.update(overrides)
+    return base
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"stamp_duty_buy_pct": -0.01},
+        {"dividend_withholding_pct": -1},
+        {"capital_gains_tax_pct": -5},
+    ],
+)
+def test_tax_rejects_negative_rates(overrides: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        TaxProfileDto(**_min_tax_fields(**overrides))
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"stamp_duty_buy_pct": nan},
+        {"dividend_withholding_pct": float("inf")},
+        {"capital_gains_tax_pct": float("inf")},
+    ],
+)
+def test_tax_rejects_nan_and_inf(overrides: dict[str, object]) -> None:
+    with pytest.raises(ValidationError):
+        TaxProfileDto(**_min_tax_fields(**overrides))
+
+
+@pytest.mark.parametrize("month", [0, 13])
+def test_tax_rejects_fiscal_year_start_month_out_of_range(month: int) -> None:
+    with pytest.raises(ValidationError):
+        TaxProfileDto(**_min_tax_fields(fiscal_year_start_month=month))
+
+
+def test_tax_accepts_fiscal_year_start_month_12() -> None:
+    dto = TaxProfileDto(**_min_tax_fields(fiscal_year_start_month=12))
+    assert dto.fiscal_year_start_month == 12
+
+
+def test_tax_accepts_none_capital_gains_tax_pct() -> None:
+    dto = TaxProfileDto(**_min_tax_fields(capital_gains_tax_pct=None))
+    assert dto.capital_gains_tax_pct is None
+
+
+def test_tax_accepts_boundary_valid_values() -> None:
+    dto = TaxProfileDto(
+        **_min_tax_fields(
+            stamp_duty_buy_pct=0,
+            dividend_withholding_pct=0,
+            capital_gains_tax_pct=0,
+            fiscal_year_start_month=12,
+        )
+    )
+    assert dto.stamp_duty_buy_pct == 0
+    assert dto.dividend_withholding_pct == 0
+    assert dto.capital_gains_tax_pct == 0
+    assert dto.fiscal_year_start_month == 12
+
+
+def test_tax_wire_populates_and_serializes_by_alias() -> None:
+    by_alias = TaxProfileDto(
+        **{
+            "jurisdiction": "US",
+            "costBasisMethod": "fifo",
+            "stampDutyBuyPct": 0.2,
+            "dividendWithholdingPct": 19.0,
+            "capitalGainsTaxPct": None,
+            "fiscalYearStartMonth": 1,
+        }
+    )
+    assert by_alias.stamp_duty_buy_pct == 0.2
+    assert by_alias.dividend_withholding_pct == 19.0
+    assert by_alias.fiscal_year_start_month == 1
+    dumped = by_alias.model_dump(by_alias=True)
+    assert dumped["stampDutyBuyPct"] == 0.2
+    assert dumped["dividendWithholdingPct"] == 19.0
+    assert dumped["fiscalYearStartMonth"] == 1

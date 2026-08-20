@@ -44,10 +44,24 @@ class TaxProfileDto(BaseModel):
 
     jurisdiction: str
     cost_basis_method: str = Field(alias="costBasisMethod")
-    stamp_duty_buy_pct: float = Field(alias="stampDutyBuyPct")
-    dividend_withholding_pct: float = Field(alias="dividendWithholdingPct")
-    capital_gains_tax_pct: float | None = Field(alias="capitalGainsTaxPct")
+    stamp_duty_buy_pct: float = Field(alias="stampDutyBuyPct", ge=0, allow_inf_nan=False)
+    dividend_withholding_pct: float = Field(
+        alias="dividendWithholdingPct", ge=0, allow_inf_nan=False
+    )
+    capital_gains_tax_pct: float | None = Field(
+        alias="capitalGainsTaxPct", ge=0, allow_inf_nan=False
+    )
     fiscal_year_start_month: int = Field(alias="fiscalYearStartMonth")
+
+    @model_validator(mode="after")
+    def fiscal_year_start_month_in_range(self) -> Self:
+        """Inviolable: el mes de inicio del año fiscal debe ser un mes válido [1,12]."""
+        if not 1 <= self.fiscal_year_start_month <= 12:
+            raise ValueError(
+                "fiscalYearStartMonth must be in [1,12] "
+                f"(got {self.fiscal_year_start_month})"
+            )
+        return self
 
 
 class AccountSettingsDto(BaseModel):
