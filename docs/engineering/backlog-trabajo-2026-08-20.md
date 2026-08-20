@@ -22,7 +22,7 @@
 >
 > **RELEVO → SIGUIENTE ETAPA (decisión 2026-08-20): FIN de R-7 COMPLETADO** — deuda de dinero real de R-7 **completa**: **Alto×3 + Medio×7 + Baja B-1 + Baja B-3 + Baja B-4 + Baja B-5 + Baja B-2** (esta última `7b3dd91`). Solo queda **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **HITO alcanzado: R-7 cerrado por completo → siguientes pasos: GUARDAR + mandar auditorías externas del estado global** (revisar checklist operativo §4 y la auditoría de ramas `stage/*`). **PACK de estado global consolidado (listo para auditoría externa): [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md)**. Secuencia por fases acotadas (una por chat). Ver texto de traspaso completo en `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` **§8**.
 >
-> **RELEVO → R-8 (decisión 2026-08-20): R-8A PUSHEADA** — P0-A/P0-B (`edf2d0c`) + docs (`7f327ab`). Plan: `docs/engineering/plan-r8-prevencion-riesgo-2026-08-20.md`. **Próximo: elegir fase R-8B P1** — B.1 (login/status → `SENSITIVE_PREFIXES`) · B.2 (migrar auth a sesión HttpOnly, freeze D4 ya levantado) · B.3 (reducir DTOs shared, NO `regen_full`). Una fase = un subagente acotado + batería + aprobación por commit + relevo.
+> **RELEVO → R-8 (decisión 2026-08-20): R-8A PUSHEADA** — P0-A/P0-B (`edf2d0c`) + docs (`7f327ab`). **R-8B.1 PUSHEADA** (`ac147fe`, rate-limit `/api/auth/login|status`) + higiene lint R-8A (`a1360bb`, 7 I001). Plan: `docs/engineering/plan-r8-prevencion-riesgo-2026-08-20.md`. **Próximo: decidir fase R-8B** — B.2 (migrar auth a sesión HttpOnly, freeze D4 ya levantado) · B.3 (reducir DTOs shared, NO `regen_full`) · R-8C · R-8D. Una fase = un subagente acotado + batería + aprobación por commit + relevo.
 
 ---
 

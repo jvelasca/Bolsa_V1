@@ -46,6 +46,8 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 **R-8A (2026-08-20, P0 hardening):** `database_bootstrap()` con `pg_advisory_lock` (serializa Alembic + migración de datos entre N workers FastAPI + scheduler) y robustez de idempotencia (`IdempotencyKeyExists` + savepoint + re-SELECT en `execute_trade`/`deposit`/`withdraw`). ✅ **PUSHEADA a `main`** (`edf2d0c` + docs `7f327ab`) — ruff/mypy/pytest verdes.
 
+**R-8B.1 (2026-08-20, P1 hardening):** rate-limit `/api/auth/login` (20/60s, brute-force) y `/api/auth/status` (60/60s) vía `SENSITIVE_PREFIXES` en `rate_limit.py`; test determinista ampliado. ✅ **PUSHEADA a `main`** (`ac147fe`). Higiene asociada: 7 I001 de R-8A corregidos (solo imports, `a1360bb`) → `ruff` project-wide 0.
+
 ---
 
 ## 3. Deuda PENDIENTE (priorizada 2026-08-19)
