@@ -160,6 +160,15 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 **Corrección:** comparar **igualdad exacta de valores normalizados a la precisión financiera** (`Numeric(18,6)`). Ej.: `Decimal(str(x)).quantize(Decimal("0.000001"))`. Eliminar la tolerancia de 1 céntimo.
 **Criterio:** tests en `test_idempotency_reused.py` (misma key + payload `100.004` vs `100.000` → **409**, ya NO rejuega; mismos valores exactos → replay). ruff 0 · mypy 0 · pytest app idempotencia.
 
+**Manifiesto verificado (2026-08-20):**
+
+- **Funciones a cambiar:** `_cash_payload_matches` (`accounts.py:301`) → reemplaza `abs(...) < Decimal("0.01")` por **igualdad exacta normalizada**; `_trade_payload_matches` (`:336-344`) → reemplaza `abs(...) > tol` por igualdad exacta normalizada.
+- **Criterio de normalización (importante):** normalizar el entrante y el persistido a **escala fija de 6 decimales** (`Decimal(str(x)).quantize(Decimal("0.000001"))`) y comparar con `==`. ELIMINAR la tolerancia de 1 céntimo. `100.004` vs `100.000` → **distinto → raise/return False → 409**; `100` vs `100.000000` → **igual → replay**.
+- **Advertencia anti-alucinación:** `quantize` por defecto usa `ROUND_HALF_EVEN`. Como la escala es de 6 decimales y los valores de dinero/trade típicos tienen ≤6 decimales, la normalización no debe introducir redondeos espurios; usa `Decimal(str(x))` (no construir desde float). No inventes contextos ni tolerancias adicionales — el objetivo es exactitud granular a 6 decimales. Documenta la semántica en el docstring (sustituyendo la mención a "tolerancia de 1 céntimo").
+- **Dependencias/imports:** `Decimal` está importado localmente en cada función (`from decimal import Decimal`). Mantener.
+- **Tests:** en `packages/py/application/tests/test_idempotency_reused.py` (zona de payload mismatch) y, si es más natural, `test_deposit_withdraw_idempotency.py`/`test_execute_trade_idempotency.py`. Añadir/ajustar casos: key reutilizada con `amount` que difiere en <1 céntimo pero es distinto a nivel granular (p.ej. `100.004` vs `100.000`) → **409**; cantidades que difieren en el 6º decimal percibido (p.ej. mismas → replay). Los casos previos que usaban `0.01` de tolerancia que YA debían dar 409 siguen igual; los que dependían de la tolerancia para "clavar" replay deben seguir pasando (mismas cantidades exactas).
+- **Sin migración, sin contrato, sin tocar F1/F2a/F3/F4.** Riesgo bajo-medio (afecta semántica de 409, zona protegida de R-9 F2 — respetar el mecanismo de replay/carrera).
+
 ### 🟠 FASE F3 — R-10.3: `balance_after` de trade + fee corregido, SIN backfill (P1.1)
 
 **Problema:** `accounts.py:817/824/844` guardan cash FINAL en ambas filas.

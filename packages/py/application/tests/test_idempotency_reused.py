@@ -234,6 +234,46 @@ async def test_deposit_reused_key_with_same_amount_still_replays() -> None:
     assert len(ledger.entries) == 1
 
 
+@pytest.mark.asyncio
+async def test_deposit_reused_key_with_sub_cent_different_amount_raises_reused() -> None:
+    """R-10 F2b: comparación por igualdad exacta normalizada a 6 decimales.
+
+    Antes, la tolerancia de 1 céntimo absorbía una diferencia de 4 milésimas
+    (100.004 vs 100.000) y rejugaba en silencio. Ahora esa diferencia sub-céntimo
+    hace que el payload sea DISTINTO → conflicto (IdempotencyKeyReused), NO rejuega.
+    """
+    ledger = _FakeLedgerRepo()
+    portfolio = _FakePortfolioCashRepo()
+    use_case = DepositCashToAccount(_FakeAccountRepo(), portfolio, ledger)
+
+    await use_case.execute("acc-1", amount=100.000, idempotency_key="dep-key-1")
+    assert portfolio.cash == 100.000
+    assert len(ledger.entries) == 1
+
+    with pytest.raises(IdempotencyKeyReused):
+        await use_case.execute("acc-1", amount=100.004, idempotency_key="dep-key-1")
+    assert portfolio.cash == 100.000
+    assert len(ledger.entries) == 1
+
+
+@pytest.mark.asyncio
+async def test_deposit_reused_key_with_exactly_equal_normalized_amount_still_replays() -> None:
+    """R-10 F2b: valores exactamente iguales (100 vs 100.000000) sí rejuegan.
+
+    La normalización a 6 decimales hace que distintos rendereados del mismo valor
+    colapsen a igualdad exacta y el replay se conserve correctamente.
+    """
+    ledger = _FakeLedgerRepo()
+    portfolio = _FakePortfolioCashRepo()
+    use_case = DepositCashToAccount(_FakeAccountRepo(), portfolio, ledger)
+
+    await use_case.execute("acc-1", amount=100.0, idempotency_key="dep-key-1")
+    replay = await use_case.execute("acc-1", amount=100.000000, idempotency_key="dep-key-1")
+    assert replay.id == "dep-key-1"
+    assert portfolio.cash == 100.0
+    assert len(ledger.entries) == 1
+
+
 # --- Withdraw ---------------------------------------------------------------
 
 
@@ -314,6 +354,59 @@ async def test_trade_reused_key_with_different_type_raises_reused() -> None:
     with pytest.raises(IdempotencyKeyReused):
         await use_case.execute(instrument_id="inst-1", trade_type="sell", idempotency_key="tk-1", **kwargs)
     assert len(portfolio.executions) == 1
+
+
+@pytest.mark.asyncio
+async def test_trade_reused_key_with_sub_cent_different_quantity_raises_reused() -> None:
+    """R-10 F2b: cantidad con diferencia sub-céntimo (10.004 vs 10.000) → conflicto.
+
+    Antes la tolerancia de 1 céntimo absorbía la diferencia y rejugaba; ahora el
+    payload es distinto → IdempotencyKeyReused, NO rejuega ni duplica.
+    """
+    use_case, portfolio, ledger = _build_trade()
+    kwargs = {"instrument_id": "inst-1", "trade_type": "buy", "account_id": "acc-1"}
+
+    await use_case.execute(quantity=10.000, price=100.0, idempotency_key="tk-1", **kwargs)
+    assert len(portfolio.executions) == 1
+
+    with pytest.raises(IdempotencyKeyReused):
+        await use_case.execute(quantity=10.004, price=100.0, idempotency_key="tk-1", **kwargs)
+    assert len(portfolio.executions) == 1
+    assert len(ledger.rows) == 2  # trade + fee originales, sin duplicar
+
+
+@pytest.mark.asyncio
+async def test_trade_reused_key_with_sub_cent_different_price_raises_reused() -> None:
+    """R-10 F2b: precio con diferencia sub-céntimo (50.004 vs 50.000) → conflicto."""
+    use_case, portfolio, ledger = _build_trade()
+    kwargs = {"instrument_id": "inst-1", "trade_type": "buy", "account_id": "acc-1"}
+
+    await use_case.execute(quantity=10.0, price=50.000, idempotency_key="tk-1", **kwargs)
+    assert len(portfolio.executions) == 1
+
+    with pytest.raises(IdempotencyKeyReused):
+        await use_case.execute(quantity=10.0, price=50.004, idempotency_key="tk-1", **kwargs)
+    assert len(portfolio.executions) == 1
+    assert len(ledger.rows) == 2
+
+
+@pytest.mark.asyncio
+async def test_trade_reused_key_with_exactly_equal_normalized_payload_still_replays() -> None:
+    """R-10 F2b: quantity/price exactamente iguales tras normalizar a 6 decimales
+    (10 vs 10.000000, 100 vs 100.000000) siguen rejugando correctamente."""
+    use_case, portfolio, ledger = _build_trade()
+
+    first = await use_case.execute(
+        instrument_id="inst-1", trade_type="buy", quantity=10.0, price=100.0,
+        account_id="acc-1", idempotency_key="tk-1",
+    )
+    replay = await use_case.execute(
+        instrument_id="inst-1", trade_type="buy", quantity=10.000000, price=100.000000,
+        account_id="acc-1", idempotency_key="tk-1",
+    )
+    assert replay.transaction.id == first.transaction.id
+    assert len(portfolio.executions) == 1
+    assert len(ledger.rows) == 2
 
 
 @pytest.mark.asyncio

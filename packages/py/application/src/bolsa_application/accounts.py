@@ -291,14 +291,14 @@ def _cash_payload_matches(
     deposit con el importe positivo y el withdraw con su signo (negativo); la
     comparación aplica ``storage_sign`` (1 para deposit, -1 para withdraw) para
     alinear el entrante con el signo de almacenamiento. Se normaliza a ``Decimal``
-    (con ``Decimal(str(x))``) con una tolerancia absoluta de 1 céntimo para
-    absorber las diferencias de representación floating point. ``note``/description
+    (con ``Decimal(str(x))``) y se compara por igualdad exacta a escala financiera
+    de 6 decimales (Numeric(18,6)); no se usa ninguna tolerancia. ``note``/description
     se comparan exactamente sólo si el entrante aporta nota. Si algún campo
     difiere, la key se está reutilizando con un payload distinto → conflicto.
     """
     from decimal import Decimal
 
-    amount_matches = abs(Decimal(str(entry.amount)) - Decimal(str(amount * storage_sign))) < Decimal("0.01")
+    amount_matches = Decimal(str(entry.amount)).quantize(Decimal("0.000001")) == Decimal(str(amount * storage_sign)).quantize(Decimal("0.000001"))
     if not amount_matches:
         return False
     if note is not None:
@@ -327,20 +327,20 @@ def _trade_payload_matches(existing: Transaction, *, instrument_id: str, trade_t
     """Compara el payload entrante de un trade contra la transacción persistida.
 
     Coincide si `instrument_id`, `trade_type`, `quantity` y `price` son iguales.
-    Se normaliza a ``Decimal`` (con ``Decimal(str(x))``) para quantity/price con la
-    misma tolerancia de 1 céntimo que los movimientos de cash (floating point).
-    ``total`` es derivable (quantity*price + fees) y no se compara directamente.
+    Se normaliza a ``Decimal`` (con ``Decimal(str(x))``) y se compara quantity/price
+    por igualdad exacta a escala financiera de 6 decimales (Numeric(18,6)); no se
+    usa ninguna tolerancia. ``total`` es derivable (quantity*price + fees) y no se
+    compara directamente.
     """
     from decimal import Decimal
 
-    tol = Decimal("0.01")
     if existing.instrument_id != instrument_id:
         return False
     if existing.type != trade_type:
         return False
-    if abs(Decimal(str(existing.quantity)) - Decimal(str(quantity))) > tol:
+    if Decimal(str(existing.quantity)).quantize(Decimal("0.000001")) != Decimal(str(quantity)).quantize(Decimal("0.000001")):
         return False
-    if abs(Decimal(str(existing.price)) - Decimal(str(price))) > tol:
+    if Decimal(str(existing.price)).quantize(Decimal("0.000001")) != Decimal(str(price)).quantize(Decimal("0.000001")):
         return False
     return True
 
