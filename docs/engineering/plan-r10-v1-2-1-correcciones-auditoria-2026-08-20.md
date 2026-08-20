@@ -2,8 +2,8 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product/Ops`) · **backlog:** `docs/engineering/backlog-trabajo-2026-08-20.md`.
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐ §0 (**PREMISAS ESENCIALES ACTUALES E1–E9**).
-> **AsOf:** 2026-08-20.
-> **Estado:** 📋 **PROPUESTA — PLAN AUTORIZADO (decisiones cerradas). SIN IMPLEMENTAR.** Ningún cambio de código se ejecuta sin **aprobación explícita del usuario POR COMMIT** (§2.4). Es el **plan director de R‑10**; cada fase se abre como subagente acotado bajo las premisas E1–E9.
+> **AsOf:** 2026-08-21 (apertura 2026-08-20; avanzado F1/F2a/F2b el 21 — ver `traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21.md`).
+> **Estado:** 🚧 **EN EJECUCIÓN (2026-08-21):** **F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a`** (todas en `main`, aprobadas por commit). **SIGUIENTE: F3.** Ningún cambio de código adicional sin **aprobación explícita del usuario POR COMMIT** (§2.4). Plan director de R‑10; cada fase se abre como subagente acotado bajo las premisas E1–E9.
 > **R‑9 quedó CERRADA** (F1–F8, decisión 2026-08-20) y **v1.2.0 intacta**. R‑10 es un paquete nuevo nacido de la **auditoría externa sobre `b28e956`/`v1.2.0`** (capa financiera P1/P2).
 
 ---
@@ -20,11 +20,12 @@
 
 | Contexto                     | Valor verificado                                                 |
 | ---------------------------- | ---------------------------------------------------------------- |
-| HEAD actual                  | `0de43ec` (tip de `main`)                                        |
+| HEAD actual                  | `86c315a` (tip de `main`, 2026-08-21)                            |
 | HEAD auditado por la externa | `b28e956` (= tag `v1.2.0`)                                       |
 | Rama / árbol                 | `main` = `origin/main` · **limpio** (`git status --short` vacío) |
 | Tags                         | `v1.0.0`, `v1.1.0`, `v1.2.0`                                     |
 | Estado R‑9                   | **CERRADA** (F1–F8) — decisión propietario 2026-08-20            |
+| Avance R‑10 (2026-08-21)     | **F1 ✅ · F2a ✅ · F2b ✅** (A F3) — commits en §2 traspaso      |
 
 ### 1.3 Evidencia verificada en código (file:line) — los 6 puntos
 
