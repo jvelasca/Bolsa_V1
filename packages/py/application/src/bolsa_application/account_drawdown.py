@@ -49,6 +49,7 @@ class EquityMarkBook:
     """
     Marcas de apertura día/semana por cuenta (proceso + opcional settings_json).
     Al primer equity del día/semana se fija la referencia; DD = caída desde esa marca.
+    max_pct se computa desde el pico de equity (high-water-mark), no desde el depósito inicial.
     """
 
     def __init__(self) -> None:
@@ -89,9 +90,28 @@ class EquityMarkBook:
 
         day_open = float(state["dayOpen"])
         week_open = float(state["weekOpen"])
+
+        peak = state.get("peakEquity")
+        if peak is None:
+            seed = float(equity)
+            if initial_deposit is not None and initial_deposit > 0:
+                seed = max(seed, float(initial_deposit))
+            peak = seed
+        else:
+            peak = float(peak)
+        peak = max(peak, float(equity))
+        state["peakEquity"] = peak
+        new_high = float(equity) >= peak
+
         max_dd = None
         if initial_deposit is not None and initial_deposit > 0:
-            max_dd = _dd_pct(float(initial_deposit), float(equity))
+            cur = _dd_pct(peak, float(equity))
+            if new_high:
+                max_dd = 0.0
+            else:
+                prev = state.get("maxDrawdownPct")
+                max_dd = cur if prev is None else max(float(prev), cur)
+            state["maxDrawdownPct"] = max_dd
 
         return AccountDrawdowns(
             daily_pct=round(_dd_pct(day_open, float(equity)), 4),
