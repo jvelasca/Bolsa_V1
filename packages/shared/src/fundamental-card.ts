@@ -10,12 +10,15 @@
  * @see docs/engineering/fa-status-and-test-plan-2026-07-31.md
  */
 
-import type { DcfScenariosV1, InstrumentFundamentalsV1 } from './fundamentals-gate.js';
+import type {
+  DcfScenariosV1,
+  InstrumentFundamentalsV1,
+} from "./fundamentals-gate.js";
 
-export const FUND_CARD_SCHEMA_VERSION = 'fund_card_v1' as const;
-export const SCORE_FUND_VERSION = 'fund_score_v1' as const;
+export const FUND_CARD_SCHEMA_VERSION = "fund_card_v1" as const;
+export const SCORE_FUND_VERSION = "fund_score_v1" as const;
 
-export type FundamentalDataConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+export type FundamentalDataConfidence = "HIGH" | "MEDIUM" | "LOW";
 
 /** Pilares F1 = mismos keys que ScoreFundResult.components. */
 export interface FundamentalPillarsV1 {
@@ -62,46 +65,46 @@ export interface FundamentalCardDerivedV1 {
 
 export interface FundamentalCardMetadataV1 {
   provider: string;
-  sourceVersion: string | null;
+  sourceVersion?: string | null;
   scoreVersion: string;
-  fetchedAt: string | null;
-  staleDays: number | null;
+  fetchedAt?: string | null;
+  staleDays?: number | null;
   isStale: boolean;
   /** Confianza de datos (Python); UI solo pinta. */
   confidence: FundamentalDataConfidence;
   /** Cobertura de pesos de pilares Score_FUND [0..1]. */
-  coverage: number | null;
+  coverage?: number | null;
   /** Corte DÍA D (YYYY-MM-DD) si se pidió asOf. */
   asOfDate?: string | null;
   /**
    * live = sin corte · snapshot = pack ≤ D · blocked = pack posterior a D
    * (scores/ratios nulled; sin look-ahead).
    */
-  pointInTime?: 'live' | 'snapshot' | 'blocked' | 'reconstructed' | null;
+  pointInTime?: "live" | "snapshot" | "blocked" | "reconstructed" | null;
 }
 
 /** Keys siempre presentes; ausentes → null (no omitir en JSON). */
 export type FundamentalCardFactsV1 = {
   [K in keyof Pick<
     InstrumentFundamentalsV1,
-    | 'marketCap'
-    | 'trailingPe'
-    | 'forwardPe'
-    | 'sector'
-    | 'roe'
-    | 'roa'
-    | 'operatingMargin'
-    | 'profitMargin'
-    | 'revenueGrowth'
-    | 'earningsGrowth'
-    | 'debtToEquity'
-    | 'currentRatio'
-    | 'quickRatio'
-    | 'totalCash'
-    | 'totalDebt'
-    | 'ebitda'
-    | 'freeCashflow'
-    | 'priceToBook'
+    | "marketCap"
+    | "trailingPe"
+    | "forwardPe"
+    | "sector"
+    | "roe"
+    | "roa"
+    | "operatingMargin"
+    | "profitMargin"
+    | "revenueGrowth"
+    | "earningsGrowth"
+    | "debtToEquity"
+    | "currentRatio"
+    | "quickRatio"
+    | "totalCash"
+    | "totalDebt"
+    | "ebitda"
+    | "freeCashflow"
+    | "priceToBook"
   >]: InstrumentFundamentalsV1[K] | null | undefined;
 };
 
@@ -109,18 +112,18 @@ export interface FundamentalCardDto {
   schemaVersion: typeof FUND_CARD_SCHEMA_VERSION | string;
   instrumentId: string;
   ticker: string;
-  scoreFund: number | null;
+  scoreFund?: number | null;
   /** Escala inequívoca 0–100 (neutro 50). */
-  scoreDisplay100: number | null;
+  scoreDisplay100?: number | null;
   distress: boolean;
-  pillars: FundamentalPillarsV1 | null;
+  pillars?: FundamentalPillarsV1 | null;
   facts: FundamentalCardFactsV1;
   derived: FundamentalCardDerivedV1;
   metadata: FundamentalCardMetadataV1;
   assessmentId?: string | null;
   /** Evidencias = claims del Score_FUND. */
-  narrativeFacts: string[];
-  warnings: string[];
+  narrativeFacts?: string[];
+  warnings?: string[];
 }
 
 export interface FundamentalCardResponseDto {
@@ -150,11 +153,13 @@ export interface FundamentalChipQueryResponseV1 {
 }
 
 /** Proyecta card → chip (UI / tests). */
-export function fundamentalCardToChip(card: FundamentalCardDto): FundamentalChipDto {
+export function fundamentalCardToChip(
+  card: FundamentalCardDto,
+): FundamentalChipDto {
   return {
     instrumentId: card.instrumentId,
     ticker: card.ticker,
-    scoreDisplay100: card.scoreDisplay100,
+    scoreDisplay100: card.scoreDisplay100 ?? null,
     confidence: card.metadata.confidence,
     isStale: card.metadata.isStale,
     distress: card.distress,

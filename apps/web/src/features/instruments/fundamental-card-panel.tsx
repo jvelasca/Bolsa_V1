@@ -65,7 +65,7 @@ function fmtMcap(n: number | null | undefined): string {
   return n.toFixed(0);
 }
 
-function scoreTone(score100: number | null): string {
+function scoreTone(score100: number | null | undefined): string {
   if (score100 == null) return "text-muted-foreground";
   if (score100 >= 70) return "text-emerald-600 dark:text-emerald-400";
   if (score100 >= 45) return "text-amber-600 dark:text-amber-400";
@@ -716,9 +716,9 @@ export function FundamentalCardPanel({
         </MoreMetrics>
       </CardSection>
 
-      {card.warnings.length > 0 ? (
+      {(card.warnings?.length ?? 0) > 0 ? (
         <ul className="space-y-0.5 text-[11px] text-muted-foreground">
-          {card.warnings.slice(0, 4).map((w) => (
+          {(card.warnings ?? []).slice(0, 4).map((w) => (
             <li key={w}>· {w}</li>
           ))}
         </ul>

@@ -9,21 +9,21 @@
  * @see docs/engineering/fundamental-intelligence-engine-2026-07-30.md
  */
 
-export const COMPOSITE_SCHEMA_VERSION = 'composite_card_v1' as const;
-export const COMPOSITE_SCORE_VERSION = 'composite_score_v1_1' as const;
+export const COMPOSITE_SCHEMA_VERSION = "composite_card_v1" as const;
+export const COMPOSITE_SCORE_VERSION = "composite_score_v1_1" as const;
 
-export type CompositeDataConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+export type CompositeDataConfidence = "HIGH" | "MEDIUM" | "LOW";
 
-export type CompositeLegStatusV1 = 'ok' | 'missing' | 'stub' | 'not_evaluated';
+export type CompositeLegStatusV1 = "ok" | "missing" | "stub" | "not_evaluated";
 
 export interface CompositeLegV1 {
   key:
-    | 'technical'
-    | 'fundamental'
-    | 'riskProfile'
-    | 'liquidity'
-    | 'marketRegime'
-    | 'portfolioConstraints';
+    | "technical"
+    | "fundamental"
+    | "riskProfile"
+    | "liquidity"
+    | "marketRegime"
+    | "portfolioConstraints";
   label: string;
   score: number | null;
   weight: number;
@@ -59,8 +59,8 @@ export interface CompositeCardMetadataV1 {
   paperDUnlocked: boolean;
   /** Corte DÍA D si se pidió asOf. */
   asOfDate?: string | null;
-  pointInTime?: 'live' | 'snapshot' | 'blocked' | 'reconstructed' | null;
-  fundPointInTime?: 'live' | 'snapshot' | 'blocked' | 'reconstructed' | null;
+  pointInTime?: "live" | "snapshot" | "blocked" | "reconstructed" | null;
+  fundPointInTime?: "live" | "snapshot" | "blocked" | "reconstructed" | null;
   /** true si la pierna TA usó OHLCV dateTo ≤ asOf. */
   taCutToAsOf?: boolean;
 }
@@ -87,9 +87,9 @@ export interface CompositeChipDto {
   instrumentId: string;
   ticker: string;
   /** Combined 0–100 (neutral 50). */
-  scoreDisplay100: number | null;
+  scoreDisplay100?: number | null;
   confidence: CompositeDataConfidence;
-  combinedScore: number | null;
+  combinedScore?: number | null;
   regime: string;
   paperDUnlocked: boolean;
   /** Pierna técnica 0–100 (hub Instrumentos I2). */
