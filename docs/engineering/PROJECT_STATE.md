@@ -2,6 +2,7 @@
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
 > **AsOf:** 2026-08-20 (revisado R-7)
+> **PACK de estado global consolidado R-1→R-7 (para auditoría externa / lectura rápida):** [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md) · **R-7 deuda COMPLETA** (solo M-4/T-M4 diferido).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
 > **Regla del hilo actual (pactada 2026-08-19):** NO tocar código fuera del alcance de la fase declarada. Cada fase se ejecuta EN UN SUBAGENTE acotado, con batería y APROBACIÓN del usuario por commit. Máx. ~3 subagentes en paralelo por chat. Al cerrar un chat se actualiza ESTE documento y el `engineering-index` §5.
