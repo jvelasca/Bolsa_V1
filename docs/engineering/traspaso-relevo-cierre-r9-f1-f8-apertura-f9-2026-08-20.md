@@ -2,19 +2,20 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Propósito:** texto de paso oficial para el **NUEVO AGENTE / NUEVO CHAT** que retome el proyecto tras el cierre de la refactorización **R-9**. Es el ancla anti-saturación / anti-alucinación de relevo: cualquier agente nuevo **LEE ESTE DOC + `backlog-trabajo-2026-08-20.md` §0/§1 ANTES de tocar nada**.
-> **Estado al redactar (verificado):** `local main = origin/main = 5c557fa` · working tree limpio · **R-9 COMPLETA (F1–F8 cerradas y pusheadas)**.
+> **Estado al redactar (verificado):** `local main = origin/main = 25fe8fc` · working tree limpio · **R-9 COMPLETA (F1–F8 cerradas y pusheadas)** · cierre + relevo commiteados · **v1.2.0 taggeada**.
 > **AsOf:** 2026-08-20 (≈23:35).
 
 ---
 
 ## 1. Estado verificado (firma — no adivinar)
 
-- **HEAD/rama:** `main` == `origin/main` == `5c557fa`. Árbol limpio (`git status --short` vacío).
+- **HEAD/rama:** `main` == `origin/main` == `25fe8fc`. Árbol limpio (`git status --short` vacío). Cierre de R-9 (`5c557fa`) **ya pusheado**; el relevo y la versión **v1.2.0** se registran en commit posterior (ver §6).
 - **R-9 COMPLETA:** las 8 fases (F1–F8) están cerradas y pusheadas a `main`. Decisión del propietario (2026-08-20): **CERRAR R-9**; la fase opcional **F9 (V2)** queda **documentada como pendiente de decisión futura** (no se ejecuta ahora).
 - **Últimos commits (`main`, de más nuevo a más antiguo) de la R-9:**
 
   | Commit    | Contenido                                                  |
   | --------- | ---------------------------------------------------------- |
+  | `25fe8fc` | docs: traspaso cierre R-9 + registro versión **v1.2.0**    |
   | `5c557fa` | docs: cerrar R-9 completa + diferir F9/V2 como pendiente   |
   | `c2b3797` | docs: cerrar R-9 F8 (plan + backlog + estado)              |
   | `5ea336f` | F8 — limpieza transversal R-9.8 (E8)                       |
@@ -92,7 +93,7 @@ Estas reglas siguen siendo las mismas que en los relevos R-7/R-8 (premisas **E1�
 
 ### 4.1 Brief de arranque (nuevo chat principal)
 
-> CONTEXTO (2026-08-20, ≈23:35): repo `Bolsa_V1`, `main` = `5c557fa`, árbol limpio. **R-9 COMPLETA: F1–F8 cerradas y pusheadas** (ver §6). El plan director está en `docs/engineering/plan-r9-refactor-hardening-2026-08-20.md` y las premisas E1–E9 en `docs/PROJECT_PREMISES.md` ⭐§0.
+> CONTEXTO (2026-08-20, actualizado): repo `Bolsa_V1`, `main` = `25fe8fc`, árbol limpio. **R-9 COMPLETA: F1–F8 cerradas y pusheadas** (ver §6) + traspaso commiteado + **v1.2.0 taggeada**. El plan director está en `docs/engineering/plan-r9-refactor-hardening-2026-08-20.md` y las premisas E1–E9 en `docs/PROJECT_PREMISES.md` ⭐§0.
 > **LEE PRIMERO (obligatorio):** `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/engineering/plan-r9-refactor-hardening-2026-08-20.md` § FASE 9 · `docs/engineering/PROJECT_STATE.md` · este doc (`traspaso-relevo-cierre-r9-f1-f8-apertura-f9-2026-08-20.md`).
 > **Tarea inmediata (decisión, NO fase abierta):** confirmar con el propietario si se **abre F9 (V2)** — arquitectura Python + puente legacy — **o** se mantiene **R-9 cerrado**. NO abrir F9 sin: ADR + diseño en el plan + aprobación explícita. Si se abre: protocolo (read-first → diseño Plan → documentar ADR/plan → subagentes de exploración de alcances disjuntos → verificación del coordinador → aprobación por commit → push a `main`).
 > **NO tocar** (salvo decisión de usuario): regen OpenAPI/`contract:gen` (pendiente decisión F2/F4), `pending-delete` riesgo alto, scheduler/worker R-8C.2, M-4/T-M4, gobernanza IA, features nuevas, ni migraciones fuera de la fase.
@@ -122,14 +123,15 @@ Estas reglas siguen siendo las mismas que en los relevos R-7/R-8 (premisas **E1�
 
 ## 6. Cierres de la R-9 registrados (completos)
 
-| Fecha      | Hito                                                    | Commits `main`                        |
-| ---------- | ------------------------------------------------------- | ------------------------------------- |
-| 2026-08-20 | **F1** idempotencia por cuenta+type (R-9.1)             | `fa070ec` (+docs `29f444f`)           |
-| 2026-08-20 | **F2** 409 idempotency_key con payload distinto (R-9.2) | `31954dd` (+docs `2823eae`)           |
-| 2026-08-20 | **F3** carrera de custodia idempotente, no 500 (R-9.3)  | `26f5ca1` (+docs `fbfefc7`)           |
-| 2026-08-20 | **F4** DTOs financieros estrictos (R-9.4)               | `b384f31` (+docs `0800ee9`)           |
-| 2026-08-20 | **F5** sesión epoch UTC (R-9.5)                         | `ef4c136` (+docs `14585bf`)           |
-| 2026-08-20 | **F6** balance_after postcondición app (R-9.6)          | `e5d8926` (+docs `2d2006e`)           |
-| 2026-08-20 | **F7** suite concurrencia/invariantes (R-9.7)           | `5d59671` (+docs `fa529dd`)           |
-| 2026-08-20 | **F8** limpieza transversal E8 (R-9.8)                  | `5ea336f` (+docs `8cd39ad`/`c2b3797`) |
-| 2026-08-20 | **FIN R-9** — decisión cerrar; F9 diferida              | `5c557fa` (docs)                      |
+| Fecha      | Hito                                                                                                   | Commits `main`                        |
+| ---------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------- |
+| 2026-08-20 | **F1** idempotencia por cuenta+type (R-9.1)                                                            | `fa070ec` (+docs `29f444f`)           |
+| 2026-08-20 | **F2** 409 idempotency_key con payload distinto (R-9.2)                                                | `31954dd` (+docs `2823eae`)           |
+| 2026-08-20 | **F3** carrera de custodia idempotente, no 500 (R-9.3)                                                 | `26f5ca1` (+docs `fbfefc7`)           |
+| 2026-08-20 | **F4** DTOs financieros estrictos (R-9.4)                                                              | `b384f31` (+docs `0800ee9`)           |
+| 2026-08-20 | **F5** sesión epoch UTC (R-9.5)                                                                        | `ef4c136` (+docs `14585bf`)           |
+| 2026-08-20 | **F6** balance_after postcondición app (R-9.6)                                                         | `e5d8926` (+docs `2d2006e`)           |
+| 2026-08-20 | **F7** suite concurrencia/invariantes (R-9.7)                                                          | `5d59671` (+docs `fa529dd`)           |
+| 2026-08-20 | **F8** limpieza transversal E8 (R-9.8)                                                                 | `5ea336f` (+docs `8cd39ad`/`c2b3797`) |
+| 2026-08-20 | **FIN R-9** — decisión cerrar; F9 diferida                                                             | `5c557fa` (docs)                      |
+| 2026-08-20 | **CIERRE + VERSIÓN** — traspaso R-9 completo + tag **v1.2.0** (post-auditoría externa, para verificar) | `25fe8fc` (docs) + tag `v1.2.0`       |
