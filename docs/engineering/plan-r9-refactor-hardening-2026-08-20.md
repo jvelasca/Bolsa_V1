@@ -284,6 +284,8 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Plan de ejecución (tras aprobación):** 1 commit de inventario + 3 subagentes de limpieza con alcances disjuntos (Python / web / shared) que apliquen los LIMPIO aprobados, cada uno con su batería; el coordinador re-verifica diffs + batería real antes de proponer commits de aprobación por usuario.
 
+**Estado (2026-08-20, IMPLEMENTADO):** aplicado y pusheado a `main`. Inventario del coordinador (`8cd39ad`) + limpieza en un commit (`5ea336f`). Backend: `SYNC_SCOPE_STALE`/`SYNC_SCOPE_ALL` (sync_scheduler), `_clamp_stars` (daily_opinion_stance), `is_scheduled_tracker` (tracker_schedule), `GetAccountInvestorProfile` (investor_profiles) y DTOs `DeleteInstrumentRequestDto`/`WorkspacePayloadDto` borrados; `prediction/ports.py` eliminado; docstring `session.py` sin el residuo "(monotónico)". Web: 5 componentes/módulos huérfanos + 2 barrels + cluster `list-membership-dialog` + slices `trading-ui-store`/`ui-store` + 7 aliases `@deprecated` + `onlyInPortfolio` (test→`scopeFilter`) borrados. Shared: `isIndicatorApiSupportedLegacy` (+ const privada), `resolveEstudioPersonalListId`, y los 3 helpers muertos de `chart-new-tab-setup.ts` borrados (se conserva el tipo `NewChartConfigSource` y el campo pending-delete `newChartConfigSource`). Batería del coordinador (post-hook): ruff 0 · mypy solo 2 preexistentes · pytest application/analytics 25 + api-python 91 · shared typecheck/lint/test 17/17 + build · web typecheck/lint/test 713/713. `pending-delete` riesgo alto intacto. Commit `5ea336f` pusheado a `main`.
+
 ---
 
 ### 🟡 FASE 9 — (Opcional / alinear con V2) Arquitectura Python + puente legacy
