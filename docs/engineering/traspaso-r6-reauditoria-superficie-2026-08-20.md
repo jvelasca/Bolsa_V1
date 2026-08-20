@@ -126,4 +126,9 @@ El subagente backend señala: **la lógica de dinero real (use-cases/repos/invar
 >
 > **SIGUIENTES (candidatos por decisión):** (1) **auditar `packages/py/{application,infrastructure}`** = lógica de dinero real (mayor agujero de cobertura, quedó fuera del surface); (2) corregir los Medio de normalización de errores backend (B-1 fuga excepción, B-2 ScanManifest tragado, B-3 fail-open effectiveness, B-4 confirm sin try) y S-1 redondeo; (3) checklist operativo manual pendiente del relevo (secret scanning, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
 >
+> **PRÓXIMA FASE ELEGIDA (2026-08-20): R-7 — auditoría read-only de la lógica de dinero real en
+> `packages/py/{application,infrastructure}` + corrección por fases de la deuda encontrada** (los use-cases/repos/
+> invariantes contables quedaron FUERA del surface de R-6; es el mayor agujero de cobertura por prioridad dinero/verdad).
+> Texto de paso en `docs/engineering/engineering-index-2026-08-03.md` §5 (nodo R-7) y PROJECT_STATE §6.
+>
 > Regla: una fase = un subagente acotado + batería + aprobación por commit + relevo documentado al cerrar chat. Freeze vigente: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA. Auth JWT diferida (D4).

@@ -268,6 +268,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 >
 > 1. **Auditar `packages/py/{application,infrastructure}`** = la lógica de dinero real (use-cases/repos/invariantes). Es el
 >    **mayor agujero de cobertura** — quedó FUERA del surface pactado (eran web+api+shared). Recomendado por prioridad dinero/verdad.
+>    **→ ELEGIDA como R-7 (2026-08-20): auditoría read-only + corrección por fases.**
 > 2. Corregir los **Medio** de normalización de errores backend: **B-1** `backtests.py:212-214` fuga de excepción en 500,
 >    **B-2** `scans.py:85-88` ScanManifest tragado (200), **B-3** `ai_governance.py:144-147` fail-open `/ai/effectiveness`,
 >    **B-4** `ai_governance.py:387-401` `confirm` sin try/except en path de ejecución de trade; y **S-1** redondeo
