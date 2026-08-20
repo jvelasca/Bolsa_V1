@@ -101,6 +101,8 @@ El freeze dice _"auth JWT diferida (D4)"_. La auditoría externa pide exactament
 
 Revisar `pending-delete/` (§1.3.9 criterio), docs obsoletos (`CHART_*`, `transfer_cash`), `logs/dev` (acciones manuales fuera de repo). Con batería completa.
 
+> **Cierre R-8D (2026-08-20): PUSHEADA a `main` (`dbd1ee5`).** Bloque de riesgo BAJO (decisión usuario): eliminados 14 símbolos/aliases deprecated muertos tras aplicarse el criterio (cero imports en `apps/`+`packages/` excl. tests-que-solo-validan-alias + sin lectura de storage por nombre): `ChartBarZoneRailButton`, `attachChartScaleWheel`, `attachChartTimeWheelSync`, `resolveDisplayToolForGroup`, `resolveActivateToolForGroup`, `resolveOverlayLineSeries`, `inferAssistantStep`(+test huérfano), `EXPLORE_PRESET_BATTERY`, `matrixPresetRowsToExploreRows`, `isSmaGridOptimizable`, `presetFromHybridStrategyScore`, `ListsTab`(+barrel), 6 aliases `ui-store` (+tipo huérfano). `pending-delete/README.md` reescrito al estado real (ítems desactualizados corregidos; `optimizeFamilyForStrategy` marcado CANÓNICO, no alias; riesgo-alto "no tocar hasta purge storage"). Verificado: `transfer_cash` y docs `CHART_*` ya estaban limpios (0 ediciones necesarias); `logs/dev` es acción manual del usuario (fuera de repo). **No tocados (riesgo alto, "hasta purge storage"):** `readLegacyPendingOrders`, `chartDataStrip`/`chartNewTabSeed`/`newChartConfigSource`, `readLegacyTimeframeFavorites`, re-export `presetRuleGroups` shared. Batería: web typecheck 0 · lint 0 · build shared+web OK · web test 714/714 · rg residuos 0. **R-8 completa.**
+
 ---
 
 ### ✅ Cierre R-8A — P0 hardening (2026-08-20, implementado y verificado)
@@ -134,19 +136,21 @@ Revisar `pending-delete/` (§1.3.9 criterio), docs obsoletos (`CHART_*`, `transf
 
 - `local main = origin/main = 7f327ab` (`edf2d0c` R-8A + `7f327ab` docs) · árbol limpio · working tree sin cambios.
 - Freeze: sin features nuevas; **`D4` (auth) levantado solo para R-8B.2** por decisión usuario 2026-08-20.
-- R-7 completo (todos sus items cerrados; `M-4/T-M4` diferido). R-8A (P0-A+P0-B) PUSHEADA.
+- R-7 completo (todos sus items cerrados; `M-4/T-M4` diferido). **R-8 COMPLETA**: R-8A (`edf2d0c`+`7f327ab`), R-8B.1 (`ac147fe`+`a1360bb`), R-8B.2 (`abf3dc2`), R-8C (`3ad48aa`), R-8D (`dbd1ee5`) — todas PUSHEADAS a `main`. Pendiente no urgente: R-8B.3 (DTOs shared) y ítems pending-delete riesgo alto ("hasta purge storage").
 - Batería base confirmada en el último cierre: ruff 0 (config CI raíz) · mypy infra/domain Success · pytest infra Postgres real 76+1xfail · domain 21 · application 240 · api-python 56 · CI verde.
 
 ---
 
 ## 6. Historial de cierres (se rellenará por fase)
 
-| Fecha      | Fase / Código            | Commit(s)                                 | Batería                                                                                                                             | Estado                         |
-| ---------- | ------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| 2026-08-20 | R-8 Fase 0               | `7f327ab` (docs)                          | docs                                                                                                                                | ✅ CERRADA (Fase 0 = este doc) |
-| 2026-08-20 | R-8A (P0-A + P0-B)       | `edf2d0c` (~ `7f327ab` docs)              | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop                                                        | ✅ **PUSHEADA a `main`**       |
-| 2026-08-20 | R-8B.1 (P1 hard.)        | `ac147fe` (~ `a1360bb` higiene lint R-8A) | ruff 0 · mypy changed-files Success · app 249 · infra 78+1xfail · api 58                                                            | ✅ **PUSHEADA a `main`**       |
-| 2026-08-20 | R-8B.2 (sesión HttpOnly) | `abf3dc2`                                 | ruff 0 · mypy(4 src) Success · auth 10 · api 66 · config 15 · app 249 · infra 78+1xfail · web typecheck/lint/build OK · web 141/716 | ✅ **PUSHEADA a `main`**       |
+| Fecha      | Fase / Código               | Commit(s)                                 | Batería                                                                                                                             | Estado                         |
+| ---------- | --------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| 2026-08-20 | R-8 Fase 0                  | `7f327ab` (docs)                          | docs                                                                                                                                | ✅ CERRADA (Fase 0 = este doc) |
+| 2026-08-20 | R-8A (P0-A + P0-B)          | `edf2d0c` (~ `7f327ab` docs)              | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop                                                        | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8B.1 (P1 hard.)           | `ac147fe` (~ `a1360bb` higiene lint R-8A) | ruff 0 · mypy changed-files Success · app 249 · infra 78+1xfail · api 58                                                            | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8B.2 (sesión HttpOnly)    | `abf3dc2`                                 | ruff 0 · mypy(4 src) Success · auth 10 · api 66 · config 15 · app 249 · infra 78+1xfail · web typecheck/lint/build OK · web 141/716 | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8C (invariable DB + debt) | `3ad48aa`                                 | ruff 0 · mypy test Success · test nueva 3 passed · infra 81 +1xfail                                                                 | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8D (limpieza bajo)        | `dbd1ee5`                                 | web typecheck 0 · lint 0 · build shared+web OK · web test 714/714 · residuos 0                                                      | ✅ **PUSHEADA a `main`**       |
 
 ---
 

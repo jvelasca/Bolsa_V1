@@ -50,6 +50,10 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 **R-8B.2 (2026-08-20, sesión HttpOnly):** token SHA-256 fuera de `localStorage` → cookie HttpOnly firmada stateless (`auth/session.py`, `exp.token.sig` + HMAC, TTL `APP_AUTH_TTL_SECONDS`=86400, `Secure` solo prod). `login` sin `token` en body + `Set-Cookie`; nuevo `POST /api/auth/logout`; middleware acepta Bearer **o** cookie; `/api/auth/status` reporta `authenticated`. FE: `credentials:"include"` (cliente + fetch manuales), gate `authEnabled && !authenticated`. Contrato regen acotada. ✅ **PUSHEADA a `main`** (`abf3dc2`) — ruff 0 · mypy Success · api 66 · web typecheck/lint/build OK · web 141/716.
 
+**R-8C (2026-08-20, mejoras consolidadoras):** invariante DB `balance_after` por **grupo atómico** (fila suelta = 1 grupo; trade+fee = grupo de 2 filas con mismo `balance_after` post-fee) verificado en nuevo test de repositorio con Postgres real (`test_r8c_ledger_balance_atomic.py`, 3 tests). Complementa M-2 sin tocar producción. Deuda `R-8C.2` scheduler-vs-worker documentada en §3. ✅ **PUSHEADA a `main`** (`3ad48aa`) — ruff 0 · mypy test Success · test nueva 3 passed · infra 81 +1xfail.
+
+**R-8D (2026-08-20, limpieza transversal — bloque bajo):** eliminados 14 símbolos/aliases deprecated muertos (criterio: 0 imports + sin localStorage) en charts/backtests/trading/shared/ui-store + test huérfano; `pending-delete/README.md` reescrito al estado real (borrados→"Ya eliminado", resueltos marcados, riesgo-alto "no tocar hasta purge storage"). ✅ **PUSHEADA a `main`** (`dbd1ee5`) — web typecheck 0 · lint 0 · build shared+web OK · web test 714/714 · residuos 0.
+
 ---
 
 ## 3. Deuda PENDIENTE (priorizada 2026-08-19)
