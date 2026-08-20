@@ -136,21 +136,22 @@ Revisar `pending-delete/` (§1.3.9 criterio), docs obsoletos (`CHART_*`, `transf
 
 - `local main = origin/main = 7f327ab` (`edf2d0c` R-8A + `7f327ab` docs) · árbol limpio · working tree sin cambios.
 - Freeze: sin features nuevas; **`D4` (auth) levantado solo para R-8B.2** por decisión usuario 2026-08-20.
-- R-7 completo (todos sus items cerrados; `M-4/T-M4` diferido). **R-8 COMPLETA**: R-8A (`edf2d0c`+`7f327ab`), R-8B.1 (`ac147fe`+`a1360bb`), R-8B.2 (`abf3dc2`), R-8C (`3ad48aa`), R-8D (`dbd1ee5`) — todas PUSHEADAS a `main`. Pendiente no urgente: R-8B.3 (DTOs shared) y ítems pending-delete riesgo alto ("hasta purge storage").
+- R-7 completo (todos sus items cerrados; `M-4/T-M4` diferido). **R-8 COMPLETA**: R-8A (`edf2d0c`+`7f327ab`), R-8B.1 (`ac147fe`+`a1360bb`), R-8B.2 (`abf3dc2`), R-8C (`3ad48aa`), R-8D (`dbd1ee5`) — todas PUSHEADAS a `main`. **R-8 a `158b3db`**. **R-8B.3 ABIERTO** (mapeo read-only hecho): Fase A (cash `description?`) PUSHEADA (`158b3db`); siguiente fase dedicada FIE FUND/composite (`FundamentalCardDto`/`Metadata`/`CompositeChipDto`, ~11 campos) + B (`signal-alerts.channels`) + C (`instrument-daily-opinion` 8 campos) + D (`account-settings.notes`). Pendiente no urgente: ítems pending-delete riesgo alto ("hasta purge storage") · **contrato `openapi.json`/`schema.d.ts` STALE** (drift preexistente R-8A `idempotencyKey`/R-8B.2 `authenticated`; `contract:check` rojo — decidido NO regen en esta fase).
 - Batería base confirmada en el último cierre: ruff 0 (config CI raíz) · mypy infra/domain Success · pytest infra Postgres real 76+1xfail · domain 21 · application 240 · api-python 56 · CI verde.
 
 ---
 
 ## 6. Historial de cierres (se rellenará por fase)
 
-| Fecha      | Fase / Código               | Commit(s)                                 | Batería                                                                                                                             | Estado                         |
-| ---------- | --------------------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| 2026-08-20 | R-8 Fase 0                  | `7f327ab` (docs)                          | docs                                                                                                                                | ✅ CERRADA (Fase 0 = este doc) |
-| 2026-08-20 | R-8A (P0-A + P0-B)          | `edf2d0c` (~ `7f327ab` docs)              | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop                                                        | ✅ **PUSHEADA a `main`**       |
-| 2026-08-20 | R-8B.1 (P1 hard.)           | `ac147fe` (~ `a1360bb` higiene lint R-8A) | ruff 0 · mypy changed-files Success · app 249 · infra 78+1xfail · api 58                                                            | ✅ **PUSHEADA a `main`**       |
-| 2026-08-20 | R-8B.2 (sesión HttpOnly)    | `abf3dc2`                                 | ruff 0 · mypy(4 src) Success · auth 10 · api 66 · config 15 · app 249 · infra 78+1xfail · web typecheck/lint/build OK · web 141/716 | ✅ **PUSHEADA a `main`**       |
-| 2026-08-20 | R-8C (invariable DB + debt) | `3ad48aa`                                 | ruff 0 · mypy test Success · test nueva 3 passed · infra 81 +1xfail                                                                 | ✅ **PUSHEADA a `main`**       |
-| 2026-08-20 | R-8D (limpieza bajo)        | `dbd1ee5`                                 | web typecheck 0 · lint 0 · build shared+web OK · web test 714/714 · residuos 0                                                      | ✅ **PUSHEADA a `main`**       |
+| Fecha      | Fase / Código                       | Commit(s)                                 | Batería                                                                                                                                          | Estado                         |
+| ---------- | ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| 2026-08-20 | R-8 Fase 0                          | `7f327ab` (docs)                          | docs                                                                                                                                             | ✅ CERRADA (Fase 0 = este doc) |
+| 2026-08-20 | R-8A (P0-A + P0-B)                  | `edf2d0c` (~ `7f327ab` docs)              | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop                                                                     | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8B.1 (P1 hard.)                   | `ac147fe` (~ `a1360bb` higiene lint R-8A) | ruff 0 · mypy changed-files Success · app 249 · infra 78+1xfail · api 58                                                                         | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8B.2 (sesión HttpOnly)            | `abf3dc2`                                 | ruff 0 · mypy(4 src) Success · auth 10 · api 66 · config 15 · app 249 · infra 78+1xfail · web typecheck/lint/build OK · web 141/716              | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8C (invariable DB + debt)         | `3ad48aa`                                 | ruff 0 · mypy test Success · test nueva 3 passed · infra 81 +1xfail                                                                              | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8D (limpieza bajo)                | `dbd1ee5`                                 | web typecheck 0 · lint 0 · build shared+web OK · web test 714/714 · residuos 0                                                                   | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8B.3 Fase A (fidelidad wire cash) | `158b3db`                                 | shared typecheck 0 · lint 0 · test 17/17 · web typecheck 0 · web test 714/714 · `contract:check` ROJO (drift preexistente R-8A/8B, no esta fase) | ✅ **PUSHEADA a `main`**       |
 
 ---
 
