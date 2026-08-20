@@ -300,11 +300,14 @@ class DepositCashToAccount:
             raise ValueError("El importe debe ser mayor que cero")
         scope = await self._account_repo.resolve_scope(account_id)
         # A-2: idempotencia — un retry con la misma idempotency_key no re-mueve
-        # efectivo; rejuega el movimiento original desde el ledger.
+        # efectivo; rejuega el movimiento original desde el ledger. Aislado por
+        # cuenta y por type (deposit) para coincidir con el UNIQUE por-cuenta+type.
         if idempotency_key:
             existing = await self._ledger_repo.find_cash_movement_by_reference(
                 "external",
                 idempotency_key,
+                account_id=scope.account.id,
+                type="deposit",
             )
             if existing is not None:
                 return _cash_movement_result_from_entry(existing, "external_deposit")
@@ -335,6 +338,8 @@ class DepositCashToAccount:
             existing = await self._ledger_repo.find_cash_movement_by_reference(
                 "external",
                 idempotency_key,  # type: ignore[arg-type]
+                account_id=scope.account.id,
+                type="deposit",
             )
             if existing is None:
                 raise
@@ -377,11 +382,14 @@ class WithdrawCashFromAccount:
         scope = await self._account_repo.resolve_scope(account_id)
         # A-2: idempotencia — un retry con la misma idempotency_key no re-mueve
         # efectivo; rejuega el movimiento original desde el ledger (antes de validar
-        # saldo actual, que ya se consumió en la ejecución original).
+        # saldo actual, que ya se consumió en la ejecución original). Aislado por
+        # cuenta y por type (withdrawal) para coincidir con el UNIQUE por-cuenta+type.
         if idempotency_key:
             existing = await self._ledger_repo.find_cash_movement_by_reference(
                 "external",
                 idempotency_key,
+                account_id=scope.account.id,
+                type="withdrawal",
             )
             if existing is not None:
                 return _cash_movement_result_from_entry(existing, "external_withdrawal")
@@ -416,6 +424,8 @@ class WithdrawCashFromAccount:
             existing = await self._ledger_repo.find_cash_movement_by_reference(
                 "external",
                 idempotency_key,  # type: ignore[arg-type]
+                account_id=scope.account.id,
+                type="withdrawal",
             )
             if existing is None:
                 raise

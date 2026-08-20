@@ -156,8 +156,17 @@ class SqlAlchemyLedgerRepository:
         self,
         reference_type: str,
         reference_id: str,
+        *,
+        account_id: str,
+        type: str,
     ) -> LedgerEntry | None:
-        """Localiza el movimiento de caja original por su reference (idempotencia A-2).
+        """Localiza el movimiento de caja original por referencia (idempotencia A-2).
+
+        La búsqueda es por cuenta y por ``type``, de modo que coincide con el UNIQUE
+        ``uq_ledger_entries_account_reference`` (account_id, reference_type,
+        reference_id, type): la idempotencia queda aislada por cuenta y por tipo de
+        operación (deposit vs withdrawal), evitando que una idempotency_key de una
+        cuenta "absorba" la de otra o que un depósito rejuegue un retiro.
 
         Devuelve la entrada más antigua (ejecución original) para poder replicala en
         un reintento con la misma idempotency_key sin volver a mover efectivo.
@@ -165,8 +174,10 @@ class SqlAlchemyLedgerRepository:
         stmt = (
             select(LedgerEntryRow)
             .where(
+                LedgerEntryRow.account_id == account_id,
                 LedgerEntryRow.reference_type == reference_type,
                 LedgerEntryRow.reference_id == reference_id,
+                LedgerEntryRow.type == type,
             )
             .order_by(LedgerEntryRow.executed_at.asc())
             .limit(1)
