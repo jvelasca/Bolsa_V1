@@ -392,7 +392,7 @@ IS NOT NULL AND reference_id IS NOT NULL`. Por-cuenta + `type` sin romper trade+
 > ratificado). `mypy accounts.py` conserva 6 errores pre-existentes (`no-untyped-def`/`arg-type`, application mypy-blind en CI), sin
 > nuevos.
 >
-> **SIGUIENTES (por decisión):** deuda de dinero real de R-7 **completa** (Alto×3 + Medio×7 + Baja **B-1** cerradas). Ahora Baja: **(1) B-3** (write-paths de cash sin ledger — xfail documentado en M-2) · **B-2** (unrealized silencia sin precio) · **B-4/B-5** · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 TODAS CERRADAS.** Detalle+inventario:
+> **SIGUIENTE ETAPA (por decisión 2026-08-20): FIN de R-7** — deuda de dinero real de R-7 **completa** (Alto×3 + Medio×7 + Baja **B-1** cerradas). Quedan **Bajas**: **(1) B-3** (write-paths de cash sin ledger — xfail documentado en M-2) · **B-4** (fee atómico) · **B-5** (FIFO quantity==0 / PnL whole-account) · **B-2** (unrealized silencia sin precio) · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **Se decide NO pausar ahora:** cuando R-7 quede del todo cerrado → **guardar y mandar auditorías externas del estado global**. **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 TODAS CERRADAS.** Detalle+inventario:
 > `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · ancla de trabajo vivo:
 > `docs/engineering/backlog-trabajo-2026-08-20.md`.
 >

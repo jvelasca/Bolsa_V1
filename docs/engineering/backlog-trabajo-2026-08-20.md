@@ -20,7 +20,7 @@
 
 > Si este bloque §0 no coincide con tu lectura del repo, **para y re-lee**: algo está desincronizado. No continúes por inerción.
 >
-> **RELEVO → SIGUIENTE por decisión: deuda de dinero real de R-7 completada en Alto×3 + Medio×7 + Baja B-1 (todas cerradas a fecha).** **B-1 CERRADA** (`4f43aeb`, high-water-mark max drawdown). Quedan **Bajos**: **B-3** (write-paths de cash sin ledger) · **B-4** (fee atómico) · **B-5** (FIFO quantity==0 / PnL whole-account) · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). Ver texto de traspaso completo en `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` **§8**.
+> **RELEVO → SIGUIENTE ETAPA (decisión 2026-08-20): completar el FIN de R-7** — deuda de dinero real de R-7 completada en **Alto×3 + Medio×7 + Baja B-1**; quedan las **Bajas: B-3** (write-paths de cash sin ledger) · **B-4** (fee atómico) · **B-5** (FIFO quantity==0 / PnL whole-account) · **B-2** (unrealized silencia sin precio) · y **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **Se decide NO pausar ahora**: cuando R-7 quede del todo cerrado → **guardar y mandar auditorías externas del estado global**. Secuencia por fases acotadas (una por chat). Ver texto de traspaso completo en `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` **§8**.
 
 ---
 
@@ -117,7 +117,7 @@ Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador).
 7. **M-4 (T-M4/T-M5)** (Medio) — custodia fuera del path de lectura (job dedicado). _Colinda con freeze._ **→ T-M5 (mezcla fees) ✅ CERRADA** (`6a1759c`, opción B acotada); **T-M4 (job dedicado) diferida** por «sin features».
 8. ~~**M-7 (L-M5)**~~ (Medio) — custodia dedup time-only. **✅ HECHO** (ver §6) — **cubierta por L-M3/M-5** (UNIQUE rechaza re-cargo; transacción compartida revierte cash) + test-postcondición (`f598e2d`).
 9. ~~**B-1 (T-M7)**~~ (Bajo) — max drawdown naive → **high-water-mark**. **✅ CERRADA** (`4f43aeb`, ver §6) — pico de equity + running-max `maxDrawdownPct`.
-10. **B-2 / B-3 / B-4 / B-5** (Bajo) — según decisión y saturación.
+10. **FIN de R-7 (Bajas restantes) → guardar + auditar al terminar.** Orden decidido (2026-08-20): B-3 · B-4 · B-5 · B-2 (una fase por chat), y **M-4/T-M4 diferido** por freeze. Al cerrar R-7 por completo → **guardar y mandar auditorías externas** del estado global.
 
 ---
 

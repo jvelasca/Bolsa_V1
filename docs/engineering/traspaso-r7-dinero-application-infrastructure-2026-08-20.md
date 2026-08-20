@@ -436,7 +436,7 @@ Confirmados personalmente en código actual:
 >
 > - **T-M6:** `_account_summary_from_portfolio` fabricaba `margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None` aunque el account tuviera leverage/posiciones. **Decisión usuario: fórmula `margin_used = Σ market_value / leverage`** + **alcance "completar"** (computar los 3 campos; DTO `AccountSummary`/endpoints intactos → sin `contract:gen`). Fix: `_account_summary_from_portfolio` computa `margin_used = Σ(mv de posiciones con precio)/leverage` (guard `leverage>0`, fail-closed→0.0), `free_margin = total_equity − margin_used`, `margin_level_pct = equity/margin_used*100` o `None` si 0. Fidelidad M-1: posiciones con `market_value=None` NO cuentan (coherentes con `total_market_value`/`total_equity`). Sin tocar FE (solo cambia el valor que ve `dashboard-page.tsx:163` "Margen libre"). Tests `test_account_summary_margin.py` (6, fakes en memoria: A sin posiciones / B single leverage / C dos posiciones leverage>1 / D sin precio no cuenta / D' mixto solo cuenta la con precio / E guard leverage==0 sin ZeroDivision); fake `_Account` de `test_list_account_summaries.py` ganó `leverage`.
 >
-> **SIGUIENTES (por decisión):** deuda de dinero real de R-7 **completa** (Alto×3 + Medio×7 + Baja **B-1** cerradas). Ahora Baja: **(1) B-3 (L-M4)** (write-paths de cash sin ledger — xfail documentado en M-2) · B-2 (unrealized silencia sin precio) · B-4 (fee atómico) · B-5 · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 TODAS CERRADAS.**
+> **SIGUIENTE ETAPA (por decisión 2026-08-20): FIN de R-7** — deuda de dinero real de R-7 **completa** (Alto×3 + Medio×7 + Baja **B-1** cerradas). Quedan **Bajas**: **(1) B-3 (L-M4)** (write-paths de cash sin ledger — xfail documentado en M-2) · B-4 (fee atómico) · B-5 · B-2 (unrealized silencia sin precio) · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **Se decide NO pausar ahora:** cuando R-7 quede del todo cerrado → **guardar + auditorías externas**. **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 TODAS CERRADAS.**
 >
 > **M-7 (L-M5) CERRADA (`f598e2d`):** el re-cobro de custodia (dedup time-only del mutex) **ya está cubierto por L-M3/M-5** (UNIQUE `(account_id, reference_type, reference_id, type)` rechaza con `IntegrityError` una 2ª fila del mismoaccount+periodo; la transacción compartida de `deduct_cash`+`append_custody_fee` revierte el cash en el `rollback` de `get_db_session`). Añadido test-postcondición `test_m7_custody_single_charge_f3_guard.py` (2, Postgres real). Sin cambios de producción. Ver §4i.
 >
@@ -463,7 +463,7 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 **Próximas candidatas (deuda Baja, requieren decisión de usuario):**
 
 - **B-1 (T-M7):** "max drawdown" naive → **✅ CERRADA** (`4f43aeb`, high-water-mark, ver §4j).
-- **B-3 (L-M4):** write-paths de cash sin ledger (`transfer_cash`/`add_cash`/`deduct_cash`, código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar. **[PRÓXIMA — ver bloque abajo]**
+- **B-3 (L-M4):** write-paths de cash sin ledger (`transfer_cash`/`add_cash`/`deduct_cash`, código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar. **[PRIMERA del FIN de R-7 — ver bloque abajo]**
 - **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio (_no confundir con M-1, ya cerrada_).
 - **B-4 / B-5** (fee atómico / FIFO + PnL whole-account).
 - **M-4/T-M4 (diferido):** mover custodia de GET a job dedicado — colinda con «sin features».
@@ -474,26 +474,28 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 
 ---
 
-## ✳️ ARRANQUE SIGUIENTE FASE: **B-3 (L-M4) — write-paths de cash sin ledger** (por decisión del usuario)
+## ✳️ ARRANQUE SIGUIENTE ETAPA: **FIN de R-7 — completar las Bajas restantes y luego GUARDAR + AUDITAR** (por decisión del usuario)
 
-> **Cómo usar:** pega este bloque (o el §8 anterior) como primer mensaje del NUEVO chat. El coordinador del nuevo chat ejecuta la secuencia en orden, una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **Alto×3 + Medio×7 + Baja B-1 de R-7 completados** → siguiente por decisión entre la deuda Baja.
+> **Cómo usar:** pega este bloque (o el §8 anterior) como primer mensaje del NUEVO chat. El coordinador del nuevo chat ejecuta la secuencia en orden, una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **DECISIÓN DE USUARIO (2026-08-20):** NO pausar todavía. **Objetivo: completar el FIN de R-7 (deuda Baja restante)** en chats secuenciales; **cuando R-7 quede del todo cerrado** → **guardar y mandar auditorías externas para ver el estado global**.
 >
 > **B-1 (T-M7) ya CERRADA** (`4f43aeb`, high-water-mark max drawdown — ver §4j).
 
 **Read-first (obligatorio):** leer `docs/engineering/backlog-trabajo-2026-08-20.md` §0 y §1. Si no coincide con el repo → PARAR y re-leer.
 
-**Estado al abrir:** `local main = origin/main` (cierre B-1 `4f43aeb` + docs actualizados), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1.**
+**Estado al abrir:** `local main = origin/main` (cierre B-1 `4f43aeb` + docs actualizados), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1.** Quedan **Bajas de R-7: B-2 · B-3 · B-4 · B-5** (+ **M-4/T-M4 DIFERIDO** por freeze).
 
-**Hallazgo a resolver (backlog §1, Baja):**
+**Plan de trabajo de esta etapa (FIN R-7) — una fase por chat, en este orden sugerido (por riesgo dinero/verdad + saturación):**
 
-> B-3 (L-M4) · infra+app · `transfer_cash` atómico pero **código muerto** (0 callers) y **no escribe ledger**; un futuro caller movería dinero sin traza reconciliable (xfail documental en M-2). Riesgo: **dinero/verdad**.
+1. **B-3 (L-M4)** — write-paths de cash sin ledger (`transfer_cash`/`add_cash`/`deduct_cash`, código muerto 0 callers, xfail documental en M-2): conectar use-case/ruta o eliminar. Riesgo dinero/verdad.
+2. **B-4 (L-M6)** — fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de F3 NO toca `transaction`). Riesgo dinero.
+3. **B-5 (T-M9/T-M10)** — FIFO divide sin guard `quantity==0`; `fetch_core_r_pnl_extra_rows` atribuye PnL whole-account a un instrumento (fail-open). Riesgo verdad.
+4. **B-2 (T-M8)** — `total_unrealized_gain` silencia a 0 las posiciones sin precio (NO confundir con M-1, ya cerrada). Riesgo verdad.
+5. Al terminar todos → **guardar + mandar auditorías externas del estado global** (revisar también el checklist operativo manual del §4 del backlog y la higiene de ramas `stage/*`).
 
-**Secuencia de arranque B-3 (obligatoria, anti-saturación):**
+**Cada fase (mismo protocolo):**
 
-1. **Mapeo read-only** (subagente, sin tocar código): confirmar que `transfer_cash`/`add_cash`/`deduct_cash` en `portfolio_repository.py` mutan cash SIN escribir ledger (evidencia file:line), confirmar que no hay callers de `transfer_cash` (0 callers), cómo quedó el xfail en M-2 (`test_m2_ledger_cash_reconciliation.py`), y qué use-cases/rutas podrían conectarlo (Deposit/Withdraw ya fija el ledger vía `append_cash_movement`? cuál es la escotilla real). Entregar file:line verificado. Determinar si conectar (use-case/ruta) o eliminar es la opción con menor riesgo/superficie.
-2. **Decisión de usuario:** opciones (conectar use-case/ruta vs eliminar el código muerto vs dejar documentado). Cambio de valor esperado solo si se conecta (afecta write-path de money).
-3. **Subagente implementación acotado** + **verificación coordinador** (code diff + test + batería real) + **aprobación + commit + push** (rama `main` protegida; el push requiere aprobación vía tarjeta) + **relevo documentado**.
-
-**Alternativas por decisión:** **B-2** (T-M8, `total_unrealized_gain` silencia posiciones sin precio) · **B-4** (fee atómico) · **B-5** (FIFO `quantity==0` / PnL whole-account) · **M-4/T-M4** (job dedicado, diferido por freeze).
+1. **Mapeo read-only** (subagente, sin tocar código): hallazgo file:line verificado + consumidores + si el fix rompe comportamiento esperado.
+2. **Decisión de usuario:** alcance y si el cambio de valor esperado es aceptable.
+3. **Subagente implementación acotado** + **verificación coordinador** (code diff + test + batería real) + **aprobación + commit + push** (rama `main` protegida; el push requiere aprobación vía tarjeta) + **relevo documentado** (actualizar backlog §0/§1/§6 y traspaso §4x/§5/§8).
 
 **Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M4 diferido por freeze (job dedicado); B-3 (write-paths de cash sin ledger) pendiente con xfail en M-2; B-1 CERRADA (high-water-mark, no reabrir); M-6/M-7 CERRADAS. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
