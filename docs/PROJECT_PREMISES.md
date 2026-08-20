@@ -1,9 +1,65 @@
 # Premisas de proyecto — Bolsa V1
 
-> **AsOf:** 2026-08-03  
+> **AsOf:** 2026-08-20  
 > **Qué es:** reglas de producto y de ingeniería que aplican a **todo** el monorepo.  
 > **Para quién:** equipo, auditores externos, quien retome el código.  
 > No sustituye ADRs: las ADRs deciden arquitectura; estas premisas fijan _cómo se trabaja y se documenta_.
+
+---
+
+## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-20) — leer primero en TODO trabajo
+
+> **AsOf:** 2026-08-20 · **Contexto:** cierre de **R-7** + **R-8** + **R-8B.3** en `main` (`v1.1.0`, tip `c06983d`). Proyecto todavía **NO en producción** → se permite refactorizar lo que sea preciso **manteniendo la idea del proyecto** (plataforma bursátil personal: embudo backtesting científico → IA gobernada → ejecución papel/paper, con integridad financiera y trazabilidad como valor central).
+> **Norma para el ciclo de hardening/financiero siguiente:** ver el **plan profundo R-9** (`docs/engineering/plan-r9-refactor-hardening-2026-08-20.md`, pendiente de aprobación del usuario) y el **backlog** (`docs/engineering/backlog-trabajo-2026-08-20.md`).
+
+### E1. Nada se implementa sin plan aprobado
+
+- Todo cambio de código corre bajo el **plan profundo R-9** (o fase acotada explicitada) aprobado por el **propietario/usuario**.
+- **No** se lanza implementación "en caliente"; primero se documenta la fase, el alcance, la batería y el riesgo en `/docs`.
+- Cualquier alteración de contrato HTTP / esquema DB / DTO compartido se tramita como **fase propia** (nunca colateral de otra).
+
+### E2. Ejecución por subagentes acotados (control de contexto y saturación)
+
+- **Una fase = un subagente acotado** con brief explícito (contexto, archivos exactos, qué **NO** tocar, batería esperada, obligación de escribir el resultado en backlog/traspaso).
+- **Máx. ~3 subagentes en paralelo por chat** y con **alcances disjuntos** (ficheros distintos). Inyectar en cada brief el **mapa de consumidores/llamadas ya verificado** para que no re-descubran call-sites ni alucinen.
+- El coordinador (agente principal) **nunca** se fía del reporte de un subagente: contrasta cada diff/resultado contra el código y la batería reales antes de proponer commit.
+- Si el contexto de un chat se satura, **cerrar el hilo** y abrir otro **pegando el texto de relevo** (doc + bloque de estado verificado), nunca adivinar el estado de memoria.
+
+### E3. Anti-alucinación / anti-pérdida de contexto
+
+- Todo hallazgo, commit, test o resultado afirmado por un subagente se **verifica contra código/datos reales (file:line)**. Sin evidencia reproducible → se rechaza y se re-pide.
+- En cada relevo de chat se genera un **texto de paso** con **estado verificado** (HEAD, rama, árbol, CI) para que el siguiente chat arranque sin asumir.
+- **Documento manda**: si un subagente reporta algo que contradice el backlog/PROJECT_STATE, el **documento** es fuente de verdad y se reconsidera antes de tocar código.
+
+### E4. Aprobación del usuario por commit
+
+- No auto-commitear ni auto-pushear. Cada commit se propone y se espera aprobación explícita del propietario.
+- Rama `main` **protegida**: push requiere aprobación nativa.
+
+### E5. Documentación y DOCSTRINGS obligatorios
+
+- Todo cambio relevante se documenta en la capa que corresponde: `docs/` para producto/decisión/auditoría/ADR; **docstring de módulo + símbolos públicos** al crear/tocar código (norma del [code-documentation-standard](./engineering/code-documentation-standard-2026-08-03.md)).
+- Medirlos con `python scripts/research/docstring_coverage_report.py` cuando se toque una zona.
+- Los cambios de contrato HTTP se reflejan en schemas + OpenAPI y, si aplica, en `API_REFERENCE.md`.
+
+### E6. Tests / scripts de verificación en cada fase
+
+- **Toda corrección lleva su TEST o SCRIPT de verificación**, no solo "el código compila". Especialmente para: idempotencia, concurrencia/locking, rollback, invariantes de ledger, migración desde DB limpia y desde DB existente, arranque multi-worker, aislamiento entre cuentas.
+- La batería mínima por fase (§4 de este archivo) es **obligatoria** y la re-verifica el coordinador.
+
+### E7. La integridad financiera y la separación de cuentas son el objetivo inmediato
+
+- Antes de ampliar ML/IA o features nuevas se cierra el núcleo financiero determinista (R-9): idempotencia aislada por cuenta, request-fingerprint, orden de custody-commit, invariantes DB, validación estricta de DTOs.
+- **No tocar salvo decisión explícita:** gobernanza IA · workers/scheduler (R-8C.2) · `pending-delete` de riesgo alto · M-4/T-M4 (job dedicado).
+
+### E8. Limpieza de código/doc obsoleto (criterio §4 de este archivo)
+
+- Solo se elimina lo que cumple: **0 imports** en `apps/`+`packages/` (excl. tests que validan el alias) · **no depende de storage/localStorage** por nombre · battery/typecheck verdes tras quitar.
+- Código/documentos obsoletos se mueven/marcan (no se pierde evidencia) y se revisan los que ya no reflejan la realidad (p. ej. deuda ya resuelta).
+
+### E9. Backlog como fuente de verdad del "trabajo por delante"
+
+- `docs/engineering/backlog-trabajo-2026-08-20.md` **es** la única fuente de verdad del estado de fases. Leer antes de abrir (read-first) y actualizar al cerrar (update-last). Igual para `PROJECT_STATE.md`.
 
 ---
 
@@ -11,6 +67,7 @@
 
 | Premisa                                        | Documento                                                                                                                       |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **PREMISAS ESENCIALES ACTUALES (E1–E9)**       | ⭐§0-este-archivo · [plan R-9](./engineering/plan-r9-refactor-hardening-2026-08-20.md)                                          |
 | **Documentar todo** (docs + código)            | §1 de este archivo · [code-documentation-standard](./engineering/code-documentation-standard-2026-08-03.md)                     |
 | UI configurable → `localStorage`               | [UI_PREFS_LOCALSTORAGE.md](./UI_PREFS_LOCALSTORAGE.md)                                                                          |
 | Responsive (chart / trading)                   | [RESPONSIVE_PREMISES.md](./RESPONSIVE_PREMISES.md)                                                                              |
