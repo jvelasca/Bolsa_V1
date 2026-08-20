@@ -145,6 +145,28 @@ class SqlAlchemyLedgerRepository:
         )
         return (await self._session.execute(stmt)).scalar_one_or_none() is not None
 
+    async def find_cash_movement_by_reference(
+        self,
+        reference_type: str,
+        reference_id: str,
+    ) -> LedgerEntry | None:
+        """Localiza el movimiento de caja original por su reference (idempotencia A-2).
+
+        Devuelve la entrada más antigua (ejecución original) para poder replicala en
+        un reintento con la misma idempotency_key sin volver a mover efectivo.
+        """
+        stmt = (
+            select(LedgerEntryRow)
+            .where(
+                LedgerEntryRow.reference_type == reference_type,
+                LedgerEntryRow.reference_id == reference_id,
+            )
+            .order_by(LedgerEntryRow.executed_at.asc())
+            .limit(1)
+        )
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        return _entry_from_row(row) if row is not None else None
+
     async def last_custody_charge_at(self, account_id: str) -> datetime | None:
         stmt = (
             select(LedgerEntryRow.executed_at)

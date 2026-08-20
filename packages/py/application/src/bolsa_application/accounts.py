@@ -221,6 +221,25 @@ class DeleteAccount:
         await self._account_repo.delete_simulated_account(account_id)
 
 
+def _cash_movement_result_from_entry(entry: LedgerEntry, kind: str) -> CashMovementResult:
+    """Reconstruye un CashMovementResult desde la entrada de ledger original.
+
+    Se usa para rejugar un movimento ya persistido (idempotencia) manteniendo la
+    misma shape (id = reference_id de la entrada, que es la idempotency_key).
+    """
+    return CashMovementResult(
+        id=entry.reference_id or entry.id,
+        account_id=entry.account_id,
+        portfolio_id=entry.portfolio_id or "",
+        kind=kind,
+        amount=entry.amount,
+        currency=entry.currency,
+        balance_after=entry.balance_after,
+        executed_at=entry.executed_at,
+        description=entry.description,
+    )
+
+
 class DepositCashToAccount:
     """Ingresa efectivo en cuenta."""
     def __init__(
@@ -239,11 +258,21 @@ class DepositCashToAccount:
         *,
         amount: float,
         note: str | None = None,
+        idempotency_key: str | None = None,
     ) -> CashMovementResult:
         if amount <= 0:
             raise ValueError("El importe debe ser mayor que cero")
         scope = await self._account_repo.resolve_scope(account_id)
-        movement_id = new_id()
+        # A-2: idempotencia — un retry con la misma idempotency_key no re-mueve
+        # efectivo; rejuega el movimiento original desde el ledger.
+        if idempotency_key:
+            existing = await self._ledger_repo.find_cash_movement_by_reference(
+                "external",
+                idempotency_key,
+            )
+            if existing is not None:
+                return _cash_movement_result_from_entry(existing, "external_deposit")
+        movement_id = idempotency_key or new_id()
         balance_after = await self._portfolio_repo.add_cash(scope.legacy_portfolio_id, amount)
         description = note or "Depósito externo (simulado)"
         entry = await self._ledger_repo.append_cash_movement(
@@ -289,16 +318,27 @@ class WithdrawCashFromAccount:
         *,
         amount: float,
         note: str | None = None,
+        idempotency_key: str | None = None,
     ) -> CashMovementResult:
         if amount <= 0:
             raise ValueError("El importe debe ser mayor que cero")
         scope = await self._account_repo.resolve_scope(account_id)
+        # A-2: idempotencia — un retry con la misma idempotency_key no re-mueve
+        # efectivo; rejuega el movimiento original desde el ledger (antes de validar
+        # saldo actual, que ya se consumió en la ejecución original).
+        if idempotency_key:
+            existing = await self._ledger_repo.find_cash_movement_by_reference(
+                "external",
+                idempotency_key,
+            )
+            if existing is not None:
+                return _cash_movement_result_from_entry(existing, "external_withdrawal")
         summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
         if summary.portfolio.cash < amount:
             raise ValueError(
                 f"Efectivo insuficiente. Disponible: {summary.portfolio.cash:.2f} {scope.account.currency}",
             )
-        movement_id = new_id()
+        movement_id = idempotency_key or new_id()
         balance_after = await self._portfolio_repo.deduct_cash(scope.legacy_portfolio_id, amount)
         description = note or "Retirada externa (simulada)"
         entry = await self._ledger_repo.append_cash_movement(

@@ -385,6 +385,7 @@ async def deposit_cash(
             account_id,
             amount=body.amount,
             note=body.note,
+            idempotency_key=body.idempotency_key,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -406,6 +407,7 @@ async def withdraw_cash(
             account_id,
             amount=body.amount,
             note=body.note,
+            idempotency_key=body.idempotency_key,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

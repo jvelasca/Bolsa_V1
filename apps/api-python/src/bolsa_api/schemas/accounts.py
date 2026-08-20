@@ -247,6 +247,9 @@ class DepositCashDto(BaseModel):
     # NaN/Inf (mismo contrato que TradeRequestDto desde F1/M4).
     amount: float = Field(gt=0, allow_inf_nan=False)
     note: str | None = None
+    # A-2 (R-7): idempotencia de movimientos. Opcional; si se repite la misma
+    # clave no se mueve dinero dos veces (se rejuega el movimiento original).
+    idempotency_key: str | None = Field(default=None, alias="idempotencyKey")
 
 
 class WithdrawCashDto(BaseModel):
@@ -254,6 +257,7 @@ class WithdrawCashDto(BaseModel):
 
     amount: float = Field(gt=0, allow_inf_nan=False)
     note: str | None = None
+    idempotency_key: str | None = Field(default=None, alias="idempotencyKey")
 
 
 class CashMovementResultDto(BaseModel):

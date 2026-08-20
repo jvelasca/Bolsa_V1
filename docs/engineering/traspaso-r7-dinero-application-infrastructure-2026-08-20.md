@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-7 — el mayor agujero de cobertura heredado de R-6: los use-cases/repos/invariantes contables quedaron FUERA del surface de la re-auditoría web+api+shared. Auditoría **read-only** de `packages/py/application` + `packages/py/infrastructure` (solo py) + corrección por fases acotadas.
-> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). Aguardan Fases 2+ con decisión del usuario.
+> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). Aguardan Fases 3+ con decisión del usuario.
 > **AsOf:** 2026-08-20.
 
 ---
@@ -71,6 +71,39 @@ Confirmados personalmente en código actual:
 
 > **Nota de entorno:** no se pudieron correr la suite infra/DB ni domain/market/analytics en este hilo (requieren Postgres/Redis vivos; el auto-review bloqueó el run fuera del surface de R-7). Los cambios de Fase 1 son **application-only**; no se tocaron archivos compartidos/domain/infra. **CI a confirmar en `main`** tras el push (Python CI quality: Ruff+Mypy en domain/market/infrastructure — no toca application — y Pytest market+analytics off?line; Frontend/Optimize/Fase2/Gitleaks sin impacto esperado por path-filter).
 
+---
+
+## 4b. Fase 2 corregida — `fix(py-application): idempotencia de deposit/withdraw (R-7/F2, A-2)`
+
+### A-2 — retry tras timeout no mueve dinero 2×
+
+- **Problema:** `DepositCashToAccount.execute` y `WithdrawCashFromAccount.execute` generaban `movement_id = new_id()` **fresco en cada llamada**, sin `idempotency_key`. Un retry (p. ej. tras timeout de red) ejecutaba el movimiento **2 veces** (doble abono/adeudo). `ledger_repo.has_reference` existía pero era código muerto.
+- **Fix (application+infra+api, sin migración):**
+  - **Use-case** (`accounts.py`): nuevo parámetro keyword-only `idempotency_key: str | None = None`. Si se suministra, **guard previo a mutar cash**: `find_cash_movement_by_reference("external", idempotency_key)`; si existe → **rejuega el movimiento original** (nueva helper `_cash_movement_result_from_entry`) sin volver a tocar `cash` ni añadir entrada. `movement_id = idempotency_key or new_id()` → la clave queda persistida como `reference_id` en el ledger.
+  - **Repo** (`ledger_repository.py`): nueva `find_cash_movement_by_reference(reference_type, reference_id) -> LedgerEntry | None` (entrada más antigua; masa `mypy strict` de infra limpia).
+  - **API** (`schemas/accounts.py` + rutas): `idempotency_key: str | None = None` (alias `idempotencyKey`) en `DepositCashDto`/`WithdrawCashDto` y reenvío en las rutas de `deposits`/`withdrawals`. Aditivo y wire-compatible; **no** requiere `contract:gen`.
+  - Se conserva `reference_type="external"` para no romper la clasificación semántica del FE (`packages/shared/src/portfolio-cash.ts` mapea `external`).
+- **Tests** (`packages/py/application/tests/test_deposit_withdraw_idempotency.py`, 6 casos, repos fake en memoria, sin DB):
+  1. Depósito idempotente: misma key no re-abona ni añade entrada; replays con misma shape (`id=key`, `kind`, `amount`, `balance_after`).
+  2. Depósitos con keys distintas mueven dinero dos veces (`cash=150`).
+  3. Depósito sin key → id fresco por llamada.
+  4. Retirada idempotente: misma key no re-adeuda.
+  5. Replay de retirada NO falla por efectivo insuficiente (guard previo a validar saldo consumido).
+  6. Retirada sin key valida saldo (`ValueError`).
+- **Limitación (documentada):** el guard es best-effort a nivel aplicación (check + mutación no atómica; el ledger **sigue sin unique constraint** — **L-M3/M-5** es fase aparte con migración Alembic que cierra la generación la concurrencia real).
+
+### Batería Fase 2 (verde)
+
+| Comprobación                                                                                         | Resultado                       |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------- |
+| `ruff check packages/py apps/api-python --config pyproject.toml` (config CI)                         | ✅ 0                            |
+| `mypy ledger_repository.py` (infra, CI-gated)                                                        | ✅ Success                      |
+| pytest application money-path F1 + nuevos (`…` F1-8 orquillas + `test_deposit_withdraw_idempotency`) | ✅ 31 passed (25 + 6)           |
+| pytest api-python offline (CORS/Auth/Health/WinLoop/Q2Hygiene/RateLimit/StartupRoute)                | ✅ 32 passed                    |
+| `git status`                                                                                         | ✅ solo 4 modificados + 1 nuevo |
+
+> **Nota:** `mypy accounts.py` sigue con los 6 errores `no-untyped-def`/`arg-type` **pre-existentes** (líneas 46/84/97/383/634/672; application NO está en el gate mypy de CI). Los cambios de Fase 2 en `accounts.py` son mypy-limpios. `contract:check` del FE no se ve afectado (respuestas sin cambios).
+
 ## 5. Inventario de deuda NUEVA (de R-7; priorizado por riesgo dinero/verdad)
 
 ### 🔴 Alto
@@ -78,7 +111,7 @@ Confirmados personalmente en código actual:
 | Código | Superficie  | Hallazgo                                                                                                                                                                        | Estado                           |
 | ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
 | A-1    | application | Custodia aplicada como side-effect de GET (summary/tax) + doble cargo bajo concurrencia (dedup time-only, sin unique constraint en ledger)                                      | ✅ CORREGIDO (Fase 1, `c957df1`) |
-| A-2    | application | Deposit/Withdraw **no idempotentes**: `movement_id = new_id()` fresco, sin `idempotency_key`; retry tras timeout mueve dinero 2×. `has_reference` existe pero es código muerto. | 📌 Fase 2 (candidato)            |
+| A-2    | application | Deposit/Withdraw **no idempotentes**: `movement_id = new_id()` fresco, sin `idempotency_key`; retry tras timeout mueve dinero 2×. `has_reference` existe pero es código muerto. | ✅ CORREGIDO (Fase 2, ver §4b)   |
 | A-3    | application | Claim AUTO de idempotencia quemado si el fill falla → reintento suprimido en silencio                                                                                           | ✅ CORREGIDO (Fase 1, `c957df1`) |
 
 ### 🟠 Medio
@@ -112,15 +145,14 @@ Confirmados personalmente en código actual:
 
 ## 6. Pendientes / fases futuras (no abrir sin decisión)
 
-1. **FASE 2 (candidato recomendado):** idempotencia de Deposit/Withdraw (A-2) — añadir `idempotency_key` opcional en DTO/use-case + guard `has_reference`; SIN migración (unique constraint de ledger → L-M3 es fase aparte con migración).
-2. **L-M3 / M-5:** unique constraint en `ledger_entries (reference_type, reference_id)` — requiere **migración Alembic** + tests infra con DB; más invasivo.
-3. **M-1 (T-M1):** `get_summary` — no sumar `cost_basis` de posiciones sin precio al total, o fallback a último precio de transacción; afecta a muchos callers/tests.
-4. **M-2 (T-M2):** añadir invariant de reconciliación cash↔ledger (test + guard).
-5. **M-3 (T-M3):** decidir cost-basis canónico (posición con fee vs tax con fee) y alinear.
-6. **M-6 (T-M6):** margin hardcoded → `None`/omitir en vez de fabricar `free_margin=cash`.
-7. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features").
-8. **B-3 (L-M4):** `transfer_cash` muerto + sin ledger — conectar use-case/ruta o eliminar; decidir.
-9. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
+1. **L-M3 / M-5:** unique constraint en `ledger_entries (reference_type, reference_id)` — cierra la ventana de concurrencia restante de A-2/Fase 2; requiere **migración Alembic** + tests infra con DB; más invasivo.
+2. **M-1 (T-M1):** `get_summary` — no sumar `cost_basis` de posiciones sin precio al total, o fallback a último precio de transacción; afecta a muchos callers/tests.
+3. **M-2 (T-M2):** añadir invariant de reconciliación cash↔ledger (test + guard).
+4. **M-3 (T-M3):** decidir cost-basis canónico (posición con fee vs tax con fee) y alinear.
+5. **M-6 (T-M6):** margin hardcoded → `None`/omitir en vez de fabricar `free_margin=cash`.
+6. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features").
+7. **B-3 (L-M4):** `transfer_cash` muerto + sin ledger — conectar use-case/ruta o eliminar; decidir.
+8. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
 
 **Freeze vigente:** sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). Una fase = un subagente acotado + batería + aprobación por commit + relevo al cerrar chat. **No hacer `regen_full`** sin decisión. **No `contract:gen`.**
 
@@ -128,17 +160,19 @@ Confirmados personalmente en código actual:
 
 ## 7. Batería acumulada (verde al cerrar esta parte)
 
-| Comprobación                                                     | Resultado                                                                                      |
-| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `ruff check packages/py apps/api-python --config pyproject.toml` | ✅ 0                                                                                           |
-| `mypy risk_runtime.py --config pyproject.toml`                   | ✅ 0                                                                                           |
-| pytest application money-path + Fase-1 nuevos (8 ficheros)       | ✅ 25 passed                                                                                   |
-| Árbol limpio tras push (`local main = origin/main = c957df1`)    | ✅                                                                                             |
-| CI `main` para `c957df1`                                         | ⏳ a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
+| Comprobación                                                                          | Resultado                                                                                                    |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ruff check packages/py apps/api-python --config pyproject.toml`                      | ✅ 0                                                                                                         |
+| `mypy risk_runtime.py` + `mypy ledger_repository.py` (infra)                          | ✅ 0 / Success                                                                                               |
+| pytest application money-path + F1 nuevos (8 ficheros)                                | ✅ 25 passed                                                                                                 |
+| pytest application + F2 nuevos (`test_deposit_withdraw_idempotency`)                  | ✅ 31 passed (25 + 6)                                                                                        |
+| pytest api-python offline (CORS/Auth/Health/WinLoop/Q2Hygiene/RateLimit/StartupRoute) | ✅ 32 passed                                                                                                 |
+| Árbol tras F1/tras F2 (`local main = origin/main`)                                    | ✅ (`…c957df1` · a confirmar F2)                                                                             |
+| CI `main` para `c957df1`                                                              | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
 
 ## 8. Texto de traspaso (pegar al abrir el próximo chat / relevo por saturación)
 
-> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fase 1 PUSHEADA a `main`** (`local main = origin/main = c957df1`, árbol limpio). Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
+> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1 y 2 PUSHEADAS a `main`**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
 >
 > **Auditoría:** 3 subagentes read-only + verificación personal del coordinador. Invariantes F1/FFIN todo INTACTOS (with_for_update, deduct_cash en lock, idempotencia trade + constraint, F-FIN-1 fail-closed, transfer_cash atómico). Deuda NUEVA: **Alto×3 / Medio×7 / Bajo×5**.
 >
@@ -148,9 +182,13 @@ Confirmados personalmente en código actual:
 > - **Fix C:** claim AUTO liberado en `except ValueError` del fill fallido (`release_auto_execute_idempotency`) — antes el reintento se suprimía en silencio sin haberse ejecutado trade.
 > - Bonus: `_redis_client -> Any | None` (risk_runtime mypy-limpio). Tests: `test_custody_idempotency.py` (5).
 >
-> **Batería:** ruff CI-config ✅ · mypy risk_runtime ✅ · pytest application money-path + nuevos **25 passed** ✅. **CI main a confirmar.** Nota: suite infra/DB y domain/market/analytics no se pudieron correr en este hilo (requieren Postgres/Redis vivos; auto-review bloqueó runs fuera del surface de R-7); changes son application-only.
+> **Fase 2 corregida y pusheada** `fix(py-application): idempotencia de deposit/withdraw (R-7/F2, A-2)`:
 >
-> **SIGUIENTES (por decisión):** (1) **FASE 2 — idempotencia Deposit/Withdraw** (A-2: `idempotency_key` + `has_reference`, sin migración); (2) **L-M3** unique constraint de ledger (requiere migración Alembic + infra tests DB); (3) M-1 (T-M1 `get_summary`), M-3 (cost-basis fee), M-6 (margin hardcoded), M-2 (reconciliación cash↔ledger), M-4 (custodia fuera de read), B-3 (`transfer_cash` muerto).
+> - **A-2:** Deposit/Withdraw no idempotentes (`movement_id = new_id()` fresco → retry tras timeout movía dinero 2×). Fix: `idempotency_key` opcional en use-case + DTO/rutas; guard `find_cash_movement_by_reference("external", key)` previo a mutar cash → rejuega el movimiento original sin duplicar; `movement_id = key or new_id()`; nuevo repo method infra; `idempotencyKey` en `DepositCashDto`/`WithdrawCashDto` (aditivo, sin `contract:gen`). Se conserva `reference_type="external"` (por FE). Sin migración. Tests `test_deposit_withdraw_idempotency.py` (6, fakes en memoria, sin DB).
+>
+> **Batería:** ruff CI-config 0 ✅ · mypy risk_runtime **y** ledger_repository (infra CI-gated) 0/Success ✅ · pytest application money-path F1 + F2 nuevos **31 passed** ✅ · api-python offline **32 passed** ✅. **CI main a confirmar** (F1 ratified). Nota: suite infra/DB y domain/market/analytics no se pudieron correr (requieren Postgres/Redis vivos); `mypy accounts.py` conserva 6 errores pre-existentes (`no-untyped-def`/`arg-type`, application mypy-blind en CI), sin nuevos.
+>
+> **SIGUIENTES (por decisión):** (1) **L-M3 / M-5** unique constraint de `ledger_entries (reference_type, reference_id)` — cierra la concurrencia restante de A-2/F2, requiere migración Alembic + infra tests DB; (2) M-1 (T-M1 `get_summary`), M-3 (cost-basis fee), M-6 (margin hardcoded), M-2 (reconciliación cash↔ledger), M-4 (custodia fuera de read), B-3 (`transfer_cash` muerto).
 >
 > Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · estado vivo: `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO) · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
 
