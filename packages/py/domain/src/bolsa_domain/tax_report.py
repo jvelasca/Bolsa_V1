@@ -365,11 +365,19 @@ def build_tax_report(
     )
 
     unrealized_lines = positions or []
-    total_unrealized_gain = (
-        sum(line.unrealized_gain or 0.0 for line in unrealized_lines)
-        if unrealized_lines
-        else None
-    )
+    # B-2 (T-M8, Opción A fail-closed): si alguna posición abierta NO tiene precio de
+    # mercado observable (market_value None → unrealized_gain None), silenciarla a 0 en el
+    # total fabricaría un valor "conocido" que infra-representa (coherente con la semántica
+    # "sin valor observable" de M-1). El total pasa a None: el FE lo muestra como "—"/no
+    # disponible en vez de un 0 real. Sin posiciones → None (respeta el shape `float | None`).
+    if unrealized_lines and any(line.unrealized_gain is None for line in unrealized_lines):
+        total_unrealized_gain = None
+    else:
+        total_unrealized_gain = (
+            sum(line.unrealized_gain or 0.0 for line in unrealized_lines)
+            if unrealized_lines
+            else None
+        )
 
     estimated_tax = None
     if capital_gains_tax_pct is not None and capital_gains_tax_pct > 0 and net_realized_gain > 0:

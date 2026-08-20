@@ -16,8 +16,11 @@ import logging
 import pytest
 
 from bolsa_domain.tax_report import (
+    TaxReportSummary,
     TaxReportTransaction,
+    UnrealizedGainLine,
     _compute_realized_gains,
+    build_tax_report,
     open_positions_with_fee_basis,
 )
 
@@ -189,3 +192,64 @@ def test_no_price_leaves_unrealized_none() -> None:
     assert line.market_price is None
     assert line.market_value is None
     assert line.unrealized_gain is None
+
+
+# ── B-2 (T-M8) — total_unrealized_gain fail-closed con posiciones sin precio ──
+
+
+def _summary_with_positions(
+    transactions: list[TaxReportTransaction],
+    prices: dict[str, float],
+) -> tuple[TaxReportSummary, list[UnrealizedGainLine]]:
+    positions = open_positions_with_fee_basis(transactions, "fifo", prices)
+    return build_tax_report(
+        account_id="acc-1",
+        currency="EUR",
+        method="fifo",
+        jurisdiction="ES",
+        year=2026,
+        transactions=transactions,
+        positions=positions,
+    ), positions
+
+
+def test_total_unrealized_gain_none_por_linea_sin_precio() -> None:
+    # B-2: posición abierta sin precio de mercado → unrealized_gain None → el TOTAL pasa a
+    # None (fail-closed, no silencia a 0). El FE lo muestra como "—" en lugar de un 0 real.
+    report, positions = _summary_with_positions(
+        [
+            _tx(tx_id="b", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-05-01T00:00:00Z", fee=5),
+        ],
+        {},
+    )
+    assert len(positions) == 1
+    assert positions[0].unrealized_gain is None
+    assert report.total_unrealized_gain is None
+
+
+def test_total_unrealized_gain_suma_cuando_todas_tienen_precio() -> None:
+    # B-2 (regresión): todas las posiciones con precio → el total SÍ es la suma real.
+    report, positions = _summary_with_positions(
+        [
+            _tx(tx_id="b1", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-05-01T00:00:00Z", fee=5),
+            _tx(tx_id="b2", typ="buy", symbol="ABC", quantity=5, price=50, executed_at="2026-05-02T00:00:00Z"),
+        ],
+        _open("XYZ", 120) | _open("ABC", 60),
+    )
+    assert len(positions) == 2
+    # XYZ: mv=1200, cost=1005 → 195. ABC: mv=300, cost=250 → 50. Total 245.
+    assert report.total_unrealized_gain == pytest.approx(245.0)
+
+
+def test_total_unrealized_gain_none_con_mixto_precio_y_sin_precio() -> None:
+    # B-2: mezcla — una con precio y otra sin → total None (no suma solo las conocidas a 0).
+    report, positions = _summary_with_positions(
+        [
+            _tx(tx_id="b1", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-05-01T00:00:00Z", fee=5),
+            _tx(tx_id="b2", typ="buy", symbol="ABC", quantity=5, price=50, executed_at="2026-05-02T00:00:00Z"),
+        ],
+        {"inst-XYZ": 120.0},
+    )
+    assert len(positions) == 2
+    assert any(p.unrealized_gain is None for p in positions)
+    assert report.total_unrealized_gain is None
