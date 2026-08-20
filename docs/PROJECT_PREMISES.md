@@ -10,7 +10,7 @@
 ## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-20) — leer primero en TODO trabajo
 
 > **AsOf:** 2026-08-20 · **Contexto:** cierre de **R-7** + **R-8** + **R-8B.3** en `main` (`v1.1.0`, tip `c06983d`). Proyecto todavía **NO en producción** → se permite refactorizar lo que sea preciso **manteniendo la idea del proyecto** (plataforma bursátil personal: embudo backtesting científico → IA gobernada → ejecución papel/paper, con integridad financiera y trazabilidad como valor central).
-> **Norma para el ciclo de hardening/financiero siguiente:** ver el **plan profundo R-9** (`docs/engineering/plan-r9-refactor-hardening-2026-08-20.md`, pendiente de aprobación del usuario) y el **backlog** (`docs/engineering/backlog-trabajo-2026-08-20.md`).
+> **Norma para el ciclo de hardening/financiero:** R-9 **CERRADA** (F1–F8, plan `docs/engineering/plan-r9-refactor-hardening-2026-08-20.md`) · **R-10 / v1.2.1 ABIERTA** — ver plan `docs/engineering/plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md` y el **backlog** (`docs/engineering/backlog-trabajo-2026-08-20.md`).
 
 ### E1. Nada se implementa sin plan aprobado
 
