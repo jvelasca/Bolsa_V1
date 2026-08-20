@@ -149,8 +149,8 @@ Para que **ningún chat ni subagente pierda el hilo ni alucine estado**:
 
 ## 6. Historial de cierres del backlog
 
-| Fecha      | Fase / Código               | Commit(s)          | Batería                                                                 | Estado       |
-| ---------- | --------------------------- | ------------------ | ----------------------------------------------------------------------- | ------------ |
-| 2026-08-20 | R-7 F1 (A-1+A-3)            | `c957df1`          | ruff 0 · mypy 0 · pytest app money-path 25                              | ✅           |
-| 2026-08-20 | R-7 F2 (A-2)                | `8c081ea`          | ruff 0 · mypy ledger_repo 0 · pytest app 31 · api-python 32             | ✅           |
-| 2026-08-20 | R-7 F3 (L-M3/M-5, opción A) | _(pending commit)_ | ruff 0 · mypy 4 files 0 · infra real 63 (incl. 6 nuevos) · app idemp 11 | ✅ en código |
+| Fecha      | Fase / Código               | Commit(s) | Batería                                                                                     | Estado |
+| ---------- | --------------------------- | --------- | ------------------------------------------------------------------------------------------- | ------ |
+| 2026-08-20 | R-7 F1 (A-1+A-3)            | `c957df1` | ruff 0 · mypy 0 · pytest app money-path 25                                                  | ✅     |
+| 2026-08-20 | R-7 F2 (A-2)                | `8c081ea` | ruff 0 · mypy ledger_repo 0 · pytest app 31 · api-python 32                                 | ✅     |
+| 2026-08-20 | R-7 F3 (L-M3/M-5, opción A) | `d7b8db8` | ruff 0 · mypy 4 files 0 · infra real 63 (incl. 6 nuevos) · app idemp 11 · pusheado a `main` | ✅     |
