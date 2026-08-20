@@ -1,0 +1,161 @@
+# Traspaso R-7 — Auditoría read-only de la lógica de dinero real en packages/py/{application,infrastructure} + corrección Fase 1 (idempotencia custodia/AUTO)
+
+> **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
+> **Fase:** R-7 — el mayor agujero de cobertura heredado de R-6: los use-cases/repos/invariantes contables quedaron FUERA del surface de la re-auditoría web+api+shared. Auditoría **read-only** de `packages/py/application` + `packages/py/infrastructure` (solo py) + corrección por fases acotadas.
+> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). Aguardan Fases 2+ con decisión del usuario.
+> **AsOf:** 2026-08-20.
+
+---
+
+## 1. Resumen
+
+R-7 cubre el mayor agujero de cobertura señalado por R-6: la lógica de dinero real (trades, depósitos, invariantes contables, idempotencia, transferencias) vive en `packages/py/{application,infrastructure}` y quedó fuera del surface pactado en R-6 (que era web+api+shared). Se ejecutó un barrido transversal **read-only** (3 subagentes `explore` en paralelo: money-path de trades, depósitos/ledger/custodia, y truth-of-results/posiciones/fiscal) y el coordinador **verificó personalmente** los hallazgos de riesgo Alto contra el código real.
+
+Resultado: **inventario de deuda NUEVA** priorizado por riesgo dinero/verdad (Alto×3, Medio×7, Bajo×5) + confirmación de que **todos los invariantes F1 siguen intactos** (sin regresión). El usuario eligió como Fase 1 corregir dos de los tres Altos que son fixes application-layer acotados sin migración. **Fase 1 COMMITEADA y PUSHEADA a `main`** (`c957df1`). El resto queda inventariado para fases futuras con decisión.
+
+## 2. Cómo se ejecutó (protocolo)
+
+- 3 subagentes `explore` **read-only** en paralelo, cada uno con una zona de dinero + dimensiones explícitas (atomicidad multi-repo, scope leaks, redondeo/precisión, idempotencia, fail-open, fidelidad domain↔application) y **instrucción de NO reportar** la deuda ya cerrada (F1/F-FIN-1/F-FIN-2/F5b/etc.).
+- El coordinador **verificó personalmente** los hallazgos de riesgo alto (y key medio) leyendo `accounts.py`, `portfolio_repository.py`, `ledger_repository.py`, `tables.py`, `risk_runtime.py`, `execution_router.py`, `auto_execute_idempotency.py` antes de aceptarlos.
+- Corrección de Fase 1: implementada por el coordinador (fixes acotados, application-layer), batería por archivos, revisión de diffs, **aprobación del usuario** y commit convencional directo en `main` (rama protegida, push aprobado).
+
+## 3. F1 intactos verificados (NO regresión — no re-auditar)
+
+Confirmados personalmente en código actual:
+
+- **with_for_update** en `execute_trade` (`portfolio_repository.py:226` y posición `:244`), `deduct_cash` (`:330`), `add_cash` (`:398`), `transfer_cash` (`:361-370`, ambos lados). ✅
+- **deduct_cash valida saldo DENTRO del lock** (`:335`) con `allow_partial` explícito (`:340`). ✅
+- **Idempotencia de trade** vía `find_transaction_by_idempotency` (`:166-194`) + unique constraint `(portfolio_id, idempotency_key)` en `transactions` (externo). ✅
+- **F-FIN-1 fail-closed**: `_resolve_portfolio` exige `legacy_portfolio_id`, sin default global por nombre (`portfolio_repository.py:31-45`). ✅
+- **balance_after** = cash real del repo, sin recálculo manual (`accounts.py` ExecuteTrade). ✅
+- **transfer_cash atómico** (ambos lados en lock, orden determinista por id, single flush). ✅ — NOTA: es **código muerto** (sin callers), ver L-M4.
+- **Decimal vs Numeric(18,6)** en almacenamiento; `Decimal(str(...))` antes de escribir. ✅
+
+## 4. Fase 1 corregida — `c957df1` `fix(py-application): idempotencia de custodia y release de claim AUTO (R-7/F1)`
+
+### Fix A — Doble cargo de custodia bajo lecturas concurrentes (GET summary/tax)
+
+- **Problema:** `GetAccountSummary` (`accounts.py`) y `GetTaxReport` ejecutan `ApplyCustodyFees` como **side-effect de una GET** (deduct cash + `append_custody_fee`, `reference_id="custody-{year}"`). El dedup solo era time-based (`last_custody_charge_at` + `(now-last).days < 365`); dos GET concurrentes que ven `last=None` **ambas cobran** → doble cargo anual, y la fila de custodia no tenía unique constraint (L-M3).
+- **Fix:** mutex atómico `claim_custody_charge(account_id, period)` en `risk_runtime.py` — Redis `SET NX` + fallback memoria (mismo patrón que `claim_auto_execute_idempotency`), clave `custody|{account}|{year}`. `ApplyCustodyFees.execute`:
+  - guard duradero del ledger primero (sin cambios de semántica);
+  - toma el claim; si no lo consigue → `return False` (otro request ya está cobrando);
+  - libera el claim en **toda** salida sin cargo (equity≤0, sin cartera de cargo) y **tras** cargo persistido (el guard duradero del ledger ya protege el año).
+- **Files:** `risk_runtime.py` (nuevo `CUSTODY_*`, `claim_custody_charge`, `release_custody_charge`, `make_custody_idempotency_key`, `clear_custody_memory_for_tests`) · `accounts.py` (import + reestructura `ApplyCustodyFees`).
+
+### Fix C — Claim AUTO quemado en fill fallido (reintento silenciosamente suprimido)
+
+- **Problema:** `ExecutionRouter._execute_paper_trade` tomaba `claim_auto_execute_idempotency` **antes** del fill (`execution_router.py`). Si `ExecuteTrade.execute` lanzaba `ValueError` (p. ej. fondos/acciones insuficientes), el claim quedaba retenido → un reintento del mismo día×política×instrumento se saltaba con `status="skipped"` y razón "Idempotencia AUTO: ya ejecutado" **aunque el trade nunca se ejecutó**.
+- **Fix:** nuevo `release_auto_execute_idempotency(key)` en `risk_runtime.py` (borra memoria + Redis best-effort); en el `except ValueError` del fill (solo ahí, donde NO se ha movido dinero) se libera el claim si se tomó.
+- **Files:** `risk_runtime.py` (`release_auto_execute_idempotency`) · `execution_router.py` (import + release en `except ValueError`).
+
+### Bonus mypy
+
+- `_redis_client` tipado `-> Any | None`: `risk_runtime.py` queda **mypy-limpio** (también limpia los `no-untyped-call` pre-existentes del patrón).
+
+### Tests (nuevo `packages/py/application/tests/test_custody_idempotency.py`, 5 casos)
+
+1. `claim_custody_charge`/`release` serializan por cuenta+periodo; reintento tras release OK.
+2. Lectura concurrente (claim en vuelo) → la 2ª GET se salta (sin cargo extra); y tras cargo persistido, dedup duradero impide repetir.
+3. Sin patrimonio (equity≤0) → no cobra y libera mutex (un tick posterior con patrimonio puede cobrar).
+4. Dedup periódico vía ledger (ya cobrada este periodo) → no repite.
+5. `release_auto_execute_idempotency` permite reintento tras release.
+
+### Batería Fase 1 (verde)
+
+| Comprobación                                                                                                                                                                                                                                                               | Resultado               |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `ruff check packages/py apps/api-python --config pyproject.toml` (config CI)                                                                                                                                                                                               | ✅ 0                    |
+| `mypy risk_runtime.py --config pyproject.toml`                                                                                                                                                                                                                             | ✅ Success              |
+| pytest application money-path + nuevos (`test_execution_router_memory`, `test_auto_execute_idempotency`, `test_account_drawdown`, `test_paper_d_propose`, `test_custody_idempotency`, `test_propose_recommendation_f3`, `test_position_policies`, `test_daily_ops_report`) | ✅ 25 passed            |
+| Árbol limpio tras push                                                                                                                                                                                                                                                     | ✅ (`0c0cf23..c957df1`) |
+
+> **Nota de entorno:** no se pudieron correr la suite infra/DB ni domain/market/analytics en este hilo (requieren Postgres/Redis vivos; el auto-review bloqueó el run fuera del surface de R-7). Los cambios de Fase 1 son **application-only**; no se tocaron archivos compartidos/domain/infra. **CI a confirmar en `main`** tras el push (Python CI quality: Ruff+Mypy en domain/market/infrastructure — no toca application — y Pytest market+analytics off?line; Frontend/Optimize/Fase2/Gitleaks sin impacto esperado por path-filter).
+
+## 5. Inventario de deuda NUEVA (de R-7; priorizado por riesgo dinero/verdad)
+
+### 🔴 Alto
+
+| Código | Superficie  | Hallazgo                                                                                                                                                                        | Estado                           |
+| ------ | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| A-1    | application | Custodia aplicada como side-effect de GET (summary/tax) + doble cargo bajo concurrencia (dedup time-only, sin unique constraint en ledger)                                      | ✅ CORREGIDO (Fase 1, `c957df1`) |
+| A-2    | application | Deposit/Withdraw **no idempotentes**: `movement_id = new_id()` fresco, sin `idempotency_key`; retry tras timeout mueve dinero 2×. `has_reference` existe pero es código muerto. | 📌 Fase 2 (candidato)            |
+| A-3    | application | Claim AUTO de idempotencia quemado si el fill falla → reintento suprimido en silencio                                                                                           | ✅ CORREGIDO (Fase 1, `c957df1`) |
+
+### 🟠 Medio
+
+| Código          | Superficie     | Hallazgo                                                                                                                                                                                                                                                 | Riesgo        |
+| --------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida = coste completo de posiciones sin precio; equity errónea sin reconciliación. | dinero/verdad |
+| M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                                                    | dinero/verdad |
+| M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: el `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                                           | dinero/verdad |
+| M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia (dependiente de lectura).                                                                      | dinero        |
+| M-5 (L-M3)      | infrastructure | Ledger SIN unique constraint en `(reference_type, reference_id)` → filas duplicadas posibles; `has_reference` muerto; raíz habilitadora de dobles concesiones.                                                                                           | dinero        |
+| M-6 (T-M6)      | application    | Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.                                                                                        | dinero        |
+| M-7 (L-M5)      | application    | Custodia dedup time-only (además del fix A-1); sin unique constraint la ventana concurr. aún la cubre el mutex, pero un restart/R-expiry en medio puede re-cobrar.                                                                                       | dinero        |
+
+### 🟢 Bajo
+
+| Código           | Superficie  | Hallazgo                                                                                                                                                                       | Riesgo        |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
+| B-1 (T-M7)       | application | "Max drawdown" naive (vs depósito inicial, no high-water-mark) alimenta el risk gate `HardMaxDrawdown` → under-bloqueo tras recuperación.                                      | verdad        |
+| B-2 (T-M8)       | domain      | `total_unrealized_gain` suma `unrealized_gain or 0.0` → posiciones sin precio se silencian a 0 en el total.                                                                    | verdad        |
+| B-3 (L-M4)       | infra+app   | `transfer_cash` atómico pero **código muerto** (0 callers) y **no escribe ledger**; un futuro caller movería dinero sin traza reconciliable.                                   | dinero/verdad |
+| B-4 (L-M6)       | application | fee ledger escrita en 2ª llamada no atómica con el trade; app guard solo se activa si se pasa `idempotency_key` (nada lo exige).                                               | dinero        |
+| B-5 (T-M9/T-M10) | application | FIFO divide sin guard `quantity==0` (latente, repo lo rechaza); `fetch_core_r_pnl_extra_rows` atribuye el PnL whole-account a un instrumento (fail-open, fallback a `list[]`). | verdad        |
+
+### ⚠️ Hábitos (no-deuda, sin re-auditar)
+
+- Mypy gate: CI corre mypy SOLO en `domain/market/infrastructure` (NO application ni apps/api-python) → **application mypy-blind en CI**. Notable gap: `accounts.py`/`execution_router.py` tienen `no-untyped-def` pre-existentes que CI no detecta.
+- Los `# type: ignore` Mapped intencionales no son deuda.
+
+---
+
+## 6. Pendientes / fases futuras (no abrir sin decisión)
+
+1. **FASE 2 (candidato recomendado):** idempotencia de Deposit/Withdraw (A-2) — añadir `idempotency_key` opcional en DTO/use-case + guard `has_reference`; SIN migración (unique constraint de ledger → L-M3 es fase aparte con migración).
+2. **L-M3 / M-5:** unique constraint en `ledger_entries (reference_type, reference_id)` — requiere **migración Alembic** + tests infra con DB; más invasivo.
+3. **M-1 (T-M1):** `get_summary` — no sumar `cost_basis` de posiciones sin precio al total, o fallback a último precio de transacción; afecta a muchos callers/tests.
+4. **M-2 (T-M2):** añadir invariant de reconciliación cash↔ledger (test + guard).
+5. **M-3 (T-M3):** decidir cost-basis canónico (posición con fee vs tax con fee) y alinear.
+6. **M-6 (T-M6):** margin hardcoded → `None`/omitir en vez de fabricar `free_margin=cash`.
+7. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features").
+8. **B-3 (L-M4):** `transfer_cash` muerto + sin ledger — conectar use-case/ruta o eliminar; decidir.
+9. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
+
+**Freeze vigente:** sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). Una fase = un subagente acotado + batería + aprobación por commit + relevo al cerrar chat. **No hacer `regen_full`** sin decisión. **No `contract:gen`.**
+
+---
+
+## 7. Batería acumulada (verde al cerrar esta parte)
+
+| Comprobación                                                     | Resultado                                                                                      |
+| ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `ruff check packages/py apps/api-python --config pyproject.toml` | ✅ 0                                                                                           |
+| `mypy risk_runtime.py --config pyproject.toml`                   | ✅ 0                                                                                           |
+| pytest application money-path + Fase-1 nuevos (8 ficheros)       | ✅ 25 passed                                                                                   |
+| Árbol limpio tras push (`local main = origin/main = c957df1`)    | ✅                                                                                             |
+| CI `main` para `c957df1`                                         | ⏳ a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
+
+## 8. Texto de traspaso (pegar al abrir el próximo chat / relevo por saturación)
+
+> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fase 1 PUSHEADA a `main`** (`local main = origin/main = c957df1`, árbol limpio). Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
+>
+> **Auditoría:** 3 subagentes read-only + verificación personal del coordinador. Invariantes F1/FFIN todo INTACTOS (with_for_update, deduct_cash en lock, idempotencia trade + constraint, F-FIN-1 fail-closed, transfer_cash atómico). Deuda NUEVA: **Alto×3 / Medio×7 / Bajo×5**.
+>
+> **Fase 1 corregida y pusheada (`c957df1`)** `fix(py-application): idempotencia de custodia y release de claim AUTO (R-7/F1)`:
+>
+> - **Fix A:** doble cargo de custodia bajo GET concurrentes (summary/tax) — mutex atómico `claim_custody_charge` por cuenta|periodo (Redis SET NX + memoria, patrón auto-exec) en `ApplyCustodyFees.execute`, con release en salidas sin cargo.
+> - **Fix C:** claim AUTO liberado en `except ValueError` del fill fallido (`release_auto_execute_idempotency`) — antes el reintento se suprimía en silencio sin haberse ejecutado trade.
+> - Bonus: `_redis_client -> Any | None` (risk_runtime mypy-limpio). Tests: `test_custody_idempotency.py` (5).
+>
+> **Batería:** ruff CI-config ✅ · mypy risk_runtime ✅ · pytest application money-path + nuevos **25 passed** ✅. **CI main a confirmar.** Nota: suite infra/DB y domain/market/analytics no se pudieron correr en este hilo (requieren Postgres/Redis vivos; auto-review bloqueó runs fuera del surface de R-7); changes son application-only.
+>
+> **SIGUIENTES (por decisión):** (1) **FASE 2 — idempotencia Deposit/Withdraw** (A-2: `idempotency_key` + `has_reference`, sin migración); (2) **L-M3** unique constraint de ledger (requiere migración Alembic + infra tests DB); (3) M-1 (T-M1 `get_summary`), M-3 (cost-basis fee), M-6 (margin hardcoded), M-2 (reconciliación cash↔ledger), M-4 (custodia fuera de read), B-3 (`transfer_cash` muerto).
+>
+> Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · estado vivo: `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO) · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
+
+---
+
+## 9. Nota de saturación / relevo de chat
+
+Este traspaso está preparado para: (a) seguir aquí con la Fase 2 si el contexto del agente lo permite, o (b) **cerrar el chat y abrir uno nuevo** pegando el §8 si el coordinador percibe saturación. Regla: una fase = subagente acotado + batería + aprobación por commit + relevo documentado al cerrar chat.
