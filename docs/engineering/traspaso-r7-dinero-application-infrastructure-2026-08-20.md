@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-7 — el mayor agujero de cobertura heredado de R-6: los use-cases/repos/invariantes contables quedaron FUERA del surface de la re-auditoría web+api+shared. Auditoría **read-only** de `packages/py/application` + `packages/py/infrastructure` (solo py) + corrección por fases acotadas.
-> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). Aguardan fases siguientes con decisión del usuario.
+> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). **M-2 COMMITEADA/PUSHEADA a `main`** (`c8e9ced`, invariante reconciliación cash↔ledger, T-M2). Aguardan fases siguientes con decisión del usuario.
 > **AsOf:** 2026-08-20.
 
 ---
@@ -168,6 +168,30 @@ Confirmados personalmente en código actual:
 
 ---
 
+## 4e. Fase M-2 corregida — `c8e9ced` `fix(py-infra): invariante de reconciliación cash↔ledger con sum_cash_amounts (R-7/M-2, T-M2)`
+
+> Decisión de usuario: **método repo + tests-postcondición** (sin guard de runtime bloqueante); **M-2 acotado a reconciliación** (B-3 no se toca en esta fase).
+
+### M-2 (T-M2) — invariant cash↔ledger
+
+- **Problema:** cash nunca se reconcilia contra el ledger; `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare. `test_financial_invariants.py` solo cubre coherencia `cash`/`balance_after` a nivel repo SIN ledger.
+- **Fix (método + tests-postcondición):**
+  - Nuevo método `SqlAlchemyLedgerRepository.sum_cash_amounts(account_id) -> Decimal`: Σ `amount` de TODAS las filas ledger del account, scoped por `account_id` (única clave inequívoca). Semántica del signo verificada: seed `deposit`(+initial), `deposit`(+), `withdrawal`(−), `buy/sell`(∓notional sin fee), `fee`(−abs, trade y custody). Como el seed es fila `deposit` +X, Σ total ya lo incluye ⇒ Σ == cash actual. Sin guard de runtime.
+  - Tests `test_m2_ledger_cash_reconciliation.py` (Postgres real), postcondición `Σ ledger == Σ cash` del account tras cada write-path de app: seed de cuenta nueva, `DepositCashToAccount`, `WithdrawCashFromAccount`, `ExecuteTrade` con fees (2 filas buy+fee reproducen −total−fees), `ApplyCustodyFees`, coherencia a nivel ACCOUNT (helper `_account_total_cash` = Σ `PortfolioRow.cash` de TODAS las legacy portfolios del account vía `InvestmentPortfolioRow`), y `xfail` documental de la escotilla B-3 (`add_cash` directo rompe el invariant; NO se sanea en esta fase).
+- **Files:** `ledger_repository.py` · nuevo `test_m2_ledger_cash_reconciliation.py`. No se tocó aplicación/domain/api/FE ni `transfer_cash`/`add_cash`/`deduct_cash` (B-3 intacto).
+
+### Batería M-2 (verde, verificada por el coordinador)
+
+| Comprobación                                                                           | Resultado                 |
+| -------------------------------------------------------------------------------------- | ------------------------- |
+| `ruff check packages/py apps/api-python --config pyproject.toml` (2 files del alcance) | ✅ 0                      |
+| `mypy ledger_repository.py` (config raíz, gate CI)                                     | ✅ Success                |
+| pytest infra **Postgres real** (suite completa, incl. 6 nuevos + 1 xfail)              | ✅ 72 passed, 1 xfailed   |
+| pytest application (fakes, sin DB)                                                     | ✅ 235 passed             |
+| `git status`                                                                           | ✅ solo files del alcance |
+
+---
+
 ## 5. Inventario de deuda NUEVA (de R-7; priorizado por riesgo dinero/verdad)
 
 ### 🔴 Alto
@@ -183,7 +207,7 @@ Confirmados personalmente en código actual:
 | Código          | Superficie     | Hallazgo                                                                                                                                                                                                                                                 | Riesgo        |
 | --------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------ |
 | M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida = coste completo de posiciones sin precio; equity errónea sin reconciliación. | dinero/verdad | ✅ CORREGIDO (M-1, ver §4d)    |
-| M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                                                    | dinero/verdad |
+| M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                                                    | dinero/verdad | ✅ CORREGIDO (M-2, ver §4e)    |
 | M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: el `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                                           | dinero/verdad |
 | M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia (dependiente de lectura).                                                                      | dinero        |
 | M-5 (L-M3)      | infrastructure | Ledger SIN unique constraint en `(reference_type, reference_id)` → filas duplicadas posibles; `has_reference` muerto; raíz habilitadora de dobles concesiones.                                                                                           | dinero        | ✅ CORREGIDO (Fase 3, ver §4c) |
@@ -209,16 +233,15 @@ Confirmados personalmente en código actual:
 
 ## 6. Pendientes / fases futuras (no abrir sin decisión)
 
-1. **M-2 (T-M2):** añadir invariant de reconciliación cash↔ledger (test + guard). **(PRÓXIMA candidata)**
-2. **M-3 (T-M3):** decidir cost-basis canónico (posición con fee vs tax con fee) y alinear.
-3. **M-6 (T-M6):** margin hardcoded → `None`/omitir en vez de fabricar `free_margin=cash`.
-4. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features").
-5. **B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown`.
-6. **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio. _(NO confundir con M-1, ya cerrada.)_
-7. **B-3 (L-M4):** `transfer_cash` muerto + sin ledger — conectar use-case/ruta o eliminar; decidir.
-8. **B-4 (L-M6):** fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de Fase 3 NO toca `transaction` → queda abierta).
-9. **B-5 (T-M9/T-M10):** FIFO divide sin guard `quantity==0`; `fetch_core_r_pnl_extra_rows` atribuye el PnL whole-account a un instrumento.
-10. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
+1. **M-3 (T-M3):** decidir cost-basis canónico (posición con fee vs tax con fee) y alinear. **(PRÓXIMA candidata)**
+2. **M-6 (T-M6):** margin hardcoded → `None`/omitir en vez de fabricar `free_margin=cash`.
+3. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features").
+4. **B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown`.
+5. **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio. _(NO confundir con M-1, ya cerrada.)_
+6. **B-3 (L-M4):** `transfer_cash`/`add_cash`/`deduct_cash` del repo mutan cash SIN ledger (código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar; decidir.
+7. **B-4 (L-M6):** fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de Fase 3 NO toca `transaction` → queda abierta).
+8. **B-5 (T-M9/T-M10):** FIFO divide sin guard `quantity==0`; `fetch_core_r_pnl_extra_rows` atribuye el PnL whole-account a un instrumento.
+9. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
 
 **Freeze vigente:** sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). Una fase = un subagente acotado + batería + aprobación por commit + relevo al cerrar chat. **No hacer `regen_full`** sin decisión. **No `contract:gen`.**
 
@@ -235,11 +258,12 @@ Confirmados personalmente en código actual:
 | pytest api-python offline (CORS/Auth/Health/WinLoop/Q2Hygiene/RateLimit/StartupRoute)                        | ✅ 32 passed                                                                                                 |
 | Árbol tras F1/tras F2/tras F3 (`local main = origin/main`) · pytest infra Postgres real 63 · idempotencia 11 | ✅ (`…c957df1` · a confirmar F2)                                                                             |
 | M-1: `ruff` config CI raíz (2 files) · `mypy portfolio_repository.py` · infra real 66 · application 235      | ✅ 0 / Success / 66 / 235 (ver §4d)                                                                          |
+| M-2: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py` · infra real 72+1xfail · application 235  | ✅ 0 / Success / 72 / 235 (ver §4e)                                                                          |
 | CI `main` para `c957df1`                                                                                     | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
 
 ## 8. Texto de traspaso (pegar al abrir el próximo chat / relevo por saturación)
 
-> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1, 2, 3 y M-1 PUSHEADAS a `main`**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
+> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1, 2, 3, M-1 y M-2 PUSHEADAS a `main`**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
 >
 > **Auditoría:** 3 subagentes read-only + verificación personal del coordinador. Invariantes F1/FFIN todo INTACTOS (with_for_update, deduct_cash en lock, idempotencia trade + constraint, F-FIN-1 fail-closed, transfer_cash atómico). Deuda NUEVA: **Alto×3 / Medio×7 / Bajo×5**.
 >
@@ -265,7 +289,11 @@ Confirmados personalmente en código actual:
 >
 > **M-1 extra (batería del coordinador):** ruff config CI raíz 2 files 0 ✅ · mypy `portfolio_repository.py` Success ✅ · pytest infra **66 passed** (3 nuevos) ✅ · pytest application **235 passed** ✅.
 >
-> **SIGUIENTES (por decisión):** (1) **M-2 (T-M2)** (reconciliación cash↔ledger), (2) M-3 (cost-basis fee), M-6 (margin hardcoded), M-4 (custodia fuera de read), B-1/B-2/B-3/B-4/B-5. **L-M3/M-5 CERRADA · M-1 CERRADA.**
+> **M-2 (T-M2) corregida y pusheada (`c8e9ced`)** `fix(py-infra): invariante de reconciliación cash↔ledger con sum_cash_amounts (R-7/M-2)`:
+>
+> - **T-M2:** cash nunca se reconcilia contra el ledger (`equity=cash+Σmv` tautológica). Fix (decisión usuario: método + tests-postcondición, sin guard runtime): nuevo `SqlAlchemyLedgerRepository.sum_cash_amounts(account_id)` → Σ `amount` de TODAS las filas ledger del account (scoped por `account_id`; semántica de signo: seed `deposit`+X, `deposit`+ / `withdrawal`− / `buy|sell` ∓notional / `fee` −abs; como el seed es fila `deposit`, Σ ya lo incluye ⇒ Σ==cash). Tests `test_m2_ledger_cash_reconciliation.py` (6, Postgres real): postcondición Σ==Σcash por write-path de app (seed cuenta, Deposit, Withdraw, ExecuteTrade con fees 2 filas, ApplyCustodyFees) + coherencia a nivel ACCOUNT + `xfail` documental de la escotilla B-3 (add_cash directo rompe el invariant; NO se sanea en esta fase, M-2 acotado). Helper `_account_total_cash` = Σ `PortfolioRow.cash` de TODAS las legacy portfolios vía `InvestmentPortfolioRow`.
+>
+> **SIGUIENTES (por decisión):** (1) **M-3 (T-M3)** (cost-basis fee posición vs tax), (2) M-6 (margin hardcoded), M-4 (custodia fuera de read), M-2 cerrada → B-3 (write-paths de cash sin ledger), B-1/B-4/B-5. **L-M3/M-5 CERRADA · M-1 CERRADA · M-2 CERRADA.**
 >
 > Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · ancla de trabajo vivo: `docs/engineering/backlog-trabajo-2026-08-20.md` (LEER PRIMERO) · estado vivo: `docs/engineering/PROJECT_STATE.md` · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
 
