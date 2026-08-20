@@ -12,8 +12,9 @@ Postcondición: tras cada write-path de application que SÍ escribe ledger
 Coherencia por-cuenta: el re-compute es a nivel ACCOUNT (suma de TODAS las legacy
 carteras + toda la traza ledger del account), no de una legacy portfolio suelta.
 
-Escotilla B-3 (documentada, NO se "arregla" en esta fase): ``add_cash``/``deduct_cash``/
-``transfer_cash`` directos (repo) mutan ``PortfolioRow.cash`` SIN escribir ledger; un
+Escotilla B-3 (documentada, NO se "arregla" en esta fase): ``add_cash``/``deduct_cash``
+directos (repo) mutan ``PortfolioRow.cash`` SIN escribir ledger (``transfer_cash`` fue
+ELIMINADO en B-3 por código muerto); un
 test negativo con ``pytest.mark.xfail`` documenta que rompen el invariant. Es un test de
 cobertura documental, no un guard de runtime.
 
@@ -28,6 +29,7 @@ import sys
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
@@ -40,6 +42,11 @@ from bolsa_infrastructure.database.models import (
     InvestmentPortfolioRow,
     PortfolioRow,
 )
+
+if TYPE_CHECKING:
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
 
 # psycopg async no soporta ProactorEventLoop en Windows (convención de infra)
 if sys.platform == "win32":
@@ -125,7 +132,7 @@ async def _account_total_cash(session: AsyncSession, account_id: str) -> Decimal
 
 async def _assert_reconciled(
     session: AsyncSession,
-    ledger_repo,
+    ledger_repo: SqlAlchemyLedgerRepository,
     account_id: str,
     *,
     expected_cash: Decimal | None = None,
@@ -333,7 +340,7 @@ async def test_recomputed_es_coherente_a_nivel_account(db_session: AsyncSession)
 @pytest.mark.xfail(
     strict=False,
     reason=(
-        "Escotilla B-3 (documentada): add_cash/deduct_cash/transfer_cash mutan "
+        "Escotilla B-3 (documentada): add_cash/deduct_cash mutan "
         "PortfolioRow.cash SIN escribir ledger → ROMPEN el invariant M-2. Es cobertura "
         "documental del agujero, NO un guard de runtime (fase B-3 lo decide). Este test "
         "demuestra que sin ledger el Σ diverge (xfail esperado)."

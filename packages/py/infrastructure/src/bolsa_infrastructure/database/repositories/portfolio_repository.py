@@ -399,51 +399,6 @@ class SqlAlchemyPortfolioRepository:
         await self._session.flush()
         return float(row.cash)
 
-    async def transfer_cash(
-        self,
-        from_legacy_portfolio_id: str,
-        to_legacy_portfolio_id: str,
-        amount: float,
-    ) -> tuple[float, float]:
-        if from_legacy_portfolio_id == to_legacy_portfolio_id:
-            raise ValueError("Origen y destino deben ser carteras distintas")
-        if amount <= 0:
-            raise ValueError("El importe debe ser mayor que cero")
-
-        amount_dec = Decimal(str(amount))
-        # Lock both rows in deterministic order by id (left_id < right_id) to
-        # avoid deadlocks when two transfers run in opposite directions (A→B / B→A).
-        left_id, right_id = sorted((from_legacy_portfolio_id, to_legacy_portfolio_id))
-        left_row = await self._session.get(
-            PortfolioRow,
-            left_id,
-            with_for_update=True,
-        )
-        right_row = await self._session.get(
-            PortfolioRow,
-            right_id,
-            with_for_update=True,
-        )
-        if left_row is None or right_row is None:
-            raise ValueError("Cartera no encontrada")
-        from_row = left_row if from_legacy_portfolio_id == left_id else right_row
-        to_row = right_row if from_legacy_portfolio_id == left_id else left_row
-        if from_row.currency != to_row.currency:
-            raise ValueError("Las carteras deben usar la misma moneda")
-        if from_row.cash < amount_dec:
-            available = float(from_row.cash)
-            raise ValueError(
-                f"Efectivo insuficiente en origen. Disponible: {available:.2f} {from_row.currency}",
-            )
-
-        from_row.cash -= amount_dec
-        to_row.cash += amount_dec
-        now = datetime.now(UTC)
-        from_row.updated_at = now
-        to_row.updated_at = now
-        await self._session.flush()
-        return float(from_row.cash), float(to_row.cash)
-
     async def add_cash(self, legacy_portfolio_id: str, amount: float) -> float:
         if amount <= 0:
             portfolio = await self.get_summary(legacy_portfolio_id)
