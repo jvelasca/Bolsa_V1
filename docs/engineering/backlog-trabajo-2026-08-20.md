@@ -14,7 +14,7 @@
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Rama activa    | `main` (`local main = origin/main`)                                                                                                                                 |
 | Working tree   | limpio                                                                                                                                                              |
-| Fase R-7       | Auditoría COMPLETADA · **F1 PUSHEADA** (`c957df1`) · **F2 PUSHEADA** (`8c081ea`) · **F3 (L-M3/M-5) EN CÓDIGO para commitear**                                       |
+| Fase R-7       | Auditoría COMPLETADA · **F1 PUSHEADA** (`c957df1`) · **F2 PUSHEADA** (`8c081ea`) · **F3 (L-M3/M-5) PUSHEADA** (`d7b8db8`) · **M-1 (T-M1) PUSHEADA** (`a78eb29`)     |
 | Freeze vigente | Sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4)                                                                         |
 | Protocolo      | Una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada. |
 
@@ -39,7 +39,7 @@ Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador).
 | Código          | Superficie     | Hallazgo                                                                                                                                                                                                                      | Riesgo        | Estado                                                                                                                    |
 | --------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **L-M3 / M-5**  | infrastructure | LEDGER **SIN unique constraint** en `(reference_type, reference_id)` → filas duplicadas posibles; raíz habilitadora de dobles concesiones.                                                                                    | dinero        | ✅ **CERRADA (Fase 3)** — `004_ledger_reference_unique` UNIQUE parcial `(account_id, reference_type, reference_id, type)` |
-| M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida=coste completo; equity errónea sin reconciliación. | dinero/verdad | ⏳                                                                                                                        |
+| M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida=coste completo; equity errónea sin reconciliación. | dinero/verdad | ✅ **CERRADA** — fallback mark-to-cost al último precio transaccional (Opción B)                                          |
 | M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                         | dinero/verdad | ⏳                                                                                                                        |
 | M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                   | dinero/verdad | ⏳                                                                                                                        |
 | M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia.                                                                    | dinero        | ⏳ (colinda con «sin features»: mover a job dedicado)                                                                     |
@@ -107,7 +107,7 @@ Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador).
 ## 3. Orden sugerido de fases (por riesgo dinero/verdad + dependencias)
 
 1. ~~**Fase 3 = L-M3 / M-5** (Medio) — unique constraint.~~ **✅ HECHO** (ver §2/§6). Cierra la ventana concurr. real de A-2.
-2. **M-1 (T-M1)** (Medio) — `get_summary` cost_basis de posiciones sin precio. **→ SIGUIENTE.**
+2. ~~**M-1 (T-M1)**~~ (Medio) — `get_summary` cost_basis de posiciones sin precio. **✅ HECHO** (ver §6) — fallback mark-to-cost (Opción B).
 3. **B-4 (L-M6)** (Bajo) — fee ledger atómico / disambiguación (queda abierta: el UNIQUE añadido NO toca `transaction`, así que trade+fee se siguen escribiendo como hoy, solo que ahora el par incluye `type`).
 4. **M-2 (T-M2)** (Medio) — reconciliación cash↔ledger (invariant + test).
 5. **M-3 (T-M3)** (Medio) — decisión cost-basis canónico.
@@ -149,8 +149,9 @@ Para que **ningún chat ni subagente pierda el hilo ni alucine estado**:
 
 ## 6. Historial de cierres del backlog
 
-| Fecha      | Fase / Código               | Commit(s) | Batería                                                                                     | Estado |
-| ---------- | --------------------------- | --------- | ------------------------------------------------------------------------------------------- | ------ |
-| 2026-08-20 | R-7 F1 (A-1+A-3)            | `c957df1` | ruff 0 · mypy 0 · pytest app money-path 25                                                  | ✅     |
-| 2026-08-20 | R-7 F2 (A-2)                | `8c081ea` | ruff 0 · mypy ledger_repo 0 · pytest app 31 · api-python 32                                 | ✅     |
-| 2026-08-20 | R-7 F3 (L-M3/M-5, opción A) | `d7b8db8` | ruff 0 · mypy 4 files 0 · infra real 63 (incl. 6 nuevos) · app idemp 11 · pusheado a `main` | ✅     |
+| Fecha      | Fase / Código               | Commit(s) | Batería                                                                                                 | Estado |
+| ---------- | --------------------------- | --------- | ------------------------------------------------------------------------------------------------------- | ------ |
+| 2026-08-20 | R-7 F1 (A-1+A-3)            | `c957df1` | ruff 0 · mypy 0 · pytest app money-path 25                                                              | ✅     |
+| 2026-08-20 | R-7 F2 (A-2)                | `8c081ea` | ruff 0 · mypy ledger_repo 0 · pytest app 31 · api-python 32                                             | ✅     |
+| 2026-08-20 | R-7 F3 (L-M3/M-5, opción A) | `d7b8db8` | ruff 0 · mypy 4 files 0 · infra real 63 (incl. 6 nuevos) · app idemp 11 · pusheado a `main`             | ✅     |
+| 2026-08-20 | R-7 M-1 (T-M1, opción B)    | `a78eb29` | ruff CI-config 0 · mypy portfolio_repo 0 · infra real 66 (incl. 3 nuevos) · app 235 · pusheado a `main` | ✅     |
