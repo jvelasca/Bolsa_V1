@@ -19,14 +19,16 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from bolsa_api.ai_bootstrap import configure_ai_governance_proxy, teardown_ai_governance_proxy
 from bolsa_api.api.v1.router import api_v1_router
 from bolsa_api.logging_redact import install_log_redact
 from bolsa_api.middleware.auth import AuthMiddleware
 from bolsa_api.middleware.rate_limit import RateLimitMiddleware
+from bolsa_domain.errors import IdempotencyKeyExists, IdempotencyKeyReused
 from bolsa_infrastructure.config import Settings, get_settings
 from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
 from bolsa_infrastructure.database.migrations import database_bootstrap
@@ -165,7 +167,18 @@ def create_app() -> FastAPI:
 
     app.include_router(api_v1_router, prefix="/api")
 
+    # R-9.2: mapear los errores de dominio de idempotencia a HTTP. La reutilización
+    # de una `idempotency_key` con un payload distinto (IdempotencyKeyReused) y la
+    # ejecución repetida (IdempotencyKeyExists) son ambas un conflicto → 409, con el
+    # `detail` = mensaje del error. Sin este handler, FastAPI devolvería 500.
+    app.add_exception_handler(IdempotencyKeyReused, _idempotency_conflict_handler)
+    app.add_exception_handler(IdempotencyKeyExists, _idempotency_conflict_handler)
+
     return app
+
+
+def _idempotency_conflict_handler(_request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"detail": str(exc)})
 
 
 app = create_app()

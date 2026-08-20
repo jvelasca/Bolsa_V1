@@ -13,7 +13,7 @@ from bolsa_domain.entities.account import (
     LedgerEntry,
 )
 from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
-from bolsa_domain.errors import IdempotencyKeyExists
+from bolsa_domain.errors import IdempotencyKeyExists, IdempotencyKeyReused
 from bolsa_domain.tax_report import (
     TaxReportTransaction,
     build_tax_report,
@@ -276,6 +276,84 @@ def _cash_movement_result_from_entry(entry: LedgerEntry, kind: str) -> CashMovem
     )
 
 
+def _cash_payload_matches(
+    entry: LedgerEntry,
+    *,
+    amount: float,
+    note: str | None,
+    storage_sign: int,
+) -> bool:
+    """Compara el payload entrante de un deposit/withdraw contra lo persistido.
+
+    El valor financiero crítico es el ``amount``. La entrada de ledger guarda el
+    deposit con el importe positivo y el withdraw con su signo (negativo); la
+    comparación aplica ``storage_sign`` (1 para deposit, -1 para withdraw) para
+    alinear el entrante con el signo de almacenamiento. Se normaliza a ``Decimal``
+    (con ``Decimal(str(x))``) con una tolerancia absoluta de 1 céntimo para
+    absorber las diferencias de representación floating point. ``note``/description
+    se comparan exactamente sólo si el entrante aporta nota. Si algún campo
+    difiere, la key se está reutilizando con un payload distinto → conflicto.
+    """
+    from decimal import Decimal
+
+    amount_matches = abs(Decimal(str(entry.amount)) - Decimal(str(amount * storage_sign))) < Decimal("0.01")
+    if not amount_matches:
+        return False
+    if note is not None:
+        return note == entry.description
+    return True
+
+
+def _assert_cash_payload_matches(
+    entry: LedgerEntry,
+    *,
+    amount: float,
+    note: str | None,
+    storage_sign: int,
+    idempotency_key: str,
+) -> None:
+    if not _cash_payload_matches(
+        entry,
+        amount=amount,
+        note=note,
+        storage_sign=storage_sign,
+    ):
+        raise IdempotencyKeyReused(idempotency_key)
+
+
+def _trade_payload_matches(existing: Transaction, *, instrument_id: str, trade_type: str, quantity: float, price: float) -> bool:
+    """Compara el payload entrante de un trade contra la transacción persistida.
+
+    Coincide si `instrument_id`, `trade_type`, `quantity` y `price` son iguales.
+    Se normaliza a ``Decimal`` (con ``Decimal(str(x))``) para quantity/price con la
+    misma tolerancia de 1 céntimo que los movimientos de cash (floating point).
+    ``total`` es derivable (quantity*price + fees) y no se compara directamente.
+    """
+    from decimal import Decimal
+
+    tol = Decimal("0.01")
+    if existing.instrument_id != instrument_id:
+        return False
+    if existing.type != trade_type:
+        return False
+    if abs(Decimal(str(existing.quantity)) - Decimal(str(quantity))) > tol:
+        return False
+    if abs(Decimal(str(existing.price)) - Decimal(str(price))) > tol:
+        return False
+    return True
+
+
+def _assert_trade_payload_matches(existing: Transaction, *, instrument_id: str, trade_type: str, quantity: float, price: float, idempotency_key: str) -> None:
+    if not _trade_payload_matches(
+        existing,
+        instrument_id=instrument_id,
+        trade_type=trade_type,
+        quantity=quantity,
+        price=price,
+    ):
+        raise IdempotencyKeyReused(idempotency_key)
+
+
 class DepositCashToAccount:
     """Ingresa efectivo en cuenta."""
     def __init__(
@@ -310,6 +388,13 @@ class DepositCashToAccount:
                 type="deposit",
             )
             if existing is not None:
+                _assert_cash_payload_matches(
+                    existing,
+                    amount=amount,
+                    note=note,
+                    storage_sign=1,
+                    idempotency_key=idempotency_key,
+                )
                 return _cash_movement_result_from_entry(existing, "external_deposit")
         movement_id = idempotency_key or new_id()
         session = getattr(self._ledger_repo, "session", None)
@@ -343,6 +428,13 @@ class DepositCashToAccount:
             )
             if existing is None:
                 raise
+            _assert_cash_payload_matches(
+                existing,
+                amount=amount,
+                note=note,
+                storage_sign=1,
+                idempotency_key=idempotency_key,  # type: ignore[arg-type]
+            )
             return _cash_movement_result_from_entry(existing, "external_deposit")
         return CashMovementResult(
             id=movement_id,
@@ -392,6 +484,13 @@ class WithdrawCashFromAccount:
                 type="withdrawal",
             )
             if existing is not None:
+                _assert_cash_payload_matches(
+                    existing,
+                    amount=amount,
+                    note=note,
+                    storage_sign=-1,
+                    idempotency_key=idempotency_key,
+                )
                 return _cash_movement_result_from_entry(existing, "external_withdrawal")
         summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
         if summary.portfolio.cash < amount:
@@ -429,6 +528,13 @@ class WithdrawCashFromAccount:
             )
             if existing is None:
                 raise
+            _assert_cash_payload_matches(
+                existing,
+                amount=amount,
+                note=note,
+                storage_sign=-1,
+                idempotency_key=idempotency_key,  # type: ignore[arg-type]
+            )
             return _cash_movement_result_from_entry(existing, "external_withdrawal")
         return CashMovementResult(
             id=movement_id,
@@ -637,6 +743,14 @@ class ExecuteTrade:
                 idempotency_key,
             )
             if existing is not None:
+                _assert_trade_payload_matches(
+                    existing,
+                    instrument_id=instrument_id,
+                    trade_type=trade_type,
+                    quantity=quantity,
+                    price=price,
+                    idempotency_key=idempotency_key,
+                )
                 summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
                 return TradeResult(transaction=existing, summary=summary)
         settings = scope.account.settings or settings_from_dict(None)
@@ -671,6 +785,14 @@ class ExecuteTrade:
             )
             if existing is None:
                 raise
+            _assert_trade_payload_matches(
+                existing,
+                instrument_id=instrument_id,
+                trade_type=trade_type,
+                quantity=quantity,
+                price=price,
+                idempotency_key=idempotency_key,
+            )
             summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
             return TradeResult(transaction=existing, summary=summary)
         amount = -result.transaction.total if trade_type == "buy" else result.transaction.total
