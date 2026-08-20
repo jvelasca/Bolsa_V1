@@ -111,6 +111,26 @@ def test_fifo_carry_in_cross_year_no_rompe_cost_basis() -> None:
     assert line.realized_gain == pytest.approx((120 - 100) * 5.0)
 
 
+def test_fifo_buy_quantity_zero_no_divide_by_zero_ni_lote() -> None:
+    # Buy con quantity == 0 dentro del FIFO: no puede lanzar ZeroDivisionError, no
+    # debe fabricar un lote (ni basis ni quantity) y el sell debe consumir SOLO el
+    # lote válido, con el realized esperado.
+    report = _build_one_year(
+        year=2026,
+        transactions=[
+            _tx(tx_id="zero", typ="buy", symbol="XYZ", quantity=0, price=100, executed_at="2026-01-01T00:00:00Z"),
+            _tx(tx_id="valid", typ="buy", symbol="XYZ", quantity=10, price=100, executed_at="2026-02-01T00:00:00Z"),
+            _tx(tx_id="sell", typ="sell", symbol="XYZ", quantity=5, price=120, executed_at="2026-03-01T00:00:00Z"),
+        ],
+        start_month=1,
+    )
+    lines = [line for line in report.realized_lines if line.sell_transaction_id == "sell"]
+    assert len(lines) == 1
+    line = lines[0]
+    assert line.cost_basis == pytest.approx(5 * 100.0)
+    assert line.realized_gain == pytest.approx((120 - 100) * 5.0)
+
+
 def test_realized_lines_filtradas_por_anio_desfasado() -> None:
     # Ejercicio 2024 start=9: la venta de 2025-mar pertenece al ejercicio 2024,
     # la venta de 2025-oct al ejercicio 2025.

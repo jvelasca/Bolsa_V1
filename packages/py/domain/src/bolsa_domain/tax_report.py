@@ -93,14 +93,15 @@ def _fifo_realized(
     for tx in _sort_tx(transactions):
         lots.setdefault(tx.instrument_id, [])
         if tx.type == "buy":
-            fee = tx.fee_amount
-            lots[tx.instrument_id].append(
-                {
-                    "quantity": tx.quantity,
-                    "unit_cost": (tx.total + fee) / tx.quantity,
-                    "acquired_at": tx.executed_at,
-                }
-            )
+            if tx.quantity > 1e-9:
+                fee = tx.fee_amount
+                lots[tx.instrument_id].append(
+                    {
+                        "quantity": tx.quantity,
+                        "unit_cost": (tx.total + fee) / tx.quantity,
+                        "acquired_at": tx.executed_at,
+                    }
+                )
             continue
 
         remaining = tx.quantity

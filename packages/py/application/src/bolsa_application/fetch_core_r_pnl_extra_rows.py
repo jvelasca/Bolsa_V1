@@ -93,9 +93,20 @@ async def fetch_core_r_pnl_extra_rows(
             strategy_ids = _slot_strategy_ids(top.slots)
             paper = find_paper_for_top_slots(accounts, strategy_ids)
             if paper is None:
+                if strategy_ids:
+                    logger.warning(
+                        "CORE-R PnL extras: no paper account for instrument_id=%s strategy_ids=%s",
+                        instrument_id,
+                        strategy_ids,
+                    )
                 continue
             live = summary_by_id.get(str(paper["id"]))
             if live is None:
+                logger.warning(
+                    "CORE-R PnL extras: no live summary for paper account id=%s instrument_id=%s",
+                    paper["id"],
+                    instrument_id,
+                )
                 continue
             return_pct = account_return_pct(
                 float(live["initialDeposit"]),
