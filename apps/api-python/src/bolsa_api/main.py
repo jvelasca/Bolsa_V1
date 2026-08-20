@@ -14,11 +14,19 @@ proceso dedicado ``python -m bolsa_api.workers.scheduler_worker``.
 
 Ver docs/API_REFERENCE.md y docs/ONBOARDING.md.
 """
-import asyncio
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+from bolsa_infrastructure.config import Settings, get_settings
+from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
+from bolsa_infrastructure.database.migrations import database_bootstrap
+from bolsa_infrastructure.database.session import (
+    create_engine,
+    create_session_factory,
+)
+from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -27,31 +35,19 @@ from bolsa_api.api.v1.router import api_v1_router
 from bolsa_api.logging_redact import install_log_redact
 from bolsa_api.middleware.auth import AuthMiddleware
 from bolsa_api.middleware.rate_limit import RateLimitMiddleware
-from bolsa_infrastructure.config import Settings, get_settings
-from bolsa_infrastructure.database.account_migration import run_account_data_migration
-from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
-from bolsa_infrastructure.database.migrations import ensure_migrated
-from bolsa_infrastructure.database.session import (
-    create_engine,
-    create_session_factory,
-)
-from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    # F3b: aplicar migraciones Alembic pendientes (idempotente) al arranque, como
-    # autoridad de esquema BD (D2), fuera del path caliente de petición.
-    await asyncio.to_thread(ensure_migrated)
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
-    # F3a (P1.2): migración de datos de cuentas (seeding/backfill) UNA vez al
-    # arranque, fuera del path de petición. Antes vivía por-request en
-    # SqlAlchemyAccountRepository.ensure_migrated (destructivo/race).
-    async with app.state.session_factory() as _migration_session:
-        await run_account_data_migration(_migration_session)
+    # F3b + F3a/account (P1.2) + R-8A/P0-A: aplicar migraciones Alembic (autoridad de
+    # esquema D2) y migración de datos de cuentas UNA vez al arranque, serializado
+    # entre los N procesos (workers + scheduler) con un advisory lock para evitar
+    # carreras de bootstrap concurrente. Fuera del path caliente de petición.
+    await database_bootstrap(engine=engine, session_factory=app.state.session_factory)
     configure_ai_governance_proxy()
     _warn_if_routes_missing(app)
     # F3a (D3): los workers/schedulers/crons ya NO se lanzan aquí. Viven en el
@@ -184,11 +180,7 @@ def run() -> None:
     settings = get_settings()
     reload_raw = os.environ.get("BOLSA_API_RELOAD", "0").strip().lower()
     reload = reload_raw in {"1", "true", "yes", "on"}
-    loop = (
-        "bolsa_api.win_loop:selector_event_loop_factory"
-        if sys.platform == "win32"
-        else "auto"
-    )
+    loop = "bolsa_api.win_loop:selector_event_loop_factory" if sys.platform == "win32" else "auto"
     uvicorn.run(
         "bolsa_api.main:app",
         host=settings.api_host,

@@ -1,9 +1,9 @@
 """Use-cases de cuentas DEMO/trading, ledger y trades."""
 
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
 from bolsa_domain.account_settings import calculate_trade_fees, settings_from_dict
 from bolsa_domain.entities.account import (
     AccountSummary,
@@ -12,6 +12,7 @@ from bolsa_domain.entities.account import (
     LedgerEntry,
 )
 from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
+from bolsa_domain.errors import IdempotencyKeyExists
 from bolsa_domain.tax_report import (
     TaxReportTransaction,
     build_tax_report,
@@ -27,6 +28,25 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
 from bolsa_infrastructure.ids import new_id
+
+from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
+
+
+@asynccontextmanager
+async def _idempotent_savepoint(session):
+    """Abre un SAVEPOINT si hay una sesión real; no-op en tests con fakes.
+
+    R-8A/P0-B: permite revertir SOLO el intento de escritura del perdedor de una
+    carrera de idempotencia (``add_cash``/``deduct_cash`` + ``append_cash_movement``)
+    sin descartar el estado de la transacción de la request. En los tests con repos
+    fake (que no exponen ``session``) se ejecuta como no-op y el patrón sigue
+    comportándose igual que antes (sin colisiones reales).
+    """
+    if session is None:
+        yield
+        return
+    async with session.begin_nested():
+        yield
 
 
 class ListAccounts:
@@ -290,20 +310,36 @@ class DepositCashToAccount:
             if existing is not None:
                 return _cash_movement_result_from_entry(existing, "external_deposit")
         movement_id = idempotency_key or new_id()
-        balance_after = await self._portfolio_repo.add_cash(scope.legacy_portfolio_id, amount)
-        description = note or "Depósito externo (simulado)"
-        entry = await self._ledger_repo.append_cash_movement(
-            account_id=account_id,
-            portfolio_id=scope.portfolio.id,
-            entry_type="deposit",
-            amount=amount,
-            currency=scope.account.currency,
-            balance_after=balance_after,
-            reference_id=movement_id,
-            reference_type="external",
-            description=description,
-        )
-        await self._account_repo.touch_activity(account_id)
+        session = getattr(self._ledger_repo, "session", None)
+        try:
+            async with _idempotent_savepoint(session):
+                balance_after = await self._portfolio_repo.add_cash(
+                    scope.legacy_portfolio_id, amount
+                )
+                description = note or "Depósito externo (simulado)"
+                entry = await self._ledger_repo.append_cash_movement(
+                    account_id=account_id,
+                    portfolio_id=scope.portfolio.id,
+                    entry_type="deposit",
+                    amount=amount,
+                    currency=scope.account.currency,
+                    balance_after=balance_after,
+                    reference_id=movement_id,
+                    reference_type="external",
+                    description=description,
+                )
+                await self._account_repo.touch_activity(account_id)
+        except IdempotencyKeyExists:
+            # R-8A/P0-B: otro request con la misma idempotency_key ganó la carrera y ya
+            # grabó el depósito; el savepoint revirtió este intento (incl. add_cash).
+            # Rejugamos el movimiento original para devolver la misma shape.
+            existing = await self._ledger_repo.find_cash_movement_by_reference(
+                "external",
+                idempotency_key,  # type: ignore[arg-type]
+            )
+            if existing is None:
+                raise
+            return _cash_movement_result_from_entry(existing, "external_deposit")
         return CashMovementResult(
             id=movement_id,
             account_id=account_id,
@@ -356,20 +392,35 @@ class WithdrawCashFromAccount:
                 f"Efectivo insuficiente. Disponible: {summary.portfolio.cash:.2f} {scope.account.currency}",
             )
         movement_id = idempotency_key or new_id()
-        balance_after = await self._portfolio_repo.deduct_cash(scope.legacy_portfolio_id, amount)
-        description = note or "Retirada externa (simulada)"
-        entry = await self._ledger_repo.append_cash_movement(
-            account_id=account_id,
-            portfolio_id=scope.portfolio.id,
-            entry_type="withdrawal",
-            amount=-amount,
-            currency=scope.account.currency,
-            balance_after=balance_after,
-            reference_id=movement_id,
-            reference_type="external",
-            description=description,
-        )
-        await self._account_repo.touch_activity(account_id)
+        session = getattr(self._ledger_repo, "session", None)
+        try:
+            async with _idempotent_savepoint(session):
+                balance_after = await self._portfolio_repo.deduct_cash(
+                    scope.legacy_portfolio_id, amount
+                )
+                description = note or "Retirada externa (simulada)"
+                entry = await self._ledger_repo.append_cash_movement(
+                    account_id=account_id,
+                    portfolio_id=scope.portfolio.id,
+                    entry_type="withdrawal",
+                    amount=-amount,
+                    currency=scope.account.currency,
+                    balance_after=balance_after,
+                    reference_id=movement_id,
+                    reference_type="external",
+                    description=description,
+                )
+                await self._account_repo.touch_activity(account_id)
+        except IdempotencyKeyExists:
+            # R-8A/P0-B: carrera de idempotencia perdida → el savepoint revirtió este
+            # intento (incl. deduct_cash); rejugamos la retirada original.
+            existing = await self._ledger_repo.find_cash_movement_by_reference(
+                "external",
+                idempotency_key,  # type: ignore[arg-type]
+            )
+            if existing is None:
+                raise
+            return _cash_movement_result_from_entry(existing, "external_withdrawal")
         return CashMovementResult(
             id=movement_id,
             account_id=account_id,
@@ -589,15 +640,30 @@ class ExecuteTrade:
             settings,
             currency=scope.account.currency,
         )
-        result = await self._portfolio_repo.execute_trade(
-            instrument_id=instrument_id,
-            trade_type=trade_type,  # type: ignore[arg-type]
-            quantity=quantity,
-            price=price,
-            legacy_portfolio_id=scope.legacy_portfolio_id,
-            fee_amount=fees.total,
-            idempotency_key=idempotency_key,
-        )
+        try:
+            result = await self._portfolio_repo.execute_trade(
+                instrument_id=instrument_id,
+                trade_type=trade_type,  # type: ignore[arg-type]
+                quantity=quantity,
+                price=price,
+                legacy_portfolio_id=scope.legacy_portfolio_id,
+                fee_amount=fees.total,
+                idempotency_key=idempotency_key,
+            )
+        except IdempotencyKeyExists:
+            # R-8A/P0-B: otro request con LA MISMA idempotency_key ganó la carrera y ya
+            # grabó la transacción (el repo revertió este intento con un savepoint).
+            # Rejugamos el trade original con un summary fresco, sin append_trade/fee.
+            if idempotency_key is None:
+                raise
+            existing = await self._portfolio_repo.find_transaction_by_idempotency(
+                scope.legacy_portfolio_id,
+                idempotency_key,
+            )
+            if existing is None:
+                raise
+            summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
+            return TradeResult(transaction=existing, summary=summary)
         amount = -result.transaction.total if trade_type == "buy" else result.transaction.total
         # M3: balance_after = cash real grabado por el repo (ya incluye comisiones),
         # NO un recálculo manual que doble-contaría las fees.

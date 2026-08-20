@@ -1,11 +1,14 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from bolsa_domain.entities.account import LedgerEntry
+from bolsa_domain.errors import IdempotencyKeyExists
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bolsa_domain.entities.account import LedgerEntry
+from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.models import LedgerEntryRow
 from bolsa_infrastructure.ids import new_id
 
@@ -33,6 +36,11 @@ def _entry_from_row(row: LedgerEntryRow, symbol: str | None = None) -> LedgerEnt
 class SqlAlchemyLedgerRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    @property
+    def session(self) -> AsyncSession:
+        """Sesión activa — R-8A (savepoint de idempotencia en use-cases)."""
+        return self._session
 
     async def append_trade(
         self,
@@ -134,8 +142,7 @@ class SqlAlchemyLedgerRepository:
             stmt = stmt.where(LedgerEntryRow.executed_at < executed_to)
         rows = (await self._session.execute(stmt)).scalars().all()
         return [
-            _entry_from_row(row, row.instrument.symbol if row.instrument else None)
-            for row in rows
+            _entry_from_row(row, row.instrument.symbol if row.instrument else None) for row in rows
         ]
 
     async def has_reference(self, reference_type: str, reference_id: str) -> bool:
@@ -294,6 +301,18 @@ class SqlAlchemyLedgerRepository:
             executed_at=now,
             created_at=now,
         )
-        self._session.add(row)
-        await self._session.flush()
+        try:
+            async with self._session.begin_nested():
+                self._session.add(row)
+                await self._session.flush()
+        except IntegrityError as exc:
+            if reference_type in ("external",) and reference_id and is_unique_violation(exc):
+                # R-8A/P0-B: colisión del UNIQUE ledger por idempotency_key → otro
+                # request ya grabó este movimiento. El savepoint revierte solo el
+                # intento; el use-case rejuega el movimiento original (no se dobla
+                # el cash). Solo relanzamos IdempotencyKeyExists ante una violación
+                # de unicidad; cualquier otro IntegrityError (FK, check, …) se
+                # re-propagó como tal.
+                raise IdempotencyKeyExists(reference_id) from exc
+            raise
         return _entry_from_row(row)

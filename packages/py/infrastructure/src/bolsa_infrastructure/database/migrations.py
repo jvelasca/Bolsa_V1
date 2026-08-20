@@ -5,23 +5,38 @@ nuevo. ``ensure_migrated`` es la vía programática para llevar la BD a ``head``
 aplica las migraciones pendientes (controladas por la tabla ``alembic_version``)
 y es idempotente por construcción.
 
+``database_bootstrap`` (R-8A) serializa el arranque de BD entre los N procesos
+(workers FastAPI + scheduler) con un advisory lock PostgreSQL, evitando las carreras
+de bootstrap concurrente (P0-A).
+
 Se invoca UNA vez al arrancar el proceso (lifespan), NUNCA en el path caliente de
 una petición (resuelve P1.2: `ensure_migrated` destructivo/backfill por request).
 """
 
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+)
 from sqlalchemy.pool import NullPool
 
+from alembic import command
 from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.account_migration import run_account_data_migration
 
 _INFRA_ROOT = Path(__file__).resolve().parents[3]
+
+# Clave global del advisory lock de bootstrap. DEBE ser idéntica en todos los
+# procesos (API workers + scheduler) para que se serialicen entre sí (P0-A).
+BOOTSTRAP_ADVISORY_LOCK_KEY = 774_104_253
 
 
 def _alembic_config() -> Config:
@@ -57,3 +72,42 @@ def ensure_migrated() -> bool:
     finally:
         engine.dispose()
     return True
+
+
+async def database_bootstrap(
+    *,
+    engine: AsyncEngine,
+    session_factory: async_sessionmaker[AsyncSession],
+    lock_key: int = BOOTSTRAP_ADVISORY_LOCK_KEY,
+) -> None:
+    """Serializa el arranque de BD (migraciones + migración de datos) entre procesos.
+
+    R-8A/P0-A: FastAPI con ``--workers N`` ejecuta su ``lifespan`` en cada worker, y el
+    proceso ``scheduler_worker`` corre también la migración de datos; sin serialización
+    las migraciones Alembic y los backfills se ejecutan N veces en paralelo (carreras en
+    ``_ensure_default_account`` y en el `upgrade head`). Un advisory lock PostgreSQL con
+    la MISMA ``lock_key`` en todos los procesos hace que solo uno entre al bootstrap y
+    el resto espere a que libere (``pg_advisory_unlock``) o cierre la conexión.
+
+    El lock es a nivel de *sesión* (no se revierte con ROLLBACK) y libera en ``finally``.
+    Aunque ``ensure_migrated`` use su propio engine síncrono y la migración de datos una
+    sesión async distinta, el lock global serializa el bloque completo entre tomadores de
+    la misma clave.
+    """
+    async with engine.connect() as conn:
+        await conn.execute(
+            text("SELECT pg_advisory_lock(:key)"),
+            {"key": lock_key},
+        )
+        try:
+            await asyncio.to_thread(ensure_migrated)
+            async with session_factory() as session:
+                await run_account_data_migration(session)
+        finally:
+            try:
+                await conn.execute(
+                    text("SELECT pg_advisory_unlock(:key)"),
+                    {"key": lock_key},
+                )
+            finally:
+                await conn.close()

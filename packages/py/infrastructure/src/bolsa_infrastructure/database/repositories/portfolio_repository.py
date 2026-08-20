@@ -2,10 +2,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     PortfolioSummary,
@@ -13,7 +9,14 @@ from bolsa_domain.entities.portfolio import (
     TradeResult,
     Transaction,
 )
+from bolsa_domain.errors import IdempotencyKeyExists
 from bolsa_domain.value_objects.timeframe import TimeFrame
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
     OhlcvBarRow,
@@ -27,6 +30,11 @@ from bolsa_infrastructure.ids import new_id
 class SqlAlchemyPortfolioRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    @property
+    def session(self) -> AsyncSession:
+        """Sesión activa — R-8A (savepoint de idempotencia en use-cases)."""
+        return self._session
 
     async def _resolve_portfolio(self, legacy_portfolio_id: str) -> Portfolio:
         # F-IND-1/F-FIN-1: NO existe un "default global por nombre". El scope a la
@@ -63,7 +71,9 @@ class SqlAlchemyPortfolioRepository:
         for iid, close in result.all():
             if close is None:
                 continue
-            out[str(iid)] = float(close) if isinstance(close, (int, float, Decimal)) else float(close)
+            out[str(iid)] = (
+                float(close) if isinstance(close, (int, float, Decimal)) else float(close)
+            )
         return out
 
     async def _latest_close(self, instrument_id: str) -> float | None:
@@ -249,6 +259,58 @@ class SqlAlchemyPortfolioRepository:
             executed_at=row.executed_at.isoformat(),
         )
 
+    async def _write_trade_rows(
+        self,
+        *,
+        transaction: TransactionRow,
+        portfolio_row: PortfolioRow,
+        existing_position: PositionRow | None,
+        trade_type: Literal["buy", "sell"],
+        quantity: float,
+        cash: Decimal,
+        total: Decimal,
+        fees: Decimal,
+        now: datetime,
+    ) -> None:
+        """Escribe transaction + mutación de cartera/posición dentro del savepoint.
+
+        Extraído en R-8A para poder envolver TODAS las escrituras del trade en un
+        único ``begin_nested()`` y revertirlas juntas si surge un IntegrityError por
+        idempotencia.
+        """
+        if trade_type == "buy":
+            portfolio_row.cash = cash - total - fees
+            if existing_position:
+                old_qty = existing_position.quantity
+                old_cost = existing_position.avg_cost
+                new_qty: Decimal = old_qty + Decimal(str(quantity))
+                new_avg = (old_qty * old_cost + total) / new_qty
+                existing_position.quantity = new_qty
+                existing_position.avg_cost = new_avg
+                existing_position.updated_at = now
+            else:
+                self._session.add(
+                    PositionRow(
+                        id=new_id(),
+                        portfolio_id=portfolio_row.id,
+                        instrument_id=transaction.instrument_id,
+                        quantity=Decimal(str(quantity)),
+                        avg_cost=Decimal(str(transaction.price)),
+                        updated_at=now,
+                    ),
+                )
+        else:
+            portfolio_row.cash = cash + total - fees
+            assert existing_position is not None
+            new_qty = existing_position.quantity - Decimal(str(quantity))
+            if new_qty == 0:
+                await self._session.delete(existing_position)
+            else:
+                existing_position.quantity = new_qty
+                existing_position.updated_at = now
+
+        portfolio_row.updated_at = now
+
     async def execute_trade(
         self,
         *,
@@ -319,41 +381,31 @@ class SqlAlchemyPortfolioRepository:
             executed_at=now,
             idempotency_key=idempotency_key,
         )
-        self._session.add(transaction)
 
-        if trade_type == "buy":
-            portfolio_row.cash = cash - total - fees
-            if existing_position:
-                old_qty = existing_position.quantity
-                old_cost = existing_position.avg_cost
-                new_qty = old_qty + Decimal(str(quantity))
-                new_avg = (old_qty * old_cost + total) / new_qty
-                existing_position.quantity = new_qty
-                existing_position.avg_cost = new_avg
-                existing_position.updated_at = now
-            else:
-                self._session.add(
-                    PositionRow(
-                        id=new_id(),
-                        portfolio_id=portfolio.id,
-                        instrument_id=instrument_id,
-                        quantity=Decimal(str(quantity)),
-                        avg_cost=Decimal(str(price)),
-                        updated_at=now,
-                    ),
+        try:
+            async with self._session.begin_nested():
+                self._session.add(transaction)
+                await self._write_trade_rows(
+                    transaction=transaction,
+                    portfolio_row=portfolio_row,
+                    existing_position=existing_position,
+                    trade_type=trade_type,
+                    quantity=quantity,
+                    cash=cash,
+                    total=total,
+                    fees=fees,
+                    now=now,
                 )
-        else:
-            portfolio_row.cash = cash + total - fees
-            assert existing_position is not None
-            new_qty = existing_position.quantity - Decimal(str(quantity))
-            if new_qty == 0:
-                await self._session.delete(existing_position)
-            else:
-                existing_position.quantity = new_qty
-                existing_position.updated_at = now
-
-        portfolio_row.updated_at = now
-        await self._session.flush()
+                await self._session.flush()
+        except IntegrityError as exc:
+            if idempotency_key is not None and is_unique_violation(exc):
+                # R-8A/P0-B: otro request con la MISMA idempotency_key ya grabó esta
+                # transacción (colisión del UNIQUE transactions(portfolio_id, idempotency_key)).
+                # El savepoint revierte este intento (cartera/posición/transaction locales);
+                # señalizamos al use-case para que rejuego el original en lugar de estallar.
+                # Solo ante violación de unicidad; otros IntegrityError se re-propagan.
+                raise IdempotencyKeyExists(idempotency_key) from exc
+            raise
 
         summary = await self.get_summary(legacy_portfolio_id)
         return TradeResult(

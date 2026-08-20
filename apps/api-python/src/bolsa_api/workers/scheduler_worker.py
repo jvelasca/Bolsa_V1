@@ -24,6 +24,9 @@ import signal
 import sys
 from typing import Any
 
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.migrations import database_bootstrap
+from bolsa_infrastructure.database.session import create_engine, create_session_factory
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
@@ -36,9 +39,6 @@ from bolsa_api.background.optimization_worker import start_optimization_worker
 from bolsa_api.background.scan_worker import start_scan_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.account_migration import run_account_data_migration
-from bolsa_infrastructure.database.session import create_engine, create_session_factory
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +69,10 @@ async def _run_scheduler(
     session_factory: async_sessionmaker[AsyncSession],
     engine: AsyncEngine,
 ) -> None:
-    # F3a (P1.2): migración de datos de cuentas idempotente UNA vez al arranque
-    # del proceso, fuera del path de petición (antes: por-request en el repositorio).
-    async with session_factory() as migration_session:
-        await run_account_data_migration(migration_session)
+    # F3b + F3a (P1.2) + R-8A/P0-A: migraciones Alembic + migración de datos de
+    # cuentas UNA vez al arranque, serializadas con el resto de procesos (workers
+    # FastAPI con --workers N) mediante advisory lock, fuera del path de petición.
+    await database_bootstrap(engine=engine, session_factory=session_factory)
 
     starters = [*_event_loop_starters(), *_queue_loop_starters()]
     tasks: list[asyncio.Task[None]] = []
