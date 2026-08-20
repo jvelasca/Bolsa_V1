@@ -31,6 +31,10 @@ SENSITIVE_PREFIXES: tuple[tuple[str, int], ...] = (
     ("/api/instruments/fundamentals/query", 60),
     ("/api/instruments/fundamentals/screener", 60),
     ("/api/sync", 20),
+    # Auth (R-8B.1): login es objetivo de fuerza bruta → límite bajo; status es una
+    # lectura barata del FE (AuthGate) → más permisivo.
+    ("/api/auth/login", 20),
+    ("/api/auth/status", 60),
 )
 
 # Extra: /api/instruments/{id}/fundamentals (id en el path). Se resuelve por segmento,

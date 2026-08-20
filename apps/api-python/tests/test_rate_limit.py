@@ -31,6 +31,9 @@ def _middleware() -> RateLimitMiddleware:
         ("/api/instruments/fundamentals/screener", 60),
         # Sync
         ("/api/sync", 20),
+        # Auth (R-8B.1): login y status tienen límites propios
+        ("/api/auth/login", 20),
+        ("/api/auth/status", 60),
         # Fuera de scope: no debe acotarse
         ("/api/portfolio/positions", None),
         ("/api/accounts", None),
