@@ -51,7 +51,7 @@ Engineering Index  (este doc)
 │   ├── dev-continuation-plan-2026-08-09.md   ← continuación (estado + próximos pasos)
 │   ├── audit-resume-premises-2026-08-09.md   ← premisas nuevo hilo auditoría
 │   ├── general-audit-plan-2026-08-10.md       ← auditoría general + plan por módulos
-│   ├── plan-r8-prevencion-riesgo-2026-08-20.md ← R-8 plan de prevención de riesgo + corrección (2026-08-20)
+│   ├── plan-r8-prevencion-riesgo-2026-08-20.md ← R-8 plan de prevención de riesgo + corrección (2026-08-20) — **R-8 COMPLETA en `main`** (R-8A `edf2d0c` · R-8B.1 `ac147fe` · R-8B.2 `abf3dc2` · R-8C `3ad48aa` · R-8D `dbd1ee5` · R-8B.3 `158b3db`,`756e3a1`,`ce1d5ca`,`e6dde15`,`fb95b27`) + **CONTRACT-STALE RESUELTO** (`aecbb28`, D5 verde)
 │   ├── traspaso-m1-reproducibilidad-backend-2026-08-10.md  ← M1 reproducibilidad backend (uv.lock)
 │   ├── traspaso-m2-versiones-frontend-2026-08-10.md        ← M2 versiones frontend (@types react) CERRADO 08-10
 │   ├── traspaso-m3-dominio-2026-08-10.md                   ← M3 capa de dominio (py/domain + application) · entrada original (punto de entrada del hilo)
