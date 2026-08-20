@@ -258,9 +258,9 @@ export function InstrumentDictamenEvolution({
               </span>
               <span
                 className="truncate text-muted-foreground"
-                title={row.reasons.join(", ")}
+                title={row.reasons?.join(", ") ?? ""}
               >
-                {reasonHint(row.reasons)}
+                {reasonHint(row.reasons ?? [])}
               </span>
             </li>
           ))}

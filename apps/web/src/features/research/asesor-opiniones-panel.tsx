@@ -375,10 +375,10 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                     </div>
                     <p
                       className="truncate text-xs text-muted-foreground"
-                      title={item.reasons.join(", ")}
+                      title={item.reasons?.join(", ") ?? ""}
                     >
                       {INSTRUMENT_DAILY_OPINION_STANCE_LABELS[item.stance]}
-                      {item.reasons.length
+                      {item.reasons && item.reasons.length
                         ? ` · ${item.reasons.slice(0, 2).join(" · ")}`
                         : ""}
                     </p>

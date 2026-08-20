@@ -66,7 +66,7 @@ export function OperativaDictamenBlock({
         className,
       )}
       data-testid="operativa-dictamen"
-      title={`Dictamen ★${opinion.dictamenStars} · Estrategia ★${opinion.strategyStars ?? "—"} · ${opinion.reasons.join(", ")}`}
+      title={`Dictamen ★${opinion.dictamenStars} · Estrategia ★${opinion.strategyStars ?? "—"} · ${opinion.reasons?.join(", ") ?? ""}`}
     >
       <p className="text-[9px] font-medium uppercase tracking-wide opacity-70">
         Postura sugerida hoy
@@ -83,7 +83,7 @@ export function OperativaDictamenBlock({
         {opinion.strategyStars != null ? ` (TOP ${opinion.strategyStars})` : ""}
         .{opinion.distress ? " · Atención: alerta fundamental." : ""}
       </p>
-      {opinion.reasons.length > 0 ? (
+      {opinion.reasons && opinion.reasons.length > 0 ? (
         <p
           className="mt-0.5 text-[10px] opacity-75"
           title={opinion.reasons.join(", ")}
