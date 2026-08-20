@@ -208,6 +208,10 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Criterio de aceptación (opción A):** INSERT corrupto → rechazado por DB; migración desde BD limpia y existente OK; tests de invariante en infra real verdes.
 
+**Decisión de alcance (2026-08-20, aprobada por el usuario): ✅ OPCIÓN B — postcondición app + corregir docs.** Verificado en código (`tables.py:1172-1219`): `LedgerEntryRow` solo tiene el UNIQUE parcial `uq_ledger_entries_account_reference`; **NO hay `CheckConstraint` ni trigger** sobre `balance_after` (grep 0 en código). El invariante vive SOLO en tests (`test_r8c_ledger_balance_atomic.py`). Se corrige la documentación que afirma "invariante DB `balance_after`" (que NO es un constraint) para que diga la verdad: **postcondición de app verificada por grupo atómico en el test-suite**, no garantía física de la BD. NO se añade trigger ni migración (menor riesgo; la garantía física se descarta por decisión).
+
+**Estado (2026-08-20, IMPLEMENTADO):** _(SE RELLENARÁ AL CERRAR)_
+
 ---
 
 ### 🟠 FASE 7 — Suite de concurrencia e invariantes (escenarios de ataque)
@@ -271,7 +275,7 @@ Como manda la premisa E5/E6, **cada fase entrega**:
 | **F1** | Cómo aislar idempotencia por cuenta **manteniendo trade+fee** | ✅ **DECIDIDA (2026-08-20):** Opción A — alinear el lookup (`account_id`+`type`) con el UNIQUE existente por-cuenta+`type`. NO tocar UNIQUE/trade+fee. Sin migración. |
 | **F3** | Orden custody                                                 | A) release tras COMMIT (recomendada) · B) documentar Redis como optimización                                                                                          |
 | **F5** | Alcance sesión                                                | ✅ **DECIDIDA (2026-08-20):** Opción A — solo epoch (`time.time()`), sin revocación Redis.                                                                            |
-| **F6** | Invariante `balance_after`                                    | A) trigger/proc DB (cierra el claim) · B) postcondición app + corregir docs (menor riesgo)                                                                            |     |
+| **F6** | Invariante `balance_after`                                    | ✅ **DECIDIDA (2026-08-20):** Opción B — postcondición app + corregir docs (sin trigger DB).                                                                          |     |
 | **F8** | Limpieza `pending-delete` riesgo alto                         | A) solo inventariar, NO ejecutar (recomendada) · B) (requiere `purge storage`)                                                                                        |
 | **F9** | Arquitectura + puente legacy                                  | A) diferir a V2 (recomendado ahora) · B) abrir fase de desacople                                                                                                      |
 
