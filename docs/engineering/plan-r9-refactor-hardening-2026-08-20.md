@@ -237,6 +237,8 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 - **¿Regression de `database_bootstrap` con 2 workers?** Requiere levantar N procesos → se excluye del alcance del subagente (entorno); se documenta como verificación manual/CI pendiente. No añadir.
 - **Sin cambios de código de producción, sin migración, sin contrato, sin web.**
 
+**Estado (2026-08-20, IMPLEMENTADO):** creados `packages/py/infrastructure/tests/test_concurrency_scenarios.py` (4 tests en PG real: aislamiento A/B misma key, deposit+withdraw racing, buy+sell racing, custody+trade racing, sin doble cargo) y `scripts/verify/verify_ledger_balance_chain.py` + `verify_account_isolation.py` (invariante `balance_after` por grupo atómico y aislamiento por cuenta, exit 0/1). Battery (verificada por el coordinador): ruff 0 en los 3 ficheros · mypy 0 en los 3 · pytest `test_concurrency_scenarios.py` 4 passed con PG real (no skipped) · ambos verify scripts EXIT 0 con PG real. `scripts/research` ruff noise preexistente (no tocado). Sin cambio de producción/migración/contrato. Commit `5d59671` pusheado a `main`.
+
 ---
 
 ### 🟡 FASE 8 — Limpieza de código/doc obsoletos + DOCSTRINGS + deuda menor
