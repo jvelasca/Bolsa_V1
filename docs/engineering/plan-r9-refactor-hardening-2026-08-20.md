@@ -123,17 +123,23 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 ### 🔴 FASE 2 — R-9.2: Request-fingerprint + 409 `IDEMPOTENCY_KEY_REUSED`
 
-**Problema:** misma `idempotency_key` con **payload distinto** devuelve hoy el original en silencio (semántica laxa).
+**Problema:** misma `idempotency_key` con **payload distinto** hoy rejuega el original en silencio (semántica laxa). Confirmado en los 3 write-paths activos:
 
-**Corrección propuesta:**
+- **Deposit/Withdraw** (`accounts.py` `DepositCashToAccount`/`WithdrawCashFromAccount`): si el guard `find_cash_movement_by_reference` encuentra el movimiento, lo rejuega sin comparar el `amount` entrante. `deposit key=ABC amt=1000` + `deposit key=ABC amt=5` → devuelve el de 1000€.
+- **Trade** (`ExecuteTrade` `accounts.py:620`): `find_transaction_by_idempotency` rejuega sin comparar instrument/type/qty/price.
+- **No hay use-case de transferencia activo** (transf_cash eliminado en R-7 B-3); solo 3 write-paths.
 
-- Modelo `idempotency` (o columnas en `ledger_entries`/tabla `transaction`): `idempotency_key` + `request_hash` (SHA-256 del payload normalizado) + `status` + `created_at`.
-- En depósito/retiro/trade/transferencia: si existe `key`:
-  - `hash` coincide → re-devolver original (idempotente).
-  - `hash` difiere → **409 `IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD`**.
-- Constraint: `UNIQUE(account_id, operation, idempotency_key)` + catch `IntegrityError`→SAVEPOINT→return original (patrón ya usado en trade).
+**Decisión F2 (2026-08-20, coordinador): ✅ OPCIÓN B — SIN migración.** No añadir columna `request_hash`/tabla `idempotency`. En el replay (guard previo y en el `except IdempotencyKeyExists`), **comparar el payload entrante contra los campos financieros YA persistidos**:
 
-**Criterio de aceptación:** tests de mismo-key-mismo-payload (OK, devuelve original), mismo-key-distinto-payload (409), concurrencia de retries.
+- Deposit/Withdraw: cotejar `amount` (y `note`→`description`) del request vs `existing.amount`/`existing.description`.
+- Trade: cotejar `instrument_id`, `trade_type`, `quantity`, `price` vs `existing`.
+- Si coinciden → re-devolver original (idempotente 200 con la misma shape). Si difieren → **nuevo error de dominio `IdempotencyKeyReused`** que la capa de rutas mapea a **HTTP 409**.
+- Reducción de superficie vs opción A (columna+hash): **sin migración Alembic, sin columna nueva**, solo dominio + use-case + mapeo de ruta. Menor riesgo, aborda directamente la ambigüedad financiera del hallazgo.
+- ⚠️ Es un cambio de **contrato HTTP** (nueva semántica de respuesta 409) → la fase debe incluir mapeo de ruta, y si toca `web`/`openapi`, `contract:check` + regen acotada de `openapi.json`/`schema.d.ts` como fase propia (premisa E1/E5). Se evaluará si el 409 necesita exponerse en la API pública o si basta un código de error interno; decisión en fase.
+
+**Criterio de aceptación:** tests de mismo-key-mismo-payload (OK, devuelve original), mismo-key-distinto-payload (409 `IDEMPOTENCY_KEY_REUSED`), en deposit, withdraw y trade; sin migración nueva; battery verde; `contract:check` donde aplique.
+
+**Estado (2026-08-20, IMPLEMENTADO):** dominio `IdempotencyKeyReused` + comparación de payload en los 3 write-paths + exception handler app-wide en `main.py`→409 · tests app (8) + API integr (3) · ruff 0 · mypy sin errores nuevos. **Contrato:** los 3 endpoints NO declaran `responses={409}`, así que el 409 no figura aún en OpenAPI (cambio semántico de contrato). Pendiente decisión separada (premisa E1/E5) si exponer el 409 en OpenAPI/`schema.d.ts` + `contract:check`; no se ejecutó `contract:gen` en esta fase.
 
 ---
 
