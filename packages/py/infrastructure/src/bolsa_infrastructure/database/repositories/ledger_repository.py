@@ -231,6 +231,27 @@ class SqlAlchemyLedgerRepository:
         amounts = (await self._session.execute(stmt)).scalars().all()
         return sum(abs(float(amount)) for amount in amounts)
 
+    async def sum_cash_amounts(self, account_id: str) -> Decimal:
+        """Σ amount de todas las filas ledger del account (reconciliación cash↔ledger).
+
+        Invariante M-2: ``cash cuentas == Σ amount del ledger del account``.
+
+        Semántica del signo (las filas que afectan cash se escriben con su signo real):
+          - seed ``deposit`` (reference_type ``manual``/``migration``): +depósito inicial
+          - ``deposit`` (external)            : +
+          - ``withdrawal`` (external)         : −
+          - ``buy``/``sell`` (trade)          : −notional / +notional (sin fee)
+          - ``fee`` (trade o custody)         : −abs
+        Como el seed de cuenta es una fila ``deposit`` de valor ``+initial_deposit``, el
+        Σ total YA lo incluye ⇒ Σ == cash actual del account (suma de TODAS sus legacy
+        portfolios). No filtramos por ``type`` en SQL: toda fila del account muta cash.
+        """
+        stmt = select(LedgerEntryRow.amount).where(
+            LedgerEntryRow.account_id == account_id,
+        )
+        amounts = (await self._session.execute(stmt)).scalars().all()
+        return sum((a for a in amounts), Decimal("0"))
+
     async def append_cash_movement(
         self,
         *,
