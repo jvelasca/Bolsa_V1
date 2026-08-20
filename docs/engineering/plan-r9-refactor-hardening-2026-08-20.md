@@ -193,7 +193,7 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Decisión de alcance (2026-08-20, aprobada por el usuario): ✅ OPCIÓN A — solo epoch.** `session.py`: `time.monotonic()` → `time.time()` (epoch UTC) en `session_deadline` y en la comparación de `verify_session_cookie`; actualizar el docstring del módulo que explica el deadline monotónico. NO se toca `session_id`/revocación Redis (mayor alcance, no recomendada para app local). Adaptar los tests de `test_auth.py` que dependen de `time.monotonic()` (`test_expired_session_cookie_rejected` lo parchea en `:138-144`) al nuevo reloj, y añadir un test de expiración/portabilidad con epoch que no dependa de un timer concreto.
 
-**Estado (2026-08-20, EN CURSO — por abrir subagente):** _(SE RELLENARÁ AL CERRAR)_
+**Estado (2026-08-20, IMPLEMENTADO):** `session.py` pasa `time.monotonic()` → `time.time()` (epoch UTC) en `session_deadline` y en `verify_session_cookie`, y el docstring del módulo explica el deadline epoch portable. `test_auth.py`: `test_expired_session_cookie_rejected` adaptado a `time.time()` (epoch congelado + avance del reloj) y añadido `test_session_epoch_portability_and_expiry` (portabilidad/expiración con epoch congelado, sin depender de timer monotónico). Decisión usuario: **opción A** (solo epoch, sin revocación Redis). Battery: ruff 0 · mypy `session.py` (gate CI) Success 0 · pytest `test_auth.py` 11 passed (10+1). Sin migración/contrato/web. Commit `ef4c136` pusheado a `main`.
 
 ---
 
