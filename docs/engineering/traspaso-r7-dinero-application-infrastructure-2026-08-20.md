@@ -379,3 +379,25 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 **Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); B-3 (write-paths de cash sin ledger, `transfer_cash`/`add_cash`/`deduct_cash`) queda pendiente con xfail documentado en M-2; M-4 colinda con "sin features" (mover custodia a job). Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
 
 **Batería acumulada confirmada (referencia del relevo):** ruff 0 (config CI raíz `pyproject.toml`) · mypy infra/domain Success (application mypy-blind en CI) · pytest infra Postgres real 72+1xfail · domain 21 · application **241** · api-python 32.
+
+---
+
+## ✳️ ARRANQUE SIGUIENTE FASE: **M-4 (T-M4/T-M5) — custodia fuera del path de lectura** (por decisión del usuario)
+
+> **Cómo usar:** pega este bloque (o el §8 anterior) como primer mensaje del NUEVO chat. El coordinador del nuevo chat ejecuta la secuencia en orden, una fase = un subagente acotado + batería + aprobación por commit + relevo documentado.
+
+**Read-first (obligatorio):** leer `docs/engineering/backlog-trabajo-2026-08-20.md` §0 y §1. Si no coincide con el repo → PARAR y re-leer.
+
+**Estado al abrir:** `local main = origin/main` (cierre M-6 `604bfef` + docs `0c47c92`), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6.**
+
+**Hallazgo a resolver (backlog §1 `:47`):**
+
+> M-4 (T-M4/T-M5) · application · `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia (dependiente de lectura). Riesgo: **dinero**.
+
+**Secuencia de arranque M-4 (obligatoria, anti-saturación):**
+
+1. **Mapeo read-only** (subagente, sin tocar código): `GetTaxReport`/`GetAccountSummary` en `packages/py/application/src/bolsa_application/accounts.py` — en qué punto mutan dinero/custodia en el GET, de dónde sale el periodo/cargo (`ApplyCustodyFees`, mutex `claim_custody_charge`), quién lee `fees_paid_total` y cómo se mezcla trade+custodia, y qué consumidores dependen del comportamiento actual (FE `dashboard-page`, API). Entregar file:line verificado.
+2. **Decisión de usuario:** alcance (a) mover el cargo a job dedicado vs (b) corregir solo `fees_paid_total`, o acotado. **Colinda con «sin features»** → la propuesta debe respetar freeze.
+3. **Subagente implementación acotado** + **verificación coordinador** (code diff + test + batería real) + **aprobación + commit + push** (rama `main` protegida; el push requiere aprobación vía tarjeta) + **relevo documentado** (actualizar §4 del traspaso + §0/§1/§3/§6 del backlog + PROJECT_STATE §6/§7 + ENGINEERING-INDEX §5).
+
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); B-3 (write-paths de cash sin ledger) pendiente con xfail en M-2; M-6 CERRADA (margen, no reabrir). Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
