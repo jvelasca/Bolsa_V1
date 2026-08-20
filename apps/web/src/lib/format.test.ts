@@ -7,6 +7,7 @@ import {
   formatFxRate,
   formatNumber,
   formatNumber0,
+  parseLocalizedNumber,
 } from "@/lib/format";
 
 describe("lib/format (es-ES)", () => {
@@ -47,5 +48,22 @@ describe("lib/format (es-ES)", () => {
     const out = formatFxRate(1.123456);
     expect(out).toBe("1,123456");
     expect(formatFxRate(1)).toBe("1,0000");
+  });
+
+  it("parseLocalizedNumber normalizes es-ES thousands/decimal separators", () => {
+    expect(parseLocalizedNumber("1.500")).toBe(1500);
+    expect(parseLocalizedNumber("1500")).toBe(1500);
+    expect(parseLocalizedNumber("1,5")).toBe(1.5);
+    expect(parseLocalizedNumber("1.500,75")).toBe(1500.75);
+    expect(parseLocalizedNumber("0")).toBe(0);
+    expect(parseLocalizedNumber("1.5")).toBe(1.5);
+    expect(parseLocalizedNumber("1.234.567,89")).toBe(1234567.89);
+  });
+
+  it("parseLocalizedNumber returns null for invalid/empty input", () => {
+    expect(parseLocalizedNumber("")).toBeNull();
+    expect(parseLocalizedNumber("   ")).toBeNull();
+    expect(parseLocalizedNumber("abc")).toBeNull();
+    expect(parseLocalizedNumber("1,2,3")).toBeNull();
   });
 });

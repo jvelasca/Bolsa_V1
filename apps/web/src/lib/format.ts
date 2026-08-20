@@ -92,3 +92,23 @@ export function formatFxRate(value: number): string {
     maximumFractionDigits: 6,
   });
 }
+
+/**
+ * Parsea un importe/cantidad escrito con formato numérico es-ES de forma
+ * tolerante, normalizando el separador de miles antes de parsear.
+ *
+ * - Soporta separador de miles `.`, decimal `,` y decimal-punto `.` a la vez.
+ * - `"1.500"` -> 1500, `"1,5"` -> 1.5, `"1.500,75"` -> 1500.75, `"1.5"` -> 1.5.
+ * - Devuelve `null` si el valor no es numérico válido (o está vacío).
+ */
+export function parseLocalizedNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === "") return null;
+  // Quita los `.` que actúan como separador de miles: seguidos de exactamente
+  // 3 dígitos y a continuación otro separador o el final (p.ej. `1.500`).
+  const noThousands = trimmed.replace(/\.(?=\d{3}(\.|,|$))/g, "");
+  // Convierte la `,` decimal en `.` decimal-punto.
+  const normalized = noThousands.replace(",", ".");
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}

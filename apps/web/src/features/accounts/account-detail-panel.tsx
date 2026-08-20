@@ -31,6 +31,7 @@ import { useActivateAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { DemoBookModePanel } from "@/features/trading/demo-book-mode-panel";
 import { api } from "@/lib/api";
+import { parseLocalizedNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useActiveAccountStore } from "@/stores/active-account-store";
 
@@ -166,8 +167,8 @@ export function AccountDetailPanel({
 
   const cashMutation = useMutation({
     mutationFn: async () => {
-      const parsed = Number(amount.replace(",", "."));
-      if (!Number.isFinite(parsed) || parsed <= 0) {
+      const parsed = parseLocalizedNumber(amount);
+      if (parsed === null || parsed <= 0) {
         throw new Error("Importe inválido");
       }
       if (cashTab === "deposit") {

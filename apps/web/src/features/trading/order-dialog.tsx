@@ -10,6 +10,7 @@ import {
 import { ExpiryDateTimeField } from "@/components/ui/expiry-datetime-field";
 import { defaultExpiryFromNow } from "@/lib/datetime-input";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { parseLocalizedNumber } from "@/lib/format";
 import {
   useActiveAccount,
   useActiveAccountSettings,
@@ -29,10 +30,6 @@ type SizeMode = "volume" | "value";
 type PendingConfirm =
   | { kind: "market"; side: "buy" | "sell" }
   | { kind: "pending"; side: "buy" | "sell" };
-
-function parseNumber(value: string) {
-  return Number.parseFloat(value.replace(",", "."));
-}
 
 export function OrderDialog() {
   const instrument = useTradingUiStore((s) => s.orderInstrument);
@@ -66,16 +63,17 @@ export function OrderDialog() {
 
   function resolveQuantity() {
     if (sizeMode === "volume") {
-      return parseNumber(volume);
+      const parsedVolume = parseLocalizedNumber(volume);
+      return parsedVolume !== null && parsedVolume > 0 ? parsedVolume : 0;
     }
-    const amount = parseNumber(value);
+    const amount = parseLocalizedNumber(value) ?? 0;
     return lastPrice > 0 ? Math.floor(amount / lastPrice) : 0;
   }
 
   const qty = resolveQuantity();
   const executionPrice =
     pendingConfirm?.kind === "pending"
-      ? parseNumber(limitPrice) || lastPrice
+      ? parseLocalizedNumber(limitPrice) || lastPrice
       : lastPrice;
 
   const { needsFx, fxLabel, notionalAccount, isFxLoading, yahooSymbol } =
@@ -111,7 +109,9 @@ export function OrderDialog() {
 
   const activeInstrument = instrument;
   const estValueInstrument =
-    sizeMode === "volume" ? qty * lastPrice : parseNumber(value);
+    sizeMode === "volume"
+      ? qty * lastPrice
+      : (parseLocalizedNumber(value) ?? 0);
   const feeNotional =
     notionalAccount != null && Number.isFinite(notionalAccount)
       ? notionalAccount
@@ -122,8 +122,8 @@ export function OrderDialog() {
     if (mode === "market" && lastPrice <= 0)
       return "No hay precio de referencia para ejecutar.";
     if (mode === "stop_limit") {
-      const limit = parseNumber(limitPrice);
-      if (!Number.isFinite(limit) || limit <= 0)
+      const limit = parseLocalizedNumber(limitPrice);
+      if (limit === null || limit <= 0)
         return "Indica un precio límite válido.";
     }
     if (needsFx && isFxLoading)
@@ -143,7 +143,7 @@ export function OrderDialog() {
   }
 
   async function executePending(side: "buy" | "sell") {
-    const limit = parseNumber(limitPrice);
+    const limit = parseLocalizedNumber(limitPrice) ?? 0;
     const expiryAt =
       useExpiry && expiryDate
         ? new Date(`${expiryDate}T${expiryTime || "23:59"}:00`).toISOString()
