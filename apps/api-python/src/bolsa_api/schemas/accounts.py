@@ -1,8 +1,8 @@
 """DTOs HTTP de cuentas de trading/DEMO."""
 
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CommissionProfileDto(BaseModel):
@@ -10,12 +10,33 @@ class CommissionProfileDto(BaseModel):
 
     preset_id: str = Field(alias="presetId")
     label: str
-    stock_commission_pct: float = Field(alias="stockCommissionPct")
-    stock_commission_min: float = Field(alias="stockCommissionMin")
-    stock_commission_max: float | None = Field(alias="stockCommissionMax")
-    vat_on_commission_pct: float = Field(alias="vatOnCommissionPct")
-    fx_conversion_pct: float = Field(alias="fxConversionPct")
-    custody_annual_pct: float | None = Field(alias="custodyAnnualPct")
+    stock_commission_pct: float = Field(alias="stockCommissionPct", ge=0, allow_inf_nan=False)
+    stock_commission_min: float = Field(
+        alias="stockCommissionMin", ge=0, allow_inf_nan=False
+    )
+    stock_commission_max: float | None = Field(
+        alias="stockCommissionMax", ge=0, allow_inf_nan=False
+    )
+    vat_on_commission_pct: float = Field(
+        alias="vatOnCommissionPct", ge=0, allow_inf_nan=False
+    )
+    fx_conversion_pct: float = Field(alias="fxConversionPct", ge=0, allow_inf_nan=False)
+    custody_annual_pct: float | None = Field(
+        alias="custodyAnnualPct", ge=0, allow_inf_nan=False
+    )
+
+    @model_validator(mode="after")
+    def max_commission_cannot_be_below_min(self) -> Self:
+        """Inviolable: un tope máximo menor que el mínimo sería un contrato absurdo."""
+        if (
+            self.stock_commission_max is not None
+            and self.stock_commission_max < self.stock_commission_min
+        ):
+            raise ValueError(
+                "stockCommissionMax must be >= stockCommissionMin "
+                f"({self.stock_commission_max} < {self.stock_commission_min})"
+            )
+        return self
 
 
 class TaxProfileDto(BaseModel):
@@ -138,9 +159,13 @@ class CreateInvestmentAccountDto(BaseModel):
     description: str | None = None
     currency: str = "EUR"
     base_currency: str = Field(default="EUR", alias="baseCurrency")
-    initial_deposit: float = Field(alias="initialDeposit", default=100_000.0)
-    leverage: float = 1.0
-    margin_call_level_pct: float | None = Field(alias="marginCallLevelPct", default=100.0)
+    initial_deposit: float = Field(
+        alias="initialDeposit", default=100_000.0, ge=0, allow_inf_nan=False
+    )
+    leverage: float = Field(1.0, gt=0, allow_inf_nan=False)
+    margin_call_level_pct: float | None = Field(
+        alias="marginCallLevelPct", default=100.0, ge=0, allow_inf_nan=False
+    )
     portfolio_name: str | None = Field(alias="portfolioName", default=None)
     portfolio_description: str | None = Field(alias="portfolioDescription", default=None)
     strategy_tag: str | None = Field(alias="strategyTag", default="core")
