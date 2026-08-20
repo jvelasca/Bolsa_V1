@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-7 — el mayor agujero de cobertura heredado de R-6: los use-cases/repos/invariantes contables quedaron FUERA del surface de la re-auditoría web+api+shared. Auditoría **read-only** de `packages/py/application` + `packages/py/infrastructure` (solo py) + corrección por fases acotadas.
-> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). **M-2 COMMITEADA/PUSHEADA a `main`** (`c8e9ced`, invariante reconciliación cash↔ledger, T-M2). **M-3 COMMITEADA/PUSHEADA a `main`** (`6962fd7`, puente cost-basis con fee en cara unrealized del tax-report, T-M3). **M-6 COMMITEADA/PUSHEADA a `main`** (`604bfef`, margen real en `_account_summary_from_portfolio`, T-M6). Aguardan fases siguientes con decisión del usuario.
+> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). **M-2 COMMITEADA/PUSHEADA a `main`** (`c8e9ced`, invariante reconciliación cash↔ledger, T-M2). **M-3 COMMITEADA/PUSHEADA a `main`** (`6962fd7`, puente cost-basis con fee en cara unrealized del tax-report, T-M3). **M-6 COMMITEADA/PUSHEADA a `main`** (`604bfef`, margen real en `_account_summary_from_portfolio`, T-M6). **M-4/T-M5 (mezcla fees) COMMITEADA/PUSHEADA a `main`** (`6a1759c`, opción B: `total_fees_for_account` excluye custodia; T-M4 job dedicado DIFERIDO por freeze). Aguardan fases siguientes con decisión del usuario.
 > **AsOf:** 2026-08-20.
 
 ---
@@ -244,6 +244,33 @@ Confirmados personalmente en código actual:
 
 ---
 
+## 4h. Fase M-4 corregida — `6a1759c` `fix(py-infra): total_fees_for_account excluye custodia (fees_paid_total no mezcla trade) (R-7/M-4, T-M5)`
+
+> Decisión de usuario: **Opción B acotada** (corregir solo `fees_paid_total` para que NO mezcle custodia). **T-M4** (custodia side-effect en GET → mover a job dedicado) se **DIFIERE** por colindar con «sin features». La Opción A (job dedicado) sigue disponible para una fase futura con decisión.
+
+### M-4 (T-M5) — `fees_paid_total` mezcla fees de trade con fees de custodia
+
+- **Problema:** `GetTaxReport` sobrescribe `fees_paid_total` (`accounts.py:750-751`) con `total_fees_for_account` (`ledger_repository.py`), que contaba TODAS las filas `type == "fee"` del account **incluyendo custodia** (`reference_type="custody"`, escrita por `append_custody_fee`). Como el cargo de custodia cae dentro del rango fiscal, el report mezclaba comisiones de administración dentro de "Comisiones pagadas" que ve el FE (`tax-report-page.tsx:325`).
+- **Fix (Opción B, acotado, infra-only):** `total_fees_for_account` filtra las filas de custodia (`reference_type != "custody"`, conservando `IS NULL`) para que `GetTaxReport` deje de mezclar. Los trade-fees (`reference_type="transaction"`) se siguen contando; el mapeo `map_ledger_fees_to_transactions` (por `reference_id=tx.id`) NO se ve afectado (la custodia usa `reference_id="custody-{period}"`, nunca coincide con un tx).
+- **Files:** `ledger_repository.py` (query + docstring) · nuevo `packages/py/infrastructure/tests/test_m4_total_fees_excludes_custody.py` (2, Postgres real). No se tocó application/domain/api/FE.
+- **Tests:**
+  1. `test_total_fees_for_account_excluye_custodia`: trade-fee (`reference_type="transaction"`) + custodia-fee (`reference_type="custody"`) en el mismo account y rango → `total_fees_for_account == 10.0` (solo trade), no 35.
+  2. `test_total_fees_rango_fiscal_respetado`: custodia en el rango + trade-fee fuera del rango → `total == 0.0` (el filtro de rango y el de custodia se componen).
+
+### Batería M-4 (verde, verificada por el coordinador)
+
+| Comprobación                                                                       | Resultado                 |
+| ---------------------------------------------------------------------------------- | ------------------------- |
+| `ruff check packages/py apps/api-python --config pyproject.toml` (2 files alcance) | ✅ 0                      |
+| `mypy ledger_repository.py` + test M-4 (config raíz, gate CI)                      | ✅ Success                |
+| pytest infra **Postgres real** (suite completa, incl. 2 nuevos)                    | ✅ 74 passed, 1 xfailed   |
+| pytest application (fakes, sin DB)                                                 | ✅ 241 passed             |
+| `git status`                                                                       | ✅ solo files del alcance |
+
+> **Nota de alcance:** esta fase NO toca T-M4 (custodia como side-effect de GET: `GetAccountSummary` `accounts.py:154-158`, `GetTaxReport` `accounts.py:653-657`, herencia vía `daily_ops_report.py:78`). Esa parte queda **diferida** por colindar con «sin features» (mover a job dedicado es cambio de comportamiento). Mapeo read-only completo en el historial del chat (subagente `explore` + verificación del coordinador).
+
+---
+
 ## 5. Inventario de deuda NUEVA (de R-7; priorizado por riesgo dinero/verdad)
 
 ### 🔴 Alto
@@ -257,13 +284,13 @@ Confirmados personalmente en código actual:
 ### 🟠 Medio
 
 | Código          | Superficie     | Hallazgo                                                                                                                                                                                                                                                 | Riesgo        |
-| --------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------ |
-| M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida = coste completo de posiciones sin precio; equity errónea sin reconciliación. | dinero/verdad | ✅ CORREGIDO (M-1, ver §4d)    |
-| M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                                                    | dinero/verdad | ✅ CORREGIDO (M-2, ver §4e)    |
-| M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: el `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                                           | dinero/verdad | ✅ CORREGIDO (M-3, ver §4f)    |
-| M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia (dependiente de lectura).                                                                      | dinero        |
-| M-5 (L-M3)      | infrastructure | Ledger SIN unique constraint en `(reference_type, reference_id)` → filas duplicadas posibles; `has_reference` muerto; raíz habilitadora de dobles concesiones.                                                                                           | dinero        | ✅ CORREGIDO (Fase 3, ver §4c) |
-| M-6 (T-M6)      | application    | Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.                                                                                        | dinero        | ✅ CORREGIDO (M-6, ver §4g)    |
+| --------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------- |
+| M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida = coste completo de posiciones sin precio; equity errónea sin reconciliación. | dinero/verdad | ✅ CORREGIDO (M-1, ver §4d)                                                 |
+| M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                                                    | dinero/verdad | ✅ CORREGIDO (M-2, ver §4e)                                                 |
+| M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: el `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                                           | dinero/verdad | ✅ CORREGIDO (M-3, ver §4f)                                                 |
+| M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia (dependiente de lectura).                                                                      | dinero        | ✅ **T-M5** (ver §4h, `6a1759c`) · **T-M4 DIFERIDO** (job dedicado, freeze) |
+| M-5 (L-M3)      | infrastructure | Ledger SIN unique constraint en `(reference_type, reference_id)` → filas duplicadas posibles; `has_reference` muerto; raíz habilitadora de dobles concesiones.                                                                                           | dinero        | ✅ CORREGIDO (Fase 3, ver §4c)                                              |
+| M-6 (T-M6)      | application    | Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.                                                                                        | dinero        | ✅ CORREGIDO (M-6, ver §4g)                                                 |
 | M-7 (L-M5)      | application    | Custodia dedup time-only (además del fix A-1); sin unique constraint la ventana concurr. aún la cubre el mutex, pero un restart/R-expiry en medio puede re-cobrar.                                                                                       | dinero        |
 
 ### 🟢 Bajo
@@ -285,8 +312,8 @@ Confirmados personalmente en código actual:
 
 ## 6. Pendientes / fases futuras (no abrir sin decisión)
 
-1. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features"). **(PRÓXIMA candidata)**
-2. **M-7 (L-M5):** custodia dedup time-only aún sin unique constraint; tras L-M3/M-5 (cerrada) el mutex es la única capa → restart/R-expiry puede re-cobrar.
+1. **M-4/T-M4 (resto de M-4):** mover el cargo de custodia del path de lectura (GET summary/tax + herencia daily-ops) a un job dedicado — cambio de comportamiento, requiere decisión (colinda con "sin features"). **T-M5 (mezcla fees) ya CERRADA** (`6a1759c`); **queda solo T-M4**.
+2. **M-7 (L-M5):** custodia dedup time-only aún sin unique constraint; tras L-M3/M-5 (cerrada) el mutex es la única capa → restart/R-expiry puede re-cobrar. **(PRÓXIMA candidata por decisión)**
 3. **B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown`.
 4. **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio. _(NO confundir con M-1, ya cerrada.)_
 5. **B-3 (L-M4):** `transfer_cash`/`add_cash`/`deduct_cash` del repo mutan cash SIN ledger (código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar; decidir.
@@ -311,11 +338,12 @@ Confirmados personalmente en código actual:
 | M-1: `ruff` config CI raíz (2 files) · `mypy portfolio_repository.py` · infra real 66 · application 235          | ✅ 0 / Success / 66 / 235 (ver §4d)                                                                          |
 | M-2: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py` · infra real 72+1xfail · application 235      | ✅ 0 / Success / 72 / 235 (ver §4e)                                                                          |
 | M-3: `ruff` config CI raíz (3 files) · `mypy tax_report.py` · domain 21 · infra real 72+1xfail · application 235 | ✅ 0 / Success / 21 / 72+1xfail / 235 (ver §4f; corrección global→log del coordinador)                       |
+| M-4/T-M5: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py`+test · infra real 74+1xfail · app 241    | ✅ 0 / Success / 74+1xfail / 241 (ver §4h)                                                                   |
 | CI `main` para `c957df1`                                                                                         | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
 
 ## 8. Texto de traspaso (pegar al abrir el próximo chat / relevo por saturación)
 
-> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1, 2, 3, M-1, M-2 y M-3 PUSHEADAS a `main`**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
+> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1, 2, 3, M-1, M-2, M-3, M-6 y M-4/T-M5 PUSHEADAS a `main`**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
 >
 > **Auditoría:** 3 subagentes read-only + verificación personal del coordinador. Invariantes F1/FFIN todo INTACTOS (with_for_update, deduct_cash en lock, idempotencia trade + constraint, F-FIN-1 fail-closed, transfer_cash atómico). Deuda NUEVA: **Alto×3 / Medio×7 / Bajo×5**.
 >
@@ -353,7 +381,9 @@ Confirmados personalmente en código actual:
 >
 > - **T-M6:** `_account_summary_from_portfolio` fabricaba `margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None` aunque el account tuviera leverage/posiciones. **Decisión usuario: fórmula `margin_used = Σ market_value / leverage`** + **alcance "completar"** (computar los 3 campos; DTO `AccountSummary`/endpoints intactos → sin `contract:gen`). Fix: `_account_summary_from_portfolio` computa `margin_used = Σ(mv de posiciones con precio)/leverage` (guard `leverage>0`, fail-closed→0.0), `free_margin = total_equity − margin_used`, `margin_level_pct = equity/margin_used*100` o `None` si 0. Fidelidad M-1: posiciones con `market_value=None` NO cuentan (coherentes con `total_market_value`/`total_equity`). Sin tocar FE (solo cambia el valor que ve `dashboard-page.tsx:163` "Margen libre"). Tests `test_account_summary_margin.py` (6, fakes en memoria: A sin posiciones / B single leverage / C dos posiciones leverage>1 / D sin precio no cuenta / D' mixto solo cuenta la con precio / E guard leverage==0 sin ZeroDivision); fake `_Account` de `test_list_account_summaries.py` ganó `leverage`.
 >
-> **SIGUIENTES (por decisión):** (1) **M-4 (T-M4/T-M5)** (custodia fuera del path de lectura — job dedicado), (2) **M-7 (L-M5)** (custodia dedup time-only, mutex como única capa tras L-M3/M-5), B-3 (write-paths de cash sin ledger — xfail documentado), B-1/B-4/B-5. **L-M3/M-5 CERRADA · M-1 CERRADA · M-2 CERRADA · M-3 CERRADA · M-6 CERRADA.**
+> **SIGUIENTES (por decisión):** (1) **M-7 (L-M5)** (custodia dedup time-only; verificar si L-M3/M-5 ya la cubre — probablemente tests-postcondición), (2) **M-4/T-M4** (resto: mover custodia de GET a job dedicado — colinda con «sin features», diferido), B-3 (write-paths de cash sin ledger — xfail documentado), B-1/B-4/B-5. **L-M3/M-5 CERRADA · M-1 CERRADA · M-2 CERRADA · M-3 CERRADA · M-6 CERRADA · M-4/T-M5 CERRADA.**
+>
+> **M-4/T-M5 (mezcla fees) CERRADA (`6a1759c`):** `total_fees_for_account` excluye `reference_type="custody"` → `fees_paid_total` deja de mezclar custodia con trade-fees. Opción B acotada (infra-only). **T-M4 (job dedicado) DIFERIDO** por freeze. Ver §4h + `test_m4_total_fees_excludes_custody.py`.
 >
 > Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · ancla de trabajo vivo: `docs/engineering/backlog-trabajo-2026-08-20.md` (LEER PRIMERO) · estado vivo: `docs/engineering/PROJECT_STATE.md` · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
 
@@ -365,39 +395,42 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 
 ---
 
-### ✅ CHECKLIST DE RELEVO → FASE CERRADA: **M-6 (T-M6) margin hardcoded** — y SIGUIENTE CANDIDATA: M-4 / M-7
+### ✅ CHECKLIST DE RELEVO → FASE CERRADA: **M-4/T-M5 (mezcla fees)** — y SIGUIENTE CANDIDATA: M-7
 
-**Estado al cerrar (verificado):** `main` limpio · **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6** · ancla `docs/engineering/backlog-trabajo-2026-08-20.md` §0 al día (LEER PRIMERO al abrir).
+**Estado al cerrar (verificado):** `main` limpio, sincronizado con `origin/main` · **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5** · **T-M4 (job dedicado) DIFERIDO** por freeze · ancla `docs/engineering/backlog-trabajo-2026-08-20.md` §0 al día (LEER PRIMERO al abrir).
 
-**M-6 cerrada (`604bfef`):** `_account_summary_from_portfolio` ahora computa `margin_used=Σ(mv con precio)/leverage` (guard `>0`), `free_margin=total_equity−margin_used`, `margin_level_pct=equity/margin_used*100` (None si 0). Posiciones con `market_value=None` NO cuentan (fidelidad M-1). DTO/shape intactos → sin `contract:gen`; FE `dashboard-page.tsx:163` ve `free_margin` real (cambio de valor esperado, NO tocar FE). Ver §4g + tests `test_account_summary_margin.py`.
+**M-4/T-M5 cerrada (`6a1759c`):** `total_fees_for_account` (`ledger_repository.py`) ahora excluye las filas `reference_type="custody"` → `GetTaxReport` deja de sobrescribir `fees_paid_total` con custodia (fix del override accounts.py:750-751 en el origen). Opción B acotada (infra-only): no se tocó application/domain/api/FE ni el timing de los GET. T-M4 (custodia side-effect en GET → job dedicado) permanece DIFERIDO. Ver §4h + `test_m4_total_fees_excludes_custody.py`.
 
 **Próximas candidatas (requieren decisión de usuario):**
 
-- **M-4 (T-M4/T-M5, backlog §1 `:47`):** sacar el cargo de custodia del path de lectura (`GetTaxReport`/`GetAccountSummary` mutan dinero en GET) → mover a job dedicado. **Colinda con "sin features"**; hoy es la que mejor corrige el "dinero en lectura" restante.
-- **M-7 (L-M5, `:48`):** custodia dedup time-only: tras L-M3/M-5 (cerrada) el mutex es la única capa → restart/R-expiry puede re-cobrar la custodia.
+- **M-7 (L-M5, backlog §1):** custodia dedup time-only. Tras L-M3/M-5 (cerrada), el UNIQUE parcial `(account_id, reference_type, reference_id, type)` ya blinda `append_custody_fee` (`"custody"`/`"custody-{period}"`, único por account+periodo). **Evaluar (mapeo read-only) si queda ventana real por restart/R-expiry del mutex TTL, o si M-7 queda cubierta por F3 y solo requiere tests-postcondición.** **[ARCO PRÓXIMA DESPUÉS DE ESTA CHECKLIST, ver bloque abajo]**
+- **M-4/T-M4 (diferido):** mover custodia de GET a job dedicado — colinda con «sin features»; requiere decisión en fase futura con freeze revisado.
+- **B-3 / B-1 / B-4 / B-5** (según decisión).
 
-**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); B-3 (write-paths de cash sin ledger, `transfer_cash`/`add_cash`/`deduct_cash`) queda pendiente con xfail documentado en M-2; M-4 colinda con "sin features" (mover custodia a job). Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M5 CERRADA; T-M4 (job dedicado) diferido por freeze; B-3 (write-paths de cash sin ledger, `transfer_cash`/`add_cash`/`deduct_cash`) pendiente con xfail documentado en M-2. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
 
-**Batería acumulada confirmada (referencia del relevo):** ruff 0 (config CI raíz `pyproject.toml`) · mypy infra/domain Success (application mypy-blind en CI) · pytest infra Postgres real 72+1xfail · domain 21 · application **241** · api-python 32.
+**Batería acumulada confirmada (referencia del relevo):** ruff 0 (config CI raíz `pyproject.toml`) · mypy infra/domain Success (application mypy-blind en CI) · pytest infra Postgres real **74+1xfail** · domain 21 · application **241** · api-python 32.
 
 ---
 
-## ✳️ ARRANQUE SIGUIENTE FASE: **M-4 (T-M4/T-M5) — custodia fuera del path de lectura** (por decisión del usuario)
+## ✳️ ARRANQUE SIGUIENTE FASE: **M-7 (L-M5) — custodia dedup time-only** (por decisión del usuario)
 
 > **Cómo usar:** pega este bloque (o el §8 anterior) como primer mensaje del NUEVO chat. El coordinador del nuevo chat ejecuta la secuencia en orden, una fase = un subagente acotado + batería + aprobación por commit + relevo documentado.
 
 **Read-first (obligatorio):** leer `docs/engineering/backlog-trabajo-2026-08-20.md` §0 y §1. Si no coincide con el repo → PARAR y re-leer.
 
-**Estado al abrir:** `local main = origin/main` (cierre M-6 `604bfef` + docs `0c47c92`), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6.**
+**Estado al abrir:** `local main = origin/main` (cierre M-4/T-M5 `6a1759c` + docs a actualizar), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5.**
 
-**Hallazgo a resolver (backlog §1 `:47`):**
+**Hallazgo a resolver (backlog §1):**
 
-> M-4 (T-M4/T-M5) · application · `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia (dependiente de lectura). Riesgo: **dinero**.
+> M-7 (L-M5) · application · Custodia dedup **time-only** (además del fix A-1): sin unique constraint la ventana concurr. aún la cubre el mutex, pero un restart/R-expiry en medio podría re-cobrar. Riesgo: **dinero**. _La custodia se registra con `reference_type="custody"` + `reference_id="custody-{period}"`; tras L-M3/M-5 el UNIQUE parcial `(account_id, reference_type, reference_id, type)` YA la protege por periodo — verificar si M-7 queda totalmente cubierta por L-M3/M-5 o si resta algo (p. ej. el dedup de `last_custody_charge_at` dependiente de lectura)._
 
-**Secuencia de arranque M-4 (obligatoria, anti-saturación):**
+**Secuencia de arranque M-7 (obligatoria, anti-saturación):**
 
-1. **Mapeo read-only** (subagente, sin tocar código): `GetTaxReport`/`GetAccountSummary` en `packages/py/application/src/bolsa_application/accounts.py` — en qué punto mutan dinero/custodia en el GET, de dónde sale el periodo/cargo (`ApplyCustodyFees`, mutex `claim_custody_charge`), quién lee `fees_paid_total` y cómo se mezcla trade+custodia, y qué consumidores dependen del comportamiento actual (FE `dashboard-page`, API). Entregar file:line verificado.
-2. **Decisión de usuario:** alcance (a) mover el cargo a job dedicado vs (b) corregir solo `fees_paid_total`, o acotado. **Colinda con «sin features»** → la propuesta debe respetar freeze.
-3. **Subagente implementación acotado** + **verificación coordinador** (code diff + test + batería real) + **aprobación + commit + push** (rama `main` protegida; el push requiere aprobación vía tarjeta) + **relevo documentado** (actualizar §4 del traspaso + §0/§1/§3/§6 del backlog + PROJECT_STATE §6/§7 + ENGINEERING-INDEX §5).
+1. **Mapeo read-only** (subagente, sin tocar código): confirmar si L-M3/M-5 (`004_ledger_reference_unique`, UNIQUE `(account_id, reference_type, reference_id, type)`) ya blinda el re-cobro de custodia en `ApplyCustodyFees` (`append_custody_fee` usa `reference_type="custody"`, `reference_id="custody-{period}"` → único por account+period, colisionaría si se re-cobra). Determinar si queda alguna ventana real (restart/R-expiry del mutex TTL con la fila ya persistida) o si M-7 queda cubierta por F3 y solo require tests-postcondición. Entregar file:line verificado.
+2. **Decisión de usuario:** alcance (tests-postcondición de cobertura vs hardening adicional) según lo que revele el mapeo.
+3. **Subagente implementación acotado** + **verificación coordinador** (code diff + test + batería real) + **aprobación + commit + push** (rama `main` protegida; el push requiere aprobación vía tarjeta) + **relevo documentado**.
 
-**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); B-3 (write-paths de cash sin ledger) pendiente con xfail en M-2; M-6 CERRADA (margen, no reabrir). Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
+**Alternativas por decisión:** **M-4/T-M4** (resto: mover custodia fuera de GET a job dedicado — colinda con «sin features», diferido) · **B-3** (write-paths de cash sin ledger, `transfer_cash`/`add_cash`/`deduct_cash`) · **B-1/B-4/B-5**.
+
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M4 diferido por freeze (job dedicado); B-3 (write-paths de cash sin ledger) pendiente con xfail en M-2; M-6 CERRADA (margen, no reabrir). Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
