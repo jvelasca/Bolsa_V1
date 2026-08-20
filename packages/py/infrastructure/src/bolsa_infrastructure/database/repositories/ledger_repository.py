@@ -220,9 +220,20 @@ class SqlAlchemyLedgerRepository:
         executed_from: datetime | None = None,
         executed_to: datetime | None = None,
     ) -> float:
+        """Σ fees de OPERACIONES (trade) del account en el rango, sin custodia.
+
+        Solo cuenta las filas ``type == "fee"`` cuyo ``reference_type`` NO es
+        ``"custody"``. La custodia (``append_custody_fee`` usa ``reference_type=
+        "custody"``) se excluye porque es comisión de administración, no un
+        fee de trade; de lo contrario inflaría ``fees_paid_total`` del tax-report
+        (M-4/T-M5). Único caller: ``GetTaxReport`` (application/accounts.py).
+        """
         stmt = select(LedgerEntryRow.amount).where(
             LedgerEntryRow.account_id == account_id,
             LedgerEntryRow.type == "fee",
+            # M-4/T-M5: excluir custodia (los trade-fees usan "transaction").
+            (LedgerEntryRow.reference_type.is_(None))
+            | (LedgerEntryRow.reference_type != "custody"),
         )
         if executed_from is not None:
             stmt = stmt.where(LedgerEntryRow.executed_at >= executed_from)
