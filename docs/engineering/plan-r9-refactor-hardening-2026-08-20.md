@@ -165,16 +165,18 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 ### 🟠 FASE 4 — R-9.4: DTOs financieros estrictos (Pydantic)
 
-**Problema:** `CreateInvestmentAccountDto`/`CommissionProfileDto` (`schemas/accounts.py`) aceptan `float` sin restricciones → posible `initial_deposit<0`, `leverage<=0`, `commission/VAT/FX/custody<0`, `allow_inf_nan` no forzado.
+**Read-first (verificado 2026-08-20):** en `apps/api-python/src/bolsa_api/schemas/accounts.py`, `CreateInvestmentAccountDto` (`:134`) expone `initial_deposit: float` (`:141`), `leverage: float` (`:142`), `margin_call_level_pct: float|None` (`:143`); `CommissionProfileDto` (`:8`) expone `stock_commission_pct/min/max`, `vat_on_commission_pct`, `fx_conversion_pct`, `custody_annual_pct` — todos `float` sin restricción ni `allow_inf_nan=False`. **Confirmado:** ninguna capa valida estos invariantes (ni el DTO, ni `CreateSimulatedAccount.execute` en `application/accounts.py:68-97` que solo reenvía, ni `settings_from_dict`, ni la entidad/repo). El consumo fluye: `routes/accounts.py:79-96` → `CreateSimulatedAccount` → `account_repo.create_simulated_account`.
 
-**Corrección propuesta:** aplicar en todos los DTOs financieros:
+**Decisión F4 (2026-08-20, coordinador): ✅ DTO-LEVEL Pydantic validation (fail-fast 422 en el borde API), acotada al plan.** Sin cambios en domain/application/entidad/repo, sin migración. El refactor a `Decimal` hasta el borde se pospone (fuera del alcance de esta fase; cambio más amplio). Aplicar:
 
-- `initial_deposit >= 0`, `leverage > 0`, `margin_call_level_pct >= 0`.
-- Comisión/VAT/FX/custodia >= 0.
-- `field(..., allow_inf_nan=False)` (config `model_config = ConfigDict(allow_inf_nan=False)` o validators).
-- Mantener `Decimal` hasta el borde cuando sea práctico (`Decimal` en HTTP/domain; `Numeric` en DB).
+- `CreateInvestmentAccountDto`: `initial_deposit >= 0`, `leverage > 0`, `margin_call_level_pct >= 0` (si no None); `allow_inf_nan=False`.
+- `CommissionProfileDto`: `stock_commission_pct >= 0`, `stock_commission_min >= 0`, `stock_commission_max >= 0` (si no None y `>= stock_commission_min`), `vat_on_commission_pct >= 0`, `fx_conversion_pct >= 0`, `custody_annual_pct >= 0` (si no None); `allow_inf_nan=False`.
+- Otros DTOs con campos financieros en `schemas/accounts.py`: aplicar la misma disciplina SOLO a los que estén en el alcance directo de este fichero; NO ampliar a otros DTOs del proyecto (dejar a F8). Mantener `populate_by_name`/alias tal cual para no romper el wire.
+- Cuidado: no romper los `model_config` existentes (hay `# type: ignore[typeddict-unknown-key]` en `CommissionProfileDto`/`AccountSettingsDto`/`InvestmentAccountDto` que debe conservarse).
 
-**Criterio de aceptación:** tests de DTOs con valores absurdos → 422; batería verde.
+**Criterio de aceptación:** tests de DTOs con valores absurdos (negativos, `leverage=0`, `NaN`, `inf`) → `ValidationError`; valores límite válidos (`initial_deposit=0`, `leverage>0`, tasas=0) siguen pasando; sin romper el wire (alias/`populate_by_name`) ni la suite (wizard, presets). Batería verde.
+
+**Estado (2026-08-20, IMPLEMENTADO):** `CommissionProfileDto` + `CreateInvestmentAccountDto` con `ge=0`/`gt=0` + `allow_inf_nan=False` (patrón `Field` como `DepositCashDto`/`WithdrawCashDto`) y `model_validator(mode="after")` (patrón `instrument_strategy_tops`) para `stock_commission_max >= stock_commission_min`. Alias/`populate_by_name`/defaults intactos → sin cambio de wire. Tests: `apps/api-python/tests/test_schemas_accounts.py` (21). Battery: ruff 0 · mypy 0 (schemas+tests) · pytest 21 nuevos + 33 offline API + 5 `test_accounts` intégr (DB). Sin migración ni cambios domain/application/entidad/repo.
 
 ---
 
