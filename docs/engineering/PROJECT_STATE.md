@@ -44,6 +44,8 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 **Consecuencia clave:** gran parte de los hallazgos de las auditorías externas de 2026-08-11 **ya están corregidos**. La auditoría externa recibida el 2026-08-19 combina hallazgos desactualizados con otros vigentes (ver §4).
 
+**R-8A (2026-08-20, P0 hardening):** `database_bootstrap()` con `pg_advisory_lock` (serializa Alembic + migración de datos entre N workers FastAPI + scheduler) y robustez de idempotencia (`IdempotencyKeyExists` + savepoint + re-SELECT en `execute_trade`/`deposit`/`withdraw`). ✅ IMPLEMENTADA + verificada (ruff/mypy/pytest verdes) — **pendiente commit** (aprobación usuario).
+
 ---
 
 ## 3. Deuda PENDIENTE (priorizada 2026-08-19)

@@ -133,4 +133,4 @@ docs/             → arquitectura, cutover, ADRs, engineering
 - **FA / FIE** ✓ código (Composite **v1.1** · CAPM Tarjeta v0 · cobertura Yahoo); **smoke UI / checklist APP** pendiente
 - **CORE-B Lab** ✓ v0.2 (meseta + familia por horizonte)
 - **Congelado:** auto-paper D execute · Lab UI P3–P9 / Belief · CORE-R multi-dispositivo
-- **Deuda:** transferencias entre carteras (repo primitivo `transfer_cash` sin use-case/ruta API) · dividendos (solo se recopila historial en instrumento; sin feature de pago/ledger)
+- **Deuda:** dividendos (solo se recopila historial en instrumento; sin feature de pago/ledger) · `transfer_cash` **eliminado en R-7/B-3 (`7cffaa7`)** por código muerto sin ledger (una futura transferencia trazada reutilizaría `reference_type="transfer"` en `append_cash_movement`; consulte `docs/engineering/traspaso-r7-...`) · auth JWT diferida (D4, ver `docs/engineering/plan-r8-prevencion-riesgo-2026-08-20.md`)
