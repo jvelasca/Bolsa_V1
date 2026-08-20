@@ -780,7 +780,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Logout */
+        /**
+         * Logout
+         * @description Borra la cookie de sesión. Funciona aunque la auth esté desactivada.
+         */
         post: operations["logout_api_auth_logout_post"];
         delete?: never;
         options?: never;
@@ -3461,8 +3464,11 @@ export interface components {
         AuthStatusDataDto: {
             /** Authenabled */
             authEnabled: boolean;
-            /** Authenticated */
-            authenticated?: boolean;
+            /**
+             * Authenticated
+             * @default false
+             */
+            authenticated: boolean;
         };
         /** AuthStatusResponseDto */
         AuthStatusResponseDto: {
@@ -4475,6 +4481,8 @@ export interface components {
         DepositCashDto: {
             /** Amount */
             amount: number;
+            /** Idempotencykey */
+            idempotencyKey?: string | null;
             /** Note */
             note?: string | null;
         };
@@ -8565,6 +8573,8 @@ export interface components {
         WithdrawCashDto: {
             /** Amount */
             amount: number;
+            /** Idempotencykey */
+            idempotencyKey?: string | null;
             /** Note */
             note?: string | null;
         };
@@ -10238,7 +10248,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": unknown;
+                };
             };
         };
     };
