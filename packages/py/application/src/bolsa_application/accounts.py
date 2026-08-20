@@ -101,6 +101,23 @@ def _account_summary_from_portfolio(
     portfolio_summary: PortfolioSummary,
 ) -> AccountSummary:
     cash = portfolio_summary.portfolio.cash
+    # M-6: margen canónico (inversión bajo apalancamiento). Definición:
+    # `margin_level_pct = equity / margin_used * 100` (investment-platform.md:46).
+    # `margin_used = Σ market_value / leverage` (decisión de usuario). Solo las
+    # posiciones con `market_value` observable aportan inversión bajo margen; las
+    # posiciones sin precio (market_value=None) NO cuentan, consistentes con
+    # total_market_value/total_equity (M-1). Guard `>0`: si leverage fuera 0
+    # (fail-closed), no dividir por cero. Sin posiciones (o todas sin precio)
+    # → margin_used=0 y no aplica margen (margin_level_pct=None).
+    margin_used = (
+        sum(mv for mv in (pos.market_value for pos in portfolio_summary.positions) if mv is not None)
+        / account.leverage
+        if account.leverage > 0
+        else 0.0
+    )
+    equity = portfolio_summary.total_equity
+    free_margin = equity - margin_used
+    margin_level_pct = (equity / margin_used * 100) if margin_used > 0 else None
     return AccountSummary(
         account=account,
         default_portfolio=default_portfolio,
@@ -108,10 +125,10 @@ def _account_summary_from_portfolio(
         total_market_value=portfolio_summary.total_market_value,
         total_cost=portfolio_summary.total_cost,
         total_unrealized_pnl=portfolio_summary.total_unrealized_pnl,
-        total_equity=portfolio_summary.total_equity,
-        margin_used=0.0,
-        free_margin=cash,
-        margin_level_pct=None,
+        total_equity=equity,
+        margin_used=margin_used,
+        free_margin=free_margin,
+        margin_level_pct=margin_level_pct,
         positions_count=len(portfolio_summary.positions),
     )
 

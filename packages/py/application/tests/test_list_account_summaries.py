@@ -14,6 +14,7 @@ from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary
 class _Account:
     id: str
     name: str = "A"
+    leverage: float = 1.0
 
 
 @dataclass
