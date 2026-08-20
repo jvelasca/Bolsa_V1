@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-7 — el mayor agujero de cobertura heredado de R-6: los use-cases/repos/invariantes contables quedaron FUERA del surface de la re-auditoría web+api+shared. Auditoría **read-only** de `packages/py/application` + `packages/py/infrastructure` (solo py) + corrección por fases acotadas.
-> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). Aguardan Fases 3+ con decisión del usuario.
+> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). Aguardan Fases 4+ con decisión del usuario.
 > **AsOf:** 2026-08-20.
 
 ---
@@ -104,6 +104,43 @@ Confirmados personalmente en código actual:
 
 > **Nota:** `mypy accounts.py` sigue con los 6 errores `no-untyped-def`/`arg-type` **pre-existentes** (líneas 46/84/97/383/634/672; application NO está en el gate mypy de CI). Los cambios de Fase 2 en `accounts.py` son mypy-limpios. `contract:check` del FE no se ve afectado (respuestas sin cambios).
 
+---
+
+## 4c. Fase 3 corregida — `fix(py-infra): UNIQUE parcial account/reference/type en ledger_entries (R-7/F3, L-M3/M-5)`
+
+### L-M3/M-5 — unique constraint de `ledger_entries` (cierra la ventana de concurrencia real de A-2/F2 y A-1/M-7)
+
+- **Problema:** `ledger_entries` SIN unique constraint en `(reference_type, reference_id)` → filas duplicadas posibles; raíz habilitadora de las dobles concesiones (money). La Fase 2 aplicó un guard best-effort a nivel aplicación; esta fase cierra la ventana real a nivel BD.
+- **Bloqueo de diseño (descubierto en planificación, verificado por auditoría read-only):** un `UNIQUE (reference_type, reference_id)` —global **o por-cuenta**— rompería los trades con fees, porque `ExecuteTrade` escribe `append_trade` + `append_fee` con el **mismo** `reference_id=tx.id`, `reference_type="transaction"` **y mismo `account_id`** (`accounts.py:598,615`; `ledger_repository.py:65,100`). Solo difieren en `type` (`"buy"/"sell"` vs `"fee"`).
+- **Solucion aplicada (opción A, decisión usuario):**
+  - **Migración `004_ledger_reference_unique.py`** (nueva, `down_revision=003`): `CREATE UNIQUE INDEX uq_ledger_entries_account_reference ON ledger_entries (account_id, reference_type, reference_id, type) WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL`.
+  - **Por-cuenta + `type`:** cierra trade+fee (difieren en `type`) y evita colisiones globales de `("custody","custody-YYYY")` y `("migration","initial-deposit")` en cuentas distintas.
+  - **Parcial** `WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL`: respeta la semántica NULL de Postgres y los seeds `(None,None)`.
+  - **Idempotente** (guard `pg_indexes`) + **preflight de duplicados** que **FALLA con error descriptivo** (no borra datos; decisión dinero/verdad).
+  - **`LedgerEntryRow` (`tables.py`):** `__table_args__` con `Index(..., unique=True, postgresql_where=...)` espejo → `target_metadata` consistente con autogenerate (verificado `compare_metadata`: 0 diffs para el índice).
+  - **Semántica `external`:** el índice queda por-cuenta, pero el guard real `find_cash_movement_by_reference` (`ledger_repository.py:148-168`, account-agnostic) es la primera línea y ya cubre la reutilización cross-cuenta de la `idempotency_key`; el índice es el backstop de concurrencia del mismo movimiento. Documentado en el docstring de la migración.
+- **Nota operativa:** `revision` acortado a `004_ledger_reference_unique` (26 chars) porque `alembic_version.version_num` es `varchar(32)` (Prisma) y el nombre completo desbordaría.
+- **Tests** (`packages/py/infrastructure/tests/test_ledger_entries_reference_unique.py`, 6 casos, Postgres real, patrón `test_f3b`):
+  1. Alembic head es el nuevo + `ensure_migrated()` idempotente y el índice único parcial existe en `ledger_entries`.
+  2. Duplicado `(account_id, reference_type, reference_id, type)` → `IntegrityError`.
+  3. trade (`buy`) + fee (`fee`) mismo account/tx → **OK** (no colisiona, difieren en `type`).
+  4. Custodia `("custody","custody-2026")` en DOS cuentas → **OK** (por-cuenta).
+  5. Filas con `reference_type IS NULL` → **OK** (el parcial las excluye).
+  6. (head + index, ver 1).
+- **Actualización mínima de aserción:** `test_f3b_alembic_data_epoch.py` espera `004_ledger_reference_unique` como head (líneas ~91 y ~120) y en el docstring.
+
+### Batería Fase 3 (verde, verificada por el coordinador)
+
+| Comprobación                                                                 | Resultado                 |
+| ---------------------------------------------------------------------------- | ------------------------- |
+| `ruff check` (4 archivos, config CI)                                         | ✅ 0                      |
+| `mypy` `tables.py` + `004_ledger_reference_unique.py` + 2 tests (gate infra) | ✅ Success                |
+| pytest infra **Postgres real** (suite completa, incl. 6 tests nuevos)        | ✅ 63 passed              |
+| pytest application idempotencia (deposit/withdraw 6 + custodia 5)            | ✅ 11 passed              |
+| `git status`                                                                 | ✅ solo files del alcance |
+
+---
+
 ## 5. Inventario de deuda NUEVA (de R-7; priorizado por riesgo dinero/verdad)
 
 ### 🔴 Alto
@@ -117,12 +154,12 @@ Confirmados personalmente en código actual:
 ### 🟠 Medio
 
 | Código          | Superficie     | Hallazgo                                                                                                                                                                                                                                                 | Riesgo        |
-| --------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| --------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------ |
 | M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida = coste completo de posiciones sin precio; equity errónea sin reconciliación. | dinero/verdad |
 | M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                                                    | dinero/verdad |
 | M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: el `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                                           | dinero/verdad |
 | M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia (dependiente de lectura).                                                                      | dinero        |
-| M-5 (L-M3)      | infrastructure | Ledger SIN unique constraint en `(reference_type, reference_id)` → filas duplicadas posibles; `has_reference` muerto; raíz habilitadora de dobles concesiones.                                                                                           | dinero        |
+| M-5 (L-M3)      | infrastructure | Ledger SIN unique constraint en `(reference_type, reference_id)` → filas duplicadas posibles; `has_reference` muerto; raíz habilitadora de dobles concesiones.                                                                                           | dinero        | ✅ CORREGIDO (Fase 3, ver §4c) |
 | M-6 (T-M6)      | application    | Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.                                                                                        | dinero        |
 | M-7 (L-M5)      | application    | Custodia dedup time-only (además del fix A-1); sin unique constraint la ventana concurr. aún la cubre el mutex, pero un restart/R-expiry en medio puede re-cobrar.                                                                                       | dinero        |
 
@@ -145,14 +182,17 @@ Confirmados personalmente en código actual:
 
 ## 6. Pendientes / fases futuras (no abrir sin decisión)
 
-1. **L-M3 / M-5:** unique constraint en `ledger_entries (reference_type, reference_id)` — cierra la ventana de concurrencia restante de A-2/Fase 2; requiere **migración Alembic** + tests infra con DB; más invasivo.
-2. **M-1 (T-M1):** `get_summary` — no sumar `cost_basis` de posiciones sin precio al total, o fallback a último precio de transacción; afecta a muchos callers/tests.
-3. **M-2 (T-M2):** añadir invariant de reconciliación cash↔ledger (test + guard).
-4. **M-3 (T-M3):** decidir cost-basis canónico (posición con fee vs tax con fee) y alinear.
-5. **M-6 (T-M6):** margin hardcoded → `None`/omitir en vez de fabricar `free_margin=cash`.
-6. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features").
-7. **B-3 (L-M4):** `transfer_cash` muerto + sin ledger — conectar use-case/ruta o eliminar; decidir.
-8. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
+1. **M-1 (T-M1):** `get_summary` — no sumar `cost_basis` de posiciones sin precio al total, o fallback a último precio de transacción; afecta a muchos callers/tests. **(PRÓXIMA candidata)**
+2. **M-2 (T-M2):** añadir invariant de reconciliación cash↔ledger (test + guard).
+3. **M-3 (T-M3):** decidir cost-basis canónico (posición con fee vs tax con fee) y alinear.
+4. **M-6 (T-M6):** margin hardcoded → `None`/omitir en vez de fabricar `free_margin=cash`.
+5. **M-4 (T-M4/T-M5):** sacar el cargo de custodia del path de lectura (mover a un job dedicado) — cambio de comportamiento, requiere decisión (colinda con "sin features").
+6. **B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown`.
+7. **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio.
+8. **B-3 (L-M4):** `transfer_cash` muerto + sin ledger — conectar use-case/ruta o eliminar; decidir.
+9. **B-4 (L-M6):** fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de Fase 3 NO toca `transaction` → queda abierta).
+10. **B-5 (T-M9/T-M10):** FIFO divide sin guard `quantity==0`; `fetch_core_r_pnl_extra_rows` atribuye el PnL whole-account a un instrumento.
+11. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
 
 **Freeze vigente:** sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). Una fase = un subagente acotado + batería + aprobación por commit + relevo al cerrar chat. **No hacer `regen_full`** sin decisión. **No `contract:gen`.**
 
@@ -160,19 +200,19 @@ Confirmados personalmente en código actual:
 
 ## 7. Batería acumulada (verde al cerrar esta parte)
 
-| Comprobación                                                                          | Resultado                                                                                                    |
-| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `ruff check packages/py apps/api-python --config pyproject.toml`                      | ✅ 0                                                                                                         |
-| `mypy risk_runtime.py` + `mypy ledger_repository.py` (infra)                          | ✅ 0 / Success                                                                                               |
-| pytest application money-path + F1 nuevos (8 ficheros)                                | ✅ 25 passed                                                                                                 |
-| pytest application + F2 nuevos (`test_deposit_withdraw_idempotency`)                  | ✅ 31 passed (25 + 6)                                                                                        |
-| pytest api-python offline (CORS/Auth/Health/WinLoop/Q2Hygiene/RateLimit/StartupRoute) | ✅ 32 passed                                                                                                 |
-| Árbol tras F1/tras F2 (`local main = origin/main`)                                    | ✅ (`…c957df1` · a confirmar F2)                                                                             |
-| CI `main` para `c957df1`                                                              | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
+| Comprobación                                                                                                 | Resultado                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `ruff check packages/py apps/api-python --config pyproject.toml`                                             | ✅ 0                                                                                                         |
+| `mypy risk_runtime.py` + `mypy ledger_repository.py` (infra)                                                 | ✅ 0 / Success                                                                                               |
+| pytest application money-path + F1 nuevos (8 ficheros)                                                       | ✅ 25 passed                                                                                                 |
+| pytest application + F2 nuevos (`test_deposit_withdraw_idempotency`)                                         | ✅ 31 passed (25 + 6)                                                                                        |
+| pytest api-python offline (CORS/Auth/Health/WinLoop/Q2Hygiene/RateLimit/StartupRoute)                        | ✅ 32 passed                                                                                                 |
+| Árbol tras F1/tras F2/tras F3 (`local main = origin/main`) · pytest infra Postgres real 63 · idempotencia 11 | ✅ (`…c957df1` · a confirmar F2)                                                                             |
+| CI `main` para `c957df1`                                                                                     | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
 
 ## 8. Texto de traspaso (pegar al abrir el próximo chat / relevo por saturación)
 
-> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1 y 2 PUSHEADAS a `main`**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
+> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1, 2 y 3 PUSHEADAS a `main`**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
 >
 > **Auditoría:** 3 subagentes read-only + verificación personal del coordinador. Invariantes F1/FFIN todo INTACTOS (with_for_update, deduct_cash en lock, idempotencia trade + constraint, F-FIN-1 fail-closed, transfer_cash atómico). Deuda NUEVA: **Alto×3 / Medio×7 / Bajo×5**.
 >
@@ -186,11 +226,15 @@ Confirmados personalmente en código actual:
 >
 > - **A-2:** Deposit/Withdraw no idempotentes (`movement_id = new_id()` fresco → retry tras timeout movía dinero 2×). Fix: `idempotency_key` opcional en use-case + DTO/rutas; guard `find_cash_movement_by_reference("external", key)` previo a mutar cash → rejuega el movimiento original sin duplicar; `movement_id = key or new_id()`; nuevo repo method infra; `idempotencyKey` en `DepositCashDto`/`WithdrawCashDto` (aditivo, sin `contract:gen`). Se conserva `reference_type="external"` (por FE). Sin migración. Tests `test_deposit_withdraw_idempotency.py` (6, fakes en memoria, sin DB).
 >
-> **Batería:** ruff CI-config 0 ✅ · mypy risk_runtime **y** ledger_repository (infra CI-gated) 0/Success ✅ · pytest application money-path F1 + F2 nuevos **31 passed** ✅ · api-python offline **32 passed** ✅. **CI main a confirmar** (F1 ratified). Nota: suite infra/DB y domain/market/analytics no se pudieron correr (requieren Postgres/Redis vivos); `mypy accounts.py` conserva 6 errores pre-existentes (`no-untyped-def`/`arg-type`, application mypy-blind en CI), sin nuevos.
+> **Fase 3 corregida y pusheada** `fix(py-infra): UNIQUE parcial account/reference/type en ledger_entries (R-7/F3, L-M3/M-5)`:
 >
-> **SIGUIENTES (por decisión):** (1) **L-M3 / M-5** unique constraint de `ledger_entries (reference_type, reference_id)` — cierra la concurrencia restante de A-2/F2, requiere migración Alembic + infra tests DB; (2) M-1 (T-M1 `get_summary`), M-3 (cost-basis fee), M-6 (margin hardcoded), M-2 (reconciliación cash↔ledger), M-4 (custodia fuera de read), B-3 (`transfer_cash` muerto).
+> - **L-M3/M-5:** `ledger_entries` SIN unique constraint → raíz de dobles concesiones. **Bloqueo:** un `UNIQUE (reference_type, reference_id)` (global O por-cuenta) rompería trade+fee (mismo `tx.id`/`account_id`, solo difieren en `type`). **Solución (opción A):** migración `004_ledger_reference_unique` → `CREATE UNIQUE INDEX uq_ledger_entries_account_reference ON ledger_entries (account_id, reference_type, reference_id, type) WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL`. Por-cuenta + `type` lo resuelve sin romper trade+fee ni custodia/migración multi-cuenta; parcial excluye seeds `(None,None)`; idempotente + preflight que FALLA si hay duplicados (no borra datos). `LedgerEntryRow.__table_args__` espejo (0 diffs). `external` queda por-cuenta (el guard global `find_cash_movement_by_reference` sigue siendo línea-1). Tests `test_ledger_entries_reference_unique.py` (6, Postgres real).
 >
-> Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · estado vivo: `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO) · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
+> **Batería:** ruff CI-config 0 ✅ · mypy infra 0/Success ✅ · pytest infra **Postgres real 63 passed** (incl. F3 nuevos) ✅ · pytest application idempotencia **11 passed** ✅ · api-python offline **32 passed** ✅. **CI main a confirmar** (F1 ratificado). `mypy accounts.py` conserva 6 errores pre-existentes (`no-untyped-def`/`arg-type`), sin nuevos.
+>
+> **SIGUIENTES (por decisión):** (1) **M-1 (T-M1 `get_summary`)** — cost_basis de posiciones sin precio), (2) M-2 (reconciliación cash↔ledger), M-3 (cost-basis fee), M-6 (margin hardcoded), M-4 (custodia fuera de read), B-1/B-2/B-3/B-4/B-5. **L-M3/M-5 CERRADA.**
+>
+> Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · ancla de trabajo vivo: `docs/engineering/backlog-trabajo-2026-08-20.md` (LEER PRIMERO) · estado vivo: `docs/engineering/PROJECT_STATE.md` · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
 
 ---
 

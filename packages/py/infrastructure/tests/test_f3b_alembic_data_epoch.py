@@ -2,8 +2,7 @@
 
 Cubre:
 - ``ensure_migrated`` aplica migraciones Alembic hasta ``head`` de forma idempotente
-  (tras P0.5/D2 el ``head`` es ``003_prisma_schema_baseline``, el takeover del esquema
-  completo del runtime).
+  (el ``head`` actual es ``004_ledger_reference_unique``).
 - La columna ``data_epoch`` existe en ``backtest_runs`` y ``research_trials``.
 - La lógica de etiquetado old/next_open (``_mark_legacy``) del recalc script.
 Requiere PostgreSQL (mismas convenciones que los tests de infraestructura).
@@ -88,7 +87,7 @@ def test_alembic_instala_baseline_y_head_migracion() -> None:
     script = ScriptDirectory.from_config(_alembic_config())
     heads = script.get_heads()
     assert len(heads) == 1, heads
-    assert heads[0] == "003_prisma_schema_baseline"
+    assert heads[0] == "004_ledger_reference_unique"
 
 
 @pytest.mark.asyncio
@@ -117,7 +116,7 @@ async def test_ensure_migrated_idempotente_y_columna_data_epoch() -> None:
             version = (
                 await conn.execute(text("SELECT version_num FROM alembic_version"))
             ).scalars().one()
-            assert version == "003_prisma_schema_baseline"
+            assert version == "004_ledger_reference_unique"
     finally:
         await engine.dispose()
 

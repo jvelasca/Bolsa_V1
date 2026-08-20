@@ -9,11 +9,13 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -1169,6 +1171,24 @@ class InvestmentPortfolioRow(Base):
 
 class LedgerEntryRow(Base):
     __tablename__ = "ledger_entries"
+    # Fase 3 (L-M3/M-5): cierra la ventana de concurrency de la idempotencia A-2
+    # (external) y A-1/M-7 (custody). Por-cuenta + type para no romper trade+fee
+    # (misma cuenta/tx, type distinto) ni custodia/migration multi-cuenta. Parcial
+    # para excluir filas con references NULL (seeds). Espejo de la migración
+    # 004_ledger_reference_unique.
+    __table_args__ = (
+        Index(
+            "uq_ledger_entries_account_reference",
+            "account_id",
+            "reference_type",
+            "reference_id",
+            "type",
+            unique=True,
+            postgresql_where=text(
+                "reference_type IS NOT NULL AND reference_id IS NOT NULL"
+            ),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     account_id: Mapped[str] = mapped_column("account_id", ForeignKey("investment_accounts.id"))

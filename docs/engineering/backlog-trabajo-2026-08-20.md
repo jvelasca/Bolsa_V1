@@ -1,0 +1,156 @@
+# Backlog de trabajo vivo — ancla anti-saturación (2026-08-20)
+
+> **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product/Ops`).
+> **Propósito:** **única fuente de verdad** del «trabajo por delante». Todo el trabajo del proyecto (fases por abrir, deuda inventariada, checklist operativo, freeze) se consolida AQUÍ con **estado + commits + decisiones**, de forma que **ningún subagente ni ningún chat futuro pueda perder el hilo** ni inventarse el estado.
+> **Regla de uso OBLIGATORIA:** antes de abrir cualquier fase, el agente/orquestador **LEE este backlog (read-first)**; al cerrar cualquier fase, **actualiza este backlog (update-last)** con commit, batería y estado. Si un subagente reporta algo que contradice este documento, **el documento manda** (fuente de verdad) y se reconsidera antes de tocar código.
+> **AsOf:** 2026-08-20.
+> **Definición de hechos (truth):** estado vivo en `docs/engineering/PROJECT_STATE.md` · traspaso R-7 en `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md`.
+
+---
+
+## 0. Estado global (leer PRIMERO)
+
+| Contexto       | Valor (verificado al último cierre)                                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rama activa    | `main` (`local main = origin/main`)                                                                                                                                 |
+| Working tree   | limpio                                                                                                                                                              |
+| Fase R-7       | Auditoría COMPLETADA · **F1 PUSHEADA** (`c957df1`) · **F2 PUSHEADA** (`8c081ea`) · **F3 (L-M3/M-5) EN CÓDIGO para commitear**                                       |
+| Freeze vigente | Sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4)                                                                         |
+| Protocolo      | Una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada. |
+
+> Si este bloque §0 no coincide con tu lectura del repo, **para y re-lee**: algo está desincronizado. No continúes por inerción.
+
+---
+
+## 1. Backlog priorizado de R-7 (deuda de dinero real en `packages/py/{application,infrastructure}`)
+
+Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador). Inventario completo en el §5 del traspaso R-7. Estados: `⏳ pendiente` · `▶ EN CURSO` · `✅ cerrada`.
+
+### 🔴 Alto (cerradas en Fases 1-2)
+
+| Código | Hallazgo                                                              | Estado          | Evidence                                                                         |
+| ------ | --------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------- |
+| A-1    | Doble cargo de custodia en GET concurrentes (summary/tax)             | ✅ CERRADA (F1) | mutex `claim_custody_charge` + release (`c957df1`)                               |
+| A-2    | Deposit/Withdraw no idempotentes (retry tras timeout movía dinero 2×) | ✅ CERRADA (F2) | `idempotency_key` + guard `find_cash_movement_by_reference` («HEAD = `8c081ea`») |
+| A-3    | Claim AUTO quemado en fill fallido (reintento suprimido en silencio)  | ✅ CERRADA (F1) | `release_auto_execute_idempotency` (`c957df1`)                                   |
+
+### 🟠 Medio (fases por decidir)
+
+| Código          | Superficie     | Hallazgo                                                                                                                                                                                                                      | Riesgo        | Estado                                                                                                                    |
+| --------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **L-M3 / M-5**  | infrastructure | LEDGER **SIN unique constraint** en `(reference_type, reference_id)` → filas duplicadas posibles; raíz habilitadora de dobles concesiones.                                                                                    | dinero        | ✅ **CERRADA (Fase 3)** — `004_ledger_reference_unique` UNIQUE parcial `(account_id, reference_type, reference_id, type)` |
+| M-1 (T-M1)      | infrastructure | `get_summary` omite de `total_market_value`/`total_equity` las posiciones sin precio D1, pero SUMA su `cost_basis` a `total_cost` → `total_unrealized_pnl` reporta pérdida=coste completo; equity errónea sin reconciliación. | dinero/verdad | ⏳                                                                                                                        |
+| M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                         | dinero/verdad | ⏳                                                                                                                        |
+| M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                   | dinero/verdad | ⏳                                                                                                                        |
+| M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia.                                                                    | dinero        | ⏳ (colinda con «sin features»: mover a job dedicado)                                                                     |
+| M-6 (T-M6)      | application    | Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.                                                             | dinero        | ⏳                                                                                                                        |
+| M-7 (L-M5)      | application    | Custodia dedup time-only (además del fix A-1); sin unique constraint la ventana concurr. aún la cubre el mutex, pero un restart/R-expiry en medio puede re-cobrar.                                                            | dinero        | ⏳ (depende de **L-M3/M-5**)                                                                                              |
+
+### 🟢 Bajo
+
+| Código           | Superficie  | Hallazgo                                                                                                                                                                     | Riesgo        | Estado                                          |
+| ---------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ----------------------------------------------- |
+| B-1 (T-M7)       | application | «Max drawdown» naive (vs depósito inicial, no high-water-mark) alimenta el risk gate `HardMaxDrawdown` → under-bloqueo tras recuperación.                                    | verdad        | ⏳                                              |
+| B-2 (T-M8)       | domain      | `total_unrealized_gain` suma `unrealized_gain or 0.0` → posiciones sin precio se silencian a 0 en el total.                                                                  | verdad        | ⏳                                              |
+| B-3 (L-M4)       | infra+app   | `transfer_cash` atómico pero **código muerto** (0 callers) y **no escribe ledger**; un futuro caller movería dinero sin traza reconciliable.                                 | dinero/verdad | ⏳ (decidir: conectar use-case/ruta o eliminar) |
+| B-4 (L-M6)       | application | Fee ledger escrita en 2ª llamada no atómica con el trade; app guard solo se activa si se pasa `idempotency_key`. **← BLOQUEO de L-M3/M-5.**                                  | dinero        | ⏳                                              |
+| B-5 (T-M9/T-M10) | application | FIFO divide sin guard `quantity==0` (latente, repo lo rechaza); `fetch_core_r_pnl_extra_rows` atribuye el PnL whole-account a un instrumento (fail-open, fallback `list[]`). | verdad        | ⏳                                              |
+
+---
+
+## 2. ⚠️ BLOQUEO DE DISEÑO de la Fase 3 (L-M3/M-5) — LEER ANTES DE ABRIRLA
+
+### 2.1 Hallazgo (verificado 2026-08-20 por AUDITORÍA READ-ONLY independiente — subagente `explore`)
+
+**`UNIQUE (reference_type, reference_id)` —global O por-cuenta— rompe los trades con fees, porque la colisión trade+fee se produce siempre en el MISMO `account_id`:**
+
+- `ExecuteTrade` (`accounts.py:531-619`) escribe `append_trade` **y** `append_fee`, ambos con **`reference_type="transaction"`** (hardcoded en `ledger_repository.py:65,100`) y el **MISMO** `reference_id=result.transaction.id` (`accounts.py:598` y `:615`).
+- Ambas filas comparten **también `account_id`** (`scope.account.id`, `accounts.py:589/610`). ⇒ un `UNIQUE(account_id, reference_type, reference_id)` TAMBIÉN falla. **La única diferencia entre ambas filas es `type` (`"buy"/"sell"` vs `"fee"`).**
+
+**Conclusión de diseño (del subagente, validada):** el discriminador correcto para cerrar el doble cargo con UNIQUE sin romper trade+fee es **`(reference_type, reference_id, type)`**. Ver §2.3 opciones.
+
+### 2.2 Write-paths a `ledger_entries` (auditados, evidencia file:line)
+
+| archivo:línea                                         | reference_type                                           | reference_id                                                        | ¿único?                                                                       |
+| ----------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `ledger_repository.py:65` (append_trade)              | `"transaction"`                                          | `result.transaction.id`                                             | **COLISIÓN** con fee                                                          |
+| `ledger_repository.py:100` (append_fee)               | `"transaction"`                                          | `result.transaction.id`                                             | **COLISIÓN** con trade                                                        |
+| `ledger_repository.py:206` (append_custody_fee)       | `"custody"`                                              | `custody-{period}`, period=`%Y` (`accounts.py:390/455`)             | por-cuenta único, **global NO**                                               |
+| `ledger_repository.py:244/259` (append_cash_movement) | parámetro → callers `"external"` (`accounts.py:286,352`) | `movement_id = idempotency_key or new_id()` (`accounts.py:275,341`) | `new_id()` global único; `idempotency_key` de cliente → no garantizado global |
+| `account_repository.py:240-241`                       | `"manual"`                                               | `account.id`                                                        | único (PK)                                                                    |
+| `account_migration.py:150-151`                        | `"migration"`                                            | `"initial-deposit"` (constante)                                     | por-cuenta único, **global NO**                                               |
+| `account_migration.py:237-238`                        | `"transaction"`                                          | legacy `tx.id` (1 row por tx, sin fee)                              | único                                                                         |
+
+**Qué discrimina el por-cuenta (vs global):** custodia `("custody","custody-2026")` por cuenta/año, y migración `("migration","initial-deposit")` por cuenta. El por-cuenta evita esas colisiones globales. Pero **NO** evita la de trade+fee (misma cuenta).
+
+**Escotilla de `external`:** `find_cash_movement_by_reference` (`ledger_repository.py:148-168`) NO filtra por cuenta → la app ya asume el par `(reference_type, reference_id)` como globalmente único para `external`. Un constraint GLOBAL en `external` sería **más** seguro que por-cuenta (evita que un cliente reutilice la misma `idempotency_key` en dos cuentas). Ver opción C en §2.3.
+
+**Retrospectiva anti-alucinación (importante para no repetir):** mi análisis previo a la auditoría proponía "índice parcial por-cuenta en `external`+`custody`" asumiendo que resolvería trade+fee — **era FALSO**: la colisión trade+fee es por-cuenta. La auditoría read-only lo detectó. Lección: **toda fase con constraint debe verificar primero si hay 2+ filas que compartirían el par bajo el candidato, mirando `type` también** (no solo `reference_type`+`reference_id`).
+
+### 2.3 Opciones de alcance (decisión de usuario REQUERIDA antes de abrir la fase)
+
+| Opción                                                         | Alcance (migración)                                                                                                                                          | Ventaja                                                                                                                    | Coste                                                                                          |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **A. UNIQUE en `(reference_type, reference_id, type)`**        | incluye `type` como discriminador; cubre TODO el ledger                                                                                                      | Un solo constraint coherente: cierra A-2 (external), A-1/M-7 (custody), y no rompe trade+fee (difieren en `type`). Sólido. | Toca semántica de `type="fee"` para trade (fee dentro de `transaction`).                       |
+| **B. Índice PARCIAL solo tipos idempotentes**                  | `UNIQUE (account_id, reference_type, reference_id) WHERE reference_type IN ('external','custody')`                                                           | Cierra A-2 y custodia; minimiza riesgo de la migración (no restrige `transaction`).                                        | `external` queda por-cuenta (no global) → escotilla si el cliente reutiliza key entre cuentas. |
+| **C. Índice PARCIAL `external` GLOBAL + `custody` por-cuenta** | `UNIQUE (reference_type, reference_id) WHERE reference_type='external'` + `UNIQUE (account_id, reference_type, reference_id) WHERE reference_type='custody'` | Alinea `external` con `find_cash_movement_by_reference` (global) y `custody` con su dedup por-cuenta.                      | Dos índices; más movimiento.                                                                   |
+| D. Global plano `(reference_type, reference_id)`               | —                                                                                                                                                            | —                                                                                                                          | ❌ **NO VIABLE**: rompe inserts de trades con fees.                                            |
+
+**Notas técnicas (verificadas) a tener en cuenta en la fase:**
+
+- PostgreSQL trata los `NULL` como **distintos** en `UNIQUE` → filas `(NULL,NULL)` (p. ej. `test_daily_ops_report.py:35-36`) no rompen; un índice parcial `WHERE reference_type IS NOT NULL AND reference_id IS NOT NULL` las excluye explícitamente.
+- La migración de backfill de `account_migration.py:187-221` presupone **1 fila por `("transaction", tx_id)`** → reafirma que un UNIQUE puro es incompatible con trade+fee.
+- Requiere **migración Alembic** nueva (head actual = `003_prisma_schema_baseline`; down_revision debe encadenar) + test infra con **Postgres real**.
+
+---
+
+## 3. Orden sugerido de fases (por riesgo dinero/verdad + dependencias)
+
+1. ~~**Fase 3 = L-M3 / M-5** (Medio) — unique constraint.~~ **✅ HECHO** (ver §2/§6). Cierra la ventana concurr. real de A-2.
+2. **M-1 (T-M1)** (Medio) — `get_summary` cost_basis de posiciones sin precio. **→ SIGUIENTE.**
+3. **B-4 (L-M6)** (Bajo) — fee ledger atómico / disambiguación (queda abierta: el UNIQUE añadido NO toca `transaction`, así que trade+fee se siguen escribiendo como hoy, solo que ahora el par incluye `type`).
+4. **M-2 (T-M2)** (Medio) — reconciliación cash↔ledger (invariant + test).
+5. **M-3 (T-M3)** (Medio) — decisión cost-basis canónico.
+6. **M-6 (T-M6)** (Medio) — margin hardcoded → `None`.
+7. **M-4 (T-M4/T-M5)** (Medio) — custodia fuera del path de lectura (job dedicado). _Requiere decisión (colinda con freeze)._
+8. **B-1 / B-2 / B-3 / B-5** (Bajo) — según decisión y saturación.
+
+---
+
+## 4. Checklist operativo manual (FUERA de repo, no bloquea código)
+
+Pendiente acumulado de R-1/F-WORKER-1 (verificar de nuevo al activarlo, no asumir):
+
+- [ ] Activar **GitHub secret scanning** nativo en la UI.
+- [ ] Definir **`TRUSTED_PROXIES` prod** con las IPs del proxy de borde (bloqueado por valores reales del usuario).
+- [ ] Corregir el registro en BD **`BP/.L` → `BP.L`** (dato corrupto, F-WORKER-1) si se quiere dato real.
+- [ ] Limpiar **`logs/dev`** locales (los `dev-*.log` acumulados; gitignore ya cubre `logs/**`).
+- [ ] Opcional: purga de **valores dev** en historial git público (filter-repo/BFG — decisión explícita).
+
+---
+
+## 5. Protocolo de orquestación anti-saturación (norma permanente)
+
+Para que **ningún chat ni subagente pierda el hilo ni alucine estado**:
+
+1. **Ancla de registro:** este backlog es la fuente de verdad del «trabajo por delante». Leer antes de abrir fase (read-first); actualizar al cerrar (update-last).
+2. **Un subagente acotado por fase**, con brief explícito que inyecte: contexto (§0-§2), archivos exactos, alcance EXACTO (qué NO tocar), batería esperada, y la instrucción de **escribir el resultado en el backlog** al terminar. El subagente SIEMPRE entrega: hallazgos verificados contra código (nunca inferidos) + diffs + batería.
+3. **No dejes que un subagente «apruebe» su propio trabajo:** el coordinador (agente principal) revisa los diffs y la batería antes de proponer commit al usuario.
+4. **Decisión de usuario por commit** (el documento manda; no auto-commitear sin aprobación).
+5. **Trigger de relevo por saturación (regla §9 traspaso R-7):** si el contexto del chat se llena, en lugar de seguir forzando, se cierra el hilo y se abre otro **pegando el texto de relevo** del traspaso + este backlog. Nunca seguir adivinando el estado de memoria.
+6. **Verificación anti-alucinación:** ante cualquier afirmación de estado/commit/resultado del subagente, el coordinador la contrasta contra este backlog y el código real antes de aceptarla. Si el subagente afirma algo sin evidencia reproducible, se rechaza y se re-pide.
+7. **Batería:**
+   - `ruff check packages/py apps/api-python --config pyproject.toml` → 0
+   - mypy de los ficheros tocados que estén en gate CI (infra/domain/market)
+   - pytest de la zona (application money-path / infra según fase)
+   - `git status` por fase: cambios acotados a los archivos declarados
+
+---
+
+## 6. Historial de cierres del backlog
+
+| Fecha      | Fase / Código               | Commit(s)          | Batería                                                                 | Estado       |
+| ---------- | --------------------------- | ------------------ | ----------------------------------------------------------------------- | ------------ |
+| 2026-08-20 | R-7 F1 (A-1+A-3)            | `c957df1`          | ruff 0 · mypy 0 · pytest app money-path 25                              | ✅           |
+| 2026-08-20 | R-7 F2 (A-2)                | `8c081ea`          | ruff 0 · mypy ledger_repo 0 · pytest app 31 · api-python 32             | ✅           |
+| 2026-08-20 | R-7 F3 (L-M3/M-5, opción A) | _(pending commit)_ | ruff 0 · mypy 4 files 0 · infra real 63 (incl. 6 nuevos) · app idemp 11 | ✅ en código |
