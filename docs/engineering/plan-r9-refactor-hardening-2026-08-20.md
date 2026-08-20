@@ -210,7 +210,7 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Decisión de alcance (2026-08-20, aprobada por el usuario): ✅ OPCIÓN B — postcondición app + corregir docs.** Verificado en código (`tables.py:1172-1219`): `LedgerEntryRow` solo tiene el UNIQUE parcial `uq_ledger_entries_account_reference`; **NO hay `CheckConstraint` ni trigger** sobre `balance_after` (grep 0 en código). El invariante vive SOLO en tests (`test_r8c_ledger_balance_atomic.py`). Se corrige la documentación que afirma "invariante DB `balance_after`" (que NO es un constraint) para que diga la verdad: **postcondición de app verificada por grupo atómico en el test-suite**, no garantía física de la BD. NO se añade trigger ni migración (menor riesgo; la garantía física se descarta por decisión).
 
-**Estado (2026-08-20, IMPLEMENTADO):** _(SE RELLENARÁ AL CERRAR)_
+**Estado (2026-08-20, IMPLEMENTADO):** decisión usuario **opción B** (postcondición app + corregir docs, sin trigger/migración). Corregidas las afirmaciones "invariante DB `balance_after`" en `PROJECT_STATE.md` (R-8C) y `audit-pack-estado-global-2026-08-20.md` (mensaje clave + fila R-8C) para reflejar la verdad: el invariante es una **postcondición de app verificada por grupo atómico en `test_r8c_ledger_balance_atomic.py`**, NO un constraint/trigger DB. Registrada la decisión de alcance en la FASE 6 y en §5.2. Docs-only (0 código, 0 migración). Commit `e5d8926` pusheado a `main`.
 
 ---
 
