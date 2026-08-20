@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Fase:** R-8 — nueva ola de hardening tras el **cierre completo de R-7** (deuda de dinero real cerrada; solo `M-4/T-M4` diferido por freeze). Motiva este plan la **auditoría externa de 2026-08-20** (3ª ronda) cruzada contra el código real de `main`, detectando que **su P0 de arranque ya está corregido** y dejando **2 P0 reales** sin cubrir.
-> **Estado:** ⏳ **R-8A IMPLEMENTADA + verificada (ruff/mypy/pytest verdes), pendiente aprobación y commit final.** Fase 0 (docs) y R-8A (P0 hardening) ejecutadas. R-8B/C/D pendientes de decisión por fase.
+> **Estado:** ✅ **R-8A PUSHEADA a `main`** (código `edf2d0c` + docs `7f327ab`) — batería verde (ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +test backstop). Fase 0 (docs) y R-8A (P0 hardening) cerradas. **R-8B/C/D pendientes de decisión por fase** (próximo: elegir R-8B P1).
 > **Decisión de usuario 2026-08-20:** (1) levantar freeze `D4` (auth) **solo** para la fase R-8B.2 acotada · (2) incluir **ambos P0** como R-8A prioritario · (3) arrancar en **modo docs_solo** (Fase 0 = solo documentos) · (4) R-8A: `database_bootstrap()` con `pg_advisory_lock` de sesión global (P0-A) y catch `IntegrityError`+savepoint+re-SELECT (P0-B).
 
 ---
@@ -128,19 +128,19 @@ Revisar `pending-delete/` (§1.3.9 criterio), docs obsoletos (`CHART_*`, `transf
 
 ## 5. Estado al abrir (firma)
 
-- `local main = origin/main = 4120029` · árbol limpio · working tree sin cambios.
+- `local main = origin/main = 7f327ab` (`edf2d0c` R-8A + `7f327ab` docs) · árbol limpio · working tree sin cambios.
 - Freeze: sin features nuevas; **`D4` (auth) levantado solo para R-8B.2** por decisión usuario 2026-08-20.
-- R-7 completo (todos sus items cerrados; `M-4/T-M4` diferido).
-- Batería base confirmada en el último cierre: ruff 0 (config CI raíz) · mypy infra/domain Success · pytest infra Postgres real 76+1xfail · domain 21 · application 245 · api-python 32 · CI verde.
+- R-7 completo (todos sus items cerrados; `M-4/T-M4` diferido). R-8A (P0-A+P0-B) PUSHEADA.
+- Batería base confirmada en el último cierre: ruff 0 (config CI raíz) · mypy infra/domain Success · pytest infra Postgres real 76+1xfail · domain 21 · application 240 · api-python 56 · CI verde.
 
 ---
 
 ## 6. Historial de cierres (se rellenará por fase)
 
-| Fecha      | Fase / Código      | Commit(s)                                | Batería                                                                      | Estado                       |
-| ---------- | ------------------ | ---------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------- |
-| 2026-08-20 | R-8 Fase 0         | — (docs)                                 | docs                                                                         | ⏳ Fase 0 (este doc)         |
-| 2026-08-20 | R-8A (P0-A + P0-B) | pendiente de commit (aprobación usuario) | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop | ✅ IMPLEMENTADA + verificada |
+| Fecha      | Fase / Código      | Commit(s)                    | Batería                                                                      | Estado                         |
+| ---------- | ------------------ | ---------------------------- | ---------------------------------------------------------------------------- | ------------------------------ |
+| 2026-08-20 | R-8 Fase 0         | `7f327ab` (docs)             | docs                                                                         | ✅ CERRADA (Fase 0 = este doc) |
+| 2026-08-20 | R-8A (P0-A + P0-B) | `edf2d0c` (~ `7f327ab` docs) | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop | ✅ **PUSHEADA a `main`**       |
 
 ---
 
