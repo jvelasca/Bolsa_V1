@@ -19,14 +19,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from bolsa_infrastructure.config import Settings, get_settings
-from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
-from bolsa_infrastructure.database.migrations import database_bootstrap
-from bolsa_infrastructure.database.session import (
-    create_engine,
-    create_session_factory,
-)
-from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -35,6 +27,14 @@ from bolsa_api.api.v1.router import api_v1_router
 from bolsa_api.logging_redact import install_log_redact
 from bolsa_api.middleware.auth import AuthMiddleware
 from bolsa_api.middleware.rate_limit import RateLimitMiddleware
+from bolsa_infrastructure.config import Settings, get_settings
+from bolsa_infrastructure.database.llm_call_audit import dispose_llm_call_audit_engine
+from bolsa_infrastructure.database.migrations import database_bootstrap
+from bolsa_infrastructure.database.session import (
+    create_engine,
+    create_session_factory,
+)
+from bolsa_infrastructure.queue.scan_job_arq import close_scan_job_arq_pool
 
 
 @asynccontextmanager

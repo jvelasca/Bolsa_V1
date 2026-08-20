@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 
+from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
 from bolsa_domain.account_settings import calculate_trade_fees, settings_from_dict
 from bolsa_domain.entities.account import (
     AccountSummary,
@@ -28,8 +29,6 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
 from bolsa_infrastructure.ids import new_id
-
-from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
 
 
 @asynccontextmanager
