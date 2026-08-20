@@ -204,22 +204,23 @@ async def test_distinct_keys_execute_trade_each_time() -> None:
 
 
 @pytest.mark.asyncio
-async def test_without_key_executes_each_time_documented_residual() -> None:
-    """Sin clave, cada llamada ejecuta (hazard documentado si un caller omite la clave).
+async def test_without_key_requires_key() -> None:
+    """R-10 F1: la idempotency_key de ExecuteTrade es OBLIGATORIA a nivel de firma.
 
-    Los dos caminos internos de producción ahora PASAN clave (B-4), así que este caso
-    solo describe la escotilla residual para un futuro caller que la omita.
-    """
+    La antigua "escotilla residual" (omitir clave → ejecutar cada vez) desaparece:
+    omitir la clave lanza TypeError porque es un argumento keyword-only requerido."""
     use_case, portfolio, ledger = _build()
 
-    await use_case.execute(
-        instrument_id="inst-1", trade_type="buy", quantity=10.0, price=100.0
-    )
-    await use_case.execute(
-        instrument_id="inst-1", trade_type="buy", quantity=10.0, price=100.0
-    )
-    assert len(portfolio.executions) == 2
-    assert len(ledger.rows) == 4
+    with pytest.raises(TypeError):
+        await use_case.execute(
+            instrument_id="inst-1", trade_type="buy", quantity=10.0, price=100.0
+        )
+    with pytest.raises(TypeError):
+        await use_case.execute(
+            instrument_id="inst-1", trade_type="buy", quantity=10.0, price=100.0
+        )
+    assert len(portfolio.executions) == 0
+    assert len(ledger.rows) == 0
 
 
 class _FakeExecuteTrade:

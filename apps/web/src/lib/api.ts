@@ -1456,6 +1456,7 @@ export const api = {
     type: "buy" | "sell";
     quantity: number;
     price: number;
+    idempotencyKey: string;
   }) =>
     call<{
       data: {

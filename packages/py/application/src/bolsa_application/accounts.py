@@ -31,7 +31,6 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
-from bolsa_infrastructure.ids import new_id
 
 
 @asynccontextmanager
@@ -375,7 +374,7 @@ class DepositCashToAccount:
         *,
         amount: float,
         note: str | None = None,
-        idempotency_key: str | None = None,
+        idempotency_key: str,
     ) -> CashMovementResult:
         if amount <= 0:
             raise ValueError("El importe debe ser mayor que cero")
@@ -399,7 +398,7 @@ class DepositCashToAccount:
                     idempotency_key=idempotency_key,
                 )
                 return _cash_movement_result_from_entry(existing, "external_deposit")
-        movement_id = idempotency_key or new_id()
+        movement_id = idempotency_key
         session = getattr(self._ledger_repo, "session", None)
         try:
             async with _idempotent_savepoint(session):
@@ -425,7 +424,7 @@ class DepositCashToAccount:
             # Rejugamos el movimiento original para devolver la misma shape.
             existing = await self._ledger_repo.find_cash_movement_by_reference(
                 "external",
-                idempotency_key,  # type: ignore[arg-type]
+                idempotency_key,
                 account_id=scope.account.id,
                 type="deposit",
             )
@@ -436,7 +435,7 @@ class DepositCashToAccount:
                 amount=amount,
                 note=note,
                 storage_sign=1,
-                idempotency_key=idempotency_key,  # type: ignore[arg-type]
+                idempotency_key=idempotency_key,
             )
             return _cash_movement_result_from_entry(existing, "external_deposit")
         return CashMovementResult(
@@ -470,7 +469,7 @@ class WithdrawCashFromAccount:
         *,
         amount: float,
         note: str | None = None,
-        idempotency_key: str | None = None,
+        idempotency_key: str,
     ) -> CashMovementResult:
         if amount <= 0:
             raise ValueError("El importe debe ser mayor que cero")
@@ -500,7 +499,7 @@ class WithdrawCashFromAccount:
             raise ValueError(
                 f"Efectivo insuficiente. Disponible: {summary.portfolio.cash:.2f} {scope.account.currency}",
             )
-        movement_id = idempotency_key or new_id()
+        movement_id = idempotency_key
         session = getattr(self._ledger_repo, "session", None)
         try:
             async with _idempotent_savepoint(session):
@@ -525,7 +524,7 @@ class WithdrawCashFromAccount:
             # intento (incl. deduct_cash); rejugamos la retirada original.
             existing = await self._ledger_repo.find_cash_movement_by_reference(
                 "external",
-                idempotency_key,  # type: ignore[arg-type]
+                idempotency_key,
                 account_id=scope.account.id,
                 type="withdrawal",
             )
@@ -536,7 +535,7 @@ class WithdrawCashFromAccount:
                 amount=amount,
                 note=note,
                 storage_sign=-1,
-                idempotency_key=idempotency_key,  # type: ignore[arg-type]
+                idempotency_key=idempotency_key,
             )
             return _cash_movement_result_from_entry(existing, "external_withdrawal")
         return CashMovementResult(
@@ -748,7 +747,7 @@ class ExecuteTrade:
         price: float,
         account_id: str | None = None,
         portfolio_id: str | None = None,
-        idempotency_key: str | None = None,
+        idempotency_key: str,
     ) -> TradeResult:
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
         # M4: doble POST con la misma idempotency_key → una sola transacción.
@@ -793,8 +792,6 @@ class ExecuteTrade:
             # R-8A/P0-B: otro request con LA MISMA idempotency_key ganó la carrera y ya
             # grabó la transacción (el repo revertió este intento con un savepoint).
             # Rejugamos el trade original con un summary fresco, sin append_trade/fee.
-            if idempotency_key is None:
-                raise
             existing = await self._portfolio_repo.find_transaction_by_idempotency(
                 scope.legacy_portfolio_id,
                 idempotency_key,

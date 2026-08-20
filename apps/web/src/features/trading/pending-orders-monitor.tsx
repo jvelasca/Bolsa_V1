@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { createIdempotencyKey } from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
 import {
   liveQuotesMap,
@@ -37,6 +38,10 @@ export function PendingOrdersMonitor() {
   const { effectiveAccountId } = useActiveAccount();
   const processing = useRef<Set<string>>(new Set());
   const errorNotified = useRef<Set<string>>(new Set());
+  // F1 (R-10): key de idempotencia cacheada por orden pendiente (order.id). Se genera
+  // la primera vez que la orden se dispara y se reutiliza en reintentos del loop, de
+  // forma que un fallo seguido de re-evaluación rejuega en vez de duplicar la operación.
+  const orderIdemKeys = useRef<Map<string, string>>(new Map());
   const orderSignature = pendingOrders.map((order) => order.id).join(",");
 
   const instrumentIds = useMemo(
@@ -93,11 +98,15 @@ export function PendingOrdersMonitor() {
 
         processing.current.add(order.id);
         try {
+          const cachedKey = orderIdemKeys.current.get(order.id);
+          const idemKey = cachedKey ?? createIdempotencyKey();
+          if (!cachedKey) orderIdemKeys.current.set(order.id, idemKey);
           const res = await api.executeTrade({
             instrumentId: order.instrumentId,
             type: order.side,
             quantity: order.quantity,
             price: order.limitPrice,
+            idempotencyKey: idemKey,
           });
           const txId = res?.data?.transaction?.id;
           if (txId && effectiveAccountId) {
@@ -108,6 +117,7 @@ export function PendingOrdersMonitor() {
             });
           }
           await removePendingOrder(order.id);
+          orderIdemKeys.current.delete(order.id);
           errorNotified.current.delete(order.id);
           pushToast(
             `Orden ${order.side === "buy" ? "compra" : "venta"} ${order.symbol} ejecutada @ ${formatPrice(order.limitPrice)}`,

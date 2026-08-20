@@ -199,18 +199,21 @@ async def test_deposit_distinct_keys_move_money_twice() -> None:
 
 
 @pytest.mark.asyncio
-async def test_deposit_without_key_uses_fresh_id() -> None:
+async def test_deposit_without_key_requires_key() -> None:
+    """R-10 F1: la idempotency_key es OBLIGATORIA a nivel de firma (estrategia C).
+
+    La "escotilla residual" (omitir clave → movimiento nuevo) desaparece: omitir la
+    clave lanza TypeError porque es un argumento keyword-only requerido."""
     ledger = _FakeLedgerRepo()
     portfolio = _FakePortfolioRepo()
     use_case = DepositCashToAccount(_FakeAccountRepo(), portfolio, ledger)
 
-    result = await use_case.execute("acc-1", amount=100.0)
-    assert result.id is not None
-    assert result.id != ""
-    # Nuevo movimiento en cada llamada sin clave.
-    second = await use_case.execute("acc-1", amount=100.0)
-    assert second.id != result.id
-    assert portfolio.cash == 200.0
+    with pytest.raises(TypeError):
+        await use_case.execute("acc-1", amount=100.0)
+    with pytest.raises(TypeError):
+        await use_case.execute("acc-1", amount=100.0)
+    assert portfolio.cash == 0.0
+    assert len(ledger.entries) == 0
 
 
 @pytest.mark.asyncio
@@ -219,7 +222,7 @@ async def test_withdraw_idempotent_same_key_does_not_double_debit() -> None:
     portfolio = _FakePortfolioRepo()
     account = _FakeAccountRepo()
     deposit = DepositCashToAccount(account, portfolio, ledger)
-    await deposit.execute("acc-1", amount=1000.0)
+    await deposit.execute("acc-1", amount=1000.0, idempotency_key="dep-seed")
 
     withdraw = WithdrawCashFromAccount(account, portfolio, ledger)
     await withdraw.execute("acc-1", amount=300.0, idempotency_key="wd-key-1")
@@ -261,7 +264,7 @@ async def test_withdraw_without_key_requires_funds() -> None:
     portfolio = _FakePortfolioRepo()
     withdraw = WithdrawCashFromAccount(_FakeAccountRepo(), portfolio, ledger)
     with pytest.raises(ValueError, match="Efectivo insuficiente"):
-        await withdraw.execute("acc-1", amount=10.0)
+        await withdraw.execute("acc-1", amount=10.0, idempotency_key="wd-1")
 
 
 @pytest.mark.asyncio

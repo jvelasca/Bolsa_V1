@@ -1631,6 +1631,7 @@
           "custodyAnnualPct": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -1640,6 +1641,7 @@
             "title": "Custodyannualpct"
           },
           "fxConversionPct": {
+            "minimum": 0.0,
             "title": "Fxconversionpct",
             "type": "number"
           },
@@ -1654,6 +1656,7 @@
           "stockCommissionMax": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -1663,14 +1666,17 @@
             "title": "Stockcommissionmax"
           },
           "stockCommissionMin": {
+            "minimum": 0.0,
             "title": "Stockcommissionmin",
             "type": "number"
           },
           "stockCommissionPct": {
+            "minimum": 0.0,
             "title": "Stockcommissionpct",
             "type": "number"
           },
           "vatOnCommissionPct": {
+            "minimum": 0.0,
             "title": "Vatoncommissionpct",
             "type": "number"
           }
@@ -2510,6 +2516,7 @@
           },
           "initialDeposit": {
             "default": 100000.0,
+            "minimum": 0.0,
             "title": "Initialdeposit",
             "type": "number"
           },
@@ -2525,12 +2532,14 @@
           },
           "leverage": {
             "default": 1.0,
+            "exclusiveMinimum": 0.0,
             "title": "Leverage",
             "type": "number"
           },
           "marginCallLevelPct": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -3497,15 +3506,8 @@
             "type": "number"
           },
           "idempotencyKey": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Idempotencykey"
+            "title": "Idempotencykey",
+            "type": "string"
           },
           "note": {
             "anyOf": [
@@ -3520,7 +3522,8 @@
           }
         },
         "required": [
-          "amount"
+          "amount",
+          "idempotencyKey"
         ],
         "title": "DepositCashDto",
         "type": "object"
@@ -14594,15 +14597,8 @@
       "TradeRequestDto": {
         "properties": {
           "idempotencyKey": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Idempotencykey"
+            "title": "Idempotencykey",
+            "type": "string"
           },
           "instrumentId": {
             "title": "Instrumentid",
@@ -14631,7 +14627,8 @@
           "instrumentId",
           "type",
           "quantity",
-          "price"
+          "price",
+          "idempotencyKey"
         ],
         "title": "TradeRequestDto",
         "type": "object"
@@ -15856,15 +15853,8 @@
             "type": "number"
           },
           "idempotencyKey": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Idempotencykey"
+            "title": "Idempotencykey",
+            "type": "string"
           },
           "note": {
             "anyOf": [
@@ -15879,7 +15869,8 @@
           }
         },
         "required": [
-          "amount"
+          "amount",
+          "idempotencyKey"
         ],
         "title": "WithdrawCashDto",
         "type": "object"

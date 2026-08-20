@@ -122,3 +122,28 @@ async def test_deposit_reused_key_different_amount_returns_409() -> None:
             )
             assert changed.status_code == 409
             assert changed.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_deposit_and_withdraw_without_key_return_422() -> None:
+    """R-10 F1: la idempotencyKey es OBLIGATORIA en deposit/withdraw (contrato estricto).
+
+    Un POST sin la clave se rechaza en el borde con 422 (validación Pydantic), de modo
+    que un retry HTTP sin clave no puede crear una 2ª operación."""
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            account_id = await _make_account(client)
+
+            deposit = await client.post(
+                f"/api/accounts/{account_id}/deposits",
+                json={"amount": 1000},
+            )
+            assert deposit.status_code == 422
+
+            withdraw = await client.post(
+                f"/api/accounts/{account_id}/withdrawals",
+                json={"amount": 1000},
+            )
+            assert withdraw.status_code == 422

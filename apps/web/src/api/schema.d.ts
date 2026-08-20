@@ -4482,7 +4482,7 @@ export interface components {
             /** Amount */
             amount: number;
             /** Idempotencykey */
-            idempotencyKey?: string | null;
+            idempotencyKey: string;
             /** Note */
             note?: string | null;
         };
@@ -8217,7 +8217,7 @@ export interface components {
         /** TradeRequestDto */
         TradeRequestDto: {
             /** Idempotencykey */
-            idempotencyKey?: string | null;
+            idempotencyKey: string;
             /** Instrumentid */
             instrumentId: string;
             /** Price */
@@ -8574,7 +8574,7 @@ export interface components {
             /** Amount */
             amount: number;
             /** Idempotencykey */
-            idempotencyKey?: string | null;
+            idempotencyKey: string;
             /** Note */
             note?: string | null;
         };

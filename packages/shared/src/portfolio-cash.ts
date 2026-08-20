@@ -32,11 +32,13 @@ export type CashMovementKind =
 export interface DepositCashRequestDto {
   amount: number;
   note?: string | null;
+  idempotencyKey: string;
 }
 
 export interface WithdrawCashRequestDto {
   amount: number;
   note?: string | null;
+  idempotencyKey: string;
 }
 
 export interface CashMovementResultDto {

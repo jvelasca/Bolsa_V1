@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Bell, RefreshCw, Settings2 } from "lucide-react";
-import { DEFAULT_CHART_CONFIG } from "@bolsa/shared";
+import { DEFAULT_CHART_CONFIG, createIdempotencyKey } from "@bolsa/shared";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +36,9 @@ export function InstrumentDetailPage() {
   const [tradeQty, setTradeQty] = useState("10");
   const [pendingSide, setPendingSide] = useState<"buy" | "sell" | null>(null);
   const [tradeError, setTradeError] = useState<string | null>(null);
+  // F1 (R-10): key de idempotencia cacheada por operación en curso. Se genera al
+  // disparar la operación (requestTrade) y se reutiliza en retries del mismo intento.
+  const tradeIdemKeyRef = useRef<string | null>(null);
   const confirmBeforeTrade = useTradePreferencesStore(
     (s) => s.confirmBeforeTrade,
   );
@@ -103,14 +106,22 @@ export function InstrumentDetailPage() {
   });
 
   const tradeMutation = useMutation({
-    mutationFn: (type: "buy" | "sell") =>
-      api.executeTrade({
+    mutationFn: (type: "buy" | "sell") => {
+      let idemKey = tradeIdemKeyRef.current;
+      if (!idemKey) {
+        idemKey = createIdempotencyKey();
+        tradeIdemKeyRef.current = idemKey;
+      }
+      return api.executeTrade({
         instrumentId: id!,
         type,
         quantity,
         price: lastPrice,
-      }),
+        idempotencyKey: idemKey,
+      });
+    },
     onSuccess: async (res) => {
+      tradeIdemKeyRef.current = null;
       const txId = res?.data?.transaction?.id;
       if (txId && effectiveAccountId && id) {
         linkTradeToMandate({
@@ -146,6 +157,8 @@ export function InstrumentDetailPage() {
       setTradeError(validationError);
       return;
     }
+    // Cada operación lógica nueva regenera su key; retries reutilizan la misma.
+    tradeIdemKeyRef.current = null;
     if (confirmBeforeTrade) {
       setPendingSide(side);
       return;

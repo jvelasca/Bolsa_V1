@@ -242,7 +242,7 @@ async def _fund_and_withdraw(amount: float, key: str) -> tuple[WithdrawCashFromA
     portfolio = _FakePortfolioCashRepo()
     account = _FakeAccountRepo()
     deposit = DepositCashToAccount(account, portfolio, ledger)
-    await deposit.execute("acc-1", amount=1000.0)
+    await deposit.execute("acc-1", amount=1000.0, idempotency_key="dep-seed")
     withdraw = WithdrawCashFromAccount(account, portfolio, ledger)
     await withdraw.execute("acc-1", amount=amount, idempotency_key=key)
     return withdraw, portfolio, ledger

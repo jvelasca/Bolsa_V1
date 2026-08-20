@@ -51,14 +51,14 @@ async def test_tax_report_after_round_trip_trade() -> None:
             buy = await client.post(
                 "/api/portfolio/trade",
                 headers={"X-Account-Id": account_id},
-                json={"instrumentId": instrument_id, "type": "buy", "quantity": 10, "price": 100},
+                json={"instrumentId": instrument_id, "type": "buy", "quantity": 10, "price": 100, "idempotencyKey": "tax-buy-1"},
             )
             assert buy.status_code == 200
 
             sell = await client.post(
                 "/api/portfolio/trade",
                 headers={"X-Account-Id": account_id},
-                json={"instrumentId": instrument_id, "type": "sell", "quantity": 5, "price": 120},
+                json={"instrumentId": instrument_id, "type": "sell", "quantity": 5, "price": 120, "idempotencyKey": "tax-sell-1"},
             )
             assert sell.status_code == 200
 

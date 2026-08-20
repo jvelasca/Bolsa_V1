@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { createIdempotencyKey } from "@bolsa/shared";
 import type { InvestmentAccountDto, LedgerEntryDto } from "@bolsa/shared";
 import { formatLedgerEntryLabel, ledgerEntryHint } from "@bolsa/shared";
 import {
@@ -81,7 +82,15 @@ export function AccountDetailPanel({
   const [cashTab, setCashTab] = useState<"deposit" | "withdraw">("deposit");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // F1 (R-10): key de idempotencia cacheada por operación de depósito/retirada en
+  // curso. Se genera al disparar el movimiento y se reutiliza en retries del mismo
+  // intento; se limpia al confirmar éxito o al cambiar de tipo de movimiento.
+  const cashIdemKeyRef = useRef<string | null>(null);
   const operativaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    cashIdemKeyRef.current = null;
+  }, [cashTab]);
 
   const isClosed = account.status === "closed";
   const isSimulated = account.type === "simulated";
@@ -171,18 +180,24 @@ export function AccountDetailPanel({
       if (parsed === null || parsed <= 0) {
         throw new Error("Importe inválido");
       }
+      if (!cashIdemKeyRef.current)
+        cashIdemKeyRef.current = createIdempotencyKey();
+      const idemKey = cashIdemKeyRef.current;
       if (cashTab === "deposit") {
         return api.depositCash(account.id, {
           amount: parsed,
           note: note.trim() || null,
+          idempotencyKey: idemKey,
         });
       }
       return api.withdrawCash(account.id, {
         amount: parsed,
         note: note.trim() || null,
+        idempotencyKey: idemKey,
       });
     },
     onSuccess: () => {
+      cashIdemKeyRef.current = null;
       setAmount("");
       setNote("");
       setMessage("Movimiento registrado.");

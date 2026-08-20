@@ -80,14 +80,13 @@ async def test_trade_idempotency_single_transaction() -> None:
             # Mismo idem-key → una sola transacción (mismo id), no duplica.
             assert second_tx_id == first_tx_id
 
-            # Sin idem-key (parámetro opcional) → nueva transacción, no colisiona.
+            # R-10 F1: sin idem-key el contrato lo rechaza → 422 (clave obligatoria).
             fresh = await client.post(
                 "/api/portfolio/trade",
                 headers=headers,
                 json={"instrumentId": instrument_id, "type": "buy", "quantity": 1, "price": 50},
             )
-            assert fresh.status_code == 200
-            assert fresh.json()["data"]["transaction"]["id"] != first_tx_id
+            assert fresh.status_code == 422
 
 
 @pytest.mark.asyncio
@@ -125,6 +124,6 @@ def test_trade_dto_rejects_nan_inf_and_negatives() -> None:
     ):
         with pytest.raises(ValidationError):
             TradeRequestDto(**bad)
-    # Válido + idempotency opcional
+    # Válido + idempotency obligatoria (R-10 F1)
     ok = TradeRequestDto(instrumentId="inst-1", type="sell", quantity=5, price=10, idempotencyKey="k")
     assert ok.idempotency_key == "k"

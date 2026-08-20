@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createIdempotencyKey } from "@bolsa/shared";
 import {
   Dialog,
   DialogTabs,
@@ -85,6 +86,7 @@ export function OrderDialog() {
       type: "buy" | "sell";
       quantity: number;
       price: number;
+      idempotencyKey: string;
     }) => api.executeTrade(body),
     onSuccess: async (res, vars) => {
       const txId = res?.data?.transaction?.id;
@@ -139,6 +141,7 @@ export function OrderDialog() {
       type: side,
       quantity: qty,
       price: lastPrice,
+      idempotencyKey: createIdempotencyKey(),
     });
   }
 

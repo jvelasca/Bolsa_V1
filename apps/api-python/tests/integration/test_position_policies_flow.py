@@ -38,6 +38,7 @@ async def test_position_policy_buy_and_evaluate_exits_flow() -> None:
                     "type": "buy",
                     "quantity": 5,
                     "price": 50,
+                    "idempotencyKey": "trade-pf-1",
                 },
             )
             assert trade.status_code == 200
@@ -120,7 +121,7 @@ async def test_evaluate_exits_without_policy_reports_no_policy() -> None:
             await client.post(
                 "/api/portfolio/trade",
                 headers={"X-Account-Id": account_id},
-                json={"instrumentId": instrument_id, "type": "buy", "quantity": 1, "price": 10},
+                json={"instrumentId": instrument_id, "type": "buy", "quantity": 1, "price": 10, "idempotencyKey": "trade-sin-1"},
             )
 
             evaluate = await client.post(

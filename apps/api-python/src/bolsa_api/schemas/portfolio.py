@@ -66,7 +66,7 @@ class TradeRequestDto(BaseModel):
     type: Literal["buy", "sell"]
     quantity: float = Field(gt=0, allow_inf_nan=False)
     price: float = Field(gt=0, allow_inf_nan=False)
-    idempotency_key: str | None = Field(default=None, alias="idempotencyKey")
+    idempotency_key: str = Field(alias="idempotencyKey")
 
 
 class TradeResponseDto(BaseModel):
