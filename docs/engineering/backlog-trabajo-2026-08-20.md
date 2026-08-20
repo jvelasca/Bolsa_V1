@@ -10,17 +10,17 @@
 
 ## 0. Estado global (leer PRIMERO)
 
-| Contexto       | Valor (verificado al último cierre)                                                                                                                                                                                                         |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Rama activa    | `main` (`local main = origin/main`)                                                                                                                                                                                                         |
-| Working tree   | limpio                                                                                                                                                                                                                                      |
-| Fase R-7       | Auditoría COMPLETADA · **F1 PUSHEADA** (`c957df1`) · **F2 PUSHEADA** (`8c081ea`) · **F3 (L-M3/M-5) PUSHEADA** (`d7b8db8`) · **M-1 (T-M1) PUSHEADA** (`a78eb29`) · **M-2 (T-M2) PUSHEADA** (`c8e9ced`) · **M-3 (T-M3) PUSHEADA** (`6962fd7`) |
-| Freeze vigente | Sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4)                                                                                                                                                 |
-| Protocolo      | Una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.                                                                         |
+| Contexto       | Valor (verificado al último cierre)                                                                                                                                                                                                                                               |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Rama activa    | `main` (`local main = origin/main`)                                                                                                                                                                                                                                               |
+| Working tree   | limpio                                                                                                                                                                                                                                                                            |
+| Fase R-7       | Auditoría COMPLETADA · **F1 PUSHEADA** (`c957df1`) · **F2 PUSHEADA** (`8c081ea`) · **F3 (L-M3/M-5) PUSHEADA** (`d7b8db8`) · **M-1 (T-M1) PUSHEADA** (`a78eb29`) · **M-2 (T-M2) PUSHEADA** (`c8e9ced`) · **M-3 (T-M3) PUSHEADA** (`6962fd7`) · **M-6 (T-M6) PUSHEADA** (`604bfef`) |
+| Freeze vigente | Sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4)                                                                                                                                                                                       |
+| Protocolo      | Una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.                                                                                                               |
 
 > Si este bloque §0 no coincide con tu lectura del repo, **para y re-lee**: algo está desincronizado. No continúes por inerción.
 >
-> **RELEVO → SIGUIENTE por decisión: M-6 (T-M6) margin hardcoded** (`_account_summary_from_portfolio`, application). Ver texto de traspaso completo + checklist de arranque en `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` **§8**.
+> **RELEVO → SIGUIENTE por decisión: M-4 (T-M4/T-M5) custodia fuera del path de lectura** (job dedicado; colinda con «sin features»). Alternativa: **M-7 (L-M5) custodia dedup time-only**. M-6 ya **CERRADA** (`604bfef`, margen real). Ver texto de traspaso completo en `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` **§8**.
 
 ---
 
@@ -45,7 +45,7 @@ Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador).
 | M-2 (T-M2)      | infrastructure | Cash NUNCA se reconcilia contra el ledger; identity `equity=cash+Σmv` es tautológica. No hay invariant que re-compute cash desde el ledger y compare.                                                                         | dinero/verdad | ✅ **CERRADA** — `sum_cash_amounts` + tests-postcondición por write-path                                                  |
 | M-3 (T-M3)      | infra+domain   | Divergencia de cost-basis: `avg_cost`/`cost_basis` de la posición EXCLUYE la fee de compra, pero el tax-report FIFO/avg la INCLUYE → unrealized (posiciones) y realized (tax) no concilian.                                   | dinero/verdad | ✅ **CERRADA** — puente `open_positions_with_fee_basis` + cara unrealized del report con fee                              |
 | M-4 (T-M4/T-M5) | application    | `GetTaxReport`/`GetAccountSummary` hacen cargo de custodia en GET (mutan dinero en lectura) + `fees_paid_total` mezcla fees de trade con fees de custodia.                                                                    | dinero        | ⏳ (colinda con «sin features»: mover a job dedicado)                                                                     |
-| M-6 (T-M6)      | application    | Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.                                                             | dinero        | ⏳                                                                                                                        |
+| M-6 (T-M6)      | application    | Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.                                                             | dinero        | ✅ **CERRADA** — `margin_used=Σmv/leverage`, `free_margin=equity−margin_used`, `margin_level_pct` (None si 0)             |
 | M-7 (L-M5)      | application    | Custodia dedup time-only (además del fix A-1); sin unique constraint la ventana concurr. aún la cubre el mutex, pero un restart/R-expiry en medio puede re-cobrar.                                                            | dinero        | ⏳ (depende de **L-M3/M-5**)                                                                                              |
 
 ### 🟢 Bajo
@@ -113,9 +113,9 @@ Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador).
 3. ~~**M-2 (T-M2)**~~ (Medio) — reconciliación cash↔ledger. **✅ HECHO** (ver §6) — `sum_cash_amounts` + tests-postcondición (M-2 acotado, B-3 pendiente).
 4. **B-4 (L-M6)** (Bajo) — fee ledger atómico / disambiguación (queda abierta: el UNIQUE añadido NO toca `transaction`, así que trade+fee se siguen escribiendo como hoy, solo que ahora el par incluye `type`).
 5. ~~**M-3 (T-M3)**~~ (Medio) — decisión cost-basis canónico. **✅ HECHO** (ver §6) — puente de conciliación con fee (opción iv).
-6. **M-6 (T-M6)** (Medio) — margin hardcoded → `None`.
-7. **M-6 (T-M6)** (Medio) — margin hardcoded → `None`.
-8. **M-4 (T-M4/T-M5)** (Medio) — custodia fuera del path de lectura (job dedicado). _Requiere decisión (colinda con freeze)._
+6. ~~**M-6 (T-M6)**~~ (Medio) — margin hardcoded → real. **✅ HECHO** (ver §6) — `margin_used=Σmv/leverage`, `free_margin=equity−margin_used`, `margin_level_pct=equity/margin_used*100` (None si 0).
+7. **M-4 (T-M4/T-M5)** (Medio) — custodia fuera del path de lectura (job dedicado). _Requiere decisión (colinda con freeze)._
+8. **M-7 (L-M5)** (Medio) — custodia dedup time-only aún sin unique constraint; tras L-M3/M-5 (cerrada) queda el mutex como única capa (restart/R-expiry puede re-cobrar). Depende de decisión.
 9. **B-1 / B-2 / B-3 / B-5** (Bajo) — según decisión y saturación.
 
 ---
@@ -160,3 +160,4 @@ Para que **ningún chat ni subagente pierda el hilo ni alucine estado**:
 | 2026-08-20 | R-7 M-1 (T-M1, opción B)    | `a78eb29` | ruff CI-config 0 · mypy portfolio_repo 0 · infra real 66 (incl. 3 nuevos) · app 235 · pusheado a `main`            | ✅     |
 | 2026-08-20 | R-7 M-2 (T-M2)              | `c8e9ced` | ruff CI-config 0 · mypy ledger_repo 0 · infra real 72 (incl. 6 nuevos + 1 xfail B-3) · app 235 · pusheado a `main` | ✅     |
 | 2026-08-20 | R-7 M-3 (T-M3)              | `6962fd7` | ruff CI-config 0 · mypy tax_report 0 · domain 21 (7 nuevos) · app 235 · infra real 72+1xfail · pusheado a `main`   | ✅     |
+| 2026-08-20 | R-7 M-6 (T-M6)              | `604bfef` | ruff CI-config 0 · app 241 (6 nuevos) · domain 21 · infra real 72+1xfail · api-python 5 · pusheado a `main`        | ✅     |
