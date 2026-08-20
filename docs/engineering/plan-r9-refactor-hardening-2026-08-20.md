@@ -227,6 +227,16 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Criterio de aceptación:** todos verdes en CI; documentar resultados.
 
+**Diseño de alcance (2026-08-20, coordinador — no requiere decisión de usuario; solo reúso lo existente):**
+
+- **Reutiliza, NO duplica** (mapa de tests existentes verificado): `test_financial_invariants.py` ya cubre `test_concurrent_buys_no_double_spend` (anti-doble-gasto con `asyncio.gather`+`with_for_update`) y `test_round_trip_balance_coherent`; `test_r8a_idempotency_backstop.py` cubre el backstop concurrente a repository (trade key + cash movement key) contra PG real; `test_r8c_ledger_balance_atomic.py` cubre el invariante `balance_after` por grupo atómico; `test_r8c_ledger_balance_atomic` + `test_ledger_entries_reference_unique` cubren UNIQUE. La suite F7 debe **añadir lo que falta**, no repetir.
+- **Nuevos ficheros a crear** dentro del alcance:
+  1. `packages/py/infrastructure/tests/test_concurrency_scenarios.py` — escenarios de ataque en PG real (patrón `db_session` de `test_r8a_idempotency_backstop.py`): mismos-key-distintas-cuentas (aislamiento A/B), deposit+withdraw racing en la misma cuenta, BUY+SELL racing sobre la misma posición, custody+trade racing (reusa `ApplyCustodyFees`), y verificación de que el perdedor de cada carrera NO deja estado inconsistente (cash/ledger). Nada de sleep/`time.sleep` salvo esperas pequeñas; usar transacciones/tasks `asyncio` con `with_for_update` o el UNIQUE como autoridad.
+  2. `scripts/verify/` — directorio nuevo con un script de verificación de invariantes y aislamiento entre cuentas (prefijo `verify_*.py`, invocable con `uv run`): `verify_ledger_balance_chain.py` (recorre `ledger_entries` por cuenta en orden `executed_at` y comprueba `balance_after[n] == prev + amount[n]`) y `verify_account_isolation.py` (comprueba que una `idempotency_key`/`reference_id` usada en la cuenta A no se "absorbe" en la cuenta B). Exit 0 si OK, mensaje claro si no.
+  3. Test de seguridad (aislamiento por cuenta a nivel request) SOLO si existe un helper claro en la app infra existente; si no, documentarlo como pendiente (no inventar un stack de integración nuevo en esta fase).
+- **¿Regression de `database_bootstrap` con 2 workers?** Requiere levantar N procesos → se excluye del alcance del subagente (entorno); se documenta como verificación manual/CI pendiente. No añadir.
+- **Sin cambios de código de producción, sin migración, sin contrato, sin web.**
+
 ---
 
 ### 🟡 FASE 8 — Limpieza de código/doc obsoletos + DOCSTRINGS + deuda menor
