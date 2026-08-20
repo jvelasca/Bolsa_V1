@@ -75,12 +75,17 @@ class ConfirmRecommendationIntent:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
             else:
                 try:
+                    # B-4: la clave de idempotencia es la identidad lógica de la decisión
+                    # (decision_id, con fallback a session_id). Un doble confirm de la misma
+                    # decisión rejuega el trade original en vez de duplicarlo (guard DB de
+                    # ExecuteTrade.find_transaction_by_idempotency).
                     trade = await self._execute_trade.execute(
                         instrument_id=intent.instrument_id,
                         trade_type=intent.side,
                         quantity=intent.quantity,
                         price=price,
                         account_id=account_id,
+                        idempotency_key=rec.decision_id or session_id,
                     )
                     result["trade"] = {
                         "status": "executed",

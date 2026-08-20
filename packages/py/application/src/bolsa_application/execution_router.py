@@ -470,6 +470,20 @@ class ExecutionRouter:
                     reason="Cantidad calculada inválida",
                 )
 
+        # OR-T4: clave de idempotencia del trade (día×política×kind). Se usa enviada a
+        # ExecuteTrade como idempotency_key (B-4) y, si el cognitive gate está activo,
+        # también como claim AUTO. Se calcula a nivel de función para que el guard DB de
+        # idempotencia se active siempre (incluso con gate desactivado). Se inicializa
+        # aqui también `claimed` para que el release del except ValueError nunca encuentre
+        # la variable sin definir cuando el gate está desactivado.
+        idem_key = make_auto_execute_idempotency_key(
+            signal.instrument_id,
+            as_of_from_iso(getattr(signal, "timestamp", None)),
+            policy.id,
+            str(signal.kind),
+        )
+        claimed = False
+
         if self._enforce_cognitive_gate:
             symbol = signal.instrument_id  # fallback; UI hits pueden enriquecer después
             profile = None
@@ -570,13 +584,7 @@ class ExecutionRouter:
                     reason=f"Risk Engine: {'; '.join(guard_decision.reasons)}",
                 )
 
-            # OR-T4: claim idempotency before fill (mismo día×política×kind).
-            idem_key = make_auto_execute_idempotency_key(
-                signal.instrument_id,
-                as_of_from_iso(getattr(signal, "timestamp", None)),
-                policy.id,
-                str(signal.kind),
-            )
+            # OR-T4: claim AUTO idempotency before fill (mismo día×política×kind).
             claimed = await claim_auto_execute_idempotency(idem_key)
             if not claimed:
                 await self._persist_risk_session(
@@ -614,6 +622,7 @@ class ExecutionRouter:
                 quantity=quantity,
                 price=price,
                 account_id=policy.account_id,
+                idempotency_key=idem_key,
             )
         except ValueError as exc:
             # El claim AUTO quedó tomado antes del fill (OR-T4). Si el fill falló
