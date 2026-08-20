@@ -14,10 +14,10 @@ from bolsa_domain.entities.account import (
 from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
 from bolsa_domain.tax_report import (
     TaxReportTransaction,
-    UnrealizedGainLine,
     build_tax_report,
     fiscal_year_range,
     map_ledger_fees_to_transactions,
+    open_positions_with_fee_basis,
 )
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
@@ -695,24 +695,27 @@ class GetTaxReport:
             for tx in transactions
         ]
 
-        unrealized: list[UnrealizedGainLine] = []
+        # M-3 (puente, decisión iv): la cara unrealized del report se deriva del residual
+        # abierto con la MISMA semántica FIFO/avg que la cara realized (fee capitalizada),
+        # en lugar de usar pos.quantity*pos.avg_cost (fee-excluida). storage/avg_cost de la
+        # posición NO cambia; este "puente" con fee solo alimenta la cara fiscal del report.
+        prices: dict[str, float] = {}
+        live_quantities: dict[str, float] = {}
         for portfolio in portfolios:
             if not portfolio.legacy_portfolio_id:
                 continue
             summary = await self._portfolio_repo.get_summary(portfolio.legacy_portfolio_id)
             for pos in summary.positions:
-                unrealized.append(
-                    UnrealizedGainLine(
-                        instrument_id=pos.instrument_id,
-                        symbol=pos.symbol,
-                        quantity=pos.quantity,
-                        avg_cost=pos.avg_cost,
-                        market_price=pos.last_price,
-                        cost_basis=pos.quantity * pos.avg_cost,
-                        market_value=pos.market_value,
-                        unrealized_gain=pos.unrealized_pnl,
-                    )
-                )
+                live_quantities[pos.instrument_id] = pos.quantity
+                if pos.last_price is not None:
+                    prices[pos.instrument_id] = pos.last_price
+
+        unrealized = open_positions_with_fee_basis(
+            report_tx,
+            method=tax.cost_basis_method,
+            prices=prices,
+            live_quantities=live_quantities,
+        )
 
         report = build_tax_report(
             account_id=scope.account.id,

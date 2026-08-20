@@ -1,11 +1,22 @@
 """Cálculo de plusvalías realizadas (FIFO / coste medio)."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_domain.entities.account import LedgerEntry
+
+logger = logging.getLogger(__name__)
+
+
+# Estado residual de una posición ABIERTA tras consumir realized con el MÉTODO del
+# report (FIFO/avg). `cost_basis` capitaliza la fee de compra (semántica canónica).
+@dataclass(frozen=True, slots=True)
+class _ResidualPosition:
+    quantity: float
+    cost_basis: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +84,9 @@ def _sort_tx(transactions: list[TaxReportTransaction]) -> list[TaxReportTransact
     return sorted(transactions, key=lambda t: t.executed_at)
 
 
-def _fifo_realized(transactions: list[TaxReportTransaction]) -> list[RealizedGainLine]:
+def _fifo_realized(
+    transactions: list[TaxReportTransaction],
+) -> tuple[list[RealizedGainLine], dict[str, _ResidualPosition]]:
     lots: dict[str, list[dict[str, Any]]] = {}
     lines: list[RealizedGainLine] = []
 
@@ -123,10 +136,19 @@ def _fifo_realized(transactions: list[TaxReportTransaction]) -> list[RealizedGai
                 acquisition_dates=acquisition_dates,
             )
         )
-    return lines
+
+    residual: dict[str, _ResidualPosition] = {}
+    for instrument_id, queue in lots.items():
+        qty = sum(lot["quantity"] for lot in queue)
+        basis = sum(lot["quantity"] * lot["unit_cost"] for lot in queue)
+        if qty > 1e-9:
+            residual[instrument_id] = _ResidualPosition(quantity=qty, cost_basis=basis)
+    return lines, residual
 
 
-def _average_realized(transactions: list[TaxReportTransaction]) -> list[RealizedGainLine]:
+def _average_realized(
+    transactions: list[TaxReportTransaction],
+) -> tuple[list[RealizedGainLine], dict[str, _ResidualPosition]]:
     state: dict[str, dict[str, float]] = {}
     lines: list[RealizedGainLine] = []
 
@@ -162,7 +184,16 @@ def _average_realized(transactions: list[TaxReportTransaction]) -> list[Realized
                 acquisition_dates=[],
             )
         )
-    return lines
+
+    residual: dict[str, _ResidualPosition] = {}
+    for instrument_id, holding in state.items():
+        qty = holding["quantity"]
+        if qty > 1e-9:
+            residual[instrument_id] = _ResidualPosition(
+                quantity=qty,
+                cost_basis=holding["total_cost"],
+            )
+    return lines, residual
 
 
 def _compute_realized_gains(
@@ -170,8 +201,77 @@ def _compute_realized_gains(
     method: str,
 ) -> list[RealizedGainLine]:
     if method == "average":
-        return _average_realized(transactions)
-    return _fifo_realized(transactions)
+        lines, _ = _average_realized(transactions)
+    else:
+        lines, _ = _fifo_realized(transactions)
+    return lines
+
+
+def _compute_residual_open(
+    transactions: list[TaxReportTransaction],
+    method: str,
+) -> dict[str, _ResidualPosition]:
+    if method == "average":
+        _, residual = _average_realized(transactions)
+    else:
+        _, residual = _fifo_realized(transactions)
+    return residual
+
+
+def open_positions_with_fee_basis(
+    transactions: list[TaxReportTransaction],
+    method: str,
+    prices: dict[str, float],
+    live_quantities: dict[str, float] | None = None,
+) -> list[UnrealizedGainLine]:
+    """Posiciones abiertas del período con un cost-basis que SÍ capitaliza la fee de compra.
+
+    Deriva el residual ABIERTO con la MISMA máquina FIFO/avg que usa la cara realized
+    del report (``_compute_realized_gains``), de modo que realized y unrealized concilian
+    sobre la misma semántica canónica del método. El storage/``avg_cost`` de la posición
+    sigue fee-excluido (decisión "puente", M-3).
+
+    ``prices`` es un dict ``instrument_id -> último precio (market)`` para el unrealized.
+    ``live_quantities`` permite fidelidad contra el storage: los gaps
+    report-vs-almacén (cantidad residual del método que no coincide con la posición
+    viva de ``get_summary``) se LOGUEAN (risk gauge del puente) — no se silencian ni
+    se inventan.
+    """
+    residual = _compute_residual_open(transactions, method)
+
+    # M-3 gap report-vs-almacén: se loguean (no se silencian) los desajustes entre la
+    # cantidad residual calculada por el método (con fee) y la posición viva.
+    if live_quantities is not None:
+        for instrument_id, res in residual.items():
+            live_qty = live_quantities.get(instrument_id)
+            if live_qty is not None and abs(live_qty - res.quantity) > 1e-9:
+                logger.warning(
+                    "M-3 gap report-vs-storage: instrument=%s report_qty=%.6g live_qty=%.6g",
+                    instrument_id,
+                    res.quantity,
+                    live_qty,
+                )
+
+    lines: list[UnrealizedGainLine] = []
+    by_symbol = {tx.instrument_id: tx.symbol for tx in transactions}
+    for instrument_id, res in residual.items():
+        price = prices.get(instrument_id)
+        avg_cost = res.cost_basis / res.quantity if res.quantity > 0 else 0.0
+        market_value = res.quantity * price if price is not None else None
+        unrealized_gain = market_value - res.cost_basis if market_value is not None else None
+        lines.append(
+            UnrealizedGainLine(
+                instrument_id=instrument_id,
+                symbol=by_symbol.get(instrument_id, instrument_id),
+                quantity=res.quantity,
+                avg_cost=avg_cost,
+                market_price=price,
+                cost_basis=res.cost_basis,
+                market_value=market_value,
+                unrealized_gain=unrealized_gain,
+            )
+        )
+    return lines
 
 
 def _is_in_fiscal_year(iso_date: str, year: int, start_month: int) -> bool:
