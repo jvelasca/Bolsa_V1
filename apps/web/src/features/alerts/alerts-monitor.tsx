@@ -68,7 +68,7 @@ export function AlertsMonitor() {
           continue;
         }
         seenSignalTriggered.current.add(dedupeKey);
-        if (hit.subscription.channels.includes("toast")) {
+        if ((hit.subscription.channels ?? []).includes("toast")) {
           pushToast(formatSignalAlertToast(hit, SIGNAL_KIND_LABELS));
         }
       }

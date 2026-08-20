@@ -1,15 +1,15 @@
-import type { BacktestStrategyType } from './types.js';
-import type { SignalEventV1, SignalKind } from './signal-events.js';
+import type { BacktestStrategyType } from "./types.js";
+import type { SignalEventV1, SignalKind } from "./signal-events.js";
 
 /** Canales de entrega SC-6 — toast es cliente; webhook/email en servidor. */
-export type AlertChannelType = 'toast' | 'webhook' | 'email';
+export type AlertChannelType = "toast" | "webhook" | "email";
 
-export const DEFAULT_ALERT_CHANNELS: AlertChannelType[] = ['toast'];
+export const DEFAULT_ALERT_CHANNELS: AlertChannelType[] = ["toast"];
 
 export const ALERT_CHANNEL_LABELS: Record<AlertChannelType, string> = {
-  toast: 'Toast (app)',
-  webhook: 'Webhook',
-  email: 'Email',
+  toast: "Toast (app)",
+  webhook: "Webhook",
+  email: "Email",
 };
 
 /** Suscripción a señales de estrategia — SC-3 (paralelo a price_alerts). */
@@ -21,7 +21,7 @@ export interface SignalAlertSubscriptionDto {
   presetKey?: BacktestStrategyType | null;
   timeframe: string;
   signalKinds: SignalKind[];
-  channels: AlertChannelType[];
+  channels?: AlertChannelType[];
   webhookUrl?: string | null;
   emailTo?: string | null;
   isActive: boolean;

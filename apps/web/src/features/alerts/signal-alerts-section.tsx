@@ -401,7 +401,7 @@ function SignalAlertRow({
           .join(", ")}
       </td>
       <td className="py-2 pr-3 text-xs">
-        {subscription.channels
+        {(subscription.channels ?? [])
           .map((channel) => ALERT_CHANNEL_LABELS[channel])
           .join(", ")}
         {subscription.webhookUrl && (
