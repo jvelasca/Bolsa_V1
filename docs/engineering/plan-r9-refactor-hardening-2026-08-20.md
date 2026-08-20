@@ -143,16 +143,23 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 ---
 
-### 🟠 FASE 3 — R-9.3: Custody commit-ordering
+### 🟠 FASE 3 — R-9.3: Custody commit-ordering / manejo de la carrera de custodia
 
-**Problema:** `release_custody_charge()` (`accounts.py:528`) se libera antes del COMMIT del request.
+**Read-first (verificado 2026-08-20):** en `ApplyCustodyFees.execute` (`accounts.py:552-648`), `release_custody_charge` ocurre en `:599/:610/:644/:647`, **antes** del COMMIT del request (que ocurre en la capa de dependencia API). `append_custody_fee` (`ledger_repository.py:201`) inserta `type="fee"`, `reference_type="custody"`, `reference_id="custody-YYYY"`. La protección física contra doble cargo es el **UNIQUE DB** `(account_id, custody, custody-YYYY, fee)` (migración 004). El mutex Redis (SET NX, `risk_runtime.claim_custody_charge`) es optimización, NO autoridad.
 
-**Corrección propuesta (elegir en §5.2):**
+> **Intuición clave:** el doble cargo YA está bloqueado por el UNIQUE. El fallo real es que, en una carrera de 2 GET concurrentes que liberan el claim antes del commit, el 2º request acaba en **`IntegrityError` no manejado → 500 en una lectura**, en vez de una respuesta limpia.
 
-- **Opción A (robust, recomendada):** mantener el mutex Redis hasta el final del **COMMIT** de la sesión HTTP (mover `release` fuera del use case, a un `finally` en la capa de request/session tras `commit`). DB-UNIQUE queda como autoridad definitiva; Redis solo contención.
-- **Opción B (mínima):** documentar que Redis es optimización y DB-UNIQUE es la verdad (sin cambio de orden). Menos código, riesgo residual bajo (blinda el UNIQUE).
+**Decisión F3 (2026-08-20, coordinador): ✅ OPCIÓN A REFINADA — tratar la carrera como idempotente (no 500).** Sin mover el commit a otro sitio (sería un cambio arquitectónico grande). En `ApplyCustodyFees.execute`:
 
-**Criterio de aceptación:** test de 2 custody GET concurrentes: uno cobra, el otro espera o recibe IntegrityError controlado; NUNCA doble cargo; release siempre ocurre (incluso en excepción).
+1. Envolver la mutación DB de custodia (`deduct_cash` + `append_custody_fee`) en `_idempotent_savepoint` (helper ya existente) para poder revertir solo el intento del perdedor sin descartar la transacción de la request.
+2. Capturar el `IntegrityError` (usando `is_unique_violation`, helper ya en `db_errors.py`) de la colisión UNIQUE de custodia → **devolver `False`** (ya se cobró este periodo), en vez de propagar 500.
+3. Mantener la liberación del mutex tal cual (es optimización); la corrección no depende del orden release/commit porque, si se pierde el claim, el UNIQUE+savepoint+catch re-validan.
+
+- **Criterio:** NUNCA doble cargo (ya garantizado por UNIQUE) y **nunca 500 en carrera**; el 2º GET devuelve la misma lectura con custodia ya aplicada.
+
+**Criterio de aceptación:** test de 2 custody concurrentes simulando la carrera (2º `append_custody_fee` choca con UNIQUE) → devuelve `False`/semántica idempotente sin 500; el 1º cobra; sin doble cargo; release siempre ocurre (except paths intactos). Battery verde.
+
+**Estado (2026-08-20, IMPLEMENTADO):** `ApplyCustodyFees.execute` envuelve la mutación (`deduct_cash`+`append_custody_fee`+`touch_activity`) en `_idempotent_savepoint`; `except IntegrityError` → `is_unique_violation` → `release` + `return False` (idempotente, nunca 500); early-exits y `except Exception` intactos. Tests: 2 nuevos en `application/tests/test_custody_idempotency.py`. Battery: ruff 0 · mypy sin errores nuevos (7 preexistentes fuera de región F3) · pytest application 261 + infra custody Postgres 4. Sin migración/DTO/web/contrato.
 
 ---
 
