@@ -331,4 +331,23 @@ Confirmados personalmente en código actual:
 
 ## 9. Nota de saturación / relevo de chat
 
-Este traspaso está preparado para: (a) seguir aquí con la Fase 2 si el contexto del agente lo permite, o (b) **cerrar el chat y abrir uno nuevo** pegando el §8 si el coordinador percibe saturación. Regla: una fase = subagente acotado + batería + aprobación por commit + relevo documentado al cerrar chat.
+Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el contexto del agente lo permite, o (b) **cerrar el chat y abrir uno nuevo** pegando el §8 si el coordinador percibe saturación. Regla: una fase = subagente acotado + batería + aprobación por commit + relevo documentado al cerrar chat.
+
+---
+
+### ✅ CHECKLIST DE RELEVO → SIGUIENTE FASE: **M-6 (T-M6) margin hardcoded** (por decisión)
+
+**Estado al cerrar (verificado):** `main` limpio · **CERRADAS: L-M3/M-5 · M-1 · M-2 · M-3** · ancla `docs/engineering/backlog-trabajo-2026-08-20.md` §0 al día (LEER PRIMERO al abrir).
+
+**Hallazgo M-6 (backlog §1, `:46`):** «Campos de margen hardcoded en `_account_summary_from_portfolio` (`margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None`) aunque haya leverage/posiciones.» Riesgo: **dinero**. Superficie: **application** (`packages/py/application/.../accounts.py`).
+
+**Secuencia de arranque M-6 (obligatoria, anti-saturación):**
+
+1. **Read-first:** leer `docs/engineering/backlog-trabajo-2026-08-20.md` §0 (si no coincide con el repo → PARAR y re-leer).
+2. **Mapeo read-only** (subagente): `_account_summary_from_portfolio`: qué campos de margen fabrica, de dónde sale `leverage`/posiciones, quién lee `margin_used`/`free_margin`/`margin_level_pct` (FE/risk/custodia), y qué haría el valor correcto. Verificar para qué sirve y si hay N cliente del `margin_level_pct=None`.
+3. **Decisión de usuario:** cómo alinear (p.ej. computar `margin_used` desde posiciones/leverage, `free_margin` real, `margin_level_pct` derivado) sin romper el FE (`_account_summary_from_portfolio` es del `GetAccountSummary`).
+4. **Subagente de implementación acotado** + **verificación del coordinador** (code diff + test + batería real) + **aprobación + commit + push** + **relevo documentado** (este §8).
+
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); B-3 (write-paths de cash sin ledger, `transfer_cash`/`add_cash`/`deduct_cash`) queda pendiente con xfail documentado en M-2; M-4 colinda con "sin features" (mover custodia a job). Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
+
+**Batería acumulada confirmada (referencia del relevo):** ruff 0 (config CI raíz `pyproject.toml`) · mypy infra/domain Success (application mypy-blind en CI) · pytest infra Postgres real 72+1xfail · domain 21 · application 235 · idempotencia 11 · api-python 32.

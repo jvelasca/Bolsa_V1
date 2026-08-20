@@ -19,6 +19,8 @@
 | Protocolo      | Una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.                                                                         |
 
 > Si este bloque §0 no coincide con tu lectura del repo, **para y re-lee**: algo está desincronizado. No continúes por inerción.
+>
+> **RELEVO → SIGUIENTE por decisión: M-6 (T-M6) margin hardcoded** (`_account_summary_from_portfolio`, application). Ver texto de traspaso completo + checklist de arranque en `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` **§8**.
 
 ---
 
