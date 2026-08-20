@@ -152,6 +152,3 @@ export function resolveBarZoneDisplayIds<T extends string>(
   if (ordered.length > 0) return ordered;
   return options?.includeActive ? [activeId] : [];
 }
-
-/** @deprecated Usar ChartBarZoneChipButton */
-export const ChartBarZoneRailButton = ChartBarZoneChipButton;

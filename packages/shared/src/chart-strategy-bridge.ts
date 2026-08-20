@@ -2,31 +2,36 @@
  * BT-3b — serializar pestaña de chart → draft StrategyDefinitionV1 / backtest form.
  */
 
-import type { ChartTabState } from './chart-defaults.js';
-import type { ChartStrategySetupDraft } from './chart-strategy-bridge-api.js';
-import type { ChartIndicatorInstance } from './indicators-catalog.js';
-import { findIndicatorDefinition } from './indicators-catalog.js';
-import { dataParametersKey, STYLE_PARAMETER_IDS } from './indicators-runtime.js';
+import type { ChartTabState } from "./chart-defaults.js";
+import type { ChartStrategySetupDraft } from "./chart-strategy-bridge-api.js";
+import type { ChartIndicatorInstance } from "./indicators-catalog.js";
+import { findIndicatorDefinition } from "./indicators-catalog.js";
+import {
+  dataParametersKey,
+  STYLE_PARAMETER_IDS,
+} from "./indicators-runtime.js";
 import {
   DEFAULT_EXECUTION_MODEL,
   strategyDefinitionFromPreset,
   type IndicatorSpec,
   type StrategyDefinitionV1,
-} from './research-platform.js';
-import { drawingSupportsReplay } from './drawing-replay.js';
-import type { BacktestStrategyType } from './types.js';
-import type { StrategyDefinitionDetailDto } from './strategy-definitions.js';
+} from "./research-platform.js";
+import { drawingSupportsReplay } from "./drawing-replay.js";
+import type { BacktestStrategyType } from "./types.js";
+import type { StrategyDefinitionDetailDto } from "./strategy-definitions.js";
 import {
   createAiIndicatorVariantPreset,
   newIndicatorPresetId,
   type IndicatorPreset,
-} from './indicator-presets.js';
-import { DEFAULT_HYBRID_MIN_SCORE } from './hybrid-strategy.js';
-import { ruleGroupHasRules } from './strategy-rules.js';
+} from "./indicator-presets.js";
+import { DEFAULT_HYBRID_MIN_SCORE } from "./hybrid-strategy.js";
+import { ruleGroupHasRules } from "./strategy-rules.js";
 
-export type { ChartStrategySetupDraft } from './chart-strategy-bridge-api.js';
+export type { ChartStrategySetupDraft } from "./chart-strategy-bridge-api.js";
 
-function indicatorInstanceToSpec(instance: ChartIndicatorInstance): IndicatorSpec | null {
+function indicatorInstanceToSpec(
+  instance: ChartIndicatorInstance,
+): IndicatorSpec | null {
   if (!instance.visible) return null;
   const definition = findIndicatorDefinition(instance.definitionId);
   if (!definition) return null;
@@ -47,7 +52,10 @@ function indicatorInstanceToSpec(instance: ChartIndicatorInstance): IndicatorSpe
 function specDataKey(spec: IndicatorSpec): string {
   const filtered = Object.fromEntries(
     Object.entries(spec.parameters).filter(
-      ([key]) => !STYLE_PARAMETER_IDS.includes(key as (typeof STYLE_PARAMETER_IDS)[number]),
+      ([key]) =>
+        !STYLE_PARAMETER_IDS.includes(
+          key as (typeof STYLE_PARAMETER_IDS)[number],
+        ),
     ),
   );
   return `${spec.definitionId}::${dataParametersKey(filtered)}`;
@@ -76,20 +84,23 @@ export function inferPresetFromIndicatorSpecs(
   const hasSma = (period: number) =>
     specs.some(
       (spec) =>
-        spec.definitionId === 'sma' && Number(spec.parameters.period) === period,
+        spec.definitionId === "sma" &&
+        Number(spec.parameters.period) === period,
     );
-  if (hasSma(20) && hasSma(50)) return 'sma_crossover';
+  if (hasSma(20) && hasSma(50)) return "sma_crossover";
 
   const rsiOnly =
     specs.length >= 1 &&
-    specs.every((spec) => spec.definitionId === 'rsi') &&
+    specs.every((spec) => spec.definitionId === "rsi") &&
     specs.some((spec) => Number(spec.parameters.period) === 14);
-  if (rsiOnly) return 'rsi_mean_reversion';
+  if (rsiOnly) return "rsi_mean_reversion";
 
   return null;
 }
 
-export function serializeChartTabToStrategyDraft(tab: ChartTabState): ChartStrategySetupDraft {
+export function serializeChartTabToStrategyDraft(
+  tab: ChartTabState,
+): ChartStrategySetupDraft {
   const indicatorSpecs = chartIndicatorInstancesToSpecs(tab.indicatorInstances);
   const indicatorLabels = tab.indicatorInstances
     .filter((instance) => instance.visible)
@@ -101,18 +112,19 @@ export function serializeChartTabToStrategyDraft(tab: ChartTabState): ChartStrat
     });
 
   const drawingAlertCount = tab.drawings.filter(
-    (drawing) => drawingSupportsReplay(drawing) && drawing.alertOnCross === true,
+    (drawing) =>
+      drawingSupportsReplay(drawing) && drawing.alertOnCross === true,
   ).length;
 
   const inferredPresetKey = inferPresetFromIndicatorSpecs(indicatorSpecs);
   const warnings: string[] = [];
 
   if (indicatorSpecs.length === 0) {
-    warnings.push('El gráfico no tiene indicadores visibles.');
+    warnings.push("El gráfico no tiene indicadores visibles.");
   }
   if (!inferredPresetKey && indicatorSpecs.length > 0) {
     warnings.push(
-      'No coincide con un preset ejecutable (SMA 20+50 o RSI 14). Puedes guardar indicadores para más adelante.',
+      "No coincide con un preset ejecutable (SMA 20+50 o RSI 14). Puedes guardar indicadores para más adelante.",
     );
   }
   if (drawingAlertCount > 0) {
@@ -144,53 +156,63 @@ export function strategyDefinitionFromChartDraft(
       [draft.instrumentId],
       draft.timeframe,
     );
-    return { ...base, name, origin: 'assisted' };
+    return { ...base, name, origin: "assisted" };
   }
 
   return {
-    id: 'draft',
+    id: "draft",
     version: 1,
     name,
-    kind: 'indicator_signals',
+    kind: "indicator_signals",
     universe: { instrumentIds: [draft.instrumentId] },
     timeframe: draft.timeframe,
-    dataSnapshotPolicy: 'latest',
-    entries: { operator: 'all', rules: [] },
-    exits: { operator: 'all', rules: [] },
-    sizing: { mode: 'fixed_cash', value: 1 },
+    dataSnapshotPolicy: "latest",
+    entries: { operator: "all", rules: [] },
+    exits: { operator: "all", rules: [] },
+    sizing: { mode: "fixed_cash", value: 1 },
     risk: {},
     indicatorSpecs: draft.indicatorSpecs,
     execution: { ...DEFAULT_EXECUTION_MODEL },
-    origin: 'assisted',
+    origin: "assisted",
   };
 }
 
 function resolveStrategyGatePresetKey(
   strategy: StrategyDefinitionDetailDto,
-): BacktestStrategyType | '' {
-  if (strategy.kind === 'hybrid') {
-    return strategy.definition.hybrid?.gatePresetKey ?? '';
+): BacktestStrategyType | "" {
+  if (strategy.kind === "hybrid") {
+    return strategy.definition.hybrid?.gatePresetKey ?? "";
   }
   if (strategy.presetKey) return strategy.presetKey;
-  return '';
+  return "";
 }
 
-function resolveStrategyMinScore(strategy: StrategyDefinitionDetailDto): number {
-  if (strategy.kind === 'hybrid') {
-    return strategy.definition.hybrid?.aiScorer?.minScore ?? DEFAULT_HYBRID_MIN_SCORE;
+function resolveStrategyMinScore(
+  strategy: StrategyDefinitionDetailDto,
+): number {
+  if (strategy.kind === "hybrid") {
+    return (
+      strategy.definition.hybrid?.aiScorer?.minScore ?? DEFAULT_HYBRID_MIN_SCORE
+    );
   }
   return DEFAULT_HYBRID_MIN_SCORE;
 }
 
 export function canPublishStrategyScoreAsIndicator(
-  strategy: Pick<StrategyDefinitionDetailDto, 'kind' | 'presetKey' | 'definition'>,
+  strategy: Pick<
+    StrategyDefinitionDetailDto,
+    "kind" | "presetKey" | "definition"
+  >,
 ): boolean {
-  if (strategy.kind === 'hybrid') {
+  if (strategy.kind === "hybrid") {
     const hybrid = strategy.definition.hybrid;
-    return hybrid?.aiScorer?.modelId === 'technical_rating_v1';
+    return hybrid?.aiScorer?.modelId === "technical_rating_v1";
   }
-  if (strategy.kind === 'indicator_signals' && strategy.presetKey) return true;
-  if (strategy.kind === 'rule_based' && ruleGroupHasRules(strategy.definition.entries)) {
+  if (strategy.kind === "indicator_signals" && strategy.presetKey) return true;
+  if (
+    strategy.kind === "rule_based" &&
+    ruleGroupHasRules(strategy.definition.entries)
+  ) {
     return true;
   }
   return false;
@@ -204,26 +226,21 @@ export function presetFromStrategyScore(
   const gatePresetKey = resolveStrategyGatePresetKey(strategy);
   const minScore = resolveStrategyMinScore(strategy);
   const preset = createAiIndicatorVariantPreset({
-    definitionId: 'strategy_hybrid_score_v1',
+    definitionId: "strategy_hybrid_score_v1",
     name: `${strategy.name} · Score`,
     parameters: {
       linkedStrategyId: strategy.id,
       strategyName: strategy.name,
       minScore,
-      showMinScoreLine: strategy.kind === 'hybrid',
+      showMinScoreLine: strategy.kind === "hybrid",
       gatePresetKey,
-      showGateLine: Boolean(gatePresetKey) || ruleGroupHasRules(strategy.definition.entries),
+      showGateLine:
+        Boolean(gatePresetKey) ||
+        ruleGroupHasRules(strategy.definition.entries),
       showComponents: true,
       warmupBars: 50,
     },
   });
   if (!preset) return null;
   return { ...preset, id: newIndicatorPresetId() };
-}
-
-/** @deprecated Usa presetFromStrategyScore */
-export function presetFromHybridStrategyScore(
-  strategy: StrategyDefinitionDetailDto,
-): IndicatorPreset | null {
-  return presetFromStrategyScore(strategy);
 }

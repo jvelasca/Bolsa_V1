@@ -1,4 +1,1 @@
-export {
-  WatchlistPanel,
-  ListsTab,
-} from "@/features/trading/lists-tab/watchlist-panel";
+export { WatchlistPanel } from "@/features/trading/lists-tab/watchlist-panel";

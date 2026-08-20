@@ -580,25 +580,6 @@ export function isGroupRailToolActive(
   return isToolRepresentedOnGroupRail(activeTool, groupId, favorites);
 }
 
-/** @deprecated Use resolveGroupRailIconTool */
-export function resolveDisplayToolForGroup(
-  groupId: DrawingToolGroupId,
-  activeTool: ChartDrawTool,
-  lastByGroup: Partial<Record<DrawingToolGroupId, ChartDrawTool>>,
-  favorites: ChartDrawTool[],
-): ChartDrawTool | null {
-  return resolveGroupRailIconTool(groupId, activeTool, lastByGroup, favorites);
-}
-
-/** @deprecated Use resolveGroupRailActivateTool */
-export function resolveActivateToolForGroup(
-  groupId: DrawingToolGroupId,
-  lastByGroup: Partial<Record<DrawingToolGroupId, ChartDrawTool>>,
-  favorites: ChartDrawTool[],
-): ChartDrawTool | null {
-  return resolveGroupRailActivateTool(groupId, lastByGroup, favorites);
-}
-
 export function groupButtonIconTool(
   groupId: DrawingToolGroupId,
   activeTool: ChartDrawTool,

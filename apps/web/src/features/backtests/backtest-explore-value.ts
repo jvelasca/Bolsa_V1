@@ -37,21 +37,6 @@ export type ExplorePeriodReturns = EquityPeriodReturns;
 
 export { periodReturnsFromEquity };
 
-/**
- * @deprecated Prefer ALL_PRESET_COACH_KEYS for coach/explore — kept as “batería corta” histórica.
- * Una pregunta por familia; útil como atajo mental, no como catálogo completo.
- */
-export const EXPLORE_PRESET_BATTERY: BacktestStrategyType[] = [
-  "sma_crossover",
-  "ema_crossover",
-  "rsi_mean_reversion",
-  "macd_signal_cross",
-  "bollinger_lower_bounce",
-  "golden_cross",
-  "pullback_in_uptrend",
-  "stoch_oversold",
-];
-
 /** Todas las genéricas del producto — coach / explorar completo. */
 export const ALL_PRESET_COACH_KEYS: BacktestStrategyType[] = [
   ...STRATEGY_PRESET_KEYS,
@@ -386,23 +371,6 @@ export function matrixRowsToExploreRows(
         periodReturns: row.periodReturns ?? null,
       };
     });
-}
-
-/**
- * @deprecated Prefer matrixRowsToExploreRows — solo filas preset ya cerradas.
- */
-export function matrixPresetRowsToExploreRows(
-  rows: StrategyMatrixRow[],
-): ExplorePresetRow[] {
-  return matrixRowsToExploreRows(
-    rows.filter(
-      (row) =>
-        row.kind === "preset" &&
-        (row.status === "ok" ||
-          row.status === "error" ||
-          row.status === "skipped"),
-    ),
-  );
 }
 
 /**

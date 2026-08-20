@@ -68,9 +68,6 @@ export function attachChartScaleInteraction({
   };
 }
 
-/** @deprecated Usar attachChartScaleInteraction */
-export const attachChartScaleWheel = attachChartScaleInteraction;
-
 /** Arrastre vertical en escala Y (solo sub-paneles; sin pan temporal). */
 export function attachChartScaleDrag({
   hitTarget,

@@ -307,13 +307,3 @@ export function attachChartHorizontalWheel(
   container.addEventListener("wheel", onWheel, { passive: false });
   return () => container.removeEventListener("wheel", onWheel);
 }
-
-/** @deprecated Usar attachChartHorizontalWheel */
-export function attachChartTimeWheelSync(
-  container: HTMLElement,
-  chartSyncId: string,
-  sourcePaneId = "main",
-): () => void {
-  void sourcePaneId;
-  return attachChartHorizontalWheel(container, chartSyncId);
-}

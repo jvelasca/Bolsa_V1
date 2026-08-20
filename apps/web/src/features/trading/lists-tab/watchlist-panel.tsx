@@ -65,8 +65,3 @@ export function WatchlistPanel() {
     </div>
   );
 }
-
-/** @deprecated Usar WatchlistPanel */
-export function ListsTab() {
-  return <WatchlistPanel />;
-}

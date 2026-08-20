@@ -124,13 +124,6 @@ export function optimizeFamilyProxyNote(
   }
 }
 
-/** @deprecated use optimizeFamilyForStrategy */
-export function isSmaGridOptimizable(
-  strategyType: BacktestStrategyType,
-): boolean {
-  return optimizeFamilyForStrategy(strategyType) === "sma_crossover";
-}
-
 export function isOptimizableStrategy(
   strategyType: BacktestStrategyType | string,
 ): boolean {

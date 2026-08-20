@@ -45,29 +45,6 @@ export type AssistantProgressInput = {
   focusOverride: AssistantStepId | null;
 };
 
-/** @deprecated use resolveAssistantActiveStep — kept for older tests */
-export function inferAssistantStep(input: {
-  hasInstrument: boolean;
-  exploreOkCount: number;
-  exploreRunning: boolean;
-  hasCoachRecs: boolean;
-  optimizeJobsPending: boolean;
-  hasActiveTop: boolean;
-  hubTab: "run" | "strategies" | "jobs" | "history";
-  resultFocus?: "detail" | "ranking" | "explore";
-}): AssistantStepId {
-  if (input.hubTab === "strategies") return "finalists";
-  if (input.hubTab === "jobs" || input.optimizeJobsPending) return "lab";
-  if (
-    input.hasCoachRecs ||
-    input.resultFocus === "explore" ||
-    input.exploreOkCount > 0
-  ) {
-    return "semifinal";
-  }
-  return "universe";
-}
-
 export function assistantStepIndex(id: AssistantStepId): number {
   return ASSISTANT_STEPS.findIndex((s) => s.id === id);
 }

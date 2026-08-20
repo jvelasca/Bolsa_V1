@@ -16,8 +16,6 @@ export type PlatformConfigTab =
   | "bd"
   | "other";
 
-export type ChartToolbarSettingsTab = "global" | "chart" | "appearance";
-
 interface UiState {
   listHubOpen: boolean;
   workspacePickerOpen: boolean;
@@ -35,10 +33,6 @@ interface UiState {
   drawingTemplatesOpen: boolean;
   chartGlobalBarSettingsOpen: boolean;
   chartDataBarSettingsOpen: boolean;
-  /** @deprecated Usar openChartGlobalBarSettings / openChartDataBarSettings */
-  chartToolbarSettingsOpen: boolean;
-  /** @deprecated */
-  chartToolbarSettingsTab: ChartToolbarSettingsTab;
   platformConfigOpen: boolean;
   platformConfigTab: PlatformConfigTab;
   chartInspectorNav: ChartInspectorNavigateRequest | null;
@@ -50,10 +44,6 @@ interface UiState {
   closeChartGlobalBarSettings: () => void;
   openChartDataBarSettings: () => void;
   closeChartDataBarSettings: () => void;
-  /** @deprecated Usar openChartGlobalBarSettings / openChartDataBarSettings */
-  openChartToolbarSettings: (tab?: ChartToolbarSettingsTab) => void;
-  /** @deprecated */
-  closeChartToolbarSettings: () => void;
   openListHub: () => void;
   closeListHub: () => void;
   openWorkspacePicker: () => void;
@@ -61,10 +51,6 @@ interface UiState {
   visualizationLogOpen: boolean;
   openVisualizationLog: () => void;
   closeVisualizationLog: () => void;
-  /** @deprecated Usar openListHub */
-  openListProperties: () => void;
-  /** @deprecated Usar closeListHub */
-  closeListProperties: () => void;
   openListManager: () => void;
   closeListManager: () => void;
   openInstrumentSyncDialog: (instrumentId: string, symbol: string) => void;
@@ -94,8 +80,6 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       chartGlobalBarSettingsOpen: false,
       chartDataBarSettingsOpen: false,
-      chartToolbarSettingsOpen: false,
-      chartToolbarSettingsTab: "global",
       listHubOpen: false,
       workspacePickerOpen: false,
       listManagerOpen: false,
@@ -120,19 +104,6 @@ export const useUiStore = create<UiState>()(
         set({ chartGlobalBarSettingsOpen: false }),
       openChartDataBarSettings: () => set({ chartDataBarSettingsOpen: true }),
       closeChartDataBarSettings: () => set({ chartDataBarSettingsOpen: false }),
-      openChartToolbarSettings: (tab = "global") => {
-        if (tab === "chart" || tab === "appearance") {
-          set({ chartDataBarSettingsOpen: true, chartToolbarSettingsTab: tab });
-          return;
-        }
-        set({ chartGlobalBarSettingsOpen: true, chartToolbarSettingsTab: tab });
-      },
-      closeChartToolbarSettings: () =>
-        set({
-          chartGlobalBarSettingsOpen: false,
-          chartDataBarSettingsOpen: false,
-          chartToolbarSettingsOpen: false,
-        }),
       openListHub: () => {
         void import("@/features/trading/open-list-hub").then(
           ({ openListHubWorkspaceAction }) => {
@@ -146,8 +117,6 @@ export const useUiStore = create<UiState>()(
       visualizationLogOpen: false,
       openVisualizationLog: () => set({ visualizationLogOpen: true }),
       closeVisualizationLog: () => set({ visualizationLogOpen: false }),
-      openListProperties: () => set({ listHubOpen: true }),
-      closeListProperties: () => set({ listHubOpen: false }),
       openListManager: () => set({ listHubOpen: true }),
       closeListManager: () => set({ listHubOpen: false }),
       openInstrumentSyncDialog: (instrumentId, symbol) =>

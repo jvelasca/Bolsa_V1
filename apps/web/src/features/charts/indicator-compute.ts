@@ -1177,15 +1177,6 @@ export function resolveOverlayRenderSeries(
   );
 }
 
-/** @deprecated usar resolveOverlayRenderSeries */
-export function resolveOverlayLineSeries(
-  instance: ChartIndicatorInstance,
-  bars: OhlcvBarDto[],
-  apiPoints: IndicatorPointDto[],
-): IndicatorLinePoint[] {
-  return resolveOverlayRenderSeries(instance, bars, apiPoints)[0]?.points ?? [];
-}
-
 function computeSubRenderSeries(
   instance: ChartIndicatorInstance,
   bars: OhlcvBarDto[],
