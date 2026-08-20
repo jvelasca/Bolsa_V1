@@ -45,8 +45,8 @@ export interface TaxProfile {
 export interface AccountSettings {
   commission: CommissionProfile;
   tax: TaxProfile;
-  /** Notas internas visibles en la ficha de cuenta. */
-  notes: string | null;
+  /** Notas internas visibles en la ficha de cuenta. Opcional en el wire (puede faltar). */
+  notes?: string | null;
 }
 
 export interface UpdateAccountSettingsRequestDto {
