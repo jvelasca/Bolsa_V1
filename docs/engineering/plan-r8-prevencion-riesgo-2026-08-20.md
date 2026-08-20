@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Fase:** R-8 — nueva ola de hardening tras el **cierre completo de R-7** (deuda de dinero real cerrada; solo `M-4/T-M4` diferido por freeze). Motiva este plan la **auditoría externa de 2026-08-20** (3ª ronda) cruzada contra el código real de `main`, detectando que **su P0 de arranque ya está corregido** y dejando **2 P0 reales** sin cubrir.
-> **Estado:** ✅ **R-8A PUSHEADA a `main`** (código `edf2d0c` + docs `7f327ab`) · ✅ **R-8B.1 PUSHEADA** (`ac147fe`). Fase 0 (docs), R-8A (P0 hardening) y R-8B.1 (P1 hard.) cerradas. Pendiente decisión: R-8B.2 (auth HttpOnly) · R-8B.3 (DTOs shared) · R-8C · R-8D.
+> **Estado:** ✅ **R-8A PUSHEADA a `main`** (código `edf2d0c` + docs `7f327ab`) · ✅ **R-8B.1 PUSHEADA** (`ac147fe`) · ✅ **R-8B.2 PUSHEADA** (`abf3dc2`). Fase 0 (docs), R-8A (P0 hardening), R-8B.1 y R-8B.2 (P1 hardening) cerradas. Pendiente decisión: R-8B.3 (DTOs shared) · R-8C · R-8D.
 > **Decisión de usuario 2026-08-20:** (1) levantar freeze `D4` (auth) **solo** para la fase R-8B.2 acotada · (2) incluir **ambos P0** como R-8A prioritario · (3) arrancar en **modo docs_solo** (Fase 0 = solo documentos) · (4) R-8A: `database_bootstrap()` con `pg_advisory_lock` de sesión global (P0-A) y catch `IntegrityError`+savepoint+re-SELECT (P0-B).
 
 ---
@@ -80,13 +80,15 @@ El freeze dice _"auth JWT diferida (D4)"_. La auditoría externa pide exactament
 
 ### 🟠 Fase R-8B — P1 hardening
 
-| Código     | Superficie | Alcance                                                                                                       | Depende de |
-| ---------- | ---------- | ------------------------------------------------------------------------------------------------------------- | ---------- |
-| **R-8B.1** | api        | Añadir `/api/auth/login` y `/api/auth/status` a `SENSITIVE_PREFIXES` (login rate-limit). No es feature nueva. | —          |
+| Código     | Superficie | Alcance                                                                                                                                                                                       | Depende de          |
+| ---------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| **R-8B.1** | api        | Añadir `/api/auth/login` y `/api/auth/status` a `SENSITIVE_PREFIXES` (login rate-limit). No es feature nueva.                                                                                 | —                   |
+| **R-8B.2** | api+web    | Migrar auth: token SHA-256 determinista + localStorage → **sesión HttpOnly + Secure + SameSite + TTL** (server-side o cookie firmada). **Requiere freeze D4 levantado por decisión usuario.** | decisión D4 (hecho) |
+| **R-8B.3** | shared     | Reducir DTOs duplicados `packages/shared` vs OpenAPI (continuación R-2/R-3/R-4). Fases pequeñas, NO `regen_full`.                                                                             | —                   |
 
 > **Cierre R-8B.1 (2026-08-20): PUSHEADA a `main` (`ac147fe`).** `SENSITIVE_PREFIXES` en `rate_limit.py`: `("/api/auth/login", 20)` (brute-force) + `("/api/auth/status", 60)` (lectura barata FE `AuthGate`). Test: +2 casos en `test_rate_limit.py` (§ `test_limit_for_is_deterministic`). Batería: ruff project-wide 0 · mypy changed-files Success · pytest api 58 · app 249 · infra 78+1xfail. **Higiene asociada:** corregidos 7 I001 de orden de imports introducidos por R-8A en `main.py`/`scheduler_worker.py`/`accounts.py`/`migrations.py`/`ledger_repository.py`/`portfolio_repository.py`/`test_r8a_idempotency_backstop.py` (commit `a1360bb`, solo imports, 0 lógica) para dejar `ruff → 0` y CI verde.
-> | **R-8B.2** | api+web | Migrar auth: token SHA-256 determinista + localStorage → **sesión HttpOnly + Secure + SameSite + TTL** (server-side o cookie firmada). **Requiere freeze D4 levantado por decisión usuario.** | decisión D4 (hecho) |
-> | **R-8B.3** | shared | Reducir DTOs duplicados `packages/shared` vs OpenAPI (continuación R-2/R-3/R-4). Fases pequeñas, NO `regen_full`. | — |
+
+> **Cierre R-8B.2 (2026-08-20): PUSHEADA a `main` (`abf3dc2`).** Sesión stateless por cookie HttpOnly firmada. Backend: `auth/session.py` (valor `exp.token.sig`, HMAC-SHA256 con `APP_AUTH_SECRET`, TTL `APP_AUTH_TTL_SECONDS`=86400, `Secure` solo prod); `login` quita `token` del body y emite `Set-Cookie`; nuevo `POST /api/auth/logout` (borra cookie); `middleware/auth.py` acepta Bearer **o** cookie; `/api/auth/status` reporta `authenticated` (valida cookie server-side). Frontend: token fuera de `localStorage`/state (`auth-store.ts`), `credentials:"include"` en cliente openapi-fetch + 3 fetch manuales, gate `authEnabled && !authenticated`. Contrato: regen acotada (login sin token, logout, `AuthStatusDataDto.authenticated`); `packages/shared` intacto. **Corrección de coordinador (regresión):** el subagente dejó `if (authEnabled) → LoginPage` (forzaba login en cada recarga al mover el token a HttpOnly); se añadió `authenticated` al status + estado + gate. Batería: ruff 0 · mypy(4 src) Success · pytest auth 10 · api 66 · config 15 · app 249 · infra 78+1xfail · web typecheck/lint/build OK · web test 141/716. Advert.: regen contrato manual (`contract:gen` falla UnicodeEncodeError Windows + drift preexistente); `keepalive` cookie edge case.
 
 ### 🟡 Fase R-8C — Mejoras consolidadoras
 
@@ -139,11 +141,12 @@ Revisar `pending-delete/` (§1.3.9 criterio), docs obsoletos (`CHART_*`, `transf
 
 ## 6. Historial de cierres (se rellenará por fase)
 
-| Fecha      | Fase / Código      | Commit(s)                                 | Batería                                                                      | Estado                         |
-| ---------- | ------------------ | ----------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------ |
-| 2026-08-20 | R-8 Fase 0         | `7f327ab` (docs)                          | docs                                                                         | ✅ CERRADA (Fase 0 = este doc) |
-| 2026-08-20 | R-8A (P0-A + P0-B) | `edf2d0c` (~ `7f327ab` docs)              | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop | ✅ **PUSHEADA a `main`**       |
-| 2026-08-20 | R-8B.1 (P1 hard.)  | `ac147fe` (~ `a1360bb` higiene lint R-8A) | ruff 0 · mypy changed-files Success · app 249 · infra 78+1xfail · api 58     | ✅ **PUSHEADA a `main`**       |
+| Fecha      | Fase / Código            | Commit(s)                                 | Batería                                                                                                                             | Estado                         |
+| ---------- | ------------------------ | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| 2026-08-20 | R-8 Fase 0               | `7f327ab` (docs)                          | docs                                                                                                                                | ✅ CERRADA (Fase 0 = este doc) |
+| 2026-08-20 | R-8A (P0-A + P0-B)       | `edf2d0c` (~ `7f327ab` docs)              | ruff 0 · mypy Success · app 249 · infra 78+1xfail · api 56 · +tests backstop                                                        | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8B.1 (P1 hard.)        | `ac147fe` (~ `a1360bb` higiene lint R-8A) | ruff 0 · mypy changed-files Success · app 249 · infra 78+1xfail · api 58                                                            | ✅ **PUSHEADA a `main`**       |
+| 2026-08-20 | R-8B.2 (sesión HttpOnly) | `abf3dc2`                                 | ruff 0 · mypy(4 src) Success · auth 10 · api 66 · config 15 · app 249 · infra 78+1xfail · web typecheck/lint/build OK · web 141/716 | ✅ **PUSHEADA a `main`**       |
 
 ---
 

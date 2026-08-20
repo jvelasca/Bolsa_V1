@@ -48,6 +48,8 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 **R-8B.1 (2026-08-20, P1 hardening):** rate-limit `/api/auth/login` (20/60s, brute-force) y `/api/auth/status` (60/60s) vía `SENSITIVE_PREFIXES` en `rate_limit.py`; test determinista ampliado. ✅ **PUSHEADA a `main`** (`ac147fe`). Higiene asociada: 7 I001 de R-8A corregidos (solo imports, `a1360bb`) → `ruff` project-wide 0.
 
+**R-8B.2 (2026-08-20, sesión HttpOnly):** token SHA-256 fuera de `localStorage` → cookie HttpOnly firmada stateless (`auth/session.py`, `exp.token.sig` + HMAC, TTL `APP_AUTH_TTL_SECONDS`=86400, `Secure` solo prod). `login` sin `token` en body + `Set-Cookie`; nuevo `POST /api/auth/logout`; middleware acepta Bearer **o** cookie; `/api/auth/status` reporta `authenticated`. FE: `credentials:"include"` (cliente + fetch manuales), gate `authEnabled && !authenticated`. Contrato regen acotada. ✅ **PUSHEADA a `main`** (`abf3dc2`) — ruff 0 · mypy Success · api 66 · web typecheck/lint/build OK · web 141/716.
+
 ---
 
 ## 3. Deuda PENDIENTE (priorizada 2026-08-19)
