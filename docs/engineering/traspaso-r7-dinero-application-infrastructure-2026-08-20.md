@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-7 — el mayor agujero de cobertura heredado de R-6: los use-cases/repos/invariantes contables quedaron FUERA del surface de la re-auditoría web+api+shared. Auditoría **read-only** de `packages/py/application` + `packages/py/infrastructure` (solo py) + corrección por fases acotadas.
-> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). **M-2 COMMITEADA/PUSHEADA a `main`** (`c8e9ced`, invariante reconciliación cash↔ledger, T-M2). **M-3 COMMITEADA/PUSHEADA a `main`** (`6962fd7`, puente cost-basis con fee en cara unrealized del tax-report, T-M3). **M-6 COMMITEADA/PUSHEADA a `main`** (`604bfef`, margen real en `_account_summary_from_portfolio`, T-M6). **M-4/T-M5 COMMITEADA/PUSHEADA a `main`** (`6a1759c`, opción B: `total_fees_for_account` excluye custodia; T-M4 job dedicado DIFERIDO por freeze). **M-7/L-M5 CERRADA por L-M3/M-5 + test-postcondición** (`f598e2d`). **B-1 (T-M7) COMMITEADA/PUSHEADA a `main`** (`4f43aeb`, high-water-mark max drawdown). **Alto×3 + Medio×7 + Baja B-1 de R-7 completados** (queda deuda Baja y T-M4 diferido).
+> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). **M-2 COMMITEADA/PUSHEADA a `main`** (`c8e9ced`, invariante reconciliación cash↔ledger, T-M2). **M-3 COMMITEADA/PUSHEADA a `main`** (`6962fd7`, puente cost-basis con fee en cara unrealized del tax-report, T-M3). **M-6 COMMITEADA/PUSHEADA a `main`** (`604bfef`, margen real en `_account_summary_from_portfolio`, T-M6). **M-4/T-M5 COMMITEADA/PUSHEADA a `main`** (`6a1759c`, opción B: `total_fees_for_account` excluye custodia; T-M4 job dedicado DIFERIDO por freeze). **M-7/L-M5 CERRADA por L-M3/M-5 + test-postcondición** (`f598e2d`). **B-1 (T-M7) COMMITEADA/PUSHEADA a `main`** (`4f43aeb`, high-water-mark max drawdown). **B-3 (L-M4) COMMITEADA/PUSHEADA a `main`** (`7cffaa7`, `transfer_cash` muerto sin ledger ELIMINADO). **Alto×3 + Medio×7 + Baja B-1 + Baja B-3 de R-7 completados** (queda deuda Baja y T-M4 diferido).
 > **AsOf:** 2026-08-20.
 
 ---
@@ -28,7 +28,7 @@ Confirmados personalmente en código actual:
 - **Idempotencia de trade** vía `find_transaction_by_idempotency` (`:166-194`) + unique constraint `(portfolio_id, idempotency_key)` en `transactions` (externo). ✅
 - **F-FIN-1 fail-closed**: `_resolve_portfolio` exige `legacy_portfolio_id`, sin default global por nombre (`portfolio_repository.py:31-45`). ✅
 - **balance_after** = cash real del repo, sin recálculo manual (`accounts.py` ExecuteTrade). ✅
-- **transfer_cash atómico** (ambos lados en lock, orden determinista por id, single flush). ✅ — NOTA: es **código muerto** (sin callers), ver L-M4.
+- **transfer_cash atómico** (ambos lados en lock, orden determinista por id, single flush). ✅ — NOTA: era **código muerto** (sin callers), ver L-M4 → **ELIMINADO en B-3** (`7cffaa7`, ver §4k).
 - **Decimal vs Numeric(18,6)** en almacenamiento; `Decimal(str(...))` antes de escribir. ✅
 
 ## 4. Fase 1 corregida — `c957df1` `fix(py-application): idempotencia de custodia y release de claim AUTO (R-7/F1)`
@@ -324,6 +324,30 @@ Confirmados personalmente en código actual:
 
 ---
 
+## 4k. Fase B-3 corregida — `7cffaa7` `fix(py-infra): eliminar transfer_cash muerto sin ledger (R-7/B-3, L-M4)`
+
+> Decisión de usuario: **ELIMINAR `transfer_cash`** (código muerto, 0 callers, muta cash SIN ledger). Opción de menor riesgo/superficie y **freeze-compatible** (quitar dead code no es feature). Se descartan «conectar use-case/ruta» (colide con "sin features") y «documentar solo» (deja el hazard vivo).
+
+### B-3 (L-M4) — write-paths de cash sin ledger: `transfer_cash` muerto eliminado
+
+- **Hallazgo (mapeo read-only verificado):** `transfer_cash` (`portfolio_repository.py:402-445`) era atómico (locks ambos `PortfolioRow` en orden determinista por id, single flush) pero **solo mutaba `row.cash`** y **NO escribía ninguna fila ledger**. Grep global: **0 callers** en todo el repo (solo la definición + refs en docs/README). `add_cash`/`deduct_cash` SÍ son vivos y sus use-cases (Deposit/Withdraw/Custodia) ya escriben ledger vía `append_cash_movement`/`append_custody_fee`.
+- **Fix (decisión usuario: eliminar):** se **elimina el método `transfer_cash`** completo de `SqlAlchemyPortfolioRepository`. Con ello el único write-path que podía mover dinero SIN ledger Y sin caller desaparece: **un futuro caller ya no puede existir** → hazard cerrado de raíz.
+- **`add_cash`/`deduct_cash` se conservan** (vivos y trazados por sus callers); su escotilla residual (un caller que los invoque directo sin `append_cash_movement`) queda documentada en el xfail M-2 reconvertido.
+- **Intactos para una futura feature ya trazada (cuando se levante el freeze):** el default `reference_type="transfer"` de `append_cash_movement` (`ledger_repository.py:276`) y el tipo `'transfer'` del FE (`packages/shared/src/portfolio-cash.ts`) permanecen — un futuro use-case de transferencia escribirá ledger desde el primer momento.
+- **Files:** `portfolio_repository.py` (eliminar `transfer_cash`) · `test_m2_ledger_cash_reconciliation.py` (docstring + razón xfail B-3 reconvertidos a escotilla residual `add_cash`/`deduct_cash`; `_assert_reconciled` ganó anotación `SqlAlchemyLedgerRepository` vía `TYPE_CHECKING`, cerrando un `no-untyped-def` pre-existente del fichero tocado). No se tocó aplicación/domain/api/FE.
+
+### Batería B-3 (verde, verificada por el coordinador)
+
+| Comprobación                                                                           | Resultado                 |
+| -------------------------------------------------------------------------------------- | ------------------------- |
+| `ruff check packages/py apps/api-python --config pyproject.toml` (config CI raíz)      | ✅ 0                      |
+| `mypy portfolio_repository.py` + `test_m2_ledger_cash_reconciliation.py` (gate infra)  | ✅ Success                |
+| pytest infra **Postgres real** (suite completa)                                        | ✅ 76 passed, 1 xfailed   |
+| pytest application money-path (deposit/withdraw, custody, margin, drawdown, execution) | ✅ 32 passed              |
+| `git status`                                                                           | ✅ solo files del alcance |
+
+---
+
 ## 5. Inventario de deuda NUEVA (de R-7; priorizado por riesgo dinero/verdad)
 
 ### 🔴 Alto
@@ -349,10 +373,10 @@ Confirmados personalmente en código actual:
 ### 🟢 Bajo
 
 | Código           | Superficie  | Hallazgo                                                                                                                                                                       | Riesgo        |
-| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | -------------------------------------- |
-| B-1 (T-M7)       | application | "Max drawdown" naive (vs depósito inicial, no high-water-mark) alimenta el risk gate `HardMaxDrawdown` → under-bloqueo tras recuperación.                                      | verdad        | ✅ CORREGIDO (B-1, ver §4j, `4f43aeb`) |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------- |
+| B-1 (T-M7)       | application | "Max drawdown" naive (vs depósito inicial, no high-water-mark) alimenta el risk gate `HardMaxDrawdown` → under-bloqueo tras recuperación.                                      | verdad        | ✅ CORREGIDO (B-1, ver §4j, `4f43aeb`)                                                |
 | B-2 (T-M8)       | domain      | `total_unrealized_gain` suma `unrealized_gain or 0.0` → posiciones sin precio se silencian a 0 en el total.                                                                    | verdad        |
-| B-3 (L-M4)       | infra+app   | `transfer_cash` atómico pero **código muerto** (0 callers) y **no escribe ledger**; un futuro caller movería dinero sin traza reconciliable.                                   | dinero/verdad |
+| B-3 (L-M4)       | infra+app   | `transfer_cash` atómico pero **código muerto** (0 callers) y **no escribe ledger**; un futuro caller movería dinero sin traza reconciliable.                                   | dinero/verdad | ✅ CORREGIDO (B-3, ver §4k, `7cffaa7`) — `transfer_cash` ELIMINADO (decisión usuario) |
 | B-4 (L-M6)       | application | fee ledger escrita en 2ª llamada no atómica con el trade; app guard solo se activa si se pasa `idempotency_key` (nada lo exige).                                               | dinero        |
 | B-5 (T-M9/T-M10) | application | FIFO divide sin guard `quantity==0` (latente, repo lo rechaza); `fetch_core_r_pnl_extra_rows` atribuye el PnL whole-account a un instrumento (fail-open, fallback a `list[]`). | verdad        |
 
@@ -369,7 +393,7 @@ Confirmados personalmente en código actual:
 2. ~~**M-7 (L-M5):** custodia dedup time-only~~ — **✅ CERRADA** (`f598e2d`, ver §4i): cubierta por L-M3/M-5 (UNIQUE rechaza re-cargo + transacción compartida revierte cash) + test-postcondición.
 3. ~~**B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown`~~ — **✅ CERRADA** (`4f43aeb`, ver §4j): high-water-mark (pico de equity + running-max `maxDrawdownPct`).
 4. **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio. _(NO confundir con M-1, ya cerrada.)_
-5. **B-3 (L-M4):** `transfer_cash`/`add_cash`/`deduct_cash` del repo mutan cash SIN ledger (código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar; decidir.
+5. ~~**B-3 (L-M4):** `transfer_cash`/`add_cash`/`deduct_cash` del repo mutan cash SIN ledger (código muerto; xfail documental en M-2)~~ — **✅ CERRADA** (`7cffaa7`, ver §4k): `transfer_cash` ELIMINADO por código muerto (decisión usuario); xfail M-2 reconvertido a escotilla residual `add_cash`/`deduct_cash`.
 6. **B-4 (L-M6):** fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de Fase 3 NO toca `transaction` → queda abierta).
 7. **B-5 (T-M9/T-M10):** FIFO divide sin guard `quantity==0`; `fetch_core_r_pnl_extra_rows` atribuye el PnL whole-account a un instrumento.
 8. Checklist operativo manual de relevos previos (secret scanning UI, `TRUSTED_PROXIES` prod, `BP/.L`→`BP.L`, logs dev).
@@ -380,25 +404,26 @@ Confirmados personalmente en código actual:
 
 ## 7. Batería acumulada (verde al cerrar esta parte)
 
-| Comprobación                                                                                                     | Resultado                                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `ruff check packages/py apps/api-python --config pyproject.toml`                                                 | ✅ 0                                                                                                         |
-| `mypy risk_runtime.py` + `mypy ledger_repository.py` (infra)                                                     | ✅ 0 / Success                                                                                               |
-| pytest application money-path + F1 nuevos (8 ficheros)                                                           | ✅ 25 passed                                                                                                 |
-| pytest application + F2 nuevos (`test_deposit_withdraw_idempotency`)                                             | ✅ 31 passed (25 + 6)                                                                                        |
-| pytest api-python offline (CORS/Auth/Health/WinLoop/Q2Hygiene/RateLimit/StartupRoute)                            | ✅ 32 passed                                                                                                 |
-| Árbol tras F1/tras F2/tras F3 (`local main = origin/main`) · pytest infra Postgres real 63 · idempotencia 11     | ✅ (`…c957df1` · a confirmar F2)                                                                             |
-| M-1: `ruff` config CI raíz (2 files) · `mypy portfolio_repository.py` · infra real 66 · application 235          | ✅ 0 / Success / 66 / 235 (ver §4d)                                                                          |
-| M-2: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py` · infra real 72+1xfail · application 235      | ✅ 0 / Success / 72 / 235 (ver §4e)                                                                          |
-| M-3: `ruff` config CI raíz (3 files) · `mypy tax_report.py` · domain 21 · infra real 72+1xfail · application 235 | ✅ 0 / Success / 21 / 72+1xfail / 235 (ver §4f; corrección global→log del coordinador)                       |
-| M-4/T-M5: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py`+test · infra real 74+1xfail · app 241    | ✅ 0 / Success / 74+1xfail / 241 (ver §4h)                                                                   |
-| M-7/L-M5: `ruff` config CI raíz · `mypy` test · infra real 76+1xfail · app 241                                   | ✅ 0 / Success / 76+1xfail / 241 (ver §4i)                                                                   |
-| B-1/T-M7: `ruff` config CI raíz (2 files) · `mypy account_drawdown.py` · application 245 (4 nuevos)              | ✅ 0 / Success / 245 (ver §4j)                                                                               |
-| CI `main` para `c957df1`                                                                                         | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
+| Comprobación                                                                                                      | Resultado                                                                                                    |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ruff check packages/py apps/api-python --config pyproject.toml`                                                  | ✅ 0                                                                                                         |
+| `mypy risk_runtime.py` + `mypy ledger_repository.py` (infra)                                                      | ✅ 0 / Success                                                                                               |
+| pytest application money-path + F1 nuevos (8 ficheros)                                                            | ✅ 25 passed                                                                                                 |
+| pytest application + F2 nuevos (`test_deposit_withdraw_idempotency`)                                              | ✅ 31 passed (25 + 6)                                                                                        |
+| pytest api-python offline (CORS/Auth/Health/WinLoop/Q2Hygiene/RateLimit/StartupRoute)                             | ✅ 32 passed                                                                                                 |
+| Árbol tras F1/tras F2/tras F3 (`local main = origin/main`) · pytest infra Postgres real 63 · idempotencia 11      | ✅ (`…c957df1` · a confirmar F2)                                                                             |
+| M-1: `ruff` config CI raíz (2 files) · `mypy portfolio_repository.py` · infra real 66 · application 235           | ✅ 0 / Success / 66 / 235 (ver §4d)                                                                          |
+| M-2: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py` · infra real 72+1xfail · application 235       | ✅ 0 / Success / 72 / 235 (ver §4e)                                                                          |
+| M-3: `ruff` config CI raíz (3 files) · `mypy tax_report.py` · domain 21 · infra real 72+1xfail · application 235  | ✅ 0 / Success / 21 / 72+1xfail / 235 (ver §4f; corrección global→log del coordinador)                       |
+| M-4/T-M5: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py`+test · infra real 74+1xfail · app 241     | ✅ 0 / Success / 74+1xfail / 241 (ver §4h)                                                                   |
+| M-7/L-M5: `ruff` config CI raíz · `mypy` test · infra real 76+1xfail · app 241                                    | ✅ 0 / Success / 76+1xfail / 241 (ver §4i)                                                                   |
+| B-1/T-M7: `ruff` config CI raíz (2 files) · `mypy account_drawdown.py` · application 245 (4 nuevos)               | ✅ 0 / Success / 245 (ver §4j)                                                                               |
+| B-3/L-M4: `ruff` config CI raíz (2 files) · `mypy portfolio_repo+test` · infra real 76+1xfail · app money-path 32 | ✅ 0 / Success / 76+1xfail / 32 (ver §4k)                                                                    |
+| CI `main` para `c957df1`                                                                                          | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
 
 ## 8. Texto de traspaso (pegar al abrir el próximo chat / relevo por saturación)
 
-> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1, 2, 3, M-1, M-2, M-3, M-6, M-4/T-M5 y M-7/L-M5 PUSHEADAS a `main`. Alto×3 + Medio×7 de R-7 completados**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
+> CONTEXTO (2026-08-20): **R-7 — auditoría read-only de la lógica de dinero real en `packages/py/{application,infrastructure}` COMPLETADA + Fases 1, 2, 3, M-1, M-2, M-3, M-6, M-4/T-M5, M-7/L-M5, B-1 y B-3 PUSHEADAS a `main`. Alto×3 + Medio×7 + Baja B-1 + Baja B-3 de R-7 completados**. Mayor agujero de cobertura heredado de R-6 (use-cases/repos/invariantes contables quedaron fuera del surface web+api+shared).
 >
 > **Auditoría:** 3 subagentes read-only + verificación personal del coordinador. Invariantes F1/FFIN todo INTACTOS (with_for_update, deduct_cash en lock, idempotencia trade + constraint, F-FIN-1 fail-closed, transfer_cash atómico). Deuda NUEVA: **Alto×3 / Medio×7 / Bajo×5**.
 >
@@ -436,13 +461,15 @@ Confirmados personalmente en código actual:
 >
 > - **T-M6:** `_account_summary_from_portfolio` fabricaba `margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None` aunque el account tuviera leverage/posiciones. **Decisión usuario: fórmula `margin_used = Σ market_value / leverage`** + **alcance "completar"** (computar los 3 campos; DTO `AccountSummary`/endpoints intactos → sin `contract:gen`). Fix: `_account_summary_from_portfolio` computa `margin_used = Σ(mv de posiciones con precio)/leverage` (guard `leverage>0`, fail-closed→0.0), `free_margin = total_equity − margin_used`, `margin_level_pct = equity/margin_used*100` o `None` si 0. Fidelidad M-1: posiciones con `market_value=None` NO cuentan (coherentes con `total_market_value`/`total_equity`). Sin tocar FE (solo cambia el valor que ve `dashboard-page.tsx:163` "Margen libre"). Tests `test_account_summary_margin.py` (6, fakes en memoria: A sin posiciones / B single leverage / C dos posiciones leverage>1 / D sin precio no cuenta / D' mixto solo cuenta la con precio / E guard leverage==0 sin ZeroDivision); fake `_Account` de `test_list_account_summaries.py` ganó `leverage`.
 >
-> **SIGUIENTE ETAPA (por decisión 2026-08-20): FIN de R-7** — deuda de dinero real de R-7 **completa** (Alto×3 + Medio×7 + Baja **B-1** cerradas). Quedan **Bajas**: **(1) B-3 (L-M4)** (write-paths de cash sin ledger — xfail documentado en M-2) · B-4 (fee atómico) · B-5 · B-2 (unrealized silencia sin precio) · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **Se decide NO pausar ahora:** cuando R-7 quede del todo cerrado → **guardar + auditorías externas**. **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 TODAS CERRADAS.**
+> **SIGUIENTE ETAPA (por decisión 2026-08-20): FIN de R-7** — deuda de dinero real de R-7 **completa** (Alto×3 + Medio×7 + Baja **B-1** + Baja **B-3** cerradas). Quedan **Bajas**: **B-4** (fee atómico) · B-5 · B-2 (unrealized silencia sin precio) · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **Se decide NO pausar ahora:** cuando R-7 quede del todo cerrado → **guardar + auditorías externas**. **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 · B-3 TODAS CERRADAS.**
 >
 > **M-7 (L-M5) CERRADA (`f598e2d`):** el re-cobro de custodia (dedup time-only del mutex) **ya está cubierto por L-M3/M-5** (UNIQUE `(account_id, reference_type, reference_id, type)` rechaza con `IntegrityError` una 2ª fila del mismoaccount+periodo; la transacción compartida de `deduct_cash`+`append_custody_fee` revierte el cash en el `rollback` de `get_db_session`). Añadido test-postcondición `test_m7_custody_single_charge_f3_guard.py` (2, Postgres real). Sin cambios de producción. Ver §4i.
 >
 > **M-4/T-M5 (mezcla fees) CERRADA (`6a1759c`):** `total_fees_for_account` excluye `reference_type="custody"` → `fees_paid_total` deja de mezclar custodia con trade-fees. Opción B acotada (infra-only). **T-M4 (job dedicado) DIFERIDO** por freeze. Ver §4h + `test_m4_total_fees_excludes_custody.py`.
 >
 > **B-1 (T-M7) CERRADA (`4f43aeb`):** max drawdown naive → **high-water-mark** en `EquityMarkBook.update` (`account_drawdown.py`): se trackea el **pico de equity** (`peakEquity`) y el **drawdown más profundo desde el pico** (`maxDrawdownPct`, running-max), reseteado a 0 solo cuando `equity >= peak` (nuevo máximo). Corrige el **under-bloqueo tras recuperación** del gate `HardMaxDrawdown` (antes el drawdown se recalculaba vs depósito inicial, estateless, y colapsaba a ~0 al recuperarse). Gating preservado: sin `initial_deposit`/≤0 → `max_pct=None` (gate SKIPPED). Persistencia automática vía `equityMarks`. Shape DTO intacto. Tests `test_account_drawdown.py` (+4: recuperación parcial mantiene 10.0 / nuevo máximo resetea / pico sobrevive restart / sin baseline None). Batería: ruff 0 · mypy Success · app 245. Ver §4j.
+>
+> **B-3 (L-M4) CERRADA (`7cffaa7`):** write-paths de cash sin ledger → **`transfer_cash` ELIMINADO** (código muerto, 0 callers; decisión usuario "eliminar"). Era el único write-path que movía dinero **sin ledger Y sin caller**; al eliminarlo un futuro caller ya no puede existir → hazard dinero/verdad cerrado de raíz. `add_cash`/`deduct_cash` se conservan (vivos, trazados por Deposit/Withdraw/Custodia vía `append_cash_movement`/`append_custody_fee`); su escotilla residual queda documentada en el xfail M-2 reconvertido (`test_b3_deuda_directa_rompe_invariant_documental`, solo describe `add_cash`/`deduct_cash`). Intactos para una futura transferencia trazada: default `reference_type="transfer"` de `append_cash_movement` (`ledger_repository.py:276`) y tipo `'transfer'` del FE (`portfolio-cash.ts`). Batería: ruff 0 · mypy infra Success · infra real 76+1xfail · app money-path 32. Ver §4k.
 >
 > Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · ancla de trabajo vivo: `docs/engineering/backlog-trabajo-2026-08-20.md` (LEER PRIMERO) · estado vivo: `docs/engineering/PROJECT_STATE.md` · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
 
@@ -456,19 +483,19 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 
 ### ✅ CHECKLIST DE RELEVO → FASE CERRADA: **B-1 (T-M7) — max drawdown high-water-mark en HardMaxDrawdown** — deuda Alta+Media+Baja parcial de R-7
 
-**Estado al cerrar (verificado):** `main` limpio, sincronizado con `origin/main` · **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1** → **Alto×3 + Medio×7 + Baja B-1 de R-7 COMPLETADAS** · **T-M4 (job dedicado) DIFERIDO** por freeze · ancla `docs/engineering/backlog-trabajo-2026-08-20.md` §0 al día (LEER PRIMERO al abrir).
+**Estado al cerrar (verificado):** `main` limpio, sincronizado con `origin/main` · **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 · B-3** → **Alto×3 + Medio×7 + Baja B-1 + Baja B-3 de R-7 COMPLETADAS** · **T-M4 (job dedicado) DIFERIDO** por freeze · ancla `docs/engineering/backlog-trabajo-2026-08-20.md` §0 al día (LEER PRIMERO al abrir).
 
 **B-1 cerrada (`4f43aeb`):** `EquityMarkBook.update` (`account_drawdown.py`) pasa de "max drawdown naive vs depósito inicial" (estateless, se recalcula cada snapshot) a **high-water-mark**: trackea el **pico de equity** (`peakEquity`, persistido en `equityMarks`) y el **drawdown más profundo desde el pico** (`maxDrawdownPct`, running-max), reseteado a 0 solo cuando `equity >= peak` (nuevo máximo). Corrige el **under-bloqueo tras recuperación** del gate `HardMaxDrawdown` — tras un gran descenso y recuperación parcial, el gate ya NO deja de bloquear (reporta el valor profundo, p.ej. 10.0, no el instantáneo 2.0). `max_pct` sigue `float | None` (shape DTO intacto; consumidores escritos). Gating preservado: sin `initial_deposit`/≤0 → `max_pct=None` (gate SKIPPED). Persistencia automática vía `export_settings_fragment`/`load_from_settings`. Tests `test_account_drawdown.py` (+4). Ver §4j.
 
 **Próximas candidatas (deuda Baja, requieren decisión de usuario):**
 
 - **B-1 (T-M7):** "max drawdown" naive → **✅ CERRADA** (`4f43aeb`, high-water-mark, ver §4j).
-- **B-3 (L-M4):** write-paths de cash sin ledger (`transfer_cash`/`add_cash`/`deduct_cash`, código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar. **[PRIMERA del FIN de R-7 — ver bloque abajo]**
+- **B-3 (L-M4):** write-paths de cash sin ledger → **✅ CERRADA** (`7cffaa7`, `transfer_cash` eliminado; ver §4k).
 - **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio (_no confundir con M-1, ya cerrada_).
 - **B-4 / B-5** (fee atómico / FIFO + PnL whole-account).
 - **M-4/T-M4 (diferido):** mover custodia de GET a job dedicado — colinda con «sin features».
 
-**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M5, M-6, M-7, B-1 CERRADAS; T-M4 (job dedicado) diferido por freeze; B-3 pendiente con xfail en M-2. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M5, M-6, M-7, B-1, B-3 CERRADAS; T-M4 (job dedicado) diferido por freeze; B-3 = eliminar `transfer_cash` (código muerto), no reabrir. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
 
 **Batería acumulada confirmada (referencia del relevo):** ruff 0 (config CI raíz `pyproject.toml`) · mypy infra/domain Success (application mypy-blind en CI) · pytest infra Postgres real **76+1xfail** · domain 21 · application **245** (241 + 4 B-1) · api-python 32.
 
@@ -478,16 +505,16 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 
 > **Cómo usar:** pega este bloque (o el §8 anterior) como primer mensaje del NUEVO chat. El coordinador del nuevo chat ejecuta la secuencia en orden, una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **DECISIÓN DE USUARIO (2026-08-20):** NO pausar todavía. **Objetivo: completar el FIN de R-7 (deuda Baja restante)** en chats secuenciales; **cuando R-7 quede del todo cerrado** → **guardar y mandar auditorías externas para ver el estado global**.
 >
-> **B-1 (T-M7) ya CERRADA** (`4f43aeb`, high-water-mark max drawdown — ver §4j).
+> **B-1 (T-M7) CERRADA** (`4f43aeb`, high-water-mark max drawdown — ver §4j). **B-3 (L-M4) CERRADA** (`7cffaa7`, `transfer_cash` muerto eliminado — ver §4k).
 
 **Read-first (obligatorio):** leer `docs/engineering/backlog-trabajo-2026-08-20.md` §0 y §1. Si no coincide con el repo → PARAR y re-leer.
 
-**Estado al abrir:** `local main = origin/main` (cierre B-1 `4f43aeb` + docs actualizados), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1.** Quedan **Bajas de R-7: B-2 · B-3 · B-4 · B-5** (+ **M-4/T-M4 DIFERIDO** por freeze).
+**Estado al abrir:** `local main = origin/main` (cierre B-3 `7cffaa7` + docs actualizados), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 · B-3.** Quedan **Bajas de R-7: B-4 · B-5 · B-2** (+ **M-4/T-M4 DIFERIDO** por freeze).
 
 **Plan de trabajo de esta etapa (FIN R-7) — una fase por chat, en este orden sugerido (por riesgo dinero/verdad + saturación):**
 
-1. **B-3 (L-M4)** — write-paths de cash sin ledger (`transfer_cash`/`add_cash`/`deduct_cash`, código muerto 0 callers, xfail documental en M-2): conectar use-case/ruta o eliminar. Riesgo dinero/verdad.
-2. **B-4 (L-M6)** — fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de F3 NO toca `transaction`). Riesgo dinero.
+1. ~~**B-3 (L-M4)**~~ — ✅ **CERRADA** (`7cffaa7`): `transfer_cash` muerto sin ledger ELIMINADO (decisión usuario "eliminar").
+2. **B-4 (L-M6)** — fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de F3 NO toca `transaction`). Riesgo dinero. **[SIGUIENTE del FIN de R-7]**
 3. **B-5 (T-M9/T-M10)** — FIFO divide sin guard `quantity==0`; `fetch_core_r_pnl_extra_rows` atribuye PnL whole-account a un instrumento (fail-open). Riesgo verdad.
 4. **B-2 (T-M8)** — `total_unrealized_gain` silencia a 0 las posiciones sin precio (NO confundir con M-1, ya cerrada). Riesgo verdad.
 5. Al terminar todos → **guardar + mandar auditorías externas del estado global** (revisar también el checklist operativo manual del §4 del backlog y la higiene de ramas `stage/*`).
@@ -498,4 +525,4 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 2. **Decisión de usuario:** alcance y si el cambio de valor esperado es aceptable.
 3. **Subagente implementación acotado** + **verificación coordinador** (code diff + test + batería real) + **aprobación + commit + push** (rama `main` protegida; el push requiere aprobación vía tarjeta) + **relevo documentado** (actualizar backlog §0/§1/§6 y traspaso §4x/§5/§8).
 
-**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M4 diferido por freeze (job dedicado); B-3 (write-paths de cash sin ledger) pendiente con xfail en M-2; B-1 CERRADA (high-water-mark, no reabrir); M-6/M-7 CERRADAS. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M4 diferido por freeze (job dedicado); B-3 CERRADA = eliminar `transfer_cash` (código muerto, no reabrir); B-1 CERRADA (high-water-mark, no reabrir); M-6/M-7 CERRADAS. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
