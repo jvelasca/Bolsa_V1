@@ -62,6 +62,12 @@ Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador).
 
 ---
 
+> **Deuda adicional R-8C.2 (registrada en `PROJECT_STATE.md` §3):** scheduler-vs-worker.
+
+| Código | Superficie   | Hallazgo                                                                                                                                                                                                                                                                                                 | Riesgo           | Estado                                                               |
+| ------ | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- | -------------------------------------------------------------------- |
+| R-8C.2 | infra+worker | Modo **no-ARQ**: `scheduler_worker.py:46-65` ejecuta `start_scan_worker` + `start_optimization_worker` inline en el MISMO proceso que los 8 crons periódicos (comparten event-loop); con ARQ migran a `arq_worker.py` (proceso separado). Un loop de scan bloqueante puede retrasar los crons en no-ARQ. | Bajo (operativo) | ⏳ documentada (no tocar salvo decisión) — ver `PROJECT_STATE.md` §3 |
+
 ## 2. ⚠️ BLOQUEO DE DISEÑO de la Fase 3 (L-M3/M-5) — LEER ANTES DE ABRIRLA
 
 ### 2.1 Hallazgo (verificado 2026-08-20 por AUDITORÍA READ-ONLY independiente — subagente `explore`)
