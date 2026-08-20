@@ -9,10 +9,12 @@ Diseño:
   - El middleware valida la cookie alternativamente al header ``Authorization``
     Bearer; el FE migra a cookie y deja el Bearer como fallback para otros clientes.
 
-`exp` se calcula y compara con ``time.monotonic()``: es un deadline relativo al
-reloj monotónico del proceso servidor, no un epoch wall-clock. Como creación y
-verificación corren en el mismo proceso, el TTL es consistente y ajeno a saltos
-del reloj de pared.
+`exp` es un deadline expresado en **Unix epoch UTC** (segundos desde
+1970-01-01T00:00:00Z), calculado y comparado con ``time.time()``. Al ser un
+timestamp absoluto y portable entre hosts, la misma cookie puede emitirse y
+validarse en procesos o servidores distintos sin depender de un reloj
+monotónico compartido. La longevidad se controla mediante el TTL aplicado en la
+creación.
 
 DEV (crítico): Secure=True impide que el navegador envíe la cookie sobre
 http://localhost:8000 en desarrollo. Por eso la cookie solo se marca ``Secure``
@@ -33,8 +35,8 @@ SESSION_COOKIE_PATH = "/api"
 
 
 def session_deadline(settings: Settings) -> int:
-    """Deadline monotónico (segundos) de la sesión actual."""
-    return int(time.monotonic()) + settings.app_auth_ttl_seconds
+    """Deadline epoch UTC (segundos) de la sesión actual."""
+    return int(time.time()) + settings.app_auth_ttl_seconds
 
 
 def create_session_cookie_value(settings: Settings) -> str:
@@ -64,7 +66,7 @@ def verify_session_cookie(settings: Settings, value: str) -> bool:
     ).hexdigest()
     if not secrets.compare_digest(sig, expected_sig):
         return False
-    if time.monotonic() >= exp:
+    if time.time() >= exp:
         return False
     return secrets.compare_digest(token, create_access_token(settings))
 

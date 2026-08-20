@@ -1,5 +1,3 @@
-import time
-
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -135,11 +133,15 @@ async def test_expired_session_cookie_rejected(monkeypatch) -> None:
 
     app = create_app()
     async with lifespan(app):
-        original = time.monotonic
-        # Forzar un deadline ya pasado para que la cookie caduque.
-        monkeypatch.setattr(session_module.time, "monotonic", lambda: original() - 100_000)
+        # Crear la cookie con un epoch congelado para fijar su deadline.
+        fixed_epoch = 1_700_000_000.0
+        monkeypatch.setattr(session_module.time, "time", lambda: fixed_epoch)
         expired_cookie = create_session_cookie_value(get_settings())
-        monkeypatch.setattr(session_module.time, "monotonic", original)
+
+        # Avanzar el reloj mucho más allá del TTL para forzar el deadline ya pasado.
+        monkeypatch.setattr(
+            session_module.time, "time", lambda: fixed_epoch + 100_000 + 3600
+        )
 
         assert verify_session_cookie(get_settings(), expired_cookie) is False
 
@@ -148,6 +150,29 @@ async def test_expired_session_cookie_rejected(monkeypatch) -> None:
             client.cookies.set(SESSION_COOKIE_NAME, expired_cookie)
             response = await client.get("/api/accounts")
             assert response.status_code == 401
+
+    get_settings.cache_clear()
+
+
+def test_session_epoch_portability_and_expiry(monkeypatch) -> None:
+    """La sesión usa Unix epoch UTC: portable y expirable sin reloj monotónico."""
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    get_settings.cache_clear()
+    settings = get_settings()
+
+    fixed_epoch = 1_700_000_000.0
+
+    # Reloj congelado para generar la cookie con un deadline determinista.
+    monkeypatch.setattr(session_module.time, "time", lambda: fixed_epoch)
+    cookie = create_session_cookie_value(settings)
+
+    # Dentro del TTL (mismo epoch) -> válida.
+    assert verify_session_cookie(settings, cookie) is True
+
+    # Avanzar el reloj más allá del deadline -> expirada.
+    monkeypatch.setattr(session_module.time, "time", lambda: fixed_epoch + 100_000)
+    assert verify_session_cookie(settings, cookie) is False
 
     get_settings.cache_clear()
 

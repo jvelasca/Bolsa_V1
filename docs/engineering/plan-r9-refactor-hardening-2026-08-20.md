@@ -191,6 +191,10 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Criterio de aceptación:** login→cookie válida TTL; logout borra cookie; con epoch la cookie es portable; tests auth existentes (10) verdes.
 
+**Decisión de alcance (2026-08-20, aprobada por el usuario): ✅ OPCIÓN A — solo epoch.** `session.py`: `time.monotonic()` → `time.time()` (epoch UTC) en `session_deadline` y en la comparación de `verify_session_cookie`; actualizar el docstring del módulo que explica el deadline monotónico. NO se toca `session_id`/revocación Redis (mayor alcance, no recomendada para app local). Adaptar los tests de `test_auth.py` que dependen de `time.monotonic()` (`test_expired_session_cookie_rejected` lo parchea en `:138-144`) al nuevo reloj, y añadir un test de expiración/portabilidad con epoch que no dependa de un timer concreto.
+
+**Estado (2026-08-20, EN CURSO — por abrir subagente):** _(SE RELLENARÁ AL CERRAR)_
+
 ---
 
 ### 🟠 FASE 6 — R-9.6: Invariante `balance_after` como garantía física (decidir)
@@ -263,11 +267,11 @@ Como manda la premisa E5/E6, **cada fase entrega**:
 ### 5.2 Decisiones por fase (una vez aprobado el plan)
 
 | Ref    | Decisión                                                      | Opciones                                                                                                                                                              |
-| ------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
 | **F1** | Cómo aislar idempotencia por cuenta **manteniendo trade+fee** | ✅ **DECIDIDA (2026-08-20):** Opción A — alinear el lookup (`account_id`+`type`) con el UNIQUE existente por-cuenta+`type`. NO tocar UNIQUE/trade+fee. Sin migración. |
 | **F3** | Orden custody                                                 | A) release tras COMMIT (recomendada) · B) documentar Redis como optimización                                                                                          |
-| **F5** | Alcance sesión                                                | A) solo epoch (recomendada, menor riesgo) · B) + session_id/revocación Redis                                                                                          |
-| **F6** | Invariante `balance_after`                                    | A) trigger/proc DB (cierra el claim) · B) postcondición app + corregir docs (menor riesgo)                                                                            |
+| **F5** | Alcance sesión                                                | ✅ **DECIDIDA (2026-08-20):** Opción A — solo epoch (`time.time()`), sin revocación Redis.                                                                            |
+| **F6** | Invariante `balance_after`                                    | A) trigger/proc DB (cierra el claim) · B) postcondición app + corregir docs (menor riesgo)                                                                            |     |
 | **F8** | Limpieza `pending-delete` riesgo alto                         | A) solo inventariar, NO ejecutar (recomendada) · B) (requiere `purge storage`)                                                                                        |
 | **F9** | Arquitectura + puente legacy                                  | A) diferir a V2 (recomendado ahora) · B) abrir fase de desacople                                                                                                      |
 
