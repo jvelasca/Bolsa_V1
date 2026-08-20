@@ -234,6 +234,48 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 > Warning operativo de auto-sync `BP/.L` (Yahoo 404) **CERRADO**: comportamiento esperado (fallo permanente no
 > reintentable, WARNING→INFO, detalle en DB — PR #43). Causa raíz = dato corrupto `yahoo_symbol='BP/.L'`; ticker
 > válido `BP.L`. Acción residual manual: corregir el registro en BD si se quiere dato real (F-WORKER-1).
+>
+> ---
+>
+> ## 📌 TEXTO DE TRASPASO — R-6 (2026-08-20) — PEGAR al abrir el próximo chat
+>
+> CONTEXTO (2026-08-20): **R-6 — Re-auditoría de superficie completa COMPLETADA y pusheada a `main`**. Árbol limpio,
+> `local main = origin/main = 9aa20b8`, **CI verde** (Frontend CI ✅ · Gitleaks ✅; Python/Optimize/Fase2 no dispararon
+> por path-filter — no se tocó `packages/py` ni `apps/api-python`).
+>
+> QUÉ PASÓ: la re-auditoría arrancó acotada a "deuda abierta/operativa" (cerró **R-5**) y luego se **amplió a la
+> superficie completa** (decisión del usuario): barrido transversal **read-only** (3 subagentes en paralelo: web /
+> api-python / shared+py), priorización por **riesgo de dinero / verdad de resultados**, inventario de **deuda NUEVA**
+> (Alto ×4, Medio ×13, Bajo ×5) + no-deuda confirmada. Se corrigieron los 3 Altos corregibles (aprobación por commit):
+>
+> - **F-1** `a64f4d0` `fix(trading)`: `parseLocalizedNumber` en `apps/web/src/lib/format.ts` (parser es-ES tolerante a
+>   separador de miles `.` / decimal `,`) aplicado en `order-dialog.tsx` (4 call-sites) y `account-detail-panel.tsx`.
+>   **Corrige el error ×1000**: escribir `1.500` ya no se lee como 1.5. Test 9 casos.
+> - **F-4** `da8aee5` `refactor(shared)`: eliminadas 262 líneas de cómputo fiscal muerto/divergente de
+>   `packages/shared/src/tax-report.ts` (conserva los DTO types `TaxReportSummaryDto`/`RealizedGainLineDto`/
+>   `UnrealizedGainLineDto`). Elimina el riesgo del `feesPaidTotal` sin filtro de ejercicio (F-FIN-2).
+> - **F-2** `8731827` `fix(shared)`: `TAX_PRESETS.US.dividendWithholdingPct` 15→30 (dominio Python = fuente de verdad).
+>   Nota: el hook lint-staged aplicó prettier full-file (comillas dobles) al mismo archivo — único cambio semántico US=30,
+>   el resto formato puro; alinea con `format:check`.
+> - **F-3** (sync workspace solo-aditivo) **DOCUMENTADO como deuda con trade-off, NO tocado** (decisión: el merge aditivo
+>   es diseño intencional; un fix de propagación de borrados = cambio del modelo de sync = colisiona con el freeze).
+> - **`9aa20b8`** `docs(engineering)`: relevo R-6 (PROJECT_STATE §6/§7, engineering-index §5, este doc).
+>
+> DETALLE COMPLETO + inventario + texto en: `docs/engineering/traspaso-r6-reauditoria-superficie-2026-08-20.md`.
+> Estado vivo: `docs/engineering/PROJECT_STATE.md` (LEER PRIMERO) · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
+>
+> SIGUIENTES (candidatos, por decisión):
+>
+> 1. **Auditar `packages/py/{application,infrastructure}`** = la lógica de dinero real (use-cases/repos/invariantes). Es el
+>    **mayor agujero de cobertura** — quedó FUERA del surface pactado (eran web+api+shared). Recomendado por prioridad dinero/verdad.
+> 2. Corregir los **Medio** de normalización de errores backend: **B-1** `backtests.py:212-214` fuga de excepción en 500,
+>    **B-2** `scans.py:85-88` ScanManifest tragado (200), **B-3** `ai_governance.py:144-147` fail-open `/ai/effectiveness`,
+>    **B-4** `ai_governance.py:387-401` `confirm` sin try/except en path de ejecución de trade; y **S-1** redondeo
+>    `calculateTradeFees` TS vs Decimal.
+> 3. Checklist operativo manual (fuera de repo): secret scanning UI · `TRUSTED_PROXIES` prod · `BP/.L`→`BP.L` en BD · limpiar logs dev.
+>
+> Regla: una fase = un subagente acotado + batería + aprobación por commit + relevo documentado al cerrar chat.
+> Freeze vigente: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA. Auth JWT diferida (D4).
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-6 — ampliación de la re-auditoría 2026-08-20 de "deuda abierta/operativa" a **superficie completa** (web + api-python + shared/domain/analytics), por barrido transversal **read-only** y corrección de los hallazgos de riesgo ALTO de dinero/verdad.
-> **Estado:** **COMPLETADO en `main`** (3 commits de fix directos: `a64f4d0` F-1 + `da8aee5` F-4 + `8731827` F-2, en procesos de doc/push; árbol limpio a final de fase).
+> **Estado:** **COMPLETADO en `main`** (3 commits de fix directos: `a64f4d0` F-1 + `da8aee5` F-4 + `8731827` F-2, + `9aa20b8` docs; árbol limpio, `local main = origin/main = 9aa20b8`, **CI verde**: Frontend CI ✅ y Gitleaks ✅).
 > **AsOf:** 2026-08-20.
 
 ---
