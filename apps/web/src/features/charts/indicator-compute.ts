@@ -1550,15 +1550,6 @@ export function resolveSubRenderSeries(
   );
 }
 
-/** @deprecated usar resolveSubRenderSeries */
-export function resolveSubLineSeries(
-  instance: ChartIndicatorInstance,
-  bars: OhlcvBarDto[],
-  apiPoints: IndicatorPointDto[],
-): IndicatorLinePoint[] {
-  return resolveSubRenderSeries(instance, bars, apiPoints)[0]?.points ?? [];
-}
-
 export function hasVolumeInstance(
   instances: ChartIndicatorInstance[],
 ): boolean {

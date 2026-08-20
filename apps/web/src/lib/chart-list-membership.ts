@@ -122,14 +122,6 @@ export function resolvePreferredListIdForInstrument(
   return containing[0]?.id ?? null;
 }
 
-/** @deprecated Prefer {@link resolvePreferredListIdForInstrument}. */
-export function resolveVirtualListForInstrument(
-  instrumentId: string,
-  membership: ChartListMembershipSnapshot,
-): string | null {
-  return resolvePreferredListIdForInstrument(instrumentId, membership);
-}
-
 export function findBestListForInstrument(
   instrumentId: string,
   membership: ChartListMembershipSnapshot,

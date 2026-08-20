@@ -1,5 +1,5 @@
 /**
- * Tests legacy — `resolveEstudioPersonalListId` alias de ADR-024.
+ * Tests legacy — resolución de la lista «Estudio» vía `resolveEstudioListId` (canónico ADR-024).
  */
 
 import { describe, expect, it } from "vitest";
@@ -8,7 +8,7 @@ import {
   ESTUDIO_LIST_NAME,
   ESTUDIO_PERSONAL_LIST_NAME,
   isEstudioPersonalListName,
-  resolveEstudioPersonalListId,
+  resolveEstudioListId,
 } from "@bolsa/shared";
 
 describe("Estudio personal list helpers (legacy alias)", () => {
@@ -20,16 +20,14 @@ describe("Estudio personal list helpers (legacy alias)", () => {
 
   it("resolves via ADR-024 (canónica / nombre / personal)", () => {
     expect(
-      resolveEstudioPersonalListId([
+      resolveEstudioListId([
         { id: "ibex35", name: "IBEX 35" },
         { id: ESTUDIO_LIST_ID, name: ESTUDIO_LIST_NAME },
       ]),
     ).toBe(ESTUDIO_LIST_ID);
-    expect(resolveEstudioPersonalListId([{ id: "x", name: "Estudio" }])).toBe(
-      "x",
-    );
+    expect(resolveEstudioListId([{ id: "x", name: "Estudio" }])).toBe("x");
     expect(
-      resolveEstudioPersonalListId([{ id: "est-1", name: "Estudio personal" }]),
+      resolveEstudioListId([{ id: "est-1", name: "Estudio personal" }]),
     ).toBe("est-1");
   });
 });

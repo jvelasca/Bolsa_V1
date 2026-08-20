@@ -571,6 +571,3 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     </div>
   );
 }
-
-/** @deprecated Usar TradingOperativaPanel */
-export const TradingCoachRail = TradingOperativaPanel;

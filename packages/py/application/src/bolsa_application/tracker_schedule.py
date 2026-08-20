@@ -25,11 +25,6 @@ def schedule_kind(definition: dict[str, Any]) -> str | None:
     return str(kind) if kind else None
 
 
-def is_scheduled_tracker(definition: dict[str, Any]) -> bool:
-    kind = schedule_kind(definition)
-    return kind in ("on_bar_close", "cron")
-
-
 def is_bar_close_window(timeframe: str, *, now: datetime | None = None) -> bool:
     """Ventana operativa post-cierre — daily exige post-market EU; weekly más laxo."""
     if timeframe == "1wk":

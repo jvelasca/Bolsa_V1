@@ -134,7 +134,7 @@ describe("instruments-hub-model", () => {
     });
     expect(byLists.map((r) => r.symbol)).toEqual(["ACS", "SAN", "IBE"]);
     const portfolioOnly = filterAndSortInstrumentsHub(catalog, {
-      onlyInPortfolio: true,
+      scopeFilter: "portfolio",
       enrichment,
     });
     expect(portfolioOnly.map((r) => r.symbol)).toEqual(["SAN"]);

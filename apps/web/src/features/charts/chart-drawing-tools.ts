@@ -649,23 +649,3 @@ export function drawingRailFamilyBlocks(
     };
   });
 }
-
-/** @deprecated Use drawingRailFamilyBlocks */
-export interface ExtraFavoriteRailBlock {
-  groupId: DrawingToolGroupId;
-  tools: ChartDrawTool[];
-  bracketed: boolean;
-}
-
-/** @deprecated Use drawingRailFamilyBlocks */
-export function extraFavoriteRailBlocks(
-  favorites: ChartDrawTool[],
-): ExtraFavoriteRailBlock[] {
-  return drawingRailFamilyBlocks(favorites)
-    .filter((block) => block.extraTools.length > 0)
-    .map((block) => ({
-      groupId: block.groupId,
-      tools: block.extraTools,
-      bracketed: block.bracketed,
-    }));
-}

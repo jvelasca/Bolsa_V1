@@ -47,10 +47,6 @@ class StanceResult:
     gate_status: GateStatus
 
 
-def _clamp_stars(value: int) -> int:
-    return max(1, min(5, int(value)))
-
-
 def map_io_to_stars(io_score: float | None) -> int:
     if io_score is None or not isinstance(io_score, (int, float)):
         return 3

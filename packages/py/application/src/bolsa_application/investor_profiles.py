@@ -100,15 +100,6 @@ class AssignInvestorProfileToAccount:
         return await self._store.assign_to_account(account_id, profile_id)
 
 
-class GetAccountInvestorProfile:
-    """Obtiene Account Investor Profile."""
-    def __init__(self, store: InvestorProfileStore) -> None:
-        self._store = store
-
-    async def execute(self, account_id: str) -> InvestorProfileRecord | None:
-        return await self._store.get_for_account(account_id)
-
-
 class EnsureDefaultInvestorProfile:
     """Crea perfil moderate + lo asigna si la cuenta no tiene active_profile_id."""
 

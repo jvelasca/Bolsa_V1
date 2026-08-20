@@ -73,12 +73,6 @@ class RemoveInstrumentFromListResponseDto(BaseModel):
     data: RemoveInstrumentFromListResultDto
 
 
-class DeleteInstrumentRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
-
-    force: bool = False
-
-
 class OrphanInstrumentDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 

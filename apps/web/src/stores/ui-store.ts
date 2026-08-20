@@ -29,7 +29,6 @@ interface UiState {
   selectedIndicatorInstanceId: string | null;
   indicatorConfigTarget: { chartId: string; instanceId: string } | null;
   indicatorsCatalogOpen: boolean;
-  indicatorTemplatesOpen: boolean;
   drawingTemplatesOpen: boolean;
   chartGlobalBarSettingsOpen: boolean;
   chartDataBarSettingsOpen: boolean;
@@ -64,8 +63,6 @@ interface UiState {
   closeIndicatorConfig: () => void;
   openIndicatorsCatalog: () => void;
   closeIndicatorsCatalog: () => void;
-  openIndicatorTemplates: () => void;
-  closeIndicatorTemplates: () => void;
   openDrawingTemplates: () => void;
   closeDrawingTemplates: () => void;
   openPlatformConfig: (tab?: PlatformConfigTab) => void;
@@ -91,7 +88,6 @@ export const useUiStore = create<UiState>()(
       selectedIndicatorInstanceId: null,
       indicatorConfigTarget: null,
       indicatorsCatalogOpen: false,
-      indicatorTemplatesOpen: false,
       drawingTemplatesOpen: false,
       platformConfigOpen: false,
       platformConfigTab: "general",
@@ -168,8 +164,6 @@ export const useUiStore = create<UiState>()(
       closeIndicatorConfig: () => set({ indicatorConfigTarget: null }),
       openIndicatorsCatalog: () => set({ indicatorsCatalogOpen: true }),
       closeIndicatorsCatalog: () => set({ indicatorsCatalogOpen: false }),
-      openIndicatorTemplates: () => set({ indicatorTemplatesOpen: true }),
-      closeIndicatorTemplates: () => set({ indicatorTemplatesOpen: false }),
       openDrawingTemplates: () => set({ drawingTemplatesOpen: true }),
       closeDrawingTemplates: () => set({ drawingTemplatesOpen: false }),
       openPlatformConfig: (tab = "general") =>

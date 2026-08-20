@@ -14,13 +14,6 @@ class WorkspaceSummaryDto(BaseModel):
     updated_at: str = Field(alias="updatedAt")
 
 
-class WorkspacePayloadDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
-
-    document: dict[str, Any]
-    dock_layout: dict[str, Any] | None = Field(alias="dockLayout", default=None)
-
-
 class WorkspaceDetailDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 

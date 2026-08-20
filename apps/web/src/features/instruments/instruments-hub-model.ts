@@ -261,10 +261,6 @@ export function filterAndSortInstrumentsHub(
 
     sortDir?: InstrumentsHubSortDir;
 
-    /** @deprecated prefer scopeFilter === 'portfolio' */
-
-    onlyInPortfolio?: boolean;
-
     scopeFilter?: InstrumentsHubScopeFilter;
 
     /** Cuando scopeFilter === 'list'. */
@@ -284,8 +280,7 @@ export function filterAndSortInstrumentsHub(
 
   const enrichment = opts.enrichment;
 
-  const scope: InstrumentsHubScopeFilter =
-    opts.scopeFilter ?? (opts.onlyInPortfolio ? "portfolio" : "all");
+  const scope: InstrumentsHubScopeFilter = opts.scopeFilter ?? "all";
 
   const filtered = instruments.filter((i) => {
     if (scope === "portfolio") {

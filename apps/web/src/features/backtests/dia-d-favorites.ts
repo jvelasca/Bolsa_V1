@@ -277,10 +277,6 @@ export function resolveDiaDCarouselChips(
   return chips;
 }
 
-/** @deprecated aliases for older imports/tests */
-export const DIA_D_QUICK_PRESETS = DIA_D_PRESETS;
-export type DiaDQuickPresetId = DiaDPresetId;
-
 export function loadDiaDFavorites(): string[] {
   return loadDiaDCarouselPrefs().customs.map((c) => c.iso);
 }

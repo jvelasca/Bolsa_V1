@@ -9,10 +9,11 @@
  * @see docs/engineering/visualizados-list-ux-2026-08-06.md
  * @see docs/engineering/estudio-supervision-model-2026-08-06.md
  */
-export const VIRTUAL_LIST_PORTFOLIO = '__builtin:portfolio__' as const;
-export const VIRTUAL_LIST_PENDING_ORDERS = '__builtin:pending-orders__' as const;
+export const VIRTUAL_LIST_PORTFOLIO = "__builtin:portfolio__" as const;
+export const VIRTUAL_LIST_PENDING_ORDERS =
+  "__builtin:pending-orders__" as const;
 /** Lista virtual «Visualizados» (pestañas abiertas / buscador). No es Estudio. */
-export const VIRTUAL_LIST_VISUALIZATION = '__builtin:visualization__' as const;
+export const VIRTUAL_LIST_VISUALIZATION = "__builtin:visualization__" as const;
 
 export type VirtualListId =
   | typeof VIRTUAL_LIST_PORTFOLIO
@@ -26,17 +27,17 @@ export const VIRTUAL_LIST_IDS: readonly VirtualListId[] = [
 ];
 
 export const VIRTUAL_LIST_LABELS: Record<VirtualListId, string> = {
-  [VIRTUAL_LIST_PORTFOLIO]: 'Cartera',
-  [VIRTUAL_LIST_PENDING_ORDERS]: 'Órdenes pendientes',
-  [VIRTUAL_LIST_VISUALIZATION]: 'Visualizados',
+  [VIRTUAL_LIST_PORTFOLIO]: "Cartera",
+  [VIRTUAL_LIST_PENDING_ORDERS]: "Órdenes pendientes",
+  [VIRTUAL_LIST_VISUALIZATION]: "Visualizados",
 };
 
 /** ID estable de la lista de catálogo IBEX 35 en API (coincide con `DEFAULT_LIST_CONFIG.id`). */
-export const CATALOG_IBEX_LIST_ID = 'ibex35';
+export const CATALOG_IBEX_LIST_ID = "ibex35";
 
 /** Lista API canónica de supervisión (ADR-024). */
-export const ESTUDIO_LIST_ID = 'estudio';
-export const ESTUDIO_LIST_NAME = 'Estudio';
+export const ESTUDIO_LIST_ID = "estudio";
+export const ESTUDIO_LIST_NAME = "Estudio";
 
 /** Carrusel por defecto: Cartera + Órdenes + Visualizados (Estudio/IBEX se pinan desde API). */
 export const DEFAULT_VIRTUAL_CAROUSEL_IDS: readonly VirtualListId[] = [
@@ -56,7 +57,7 @@ export function isEstudioListId(id: string): boolean {
 /** Match case-insensitive del nombre canónico «Estudio». */
 export function isEstudioListName(name: string): boolean {
   const n = name.trim().toLowerCase();
-  return n === 'estudio' || n === 'en estudio';
+  return n === "estudio" || n === "en estudio";
 }
 
 /**
@@ -71,7 +72,7 @@ export function isEstudioListNameCollision(name: string): boolean {
  * @deprecated ADR-024 — usar {@link ESTUDIO_LIST_NAME} / {@link resolveEstudioListId}.
  * Se mantiene para migración / tests legacy.
  */
-export const ESTUDIO_PERSONAL_LIST_NAME = 'Estudio personal';
+export const ESTUDIO_PERSONAL_LIST_NAME = "Estudio personal";
 
 /** @deprecated ADR-024 */
 export function isEstudioPersonalListName(name: string): boolean {
@@ -91,11 +92,4 @@ export function resolveEstudioListId(
   if (byName) return byName.id;
   const personal = lists.find((l) => isEstudioPersonalListName(l.name));
   return personal?.id ?? null;
-}
-
-/** @deprecated ADR-024 — preferir {@link resolveEstudioListId}. */
-export function resolveEstudioPersonalListId(
-  lists: ReadonlyArray<{ id: string; name: string }>,
-): string | null {
-  return resolveEstudioListId(lists);
 }

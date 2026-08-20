@@ -19,11 +19,6 @@ import { cn } from "@/lib/utils";
 
 const MODES: DiaDTradingMode[] = ["manual", "semi", "auto"];
 
-/** @deprecated alias — prefer DiaDVerifyBanner */
-export function TradingDiaDBanner() {
-  return <DiaDVerifyBanner />;
-}
-
 export function DiaDVerifyBanner() {
   const session = useDiaDTradingSessionStore((s) => s.session);
   const setMode = useDiaDTradingSessionStore((s) => s.setMode);

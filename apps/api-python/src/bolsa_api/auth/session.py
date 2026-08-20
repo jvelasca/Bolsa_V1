@@ -3,8 +3,7 @@
 Diseño:
   - Sin store server-side: la cookie {@link SESSION_COOKIE_NAME} lleva
     ``"{exp:.0f}.{token}.{sig}"`` donde ``token`` es el SHA-256 existente de
-    tokens.create_access_token, ``exp`` el deadline (monotónico, ver abajo) y
-    ``sig`` el HMAC del valor firmado con app_auth_secret (comparación en tiempo
+    tokens.create_access_token, ``exp`` el deadline y ``sig`` el HMAC del valor firmado con app_auth_secret (comparación en tiempo
     constante).
   - El middleware valida la cookie alternativamente al header ``Authorization``
     Bearer; el FE migra a cookie y deja el Bearer como fallback para otros clientes.

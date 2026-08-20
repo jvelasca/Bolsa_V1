@@ -66,8 +66,6 @@ class EnqueueStaleResult:
 
 
 SYNC_SCOPE_LISTS = "lists"
-SYNC_SCOPE_STALE = "stale"  # todos los activos que necesiten sync (legado)
-SYNC_SCOPE_ALL = "all"  # alias de stale
 
 
 class EnqueueStaleInstruments:

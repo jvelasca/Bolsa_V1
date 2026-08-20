@@ -10,7 +10,6 @@ import {
   isEstudioListName,
   isEstudioPersonalListName,
   resolveEstudioListId,
-  resolveEstudioPersonalListId,
 } from "@bolsa/shared";
 
 describe("Estudio list helpers (ADR-024)", () => {
@@ -48,13 +47,5 @@ describe("Estudio list helpers (ADR-024)", () => {
     expect(
       resolveEstudioListId([{ id: "ibex35", name: "IBEX 35" }]),
     ).toBeNull();
-  });
-
-  it("legacy resolveEstudioPersonalListId aliases resolveEstudioListId", () => {
-    expect(
-      resolveEstudioPersonalListId([
-        { id: ESTUDIO_LIST_ID, name: ESTUDIO_LIST_NAME },
-      ]),
-    ).toBe(ESTUDIO_LIST_ID);
   });
 });

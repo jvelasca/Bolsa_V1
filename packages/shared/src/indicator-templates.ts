@@ -1,15 +1,18 @@
-import type { ChartIndicatorInstance, IndicatorSource } from './indicators-catalog.js';
+import type {
+  ChartIndicatorInstance,
+  IndicatorSource,
+} from "./indicators-catalog.js";
 import {
   findIndicatorDefinition,
   instanceLabel,
   newIndicatorInstanceId,
-} from './indicators-catalog.js';
+} from "./indicators-catalog.js";
 import {
   collectPresetIdsFromInstances,
   instanceFromPreset,
   type IndicatorPreset,
-} from './indicator-presets.js';
-import { instanceSpecKey } from './indicators-runtime.js';
+} from "./indicator-presets.js";
+import { instanceSpecKey } from "./indicators-runtime.js";
 
 /** @deprecated Usar presetIds en plantillas nuevas. */
 export interface IndicatorTemplateItem {
@@ -43,61 +46,63 @@ export interface IndicatorFavoriteRef {
 }
 
 export const DEFAULT_INDICATOR_FAVORITES: IndicatorFavoriteRef[] = [
-  { definitionId: 'volume', parameters: {}, presetId: 'preset-sys-volume-default' },
-  { definitionId: 'sma', parameters: { period: 20 }, presetId: 'preset-sys-sma-default' },
-  { definitionId: 'rsi', parameters: { period: 14 }, presetId: 'preset-sys-rsi-default' },
+  {
+    definitionId: "volume",
+    parameters: {},
+    presetId: "preset-sys-volume-default",
+  },
+  {
+    definitionId: "sma",
+    parameters: { period: 20 },
+    presetId: "preset-sys-sma-default",
+  },
+  {
+    definitionId: "rsi",
+    parameters: { period: 14 },
+    presetId: "preset-sys-rsi-default",
+  },
 ];
 
 /** Accesos directos de plantillas en la barra del gráfico (favoritos). */
 /** Vacío = solo icono con plantilla activa; chips opcionales vía estrella. */
 export const DEFAULT_INDICATOR_TEMPLATE_FAVORITES: string[] = [];
 
-export const BUILTIN_PERSONAL_TEMPLATE_ID = 'builtin-personal';
+export const BUILTIN_PERSONAL_TEMPLATE_ID = "builtin-personal";
 
 export const DEFAULT_INDICATOR_TEMPLATES: IndicatorTemplate[] = [
   {
-    id: 'builtin-swing',
-    name: 'Swing',
-    source: 'builtin',
+    id: "builtin-swing",
+    name: "Swing",
+    source: "builtin",
     locked: true,
     builtin: true,
-    presetIds: ['preset-sys-volume-default', 'preset-sys-sma-50', 'preset-sys-rsi-default'],
+    presetIds: [
+      "preset-sys-volume-default",
+      "preset-sys-sma-50",
+      "preset-sys-rsi-default",
+    ],
   },
   {
-    id: 'builtin-day',
-    name: 'Intradía',
-    source: 'builtin',
+    id: "builtin-day",
+    name: "Intradía",
+    source: "builtin",
     locked: true,
     builtin: true,
-    presetIds: ['preset-sys-volume-default', 'preset-sys-ema-default', 'preset-sys-rsi-default'],
+    presetIds: [
+      "preset-sys-volume-default",
+      "preset-sys-ema-default",
+      "preset-sys-rsi-default",
+    ],
   },
   {
     id: BUILTIN_PERSONAL_TEMPLATE_ID,
-    name: 'Personal',
-    source: 'custom',
+    name: "Personal",
+    source: "custom",
     locked: true,
     builtin: true,
     presetIds: [],
   },
 ];
-
-const API_SUPPORTED_PERIODS: Record<string, number[]> = {
-  sma: [20, 50],
-  ema: [20],
-  rsi: [14],
-};
-
-/** @deprecated Usar isIndicatorApiSupported de indicators-runtime. */
-export function isIndicatorApiSupportedLegacy(
-  definitionId: string,
-  parameters: Record<string, number | boolean | string>,
-): boolean {
-  if (definitionId === 'volume') return true;
-  const periods = API_SUPPORTED_PERIODS[definitionId];
-  if (!periods) return false;
-  const period = Number(parameters.period);
-  return Number.isFinite(period) && periods.includes(period);
-}
 
 export function favoriteRefKey(ref: IndicatorFavoriteRef): string {
   if (ref.presetId) return `preset:${ref.presetId}`;
@@ -113,7 +118,9 @@ export function favoriteRefLabel(ref: IndicatorFavoriteRef): string {
   return definition.shortLabel;
 }
 
-export function favoriteRefFromInstance(instance: ChartIndicatorInstance): IndicatorFavoriteRef {
+export function favoriteRefFromInstance(
+  instance: ChartIndicatorInstance,
+): IndicatorFavoriteRef {
   return {
     definitionId: instance.definitionId,
     parameters: { ...instance.parameters },
@@ -126,7 +133,9 @@ export function instanceMatchesRef(
   ref: IndicatorFavoriteRef,
 ): boolean {
   if (ref.presetId) return instance.presetId === ref.presetId;
-  return favoriteRefKey(favoriteRefFromInstance(instance)) === favoriteRefKey(ref);
+  return (
+    favoriteRefKey(favoriteRefFromInstance(instance)) === favoriteRefKey(ref)
+  );
 }
 
 export function findInstanceByRef(
@@ -145,7 +154,10 @@ function resolveTemplatePresetIds(template: IndicatorTemplate): string[] {
   return [];
 }
 
-export function templateIncludesPreset(template: IndicatorTemplate, presetId: string): boolean {
+export function templateIncludesPreset(
+  template: IndicatorTemplate,
+  presetId: string,
+): boolean {
   return resolveTemplatePresetIds(template).includes(presetId);
 }
 
@@ -155,8 +167,10 @@ export function normalizeIndicatorTemplates(
   const merged: IndicatorTemplate[] = (raw?.length ? raw : []).map((t) => ({
     ...t,
     locked: t.locked ?? t.builtin ?? false,
-    source: (t.source ?? (t.builtin ? 'builtin' : 'custom')) as IndicatorSource,
-    presetIds: t.presetIds?.length ? [...t.presetIds] : resolveTemplatePresetIds(t),
+    source: (t.source ?? (t.builtin ? "builtin" : "custom")) as IndicatorSource,
+    presetIds: t.presetIds?.length
+      ? [...t.presetIds]
+      : resolveTemplatePresetIds(t),
     items: Array.isArray(t.items)
       ? t.items.map((item) => ({ ...item, parameters: { ...item.parameters } }))
       : undefined,
@@ -174,7 +188,7 @@ export function normalizeIndicatorTemplates(
       merged.unshift({
         ...builtin,
         locked: builtin.locked ?? true,
-        source: (builtin.source ?? 'builtin') as IndicatorSource,
+        source: (builtin.source ?? "builtin") as IndicatorSource,
         presetIds: [...(builtin.presetIds ?? [])],
       });
     }
@@ -219,11 +233,13 @@ export function instancesFromTemplate(
   }));
 }
 
-export function createBlankIndicatorTemplate(name = 'Nuevo grupo'): IndicatorTemplate {
+export function createBlankIndicatorTemplate(
+  name = "Nuevo grupo",
+): IndicatorTemplate {
   return {
     id: newIndicatorTemplateId(),
     name,
-    source: 'custom',
+    source: "custom",
     locked: false,
     presetIds: [],
   };
@@ -237,7 +253,7 @@ export function indicatorTemplateFromInstances(
   return {
     id: newIndicatorTemplateId(),
     name,
-    source: 'custom',
+    source: "custom",
     locked: false,
     presetIds: collectPresetIdsFromInstances(instances, presets),
   };
@@ -245,7 +261,7 @@ export function indicatorTemplateFromInstances(
 
 export function templateItemLabel(item: IndicatorTemplateItem): string {
   return instanceLabel({
-    instanceId: 'x',
+    instanceId: "x",
     definitionId: item.definitionId,
     parameters: item.parameters,
     visible: item.visible,
