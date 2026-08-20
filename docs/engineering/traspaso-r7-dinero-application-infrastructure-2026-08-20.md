@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §5.
 > **Fase:** R-7 — el mayor agujero de cobertura heredado de R-6: los use-cases/repos/invariantes contables quedaron FUERA del surface de la re-auditoría web+api+shared. Auditoría **read-only** de `packages/py/application` + `packages/py/infrastructure` (solo py) + corrección por fases acotadas.
-> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). **M-2 COMMITEADA/PUSHEADA a `main`** (`c8e9ced`, invariante reconciliación cash↔ledger, T-M2). **M-3 COMMITEADA/PUSHEADA a `main`** (`6962fd7`, puente cost-basis con fee en cara unrealized del tax-report, T-M3). **M-6 COMMITEADA/PUSHEADA a `main`** (`604bfef`, margen real en `_account_summary_from_portfolio`, T-M6). **M-4/T-M5 COMMITEADA/PUSHEADA a `main`** (`6a1759c`, opción B: `total_fees_for_account` excluye custodia; T-M4 job dedicado DIFERIDO por freeze). **M-7/L-M5 CERRADA por L-M3/M-5 + test-postcondición** (`f598e2d`). **Alto×3 + Medio×7 de R-7 completados** (queda deuda Baja y T-M4 diferido).
+> **Estado:** **EN CURSO.** Auditoría COMPLETADA (3 subagentes + verificación personal del coordinador). **Fase 1 COMMITEADA/PUSHEADA a `main`** (`c957df1`). **Fase 2 COMMITEADA/PUSHEADA a `main`** (idempotencia Deposit/Withdraw, A-2). **Fase 3 COMMITEADA/PUSHEADA a `main`** (`d7b8db8`, unique constraint parcial `ledger_entries` account/reference/type, L-M3/M-5). **M-1 COMMITEADA/PUSHEADA a `main`** (`a78eb29`, fallback mark-to-cost en `get_summary`, T-M1). **M-2 COMMITEADA/PUSHEADA a `main`** (`c8e9ced`, invariante reconciliación cash↔ledger, T-M2). **M-3 COMMITEADA/PUSHEADA a `main`** (`6962fd7`, puente cost-basis con fee en cara unrealized del tax-report, T-M3). **M-6 COMMITEADA/PUSHEADA a `main`** (`604bfef`, margen real en `_account_summary_from_portfolio`, T-M6). **M-4/T-M5 COMMITEADA/PUSHEADA a `main`** (`6a1759c`, opción B: `total_fees_for_account` excluye custodia; T-M4 job dedicado DIFERIDO por freeze). **M-7/L-M5 CERRADA por L-M3/M-5 + test-postcondición** (`f598e2d`). **B-1 (T-M7) COMMITEADA/PUSHEADA a `main`** (`4f43aeb`, high-water-mark max drawdown). **Alto×3 + Medio×7 + Baja B-1 de R-7 completados** (queda deuda Baja y T-M4 diferido).
 > **AsOf:** 2026-08-20.
 
 ---
@@ -296,6 +296,34 @@ Confirmados personalmente en código actual:
 
 ---
 
+## 4j. Fase B-1 corregida — `4f43aeb` `fix(py-application): max drawdown high-water-mark en HardMaxDrawdown (R-7/B-1, T-M7)`
+
+> Decisión de usuario: **Opción A — high-water-mark (HWM)**: `max_pct` = drawdown desde el pico de equity (running peak), monotónico no-decreciente, resetea a 0 solo con nuevo máximo. No-depósito/≤0 preserva `max_pct=None` (gate `HardMaxDrawdown` SKIPPED).
+
+### B-1 (T-M7) — max drawdown naive vs depósito inicial → under-bloqueo tras recuperación
+
+- **Problema:** `EquityMarkBook.update` (`account_drawdown.py:93-94`) computaba `max_dd = _dd_pct(initial_deposit, equity)` — función **estateless** `max(0, (ref−cur)/ref*100)` que comparaba el equity **actual** contra el depósito inicial y se recalculara desde cero en cada snapshot, **sin trackear el pico de equity (high-water-mark)** ni el drawdown más profundo. Consecuencia: si la cuenta sufrió un gran descenso y luego **se recuperó** (equity ≈ inicial), `max_pct` colapsaba hacia 0 → el gate `HardMaxDrawdown` (bloquea si `account_max_drawdown_pct <= limit`) **dejaba de bloquear** (under-bloqueo tras recuperación), "olvidando" que se tocó fondo.
+- **Flow verificado (mapeo read-only):** `execution_router.py:490-494/:752-756` llama `GLOBAL_EQUITY_MARK_BOOK.update(..., initial_deposit=...)` → `dds.max_pct` (`account_drawdown.py`) → `:517/:780 account_max_drawdown_pct=dds.max_pct` → `trading_policy_guard.py:195` → `risk_engine.py:121` → analytics `policy_gate.py:223-241` (regla `HardMaxDrawdown`: PASS si `<= limit`). Espejo TS del gate en `packages/shared/src/cognitive/policy-gate.ts:200-217` consume `dd.maxPct`. Límites `trading_policy_templates.py:53/122/190` (8/12/18%).
+- **Fix (HWM, application-only):** `EquityMarkBook.update` (1 función) ahora
+  - trackea `state["peakEquity"]` (running peak). Semilla: si ausente (1er observation), `max(equity, initial_deposit_>0)`; si ya presente (restart vía settings), se conserva. Después `peak = max(peak, equity)` monotónico.
+  - trackea `state["maxDrawdownPct"]` (running max / drawdown más profundo desde el pico), reseteado a 0 solo cuando `equity >= peak` (nuevo máximo) — esto preserva el valor profundo tras recuperación parcial (10.0, no 2.0), que es exactamente el fix del under-bloqueo.
+  - **Gating preservado:** `max_pct` solo se computa si `initial_deposit is not None and > 0` (baseline presente); sin baseline → `max_pct=None` → gate `HardMaxDrawdown` SKIPPED (idéntico a antes).
+  - **Persistencia automática:** `peakEquity`/`maxDrawdownPct` viven en el state dict que `export_settings_fragment`/`load_from_settings` ya serializan/restauran (sin tocar esos métodos). `daily_pct`/`weekly_pct`/`day_open_equity`/`week_open_equity`/`lastEquity` intactos. DTO shape sin cambio (`max_pct: float | None`).
+- **Nota de diseño (verificación anti-alucinación del coordinador):** el subagente se desvió del brief "puro `_dd_pct(peak, equity)`" añadiendo el running-max `maxDrawdownPct`. Verifiqué que la desviación es **necesaria y correcta** (el `_dd_pct(peak, equity)` puro reportaría 2.0 en la recuperación parcial 100k→90k→98k, no el 10.0 monotónico que exige la intención documentada y los tests).
+- **Files:** `packages/py/application/src/bolsa_application/account_drawdown.py` · `packages/py/application/tests/test_account_drawdown.py` (4 nuevos). No se tocó infra/domain/api/FE ni el shape del DTO.
+
+### Batería B-1 (verificada por el coordinador)
+
+| Comprobación                                                                       | Resultado                   |
+| ---------------------------------------------------------------------------------- | --------------------------- |
+| `ruff check packages/py apps/api-python --config pyproject.toml` (2 files alcance) | ✅ exit 0                   |
+| `mypy account_drawdown.py` (config raíz)                                           | ✅ Success                  |
+| pytest `test_account_drawdown.py`                                                  | ✅ 6 passed (2 pre + 4 new) |
+| pytest application (fakes, sin DB) (suite completa)                                | ✅ 245 passed (4 nuevos)    |
+| `git status`                                                                       | ✅ solo files del alcance   |
+
+---
+
 ## 5. Inventario de deuda NUEVA (de R-7; priorizado por riesgo dinero/verdad)
 
 ### 🔴 Alto
@@ -321,8 +349,8 @@ Confirmados personalmente en código actual:
 ### 🟢 Bajo
 
 | Código           | Superficie  | Hallazgo                                                                                                                                                                       | Riesgo        |
-| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- |
-| B-1 (T-M7)       | application | "Max drawdown" naive (vs depósito inicial, no high-water-mark) alimenta el risk gate `HardMaxDrawdown` → under-bloqueo tras recuperación.                                      | verdad        |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | -------------------------------------- |
+| B-1 (T-M7)       | application | "Max drawdown" naive (vs depósito inicial, no high-water-mark) alimenta el risk gate `HardMaxDrawdown` → under-bloqueo tras recuperación.                                      | verdad        | ✅ CORREGIDO (B-1, ver §4j, `4f43aeb`) |
 | B-2 (T-M8)       | domain      | `total_unrealized_gain` suma `unrealized_gain or 0.0` → posiciones sin precio se silencian a 0 en el total.                                                                    | verdad        |
 | B-3 (L-M4)       | infra+app   | `transfer_cash` atómico pero **código muerto** (0 callers) y **no escribe ledger**; un futuro caller movería dinero sin traza reconciliable.                                   | dinero/verdad |
 | B-4 (L-M6)       | application | fee ledger escrita en 2ª llamada no atómica con el trade; app guard solo se activa si se pasa `idempotency_key` (nada lo exige).                                               | dinero        |
@@ -339,7 +367,7 @@ Confirmados personalmente en código actual:
 
 1. **M-4/T-M4 (resto de M-4):** mover el cargo de custodia del path de lectura (GET summary/tax + herencia daily-ops) a un job dedicado — cambio de comportamiento, requiere decisión (colinda con "sin features"). **T-M5 (mezcla fees) ya CERRADA** (`6a1759c`); **queda solo T-M4, DIFERIDO**.
 2. ~~**M-7 (L-M5):** custodia dedup time-only~~ — **✅ CERRADA** (`f598e2d`, ver §4i): cubierta por L-M3/M-5 (UNIQUE rechaza re-cargo + transacción compartida revierte cash) + test-postcondición.
-3. **B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown`. ****(PRÓXIMA candidata de Baja por decisión)****
+3. ~~**B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown`~~ — **✅ CERRADA** (`4f43aeb`, ver §4j): high-water-mark (pico de equity + running-max `maxDrawdownPct`).
 4. **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio. _(NO confundir con M-1, ya cerrada.)_
 5. **B-3 (L-M4):** `transfer_cash`/`add_cash`/`deduct_cash` del repo mutan cash SIN ledger (código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar; decidir.
 6. **B-4 (L-M6):** fee ledger escrita en 2ª llamada no atómica con el trade (el UNIQUE de Fase 3 NO toca `transaction` → queda abierta).
@@ -365,6 +393,7 @@ Confirmados personalmente en código actual:
 | M-3: `ruff` config CI raíz (3 files) · `mypy tax_report.py` · domain 21 · infra real 72+1xfail · application 235 | ✅ 0 / Success / 21 / 72+1xfail / 235 (ver §4f; corrección global→log del coordinador)                       |
 | M-4/T-M5: `ruff` config CI raíz (2 files) · `mypy ledger_repository.py`+test · infra real 74+1xfail · app 241    | ✅ 0 / Success / 74+1xfail / 241 (ver §4h)                                                                   |
 | M-7/L-M5: `ruff` config CI raíz · `mypy` test · infra real 76+1xfail · app 241                                   | ✅ 0 / Success / 76+1xfail / 241 (ver §4i)                                                                   |
+| B-1/T-M7: `ruff` config CI raíz (2 files) · `mypy account_drawdown.py` · application 245 (4 nuevos)              | ✅ 0 / Success / 245 (ver §4j)                                                                               |
 | CI `main` para `c957df1`                                                                                         | → ratificado; F2 a confirmar (Gitleaks/Frontend sin impacto por path-filter; Python CI no gatea application) |
 
 ## 8. Texto de traspaso (pegar al abrir el próximo chat / relevo por saturación)
@@ -407,11 +436,13 @@ Confirmados personalmente en código actual:
 >
 > - **T-M6:** `_account_summary_from_portfolio` fabricaba `margin_used=0.0`, `free_margin=cash`, `margin_level_pct=None` aunque el account tuviera leverage/posiciones. **Decisión usuario: fórmula `margin_used = Σ market_value / leverage`** + **alcance "completar"** (computar los 3 campos; DTO `AccountSummary`/endpoints intactos → sin `contract:gen`). Fix: `_account_summary_from_portfolio` computa `margin_used = Σ(mv de posiciones con precio)/leverage` (guard `leverage>0`, fail-closed→0.0), `free_margin = total_equity − margin_used`, `margin_level_pct = equity/margin_used*100` o `None` si 0. Fidelidad M-1: posiciones con `market_value=None` NO cuentan (coherentes con `total_market_value`/`total_equity`). Sin tocar FE (solo cambia el valor que ve `dashboard-page.tsx:163` "Margen libre"). Tests `test_account_summary_margin.py` (6, fakes en memoria: A sin posiciones / B single leverage / C dos posiciones leverage>1 / D sin precio no cuenta / D' mixto solo cuenta la con precio / E guard leverage==0 sin ZeroDivision); fake `_Account` de `test_list_account_summaries.py` ganó `leverage`.
 >
-> **SIGUIENTES (por decisión):** deuda Media de R-7 **completa** (Alto×3 + Medio×7 cerradas). Ahora Baja: **(1) B-1 (T-M7)** (max drawdown naive) · **(2) B-3 (L-M4)** (write-paths de cash sin ledger — xfail documentado) · B-4 (fee atómico) · B-5 · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 TODAS CERRADAS.**
+> **SIGUIENTES (por decisión):** deuda de dinero real de R-7 **completa** (Alto×3 + Medio×7 + Baja **B-1** cerradas). Ahora Baja: **(1) B-3 (L-M4)** (write-paths de cash sin ledger — xfail documentado en M-2) · B-2 (unrealized silencia sin precio) · B-4 (fee atómico) · B-5 · **M-4/T-M4** (job dedicado, DIFERIDO por freeze). **L-M3/M-5 CERRADA · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1 TODAS CERRADAS.**
 >
 > **M-7 (L-M5) CERRADA (`f598e2d`):** el re-cobro de custodia (dedup time-only del mutex) **ya está cubierto por L-M3/M-5** (UNIQUE `(account_id, reference_type, reference_id, type)` rechaza con `IntegrityError` una 2ª fila del mismoaccount+periodo; la transacción compartida de `deduct_cash`+`append_custody_fee` revierte el cash en el `rollback` de `get_db_session`). Añadido test-postcondición `test_m7_custody_single_charge_f3_guard.py` (2, Postgres real). Sin cambios de producción. Ver §4i.
 >
 > **M-4/T-M5 (mezcla fees) CERRADA (`6a1759c`):** `total_fees_for_account` excluye `reference_type="custody"` → `fees_paid_total` deja de mezclar custodia con trade-fees. Opción B acotada (infra-only). **T-M4 (job dedicado) DIFERIDO** por freeze. Ver §4h + `test_m4_total_fees_excludes_custody.py`.
+>
+> **B-1 (T-M7) CERRADA (`4f43aeb`):** max drawdown naive → **high-water-mark** en `EquityMarkBook.update` (`account_drawdown.py`): se trackea el **pico de equity** (`peakEquity`) y el **drawdown más profundo desde el pico** (`maxDrawdownPct`, running-max), reseteado a 0 solo cuando `equity >= peak` (nuevo máximo). Corrige el **under-bloqueo tras recuperación** del gate `HardMaxDrawdown` (antes el drawdown se recalculaba vs depósito inicial, estateless, y colapsaba a ~0 al recuperarse). Gating preservado: sin `initial_deposit`/≤0 → `max_pct=None` (gate SKIPPED). Persistencia automática vía `equityMarks`. Shape DTO intacto. Tests `test_account_drawdown.py` (+4: recuperación parcial mantiene 10.0 / nuevo máximo resetea / pico sobrevive restart / sin baseline None). Batería: ruff 0 · mypy Success · app 245. Ver §4j.
 >
 > Detalle + inventario completo: `docs/engineering/traspaso-r7-dinero-application-infrastructure-2026-08-20.md` · ancla de trabajo vivo: `docs/engineering/backlog-trabajo-2026-08-20.md` (LEER PRIMERO) · estado vivo: `docs/engineering/PROJECT_STATE.md` · índice: `docs/engineering/engineering-index-2026-08-03.md` §5.
 
@@ -423,43 +454,46 @@ Este traspaso está preparado para: (a) seguir aquí con la fase siguiente si el
 
 ---
 
-### ✅ CHECKLIST DE RELEVO → FASE CERRADA: **M-7/L-M5 (custodia dedup, cubierta por F3)** — deuda Media de R-7 COMPLETA
+### ✅ CHECKLIST DE RELEVO → FASE CERRADA: **B-1 (T-M7) — max drawdown high-water-mark en HardMaxDrawdown** — deuda Alta+Media+Baja parcial de R-7
 
-**Estado al cerrar (verificado):** `main` limpio, sincronizado con `origin/main` · **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7** → **Alto×3 + Medio×7 de R-7 COMPLETADOS** · **T-M4 (job dedicado) DIFERIDO** por freeze · ancla `docs/engineering/backlog-trabajo-2026-08-20.md` §0 al día (LEER PRIMERO al abrir).
+**Estado al cerrar (verificado):** `main` limpio, sincronizado con `origin/main` · **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1** → **Alto×3 + Medio×7 + Baja B-1 de R-7 COMPLETADAS** · **T-M4 (job dedicado) DIFERIDO** por freeze · ancla `docs/engineering/backlog-trabajo-2026-08-20.md` §0 al día (LEER PRIMERO al abrir).
 
-**M-7 cerrada (`f598e2d`):** el re-cobro de custodia (dedup time-only del mutex) **ya quedó cubierto por L-M3/M-5**: el UNIQUE `(account_id, reference_type, reference_id, type)` rechaza con `IntegrityError` una 2ª fila del mismo account+periodo, y como `deduct_cash`+`append_custody_fee` comparten la `AsyncSession`, el `rollback` de `get_db_session` revierte el cash → no queda cash descontado sin fila. Añadido test-postcondición `test_m7_custody_single_charge_f3_guard.py` (2, Postgres real). Sin cambios de producción. Ver §4i.
+**B-1 cerrada (`4f43aeb`):** `EquityMarkBook.update` (`account_drawdown.py`) pasa de "max drawdown naive vs depósito inicial" (estateless, se recalcula cada snapshot) a **high-water-mark**: trackea el **pico de equity** (`peakEquity`, persistido en `equityMarks`) y el **drawdown más profundo desde el pico** (`maxDrawdownPct`, running-max), reseteado a 0 solo cuando `equity >= peak` (nuevo máximo). Corrige el **under-bloqueo tras recuperación** del gate `HardMaxDrawdown` — tras un gran descenso y recuperación parcial, el gate ya NO deja de bloquear (reporta el valor profundo, p.ej. 10.0, no el instantáneo 2.0). `max_pct` sigue `float | None` (shape DTO intacto; consumidores escritos). Gating preservado: sin `initial_deposit`/≤0 → `max_pct=None` (gate SKIPPED). Persistencia automática vía `export_settings_fragment`/`load_from_settings`. Tests `test_account_drawdown.py` (+4). Ver §4j.
 
 **Próximas candidatas (deuda Baja, requieren decisión de usuario):**
 
-- **B-1 (T-M7):** "max drawdown" naive en el risk gate `HardMaxDrawdown` → under-bloqueo tras recuperación. **[ARCO PRÓXIMA DESPUÉS DE ESTA CHECKLIST, ver bloque abajo]**
-- **B-3 (L-M4):** write-paths de cash sin ledger (`transfer_cash`/`add_cash`/`deduct_cash`, código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar.
+- **B-1 (T-M7):** "max drawdown" naive → **✅ CERRADA** (`4f43aeb`, high-water-mark, ver §4j).
+- **B-3 (L-M4):** write-paths de cash sin ledger (`transfer_cash`/`add_cash`/`deduct_cash`, código muerto; xfail documental en M-2) — conectar use-case/ruta o eliminar. **[PRÓXIMA — ver bloque abajo]**
+- **B-2 (T-M8):** `total_unrealized_gain` silencia a 0 las posiciones sin precio (_no confundir con M-1, ya cerrada_).
 - **B-4 / B-5** (fee atómico / FIFO + PnL whole-account).
 - **M-4/T-M4 (diferido):** mover custodia de GET a job dedicado — colinda con «sin features».
 
-**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M5, M-6, M-7 CERRADAS; T-M4 (job dedicado) diferido por freeze; B-3 pendiente con xfail en M-2. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M5, M-6, M-7, B-1 CERRADAS; T-M4 (job dedicado) diferido por freeze; B-3 pendiente con xfail en M-2. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4).
 
-**Batería acumulada confirmada (referencia del relevo):** ruff 0 (config CI raíz `pyproject.toml`) · mypy infra/domain Success (application mypy-blind en CI) · pytest infra Postgres real **76+1xfail** · domain 21 · application **241** · api-python 32.
+**Batería acumulada confirmada (referencia del relevo):** ruff 0 (config CI raíz `pyproject.toml`) · mypy infra/domain Success (application mypy-blind en CI) · pytest infra Postgres real **76+1xfail** · domain 21 · application **245** (241 + 4 B-1) · api-python 32.
 
 ---
 
-## ✳️ ARRANQUE SIGUIENTE FASE: **B-1 (T-M7) — max drawdown naive en HardMaxDrawdown** (por decisión del usuario)
+## ✳️ ARRANQUE SIGUIENTE FASE: **B-3 (L-M4) — write-paths de cash sin ledger** (por decisión del usuario)
 
-> **Cómo usar:** pega este bloque (o el §8 anterior) como primer mensaje del NUEVO chat. El coordinador del nuevo chat ejecuta la secuencia en orden, una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **Alto×3 + Medio×7 de R-7 completados** → siguiente por decisión entre la deuda Baja.
+> **Cómo usar:** pega este bloque (o el §8 anterior) como primer mensaje del NUEVO chat. El coordinador del nuevo chat ejecuta la secuencia en orden, una fase = un subagente acotado + batería + aprobación por commit + relevo documentado. **Alto×3 + Medio×7 + Baja B-1 de R-7 completados** → siguiente por decisión entre la deuda Baja.
+>
+> **B-1 (T-M7) ya CERRADA** (`4f43aeb`, high-water-mark max drawdown — ver §4j).
 
 **Read-first (obligatorio):** leer `docs/engineering/backlog-trabajo-2026-08-20.md` §0 y §1. Si no coincide con el repo → PARAR y re-leer.
 
-**Estado al abrir:** `local main = origin/main` (cierre M-7 `f598e2d` + docs a actualizar), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7.**
+**Estado al abrir:** `local main = origin/main` (cierre B-1 `4f43aeb` + docs actualizados), árbol limpio. **CERRADAS: L-M3/M-5 (F3) · M-1 · M-2 · M-3 · M-6 · M-4/T-M5 · M-7 · B-1.**
 
 **Hallazgo a resolver (backlog §1, Baja):**
 
-> B-1 (T-M7) · application · "Max drawdown" **naive** (vs depósito inicial, no high-water-mark) alimenta el risk gate `HardMaxDrawdown` → **under-bloqueo tras recuperación**. Riesgo: **verdad**.
+> B-3 (L-M4) · infra+app · `transfer_cash` atómico pero **código muerto** (0 callers) y **no escribe ledger**; un futuro caller movería dinero sin traza reconciliable (xfail documental en M-2). Riesgo: **dinero/verdad**.
 
-**Secuencia de arranque B-1 (obligatoria, anti-saturación):**
+**Secuencia de arranque B-3 (obligatoria, anti-saturación):**
 
-1. **Mapeo read-only** (subagente, sin tocar código): dónde se computa el max drawdown en application (risk gates / `HardMaxDrawdown`), contra qué referencia ("vs depósito inicial"), cómo alimenta el gate, y qué consumidores dependen de ese cálculo (risk pipeline, reports). Entregar file:line verificado. Determinar si el fix rompe algún comportamiento esperado/consumidor.
-2. **Decisión de usuario:** alcance (high-water-mark vs dejar), y si el cambio de valor esperado es aceptable (puede alterar gate de riesgo existente).
+1. **Mapeo read-only** (subagente, sin tocar código): confirmar que `transfer_cash`/`add_cash`/`deduct_cash` en `portfolio_repository.py` mutan cash SIN escribir ledger (evidencia file:line), confirmar que no hay callers de `transfer_cash` (0 callers), cómo quedó el xfail en M-2 (`test_m2_ledger_cash_reconciliation.py`), y qué use-cases/rutas podrían conectarlo (Deposit/Withdraw ya fija el ledger vía `append_cash_movement`? cuál es la escotilla real). Entregar file:line verificado. Determinar si conectar (use-case/ruta) o eliminar es la opción con menor riesgo/superficie.
+2. **Decisión de usuario:** opciones (conectar use-case/ruta vs eliminar el código muerto vs dejar documentado). Cambio de valor esperado solo si se conecta (afecta write-path de money).
 3. **Subagente implementación acotado** + **verificación coordinador** (code diff + test + batería real) + **aprobación + commit + push** (rama `main` protegida; el push requiere aprobación vía tarjeta) + **relevo documentado**.
 
-**Alternativas por decisión:** **B-3** (write-paths de cash sin ledger, `transfer_cash`/`add_cash`/`deduct_cash`, código muerto) · **B-4** (fee atómico) · **B-5** (FIFO `quantity==0` / PnL whole-account) · **M-4/T-M4** (job dedicado, diferido por freeze).
+**Alternativas por decisión:** **B-2** (T-M8, `total_unrealized_gain` silencia posiciones sin precio) · **B-4** (fee atómico) · **B-5** (FIFO `quantity==0` / PnL whole-account) · **M-4/T-M4** (job dedicado, diferido por freeze).
 
-**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M4 diferido por freeze (job dedicado); B-3 (write-paths de cash sin ledger) pendiente con xfail en M-2; M-6 CERRADA (margen, no reabrir); M-7 CERRADA. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
+**Decisiones de alcance vigentes que NO reabrir sin pedir:** M-3 = puente (storage/`avg_cost` sigue fee-excluido); M-4/T-M4 diferido por freeze (job dedicado); B-3 (write-paths de cash sin ledger) pendiente con xfail en M-2; B-1 CERRADA (high-water-mark, no reabrir); M-6/M-7 CERRADAS. Freeze: sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida (D4). **No `regen_full`** sin decisión. **No `contract:gen`** salvo fase pactada.
