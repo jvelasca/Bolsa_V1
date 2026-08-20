@@ -18,6 +18,9 @@ KILL_SWITCH_REDIS_KEY = "bolsa:risk:kill_switch"
 IDEMPOTENCY_REDIS_PREFIX = "bolsa:auto-exec:idem:"
 IDEMPOTENCY_TTL_SEC = 60 * 60 * 48  # 48h
 
+CUSTODY_REDIS_PREFIX = "bolsa:custody:"
+CUSTODY_TTL_SEC = 60 * 60 * 48  # 48h: ventana de bloqueo igual que auto-exec
+
 
 def get_runtime_kill_switch_memory() -> bool:
     return _RUNTIME_KILL
@@ -32,7 +35,7 @@ def clear_idempotency_memory_for_tests() -> None:
     _IDEMPOTENCY_MEMORY.clear()
 
 
-async def _redis_client():
+async def _redis_client() -> Any | None:
     from bolsa_infrastructure.config import get_settings
 
     url = (get_settings().redis_url or "").strip()
@@ -147,3 +150,87 @@ async def claim_auto_execute_idempotency(key: str) -> bool:
                 pass
     _IDEMPOTENCY_MEMORY.add(key)
     return True
+
+
+async def release_auto_execute_idempotency(key: str) -> None:
+    """Libera un claim AUTO no confirmado (p. ej. fill fallido) para permitir reintento.
+
+    Best-effort: borra memoria del proceso y Redis si hay. Un retry con la misma clave
+    volverá a pasar ``claim_auto_execute_idempotency``.
+    """
+    _IDEMPOTENCY_MEMORY.discard(key)
+    client = await _redis_client()
+    if client is None:
+        return
+    try:
+        await client.delete(f"{IDEMPOTENCY_REDIS_PREFIX}{key}")
+        await client.aclose()
+    except Exception:
+        logger.debug("idempotency redis release failed", exc_info=True)
+        try:
+            await client.aclose()
+        except Exception:
+            pass
+
+
+_CUSTODY_MEMORY: set[str] = set()
+
+
+def clear_custody_memory_for_tests() -> None:
+    _CUSTODY_MEMORY.clear()
+
+
+def make_custody_idempotency_key(account_id: str, period: str) -> str:
+    """Clave estable por cuenta y periodo (año) para el cargo de custodia."""
+    return f"custody|{account_id}|{period}"
+
+
+async def claim_custody_charge(account_id: str, period: str) -> bool:
+    """True si el cargo de custodia (cuenta, periodo) no se ha aplicado aún.
+
+    Guard SET NX sobre ``bolsa:custody:*`` — único medio atomico entre workers/requests
+    para impedir el doble cargo de custodia en lecturas concurrentes (GET summary/tax).
+    """
+    key = make_custody_idempotency_key(account_id, period)
+    if key in _CUSTODY_MEMORY:
+        return False
+    client = await _redis_client()
+    if client is not None:
+        try:
+            ok = await client.set(
+                f"{CUSTODY_REDIS_PREFIX}{key}",
+                "1",
+                nx=True,
+                ex=CUSTODY_TTL_SEC,
+            )
+            await client.aclose()
+            if ok:
+                _CUSTODY_MEMORY.add(key)
+                return True
+            return False
+        except Exception:
+            logger.debug("custody redis claim failed", exc_info=True)
+            try:
+                await client.aclose()
+            except Exception:
+                pass
+    _CUSTODY_MEMORY.add(key)
+    return True
+
+
+async def release_custody_charge(account_id: str, period: str) -> None:
+    """Libera un claim de custodia cuando NO se aplicó cargo (salida temprana)."""
+    key = make_custody_idempotency_key(account_id, period)
+    _CUSTODY_MEMORY.discard(key)
+    client = await _redis_client()
+    if client is None:
+        return
+    try:
+        await client.delete(f"{CUSTODY_REDIS_PREFIX}{key}")
+        await client.aclose()
+    except Exception:
+        logger.debug("custody redis release failed", exc_info=True)
+        try:
+            await client.aclose()
+        except Exception:
+            pass

@@ -25,6 +25,7 @@ from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import (
     claim_auto_execute_idempotency,
     effective_kill_switch,
+    release_auto_execute_idempotency,
 )
 from bolsa_application.trading_policy_guard import CognitiveGuardResult
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
@@ -615,6 +616,11 @@ class ExecutionRouter:
                 account_id=policy.account_id,
             )
         except ValueError as exc:
+            # El claim AUTO quedó tomado antes del fill (OR-T4). Si el fill falló
+            # (no se ha ejecutado nada), liberarlo para permitir el reintento mismo
+            # día×política×instrumento; no se ha movido dinero.
+            if claimed:
+                await release_auto_execute_idempotency(idem_key)
             return ExecutionActionResult(
                 instrument_id=signal.instrument_id,
                 signal_kind=str(signal.kind),

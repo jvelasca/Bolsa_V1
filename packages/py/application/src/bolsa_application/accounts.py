@@ -3,6 +3,7 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 
+from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
 from bolsa_domain.account_settings import calculate_trade_fees, settings_from_dict
 from bolsa_domain.entities.account import (
     AccountSummary,
@@ -345,64 +346,83 @@ class ApplyCustodyFees:
         if pct is None or pct <= 0:
             return False
 
-        last = await self._ledger_repo.last_custody_charge_at(scope.account.id)
         now = datetime.now(UTC)
+        period = now.strftime("%Y")
+
+        # Dedup duradero vía ledger: si ya se cobró este periodo, no repetir.
+        # (Consulta previa al claim: serializa la ventana concurrente abajo; este
+        # guard se apoya en la fila ya persistida y sobrevive a reinicios.)
+        last = await self._ledger_repo.last_custody_charge_at(scope.account.id)
         if last is not None:
             last_dt = last if last.tzinfo else last.replace(tzinfo=UTC)
             if (now - last_dt).days < self.CUSTODY_INTERVAL_DAYS:
                 return False
 
-        portfolios = await self._account_repo.list_portfolios(scope.account.id)
-        total_equity = 0.0
-        for portfolio in portfolios:
-            if not portfolio.legacy_portfolio_id:
-                continue
-            summary = await self._portfolio_repo.get_summary(portfolio.legacy_portfolio_id)
-            total_equity += summary.total_equity
-        if total_equity <= 0:
+        # Mutex atómico (SET NX) por cuenta+periodo: evita el doble cargo cuando
+        # dos GET (summary/tax) entran a la vez y ambas superan el guard de arriba.
+        claimed = await claim_custody_charge(scope.account.id, period)
+        if not claimed:
             return False
 
-        fee_amount = total_equity * pct / 100
-        charge_portfolio_id = scope.portfolio.id
-        charge_legacy_id = scope.portfolio.legacy_portfolio_id
-        if not charge_legacy_id:
-            default = next((p for p in portfolios if p.is_default), portfolios[0])
-            charge_portfolio_id = default.id
-            charge_legacy_id = default.legacy_portfolio_id
-        if not charge_legacy_id:
-            return False
+        try:
+            portfolios = await self._account_repo.list_portfolios(scope.account.id)
+            total_equity = 0.0
+            for portfolio in portfolios:
+                if not portfolio.legacy_portfolio_id:
+                    continue
+                summary = await self._portfolio_repo.get_summary(portfolio.legacy_portfolio_id)
+                total_equity += summary.total_equity
+            if total_equity <= 0:
+                await release_custody_charge(scope.account.id, period)
+                return False
 
-        # Custodia descuenta del cash de una única cartera el cargo calculado
-        # sobre el patrimonio total (por definición el cargo puede superar el
-        # cash disponible). allow_partial: True descarta lo que haya, de forma
-        # explícita (nunca en silencio) y trazada en el ledger con el importe real.
-        pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
-        cash_before = pre_summary.portfolio.cash
-        balance_after = await self._portfolio_repo.deduct_cash(
-            charge_legacy_id,
-            fee_amount,
-            allow_partial=True,
-        )
-        charged = cash_before - balance_after
-        if charged < 0:
-            charged = 0.0
-        period = now.strftime("%Y")
-        description = f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
-        if charged < fee_amount:
-            description += (
-                f" · cargo parcial por saldo (aplicado {charged:.2f} € de {fee_amount:.2f} €)"
+            fee_amount = total_equity * pct / 100
+            charge_portfolio_id = scope.portfolio.id
+            charge_legacy_id = scope.portfolio.legacy_portfolio_id
+            if not charge_legacy_id:
+                default = next((p for p in portfolios if p.is_default), portfolios[0])
+                charge_portfolio_id = default.id
+                charge_legacy_id = default.legacy_portfolio_id
+            if not charge_legacy_id:
+                await release_custody_charge(scope.account.id, period)
+                return False
+
+            # Custodia descuenta del cash de una única cartera el cargo calculado
+            # sobre el patrimonio total (por definición el cargo puede superar el
+            # cash disponible). allow_partial: True descarta lo que haya, de forma
+            # explícita (nunca en silencio) y trazada en el ledger con el importe real.
+            pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
+            cash_before = pre_summary.portfolio.cash
+            balance_after = await self._portfolio_repo.deduct_cash(
+                charge_legacy_id,
+                fee_amount,
+                allow_partial=True,
             )
-        await self._ledger_repo.append_custody_fee(
-            account_id=scope.account.id,
-            portfolio_id=charge_portfolio_id,
-            amount=charged,
-            currency=scope.account.currency,
-            balance_after=balance_after,
-            reference_id=f"custody-{period}",
-            description=description,
-        )
-        await self._account_repo.touch_activity(scope.account.id)
-        return True
+            charged = cash_before - balance_after
+            if charged < 0:
+                charged = 0.0
+            description = f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
+            if charged < fee_amount:
+                description += (
+                    f" · cargo parcial por saldo (aplicado {charged:.2f} € de {fee_amount:.2f} €)"
+                )
+            await self._ledger_repo.append_custody_fee(
+                account_id=scope.account.id,
+                portfolio_id=charge_portfolio_id,
+                amount=charged,
+                currency=scope.account.currency,
+                balance_after=balance_after,
+                reference_id=f"custody-{period}",
+                description=description,
+            )
+            await self._account_repo.touch_activity(scope.account.id)
+            # Tras el cargo persistido, el guard duradero (ledger) ya protege el
+            # año; liberar el mutex para no bloquear reintentos de otros periodos.
+            await release_custody_charge(scope.account.id, period)
+            return True
+        except Exception:
+            await release_custody_charge(scope.account.id, period)
+            raise
 
 
 class ListLedgerEntries:
