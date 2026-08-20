@@ -70,6 +70,43 @@ class SqlAlchemyPortfolioRepository:
         closes = await self._latest_closes([instrument_id])
         return closes.get(instrument_id)
 
+    async def _latest_transaction_prices(
+        self, portfolio_id: str, instrument_ids: list[str]
+    ) -> dict[str, float]:
+        """Último ``TransactionRow.price`` por instrumento, scoped a la cartera.
+
+        Fallback "mark-to-cost" (M-1, Opción B): cuando un instrumento de la cartera no
+        tiene close D1 (``_latest_closes`` no devuelve precio), usamos su último precio
+        TRANSACCIONAL histórico como ``last_price``. Es un precio histórico de coste
+        (≈ coste del último trade), NO un precio de mercado, pero es el mejor dato
+        disponible y evita: (1) la pérdida ficticia (=coste completo de la posición)
+        que antes se reportaba en ``total_unrealized_pnl``, y (2) subestimar la equity
+        en custodia/riesgo (``total_equity = cash + Σ market_value`` seguía excluyendo
+        estas posiciones mientras su cost ya sumaba). No es ideal como mark-to-market,
+        pero es la decisión del usuario (Opción B).
+
+        Una sola query para el conjunto (sin N+1): ``DISTINCT ON (instrument_id)`` con
+        el ``executed_at`` más reciente por instrumento.
+        """
+        if not instrument_ids:
+            return {}
+        stmt = (
+            select(TransactionRow.instrument_id, TransactionRow.price)
+            .where(
+                TransactionRow.portfolio_id == portfolio_id,
+                TransactionRow.instrument_id.in_(instrument_ids),
+            )
+            .distinct(TransactionRow.instrument_id)
+            .order_by(TransactionRow.instrument_id, TransactionRow.executed_at.desc())
+        )
+        result = await self._session.execute(stmt)
+        out: dict[str, float] = {}
+        for iid, price in result.all():
+            if price is None:
+                continue
+            out[str(iid)] = float(price)
+        return out
+
     async def get_summary(self, legacy_portfolio_id: str) -> PortfolioSummary:
         portfolio = await self._resolve_portfolio(legacy_portfolio_id)
         stmt = (
@@ -83,6 +120,17 @@ class SqlAlchemyPortfolioRepository:
         positions_rows = list(result.scalars().all())
         closes = await self._latest_closes([row.instrument_id for row in positions_rows])
 
+        # M-1 (Opción B): para los instrumentos sin close D1, un fallback "mark-to-cost"
+        # al último precio transaccional de la cartera (una query para el conjunto).
+        ids_sin_precio = [
+            row.instrument_id for row in positions_rows if closes.get(row.instrument_id) is None
+        ]
+        tx_prices = (
+            await self._latest_transaction_prices(portfolio.id, ids_sin_precio)
+            if ids_sin_precio
+            else {}
+        )
+
         positions: list[Position] = []
         total_market_value = 0.0
         total_cost = 0.0
@@ -92,6 +140,9 @@ class SqlAlchemyPortfolioRepository:
             avg_cost = float(row.avg_cost)
             cost_basis = quantity * avg_cost
             last_price = closes.get(row.instrument_id)
+            if last_price is None:
+                # fallback "mark-to-cost": último precio transaccional (M-1, Opción B)
+                last_price = tx_prices.get(row.instrument_id)
             market_value = quantity * last_price if last_price is not None else None
             unrealized_pnl = market_value - cost_basis if market_value is not None else None
             unrealized_pnl_pct = (
@@ -101,7 +152,12 @@ class SqlAlchemyPortfolioRepository:
             )
             if market_value is not None:
                 total_market_value += market_value
-            total_cost += cost_basis
+                total_cost += cost_basis
+            # Nota M-1 (Opción B): si la posición NO tiene ni close D1 ni transacción
+            # en cartera, queda sin precio observable → NO suma a total_market_value
+            # NI a total_cost, para que total_unrealized_pnl (= Σ market_value − Σ cost)
+            # no fabrique una pérdida fantasma (=coste completo) ni total_equity
+            # (`cash + total_market_value`) contabilice un valor desconocido.
             positions.append(
                 Position(
                     id=row.id,
