@@ -1,10 +1,10 @@
 /** Perfil de comisiones simuladas (estilo broker retail EU). */
 export type CommissionPresetId =
-  | 'standard_es'
-  | 'xtb_zero_stock'
-  | 'ibkr_tiered'
-  | 'custom'
-  | 'none';
+  | "standard_es"
+  | "xtb_zero_stock"
+  | "ibkr_tiered"
+  | "custom"
+  | "none";
 
 export interface CommissionProfile {
   presetId: CommissionPresetId;
@@ -23,8 +23,8 @@ export interface CommissionProfile {
   custodyAnnualPct: number | null;
 }
 
-export type TaxJurisdiction = 'ES' | 'EU_OTHER' | 'US' | 'CUSTOM';
-export type CostBasisMethod = 'fifo' | 'average';
+export type TaxJurisdiction = "ES" | "EU_OTHER" | "US" | "CUSTOM";
+export type CostBasisMethod = "fifo" | "average";
 
 export interface TaxProfile {
   jurisdiction: TaxJurisdiction;
@@ -63,12 +63,12 @@ export interface TradeFeeBreakdownDto {
 }
 
 export const COMMISSION_PRESETS: Record<
-  Exclude<CommissionPresetId, 'custom'>,
+  Exclude<CommissionPresetId, "custom">,
   CommissionProfile
 > = {
   none: {
-    presetId: 'none',
-    label: 'Sin comisiones',
+    presetId: "none",
+    label: "Sin comisiones",
     stockCommissionPct: 0,
     stockCommissionMin: 0,
     stockCommissionMax: null,
@@ -77,8 +77,8 @@ export const COMMISSION_PRESETS: Record<
     custodyAnnualPct: null,
   },
   xtb_zero_stock: {
-    presetId: 'xtb_zero_stock',
-    label: 'Zero comisión acciones (spread)',
+    presetId: "xtb_zero_stock",
+    label: "Zero comisión acciones (spread)",
     stockCommissionPct: 0,
     stockCommissionMin: 0,
     stockCommissionMax: null,
@@ -87,8 +87,8 @@ export const COMMISSION_PRESETS: Record<
     custodyAnnualPct: null,
   },
   standard_es: {
-    presetId: 'standard_es',
-    label: 'Broker estándar ES',
+    presetId: "standard_es",
+    label: "Broker estándar ES",
     stockCommissionPct: 0.1,
     stockCommissionMin: 1,
     stockCommissionMax: 29,
@@ -97,8 +97,8 @@ export const COMMISSION_PRESETS: Record<
     custodyAnnualPct: 0.2,
   },
   ibkr_tiered: {
-    presetId: 'ibkr_tiered',
-    label: 'IBKR tiered (EU)',
+    presetId: "ibkr_tiered",
+    label: "IBKR tiered (EU)",
     stockCommissionPct: 0.05,
     stockCommissionMin: 1.25,
     stockCommissionMax: null,
@@ -110,32 +110,32 @@ export const COMMISSION_PRESETS: Record<
 
 export const TAX_PRESETS: Record<TaxJurisdiction, TaxProfile> = {
   ES: {
-    jurisdiction: 'ES',
-    costBasisMethod: 'fifo',
+    jurisdiction: "ES",
+    costBasisMethod: "fifo",
     stampDutyBuyPct: 0.2,
     dividendWithholdingPct: 19,
     capitalGainsTaxPct: null,
     fiscalYearStartMonth: 1,
   },
   EU_OTHER: {
-    jurisdiction: 'EU_OTHER',
-    costBasisMethod: 'fifo',
+    jurisdiction: "EU_OTHER",
+    costBasisMethod: "fifo",
     stampDutyBuyPct: 0,
     dividendWithholdingPct: 15,
     capitalGainsTaxPct: null,
     fiscalYearStartMonth: 1,
   },
   US: {
-    jurisdiction: 'US',
-    costBasisMethod: 'fifo',
+    jurisdiction: "US",
+    costBasisMethod: "fifo",
     stampDutyBuyPct: 0,
-    dividendWithholdingPct: 15,
+    dividendWithholdingPct: 30,
     capitalGainsTaxPct: null,
     fiscalYearStartMonth: 1,
   },
   CUSTOM: {
-    jurisdiction: 'CUSTOM',
-    costBasisMethod: 'fifo',
+    jurisdiction: "CUSTOM",
+    costBasisMethod: "fifo",
     stampDutyBuyPct: 0,
     dividendWithholdingPct: 0,
     capitalGainsTaxPct: null,
@@ -147,10 +147,10 @@ export function resolveCommissionProfile(
   presetId: CommissionPresetId,
   overrides?: Partial<CommissionProfile>,
 ): CommissionProfile {
-  if (presetId === 'custom') {
+  if (presetId === "custom") {
     return {
-      presetId: 'custom',
-      label: overrides?.label ?? 'Personalizado',
+      presetId: "custom",
+      label: overrides?.label ?? "Personalizado",
       stockCommissionPct: overrides?.stockCommissionPct ?? 0.1,
       stockCommissionMin: overrides?.stockCommissionMin ?? 1,
       stockCommissionMax: overrides?.stockCommissionMax ?? null,
@@ -164,8 +164,8 @@ export function resolveCommissionProfile(
 }
 
 export function defaultAccountSettings(
-  commissionPresetId: CommissionPresetId = 'standard_es',
-  jurisdiction: TaxJurisdiction = 'ES',
+  commissionPresetId: CommissionPresetId = "standard_es",
+  jurisdiction: TaxJurisdiction = "ES",
 ): AccountSettings {
   return {
     commission: resolveCommissionProfile(commissionPresetId),
@@ -177,7 +177,7 @@ export function defaultAccountSettings(
 /** Calcula comisiones e impuestos de una operación (cliente y servidor). */
 export function calculateTradeFees(
   notional: number,
-  side: 'buy' | 'sell',
+  side: "buy" | "sell",
   settings: AccountSettings,
   options?: { isFxConversion?: boolean; currency?: string },
 ): TradeFeeBreakdownDto {
@@ -193,7 +193,9 @@ export function calculateTradeFees(
   }
   const vatOnCommission = (commissionAmount * profile.vatOnCommissionPct) / 100;
   const stampDuty =
-    side === 'buy' && tax.stampDutyBuyPct > 0 ? (notional * tax.stampDutyBuyPct) / 100 : 0;
+    side === "buy" && tax.stampDutyBuyPct > 0
+      ? (notional * tax.stampDutyBuyPct) / 100
+      : 0;
   const fxConversion =
     options?.isFxConversion && profile.fxConversionPct > 0
       ? (notional * profile.fxConversionPct) / 100
@@ -205,6 +207,6 @@ export function calculateTradeFees(
     stampDuty,
     fxConversion,
     total,
-    currency: options?.currency ?? 'EUR',
+    currency: options?.currency ?? "EUR",
   };
 }
