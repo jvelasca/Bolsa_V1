@@ -12,6 +12,7 @@ Tres sub-casos:
 from __future__ import annotations
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from bolsa_application.accounts import ApplyCustodyFees
 from bolsa_application.risk_runtime import (
@@ -26,15 +27,28 @@ from bolsa_application.risk_runtime import (
 from bolsa_domain.account_settings import settings_from_dict
 
 
+class _UniqueViolationOrig:
+    """``orig`` de un ``IntegrityError`` clasificable por ``is_unique_violation``."""
+
+    sqlstate = "23505"
+
+
+def _unique_conflict_error() -> IntegrityError:
+    return IntegrityError("INSERT ...", {}, _UniqueViolationOrig())
+
+
 class _FakeLedger:
-    def __init__(self, last_charge_at=None) -> None:
+    def __init__(self, last_charge_at=None, *, raise_append: bool = False) -> None:
         self._last = last_charge_at
+        self._raise_append = raise_append
         self.appended: list[dict] = []
 
     async def last_custody_charge_at(self, account_id: str):  # noqa: ARG001
         return self._last
 
     async def append_custody_fee(self, **kwargs) -> dict:
+        if self._raise_append:
+            raise _unique_conflict_error()
         self.appended.append(kwargs)
         return {"id": "ledger-1", "executed_at": "t"}
 
@@ -173,6 +187,55 @@ def test_custody_skips_when_already_charged_this_period():
     uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
     assert asyncio_run(uc.execute(scope)) is False
     assert len(ledger.appended) == 0
+
+
+def test_custody_unique_conflict_returns_false_not_500():
+    """R-9.3/P1: 2º request que choca con el UNIQUE de custodia → False, no 500.
+
+    Simula el caso en que ``append_custody_fee`` (misma cuenta+periodo, type 'fee')
+    lanza un ``IntegrityError`` de violación de UNIQUE (SQLSTATE 23505) ya grabado
+    por el request ganador. ``ApplyCustodyFees.execute`` debe tratarlo como
+    idempotente (ya se cobró) y devolver ``False`` sin propagar.
+    """
+    portfolio = type("P", (), {"id": "pf-id", "legacy_portfolio_id": "pf-legacy"})
+    portfolios = [portfolio]
+    scope = _Scope(portfolio, portfolios)
+    scope.account.settings = _settings_with_custody(0.2)
+    ledger = _FakeLedger(last_charge_at=None, raise_append=True)
+    account_repo = _FakeAccountRepo(portfolios)
+    portfolio_repo = _FakePortfolioRepo(cash=10_000.0, equity=100_000.0)
+
+    uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
+    # La colisión de UNIQUE se absorbe: semántica idempotente, no excepción/500.
+    # (Con fakes el SAVEPOINT es no-op — no expone ``session`` —, así que aquí no se
+    # verifica el rollback de ``deduct_cash``: eso lo cubren los tests Postgres reales
+    # de infraestructura M-7, p. ej. ``test_recargo_forzado_no_deja_cash_descontado``.)
+    assert asyncio_run(uc.execute(scope)) is False
+    assert len(ledger.appended) == 0  # sin doble cargo
+    # El mutex quedó liberado (release del perdedor): el claim vuelve a estar libre.
+    period = datetime_now_utc().strftime("%Y")
+    assert asyncio_run(claim_custody_charge("acc-1", period)) is True
+    asyncio_run(release_custody_charge("acc-1", period))
+
+
+def test_custody_unique_conflict_flush_still_records_first_charge():
+    """R-9.3/P1: una colisión no rompe el flujo normal (1ª exec) que sí graba.
+
+    El caso 'perdedor' (colisión) devuelve False, pero la 1ª ejecución sin colisión
+    sigue devolviendo True y grabando la entrada de custodia en el ledger.
+    """
+    portfolio = type("P", (), {"id": "pf-id", "legacy_portfolio_id": "pf-legacy"})
+    portfolios = [portfolio]
+    scope = _Scope(portfolio, portfolios)
+    scope.account.settings = _settings_with_custody(0.2)
+    ledger = _FakeLedger(last_charge_at=None)
+    account_repo = _FakeAccountRepo(portfolios)
+    portfolio_repo = _FakePortfolioRepo(cash=10_000.0, equity=100_000.0)
+
+    uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
+    assert asyncio_run(uc.execute(scope)) is True
+    assert len(ledger.appended) == 1  # el cargo del 1er request se graba
+    assert ledger.appended[0]["reference_id"].startswith("custody-")
 
 
 def test_release_auto_idempotency_allows_retry():
