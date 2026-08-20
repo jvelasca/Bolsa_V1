@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # F2·6: sin secreto hardcodeado. Vacío por defecto; si se activa APP_PASSWORD
     # se exige un APP_AUTH_SECRET real (ver validator más abajo).
     app_auth_secret: str = Field(default="", validation_alias="APP_AUTH_SECRET")
+    # TTL de sesión de la cookie HttpOnly stateless (ver bolsa_api.auth.session).
+    # 1 día por defecto; 0 o negativo desactiva los Set-Cookie de sesión.
+    app_auth_ttl_seconds: int = Field(default=86400, validation_alias="APP_AUTH_TTL_SECONDS")
     environment: str = "development"
     scan_queue_backend: str = Field(default="postgres", validation_alias="SCAN_QUEUE_BACKEND")
     alert_webhook_timeout_seconds: float = Field(

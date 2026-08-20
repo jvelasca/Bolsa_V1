@@ -7,11 +7,11 @@ const API_URL = resolveApiBaseUrl();
 const AUTH_STATUS_TIMEOUT_MS = 8_000;
 
 interface AuthState {
-  token: string | null;
   authEnabled: boolean;
+  authenticated: boolean;
   isHydrated: boolean;
   bootstrapError: string | null;
-  setSession: (token: string, authEnabled: boolean) => void;
+  setSession: (authEnabled: boolean, authenticated?: boolean) => void;
   clearSession: () => void;
   setHydrated: () => void;
   clearBootstrapError: () => void;
@@ -28,6 +28,7 @@ async function fetchAuthStatus(): Promise<Response> {
   try {
     return await fetch(`${API_URL}/api/auth/status`, {
       signal: controller.signal,
+      credentials: "include",
     });
   } finally {
     clearTimeout(timeout);
@@ -37,15 +38,22 @@ async function fetchAuthStatus(): Promise<Response> {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      token: null,
       authEnabled: false,
+      authenticated: false,
       isHydrated: false,
       bootstrapError: null,
-      setSession: (token, authEnabled) =>
-        set({ token, authEnabled, bootstrapError: null }),
+      setSession: (authEnabled, authenticated = authEnabled) =>
+        set({ authEnabled, authenticated, bootstrapError: null }),
       clearSession: () => {
         clearVisualizationSession();
-        set({ token: null });
+        set({ authEnabled: false, authenticated: false });
+        // R-8B.2: la sesión es una cookie HttpOnly del backend; hay que pedir
+        // al servidor que la borre. Si el login falla, la cookie queda huérfana
+        // pero no bloqueamos la UI (es solo una petición best-effort).
+        void fetch(`${API_URL}/api/auth/logout`, {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => undefined);
       },
       setHydrated: () => set({ isHydrated: true }),
       clearBootstrapError: () => set({ bootstrapError: null }),
@@ -70,9 +78,15 @@ export const useAuthStore = create<AuthState>()(
           }
 
           const body = (await response.json()) as {
-            data: { authEnabled: boolean };
+            data: { authEnabled: boolean; authenticated?: boolean };
           };
-          set({ authEnabled: body.data.authEnabled, bootstrapError: null });
+          set({
+            authEnabled: body.data.authEnabled,
+            authenticated: body.data.authEnabled
+              ? (body.data.authenticated ?? false)
+              : false,
+            bootstrapError: null,
+          });
           return body.data.authEnabled;
         } catch (error) {
           const timedOut =
@@ -90,6 +104,7 @@ export const useAuthStore = create<AuthState>()(
         const response = await fetch(`${API_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ password }),
         });
         if (!response.ok) {
@@ -98,12 +113,14 @@ export const useAuthStore = create<AuthState>()(
           } | null;
           throw new Error(body?.detail ?? "Contraseña incorrecta");
         }
+        // R-8B.2: el token ya no viaja en el body; solo authEnabled. La sesión
+        // se establece vía cookie HttpOnly que el navegador guarda y envía.
         const body = (await response.json()) as {
-          data: { token: string; authEnabled: boolean };
+          data: { authEnabled: boolean };
         };
         set({
-          token: body.data.token,
           authEnabled: body.data.authEnabled,
+          authenticated: body.data.authEnabled,
           bootstrapError: null,
         });
       },
@@ -111,7 +128,6 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "bolsa-auth",
       partialize: (state) => ({
-        token: state.token,
         authEnabled: state.authEnabled,
       }),
       onRehydrateStorage: () => () => {
@@ -120,10 +136,6 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
-
-export function getAuthToken(): string | null {
-  return useAuthStore.getState().token;
-}
 
 export function getApiBaseUrl(): string {
   return API_URL;

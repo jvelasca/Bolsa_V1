@@ -62,8 +62,8 @@ function BootstrapError({
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const {
-    token,
     authEnabled,
+    authenticated,
     isHydrated,
     bootstrapError,
     checkAuthRequired,
@@ -90,7 +90,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         const required = await checkAuthRequired();
         if (cancelled) return;
         if (!required) {
-          setSession("", false);
+          setSession(false);
         }
       } finally {
         if (!cancelled) {
@@ -123,7 +123,11 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (authEnabled && !token) {
+  // R-8B.2: ya no guardamos un token en memoria; la sesión es una cookie
+  // HttpOnly que el backend valida. En el arranque, `checkAuthRequired` lee
+  // `/api/auth/status` (con la cookie) y fija `authenticated`; renderizamos el
+  // login solo si auth está activo y aún no hay una sesión válida.
+  if (authEnabled && !authenticated) {
     return <LoginPage />;
   }
 

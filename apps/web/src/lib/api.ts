@@ -2,15 +2,15 @@
  * Cliente HTTP del frontend hacia la API FastAPI (VITE_API_URL, default :8000).
  *
  * Punto único de integración web ↔ backend. Transporte openapi-fetch generado
- * desde apps/web/api/openapi.json (contrato F5a). Añade Authorization Bearer si
- * hay token en auth-store. Lanza ApiError en respuestas no OK.
+ * desde apps/web/api/openapi.json (contrato F5a). Todas las peticiones envían
+ * cookies (credentials:"include") para la sesión HttpOnly. Lanza ApiError en
+ * respuestas no OK.
  *
  * @see docs/API_REFERENCE.md — mapa de endpoints
  * @see packages/shared/src/types.ts — DTOs TypeScript (manual, no OpenAPI gen)
  */
 import createClient from "openapi-fetch";
 import type { paths } from "@/api/schema";
-import { getAuthToken } from "@/stores/auth-store";
 import { getActiveAccountId } from "@/stores/active-account-store";
 import { resolveApiBaseUrl } from "@/lib/api-base-url";
 
@@ -66,23 +66,22 @@ type ClientResult = {
 };
 
 /**
- * Cliente compartido openapi-fetch. El middleware onRequest inyecta las
- * cabeceras de auth (Authorization, X-Account-Id) y Content-Type; las
+ * Cliente compartido openapi-fetch. `credentials:"include"` (config global del
+ * cliente) hace que todas las peticiones envíen las cookies HttpOnly de sesión
+ * (R-8B.2). El middleware onRequest inyecta X-Account-Id y Content-Type; las
  * cabeceras ya presentes en el request (p. ej. X-Account-Id explícito de
  * depositCash/withdrawCash) tienen prioridad y NO se sobreescriben — misma
- * semántica que el request<T> manual. onError traduce los errores de red
+ * semántica que el request<T> manual. Ya no se inyecta Authorization Bearer: la
+ * sesión va en la cookie HttpOnly. onError traduce los errores de red
  * (TypeError) a ApiError con status 0.
  */
 const client = createClient<paths>({
   baseUrl: API_URL,
+  credentials: "include",
 });
 
 client.use({
   onRequest({ request }) {
-    const token = getAuthToken();
-    if (token && !request.headers.has("Authorization")) {
-      request.headers.set("Authorization", `Bearer ${token}`);
-    }
     if (!request.headers.has("X-Account-Id")) {
       const accountId = getActiveAccountId();
       if (accountId) request.headers.set("X-Account-Id", accountId);
@@ -320,7 +319,6 @@ export const api = {
     file: File,
     kind: import("@bolsa/shared").InstrumentFilingKindV1 = "10-K",
   ) => {
-    const token = getAuthToken();
     const accountId = getActiveAccountId();
     const body = new FormData();
     body.append("file", file);
@@ -330,9 +328,9 @@ export const api = {
       {
         method: "POST",
         headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(accountId ? { "X-Account-Id": accountId } : {}),
         },
+        credentials: "include",
         body,
       },
     );
@@ -1070,13 +1068,11 @@ export const api = {
       q.set("instrumentIds", opts.instrumentIds.join(","));
     const qs = q.toString();
     const headers: HeadersInit = {};
-    const token = getAuthToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
     const account = getActiveAccountId();
     if (account) headers["X-Account-Id"] = account;
     const res = await fetch(
       `${API_URL}/api/accounts/${accountId}/daily-ops-report.pdf${qs ? `?${qs}` : ""}`,
-      { headers },
+      { headers, credentials: "include" },
     );
     if (!res.ok) {
       throw new ApiError(`PDF digest · HTTP ${res.status}`, res.status);
@@ -2081,13 +2077,12 @@ export const api = {
       isDefault?: boolean;
     },
   ) => {
-    const token = getAuthToken();
     void fetch(`${API_URL}/api/workspaces/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      credentials: "include",
       body: JSON.stringify(body),
       keepalive: true,
     });

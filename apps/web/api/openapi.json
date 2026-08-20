@@ -562,6 +562,11 @@
           "authEnabled": {
             "title": "Authenabled",
             "type": "boolean"
+          },
+          "authenticated": {
+            "default": false,
+            "title": "Authenticated",
+            "type": "boolean"
           }
         },
         "required": [
@@ -9306,14 +9311,9 @@
           "authEnabled": {
             "title": "Authenabled",
             "type": "boolean"
-          },
-          "token": {
-            "title": "Token",
-            "type": "string"
           }
         },
         "required": [
-          "token",
           "authEnabled"
         ],
         "title": "LoginResponseDataDto",
@@ -18355,6 +18355,26 @@
           }
         },
         "summary": "Login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "description": "Borra la cookie de sesión. Funciona aunque la auth esté desactivada.",
+        "operationId": "logout_api_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
         "tags": [
           "auth"
         ]

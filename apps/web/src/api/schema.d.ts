@@ -771,6 +771,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logout */
+        post: operations["logout_api_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/status": {
         parameters: {
             query?: never;
@@ -3444,6 +3461,8 @@ export interface components {
         AuthStatusDataDto: {
             /** Authenabled */
             authEnabled: boolean;
+            /** Authenticated */
+            authenticated?: boolean;
         };
         /** AuthStatusResponseDto */
         AuthStatusResponseDto: {
@@ -6402,8 +6421,6 @@ export interface components {
         LoginResponseDataDto: {
             /** Authenabled */
             authEnabled: boolean;
-            /** Token */
-            token: string;
         };
         /** LoginResponseDto */
         LoginResponseDto: {
@@ -10204,6 +10221,24 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    logout_api_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
