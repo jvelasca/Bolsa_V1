@@ -247,6 +247,43 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Criterio de aceptación:** battery/typecheck verdes tras limpiar; `git status` acotado; docs actualizadas sin perder evidencia.
 
+**Inventario del coordinador (2026-08-20, verificado file:line):** read-first acotado con 3 subagentes `explore` de alcances disjuntos (Python / web / shared), cada hallazgo recontrastado por el coordinador con `rg` antes de listarse. Decisión §5.2 F8 (pending-delete riesgo alto = **solo inventariar, NO ejecutar**) ya tomada y respetada: ninguno de los ítems pending-delete de riesgo alto se propone para borrar. Verificado además que la deuda "Alembic baseline pendiente" **ya no es deuda viva** (retirada de `PROJECT_STATE.md` y del README real; ADR-025 la mantiene solo como hito FUTURO diferido y deliberado → **NO se toca**, no es docs obsoleta). Lo siguiente es el inventario "LIMPIO para borrar" (0 imports / sin storage por nombre) y "DUDOSO" (decisión usuario).
+
+**A. Backend Python — LIMPIO para borrar (0 usos / sin storage):**
+| path:line | símbolo | tipo | evidencia | reemplazo |
+| --- | --- | --- | --- | --- |
+| `application/sync_scheduler.py:69` | `SYNC_SCOPE_STALE` | constante muerta | rg → 1 hit (def) | — |
+| `application/sync_scheduler.py:70` | `SYNC_SCOPE_ALL` | alias muerto | rg → 1 hit (def) | — |
+| `application/daily_opinion_stance.py:50` | `_clamp_stars` | helper privado muerto | rg → 1 hit (def) | `map_io_to_stars` |
+| `application/tracker_schedule.py:28` | `is_scheduled_tracker` | helper público muerto | rg → 1 hit (def) | `schedule_kind(...)` inline |
+| `application/investor_profiles.py:103` | `GetAccountInvestorProfile` | use-case muerto | rg → 1 hit (def); API llama `store.get_for_account` directo | `store.get_for_account` |
+| `schemas/instrument_lifecycle.py:76` | `DeleteInstrumentRequestDto` | DTO Pydantic muerto | rg → 1 hit (def); no en OpenAPI/routes | — |
+| `schemas/workspaces.py:17` | `WorkspacePayloadDto` | DTO Pydantic muerto | rg → 1 hit (def); no en OpenAPI/routes | `CreateWorkspaceRequestDto` |
+| `auth/session.py:6` | "(monotónico, ver abajo)" | docstring obsoleto (residuo F5) | contradice `session.py:12-17` (epoch UTC) | eliminar paréntesis |
+
+**B. Web — limpios confirmados y clusteres muertos:**
+
+- Módulos/componentes huérfanos (0 importadores, no ruta/barrel/drilldown): `charts/chart-overlay-indicators-zone.tsx`, `charts/indicator-templates-dialog.tsx`, `charts/rsi-indicator-chart.tsx`, `backtests/backtest-result-tabs.tsx`, `components/ui/info-tip.tsx`.
+- Barrels re-export huérfanos: `trading/lists-tab/lists-tab.tsx` (`WatchlistPanel` se importa directo desde `watchlist-panel.tsx`), `trading/trading-coach-rail.tsx`.
+- Cluster muerto `trading/lists-tab/list-membership-dialog.tsx` + slice `trading-ui-store.ts` (`listMembershipInstrument`/`open/closeListMembershipDialog`): dialog sin renderers (rg 0), slice solo consumido por el dialog, no persistido.
+- Slice muerto `stores/ui-store.ts` (`indicatorTemplatesOpen`/`open/closeIndicatorTemplates`): solo consumido por el dialog huérfano `indicator-templates-dialog.tsx`; no persistido.
+- Alias `@deprecated` muertos (0 imports): `charts/indicator-compute.ts:1554` `resolveSubLineSeries`; `charts/chart-drawing-tools.ts:654/661` `ExtraFavoriteRailBlock`/`extraFavoriteRailBlocks`; `lib/chart-list-membership.ts:126` `resolveVirtualListForInstrument`; `backtests/dia-d-favorites.ts:281-282` `DIA_D_QUICK_PRESETS`/`DiaDQuickPresetId`; `trading/trading-dia-d-banner.tsx:23` `TradingDiaDBanner`; `trading/trading-operativa-panel.tsx:575-576` `TradingCoachRail` (alias).
+- `instruments/instruments-hub-model.ts:266/288` `onlyInPortfolio` (alias `@deprecated`): 0 uso salvo su propio def + test `instruments-hub-model.test.ts:137` que solo valida el alias → **requiere actualizar ese test** a `scopeFilter` antes de borrar.
+
+**C. Shared — limpios confirmados y dudosos:**
+
+- `package shape` (verificado): `@bolsa/shared` solo expone el root `.`/`dist/index.js` (no deep-path), y `rg` = 0 imports relativos `shared/src/...` → un símbolo solo es alcanzable vía barrel; ser re-exportado en barrel no es uso.
+- LIMPIO: `indicator-templates.ts:91` `isIndicatorApiSupportedLegacy` (`@deprecated`, 0 refs) → `isIndicatorApiSupported` (`indicators-runtime.ts:117`). `default-lists.ts:97` `resolveEstudioPersonalListId` (`@deprecated` ADR-024, solo 2 tests que validan alias) → `resolveEstudioListId`. (Requiere actualizar esos 2 tests.)
+- **C-DUDOSO resuelto (decisión usuario 2026-08-20: ✅ BORRAR):** `chart-new-tab-setup.ts:26/29/35` `DEFAULT_NEW_CHART_CONFIG_SOURCE` / `NEW_CHART_CONFIG_SOURCE_LABELS` / `normalizeNewChartConfigSource` — 0 refs y sin storage; cumplen E8 por sí solos. **DECISIÓN: BORRAR.** El tipo `NewChartConfigSource` y el campo `workspace.newChartConfigSource` (pending-delete RIESGO ALTO, migración workspaces) **se mantienen** (el tipo lo importa `chart-defaults.ts:21/244`).
+
+**D. DUDOSO backend (decisión usuario 2026-08-20: ✅ BORRAR):**
+
+- `packages/py/analytics/src/bolsa_analytics/prediction/ports.py` — módulo `IPredictionPort` sin importador y no exportado en `prediction/__init__`; **DECISIÓN: BORRAR** (cumple E8: 0 imports; solo ancla de diseño ya no usada).
+
+**E. Excluidos (no tocar):** `pending-delete` riesgo alto (`readLegacyPendingOrders`, `chartDataStrip`/`chartNewTabSeed`/`newChartConfigSource`, `readLegacyTimeframeFavorites`, re-export `presetRuleGroups`) · gobernanza IA (`packages/py/ai/adapters/base.py` no observado como candidate por freeze) · workers/scheduler (R-8C.2) · wire/persistencia shared (`chartPanel`, `prediction`, `chart-list-context`, `strategy-definitions`, `IndicatorTemplate.items`, knobs `chart-toolbar`) · `NewChartConfigSource` tipo + `newChartConfigSource` campo (pending-delete). Fila `session.py:12-17` (parte correcta del docstring) se conserva.
+
+**Plan de ejecución (tras aprobación):** 1 commit de inventario + 3 subagentes de limpieza con alcances disjuntos (Python / web / shared) que apliquen los LIMPIO aprobados, cada uno con su batería; el coordinador re-verifica diffs + batería real antes de proponer commits de aprobación por usuario.
+
 ---
 
 ### 🟡 FASE 9 — (Opcional / alinear con V2) Arquitectura Python + puente legacy
@@ -282,14 +319,14 @@ Como manda la premisa E5/E6, **cada fase entrega**:
 
 ### 5.2 Decisiones por fase (una vez aprobado el plan)
 
-| Ref    | Decisión                                                      | Opciones                                                                                                                                                              |
-| ------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
-| **F1** | Cómo aislar idempotencia por cuenta **manteniendo trade+fee** | ✅ **DECIDIDA (2026-08-20):** Opción A — alinear el lookup (`account_id`+`type`) con el UNIQUE existente por-cuenta+`type`. NO tocar UNIQUE/trade+fee. Sin migración. |
-| **F3** | Orden custody                                                 | A) release tras COMMIT (recomendada) · B) documentar Redis como optimización                                                                                          |
-| **F5** | Alcance sesión                                                | ✅ **DECIDIDA (2026-08-20):** Opción A — solo epoch (`time.time()`), sin revocación Redis.                                                                            |
-| **F6** | Invariante `balance_after`                                    | ✅ **DECIDIDA (2026-08-20):** Opción B — postcondición app + corregir docs (sin trigger DB).                                                                          |     |
-| **F8** | Limpieza `pending-delete` riesgo alto                         | A) solo inventariar, NO ejecutar (recomendada) · B) (requiere `purge storage`)                                                                                        |
-| **F9** | Arquitectura + puente legacy                                  | A) diferir a V2 (recomendado ahora) · B) abrir fase de desacople                                                                                                      |
+| Ref    | Decisión                                                      | Opciones                                                                                                                                                                                                                                                                                                                                      |
+| ------ | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| **F1** | Cómo aislar idempotencia por cuenta **manteniendo trade+fee** | ✅ **DECIDIDA (2026-08-20):** Opción A — alinear el lookup (`account_id`+`type`) con el UNIQUE existente por-cuenta+`type`. NO tocar UNIQUE/trade+fee. Sin migración.                                                                                                                                                                         |
+| **F3** | Orden custody                                                 | A) release tras COMMIT (recomendada) · B) documentar Redis como optimización                                                                                                                                                                                                                                                                  |
+| **F5** | Alcance sesión                                                | ✅ **DECIDIDA (2026-08-20):** Opción A — solo epoch (`time.time()`), sin revocación Redis.                                                                                                                                                                                                                                                    |
+| **F6** | Invariante `balance_after`                                    | ✅ **DECIDIDA (2026-08-20):** Opción B — postcondición app + corregir docs (sin trigger DB).                                                                                                                                                                                                                                                  |     |
+| **F8** | Limpieza `pending-delete` riesgo alto                         | ✅ **DECIDIDA (2026-08-20):** Opción A — solo inventariar, NO ejecutar (aplicada). **Complemento 2026-08-20 (aprobado):** BORRAR los LIMPIO E8 (0 imports/sin storage) en Python+web+shared + los 2 dudosos (`chart-new-tab-setup` 3 helpers y `prediction/ports.py`) → ✅ BORRAR, manteniendo intactos los ítems pending-delete riesgo alto. |
+| **F9** | Arquitectura + puente legacy                                  | A) diferir a V2 (recomendado ahora) · B) abrir fase de desacople                                                                                                                                                                                                                                                                              |
 
 ---
 
