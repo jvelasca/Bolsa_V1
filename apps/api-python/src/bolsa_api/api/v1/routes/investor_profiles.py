@@ -4,24 +4,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from bolsa_api.api.dependencies import (
-    get_db_session,
-    get_investor_profile_repository,
-    get_list_accounts_use_case,
-)
-from bolsa_api.schemas.investor_profiles import (
-    AssignProfileDto,
-    AssignProfileResponseDto,
-    CreateInvestorProfileDto,
-    DeclaredProfileDto,
-    InvestorProfileDto,
-    InvestorProfileListResponseDto,
-    InvestorProfileResponseDto,
-    UpdateInvestorProfileDto,
-)
 from bolsa_application.investor_profiles import (
     AssignInvestorProfileToAccount,
     CreateInvestorProfile,
@@ -38,6 +20,25 @@ from bolsa_infrastructure.database.repositories.cognitive_repository import (
 )
 from bolsa_infrastructure.database.repositories.investor_profile_repository import (
     SqlAlchemyInvestorProfileRepository,
+)
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bolsa_api.api.dependencies import (
+    get_db_session,
+    get_investor_profile_repository,
+    get_list_accounts_use_case,
+    require_account_access,
+)
+from bolsa_api.schemas.investor_profiles import (
+    AssignProfileDto,
+    AssignProfileResponseDto,
+    CreateInvestorProfileDto,
+    DeclaredProfileDto,
+    InvestorProfileDto,
+    InvestorProfileListResponseDto,
+    InvestorProfileResponseDto,
+    UpdateInvestorProfileDto,
 )
 
 router = APIRouter()
@@ -203,7 +204,7 @@ async def refresh_observed_profile(
 
 @router.put("/accounts/{account_id}/active-profile", response_model=AssignProfileResponseDto)
 async def assign_active_profile(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: AssignProfileDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AssignProfileResponseDto:
@@ -219,7 +220,7 @@ async def assign_active_profile(
 
 @router.get("/accounts/{account_id}/active-profile", response_model=InvestorProfileResponseDto)
 async def get_active_profile(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileResponseDto:
     store: SqlAlchemyInvestorProfileRepository = get_investor_profile_repository(session)

@@ -32,3 +32,27 @@ Hoy el «user» es un **gate `APP_PASSWORD`** (cookie HttpOnly + Bearer). No hay
 ## 4. Hecho cuando
 
 Login sigue igual (un password). Cuentas nuevas llevan `user_id`. Get de cuenta con `user_id` ajeno → 404/403. Legacy `None` no se rompe. Cero JWT.
+
+---
+
+## 5. Fase 2 — más superficie Account (NO JWT, NO money)
+
+**Qué:** el mismo `require_account_access` en rutas `{account_id}` que F1 no cubrió, y en lecturas de cartera/`X-Account-Id` (si el header viene).
+
+Path:
+
+- `core_r.py` GET/PUT `/accounts/{account_id}/core-r`
+- `mandates.py` GET/PUT `/accounts/{account_id}/mandates`
+- `supervised_f3.py` GET/PUT `/accounts/{account_id}/supervised-f3-queue`
+- `investor_profiles.py` GET/PUT `/accounts/{account_id}/active-profile`
+
+Header `X-Account-Id` (solo si está presente; `None` = comportamiento actual):
+
+- `portfolio.py` GET `/portfolio` y GET `/portfolio/transactions`
+- `pending_orders.py` list/create/delete (recurso de cuenta, no cash)
+
+**NO:** `POST /portfolio/trade` · deposit/withdraw · JWT · `ai_governance` · `contract:gen` · `PAPER_D_EXECUTE` · purge pending-delete · paquete `bolsa_application/accounts/`.
+
+Tests: extender `test_account_isolation.py` (foreign id → 404 en al menos core-r GET, mandates GET, portfolio GET con header).
+
+Batería: pytest isolation + test_auth · ruff zona tocada.

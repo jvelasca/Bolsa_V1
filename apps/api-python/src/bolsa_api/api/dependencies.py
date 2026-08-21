@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
-from fastapi import Header, HTTPException, Request
+from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 if TYPE_CHECKING:
@@ -336,7 +336,7 @@ async def require_account_access(request: Request, account_id: str) -> str:
     """404 si el ``account_id`` de path no es visible para el principal del request.
 
     Filas legacy ``user_id is None`` siguen accesibles. No usar en deposit/withdraw
-    ni en rutas de trade (R12-AUTH fase 1).
+    ni en rutas de trade (R12-AUTH fase 1/2).
     """
     factory = get_session_factory(request)
     async with factory() as session:
@@ -348,6 +348,19 @@ async def require_account_access(request: Request, account_id: str) -> str:
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
     return account_id
+
+
+async def require_account_header_access(
+    request: Request,
+    account_id: Annotated[str | None, Depends(get_account_id_header)],
+) -> str | None:
+    """Si ``X-Account-Id`` viene, misma visibilidad que ``require_account_access``.
+
+    Header ausente → ``None`` (no 400). No usar en trade/deposit/withdraw.
+    """
+    if account_id is None:
+        return None
+    return await require_account_access(request, account_id)
 
 
 def get_list_accounts_use_case(session: AsyncSession) -> ListAccounts:

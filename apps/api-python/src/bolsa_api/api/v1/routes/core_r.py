@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
+from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,10 +12,10 @@ from bolsa_api.api.dependencies import (
     get_account_core_r_state_use_case,
     get_db_session,
     get_sync_core_r_state_use_case,
+    require_account_access,
 )
 from bolsa_api.schemas.core_r import CoreRBundleDto, CoreRBundleResponseDto, SyncCoreRBundleDto
 from bolsa_api.schemas.mappers import to_iso
-from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ def _empty_bundle(account_id: str) -> CoreRBundleDto:
     response_model=CoreRBundleResponseDto,
 )
 async def get_account_core_r(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> CoreRBundleResponseDto:
     row = await get_account_core_r_state_use_case(session).execute(account_id)
@@ -56,7 +57,7 @@ async def get_account_core_r(
     response_model=CoreRBundleResponseDto,
 )
 async def sync_account_core_r(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: SyncCoreRBundleDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> CoreRBundleResponseDto:

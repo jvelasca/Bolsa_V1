@@ -3,22 +3,22 @@
 from datetime import datetime
 from typing import Annotated
 
+from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
-    get_account_id_header,
     get_create_pending_order_use_case,
     get_db_session,
     get_delete_pending_order_use_case,
     get_list_pending_orders_use_case,
+    require_account_header_access,
 )
 from bolsa_api.schemas.pending_orders import (
     CreatePendingOrderDto,
     PendingOrderDto,
     PendingOrdersResponseDto,
 )
-from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 
 router = APIRouter()
 
@@ -40,7 +40,7 @@ def _to_dto(record: PendingOrderRecord) -> PendingOrderDto:
 @router.get("/pending-orders", response_model=PendingOrdersResponseDto)
 async def list_pending_orders(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    account_id: Annotated[str | None, Depends(get_account_id_header)],
+    account_id: Annotated[str | None, Depends(require_account_header_access)],
 ) -> PendingOrdersResponseDto:
     items = await get_list_pending_orders_use_case(session).execute(account_id=account_id)
     return PendingOrdersResponseDto(data=[_to_dto(item) for item in items])
@@ -50,7 +50,7 @@ async def list_pending_orders(
 async def create_pending_order(
     body: CreatePendingOrderDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    account_id: Annotated[str | None, Depends(get_account_id_header)],
+    account_id: Annotated[str | None, Depends(require_account_header_access)],
 ) -> PendingOrdersResponseDto:
     expiry = (
         datetime.fromisoformat(body.expiry_at.replace("Z", "+00:00"))
@@ -74,7 +74,7 @@ async def create_pending_order(
 async def delete_pending_order(
     order_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    account_id: Annotated[str | None, Depends(get_account_id_header)],
+    account_id: Annotated[str | None, Depends(require_account_header_access)],
 ) -> None:
     try:
         await get_delete_pending_order_use_case(session).execute(order_id, account_id=account_id)

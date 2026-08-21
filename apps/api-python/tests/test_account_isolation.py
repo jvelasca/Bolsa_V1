@@ -182,3 +182,48 @@ async def test_foreign_account_404_with_session_cookie(monkeypatch: pytest.Monke
             await _delete_raw_account(factory, foreign_id)
 
     get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_foreign_account_nested_and_header_routes_return_404() -> None:
+    """R12-AUTH fase 2: core-r/mandates path + portfolio X-Account-Id."""
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        foreign_id = await _insert_raw_account(
+            factory, user_id="other", name="Foreign nested isolation"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                core_r = await client.get(f"/api/accounts/{foreign_id}/core-r")
+                assert core_r.status_code == 404
+
+                mandates = await client.get(f"/api/accounts/{foreign_id}/mandates")
+                assert mandates.status_code == 404
+
+                portfolio = await client.get(
+                    "/api/portfolio",
+                    headers={"X-Account-Id": foreign_id},
+                )
+                assert portfolio.status_code == 404
+        finally:
+            await _delete_raw_account(factory, foreign_id)
+
+
+@pytest.mark.asyncio
+async def test_legacy_null_user_id_core_r_still_gettable() -> None:
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        legacy_id = await _insert_raw_account(
+            factory, user_id=None, name="Legacy core-r isolation"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(f"/api/accounts/{legacy_id}/core-r")
+                assert response.status_code == 200
+                assert response.json()["data"]["accountId"] == legacy_id
+        finally:
+            await _delete_raw_account(factory, legacy_id)

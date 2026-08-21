@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from typing import Annotated
 
+from bolsa_infrastructure.database.repositories.mandate_repository import (
+    MandateTenureRecord,
+    MandateTradeLinkRecord,
+)
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +15,7 @@ from bolsa_api.api.dependencies import (
     get_account_mandates_use_case,
     get_db_session,
     get_sync_account_mandates_use_case,
+    require_account_access,
 )
 from bolsa_api.schemas.mandates import (
     MandateBundleDto,
@@ -20,10 +25,6 @@ from bolsa_api.schemas.mandates import (
     SyncMandateBundleDto,
 )
 from bolsa_api.schemas.mappers import to_iso
-from bolsa_infrastructure.database.repositories.mandate_repository import (
-    MandateTenureRecord,
-    MandateTradeLinkRecord,
-)
 
 router = APIRouter()
 
@@ -62,7 +63,7 @@ def _link_dto(row: MandateTradeLinkRecord) -> MandateTradeLinkDto:
     response_model=MandateBundleResponseDto,
 )
 async def get_account_mandates(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     instrument_id: str | None = Query(default=None, alias="instrumentId"),
 ) -> MandateBundleResponseDto:
@@ -82,7 +83,7 @@ async def get_account_mandates(
     response_model=MandateBundleResponseDto,
 )
 async def sync_account_mandates(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: SyncMandateBundleDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> MandateBundleResponseDto:

@@ -11,6 +11,7 @@ from bolsa_api.api.dependencies import (
     get_account_supervised_f3_state_use_case,
     get_db_session,
     get_sync_supervised_f3_state_use_case,
+    require_account_access,
 )
 from bolsa_api.schemas.mappers import to_iso
 from bolsa_api.schemas.supervised_f3 import (
@@ -36,7 +37,7 @@ def _empty(account_id: str) -> SupervisedF3BundleDto:
     response_model=SupervisedF3BundleResponseDto,
 )
 async def get_account_supervised_f3(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SupervisedF3BundleResponseDto:
     row = await get_account_supervised_f3_state_use_case(session).execute(account_id)
@@ -57,7 +58,7 @@ async def get_account_supervised_f3(
     response_model=SupervisedF3BundleResponseDto,
 )
 async def sync_account_supervised_f3(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: SyncSupervisedF3BundleDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> SupervisedF3BundleResponseDto:
