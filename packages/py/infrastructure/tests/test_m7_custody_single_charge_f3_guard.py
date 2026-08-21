@@ -14,7 +14,11 @@ M-7 queda entonces **CUBIERTA por F3**: el UNIQUE es el backstop real del re-cob
 transacción compartida garantiza que no queda cash descontado sin fila. Este test aporta la
 evidencia como test-postcondición (decisión usuario: Opción A, sin tocar código de producción).
 
-PostgreSQL real (patrón db_session). """
+PostgreSQL real (patrón db_session). Los tests crean cuentas simuladas ``m7-uniq-*``/``m7-win-*``
+y las limpian físicamente al final (``_cleanup_account``: ``close_account`` + ``delete_simulated_account``
++ commit, R000 post-v1.3.0) para no dejar residuos ``simulated`` en la DB compartida.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -105,6 +109,24 @@ async def _new_account(
     return scope.account.id
 
 
+async def _cleanup_account(session: AsyncSession, account_id: str) -> None:
+    """Cierra y borra físicamente una cuenta simulada creada por ``_new_account``.
+
+    R000 (deuda post-v1.3.0): cada test que crea una cuenta simulada vía repo debe
+    limpiarla (``close_account`` + ``delete_simulated_account``) y COMMITEAR el borrado,
+    para que no queden filas ``simulated`` sobre la DB compartida entre ejecuciones de
+    la suite (rompían el invariante A del verify). Canon: account_repository ``:431``/``:444``.
+    """
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+
+    repo = SqlAlchemyAccountRepository(session)
+    await repo.close_account(account_id)
+    await repo.delete_simulated_account(account_id)
+    await session.commit()
+
+
 async def _account_total_cash(session: AsyncSession, account_id: str) -> Decimal:
     """Cash del account = Σ ``PortfolioRow.cash`` de sus legacy portfolios."""
     stmt = select(PortfolioRow.cash).join(
@@ -141,6 +163,9 @@ async def test_unique_rechaza_recargo_mismo_periodo(db_session: AsyncSession) ->
     ``append_custody_fee`` (``reference_type="custody"``, ``reference_id="custody-<año>``,
     ``type="fee"``) es único por cuenta+periodo desde L-M3/M-5 → la segunda inserta
     ``IntegrityError`` (base del cierre de M-7).
+
+    Limpieza (R000): tras el ``rollback`` la cuenta simulada se cierra y borra físicamente
+    (``_cleanup_account`` + commit) para no dejar residuos ``simulated`` en la DB compartida.
     """
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
@@ -179,6 +204,9 @@ async def test_unique_rechaza_recargo_mismo_periodo(db_session: AsyncSession) ->
             description="Cargos custodia (2º, debe rechazarse)",
         )
     await db_session.rollback()
+    # Limpieza R000: la cuenta se creó y commiteó antes, persiste tras el rollback →
+    # ciérrala y bórrala físicamente para no dejar residuo `m7-uniq-*`.
+    await _cleanup_account(db_session, account_id)
 
 
 @pytest.mark.asyncio
@@ -190,6 +218,9 @@ async def test_recargo_forzado_no_deja_cash_descontado(db_session: AsyncSession)
     (fila custodia persistida). La 2ª request entra con cash descontado (``deduct_cash``)
     pero su ``append_custody_fee`` del mismo periodo choca inmediatamente con el UNIQUE →
     el ``rollback`` del caller revierte el descuento, dejando ``Σ ledger == Σ cash``.
+
+    Limpieza (R000): al final se cierra y borra físicamente la cuenta simulada
+    (``_cleanup_account`` + commit) aunque el cuerpo hizo commits intermedios.
     """
     from bolsa_application.accounts import ApplyCustodyFees
     from bolsa_infrastructure.database.repositories.account_repository import (
@@ -255,3 +286,5 @@ async def test_recargo_forzado_no_deja_cash_descontado(db_session: AsyncSession)
     # se revierte con la transacción fallida y el cash vuelve a reconciliarse (M-2).
     await db_session.rollback()
     await _assert_reconciled(db_session, ledger_repo, account_id)
+    # Limpieza R000: cierra y borra físicamente la cuenta simulada (la 1ª request commiteó).
+    await _cleanup_account(db_session, account_id)
