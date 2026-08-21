@@ -303,6 +303,23 @@ def get_custody_obligation_repository(session: AsyncSession) -> CustodyObligatio
     return CustodyObligationRepository(session)
 
 
+def get_custody_job_use_case(session: AsyncSession) -> Any:
+    """R-10 F4b — job periódico de custodia sobre cuentas activas (RunCustodyJob).
+
+    El worker del scheduler construye el use-case con repos bajo la misma sesión;
+    este provider queda disponible por si un endpoint/script de administración quiere
+    forzar una pasada.
+    """
+    from bolsa_application.custody_job import RunCustodyJob
+
+    return RunCustodyJob(
+        get_account_repository(session),
+        get_portfolio_repository(session),
+        get_ledger_repository(session),
+        get_custody_obligation_repository(session),
+    )
+
+
 def get_mandate_repository(session: AsyncSession) -> SqlAlchemyMandateRepository:
     return SqlAlchemyMandateRepository(session)
 
@@ -343,7 +360,6 @@ def get_get_account_summary_use_case(session: AsyncSession) -> GetAccountSummary
         get_account_repository(session),
         get_portfolio_repository(session),
         get_ledger_repository(session),
-        custody_obligation_repo=get_custody_obligation_repository(session),
     )
 
 
@@ -415,7 +431,6 @@ def get_tax_report_use_case(session: AsyncSession) -> GetTaxReport:
         get_account_repository(session),
         get_portfolio_repository(session),
         get_ledger_repository(session),
-        custody_obligation_repo=get_custody_obligation_repository(session),
     )
 
 

@@ -164,25 +164,18 @@ class GetAccountSummary:
         account_repo: SqlAlchemyAccountRepository,
         portfolio_repo: SqlAlchemyPortfolioRepository,
         ledger_repo: SqlAlchemyLedgerRepository,
-        custody_obligation_repo: CustodyObligationRepository | None = None,
     ) -> None:
         self._account_repo = account_repo
         self._portfolio_repo = portfolio_repo
         self._ledger_repo = ledger_repo
-        self._obligation_repo = custody_obligation_repo
 
     async def execute(
         self,
         account_id: str | None = None,
         portfolio_id: str | None = None,
     ) -> AccountSummary:
-        scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
-        await ApplyCustodyFees(
-            self._account_repo,
-            self._portfolio_repo,
-            self._ledger_repo,
-            custody_obligation_repo=self._obligation_repo,
-        ).execute(scope)
+        # R-10 F4b: GET de solo lectura — la custodia se aplica en el job periódico
+        # (RunCustodyJob), nunca muta el estado por side-effect en lectura.
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
         summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
         return _account_summary_from_portfolio(
@@ -889,21 +882,15 @@ class GetTaxReport:
         account_repo: SqlAlchemyAccountRepository,
         portfolio_repo: SqlAlchemyPortfolioRepository,
         ledger_repo: SqlAlchemyLedgerRepository,
-        custody_obligation_repo: CustodyObligationRepository | None = None,
     ) -> None:
         self._account_repo = account_repo
         self._portfolio_repo = portfolio_repo
         self._ledger_repo = ledger_repo
-        self._obligation_repo = custody_obligation_repo
 
     async def execute(self, account_id: str, year: int):
+        # R-10 F4b: GET de solo lectura — la custodia la aplica el job periódico,
+        # no se muta estado en la lectura de tax report.
         scope = await self._account_repo.resolve_scope(account_id)
-        await ApplyCustodyFees(
-            self._account_repo,
-            self._portfolio_repo,
-            self._ledger_repo,
-            custody_obligation_repo=self._obligation_repo,
-        ).execute(scope)
         settings = scope.account.settings or settings_from_dict(None)
         tax = settings.tax
 

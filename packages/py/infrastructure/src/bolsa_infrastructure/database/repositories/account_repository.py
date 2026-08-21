@@ -139,6 +139,21 @@ class SqlAlchemyAccountRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_account_from_row(row) for row in rows]
 
+    async def list_active_accounts(self) -> list[InvestmentAccount]:
+        """Cuentas ACTIVAS (R-10 F4b): mismo orden que ``list_accounts``, filtrando
+        ``status == "active"`` (literal idéntico al de ``_load_scope``). El job de
+        custodia solo opera sobre este subconjunto, nunca sobre cuentas cerradas."""
+        stmt = (
+            select(InvestmentAccountRow)
+            .where(InvestmentAccountRow.status == "active")
+            .order_by(
+                InvestmentAccountRow.is_default.desc(),
+                InvestmentAccountRow.created_at.asc(),
+            )
+        )
+        rows = (await self._session.execute(stmt)).scalars().all()
+        return [_account_from_row(row) for row in rows]
+
     async def get_account(self, account_id: str) -> InvestmentAccount:
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:

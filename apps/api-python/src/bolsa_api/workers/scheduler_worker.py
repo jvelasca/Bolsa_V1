@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from bolsa_api.background.auto_sync_worker import start_auto_sync_worker
 from bolsa_api.background.core_r_cron_worker import start_core_r_cron_worker
+from bolsa_api.background.custody_job_worker import start_custody_job_worker
 from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluator
 from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_opinion_worker
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
@@ -51,6 +52,7 @@ def _event_loop_starters() -> list[Any]:
         start_tracker_schedule_worker,
         start_fa_weekly_worker,
         start_core_r_cron_worker,
+        start_custody_job_worker,
         start_estudio_eod_opinion_worker,
         start_auto_sync_worker,
         start_index_subscribe_worker,

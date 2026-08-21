@@ -109,6 +109,14 @@ class Settings(BaseSettings):
     core_r_cron_interval_seconds: float = Field(
         default=300.0, validation_alias="CORE_R_CRON_INTERVAL_SECONDS"
     )
+    # R-10 F4b — job periódico de custodia (mueve ApplyCustodyFees del GET al
+    # scheduler). On-by-default: reemplaza el side-effect que hoy hace el GET.
+    custody_job_enabled: bool = Field(
+        default=True, validation_alias="CUSTODY_JOB_ENABLED"
+    )
+    custody_job_interval_seconds: float = Field(
+        default=300.0, validation_alias="CUSTODY_JOB_INTERVAL_SECONDS"
+    )
     # Q3.5 — cost model v2 (volume-aware). Off by default; does not change Lab/paper tips.
     cost_model_v2_enabled: bool = Field(
         default=False, validation_alias="COST_MODEL_V2_ENABLED"
