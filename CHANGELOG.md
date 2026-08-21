@@ -18,6 +18,7 @@ Auditoría residual post-v1.3.0, higiene documental y estudio teórico del flujo
 - Track C **C5** (`0eb8976`): HELP + Ayuda sync Confirm `/confirm` · Señales/Libro · AUTO BETA · frase SEMI; Track C **cerrado en `origin/main`** (stamp **`d281b8c`**)
 - Copy E8 residual (`ce601c9`) + leftover CORE-R (`8dd3caf`): CTAs de firma que van a `/confirm` dejan de decir Ayuda; atajos list-hub `/screeners` = Señales (Laboratorio, no Backtesting); leftover CORE-R Proponer F3 ya en Confirmar
 - **R12-409 B1** (WT, SHA pending): declarar HTTP 409 en OpenAPI para conflictos de `idempotency_key` en deposit/withdraw/trade (`{detail: str}`); regen acotada `openapi.json` + `schema.d.ts`; runtime handler sin cambio
+- **EXEC-B-CONC** (WT, SHA pending): `ExecuteTrade` deriva `balance_after` trade/fee desde cash post-lock (`result.summary.portfolio.cash`); elimina lectura pre-lock `get_summary`; chaos refuerza invariante B estricta bajo concurrencia
 
 ## [1.3.0] — 2026-08-21
 

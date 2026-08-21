@@ -16,6 +16,7 @@ La auditoría externa pegada el 2026-08-21 (tarde) evaluó `main` ~`49ecbcd`. **
 - F1 invariante A+B en `verify_ledger_balance_chain.py`.
 - F2 tests de concurrencia de custodia (PG real).
 - F3 contrato 409 → **R12-409 B1 HECHO en WT** (SHA pending; supersede Opción A).
+- ExecuteTrade B → **EXEC-B-CONC HECHO en WT** (SHA pending; `balance_after` post-lock).
 - F4 crash-consistency · F5 500-ops chaos · R000 cleanup tests m7/m2.
 
 **Prohibido** reabrir producción financiera, `PAPER_D_EXECUTE`, gobernanza IA, scheduler-vs-worker, purge de `pending-delete` riesgo alto, `contract:gen` salvo gate 409.
@@ -52,15 +53,15 @@ Plantilla de paso:
 
 ### Gates (NO auto-abrir)
 
-| Gate                             | Recomendación                                         | Estado                                      |
-| -------------------------------- | ----------------------------------------------------- | ------------------------------------------- |
-| 409 en OpenAPI                   | Opción B1 (deposit/withdraw/trade)                    | ✅ **ABIERTA/HECHA B1 en WT** (SHA pending) |
-| ExecuteTrade / invariante B      | `cash_before` **post-lock** (`accounts.py` ~L884-888) | Deuda V2 EXEC-B-CONC                        |
-| scheduler-vs-worker (R-8C.2)     | Una autoridad                                         | No tocar                                    |
-| Split `accounts.py` (~978 LOC)   | V2 P3                                                 | No ahora                                    |
-| Auth User→Account→Resource       | V2                                                    | JWT congelado D4                            |
-| `TRUSTED_PROXIES` prod           | Checklist operativo                                   | Fuera de repo                               |
-| SIGKILL real / PG restart mid-tx | Ampliar F4                                            | Opcional; F4 ya cubre rollback equivalente  |
+| Gate                             | Recomendación                                                       | Estado                                       |
+| -------------------------------- | ------------------------------------------------------------------- | -------------------------------------------- |
+| 409 en OpenAPI                   | Opción B1 (deposit/withdraw/trade)                                  | ✅ **ABIERTA/HECHA B1 en WT** (SHA pending)  |
+| ExecuteTrade / invariante B      | `balance_after` desde cash **post-lock** (`summary.portfolio.cash`) | ✅ **EXEC-B-CONC HECHO en WT** (SHA pending) |
+| scheduler-vs-worker (R-8C.2)     | Una autoridad                                                       | No tocar                                     |
+| Split `accounts.py` (~978 LOC)   | V2 P3                                                               | No ahora                                     |
+| Auth User→Account→Resource       | V2                                                                  | JWT congelado D4                             |
+| `TRUSTED_PROXIES` prod           | Checklist operativo                                                 | Fuera de repo                                |
+| SIGKILL real / PG restart mid-tx | Ampliar F4                                                          | Opcional; F4 ya cubre rollback equivalente   |
 
 ---
 

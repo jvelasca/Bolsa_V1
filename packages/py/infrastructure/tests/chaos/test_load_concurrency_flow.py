@@ -6,13 +6,12 @@ NUNCA la dev real). Cada escenario lanza un GRAN número de operaciones
 tras cada uno, verifica las invariantes:
 
 - **Invariante A** (M-2): ``Σ ledger.amount == cash`` (sin dinero fantasma).
-- **Invariante B** (cadena ``balance_after``), en DOS niveles según el flujo real:
-    - flujos que escriben ``balance_after`` desde el cash REAL bloqueado (deposit/withdraw:
-      ``add_cash``/``deduct_cash``) → encadenado ESTRICTO secuencial verificado con
-      ``_check_ledger_chain``;
-    - flujos ``ExecuteTrade`` bajo concurrencia → la lectura PRE-lock de ``cash_before``
-      puede descuadrar el encadenado estricto en O(N) sin violar M-2 → se verifica la
-      variante robusta ``_assert_chain_concurrent`` (sin ``balance_after`` negativo).
+- **Invariante B** (cadena ``balance_after``): encadenado ESTRICTO
+  ``balance_after[n] == balance_after[n-1] + amount[n]`` vía ``_check_ledger_chain`` /
+  ``_assert_chain_concurrent`` (alias post EXEC-B-CONC). Deposit/withdraw y
+  ``ExecuteTrade`` escriben ``balance_after`` desde cash bajo lock (post-lock /
+  summary); ``executed_at`` se genera con el lock de cartera aún retenido hasta
+  commit → orden ``(executed_at, id)`` alineado con el orden de aplicación.
 - **cash >= 0** y **quantity >= 0** siempre.
 
 Se usa el patrón real (no dobles del código): los use-cases de ``bolsa_application``
@@ -216,27 +215,19 @@ async def _load_sorted_rows(session: AsyncSession, account_id: str) -> list[Ledg
 
 
 def _assert_chain_concurrent(rows: list[LedgerEntryRow]) -> None:
-    """Invariante B en su variante robusta-vs-concurrencia para ``ExecuteTrade``.
+    """Invariante B estricta tras EXEC-B-CONC (antes: variante debilitada).
 
-    Para los flujos que escriben ``balance_after`` desde el cash REAL bloqueado
-    (``add_cash``/``deduct_cash`` → deposit/withdraw) el encadenado estricto
-    ``balance_after[n] == balance_after[n-1] + amount[n]`` SÍ es un postcondición y se
-    verifica con ``_check_ledger_chain``. En cambio ``ExecuteTrade`` (compra/venta/custodia
-    de compra) escribe ``balance_after`` desde una lectura PRE-lock de cash (``cash_before``
-    en ``ExecuteTrade.execute``): bajo operaciones concurrentes esa lectura puede quedarse
-    corta respecto al cash real ya aplicado por un trade vecino, por lo que la cadena
-    estricta ``order_by(executed_at,id)`` puede descuadrar en O(N) sin violar la invariante
-    financiera M-2 (``Σ ledger == Σ cash``). Variante verificable y no-flaky bajo carga:
-      1. ninguna fila registra ``balance_after`` negativo (no hay cash fantasma negativo);
-      2. el último ``balance_after`` no es negativo;
-      3. las invariantes cuantitativas de cada escenario (Σ ledger == Σ cash exacta) se
-         comprueban aparte con ``_assert_reconciled``.
+    Pre-fix: ``ExecuteTrade`` leía ``cash_before`` PRE-lock → bajo concurrencia la
+    cadena ``order_by(executed_at,id)`` podía descuadrar en O(N) sin violar M-2; este
+    helper solo comprobaba ``balance_after >= 0``.
+
+    Post EXEC-B-CONC: ``balance_after`` se deriva del cash post-lock
+    (``result.summary.portfolio.cash``) dentro de la misma transacción que retiene
+    ``with_for_update`` hasta commit. Misma postcondición que deposit/withdraw →
+    delega en ``_check_ledger_chain`` (``balance_after[n] == prev + amount[n]``).
+    M-2 se sigue comprobando aparte con ``_assert_reconciled``.
     """
-    assert rows, "sin filas de ledger para validar"
-    for r in rows:
-        assert r.balance_after >= 0, (
-            f"fila {r.id} registra balance_after negativo {r.balance_after}"
-        )
+    _check_ledger_chain(rows)
 
 
 async def _cleanup(session: AsyncSession, account_id: str, instrument_id: str) -> None:
@@ -723,9 +714,7 @@ async def test_load_500_buys_and_500_sells_same_position() -> None:
     - todos los trades aplican (cash suficiente y 10_000 de siembra >> 500 ventas);
     - ``quantity == 10_000 + 500 - 500 == 10_000`` y ``quantity >= 0``;
     - ``cash >= 0`` e invariante A ``Σ ledger == Σ cash`` (exacta);
-    - invariante B en su variante robusta-vs-concurrencia (no ``balance_after`` negativo).
-      NOTA: bajo ``ExecuteTrade`` concurrente el encadenado ESTRICTO secuencial no es un
-      postcondición (lee ``cash_before`` pre-lock) → se verifica con ``_assert_chain_concurrent``.
+    - invariante B estricta (EXEC-B-CONC: ``balance_after`` post-lock → ``_assert_chain_concurrent``).
     """
     async with _factory() as factory:
         tag = f"tr{uuid4().hex[:4]}"
@@ -776,8 +765,7 @@ async def test_load_buy_and_sell_concurrent_mixed() -> None:
     Combina DOS operaciones distintas (compra y venta) lanzadas concurrentes sobre la
     misma cuenta/posición (``asyncio.gather``). Con cash y siembra suficientes todas
     aplican y el estado final cumple ``quantity >= 0``, ``cash >= 0``, invariante A
-    ``Σ ledger == Σ cash`` e invariante B robusta-vs-concurrencia (sin ``balance_after``
-    negativo; el encadenado estricto es invariante del flujo seriado en ``_check_ledger_chain``).
+    ``Σ ledger == Σ cash`` e invariante B estricta (EXEC-B-CONC / ``_assert_chain_concurrent``).
     """
     async with _factory() as factory:
         tag = f"bs{uuid4().hex[:4]}"
@@ -829,8 +817,7 @@ async def test_load_custody_and_buy_concurrent_no_double_charge() -> None:
     (``asyncio.gather``). La custodia del periodo se cobra a lo sumo UNA vez (lo blinda el
     mutex ``claim_custody_charge`` con fallback a memoria + el guard durable del ledger +
     UNIQUE), nunca ``cash - 2*fee``. Tras todo: ``Σ ledger == Σ cash``, ``quantity >= 0`` y
-    la invariante B robusta-vs-concurrencia (sin ``balance_after`` negativo; el encadenado
-    estricto secuencial es invariante del flujo seriado de la siembra/``_check_ledger_chain``).
+    la invariante B estricta (EXEC-B-CONC / ``_assert_chain_concurrent``).
 
     Sin ``time.sleep``: la serialización la dan ``with_for_update`` (M1) y el guard
     anti doble-cobro de custodia (misma restricción de entorno que

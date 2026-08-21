@@ -259,13 +259,16 @@ class _FakeExecuteTrade:
 class _CashAwarePortfolioRepo:
     """Repo fake con semántica de cash real para verificar la aritmética Decimal.
 
-    ``get_summary`` devuelve el cash previo al trade; ``execute_trade`` descuenta
-    notional+fees. Permite comprobar que ``ExecuteTrade`` escribe ``balance_after``
-    secuenciales exactos (invariante no-float-drift, R-11 C3)."""
+    ``execute_trade`` aplica notional±fees y el summary POST-lock refleja el cash
+    final (EXEC-B-CONC). ``get_summary`` solo se usa en caminos de replay.
+    Comprueba que ``ExecuteTrade`` escribe ``balance_after`` secuenciales exactos
+    (R-11 C3 / R-10 F3) derivados del summary, no de una lectura pre-lock.
+    """
 
     def __init__(self, cash: float) -> None:
         self._cash = cash
         self._by_key: dict[str, Transaction] = {}
+        self.get_summary_calls = 0
 
     async def find_transaction_by_idempotency(
         self, legacy_portfolio_id: str, idempotency_key: str
@@ -273,6 +276,7 @@ class _CashAwarePortfolioRepo:
         return self._by_key.get(idempotency_key)
 
     async def get_summary(self, legacy_portfolio_id: str) -> _FakeSummary:
+        self.get_summary_calls += 1
         return _FakeSummary(self._cash)
 
     async def execute_trade(
@@ -297,22 +301,21 @@ class _CashAwarePortfolioRepo:
             total=total,
             executed_at="2026-08-20T08:00:00Z",
         )
-        # Mirrors producción: tras ejecutar, el cash queda descontado de notional+fees.
-        self._cash -= total + fee_amount
+        # Mirrors producción: buy descuenta notional+fees; sell suma notional − fees.
+        if trade_type == "buy":
+            self._cash -= total + fee_amount
+        else:
+            self._cash += total - fee_amount
         self._by_key[idempotency_key] = tx
         return TradeResult(transaction=tx, summary=_FakeSummary(self._cash))
 
 
 @pytest.mark.asyncio
 async def test_execute_trade_with_decimal_sequential_balance_exact() -> None:
-    """R-11 C3 (R-10.8): balance_after secuencial en Decimal, sin drift float.
+    """R-11 C3 / EXEC-B-CONC: buy+fee balance_after desde summary post-lock.
 
-    BUG-verificación: una compra con fracciones no debe acumular ruido float entre
-    trade y fee. El invariante secuencial (balance_after[n] == balance_after[n-1]
-    + amount[n]) se escribe desde Decimal exactos: la resta ``trade_balance`` →
-    ``fee_balance`` debe ser exactamente el fee usado, y la ``trade_balance`` es
-    exactamente el cash inicial menos el notional. Comparamos contra los valores
-    CAPTURADOS en el ledger (amount/balance) reconstruidos aritméticamente.
+    Compra con fracciones: fee_balance = cash post notional+fee; trade_balance =
+    fee_balance + fee. Sin get_summary pre-lock en el camino feliz.
     """
     ledger = _FakeLedgerRepo()
     portfolio = _CashAwarePortfolioRepo(cash=105000.0)
@@ -327,6 +330,7 @@ async def test_execute_trade_with_decimal_sequential_balance_exact() -> None:
         idempotency_key="decimal-key-1-abcdefghij",
     )
 
+    assert portfolio.get_summary_calls == 0
     assert ledger.trade_amount is not None
     assert ledger.fee_amount is not None
     assert ledger.trade_balance is not None
@@ -346,6 +350,75 @@ async def test_execute_trade_with_decimal_sequential_balance_exact() -> None:
     # Con el notional fraccionario (>6 decimales), la resta secuencial cierra: la
     # fee_balance queda por debajo de trade_balance en exactamente el fee.
     assert ledger.fee_balance == pytest.approx(105000.0 - abs(ledger.trade_amount) - ledger.fee_amount)
+    # EXEC-B-CONC: fee_balance == cash post-lock del summary (último cash del fake).
+    assert ledger.fee_balance == pytest.approx(portfolio._cash)
+
+
+@pytest.mark.asyncio
+async def test_execute_trade_sell_sequential_balance_from_post_lock_summary() -> None:
+    """EXEC-B-CONC: sell+fee balance_after desde summary post-lock (R-10 F3).
+
+    Venta: amount positivo (notional); fee_balance = prior + notional − fee;
+    trade_balance = fee_balance + fee (= prior + notional).
+    """
+    ledger = _FakeLedgerRepo()
+    cash_before = 50_000.0
+    portfolio = _CashAwarePortfolioRepo(cash=cash_before)
+    use_case = ExecuteTrade(_FakeAccountRepo(), portfolio, ledger)  # type: ignore[arg-type]
+
+    await use_case.execute(
+        instrument_id="inst-1",
+        trade_type="sell",
+        quantity=5.0,
+        price=200.0,
+        account_id="acc-1",
+        idempotency_key="decimal-key-sell-abcdefgh",
+    )
+
+    assert portfolio.get_summary_calls == 0
+    assert ledger.trade_amount is not None
+    assert ledger.fee_amount is not None
+    assert ledger.trade_balance is not None
+    assert ledger.fee_balance is not None
+    assert ledger.trade_amount > 0
+    assert ledger.fee_balance == pytest.approx(ledger.trade_balance - ledger.fee_amount)
+    assert ledger.trade_balance == pytest.approx(cash_before + ledger.trade_amount)
+    assert ledger.fee_balance == pytest.approx(
+        cash_before + ledger.trade_amount - ledger.fee_amount
+    )
+    assert ledger.fee_balance == pytest.approx(portfolio._cash)
+
+
+@pytest.mark.asyncio
+async def test_execute_trade_zero_fee_trade_balance_equals_fee_balance() -> None:
+    """EXEC-B-CONC: fees.total==0 → trade_balance == fee_balance; sin append_fee."""
+    from bolsa_domain.account_settings import settings_from_dict
+
+    ledger = _FakeLedgerRepo()
+    portfolio = _CashAwarePortfolioRepo(cash=10_000.0)
+    account_repo = _FakeAccountRepo()
+    account_repo.scope.account.settings = settings_from_dict(
+        {
+            "commission": {"presetId": "none"},
+            "tax": {"costBasisMethod": "FIFO", "stampDutyBuyPct": 0.0},
+        }
+    )
+    use_case = ExecuteTrade(account_repo, portfolio, ledger)  # type: ignore[arg-type]
+
+    await use_case.execute(
+        instrument_id="inst-1",
+        trade_type="buy",
+        quantity=2.0,
+        price=50.0,
+        account_id="acc-1",
+        idempotency_key="decimal-key-zerofee-abcdef",
+    )
+
+    assert ledger.rows == [("buy", "tx-cash")]
+    assert ledger.fee_amount is None
+    assert ledger.trade_balance is not None
+    assert ledger.trade_balance == pytest.approx(portfolio._cash)
+    assert ledger.trade_balance == pytest.approx(10_000.0 - 100.0)
 
 
 @pytest.mark.asyncio

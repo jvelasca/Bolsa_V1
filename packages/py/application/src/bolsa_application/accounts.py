@@ -878,14 +878,10 @@ class ExecuteTrade:
             settings,
             currency=scope.account.currency,
         )
-        # R-10 F3: capturar el cash ANTES de mutar (execute_trade deducirá el notional
-        # + fees y devolverá un summary POST-fee). Sin esta lectura previa no habría
-        # base para escribir balance_after secuenciales (trade → fee).
-        cash_before = Decimal(
-            str(
-                (await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)).portfolio.cash
-            )
-        )
+        # EXEC-B-CONC / R-10 F3: NO leer cash PRE-lock. execute_trade ya serializa con
+        # with_for_update y el summary devuelto es cash POST notional+fee (misma sesión).
+        # Derivar balance_after desde ese cash post-lock evita la cadena B rota bajo
+        # ExecuteTrade concurrente (cash_before desfasado) sin cambiar TradeResult.
         try:
             result = await self._portfolio_repo.execute_trade(
                 instrument_id=instrument_id,
@@ -921,13 +917,13 @@ class ExecuteTrade:
             if trade_type == "buy"
             else Decimal(str(result.transaction.total))
         )
-        # R-10 F3: balance_after SECUENCIAL por fila, en Decimal (R-11 C3) para que la
-        # invariante secuencial sea exacta y no acumule ruido float entre trade y fee.
-        #   trade: cash tras aplicar SOLO el notional (aún sin fee).
-        #   fee:   cash tras aplicar notional + fee (= cash final post-operación).
+        # R-10 F3: balance_after SECUENCIAL por fila, en Decimal (R-11 C3).
+        #   fee:   cash final post notional+fee (= summary.portfolio.cash post-lock).
+        #   trade: cash tras SOLO el notional = fee_balance + abs(fees)
+        #          (fees.total==0 → trade_balance == fee_balance; skip append_fee abajo).
         # Semántica invariante: balance_after[n] == balance_after[n-1] + amount[n].
-        trade_balance = cash_before + amount
-        fee_balance = trade_balance - Decimal(str(abs(fees.total)))
+        fee_balance = Decimal(str(result.summary.portfolio.cash))
+        trade_balance = fee_balance + Decimal(str(abs(fees.total)))
         await self._ledger_repo.append_trade(
             account_id=scope.account.id,
             portfolio_id=scope.portfolio.id,
