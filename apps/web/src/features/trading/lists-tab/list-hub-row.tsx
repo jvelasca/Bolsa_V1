@@ -28,6 +28,7 @@ import {
   listHubColumnContentClass,
 } from "@/lib/list-hub-column-layout";
 import { useListHubColumnLayoutContext } from "@/features/trading/lists-tab/list-hub-column-layout-context";
+import { LIST_HUB_EXPAND_ACCESOS_TITLE } from "@/features/confirm/daily-nav";
 import { ListHubShortcutsSection } from "@/features/trading/lists-tab/list-hub-shortcuts-section";
 
 function formatLastSynced(iso: string | null | undefined): string | null {
@@ -183,11 +184,7 @@ export function ListHubRow({
           {isExpandable ? (
             <IconButton
               icon={expanded ? ChevronDown : ChevronRight}
-              title={
-                expanded
-                  ? "Contraer"
-                  : "Accesos: Rastreadores, Alertas, Backtesting"
-              }
+              title={expanded ? "Contraer" : LIST_HUB_EXPAND_ACCESOS_TITLE}
               onClick={onToggleExpand}
             />
           ) : (

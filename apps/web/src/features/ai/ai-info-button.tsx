@@ -1,10 +1,11 @@
 /**
- * Botón compacto «IA» → diálogo informativo (qué hace / qué no / enlace Ayuda).
+ * Botón compacto «IA» → diálogo informativo (qué hace / qué no / CTA Confirmar o Ayuda).
  */
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { aiInfoHelpCtaLabel } from "@/features/ai/ai-info-button-copy";
 import {
   AI_INFO_SURFACES,
   type AiInfoSurfaceId,
@@ -75,7 +76,7 @@ export function AiInfoButton({ surface, className, label = "IA" }: Props) {
                 );
               }}
             >
-              Abrir Ayuda · Plataforma IA
+              {aiInfoHelpCtaLabel(info.helpPanel)}
             </Button>
             <Button
               type="button"

@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { DecisionReplayStepV1 } from "@bolsa/shared";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import { CONFIRMAR_LABEL } from "@/features/confirm/daily-nav";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -186,8 +188,7 @@ export function DecisionReplayPanel({
         </p>
       ) : items.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          Aún no hay DecisionSessions. Genera una en Ayuda → Plataforma IA →
-          Supervisado F3.
+          {`Aún no hay DecisionSessions. Genera una en ${CONFIRMAR_LABEL} (${CONFIRM_PATH}) → Supervisado F3.`}
         </p>
       ) : (
         <ul className="max-h-36 space-y-1 overflow-y-auto text-[11px]">

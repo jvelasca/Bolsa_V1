@@ -21,7 +21,7 @@ export type AiInfoSurface = {
   doesNot: string;
   /** Motor / proveedor típico. */
   engineHint: string;
-  /** Panel Ayuda → Plataforma IA (opcional). */
+  /** `supervised-f3` → `/confirm`; sin panel → Ayuda → Plataforma IA. */
   helpPanel?: "supervised-f3" | null;
 };
 

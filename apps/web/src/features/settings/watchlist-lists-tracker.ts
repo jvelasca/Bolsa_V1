@@ -5,6 +5,7 @@
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
 
+import { LABORATORIO_LABEL, SEÑALES_LABEL } from "@/features/confirm/daily-nav";
 import { HELP_CONTENT_AS_OF } from "@/features/help/help-content-as-of";
 
 export const WATCHLIST_SYNC = {
@@ -20,7 +21,7 @@ export const WATCHLIST_SUMMARY = {
     "Listas — secciones Sistema / Índices / Personales; crear, fijar al carrusel, congelar copia desde un índice.",
     "Índices — catálogo + búsqueda; Suscribir importa constitutivos (misma tubería A→B→C para todos).",
     "Valores — tickers de la lista activa; carrusel y menú ⋯; quitar de lista ≠ borrar de BD.",
-    "Atajos al expandir — Rastreadores / Alertas / Backtesting (con ?listId=).",
+    `Atajos al expandir — ${SEÑALES_LABEL} / Alertas / ${LABORATORIO_LABEL} (con ?listId=).`,
   ],
 } as const;
 
@@ -58,7 +59,7 @@ export const WATCHLIST_LISTS_UI = [
   {
     id: "expand",
     title: "Chevron expandir",
-    body: "Atajos: Rastreadores, Alertas y Backtesting (?listId=). El contenido se ve en Valores.",
+    body: `Atajos: ${SEÑALES_LABEL}, Alertas y ${LABORATORIO_LABEL} (?listId=). El contenido se ve en Valores.`,
   },
 ] as const;
 
@@ -98,6 +99,6 @@ export const WATCHLIST_VALUES_UI = [
 export const WATCHLIST_NEXT = [
   "Suscribe un índice (p. ej. S&P 100) y comprueba badge Últ. sync + familia Índices.",
   "Congela una copia y edítala sin afectar al índice.",
-  "Desde el chevron, abre Backtesting con esa lista (?listId=) y mira el resumen por valor.",
+  "Desde el chevron, abre Laboratorio con esa lista (?listId=) y mira el resumen por valor.",
   "En Listas, marca Carrusel y confirma el chip en Valores → ⋯.",
 ] as const;

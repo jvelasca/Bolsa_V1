@@ -19,6 +19,7 @@ import {
   LIBRO_OPERACIONES_HINT,
   LIBRO_OPERACIONES_LABEL,
   LIBRO_OPERACIONES_PATH,
+  LIST_HUB_EXPAND_ACCESOS_TITLE,
   SEÑALES_LABEL,
   SEÑALES_PATH,
   TRADING_NAV_LABEL,
@@ -87,6 +88,15 @@ describe("daily-nav", () => {
     expect(LAB_TESIS_NAV_ORDER).toEqual([LABORATORIO_LABEL, ASESOR_LABEL]);
     expect(ASESOR_LABEL).toBe("Asesor");
     expect(ASESOR_TESIS_HINT.toLowerCase()).toMatch(/tesis/);
+  });
+
+  it("names list-hub expand atajos Señales and Laboratorio", () => {
+    expect(LIST_HUB_EXPAND_ACCESOS_TITLE).toBe(
+      `Accesos: ${SEÑALES_LABEL}, Alertas, ${LABORATORIO_LABEL}`,
+    );
+    expect(LIST_HUB_EXPAND_ACCESOS_TITLE).not.toMatch(
+      /Rastreadores|Backtesting/,
+    );
   });
 
   it("uses Universo en vigilancia copy for the Estudio gate", () => {

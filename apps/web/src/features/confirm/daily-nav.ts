@@ -75,6 +75,13 @@ export const HERRAMIENTAS_NAV_ORDER = [
   "Instrumentos",
 ] as const;
 
+/**
+ * Title del chevron contraído en list-hub (atajos a puertas diarias).
+ * No nombra el objeto «Rastreadores» de la página Señales.
+ */
+export const LIST_HUB_EXPAND_ACCESOS_TITLE =
+  `Accesos: ${SEÑALES_LABEL}, Alertas, ${LABORATORIO_LABEL}` as const;
+
 export const LAB_TESIS_NAV_ORDER = [LABORATORIO_LABEL, ASESOR_LABEL] as const;
 
 /**

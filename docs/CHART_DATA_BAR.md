@@ -8,10 +8,10 @@ Ver también: [CHART_RESPONSIVE.md](./CHART_RESPONSIVE.md) (layout adaptable), [
 
 ## Alcance
 
-| Barra | Componente | Contenido |
-|-------|------------|-----------|
-| **Workspace** (global) | `chart-toolbar-global-bar.tsx` | Indicadores, C/V, sync BD, inspector, ⚙ global |
-| **Datos del gráfico** (por tab) | `chart-toolbar-chart-bar.tsx` | Escala, Estilo, Plantillas, Valor, **TradingView**, Cursor, **(i) ficha**, **IA F3**, atajos inspector, ⚙ |
+| Barra                           | Componente                     | Contenido                                                                                                 |
+| ------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| **Workspace** (global)          | `chart-toolbar-global-bar.tsx` | Indicadores, C/V, sync BD, inspector, ⚙ global                                                            |
+| **Datos del gráfico** (por tab) | `chart-toolbar-chart-bar.tsx`  | Escala, Estilo, Plantillas, Valor, **TradingView**, Cursor, **(i) ficha**, **IA F3**, atajos inspector, ⚙ |
 
 Esta guía cubre solo la **barra de datos del gráfico**.
 
@@ -28,7 +28,7 @@ Una **familia** (zona) agrupa todo lo relacionado con un mismo aspecto del gráf
 ```
 
 - **(i)** → mismo `InstrumentInfoDialog` que la lista (hechos / perfil / Nuestra BD).
-- **IA** (`BrainCircuit`) → `proposeRecommendation` del valor activo → cola Supervisado F3 → Ayuda → Plataforma IA (`chart-instrument-ai-button.tsx`). No mezcla juicios en la ficha (i).
+- **IA** (`BrainCircuit`) → `proposeRecommendation` del valor activo → cola Supervisado F3 → Confirmar (`/confirm`) (`chart-instrument-ai-button.tsx`). No mezcla juicios en la ficha (i).
 
 Reglas:
 
@@ -42,32 +42,32 @@ Reglas:
 
 Cada familia sigue el mismo contrato que la barra vertical de dibujos, adaptado a horizontal:
 
-| Elemento | Rol | Menú (muesca) |
-|----------|-----|----------------|
-| **Icono de familia** | Identifica la zona; en modo `select` muestra el **valor activo** (p. ej. `1D`, `Velas`) | **Sí** — menú completo y estrellas |
-| **Chips de favoritos** | Acceso directo opcional (solo si los fijas con estrella) | **No** |
-| **Controles inline** | Solo en Escala: zoom − / + / ajustar a ventana | **No** |
+| Elemento               | Rol                                                                                     | Menú (muesca)                      |
+| ---------------------- | --------------------------------------------------------------------------------------- | ---------------------------------- |
+| **Icono de familia**   | Identifica la zona; en modo `select` muestra el **valor activo** (p. ej. `1D`, `Velas`) | **Sí** — menú completo y estrellas |
+| **Chips de favoritos** | Acceso directo opcional (solo si los fijas con estrella)                                | **No**                             |
+| **Controles inline**   | Solo en Escala: zoom − / + / ajustar a ventana                                          | **No**                             |
 
 ### Interacción
 
-| Acción | Efecto |
-|--------|--------|
-| Clic en **icono** o **muesca** | Abre/cierra menú con todas las opciones + estrellas |
-| Clic en **opción** del menú (modo `select`) | Aplica valor; no requiere favorito previo |
-| Clic en **chip** (modo `select`) | Aplica valor (solo chips fijados con estrella) |
-| Clic en **chip** (modo `display`) | Informativo (Valor, Cursor); no cambia selección |
-| **Estrella** en menú | Añade/quita chip opcional en la barra |
-| Ancla bloqueada | Símbolo (Valor) y Cierre (Cursor) siempre en barra; estrella deshabilitada |
+| Acción                                      | Efecto                                                                     |
+| ------------------------------------------- | -------------------------------------------------------------------------- |
+| Clic en **icono** o **muesca**              | Abre/cierra menú con todas las opciones + estrellas                        |
+| Clic en **opción** del menú (modo `select`) | Aplica valor; no requiere favorito previo                                  |
+| Clic en **chip** (modo `select`)            | Aplica valor (solo chips fijados con estrella)                             |
+| Clic en **chip** (modo `display`)           | Informativo (Valor, Cursor); no cambia selección                           |
+| **Estrella** en menú                        | Añade/quita chip opcional en la barra                                      |
+| Ancla bloqueada                             | Símbolo (Valor) y Cierre (Cursor) siempre en barra; estrella deshabilitada |
 
 ### Componentes
 
-| Componente | Archivo | Uso |
-|------------|---------|-----|
-| `ChartBarZonePicker` | `chart-bar-zone-picker.tsx` | Orquestador: icono, chips, menú portal, favoritos |
-| `ChartBarZoneIconAnchor` | `chart-bar-zone-rail-button.tsx` | Icono + muesca inferior derecha |
-| `ChartBarZoneChipButton` | `chart-bar-zone-rail-button.tsx` | Chip sin muesca |
-| `resolveBarZoneDisplayIds` | `chart-bar-zone-rail-button.tsx` | Orden de chips; solo favoritos en modo `select` |
-| `CHART_ZONE_DROPDOWN_PANEL_CLASS` | `chart-bar-zone-styles.ts` | Panel opaco compartido con barra vertical |
+| Componente                        | Archivo                          | Uso                                               |
+| --------------------------------- | -------------------------------- | ------------------------------------------------- |
+| `ChartBarZonePicker`              | `chart-bar-zone-picker.tsx`      | Orquestador: icono, chips, menú portal, favoritos |
+| `ChartBarZoneIconAnchor`          | `chart-bar-zone-rail-button.tsx` | Icono + muesca inferior derecha                   |
+| `ChartBarZoneChipButton`          | `chart-bar-zone-rail-button.tsx` | Chip sin muesca                                   |
+| `resolveBarZoneDisplayIds`        | `chart-bar-zone-rail-button.tsx` | Orden de chips; solo favoritos en modo `select`   |
+| `CHART_ZONE_DROPDOWN_PANEL_CLASS` | `chart-bar-zone-styles.ts`       | Panel opaco compartido con barra vertical         |
 
 Estilos compartidos: `chart-bar-zone-styles.ts` (`CHART_BAR_ZONE_ROW_CLASS`, altura fija `1.375rem`, scroll horizontal en chips).
 
@@ -85,13 +85,13 @@ En zonas **display** (Valor, Cursor) el comportamiento no cambia: ancla fija (`s
 
 ### Enlace TradingView
 
-| Aspecto | Detalle |
-|---------|---------|
-| **Ubicación** | Barra de datos del gráfico activo, **después de Valor** y antes de Cursor |
-| **Visibilidad** | `ChartToolbarChartVisibility.tradingView` (⚙ barra de datos, no barra global) |
-| **Migración** | `visibility.tradingView` legacy en barra global → `chartVisibilityDefaults.tradingView` al normalizar |
-| **URL** | `chart-trading-view-url.ts` → `BME:{símbolo}` (Yahoo sin `.MC`) |
-| **Props** | `symbol`, `yahooSymbol` desde `chart-workspace-page.tsx` |
+| Aspecto         | Detalle                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| **Ubicación**   | Barra de datos del gráfico activo, **después de Valor** y antes de Cursor                             |
+| **Visibilidad** | `ChartToolbarChartVisibility.tradingView` (⚙ barra de datos, no barra global)                         |
+| **Migración**   | `visibility.tradingView` legacy en barra global → `chartVisibilityDefaults.tradingView` al normalizar |
+| **URL**         | `chart-trading-view-url.ts` → `BME:{símbolo}` (Yahoo sin `.MC`)                                       |
+| **Props**       | `symbol`, `yahooSymbol` desde `chart-workspace-page.tsx`                                              |
 
 Razonamiento: el enlace es del **instrumento del tab activo**, no del workspace entero.
 
@@ -99,16 +99,16 @@ Razonamiento: el enlace es del **instrumento del tab activo**, no del workspace 
 
 Todos los desplegables de familias (horizontal y vertical) comparten el mismo contrato desde **jul 2026**:
 
-| Capa | z-index | Clase / rol |
-|------|---------|-------------|
-| Backdrop | `200` | `fixed inset-0 bg-black/10` — clic cierra |
-| Zona / rail activa | `202` | `relative z-[202]` mientras el menú está abierto |
-| Panel del menú | `203` | `CHART_ZONE_DROPDOWN_PANEL_CLASS` |
+| Capa               | z-index | Clase / rol                                      |
+| ------------------ | ------- | ------------------------------------------------ |
+| Backdrop           | `200`   | `fixed inset-0 bg-black/10` — clic cierra        |
+| Zona / rail activa | `202`   | `relative z-[202]` mientras el menú está abierto |
+| Panel del menú     | `203`   | `CHART_ZONE_DROPDOWN_PANEL_CLASS`                |
 
 **Panel opaco** (`CHART_ZONE_DROPDOWN_PANEL_CLASS`):
 
 ```ts
-'rounded-lg border border-border bg-card text-foreground shadow-2xl ring-1 ring-black/20'
+"rounded-lg border border-border bg-card text-foreground shadow-2xl ring-1 ring-black/20";
 ```
 
 > **Importante:** no usar `bg-popover` — no está definido en el tema (`index.css`) y el menú queda transparente.
@@ -127,13 +127,13 @@ Implementación horizontal: `chart-bar-zone-picker.tsx`. Vertical: `DrawingToolF
 
 ## Familias implementadas
 
-| Familia | Icono (Lucide) | Componente | Modo | Chips típicos |
-|---------|----------------|------------|------|----------------|
-| **Escala** | `Clock` | `chart-timeframe-bar.tsx` | `select` | Icono `1D` + zoom; chips opcionales |
-| **Estilo** | `ChartCandlestick` | `chart-series-type-zone.tsx` | `select` | Icono `Velas`; chips opcionales |
-| **Plantillas** | `LayoutTemplate` | `chart-indicator-template-zone.tsx` | `select` | Icono + nombre corto; chips opcionales |
-| **Valor** | `Landmark` | `chart-instrument-zone.tsx` | `display` | Símbolo (fijo), nombre, lista… |
-| **Cursor** | `Crosshair` | `chart-cursor-zone.tsx` | `display` | O, H, L, C (C fijo), Δ, Vol |
+| Familia        | Icono (Lucide)     | Componente                          | Modo      | Chips típicos                          |
+| -------------- | ------------------ | ----------------------------------- | --------- | -------------------------------------- |
+| **Escala**     | `Clock`            | `chart-timeframe-bar.tsx`           | `select`  | Icono `1D` + zoom; chips opcionales    |
+| **Estilo**     | `ChartCandlestick` | `chart-series-type-zone.tsx`        | `select`  | Icono `Velas`; chips opcionales        |
+| **Plantillas** | `LayoutTemplate`   | `chart-indicator-template-zone.tsx` | `select`  | Icono + nombre corto; chips opcionales |
+| **Valor**      | `Landmark`         | `chart-instrument-zone.tsx`         | `display` | Símbolo (fijo), nombre, lista…         |
+| **Cursor**     | `Crosshair`        | `chart-cursor-zone.tsx`             | `display` | O, H, L, C (C fijo), Δ, Vol            |
 
 ### Escala y zoom
 
@@ -143,12 +143,12 @@ Visibilidad independiente: `visibility.timeframe` (chips) y `visibility.timefram
 
 ### Etiquetas abreviadas (shared)
 
-| Dominio | Campo | Ejemplos |
-|---------|-------|----------|
-| Timeframes | `shortLabel` en `chart-timeframes.ts` | `1m`, `1h`, `1D`, `1W`, `1M` |
-| Estilo | `shortLabel` en `chart-series-type.ts` | `Velas`, `Línea`, `P&F` |
-| Valor | `CHART_INSTRUMENT_FIELD_SHORT_LABELS` | Sym, Nom, Lista… |
-| Cursor | `CHART_CURSOR_FIELD_SHORT_LABELS` | O, H, L, C, Δ, Vol |
+| Dominio    | Campo                                  | Ejemplos                     |
+| ---------- | -------------------------------------- | ---------------------------- |
+| Timeframes | `shortLabel` en `chart-timeframes.ts`  | `1m`, `1h`, `1D`, `1W`, `1M` |
+| Estilo     | `shortLabel` en `chart-series-type.ts` | `Velas`, `Línea`, `P&F`      |
+| Valor      | `CHART_INSTRUMENT_FIELD_SHORT_LABELS`  | Sym, Nom, Lista…             |
+| Cursor     | `CHART_CURSOR_FIELD_SHORT_LABELS`      | O, H, L, C, Δ, Vol           |
 
 ### Cursor — semántica OHLC
 
@@ -167,13 +167,13 @@ Visibilidad independiente: `visibility.timeframe` (chips) y `visibility.timefram
 
 ## Favoritos y persistencia
 
-| Zona | Campo workspace | Default (shared) | Hook |
-|------|-----------------|------------------|------|
-| Escala | `timeframeFavorites` | `[]` (barra mínima) | `use-chart-timeframe-favorites.ts` |
-| Estilo | `seriesTypeFavorites` | `[]` | `use-chart-series-type-favorites.ts` |
-| Plantillas | `indicatorTemplateFavorites` | `[]` | `use-chart-indicator-template-favorites.ts` |
-| Valor | `instrumentFieldFavorites` | `DEFAULT_CHART_INSTRUMENT_FIELD_FAVORITES` | `use-chart-bar-zone-favorites.ts` |
-| Cursor | `cursorFieldFavorites` | `DEFAULT_CHART_CURSOR_FIELD_FAVORITES` | `use-chart-bar-zone-favorites.ts` |
+| Zona       | Campo workspace              | Default (shared)                           | Hook                                        |
+| ---------- | ---------------------------- | ------------------------------------------ | ------------------------------------------- |
+| Escala     | `timeframeFavorites`         | `[]` (barra mínima)                        | `use-chart-timeframe-favorites.ts`          |
+| Estilo     | `seriesTypeFavorites`        | `[]`                                       | `use-chart-series-type-favorites.ts`        |
+| Plantillas | `indicatorTemplateFavorites` | `[]`                                       | `use-chart-indicator-template-favorites.ts` |
+| Valor      | `instrumentFieldFavorites`   | `DEFAULT_CHART_INSTRUMENT_FIELD_FAVORITES` | `use-chart-bar-zone-favorites.ts`           |
+| Cursor     | `cursorFieldFavorites`       | `DEFAULT_CHART_CURSOR_FIELD_FAVORITES`     | `use-chart-bar-zone-favorites.ts`           |
 
 Normalización y toggles: `packages/shared/src/chart-data-bar-zones.ts`, `chart-timeframes.ts`, `chart-series-type.ts`, `indicator-templates.ts`. Merge en `mergeChartToolbarGlobalConfig` (`chart-toolbar.ts`).
 
@@ -185,18 +185,18 @@ Regla común: en zonas **select** (Escala, Estilo, Plantillas) los favoritos son
 
 Flags en `ChartToolbarChartVisibility` (`packages/shared/src/chart-toolbar.ts`):
 
-| Flag | Zona |
-|------|------|
-| `timeframe` | Chips de Escala |
-| `timeframeZoom` | Zoom en Escala |
-| `seriesZone` | Estilo |
-| `indicatorTemplateZone` | Plantillas |
-| `instrumentZone` | Valor |
-| `tradingView` | Enlace externo TradingView (tras Valor) |
-| `cursorZone` | Cursor |
-| `instrumentInfo` | Botón (i) tras Cursor → ficha del valor |
-| `instrumentAi` | Botón IA tras (i) → propose / Supervisado F3 |
-| `overlayIndicators` | *(obsoleto)* — usar `inspectorBarShortcutFavorites` |
+| Flag                            | Zona                                                            |
+| ------------------------------- | --------------------------------------------------------------- |
+| `timeframe`                     | Chips de Escala                                                 |
+| `timeframeZoom`                 | Zoom en Escala                                                  |
+| `seriesZone`                    | Estilo                                                          |
+| `indicatorTemplateZone`         | Plantillas                                                      |
+| `instrumentZone`                | Valor                                                           |
+| `tradingView`                   | Enlace externo TradingView (tras Valor)                         |
+| `cursorZone`                    | Cursor                                                          |
+| `instrumentInfo`                | Botón (i) tras Cursor → ficha del valor                         |
+| `instrumentAi`                  | Botón IA tras (i) → propose / Supervisado F3                    |
+| `overlayIndicators`             | _(obsoleto)_ — usar `inspectorBarShortcutFavorites`             |
 | `inspectorBarShortcutFavorites` | Atajos al inspector en barra (estrella en Config del inspector) |
 
 ### Atajos al inspector (favoritos)
@@ -248,22 +248,22 @@ Ejemplo mínimo:
 
 ## Mapa de archivos
 
-| Área | Ruta |
-|------|------|
-| Orquestador barra | `apps/web/src/features/charts/chart-toolbar-chart-bar.tsx` |
-| Picker + icono/chips | `apps/web/src/features/charts/chart-bar-zone-picker.tsx` |
-| Botones | `apps/web/src/features/charts/chart-bar-zone-rail-button.tsx` |
-| Estilos | `apps/web/src/features/charts/chart-bar-zone-styles.ts` |
-| Escala | `apps/web/src/features/charts/chart-timeframe-bar.tsx` |
-| Estilo | `apps/web/src/features/charts/chart-series-type-zone.tsx` |
-| Plantillas | `apps/web/src/features/charts/chart-indicator-template-zone.tsx` |
-| Valor | `apps/web/src/features/charts/chart-instrument-zone.tsx` |
-| Cursor | `apps/web/src/features/charts/chart-cursor-zone.tsx` |
-| TradingView | `apps/web/src/features/charts/chart-trading-view-url.ts`, enlace en `chart-toolbar-chart-bar.tsx` |
-| Timeframes | `packages/shared/src/chart-timeframes.ts` |
-| Tipos de serie | `packages/shared/src/chart-series-type.ts` |
-| Campos Valor/Cursor | `packages/shared/src/chart-data-bar-zones.ts` |
-| Toolbar config | `packages/shared/src/chart-toolbar.ts` |
+| Área                 | Ruta                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| Orquestador barra    | `apps/web/src/features/charts/chart-toolbar-chart-bar.tsx`                                        |
+| Picker + icono/chips | `apps/web/src/features/charts/chart-bar-zone-picker.tsx`                                          |
+| Botones              | `apps/web/src/features/charts/chart-bar-zone-rail-button.tsx`                                     |
+| Estilos              | `apps/web/src/features/charts/chart-bar-zone-styles.ts`                                           |
+| Escala               | `apps/web/src/features/charts/chart-timeframe-bar.tsx`                                            |
+| Estilo               | `apps/web/src/features/charts/chart-series-type-zone.tsx`                                         |
+| Plantillas           | `apps/web/src/features/charts/chart-indicator-template-zone.tsx`                                  |
+| Valor                | `apps/web/src/features/charts/chart-instrument-zone.tsx`                                          |
+| Cursor               | `apps/web/src/features/charts/chart-cursor-zone.tsx`                                              |
+| TradingView          | `apps/web/src/features/charts/chart-trading-view-url.ts`, enlace en `chart-toolbar-chart-bar.tsx` |
+| Timeframes           | `packages/shared/src/chart-timeframes.ts`                                                         |
+| Tipos de serie       | `packages/shared/src/chart-series-type.ts`                                                        |
+| Campos Valor/Cursor  | `packages/shared/src/chart-data-bar-zones.ts`                                                     |
+| Toolbar config       | `packages/shared/src/chart-toolbar.ts`                                                            |
 
 ### Obsoleto
 
@@ -273,15 +273,15 @@ Ejemplo mínimo:
 
 ## Relación con la barra vertical de dibujos
 
-| Aspecto | Barra vertical (dibujos) | Barra horizontal (datos) |
-|---------|--------------------------|---------------------------|
-| Identificador | Icono herramienta / grupo | Icono familia (`Clock`, `ChartCandlestick`…) |
-| Muesca | Esquina inferior derecha | Igual |
-| Accesos directos | Favoritos en rail | Chips en fila |
-| Separadores | Entre familias de herramientas | Entre zonas Escala \| Estilo \| … |
-| Menú | Flyout modal + estrellas | Portal modal + estrellas |
-| Fondo menú | `CHART_ZONE_DROPDOWN_PANEL_CLASS` | Igual |
-| Backdrop | `bg-black/10` | Igual |
+| Aspecto          | Barra vertical (dibujos)          | Barra horizontal (datos)                     |
+| ---------------- | --------------------------------- | -------------------------------------------- |
+| Identificador    | Icono herramienta / grupo         | Icono familia (`Clock`, `ChartCandlestick`…) |
+| Muesca           | Esquina inferior derecha          | Igual                                        |
+| Accesos directos | Favoritos en rail                 | Chips en fila                                |
+| Separadores      | Entre familias de herramientas    | Entre zonas Escala \| Estilo \| …            |
+| Menú             | Flyout modal + estrellas          | Portal modal + estrellas                     |
+| Fondo menú       | `CHART_ZONE_DROPDOWN_PANEL_CLASS` | Igual                                        |
+| Backdrop         | `bg-black/10`                     | Igual                                        |
 
 Misma filosofía: **un solo menú por familia**, favoritos opcionales como botones compactos, persistencia en `chartToolbarGlobal`. Detalle barra vertical: [CHART_DRAWING_TAXONOMY.md](./CHART_DRAWING_TAXONOMY.md).
 
@@ -291,24 +291,24 @@ Misma filosofía: **un solo menú por familia**, favoritos opcionales como boton
 
 ### 11 jul — sesión cierre barras
 
-| Cambio | Descripción |
-|--------|-------------|
-| TradingView en barra activa | Movido desde barra global; flag `tradingView` en `ChartToolbarChartVisibility` |
-| Barra mínima | Favoritos `[]` por defecto (Escala, Estilo, Plantillas); badge de valor activo en icono |
-| Chips opcionales | `resolveBarZoneDisplayIds` sin forzar activo en modo `select`; toggles permiten lista vacía |
-| Menús modales H | Backdrop `bg-black/10`, Escape, panel opaco `bg-card` |
-| Coherencia V/H | `CHART_ZONE_DROPDOWN_PANEL_CLASS` compartida con barra de dibujos |
+| Cambio                      | Descripción                                                                                 |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| TradingView en barra activa | Movido desde barra global; flag `tradingView` en `ChartToolbarChartVisibility`              |
+| Barra mínima                | Favoritos `[]` por defecto (Escala, Estilo, Plantillas); badge de valor activo en icono     |
+| Chips opcionales            | `resolveBarZoneDisplayIds` sin forzar activo en modo `select`; toggles permiten lista vacía |
+| Menús modales H             | Backdrop `bg-black/10`, Escape, panel opaco `bg-card`                                       |
+| Coherencia V/H              | `CHART_ZONE_DROPDOWN_PANEL_CLASS` compartida con barra de dibujos                           |
 
 ### 10 jul — rail unificado
 
-| Cambio | Descripción |
-|--------|-------------|
-| Rail unificado | `ChartBarZonePicker` para todas las zonas de datos |
-| Iconos vs texto | Etiquetas «Escala», «Estilo»… sustituidas por iconos con tooltip |
-| Menú solo en icono | Chips sin muesca; favoritos solo desde menú del icono |
-| Sin separadores internos | Solo entre familias (zonas), no entre `1m`/`1D` ni minutos/horas |
-| Zoom en Escala | − / + / ajustar en la misma familia, sin borde lateral |
-| Cursor estable | Anchos fijos por chip OHLC/Δ/Vol |
-| Plantillas | Migradas al mismo patrón que Escala/Estilo |
-| Atajos inspector | Solo favoritos (`inspectorBarShortcutFavorites`); ⚙ siempre visible |
-| `shortLabel` | Timeframes `1D`, `1W`, `1M`; defaults incluyen `1mo` |
+| Cambio                   | Descripción                                                         |
+| ------------------------ | ------------------------------------------------------------------- |
+| Rail unificado           | `ChartBarZonePicker` para todas las zonas de datos                  |
+| Iconos vs texto          | Etiquetas «Escala», «Estilo»… sustituidas por iconos con tooltip    |
+| Menú solo en icono       | Chips sin muesca; favoritos solo desde menú del icono               |
+| Sin separadores internos | Solo entre familias (zonas), no entre `1m`/`1D` ni minutos/horas    |
+| Zoom en Escala           | − / + / ajustar en la misma familia, sin borde lateral              |
+| Cursor estable           | Anchos fijos por chip OHLC/Δ/Vol                                    |
+| Plantillas               | Migradas al mismo patrón que Escala/Estilo                          |
+| Atajos inspector         | Solo favoritos (`inspectorBarShortcutFavorites`); ⚙ siempre visible |
+| `shortLabel`             | Timeframes `1D`, `1W`, `1M`; defaults incluyen `1mo`                |

@@ -1,5 +1,10 @@
 import { Link } from "react-router-dom";
 import { Bell, FlaskConical, Radar } from "lucide-react";
+import {
+  LABORATORIO_LABEL,
+  SEÑALES_LABEL,
+  SEÑALES_PATH,
+} from "@/features/confirm/daily-nav";
 import { cn } from "@/lib/utils";
 
 interface ListHubShortcutsSectionProps {
@@ -14,7 +19,7 @@ const shortcutClassName = cn(
 
 /**
  * Accesos directos al mismo flujo que los menús generales, acotados a esta lista
- * cuando la sección lo soporta (Rastreadores vía ?listId=).
+ * cuando la sección lo soporta (Señales vía ?listId=).
  */
 export function ListHubShortcutsSection({
   listId,
@@ -30,13 +35,13 @@ export function ListHubShortcutsSection({
       </p>
       <div className="flex flex-col gap-1.5 sm:flex-row">
         <Link
-          to={`/screeners?listId=${encoded}`}
+          to={`${SEÑALES_PATH}?listId=${encoded}`}
           className={shortcutClassName}
-          title={`Rastreadores con universo «${nameHint}»`}
+          title={`${SEÑALES_LABEL} con universo «${nameHint}»`}
         >
           <Radar className="h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="min-w-0">
-            <span className="block font-medium">Rastreadores</span>
+            <span className="block font-medium">{SEÑALES_LABEL}</span>
             <span className="block truncate text-[10px] text-muted-foreground">
               Escaneo y señales de esta lista
             </span>
@@ -58,11 +63,11 @@ export function ListHubShortcutsSection({
         <Link
           to={`/backtests?tab=run&listId=${encoded}`}
           className={shortcutClassName}
-          title={`Backtesting con universo «${nameHint}»`}
+          title={`${LABORATORIO_LABEL} con universo «${nameHint}»`}
         >
           <FlaskConical className="h-3.5 w-3.5 shrink-0 text-primary" />
           <span className="min-w-0">
-            <span className="block font-medium">Backtesting</span>
+            <span className="block font-medium">{LABORATORIO_LABEL}</span>
             <span className="block truncate text-[10px] text-muted-foreground">
               Lista AUTO / embudo de esta lista
             </span>

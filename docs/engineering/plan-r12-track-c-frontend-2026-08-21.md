@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md` §4.
 > **Hipótesis aprobada:** `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (propietario, 2026-08-21, línea a línea).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · E1–E9. Una fase = un subagente. 0 commits sin OK.
-> **Estado:** plan **aprobado**. Track C **C1–C5 en `origin/main`** (`5bc51ff`…`0eb8976` · stamp **`d281b8c`**).
+> **Estado:** plan **aprobado**. Track C **C1–C5** (`5bc51ff`…`0eb8976`) + leftover CORE-R **hecho `8dd3caf`**. Gates no abiertos.
 > **AsOf:** 2026-08-21 · coordinación GitHub `origin/main`.
 
 ---

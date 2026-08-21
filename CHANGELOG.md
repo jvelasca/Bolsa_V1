@@ -16,6 +16,7 @@ Auditoría residual post-v1.3.0, higiene documental y estudio teórico del flujo
 - Track C **C3** (`97e20ab`): AUTO de cuenta «No disponible (BETA)»; copy de mesa sin `PAPER_D_EXECUTE`; execute sigue congelado
 - Track C **C4** (`154fcd1`): nav **Libro** (Operaciones + Historial); cabeceras «Libro · …»; sin fusionar páginas
 - Track C **C5** (`0eb8976`): HELP + Ayuda sync Confirm `/confirm` · Señales/Libro · AUTO BETA · frase SEMI; Track C **cerrado en `origin/main`** (stamp **`d281b8c`**)
+- Copy E8 residual + leftover CORE-R (`8dd3caf`): CTAs de firma que van a `/confirm` dejan de decir Ayuda; atajos list-hub `/screeners` = Señales (Laboratorio, no Backtesting); leftover CORE-R Proponer F3 ya en Confirmar
 
 ## [1.3.0] — 2026-08-21
 
