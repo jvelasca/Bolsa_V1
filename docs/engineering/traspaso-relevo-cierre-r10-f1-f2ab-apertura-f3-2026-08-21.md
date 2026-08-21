@@ -1,20 +1,21 @@
-# TRASPASO / RELEVO — Cierre R-10 (F1 · F2a · F2b) — apertura F3 (2026-08-21)
+# RELEVO — R-10: F3 implementada + verificada (pendiente commit) — apertura F4a (2026-08-21)
 
 > **Tipo:** Relevo de cierre de chat/día. Leer PRIMERO junto al **texto de paso** (§7) para que un nuevo agente / nuevo chat continúe **sin perder contexto**.
 > **Repos:** `Bolsa_V1` (monorepo).
-> **Firma del estado (verificada, no adivinada):** `git branch --show-current` = `main` · `HEAD` = **`86c315a`** · `git status --short` = **limpio** · sin tag en HEAD.
+> **Firma del estado (verificada, no adivinada):** `git branch --show-current` = `main` · `HEAD` = **`86c315a`** (`origin/main` al anterior cierre) · **árbol de trabajo con cambios F3 sin commitear** (4 ficheros código/test/verify + 3 docs) · sin tag en HEAD.
 
 ---
 
 ## 1. Qué se ha hecho hoy (2026-08-21)
 
-Conforme al **plan director** `docs/engineering/plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md` (6 correcciones P1/P2 de la **auditoría externa post‑v1.2.0**), se completaron y pusheron **3 fases**. Cada una: **subagente read-only de mapeo** (cuando aplicó) → **documentación de la fase en el plan** → **subagente de implementación acotado** → **verificación del coordinador (diff + batería)** → **aprobación del propietario por commit** → **push a `main`**.
+Conforme al **plan director** `docs/engineering/plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md` (6 correcciones P1/P2 de la **auditoría externa post‑v1.2.0**), se completaron y pusheron **3 fases** (F1/F2a/F2b) y se **implementó+verificó F3** (pendiente commit). Cada fase: **verificación del coordinador (diff + batería)** → **aprobación del propietario por commit** → **push a `main`**.
 
-| Fase    | Corrección                                                  | Prioridad | Commit    | Descripción breve                                                                                                                                                                                      |
-| ------- | ----------------------------------------------------------- | --------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **F1**  | `idempotency_key` **OBLIGATORIA** en deposit/withdraw/trade | P2        | `a1501e6` | DTOs + firma de use-case requieren la key (sin default); web genera y cachea la key por operación (estrategia C, helper `createIdempotencyKey`). POST sin clave → **422**.                             |
-| **F2a** | `TaxProfileDto` estricto                                    | P1.3      | `b4dcc72` | `ge=0` + `allow_inf_nan=False` en los 3 pct; `fiscal_year_start_month ∈ [1,12]` (`model_validator`). Wire intacto.                                                                                     |
-| **F2b** | Comparación idempotente **exacta** (sin tolerancia `0.01`)  | P2        | `86c315a` | `_cash_payload_matches`/`_trade_payload_matches` comparan por `==` normalizado a 6 decimales (`Decimal(str(x)).quantize(0.000001)`). Diferencia sub‑céntimo → 409/conflicto; valores iguales → replay. |
+| Fase    | Corrección                                                  | Prioridad | Commit               | Descripción breve                                                                                                                                                                                                                                                                   |
+| ------- | ----------------------------------------------------------- | --------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F1**  | `idempotency_key` **OBLIGATORIA** en deposit/withdraw/trade | P2        | `a1501e6`            | DTOs + firma de use-case requieren la key (sin default); web genera y cachea la key por operación (estrategia C, helper `createIdempotencyKey`). POST sin clave → **422**.                                                                                                          |
+| **F2a** | `TaxProfileDto` estricto                                    | P1.3      | `b4dcc72`            | `ge=0` + `allow_inf_nan=False` en los 3 pct; `fiscal_year_start_month ∈ [1,12]` (`model_validator`). Wire intacto.                                                                                                                                                                  |
+| **F2b** | Comparación idempotente **exacta** (sin tolerancia `0.01`)  | P2        | `86c315a`            | `_cash_payload_matches`/`_trade_payload_matches` comparan por `==` normalizado a 6 decimales (`Decimal(str(x)).quantize(0.000001)`). Diferencia sub‑céntimo → 409/conflicto; valores iguales → replay.                                                                              |
+| **F3**  | `balance_after` trade+fee **secuencial** (sin backfill D6)  | 🔴 P1     | _(pendiente commit)_ | Captura `cash_before` antes de mutar; `trade_balance=cash_before+amount`, `fee_balance=trade_balance−fees`. Verify+tests a invariante secuencial por fila. **Reset datos sim dev** (decisión propietario) → `verify` EXIT 0. Verificado: smock `buy`→`fee` 105000→104000→103996.79. |
 
 **Historial de `main` (más reciente → antiguo):**
 
@@ -31,15 +32,15 @@ b28e956  v1.2.0 (tag) / HEAD auditado por la externa
 
 - **R‑9:** CERRADA (F1–F8, 2026-08-20). **v1.2.0** intacta (`b28e956`).
 - **R‑10 (v1.2.1) ABIERTA** — plan `plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md`. Orden: **F1 → F2a → F2b → F3 → F4a → F4b → F5**.
-- **Hechas hoy:** F1 ✅ · F2a ✅ · F2b ✅.
-- **Pendientes (siguiente = F3):**
+- **Hechas y pusheadas:** F1 ✅ · F2a ✅ · F2b ✅. **F3 ✅ implementada + verificada (pendiente commit/aprobación).**
+- **Pendientes (siguiente = F4a — requiere ADR + decisión antes de código):**
 
-| Fase    | Corrección                                                               | Prioridad    | Notas clave                                                                                                                                     |
-| ------- | ------------------------------------------------------------------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **F3**  | `balance_after` de trade+fee = cash FINAL (ambos) — ver plan §33-34      | 🔴 P1        | Toca invariante de ledger; requiere capturar `cash_before` **antes** de mutar. Revisar `verify_ledger_balance_chain.py`. **Sin backfill (D6).** |
-| **F4a** | Custodia parcial silenciosa con `allow_partial=True` → perder obligación | 🔴 P1.2 ALTO | **Opción B** (tabla/estado de obligación pendiente) → requiere **migración + ADR** (decisión propietario antes de código).                      |
-| **F4b** | `ApplyCustodyFees` muta dentro de GET                                    | 🟠 P1/P2     | Mover a **job programado**; aceptar desfase de saldo (D4/D4.1). Reactiva `M-4/T-M4`.                                                            |
-| **F5**  | Docs + CHANGELOG + versión + limpieza obsoletos                          | –            | Tag/release `v1.2.1` + limpieza E8.                                                                                                             |
+| Fase       | Corrección                                                               | Prioridad    | Notas clave                                                                                                                |
+| ---------- | ------------------------------------------------------------------------ | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| ~~**F3**~~ | ~~`balance_after` de trade+fee = cash FINAL (ambos)~~                    | ~~🔴 P1~~    | **✅ HECHA** — invariante secuencial por fila; reset datos sim dev aprobado; `verify` EXIT 0. Pendiente commit.            |
+| **F4a**    | Custodia parcial silenciosa con `allow_partial=True` → perder obligación | 🔴 P1.2 ALTO | **Opción B** (tabla/estado de obligación pendiente) → requiere **migración + ADR** (decisión propietario antes de código). |
+| **F4b**    | `ApplyCustodyFees` muta dentro de GET                                    | 🟠 P1/P2     | Mover a **job programado**; aceptar desfase de saldo (D4/D4.1). Reactiva `M-4/T-M4`.                                       |
+| **F5**     | Docs + CHANGELOG + versión + limpieza obsoletos                          | –            | Tag/release `v1.2.1` + limpieza E8.                                                                                        |
 
 ## 3. Protocolo operativo del proyecto (recordatorio — premisas E1–E9)
 
@@ -82,11 +83,12 @@ b28e956  v1.2.0 (tag) / HEAD auditado por la externa
 
 ## 7. TEXTO DE PASO (pegar/copiar para el próximo chat/agente)
 
-> **RELEVO → R-10 (v1.2.1) — CONTINÚA en F3.** Repo `Bolsa_V1`, `main` = `86c315a` (= `origin/main`), árbol **limpio**. **R-9 cerrada** · **v1.2.0** (`b28e956`) intacta. R-10 **abierta**: **F1✅ `a1501e6` · F2a✅ `b4dcc72` · F2b✅ `86c315a`**, todo `main` pusheado.
-> **Siguiente fase:** **F3 (R-10.3) `balance_after` de trade+fee corregido, SIN backfill (D6)** — P1; toca invariante de ledger. Ver bloque F3 en `plan-r10` (§172) y las evidencias §33-34.
+> **RELEVO → R-10 (v1.2.1) — CONTINÚA en F4a.** Repo `Bolsa_V1`, rama `main`. **F1✅ `a1501e6` · F2a✅ `b4dcc72` · F2b✅ `86c315a`** pusheados. **F3 ✅ implementada y verificada — PENDIENTE aprobación de commit por el propietario** (árbol de trabajo con 4 ficheros: `accounts.py`, `test_concurrency_scenarios.py`, `test_r8c_ledger_balance_atomic.py`, `verify_ledger_balance_chain.py` + docs backlog/plan/traspaso). **R-9 cerrada** · **v1.2.0** (`b28e956`) intacta.
+> **Siguiente fase:** **F4a (R-10.4a) Custodia Opción B — obligación pendiente + cobro completo** — 🔴 P1.2 ALTO. **Requisito previo del plan (§2.3/§5.2): ADR + diseño en plan + decisión explícita del propietario ANTES de abrir código** (migración Alembic + tabla de obligación). Ver bloque F4a en `plan-r10`.
+> **Decisión cerrada F3 (2026-08-21):** reset de datos sim dev (404 cuentas `simulated` eliminadas por `close_account`→`delete_simulated_account`) para alcanzar `verify_ledger_balance_chain.py` EXIT 0 — porque D6 prohíbe backfill y las filas históricas trade+fee (semántica antigua) no cumplen el invariante secuencial. **Si se reasemejan cuentas históricas con la semántica antigua, `verify` volverá a marcarlas.**
 > **LEE PRIMERO (obligatorio):** este traspaso (§1–§7) · `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/PROJECT_PREMISES.md` ⭐ §0 (E1–E9) · `docs/engineering/PROJECT_STATE.md` · `docs/engineering/plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md`.
-> **Plan director:** `plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md`. **Orden:** F1→F2a→F2b→**F3**→F4a→F4b→F5.
-> **Protocolo:** cada fase = subagente acotado (read‑first de consumidores) + verificación del coordinador (diff + batería) + **aprobación del propietario por commit** + push a `main`. No saturar chat principal: delegar a subagentes.
-> **Decisiones cerradas:** D1–D7 y F1-C (ver §4). **F3: SIN backfill (D6)**.
+> **Plan director:** `plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md`. **Orden:** F1→F2a→F2b→F3→**F4a**→F4b→F5.
+> **Protocolo:** cada fase = verificación del coordinador (diff + batería) + **aprobación del propietario por commit** + push a `main`. No saturar chat principal: delegar a subagentes.
+> **Decisiones cerradas:** D1–D7, F1-C (ver §4) y **F3-sim**. **F3: SIN backfill (D6)**.
 > **NO tocar** (salvo decisión): `pending-delete` (riesgo alto) · gobernanza IA · workers ARQ/no‑ARQ excepto la parte de custodia‑job que decida F4b · features nuevas · **drift de contrato baseline F4** (no colar sin autorización; `contract:check` rojo preexistente registrado en §5).
 > **Progreso por fase:** al cerrar cada una, actualizar este traspaso, el `plan-r10` y el `backlog`.

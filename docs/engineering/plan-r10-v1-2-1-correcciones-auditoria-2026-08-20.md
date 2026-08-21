@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product/Ops`) · **backlog:** `docs/engineering/backlog-trabajo-2026-08-20.md`.
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐ §0 (**PREMISAS ESENCIALES ACTUALES E1–E9**).
 > **AsOf:** 2026-08-21 (apertura 2026-08-20; avanzado F1/F2a/F2b el 21 — ver `traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21.md`).
-> **Estado:** 🚧 **EN EJECUCIÓN (2026-08-21):** **F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a`** (todas en `main`, aprobadas por commit). **SIGUIENTE: F3.** Ningún cambio de código adicional sin **aprobación explícita del usuario POR COMMIT** (§2.4). Plan director de R‑10; cada fase se abre como subagente acotado bajo las premisas E1–E9.
+> **Estado:** 🚧 **EN EJECUCIÓN (2026-08-21):** **F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅** (F3 pendiente de commit/aprobación) — todas de R‑10 aprobadas por commit. **SIGUIENTE: F4a** (requiere ADR + decisión antes de código). Ningún cambio de código adicional sin **aprobación explícita del usuario POR COMMIT** (§2.4). Plan director de R‑10; cada fase se abre como subagente acotado bajo las premisas E1–E9.
 > **R‑9 quedó CERRADA** (F1–F8, decisión 2026-08-20) y **v1.2.0 intacta**. R‑10 es un paquete nuevo nacido de la **auditoría externa sobre `b28e956`/`v1.2.0`** (capa financiera P1/P2).
 
 ---
@@ -177,6 +177,12 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 **Semántica resultante:** `balance_after[n] = balance_after[n-1] + amount[n]` dentro de cada operación (trade→fee). **Actualizar `verify_ledger_balance_chain.py`** si asumía otra cosa.
 **Sin backfill (D6).**
 **Criterio:** tests de invariante secuencial en`test_r8c_ledger_balance_atomic.py`/`test_concurrency_scenarios.py` verdes; `verify_ledger_balance_chain.py` EXIT 0; ruff 0 · mypy 0; sin migración.
+
+> **✅ F3 HECHA (2026-08-21, pendiente commit/aprobación):** implementado en `accounts.py` (captura `cash_before = get_summary(...)` antes de `execute_trade`; `trade_balance = cash_before + amount`; `fee_balance = trade_balance - abs(fees.total)`). `verify_ledger_balance_chain.py` + `test_r8c_ledger_balance_atomic.py` + `test_concurrency_scenarios.py` actualizados de "grupo atómico que comparte balance_after" a **invariante secuencial por fila**. Batería: ruff 0 · mypy solo 7 pre‑existentes (no nuevos) · app 25 passed · PG `test_r8c` 3 + `test_concurrency` 4 passed · `verify_ledger_balance_chain.py` **EXIT 0** · smoke end‑to‑end confirmó `buy`→`fee` secuenciales (105000→104000→103996.79).
+>
+> **Decisión 2026-08-21 (contradicción D6 vs `verify EXIT 0`):** el criterio "`verify_ledger_balance_chain.py` EXIT 0" **no es alcanzable** sobre la DB dev actual **sin reset ni backfill**, porque 127 cuentas de simulación contienen grupos trade+fee **históricos** escritos con la semántica antigua (ambas filas comparten balance post‑fee; p. ej. `buy` y `fee` ambos `99748.29`). **D6 prohíbe backfill.** **DECISIÓN DEL PROPIETARIO:** **resetear los datos de simulación dev** (404 cuentas, todas `simulated`, borradas por el path canónico `close_account`→`delete_simulated_account`; `ledger=0`), de modo que el invariante secuencial sea verificable desde ya (forward‑only). **No afecta producción** (no hay); **no altera esquema/migración**. Si en el futuro se reasemejan cuentas históricas con la semántica antigua, `verify` las marcará de nuevo. Queda registrado como decisión y pendiente de reflejar en backlog/traspaso.
+>
+> **Nota de contrato/migración:** F3 **sin migración** (D6) y **sin backfill**. `openapi.json`/`schema.d.ts` NO se tocan (sin cambio de contrato HTTP).
 
 ### 🔴 FASE F4a — R-10.4a: Custodia Opción B — obligación pendiente + cobro completo (P1.2, ALTO)
 

@@ -778,6 +778,10 @@ class ExecuteTrade:
             settings,
             currency=scope.account.currency,
         )
+        # R-10 F3: capturar el cash ANTES de mutar (execute_trade deducirá el notional
+        # + fees y devolverá un summary POST-fee). Sin esta lectura previa no habría
+        # base para escribir balance_after secuenciales (trade → fee).
+        cash_before = (await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)).portfolio.cash
         try:
             result = await self._portfolio_repo.execute_trade(
                 instrument_id=instrument_id,
@@ -809,9 +813,12 @@ class ExecuteTrade:
             summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
             return TradeResult(transaction=existing, summary=summary)
         amount = -result.transaction.total if trade_type == "buy" else result.transaction.total
-        # M3: balance_after = cash real grabado por el repo (ya incluye comisiones),
-        # NO un recálculo manual que doble-contaría las fees.
-        trade_balance = result.summary.portfolio.cash
+        # R-10 F3: balance_after SECUENCIAL por fila.
+        #   trade: cash tras aplicar SOLO el notional (aún sin fee).
+        #   fee:   cash tras aplicar notional + fee (= cash final post-operación).
+        # Semántica invariante: balance_after[n] == balance_after[n-1] + amount[n].
+        trade_balance = cash_before + amount
+        fee_balance = trade_balance - abs(fees.total)
         await self._ledger_repo.append_trade(
             account_id=scope.account.id,
             portfolio_id=scope.portfolio.id,
@@ -838,7 +845,7 @@ class ExecuteTrade:
                 portfolio_id=scope.portfolio.id,
                 amount=fees.total,
                 currency=scope.account.currency,
-                balance_after=result.summary.portfolio.cash,
+                balance_after=fee_balance,
                 reference_id=result.transaction.id,
                 description=description,
             )

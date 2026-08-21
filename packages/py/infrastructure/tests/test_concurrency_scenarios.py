@@ -202,47 +202,24 @@ async def _account_total_cash(session: AsyncSession, account_id: str) -> Decimal
     return sum((c for c in cash_values), Decimal("0"))
 
 
-def _is_transaction_group_row(row: LedgerEntryRow) -> bool:
-    """Una fila trade (reference_type=='transaction') es el primer miembro de un grupo."""
-    return row.reference_type == "transaction" and row.reference_id is not None
-
-
 def _check_ledger_chain(rows: list[LedgerEntryRow]) -> None:
-    """Invariante ``balance_after`` POR GRUPO ATÓMICO sobre una secuencia ordenada.
+    """Invariante ``balance_after`` **secuencial por fila** sobre una secuencia ordenada.
 
-    Un grupo atómico = 2 filas consecutivas con el MISMO ``(reference_type='transaction',
-    reference_id)`` con ``type`` en {buy, sell, fee}, que comparten el MISMO
-    ``balance_after`` post-fee (semántica de producción ``ExecuteTrade``/``append_fee``).
-    Cualquier otra fila es un grupo de 1 elemento. Para cada grupo se valida
-    ``balance_after == balance_after(prev) + Σ amounts``.
+    Regla (R-10 F3): ``balance_after[n] == balance_after[n-1] + amount[n]`` para TODA
+    fila, arrancando desde ``prev_balance = 0``. Ya no hay grupos atómicos trade+fee
+    que compartan balance_after: la fila ``trade`` escribe cash sin fee y la fila
+    ``fee`` encadena el cash final (semántica ``ExecuteTrade``/``append_fee``).
     """
     assert rows, "sin filas de ledger para validar"
     prev_balance = Decimal("0")
-    idx = 0
-    while idx < len(rows):
-        group: list[LedgerEntryRow] = [rows[idx]]
-        if idx + 1 < len(rows) and _is_transaction_group_row(rows[idx]):
-            nxt = rows[idx + 1]
-            if (
-                nxt.reference_type == rows[idx].reference_type
-                and nxt.reference_id == rows[idx].reference_id
-            ):
-                group.append(nxt)
-        group_sum = sum((r.amount for r in group), Decimal("0"))
-        expected = prev_balance + group_sum
-        if len(group) == 2 and group[0].balance_after != group[1].balance_after:
+    for r in rows:
+        expected = prev_balance + r.amount
+        if r.balance_after != expected:
             raise AssertionError(
-                f"grupo atómico {group[0].reference_id!r} no comparte balance_after: "
-                f"{group[0].balance_after} != {group[1].balance_after}"
+                f"fila {r.id} balance={r.balance_after} "
+                f"!= prev={prev_balance} + amount({r.amount})={expected}"
             )
-        for r in group:
-            if r.balance_after != expected:
-                raise AssertionError(
-                    f"grupo {[g.id for g in group]} balance={r.balance_after} "
-                    f"!= prev={prev_balance} + sum({group_sum})={expected}"
-                )
-        prev_balance = group[-1].balance_after
-        idx += len(group)
+        prev_balance = r.balance_after
 
 
 async def _load_sorted_rows(session: AsyncSession, account_id: str) -> list[LedgerEntryRow]:

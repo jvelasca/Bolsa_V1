@@ -1,19 +1,20 @@
-"""R-8C.1 — invariante de `balance_after` POR GRUPO ATÓMICO en `ledger_entries`.
+"""R-8C.1 (actualizado R-10 F3) — invariante de `balance_after` **secuencial por fila** en `ledger_entries`.
 
 Invariante objetivo: recorriendo las filas de un account ordenadas por
-``executed_at, id``, el `balance_after` de cada **grupo** es igual al
-`balance_after` del grupo anterior MÁS la suma de los `amount` de ese grupo.
+``executed_at, id``, el `balance_after` de CADA fila es igual al `balance_after`
+de la anterior MÁS su `amount`::
 
-Un **grupo** puede ser:
-- una fila aislada (p. ej. `deposit`/`withdrawal`/`fee`/`custody` sueltas), o
-- un par **trade+fee atómico**: 2 filas con el MISMO
-  ``(reference_type="transaction", reference_id)`` que comparten el mismo
-  `balance_after` post-fee.
+    balance_after[n] == balance_after[n-1] + amount[n]
 
-Esto modela EXACTAMENTE el comportamiento de producción ``ExecuteTrade``
-(``bolsa_application/accounts.py``): la fila ``trade`` y la fila ``fee`` escriben
-el MISMO ``balance_after = result.summary.portfolio.cash`` (post-fee), así que el
-invariante por-fila NO se cumple en ese par; solo POR GRUPO.
+Modela EXACTAMENTE el comportamiento de producción ``ExecuteTrade``
+(``bolsa_application/accounts.py``) desde **R-10 F3**:
+- la fila ``trade`` escribe ``balance_after = cash_before + amount`` (cash tras
+  aplicar SOLO el notional, aún sin fee);
+- la fila ``fee`` escribe ``balance_after = trade_balance - abs(fees)`` (cash final
+  post-operación).
+
+Ya NO existe el caso de grupo atómico que comparte balance_after entre trade y fee;
+cada fila encadena con la anterior según la suma de su propio ``amount``.
 
 Nota sobre signos (emulación fiel de producción):
 - ``append_trade`` escribe ``amount = -notional`` (buy) / ``+notional`` (sell).
@@ -21,11 +22,11 @@ Nota sobre signos (emulación fiel de producción):
   ``append_fee``) → en buy la fee es negativa, en sell también (resta cash).
 - Ambas filas comparten ``reference_id = result.transaction.id``.
 
-⇒ Para un buy: ``amount[trade] + amount[fee] = -(notional + fees)`` y
-``balance_after = balance_prev − (notional + fees)`` (el impacto de cash total).
+⇒ Para un buy: ``balance_after[trade] = cash_before − notional`` y
+``balance_after[fee] = cash_before − notional − fees`` (impacto de cash total).
 
 PostgreSQL real (patrón ``db_session`` local, ``pytest.skip`` si no hay DB).
-No modifica producción: es SOLO un test-espejo de la semántica de grupo.
+No modifica producción: es SOLO un test-espejo de la semántica secuencial.
 """
 
 from __future__ import annotations
@@ -219,20 +220,22 @@ class _LedgerBuilder:
     async def trade_with_fees(
         self, *, notional: Decimal, fees: Decimal, trade_type: str
     ) -> tuple[LedgerEntryRow, LedgerEntryRow]:
-        """Emula `ExecuteTrade` (accounts.py): trade+fee atómicos con mismo `balance_after`.
+        """Emula `ExecuteTrade` (accounts.py) tras R-10 F3: balance_after SECUENCIAL.
 
-        - amount[trade]  = -notional (buy) / +notional (sell)
-        - amount[fee]    = -abs(fees)   (append_fee siempre negativo)
-        - ambos `balance_after` = running_balance ANTES − notional − fees (post-fee).
+        - amount[trade] = -notional (buy) / +notional (sell)
+        - amount[fee]   = -abs(fees)   (append_fee siempre negativo)
+        - balance_after[trade] = running_balance + amount[trade]   (cash sin fee)
+        - balance_after[fee]   = balance_after[trade] + amount[fee] (cash final)
         """
         trade_amount = -notional if trade_type == "buy" else notional
         fee_amount = -abs(fees)
-        self._running = self._running + trade_amount + fee_amount
+        trade_balance = self._running + trade_amount
+        self._running = trade_balance + fee_amount
         tx_id = f"tx_{uuid4().hex[:12]}"
         trade = await self._add(
             type=trade_type,
             amount=trade_amount,
-            balance_after=self._running,
+            balance_after=trade_balance,
             reference_type="transaction",
             reference_id=tx_id,
         )
@@ -259,47 +262,24 @@ async def _load_sorted_rows(session: AsyncSession, account_id: str) -> list[Ledg
     return list((await session.execute(stmt)).scalars())
 
 
-def _is_atomic_trade_group(row: LedgerEntryRow) -> bool:
-    return row.reference_type == "transaction" and row.reference_id is not None
-
-
 def _check_atomic_invariant(rows: list[LedgerEntryRow]) -> None:
-    """Valida el invariante POR GRUPO ATOMICO sobre una secuencia ordenada.
+    """Valida el invariante **secuencial por fila** sobre una secuencia ordenada.
 
-    Un grupo atómico = 2 filas consecutivas con el MISMO (reference_type, reference_id)
-    con ``type`` en {trade_type, fee}. Cualquier otra fila es un grupo de 1 elemento.
-    Para cada grupo, ``balance_after == balance_after(prev) + Σ amounts`` y, si es
-    un grupo atómico, ambas filas comparten el MISMO ``balance_after`` post-fee.
+    Regla (R-10 F3): ``balance_after[n] == balance_after[n-1] + amount[n]`` para
+    TODA fila, arrancando desde ``prev_balance = 0``. Ya no hay grupos atómicos que
+    compartan balance_after: la fila ``trade`` y la fila ``fee`` encadenan cada una
+    con la suma de su propio ``amount``.
     """
     assert rows, "sin filas de ledger para validar"
     prev_balance = Decimal("0")
-    idx = 0
-    while idx < len(rows):
-        group: list[LedgerEntryRow] = [rows[idx]]
-        if idx + 1 < len(rows) and _is_atomic_trade_group(rows[idx]):
-            nxt = rows[idx + 1]
-            if (
-                nxt.reference_type == rows[idx].reference_type
-                and nxt.reference_id == rows[idx].reference_id
-            ):
-                group.append(nxt)
-        group_sum = sum((r.amount for r in group), Decimal("0"))
-        expected = prev_balance + group_sum
-        if len(group) == 2:
-            # El grupo atómico comparte el MISMO balance_after post-fee.
-            if group[0].balance_after != group[1].balance_after:
-                raise AssertionError(
-                    f"grupo atómico {group[0].reference_id!r} no comparte balance_after: "
-                    f"{group[0].balance_after} != {group[1].balance_after}"
-                )
-        for r in group:
-            if r.balance_after != expected:
-                raise AssertionError(
-                    f"grupo {[g.id for g in group]} balance={r.balance_after} "
-                    f"!= prev={prev_balance} + sum({group_sum})={expected}"
-                )
-        prev_balance = group[-1].balance_after
-        idx += len(group)
+    for r in rows:
+        expected = prev_balance + r.amount
+        if r.balance_after != expected:
+            raise AssertionError(
+                f"fila {r.id} balance={r.balance_after} "
+                f"!= prev={prev_balance} + amount({r.amount})={expected}"
+            )
+        prev_balance = r.balance_after
 
 
 @pytest.mark.asyncio
@@ -350,7 +330,7 @@ async def test_r8c_atomic_grupo_balance_final(db_session: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_r8c_detectar_fila_descuadrada(db_session: AsyncSession) -> None:
-    """NEGATIVO: un `balance_after` corrupto en un grupo atómico rompe el test."""
+    """NEGATIVO: un `balance_after` corrupto rompe el invariante secuencial."""
     account, portfolio = await _new_account(db_session, "broken")
     builder = _LedgerBuilder(db_session, account.id, portfolio.id)
 
@@ -358,7 +338,9 @@ async def test_r8c_detectar_fila_descuadrada(db_session: AsyncSession) -> None:
     trade, fee = await builder.trade_with_fees(
         notional=Decimal("10000"), fees=Decimal("5.50"), trade_type="buy"
     )
-    # Corromper la fila fee: balance_after descuadrado (rompe el grupo).
+    # Sentido R-10 F3: trade y fee tienen balance_after SECUENCIALES y distintos.
+    assert fee.balance_after == trade.balance_after - Decimal("5.50")
+    # Corromper la fila fee: balance_after descuadrado (rompe la cadena secuencial).
     fee.balance_after = fee.balance_after + Decimal("0.01")
     db_session.add(fee)
     await db_session.commit()
@@ -366,5 +348,3 @@ async def test_r8c_detectar_fila_descuadrada(db_session: AsyncSession) -> None:
     rows = await _load_sorted_rows(db_session, account.id)
     with pytest.raises(AssertionError):
         _check_atomic_invariant(rows)
-    # Sanidad: el test SIEMPRE detecta la fila descuadrada.
-    assert trade.balance_after != fee.balance_after

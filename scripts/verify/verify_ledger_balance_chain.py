@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
-"""Fase R-9.7 (F7) — verificación del invariante ``balance_after`` en el ledger real.
+"""Fase R-9.7 (F7) + R-10 F3 — verificación del invariante ``balance_after`` en el ledger real.
 
 Recorre ``ledger_entries`` por ``account_id`` en orden ``(executed_at, id)`` y
-comprueba que el ``balance_after`` encadena correctamente con la tolerancia Decimal
-de la suite de infraestructura:
+comprueba el invariante **secuencial por fila** para TODO el ledger::
 
-- Para una fila aislada (deposit/withdrawal/fee/custody): ``balance_after[n] ==
-  balance_after[n-1] + amount[n]``.
-- Para un grupo atómico trade+fee (``reference_type='transaction'`` y mismo
-  ``reference_id``): ambas filas comparten el MISMO ``balance_after`` post-fee
-  (semántica de producción ``ExecuteTrade``), de modo que el invariante se valida POR
-  GRUPO, no por fila.
+    balance_after[n] == balance_after[n-1] + amount[n]
+
+La fila ``trade`` y la fila ``fee`` de una operación ya NO comparten balance_after;
+desde R-10 F3, ``ExecuteTrade`` escribe ``balance_after`` secuenciales:
+
+- ``trade``: cash tras aplicar SOLO el notional (aún sin fee).
+- ``fee``:   cash tras aplicar notional + fee (= cash final post-operación).
+
+Para una fila aislada (deposit/withdrawal/fee/custody) la misma regla encadena con
+la anterior. No existe caso de grupo que comparta balance_after.
 
 Uso (repo root):
   uv run python scripts/verify/verify_ledger_balance_chain.py
@@ -54,39 +57,25 @@ def _load_env() -> None:
     load_dotenv(env_path, override=False)
 
 
-def _validate_groups(rows: list[tuple[str, str, str, Decimal, Decimal]], account_id: str) -> str:
-    """Valida la cadena balance_after POR GRUPO sobre filas ordenadas.
+def _validate_sequential(rows: list[tuple[str, str, str, Decimal, Decimal]], account_id: str) -> str:
+    """Valida el invariante **secuencial por fila** sobre filas ordenadas.
 
     Cada fila del query es ``(id, reference_id, reference_type, amount,
-    balance_after)``. Un grupo atómico = 2 filas consecutivas con el MISMO
-    ``(reference_type='transaction', reference_id)`` que comparten balance_after.
-    Devuelve 'OK (...) ' o 'FAIL (...) ' con el detalle.
+    balance_after)``. Regla: ``balance_after[n] == balance_after[n-1] + amount[n]``
+    arrancando desde ``prev_balance = 0`` (semántica R-10 F3, sin grupos que
+    compartan balance_after). Devuelve 'OK (...) ' o 'FAIL (...) ' con el detalle.
     """
     if not rows:
         return "OK (sin entradas)"
     prev_balance = Decimal("0")
-    idx = 0
-    while idx < len(rows):
-        group = [rows[idx]]
-        if idx + 1 < len(rows) and rows[idx][2] == "transaction" and rows[idx][1]:
-            nxt = rows[idx + 1]
-            if nxt[2] == rows[idx][2] and nxt[1] == rows[idx][1]:
-                group.append(nxt)
-        group_sum = sum((r[3] for r in group), Decimal("0"))
-        expected = prev_balance + group_sum
-        if len(group) == 2 and group[0][4] != group[1][4]:
+    for r in rows:
+        expected = prev_balance + r[3]
+        if r[4] != expected:
             return (
-                f"FAIL(cuenta {account_id}) grupo atómico {group[0][1]!r}: "
-                f"balance_after {group[0][4]} != {group[1][4]}"
+                f"FAIL(cuenta {account_id}) fila {r[0]}: balance_after {r[4]} "
+                f"!= prev {prev_balance} + amount {r[3]} = {expected}"
             )
-        for r in group:
-            if r[4] != expected:
-                return (
-                    f"FAIL(cuenta {account_id}) fila {r[0]}: balance_after {r[4]} "
-                    f"!= prev {prev_balance} + sum({group_sum}) = {expected}"
-                )
-        prev_balance = group[-1][4]
-        idx += len(group)
+        prev_balance = r[4]
     return f"OK (final balance_after {prev_balance})"
 
 
@@ -143,7 +132,7 @@ async def _run() -> int:
                 )
                 for r in res.all()
             ]
-            result = _validate_groups(rows, str(account_id))
+            result = _validate_sequential(rows, str(account_id))
             print(f"  {account_id}: {result}")
             if result.startswith("FAIL"):
                 failures += 1
