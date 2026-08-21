@@ -1382,3 +1382,27 @@ class SupervisedF3AccountStateRow(Base):
     updated_at: Mapped[datetime] = mapped_column(
         "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
     )
+
+
+class CustodyObligationRow(Base):
+    """ADR 026 / F4a — obligación de custodia pendiente/aplicada por cuenta.
+
+    Una fila por cuenta (PK ``account_id`` FK), un único periodo pendiente en curso;
+    el ``period`` se sobrescribe en cada ciclo anual re-cobrable. ``status`` solo
+    ``PENDING`` | ``APPLIED``. Nace sin backfill (forward-only, D6).
+    """
+
+    __tablename__ = "custody_obligation"
+
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        ForeignKey("investment_accounts.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    period: Mapped[str] = mapped_column("period", String)
+    status: Mapped[str] = mapped_column("status", String)
+    outstanding: Mapped[Decimal] = mapped_column("outstanding", Numeric(18, 6))
+    total_fee: Mapped[Decimal] = mapped_column("total_fee", Numeric(18, 6))
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
+    )

@@ -65,6 +65,20 @@ class _FakeAccountRepo:
         self.activities += 1
 
 
+class _FakeObligationRepo:
+    """Fake del repo dedicado de obligación de custodia (ADR 026 / F4a)."""
+
+    def __init__(self) -> None:
+        self.upserted: list[dict] = []
+
+    async def get_by_account(self, account_id):  # noqa: ARG001
+        return None
+
+    async def upsert(self, **kwargs) -> dict:
+        self.upserted.append(kwargs)
+        return dict(kwargs)
+
+
 class _FakePortfolioRepo:
     def __init__(self, cash: float, equity: float) -> None:
         self._cash = cash
@@ -105,7 +119,14 @@ def _scope_with_charged_ledger(last_charge_at):
     ledger = _FakeLedger(last_charge_at=last_charge_at)
     account_repo = _FakeAccountRepo(portfolios)
     portfolio_repo = _FakePortfolioRepo(cash=10_000.0, equity=100_000.0)
-    return ApplyCustodyFees(account_repo, portfolio_repo, ledger), scope, ledger
+    obligation_repo = _FakeObligationRepo()
+    return (
+        ApplyCustodyFees(
+            account_repo, portfolio_repo, ledger, custody_obligation_repo=obligation_repo
+        ),
+        scope,
+        ledger,
+    )
 
 
 def test_custody_claim_and_release():
@@ -137,8 +158,11 @@ def test_custody_charged_once_across_concurrent_reads():
     ledger = _FakeLedger(last_charge_at=None)
     account_repo = _FakeAccountRepo(portfolios)
     portfolio_repo = _FakePortfolioRepo(cash=10_000.0, equity=100_000.0)
+    obligation_repo = _FakeObligationRepo()
 
-    uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
+    uc = ApplyCustodyFees(
+        account_repo, portfolio_repo, ledger, custody_obligation_repo=obligation_repo
+    )
 
     # 1) Ventana concurrente: la 1ª request ya tomó el mutex (claim en vuelo).
     assert asyncio_run(claim_custody_charge("acc-1", "2026")) is True
@@ -163,8 +187,11 @@ def test_custody_no_charge_releases_claim():
     ledger = _FakeLedger(last_charge_at=None)
     account_repo = _FakeAccountRepo(portfolios)
     portfolio_repo = _FakePortfolioRepo(cash=0.0, equity=0.0)
+    obligation_repo = _FakeObligationRepo()
 
-    uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
+    uc = ApplyCustodyFees(
+        account_repo, portfolio_repo, ledger, custody_obligation_repo=obligation_repo
+    )
     assert asyncio_run(uc.execute(scope)) is False
     assert len(ledger.appended) == 0  # no cargo
     # el mutex quedó liberado: un siguiente tick con patrimonio puede cobrar
@@ -183,8 +210,11 @@ def test_custody_skips_when_already_charged_this_period():
     ledger = _FakeLedger(last_charge_at=now)  # ya cobrada hace unos días
     account_repo = _FakeAccountRepo(portfolios)
     portfolio_repo = _FakePortfolioRepo(cash=10_000.0, equity=100_000.0)
+    obligation_repo = _FakeObligationRepo()
 
-    uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
+    uc = ApplyCustodyFees(
+        account_repo, portfolio_repo, ledger, custody_obligation_repo=obligation_repo
+    )
     assert asyncio_run(uc.execute(scope)) is False
     assert len(ledger.appended) == 0
 
@@ -204,8 +234,11 @@ def test_custody_unique_conflict_returns_false_not_500():
     ledger = _FakeLedger(last_charge_at=None, raise_append=True)
     account_repo = _FakeAccountRepo(portfolios)
     portfolio_repo = _FakePortfolioRepo(cash=10_000.0, equity=100_000.0)
+    obligation_repo = _FakeObligationRepo()
 
-    uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
+    uc = ApplyCustodyFees(
+        account_repo, portfolio_repo, ledger, custody_obligation_repo=obligation_repo
+    )
     # La colisión de UNIQUE se absorbe: semántica idempotente, no excepción/500.
     # (Con fakes el SAVEPOINT es no-op — no expone ``session`` —, así que aquí no se
     # verifica el rollback de ``deduct_cash``: eso lo cubren los tests Postgres reales
@@ -231,8 +264,11 @@ def test_custody_unique_conflict_flush_still_records_first_charge():
     ledger = _FakeLedger(last_charge_at=None)
     account_repo = _FakeAccountRepo(portfolios)
     portfolio_repo = _FakePortfolioRepo(cash=10_000.0, equity=100_000.0)
+    obligation_repo = _FakeObligationRepo()
 
-    uc = ApplyCustodyFees(account_repo, portfolio_repo, ledger)
+    uc = ApplyCustodyFees(
+        account_repo, portfolio_repo, ledger, custody_obligation_repo=obligation_repo
+    )
     assert asyncio_run(uc.execute(scope)) is True
     assert len(ledger.appended) == 1  # el cargo del 1er request se graba
     assert ledger.appended[0]["reference_id"].startswith("custody-")

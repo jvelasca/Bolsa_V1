@@ -95,3 +95,18 @@ class CashMovementResult:
     balance_after: float
     executed_at: str
     description: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class CustodyObligation:
+    """Obligación de custodia pendiente/aplicada de una cuenta (ADR 026, F4a).
+
+    Una fila por cuenta (PK ``account_id``): el ``period`` en curso se sobrescribe en
+    cada ciclo anual re-cobrable. ``status`` solo ``PENDING`` | ``APPLIED``.
+    """
+
+    account_id: str
+    period: str
+    status: str
+    outstanding: float
+    total_fee: float

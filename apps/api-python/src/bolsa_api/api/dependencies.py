@@ -174,6 +174,9 @@ from bolsa_infrastructure.database.repositories.cognitive_repository import (
     SqlAlchemyCognitiveRepository,
 )
 from bolsa_infrastructure.database.repositories.core_r_repository import SqlAlchemyCoreRRepository
+from bolsa_infrastructure.database.repositories.custody_obligation_repository import (
+    CustodyObligationRepository,
+)
 from bolsa_infrastructure.database.repositories.execution_policy_repository import (
     SqlAlchemyExecutionPolicyRepository,
 )
@@ -296,6 +299,10 @@ def get_supervised_f3_repository(session: AsyncSession) -> SqlAlchemySupervisedF
     return SqlAlchemySupervisedF3Repository(session)
 
 
+def get_custody_obligation_repository(session: AsyncSession) -> CustodyObligationRepository:
+    return CustodyObligationRepository(session)
+
+
 def get_mandate_repository(session: AsyncSession) -> SqlAlchemyMandateRepository:
     return SqlAlchemyMandateRepository(session)
 
@@ -336,6 +343,7 @@ def get_get_account_summary_use_case(session: AsyncSession) -> GetAccountSummary
         get_account_repository(session),
         get_portfolio_repository(session),
         get_ledger_repository(session),
+        custody_obligation_repo=get_custody_obligation_repository(session),
     )
 
 
@@ -407,6 +415,7 @@ def get_tax_report_use_case(session: AsyncSession) -> GetTaxReport:
         get_account_repository(session),
         get_portfolio_repository(session),
         get_ledger_repository(session),
+        custody_obligation_repo=get_custody_obligation_repository(session),
     )
 
 

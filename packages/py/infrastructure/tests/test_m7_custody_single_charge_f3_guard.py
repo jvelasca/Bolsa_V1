@@ -195,6 +195,9 @@ async def test_recargo_forzado_no_deja_cash_descontado(db_session: AsyncSession)
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
+    from bolsa_infrastructure.database.repositories.custody_obligation_repository import (
+        CustodyObligationRepository,
+    )
     from bolsa_infrastructure.database.repositories.ledger_repository import (
         SqlAlchemyLedgerRepository,
     )
@@ -205,6 +208,7 @@ async def test_recargo_forzado_no_deja_cash_descontado(db_session: AsyncSession)
     account_repo = SqlAlchemyAccountRepository(db_session)
     ledger_repo = SqlAlchemyLedgerRepository(db_session)
     portfolio_repo = SqlAlchemyPortfolioRepository(db_session)
+    obligation_repo = CustodyObligationRepository(db_session)
 
     account_id = await _new_account(
         db_session,
@@ -216,7 +220,10 @@ async def test_recargo_forzado_no_deja_cash_descontado(db_session: AsyncSession)
 
     # 1ª request: cargo real de custodia → fila persistida + cash descontado, commit.
     applied = await ApplyCustodyFees(
-        account_repo, portfolio_repo, ledger_repo
+        account_repo,
+        portfolio_repo,
+        ledger_repo,
+        custody_obligation_repo=obligation_repo,
     ).execute(scope)
     assert applied is True
     await db_session.commit()

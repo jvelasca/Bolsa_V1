@@ -27,6 +27,9 @@ from bolsa_infrastructure.database.db_errors import is_unique_violation
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
+from bolsa_infrastructure.database.repositories.custody_obligation_repository import (
+    CustodyObligationRepository,
+)
 from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlchemyLedgerRepository
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
@@ -161,10 +164,12 @@ class GetAccountSummary:
         account_repo: SqlAlchemyAccountRepository,
         portfolio_repo: SqlAlchemyPortfolioRepository,
         ledger_repo: SqlAlchemyLedgerRepository,
+        custody_obligation_repo: CustodyObligationRepository | None = None,
     ) -> None:
         self._account_repo = account_repo
         self._portfolio_repo = portfolio_repo
         self._ledger_repo = ledger_repo
+        self._obligation_repo = custody_obligation_repo
 
     async def execute(
         self,
@@ -176,6 +181,7 @@ class GetAccountSummary:
             self._account_repo,
             self._portfolio_repo,
             self._ledger_repo,
+            custody_obligation_repo=self._obligation_repo,
         ).execute(scope)
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
         summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
@@ -560,10 +566,12 @@ class ApplyCustodyFees:
         account_repo: SqlAlchemyAccountRepository,
         portfolio_repo: SqlAlchemyPortfolioRepository,
         ledger_repo: SqlAlchemyLedgerRepository,
+        custody_obligation_repo: CustodyObligationRepository | None = None,
     ) -> None:
         self._account_repo = account_repo
         self._portfolio_repo = portfolio_repo
         self._ledger_repo = ledger_repo
+        self._obligation_repo = custody_obligation_repo
 
     async def execute(self, scope) -> bool:
         settings = scope.account.settings or settings_from_dict(None)
@@ -620,34 +628,55 @@ class ApplyCustodyFees:
             session = getattr(self._ledger_repo, "session", None)
             pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
             cash_before = pre_summary.portfolio.cash
-            async with _idempotent_savepoint(session):
-                balance_after = await self._portfolio_repo.deduct_cash(
-                    charge_legacy_id,
-                    fee_amount,
-                    allow_partial=True,
-                )
-                charged = cash_before - balance_after
-                if charged < 0:
-                    charged = 0.0
-                description = (
-                    f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
-                )
-                if charged < fee_amount:
-                    description += (
-                        f" · cargo parcial por saldo (aplicado {charged:.2f} € de {fee_amount:.2f} €)"
+            description = f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
+            if cash_before >= fee_amount:
+                # Cobro completo: solo con saldo suficiente se descuenta cash y se
+                # escribe el ledger (fila custody + fee). balance_after (F3) ya viene
+                # descontado · invariante Σ ledger == cash se mantiene (no cargo parcial).
+                balance_after = cash_before - fee_amount
+                async with _idempotent_savepoint(session):
+                    await self._portfolio_repo.deduct_cash(
+                        charge_legacy_id,
+                        fee_amount,
+                        allow_partial=False,
                     )
-                await self._ledger_repo.append_custody_fee(
-                    account_id=scope.account.id,
-                    portfolio_id=charge_portfolio_id,
-                    amount=charged,
-                    currency=scope.account.currency,
-                    balance_after=balance_after,
-                    reference_id=f"custody-{period}",
-                    description=description,
-                )
-                await self._account_repo.touch_activity(scope.account.id)
-            # Tras el cargo persistido (dentro del SAVEPOINT, atómico con el touch de
-            # activity), el guard duradero (ledger) ya protege el año; liberar mutex.
+                    await self._ledger_repo.append_custody_fee(
+                        account_id=scope.account.id,
+                        portfolio_id=charge_portfolio_id,
+                        amount=fee_amount,
+                        currency=scope.account.currency,
+                        balance_after=balance_after,
+                        reference_id=f"custody-{period}",
+                        description=description,
+                    )
+                    await self._account_repo.touch_activity(scope.account.id)
+                    if self._obligation_repo is not None:
+                        await self._obligation_repo.upsert(
+                            account_id=scope.account.id,
+                            period=period,
+                            status="APPLIED",
+                            outstanding=0.0,
+                            total_fee=fee_amount,
+                        )
+                # Tras el cargo persistido (dentro del SAVEPOINT, atómico con el touch
+                # de activity y el upsert de obligación), el guard duradero (ledger) ya
+                # protege el año; liberar mutex.
+                await release_custody_charge(scope.account.id, period)
+                return True
+            # cash < fee: NO se descuenta, NO se escribe ledger (invariante Σ ledger ==
+            # cash intacto) y NO se marca DONE. Se registra la obligación como PENDING
+            # con el resto pendiente por cobrar para un reintento posterior (F4b/job).
+            if self._obligation_repo is not None:
+                outstanding = fee_amount - cash_before
+                async with _idempotent_savepoint(session):
+                    await self._obligation_repo.upsert(
+                        account_id=scope.account.id,
+                        period=period,
+                        status="PENDING",
+                        outstanding=outstanding,
+                        total_fee=fee_amount,
+                    )
+                    await self._account_repo.touch_activity(scope.account.id)
             await release_custody_charge(scope.account.id, period)
             return True
         except IntegrityError as exc:
@@ -860,10 +889,12 @@ class GetTaxReport:
         account_repo: SqlAlchemyAccountRepository,
         portfolio_repo: SqlAlchemyPortfolioRepository,
         ledger_repo: SqlAlchemyLedgerRepository,
+        custody_obligation_repo: CustodyObligationRepository | None = None,
     ) -> None:
         self._account_repo = account_repo
         self._portfolio_repo = portfolio_repo
         self._ledger_repo = ledger_repo
+        self._obligation_repo = custody_obligation_repo
 
     async def execute(self, account_id: str, year: int):
         scope = await self._account_repo.resolve_scope(account_id)
@@ -871,6 +902,7 @@ class GetTaxReport:
             self._account_repo,
             self._portfolio_repo,
             self._ledger_repo,
+            custody_obligation_repo=self._obligation_repo,
         ).execute(scope)
         settings = scope.account.settings or settings_from_dict(None)
         tax = settings.tax

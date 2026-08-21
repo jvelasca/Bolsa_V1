@@ -579,6 +579,9 @@ async def test_custody_trade_racing_no_doble_cargo() -> None:
         from bolsa_infrastructure.database.repositories.account_repository import (
             SqlAlchemyAccountRepository,
         )
+        from bolsa_infrastructure.database.repositories.custody_obligation_repository import (
+            CustodyObligationRepository,
+        )
         from bolsa_infrastructure.database.repositories.ledger_repository import (
             SqlAlchemyLedgerRepository,
         )
@@ -594,6 +597,7 @@ async def test_custody_trade_racing_no_doble_cargo() -> None:
                     acc,
                     SqlAlchemyPortfolioRepository(s),
                     SqlAlchemyLedgerRepository(s),
+                    custody_obligation_repo=CustodyObligationRepository(s),
                 ).execute(scope)
                 await s.commit()
                 return applied

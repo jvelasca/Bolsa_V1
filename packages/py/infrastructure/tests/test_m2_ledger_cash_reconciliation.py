@@ -282,10 +282,13 @@ async def test_execute_trade_con_fees_reconcilia(db_session: AsyncSession) -> No
 
 @pytest.mark.asyncio
 async def test_apply_custody_fees_reconcilia(db_session: AsyncSession) -> None:
-    """ApplyCustodyFees: Σ ledger == Σ cash (cargo fee/custody, incl. partial si aplica)."""
+    """ApplyCustodyFees: Σ ledger == Σ cash (cargo completo fee/custody con saldo)."""
     from bolsa_application.accounts import ApplyCustodyFees
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.custody_obligation_repository import (
+        CustodyObligationRepository,
     )
     from bolsa_infrastructure.database.repositories.ledger_repository import (
         SqlAlchemyLedgerRepository,
@@ -297,16 +300,149 @@ async def test_apply_custody_fees_reconcilia(db_session: AsyncSession) -> None:
     account_repo = SqlAlchemyAccountRepository(db_session)
     ledger_repo = SqlAlchemyLedgerRepository(db_session)
     portfolio_repo = SqlAlchemyPortfolioRepository(db_session)
+    obligation_repo = CustodyObligationRepository(db_session)
 
     account_id = await _new_account(
         db_session, name=f"m2-custody-{uuid4().hex[:8]}", initial_deposit=100_000.0
     )
     scope = await account_repo.resolve_scope(account_id)
-    applied = await ApplyCustodyFees(account_repo, portfolio_repo, ledger_repo).execute(
-        scope
-    )
+    applied = await ApplyCustodyFees(
+        account_repo,
+        portfolio_repo,
+        ledger_repo,
+        custody_obligation_repo=obligation_repo,
+    ).execute(scope)
     assert applied is True
     await _assert_reconciled(db_session, ledger_repo, account_id)
+
+
+@pytest.mark.asyncio
+async def test_custody_cash_insuficiente_no_escribe_ledger(db_session: AsyncSession) -> None:
+    """F4a (ADR 026): con cash < fee la custodia NO descuenta ni escribe ledger.
+
+    Se monta una cartera con patrimonio alto (equity de posición) y cash bajo, de modo
+    que ``fee = equity*pct/100 > cash``. ``ApplyCustodyFees`` debe:
+    - NO descontar cash ni escribir fila ledger ``custody`` (invariante Σ ledger (no
+      añadido) intacto);
+    - registrar la obligación como ``PENDING`` con ``outstanding = fee - cash``.
+    """
+    from bolsa_application.accounts import ApplyCustodyFees
+    from bolsa_infrastructure.database.models import (
+        CustodyObligationRow,
+        LedgerEntryRow,
+        PositionRow,
+        TransactionRow,
+    )
+    from bolsa_infrastructure.database.repositories.account_repository import (
+        SqlAlchemyAccountRepository,
+    )
+    from bolsa_infrastructure.database.repositories.custody_obligation_repository import (
+        CustodyObligationRepository,
+    )
+    from bolsa_infrastructure.database.repositories.ledger_repository import (
+        SqlAlchemyLedgerRepository,
+    )
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    account_repo = SqlAlchemyAccountRepository(db_session)
+    ledger_repo = SqlAlchemyLedgerRepository(db_session)
+    portfolio_repo = SqlAlchemyPortfolioRepository(db_session)
+    obligation_repo = CustodyObligationRepository(db_session)
+
+    account_id = await _new_account(
+        db_session, name=f"m2-insf-{uuid4().hex[:8]}", initial_deposit=1000.0
+    )
+    scope = await account_repo.resolve_scope(account_id)
+    legacy_id = scope.portfolio.legacy_portfolio_id
+    assert legacy_id is not None
+
+    # Posición con valor de mercado alto (via precio transaccional) → equity >> cash.
+    instrument = await _new_instrument(db_session, "insf")
+    await db_session.flush()
+    portfolio_row = (
+        await db_session.execute(select(PortfolioRow).where(PortfolioRow.id == legacy_id))
+    ).scalar_one()
+    position = PositionRow(
+        id=f"pos-{uuid4().hex[:8]}",
+        portfolio_id=portfolio_row.id,
+        instrument_id=instrument.id,
+        quantity=Decimal("1000"),
+        avg_cost=Decimal("100"),
+        updated_at=_now(),
+    )
+    db_session.add(position)
+    tx = TransactionRow(
+        id=f"tx-{uuid4().hex[:8]}",
+        portfolio_id=portfolio_row.id,
+        instrument_id=instrument.id,
+        type="buy",
+        quantity=Decimal("1000"),
+        price=Decimal("150"),
+        total=Decimal("150000"),
+        executed_at=_now(),
+        idempotency_key=None,
+    )
+    db_session.add(tx)
+    # Cash bajo (se reduce DIRECTAMENTE en la fila, B-3: muta cash SIN ledger; es la
+    # escena documental del agujero, no un guard). cash=10 << fee.
+    portfolio_row.cash = Decimal("10")
+    portfolio_row.updated_at = _now()
+    await db_session.commit()
+
+    # fee = (cash + market_value) * pct/100 = (10 + 150000) * 0.2/100 ≈ 300 > cash 10.
+    n_custody_before = len(
+        (
+            await db_session.execute(
+                select(LedgerEntryRow.id).where(
+                    LedgerEntryRow.account_id == account_id,
+                    LedgerEntryRow.reference_type == "custody",
+                )
+            )
+        ).scalars().all()
+    )
+
+    applied = await ApplyCustodyFees(
+        account_repo,
+        portfolio_repo,
+        ledger_repo,
+        custody_obligation_repo=obligation_repo,
+    ).execute(scope)
+
+    # El cargo queda registrado como pendiente; get devuelve True pero NO hay cargo.
+    assert applied is True
+
+    # NO se escribió ninguna fila ledger de custodia nueva.
+    n_custody_after = len(
+        (
+            await db_session.execute(
+                select(LedgerEntryRow).where(
+                    LedgerEntryRow.account_id == account_id,
+                    LedgerEntryRow.reference_type == "custody",
+                )
+            )
+        ).scalars().all()
+    )
+    assert n_custody_after == n_custody_before == 0
+
+    # Cash sin cambio (no se descuenta).
+    fresh = (
+        await db_session.execute(select(PortfolioRow).where(PortfolioRow.id == legacy_id))
+    ).scalar_one()
+    assert fresh.cash == Decimal("10")
+
+    # Obligación PENDING con el resto pendiente por cobrar.
+    oblig = (
+        await db_session.execute(
+            select(CustodyObligationRow).where(
+                CustodyObligationRow.account_id == account_id
+            )
+        )
+    ).scalar_one()
+    assert oblig.status == "PENDING"
+    assert float(oblig.total_fee) > 10.0  # fee > cash
+    assert oblig.outstanding == oblig.total_fee - 10  # resto pendiente
 
 
 @pytest.mark.asyncio
