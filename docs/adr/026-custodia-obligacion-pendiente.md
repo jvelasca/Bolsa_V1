@@ -104,7 +104,7 @@ Siguiendo la convención de tablas de estado por cuenta del repo (PK `account_id
 ## Referencias
 
 - Plan director R-10 / v1.2.1: `docs/engineering/plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md` — §1.3 hallazgo #2 (`:35`) · §3 D3 (`:98`) / D3.1 (`:99`) · §4 F4a (`:187-199`) · §5 punto ADR F4a (`:227-228`).
-- Traspaso R-10: `docs/engineering/traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21.md` (F4a pendiente, fichero en lectura directa).
+- Traspaso R-10: `docs/engineering/traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md` (F4a hecha, fichero en lectura directa).
 - Backlog: `docs/engineering/backlog-trabajo-2026-08-20.md`.
 - Premisas de proyecto: `docs/PROJECT_PREMISES.md` (§0 E1–E9, aprobación por commit).
 - ADR previo de cuentas/ledger/custodia: `docs/adr/008-investment-accounts-and-ledger.md`.

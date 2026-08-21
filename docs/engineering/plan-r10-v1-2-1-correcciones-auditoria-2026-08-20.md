@@ -2,8 +2,8 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product/Ops`) · **backlog:** `docs/engineering/backlog-trabajo-2026-08-20.md`.
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐ §0 (**PREMISAS ESENCIALES ACTUALES E1–E9**).
-> **AsOf:** 2026-08-21 (apertura 2026-08-20; avanzado F1/F2a/F2b el 21 — ver `traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21.md`).
-> **Estado:** 🚧 **EN EJECUCIÓN (2026-08-21):** **F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅** (F3 pendiente de commit/aprobación) — todas de R‑10 aprobadas por commit. **SIGUIENTE: F4a** (requiere ADR + decisión antes de código). Ningún cambio de código adicional sin **aprobación explícita del usuario POR COMMIT** (§2.4). Plan director de R‑10; cada fase se abre como subagente acotado bajo las premisas E1–E9.
+> **AsOf:** 2026-08-21 (apertura 2026-08-20; avanzado F1/F2a/F2b/F3/F4a el 21 — ver `traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`).
+> **Estado:** 🚧 **EN EJECUCIÓN (2026-08-21):** **F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅ `b79e5dd` · F4a ✅ (`49e2731` ADR 026 docs + `5c304e6` implementación)** — todas de R‑10 aprobadas por commit y pusheadas a `main`. **SIGUIENTE: F4b** (custodia fuera del GET → job programado; reactiva `M-4/T-M4`). Ningún cambio de código adicional sin **aprobación explícita del usuario POR COMMIT** (§2.4). Plan director de R‑10; cada fase se abre como subagente acotado bajo las premisas E1–E9.
 > **R‑9 quedó CERRADA** (F1–F8, decisión 2026-08-20) y **v1.2.0 intacta**. R‑10 es un paquete nuevo nacido de la **auditoría externa sobre `b28e956`/`v1.2.0`** (capa financiera P1/P2).
 
 ---
@@ -18,14 +18,14 @@
 
 ### 1.2 Estado verificado (firma — no adivinar)
 
-| Contexto                     | Valor verificado                                                 |
-| ---------------------------- | ---------------------------------------------------------------- |
-| HEAD actual                  | `86c315a` (tip de `main`, 2026-08-21)                            |
-| HEAD auditado por la externa | `b28e956` (= tag `v1.2.0`)                                       |
-| Rama / árbol                 | `main` = `origin/main` · **limpio** (`git status --short` vacío) |
-| Tags                         | `v1.0.0`, `v1.1.0`, `v1.2.0`                                     |
-| Estado R‑9                   | **CERRADA** (F1–F8) — decisión propietario 2026-08-20            |
-| Avance R‑10 (2026-08-21)     | **F1 ✅ · F2a ✅ · F2b ✅** (A F3) — commits en §2 traspaso      |
+| Contexto                     | Valor verificado                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| HEAD actual                  | `5c304e6` (tip de `main`, 2026-08-21)                                         |
+| HEAD auditado por la externa | `b28e956` (= tag `v1.2.0`)                                                    |
+| Rama / árbol                 | `main` = `origin/main` · **limpio** (`git status --short` vacío)              |
+| Tags                         | `v1.0.0`, `v1.1.0`, `v1.2.0`                                                  |
+| Estado R‑9                   | **CERRADA** (F1–F8) — decisión propietario 2026-08-20                         |
+| Avance R‑10 (2026-08-21)     | **F1 ✅ · F2a ✅ · F2b ✅ · F3 ✅ · F4a ✅** (A F4b) — commits en §2 traspaso |
 
 ### 1.3 Evidencia verificada en código (file:line) — los 6 puntos
 
@@ -69,12 +69,12 @@ Cada fase:
 ```
 FASE 0  → este plan (decisión propietario) + premisas                          [DONE: este doc]
        ↓ aprobación usuario
-F1      → idempotency_key OBLIGATORIA en deposit/withdraw/trade (D5)            [contrato, base]
-F2a     → TaxProfileDto estricto (P1.3)                                          [schemas, bajo riesgo]
-F2b     → comparación idempotente exacta, sin tolerancia 0.01 (P2)              [accounts, bajo]
-F3      → balance_after trade/fee corregido, SIN backfill (P1.1)                [accounts+verify, medio]
-F4a     → custodia Opción B: obligación pendiente (tabla/ADR/migración) (P1.2)  [datos, ALTO]
-F4b     → custodia fuera del GET → job programado (D4) (reabre M-4/T-M4)        [scheduler, ALTO]
+F1      → idempotency_key OBLIGATORIA en deposit/withdraw/trade (D5)            [contrato, base] ✅ `a1501e6`
+F2a     → TaxProfileDto estricto (P1.3)                                          [schemas, bajo riesgo] ✅ `b4dcc72`
+F2b     → comparación idempotente exacta, sin tolerancia 0.01 (P2)              [accounts, bajo] ✅ `86c315a`
+F3      → balance_after trade/fee corregido, SIN backfill (P1.1)                [accounts+verify, medio] ✅ `b79e5dd`
+F4a     → custodia Opción B: obligación pendiente (tabla/ADR/migración) (P1.2)  [datos, ALTO] ✅ ADR `49e2731` + impl `5c304e6`
+F4b     → custodia fuera del GET → job programado (D4) (reabre M-4/T-M4)        [scheduler, ALTO] ◀ SIGUIENTE
 F5      → docs + CHANGELOG + tag/release v1.2.1 + limpieza obsoletos (E8)       [higiene]
 ```
 
@@ -178,11 +178,9 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 **Sin backfill (D6).**
 **Criterio:** tests de invariante secuencial en`test_r8c_ledger_balance_atomic.py`/`test_concurrency_scenarios.py` verdes; `verify_ledger_balance_chain.py` EXIT 0; ruff 0 · mypy 0; sin migración.
 
-> **✅ F3 HECHA (2026-08-21, pendiente commit/aprobación):** implementado en `accounts.py` (captura `cash_before = get_summary(...)` antes de `execute_trade`; `trade_balance = cash_before + amount`; `fee_balance = trade_balance - abs(fees.total)`). `verify_ledger_balance_chain.py` + `test_r8c_ledger_balance_atomic.py` + `test_concurrency_scenarios.py` actualizados de "grupo atómico que comparte balance_after" a **invariante secuencial por fila**. Batería: ruff 0 · mypy solo 7 pre‑existentes (no nuevos) · app 25 passed · PG `test_r8c` 3 + `test_concurrency` 4 passed · `verify_ledger_balance_chain.py` **EXIT 0** · smoke end‑to‑end confirmó `buy`→`fee` secuenciales (105000→104000→103996.79).
+> **✅ F3 HECHA `b79e5dd` (2026-08-21, pusheado a `main`):** implementado en `accounts.py` (captura `cash_before = get_summary(...)` antes de `execute_trade`; `trade_balance = cash_before + amount`; `fee_balance = trade_balance - abs(fees.total)`). `verify_ledger_balance_chain.py` + `test_r8c_ledger_balance_atomic.py` + `test_concurrency_scenarios.py` actualizados de "grupo atómico que comparte balance_after" a **invariante secuencial por fila**. Batería: ruff 0 · mypy solo 7 pre‑existentes (no nuevos) · app 25 passed · PG `test_r8c` 3 + `test_concurrency` 4 passed · `verify_ledger_balance_chain.py` **EXIT 0** · smoke end‑to‑end confirmó `buy`→`fee` secuenciales (105000→104000→103996.79). **Sin migración** (D6) y **sin backfill**; `openapi.json`/`schema.d.ts` NO se tocan (sin cambio de contrato HTTP).
 >
-> **Decisión 2026-08-21 (contradicción D6 vs `verify EXIT 0`):** el criterio "`verify_ledger_balance_chain.py` EXIT 0" **no es alcanzable** sobre la DB dev actual **sin reset ni backfill**, porque 127 cuentas de simulación contienen grupos trade+fee **históricos** escritos con la semántica antigua (ambas filas comparten balance post‑fee; p. ej. `buy` y `fee` ambos `99748.29`). **D6 prohíbe backfill.** **DECISIÓN DEL PROPIETARIO:** **resetear los datos de simulación dev** (404 cuentas, todas `simulated`, borradas por el path canónico `close_account`→`delete_simulated_account`; `ledger=0`), de modo que el invariante secuencial sea verificable desde ya (forward‑only). **No afecta producción** (no hay); **no altera esquema/migración**. Si en el futuro se reasemejan cuentas históricas con la semántica antigua, `verify` las marcará de nuevo. Queda registrado como decisión y pendiente de reflejar en backlog/traspaso.
->
-> **Nota de contrato/migración:** F3 **sin migración** (D6) y **sin backfill**. `openapi.json`/`schema.d.ts` NO se tocan (sin cambio de contrato HTTP).
+> **Decisión F3-sim 2026-08-21 (contradicción D6 vs `verify EXIT 0`):** el criterio "`verify_ledger_balance_chain.py` EXIT 0" **no es alcanzable** sobre la DB dev actual **sin reset ni backfill**, porque las cuentas de simulación contienen grupos trade+fee **históricos** escritos con la semántica antigua (ambas filas comparten balance post‑fee). **D6 prohíbe backfill.** **DECISIÓN DEL PROPIETARIO:** **resetear los datos de simulación dev** (404 cuentas, todas `simulated`, borradas por el path canónico `close_account`→`delete_simulated_account`; `ledger=0`), de modo que el invariante secuencial sea verificable desde ya (forward‑only). **No afecta producción** (no hay); **no altera esquema/migración**. Si en el futuro se reasemejan cuentas históricas con la semántica antigua, `verify` las marcará de nuevo. Registrado como decisión en backlog/traspaso.
 
 ### 🔴 FASE F4a — R-10.4a: Custodia Opción B — obligación pendiente + cobro completo (P1.2, ALTO)
 
@@ -198,7 +196,13 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 
 **Criterio:** test de custodia con `cash < fee` → quedada PENDING + `outstanding==fee`, sin cargo ni DONE; después, cash suficiente → cobra completo y liquida; dos intentos concurrentes no duplican (idempotente); migración desde DB limpia y existente OK.
 
-### 🔴 FASE F4b — R-10.4b: Custodia fuera del GET → job programado (D4, ALTO)
+> **✅ F4a HECHA (2026-08-21, pusheado a `main`):** **ADR 026** — `docs/adr/026-custodia-obligacion-pendiente.md` (**docs** `49e2731`, 2026-08-21): documenta D3/D3.1/D6, tabla `custody_obligation` (PK `account_id`, **una fila/cuenta**), `status` **`PENDING`/`APPLIED`**, cobro completo solo `cash>=fee`, histórico forward-only sin re-cobro retroactivo. **Implementación** `5c304e6` (2026-08-21): migración Alembic `005_custody_obligation` (down*revision `004_ledger_reference_unique`; forward-only, sin backfill D6) + `CustodyObligationRepository` + modelo/tabla `custody_obligation` en `tables.py` + lógica `ApplyCustodyFees` Opción B (`cash>=fee` cobra **TOTAL** y marca `APPLIED`; `cash<fee` **no descuenta / no escribe ledger / no marca DONE** y registra `PENDING` con `outstanding=fee−cash`). Mutex R-9 F3 y UNIQUE ledger intactos; invariante `Σ ledger==cash` intacto. Batería: ruff 0 · app custodia 11 · infra `m7` 2 + `m2` 6 (custodia+cash<fee) + concurrency 4 · migración up/down OK. Deuda conocida NO regresión: `test_execute_trade_con_fees_reconcilia` roto (F1) y `verify` EXIT 1 por fixture dev `acc_broken*\*`.
+>
+> **Pendiente de F4a (depende de F4b):** el **disparador de reintento del `PENDING`** (job que decide en qué frecuencia re-cobra el saldo pendiente) — se abre en la fase F4b.
+
+### 🔴 FASE F4b — R-10.4b: Custodia fuera del GET → job programado (D4, ALTO) ◀ SIGUIENTE
+
+> **Pendiente de apertura en la fase:** se ejecutará en la siguiente fase (2026-08-21). Requiere decisión de job ANTES de código (alcance, frecuencia, fallo/sin saldo → `PENDING`, y coexistencia con scheduler no‑ARQ R-8C.2).
 
 **Problema:** `GetAccountSummary` (`:176`) y `GetTaxReport` (`:866`) mutan en GET.
 **Corrección (D4):**
@@ -221,23 +225,23 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 
 ## 5. Puntos que requieren ADR/decisión ANTES de abrir código (no auto‑cerrar)
 
-| Ref    | Punto                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Estado                                                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------- |
-| **F1** | **Estrategia de generación de `idempotency_key` en el cliente.** ✅ **DECIDIDA (2026-08-20):** **Opción C** — cada call-site genera una key única y la **cachea por operación en curso** (reutilizada en retries → replay/409), sobre un **helper reutilizable** derivado de `createRandomId` (`@bolsa/shared/src/create-id.ts`). **El endpoint `/api/ai/intents/confirm` NO exige key en F1** (el trade server-side ya usa clave interna vía B-4); alcance F1 = solo `deposit`/`withdraw`/`trade` directos. | ✅ **DECIDIDA (2026-08-20)** — Opción C + confirm fuera |
-| F4a    | **ADR** del modelo de obligación de custodia pendiente (tabla/estado, transición de cuentas con `custody-YYYY` ya marcado como DONE en v1.2.0 sin re‑cobrar retroactivamente).                                                                                                                                                                                                                                                                                                                               | ⏳ pendiente (se abre en modo Plan dentro de F4a)       |
-| F4a    | Migración Alembic de la tabla + estrategia para **no re‑cobrar** periodos ya liquidados como DONE en v1.2.0.                                                                                                                                                                                                                                                                                                                                                                                                 | ⏳ en el ADR                                            |
-| F4b    | Estrategia de job: alcance (todas cuentas activas vs cuentas con saldo), frecuencia, fallo/sin saldo (→ PENDING), coexistencia con scheduler no‑ARQ (R-8C.2).                                                                                                                                                                                                                                                                                                                                                | ⏳ decisión en F4b                                      |
-| F5     | Tag/release `v1.2.1` + confirmar subversión en `apps/web/package.json`/`packages/shared/package.json`.                                                                                                                                                                                                                                                                                                                                                                                                       | ⏳ aprobación final                                     |
+| Ref    | Punto                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Estado                                                                                                                                                                                                                      |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **F1** | **Estrategia de generación de `idempotency_key` en el cliente.** ✅ **DECIDIDA (2026-08-20):** **Opción C** — cada call-site genera una key única y la **cachea por operación en curso** (reutilizada en retries → replay/409), sobre un **helper reutilizable** derivado de `createRandomId` (`@bolsa/shared/src/create-id.ts`). **El endpoint `/api/ai/intents/confirm` NO exige key en F1** (el trade server-side ya usa clave interna vía B-4); alcance F1 = solo `deposit`/`withdraw`/`trade` directos. | ✅ **DECIDIDA (2026-08-20)** — Opción C + confirm fuera · F1 ✅ `a1501e6`                                                                                                                                                   |
+| F4a    | **ADR** del modelo de obligación de custodia pendiente (tabla/estado, transición de cuentas con `custody-YYYY` ya marcado como DONE en v1.2.0 sin re‑cobrar retroactivamente).                                                                                                                                                                                                                                                                                                                               | ✅ **CERRADO (2026-08-21)** — **ADR 026** (`docs/adr/026-custodia-obligacion-pendiente.md`, docs `49e2731`): tabla `custody_obligation` (PK `account_id`, una fila/cuenta), `status` `PENDING`/`APPLIED`, forward-only (D6) |
+| F4a    | Migración Alembic de la tabla + estrategia para **no re‑cobrar** periodos ya liquidados como DONE en v1.2.0.                                                                                                                                                                                                                                                                                                                                                                                                 | ✅ **CERRADO (2026-08-21)** — implementado en `5c304e6`: migración `005_custody_obligation` (down_revision `004_ledger_reference_unique`, forward-only, sin backfill) + repo + Opción B. Sin re-cobro retroactivo (D6)      |
+| F4b    | Estrategia de job: alcance (todas cuentas activas vs cuentas con saldo), frecuencia, fallo/sin saldo (→ PENDING), coexistencia con scheduler no‑ARQ (R-8C.2).                                                                                                                                                                                                                                                                                                                                                | ⏳ **SIGUIENTE — pendiente apertura en la fase F4b** (reactiva M-4/T-M4)                                                                                                                                                    |
+| F5     | Tag/release `v1.2.1` + confirmar subversión en `apps/web/package.json`/`packages/shared/package.json`.                                                                                                                                                                                                                                                                                                                                                                                                       | ⏳ aprobación final                                                                                                                                                                                                         |
 
 ---
 
 ## 6. Texto de paso (relevo / nuevo chat)
 
-> **RELEVO → FASE R‑10 (v1.2.1).** Repo `Bolsa_V1`, `main` = `4e4a81a` = `origin/main` (push aprobado 2026-08-20), árbol limpio. **R‑9 cerrada**; **v1.2.0** taggeada (`b28e956`). **NO tocar código sin aprobación por commit.**
-> **LEE PRIMERO (obligatorio):** `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/PROJECT_PREMISES.md` ⭐ §0 (E1–E9) · `docs/engineering/PROJECT_STATE.md` · este doc (`plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md`) · traspaso R‑9 (`traspaso-relevo-cierre-r9-f1-f8-apertura-f9-2026-08-20.md`).
+> **RELEVO → FASE R‑10 (v1.2.1).** Repo `Bolsa_V1`, `main` = **`5c304e6`** = `origin/main`, árbol **limpio**. **R‑9 cerrada**; **v1.2.0** taggeada (`b28e956`). **AVANZADO 2026-08-21:** F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅ `b79e5dd` · F4a ✅ (`49e2731` ADR 026 + `5c304e6` impl). **SIGUIENTE: F4b** (custodia fuera del GET → job; reactiva M-4/T-M4). **NO tocar código sin aprobación por commit.**
+> **LEE PRIMERO (obligatorio):** `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/PROJECT_PREMISES.md` ⭐ §0 (E1–E9) · `docs/engineering/PROJECT_STATE.md` · este doc (`plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md`) · traspaso activo (`traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`) · `docs/adr/026-custodia-obligacion-pendiente.md`.
 > **Plan director:** este doc. **Progreso por fase:** se actualiza aquí y en el backlog al cerrar cada una.
 > **Orden:** F1 → F2a → F2b → F3 → F4a → F4b → F5. Cada fase: un subagente acotado (alcances disjuntos, máx ~3 en paralelo, brief con mapa de consumidores verificado) + verificación del coordinador (diff + batería real) + **aprobación del usuario por commit** + push a `main`.
-> **Decisiones cerradas (2026-08-20):** D1 encaje R‑10/v1.2.1 · D2 las 6 correcciones · D3/D3.1 custodia Opción B con tabla de obligación (migración+ADR) · D4/D4.1 custodia fuera del GET (job) con desfase aceptado · D5 idempotency‑key obligatoria (contrato+regen) · D6 sin backfill → forward‑only · D7 F2a/F2b separadas · **F1-C** (key cacheada por operación en curso, helper `createRandomId`) · **F1-no-confirm** (endpoint `/api/ai/intents/confirm` fuera del alcance).
+> **Decisiones cerradas (2026-08-20):** D1 encaje R‑10/v1.2.1 · D2 las 6 correcciones · D3/D3.1 custodia Opción B con tabla de obligación (migración+ADR) · D4/D4.1 custodia fuera del GET (job) con desfase aceptado · D5 idempotency‑key obligatoria (contrato+regen) · D6 sin backfill → forward‑only · D7 F2a/F2b separadas · **F1-C** (key cacheada por operación en curso, helper `createRandomId`) · **F1-no-confirm** (endpoint `/api/ai/intents/confirm` fuera del alcance) · **F3-sim (2026-08-21)**: reset datos sim dev para `verify` EXIT 0 · **F4a-ADR-026 (2026-08-21)**: cardinalidad una fila/cuenta + `PENDING`/`APPLIED`.
 > **NO tocar** (salvo decisión): `pending-delete` riesgo alto · gobernanza IA · workers ARQ/no‑ARQ excepto la parte de custodia‑job que decida F4b · features nuevas.
 
 ---
@@ -248,6 +252,8 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 - Backlog (LEER PRIMERO): `docs/engineering/backlog-trabajo-2026-08-20.md`
 - Plan R‑9 (cerrado): `docs/engineering/plan-r9-refactor-hardening-2026-08-20.md`
 - Traspaso R‑9: `docs/engineering/traspaso-relevo-cierre-r9-f1-f8-apertura-f9-2026-08-20.md`
+- **Traspaso R‑10 activo (F1–F4a):** `docs/engineering/traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`
+- **ADR 026 (F4a):** `docs/adr/026-custodia-obligacion-pendiente.md`
 - Estado vivo: `docs/engineering/PROJECT_STATE.md`
 - Auditoría externa (fuente): aportada por el propietario en conversación (audita `b28e956`/`v1.2.0`)
 - Norma docs: `docs/engineering/code-documentation-standard-2026-08-03.md`
