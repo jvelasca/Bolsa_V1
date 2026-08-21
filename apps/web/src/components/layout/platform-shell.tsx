@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { TradingLayout } from "@/components/layout/trading-layout";
 
@@ -48,6 +48,11 @@ import { BacktestsPage } from "@/features/backtests/backtests-page";
 
 import { CoreRSchedulerHost } from "@/features/backtests/core-r-scheduler-host";
 import { SupervisedF3QueueHost } from "@/features/trading/supervised-f3-queue-host";
+import {
+  BOLSA_NAVIGATE_EVENT,
+  CONFIRM_PATH,
+  isConfirmNavigateTarget,
+} from "@/features/confirm/confirm-nav";
 import { isFillHubRoute, isTradingRoute } from "@/lib/routes";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -73,6 +78,17 @@ function EstudioProcessRunningWire() {
 
 export function PlatformShell() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const onNavigate = (event: Event) => {
+      const to = (event as CustomEvent<{ to?: unknown }>).detail?.to;
+      if (!isConfirmNavigateTarget(to)) return;
+      navigate(CONFIRM_PATH);
+    };
+    window.addEventListener(BOLSA_NAVIGATE_EVENT, onNavigate);
+    return () => window.removeEventListener(BOLSA_NAVIGATE_EVENT, onNavigate);
+  }, [navigate]);
 
   const trading = isTradingRoute(pathname);
   const fillHub = isFillHubRoute(pathname);

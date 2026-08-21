@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Ancla:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` · `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/engineering/PROJECT_STATE.md` · premisas E1–E9 + ciclo R-12 en `docs/PROJECT_PREMISES.md` ⭐§0.
 > **Estado de partida (verificado):** `main` local = `origin/main` = **`f7a86cc`** · tag **`v1.3.0` → `b778292`** · árbol limpio al abrir · `v1.3.0-5-gf7a86cc`.
-> **Estado del plan:** Track A (A0–A6) + Track B (estudio teórico) **hechos** (2026-08-21). Track C bloqueado. Coordinación: commit+push a GitHub `origin/main` (E4).
+> **Estado del plan:** Track A (A0–A6) + Track B (estudio teórico) **hechos** (2026-08-21). Track B **APROBADO** línea a línea (2026-08-21). Track C: plan [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md). **C1 en este commit.** Coordinación: commit+push a GitHub `origin/main` (E4).
 > **Supersede:** `plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` (Relevo UNO/DOS ejecutados; Relevo TRES/Fase 6 higiene se absorbe aquí).
 
 ---
@@ -76,9 +76,9 @@ La unificación Research→Radar (`plan-unificacion-research-radar-2026-08-21.md
 
 ---
 
-## 4. Track C — Frontend bloqueado
+## 4. Track C — plan propio (hipótesis B aprobada)
 
-Nada de ruta `/confirm`, ni unificación de nav, ni split de `backtests-page.tsx` hasta que Track B esté aprobado línea a línea. Entonces: plan C propio.
+Track B aprobado 2026-08-21. Plan de fases: [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md). **C1 en este commit** (`/confirm` + nav + redirigir F3). Siguiente C2. Split `backtests-page.tsx` y fusión Research→Radar **siguen fuera**.
 
 ---
 
@@ -104,7 +104,8 @@ Producto **BETA**. Tag `v1.3.0` intacto sobre `b778292`. Tras Track A se **propo
 - Estado vivo: `docs/engineering/PROJECT_STATE.md`
 - Backlog: `docs/engineering/backlog-trabajo-2026-08-20.md`
 - Ancla SHA: `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md`
-- Estudio UX: `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md`
+- Estudio UX: `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (**APROBADO**)
+- Plan Track C: `docs/engineering/plan-r12-track-c-frontend-2026-08-21.md`
 - Inventario pending-delete: `docs/engineering/pending-delete/inventory-r12-2026-08-21.md`
 - ADR 026: `docs/adr/026-custodia-obligacion-pendiente.md`
 - Relevo: `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md`

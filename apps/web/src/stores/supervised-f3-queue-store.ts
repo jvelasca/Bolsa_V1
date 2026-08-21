@@ -5,8 +5,9 @@
  * Campo `origin` + `resolveSupervisedQueueOrigin` alimentan badges en
  * `supervised-f3-panel.tsx`. Cap 40 ítems (preprend; el primero es el más reciente).
  *
- * `openHelpAiPlatform({ panel: 'supervised-f3' })` abre Ayuda → Plataforma IA
- * y hace scroll al panel Confirm (escuchado por `app-help-menu.tsx`).
+ * `openHelpAiPlatform({ panel: 'supervised-f3' })` navega SPA a `/confirm`
+ * (`bolsa:navigate`, escuchado por `PlatformShell`). Sin panel, abre Ayuda →
+ * Plataforma IA (`bolsa:open-help`, escuchado por `app-help-menu.tsx`).
  *
  * Persistencia: sessionStorage (cache) + BD `supervised_f3_account_state`
  * vía `supervised-f3-sync.ts` (hydrate/push por cuenta Activa).
@@ -23,6 +24,10 @@ import type {
   SupervisedProposePayloadDto,
   SupervisedQueueOriginDto,
 } from "@bolsa/shared";
+import {
+  BOLSA_NAVIGATE_EVENT,
+  CONFIRM_PATH,
+} from "@/features/confirm/confirm-nav";
 
 /**
  * P2.6 (R-2): tipos de datos de la cola movidos a su hogar canónico en
@@ -167,12 +172,30 @@ export const useSupervisedF3QueueStore = create<SupervisedF3QueueState>()(
 );
 
 export type OpenHelpAiPlatformOpts = {
-  /** Scroll/focus al panel Supervisado F3 en Ayuda → Plataforma IA. */
+  /**
+   * `supervised-f3` → `/confirm` (R-12 C1). Sin panel, Ayuda → Plataforma IA.
+   */
   panel?: "supervised-f3";
 };
 
-/** Abre Ayuda → Plataforma IA (escuchado por AppHelpMenu). */
+/** Navega SPA a `/confirm` vía `bolsa:navigate` (escuchado por PlatformShell). */
+export function openConfirm() {
+  window.dispatchEvent(
+    new CustomEvent(BOLSA_NAVIGATE_EVENT, {
+      detail: { to: CONFIRM_PATH },
+    }),
+  );
+}
+
+/**
+ * Con `panel: "supervised-f3"` abre Confirmar. Sin panel, abre Ayuda.
+ * Nunca usa `window.location` (rompería keep-alive Lista AUTO).
+ */
 export function openHelpAiPlatform(opts?: OpenHelpAiPlatformOpts) {
+  if (opts?.panel === "supervised-f3") {
+    openConfirm();
+    return;
+  }
   window.dispatchEvent(
     new CustomEvent("bolsa:open-help", {
       detail: { section: "ai", panel: opts?.panel },

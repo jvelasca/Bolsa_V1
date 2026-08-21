@@ -1,7 +1,7 @@
 # Estudio teórico — flujo SEMI vs apps top (R-12 Track B)
 
 > **Padre:** [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md).
-> **Estado:** teórico / comparativo. **Cero código frontend.** Track C bloqueado hasta aprobación línea a línea.
+> **Estado:** **APROBADO** por el propietario (2026-08-21), línea a línea. Cero código en este documento. Track C: plan [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md) (**C1 en este commit**).
 > **AsOf:** 2026-08-21 · audiencia: profesional de mercados que **no** es ingeniero de software.
 > **Fuentes de nuestro lado:** `apps/web/src/app.tsx`, `trading-operativa-panel.tsx`, `supervised-f3-panel.tsx`, `demo-operating-modes-brief-2026-08-03.md`, ADR-019/023/024.
 
@@ -139,16 +139,9 @@ El plan [`plan-unificacion-research-radar-2026-08-21.md`](./plan-unificacion-res
 
 ---
 
-## 7. Track C — bloqueado
+## 7. Track C — plan propio (C1 no abierta)
 
-No se implementa:
-
-- ruta `/confirm`
-- unificación de nav
-- split de `backtests-page.tsx`
-- ocultar AUTO
-
-hasta que este documento (o una enmienda) esté **aprobado línea a línea** (E1). Entonces: plan C propio, fases pequeñas, tests de UI, HELP.
+Este estudio está **aprobado**. Código FE solo bajo [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md). Sigue **fuera** de C: split de `backtests-page.tsx`, fusión Research→Radar, `PAPER_D_EXECUTE`.
 
 ---
 
@@ -158,4 +151,4 @@ No superar a TradingView en dibujo ni a IBKR en routing. Superarlas en **el ofic
 
 > Un profesional ve _por qué_ (embudo + dictamen), _firma_ en el mismo sitio donde opera, y el paper tiene la seriedad contable de un broker.
 
-Eso es el delta de producto. Track C, si se abre, solo existe para hacer ese oficio **obvio**.
+Eso es el delta de producto. Track C solo existe para hacer ese oficio **obvio**.

@@ -199,7 +199,7 @@ export function ScanResultsPanel({
       setF3Feedback(
         `Encoladas ${n} propuestas F3` +
           (errors.length ? ` · ${errors.length} error(es)` : "") +
-          " — revisa Ayuda → Plataforma IA · Supervisado F3",
+          " — revisa Confirmar (pendientes de firma)",
       );
       if (n > 0) openHelpAiPlatform({ panel: "supervised-f3" });
     },
@@ -253,7 +253,7 @@ export function ScanResultsPanel({
             className="text-xs text-primary hover:underline"
             onClick={() => openHelpAiPlatform({ panel: "supervised-f3" })}
           >
-            Abrir cola en Ayuda → Plataforma IA
+            Abrir Confirmar
           </button>
           {!effectiveAccountId ? (
             <span className="text-[11px] text-muted-foreground">

@@ -3,7 +3,7 @@
  *
  * Anchos reservados para que la barra no «salte» al cambiar conteos.
  * CORE-R v1.5: chip siempre visible → Ayuda · Monitor.
- * F3: cola Confirm SEMI → Ayuda · Supervisado.
+ * F3: cola Confirm SEMI → `/confirm` (R-12 C1).
  *
  * @see trading-status-bar.tsx
  */
@@ -113,8 +113,8 @@ export function TradingAppThreads() {
         )}
         title={
           f3Count > 0
-            ? `Cola Confirm F3 · ${f3Count} pendiente(s)\nClic → Supervisado F3`
-            : "Cola Confirm F3 vacía\nClic → Supervisado F3"
+            ? `Cola Confirm F3 · ${f3Count} pendiente(s)\nClic → Confirmar`
+            : "Cola Confirm F3 vacía\nClic → Confirmar"
         }
       >
         <BrainCircuit className="h-3 w-3 shrink-0 opacity-70" aria-hidden />

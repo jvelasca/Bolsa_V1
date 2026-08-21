@@ -32,6 +32,7 @@ import {
   Microscope,
   PanelBottom,
   PanelRight,
+  PenLine,
   Radar,
   RotateCcw,
   Settings,
@@ -48,7 +49,13 @@ import { useTradingLayoutStore } from "@/stores/trading-layout-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 import { useScreenerNavBadge } from "@/features/screeners/use-screener-nav-badge";
 import { useAsesorAlarmaBadge } from "@/features/research/use-asesor-alarma-badge";
+import {
+  CONFIRM_PATH,
+  confirmNavAriaLabel,
+  formatConfirmNavBadge,
+} from "@/features/confirm/confirm-nav";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { isTradingRoute } from "@/lib/routes";
 
 /** Historial SPA para habilitar ← / → en la barra (cualquier ruta / query). */
@@ -295,6 +302,8 @@ export function AppTopBar() {
   const layout = useTradingLayoutStore();
   const screenerNavBadge = useScreenerNavBadge();
   const asesorAlarmaBadge = useAsesorAlarmaBadge();
+  const confirmQueueCount = useSupervisedF3QueueStore((s) => s.items.length);
+  const confirmBadge = formatConfirmNavBadge(confirmQueueCount);
   const listAutoActive = useListAutoActivityStore((s) => s.active);
   const listAutoSummary = useListAutoActivityStore((s) => s.summary);
 
@@ -441,6 +450,31 @@ export function AppTopBar() {
               {screenerNavBadge > 9 ? "9+" : screenerNavBadge}
             </span>
           )}
+        </NavLink>
+        <NavLink
+          to={CONFIRM_PATH}
+          className={({ isActive }) =>
+            cn(
+              "relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
+              isActive && "bg-accent text-primary",
+            )
+          }
+          title={
+            confirmQueueCount > 0
+              ? `${confirmQueueCount} pendientes de firma`
+              : "Confirmar"
+          }
+        >
+          <PenLine className="h-4 w-4 shrink-0" />
+          <span className="hidden lg:inline">Confirmar</span>
+          {confirmBadge ? (
+            <span
+              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
+              aria-label={confirmNavAriaLabel(confirmQueueCount)}
+            >
+              {confirmBadge}
+            </span>
+          ) : null}
         </NavLink>
       </nav>
 

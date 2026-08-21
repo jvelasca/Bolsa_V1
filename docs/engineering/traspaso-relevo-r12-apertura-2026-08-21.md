@@ -1,4 +1,4 @@
-# RELEVO / TRASPASO — R-12 apertura (2026-08-21)
+# RELEVO / TRASPASO — R-12 Track C (2026-08-21)
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1.
 > **Propósito:** texto de paso anti-alucinación para el **siguiente chat**. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
@@ -7,30 +7,28 @@
 
 ---
 
-## 1. Qué está hecho (Track A + B)
+## 1. Qué está hecho
 
-- A0/A1 docs: premisas R-12 (GitHub = fuente de coordinación), plan, SHA vivos, README `v1.3.0 BETA`, CHANGELOG tag `b778292`.
-- A2 test PG `test_custody_default_portfolio_policy.py`.
-- A3 `scripts/verify/verify_financial_invariants.py` (A–E) + unit tests en python-ci.
-- A4 `test_http_retry_idempotency.py` (deposit/withdraw retry misma key).
-- A5 inventario pending-delete (sin purge). Hallazgo: `presetRuleGroups` es API viva.
-- A6 higiene: índice histórico en engineering-index; script `cleanup_dev_test_residues.py` (8 cuentas `m7-win-*` + 9 instrumentos `M2 *` borrados por path canónico 2026-08-21); relevo R-10 `-obsoleto` movido a `docs/engineering/archive/`. **mypy analytics:** fuera de gate; medición 2026-08-21 muestra errores en `knowledge/dia_d_session_evidence.py`, `core_r_review_evidence.py`, `cognitive/weight_rules.py` (mypy 1.x INTERNAL ERROR al final del barrido). **No se pone a 0 en este ciclo.**
-- Track B estudio teórico `estudio-flujo-semi-vs-tops-2026-08-21.md`.
-- Track C **BLOQUEADO**. Gates documentados, no abiertos.
+- Track A (A0–A6) + Track B estudio: **`48cc255`**.
+- Track B **APROBADO** por el propietario (2026-08-21), línea a línea: mesa 5 puertas (Universo · Señales · Dictamen · Confirmar · Libro).
+- Plan C escrito: `docs/engineering/plan-r12-track-c-frontend-2026-08-21.md`.
+- **C1 en este commit** (`/confirm` + nav Confirmar + `openHelpAiPlatform({ panel: "supervised-f3" })` → `bolsa:navigate`). C2–C5 no abiertas. Push a GitHub pendiente.
+- Gates documentados, no abiertos.
 
 ## 2. NO tocar
 
-`pending-delete` riesgo alto · gobernanza IA · `PAPER_D_EXECUTE` · scheduler-vs-worker · `contract:gen` · producción `ExecuteTrade` cash_before · split `accounts.py` · frontend mesa/Confirm.
+`pending-delete` riesgo alto · gobernanza IA · `PAPER_D_EXECUTE` · scheduler-vs-worker · `contract:gen` · producción `ExecuteTrade` cash_before · split `accounts.py` · split `backtests-page.tsx` · fusión `/research`+`/screeners` · frontend **fuera de la fase C viva**.
 
 ## 3. Texto de paso (pegar en el chat nuevo)
 
-> CONTEXTO: repo Bolsa_V1, ciclo **R-12**. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md` · `docs/PROJECT_PREMISES.md` ⭐§0 · `docs/engineering/PROJECT_STATE.md` §2ac · backlog §0.
+> CONTEXTO: repo Bolsa_V1, ciclo **R-12**. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `docs/engineering/plan-r12-track-c-frontend-2026-08-21.md` · `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` · `docs/PROJECT_PREMISES.md` ⭐§0 · `docs/engineering/PROJECT_STATE.md` §2ac · backlog §0.
 > Firma: **GitHub `origin/main`** — ejecutar `git fetch && git rev-parse HEAD origin/main` y `git status`. Partida del ciclo: `f7a86cc`. Tag `v1.3.0` → `b778292`.
-> Tarea viva: Track C **no** se abre sin aprobación línea a línea de Track B. Gates (409, ExecuteTrade post-lock, scheduler) siguen en decisión. Higiene E8 continua (residuos/docs obsoletos) sin purge de `pending-delete` alto. Coordinación SIEMPRE desde GitHub (commit+push; working tree ≠ estado).
-> Batería: ruff 0 · mypy zona · pytest A2/A3/A4 · `verify_financial_invariants.py` EXIT 0 · `verify_ledger_balance_chain.py` EXIT 0.
+> Track B **APROBADO**. **C1 en este commit.** Tarea viva: **C2** (nav diaria vs laboratorio). C3 AUTO BETA paralelo opcional. Gates (409, ExecuteTrade post-lock, scheduler) siguen en decisión. Coordinación SIEMPRE desde GitHub (commit+push; working tree ≠ estado).
+> Batería C1: typecheck web · vitest confirm/nav/`supervised-f3*` · lint 0 · sin diff OpenAPI.
 
-## 4. Siguiente producto (decisión del propietario)
+## 4. Siguiente producto
 
-1. Aprobar o rechazar hipótesis Track B (mesa 5 puertas: Universo · Señales · Dictamen · Confirmar · Libro).
-2. Si se aprueba: abrir Track C como fases FE acotadas (una por subagente).
-3. Opcional: tag `v1.4.0` BETA **solo** si el propietario lo pide.
+1. **C2** nav diaria vs laboratorio (Trading · Señales · Confirmar · Laboratorio).
+2. Opcional en paralelo: **C3** AUTO «No disponible (BETA)».
+3. Después: **C4** Libro · **C5** HELP.
+4. Push C1 a `origin/main` cuando el propietario lo pida. Tag `v1.4.0` / `v1.5.0-beta` **solo** si lo pide.
