@@ -78,7 +78,20 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - **D2 ✅ `db95709`** (cierre documental): docstrings aditivos en `ApplyCustodyFees.execute`/`ExecuteTrade.execute` (accounts.py, 14 ins, 0 lógica) · actualizados `PROJECT_STATE.md`, `backlog` §0/§6, `engineering-index`, `plan-r11`, `CHANGELOG.md` (`## R-11 hardening post-v1.2.1 — 2026-08-21`, sin tag), ADR 026 (fila 3 + Historial).
 - **RELEASE ✅ `v1.3.0` (2026-08-21, tag anotado sobre `deafa27`)** — entrada `CHANGELOG [1.3.0]` retro-escrita desde la sección R-11 + cierre de deuda §3 post-cierre: `deafa27` (fix `test_execute_trade_con_fees_reconcilia`) + delete dev `acc_broken_72ab7c2aa881` por path canónico (D6 prohíbe backfill) → `verify_ledger_balance_chain.py` **EXIT 0** global.
 - **D1 ✅ `870fb21`** (limpieza transversal E8): `custody_obligation_repository.get_by_account` (idea una-fila) + `get_by_account_period` (nunca cableado) — **0 callers producción** · quitados también de fakes de test · se mantienen `get_pending_by_account`/`upsert` · **no se tocó NINGÚN ítem RIESGO ALTO** · batería: ruff 0 · mypy repo gate 0 · pytest custodia 7 · pytest application 279.
-- **R-11 COMPLETA/CERRADA (2026-08-21).** Relevo histórico de apertura: `traspaso-relevo-cierre-r11-c1-c6-d1-d2-siguiente-2026-08-21.md`. **Release `v1.3.0` (2026-08-21, tag anotado sobre `deafa27`)** — incluye R-11 C1–C6+D1+D2 + cierre deuda §3 (`deafa27` fix test + delete dev `acc_broken` → verify EXIT 0). Último tag release previo `v1.2.1` sobre `2093296`. Siguiente: decisión de fase (no predefinida) — candidatos aparcado §4 del plan (unificación Research→Radar, auditoría de caos financiero, puente legacy V2, semver packages, scheduler-vs-worker). Plan Unificación Research→Radar redactado (read-only) pendiente de decisión.
+- **R-11 COMPLETA/CERRADA (2026-08-21).** Relevo histórico de apertura: `traspaso-relevo-cierre-r11-c1-c6-d1-d2-siguiente-2026-08-21.md`. **Release `v1.3.0` (2026-08-21, tag anotado sobre `deafa27`)** — incluye R-11 C1–C6+D1+D2 + cierre deuda §3 (`deafa27` fix test + delete dev `acc_broken` → verify EXIT 0). Último tag release previo `v1.2.1` sobre `2093296`. Siguiente: decisión de fase (no predefinida) — candidatos aparcado §4 del plan (unificación Research→Radar, auditoría de caos financiero, puente legacy V2, semver packages, scheduler-vs-worker).
+
+---
+
+## 2b. Unificación Research → Radar (DRAFT / APARCADO — pista documental en curso)
+
+> Plan director vivo (read-only, **draft**): `docs/engineering/plan-unificacion-research-radar-2026-08-21.md`. Planifica «Unificación Research→Radar»: reunificar el embudo científico `/research` y operativo `/screeners`/Radar reutilizando el puente B0 ya implementado (**sin features nuevas**). Estado: **APARCADO / DRAFT — pendiente de decisión explícita del propietario para abrir fases de código (E1).** La documentación de ingeniería sí avanza (pista documental) como **Fase 3** (este cierre).
+
+- **Fase 1 ✅ CERRADA (2026-08-21, `b7af24b` plan + `5276d47` cierre).** Trazado e inyección del **mapa de consumidores B0** de `promote-finalist-to-tracker.ts` (§2.2 del plan) + JSDoc `@see` de trazabilidad en el doc-comment de módulo de `use-activate-instrument-tracking.ts` (:4) e `instruments-page.tsx` (:7). Cero cambios de comportamiento.
+- **Fase 2 ✅ CERRADA sin cambios (2026-08-21).** Copy/deep-link de Radar audita y ya coherentes: label **«Rastreadores»** en nav (`app-top-bar.tsx`) y hub (`screeners-page.tsx:9`), ruta `/screeners`. Sin diffs.
+- **Fase 3 📄 EN CURSO (este cierre, docs-only)** — abre la **pista documental**: registra este aparcado en `PROJECT_STATE.md`, enlaza el plan en `engineering-index` §1 y confirma que `research-radar-unification-2026-07-31.md` §3/§4 (B0 ✅ / B1 ✅) es la referencia viva. **Sin tocar código ni contrato.**
+- **Fases siguientes (1.1 on, cuando el propietario abra):** ver §3 del plan. Ninguna abierta.
+
+> **Estado general que se mantiene:** HEAD `main` = `5276d47` (árbol limpio) · release **`v1.3.0`** (tag anotado sobre `deafa27`, cierre R-11). Hasta que se apruebe abrir la Fase 4 (o la correspondiente de código), **no se modifica ningún fichero de código** de esta unificación (E1).
 
 ---
 
