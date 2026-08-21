@@ -838,9 +838,13 @@ class ExecuteTrade:
         settings = scope.account.settings or settings_from_dict(None)
         from decimal import Decimal
 
-        notional = float(Decimal(str(quantity)) * Decimal(str(price)))
+        # R-11 C3 (R-10.8): notional se calcula en Decimal. calculate_trade_fees y
+        # execute_trade ya operan internamente en Decimal; aquí se evita el salto
+        # Decimal→float→Decimal en la aritmética del use-case. La conversión a float
+        # queda solo en el borde al invocar repo/ledger (que re-hacen Decimal).
+        notional = Decimal(str(quantity)) * Decimal(str(price))
         fees = calculate_trade_fees(
-            notional,
+            float(notional),
             trade_type,  # type: ignore[arg-type]
             settings,
             currency=scope.account.currency,
@@ -848,7 +852,11 @@ class ExecuteTrade:
         # R-10 F3: capturar el cash ANTES de mutar (execute_trade deducirá el notional
         # + fees y devolverá un summary POST-fee). Sin esta lectura previa no habría
         # base para escribir balance_after secuenciales (trade → fee).
-        cash_before = (await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)).portfolio.cash
+        cash_before = Decimal(
+            str(
+                (await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)).portfolio.cash
+            )
+        )
         try:
             result = await self._portfolio_repo.execute_trade(
                 instrument_id=instrument_id,
@@ -879,20 +887,25 @@ class ExecuteTrade:
             )
             summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
             return TradeResult(transaction=existing, summary=summary)
-        amount = -result.transaction.total if trade_type == "buy" else result.transaction.total
-        # R-10 F3: balance_after SECUENCIAL por fila.
+        amount = (
+            -Decimal(str(result.transaction.total))
+            if trade_type == "buy"
+            else Decimal(str(result.transaction.total))
+        )
+        # R-10 F3: balance_after SECUENCIAL por fila, en Decimal (R-11 C3) para que la
+        # invariante secuencial sea exacta y no acumule ruido float entre trade y fee.
         #   trade: cash tras aplicar SOLO el notional (aún sin fee).
         #   fee:   cash tras aplicar notional + fee (= cash final post-operación).
         # Semántica invariante: balance_after[n] == balance_after[n-1] + amount[n].
         trade_balance = cash_before + amount
-        fee_balance = trade_balance - abs(fees.total)
+        fee_balance = trade_balance - Decimal(str(abs(fees.total)))
         await self._ledger_repo.append_trade(
             account_id=scope.account.id,
             portfolio_id=scope.portfolio.id,
             entry_type=trade_type,
-            amount=amount,
+            amount=float(amount),
             currency=scope.account.currency,
-            balance_after=trade_balance,
+            balance_after=float(trade_balance),
             instrument_id=instrument_id,
             quantity=quantity,
             price=price,
@@ -912,7 +925,7 @@ class ExecuteTrade:
                 portfolio_id=scope.portfolio.id,
                 amount=fees.total,
                 currency=scope.account.currency,
-                balance_after=fee_balance,
+                balance_after=float(fee_balance),
                 reference_id=result.transaction.id,
                 description=description,
             )

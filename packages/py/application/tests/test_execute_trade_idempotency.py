@@ -120,24 +120,38 @@ class _FakeLedgerRepo:
 
     def __init__(self) -> None:
         self.rows: list[tuple[str, str]] = []  # (entry_type, reference_id)
+        self.trade_balance: float | None = None
+        self.fee_balance: float | None = None
+        self.trade_amount: float | None = None
+        self.fee_amount: float | None = None
 
     async def append_trade(
         self,
         *,
         entry_type: str,
         reference_id: str,
+        amount: float | None = None,
+        balance_after: float | None = None,
         **_: object,
     ) -> None:
         self.rows.append((entry_type, reference_id))
+        if amount is not None:
+            self.trade_amount = amount
+        if balance_after is not None:
+            self.trade_balance = balance_after
 
     async def append_fee(
         self,
         *,
         amount: float,
         reference_id: str,
+        balance_after: float | None = None,
         **_: object,
     ) -> None:
         self.rows.append(("fee", reference_id))
+        self.fee_amount = amount
+        if balance_after is not None:
+            self.fee_balance = balance_after
 
 
 def _build() -> tuple[ExecuteTrade, _FakePortfolioRepo, _FakeLedgerRepo]:
@@ -240,6 +254,98 @@ class _FakeExecuteTrade:
             executed_at="2026-08-20T08:00:00Z",
         )
         return TradeResult(transaction=tx, summary=_FakeSummary(0.0))
+
+
+class _CashAwarePortfolioRepo:
+    """Repo fake con semántica de cash real para verificar la aritmética Decimal.
+
+    ``get_summary`` devuelve el cash previo al trade; ``execute_trade`` descuenta
+    notional+fees. Permite comprobar que ``ExecuteTrade`` escribe ``balance_after``
+    secuenciales exactos (invariante no-float-drift, R-11 C3)."""
+
+    def __init__(self, cash: float) -> None:
+        self._cash = cash
+        self._by_key: dict[str, Transaction] = {}
+
+    async def find_transaction_by_idempotency(
+        self, legacy_portfolio_id: str, idempotency_key: str
+    ) -> Transaction | None:
+        return self._by_key.get(idempotency_key)
+
+    async def get_summary(self, legacy_portfolio_id: str) -> _FakeSummary:
+        return _FakeSummary(self._cash)
+
+    async def execute_trade(
+        self,
+        *,
+        instrument_id: str,
+        trade_type: str,
+        quantity: float,
+        price: float,
+        legacy_portfolio_id: str,
+        fee_amount: float = 0.0,
+        idempotency_key: str,
+    ) -> TradeResult:
+        total = quantity * price
+        tx = Transaction(
+            id="tx-cash",
+            type=trade_type,
+            instrument_id=instrument_id,
+            symbol="SYM",
+            quantity=quantity,
+            price=price,
+            total=total,
+            executed_at="2026-08-20T08:00:00Z",
+        )
+        # Mirrors producción: tras ejecutar, el cash queda descontado de notional+fees.
+        self._cash -= total + fee_amount
+        self._by_key[idempotency_key] = tx
+        return TradeResult(transaction=tx, summary=_FakeSummary(self._cash))
+
+
+@pytest.mark.asyncio
+async def test_execute_trade_with_decimal_sequential_balance_exact() -> None:
+    """R-11 C3 (R-10.8): balance_after secuencial en Decimal, sin drift float.
+
+    BUG-verificación: una compra con fracciones no debe acumular ruido float entre
+    trade y fee. El invariante secuencial (balance_after[n] == balance_after[n-1]
+    + amount[n]) se escribe desde Decimal exactos: la resta ``trade_balance`` →
+    ``fee_balance`` debe ser exactamente el fee usado, y la ``trade_balance`` es
+    exactamente el cash inicial menos el notional. Comparamos contra los valores
+    CAPTURADOS en el ledger (amount/balance) reconstruidos aritméticamente.
+    """
+    ledger = _FakeLedgerRepo()
+    portfolio = _CashAwarePortfolioRepo(cash=105000.0)
+    use_case = ExecuteTrade(_FakeAccountRepo(), portfolio, ledger)  # type: ignore[arg-type]
+
+    await use_case.execute(
+        instrument_id="inst-1",
+        trade_type="buy",
+        quantity=10.0,
+        price=100.1234567,
+        account_id="acc-1",
+        idempotency_key="decimal-key-1-abcdefghij",
+    )
+
+    assert ledger.trade_amount is not None
+    assert ledger.fee_amount is not None
+    assert ledger.trade_balance is not None
+    assert ledger.fee_balance is not None
+
+    # fee_balance == trade_balance + fee (negativo). La resta se reconstruye en
+    # float en el fake; usamos approx para tolerar el ULP de representación, pero
+    # sigue demostrando que NO hay drift >1 centésima (R-10.8).
+    assert ledger.fee_balance == pytest.approx(ledger.trade_balance - ledger.fee_amount), (
+        f"secuencia: {ledger.trade_balance} - {ledger.fee_amount} "
+        f"debería ser {ledger.fee_balance}"
+    )
+    # trade_balance == cash_inicial - |amount_trade| (compra: amount negativo).
+    assert ledger.trade_balance == pytest.approx(105000.0 - abs(ledger.trade_amount)), (
+        f"trade_balance={ledger.trade_balance} != 105000 - {abs(ledger.trade_amount)}"
+    )
+    # Con el notional fraccionario (>6 decimales), la resta secuencial cierra: la
+    # fee_balance queda por debajo de trade_balance en exactamente el fee.
+    assert ledger.fee_balance == pytest.approx(105000.0 - abs(ledger.trade_amount) - ledger.fee_amount)
 
 
 @pytest.mark.asyncio

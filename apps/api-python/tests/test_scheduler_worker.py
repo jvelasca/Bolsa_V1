@@ -15,6 +15,9 @@ from bolsa_api.background.auto_sync_worker import (  # type: ignore[import-untyp
 from bolsa_api.background.core_r_cron_worker import (  # type: ignore[import-untyped]
     start_core_r_cron_worker,
 )
+from bolsa_api.background.custody_job_worker import (  # type: ignore[import-untyped]
+    start_custody_job_worker,
+)
 from bolsa_api.background.daily_alert_evaluator import (  # type: ignore[import-untyped]
     start_daily_alert_evaluator,
 )
@@ -23,9 +26,6 @@ from bolsa_api.background.estudio_eod_opinion_worker import (  # type: ignore[im
 )
 from bolsa_api.background.fa_weekly_worker import (  # type: ignore[import-untyped]
     start_fa_weekly_worker,
-)
-from bolsa_api.background.custody_job_worker import (  # type: ignore[import-untyped]
-    start_custody_job_worker,
 )
 from bolsa_api.background.index_subscribe_worker import (  # type: ignore[import-untyped]
     start_index_subscribe_worker,
