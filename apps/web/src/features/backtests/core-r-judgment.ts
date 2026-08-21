@@ -21,6 +21,7 @@ import type { FullCycleSettleReason } from "@/features/backtests/backtest-list-a
 import type { ListAutoChangeKind } from "@/features/backtests/backtest-list-auto-board";
 import { strategyMonitorChecklistHref } from "@/features/backtests/strategy-monitor";
 import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
+import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import type {
   CoreRAction,
   CoreRDualAuditSnap,
@@ -173,22 +174,22 @@ function checkFailed(
   return checks.some((c) => c.code === code && c.passed === false);
 }
 
+/**
+ * Deep-links for a CORE-R verdict. `propose_f3` goes to Confirmar (`CONFIRM_PATH`),
+ * not Ayuda — leftover from pre–R-12 C1 when signing lived on the help page.
+ */
 function buildActions(opts: {
   verdict: CoreRVerdict;
   instrumentId: string;
   timeframe: string;
-  symbol?: string;
   slot1RunId?: string | null;
   hasPaper?: boolean;
 }): CoreRAction[] {
-  const { verdict, instrumentId, timeframe, symbol, slot1RunId, hasPaper } =
-    opts;
+  const { verdict, instrumentId, timeframe, slot1RunId, hasPaper } = opts;
   const actions: CoreRAction[] = [];
   const finalistsHref = instrumentTopBacktestsHref(instrumentId, timeframe);
   const labHref = `/backtests?tab=jobs&instrumentId=${encodeURIComponent(instrumentId)}&timeframe=${encodeURIComponent(timeframe)}`;
-  const proposeHref = `/help?section=ai-platform&focus=supervised-f3${
-    symbol ? `&symbol=${encodeURIComponent(symbol)}` : ""
-  }`;
+  const proposeHref = CONFIRM_PATH;
 
   if (verdict === "fresh_ok" || verdict === "keep") {
     actions.push({ id: "finalists", label: "Finalistas", href: finalistsHref });
@@ -254,7 +255,6 @@ export function judgeCoreR(input: CoreRJudgeInput): CoreRJudgment {
       verdict,
       instrumentId,
       timeframe,
-      symbol: input.symbol,
       slot1RunId,
       hasPaper,
     }),

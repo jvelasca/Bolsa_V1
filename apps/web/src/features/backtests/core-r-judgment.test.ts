@@ -17,6 +17,7 @@ import {
   readCoreRVerdictForInstrument,
   saveCoreRReport,
 } from "@/features/backtests/core-r-judgment";
+import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 
 const base = {
   instrumentId: "inst-1",
@@ -111,6 +112,11 @@ describe("judgeCoreR", () => {
     expect(j.actions.map((a) => a.id)).toEqual(
       expect.arrayContaining(["lab", "finalists", "checklist"]),
     );
+    const propose = j.actions.find((a) => a.id === "propose_f3");
+    expect(propose?.label).toBe("Proponer F3");
+    expect(propose?.href).toBe(CONFIRM_PATH);
+    expect(propose?.href).toBe("/confirm");
+    expect(propose?.href).not.toMatch(/^\/help/);
   });
 
   it("stable lab_validated → keep", () => {
