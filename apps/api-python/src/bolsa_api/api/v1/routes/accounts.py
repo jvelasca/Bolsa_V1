@@ -23,6 +23,7 @@ from bolsa_api.api.dependencies import (
     get_update_account_settings_use_case,
     get_update_account_use_case,
     get_withdraw_cash_use_case,
+    require_account_access,
 )
 from bolsa_api.api.v1.idempotency_responses import IDEMPOTENCY_CONFLICT_RESPONSES
 from bolsa_api.schemas.account_mappers import (
@@ -129,7 +130,7 @@ async def create_account(
 
 @router.get("/accounts/{account_id}", response_model=AccountResponseDto)
 async def get_account(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountResponseDto:
     try:
@@ -141,7 +142,7 @@ async def get_account(
 
 @router.patch("/accounts/{account_id}", response_model=AccountResponseDto)
 async def update_account(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: UpdateInvestmentAccountDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountResponseDto:
@@ -158,7 +159,7 @@ async def update_account(
 
 @router.post("/accounts/{account_id}/make-default", response_model=AccountResponseDto)
 async def make_default_account(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountResponseDto:
     try:
@@ -170,7 +171,7 @@ async def make_default_account(
 
 @router.patch("/accounts/{account_id}/settings", response_model=AccountResponseDto)
 async def update_account_settings(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: UpdateAccountSettingsDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountResponseDto:
@@ -186,7 +187,7 @@ async def update_account_settings(
 
 @router.post("/accounts/{account_id}/close", response_model=AccountResponseDto)
 async def close_account(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountResponseDto:
     try:
@@ -198,7 +199,7 @@ async def close_account(
 
 @router.delete("/accounts/{account_id}", status_code=204)
 async def delete_account(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> Response:
     try:
@@ -210,7 +211,7 @@ async def delete_account(
 
 @router.get("/accounts/{account_id}/summary", response_model=AccountSummaryResponseDto)
 async def get_account_summary(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AccountSummaryResponseDto:
     try:
@@ -222,7 +223,7 @@ async def get_account_summary(
 
 @router.get("/accounts/{account_id}/daily-ops-report", response_model=AiEffectivenessResponseDto)
 async def get_daily_ops_report(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     as_of: Annotated[
         str | None,
@@ -278,7 +279,7 @@ async def get_daily_ops_report(
 
 @router.get("/accounts/{account_id}/daily-ops-report.pdf")
 async def download_daily_ops_digest_pdf(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     as_of: Annotated[
         str | None,
@@ -327,7 +328,7 @@ async def download_daily_ops_digest_pdf(
     response_model=DailyOpsDigestNotifyResponseDto,
 )
 async def send_daily_ops_digest_email(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: SendDailyOpsDigestDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> DailyOpsDigestNotifyResponseDto:
@@ -419,7 +420,7 @@ async def withdraw_cash(
 
 @router.get("/accounts/{account_id}/tax-report", response_model=TaxReportResponseDto)
 async def get_tax_report(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     year: Annotated[int, Query(ge=2000, le=2100)] | None = None,
 ) -> TaxReportResponseDto:
@@ -433,7 +434,7 @@ async def get_tax_report(
 
 @router.get("/accounts/{account_id}/ledger", response_model=LedgerResponseDto)
 async def list_ledger(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,

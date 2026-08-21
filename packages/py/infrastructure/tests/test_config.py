@@ -9,6 +9,19 @@ import pytest
 from bolsa_infrastructure.config import Settings
 
 
+def test_owner_principal_default_app() -> None:
+    with _env_cleanup("APP_OWNER_ID", "APP_PASSWORD", "APP_AUTH_SECRET"):
+        s = Settings(_env_file=None)
+        assert s.app_owner_id == "app"
+        assert s.owner_principal() == "app"
+
+
+def test_owner_principal_blank_falls_back_to_app() -> None:
+    with _env_cleanup("APP_OWNER_ID", "APP_PASSWORD", "APP_AUTH_SECRET"):
+        s = Settings(_env_file=None, APP_OWNER_ID="   ")
+        assert s.owner_principal() == "app"
+
+
 def test_database_url_se_compone_desde_db_vars_vacio() -> None:
     with _env_cleanup("DATABASE_URL", "DB_PASSWORD", "APP_PASSWORD", "APP_AUTH_SECRET"):
         s = Settings(

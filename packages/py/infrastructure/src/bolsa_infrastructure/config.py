@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     api_port: int = Field(default=8000, validation_alias="API_PYTHON_PORT")
     xtb_bridge_url: str | None = Field(default=None, validation_alias="XTB_BRIDGE_URL")
     app_password: str | None = Field(default=None, validation_alias="APP_PASSWORD")
+    # R12-AUTH fase 1: id de propietario single-tenant (no JWT, no tabla users).
+    # Se estampa en altas nuevas de cuenta y se usa como request.state.principal.
+    app_owner_id: str = Field(default="app", validation_alias="APP_OWNER_ID")
     # F2·6: sin secreto hardcodeado. Vacío por defecto; si se activa APP_PASSWORD
     # se exige un APP_AUTH_SECRET real (ver validator más abajo).
     app_auth_secret: str = Field(default="", validation_alias="APP_AUTH_SECRET")
@@ -207,6 +210,14 @@ class Settings(BaseSettings):
         if value and "?" in value:
             value = value.split("?", 1)[0]
         return value
+
+    def owner_principal(self) -> str:
+        """Id single-tenant estampado en cuentas nuevas y adjunto al request.
+
+        Vacío o solo espacios cae a ``app`` para que auth-off y tests
+        dejen el mismo ``user_id`` que el modo con ``APP_PASSWORD``.
+        """
+        return (self.app_owner_id or "").strip() or "app"
 
     def __repr__(self) -> str:
         # F-SEG-2: un `repr(Settings)` accidental en un log/traceback no debe exponer

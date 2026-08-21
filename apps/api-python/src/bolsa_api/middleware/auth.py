@@ -1,12 +1,15 @@
+"""Gate opcional APP_PASSWORD (cookie HttpOnly + Bearer SHA-256, sin JWT)."""
+
 from collections.abc import Awaitable, Callable
 
+from bolsa_infrastructure.config import get_settings
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from bolsa_api.auth.principal import resolve_app_principal
 from bolsa_api.auth.session import SESSION_COOKIE_NAME, verify_session_cookie
 from bolsa_api.auth.tokens import verify_access_token
-from bolsa_infrastructure.config import get_settings
 
 PUBLIC_PREFIXES = (
     "/api/health",
@@ -20,6 +23,8 @@ PUBLIC_PREFIXES = (
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
+    """Adjunta ``request.state.principal`` y, si hay password, exige cookie/Bearer."""
+
     async def dispatch(
         self,
         request: Request,
@@ -27,6 +32,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         settings = get_settings()
         path = request.url.path
+        # Siempre: altas y tests auth-off estampan el mismo owner que el modo password.
+        request.state.principal = resolve_app_principal(settings)
 
         if not settings.app_password:
             return await call_next(request)

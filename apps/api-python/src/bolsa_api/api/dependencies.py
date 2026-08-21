@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Any, cast
 
-from fastapi import Header, Request
+from fastapi import Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 if TYPE_CHECKING:
@@ -265,6 +265,8 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
+from bolsa_api.auth.principal import get_request_principal
+
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     return cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)
@@ -328,6 +330,24 @@ def get_account_id_header(
     x_account_id: str | None = Header(default=None, alias="X-Account-Id"),
 ) -> str | None:
     return x_account_id
+
+
+async def require_account_access(request: Request, account_id: str) -> str:
+    """404 si el ``account_id`` de path no es visible para el principal del request.
+
+    Filas legacy ``user_id is None`` siguen accesibles. No usar en deposit/withdraw
+    ni en rutas de trade (R12-AUTH fase 1).
+    """
+    factory = get_session_factory(request)
+    async with factory() as session:
+        try:
+            await get_account_repository(session).get_account(
+                account_id,
+                owner_user_id=get_request_principal(request),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return account_id
 
 
 def get_list_accounts_use_case(session: AsyncSession) -> ListAccounts:

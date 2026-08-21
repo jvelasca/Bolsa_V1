@@ -49,7 +49,7 @@ jobs:
       - name: Pytest
         # Sin servicio Postgres en este workflow: unitarios + API tests offline.
         # Integración ASGI/DB → pnpm test:coach:api / jobs con DB.
-        # test_lists/test_workspaces/test_health/test_auth/test_ai_authoring entran
+        # test_lists/test_workspaces/test_health/test_auth/test_account_isolation/test_ai_authoring entran
         # al lifespan→ensure_migrated→DB: se excluyen aquí (no hay Postgres en CI),
         # mismo criterio que las DB-gated existentes (P2.5/CI).
         # R-12 A3: invariantes C/D/E son unitarios in-memory (sin PG).
@@ -64,5 +64,6 @@ jobs:
           --ignore=apps/api-python/tests/test_workspaces.py
           --ignore=apps/api-python/tests/test_health.py
           --ignore=apps/api-python/tests/test_auth.py
+          --ignore=apps/api-python/tests/test_account_isolation.py
           --ignore=apps/api-python/tests/test_ai_authoring.py
           -q

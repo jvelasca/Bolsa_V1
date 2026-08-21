@@ -1,10 +1,8 @@
+"""Repositorio SQLAlchemy de cuentas de inversión (CRUD + scope operativo)."""
+
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-
-from sqlalchemy import delete, select, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from bolsa_domain.account_settings import (
     AccountSettings,
@@ -13,6 +11,11 @@ from bolsa_domain.account_settings import (
     settings_to_dict,
 )
 from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
+from sqlalchemy import delete, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from bolsa_infrastructure.config import get_settings as load_app_settings
 from bolsa_infrastructure.database.models import (
     ConfidenceStateRow,
     DecisionMemoryRow,
@@ -28,6 +31,17 @@ from bolsa_infrastructure.database.models import (
     TrialRecordRow,
 )
 from bolsa_infrastructure.ids import new_id
+
+
+def _app_owner_id() -> str:
+    return load_app_settings().owner_principal()
+
+
+def _owner_visibility_clause(owner_user_id: str) -> Any:
+    return or_(
+        InvestmentAccountRow.user_id == owner_user_id,
+        InvestmentAccountRow.user_id.is_(None),
+    )
 
 
 def _account_from_row(row: InvestmentAccountRow) -> InvestmentAccount:
@@ -78,6 +92,8 @@ def _portfolio_from_row(row: InvestmentPortfolioRow) -> InvestmentPortfolio:
 
 
 class SqlAlchemyAccountRepository:
+    """Persistencia de cuentas; altas nuevas llevan ``user_id`` del owner single-tenant."""
+
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
@@ -129,10 +145,20 @@ class SqlAlchemyAccountRepository:
     ) -> AccountScope:
         return await self._load_scope(account_id, portfolio_id)
 
-    async def list_accounts(self, account_type: str | None = None) -> list[InvestmentAccount]:
-        stmt = select(InvestmentAccountRow).order_by(
-            InvestmentAccountRow.is_default.desc(),
-            InvestmentAccountRow.created_at.asc(),
+    async def list_accounts(
+        self,
+        account_type: str | None = None,
+        user_id: str | None = None,
+    ) -> list[InvestmentAccount]:
+        """Lista cuentas del owner (o ``user_id``) más filas legacy ``user_id is None``."""
+        owner = user_id if user_id is not None else _app_owner_id()
+        stmt = (
+            select(InvestmentAccountRow)
+            .where(_owner_visibility_clause(owner))
+            .order_by(
+                InvestmentAccountRow.is_default.desc(),
+                InvestmentAccountRow.created_at.asc(),
+            )
         )
         if account_type:
             stmt = stmt.where(InvestmentAccountRow.type == account_type)
@@ -154,9 +180,17 @@ class SqlAlchemyAccountRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_account_from_row(row) for row in rows]
 
-    async def get_account(self, account_id: str) -> InvestmentAccount:
+    async def get_account(
+        self,
+        account_id: str,
+        owner_user_id: str | None = None,
+    ) -> InvestmentAccount:
+        """Carga por id. ``user_id`` ajeno se trata como no encontrada (no 500)."""
         row = await self._session.get(InvestmentAccountRow, account_id)
         if row is None:
+            raise ValueError("Cuenta no encontrada")
+        owner = owner_user_id if owner_user_id is not None else _app_owner_id()
+        if row.user_id is not None and row.user_id != owner:
             raise ValueError("Cuenta no encontrada")
         return _account_from_row(row)
 
@@ -192,7 +226,7 @@ class SqlAlchemyAccountRepository:
         default_name = "Cuenta simulada" if account_type == "simulated" else "Cuenta paper"
         account = InvestmentAccountRow(
             id=new_id(),
-            user_id=None,
+            user_id=_app_owner_id(),
             name=name.strip() or default_name,
             description=description,
             type=account_type,
