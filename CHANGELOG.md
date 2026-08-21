@@ -6,7 +6,7 @@ All notable releases of Bolsa V1.
 
 Auditoría residual post-v1.3.0, higiene documental y estudio teórico del flujo SEMI. **No es un tag.** Plan: `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`. Producto sigue **BETA**.
 
-- Firma de estado: **GitHub `origin/main`** es la fuente de coordinación (partida R-12 `f7a86cc`); premisas esenciales del ciclo R-12
+- Firma de estado: **GitHub `origin/main`** es la fuente de coordinación (implementación Track A+B `48cc255`; partida R-12 `f7a86cc`); premisas esenciales del ciclo R-12
 - Alineación documental: README `v1.3.0 BETA`; tag `v1.3.0` → **`b778292`** (el tag anotado apunta al commit de cierre documental, padre `deafa27`)
 - Tests/scripts de verificación residuales (DEFAULT_PORTFOLIO, invariantes C–E, retry HTTP)
 - Inventario `pending-delete` (sin purge) + higiene E8 (residuos m7-win/M2 + archivo de relevo `-obsoleto`) + estudio UX comparativo (Track B, cero código FE)

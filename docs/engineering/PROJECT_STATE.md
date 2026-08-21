@@ -1,7 +1,7 @@
 # PROJECT_STATE — Estado vivo del proyecto (fuente única de continuación)
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
-> **AsOf:** 2026-08-21 · **Fuente de coordinación: GitHub `origin/main`** (`git fetch && git rev-parse origin/main`). Tag **`v1.3.0` → `b778292`** · **R-12 EN CURSO** (`plan-r12-auditoria-ux-2026-08-21.md`). Partida R-12: `f7a86cc`. R-7..R-11 cerradas. Relevo UNO (`f7a4ab0`) + DOS (`f7a86cc`) ejecutados (ese plan queda **supersedido** por R-12).
+> **AsOf:** 2026-08-21 · **Fuente de coordinación: GitHub `origin/main`** (`git fetch && git rev-parse origin/main`). Tag **`v1.3.0` → `b778292`** · **R-12 EN CURSO** (`plan-r12-auditoria-ux-2026-08-21.md`). Implementación Track A+B: **`48cc255`**. Partida: `f7a86cc`. R-7..R-11 cerradas. Relevo UNO (`f7a4ab0`) + DOS (`f7a86cc`) ejecutados (ese plan queda **supersedido** por R-12).
 > **PACK de estado global consolidado R-1→R-7 (para auditoría externa / lectura rápida):** [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md) · **R-7 deuda COMPLETA** (solo M-4/T-M4 diferido).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
@@ -108,7 +108,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ## 2ac. R-12 — Auditoría residual, higiene y estudio UX (2026-08-21)
 
-> Plan vivo: [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md). Premisas: `docs/PROJECT_PREMISES.md` ⭐§0. Coordinación: **GitHub `origin/main`**. Partida: `f7a86cc`. Tag `v1.3.0` → `b778292`. Núcleo financiero **no se toca** salvo gates. Track C frontend **bloqueado**.
+> Plan vivo: [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md). Premisas: `docs/PROJECT_PREMISES.md` ⭐§0. Coordinación: **GitHub `origin/main`**. Implementación Track A+B: **`48cc255`**. Partida: `f7a86cc`. Tag `v1.3.0` → `b778292`. Núcleo financiero **no se toca** salvo gates. Track C frontend **bloqueado**.
 
 | Fase                         | Estado                    | Entregable                                                         |
 | ---------------------------- | ------------------------- | ------------------------------------------------------------------ |

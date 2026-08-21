@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1.
 > **Propósito:** texto de paso anti-alucinación para el **siguiente chat**. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch && git rev-parse origin/main` (no asumir un SHA de este fichero).
-> **Firma de partida R-12:** `f7a86cc` · tag `v1.3.0` → `b778292` · rama `main`.
+> **Firma de partida R-12:** `f7a86cc` · implementación Track A+B **`48cc255`** · tag `v1.3.0` → `b778292` · rama `main`. El tip de GitHub puede ser un commit de firma documental posterior: verificar `git rev-parse origin/main`.
 
 ---
 
