@@ -1,5 +1,14 @@
 # PENDIENTE DE BORRAR — inventario (2026-07-31)
 
+> **AsOf 2026-08-22 (V2 SAFE, sin purge):** E8 sigue **N** para ítems de riesgo alto.
+> Hay readers/migradores runtime reales; no hay métrica de blobs, flag de migración
+> completa ni test de ausencia. **NO PURGE. NO wipe localStorage. NO quitar migradores.**
+>
+> - `apps/web/src/features/charts/chart-inspector-nav.ts` está **LIVE** (imports en
+>   `ui-store`, workspace slices, inspector panel/toolbar). **No borrar el fichero.**
+> - `presetRuleGroups` es **API viva** (callers en `hybrid-strategy`, `research-platform`,
+>   `strategy-gate-series`); **no es candidato de borrado.**
+
 Zona de auditoría: código / aliases **obsoletos** que aún no se eliminan porque pueden tener
 callers, tests o compat de persistencia. Revisar antes de borrar en frío.
 
@@ -27,18 +36,18 @@ callers, tests o compat de persistencia. Revisar antes de borrar en frío.
 
 ### Web / stores
 
-| Path                                                                                                                    | Notas                                                                               |
-| ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `apps/web/src/features/charts/chart-inspector-nav.ts`                                                                   | Tabs legacy → secciones                                                             |
-| `apps/web/src/features/trading/use-pending-orders.ts` — `readLegacyPendingOrders`                                       | RIESGO ALTO · gate `bolsa-trading-ui` → no tocar hasta purge storage                |
-| `apps/web/src/stores/workspace-store.ts` — lectura legacy `chartDataStrip` / `chartNewTabSeed` / `newChartConfigSource` | RIESGO ALTO · migración workspaces → no tocar hasta purge storage                   |
-| `readLegacyTimeframeFavorites`                                                                                          | RIESGO ALTO · gate `bolsa-chart-timeframe-favorites` → no tocar hasta purge storage |
+| Path                                                                                                                    | Notas                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/features/charts/chart-inspector-nav.ts`                                                                   | **LIVE — no borrar el fichero.** Tipo `ChartInspectorTab` sin usos externos (docs-only; no borrar sin tests). Tabs legacy → secciones |
+| `apps/web/src/features/trading/use-pending-orders.ts` — `readLegacyPendingOrders`                                       | RIESGO ALTO · gate `bolsa-trading-ui` → no tocar hasta purge storage                                                                  |
+| `apps/web/src/stores/workspace-store.ts` — lectura legacy `chartDataStrip` / `chartNewTabSeed` / `newChartConfigSource` | RIESGO ALTO · migración workspaces → no tocar hasta purge storage                                                                     |
+| `readLegacyTimeframeFavorites`                                                                                          | RIESGO ALTO · gate `bolsa-chart-timeframe-favorites` → no tocar hasta purge storage                                                   |
 
 ### Shared
 
 | Path                                                                                               | Notas                                                                                                 |
 | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `packages/shared` — re-export `presetRuleGroups` desde `strategy-rules`                            | RIESGO ALTO · requiere repuntar imports shared → fuera de alcance                                     |
+| `packages/shared` — `presetRuleGroups` (definición + re-export `strategy-rules` / `types`)         | **API viva, no candidato.** Callers de producción; no “purgar” el re-export                           |
 | `packages/shared` — otros `@deprecated` en chart-defaults / strategy-rules / chart-strategy-bridge | Compat dist; borrar tras bump consumers (salvo `presetFromHybridStrategyScore`, ya eliminado en R-8D) |
 
 ### Docs / copy
