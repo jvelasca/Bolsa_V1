@@ -4,7 +4,7 @@
 > **Propósito:** texto de paso anti-alucinación. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch` + `git rev-parse origin/main` (no asumir SHA de este fichero).
 > **Firma de partida R-12:** `f7a86cc` · Track A+B **`48cc255`** · tag `v1.3.0` → `b778292`.
-> **AsOf:** tag **`v1.5.0-beta` → `5e52bd6`** (R12-SCHED). SHA vivo = `git fetch` + `git rev-parse origin/main` (el stamp docs puede ir un commit por delante del tag; **el tag no se mueve**). Track C C1–C5 · copy E8 · leftover CORE-R · gates R12-409 / EXEC-B-CONC / R12-SCHED **cerrados**.
+> **AsOf:** HEAD/`origin/main` = **`992af40`** · tag **`v1.5.0-beta` → `5e52bd6`** (R12-SCHED; **el tag no se mueve**). Track C C1–C5 · copy E8 · leftover CORE-R · gates R12-409 / EXEC-B-CONC / R12-SCHED **cerrados**.
 
 ---
 
@@ -36,11 +36,11 @@ Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Labo
 ## 3. Texto de paso (pegar en chat nuevo)
 
 > CONTEXTO: Bolsa_V1, R-12. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `plan-r12-track-c-frontend-2026-08-21.md` · `PROJECT_PREMISES.md` ⭐§0 · `PROJECT_STATE.md` §2ac · backlog §0.
-> Firma: `git fetch` + `git rev-parse HEAD origin/main` · `git status`. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292` intacto. Partida R-12 `f7a86cc`.
-> Hecho: Track C C1–C5 (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9` + gates **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6`. Gates restantes (split accounts · auth · pending-delete) **no auto**. Fuente viva = `origin/main`.
+> Firma: `git fetch` + `git rev-parse HEAD origin/main` · `git status`. HEAD/`origin/main` = **`992af40`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292` intacto. Partida R-12 `f7a86cc`.
+> Hecho: Track C C1–C5 (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9` + gates **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6`. Siguiente = **decisión** (split accounts · auth · pending-delete); **no auto**. Abrir chat nuevo si este hilo satura. Fuente viva = `origin/main`.
 
 ## 4. Siguiente (decisión del propietario)
 
 1. Gates **R12-409 / EXEC-B-CONC / R12-SCHED cerrados** (SHAs arriba). Leftover CORE-R **no** está pendiente.
-2. Gates restantes si aplica (split `accounts.py`, auth) siguen en **decisión**; no auto-abrir.
+2. Siguiente = **decisión** (split `accounts.py` · auth · pending-delete); **no auto-abrir**.
 3. **Abrir chat nuevo** si este hilo satura (documento manda).
