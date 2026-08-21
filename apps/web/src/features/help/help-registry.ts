@@ -146,7 +146,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "apps/web/src/features/trading/demo-book-mode-panel.tsx",
         role: "code",
-        note: "MANUAL/SEMI/AUTO prep · kill · armado (Cuentas)",
+        note: "MANUAL/SEMI · AUTO No disponible (BETA) · kill (Cuentas)",
       },
       {
         path: "apps/web/src/features/trading/trading-status-bar.tsx",
@@ -405,7 +405,17 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "apps/web/src/stores/supervised-f3-queue-store.ts",
         role: "code",
-        note: "Cola session scan→F3",
+        note: "Cola session scan→F3 · openHelpAiPlatform F3 → /confirm",
+      },
+      {
+        path: "apps/web/src/features/confirm/confirm-page.tsx",
+        role: "code",
+        note: "UI Confirmar `/confirm` · reutiliza SupervisedF3Panel",
+      },
+      {
+        path: "apps/web/src/features/settings/supervised-f3-panel.tsx",
+        role: "code",
+        note: "Panel cola F3 (también en Ayuda → Plataforma IA)",
       },
       {
         path: AI_TRACKER_SYNC.solutionDoc,

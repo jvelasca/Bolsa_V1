@@ -103,7 +103,7 @@ function GuideContent() {
         <ul className="space-y-2 text-muted-foreground">
           <li>
             <RouteLink to="/overview">Overview</RouteLink> — Cuenta activa,
-            patrimonio y atajos a Trading, Backtesting (Play / Lista AUTO /
+            patrimonio y atajos a Trading, Laboratorio (Play / Lista AUTO /
             Finalistas) y análisis fundamental (Tarjeta Valor · Screeners FA ·
             Paper D).
           </li>
@@ -114,7 +114,22 @@ function GuideContent() {
           </li>
           <li>
             <RouteLink to="/trading">Trading</RouteLink> — Workspace de
-            gráficos, watchlist, indicadores y panel de operaciones.
+            gráficos, watchlist, indicadores y panel de operaciones (Universo en
+            vigilancia).
+          </li>
+          <li>
+            <RouteLink to="/screeners">Señales</RouteLink> — Hub de señales
+            (ruta <code className="text-[10px]">/screeners</code>; rastreadores
+            guardados siguen existiendo).
+          </li>
+          <li>
+            <RouteLink to="/confirm">Confirmar</RouteLink> — Firma humana de la
+            cola F3 (SEMI). Primer nivel de nav.
+          </li>
+          <li>
+            <strong className="text-foreground">Libro</strong> —{" "}
+            <RouteLink to="/operations">Operaciones</RouteLink> (posiciones /
+            órdenes) · <RouteLink to="/history">Historial</RouteLink> (ledger).
           </li>
           <li>
             <RouteLink to="/accounts">Cuentas</RouteLink> — Hub de cuentas:
@@ -131,14 +146,6 @@ function GuideContent() {
         <h3 className="mb-2 font-semibold">Más pantallas</h3>
         <ul className="space-y-2 text-muted-foreground">
           <li>
-            <RouteLink to="/operations">Operaciones</RouteLink> — Posiciones
-            abiertas y órdenes pendientes de la cuenta activa.
-          </li>
-          <li>
-            <RouteLink to="/history">Historial</RouteLink> — Libro mayor
-            (ledger) y registro de operaciones ejecutadas.
-          </li>
-          <li>
             <RouteLink to="/fiscal">Fiscal</RouteLink> — Informe de plusvalías
             realizadas y latentes por ejercicio.
           </li>
@@ -148,13 +155,9 @@ function GuideContent() {
             seguimiento Radar). Importación desde Listas.
           </li>
           <li>
-            <RouteLink to="/backtests">Backtesting</RouteLink> — Simulaciones
-            históricas. Guía y seguimiento en Ayuda →{" "}
+            <RouteLink to="/backtests">Laboratorio</RouteLink> — Simulaciones
+            históricas (alias Backtesting). Guía en Ayuda →{" "}
             <strong className="text-foreground">Backtesting</strong>.
-          </li>
-          <li>
-            <RouteLink to="/screeners">Rastreadores</RouteLink> — Escaneo de
-            universo y señales en la última barra.
           </li>
         </ul>
       </section>
@@ -207,8 +210,9 @@ function GuideContent() {
         <h3 className="mb-2 font-semibold">Barra superior</h3>
         <ul className="space-y-1 text-muted-foreground">
           <li>
-            <strong>Nav</strong> — Overview, Trading, Cuentas, Alertas,
-            Instrumentos, Backtesting, Rastreadores.
+            <strong>Nav</strong> — Mesa diaria: Trading · Señales · Confirmar ·
+            Libro. Herramientas: Cuentas · Alertas · Instrumentos. Menús:
+            Laboratorio · Asesor.
           </li>
           <li>
             <strong>Grupo tras separador</strong> — Flechas ← → (historial). En
@@ -402,10 +406,16 @@ function TradingContent() {
           de la <strong className="text-foreground">cuenta entera</strong> (no
           del valor). Barra inferior: badge{" "}
           <strong className="text-foreground">OPERATIVA: Semi</strong> → clic
-          abre Cuentas · Config · Operativa (sizing, kill switch, armado AUTO
-          prep). <strong className="text-foreground">AUTO</strong> sigue en prep
-          (<code className="text-[10px]">PAPER_D_EXECUTE</code> off). Usa SEMI +
-          Confirm.
+          abre Cuentas · Config · Operativa (sizing · kill switch).{" "}
+          <strong className="text-foreground">AUTO</strong> = «No disponible
+          (BETA)» (no armable). Usa SEMI +{" "}
+          <RouteLink to="/confirm">Confirmar</RouteLink>.
+        </p>
+        <p className="mt-2 text-muted-foreground">
+          <em>
+            La app propone operaciones sobre tu Universo. Tú las firmas aquí.
+            Nunca se envían solas.
+          </em>
         </p>
         <p className="mt-2">
           Lista virtual{" "}
@@ -424,20 +434,20 @@ function TradingContent() {
           + chips V·F·R. SEMI/AUTO exigen pertenencia; MANUAL no. ADR-024.
         </p>
         <h4 className="mb-1 mt-3 font-semibold text-foreground">
-          SEMI vs AUTO (2026-08-04)
+          SEMI vs AUTO (R-12 Track C)
         </h4>
         <ul className="list-disc space-y-1 pl-5">
           <li>
             <strong className="text-foreground">SEMI</strong> — camino operativo
-            diario: Alarma / Proponer F3 → Confirm humano → fill DEMO.
+            diario: Alarma / Proponer F3 →{" "}
+            <RouteLink to="/confirm">Confirmar</RouteLink> (firma humana) → fill
+            DEMO. Frase de mesa: «La app propone operaciones sobre tu Universo.
+            Tú las firmas aquí. Nunca se envían solas.»
           </li>
           <li>
-            <strong className="text-foreground">AUTO</strong> — solo prep: pill
-            disabled, kill switch y armado local (
-            <code className="text-[10px]">ACTIVAR AUTO</code>). Execute requiere
-            checklist thaw + ADR-023 Accepted +{" "}
-            <code className="text-[10px]">PAPER_D_EXECUTE=1</code> (default
-            off).
+            <strong className="text-foreground">AUTO</strong> — «No disponible
+            (BETA)»: pill no seleccionable. No confundir con Lista AUTO del
+            Laboratorio. Thaw / execute solo en ops (fuera de mesa diaria).
           </li>
           <li>
             <strong className="text-foreground">Asesor → Diario</strong> —
@@ -579,8 +589,9 @@ function TradingContent() {
           </li>
           <li>
             Seguimiento de fases F0–F6 y arquitectura de decisión (Assessment →
-            Runtime → Gate): Ayuda → <strong>Plataforma IA</strong> (no está en
-            Configuración).
+            Runtime → Gate): Ayuda → <strong>Plataforma IA</strong> (docs /
+            tracker; no está en Configuración). Firma viva: nav{" "}
+            <RouteLink to="/confirm">Confirmar</RouteLink>.
           </li>
         </ul>
       </section>
@@ -605,9 +616,10 @@ function TradingContent() {
             entra como Assessment en propose.
           </li>
           <li>
-            Prueba el flujo en Ayuda →{" "}
-            <strong className="text-foreground">Plataforma IA</strong> →
-            Supervisado F3. Desde Rastreadores puedes{" "}
+            Firma en <RouteLink to="/confirm">Confirmar</RouteLink> (nav
+            Confirmar). Ayuda →{" "}
+            <strong className="text-foreground">Plataforma IA</strong> sigue
+            como docs/seguridad del tracker. Desde Señales puedes{" "}
             <strong className="text-foreground">Encolar F3</strong> (top hits →
             cola supervisada).
           </li>
@@ -687,12 +699,13 @@ function TradingContent() {
       </section>
       <section>
         <h3 className="mb-2 font-semibold text-foreground">
-          Rastreadores híbridos
+          Señales (rastreadores híbridos)
         </h3>
         <p>
-          En <RouteLink to="/screeners">Rastreadores</RouteLink>: escaneo con
-          rating, gate de fundamentales y señales. Ver{" "}
-          <code>docs/HYBRID_TRACKERS.md</code>.
+          Hub <RouteLink to="/screeners">Señales</RouteLink> (ruta{" "}
+          <code className="text-[10px]">/screeners</code>): escaneo con rating,
+          gate de fundamentales y señales. Los rastreadores guardados siguen
+          existiendo. Ver <code>docs/HYBRID_TRACKERS.md</code>.
         </p>
       </section>
       <section>

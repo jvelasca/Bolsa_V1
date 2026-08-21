@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md` §4.
 > **Hipótesis aprobada:** `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (propietario, 2026-08-21, línea a línea).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · E1–E9. Una fase = un subagente. 0 commits sin OK.
-> **Estado:** plan **aprobado** (propietario, 2026-08-21). **C1** `5bc51ff` · **C2** `01af9ff` · **C3** `97e20ab` · **C4 en este commit**. Siguiente: C5.
+> **Estado:** plan **aprobado**. Track C **C1–C5 hechas en local** (C5 = este commit). Push a GitHub pendiente.
 > **AsOf:** 2026-08-21 · coordinación GitHub `origin/main`.
 
 ---
@@ -122,7 +122,7 @@ Copy Estudio en mesa: «Universo en vigilancia» donde hoy diga solo jerga de me
 
 ### C4 — Libro en nav
 
-**Estado:** **hecha en este commit** (2026-08-21). C1 `5bc51ff` · C2 `01af9ff` · C3 `97e20ab`.
+**Estado:** **hecha** `154fcd1` (2026-08-21, local; push pendiente). C1 `5bc51ff` · C2 `01af9ff` · C3 `97e20ab`.
 
 Dropdown **Libro**: Operaciones (`/operations`) · Historial / ledger (`/history`). No fusionar páginas. Copy de cabecera alineado a «Libro».
 
@@ -132,7 +132,9 @@ Dropdown **Libro**: Operaciones (`/operations`) · Historial / ledger (`/history
 
 ### C5 — HELP + frase SEMI
 
-Sincronizar `docs/HELP.md` + `app-help-menu.tsx` + `help-registry.ts`: Confirm es primer nivel; AUTO BETA; frase SEMI en mesa/Cuentas. Tracker Plataforma IA apunta a `/confirm`.
+**Estado:** **hecha en este commit** (2026-08-21). C1–C4: `5bc51ff` · `01af9ff` · `97e20ab` · `154fcd1`. Track C **cerrado en local**; push pendiente.
+
+Sincronizar `docs/HELP.md` + `app-help-menu.tsx` + `help-registry.ts` + `help-content-as-of.ts` + tracker: Confirm es primer nivel; AUTO BETA; frase SEMI en mesa/Confirm. Tracker Plataforma IA apunta a `/confirm`.
 
 ---
 
@@ -155,4 +157,4 @@ Producto **BETA**. Tag `v1.3.0` → `b778292` intacto. Track C **no** tagea solo
 
 ## 6. Texto de paso (tras aprobar este plan)
 
-> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1** `5bc51ff` · **C2** `01af9ff` · **C3** `97e20ab` · **C4 en este commit.** Siguiente: C5 HELP. NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.
+> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1–C5 hechas en local** (C5 = este commit). Push pendiente. NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.

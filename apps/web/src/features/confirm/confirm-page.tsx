@@ -15,7 +15,8 @@ export function ConfirmPage() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Confirmar</h2>
         <p className="text-sm text-muted-foreground">
-          La app propone; tú firmas aquí.
+          La app propone operaciones sobre tu Universo. Tú las firmas aquí.
+          Nunca se envían solas.
         </p>
       </div>
       <SupervisedF3Panel />

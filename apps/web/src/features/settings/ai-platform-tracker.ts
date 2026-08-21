@@ -38,7 +38,7 @@ export const AI_DECISION_PIPELINE = {
     "DecisionRuntime v1.1 (WeightRules) → DecisionPackage + Recommendation",
     "ART-DECISION-SESSION persistido en propose (auditabilidad)",
     "Policy Gate: propose = pasivo · paper_auto = hard VETO",
-    "Scan hits → Encolar F3 → cola supervisada (Ayuda → Plataforma IA)",
+    "Scan hits → Encolar F3 → cola supervisada Confirmar (`/confirm`; Ayuda → Plataforma IA = docs)",
   ],
   rules: [
     "Ningún Assessment emite BUY/SELL — solo bias, score, facts, warnings.",
@@ -186,7 +186,7 @@ export const AI_PRODUCT_GOALS: AiTrackItem[] = [
     title: "Trading supervisado (Decision Engine)",
     status: "done",
     how: "Assessment[] → Runtime → Recommendation → humano. Cola scan→F3. Propose → DecisionSession.",
-    note: "Operativo en Ayuda → Plataforma IA / Finalistas Proponer.",
+    note: "Operativo en Confirmar (`/confirm`) / Finalistas Proponer. Ayuda → Plataforma IA = docs/tracker.",
     docRef: "RFC-008 §22",
   },
   {
@@ -360,7 +360,7 @@ export const AI_EXECUTION_PHASES: AiTrackItem[] = [
     id: "f3",
     title: "F3 — Supervisado (Recommendation → Intent)",
     status: "done",
-    how: "Endpoint propose: TA+FUND+Macro live+Evidence+News → Runtime v1.1. Scan → Encolar F3 → cola Ayuda.",
+    how: "Endpoint propose: TA+FUND+Macro live+Evidence+News → Runtime v1.1. Scan → Encolar F3 → cola Confirmar (`/confirm`).",
     note: "News = Yahoo search + heuristic sentiment + earnings. Propose → DecisionSession en PG.",
     docRef: "RFC-008 §22 / AI_PLATFORM_SOLUTION §F3",
   },

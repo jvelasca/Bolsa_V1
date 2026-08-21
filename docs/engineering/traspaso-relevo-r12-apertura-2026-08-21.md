@@ -1,35 +1,41 @@
-# RELEVO / TRASPASO — R-12 Track C (2026-08-21)
+# RELEVO / TRASPASO — R-12 Track C CERRADO local (2026-08-21)
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1.
-> **Propósito:** texto de paso anti-alucinación para el **siguiente chat**. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
-> **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch && git rev-parse origin/main` (no asumir un SHA de este fichero).
-> **Firma de partida R-12:** `f7a86cc` · implementación Track A+B **`48cc255`** · tag `v1.3.0` → `b778292` · rama `main`. El tip de GitHub puede ser un commit de firma documental posterior: verificar `git rev-parse origin/main`.
+> **Propósito:** texto de paso anti-alucinación. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
+> **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch && git rev-parse origin/main` (no asumir SHA de este fichero).
+> **Firma de partida R-12:** `f7a86cc` · Track A+B **`48cc255`** · tag `v1.3.0` → `b778292`.
 
 ---
 
 ## 1. Qué está hecho
 
-- Track A (A0–A6) + Track B estudio: **`48cc255`**.
-- Track B **APROBADO** por el propietario (2026-08-21), línea a línea: mesa 5 puertas (Universo · Señales · Dictamen · Confirmar · Libro).
-- Plan C escrito: `docs/engineering/plan-r12-track-c-frontend-2026-08-21.md`.
-- **C1** `5bc51ff` (local; no en GitHub hasta push del propietario): `/confirm` + nav Confirmar + `openHelpAiPlatform({ panel: "supervised-f3" })` → `bolsa:navigate`.
-- **C2** `01af9ff` (local): nav diaria (Trading · Señales · Confirmar) vs herramientas vs Laboratorio/Asesor; hub Señales; copy Universo en vigilancia.
-- **C3** `97e20ab` (local): AUTO de cuenta «No disponible (BETA)»; `DEMO_BOOK_AUTO_UI_ENABLED=false`; copy de mesa sin `PAPER_D_EXECUTE`.
-- **C4 en este commit:** dropdown nav **Libro** (Operaciones `/operations` + Historial `/history`); cabeceras alineadas a «Libro»; sin fusionar páginas. C5 no abierta.
+- Track A + B: **`48cc255`**. Track B **APROBADO** (mesa 5 puertas).
+- Track C **C1–C5 cerradas en local** (este hilo). Push a GitHub **pendiente** (E4).
+
+| Fase | SHA local       | Qué                                                            |
+| ---- | --------------- | -------------------------------------------------------------- |
+| C1   | `5bc51ff`       | `/confirm` + nav Confirmar + F3 → `bolsa:navigate`             |
+| C2   | `01af9ff`       | Nav diaria Trading · Señales · Confirmar vs Laboratorio/Asesor |
+| C3   | `97e20ab`       | AUTO cuenta «No disponible (BETA)»; sin thaw                   |
+| C4   | `154fcd1`       | Nav Libro (Operaciones + Historial)                            |
+| C5   | _(este commit)_ | HELP + Ayuda + tracker + frase SEMI                            |
+
+Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Laboratorio · Asesor**.
 
 ## 2. NO tocar
 
-`pending-delete` riesgo alto · gobernanza IA · `PAPER_D_EXECUTE` · scheduler-vs-worker · `contract:gen` · producción `ExecuteTrade` cash_before · split `accounts.py` · split `backtests-page.tsx` · fusión `/research`+`/screeners` · frontend **fuera de la fase C viva**.
+`pending-delete` alto · gobernanza IA · `PAPER_D_EXECUTE` · scheduler-vs-worker · `contract:gen` · `ExecuteTrade` cash_before · split `accounts.py` · split `backtests-page` · fusión research/screeners.
 
-## 3. Texto de paso (pegar en el chat nuevo)
+## 3. Texto de paso (pegar en chat nuevo)
 
-> CONTEXTO: repo Bolsa_V1, ciclo **R-12**. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `docs/engineering/plan-r12-track-c-frontend-2026-08-21.md` · `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` · `docs/PROJECT_PREMISES.md` ⭐§0 · `docs/engineering/PROJECT_STATE.md` §2ac · backlog §0.
-> Firma: **GitHub `origin/main`** — ejecutar `git fetch && git rev-parse HEAD origin/main` y `git status`. Partida del ciclo: `f7a86cc`. Tag `v1.3.0` → `b778292`.
-> Track B **APROBADO**. **C1** `5bc51ff` · **C2** `01af9ff` · **C3** `97e20ab` · **C4 en este commit**. Tarea viva: **C5** HELP (+ frase SEMI). Gates (409, ExecuteTrade post-lock, scheduler) siguen en decisión. Coordinación SIEMPRE desde GitHub (commit+push; working tree ≠ estado).
-> Batería C4: typecheck web · vitest `src/features/confirm` · lint zona tocada · sin diff OpenAPI.
+> CONTEXTO: Bolsa_V1, R-12. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `plan-r12-track-c-frontend-2026-08-21.md` · `PROJECT_PREMISES.md` ⭐§0 · `PROJECT_STATE.md` §2ac · backlog §0.
+> Firma: `git fetch && git rev-parse HEAD origin/main` · `git status`. Partida `f7a86cc` · tag `v1.3.0` → `b778292`.
+> Track C **C1–C5 hechos en local**. Si `origin/main` no tiene C1–C5: **push pendiente** (no asumir GitHub = local). Gates 409/EXEC-B/scheduler no auto.
+> Siguiente producto: push C1–C5 · opcional tag `v1.5.0-beta` solo si el propietario lo pide · o higiene E8 / gates R-12.
 
-## 4. Siguiente producto
+## 4. Siguiente (decisión del propietario)
 
-1. **C5** HELP + frase SEMI.
-2. Push C1–C4 a `origin/main` cuando el propietario lo pida.
-3. Tag `v1.4.0` / `v1.5.0-beta` **solo** si lo pide.
+1. **Push** `origin/main` (C1–C5).
+2. Tag `v1.4.0` / `v1.5.0-beta` **solo** si lo pide.
+3. Gates R-12 (409, EXEC-B-CONC, scheduler) siguen en decisión.
+4. **Abrir chat nuevo** si este hilo satura (documento manda).
