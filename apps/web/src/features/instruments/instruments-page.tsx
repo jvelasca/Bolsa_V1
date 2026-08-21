@@ -4,6 +4,7 @@
  *
  * @see docs/engineering/instruments-hub-2026-07-31.md
  * @see docs/engineering/instruments-hub-narrative-2026-08-04.md
+ * @see docs/engineering/research-radar-unification-2026-07-31.md
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";

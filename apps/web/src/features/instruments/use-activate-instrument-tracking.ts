@@ -1,5 +1,7 @@
 /**
  * Activar seguimiento desde hub: Finalistas #1 → crear Tracker → Radar.
+ *
+ * @see docs/engineering/research-radar-unification-2026-07-31.md
  */
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
