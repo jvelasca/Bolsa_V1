@@ -31,10 +31,10 @@ export function OperationsPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            Mis operaciones
+            Libro · Operaciones
           </h2>
           <p className="text-sm text-muted-foreground">
-            Posiciones abiertas y órdenes pendientes
+            Posiciones abiertas y órdenes pendientes del Libro
             {account ? ` · ${account.name}` : ""}.
           </p>
         </div>
@@ -51,7 +51,7 @@ export function OperationsPage() {
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-primary"
           >
             <History className="h-4 w-4" />
-            Historial
+            Libro · Historial
           </Link>
         </div>
       </div>

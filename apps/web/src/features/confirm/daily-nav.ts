@@ -1,11 +1,12 @@
 /**
- * Mesa diaria vs laboratorio (R-12 C2).
+ * Mesa diaria vs laboratorio (R-12 C2 + C4).
  *
  * Labels/rutas unit-testeables sin montar la barra. El bucle diario
- * (Trading · Señales · Confirmar) es primer nivel; Laboratorio y Asesor
- * quedan en menú. No fusiona `/research` + `/screeners`.
+ * (Trading · Señales · Confirmar · Libro) es primer nivel; Laboratorio y
+ * Asesor quedan en menú. Libro es dropdown a Operaciones + Historial (no
+ * fusiona páginas). No fusiona `/research` + `/screeners`.
  *
- * @see docs/engineering/plan-r12-track-c-frontend-2026-08-21.md § C2
+ * @see docs/engineering/plan-r12-track-c-frontend-2026-08-21.md § C2 · § C4
  */
 
 /** Hub diario de señales (ruta histórica `/screeners`; copy trader). */
@@ -18,6 +19,37 @@ export const LABORATORIO_LABEL = "Laboratorio" as const;
 export const ASESOR_LABEL = "Asesor" as const;
 export const CONFIRMAR_LABEL = "Confirmar" as const;
 export const TRADING_NAV_LABEL = "Trading" as const;
+
+/** Dropdown Libro (R-12 C4): Operaciones + Historial; no fusiona rutas. */
+export const LIBRO_LABEL = "Libro" as const;
+export const LIBRO_OPERACIONES_LABEL = "Operaciones" as const;
+export const LIBRO_HISTORIAL_LABEL = "Historial" as const;
+export const LIBRO_OPERACIONES_PATH = "/operations" as const;
+export const LIBRO_HISTORIAL_PATH = "/history" as const;
+/** Hint DropdownMenu: posiciones abiertas / órdenes. */
+export const LIBRO_OPERACIONES_HINT = "Posiciones y órdenes" as const;
+/** Hint DropdownMenu: ledger contable + fills. */
+export const LIBRO_HISTORIAL_HINT = "Ledger y fills" as const;
+
+/**
+ * Piezas del menú Libro (testable; misma forma que items de DropdownMenu).
+ * Tras Confirmar en el bucle diario; antes del separador de herramientas.
+ */
+export const LIBRO_NAV = {
+  label: LIBRO_LABEL,
+  items: [
+    {
+      label: LIBRO_OPERACIONES_LABEL,
+      href: LIBRO_OPERACIONES_PATH,
+      hint: LIBRO_OPERACIONES_HINT,
+    },
+    {
+      label: LIBRO_HISTORIAL_LABEL,
+      href: LIBRO_HISTORIAL_PATH,
+      hint: LIBRO_HISTORIAL_HINT,
+    },
+  ],
+} as const;
 
 /**
  * Hint del primer ítem del menú Asesor (`hint` existente).
@@ -33,6 +65,7 @@ export const DAILY_NAV_ORDER = [
   TRADING_NAV_LABEL,
   SEÑALES_LABEL,
   CONFIRMAR_LABEL,
+  LIBRO_LABEL,
 ] as const;
 
 export const HERRAMIENTAS_NAV_ORDER = [

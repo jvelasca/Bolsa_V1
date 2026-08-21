@@ -21,6 +21,7 @@ import {
 import {
   BarChart3,
   Bell,
+  BookMarked,
   BookOpen,
   ChevronDown,
   ChevronLeft,
@@ -59,6 +60,8 @@ import {
   ASESOR_TESIS_HINT,
   CONFIRMAR_LABEL,
   LABORATORIO_LABEL,
+  LIBRO_LABEL,
+  LIBRO_NAV,
   SEÑALES_LABEL,
   SEÑALES_PATH,
   TRADING_NAV_LABEL,
@@ -256,7 +259,7 @@ function DropdownMenu({
   );
 }
 
-/** Bucle diario (primer nivel). Señales y Confirmar se renderizan aparte (badges). */
+/** Bucle diario (primer nivel). Señales, Confirmar y Libro se renderizan aparte. */
 const DAILY_NAV = [
   { to: "/trading", label: TRADING_NAV_LABEL, icon: LineChart, end: true },
 ] as const;
@@ -267,6 +270,12 @@ const HERRAMIENTAS_NAV = [
   { to: "/alerts", label: "Alertas", icon: Bell },
   { to: "/instruments", label: "Instrumentos", icon: BookOpen },
 ] as const;
+
+const LIBRO_MENU: MenuItem[] = LIBRO_NAV.items.map((item) => ({
+  label: item.label,
+  href: item.href,
+  hint: item.hint,
+}));
 
 const BACKTESTING_MENU: MenuItem[] = [
   {
@@ -306,6 +315,9 @@ export function AppTopBar() {
   const location = useLocation();
   const isBacktestsRoute = location.pathname.startsWith("/backtests");
   const isResearchRoute = location.pathname.startsWith("/research");
+  const isLibroRoute =
+    location.pathname.startsWith("/operations") ||
+    location.pathname.startsWith("/history");
   const trading = isTradingRoute(location.pathname);
   const historyNav = useSpaHistoryNav();
 
@@ -454,6 +466,14 @@ export function AppTopBar() {
             </span>
           ) : null}
         </NavLink>
+        <DropdownMenu
+          label={LIBRO_LABEL}
+          icon={BookMarked}
+          items={LIBRO_MENU}
+          align="left"
+          navStyle
+          active={isLibroRoute}
+        />
         <div className="mx-0.5 hidden h-5 w-px bg-border md:block" />
         {HERRAMIENTAS_NAV.map(({ to, label, icon: Icon }) => (
           <NavLink

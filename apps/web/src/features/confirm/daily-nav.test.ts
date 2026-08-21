@@ -1,5 +1,5 @@
 /**
- * Tests — labels y rutas de la mesa diaria vs laboratorio (R-12 C2).
+ * Tests — labels y rutas de la mesa diaria vs laboratorio (R-12 C2 + C4).
  */
 
 import { describe, expect, it } from "vitest";
@@ -11,6 +11,14 @@ import {
   HERRAMIENTAS_NAV_ORDER,
   LABORATORIO_LABEL,
   LAB_TESIS_NAV_ORDER,
+  LIBRO_HISTORIAL_HINT,
+  LIBRO_HISTORIAL_LABEL,
+  LIBRO_HISTORIAL_PATH,
+  LIBRO_LABEL,
+  LIBRO_NAV,
+  LIBRO_OPERACIONES_HINT,
+  LIBRO_OPERACIONES_LABEL,
+  LIBRO_OPERACIONES_PATH,
   SEÑALES_LABEL,
   SEÑALES_PATH,
   TRADING_NAV_LABEL,
@@ -36,12 +44,40 @@ describe("daily-nav", () => {
     expect(CONFIRM_PATH).toBe("/confirm");
   });
 
+  it("exposes Libro dropdown to Operaciones and Historial without merging routes", () => {
+    expect(LIBRO_LABEL).toBe("Libro");
+    expect(LIBRO_OPERACIONES_LABEL).toBe("Operaciones");
+    expect(LIBRO_HISTORIAL_LABEL).toBe("Historial");
+    expect(LIBRO_OPERACIONES_PATH).toBe("/operations");
+    expect(LIBRO_HISTORIAL_PATH).toBe("/history");
+    expect(LIBRO_OPERACIONES_PATH).not.toBe(LIBRO_HISTORIAL_PATH);
+    expect(LIBRO_OPERACIONES_HINT.toLowerCase()).toMatch(/posicion/);
+    expect(LIBRO_HISTORIAL_HINT.toLowerCase()).toMatch(/ledger|fill/);
+    expect(LIBRO_NAV.label).toBe(LIBRO_LABEL);
+    expect(LIBRO_NAV.items).toEqual([
+      {
+        label: LIBRO_OPERACIONES_LABEL,
+        href: LIBRO_OPERACIONES_PATH,
+        hint: LIBRO_OPERACIONES_HINT,
+      },
+      {
+        label: LIBRO_HISTORIAL_LABEL,
+        href: LIBRO_HISTORIAL_PATH,
+        hint: LIBRO_HISTORIAL_HINT,
+      },
+    ]);
+  });
+
   it("orders daily, tools, and lab/tesis groups", () => {
     expect(DAILY_NAV_ORDER).toEqual([
       TRADING_NAV_LABEL,
       SEÑALES_LABEL,
       CONFIRMAR_LABEL,
+      LIBRO_LABEL,
     ]);
+    expect(DAILY_NAV_ORDER.indexOf(LIBRO_LABEL)).toBeGreaterThan(
+      DAILY_NAV_ORDER.indexOf(CONFIRMAR_LABEL),
+    );
     expect(HERRAMIENTAS_NAV_ORDER).toEqual([
       "Overview",
       "Cuentas",

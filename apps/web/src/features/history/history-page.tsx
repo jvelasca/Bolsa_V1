@@ -175,9 +175,12 @@ export function HistoryPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Historial</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Libro · Historial
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Ledger contable y operaciones ejecutadas de la cuenta activa.
+            Ledger y fills del Libro
+            {account ? ` · ${account.name}` : ""}.
           </p>
         </div>
         <Link to="/overview" className="text-sm text-primary hover:underline">

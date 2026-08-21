@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md` §4.
 > **Hipótesis aprobada:** `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (propietario, 2026-08-21, línea a línea).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · E1–E9. Una fase = un subagente. 0 commits sin OK.
-> **Estado:** plan **aprobado** (propietario, 2026-08-21). **C1** `5bc51ff` · **C2** `01af9ff` · **C3 en este commit** (local). Siguiente: C4. C5 no abierta.
+> **Estado:** plan **aprobado** (propietario, 2026-08-21). **C1** `5bc51ff` · **C2** `01af9ff` · **C3** `97e20ab` · **C4 en este commit**. Siguiente: C5.
 > **AsOf:** 2026-08-21 · coordinación GitHub `origin/main`.
 
 ---
@@ -105,7 +105,7 @@ Copy Estudio en mesa: «Universo en vigilancia» donde hoy diga solo jerga de me
 
 ### C3 — AUTO de cuenta no disponible (BETA)
 
-**Estado:** **hecha en este commit** (2026-08-21). C1 `5bc51ff` · C2 `01af9ff` (local; push pendiente).
+**Estado:** **hecha** `97e20ab` (2026-08-21, local; push pendiente). C1 `5bc51ff` · C2 `01af9ff`.
 
 **Disjunto de C1** (ficheros `demo-book-*` + status bar). Puede ir **en paralelo con C1** si el propietario lo pide.
 
@@ -122,9 +122,11 @@ Copy Estudio en mesa: «Universo en vigilancia» donde hoy diga solo jerga de me
 
 ### C4 — Libro en nav
 
+**Estado:** **hecha en este commit** (2026-08-21). C1 `5bc51ff` · C2 `01af9ff` · C3 `97e20ab`.
+
 Dropdown **Libro**: Operaciones (`/operations`) · Historial / ledger (`/history`). No fusionar páginas. Copy de cabecera alineado a «Libro».
 
-**Archivos:** `app-top-bar.tsx` (tras C2) · títulos `operations-page.tsx` / `history-page.tsx` · tests de labels si aplica.
+**Archivos:** `app-top-bar.tsx` (tras C2) · títulos `operations-page.tsx` / `history-page.tsx` · `daily-nav.ts` + tests.
 
 ---
 
@@ -153,4 +155,4 @@ Producto **BETA**. Tag `v1.3.0` → `b778292` intacto. Track C **no** tagea solo
 
 ## 6. Texto de paso (tras aprobar este plan)
 
-> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1** `5bc51ff` · **C2** `01af9ff` · **C3 en este commit.** Siguiente: C4 Libro. NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.
+> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1** `5bc51ff` · **C2** `01af9ff` · **C3** `97e20ab` · **C4 en este commit.** Siguiente: C5 HELP. NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.
