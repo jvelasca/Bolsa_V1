@@ -1,22 +1,27 @@
 /**
- * A1 — copy de riesgos del modo AUTO (Libro DEMO).
- * UI muestra AUTO deshabilitado; execute sigue freeze (`PAPER_D_EXECUTE` + checklist thaw).
+ * R-12 C3 — copy de mesa para AUTO de cuenta (libro operativo).
+ * AUTO no está disponible en BETA: no se presenta como modo usable.
+ * `DEMO_BOOK_AUTO_UI_ENABLED` permanece false; no thaw de execute.
  *
- * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A1
+ * No confundir con Lista AUTO del Laboratorio (`list-auto-activity-store`).
  */
 
-/** Flag de producto: no habilitar pill AUTO hasta A3 + evidencia P1–P10. */
+/** Flag de producto: no habilitar pill AUTO hasta thaw explícito. */
 export const DEMO_BOOK_AUTO_UI_ENABLED = false;
 
-export const DEMO_BOOK_AUTO_TOOLTIP =
-  "AUTO (Camino D) no disponible. Misma Alarma Estudio + Gate + Risk Engine, sin Confirm humano. Requiere evidencia + PAPER_D_EXECUTE + doble confirmación. Usa SEMI.";
+/** R-12 C3 — etiqueta trader: AUTO de cuenta no usable en BETA. */
+export const DEMO_BOOK_AUTO_UNAVAILABLE_LABEL = "No disponible (BETA)";
 
+/** R-12 C3 — tooltip de mesa. Sin jerga de ops; SEMI = firma humana. */
+export const DEMO_BOOK_AUTO_TOOLTIP =
+  "AUTO no está disponible en BETA. Usa SEMI: la app propone y tú firmas.";
+
+/** R-12 C3 — líneas cortas si el panel las muestra. Sin jerga de execute/ops. */
 export const DEMO_BOOK_AUTO_RISK_LINES = [
-  "Sin Confirm: Alarma Estudio → Risk Engine → fill DEMO.",
-  "Kill switch servidor (RISK_KILL_SWITCH) + confirmación doble en UI antes de activar.",
-  "No es Radar paper_auto ni Auto del sandbox DÍA D.",
-  "Thaw solo con checklist P1–P10 + ADR; PAPER_D_EXECUTE off por defecto.",
+  "AUTO no está disponible en BETA.",
+  "SEMI: tú firmas cada operación (Confirm).",
 ] as const;
 
+/** R-12 C3 — pie del panel Config operativa. */
 export const DEMO_BOOK_AUTO_FOOTER =
-  "SEMI = Confirm humano (F3). AUTO = prep visible, execute congelado (Camino D). Geo ordena la cola; no veta.";
+  "SEMI = Confirm humano. AUTO no disponible (BETA).";

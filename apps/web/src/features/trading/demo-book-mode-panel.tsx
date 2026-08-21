@@ -1,29 +1,21 @@
 /**
- * Controles del libro operativo de la cuenta activa: MANUAL/SEMI + N posiciones + % sizing.
- * A1–A3 — AUTO visible con riesgos; kill switch runtime; doble confirmación de armado (prep).
+ * Controles del libro operativo de la cuenta activa: MANUAL/SEMI.
+ * R-12 C3 — AUTO de cuenta no disponible en BETA (no se presenta como modo usable).
  * Título UI = nombre de la cuenta activa (no «Libro DEMO»).
  *
- * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A1–A3
+ * No confundir con Lista AUTO del Laboratorio (`list-auto-activity-store`).
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import {
-  AUTO_ARM_CONFIRM_PHRASE,
-  disarmAutoArm,
-  loadAutoArm,
-  tryArmAuto,
-  type DemoBookAutoArm,
-} from "@/features/trading/demo-book-auto-arm";
-import {
   DEMO_BOOK_AUTO_FOOTER,
-  DEMO_BOOK_AUTO_RISK_LINES,
   DEMO_BOOK_AUTO_TOOLTIP,
   DEMO_BOOK_AUTO_UI_ENABLED,
+  DEMO_BOOK_AUTO_UNAVAILABLE_LABEL,
 } from "@/features/trading/demo-book-auto-copy";
 import {
   DEMO_BOOK_MAX_OPEN_MAX,
@@ -37,10 +29,9 @@ import {
 } from "@/features/trading/demo-book-prefs";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 
-const MODE_LABEL: Record<DemoBookMode, string> = {
+const MODE_LABEL: Record<Exclude<DemoBookMode, "auto">, string> = {
   manual: "Manual",
   semi: "Semi",
-  auto: "Auto",
 };
 
 const GEO_LABEL: Record<DemoBookCountryPrefer, string> = {
@@ -60,25 +51,6 @@ export function DemoBookModePanel({ className, compact }: Props) {
   const accountTitle = account?.name?.trim() || "Sin cuenta activa";
   const qc = useQueryClient();
 
-  const [arm, setArm] = useState<DemoBookAutoArm>(() =>
-    typeof window === "undefined"
-      ? { armed: false, armedAt: null, confirmPhrase: null }
-      : loadAutoArm(),
-  );
-  const [armStep, setArmStep] = useState<0 | 1 | 2>(0);
-  const [armPhrase, setArmPhrase] = useState("");
-  const [armError, setArmError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const sync = () => setArm(loadAutoArm());
-    window.addEventListener("bolsa-demo-book-auto-arm", sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener("bolsa-demo-book-auto-arm", sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-
   const killQ = useQuery({
     queryKey: ["risk-kill-switch"],
     queryFn: () => api.getRiskKillSwitch(),
@@ -95,18 +67,6 @@ export function DemoBookModePanel({ className, compact }: Props) {
   function update(patch: Partial<DemoBookPrefs>) {
     patchDemoBookPrefs(patch);
   }
-
-  const onArmConfirm = useCallback(() => {
-    const result = tryArmAuto(armPhrase);
-    if (!result.ok) {
-      setArmError(result.error);
-      return;
-    }
-    setArm(result.arm);
-    setArmStep(0);
-    setArmPhrase("");
-    setArmError(null);
-  }, [armPhrase]);
 
   const killOn = Boolean(killQ.data?.effective);
 
@@ -127,41 +87,52 @@ export function DemoBookModePanel({ className, compact }: Props) {
         ) : null}
       </p>
       <div className="flex flex-wrap gap-1">
-        {(["manual", "semi", "auto"] as const).map((mode) => {
-          const disabled = mode === "auto" && !DEMO_BOOK_AUTO_UI_ENABLED;
+        {(["manual", "semi"] as const).map((mode) => {
           const active = prefs.mode === mode;
           return (
             <button
               key={mode}
               type="button"
-              disabled={disabled}
-              aria-disabled={disabled}
               title={
-                disabled
-                  ? DEMO_BOOK_AUTO_TOOLTIP
-                  : mode === "manual"
-                    ? "Solo avisos · sin Confirm automático"
-                    : "Propuestas → Confirm F3 → DEMO"
+                mode === "manual"
+                  ? "Solo avisos · sin Confirm automático"
+                  : "Propuestas → Confirm F3 → DEMO"
               }
-              onClick={() => {
-                if (mode === "auto" && !DEMO_BOOK_AUTO_UI_ENABLED) return;
-                update({ mode });
-              }}
+              onClick={() => update({ mode })}
               className={cn(
-                "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
                 active
                   ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
                   : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                disabled && "border-dashed",
               )}
             >
               {MODE_LABEL[mode]}
-              {disabled ? (
-                <span className="ml-1 font-normal opacity-70">· prep</span>
-              ) : null}
             </button>
           );
         })}
+        {DEMO_BOOK_AUTO_UI_ENABLED ? (
+          <button
+            type="button"
+            title={DEMO_BOOK_AUTO_TOOLTIP}
+            onClick={() => update({ mode: "auto" })}
+            className={cn(
+              "rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
+              prefs.mode === "auto"
+                ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300"
+                : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+            )}
+          >
+            Auto
+          </button>
+        ) : (
+          <span
+            className="cursor-default rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground/70"
+            data-testid="demo-book-auto-unavailable"
+            title={DEMO_BOOK_AUTO_TOOLTIP}
+          >
+            AUTO · {DEMO_BOOK_AUTO_UNAVAILABLE_LABEL}
+          </span>
+        )}
       </div>
 
       <div
@@ -182,124 +153,8 @@ export function DemoBookModePanel({ className, compact }: Props) {
         >
           {killOn ? "Kill switch ON" : "Kill switch off"}
         </button>
-        {killQ.data?.paperDExecuteEnv ? (
-          <span className="text-[10px] text-amber-700 dark:text-amber-300">
-            PAPER_D_EXECUTE=1
-          </span>
-        ) : (
-          <span className="text-[10px] text-muted-foreground">
-            PAPER_D_EXECUTE off
-          </span>
-        )}
-        {arm.armed ? (
-          <button
-            type="button"
-            className="rounded border border-amber-500/50 px-2 py-0.5 text-[10px] text-amber-800 dark:text-amber-200"
-            onClick={() => {
-              setArm(disarmAutoArm());
-              setArmStep(0);
-            }}
-            title="Desarmar prep local (no afecta servidor)"
-          >
-            Armado local · desarmar
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="rounded border border-border px-2 py-0.5 text-[10px] text-muted-foreground hover:text-foreground"
-            onClick={() => {
-              setArmStep(1);
-              setArmError(null);
-              setArmPhrase("");
-            }}
-          >
-            Armar AUTO (doble confirm)
-          </button>
-        )}
       </div>
 
-      {armStep > 0 ? (
-        <div
-          className="space-y-1.5 border border-border/70 bg-background/60 p-2"
-          data-testid="demo-book-auto-arm-dialog"
-        >
-          {armStep === 1 ? (
-            <>
-              <p className="text-[10px] text-foreground">
-                Paso 1/2 — AUTO execute sigue congelado. Esto solo registra
-                intención local (checklist P8). ¿Continuar?
-              </p>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-0.5 text-[10px]"
-                  onClick={() => setArmStep(2)}
-                >
-                  Sí, continuar
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-0.5 text-[10px] text-muted-foreground"
-                  onClick={() => setArmStep(0)}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="text-[10px] text-foreground">
-                Paso 2/2 — escribe{" "}
-                <code className="text-[10px]">{AUTO_ARM_CONFIRM_PHRASE}</code>
-              </p>
-              <input
-                value={armPhrase}
-                onChange={(e) => setArmPhrase(e.target.value)}
-                className="w-full rounded border border-border bg-background px-1.5 py-1 text-[11px] text-foreground"
-                placeholder={AUTO_ARM_CONFIRM_PHRASE}
-                aria-label="Frase de confirmación AUTO"
-              />
-              {armError ? (
-                <p className="text-[10px] text-red-600 dark:text-red-400">
-                  {armError}
-                </p>
-              ) : null}
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  className="rounded border border-emerald-500/50 px-2 py-0.5 text-[10px]"
-                  onClick={onArmConfirm}
-                >
-                  Confirmar armado
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-0.5 text-[10px] text-muted-foreground"
-                  onClick={() => setArmStep(0)}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      ) : null}
-
-      {!DEMO_BOOK_AUTO_UI_ENABLED ? (
-        <div
-          className="space-y-1 border-t border-border/60 pt-1.5 text-[10px] leading-snug text-muted-foreground"
-          data-testid="demo-book-auto-risk"
-        >
-          <p className="font-medium text-foreground/80">
-            AUTO (Camino D) — riesgos
-          </p>
-          <ul className="list-disc space-y-0.5 pl-3.5">
-            {DEMO_BOOK_AUTO_RISK_LINES.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
       <div
         className={cn("grid gap-1.5", compact ? "grid-cols-1" : "grid-cols-2")}
       >

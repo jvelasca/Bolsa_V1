@@ -1,7 +1,8 @@
 /**
  * Barra de estado Trading: cuenta Activa + operativa + métricas (izq.) · Colas/Alarmas (der.).
  *
- * Badge `OPERATIVA: Manual|Semi|Auto` = modo de la cuenta entera (no por valor).
+ * Badge `OPERATIVA: Manual|Semi` = modo de la cuenta entera (no por valor).
+ * AUTO de cuenta no está disponible en BETA (R-12 C3); no se presenta como modo armable.
  * Clic en nombre o badge → `/accounts?selected=…&tab=config&focus=operativa`.
  *
  * @see docs/engineering/estudio-process-status-ui-2026-08-06.md §6
@@ -23,15 +24,19 @@ import {
   accountTypeShortLabel,
   useActiveAccount,
 } from "@/features/accounts/use-active-account";
-import { TradingAppThreads } from "@/features/trading/trading-app-threads";
-import { TradingAlarmInboxButton } from "@/features/trading/trading-alarm-inbox-button";
-import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import {
+  DEMO_BOOK_AUTO_UI_ENABLED,
+  DEMO_BOOK_AUTO_UNAVAILABLE_LABEL,
+} from "@/features/trading/demo-book-auto-copy";
 import type { DemoBookMode } from "@/features/trading/demo-book-prefs";
+import { TradingAlarmInboxButton } from "@/features/trading/trading-alarm-inbox-button";
+import { TradingAppThreads } from "@/features/trading/trading-app-threads";
+import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 
 const OPERATIVA_MODE_LABEL: Record<DemoBookMode, string> = {
   manual: "Manual",
   semi: "Semi",
-  auto: "Auto",
+  auto: DEMO_BOOK_AUTO_UI_ENABLED ? "Auto" : DEMO_BOOK_AUTO_UNAVAILABLE_LABEL,
 };
 
 type StatusItemId = "equity" | "cash" | "marketValue" | "pnl" | "positions";
@@ -157,11 +162,9 @@ export function TradingStatusBar() {
                   to={accountsHref}
                   className={cn(
                     "shrink-0 rounded border px-1.5 py-px text-[10px] font-semibold tracking-wide hover:bg-accent",
-                    bookPrefs.mode === "auto"
-                      ? "border-amber-500/60 bg-amber-500/10 text-amber-800 dark:text-amber-200"
-                      : bookPrefs.mode === "semi"
-                        ? "border-sky-500/60 bg-sky-500/10 text-sky-800 dark:text-sky-200"
-                        : "border-border bg-muted/40 text-foreground",
+                    bookPrefs.mode === "semi"
+                      ? "border-sky-500/60 bg-sky-500/10 text-sky-800 dark:text-sky-200"
+                      : "border-border bg-muted/40 text-foreground",
                   )}
                   title={`Operativa de la cuenta: ${OPERATIVA_MODE_LABEL[bookPrefs.mode]}\nAfecta a todos los valores. Clic → cambiar en Cuentas`}
                   data-testid="status-bar-operativa-mode"
