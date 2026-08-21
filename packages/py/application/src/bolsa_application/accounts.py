@@ -583,6 +583,14 @@ class ApplyCustodyFees:
         self._obligation_repo = custody_obligation_repo
 
     async def execute(self, scope: AccountScope) -> bool:
+        """Liquida las obligaciones de custodia pendientes de la cuenta.
+
+        R-11 C1 / R-10.6: primero el PENDING más antiguo y después el periodo
+        actual. Importe sobre el ``total_equity`` **agregado** de la cuenta, pero el
+        cobro se hace siempre desde la cartera seleccionada/default
+        (``scope.portfolio``, `custody_charge_source = DEFAULT_PORTFOLIO`); no hay
+        transferencia implícita entre carteras.
+        """
         settings = scope.account.settings or settings_from_dict(None)
         pct = settings.commission.custody_annual_pct
         if pct is None or pct <= 0:
@@ -831,6 +839,12 @@ class ExecuteTrade:
         portfolio_id: str | None = None,
         idempotency_key: str,
     ) -> TradeResult:
+        """Ejecuta un trade sobre la cuenta/cartera resuelta por el scope.
+
+        R-11 C2/C3: ``idempotency_key`` obligatoria (str 16-128, sin whitespace) y
+        precisión `Decimal` íntegra hasta el borde del wire; el float solo aparece al
+        invocar repo/ledger.
+        """
         scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
         # M4: doble POST con la misma idempotency_key → una sola transacción.
         # Devuelve la transacción original (misma shape) con un summary fresco, sin duplicar.

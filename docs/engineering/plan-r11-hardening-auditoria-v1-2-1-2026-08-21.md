@@ -2,7 +2,7 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 · **AsOf:** 2026-08-21.
 > **Propósito:** plan profundo aprobado por el propietario para corregir los hallazgos vigentes de la auditoría externa sobre **v1.2.1 (2093296)**. Alcance inicial aprobado: **C1 · C2 · C3** (núcleo financiero P1+P2). C4–D2 quedan documentadas como fases posteriores pendientes de revisión del propietario.
-> **Estado:** PLAN APROBADO (2026-08-21) — nada implementado aún. Verificación inicial confirmada file:line (ver §1).
+> **Estado:** **C1–C5 CERRADAS y pusheadas a `main` (2026-08-21)** · **C6 CERRADA como documentación (ADR 026, política `DEFAULT_PORTFOLIO`)** · **D1/D2 → ver fase de documentación R-11 C6+D2 (2026-08-21)**. Ver §3 (commits por fase).
 
 ---
 
@@ -33,36 +33,39 @@
 
 ## 2. Decisiones del propietario (2026-08-21)
 
-| Ítem            | Decisión aprobada                                                                                                                                                           |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1 (R-10.6)     | **PK `id` autoincremental + `UNIQUE(account_id, period)`** con migración `006`; el job **liquida primero el PENDING más antiguo** antes de generar/cobrar el periodo nuevo. |
-| C6 (#2)         | **DEFAULT_PORTFOLIO** explícito — cobrar siempre de la cartera default/seleccionada; **solo documentar** la regla, sin cambio de comportamiento.                            |
-| Alcance inicial | **C1 + C2 + C3** (núcleo financiero P1+P2). C4–D2 se revisan después.                                                                                                       |
+| Ítem            | Decisión aprobada                                                                                                                                                                                                                                                                                                                      |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1 (R-10.6)     | **PK `id` autoincremental + `UNIQUE(account_id, period)`** con migración `006`; el job **liquida primero el PENDING más antiguo** antes de generar/cobrar el periodo nuevo.                                                                                                                                                            |
+| C6 (#2)         | **DEFAULT_PORTFOLIO** explícito — cobrar siempre de la cartera default/seleccionada; **solo documentar** la regla, sin cambio de comportamiento. ✅ **DOCUMENTADA 2026-08-21** en [`docs/adr/026-custodia-obligacion-pendiente.md`](../adr/026-custodia-obligacion-pendiente.md) (fila 3 de «Decisiones del propietario» + Historial). |
+| Alcance inicial | **C1 + C2 + C3** (núcleo financiero P1+P2). C4–D2 se revisan después.                                                                                                                                                                                                                                                                  |
 
 ---
 
 ## 3. Fases (orden, alcance exacto, batería)
 
-### Fase C1 — 🔴 R-10.6 · Custodia multi-periodo (arreglo)
+### Fase C1 — 🔴 R-10.6 · Custodia multi-periodo (arreglo) — ✅ CERRADA (`c3327c1`)
 
 - **Migración `006_custody_obligations_period`:** nueva tabla `custody_obligations` con PK `id` + `UNIQUE(account_id, period)` + `created_at`/`updated_at`; migrar filas existentes de `custody_obligation` preservando PENDING actuales (D6: sin backfill retroactivo).
 - **Modelo `tables.py` + repo** `custody_obligation_repository.py`: `list_pending_by_account`, `get_by_account_period`, `upsert(account_id, period)`.
 - **`ApplyCustodyFees` / `RunCustodyJob`:** liquidar primero el PENDING más antiguo (cobro parcial si el saldo no cubre el total); después generar/cobrar el periodo actual.
 - **Tests:** `test_custody_obligation_multi_period.py` (PENDING 2026 + 2027 coexisten sin sobrescritura; job cobra primero el más antiguo; PENDING no bloquea el proceso del periodo nuevo). Migración desde DB con filas 005 existentes.
 - **Batería:** ruff 0 · mypy ficheros tocados · pytest zona custodia (app + infra PG real) · verificar invariante Σ ledger == cash.
+- **Resultado ✅ (`c3327c1`, pusheado `main`):** tabla `custody_obligations` PK `id` autoincrement + `UNIQUE(account_id, period)` + `created_at`/`updated_at`; migración Alembic `006_custody_obligations_period` (encadena sobre `005`); reparado el `upsert` para no sobrescribir y añadidos `get_pending_by_account`/`get_by_account_period`; `ApplyCustodyFees` y `RunCustodyJob` liquidan primero el PENDING más antiguo antes del periodo nuevo.
 
-### Fase C2 — 🟠 R-10.7 · Endurecer `idempotency_key` end-to-end
+### Fase C2 — 🟠 R-10.7 · Endurecer `idempotency_key` end-to-end — ✅ CERRADA (`17a1107`)
 
 - DTOs `schemas/accounts.py` y `schemas/portfolio.py`: `str` con `min_length=16`, `max_length=128`, `strip()` y rechazo de whitespace → 422 limpio.
 - `portfolio_repository.py:execute_trade`: `idempotency_key: str` obligatorio; rechazo explícito de `""`/whitespace.
 - Tests unit + API integr (sin clave, clave vacía, clave válida 16–128, whitespace).
 - **Batería:** ruff 0 · pytest app + api-python · sin regen OpenAPI salvo decisión contrato (no propio de esta fase).
+- **Resultado ✅ (`17a1107`, pusheado `main`):** DTOs `DepositCashDto`/`WithdrawCashDto`/`TradeRequestDto` con `str_strip_whitespace=True`, `min_length=16`, `max_length=128`; repo `execute_trade` con `idempotency_key: str` obligatoria y rechazo de `""`/whitespace; guard en `ConfirmRecommendationIntent` (uuid4 fallback).
 
-### Fase C3 — 🟠 R-10.8 · Eliminar `Decimal→float→Decimal` en notional de trade
+### Fase C3 — 🟠 R-10.8 · Eliminar `Decimal→float→Decimal` en notional de trade — ✅ CERRADA (`cda26e9`)
 
 - `accounts.py:796` y `cash_before/trade_balance/fee_balance` en `Decimal` íntegro hasta `Numeric(18,6)`; float solo en el borde del wire contract (compat frontend, sin cambio de schema).
 - Tests de precisión con >6 decimales y comparación exacta.
 - **Batería:** ruff 0 · mypy · pytest trade/fee (app + infra PG real) · invariante secuencial.
+- **Resultado ✅ (`cda26e9`, pusheado `main`):** precisión Decimal end-to-end en `ExecuteTrade.execute` (`notional`/`cash_before`/`amount`/`trade_balance`/`fee_balance` en `Decimal`, `float` solo en el borde al invocar repo/ledger); invariante secuencial exacta.
 
 ---
 
@@ -75,6 +78,8 @@
 | C6   | Documentar `custody_charge_source = DEFAULT_PORTFOLIO` (Decisión del propietario)                        | —                     |
 | D1   | Limpieza transversal `pending-delete` que cumpla criterio E8 (sin tocar RIESGO ALTO)                     | Previa revisión       |
 | D2   | Docstrings + actualización `PROJECT_STATE`/backlog/index/ADR/CHANGELOG                                   | Post C1–C5            |
+
+> **ESTADO (2026-08-21):** **C4 ✅ CERRADA** (`157bb45`) — `contract:check` EXIT 0 (Opción A): regen acotada de `apps/web/api/openapi.json` (`idempotencyKey` con `minLength/maxLength` R-11 C2 · `TaxProfileDto` con `minimum:0.0` R-10 F1); `schema.d.ts` sin cambio; el 409 sigue solo en runtime (handler global), no en OpenAPI (decisión C4 Opción A). · **C5 ✅ CERRADA** (`6762614`) — mypy == 0 en gate CI: añadida `packages/py/application/src` al step Mypy de `.github/workflows/python-ci.yml`; limpiados **105 errores en 33 ficheros** de la capa application; semántica mínima en `ledger_repository` (`limit: int|None=50`), `market_indices`, `fetch_core_r_pnl_extra_rows` (guard numérico), `scans.py` (fix de `TypeError` latente: `expected_last_daily_bar()` se invocaba sin el `exchange` obligatorio; ahora por instrumento). · **C6 ✅ DOCUMENTADA 2026-08-21** en ADR 026 (política `DEFAULT_PORTFOLIO`; solo documenta la regla, sin cambio de comportamiento). · **D2 en curso (2026-08-21):** fase de documentación C6+D2 (docstrings + estado documental) — este plan, backlog §0/§6, PROJECT_STATE, engineering-index y CHANGELOG (sección `## R-11 hardening post-v1.2.1 — 2026-08-21`, sin tag) se actualizan aquí. · **D1** pendiente (limpieza `pending-delete`, requiere revisión previa).
 
 **Aparcado (freeze/decisión, NO en este ciclo):** puente legacy↔nuevo (V2/ADR) · auditoría de caos financiero (propuesta tras C1–C5) · scheduler-vs-worker (R-8C.2) · gobernanza IA · semver real de packages.
 
