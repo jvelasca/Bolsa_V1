@@ -1,10 +1,12 @@
 """R-10 F4a — custodia parcial silenciosa corregida (ADR 026, Opción B).
 
-Semántica nueva de ``ApplyCustodyFees``:
+Semántica nueva (multi-periodo, R-11 C1 / R-10.6) de ``ApplyCustodyFees``:
 - ``cash >= fee`` → cobro completo (``deduct_cash(allow_partial=False)`` +
   ``append_custody_fee(amount=fee)``) y obligación ``APPLIED``/``outstanding=0``.
 - ``cash < fee`` → NO se descuenta, NO se escribe ledger, y la obligación queda
   ``PENDING`` con ``outstanding = fee - cash`` (sin perder el saldo pendiente).
+- Obligación MULTI-periodo (``UNIQUE(account_id, period)``): un PENDING de un año
+  anterior pervive aunque se genere/cobre el periodo actual.
 - Repetición del mismo periodo no duplica (guard duradero) y dos intentos
   concurrentes no duplican (UNIQUE → ``return False``).
 
@@ -27,19 +29,28 @@ from bolsa_domain.account_settings import settings_from_dict
 
 
 class _FakeObligationRepo:
-    """Fake del repo dedicado de obligación de custodia."""
+    """Fake del repo dedicado de obligación de custodia (multi-periodo)."""
 
     def __init__(self) -> None:
         self.upserted: list[dict] = []
-        self.row: dict | None = None
+        self.rows: dict[str, dict] = {}
 
     async def get_by_account(self, account_id: str):  # noqa: ARG001
-        return self.row
+        return sorted(
+            (dict(r) for r in self.rows.values()), key=lambda r: r["period"]
+        )
+
+    async def get_pending_by_account(self, account_id: str):  # noqa: ARG001
+        return [
+            dict(r)
+            for r in sorted(self.rows.values(), key=lambda r: r["period"])
+            if r["status"] == "PENDING"
+        ]
 
     async def upsert(self, **kwargs) -> dict:
         self.upserted.append(kwargs)
-        self.row = dict(kwargs)
-        return self.row
+        self.rows[kwargs["period"]] = dict(kwargs)
+        return self.rows[kwargs["period"]]
 
 
 class _FakeLedger:

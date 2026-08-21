@@ -99,10 +99,13 @@ class CashMovementResult:
 
 @dataclass(frozen=True, slots=True)
 class CustodyObligation:
-    """Obligación de custodia pendiente/aplicada de una cuenta (ADR 026, F4a).
+    """Obligaciones de custodia pendiente/aplicada de una cuenta, MULTI-periodo.
 
-    Una fila por cuenta (PK ``account_id``): el ``period`` en curso se sobrescribe en
-    cada ciclo anual re-cobrable. ``status`` solo ``PENDING`` | ``APPLIED``.
+    Representa UNA obligación por (cuenta, año): ``UNIQUE(account_id, period)``.
+    Un PENDING de un año anterior (p. ej. 2026) pervive aunque se genere el cargo de
+    2027 — no se sobrescribe. ``status`` solo ``PENDING`` | ``APPLIED``; ``outstanding``
+    = importe pendiente; ``total_fee`` = importe total original. ``id`` (PK) y
+    ``created_at``/``updated_at`` son opcionales (ausentes en flujos de solo lectura).
     """
 
     account_id: str
@@ -110,3 +113,6 @@ class CustodyObligation:
     status: str
     outstanding: float
     total_fee: float
+    id: int | None = None
+    created_at: object | None = None
+    updated_at: object | None = None

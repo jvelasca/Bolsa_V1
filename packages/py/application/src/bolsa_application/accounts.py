@@ -551,7 +551,8 @@ class WithdrawCashFromAccount:
 
 
 class ApplyCustodyFees:
-    """Aplica Custody Fees."""
+    """Aplica Custody Fees (R-11 C1 / R-10.6) — multi-periodo."""
+
     CUSTODY_INTERVAL_DAYS = 365
 
     def __init__(
@@ -575,7 +576,7 @@ class ApplyCustodyFees:
         now = datetime.now(UTC)
         period = now.strftime("%Y")
 
-        # Dedup duradero vía ledger: si ya se cobró este periodo, no repetir.
+        # Dedup duradero vía ledger: si ya se cobró ESTE periodo, no repetir.
         # (Consulta previa al claim: serializa la ventana concurrente abajo; este
         # guard se apoya en la fila ya persistida y sobrevive a reinicios.)
         last = await self._ledger_repo.last_custody_charge_at(scope.account.id)
@@ -585,7 +586,7 @@ class ApplyCustodyFees:
                 return False
 
         # Mutex atómico (SET NX) por cuenta+periodo: evita el doble cargo cuando
-        # dos GET (summary/tax) entran a la vez y ambas superan el guard de arriba.
+        # dos entradas superan el guard de arriba a la vez.
         claimed = await claim_custody_charge(scope.account.id, period)
         if not claimed:
             return False
@@ -613,19 +614,62 @@ class ApplyCustodyFees:
                 await release_custody_charge(scope.account.id, period)
                 return False
 
-            # R-9.3/P1: la carrera de custodia la gana el UNIQUE
-            # ``(account_id, reference_type='custody', reference_id='custody-YYYY',
-            # type='fee')`` en el flush de ``append_custody_fee``. Tratamos esa
-            # colisión como idempotente (ya se cobró): el SAVEPOINT revierte solo el
-            # intento del perdedor y devolvemos False en vez de propagar un 500.
             session = getattr(self._ledger_repo, "session", None)
+
+            # 1) Liquidar primero los PENDING más antiguos (saldar deuda, no cobrar
+            #    periodo nuevo). Cada (deduct_cash + append_custody_fee(custody-<año>))
+            #    va junto en el mismo SAVEPOINT (invariante Σ ledger == cash). El
+            #    UNIQUE de ledger por (account, custody, custody-<año>, fee) impide
+            #    doble liquidación del mismo pendiente; este guard NO bloquea los
+            #    PENDING de años anteriores (no es el cobro del periodo actual).
+            if self._obligation_repo is not None:
+                pending_list = await self._obligation_repo.get_pending_by_account(
+                    scope.account.id
+                )
+                for pending in pending_list:
+                    pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
+                    cash = pre_summary.portfolio.cash
+                    if cash <= 0 or pending.outstanding <= 0:
+                        continue
+                    to_charge = min(pending.outstanding, cash)
+                    new_outstanding = pending.outstanding - to_charge
+                    balance_after = cash - to_charge
+                    description = (
+                        f"Custodia {pending.period} (pendiente) {pct:.2f} % · "
+                        f"patrimonio {total_equity:.2f} €"
+                    )
+                    async with _idempotent_savepoint(session):
+                        await self._portfolio_repo.deduct_cash(
+                            charge_legacy_id, to_charge, allow_partial=True
+                        )
+                        await self._ledger_repo.append_custody_fee(
+                            account_id=scope.account.id,
+                            portfolio_id=charge_portfolio_id,
+                            amount=to_charge,
+                            currency=scope.account.currency,
+                            balance_after=balance_after,
+                            reference_id=f"custody-{pending.period}",
+                            description=description,
+                        )
+                        await self._account_repo.touch_activity(scope.account.id)
+                        settled = new_outstanding <= 0
+                        await self._obligation_repo.upsert(
+                            account_id=scope.account.id,
+                            period=pending.period,
+                            status="APPLIED" if settled else "PENDING",
+                            outstanding=new_outstanding,
+                            total_fee=pending.total_fee,
+                        )
+
+            # 2) Cobro del periodo actual con el cash restante. cash >= fee → APPLIED
+            #    (cobro completo); cash < fee → PENDING con outstanding = fee - cash.
             pre_summary = await self._portfolio_repo.get_summary(charge_legacy_id)
             cash_before = pre_summary.portfolio.cash
             description = f"Custodia anual {pct:.2f} % · patrimonio {total_equity:.2f} €"
             if cash_before >= fee_amount:
-                # Cobro completo: solo con saldo suficiente se descuenta cash y se
-                # escribe el ledger (fila custody + fee). balance_after (F3) ya viene
-                # descontado · invariante Σ ledger == cash se mantiene (no cargo parcial).
+                # Cobro completo, no parcial: solo con saldo suficiente se descuenta
+                # cash y se escribe el ledger. balance_after (F3) ya viene descontado;
+                # invariante Σ ledger == cash se mantiene (no cargo parcial).
                 balance_after = cash_before - fee_amount
                 async with _idempotent_savepoint(session):
                     await self._portfolio_repo.deduct_cash(
@@ -657,8 +701,8 @@ class ApplyCustodyFees:
                 await release_custody_charge(scope.account.id, period)
                 return True
             # cash < fee: NO se descuenta, NO se escribe ledger (invariante Σ ledger ==
-            # cash intacto) y NO se marca DONE. Se registra la obligación como PENDING
-            # con el resto pendiente por cobrar para un reintento posterior (F4b/job).
+            # cash intacto) y NO se marca DONE. Se registra la obligación del periodo
+            # como PENDING con el resto pendiente por cobrar (reintento F4b/job).
             if self._obligation_repo is not None:
                 outstanding = fee_amount - cash_before
                 async with _idempotent_savepoint(session):
@@ -674,8 +718,9 @@ class ApplyCustodyFees:
             return True
         except IntegrityError as exc:
             # R-9.3/P1: el 2º request concurrente que sí ganó el claim pero chocó
-            # con el UNIQUE de custodia → ya se cobró este periodo. Liberar mutex y
-            # devolver False (idempotente). El SAVEPOINT revirtió su escritura.
+            # con el UNIQUE de custodia → ya se cobró este periodo (o, al liquidar
+            # un PENDING, ya se saldó antes). Liberar mutex y devolver False
+            # (idempotente). El SAVEPOINT revirtió su escritura.
             if is_unique_violation(exc):
                 await release_custody_charge(scope.account.id, period)
                 return False

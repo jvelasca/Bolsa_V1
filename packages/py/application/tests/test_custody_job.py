@@ -5,7 +5,9 @@ Verifica la orquestación del job sobre fakes (mismo patrón que
 activas/cerradas:
 - solo se procesan cuentas ``status == "active"`` (la cerrada no se toca),
 - agregado ``{scanned, applied_complete, pending, skipped}`` coherente,
-- idempotente ante doble invocación (no re-cobra el mismo periodo).
+- idempotente ante doble invocación (no re-cobra el mismo periodo),
+- multi-periodo (R-11 C1 / R-10.6): ``pending`` se reporta cuando queda alguna
+  obligación PENDING (no solo el periodo en curso).
 """
 
 from __future__ import annotations
@@ -91,27 +93,29 @@ class _FakeLedger:
 
 
 class _FakeObligationRepo:
-    """Obligación por cuenta (una fila por cuenta, patrón del repo dedicado)."""
+    """Obligación multi-periodo por (cuenta, periodo) — patrón del repo dedicado."""
 
     def __init__(self) -> None:
-        self.rows: dict[str, dict] = {}
+        # account_id -> lista de {period, status, outstanding, ...} ordenadas ASC.
+        self.rows: dict[str, list[dict]] = {}
         self.upserted: list[dict] = []
 
-    async def get_by_account(self, account_id: str):
-        row = self.rows.get(account_id)
-        if row is None:
-            return None
-        return SimpleNamespace(
-            account_id=account_id,
-            period=row["period"],
-            status=row["status"],
-            outstanding=row["outstanding"],
-        )
+    async def get_pending_by_account(self, account_id: str):
+        return [
+            dict(r)
+            for r in sorted(self.rows.get(account_id, []), key=lambda r: r["period"])
+            if r["status"] == "PENDING"
+        ]
 
     async def upsert(self, **kwargs) -> dict:
         self.upserted.append(kwargs)
-        self.rows[kwargs["account_id"]] = dict(kwargs)
-        return self.rows[kwargs["account_id"]]
+        account_obligations = self.rows.setdefault(kwargs["account_id"], [])
+        for idx, existing in enumerate(account_obligations):
+            if existing["period"] == kwargs["period"]:
+                account_obligations[idx] = dict(kwargs)
+                return dict(kwargs)
+        account_obligations.append(dict(kwargs))
+        return dict(kwargs)
 
 
 def _settings_with_custody(pct: float | None):
@@ -193,7 +197,7 @@ def test_job_cuenta_con_saldo_cobra_completo() -> None:
     assert result["pending"] == 0
     assert len(ledger.appended["acc-1"]) == 1
     assert portfolio_repo._cash == pytest.approx(80.0)
-    assert obligation.rows["acc-1"]["status"] == "APPLIED"
+    assert obligation.rows["acc-1"][0]["status"] == "APPLIED"
 
 
 def test_job_cuenta_con_saldo_insuficiente_queda_pending() -> None:
@@ -211,8 +215,8 @@ def test_job_cuenta_con_saldo_insuficiente_queda_pending() -> None:
     assert ledger.appended.get("acc-1") is None
     assert portfolio_repo.deduct_calls == []
     assert portfolio_repo._cash == pytest.approx(10.0)
-    assert obligation.rows["acc-1"]["status"] == "PENDING"
-    assert obligation.rows["acc-1"]["outstanding"] == pytest.approx(20.0 - 10.0)
+    assert obligation.rows["acc-1"][0]["status"] == "PENDING"
+    assert obligation.rows["acc-1"][0]["outstanding"] == pytest.approx(20.0 - 10.0)
 
 
 def test_job_cuenta_sin_custodia_skipped() -> None:

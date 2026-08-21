@@ -1385,24 +1385,36 @@ class SupervisedF3AccountStateRow(Base):
 
 
 class CustodyObligationRow(Base):
-    """ADR 026 / F4a — obligación de custodia pendiente/aplicada por cuenta.
+    """MULTI-periodo (R-11 C1 / R-10.6) — obligaciones de custodia por (cuenta, año).
 
-    Una fila por cuenta (PK ``account_id`` FK), un único periodo pendiente en curso;
-    el ``period`` se sobrescribe en cada ciclo anual re-cobrable. ``status`` solo
-    ``PENDING`` | ``APPLIED``. Nace sin backfill (forward-only, D6).
+    Fuente de verdad de la deuda de custodia. PK ``id`` autoincremental +
+    ``UNIQUE(account_id, period)``: UNA fila por (cuenta, año). Un PENDING de 2026
+    permanece representado aunque llegue 2027 (no se sobrescribe). ``status`` solo
+    ``PENDING`` | ``APPLIED``; ``outstanding`` = importe pendiente; ``total_fee`` =
+    importe total original.
+
+    La tabla obsoleta ``custody_obligation`` (005, PK ``account_id``, una fila por
+    cuenta) ya NO se usa.
     """
 
-    __tablename__ = "custody_obligation"
+    __tablename__ = "custody_obligations"
 
+    id: Mapped[int] = mapped_column("id", Integer, primary_key=True, autoincrement=True)
     account_id: Mapped[str] = mapped_column(
         "account_id",
         ForeignKey("investment_accounts.id", ondelete="CASCADE"),
-        primary_key=True,
     )
     period: Mapped[str] = mapped_column("period", String)
     status: Mapped[str] = mapped_column("status", String)
     outstanding: Mapped[Decimal] = mapped_column("outstanding", Numeric(18, 6))
     total_fee: Mapped[Decimal] = mapped_column("total_fee", Numeric(18, 6))
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
+    )
     updated_at: Mapped[datetime] = mapped_column(
         "updated_at", DateTime(timezone=True), default=lambda: datetime.now(tz=UTC)
+    )
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "period", name="uq_custody_obligations_account_period"),
     )

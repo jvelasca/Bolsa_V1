@@ -7,8 +7,10 @@ en cada ciclo; aquí se agrega ``{scanned, applied_complete, pending, skipped}``
 Idempotencia: ``ApplyCustodyFees.execute`` ya devuelve ``False`` ante colisión de
 UNIQUE/mutex (R-9 F3), si ya se cobró este periodo (guard duradero de ledger) o si
 la custodia no aplica (fee 0 / equity<=0); el job tolera ``False`` y lo agrega como
-``skipped`` — nunca error fatal. Un ``True`` cobra (obligación ``APPLIED``) o deja
-la obligación ``PENDING`` (cash<fee); se distingue por el estado persistido.
+``skipped`` — nunca error fatal. Un ``True`` cobra: la obligación/pendientes
+quedan ``APPLIED`` (saldado) o queda algún ``PENDING`` (cash<fee o histórico).
+Multi-periodo (R-11 C1 / R-10.6): se consultan las obligaciones PENDING de la
+cuenta; si queda alguna → ``pending``, si no → ``applied_complete``.
 """
 
 from __future__ import annotations
@@ -63,10 +65,12 @@ class RunCustodyJob:
                 skipped += 1
                 results.append({"accountId": account.id, "outcome": "skipped"})
                 continue
-            # True == cobrado. Distinguir APPLIED vs PENDING por la obligación persistida
-            # (PENDING solo cuando cash<fee en el periodo en curso).
-            obligation = await self._obligation_repo.get_by_account(account.id)
-            if obligation is not None and obligation.status == "PENDING":
+            # True == cobrado/saldado. Distinguir APPLIED vs PENDING por las
+            # obligaciones persistidas (multi-periodo): si queda alguna PENDING (ya sea
+            # el periodo actual con cash<fee o histórico no saldado) → pending; si no →
+            # applied_complete.
+            pendings = await self._obligation_repo.get_pending_by_account(account.id)
+            if pendings:
                 pending += 1
                 results.append({"accountId": account.id, "outcome": "pending"})
             else:

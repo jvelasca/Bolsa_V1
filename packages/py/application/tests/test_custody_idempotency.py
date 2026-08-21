@@ -71,8 +71,8 @@ class _FakeObligationRepo:
     def __init__(self) -> None:
         self.upserted: list[dict] = []
 
-    async def get_by_account(self, account_id):  # noqa: ARG001
-        return None
+    async def get_pending_by_account(self, account_id):  # noqa: ARG001
+        return []
 
     async def upsert(self, **kwargs) -> dict:
         self.upserted.append(kwargs)
