@@ -43,6 +43,9 @@ from bolsa_infrastructure.database.repositories.account_repository import (
 from bolsa_infrastructure.database.repositories.backtest_repository import (
     SqlAlchemyBacktestRepository,
 )
+from bolsa_infrastructure.database.repositories.scan_job_repository import (
+    SqlAlchemyScanJobRepository,
+)
 from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     SignalAlertSubscriptionRecord,
 )
@@ -869,7 +872,7 @@ class ExecuteScanJobHits:
     """Ejecuta Scan Job Hits."""
     def __init__(
         self,
-        scan_job_repo,
+        scan_job_repo: SqlAlchemyScanJobRepository,
         router: ExecutionRouter,
     ) -> None:
         self._jobs = scan_job_repo

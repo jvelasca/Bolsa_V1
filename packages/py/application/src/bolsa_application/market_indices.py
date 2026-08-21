@@ -98,7 +98,7 @@ class SearchMarketIndices:
     async def execute(self, query: str, *, limit: int = 12) -> SearchMarketIndicesResult:
         client = get_yahoo_finance_client()
 
-        async def search_fn(q: str, *, quotes_count: int = 10) -> list[dict]:
+        async def search_fn(q: str, *, quotes_count: int = 10) -> list[dict[str, Any]]:
             try:
                 return await client.search_quotes(q, quotes_count=quotes_count)
             except Exception as exc:
@@ -247,7 +247,7 @@ class SubscribeMarketIndex:
         }
 
         if existing_list is None:
-            detail = await self._list_repo.create(
+            detail: InstrumentListDetail | None = await self._list_repo.create(
                 name=display_name,
                 source="catalog",
                 instrument_ids=ordered_ids,
@@ -269,7 +269,8 @@ class SubscribeMarketIndex:
                 content_hash=constituents.content_hash,
                 membership_changelog=changelog,
             )
-            assert detail is not None
+
+        assert detail is not None
 
         progress = SubscribeProgress(
             total=total,

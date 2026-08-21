@@ -1,7 +1,7 @@
 """Use-cases de alertas por señal."""
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from bolsa_analytics.research.manifest import strategy_definition_from_preset
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
@@ -215,7 +215,7 @@ class EvaluateSignalAlertSubscriptions:
         if not filtered:
             return None
 
-        return filtered[0]
+        return cast(SignalEventV1, filtered[0])
 
     async def _resolve_definition(self, subscription: SignalAlertSubscriptionRecord) -> dict[str, Any]:
         if subscription.strategy_definition_id:

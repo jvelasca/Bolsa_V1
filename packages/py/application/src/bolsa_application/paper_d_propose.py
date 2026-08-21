@@ -214,8 +214,12 @@ class ProposePaperDPlan:
             )
             display = card.get("scoreDisplay100")
             combined = card.get("combinedScore")
-            meta = card.get("metadata") if isinstance(card.get("metadata"), dict) else {}
-            weights = card.get("weights") if isinstance(card.get("weights"), dict) else {}
+            meta = card.get("metadata")
+            weights = card.get("weights")
+            if not isinstance(meta, dict):
+                meta = {}
+            if not isinstance(weights, dict):
+                weights = {}
             veto = bool(weights.get("vetoNewLong"))
             confidence = meta.get("confidence")
 

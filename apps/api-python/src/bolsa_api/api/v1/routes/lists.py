@@ -226,9 +226,9 @@ async def update_list(
             instrument_ids=body.instrument_ids,
         )
     except ValueError as exc:
-        detail = str(exc)
-        status = 404 if "not found" in detail.lower() else 400
-        raise HTTPException(status_code=status, detail=detail) from exc
+        msg = str(exc)
+        status = 404 if "not found" in msg.lower() else 400
+        raise HTTPException(status_code=status, detail=msg) from exc
     return InstrumentListResponseDto(data=_to_detail_dto(detail))
 
 

@@ -55,8 +55,8 @@ def prediction_to_record(prediction: Any) -> PredictionRecord:
         model_id = prediction.model_id
         model_version = prediction.model_version
         horizon = prediction.horizon
-        value = float(prediction.value)
-        confidence = float(prediction.confidence)
+        value: float | None = float(prediction.value)
+        confidence: float | None = float(prediction.confidence)
         as_of = prediction.as_of
         created = prediction.timestamp
     else:

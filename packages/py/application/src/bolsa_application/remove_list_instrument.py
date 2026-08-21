@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any, cast
 
 from sqlalchemy import delete, func, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -54,7 +56,7 @@ class DeleteInstrument:
         result = await self._session.execute(
             delete(InstrumentRow).where(InstrumentRow.id == instrument_id),
         )
-        if result.rowcount == 0:
+        if cast(CursorResult[Any], result).rowcount == 0:
             raise ValueError("Instrumento no encontrado")
         await self._session.flush()
 

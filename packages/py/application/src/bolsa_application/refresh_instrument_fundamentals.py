@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import Any
 
 from bolsa_analytics.signals.fundamental_gate import fundamentals_need_refresh
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
@@ -29,7 +30,7 @@ class RefreshInstrumentFundamentals:
     def __init__(self, instrument_repository: InstrumentRepository) -> None:
         self._instruments = instrument_repository
 
-    async def execute(self, instrument_id: str) -> dict | None:
+    async def execute(self, instrument_id: str) -> dict[str, Any] | None:
         if not isinstance(self._instruments, SqlAlchemyInstrumentRepository):
             return await self._instruments.get_fundamentals(instrument_id)
 

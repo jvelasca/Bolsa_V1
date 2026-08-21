@@ -111,9 +111,10 @@ async def route_tracker_alarms(
 
     hit_payloads: list[dict[str, Any]]
     if hits and isinstance(hits[0], ScanHit):
-        hit_payloads = hits_as_route_payload(hits)  # type: ignore[arg-type]
+        hit_payloads = hits_as_route_payload(hits)
     else:
-        hit_payloads = list(hits)  # type: ignore[arg-type]
+        # Lista heterogénea: en la rama no-ScanHit solo hay dicts (payload ya serializado).
+        hit_payloads = [payload for payload in hits if isinstance(payload, dict)]
 
     try:
         return await router.execute(policy_id, hit_payloads)

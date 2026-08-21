@@ -123,10 +123,12 @@ class RunFundamentalScreener:
             elif skip is not None:
                 skipped.append(skip)
 
-        # Orden: Score_FUND display desc, luego símbolo
+        # Orden: Score_FUND display desc, luego símbolo (None/incorrecto → -1 → 1 asc).
         hits.sort(
             key=lambda h: (
-                -(h.get("scoreDisplay100") if h.get("scoreDisplay100") is not None else -1),
+                -(h["scoreDisplay100"])
+                if isinstance(h.get("scoreDisplay100"), (int, float))
+                else 1,
                 str(h.get("symbol") or ""),
             )
         )

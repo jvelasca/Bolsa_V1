@@ -40,6 +40,7 @@ jobs:
           packages/py/domain/src
           packages/py/market/src
           packages/py/infrastructure/src
+          packages/py/application/src
           apps/api-python/src
           --follow-imports=silent
 

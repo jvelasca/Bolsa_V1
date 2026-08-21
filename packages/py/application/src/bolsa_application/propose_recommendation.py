@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
@@ -12,9 +12,10 @@ from bolsa_analytics.cognitive.recommendation import (
     recommendation_from_decision_package,
 )
 from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
+from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_analytics.indicators.compute import OhlcvBar
 from bolsa_analytics.knowledge.assessment import Assessment
-from bolsa_analytics.knowledge.decision_package_ta import DecisionPackageTa
+from bolsa_analytics.knowledge.decision_package_ta import DecisionAction, DecisionPackageTa
 from bolsa_analytics.knowledge.decision_runtime import (
     DecisionRuntimeResult,
     run_decision_runtime,
@@ -42,7 +43,11 @@ from bolsa_analytics.knowledge.technical_assessment import (
     build_technical_assessment,
 )
 from bolsa_domain.entities.market_event import MarketEventCalendar
+from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
+
+# Overrides de acción que ProposeRecommendation acepta del cliente (subconjunto de DecisionAction).
+_PROPOSE_OVERRIDE_OPTIONS = frozenset({"recommend_long", "recommend_short", "wait"})
 
 
 class OhlcvBarsPort(Protocol):
@@ -68,12 +73,12 @@ class InstrumentLookupPort(Protocol):
 
 class FundamentalsPort(Protocol):
     """Puerto (interfaz) Fundamentals Port."""
-    async def get_fundamentals(self, instrument_id: str) -> dict | None: ...
+    async def get_fundamentals(self, instrument_id: str) -> dict[str, Any] | None: ...
 
 
 class MacroSnapshotPort(Protocol):
     """Puerto (interfaz) Macro Snapshot Port."""
-    async def get_macro(self) -> dict | None: ...
+    async def get_macro(self) -> dict[str, Any] | None: ...
 
 
 class EdgeReportLookupPort(Protocol):
@@ -175,9 +180,9 @@ class ProposeRecommendationFromTa:
         feature_set_id: str = "fset_core_v1",
         profile_snapshot_ref: str | None = None,
         policy_version: str | None = None,
-        fundamental: FundamentalInputs | dict | None = None,
+        fundamental: FundamentalInputs | dict[str, Any] | None = None,
         include_fundamentals: bool = True,
-        macro: MacroInputs | dict | None = None,
+        macro: MacroInputs | dict[str, Any] | None = None,
         include_macro: bool = True,
         include_evidence: bool = True,
         include_news: bool = True,
@@ -226,7 +231,7 @@ class ProposeRecommendationFromTa:
         last_close = float(ohlcv_bars[-1].close)
 
         snap = materialize_feature_snapshot(
-            self._feature_port,
+            cast(OnlineFeatureAdapter, self._feature_port),
             instrument_id=instrument_id,
             bars=ohlcv_bars,
             feature_set_id=feature_set_id,
@@ -239,7 +244,7 @@ class ProposeRecommendationFromTa:
         bag: list[Any] = [assessment]
 
         fund_assess: FundamentalAssessment | None = None
-        fund_in: FundamentalInputs | dict | None = fundamental
+        fund_in: FundamentalInputs | dict[str, Any] | None = fundamental
         if fund_in is None and include_fundamentals and self._fundamentals is not None:
             raw = await self._fundamentals.get_fundamentals(instrument_id)
             from bolsa_analytics.signals.fundamental_gate import (
@@ -255,7 +260,9 @@ class ProposeRecommendationFromTa:
                             RefreshInstrumentFundamentals,
                         )
 
-                        refreshed = await RefreshInstrumentFundamentals(self._instruments).execute(
+                        refreshed = await RefreshInstrumentFundamentals(
+                            cast(InstrumentRepository, self._instruments)
+                        ).execute(
                             instrument_id
                         )
                         if refreshed:
@@ -290,7 +297,7 @@ class ProposeRecommendationFromTa:
                 bag.append(fund_assess)
 
         macro_assess: MacroAssessment | None = None
-        macro_in: MacroInputs | dict | None = macro
+        macro_in: MacroInputs | dict[str, Any] | None = macro
         if macro_in is None and include_macro and self._macro_port is not None:
             raw_m = await self._macro_port.get_macro()
             if raw_m:
@@ -338,9 +345,9 @@ class ProposeRecommendationFromTa:
             if news_assess.event_count > 0:
                 bag.append(news_assess)
 
-        override = None
-        if action_override in {"recommend_long", "recommend_short", "wait"}:
-            override = action_override  # type: ignore[assignment]
+        override: DecisionAction | None = None
+        if action_override in _PROPOSE_OVERRIDE_OPTIONS:
+            override = cast(DecisionAction, action_override)
 
         hz = horizon if horizon in {"intraday", "swing", "position", "long_term"} else "swing"
         regime = "neutral"

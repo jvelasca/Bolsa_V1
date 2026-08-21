@@ -21,12 +21,13 @@ class GetMarketStatus:
         self._xtb_bridge_url = xtb_bridge_url
 
     async def execute(self) -> list[MarketProviderStatus]:
-        xtb_enabled = bool(self._xtb_bridge_url and self._xtb_bridge_url.strip())
+        xtb_url = self._xtb_bridge_url
+        xtb_enabled = bool(xtb_url and xtb_url.strip())
         xtb_healthy = False
         xtb_message = "XTB_BRIDGE_URL no configurada"
 
-        if xtb_enabled:
-            client = XtbBridgeClient(self._xtb_bridge_url.strip())  # type: ignore[union-attr]
+        if xtb_enabled and xtb_url is not None:
+            client = XtbBridgeClient(xtb_url.strip())
             try:
                 health = await client.check_health()
                 xtb_healthy = health.status == "ok"
@@ -35,7 +36,7 @@ class GetMarketStatus:
                 )
             except Exception as exc:
                 xtb_healthy = False
-                xtb_message = format_xtb_bridge_connect_error(self._xtb_bridge_url.strip(), exc)
+                xtb_message = format_xtb_bridge_connect_error(xtb_url.strip(), exc)
 
         return [
             MarketProviderStatus(

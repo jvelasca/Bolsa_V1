@@ -1,7 +1,7 @@
 """Use-case RunScan y modelos de resultado."""
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
@@ -234,8 +234,6 @@ class RunScan:
             fundamentals_refreshed_count = refresh_result.refreshed_count
 
         expected_last_bar_iso: str | None = None
-        if hybrid_mode and tf == TimeFrame.D1:
-            expected_last_bar_iso = expected_last_daily_bar().isoformat()
 
         for instrument_id in instrument_ids:
             instrument = await self._instruments.get_by_id(instrument_id)
@@ -306,8 +304,8 @@ class RunScan:
                     specs_for_ctx = indicator_specs
 
                     def build_context(
-                        _bars: list = bars_for_ctx,
-                        _specs: list = specs_for_ctx,
+                        _bars: list[OhlcvBar] = bars_for_ctx,
+                        _specs: list[dict[str, Any]] = specs_for_ctx,
                     ) -> dict[str, list[float | None]]:
                         return build_indicator_context(_bars, _specs)
 
@@ -353,6 +351,11 @@ class RunScan:
                             per_instrument_definition,
                         )
                     last_sync = await self._instruments.get_last_sync_detail(instrument_id)
+                    if hybrid_mode and tf == TimeFrame.D1:
+                        expected_last_bar_iso = expected_last_daily_bar(
+                            exchange=instrument.exchange,
+                            country=instrument.country,
+                        ).isoformat()
                     data_quality_context = DataQualityScanContext(
                         bar_count=len(bars),
                         last_bar_timestamp=bars[-1].timestamp,
@@ -473,7 +476,7 @@ class RunScan:
         *,
         strategy_definition_id: str | None,
         definition: dict[str, Any] | None,
-        preset_key: Literal["sma_crossover", "rsi_mean_reversion"] | None,
+        preset_key: str | None,
         timeframe: str,
     ) -> tuple[dict[str, Any], str | None]:
         if strategy_definition_id:

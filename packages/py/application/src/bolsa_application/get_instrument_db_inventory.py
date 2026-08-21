@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -69,7 +70,7 @@ class InstrumentRecordInventory:
     created_at: str
     updated_at: str
     profile_fetched_at: str | None
-    last_xtb_validation: dict | None = None
+    last_xtb_validation: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,7 +188,7 @@ class GetInstrumentDbInventory:
         ]
 
     async def _app_data_counts(self, instrument_id: str) -> AppDataInventory:
-        async def count(model, column) -> int:
+        async def count(model: type[Any], column: Any) -> int:
             stmt = select(func.count()).select_from(model).where(column == instrument_id)
             result = await self._session.execute(stmt)
             return int(result.scalar_one())

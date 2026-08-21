@@ -108,10 +108,18 @@ def build_evidence_summary(
 ) -> dict[str, Any]:
     blocks = trial.blocks if isinstance(trial.blocks, dict) else {}
     metrics = trial.is_metrics if isinstance(trial.is_metrics, dict) else {}
-    edge = blocks.get("edgeReport") if isinstance(blocks.get("edgeReport"), dict) else {}
-    lab = blocks.get("labEvidence") if isinstance(blocks.get("labEvidence"), dict) else {}
-    wf = blocks.get("walkForward") if isinstance(blocks.get("walkForward"), dict) else {}
-    cpcv = blocks.get("cpcv") if isinstance(blocks.get("cpcv"), dict) else {}
+    edge = blocks.get("edgeReport")
+    lab = blocks.get("labEvidence")
+    wf = blocks.get("walkForward")
+    cpcv = blocks.get("cpcv")
+    if not isinstance(edge, dict):
+        edge = {}
+    if not isinstance(lab, dict):
+        lab = {}
+    if not isinstance(wf, dict):
+        wf = {}
+    if not isinstance(cpcv, dict):
+        cpcv = {}
     wfe = (
         lab.get("walkForwardEfficiency")
         or wf.get("walkForwardEfficiency")
@@ -146,7 +154,9 @@ def build_evidence_draft_from_trial(trial: ResearchTrial) -> dict[str, Any] | No
     has_metrics = bool(trial.is_metrics)
     level, source = classify_evidence_from_blocks(trial.blocks, has_is_metrics=has_metrics)
     blocks = trial.blocks if isinstance(trial.blocks, dict) else {}
-    edge = blocks.get("edgeReport") if isinstance(blocks.get("edgeReport"), dict) else {}
+    edge = blocks.get("edgeReport")
+    if not isinstance(edge, dict):
+        edge = {}
     edge_id = edge.get("persistedEdgeReportId") or edge.get("edgeReportId")
     if isinstance(edge_id, str) and not edge_id:
         edge_id = None
@@ -199,13 +209,23 @@ def build_evidence_draft_from_dia_d_session(payload: dict[str, Any]) -> dict[str
     instrument_id = str(payload.get("instrumentId") or payload.get("instrument_id") or "").strip()
     if not instrument_id:
         return None
-    evidence = payload.get("evidence") if isinstance(payload.get("evidence"), dict) else {}
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        evidence = {}
     band = str(evidence.get("band") or payload.get("band") or "")
     level = classify_dia_d_session_level(band)
-    paragraphs = evidence.get("paragraphs") if isinstance(evidence.get("paragraphs"), list) else []
-    claims = evidence.get("claims") if isinstance(evidence.get("claims"), list) else []
-    warnings = evidence.get("warnings") if isinstance(evidence.get("warnings"), list) else []
-    metrics = evidence.get("metrics") if isinstance(evidence.get("metrics"), dict) else {}
+    paragraphs = evidence.get("paragraphs")
+    claims = evidence.get("claims")
+    warnings = evidence.get("warnings")
+    metrics = evidence.get("metrics")
+    if not isinstance(paragraphs, list):
+        paragraphs = []
+    if not isinstance(claims, list):
+        claims = []
+    if not isinstance(warnings, list):
+        warnings = []
+    if not isinstance(metrics, dict):
+        metrics = {}
     summary: dict[str, Any] = {
         "kind": "dia_d_session",
         "schemaVersion": evidence.get("schemaVersion") or "dia_d_session_evidence_v1",

@@ -206,7 +206,7 @@ class RunAndSaveBacktest:
 
         run_id = new_id()
         strategy_payload = saved_strategy.definition if saved_strategy else None
-        equity_curve_payload = [
+        equity_curve_payload: list[dict[str, float | str]] = [
             {"timestamp": point.timestamp, "equity": round(point.equity, 2)}
             for point in result.equity_curve
         ]

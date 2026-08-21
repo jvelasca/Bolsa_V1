@@ -101,11 +101,13 @@ def decision_session_to_record(session: Any) -> DecisionSessionRecord:
     """Convierte DecisionSession (analytics) → DecisionSessionRecord (domain)."""
     payload = session.to_dict() if hasattr(session, "to_dict") else dict(session)
     return DecisionSessionRecord(
-        id=payload.get("sessionId") or getattr(session, "session_id", ""),
-        kind=payload.get("kind") or getattr(session, "kind", "propose"),
-        status=payload.get("status") or getattr(session, "status", "open"),
-        instrument_id=payload.get("instrumentId") or getattr(session, "instrument_id", ""),
-        created_at=payload.get("createdAt") or getattr(session, "created_at", ""),
+        id=str(payload.get("sessionId") or getattr(session, "session_id", "")),
+        kind=str(payload.get("kind") or getattr(session, "kind", "propose")),
+        status=str(payload.get("status") or getattr(session, "status", "open")),
+        instrument_id=str(
+            payload.get("instrumentId") or getattr(session, "instrument_id", "")
+        ),
+        created_at=str(payload.get("createdAt") or getattr(session, "created_at", "")),
         account_id=payload.get("accountId") or getattr(session, "account_id", None),
         symbol=payload.get("symbol") or getattr(session, "symbol", None),
         recommendation_id=payload.get("recommendationId")

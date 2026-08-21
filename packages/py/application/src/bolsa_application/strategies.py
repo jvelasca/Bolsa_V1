@@ -43,7 +43,7 @@ class CreateStrategyFromPreset:
         definition = strategy_definition_from_preset(
             preset_key,
             instrument_ids=[],
-            timeframe=timeframe,  # type: ignore[arg-type]
+            timeframe=timeframe,
             commission_bps=commission_bps,
             slippage_bps=slippage_bps,
         )

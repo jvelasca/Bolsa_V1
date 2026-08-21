@@ -108,10 +108,11 @@ async def fetch_core_r_pnl_extra_rows(
                     instrument_id,
                 )
                 continue
-            return_pct = account_return_pct(
-                float(live["initialDeposit"]),
-                float(live["totalEquity"]),
-            )
+            deposit_raw = live["initialDeposit"]
+            equity_raw = live["totalEquity"]
+            if not isinstance(deposit_raw, (int, float)) or not isinstance(equity_raw, (int, float)):
+                continue
+            return_pct = account_return_pct(float(deposit_raw), float(equity_raw))
             if return_pct is None:
                 continue
             symbol = (top.symbol or instrument_id[:8]).strip() or instrument_id[:8]

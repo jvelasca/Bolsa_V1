@@ -1,5 +1,7 @@
 """Puente paper / broker D (gated)."""
 
+from typing import Any
+
 from bolsa_application.paper_lab_evidence import (
     LAB_EVIDENCE_SETTINGS_KEY,
     lab_evidence_snapshot_from_blocks,
@@ -40,7 +42,7 @@ class DeployStrategyToPaperAccount:
         initial_deposit: float | None = None,
         source_backtest_run_id: str | None = None,
         account_name: str | None = None,
-        lab_evidence_hint: dict | None = None,
+        lab_evidence_hint: dict[str, Any] | None = None,
     ) -> InvestmentAccount:
         strategy = await self._strategy_repo.get_definition(strategy_definition_id)
         if strategy is None:
@@ -99,7 +101,7 @@ class DeployStrategyToPaperAccount:
     async def _resolve_lab_evidence_from_ledger(
         self,
         source_backtest_run_id: str | None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         if not source_backtest_run_id or self._trial_repo is None:
             return lab_evidence_snapshot_from_blocks(
                 None,

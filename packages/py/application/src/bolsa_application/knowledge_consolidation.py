@@ -5,6 +5,7 @@ Consolidation is always explicit. Never auto-promotes from a single good trial.
 
 from __future__ import annotations
 
+import builtins
 from typing import Any, Protocol, get_args
 
 from bolsa_domain.entities.hypothesis import Hypothesis
@@ -80,7 +81,7 @@ class _KnowledgeRepo(Protocol):
 
     async def list_active_for_hypothesis(
         self, hypothesis_id: str
-    ) -> list[KnowledgeNode]: ...
+    ) -> builtins.list[KnowledgeNode]: ...
 
     async def update_stage(
         self, node_id: str, stage: str

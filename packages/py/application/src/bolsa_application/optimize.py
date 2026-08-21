@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field, replace
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from bolsa_analytics.backtest import BacktestBarInput, run_backtest
 from bolsa_analytics.optimize.cpcv import (
@@ -517,18 +517,18 @@ async def _run_in_thread_with_live_progress[T](
     async def flush_loop() -> None:
         last_done = -1
         while not stop.is_set():
-            done = int(latest["done"] or 0)
-            best = latest["best"]
+            done = cast(int, latest["done"])
+            best = cast(float | None, latest["best"])
             if done != last_done:
-                await on_progress(done, trials_total, best)  # type: ignore[arg-type]
+                await on_progress(done, trials_total, best)
                 last_done = done
             try:
                 await asyncio.wait_for(stop.wait(), timeout=poll_seconds)
             except TimeoutError:
                 pass
-        done = int(latest["done"] or 0)
+        done = cast(int, latest["done"])
         if done != last_done:
-            await on_progress(done, trials_total, latest["best"])  # type: ignore[arg-type]
+            await on_progress(done, trials_total, cast(float | None, latest["best"]))
 
     flusher = asyncio.create_task(flush_loop())
     try:

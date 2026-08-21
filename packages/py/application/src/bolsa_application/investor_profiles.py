@@ -164,7 +164,7 @@ class EnsureAccountInvestorProfile:
             )
             selected = declared.selected_policy_template_id or suggested
             profile_name = (declared.name or "").strip() or f"Perfil · {account_name}".strip()[:80]
-            profile = await CreateInvestorProfile(self._store).execute(  # type: ignore[arg-type]
+            profile = await CreateInvestorProfile(self._store).execute(
                 name=profile_name,
                 horizon=declared.horizon,
                 objectives=list(declared.objectives),

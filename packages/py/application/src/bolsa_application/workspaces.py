@@ -8,8 +8,12 @@ Ver docs/WORKSPACE_PERSISTENCE.md.
 
 from __future__ import annotations
 
+from typing import Any
+
 from bolsa_infrastructure.database.repositories.workspace_repository import (
     SqlAlchemyWorkspaceRepository,
+    WorkspaceRecord,
+    WorkspaceSummary,
 )
 
 
@@ -18,7 +22,7 @@ class ListWorkspaces:
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 
-    async def execute(self):
+    async def execute(self) -> list[WorkspaceSummary]:
         return await self._repo.list_all()
 
 
@@ -27,7 +31,7 @@ class GetWorkspace:
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 
-    async def execute(self, workspace_id: str):
+    async def execute(self, workspace_id: str) -> WorkspaceRecord | None:
         return await self._repo.get_by_id(workspace_id)
 
 
@@ -36,7 +40,7 @@ class GetDefaultWorkspace:
     def __init__(self, repo: SqlAlchemyWorkspaceRepository) -> None:
         self._repo = repo
 
-    async def execute(self):
+    async def execute(self) -> WorkspaceRecord | None:
         return await self._repo.get_default()
 
 
@@ -50,10 +54,10 @@ class CreateWorkspace:
         self,
         *,
         name: str,
-        document: dict,
-        dock_layout: dict | None = None,
+        document: dict[str, Any],
+        dock_layout: dict[str, Any] | None = None,
         is_default: bool = False,
-    ):
+    ) -> WorkspaceRecord:
         if not name.strip():
             raise ValueError("Workspace name is required")
         count = await self._repo.count()
@@ -77,10 +81,10 @@ class UpdateWorkspace:
         workspace_id: str,
         *,
         name: str | None = None,
-        document: dict | None = None,
-        dock_layout: dict | None = None,
+        document: dict[str, Any] | None = None,
+        dock_layout: dict[str, Any] | None = None,
         is_default: bool | None = None,
-    ):
+    ) -> WorkspaceRecord:
         if name is not None and not name.strip():
             raise ValueError("Workspace name is required")
         updated = await self._repo.update(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
@@ -45,7 +46,7 @@ class UpdateSyncSettings:
     def __init__(self, repo: SqlAlchemySyncSchedulerRepository) -> None:
         self._repo = repo
 
-    async def execute(self, **kwargs) -> SyncSettingsRecord:
+    async def execute(self, **kwargs: Any) -> SyncSettingsRecord:
         return await self._repo.update_settings(**kwargs)
 
 

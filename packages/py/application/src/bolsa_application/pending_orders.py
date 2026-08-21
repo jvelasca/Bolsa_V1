@@ -1,9 +1,12 @@
 """Use-cases de órdenes pendientes."""
 
+from datetime import datetime
+
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
 from bolsa_infrastructure.database.repositories.pending_order_repository import (
+    PendingOrderRecord,
     SqlAlchemyPendingOrderRepository,
 )
 
@@ -18,7 +21,7 @@ class ListPendingOrders:
         self._repo = repo
         self._account_repo = account_repo
 
-    async def execute(self, account_id: str | None = None):
+    async def execute(self, account_id: str | None = None) -> list[PendingOrderRecord]:
         scope = await self._account_repo.resolve_scope(account_id)
         return await self._repo.list_for_account(scope.account.id)
 
@@ -42,9 +45,9 @@ class CreatePendingOrder:
         order_type: str,
         quantity: float,
         limit_price: float,
-        expiry_at,
+        expiry_at: datetime | None,
         account_id: str | None = None,
-    ):
+    ) -> PendingOrderRecord:
         scope = await self._account_repo.resolve_scope(account_id)
         return await self._repo.create(
             account_id=scope.account.id,

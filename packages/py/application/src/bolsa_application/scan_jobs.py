@@ -20,7 +20,7 @@ from bolsa_application.scan_universe import (
     resolve_scan_universe_instrument_ids,
     universe_from_payload,
 )
-from bolsa_application.scans import RunScan, scan_run_result_to_dict
+from bolsa_application.scans import RunScan, ScanHit, ScanRunResult, scan_run_result_to_dict
 from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
 from bolsa_domain.platform_kernel import validate_kernel_timeframe
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
@@ -221,7 +221,9 @@ class ProcessScanJob:
         await self._maybe_finalize_parent(job.payload.get("parentJobId"))
         return ProcessScanJobResult(processed=True, job_id=job.id, status="completed")
 
-    async def _maybe_route_tracker_alarms(self, job: ScanJobRecord, hits) -> dict[str, Any] | None:
+    async def _maybe_route_tracker_alarms(
+        self, job: ScanJobRecord, hits: list[ScanHit]
+    ) -> dict[str, Any] | None:
         tracker_id = job.tracker_definition_id or (job.payload or {}).get("trackerDefinitionId")
         if not tracker_id or self._trackers is None or self._policies is None or self._router is None:
             return None
@@ -239,7 +241,7 @@ class ProcessScanJob:
         )
         return execution_route_to_dict(route) if route is not None else None
 
-    async def _run_scan_from_payload(self, payload: dict[str, Any]):
+    async def _run_scan_from_payload(self, payload: dict[str, Any]) -> ScanRunResult:
         universe = payload.get("universe") or {}
         scan_request = payload.get("scanRequest") if payload.get("jobKind") == JOB_KIND_PARENT else payload
         source = scan_request if isinstance(scan_request, dict) else payload

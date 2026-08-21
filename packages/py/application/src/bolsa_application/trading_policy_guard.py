@@ -84,7 +84,7 @@ def enforce_cognitive_policy_for_opening(
     event_calendar: MarketEventCalendar | None = None,
     auto_live: bool = False,
     edge_report: EdgeReport | None = None,
-    technical_inputs: TechnicalInputs | dict | None = None,
+    technical_inputs: TechnicalInputs | dict[str, Any] | None = None,
     sector: str | None = None,
     market_cap_usd: float | None = None,
     average_daily_volume_usd: float | None = None,

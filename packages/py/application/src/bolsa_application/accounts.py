@@ -1,22 +1,35 @@
 """Use-cases de cuentas DEMO/trading, ledger y trades."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import UTC, datetime
 
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
-from bolsa_domain.account_settings import calculate_trade_fees, settings_from_dict
+from bolsa_domain.account_settings import (
+    AccountSettings,
+    calculate_trade_fees,
+    settings_from_dict,
+)
 from bolsa_domain.entities.account import (
+    AccountScope,
     AccountSummary,
     CashMovementResult,
     InvestmentAccount,
+    InvestmentPortfolio,
     LedgerEntry,
 )
-from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
+from bolsa_domain.entities.portfolio import (
+    PortfolioSummary,
+    TradeResult,
+    Transaction,
+)
 from bolsa_domain.errors import IdempotencyKeyExists, IdempotencyKeyReused
 from bolsa_domain.tax_report import (
+    TaxReportSummary,
     TaxReportTransaction,
     build_tax_report,
     fiscal_year_range,
@@ -37,7 +50,9 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
 
 
 @asynccontextmanager
-async def _idempotent_savepoint(session):
+async def _idempotent_savepoint(
+    session: AsyncSession | None,
+) -> AsyncIterator[None]:
     """Abre un SAVEPOINT si hay una sesión real; no-op en tests con fakes.
 
     R-8A/P0-B: permite revertir SOLO el intento de escritura del perdedor de una
@@ -80,7 +95,7 @@ class CreateSimulatedAccount:
         portfolio_name: str | None = None,
         portfolio_description: str | None = None,
         strategy_tag: str | None = "core",
-        settings=None,
+        settings: AccountSettings | None = None,
         commission_preset_id: str | None = None,
     ) -> InvestmentAccount:
         scope = await self._account_repo.create_simulated_account(
@@ -105,7 +120,7 @@ class UpdateAccountSettings:
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
-    async def execute(self, account_id: str, settings) -> InvestmentAccount:
+    async def execute(self, account_id: str, settings: AccountSettings) -> InvestmentAccount:
         return await self._account_repo.update_settings(account_id, settings)
 
 
@@ -121,7 +136,7 @@ class GetAccount:
 def _account_summary_from_portfolio(
     *,
     account: InvestmentAccount,
-    default_portfolio,
+    default_portfolio: InvestmentPortfolio,
     portfolio_summary: PortfolioSummary,
 ) -> AccountSummary:
     cash = portfolio_summary.portfolio.cash
@@ -567,7 +582,7 @@ class ApplyCustodyFees:
         self._ledger_repo = ledger_repo
         self._obligation_repo = custody_obligation_repo
 
-    async def execute(self, scope) -> bool:
+    async def execute(self, scope: AccountScope) -> bool:
         settings = scope.account.settings or settings_from_dict(None)
         pct = settings.commission.custody_annual_pct
         if pct is None or pct <= 0:
@@ -945,7 +960,7 @@ class GetTaxReport:
         self._portfolio_repo = portfolio_repo
         self._ledger_repo = ledger_repo
 
-    async def execute(self, account_id: str, year: int):
+    async def execute(self, account_id: str, year: int) -> TaxReportSummary:
         # R-10 F4b: GET de solo lectura — la custodia la aplica el job periódico,
         # no se muta estado en la lectura de tax report.
         scope = await self._account_repo.resolve_scope(account_id)

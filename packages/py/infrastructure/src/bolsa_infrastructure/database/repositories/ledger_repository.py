@@ -119,7 +119,7 @@ class SqlAlchemyLedgerRepository:
         self,
         account_id: str,
         *,
-        limit: int = 50,
+        limit: int | None = 50,
         offset: int = 0,
         portfolio_id: str | None = None,
         executed_from: datetime | None = None,

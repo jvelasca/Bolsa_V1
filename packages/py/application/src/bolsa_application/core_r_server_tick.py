@@ -271,9 +271,19 @@ def apply_server_tick(
     Aplica un tick sobre un blob account state.
     Returns (new_state, meta) where meta has skipped/added/listId/reason.
     """
-    scheduler = deepcopy(state.get("scheduler") if isinstance(state.get("scheduler"), dict) else {})
-    queue = list(state.get("queue") if isinstance(state.get("queue"), list) else [])
-    reports = state.get("reports") if isinstance(state.get("reports"), dict) else {}
+    raw_scheduler = state.get("scheduler")
+    if not isinstance(raw_scheduler, dict):
+        raw_scheduler = {}
+    scheduler: dict[str, Any] = deepcopy(raw_scheduler)
+
+    raw_queue = state.get("queue")
+    if not isinstance(raw_queue, list):
+        raw_queue = []
+    queue: list[Any] = list(raw_queue)
+
+    reports = state.get("reports")
+    if not isinstance(reports, dict):
+        reports = {}
 
     meta: dict[str, Any] = {"skipped": True, "added": 0, "listId": "", "reason": "disabled"}
     if not scheduler.get("enabled") and not force:

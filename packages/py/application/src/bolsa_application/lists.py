@@ -1,7 +1,12 @@
 """Use-cases de listas / universos."""
 
 from bolsa_application.market_indices import SyncSubscribedCatalogIndices
-from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
+from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
+from bolsa_infrastructure.database.repositories.list_repository import (
+    InstrumentListDetail,
+    InstrumentListSummary,
+    SqlAlchemyListRepository,
+)
 
 # Reservado salvo la lista canónica ADR-024 (id = estudio).
 _RESERVED_ESTUDIO_NAMES = frozenset({"estudio", "en estudio"})
@@ -32,7 +37,7 @@ class ListInstrumentLists:
         self._list_repo = list_repo
         self._sync_indices = sync_indices
 
-    async def execute(self, *, sync_catalog: bool = True) -> list:
+    async def execute(self, *, sync_catalog: bool = True) -> list[InstrumentListSummary]:
         # Índices suscritos: import faltantes + membresía exacta (join/leave; no borra Instrument).
         # En hot path (TTL) se omite: ver list_lists — evita re-sync en cada GET /lists.
         if sync_catalog:
@@ -64,7 +69,7 @@ class GetInstrumentList:
     def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
         self._list_repo = list_repo
 
-    async def execute(self, list_id: str):
+    async def execute(self, list_id: str) -> InstrumentListDetail | None:
         if list_id == SqlAlchemyListRepository.ESTUDIO_LIST_ID:
             await self._list_repo.ensure_estudio_list()
         return await self._list_repo.get_by_id(list_id)
@@ -83,7 +88,7 @@ class CreateInstrumentList:
         instrument_ids: list[str] | None = None,
         source: str | None = "custom",
         kind: str | None = None,
-    ):
+    ) -> InstrumentListDetail:
         cleaned = _assert_list_name_allowed(name)
         return await self._list_repo.create(
             name=cleaned,
@@ -105,7 +110,7 @@ class UpdateInstrumentList:
         *,
         name: str | None = None,
         instrument_ids: list[str] | None = None,
-    ):
+    ) -> InstrumentListDetail:
         cleaned_name = (
             _assert_list_name_allowed(name, list_id=list_id) if name is not None else None
         )
@@ -143,7 +148,7 @@ class GetListQuotes:
     def __init__(self, list_repo: SqlAlchemyListRepository) -> None:
         self._list_repo = list_repo
 
-    async def execute(self, list_id: str):
+    async def execute(self, list_id: str) -> list[InstrumentWithMeta]:
         quotes = await self._list_repo.get_quotes_for_list(list_id)
 
         if quotes is None:
