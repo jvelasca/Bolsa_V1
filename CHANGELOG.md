@@ -19,6 +19,7 @@ Auditoría residual post-v1.3.0, higiene documental y estudio teórico del flujo
 - Copy E8 residual (`ce601c9`) + leftover CORE-R (`8dd3caf`): CTAs de firma que van a `/confirm` dejan de decir Ayuda; atajos list-hub `/screeners` = Señales (Laboratorio, no Backtesting); leftover CORE-R Proponer F3 ya en Confirmar
 - **R12-409 B1** (WT, SHA pending): declarar HTTP 409 en OpenAPI para conflictos de `idempotency_key` en deposit/withdraw/trade (`{detail: str}`); regen acotada `openapi.json` + `schema.d.ts`; runtime handler sin cambio
 - **EXEC-B-CONC** (WT, SHA pending): `ExecuteTrade` deriva `balance_after` trade/fee desde cash post-lock (`result.summary.portfolio.cash`); elimina lectura pre-lock `get_summary`; chaos refuerza invariante B estricta bajo concurrencia
+- **R12-SCHED / R-8C.2** (WT, SHA pending): scheduler = crons only; poll no-ARQ → `bolsa-queue-poll-worker`; ARQ → `bolsa-arq-worker` (queue_poll no-op); `run-dev.mjs` spawnea el proceso correcto según `SCAN_QUEUE_BACKEND`
 
 ## [1.3.0] — 2026-08-21
 

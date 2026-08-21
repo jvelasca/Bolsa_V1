@@ -21,7 +21,7 @@
 - **Relevo de chat:** al saturarse, cerrar y abrir otro pegando el `traspaso-relevo-*` + firma (HEAD GitHub, rama, árbol, tag, batería, deuda no-regresión). Riesgo de alucinación objetivo: 0 (documento manda).
 - **Higiene E8 continua:** residuos de test/dev se eliminan por path canónico; módulos/docs obsoletos se archivan o se marcan históricos; no se purga `pending-delete` de riesgo alto sin decisión.
 - **Track B APROBADO** (2026-08-21, línea a línea). Track C: plan [`engineering/plan-r12-track-c-frontend-2026-08-21.md`](./engineering/plan-r12-track-c-frontend-2026-08-21.md). **C1–C5** (`0eb8976`) + leftover CORE-R **`8dd3caf`**.
-- **Gates no auto-abiertos:** scheduler-vs-worker · split `accounts.py` · auth multiusuario · purge `pending-delete`. (**R12-409 B1** — 409 OpenAPI deposit/withdraw/trade — **HECHO en WT**, SHA pending.) (**EXEC-B-CONC** — `ExecuteTrade` `balance_after` post-lock — **HECHO en WT**, SHA pending.)
+- **Gates no auto-abiertos:** split `accounts.py` · auth multiusuario · purge `pending-delete`. (**R12-409 B1** — 409 OpenAPI deposit/withdraw/trade — **HECHO en WT**, SHA pending.) (**EXEC-B-CONC** — `ExecuteTrade` `balance_after` post-lock — **HECHO en WT**, SHA pending.) (**R12-SCHED / R-8C.2** — scheduler=crons; queue_poll|arq — **HECHO en WT**, SHA pending.)
 
 ### E1. Nada se implementa sin plan aprobado
 
@@ -61,7 +61,7 @@
 ### E7. La integridad financiera y la separación de cuentas son el objetivo inmediato
 
 - Antes de ampliar ML/IA o features nuevas se cierra el núcleo financiero determinista (R-9): idempotencia aislada por cuenta, request-fingerprint, orden de custody-commit, invariantes DB, validación estricta de DTOs.
-- **No tocar salvo decisión explícita:** gobernanza IA · workers/scheduler (R-8C.2) · `pending-delete` de riesgo alto · M-4/T-M4 (job dedicado).
+- **No tocar salvo decisión explícita:** gobernanza IA · `pending-delete` de riesgo alto. (**R-8C.2 / R12-SCHED** cerrado en WT — no reabrir layout de workers sin fase.)
 
 ### E8. Limpieza de código/doc obsoleto (criterio §4 de este archivo)
 

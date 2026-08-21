@@ -9,11 +9,11 @@ configuración), de modo que haya exactamente una instancia de cada cron.
 Ejecución:
     python -m bolsa_api.workers.scheduler_worker
 
-Este proceso NO es un worker Arq: los loops son periódicos (``while True`` +
-``sleep``) y el gate por-feature es el mismo que usaba FastAPI. Los jobs
-scan/optimize siguen siendo gestionados por el worker Arq cuando
-``SCAN_QUEUE_BACKEND=arq`` (ver ``arq_worker.py``); en el resto de backends los
-loops inline de scan/optimize viven aquí, igual que antes vivían en FastAPI.
+R12-SCHED / R-8C.2: este proceso es **solo crons periódicos**. Nunca arranca
+scan/optimize. Autoridad de colas:
+
+- ``SCAN_QUEUE_BACKEND=arq`` → ``arq_worker``
+- postgres / redis / otros backends no-ARQ → ``queue_poll_worker``
 """
 
 from __future__ import annotations
@@ -33,8 +33,6 @@ from bolsa_api.background.daily_alert_evaluator import start_daily_alert_evaluat
 from bolsa_api.background.estudio_eod_opinion_worker import start_estudio_eod_opinion_worker
 from bolsa_api.background.fa_weekly_worker import start_fa_weekly_worker
 from bolsa_api.background.index_subscribe_worker import start_index_subscribe_worker
-from bolsa_api.background.optimization_worker import start_optimization_worker
-from bolsa_api.background.scan_worker import start_scan_worker
 from bolsa_api.background.signal_alert_evaluator import start_signal_alert_evaluator
 from bolsa_api.background.tracker_schedule_worker import start_tracker_schedule_worker
 from bolsa_infrastructure.config import get_settings
@@ -59,14 +57,6 @@ def _event_loop_starters() -> list[Any]:
     ]
 
 
-def _queue_loop_starters() -> list[Any]:
-    # Scan/optimize inline: solo si el backend NO es arq (arq lo gestiona aparte).
-    settings = get_settings()
-    if settings.scan_queue_backend.lower() == "arq":
-        return []
-    return [start_scan_worker, start_optimization_worker]
-
-
 async def _run_scheduler(
     session_factory: async_sessionmaker[AsyncSession],
     engine: AsyncEngine,
@@ -76,7 +66,7 @@ async def _run_scheduler(
     # FastAPI con --workers N) mediante advisory lock, fuera del path de petición.
     await database_bootstrap(engine=engine, session_factory=session_factory)
 
-    starters = [*_event_loop_starters(), *_queue_loop_starters()]
+    starters = _event_loop_starters()
     tasks: list[asyncio.Task[None]] = []
     for starter in starters:
         task = starter(session_factory)
@@ -120,7 +110,7 @@ def run() -> None:
     else:
         loop = asyncio.new_event_loop()
 
-    logger.info("Scheduler worker iniciado")
+    logger.info("Scheduler worker iniciado (crons only; R12-SCHED)")
     try:
         with asyncio.Runner(loop_factory=lambda: loop) as runner:
             runner.run(_run_scheduler(session_factory, engine))

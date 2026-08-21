@@ -57,7 +57,7 @@ Plantilla de paso:
 | -------------------------------- | ------------------------------------------------------------------- | -------------------------------------------- |
 | 409 en OpenAPI                   | Opción B1 (deposit/withdraw/trade)                                  | ✅ **ABIERTA/HECHA B1 en WT** (SHA pending)  |
 | ExecuteTrade / invariante B      | `balance_after` desde cash **post-lock** (`summary.portfolio.cash`) | ✅ **EXEC-B-CONC HECHO en WT** (SHA pending) |
-| scheduler-vs-worker (R-8C.2)     | Una autoridad                                                       | No tocar                                     |
+| scheduler-vs-worker (R-8C.2)     | Una autoridad: crons=`scheduler`; colas=`queue_poll`\|`arq`         | ✅ **R12-SCHED HECHO en WT** (SHA pending)   |
 | Split `accounts.py` (~978 LOC)   | V2 P3                                                               | No ahora                                     |
 | Auth User→Account→Resource       | V2                                                                  | JWT congelado D4                             |
 | `TRUSTED_PROXIES` prod           | Checklist operativo                                                 | Fuera de repo                                |

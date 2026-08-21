@@ -12,6 +12,7 @@
     "startup:report": "node scripts/startup-report.mjs",
     "dev:web": "pnpm --filter @bolsa/web dev",
     "dev:arq-worker": "node scripts/dev-arq-worker.mjs",
+    "dev:queue-poll-worker": "node scripts/dev-queue-poll-worker.mjs",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test --filter=@bolsa/web",

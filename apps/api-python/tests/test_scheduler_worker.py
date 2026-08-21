@@ -1,13 +1,11 @@
-"""F3a (D3) — el scheduler worker reúne los workers programados fuera de FastAPI.
+"""F3a (D3) + R12-SCHED — scheduler worker = crons only, fuera de FastAPI.
 
 Valida que el proceso dedicado ``bolsa_api.workers.scheduler_worker`` active los
-loops periódicos y que los loops scan/optimize inline solo se activen cuando el
-backend de cola NO es ``arq`` (si es ``arq``, los gestiona ``arq_worker``).
+loops periódicos y que **nunca** embeba scan/optimize (autoridad de colas:
+``arq_worker`` o ``queue_poll_worker`` según backend).
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 from bolsa_api.background.auto_sync_worker import (  # type: ignore[import-untyped]
     start_auto_sync_worker,
@@ -61,21 +59,9 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
     assert set(starters) == expected
 
 
-def _patch_backend(monkeypatch: Any, backend: str) -> None:
-    class _Fake:
-        scan_queue_backend = backend
-
-    monkeypatch.setattr(scheduler_worker, "get_settings", lambda: _Fake())
-
-
-def test_queue_loop_starters_sin_arq_activa_scan_y_optimize(monkeypatch: Any) -> None:
-    _patch_backend(monkeypatch, "postgres")
-    assert scheduler_worker._queue_loop_starters() == [
-        start_scan_worker,
-        start_optimization_worker,
-    ]
-
-
-def test_queue_loop_starters_con_arq_estan_vacios(monkeypatch: Any) -> None:
-    _patch_backend(monkeypatch, "arq")
-    assert scheduler_worker._queue_loop_starters() == []
+def test_scheduler_no_embebe_scan_ni_optimize() -> None:
+    """R12-SCHED: el scheduler no exporta ni reúne starters de cola."""
+    starters = scheduler_worker._event_loop_starters()
+    assert start_scan_worker not in starters
+    assert start_optimization_worker not in starters
+    assert not hasattr(scheduler_worker, "_queue_loop_starters")

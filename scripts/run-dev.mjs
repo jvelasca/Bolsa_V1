@@ -376,10 +376,12 @@ const schedulerChild = spawn(
   },
 );
 children.push(schedulerChild);
-logInfo('dev', 'Scheduler worker (crons/evaluators) en proceso dedicado (D3)');
+logInfo('dev', 'Scheduler worker (crons only; R12-SCHED) en proceso dedicado (D3)');
 tee(schedulerChild.stdout, 'stdout', log);
 tee(schedulerChild.stderr, 'stderr', log);
 
+// R12-SCHED / R-8C.2: una autoridad de colas por proceso.
+// arq → arq_worker; postgres/redis/etc → queue_poll_worker (scan + optimize).
 const arqChild =
   SCAN_QUEUE_BACKEND === 'arq'
     ? spawn(python, ['-m', 'bolsa_api.workers.arq_worker'], {
@@ -394,6 +396,25 @@ if (arqChild) {
   logInfo('dev', 'Worker Arq (SCAN_QUEUE_BACKEND=arq)');
   tee(arqChild.stdout, 'stdout', log);
   tee(arqChild.stderr, 'stderr', log);
+}
+
+const queuePollChild =
+  SCAN_QUEUE_BACKEND !== 'arq'
+    ? spawn(python, ['-m', 'bolsa_api.workers.queue_poll_worker'], {
+        cwd: apiDir,
+        stdio: ['inherit', 'pipe', 'pipe'],
+        env: { ...process.env, PYTHONPATH: join(apiDir, 'src') },
+        shell: false,
+      })
+    : null;
+if (queuePollChild) {
+  children.push(queuePollChild);
+  logInfo(
+    'dev',
+    `Queue poll worker (scan/optimize; SCAN_QUEUE_BACKEND=${SCAN_QUEUE_BACKEND})`,
+  );
+  tee(queuePollChild.stdout, 'stdout', log);
+  tee(queuePollChild.stderr, 'stderr', log);
 }
 
 function shutdown(code = 0) {

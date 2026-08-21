@@ -38,6 +38,7 @@ dev = [
 bolsa-api = "bolsa_api.main:run"
 bolsa-arq-worker = "bolsa_api.workers.arq_worker:run"
 bolsa-scheduler-worker = "bolsa_api.workers.scheduler_worker:run"
+bolsa-queue-poll-worker = "bolsa_api.workers.queue_poll_worker:run"
 
 [build-system]
 requires = ["hatchling"]
