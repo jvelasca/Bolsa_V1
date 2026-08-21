@@ -12,6 +12,7 @@ from bolsa_api.api.dependencies import (
     get_list_transactions_use_case,
     get_portfolio_summary_use_case,
 )
+from bolsa_api.api.v1.idempotency_responses import IDEMPOTENCY_CONFLICT_RESPONSES
 from bolsa_api.schemas.extra_mappers import (
     to_portfolio_summary_dto,
     to_trade_response_data,
@@ -77,7 +78,11 @@ async def list_transactions(
 
 
 
-@router.post("/portfolio/trade", response_model=TradeResponseDto)
+@router.post(
+    "/portfolio/trade",
+    response_model=TradeResponseDto,
+    responses=IDEMPOTENCY_CONFLICT_RESPONSES,
+)
 
 async def execute_trade(
 

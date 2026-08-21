@@ -9134,6 +9134,17 @@ export interface operations {
                     "application/json": components["schemas"]["CashMovementResponseDto"];
                 };
             };
+            /** @description Idempotency key conflict (reused with different payload, or key exists). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -9465,6 +9476,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CashMovementResponseDto"];
+                };
+            };
+            /** @description Idempotency key conflict (reused with different payload, or key exists). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -13294,6 +13316,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TradeResponseDto"];
+                };
+            };
+            /** @description Idempotency key conflict (reused with different payload, or key exists). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail: string;
+                    };
                 };
             };
             /** @description Validation Error */

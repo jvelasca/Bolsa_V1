@@ -24,6 +24,7 @@ from bolsa_api.api.dependencies import (
     get_update_account_use_case,
     get_withdraw_cash_use_case,
 )
+from bolsa_api.api.v1.idempotency_responses import IDEMPOTENCY_CONFLICT_RESPONSES
 from bolsa_api.schemas.account_mappers import (
     settings_dto_to_domain,
     to_account_summary_dto,
@@ -374,6 +375,7 @@ async def send_daily_ops_digest_email(
     "/accounts/{account_id}/deposits",
     response_model=CashMovementResponseDto,
     status_code=201,
+    responses=IDEMPOTENCY_CONFLICT_RESPONSES,
 )
 async def deposit_cash(
     account_id: str,
@@ -396,6 +398,7 @@ async def deposit_cash(
     "/accounts/{account_id}/withdrawals",
     response_model=CashMovementResponseDto,
     status_code=201,
+    responses=IDEMPOTENCY_CONFLICT_RESPONSES,
 )
 async def withdraw_cash(
     account_id: str,

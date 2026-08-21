@@ -58,7 +58,7 @@ Todos estos commits ya están **pusheados a `main`** y cierran exactamente los P
 | 🔴 P1 custodia multi-periodo (`UNIQUE(account_id, period)`)                                                 | ✅ **CERRADO**                                           | `c3327c1` · migración `006` · `tables.py:1419` · `custody_obligation_repository.py:43-54` (order by `period.asc()`) |
 | 🔴 P1 "test roto" `test_execute_trade_con_fees_reconcilia`                                                  | ✅ **CERRADO**                                           | `deafa27` · test corregido con `idempotency_key` estable                                                            |
 | 🔴 P1 `verify_ledger_balance_chain.py` EXIT 1                                                               | ✅ **CERRADO** (EXIT 0 global)                           | `b778292` / `deafa27` · cuenta dev `acc_broken_72ab7c2aa881` eliminada por path canónico                            |
-| 🔴 P1 `contract:check` rojo                                                                                 | ✅ **EXIT 0**                                            | `157bb45` · `contract:check` verde; **pero ver §3.1**: el `409` sigue SOLO en runtime (Opción A)                    |
+| 🔴 P1 `contract:check` rojo                                                                                 | ✅ **EXIT 0**                                            | `157bb45` · C4 Opción A; **R12-409 B1 HECHO en WT** (409 declarado en OpenAPI; SHA pending)                         |
 | 🟠 P2 7 errores mypy                                                                                        | ✅ **CERRADO**                                           | `6762614` · mypy 0 gate, incluso `application/src`                                                                  |
 | 🟠 P2 `idempotency_key` vacía                                                                               | ✅ **CERRADO**                                           | `17a1107` · DTO 16–128 + strip · repo obligatoria no vacía                                                          |
 | 🟠 P2 Decimal→float→Decimal                                                                                 | ✅ **CERRADO en ExecuteTrade**                           | `cda26e9` · Decimal end-to-end; float solo en borde                                                                 |
@@ -76,14 +76,13 @@ Todos estos commits ya están **pusheados a `main`** y cierran exactamente los P
 
 Los siguientes NO fueron cerrados por R-11/v1.3.0 y son los que un plan de mejora debería atacar primero (por riesgo dinero/verdad, según la matriz de la propia auditoría).
 
-### 3.1 Contrato residual — `409 IDEMPOTENCY_KEY_REUSED` solo en runtime (P1 contractual, bajo)
+### 3.1 Contrato residual — `409 IDEMPOTENCY_KEY_REUSED` → **Opción B1 HECHA en WT** (P1 contractual, bajo)
 
-> **Estado de la decisión (2026-08-21):** analizado (Fase 3) y **dejado en Opción A (sigue solo runtime)**. Revisión: la recomendación es expuesta la Opción **B1** (declarar el `409` en los write-paths `deposit` `accounts.py:373` · `withdraw` `:395` · `trade PortfolioRepository` `portfolio.py:80` con regen acotada de openapi.json + schema.d.ts, con body propio `{detail: str}`), pero **queda aplazado** porque requiere `contract:gen`/fase de contrato pactada y no bloquea F1/F2. El FE ya muestra el `detail` del 409 vía `formatApiErrorDetail` (`apps/web/src/lib/api.ts:35`) y ningún call-site ramifica por status 409, así que B1 no rompe nada y da 0 beneficio inmediato en FE.
+> **Estado (2026-08-22):** propietario abrió gate **R12-409** y eligió **Opción B1**. Implementado en working tree (SHA pending commit): `responses` 409 con body `{detail: str}` en `deposit_cash` / `withdraw_cash` / `execute_trade`; shared `apps/api-python/src/bolsa_api/api/v1/idempotency_responses.py`; regen acotada `openapi.json` + `schema.d.ts`; `contract:check` EXIT 0. Runtime handler en `main.py` **sin cambios**.
 
-- **Estado verificado (subagente):** el 409 existe solo como handler global en `apps/api-python/src/bolsa_api/main.py:174-181` → `JSONResponse(status_code=409, ...)`. La excepción `IdempotencyKeyReused` vive en `packages/py/domain/src/bolsa_domain/errors.py:28-44`.
-- **`openapi.json` y `schema.d.ts` NO declaran el 409** (0 hits de `409`/`IDEMPOTENCY` en ambos). Deposit/withdraw solo declaran `201` y `422` (`openapi.json:16787-16807`, `17302-17322`).
-- **`contract:check`** (`apps/web/scripts/sync-contract.mjs`) **no verifica nada sobre códigos de estado**: solo regenera openapi.json desde FastAPI + schema.d.ts desde openapi.json (openapi-typescript) y compara contra el commit. Pasa verde aunque el 409 no esté declarado. Así que el contrato está "verde" por diseño (se regenera desde el runtime), pero el 409 sigue fuera del spec.
-- **Decisión pendiente (documentada):** exponer el `409` en OpenAPI o no (Opción A vs B1). **No auto-cerrar**: requiere decisión del propietario y `contract:gen`/fase pactada.
+- **Runtime (sin cambio):** handler global `apps/api-python/src/bolsa_api/main.py` → `JSONResponse(status_code=409, content={"detail": str(exc)})` para `IdempotencyKeyReused` + `IdempotencyKeyExists`.
+- **OpenAPI (B1):** las tres write-paths declaran `409` con schema `{detail: string}` required. Paths: `/api/accounts/{account_id}/deposits`, `/api/accounts/{account_id}/withdrawals`, `/api/portfolio/trade`.
+- **Gate de verificación:** `contract:gen` + `contract:check` EXIT 0 (no hay test barato aparte; el check es la batería).
 
 ### 3.2 Gaps de VERIFICACIÓN (lo que recomienda la auditoría como siguiente fase: chaos / invariantes bajo estrés) — ESTADO TRAS F1/F2 (2026-08-21)
 
