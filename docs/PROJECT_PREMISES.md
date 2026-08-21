@@ -9,8 +9,8 @@
 
 ## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-20) — leer primero en TODO trabajo
 
-> **AsOf:** 2026-08-20 · **Contexto:** cierre de **R-7** + **R-8** + **R-8B.3** en `main` (`v1.1.0`, tip `c06983d`). Proyecto todavía **NO en producción** → se permite refactorizar lo que sea preciso **manteniendo la idea del proyecto** (plataforma bursátil personal: embudo backtesting científico → IA gobernada → ejecución papel/paper, con integridad financiera y trazabilidad como valor central).
-> **Norma para el ciclo de hardening/financiero:** R-9 **CERRADA** (F1–F8, plan `docs/engineering/plan-r9-refactor-hardening-2026-08-20.md`) · **R-10 / v1.2.1 ABIERTA** — ver plan `docs/engineering/plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md` y el **backlog** (`docs/engineering/backlog-trabajo-2026-08-20.md`).
+> **AsOf:** 2026-08-21 · **Contexto:** cierre de **R-11 (hardening post-v1.2.1) → release `v1.3.0`** en `main` (tip `49ecbcd`, GitHub verificado = local). Proyecto todavía **NO en producción** → se permite refactorizar lo que sea preciso **manteniendo la idea del proyecto** (plataforma bursátil personal: embudo backtesting científico → IA gobernada → ejecución papel/paper, con integridad financiera y trazabilidad como valor central).
+> **Norma para el ciclo de hardening/financiero:** R-9 **CERRADA** · R-10/v1.2.1 **CERRADA** · R-11/v1.3.0 **CERRADA** — ver **backlog** (`docs/engineering/backlog-trabajo-2026-08-20.md`) · **ancla anti-alucinación** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` (firma de estado GitHub `main`=`49ecbcd`; la auditoría externa 2026-08-21 evaluó `75e8c23`, 14 commits atrás) · **plan abierto de refactor/corrección/melora** `docs/engineering/plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` (PROPUESTA, pendiente de aprobación E1).
 
 ### E1. Nada se implementa sin plan aprobado
 

@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Fase R-9.7 (F7) + R-10 F3 — verificación del invariante ``balance_after`` en el ledger real.
+"""Fase R-9.7 (F7) + R-10 F3 — verificación de los invariantes A + B del ledger real.
 
 Recorre ``ledger_entries`` por ``account_id`` en orden ``(executed_at, id)`` y
-comprueba el invariante **secuencial por fila** para TODO el ledger::
+comprueba, por cuenta, las invariantes **A** (cash↔ledger, M-2) y **B**
+(secuencial por fila):
+
+**Invariante B** (cadena ``balance_after``)::
 
     balance_after[n] == balance_after[n-1] + amount[n]
 
@@ -15,10 +18,23 @@ desde R-10 F3, ``ExecuteTrade`` escribe ``balance_after`` secuenciales:
 Para una fila aislada (deposit/withdrawal/fee/custody) la misma regla encadena con
 la anterior. No existe caso de grupo que comparta balance_after.
 
+**Invariante A** (M-2, conciliación cash↔ledger)::
+
+    Σ ledger_entries.amount del account == Σ portfolios.cash del account
+
+``Σ ledger`` no filtra por ``type`` (toda fila muta cash) e incluye la fila
+``deposit`` +``initial_deposit`` del seed. El cash del account es la **suma** del
+``cash`` de TODAS sus legacy portfolios (vía ``InvestmentPortfolioRow.
+legacy_portfolio_id -> PortfolioRow.cash``), no de una sola cartera. Cuentas sin
+portfolios exigen ``Σ ledger == 0``. Comparación con tolerancia ``1e-6``
+(NUMERIC(18,6)). No se hacen backfill: si una cuenta legacy no cumple A, se refleja
+el FAIL en la salida (política D6).
+
 Uso (repo root):
   uv run python scripts/verify/verify_ledger_balance_chain.py
 
-Exit 0 si todas las cuentas cumplen el invariante; exit 1 con mensaje claro si no.
+Exit 0 si todas las cuentas cumplen A y B; exit 1 con mensaje claro si alguna
+falla o si no hay conexión.
 """
 
 from __future__ import annotations
@@ -79,12 +95,38 @@ def _validate_sequential(rows: list[tuple[str, str, str, Decimal, Decimal]], acc
     return f"OK (final balance_after {prev_balance})"
 
 
+def _validate_account_cash_ledger(
+    ledger_total: Decimal, cash_total: Decimal, account_id: str
+) -> str:
+    """Valida el invariante **A** (M-2) para una cuenta: cash del account == Σ ledger.
+
+    ``ledger_total`` = Σ ``amount`` de TODAS las filas ledger del account (sin
+    filtrar por ``type``; incluye el ``deposit`` +``initial_deposit`` del seed).
+    ``cash_total`` = Σ ``PortfolioRow.cash`` de TODAS sus legacy portfolios.
+
+    Compara con tolerancia ``Decimal("1e-6")`` (NUMERIC(18,6)). Cuentas sin
+    portfolios (``cash_total == 0``) exigen ``ledger_total == 0`` dentro de la
+    tolerancia. Devuelve ``'OK ...'`` o ``'FAIL(...) ...'`` con el detalle.
+    """
+    tolerance = Decimal("1e-6")
+    if abs(ledger_total - cash_total) > tolerance:
+        return (
+            f"FAIL(cuenta {account_id}) sum_ledger {ledger_total} != "
+            f"sum_cash_portfolios {cash_total} (diff {ledger_total - cash_total})"
+        )
+    return f"OK (sum_ledger {ledger_total} == sum_cash {cash_total})"
+
+
 async def _run() -> int:
     _load_env()
     from sqlalchemy import select, text
 
     from bolsa_infrastructure.config import get_settings
-    from bolsa_infrastructure.database.models import LedgerEntryRow
+    from bolsa_infrastructure.database.models import (
+        InvestmentPortfolioRow,
+        LedgerEntryRow,
+        PortfolioRow,
+    )
     from bolsa_infrastructure.database.session import create_engine
 
     get_settings.cache_clear()
@@ -133,15 +175,42 @@ async def _run() -> int:
                 for r in res.all()
             ]
             result = _validate_sequential(rows, str(account_id))
-            print(f"  {account_id}: {result}")
+            print(f"  {account_id} [B balance_after]: {result}")
             if result.startswith("FAIL"):
+                failures += 1
+
+            # Invariante A (M-2): Σ ledger.amount == Σ portfolios.cash del account.
+            ledger_total = (
+                await conn.execute(
+                    select(LedgerEntryRow.amount).where(
+                        LedgerEntryRow.account_id == account_id
+                    )
+                )
+            ).scalars().all()
+            ledger_sum = sum(ledger_total, Decimal("0"))
+
+            cash_values = (
+                await conn.execute(
+                    select(PortfolioRow.cash)
+                    .join(
+                        InvestmentPortfolioRow,
+                        InvestmentPortfolioRow.legacy_portfolio_id == PortfolioRow.id,
+                    )
+                    .where(InvestmentPortfolioRow.account_id == account_id)
+                )
+            ).scalars().all()
+            cash_sum = sum((c for c in cash_values if c is not None), Decimal("0"))
+
+            result_a = _validate_account_cash_ledger(ledger_sum, cash_sum, str(account_id))
+            print(f"  {account_id} [A cash-ledger]: {result_a}")
+            if result_a.startswith("FAIL"):
                 failures += 1
     await engine.dispose()
 
     if failures:
-        print(f"FAIL: {failures} cuenta(s) NO cumplen el invariante balance_after")
+        print(f"FAIL: {failures} cuenta(s) NO cumplen invariantes A/B del ledger")
         return 1
-    print("OK: todas las cuentas cumplen la cadena balance_after")
+    print("OK: todas las cuentas cumplen A (cash-ledger) y B (cadena balance_after)")
     return 0
 
 
