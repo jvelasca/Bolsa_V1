@@ -2,9 +2,18 @@
 
 All notable releases of Bolsa V1.
 
+## [Unreleased] — R-12 (2026-08-21)
+
+Auditoría residual post-v1.3.0, higiene documental y estudio teórico del flujo SEMI. **No es un tag.** Plan: `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`. Producto sigue **BETA**.
+
+- Firma de estado: **GitHub `origin/main`** es la fuente de coordinación (partida R-12 `f7a86cc`); premisas esenciales del ciclo R-12
+- Alineación documental: README `v1.3.0 BETA`; tag `v1.3.0` → **`b778292`** (el tag anotado apunta al commit de cierre documental, padre `deafa27`)
+- Tests/scripts de verificación residuales (DEFAULT_PORTFOLIO, invariantes C–E, retry HTTP)
+- Inventario `pending-delete` (sin purge) + higiene E8 (residuos m7-win/M2 + archivo de relevo `-obsoleto`) + estudio UX comparativo (Track B, cero código FE)
+
 ## [1.3.0] — 2026-08-21
 
-Endurecimiento del núcleo financiero y del gate CI apuntado por la **auditoría externa sobre v1.2.1** (R-11: C1–C5, C6, D1, D2 — todas cerradas) + deuda de datos/código residual cerrada tras el cierre de R-11. Documenta la política de cargo de custodia (C6) y deja `verify_ledger_balance_chain.py` en **EXIT 0 global**. Tag: `v1.3.0` sobre `deafa27`. DEMO / paper; sin broker live.
+Endurecimiento del núcleo financiero y del gate CI apuntado por la **auditoría externa sobre v1.2.1** (R-11: C1–C5, C6, D1, D2 — todas cerradas) + deuda de datos/código residual cerrada tras el cierre de R-11. Documenta la política de cargo de custodia (C6) y deja `verify_ledger_balance_chain.py` en **EXIT 0 global**. Tag: `v1.3.0` sobre **`b778292`** (cierre documental; padre `deafa27` = fix test + verify EXIT 0). DEMO / paper; sin broker live.
 
 ### Post-R-11 (deuda §3 del traspaso, cierre de release)
 

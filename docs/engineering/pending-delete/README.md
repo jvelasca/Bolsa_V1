@@ -67,3 +67,5 @@ callers, tests o compat de persistencia. Revisar antes de borrar en frío.
 Verificación operativa: `pnpm test:fa` · `pnpm test:fa:ops` · `pnpm test:fa:boot`.
 
 Próximas UX: botón IA informativo — **hecho** ([`NEXT-IA-BUTTON.md`](./NEXT-IA-BUTTON.md)). Unificación Research→Radar: [`research-radar-unification-2026-07-31.md`](../research-radar-unification-2026-07-31.md).
+
+**R-12 A5 inventario (sin purge):** [`inventory-r12-2026-08-21.md`](./inventory-r12-2026-08-21.md). `presetRuleGroups` es API viva, no candidato de borrado.

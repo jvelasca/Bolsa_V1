@@ -92,7 +92,7 @@
 - Índice / registro: `docs/engineering/engineering-index-2026-08-03.md` §5
 - ADR 026 (custodia Opción B): `docs/adr/026-custodia-obligacion-pendiente.md`
 - Relevo R-10 previo (cierre F3+F4a → apertura F4b): `docs/engineering/traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`
-- Relevo R-10 previo (cierre F1+F2a+F2b → apertura F3, archivado `-obsoleto`): `docs/engineering/traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21-obsoleto.md`
+- Relevo R-10 previo (cierre F1+F2a+F2b → apertura F3, archivado `-obsoleto`): `docs/engineering/archive/traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21-obsoleto.md`
 - Relevo R-9 de cierre (referencia de estructura, v1.2.0): `docs/engineering/traspaso-relevo-cierre-r9-f1-f8-apertura-f9-2026-08-20.md`
 - Verificadores invariante: `scripts/verify/verify_ledger_balance_chain.py` · `verify_account_isolation.py`
 

@@ -1,16 +1,27 @@
 # Premisas de proyecto — Bolsa V1
 
-> **AsOf:** 2026-08-20  
+> **AsOf:** 2026-08-21  
 > **Qué es:** reglas de producto y de ingeniería que aplican a **todo** el monorepo.  
 > **Para quién:** equipo, auditores externos, quien retome el código.  
 > No sustituye ADRs: las ADRs deciden arquitectura; estas premisas fijan _cómo se trabaja y se documenta_.
 
 ---
 
-## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-20) — leer primero en TODO trabajo
+## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-21) — leer primero en TODO trabajo
 
-> **AsOf:** 2026-08-21 · **Contexto:** cierre de **R-11 (hardening post-v1.2.1) → release `v1.3.0`** en `main` (tip `49ecbcd`, GitHub verificado = local). Proyecto todavía **NO en producción** → se permite refactorizar lo que sea preciso **manteniendo la idea del proyecto** (plataforma bursátil personal: embudo backtesting científico → IA gobernada → ejecución papel/paper, con integridad financiera y trazabilidad como valor central).
-> **Norma para el ciclo de hardening/financiero:** R-9 **CERRADA** · R-10/v1.2.1 **CERRADA** · R-11/v1.3.0 **CERRADA** — ver **backlog** (`docs/engineering/backlog-trabajo-2026-08-20.md`) · **ancla anti-alucinación** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` (firma de estado GitHub `main`=`49ecbcd`; la auditoría externa 2026-08-21 evaluó `75e8c23`, 14 commits atrás) · **plan abierto de refactor/corrección/melora** `docs/engineering/plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` (PROPUESTA, pendiente de aprobación E1).
+> **AsOf:** 2026-08-21 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` (no un SHA de un traspaso histórico). Tag **`v1.3.0` → `b778292`** · **BETA / NO en producción**.
+> **Contexto:** R-9 · R-10/v1.2.1 · R-11/v1.3.0 **CERRADAS**. Relevo UNO+DOS del plan post-v1.3.0 **EJECUTADOS** (`f7a4ab0`, `f7a86cc`). Ciclo vivo: **R-12** (`docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`).
+> **Ancla anti-alucinación:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md`. Una auditoría externa del 2026-08-21 evaluó `75e8c23` (14 commits atrás de `49ecbcd`); una re-auditoría posterior evaluó ~`49ecbcd` y **no ve** Relevo UNO/DOS. El SHA que un agente debe usar es **`origin/main` + `PROJECT_STATE.md` / backlog §0**, no un SHA histórico incrustado en un traspaso.
+> **Idea del proyecto (invariante de producto):** embudo backtesting científico → IA gobernada (LLM propone, motor determinista decide) → confirmación humana → paper. Integridad financiera y trazabilidad son el valor central. Se puede refactorizar lo que haga falta **mientras se preserve esa idea**.
+
+### Ciclo R-12 (refuerza E1–E9; no las sustituye)
+
+- **GitHub es la fuente de coordinación.** Un cambio no existe para el equipo hasta estar en `origin/main`. Working tree local ≠ estado. Tras cada push: actualizar firma en `PROJECT_STATE.md` y backlog §0; verificar `git rev-parse origin/main`.
+- **Subagentes para todo cambio de código.** El coordinador no implementa fases enteras en un hilo saturado. Máx. ~3 subagentes en paralelo, alcances **disjuntos**.
+- **Relevo de chat:** al saturarse, cerrar y abrir otro pegando el `traspaso-relevo-*` + firma (HEAD GitHub, rama, árbol, tag, batería, deuda no-regresión). Riesgo de alucinación objetivo: 0 (documento manda).
+- **Higiene E8 continua:** residuos de test/dev se eliminan por path canónico; módulos/docs obsoletos se archivan o se marcan históricos; no se purga `pending-delete` de riesgo alto sin decisión.
+- **Track C frontend bloqueado** hasta aprobar el estudio teórico Track B línea a línea.
+- **Gates no auto-abiertos:** 409 OpenAPI · ExecuteTrade post-lock · scheduler-vs-worker · split `accounts.py` · auth multiusuario · purge `pending-delete`.
 
 ### E1. Nada se implementa sin plan aprobado
 
@@ -65,17 +76,17 @@
 
 ## 0. Índice de premisas
 
-| Premisa                                        | Documento                                                                                                                       |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **PREMISAS ESENCIALES ACTUALES (E1–E9)**       | ⭐§0-este-archivo · [plan R-9](./engineering/plan-r9-refactor-hardening-2026-08-20.md)                                          |
-| **Documentar todo** (docs + código)            | §1 de este archivo · [code-documentation-standard](./engineering/code-documentation-standard-2026-08-03.md)                     |
-| UI configurable → `localStorage`               | [UI_PREFS_LOCALSTORAGE.md](./UI_PREFS_LOCALSTORAGE.md)                                                                          |
-| Responsive (chart / trading)                   | [RESPONSIVE_PREMISES.md](./RESPONSIVE_PREMISES.md)                                                                              |
-| Cuentas DEMO vs Paper                          | [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md)                      |
-| Backtesting DÍA D                              | [backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md)                              |
-| LAB ≠ TRADING                                  | [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md) |
-| Freeze post-auditorías                         | [post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md)                              |
-| Orquestación / relevo / anti-alucinación (R-8) | §4 de este archivo · [plan R-8](./engineering/plan-r8-prevencion-riesgo-2026-08-20.md)                                          |
+| Premisa                                               | Documento                                                                                                                                               |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PREMISAS ESENCIALES ACTUALES (E1–E9 + ciclo R-12)** | ⭐§0-este-archivo · [plan R-12](./engineering/plan-r12-auditoria-ux-2026-08-21.md) · [plan R-9](./engineering/plan-r9-refactor-hardening-2026-08-20.md) |
+| **Documentar todo** (docs + código)                   | §1 de este archivo · [code-documentation-standard](./engineering/code-documentation-standard-2026-08-03.md)                                             |
+| UI configurable → `localStorage`                      | [UI_PREFS_LOCALSTORAGE.md](./UI_PREFS_LOCALSTORAGE.md)                                                                                                  |
+| Responsive (chart / trading)                          | [RESPONSIVE_PREMISES.md](./RESPONSIVE_PREMISES.md)                                                                                                      |
+| Cuentas DEMO vs Paper                                 | [account-premises-demo-vs-paper-2026-07-31.md](./engineering/account-premises-demo-vs-paper-2026-07-31.md)                                              |
+| Backtesting DÍA D                                     | [backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md)                                                      |
+| LAB ≠ TRADING                                         | [ADR-019](./adr/019-dual-universes-lab-vs-trading.md) · [diseño](./engineering/dual-universes-lab-trading-design-2026-08-02.md)                         |
+| Freeze post-auditorías                                | [post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md)                                                      |
+| Orquestación / relevo / anti-alucinación (R-8)        | §4 de este archivo · [plan R-8](./engineering/plan-r8-prevencion-riesgo-2026-08-20.md)                                                                  |
 
 Entrada auditoría: [audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md).  
 Índice ingeniería (docs): [engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md).  

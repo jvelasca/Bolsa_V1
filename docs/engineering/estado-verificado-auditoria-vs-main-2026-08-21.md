@@ -1,26 +1,28 @@
 # ESTADO VERIFICADO — Auditoría externa 2026-08-21 vs `main` (GitHub) — firma de anti-alucinación
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
-> **Propósito:** documentar la **firma de estado verificada** que resuelve la aparente contradicción entre la **auditoría externa recibida el 2026-08-21** (que evalúa el estado `75e8c23`) y el **estado REAL de `main`** (que ya es `49ecbcd`, release **v1.3.0**). Cualquier agente/chat que retome este tema **LEE ESTE DOC OBLIGATORIAMENTE antes de abrir ninguna fase**, para no "corregir" cosas que ya están corregidas (premisa E3: documento manda · anti-alucinación).
-> **Estado al redactar (verificado vía `gh api` contra el servidor real de GitHub, no solo refs locales):** GitHub `main` = `49ecbcd554687694556cfcd1f5756ff8d7216e6c` · local `main` = `49ecbcd` · árbol limpio · **no hay commits sin empujar** (`git log origin/main..HEAD` vacío).
-> **AsOf:** 2026-08-21.
+> **Propósito:** documentar la **firma de estado verificada** que resuelve la aparente contradicción entre la **auditoría externa recibida el 2026-08-21** (que evalúa el estado `75e8c23`) y el **estado REAL de `main` en GitHub**. Cualquier agente/chat que retome este tema **LEE ESTE DOC OBLIGATORIAMENTE antes de abrir ninguna fase**, para no "corregir" cosas que ya están corregidas (premisa E3: documento manda · anti-alucinación).
+> **Fuente de coordinación:** GitHub `jvelasca/Bolsa_V1` `origin/main`. SHA vivo = `git fetch && git rev-parse origin/main`. **No** usar SHAs de este doc como HEAD sin verificar.
+> **Estado al abrir R-12 (verificado):** GitHub `main` = local = **`f7a86ccce6549e704e705e272db68a0fa863c65f`**. Tag `v1.3.0` → **`b778292`**. La auditoría externa de la mañana evaluó `75e8c23` (14 commits detrás de `49ecbcd`); la re-auditoría de la tarde evaluó ~`49ecbcd` y **no incluye** Relevo UNO (`f7a4ab0`) ni DOS (`f7a86cc`).
+> **AsOf:** 2026-08-21 (actualizado R-12).
 
 ---
 
 ## 0. Firma de estado (convertida en hecho, no asunción)
 
-| Comprobación                        | Comando / medio                                | Resultado verificado                                    |
-| ----------------------------------- | ---------------------------------------------- | ------------------------------------------------------- |
-| HEAD local                          | `git rev-parse HEAD`                           | `49ecbcd554687694556cfcd1f5756ff8d7216e6c`              |
-| `origin/main` (ref local)           | `git rev-parse origin/main`                    | `49ecbcd...` (idéntico a HEAD)                          |
-| Commits sin empujar                 | `git log origin/main..HEAD`                    | **vacío** (0)                                           |
-| Actualizaciones del remoto          | `git fetch --dry-run`                          | sin cambios entrantes                                   |
-| Remotes                             | `git remote -v`                                | `https://github.com/jvelasca/Bolsa_V1.git` (fetch/push) |
-| **ESTADO REAL del servidor GitHub** | `gh api repos/jvelasca/Bolsa_V1/branches/main` | `sha = 49ecbcd...` (idéntico a local)                   |
-| Fecha del commit HEAD               | `gh api .../commits/49ecbcd...`                | `2026-08-21T13:40:41Z`                                  |
-| Relación con el punto auditado      | `gh api .../compare/75e8c23...49ecbcd`         | `ahead_by: 14 · behind_by: 0 · status: "ahead"`         |
+| Comprobación                        | Comando / medio                                | Resultado verificado                                                      |
+| ----------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------- |
+| HEAD local                          | `git rev-parse HEAD`                           | `f7a86ccce6549e704e705e272db68a0fa863c65f`                                |
+| `origin/main` (ref local)           | `git rev-parse origin/main`                    | `f7a86cc...` (idéntico a HEAD al abrir R-12)                              |
+| Tag `v1.3.0`                        | `git log -1 --oneline v1.3.0`                  | **`b778292`** (no `deafa27`)                                              |
+| Commits sin empujar                 | `git log origin/main..HEAD`                    | **vacío** (0)                                                             |
+| Actualizaciones del remoto          | `git fetch --dry-run`                          | sin cambios entrantes                                                     |
+| Remotes                             | `git remote -v`                                | `https://github.com/jvelasca/Bolsa_V1.git` (fetch/push)                   |
+| **ESTADO REAL del servidor GitHub** | `gh api repos/jvelasca/Bolsa_V1/branches/main` | al abrir R-12 = `f7a86cc...` (**no** `49ecbcd`; verificar siempre el tip) |
+| Fecha del commit HEAD               | `gh api .../commits/49ecbcd...`                | `2026-08-21T13:40:41Z`                                                    |
+| Relación con el punto auditado      | `gh api .../compare/75e8c23...49ecbcd`         | `ahead_by: 14 · behind_by: 0 · status: "ahead"`                           |
 
-**Conclusión de la firma:** **GitHub está actualizado y coincide con el repo local en `49ecbcd`.** La aparente contradicción NO es una desincronización de GitHub: es que **la auditoría externa se realizó sobre `75e8c23`, un snapshot de hace unos días, 14 commits por detrás de `main`**.
+**Conclusión de la firma:** GitHub es la fuente de coordinación. La aparente contradicción de la mañana **NO** era desincronización: la auditoría evaluó `75e8c23`, 14 commits detrás de `49ecbcd`. Al **abrir R-12** el tip ya era **`f7a86cc`** (Relevo UNO+DOS encima de `49ecbcd`). El tip actual se verifica siempre con `git rev-parse origin/main`.
 
 ---
 
@@ -109,7 +111,7 @@ Los siguientes NO fueron cerrados por R-11/v1.3.0 y son los que un plan de mejor
 1. **Nada se implementa sin plan aprobado (E1).** El plan de fases se documenta en `/docs` y cada fase se abre solo tras aprobación explícita del propietario. **No lanzar código "en caliente".**
 2. **Una fase = un subagente acotado + verificación del coordinador + batería real + aprobación por commit + push a `main` (rama protegida) (E2/E4/E6).** Máx. ~3 subagentes en paralelo con alcances disjuntos.
 3. **Read-first anti-alucinación (E3).** Antes de abrir cualquier fase: leer `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1, `PROJECT_STATE.md`, las premisas E1–E9 y **este doc §0 (firma de estado)**. Si el repo no coincide con la documentación → PARAR y re-leer.
-4. **La firma de estado de GitHub es la verdad para las auditorías externas.** Las próximas auditorías deben comunicarse con el estado `49ecbcd` (GH `main` real), no con snapshots previos. Todo relevo de chat incluirá la firma (HEAD/rama/árbol/tags).
+4. **La firma de estado de GitHub es la verdad para las auditorías externas.** Las próximas auditorías deben usarse contra **`origin/main`** (verificar `git rev-parse origin/main`), no contra `f7a86cc`/`49ecbcd`/`75e8c23` incrustados en un traspaso. Todo relevo incluye firma (HEAD GitHub/rama/árbol/tags).
 5. **Documentación y DOCSTRINGS obligatorios (E5).** Todo cambio relevante: capa `docs/` (producto/decisión/ADR) + docstrings forward-only según [code-documentation-standard](./code-documentation-standard-2026-08-03.md).
 6. **TESTS/SCRIPTS en cada fase (E6).** Especialmente para idempotencia, concurrencia/locking, rollback, invariantes de ledger, migración, multi-worker, aislamiento entre cuentas.
 7. **Freeze vigente.** Sin features nuevas · no reabrir Belief/H · no tocar gobernanza IA · auth JWT diferida · `contract:gen`/`regen_full` solo en fase pactada · `pending-delete` riesgo alto y R-8C.2 NO tocar salvo decisión.

@@ -82,7 +82,7 @@ a1501e6  feat: R-10 F1 - hacer idempotency_key OBLIGATORIA en deposit/withdraw/t
 - Premisas E1–E9: `docs/PROJECT_PREMISES.md` ⭐ §0
 - Estado vivo: `docs/engineering/PROJECT_STATE.md`
 - Índice docs: `docs/engineering/engineering-index-2026-08-03.md`
-- Traspaso previo (F1+F2a+F2b → apertura F3, **archivado como obsoleto**): `docs/engineering/traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21-obsoleto.md`
+- Traspaso previo (F1+F2a+F2b → apertura F3, **archivado como obsoleto**): `docs/engineering/archive/traspaso-relevo-cierre-r10-f1-f2ab-apertura-f3-2026-08-21-obsoleto.md`
 - Traspasos de referencia R-9: `traspaso-relevo-cierre-r9-f1-f8-apertura-f9-2026-08-20.md`, `traspaso-relevo-cierre-r9-f1-f4-2026-08-20.md`
 - Código clave (F3): `packages/py/application/src/bolsa_application/accounts.py` + `scripts/verify/verify_ledger_balance_chain.py`.
 - Código clave (F4a): `packages/py/infrastructure/.../alembic/versions/005_custody_obligation.py`, `.../repositories/custody_obligation_repository.py`, `models/tables.py` (tabla `custody_obligation`), `packages/py/application/src/bolsa_application/accounts.py` (`ApplyCustodyFees`).

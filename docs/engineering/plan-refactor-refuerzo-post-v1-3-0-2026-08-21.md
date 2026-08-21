@@ -1,5 +1,7 @@
 # PLAN PROFUNDO — Refactorización, corrección y mejora post-v1.3.0 (2026-08-21)
 
+> **SUPERSEDIDO (2026-08-21) por [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md).** Relevo UNO (`f7a4ab0`) y DOS (`f7a86cc`) están ejecutados; la Fase 6 higiene se absorbe en R-12 A5/A6. No abrir fases de este plan; usar R-12.
+
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Ancla obligatoria:** leer PRIMERO `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` (§0 firma de estado + §3 gaps reales) y `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/engineering/PROJECT_STATE.md` · premisas E1–E9 (`docs/PROJECT_PREMISES.md`).
 > **Estado de partida (verificado):** `main` GitHub = local = **`49ecbcd`** (release **`v1.3.0`**), árbol limpio, sin commits sin empujar.

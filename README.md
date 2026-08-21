@@ -4,8 +4,8 @@ Plataforma personal de gestión bursátil: IBEX, Europa y acciones (sin CFD).
 
 **Stack actual:** React + Vite (frontend) · **FastAPI Python** (API por defecto) · PostgreSQL.
 
-**Producto (v1.0.0 · sync docs 2026-08-06):** Embudo + Lista AUTO · Finalistas · **DÍA D** · **CORE-R v1.12** · **CORE-P** · FA/FIE · DEMO only · **Operativa SEMI** · **Estudio ADR-024** (Supervisión 3 capas · Actualizar/Redescubrir) · Asesor/Canales · **prep AUTO A0–A5** (`PAPER_D_EXECUTE` off).  
-Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · GitHub: [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) · PR stage: [#29](https://github.com/jvelasca/Bolsa_V1/pull/29) · Handoff Estudio UI: [`session-handoff-2026-08-06-estudio-process-ui`](./docs/engineering/session-handoff-2026-08-06-estudio-process-ui.md) · ADR-024: [`024-estudio-supervision-universe`](./docs/adr/024-estudio-supervision-universe.md) · Auditoría Lab: [`docs/engineering/audit-pack-post-audits-2026-08-03.md`](./docs/engineering/audit-pack-post-audits-2026-08-03.md) · Canales: [`audit-pack-estudio-asesor-canales`](./docs/engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) · Prep AUTO: [`audit-pack-pre-auto-a0-a5`](./docs/engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) · HELP: [`docs/HELP.md`](./docs/HELP.md).
+**Producto (v1.3.0 BETA · tag `b778292` · 2026-08-21):** Embudo + Lista AUTO · Finalistas · **DÍA D** · **CORE-R v1.12** · **CORE-P** · FA/FIE · DEMO / paper · **Operativa SEMI** · **Estudio ADR-024** (Supervisión 3 capas · Actualizar/Redescubrir) · Asesor/Canales · **prep AUTO A0–A5** (`PAPER_D_EXECUTE` off). Sin broker live.  
+Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · **Fuente de coordinación: GitHub** [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) (`origin/main`) · Estado vivo: [`PROJECT_STATE.md`](./docs/engineering/PROJECT_STATE.md) · Plan R-12: [`plan-r12-auditoria-ux-2026-08-21.md`](./docs/engineering/plan-r12-auditoria-ux-2026-08-21.md) · Premisas: [`PROJECT_PREMISES.md`](./docs/PROJECT_PREMISES.md) · ADR-024: [`024-estudio-supervision-universe`](./docs/adr/024-estudio-supervision-universe.md) · HELP: [`docs/HELP.md`](./docs/HELP.md).
 
 ## Requisitos
 

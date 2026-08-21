@@ -1,6 +1,6 @@
 # (ARCHIVADO/OBSOLETO) — R-10: F3 implementada + verificada (pendiente commit) — apertura F4a (2026-08-21)
 
-> **ESTADO: OBSOLETO.** Este traspaso de apertura de F3 queda **archivado** — F3 (`b79e5dd`), F4a (`49e2731` + `5c304e6`) están **HECHAS y pusheadas**, y el relevo activo es `traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`. El contenido histórico (header de estado, notas F3) se conserva solo por trazabilidad. Sujétese al nuevo traspaso y al backlog para el estado real.
+> **ESTADO: OBSOLETO / ARCHIVADO.** Vive en `docs/engineering/archive/`. F3 (`b79e5dd`), F4a (`49e2731` + `5c304e6`) están **HECHAS y pusheadas**. El relevo R-10 siguiente fue `traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`. El relevo **vivo** del producto (2026-08-21+) es `traspaso-relevo-r12-apertura-2026-08-21.md`. Coordinación: GitHub `origin/main`. El contenido histórico se conserva solo por trazabilidad.
 >
 > **Tipo:** Relevo de cierre de chat/día. Leer PRIMERO junto al **texto de paso** (§7) para que un nuevo agente / nuevo chat continúe **sin perder contexto**.
 > **Repos:** `Bolsa_V1` (monorepo).

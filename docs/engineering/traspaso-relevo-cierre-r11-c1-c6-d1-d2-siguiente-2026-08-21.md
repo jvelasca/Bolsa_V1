@@ -1,11 +1,13 @@
 # RELEVO / TRASPASO — cierre R-11 hardening (C1–C6 + D1 + D2) → apertura siguiente (2026-08-21)
 
-> **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
-> **Propósito:** texto de paso oficial para el **NUEVO AGENTE / NUEVO CHAT** que retome el proyecto tras el cierre completo de **R-11 (hardening post-v1.2.1)**. Es el ancla anti-saturación / anti-alucinación de relevo: cualquier agente nuevo **LEE ESTE DOC + `backlog-trabajo-2026-08-20.md` §0/§1 ANTES de tocar nada**.
-> **Estado al redactar (verificado):** `local main = origin/main = 870fb21` · working tree limpio · **R-11 COMPLETA (C1–C6 + D1 + D2 cerradas y pusheadas)** · tag **`v1.2.1`** sigue sobre `2093296` (R-10); **sin tag de release R-11** (decisión pendiente, ver §3).
-> **AsOf:** 2026-08-21 (≈11:45).
+> **⚠️ HISTÓRICO — NO es el relevo vivo.** Cierre de R-11 / release `v1.3.0`. Los SHA incrustados (`870fb21`, `deafa27`) **no son HEAD**. Fuente viva: `PROJECT_STATE.md` · backlog §0 · `traspaso-relevo-r12-apertura-2026-08-21.md`. Coordinación: GitHub `origin/main` (`git fetch && git rev-parse origin/main`).
 >
-> **>>> ACTUALIZADO (cierre de release 2026-08-21, tarde):** R-11 se RELEASA como **`v1.3.0`** — tag anotado sobre `deafa27` + CHANGELOG `[1.3.0]` + cierre de deuda §3 (`deafa27` fix test `test_execute_trade_con_fees_reconcilia`, delete dev `acc_broken_72ab7c2aa881` → `verify_ledger_balance_chain.py` EXIT 0). Ver §3/§6. Este doc queda como referencial-histórico de la apertura; el estado VIVO es `PROJECT_STATE.md` y `backlog §0/§1`.
+> **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
+> **Propósito (archivo):** registro del cierre R-11 para auditoría; **no** usarlo como texto de paso de un chat nuevo.
+> **Estado al redactar (histórico):** `local main = origin/main = 870fb21` en la apertura de este doc; release posterior `v1.3.0` tag `b778292`.
+> **AsOf:** 2026-08-21.
+>
+> **>>> ACTUALIZADO (cierre de release 2026-08-21, tarde):** R-11 se RELEASA como **`v1.3.0`** — tag anotado sobre `b778292` (padre `deafa27` = fix `test_execute_trade_con_fees_reconcilia` + delete dev `acc_broken_72ab7c2aa881` → `verify_ledger_balance_chain.py` EXIT 0). Ver §3/§6. Este doc queda como referencial-histórico; el estado VIVO es `PROJECT_STATE.md` y `backlog §0/§1`.
 
 ---
 

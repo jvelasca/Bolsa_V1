@@ -4,7 +4,7 @@
 > **Propósito:** plan director (read-only, **draft**) para consolidar la superficie UX Research→Radar: unificar puente y navegación entre el hub científico `/research` (`features/research`) y el hub operativo `/screeners` (`features/screeners`, nav **Rastreadores**), reutilizando el puente B0 `promote-finalist-to-tracker.ts` ya implementado y el embudo backend/shared ya consolidado. Sin features nuevas (freeze E7).
 > **Estado:** **APARCADO / DRAFT — pendiente de decisión y aprobación del propietario para abrir.** Ninguna fase está abierta ni cerrada. NO abrir código hasta decisión (E1).
 > **AsOf:** 2026-08-21.
-> **Nota de estado vivo:** R-11 ya se **RELEASEó como `v1.3.0`** (2026-08-21): HEAD `main` = `b778292`, tag anotado `v1.3.0` sobre el cierre de R-11 (`deafa27`). Árbol de trabajo **limpio (`git status --short` vacío)**.
+> **Nota de estado vivo:** este plan sigue **APARCADO / DRAFT**. El HEAD de GitHub **no** es `b778292`. Verificar `git rev-parse origin/main`. Release **`v1.3.0`** tag anotado `b778292` (padre `deafa27`). Pista documental Fase 1–3 hecha; código de unificación **no** abierto (E1). El estudio R-12 Track B la trata como capítulo, sin implementar.
 
 ---
 

@@ -5,12 +5,14 @@ on:
     paths:
       - 'apps/api-python/**'
       - 'packages/py/**'
+      - 'scripts/verify/**'
       - 'pyproject.toml'
       - 'Makefile'
   pull_request:
     paths:
       - 'apps/api-python/**'
       - 'packages/py/**'
+      - 'scripts/verify/**'
       - 'pyproject.toml'
       - 'Makefile'
 
@@ -50,10 +52,12 @@ jobs:
         # test_lists/test_workspaces/test_health/test_auth/test_ai_authoring entran
         # al lifespan→ensure_migrated→DB: se excluyen aquí (no hay Postgres en CI),
         # mismo criterio que las DB-gated existentes (P2.5/CI).
+        # R-12 A3: invariantes C/D/E son unitarios in-memory (sin PG).
         run: >
           uv run pytest
           packages/py/market/tests
           packages/py/analytics/tests
+          packages/py/infrastructure/tests/test_verify_financial_invariants.py
           apps/api-python/tests
           --ignore=apps/api-python/tests/integration
           --ignore=apps/api-python/tests/test_lists.py
