@@ -1,7 +1,7 @@
 # Estudio teórico — flujo SEMI vs apps top (R-12 Track B)
 
 > **Padre:** [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md).
-> **Estado:** **APROBADO** por el propietario (2026-08-21), línea a línea. Cero código en este documento. Track C: plan [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md) (**C1 en este commit**).
+> **Estado:** **APROBADO** por el propietario (2026-08-21), línea a línea. Cero código en este documento. Track C: plan [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md) (**C1–C5 en `origin/main` `d281b8c`**).
 > **AsOf:** 2026-08-21 · audiencia: profesional de mercados que **no** es ingeniero de software.
 > **Fuentes de nuestro lado:** `apps/web/src/app.tsx`, `trading-operativa-panel.tsx`, `supervised-f3-panel.tsx`, `demo-operating-modes-brief-2026-08-03.md`, ADR-019/023/024.
 

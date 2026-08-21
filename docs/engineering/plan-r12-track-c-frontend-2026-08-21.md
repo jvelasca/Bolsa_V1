@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md` §4.
 > **Hipótesis aprobada:** `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (propietario, 2026-08-21, línea a línea).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · E1–E9. Una fase = un subagente. 0 commits sin OK.
-> **Estado:** plan **aprobado**. Track C **C1–C5 hechas en local** (`5bc51ff`…`0eb8976`). Push a GitHub pendiente.
+> **Estado:** plan **aprobado**. Track C **C1–C5 en `origin/main`** (`5bc51ff`…`0eb8976` · stamp **`d281b8c`**).
 > **AsOf:** 2026-08-21 · coordinación GitHub `origin/main`.
 
 ---
@@ -64,7 +64,7 @@ Frase SEMI (UI): _«La app propone operaciones sobre tu Universo. Tú las firmas
 
 ### C1 — Confirmar de primer nivel (recomendado primero)
 
-**Estado:** **hecha en este commit** (2026-08-21). Push a GitHub pendiente de OK.
+**Estado:** **hecha** `5bc51ff` (2026-08-21). En `origin/main` (stamp `d281b8c`).
 
 **Qué:** Confirm deja de ser un rincón de Ayuda.
 
@@ -87,7 +87,7 @@ Frase SEMI (UI): _«La app propone operaciones sobre tu Universo. Tú las firmas
 
 ### C2 — Nav diaria vs laboratorio
 
-**Estado:** **hecha** `01af9ff` (2026-08-21, local; push pendiente). C1 SHA `5bc51ff`.
+**Estado:** **hecha** `01af9ff` (2026-08-21). En `origin/main`. C1 SHA `5bc51ff`.
 
 **Depende de C1** (mismo `app-top-bar.tsx`; no paralelo).
 
@@ -105,7 +105,7 @@ Copy Estudio en mesa: «Universo en vigilancia» donde hoy diga solo jerga de me
 
 ### C3 — AUTO de cuenta no disponible (BETA)
 
-**Estado:** **hecha** `97e20ab` (2026-08-21, local; push pendiente). C1 `5bc51ff` · C2 `01af9ff`.
+**Estado:** **hecha** `97e20ab` (2026-08-21). En `origin/main`. C1 `5bc51ff` · C2 `01af9ff`.
 
 **Disjunto de C1** (ficheros `demo-book-*` + status bar). Puede ir **en paralelo con C1** si el propietario lo pide.
 
@@ -122,7 +122,7 @@ Copy Estudio en mesa: «Universo en vigilancia» donde hoy diga solo jerga de me
 
 ### C4 — Libro en nav
 
-**Estado:** **hecha** `154fcd1` (2026-08-21, local; push pendiente). C1 `5bc51ff` · C2 `01af9ff` · C3 `97e20ab`.
+**Estado:** **hecha** `154fcd1` (2026-08-21). En `origin/main`. C1 `5bc51ff` · C2 `01af9ff` · C3 `97e20ab`.
 
 Dropdown **Libro**: Operaciones (`/operations`) · Historial / ledger (`/history`). No fusionar páginas. Copy de cabecera alineado a «Libro».
 
@@ -132,7 +132,7 @@ Dropdown **Libro**: Operaciones (`/operations`) · Historial / ledger (`/history
 
 ### C5 — HELP + frase SEMI
 
-**Estado:** **hecha** `0eb8976` (2026-08-21). C1–C4: `5bc51ff` · `01af9ff` · `97e20ab` · `154fcd1`. Track C **cerrado en local**; push pendiente.
+**Estado:** **hecha** `0eb8976` (2026-08-21). C1–C4: `5bc51ff` · `01af9ff` · `97e20ab` · `154fcd1`. Track C **cerrado en `origin/main`** (stamp `d281b8c`).
 
 Sincronizar `docs/HELP.md` + `app-help-menu.tsx` + `help-registry.ts` + `help-content-as-of.ts` + tracker: Confirm es primer nivel; AUTO BETA; frase SEMI en mesa/Confirm. Tracker Plataforma IA apunta a `/confirm`.
 
@@ -157,4 +157,4 @@ Producto **BETA**. Tag `v1.3.0` → `b778292` intacto. Track C **no** tagea solo
 
 ## 6. Texto de paso (tras aprobar este plan)
 
-> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1–C5 hechas en local** (`5bc51ff`…`0eb8976`). Push pendiente. NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.
+> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1–C5 en `origin/main`** (`5bc51ff`…`0eb8976` · stamp `d281b8c`). NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.
