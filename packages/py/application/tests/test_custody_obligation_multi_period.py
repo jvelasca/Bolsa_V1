@@ -56,11 +56,6 @@ class _FakeObligationRepo:
             if k[0] == account_id and r["status"] == "PENDING"
         ]
 
-    async def get_by_account(self, account_id: str):
-        return [
-            self._as_object(r) for k, r in sorted(self.rows.items()) if k[0] == account_id
-        ]
-
     async def upsert(self, **kwargs) -> dict:
         self.upserted.append(kwargs)
         key = (kwargs["account_id"], kwargs["period"])

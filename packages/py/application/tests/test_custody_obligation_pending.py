@@ -35,11 +35,6 @@ class _FakeObligationRepo:
         self.upserted: list[dict] = []
         self.rows: dict[str, dict] = {}
 
-    async def get_by_account(self, account_id: str):  # noqa: ARG001
-        return sorted(
-            (dict(r) for r in self.rows.values()), key=lambda r: r["period"]
-        )
-
     async def get_pending_by_account(self, account_id: str):  # noqa: ARG001
         return [
             dict(r)

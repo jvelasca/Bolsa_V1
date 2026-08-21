@@ -40,16 +40,6 @@ class CustodyObligationRepository:
         """Sesión activa — expone la sesión para los savepoints de los use-cases."""
         return self._session
 
-    async def get_by_account(self, account_id: str) -> list[CustodyObligation]:
-        """Todas las obligaciones de la cuenta ordenadas por ``period`` ASC."""
-        stmt = (
-            select(CustodyObligationRow)
-            .where(CustodyObligationRow.account_id == account_id)
-            .order_by(CustodyObligationRow.period.asc())
-        )
-        rows = (await self._session.execute(stmt)).scalars().all()
-        return [_obligation_from_row(row) for row in rows]
-
     async def get_pending_by_account(self, account_id: str) -> list[CustodyObligation]:
         """Obligaciones ``status == "PENDING"`` de la cuenta, la más antigua primero."""
         stmt = (
@@ -62,17 +52,6 @@ class CustodyObligationRepository:
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_obligation_from_row(row) for row in rows]
-
-    async def get_by_account_period(
-        self, account_id: str, period: str
-    ) -> CustodyObligation | None:
-        """Obligación exacta de la cuenta para el ``period`` dado, o ``None``."""
-        stmt = select(CustodyObligationRow).where(
-            CustodyObligationRow.account_id == account_id,
-            CustodyObligationRow.period == period,
-        )
-        row = (await self._session.execute(stmt)).scalar_one_or_none()
-        return None if row is None else _obligation_from_row(row)
 
     async def upsert(
         self,
