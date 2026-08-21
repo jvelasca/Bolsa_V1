@@ -10,6 +10,7 @@ import asyncio
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 import pytest_asyncio
@@ -137,6 +138,7 @@ async def test_buy_insufficient_never_overdraws(db_session) -> None:
             quantity=100,
             price=100,
             legacy_portfolio_id=pid,
+            idempotency_key="invariants-buy-1-abcdefgh",
         )
     await db_session.rollback()
     assert await _query_cash(db_session, pid) == 1500.0
@@ -157,6 +159,7 @@ async def test_sell_more_than_held_never_negative_qty(db_session) -> None:
         quantity=5,
         price=100,
         legacy_portfolio_id=pid,
+        idempotency_key="invariants-buy-2-abcdefgh",
     )
     await db_session.commit()
     assert await _query_qty(db_session, pid, iid) == 5.0
@@ -169,6 +172,7 @@ async def test_sell_more_than_held_never_negative_qty(db_session) -> None:
             quantity=99,
             price=100,
             legacy_portfolio_id=pid,
+            idempotency_key="invariants-sell-1-abcdefgh",
         )
     await db_session.rollback()
     assert await _query_qty(db_session, pid, iid) == 5.0
@@ -190,6 +194,7 @@ async def test_round_trip_balance_coherent(db_session) -> None:
         price=100,
         legacy_portfolio_id=pid,
         fee_amount=5,
+        idempotency_key="invariants-roundtrip-1-abcdefgh",
     )
     await db_session.commit()
     # buy: 1500 - 500 - 5 = 995
@@ -203,6 +208,7 @@ async def test_round_trip_balance_coherent(db_session) -> None:
         price=120,
         legacy_portfolio_id=pid,
         fee_amount=3,
+        idempotency_key="invariants-roundtrip-2-abcdefgh",
     )
     await db_session.commit()
     # sell: 995 + 240 - 3 = 1232
@@ -279,6 +285,7 @@ async def test_concurrent_buys_no_double_spend() -> None:
                     quantity=10,
                     price=100,
                     legacy_portfolio_id=pid,
+                    idempotency_key=f"concurrent-buy-{uuid4().hex}",
                 )
                 await session.commit()
                 return True
@@ -321,4 +328,28 @@ async def test_fin1_no_global_default_portfolio_by_name(db_session) -> None:
     # 2) Resolver una cartera con id inexistente falla explícitamente (fail-closed).
     with pytest.raises(ValueError, match="Cartera no encontrada"):
         await repo.get_summary("no-existe-cartera")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("bad_key", ["", "   ", "\t", "\n  \n"], ids=["empty", "spaces", "tab", "newlines"])
+async def test_execute_trade_rejects_empty_or_whitespace_key(db_session, bad_key: str) -> None:
+    """R-11 C2 · defensa en profundidad: `execute_trade` rechaza clave vacía/whitespace.
+
+    El guard de validación corre ANTES de tocar el ledger, de modo que no necesita
+    ningún entorno de datos; cualquier cadena que tras `strip()` quede vacía lanza
+    ValueError sin llegar a la base de datos."""
+    from bolsa_infrastructure.database.repositories.portfolio_repository import (
+        SqlAlchemyPortfolioRepository,
+    )
+
+    repo = SqlAlchemyPortfolioRepository(db_session)
+    with pytest.raises(ValueError, match="idempotency_key no puede estar vacía"):
+        await repo.execute_trade(
+            instrument_id="inst-1",
+            trade_type="buy",
+            quantity=10,
+            price=100,
+            legacy_portfolio_id="pf-1",
+            idempotency_key=bad_key,
+        )
 

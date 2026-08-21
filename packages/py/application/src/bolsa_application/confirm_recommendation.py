@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC
 from typing import Any
+from uuid import uuid4
 
 from bolsa_analytics.cognitive.decision_session import (
     attach_execution_to_payload,
@@ -79,13 +80,17 @@ class ConfirmRecommendationIntent:
                     # (decision_id, con fallback a session_id). Un doble confirm de la misma
                     # decisión rejuega el trade original en vez de duplicarlo (guard DB de
                     # ExecuteTrade.find_transaction_by_idempotency).
+                    # R-11 C2: el repo de trades exige clave NO vacía. Si ni decision_id ni
+                    # session_id están, se genera una clave uuid4-siempre-no-vacía para que
+                    # el fill nunca invoque execute_trade con ""/whitespace/Nones.
+                    idem_key = rec.decision_id or session_id or f"confirm-{uuid4().hex}"
                     trade = await self._execute_trade.execute(
                         instrument_id=intent.instrument_id,
                         trade_type=intent.side,
                         quantity=intent.quantity,
                         price=price,
                         account_id=account_id,
-                        idempotency_key=rec.decision_id or session_id,
+                        idempotency_key=idem_key,
                     )
                     result["trade"] = {
                         "status": "executed",

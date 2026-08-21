@@ -63,7 +63,7 @@ async def test_trade_reused_key_different_price_returns_409() -> None:
                 "type": "buy",
                 "quantity": 10,
                 "price": 100,
-                "idempotencyKey": "tk-409",
+                "idempotencyKey": "tk-409-abcdefghijkl",
             }
 
             first = await client.post("/api/portfolio/trade", headers=headers, json=payload)
@@ -92,7 +92,7 @@ async def test_trade_reused_key_same_payload_still_replays_200() -> None:
                 "type": "buy",
                 "quantity": 10,
                 "price": 100,
-                "idempotencyKey": "tk-replay",
+                "idempotencyKey": "tk-replay-abcdefghijkl",
             }
 
             first = await client.post("/api/portfolio/trade", headers=headers, json=payload)
@@ -112,13 +112,13 @@ async def test_deposit_reused_key_different_amount_returns_409() -> None:
 
             first = await client.post(
                 f"/api/accounts/{account_id}/deposits",
-                json={"amount": 1000, "idempotencyKey": "dep-409"},
+                json={"amount": 1000, "idempotencyKey": "dep-409-abcdefghijkl"},
             )
             assert first.status_code == 201
 
             changed = await client.post(
                 f"/api/accounts/{account_id}/deposits",
-                json={"amount": 5, "idempotencyKey": "dep-409"},
+                json={"amount": 5, "idempotencyKey": "dep-409-abcdefghijkl"},
             )
             assert changed.status_code == 409
             assert changed.json()["detail"]
@@ -147,3 +147,53 @@ async def test_deposit_and_withdraw_without_key_return_422() -> None:
                 json={"amount": 1000},
             )
             assert withdraw.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_deposit_and_withdraw_empty_or_whitespace_key_return_422() -> None:
+    """R-11 C2: idempotencyKey vacía (`""`) o whitespace puro (`"   "`) → 422.
+
+    str_strip_whitespace recorta antes de validar: una cadena de solo espacios queda
+    vacía y `min_length=16` la rechaza, igual que una clave ausente."""
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            account_id = await _make_account(client)
+
+            for bad_key in ("", "   "):
+                for endpoint in ("deposits", "withdrawals"):
+                    resp = await client.post(
+                        f"/api/accounts/{account_id}/{endpoint}",
+                        json={"amount": 1000, "idempotencyKey": bad_key},
+                    )
+                    assert resp.status_code == 422, (
+                        f"esperaba 422 para {endpoint} key={bad_key!r}, obtuve {resp.status_code}"
+                    )
+            # Clave válida 16–128 con espacios exteriores se recorta y pasa → 201.
+            ok = await client.post(
+                f"/api/accounts/{account_id}/deposits",
+                json={"amount": 1000, "idempotencyKey": "  dep-ok-abcdefghijkl  "},
+            )
+            assert ok.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_trade_empty_or_short_idempotency_key_return_422() -> None:
+    """R-11 C2: clave de trade vacía/whitespace o fuera de 16–128 chars → 422 clean."""
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            account_id = await _make_account(client)
+            instrument_id = await _first_instrument_id(client)
+            headers = {"X-Account-Id": account_id}
+            base = {"instrumentId": instrument_id, "type": "buy", "quantity": 1, "price": 50}
+            for bad_key in (None, "", "   ", "short", "x" * 15, "x" * 129):
+                payload: dict[str, object] = dict(base)
+                if bad_key is not None:
+                    payload["idempotencyKey"] = bad_key
+                resp = await client.post("/api/portfolio/trade", headers=headers, json=payload)
+                assert resp.status_code == 422, (
+                    f"esperaba 422 para key={bad_key!r}, obtuve {resp.status_code}"
+                )

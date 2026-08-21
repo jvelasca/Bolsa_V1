@@ -66,7 +66,7 @@ async def test_trade_idempotency_single_transaction() -> None:
                 "type": "buy",
                 "quantity": 10,
                 "price": 100,
-                "idempotencyKey": "order-abc-123",
+                "idempotencyKey": "order-abc-1234567890",
             }
 
             first = await client.post("/api/portfolio/trade", headers=headers, json=payload)
@@ -113,7 +113,8 @@ async def test_trade_rejects_non_financial_values_422() -> None:
 def test_trade_dto_rejects_nan_inf_and_negatives() -> None:
     # NaN/Inf no son JSON-serializables (el transporte los bloquea antes de llegar),
     # pero además Pydantic los rechaza en el borde junto con negativos (contrato estricto).
-    base = {"instrumentId": "inst-1", "type": "buy", "quantity": 10}
+    default_key = "trade-key-1234567890"  # 19 chars, válida (16–128)
+    base = {"instrumentId": "inst-1", "type": "buy", "quantity": 10, "idempotencyKey": default_key}
     for bad in (
         {**base, "price": float("nan")},
         {**base, "quantity": float("nan")},
@@ -124,6 +125,39 @@ def test_trade_dto_rejects_nan_inf_and_negatives() -> None:
     ):
         with pytest.raises(ValidationError):
             TradeRequestDto(**bad)
-    # Válido + idempotency obligatoria (R-10 F1)
-    ok = TradeRequestDto(instrumentId="inst-1", type="sell", quantity=5, price=10, idempotencyKey="k")
-    assert ok.idempotency_key == "k"
+    # Válido + idempotency obligatoria (R-10 F1) y 16–128 chars (R-11 C2).
+    ok = TradeRequestDto(
+        instrumentId="inst-1", type="sell", quantity=5, price=10, idempotencyKey=default_key
+    )
+    assert ok.idempotency_key == default_key
+
+
+@pytest.mark.parametrize(
+    "bad_key",
+    [None, "", "   ", "short", "x" * 15, "x" * 129],
+    ids=["missing", "empty", "whitespace", "too_short", "15chars", "129chars"],
+)
+def test_trade_dto_rejects_invalid_idempotency_key(bad_key: object) -> None:
+    # R-11 C2: sin clave / "" / whitespace / longitud <16 o >128 → 422 limpio.
+    payload: dict[str, object] = {
+        "instrumentId": "inst-1",
+        "type": "buy",
+        "quantity": 10,
+        "price": 100,
+    }
+    if bad_key is not None:
+        payload["idempotencyKey"] = bad_key
+    with pytest.raises(ValidationError):
+        TradeRequestDto(**payload)
+
+
+def test_trade_dto_strips_whitespace_around_valid_key() -> None:
+    # R-11 C2: clave válida con espacios exteriores se recorta; pasa tras strip.
+    dto = TradeRequestDto(
+        instrumentId="inst-1",
+        type="buy",
+        quantity=10,
+        price=100,
+        idempotencyKey="  key-16-abcdefghijklmnop  ",
+    )
+    assert dto.idempotency_key == "key-16-abcdefghijklmnop"

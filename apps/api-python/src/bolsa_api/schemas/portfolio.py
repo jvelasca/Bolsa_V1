@@ -60,13 +60,17 @@ class TransactionsResponseDto(BaseModel):
 
 
 class TradeRequestDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
+    # R-11 C2: idempotency_key obligatoria, 16–128 chars, sin whitespace exterior
+    # (str_strip_whitespace convierte `""`/`"   "` en vacío → min_length → 422).
     instrument_id: str = Field(alias="instrumentId")
     type: Literal["buy", "sell"]
     quantity: float = Field(gt=0, allow_inf_nan=False)
     price: float = Field(gt=0, allow_inf_nan=False)
-    idempotency_key: str = Field(alias="idempotencyKey")
+    idempotency_key: str = Field(
+        alias="idempotencyKey", min_length=16, max_length=128
+    )
 
 
 class TradeResponseDto(BaseModel):

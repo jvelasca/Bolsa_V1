@@ -320,8 +320,20 @@ class SqlAlchemyPortfolioRepository:
         price: float,
         legacy_portfolio_id: str,
         fee_amount: float = 0.0,
-        idempotency_key: str | None = None,
+        idempotency_key: str,
     ) -> TradeResult:
+        """Ejecuta un trade idempotente.
+
+        ``idempotency_key`` es OBLIGATORIA y debe ser no vacía (defensa en
+        profundidad R-11 C2): ``""``, whitespace puro ``"   "`` o cualquier cadena
+        que tras ``strip()`` quede vacía lanzan ``ValueError`` antes de tocar el
+        ledger. El guard DB de idempotencia (UNIQUE + ``IdempotencyKeyExists``) y el
+        uso como ``reference`` dependen de una clave estable y no vacía; la capa DTO
+        ya exige 16–128 chars, pero aquí se revalidan vacío/whitespace porque hay
+        call-sites internos (AUTO execute / confirm) que la construyen desde datos.
+        """
+        if not idempotency_key.strip():
+            raise ValueError("idempotency_key no puede estar vacía")
         if quantity <= 0:
             raise ValueError("La cantidad debe ser mayor que cero")
         if price <= 0:

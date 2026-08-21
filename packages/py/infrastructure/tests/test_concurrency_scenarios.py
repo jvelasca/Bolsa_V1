@@ -484,6 +484,7 @@ async def test_buy_sell_racing_misma_posicion() -> None:
                 quantity=10,
                 price=1000.0,
                 legacy_portfolio_id=legacy_pf_id,
+                idempotency_key=f"seed-{tag}-{uuid4().hex}",
             )
             assert seed.transaction.id
             await setup.commit()

@@ -111,7 +111,7 @@ async def test_create_account_with_settings_and_trade_fees() -> None:
                     "type": "buy",
                     "quantity": 10,
                     "price": 100,
-                    "idempotencyKey": "trade-fees-1",
+                    "idempotencyKey": "trade-fees-1-abcdefghij",
                 },
             )
             assert trade.status_code == 200
@@ -147,7 +147,7 @@ async def test_account_cash_deposits_and_lifecycle() -> None:
 
             deposit = await client.post(
                 f"/api/accounts/{account_id}/deposits",
-                json={"amount": 1000, "note": "Aportación", "idempotencyKey": "dep-lifecycle"},
+                json={"amount": 1000, "note": "Aportación", "idempotencyKey": "dep-lifecycle-abcdefgh"},
             )
             assert deposit.status_code == 201
             assert deposit.json()["data"]["kind"] == "external_deposit"

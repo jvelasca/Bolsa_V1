@@ -280,7 +280,7 @@ class TaxReportResponseDto(BaseModel):
 
 
 class DepositCashDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     # P2.7: dinero en movimiento (alimenta deposit → ledger). Estricto: >0 y sin
     # NaN/Inf (mismo contrato que TradeRequestDto desde F1/M4).
@@ -288,15 +288,22 @@ class DepositCashDto(BaseModel):
     note: str | None = None
     # A-2 (R-7): idempotencia de movimientos. Obligatoria (R-10 F1): sin clave no
     # se permite el depósito, para que un retry HTTP no cree una 2ª operación.
-    idempotency_key: str = Field(alias="idempotencyKey")
+    # R-11 C2: validación estricta end-to-end — longitud 16–128 y sin whitespace
+    # exterior (str_strip_whitespace convierte `""`/`"   "` en vacío → min_length→422).
+    idempotency_key: str = Field(
+        alias="idempotencyKey", min_length=16, max_length=128
+    )
 
 
 class WithdrawCashDto(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     amount: float = Field(gt=0, allow_inf_nan=False)
     note: str | None = None
-    idempotency_key: str = Field(alias="idempotencyKey")
+    # R-11 C2: idempotency_key obligatoria, 16–128 chars, sin whitespace (ver DepositCashDto).
+    idempotency_key: str = Field(
+        alias="idempotencyKey", min_length=16, max_length=128
+    )
 
 
 class CashMovementResultDto(BaseModel):

@@ -24,6 +24,9 @@ from bolsa_api.background.estudio_eod_opinion_worker import (  # type: ignore[im
 from bolsa_api.background.fa_weekly_worker import (  # type: ignore[import-untyped]
     start_fa_weekly_worker,
 )
+from bolsa_api.background.custody_job_worker import (  # type: ignore[import-untyped]
+    start_custody_job_worker,
+)
 from bolsa_api.background.index_subscribe_worker import (  # type: ignore[import-untyped]
     start_index_subscribe_worker,
 )
@@ -53,6 +56,7 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_estudio_eod_opinion_worker,
         start_auto_sync_worker,
         start_index_subscribe_worker,
+        start_custody_job_worker,
     }
     assert set(starters) == expected
 
