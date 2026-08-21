@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md` §4.
 > **Hipótesis aprobada:** `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (propietario, 2026-08-21, línea a línea).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · E1–E9. Una fase = un subagente. 0 commits sin OK.
-> **Estado:** plan **aprobado**. Track C **C1–C5** (`5bc51ff`…`0eb8976`) + leftover CORE-R **hecho `8dd3caf`**. Gates no abiertos.
+> **Estado:** plan **aprobado**. Track C **C1–C5** (`5bc51ff`…`0eb8976`) + leftover CORE-R **hecho `8dd3caf`** + copy E8 **`ce601c9`**. Gates R12-409 / EXEC-B-CONC / R12-SCHED **cerrados**. Tag **`v1.5.0-beta` → `5e52bd6`**.
 > **AsOf:** 2026-08-21 · coordinación GitHub `origin/main`.
 
 ---
@@ -140,20 +140,18 @@ Sincronizar `docs/HELP.md` + `app-help-menu.tsx` + `help-registry.ts` + `help-co
 
 ## 4. Fuera de Track C (explícito)
 
-| Ítem                                                           | Por qué                                        |
-| -------------------------------------------------------------- | ---------------------------------------------- |
-| Split `backtests-page.tsx`                                     | Higiene M5; no desbloquea las 5 puertas        |
-| Unificación Research→Radar código                              | Plan aparcado; capítulo del estudio, no fase C |
-| Tag `v1.4.0` / `v1.5.0-beta`                                   | Solo si el propietario lo pide                 |
-| Gates R-12 (409, EXEC-B-CONC, scheduler, split accounts, auth) | Siguen en decisión; otro track                 |
+| Ítem                              | Por qué                                            |
+| --------------------------------- | -------------------------------------------------- |
+| Split `backtests-page.tsx`        | Higiene M5; no desbloquea las 5 puertas            |
+| Unificación Research→Radar código | Plan aparcado; capítulo del estudio, no fase C     |
+| Tag `v1.4.0` / `v1.5.0-beta`      | **`v1.5.0-beta` cortado** → `5e52bd6` (2026-08-22) |
+| Gates R-12 (split accounts, auth) | Siguen en decisión; 409/EXEC-B/SCHED **cerrados**  |
 
 ---
 
 ## 5. Versionado
 
-Producto **BETA**. Tag `v1.3.0` → `b778292` intacto. Track C **no** tagea solo. Plan R-12 §6: C sería `v1.5.0-beta` **si** el propietario pide tag.
-
----
+## Producto **BETA**. Tag `v1.3.0` → `b778292` intacto. Tag **`v1.5.0-beta` → `5e52bd6`** cortado (Track C + copy E8 + gates R12-409 / EXEC-B-CONC / R12-SCHED).
 
 ## 6. Texto de paso (tras aprobar este plan)
 

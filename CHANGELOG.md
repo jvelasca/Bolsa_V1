@@ -2,24 +2,35 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased] — R-12 (2026-08-21)
+## [Unreleased]
 
-Auditoría residual post-v1.3.0, higiene documental y estudio teórico del flujo SEMI. **No es un tag.** Plan: `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`. Producto sigue **BETA**.
+Trabajo post-`v1.5.0-beta`. Ver sección `[1.5.0-beta]` para el cierre R-12 Track C + gates.
 
-- Firma de estado: **GitHub `origin/main`** es la fuente de coordinación (implementación Track A+B `48cc255`; partida R-12 `f7a86cc`); premisas esenciales del ciclo R-12
-- Alineación documental: README `v1.3.0 BETA`; tag `v1.3.0` → **`b778292`** (el tag anotado apunta al commit de cierre documental, padre `deafa27`)
-- Tests/scripts de verificación residuales (DEFAULT_PORTFOLIO, invariantes C–E, retry HTTP)
-- Inventario `pending-delete` (sin purge) + higiene E8 (residuos m7-win/M2 + archivo de relevo `-obsoleto`) + estudio UX comparativo (Track B, cero código FE)
-- Track B **aprobado** (2026-08-21): mesa 5 puertas. Plan Track C (`plan-r12-track-c-frontend-2026-08-21.md`)
+## [1.5.0-beta] — 2026-08-22
+
+R-12 Track C (mesa SEMI frontend) + copy E8 residual + leftover CORE-R + tres gates de contrato/ejecución/workers. Producto sigue **BETA**. Tag anotado **`v1.5.0-beta` → `5e52bd6`**. Tag `v1.3.0` → `b778292` intacto. Plan: `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`.
+
+### Track C + higiene copy
+
 - Track C **C1** (`5bc51ff`): ruta `/confirm`, nav Confirmar con badge de cola, `openHelpAiPlatform({ panel: "supervised-f3" })` navega SPA (no Ayuda)
 - Track C **C2** (`01af9ff`): nav diaria Trading · Señales · Confirmar vs Laboratorio / Asesor; hub Señales; copy Universo en vigilancia
 - Track C **C3** (`97e20ab`): AUTO de cuenta «No disponible (BETA)»; copy de mesa sin `PAPER_D_EXECUTE`; execute sigue congelado
 - Track C **C4** (`154fcd1`): nav **Libro** (Operaciones + Historial); cabeceras «Libro · …»; sin fusionar páginas
-- Track C **C5** (`0eb8976`): HELP + Ayuda sync Confirm `/confirm` · Señales/Libro · AUTO BETA · frase SEMI; Track C **cerrado en `origin/main`** (stamp **`d281b8c`**)
-- Copy E8 residual (`ce601c9`) + leftover CORE-R (`8dd3caf`): CTAs de firma que van a `/confirm` dejan de decir Ayuda; atajos list-hub `/screeners` = Señales (Laboratorio, no Backtesting); leftover CORE-R Proponer F3 ya en Confirmar
-- **R12-409 B1** (WT, SHA pending): declarar HTTP 409 en OpenAPI para conflictos de `idempotency_key` en deposit/withdraw/trade (`{detail: str}`); regen acotada `openapi.json` + `schema.d.ts`; runtime handler sin cambio
-- **EXEC-B-CONC** (WT, SHA pending): `ExecuteTrade` deriva `balance_after` trade/fee desde cash post-lock (`result.summary.portfolio.cash`); elimina lectura pre-lock `get_summary`; chaos refuerza invariante B estricta bajo concurrencia
-- **R12-SCHED / R-8C.2** (WT, SHA pending): scheduler = crons only; poll no-ARQ → `bolsa-queue-poll-worker`; ARQ → `bolsa-arq-worker` (queue_poll no-op); `run-dev.mjs` spawnea el proceso correcto según `SCAN_QUEUE_BACKEND`
+- Track C **C5** (`0eb8976`): HELP + Ayuda sync Confirm `/confirm` · Señales/Libro · AUTO BETA · frase SEMI
+- Copy E8 residual (`ce601c9`) + leftover CORE-R (`8dd3caf`): CTAs de firma → `/confirm` dejan de decir Ayuda; atajos list-hub `/screeners` = Señales (Laboratorio); leftover CORE-R Proponer F3 ya en Confirmar
+
+### Gates cerrados
+
+- **R12-409 B1** (`eb24608`): declarar HTTP 409 en OpenAPI para conflictos de `idempotency_key` en deposit/withdraw/trade (`{detail: str}`); regen acotada `openapi.json` + `schema.d.ts`; runtime handler sin cambio
+- **EXEC-B-CONC** (`ca60d0a`): `ExecuteTrade` deriva `balance_after` trade/fee desde cash post-lock (`result.summary.portfolio.cash`); elimina lectura pre-lock `get_summary`; chaos refuerza invariante B estricta bajo concurrencia
+- **R12-SCHED / R-8C.2** (`5e52bd6`): scheduler = crons only; poll no-ARQ → `bolsa-queue-poll-worker`; ARQ → `bolsa-arq-worker` (queue_poll no-op); `run-dev.mjs` spawnea el proceso correcto según `SCAN_QUEUE_BACKEND`
+
+### Contexto R-12 previo (Track A+B)
+
+- Firma de estado: **GitHub `origin/main`**; implementación Track A+B `48cc255`; partida R-12 `f7a86cc`; premisas esenciales del ciclo R-12
+- Alineación documental: README `v1.3.0 BETA`; tag `v1.3.0` → **`b778292`**
+- Tests/scripts de verificación residuales (DEFAULT_PORTFOLIO, invariantes C–E, retry HTTP)
+- Inventario `pending-delete` (sin purge) + higiene E8 + estudio UX comparativo (Track B **aprobado**, mesa 5 puertas)
 
 ## [1.3.0] — 2026-08-21
 

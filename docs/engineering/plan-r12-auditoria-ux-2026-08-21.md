@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Ancla:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` · `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/engineering/PROJECT_STATE.md` · premisas E1–E9 + ciclo R-12 en `docs/PROJECT_PREMISES.md` ⭐§0.
 > **Estado de partida (verificado):** `main` local = `origin/main` = **`f7a86cc`** · tag **`v1.3.0` → `b778292`** · árbol limpio al abrir · `v1.3.0-5-gf7a86cc`.
-> **Estado del plan:** Track A (A0–A6) + Track B (estudio teórico) **hechos** (2026-08-21). Track B **APROBADO** línea a línea (2026-08-21). Track C: plan [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md). **C1–C5 en `origin/main`** (`d281b8c`). Coordinación: GitHub `origin/main` (E4).
+> **Estado del plan (AsOf 2026-08-22):** Track A (A0–A6) + Track B (estudio teórico) **hechos**. Track B **APROBADO**. Track C **C1–C5** (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9`. Gates **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` **cerrados**. HEAD/`origin/main` = **`5e52bd6`** · tag **`v1.5.0-beta` → `5e52bd6`**. Coordinación: GitHub `origin/main` (E4).
 > **Supersede:** `plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` (Relevo UNO/DOS ejecutados; Relevo TRES/Fase 6 higiene se absorbe aquí).
 
 ---
@@ -15,11 +15,12 @@ La auditoría externa pegada el 2026-08-21 (tarde) evaluó `main` ~`49ecbcd`. **
 - R-11 C1–C6 + D1 + D2 (custodia multi-periodo, idempotency_key, Decimal, contract:check, mypy gate, DEFAULT_PORTFOLIO docs, E8 métodos muertos).
 - F1 invariante A+B en `verify_ledger_balance_chain.py`.
 - F2 tests de concurrencia de custodia (PG real).
-- F3 contrato 409 → **R12-409 B1 HECHO en WT** (SHA pending; supersede Opción A).
-- ExecuteTrade B → **EXEC-B-CONC HECHO en WT** (SHA pending; `balance_after` post-lock).
+- F3 contrato 409 → **R12-409 B1 HECHO `eb24608`** (supersede Opción A).
+- ExecuteTrade B → **EXEC-B-CONC HECHO `ca60d0a`** (`balance_after` post-lock).
 - F4 crash-consistency · F5 500-ops chaos · R000 cleanup tests m7/m2.
+- R-8C.2 scheduler-vs-worker → **R12-SCHED HECHO `5e52bd6`**.
 
-**Prohibido** reabrir producción financiera, `PAPER_D_EXECUTE`, gobernanza IA, scheduler-vs-worker, purge de `pending-delete` riesgo alto, `contract:gen` salvo gate 409.
+**Prohibido** reabrir producción financiera, `PAPER_D_EXECUTE`, gobernanza IA, layout de workers (salvo fase), purge de `pending-delete` riesgo alto, `contract:gen` salvo fase pactada.
 
 ---
 
@@ -51,17 +52,17 @@ Plantilla de paso:
 | **A5** | Inventario pending-delete (read-only, **sin purge**)                             | Docs          | `docs/engineering/pending-delete/inventory-r12-2026-08-21.md`                        |
 | **A6** | Higiene E8: índice histórico + residuos m7-win/M2 + mypy medir                   | Docs + script | `engineering-index`, `scripts/verify/cleanup_dev_test_residues.py`                   |
 
-### Gates (NO auto-abrir)
+### Gates (NO auto-abrir salvo los ya cerrados)
 
-| Gate                             | Recomendación                                                       | Estado                                       |
-| -------------------------------- | ------------------------------------------------------------------- | -------------------------------------------- |
-| 409 en OpenAPI                   | Opción B1 (deposit/withdraw/trade)                                  | ✅ **ABIERTA/HECHA B1 en WT** (SHA pending)  |
-| ExecuteTrade / invariante B      | `balance_after` desde cash **post-lock** (`summary.portfolio.cash`) | ✅ **EXEC-B-CONC HECHO en WT** (SHA pending) |
-| scheduler-vs-worker (R-8C.2)     | Una autoridad: crons=`scheduler`; colas=`queue_poll`\|`arq`         | ✅ **R12-SCHED HECHO en WT** (SHA pending)   |
-| Split `accounts.py` (~978 LOC)   | V2 P3                                                               | No ahora                                     |
-| Auth User→Account→Resource       | V2                                                                  | JWT congelado D4                             |
-| `TRUSTED_PROXIES` prod           | Checklist operativo                                                 | Fuera de repo                                |
-| SIGKILL real / PG restart mid-tx | Ampliar F4                                                          | Opcional; F4 ya cubre rollback equivalente   |
+| Gate                             | Recomendación                                                       | Estado                                     |
+| -------------------------------- | ------------------------------------------------------------------- | ------------------------------------------ |
+| 409 en OpenAPI                   | Opción B1 (deposit/withdraw/trade)                                  | ✅ **HECHO** R12-409 B1 (`eb24608`)        |
+| ExecuteTrade / invariante B      | `balance_after` desde cash **post-lock** (`summary.portfolio.cash`) | ✅ **HECHO** EXEC-B-CONC (`ca60d0a`)       |
+| scheduler-vs-worker (R-8C.2)     | Una autoridad: crons=`scheduler`; colas=`queue_poll`\|`arq`         | ✅ **HECHO** R12-SCHED (`5e52bd6`)         |
+| Split `accounts.py` (~978 LOC)   | V2 P3                                                               | No ahora                                   |
+| Auth User→Account→Resource       | V2                                                                  | JWT congelado D4                           |
+| `TRUSTED_PROXIES` prod           | Checklist operativo                                                 | Fuera de repo                              |
+| SIGKILL real / PG restart mid-tx | Ampliar F4                                                          | Opcional; F4 ya cubre rollback equivalente |
 
 ---
 
@@ -79,7 +80,7 @@ La unificación Research→Radar (`plan-unificacion-research-radar-2026-08-21.md
 
 ## 4. Track C — plan propio (hipótesis B aprobada)
 
-Track B aprobado 2026-08-21. Plan de fases: [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md). **C1–C5 en `origin/main`** (`d281b8c`). Split `backtests-page.tsx` y fusión Research→Radar **siguen fuera**.
+Track B aprobado 2026-08-21. Plan de fases: [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md). **C1–C5 en `origin/main`** (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9`. Split `backtests-page.tsx` y fusión Research→Radar **siguen fuera**.
 
 ---
 
@@ -87,7 +88,7 @@ Track B aprobado 2026-08-21. Plan de fases: [`plan-r12-track-c-frontend-2026-08-
 
 - ruff 0 · mypy de la zona (gate incluye `packages/py/application/src`) · pytest de la zona
 - `scripts/verify/verify_ledger_balance_chain.py` EXIT 0
-- `contract:check` si toca OpenAPI · **NO `contract:gen`** salvo gate 409
+- `contract:check` si toca OpenAPI · **NO `contract:gen`** salvo fase pactada
 - Chaos/PG-real: DB de test; no ensuciar dev (cleanup canónico)
 - `git status` acotado a ficheros de la fase
 
@@ -95,7 +96,7 @@ Track B aprobado 2026-08-21. Plan de fases: [`plan-r12-track-c-frontend-2026-08-
 
 ## 6. Versionado
 
-Producto **BETA**. Tag `v1.3.0` intacto sobre `b778292`. Tras Track A se **propone** `v1.4.0` (verificación + higiene); no se tagea en este ciclo sin decisión. Track B no sube versión. Track C sería `v1.5.0-beta`.
+Producto **BETA**. Tag `v1.3.0` intacto sobre `b778292`. Tag **`v1.5.0-beta` → `5e52bd6`** (Track C + copy E8 + gates R12-409 / EXEC-B-CONC / R12-SCHED).
 
 ---
 

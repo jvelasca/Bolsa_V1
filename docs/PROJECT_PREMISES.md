@@ -1,15 +1,15 @@
 # Premisas de proyecto — Bolsa V1
 
-> **AsOf:** 2026-08-21  
+> **AsOf:** 2026-08-22  
 > **Qué es:** reglas de producto y de ingeniería que aplican a **todo** el monorepo.  
 > **Para quién:** equipo, auditores externos, quien retome el código.  
 > No sustituye ADRs: las ADRs deciden arquitectura; estas premisas fijan _cómo se trabaja y se documenta_.
 
 ---
 
-## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-21) — leer primero en TODO trabajo
+## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-22) — leer primero en TODO trabajo
 
-> **AsOf:** 2026-08-21 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` (no un SHA de un traspaso histórico). Tag **`v1.3.0` → `b778292`** · **BETA / NO en producción**.
+> **AsOf:** 2026-08-22 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` (no un SHA de un traspaso histórico). Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **BETA / NO en producción**.
 > **Contexto:** R-9 · R-10/v1.2.1 · R-11/v1.3.0 **CERRADAS**. Relevo UNO+DOS del plan post-v1.3.0 **EJECUTADOS** (`f7a4ab0`, `f7a86cc`). Ciclo vivo: **R-12** (`docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`).
 > **Ancla anti-alucinación:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md`. Una auditoría externa del 2026-08-21 evaluó `75e8c23` (14 commits atrás de `49ecbcd`); una re-auditoría posterior evaluó ~`49ecbcd` y **no ve** Relevo UNO/DOS. El SHA que un agente debe usar es **`origin/main` + `PROJECT_STATE.md` / backlog §0**, no un SHA histórico incrustado en un traspaso.
 > **Idea del proyecto (invariante de producto):** embudo backtesting científico → IA gobernada (LLM propone, motor determinista decide) → confirmación humana → paper. Integridad financiera y trazabilidad son el valor central. Se puede refactorizar lo que haga falta **mientras se preserve esa idea**.
@@ -20,8 +20,8 @@
 - **Subagentes para todo cambio de código.** El coordinador no implementa fases enteras en un hilo saturado. Máx. ~3 subagentes en paralelo, alcances **disjuntos**.
 - **Relevo de chat:** al saturarse, cerrar y abrir otro pegando el `traspaso-relevo-*` + firma (HEAD GitHub, rama, árbol, tag, batería, deuda no-regresión). Riesgo de alucinación objetivo: 0 (documento manda).
 - **Higiene E8 continua:** residuos de test/dev se eliminan por path canónico; módulos/docs obsoletos se archivan o se marcan históricos; no se purga `pending-delete` de riesgo alto sin decisión.
-- **Track B APROBADO** (2026-08-21, línea a línea). Track C: plan [`engineering/plan-r12-track-c-frontend-2026-08-21.md`](./engineering/plan-r12-track-c-frontend-2026-08-21.md). **C1–C5** (`0eb8976`) + leftover CORE-R **`8dd3caf`**.
-- **Gates no auto-abiertos:** split `accounts.py` · auth multiusuario · purge `pending-delete`. (**R12-409 B1** — 409 OpenAPI deposit/withdraw/trade — **HECHO en WT**, SHA pending.) (**EXEC-B-CONC** — `ExecuteTrade` `balance_after` post-lock — **HECHO en WT**, SHA pending.) (**R12-SCHED / R-8C.2** — scheduler=crons; queue_poll|arq — **HECHO en WT**, SHA pending.)
+- **Track B APROBADO** (2026-08-21, línea a línea). Track C: plan [`engineering/plan-r12-track-c-frontend-2026-08-21.md`](./engineering/plan-r12-track-c-frontend-2026-08-21.md). **C1–C5** (`0eb8976`) + leftover CORE-R **`8dd3caf`** + copy E8 **`ce601c9`**. Gates: **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6`.
+- **Gates no auto-abiertos:** split `accounts.py` · auth multiusuario · purge `pending-delete`. (R12-409 / EXEC-B-CONC / R12-SCHED **cerrados** — no reabrir sin fase.)
 
 ### E1. Nada se implementa sin plan aprobado
 
@@ -61,7 +61,7 @@
 ### E7. La integridad financiera y la separación de cuentas son el objetivo inmediato
 
 - Antes de ampliar ML/IA o features nuevas se cierra el núcleo financiero determinista (R-9): idempotencia aislada por cuenta, request-fingerprint, orden de custody-commit, invariantes DB, validación estricta de DTOs.
-- **No tocar salvo decisión explícita:** gobernanza IA · `pending-delete` de riesgo alto. (**R-8C.2 / R12-SCHED** cerrado en WT — no reabrir layout de workers sin fase.)
+- **No tocar salvo decisión explícita:** gobernanza IA · `pending-delete` de riesgo alto. (**R-8C.2 / R12-SCHED** cerrado `5e52bd6` — no reabrir layout de workers sin fase.)
 
 ### E8. Limpieza de código/doc obsoleto (criterio §4 de este archivo)
 
