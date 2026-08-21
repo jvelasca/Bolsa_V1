@@ -4,7 +4,7 @@ import { useScreenerActivityStore } from "@/stores/screener-activity-store";
 
 const ACTIVE_JOB_STATUSES = new Set(["pending", "processing"]);
 
-/** Jobs en cola + scan sync local → badge en nav Rastreadores. */
+/** Jobs en cola + scan sync local → badge en nav Señales. */
 export function useScreenerNavBadge(): number {
   const syncScanActive = useScreenerActivityStore(
     (state) => state.syncScanActive,

@@ -11,7 +11,8 @@ Auditoría residual post-v1.3.0, higiene documental y estudio teórico del flujo
 - Tests/scripts de verificación residuales (DEFAULT_PORTFOLIO, invariantes C–E, retry HTTP)
 - Inventario `pending-delete` (sin purge) + higiene E8 (residuos m7-win/M2 + archivo de relevo `-obsoleto`) + estudio UX comparativo (Track B, cero código FE)
 - Track B **aprobado** (2026-08-21): mesa 5 puertas. Plan Track C (`plan-r12-track-c-frontend-2026-08-21.md`)
-- Track C **C1** (este commit): ruta `/confirm`, nav Confirmar con badge de cola, `openHelpAiPlatform({ panel: "supervised-f3" })` navega SPA (no Ayuda)
+- Track C **C1** (`5bc51ff`): ruta `/confirm`, nav Confirmar con badge de cola, `openHelpAiPlatform({ panel: "supervised-f3" })` navega SPA (no Ayuda)
+- Track C **C2** (este commit): nav diaria Trading · Señales · Confirmar vs Laboratorio / Asesor; hub Señales; copy Universo en vigilancia
 
 ## [1.3.0] — 2026-08-21
 

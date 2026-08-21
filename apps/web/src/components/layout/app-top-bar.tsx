@@ -1,7 +1,7 @@
 /**
  * Barra superior de la plataforma (nav + cluster derecha).
  *
- * Izquierda: marca · historial ←→ · separador · nav (Overview…) · paneles Trading.
+ * Izquierda: marca · historial ←→ · separador · nav (diario · herramientas · lab) · paneles Trading.
  * Derecha (L→R): chip universo (compacto) · espacio · Ayuda · Config · menú sesión.
  * Tras Restablecer paneles (o solo en otras rutas): icono «abrir en otra pestaña».
  *
@@ -54,6 +54,15 @@ import {
   confirmNavAriaLabel,
   formatConfirmNavBadge,
 } from "@/features/confirm/confirm-nav";
+import {
+  ASESOR_LABEL,
+  ASESOR_TESIS_HINT,
+  CONFIRMAR_LABEL,
+  LABORATORIO_LABEL,
+  SEÑALES_LABEL,
+  SEÑALES_PATH,
+  TRADING_NAV_LABEL,
+} from "@/features/confirm/daily-nav";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { isTradingRoute } from "@/lib/routes";
@@ -247,9 +256,13 @@ function DropdownMenu({
   );
 }
 
-const MAIN_NAV = [
+/** Bucle diario (primer nivel). Señales y Confirmar se renderizan aparte (badges). */
+const DAILY_NAV = [
+  { to: "/trading", label: TRADING_NAV_LABEL, icon: LineChart, end: true },
+] as const;
+
+const HERRAMIENTAS_NAV = [
   { to: "/overview", label: "Overview", icon: LayoutDashboard },
-  { to: "/trading", label: "Trading", icon: LineChart, end: true },
   { to: "/accounts", label: "Cuentas", icon: Wallet },
   { to: "/alerts", label: "Alertas", icon: Bell },
   { to: "/instruments", label: "Instrumentos", icon: BookOpen },
@@ -279,7 +292,11 @@ const BACKTESTING_MENU: MenuItem[] = [
 ];
 
 const RESEARCH_MENU: MenuItem[] = [
-  { label: "Resumen", href: "/research?tab=dashboard" },
+  {
+    label: "Resumen",
+    href: "/research?tab=dashboard",
+    hint: ASESOR_TESIS_HINT,
+  },
   { label: "Diario", href: "/research?tab=diario" },
   { label: "Historial", href: "/research?tab=history" },
   { label: "Opiniones", href: "/research?tab=opiniones" },
@@ -328,7 +345,7 @@ export function AppTopBar() {
         </span>
       </div>
 
-      {/* Historial SPA al inicio, antes de Overview */}
+      {/* Historial SPA al inicio, antes del grupo diario */}
       <div
         className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background/40 p-0.5"
         role="group"
@@ -371,7 +388,7 @@ export function AppTopBar() {
       <div className="mx-1.5 h-5 w-px shrink-0 bg-border sm:mx-2" aria-hidden />
 
       <nav className="flex items-center gap-0.5" aria-label="Principal">
-        {MAIN_NAV.map(({ to, label, icon: Icon, ...rest }) => (
+        {DAILY_NAV.map(({ to, label, icon: Icon, ...rest }) => (
           <NavLink
             key={to}
             to={to}
@@ -387,47 +404,8 @@ export function AppTopBar() {
             <span className="hidden lg:inline">{label}</span>
           </NavLink>
         ))}
-        <div className="mx-0.5 hidden h-5 w-px bg-border md:block" />
-        <div className="relative">
-          <DropdownMenu
-            label="Backtesting"
-            icon={FlaskConical}
-            items={BACKTESTING_MENU}
-            align="left"
-            navStyle
-            active={isBacktestsRoute}
-          />
-          {listAutoActive ? (
-            <span
-              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-semibold leading-none text-white"
-              title={listAutoSummary ?? "Lista AUTO en curso"}
-              aria-label={listAutoSummary ?? "Lista AUTO en curso"}
-            >
-              …
-            </span>
-          ) : null}
-        </div>
-        <div className="relative">
-          <DropdownMenu
-            label="Asesor"
-            icon={Microscope}
-            items={RESEARCH_MENU}
-            align="left"
-            navStyle
-            active={isResearchRoute}
-          />
-          {asesorAlarmaBadge > 0 ? (
-            <span
-              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold leading-none text-white"
-              title={`${asesorAlarmaBadge} alarma${asesorAlarmaBadge === 1 ? "" : "s"} de dictamen`}
-              aria-label={`${asesorAlarmaBadge} alarmas de dictamen`}
-            >
-              {asesorAlarmaBadge > 9 ? "9+" : asesorAlarmaBadge}
-            </span>
-          ) : null}
-        </div>
         <NavLink
-          to="/screeners"
+          to={SEÑALES_PATH}
           className={({ isActive }) =>
             cn(
               "relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
@@ -437,11 +415,11 @@ export function AppTopBar() {
           title={
             screenerNavBadge > 0
               ? `${screenerNavBadge} rastreo${screenerNavBadge === 1 ? "" : "s"} en curso`
-              : "Rastreadores"
+              : SEÑALES_LABEL
           }
         >
           <Radar className="h-4 w-4 shrink-0" />
-          <span className="hidden lg:inline">Rastreadores</span>
+          <span className="hidden lg:inline">{SEÑALES_LABEL}</span>
           {screenerNavBadge > 0 && (
             <span
               className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
@@ -462,11 +440,11 @@ export function AppTopBar() {
           title={
             confirmQueueCount > 0
               ? `${confirmQueueCount} pendientes de firma`
-              : "Confirmar"
+              : CONFIRMAR_LABEL
           }
         >
           <PenLine className="h-4 w-4 shrink-0" />
-          <span className="hidden lg:inline">Confirmar</span>
+          <span className="hidden lg:inline">{CONFIRMAR_LABEL}</span>
           {confirmBadge ? (
             <span
               className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
@@ -476,6 +454,61 @@ export function AppTopBar() {
             </span>
           ) : null}
         </NavLink>
+        <div className="mx-0.5 hidden h-5 w-px bg-border md:block" />
+        {HERRAMIENTAS_NAV.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
+                isActive && "bg-accent text-primary",
+              )
+            }
+          >
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="hidden lg:inline">{label}</span>
+          </NavLink>
+        ))}
+        <div className="mx-0.5 hidden h-5 w-px bg-border md:block" />
+        <div className="relative">
+          <DropdownMenu
+            label={LABORATORIO_LABEL}
+            icon={FlaskConical}
+            items={BACKTESTING_MENU}
+            align="left"
+            navStyle
+            active={isBacktestsRoute}
+          />
+          {listAutoActive ? (
+            <span
+              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-semibold leading-none text-white"
+              title={listAutoSummary ?? "Lista AUTO en curso"}
+              aria-label={listAutoSummary ?? "Lista AUTO en curso"}
+            >
+              …
+            </span>
+          ) : null}
+        </div>
+        <div className="relative">
+          <DropdownMenu
+            label={ASESOR_LABEL}
+            icon={Microscope}
+            items={RESEARCH_MENU}
+            align="left"
+            navStyle
+            active={isResearchRoute}
+          />
+          {asesorAlarmaBadge > 0 ? (
+            <span
+              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-semibold leading-none text-white"
+              title={`${asesorAlarmaBadge} alarma${asesorAlarmaBadge === 1 ? "" : "s"} de dictamen`}
+              aria-label={`${asesorAlarmaBadge} alarmas de dictamen`}
+            >
+              {asesorAlarmaBadge > 9 ? "9+" : asesorAlarmaBadge}
+            </span>
+          ) : null}
+        </div>
       </nav>
 
       {trading ? (

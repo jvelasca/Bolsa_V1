@@ -17,6 +17,7 @@ import {
   formatFinalistsStabilityBadge,
   readLabEvidenceFromCoachFacts,
 } from "@/features/backtests/finalists-stability-summary";
+import { formatFueraUniversoOperativaCopy } from "@/features/confirm/daily-nav";
 import {
   diaDVerifyHref,
   VERIFY_DIA_D_CTA,
@@ -318,7 +319,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           data-testid="operativa-fuera-estudio"
         >
           <p className="font-medium text-amber-950 dark:text-amber-50">
-            Fuera de Estudio — {bookPrefs.mode.toUpperCase()} exige membresía
+            {formatFueraUniversoOperativaCopy(bookPrefs.mode.toUpperCase())}
           </p>
           <button
             type="button"

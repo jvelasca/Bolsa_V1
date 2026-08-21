@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/plan-r12-auditoria-ux-2026-08-21.md` §4.
 > **Hipótesis aprobada:** `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (propietario, 2026-08-21, línea a línea).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · E1–E9. Una fase = un subagente. 0 commits sin OK.
-> **Estado:** plan **aprobado** (propietario, 2026-08-21). **C1 en este commit.** Siguiente: C2. C3–C5 no abiertas.
+> **Estado:** plan **aprobado** (propietario, 2026-08-21). **C1** `5bc51ff` (local). **C2 en este commit.** Siguiente: C3. C4–C5 no abiertas.
 > **AsOf:** 2026-08-21 · coordinación GitHub `origin/main`.
 
 ---
@@ -87,6 +87,8 @@ Frase SEMI (UI): _«La app propone operaciones sobre tu Universo. Tú las firmas
 
 ### C2 — Nav diaria vs laboratorio
 
+**Estado:** **hecha en este commit** (2026-08-21). C1 SHA `5bc51ff` (local; push pendiente).
+
 **Depende de C1** (mismo `app-top-bar.tsx`; no paralelo).
 
 Grupo **diario** (visible): Trading · Señales (`/screeners`, hoy Rastreadores) · Confirmar · (Libro lo pone C4 si aún no existe).
@@ -149,4 +151,4 @@ Producto **BETA**. Tag `v1.3.0` → `b778292` intacto. Track C **no** tagea solo
 
 ## 6. Texto de paso (tras aprobar este plan)
 
-> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1 en este commit.** Siguiente: C2 (nav diaria vs laboratorio). C3 AUTO BETA paralelo opcional. NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.
+> Track B APROBADO. Plan C: `plan-r12-track-c-frontend-2026-08-21.md`. **C1** `5bc51ff` (local). **C2 en este commit.** Siguiente: C3 AUTO BETA. NO split backtests · NO fusionar research/radar · NO `PAPER_D_EXECUTE`.
