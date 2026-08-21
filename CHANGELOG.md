@@ -2,9 +2,14 @@
 
 All notable releases of Bolsa V1.
 
-## R-11 hardening post-v1.2.1 — 2026-08-21
+## [1.3.0] — 2026-08-21
 
-Endurecimiento del núcleo financiero y del gate CI apuntado por la **auditoría externa sobre v1.2.1** (C1–C5, C6, D1, D2 — **todas cerradas**). Documenta la política de cargo de custodia (C6). Aún **sin tag** (el repo versiona por tags; el tag se creará con la aprobación por commit del coordinador; último tag `v1.2.1` sobre `2093296`). DEMO / paper; sin broker live.
+Endurecimiento del núcleo financiero y del gate CI apuntado por la **auditoría externa sobre v1.2.1** (R-11: C1–C5, C6, D1, D2 — todas cerradas) + deuda de datos/código residual cerrada tras el cierre de R-11. Documenta la política de cargo de custodia (C6) y deja `verify_ledger_balance_chain.py` en **EXIT 0 global**. Tag: `v1.3.0` sobre `deafa27`. DEMO / paper; sin broker live.
+
+### Post-R-11 (deuda §3 del traspaso, cierre de release)
+
+- **Test** (`deafa27`) `test_execute_trade_con_fees_reconcilia` corregido: `ExecuteTrade.execute(...)` pide `idempotency_key` (R-10 F1 / R-11 C2); se añade `f"trade-{uuid4().hex[:8]}"` (deuda ajena a R-11, no regresión de gate). Batería coordinador: `test_m2` 7 passed 1 xfailed
+- **Dato dev** (fuera de repo) cuenta de simulación huérfana `acc_broken_72ab7c2aa881` ("R8C broken", única de 111 que fallaba la cadena `balance_after` por +0.01 float legacy) **eliminada por path canónico** `close_account`→`delete_simulated_account` (coherente con R-10 F3-sim; **D6 prohíbe backfill** por eso no se reescribió `balance_after`) → `verify_ledger_balance_chain.py` **EXIT 0**
 
 ### R-11 — Endurecimiento post-v1.2.1 (C1–C6 + D1 + D2 cerradas a `main`)
 
