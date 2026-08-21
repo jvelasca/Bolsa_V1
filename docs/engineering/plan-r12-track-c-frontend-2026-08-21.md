@@ -140,12 +140,12 @@ Sincronizar `docs/HELP.md` + `app-help-menu.tsx` + `help-registry.ts` + `help-co
 
 ## 4. Fuera de Track C (explícito)
 
-| Ítem                              | Por qué                                            |
-| --------------------------------- | -------------------------------------------------- |
-| Split `backtests-page.tsx`        | Higiene M5; no desbloquea las 5 puertas            |
-| Unificación Research→Radar código | Plan aparcado; capítulo del estudio, no fase C     |
-| Tag `v1.4.0` / `v1.5.0-beta`      | **`v1.5.0-beta` cortado** → `5e52bd6` (2026-08-22) |
-| Gates R-12 (split accounts, auth) | Siguen en decisión; 409/EXEC-B/SCHED **cerrados**  |
+| Ítem                              | Por qué                                                                                                                  |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Split `backtests-page.tsx`        | Higiene M5; no desbloquea las 5 puertas                                                                                  |
+| Unificación Research→Radar código | Plan aparcado; capítulo del estudio, no fase C                                                                           |
+| Tag `v1.4.0` / `v1.5.0-beta`      | **`v1.5.0-beta` cortado** → `5e52bd6` (2026-08-22)                                                                       |
+| Gates R-12 (split accounts, auth) | **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1** `e52e016`; JWT/D4 y purge siguen en decisión; 409/EXEC-B/SCHED **cerrados** |
 
 ---
 
