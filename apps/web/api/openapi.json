@@ -3506,6 +3506,8 @@
             "type": "number"
           },
           "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
             "title": "Idempotencykey",
             "type": "string"
           },
@@ -14225,6 +14227,7 @@
           "capitalGainsTaxPct": {
             "anyOf": [
               {
+                "minimum": 0.0,
                 "type": "number"
               },
               {
@@ -14238,6 +14241,7 @@
             "type": "string"
           },
           "dividendWithholdingPct": {
+            "minimum": 0.0,
             "title": "Dividendwithholdingpct",
             "type": "number"
           },
@@ -14250,6 +14254,7 @@
             "type": "string"
           },
           "stampDutyBuyPct": {
+            "minimum": 0.0,
             "title": "Stampdutybuypct",
             "type": "number"
           }
@@ -14597,6 +14602,8 @@
       "TradeRequestDto": {
         "properties": {
           "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
             "title": "Idempotencykey",
             "type": "string"
           },
@@ -15853,6 +15860,8 @@
             "type": "number"
           },
           "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
             "title": "Idempotencykey",
             "type": "string"
           },
