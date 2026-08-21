@@ -274,6 +274,7 @@ async def test_execute_trade_con_fees_reconcilia(db_session: AsyncSession) -> No
         quantity=10,
         price=500,
         account_id=account_id,
+        idempotency_key=f"trade-{uuid4().hex[:8]}",
     )
     # Fees de standard_es: el trade escribe buy (-notional) + fee (-abs) en ledger.
     # Σ = seed(+10000) - notional - fees == cash tras trade.
