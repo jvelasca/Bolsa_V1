@@ -56,3 +56,16 @@ Header `X-Account-Id` (solo si está presente; `None` = comportamiento actual):
 Tests: extender `test_account_isolation.py` (foreign id → 404 en al menos core-r GET, mandates GET, portfolio GET con header).
 
 Batería: pytest isolation + test_auth · ruff zona tocada.
+
+---
+
+## 6. Fase 3 — mismo 404 en cash/trade (NO JWT, NO reescribir motor)
+
+**Qué:** el guard de visibilidad en las rutas de dinero. **Cero cambio** en `ExecuteTrade` / deposit / withdraw use-cases (paquete `accounts/`).
+
+- `accounts.py` routes: `POST /accounts/{account_id}/deposits` y `/withdrawals` → `Depends(require_account_access)`
+- `portfolio.py`: `POST /portfolio/trade` → `Depends(require_account_header_access)` (header ausente → `None`, igual que hoy; header ajeno → 404)
+
+**NO:** JWT · tabla users · `ai_governance` · `contract:gen` · `PAPER_D_EXECUTE` · purge · reescribir ledger/idempotencia.
+
+Tests: foreign deposit → 404; foreign `X-Account-Id` en trade → 404 (no hace falta un trade válido si el Depends corta antes); legacy `user_id=None` deposit sigue 2xx/4xx de negocio, no 404 de owner.

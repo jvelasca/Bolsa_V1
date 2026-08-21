@@ -379,7 +379,7 @@ async def send_daily_ops_digest_email(
     responses=IDEMPOTENCY_CONFLICT_RESPONSES,
 )
 async def deposit_cash(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: DepositCashDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> CashMovementResponseDto:
@@ -402,7 +402,7 @@ async def deposit_cash(
     responses=IDEMPOTENCY_CONFLICT_RESPONSES,
 )
 async def withdraw_cash(
-    account_id: str,
+    account_id: Annotated[str, Depends(require_account_access)],
     body: WithdrawCashDto,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> CashMovementResponseDto:

@@ -2,12 +2,10 @@
 
 from typing import Annotated
 
-from bolsa_application.accounts import ExecuteTrade
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
-    get_account_id_header,
     get_db_session,
     get_execute_trade_use_case,
     get_list_transactions_use_case,
@@ -26,6 +24,7 @@ from bolsa_api.schemas.portfolio import (
     TradeResponseDto,
     TransactionsResponseDto,
 )
+from bolsa_application.accounts import ExecuteTrade
 
 router = APIRouter()
 
@@ -91,7 +90,7 @@ async def execute_trade(
 
     session: Annotated[AsyncSession, Depends(get_db_session)],
 
-    account_id: Annotated[str | None, Depends(get_account_id_header)],
+    account_id: Annotated[str | None, Depends(require_account_header_access)],
 
 ) -> TradeResponseDto:
 

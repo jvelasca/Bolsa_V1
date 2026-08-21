@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
+from bolsa_api.auth.principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -265,8 +266,6 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
-from bolsa_api.auth.principal import get_request_principal
-
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     return cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)
@@ -335,8 +334,7 @@ def get_account_id_header(
 async def require_account_access(request: Request, account_id: str) -> str:
     """404 si el ``account_id`` de path no es visible para el principal del request.
 
-    Filas legacy ``user_id is None`` siguen accesibles. No usar en deposit/withdraw
-    ni en rutas de trade (R12-AUTH fase 1/2).
+    Filas legacy ``user_id is None`` siguen accesibles.
     """
     factory = get_session_factory(request)
     async with factory() as session:
@@ -356,7 +354,7 @@ async def require_account_header_access(
 ) -> str | None:
     """Si ``X-Account-Id`` viene, misma visibilidad que ``require_account_access``.
 
-    Header ausente → ``None`` (no 400). No usar en trade/deposit/withdraw.
+    Header ausente → ``None`` (no 400).
     """
     if account_id is None:
         return None

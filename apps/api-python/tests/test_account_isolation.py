@@ -5,14 +5,14 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import InvestmentAccountRow
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.auth.principal import DEFAULT_APP_PRINCIPAL, resolve_app_principal
 from bolsa_api.auth.session import SESSION_COOKIE_NAME, create_session_cookie_value
 from bolsa_api.main import create_app, lifespan
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import InvestmentAccountRow
 
 
 def _now() -> datetime:
@@ -209,6 +209,62 @@ async def test_foreign_account_nested_and_header_routes_return_404() -> None:
                 assert portfolio.status_code == 404
         finally:
             await _delete_raw_account(factory, foreign_id)
+
+
+@pytest.mark.asyncio
+async def test_foreign_account_cash_and_trade_routes_return_404() -> None:
+    """R12-AUTH fase 3: deposit path + trade X-Account-Id (Depends before use-case)."""
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        foreign_id = await _insert_raw_account(
+            factory, user_id="other", name="Foreign cash isolation"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                deposit = await client.post(
+                    f"/api/accounts/{foreign_id}/deposits",
+                    json={
+                        "amount": 10,
+                        "idempotencyKey": "iso-deposit-key-01",
+                    },
+                )
+                assert deposit.status_code == 404
+
+                trade = await client.post(
+                    "/api/portfolio/trade",
+                    headers={"X-Account-Id": foreign_id},
+                    json={"dummy": True},
+                )
+                assert trade.status_code == 404
+        finally:
+            await _delete_raw_account(factory, foreign_id)
+
+
+@pytest.mark.asyncio
+async def test_legacy_null_user_id_deposit_not_owner_404() -> None:
+    """Legacy ``user_id is None`` deposit is not hidden; 404 would be owner isolation."""
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        legacy_id = await _insert_raw_account(
+            factory, user_id=None, name="Legacy cash isolation"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.post(
+                    f"/api/accounts/{legacy_id}/deposits",
+                    json={
+                        "amount": 10,
+                        "idempotencyKey": "iso-legacy-dep-001",
+                    },
+                )
+                assert response.status_code != 404
+                assert response.status_code in {201, 400, 422}
+        finally:
+            await _delete_raw_account(factory, legacy_id)
 
 
 @pytest.mark.asyncio
