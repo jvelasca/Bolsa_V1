@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product/Ops`) · **backlog:** `docs/engineering/backlog-trabajo-2026-08-20.md`.
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐ §0 (**PREMISAS ESENCIALES ACTUALES E1–E9**).
 > **AsOf:** 2026-08-21 (apertura 2026-08-20; avanzado F1/F2a/F2b/F3/F4a el 21 — ver `traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`).
-> **Estado:** 🚧 **EN EJECUCIÓN (2026-08-21):** **F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅ `b79e5dd` · F4a ✅ (`49e2731` ADR 026 docs + `5c304e6` implementación)** — todas de R‑10 aprobadas por commit y pusheadas a `main`. **SIGUIENTE: F4b** (custodia fuera del GET → job programado; reactiva `M-4/T-M4`). Ningún cambio de código adicional sin **aprobación explícita del usuario POR COMMIT** (§2.4). Plan director de R‑10; cada fase se abre como subagente acotado bajo las premisas E1–E9.
+> **Estado:** ✅ **COMPLETADO — R-10 cerrada (F1–F5) · v1.2.1 taggeada.** **F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅ `b79e5dd` · F4a ✅ (`49e2731` ADR 026 docs + `5c304e6` implementación) · F4b ✅ `e12a125` (custodia fuera del GET → job `RunCustodyJob`; reactiva `M-4/T-M4`) · F5 ✅ (docs + CHANGELOG `[1.2.1]` + cierre v1.2.1, 2026-08-21).** Todas las fases R‑10 aprobadas por commit y pusheadas a `main`. **v1.2.1 queda pendiente únicamente de la aprobación por commit del cierre F5 y del tag `v1.2.1` (los hace el coordinador/propietario post‑commit).** Cierre R-10/v1.2.1: `traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`. Plan director de R‑10; cada fase se abrió como subagente acotado bajo las premisas E1–E9.
 > **R‑9 quedó CERRADA** (F1–F8, decisión 2026-08-20) y **v1.2.0 intacta**. R‑10 es un paquete nuevo nacido de la **auditoría externa sobre `b28e956`/`v1.2.0`** (capa financiera P1/P2).
 
 ---
@@ -25,7 +25,7 @@
 | Rama / árbol                 | `main` = `origin/main` · **limpio** (`git status --short` vacío)              |
 | Tags                         | `v1.0.0`, `v1.1.0`, `v1.2.0`                                                  |
 | Estado R‑9                   | **CERRADA** (F1–F8) — decisión propietario 2026-08-20                         |
-| Avance R‑10 (2026-08-21)     | **F1 ✅ · F2a ✅ · F2b ✅ · F3 ✅ · F4a ✅** (A F4b) — commits en §2 traspaso |
+| Avance R‑10 (2026-08-21)     | **F1 ✅ · F2a ✅ · F2b ✅ · F3 ✅ · F4a ✅ · F4b ✅ · F5 ✅ — R-10 COMPLETA** |
 
 ### 1.3 Evidencia verificada en código (file:line) — los 6 puntos
 
@@ -74,8 +74,8 @@ F2a     → TaxProfileDto estricto (P1.3)                                       
 F2b     → comparación idempotente exacta, sin tolerancia 0.01 (P2)              [accounts, bajo] ✅ `86c315a`
 F3      → balance_after trade/fee corregido, SIN backfill (P1.1)                [accounts+verify, medio] ✅ `b79e5dd`
 F4a     → custodia Opción B: obligación pendiente (tabla/ADR/migración) (P1.2)  [datos, ALTO] ✅ ADR `49e2731` + impl `5c304e6`
-F4b     → custodia fuera del GET → job programado (D4) (reabre M-4/T-M4)        [scheduler, ALTO] ◀ SIGUIENTE
-F5      → docs + CHANGELOG + tag/release v1.2.1 + limpieza obsoletos (E8)       [higiene]
+F4b     → custodia fuera del GET → job programado (D4) (reabre M-4/T-M4)        [scheduler, ALTO] ✅ `e12a125`
+F5      → docs + CHANGELOG + tag/release v1.2.1 + limpieza obsoletos (E8)       [higiene] ✅ (2026-08-21)
 ```
 
 Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a, F2b, F5 son de riesgo bajo; F3 medio; F4a y F4b altos** (datos + scheduler) y requieren ADR/estrategia antes de código.
@@ -200,9 +200,9 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 >
 > **Pendiente de F4a (depende de F4b):** el **disparador de reintento del `PENDING`** (job que decide en qué frecuencia re-cobra el saldo pendiente) — se abre en la fase F4b.
 
-### 🔴 FASE F4b — R-10.4b: Custodia fuera del GET → job programado (D4, ALTO) ◀ SIGUIENTE
+### 🔴 FASE F4b — R-10.4b: Custodia fuera del GET → job programado (D4, ALTO) ✅ CERRADO
 
-> **Pendiente de apertura en la fase:** se ejecutará en la siguiente fase (2026-08-21). Requiere decisión de job ANTES de código (alcance, frecuencia, fallo/sin saldo → `PENDING`, y coexistencia con scheduler no‑ARQ R-8C.2).
+> **✅ F4b HECHA (2026-08-21, pusheado a `main` `e12a125`):** la custodia **sale del path de lectura** y pasa a un **job programado**. `GetAccountSummary` (`:177-178`) y `GetTaxReport` (`:891-892`) quedan **100% de solo lectura** (comentario `# R-10 F4b`); el cobro se mueve a `RunCustodyJob` (`packages/py/application/src/bolsa_application/custody_job.py`, nuevo use-case) invocado por el scheduler/worker. Idempotente (`ApplyCustodyFees.execute` devuelve `False` ante colisión UNIQUE/mutex R-9 F3, ya cobrado o no aplica; `True` cobra→`APPLIED` o deja `PENDING` si `cash<fee`). **Reactiva `M-4/T-M4`** (job dedicado, D4). Desfase de saldo pre‑custodia aceptado (D4.1). `ApplyCustodyFees` en `accounts.py` queda solo en su propia definición (`:553`) y en el job — verificado que **ya no aparece** en `GetAccountSummary`/`GetTaxReport`.
 
 **Problema:** `GetAccountSummary` (`:176`) y `GetTaxReport` (`:866`) mutan en GET.
 **Corrección (D4):**
@@ -214,7 +214,9 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 
 **Criterio:** GET summary/tax no mutan (no escriben ledger/cash); el job aplica custodia de forma idempotente y sin duplicar; tests de regresión de R-9 F3/F7 verdes; batería scheduler.
 
-### 🟢 FASE F5 — R-10.5: Docs + CHANGELOG + versión + limpieza obsoletos (E8)
+### 🟢 FASE F5 — R-10.5: Docs + CHANGELOG + versión + limpieza obsoletos (E8) ✅ CERRADO
+
+> **✅ F5 HECHA (2026-08-21, en curso como fase de cierre):** docs de estado actualizados a **R-10 COMPLETA / v1.2.1** (backlog §0+§6 con filas F4b y F5/cierre · `PROJECT_STATE.md` · `engineering-index` · este doc); **CHANGELOG.md** con entrada **`## [1.2.1] — 2026-08-21`** resumiendo la auditoría externa post‑v1.2.0 y las 6 correcciones R-10 (F1/F2a/F2b/F3/F4a/F4b) y reflejando **M-4/T-M4 REACTIVADO por F4b**; limpieza E8 verificada (inventariar, NO borrar; `pending-delete` riesgo alto intacto). **Versión:** `apps/web/package.json` y `packages/shared/package.json` permanecen en `"0.1.0"` (no se suben — el versionado semántico del repo va por **tags**, no por package.json; precedente v1.2.0). **El tag `v1.2.1` lo crea el coordinador post‑commit** (pendiente única de cierre).
 
 - Actualizar `backlog-trabajo-2026-08-20.md` (§0 relego + §6), `PROJECT_STATE.md`, `engineering-index`, y este doc (estados por fase).
 - Registrar decisión de contraste contra la auditoría externa y el **texto de paso** de R‑10.
@@ -230,14 +232,14 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 | **F1** | **Estrategia de generación de `idempotency_key` en el cliente.** ✅ **DECIDIDA (2026-08-20):** **Opción C** — cada call-site genera una key única y la **cachea por operación en curso** (reutilizada en retries → replay/409), sobre un **helper reutilizable** derivado de `createRandomId` (`@bolsa/shared/src/create-id.ts`). **El endpoint `/api/ai/intents/confirm` NO exige key en F1** (el trade server-side ya usa clave interna vía B-4); alcance F1 = solo `deposit`/`withdraw`/`trade` directos. | ✅ **DECIDIDA (2026-08-20)** — Opción C + confirm fuera · F1 ✅ `a1501e6`                                                                                                                                                   |
 | F4a    | **ADR** del modelo de obligación de custodia pendiente (tabla/estado, transición de cuentas con `custody-YYYY` ya marcado como DONE en v1.2.0 sin re‑cobrar retroactivamente).                                                                                                                                                                                                                                                                                                                               | ✅ **CERRADO (2026-08-21)** — **ADR 026** (`docs/adr/026-custodia-obligacion-pendiente.md`, docs `49e2731`): tabla `custody_obligation` (PK `account_id`, una fila/cuenta), `status` `PENDING`/`APPLIED`, forward-only (D6) |
 | F4a    | Migración Alembic de la tabla + estrategia para **no re‑cobrar** periodos ya liquidados como DONE en v1.2.0.                                                                                                                                                                                                                                                                                                                                                                                                 | ✅ **CERRADO (2026-08-21)** — implementado en `5c304e6`: migración `005_custody_obligation` (down_revision `004_ledger_reference_unique`, forward-only, sin backfill) + repo + Opción B. Sin re-cobro retroactivo (D6)      |
-| F4b    | Estrategia de job: alcance (todas cuentas activas vs cuentas con saldo), frecuencia, fallo/sin saldo (→ PENDING), coexistencia con scheduler no‑ARQ (R-8C.2).                                                                                                                                                                                                                                                                                                                                                | ⏳ **SIGUIENTE — pendiente apertura en la fase F4b** (reactiva M-4/T-M4)                                                                                                                                                    |
-| F5     | Tag/release `v1.2.1` + confirmar subversión en `apps/web/package.json`/`packages/shared/package.json`.                                                                                                                                                                                                                                                                                                                                                                                                       | ⏳ aprobación final                                                                                                                                                                                                         |
+| F4b    | Estrategia de job: alcance (todas cuentas activas vs cuentas con saldo), frecuencia, fallo/sin saldo (→ PENDING), coexistencia con scheduler no‑ARQ (R-8C.2).                                                                                                                                                                                                                                                                                                                                                | ✅ **CERRADO (2026-08-21)** — F4b `e12a125` (job `RunCustodyJob` sobre cuentas activas, idempotente; GET solo lectura; reactiva M-4/T-M4; desfase D4.1 aceptado)                                                            |
+| F5     | Tag/release `v1.2.1` + confirmar subversión en `apps/web/package.json`/`packages/shared/package.json`.                                                                                                                                                                                                                                                                                                                                                                                                       | ✅ **CERRADO (2026-08-21)** — docs+CHANGELOG `[1.2.1]` hechos; al tag le falta solo la aprobación por commit del coordinador (packages quedan en `0.1.0`, versión por tag)                                                  |
 
 ---
 
 ## 6. Texto de paso (relevo / nuevo chat)
 
-> **RELEVO → FASE R‑10 (v1.2.1).** Repo `Bolsa_V1`, `main` = **`5c304e6`** = `origin/main`, árbol **limpio**. **R‑9 cerrada**; **v1.2.0** taggeada (`b28e956`). **AVANZADO 2026-08-21:** F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅ `b79e5dd` · F4a ✅ (`49e2731` ADR 026 + `5c304e6` impl). **SIGUIENTE: F4b** (custodia fuera del GET → job; reactiva M-4/T-M4). **NO tocar código sin aprobación por commit.**
+> **RELEVO → FASE R‑10 (v1.2.1) — CERRADA.** Repo `Bolsa_V1`, `main` = `c84e1e3` = `origin/main`, árbol **limpio**. **R‑9 cerrada**; **v1.2.0** taggeada (`b28e956`). **COMPLETADO 2026-08-21:** F1 ✅ `a1501e6` · F2a ✅ `b4dcc72` · F2b ✅ `86c315a` · F3 ✅ `b79e5dd` · F4a ✅ (`49e2731` ADR 026 + `5c304e6` impl) · **F4b ✅ `e12a125`** (job `RunCustodyJob`, GET solo lectura, reactiva M-4/T-M4) · **F5 ✅** (docs + CHANGELOG `[1.2.1]`). **v1.2.1 queda pendiente solo de la aprobación por commit del cierre F5 y del tag `v1.2.1`** (los hace el coordinador/propietario). Cierre/traspaso: `traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`.
 > **LEE PRIMERO (obligatorio):** `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/PROJECT_PREMISES.md` ⭐ §0 (E1–E9) · `docs/engineering/PROJECT_STATE.md` · este doc (`plan-r10-v1-2-1-correcciones-auditoria-2026-08-20.md`) · traspaso activo (`traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`) · `docs/adr/026-custodia-obligacion-pendiente.md`.
 > **Plan director:** este doc. **Progreso por fase:** se actualiza aquí y en el backlog al cerrar cada una.
 > **Orden:** F1 → F2a → F2b → F3 → F4a → F4b → F5. Cada fase: un subagente acotado (alcances disjuntos, máx ~3 en paralelo, brief con mapa de consumidores verificado) + verificación del coordinador (diff + batería real) + **aprobación del usuario por commit** + push a `main`.
@@ -252,7 +254,7 @@ Cada fase se abre de una en una, con su subagente acotado y batería. **F1, F2a,
 - Backlog (LEER PRIMERO): `docs/engineering/backlog-trabajo-2026-08-20.md`
 - Plan R‑9 (cerrado): `docs/engineering/plan-r9-refactor-hardening-2026-08-20.md`
 - Traspaso R‑9: `docs/engineering/traspaso-relevo-cierre-r9-f1-f8-apertura-f9-2026-08-20.md`
-- **Traspaso R‑10 activo (F1–F4a):** `docs/engineering/traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`
+- **Traspaso R‑10 activo (F1–F4b, cierre v1.2.1):** `docs/engineering/traspaso-relevo-cierre-r10-f3-f4a-apertura-f4b-2026-08-21.md`
 - **ADR 026 (F4a):** `docs/adr/026-custodia-obligacion-pendiente.md`
 - Estado vivo: `docs/engineering/PROJECT_STATE.md`
 - Auditoría externa (fuente): aportada por el propietario en conversación (audita `b28e956`/`v1.2.0`)
