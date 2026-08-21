@@ -12,13 +12,13 @@
 - Track A + B: **`48cc255`**. Track B **APROBADO** (mesa 5 puertas).
 - Track C **C1–C5 cerradas en local** (este hilo). Push a GitHub **pendiente** (E4).
 
-| Fase | SHA local       | Qué                                                            |
-| ---- | --------------- | -------------------------------------------------------------- |
-| C1   | `5bc51ff`       | `/confirm` + nav Confirmar + F3 → `bolsa:navigate`             |
-| C2   | `01af9ff`       | Nav diaria Trading · Señales · Confirmar vs Laboratorio/Asesor |
-| C3   | `97e20ab`       | AUTO cuenta «No disponible (BETA)»; sin thaw                   |
-| C4   | `154fcd1`       | Nav Libro (Operaciones + Historial)                            |
-| C5   | _(este commit)_ | HELP + Ayuda + tracker + frase SEMI                            |
+| Fase | SHA local | Qué                                                            |
+| ---- | --------- | -------------------------------------------------------------- |
+| C1   | `5bc51ff` | `/confirm` + nav Confirmar + F3 → `bolsa:navigate`             |
+| C2   | `01af9ff` | Nav diaria Trading · Señales · Confirmar vs Laboratorio/Asesor |
+| C3   | `97e20ab` | AUTO cuenta «No disponible (BETA)»; sin thaw                   |
+| C4   | `154fcd1` | Nav Libro (Operaciones + Historial)                            |
+| C5   | `0eb8976` | HELP + Ayuda + tracker + frase SEMI                            |
 
 Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Laboratorio · Asesor**.
 
