@@ -5,7 +5,13 @@ from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 
 class ExecutionPolicyRepository(Protocol):
-    async def list_policies(self, *, limit: int = 50, enabled_only: bool = False) -> list[ExecutionPolicyRecord]: ...
+    async def list_policies(
+        self,
+        *,
+        limit: int = 50,
+        enabled_only: bool = False,
+        owner_user_id: str | None = None,
+    ) -> list[ExecutionPolicyRecord]: ...
 
     async def get_policy(self, policy_id: str) -> ExecutionPolicyRecord | None: ...
 

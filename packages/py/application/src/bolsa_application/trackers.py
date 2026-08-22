@@ -3,10 +3,6 @@
 from dataclasses import dataclass
 from typing import Any
 
-from bolsa_application.execution_router import ExecutionRouter
-from bolsa_application.scan_jobs import EnqueueScanJob
-from bolsa_application.scans import RunScan, ScanRunResult
-from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
 from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from bolsa_domain.platform_kernel import (
     KERNEL_EVALUATION_MODES,
@@ -18,6 +14,11 @@ from bolsa_domain.repositories.execution_policy_repository import ExecutionPolic
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
 from bolsa_domain.repositories.tracker_definition_repository import TrackerDefinitionRepository
 from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
+
+from bolsa_application.execution_router import ExecutionRouter
+from bolsa_application.scan_jobs import EnqueueScanJob
+from bolsa_application.scans import RunScan, ScanRunResult
+from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
 
 
 def _validate_universe(universe: dict[str, Any]) -> None:
@@ -91,8 +92,18 @@ class ListTrackerDefinitions:
     def __init__(self, repository: TrackerDefinitionRepository) -> None:
         self._repository = repository
 
-    async def execute(self, *, limit: int = 50, enabled_only: bool = False) -> list[TrackerDefinitionRecord]:
-        return await self._repository.list_trackers(limit=limit, enabled_only=enabled_only)
+    async def execute(
+        self,
+        *,
+        limit: int = 50,
+        enabled_only: bool = False,
+        owner_user_id: str | None = None,
+    ) -> list[TrackerDefinitionRecord]:
+        return await self._repository.list_trackers(
+            limit=limit,
+            enabled_only=enabled_only,
+            owner_user_id=owner_user_id,
+        )
 
 
 class ListTrackerDefinitionsForList:
@@ -140,6 +151,7 @@ class CreateTrackerDefinition:
         origin: str = "manual",
         source_prompt: str | None = None,
         enabled: bool = True,
+        user_id: str | None = None,
     ) -> TrackerDefinitionRecord:
         strategy = await self._strategies.get_definition(strategy_definition_id)
         if strategy is None:
@@ -161,6 +173,7 @@ class CreateTrackerDefinition:
             evaluation_mode=evaluation_mode,
             origin=origin,
             enabled=enabled,
+            user_id=user_id,
         )
         definition = build_tracker_definition_dict(
             tracker_id=record.id,

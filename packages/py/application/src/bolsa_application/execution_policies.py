@@ -59,8 +59,18 @@ class ListExecutionPolicies:
     def __init__(self, repository: ExecutionPolicyRepository) -> None:
         self._repository = repository
 
-    async def execute(self, *, limit: int = 50, enabled_only: bool = False) -> list[ExecutionPolicyRecord]:
-        return await self._repository.list_policies(limit=limit, enabled_only=enabled_only)
+    async def execute(
+        self,
+        *,
+        limit: int = 50,
+        enabled_only: bool = False,
+        owner_user_id: str | None = None,
+    ) -> list[ExecutionPolicyRecord]:
+        return await self._repository.list_policies(
+            limit=limit,
+            enabled_only=enabled_only,
+            owner_user_id=owner_user_id,
+        )
 
 
 class GetExecutionPolicy:
@@ -98,6 +108,7 @@ class CreateExecutionPolicy:
         require_validated_backtest: bool = False,
         origin: str = "manual",
         enabled: bool = True,
+        user_id: str | None = None,
     ) -> ExecutionPolicyRecord:
         mode = validate_execution_mode(mode)
         kinds = list(signal_kinds or DEFAULT_SIGNAL_KINDS)
@@ -127,6 +138,7 @@ class CreateExecutionPolicy:
             strategy_definition_id=strategy_definition_id,
             origin=origin,
             enabled=enabled,
+            user_id=user_id,
         )
         definition = build_execution_policy_definition(
             policy_id=record.id,

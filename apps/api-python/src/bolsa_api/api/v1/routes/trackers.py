@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -16,6 +16,8 @@ from bolsa_api.api.dependencies import (
     get_tracker_definition_use_case,
     get_update_tracker_use_case,
 )
+from bolsa_api.auth.principal import account_visible_to_principal
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.schemas.scans import (
     ScanJobResponseDto,
     ScanRunResponseDto,
@@ -47,6 +49,15 @@ from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 router = APIRouter()
 
 
+def _require_tracker_access(
+    record: TrackerDefinitionRecord | None,
+    principal: str,
+) -> TrackerDefinitionRecord:
+    if record is None or not account_visible_to_principal(record.user_id, principal):
+        raise HTTPException(status_code=404, detail="Tracker not found")
+    return record
+
+
 def _summary(record: TrackerDefinitionRecord) -> TrackerDefinitionSummaryDto:
     return TrackerDefinitionSummaryDto(
         id=record.id,
@@ -71,20 +82,32 @@ def _detail(record: TrackerDefinitionRecord) -> TrackerDefinitionDetailDto:
 
 @router.get("/trackers", response_model=TrackerDefinitionsListResponseDto)
 async def list_trackers(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     enabled_only: bool = False,
 ) -> TrackerDefinitionsListResponseDto:
+    principal = get_request_principal(request)
     use_case: ListTrackerDefinitions = get_list_trackers_use_case(session)
-    records = await use_case.execute(limit=50, enabled_only=enabled_only)
+    records = await use_case.execute(
+        limit=50,
+        enabled_only=enabled_only,
+        owner_user_id=principal,
+    )
     return TrackerDefinitionsListResponseDto(data=[_summary(r) for r in records])
 
 
 @router.post("/trackers/schedules/evaluate", response_model=EvaluateTrackerSchedulesResponseDto)
 async def evaluate_tracker_schedules(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     tracker_id: str | None = Query(default=None, alias="trackerId"),
     force: bool = False,
 ) -> EvaluateTrackerSchedulesResponseDto:
+    principal = get_request_principal(request)
+    if tracker_id is not None:
+        get_use_case: GetTrackerDefinition = get_tracker_definition_use_case(session)
+        existing = await get_use_case.execute(tracker_id)
+        _require_tracker_access(existing, principal)
     use_case: ProcessTrackerSchedules = get_process_tracker_schedules_use_case(session)
     result = await use_case.execute(tracker_id=tracker_id, force=force)
     return EvaluateTrackerSchedulesResponseDto(
@@ -109,18 +132,20 @@ async def evaluate_tracker_schedules(
 @router.get("/trackers/{tracker_id}", response_model=TrackerDefinitionResponseDto)
 async def get_tracker(
     tracker_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TrackerDefinitionResponseDto:
+    principal = get_request_principal(request)
     use_case: GetTrackerDefinition = get_tracker_definition_use_case(session)
     record = await use_case.execute(tracker_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Tracker not found")
+    record = _require_tracker_access(record, principal)
     return TrackerDefinitionResponseDto(data=_detail(record))
 
 
 @router.post("/trackers", response_model=TrackerDefinitionResponseDto, status_code=201)
 async def create_tracker(
     body: CreateTrackerDefinitionRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TrackerDefinitionResponseDto:
     use_case: CreateTrackerDefinition = get_create_tracker_use_case(session)
@@ -140,6 +165,7 @@ async def create_tracker(
             origin=body.origin,
             source_prompt=body.source_prompt,
             enabled=body.enabled,
+            user_id=get_request_principal(request),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -150,8 +176,13 @@ async def create_tracker(
 async def update_tracker(
     tracker_id: str,
     body: UpdateTrackerDefinitionRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TrackerDefinitionResponseDto:
+    principal = get_request_principal(request)
+    get_use_case: GetTrackerDefinition = get_tracker_definition_use_case(session)
+    existing = await get_use_case.execute(tracker_id)
+    _require_tracker_access(existing, principal)
     use_case: UpdateTrackerDefinition = get_update_tracker_use_case(session)
     universe = (
         body.universe.model_dump(by_alias=True, exclude_none=True)
@@ -186,8 +217,13 @@ async def update_tracker(
 @router.delete("/trackers/{tracker_id}", status_code=204)
 async def delete_tracker(
     tracker_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> None:
+    principal = get_request_principal(request)
+    get_use_case: GetTrackerDefinition = get_tracker_definition_use_case(session)
+    existing = await get_use_case.execute(tracker_id)
+    _require_tracker_access(existing, principal)
     use_case: DeleteTrackerDefinition = get_delete_tracker_use_case(session)
     deleted = await use_case.execute(tracker_id)
     if not deleted:
@@ -197,8 +233,13 @@ async def delete_tracker(
 @router.post("/trackers/{tracker_id}/scan", response_model=ScanRunResponseDto)
 async def run_tracker_scan(
     tracker_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> ScanRunResponseDto:
+    principal = get_request_principal(request)
+    get_use_case: GetTrackerDefinition = get_tracker_definition_use_case(session)
+    existing = await get_use_case.execute(tracker_id)
+    _require_tracker_access(existing, principal)
     use_case: RunTrackerScan = get_run_tracker_scan_use_case(session)
     try:
         outcome = await use_case.execute(tracker_id)
@@ -212,8 +253,13 @@ async def run_tracker_scan(
 @router.post("/trackers/{tracker_id}/scan-jobs", response_model=ScanJobResponseDto, status_code=202)
 async def enqueue_tracker_scan_job(
     tracker_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> ScanJobResponseDto:
+    principal = get_request_principal(request)
+    get_use_case: GetTrackerDefinition = get_tracker_definition_use_case(session)
+    existing = await get_use_case.execute(tracker_id)
+    _require_tracker_access(existing, principal)
     use_case: EnqueueTrackerScanJob = get_enqueue_tracker_scan_job_use_case(session)
     try:
         job = await use_case.execute(tracker_id)

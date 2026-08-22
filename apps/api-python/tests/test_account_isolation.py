@@ -132,6 +132,8 @@ def _patch_request_principal(
         "bolsa_api.api.dependencies.get_request_principal",
         "bolsa_api.api.v1.routes.accounts.get_request_principal",
         "bolsa_api.api.v1.routes.investor_profiles.get_request_principal",
+        "bolsa_api.api.v1.routes.trackers.get_request_principal",
+        "bolsa_api.api.v1.routes.execution_policies.get_request_principal",
     ):
         monkeypatch.setattr(target, fake)
 

@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -15,6 +15,8 @@ from bolsa_api.api.dependencies import (
     get_list_execution_policies_use_case,
     get_update_execution_policy_use_case,
 )
+from bolsa_api.auth.principal import account_visible_to_principal
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.schemas.execution_policies import (
     CreateExecutionPolicyRequestDto,
     ExecuteScanJobRequestDto,
@@ -42,6 +44,15 @@ from bolsa_application.execution_router import (
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 router = APIRouter()
+
+
+def _require_policy_access(
+    record: ExecutionPolicyRecord | None,
+    principal: str,
+) -> ExecutionPolicyRecord:
+    if record is None or not account_visible_to_principal(record.user_id, principal):
+        raise HTTPException(status_code=404, detail="Execution policy not found")
+    return record
 
 
 def _summary(record: ExecutionPolicyRecord) -> ExecutionPolicySummaryDto:
@@ -90,29 +101,37 @@ def _action_dto(action: ExecutionActionResult) -> ExecutionActionResultDto:
 
 @router.get("/execution-policies", response_model=ExecutionPoliciesListResponseDto)
 async def list_execution_policies(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     enabled_only: bool = False,
 ) -> ExecutionPoliciesListResponseDto:
+    principal = get_request_principal(request)
     use_case: ListExecutionPolicies = get_list_execution_policies_use_case(session)
-    records = await use_case.execute(limit=50, enabled_only=enabled_only)
+    records = await use_case.execute(
+        limit=50,
+        enabled_only=enabled_only,
+        owner_user_id=principal,
+    )
     return ExecutionPoliciesListResponseDto(data=[_summary(r) for r in records])
 
 
 @router.get("/execution-policies/{policy_id}", response_model=ExecutionPolicyResponseDto)
 async def get_execution_policy(
     policy_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> ExecutionPolicyResponseDto:
+    principal = get_request_principal(request)
     use_case: GetExecutionPolicy = get_execution_policy_use_case(session)
     record = await use_case.execute(policy_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Execution policy not found")
+    record = _require_policy_access(record, principal)
     return ExecutionPolicyResponseDto(data=_detail(record))
 
 
 @router.post("/execution-policies", response_model=ExecutionPolicyResponseDto, status_code=201)
 async def create_execution_policy(
     body: CreateExecutionPolicyRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> ExecutionPolicyResponseDto:
     use_case: CreateExecutionPolicy = get_create_execution_policy_use_case(session)
@@ -129,6 +148,7 @@ async def create_execution_policy(
             require_validated_backtest=body.require_validated_backtest,
             origin=body.origin,
             enabled=body.enabled,
+            user_id=get_request_principal(request),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -139,8 +159,13 @@ async def create_execution_policy(
 async def update_execution_policy(
     policy_id: str,
     body: UpdateExecutionPolicyRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> ExecutionPolicyResponseDto:
+    principal = get_request_principal(request)
+    get_use_case: GetExecutionPolicy = get_execution_policy_use_case(session)
+    existing = await get_use_case.execute(policy_id)
+    _require_policy_access(existing, principal)
     use_case: UpdateExecutionPolicy = get_update_execution_policy_use_case(session)
     try:
         record = await use_case.execute(
@@ -166,8 +191,13 @@ async def update_execution_policy(
 @router.delete("/execution-policies/{policy_id}", status_code=204)
 async def delete_execution_policy(
     policy_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> None:
+    principal = get_request_principal(request)
+    get_use_case: GetExecutionPolicy = get_execution_policy_use_case(session)
+    existing = await get_use_case.execute(policy_id)
+    _require_policy_access(existing, principal)
     use_case: DeleteExecutionPolicy = get_delete_execution_policy_use_case(session)
     deleted = await use_case.execute(policy_id)
     if not deleted:
@@ -178,8 +208,13 @@ async def delete_execution_policy(
 async def route_signals_through_policy(
     policy_id: str,
     body: RouteSignalsRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> RouteSignalsResponseDto:
+    principal = get_request_principal(request)
+    get_use_case: GetExecutionPolicy = get_execution_policy_use_case(session)
+    existing = await get_use_case.execute(policy_id)
+    _require_policy_access(existing, principal)
     use_case: ExecutionRouter = get_execution_router_use_case(session)
     try:
         result = await use_case.execute(policy_id, body.hits)
@@ -198,8 +233,13 @@ async def route_signals_through_policy(
 async def execute_scan_job_hits(
     job_id: str,
     body: ExecuteScanJobRequestDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> RouteSignalsResponseDto:
+    principal = get_request_principal(request)
+    get_use_case: GetExecutionPolicy = get_execution_policy_use_case(session)
+    existing = await get_use_case.execute(body.policy_id)
+    _require_policy_access(existing, principal)
     use_case: ExecuteScanJobHits = get_execute_scan_job_hits_use_case(session)
     try:
         result = await use_case.execute(job_id, body.policy_id)

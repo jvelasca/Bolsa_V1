@@ -5,7 +5,13 @@ from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 
 
 class TrackerDefinitionRepository(Protocol):
-    async def list_trackers(self, *, limit: int = 50, enabled_only: bool = False) -> list[TrackerDefinitionRecord]: ...
+    async def list_trackers(
+        self,
+        *,
+        limit: int = 50,
+        enabled_only: bool = False,
+        owner_user_id: str | None = None,
+    ) -> list[TrackerDefinitionRecord]: ...
 
     async def list_trackers_for_list(
         self, list_id: str, *, limit: int = 50
