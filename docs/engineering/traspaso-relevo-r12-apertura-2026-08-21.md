@@ -4,7 +4,7 @@
 > **Propósito:** texto de paso anti-alucinación. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch` + `git rev-parse origin/main` (no asumir SHA de este fichero).
 > **Firma de partida R-12:** `f7a86cc` · Track A+B **`48cc255`** · tag `v1.3.0` → `b778292`.
-> **AsOf:** `origin/main` = **`6db848b`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Gates R12-ACCOUNTS + R12-AUTH **F1–F10 + F8b–F8e** · **F7b script + apply local** · **F7c** (working tree) · **JWT-only** · `scan.completed` worker `ownerUserId` (working tree). D4 **Opción C** · ADR-027 **Aceptado**. Pending-delete E8 **N** (sin purge). Ventana purge V2 + kit log **abierta 2026-08-22** (`0763700`). T+0 monitor **19/19**.
+> **AsOf:** `origin/main` = **`4e13746`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Gates R12-ACCOUNTS + R12-AUTH **F1–F10 + F8b–F8e** · **F7b apply local** · **F7c** · **JWT-only** · `scan.completed` worker + cron stamp. D4 **Opción C** · ADR-027 **Aceptado**. Pending-delete E8 **N** (sin purge). Ventana purge V2 T+0 **19/19**.
 
 ---
 
@@ -13,7 +13,7 @@
 - Track A + B: **`48cc255`**. Track B **APROBADO** (mesa 5 puertas).
 - Track C **C1–C5 en `origin/main`** (`5bc51ff`…`0eb8976`). Leftover CORE-R («Proponer F3» → `/confirm`) **hecho `8dd3caf`**. Copy E8 residual **`ce601c9`**.
 - Gates infra + auth base: **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1** `e52e016` · **F2** `9f3354f` · **F3** `5fe5ace`. Pending-delete E8 tests **`851b545`** (**sin purge**).
-- D4 JWT (Opción C): **F4** `cdda80d` · **F5** `02c86fc` · **F6+F7a** `98b4986` · **F8** `5e7c67b` · **F9** `26494d8` · **F8b** `2cd20b0` · **F8c** `b44cf52` · **F8d** `c697bae` · **F8e** `905acee` · **F10** `837ec85`. **F7b script + JWT-only gate** **`a93ac9f`**. Stamp docs **`6db848b`**. **F7c + scan.completed worker** en working tree (pendiente commit).
+- D4 JWT (Opción C): **F4** `cdda80d` · **F5** `02c86fc` · **F6+F7a** `98b4986` · **F8** `5e7c67b` · **F9** `26494d8` · **F8b** `2cd20b0` · **F8c** `b44cf52` · **F8d** `c697bae` · **F8e** `905acee` · **F10** `837ec85`. **F7b script + JWT-only gate** **`a93ac9f`**. **F7c + scan.completed + cron stamp** **`4e13746`**.
 
 | Fase              | SHA       | Qué                                                                             |
 | ----------------- | --------- | ------------------------------------------------------------------------------- |
@@ -47,8 +47,8 @@
 | JWT-only gate     | `a93ac9f` | SHA-256/HMAC → 401; `tokens.py` eliminado; env `APP_PASSWORD` = flag            |
 | pending-delete E8 | `851b545` | tests migrador; E8 sigue N; **sin purge**                                       |
 | monitor V2 T+0    | —         | batería 19/19; E8 N; **sin purge**                                              |
-| R12-AUTH F7c      | (tree)    | match estricto `user_id == principal`; NULL invisible incl. bootstrap           |
-| scan.completed    | (tree)    | worker `ownerUserId` + cron `EnqueueTrackerScanJob` estampa `tracker.user_id`   |
+| R12-AUTH F7c      | `4e13746` | match estricto `user_id == principal`; NULL invisible incl. bootstrap           |
+| scan.completed    | `4e13746` | worker `ownerUserId` + cron `EnqueueTrackerScanJob` estampa `tracker.user_id`   |
 
 Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Laboratorio · Asesor**.
 
@@ -59,7 +59,7 @@ Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Labo
 ## 3. Texto de paso (pegar en chat nuevo)
 
 > CONTEXTO: Bolsa_V1, R-12. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `plan-r12-auth-d4-jwt-multiuser-2026-08-22.md` · ADR-027 · `PROJECT_PREMISES.md` ⭐§0 · `PROJECT_STATE.md` §2ac · backlog §0.
-> Firma: `git fetch` + `git rev-parse origin/main` · `git status`. **`origin/main` `6db848b`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292`. Partida R-12 `f7a86cc`. Working tree: F7c + `scan.completed` worker + cron tracker stamp (sin commit hasta este cierre).
+> Firma: `git fetch` + `git rev-parse origin/main` · `git status`. **`origin/main` `4e13746`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292`. Partida R-12 `f7a86cc`.
 > Hecho: … R12-AUTH F1–F10 + F8b–F8e · F7b script + **apply local** (103→0) · F7c hard close · JWT-only · ventana purge V2 T+0 19/19 (E8 N, sin purge) · `scan.completed` worker `ownerUserId` · cron `EnqueueTrackerScanJob` estampa `tracker.user_id`. **No auto.**
 
 ## 4. Siguiente (decisión del propietario)

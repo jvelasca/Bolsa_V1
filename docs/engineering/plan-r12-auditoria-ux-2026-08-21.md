@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Ancla:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` · `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/engineering/PROJECT_STATE.md` · premisas E1–E9 + ciclo R-12 en `docs/PROJECT_PREMISES.md` ⭐§0.
 > **Estado de partida (verificado):** `main` local = `origin/main` = **`f7a86cc`** · tag **`v1.3.0` → `b778292`** · árbol limpio al abrir · `v1.3.0-5-gf7a86cc`.
-> **Estado del plan (AsOf 2026-08-22):** … **R12-AUTH F1–F10 + F8b–F8e** · **F7b apply local** · **F7c** · **JWT-only** · `scan.completed` worker + cron stamp. **`origin/main` `6db848b`** hasta push. Siguiente: monitor resto ventana purge V2 (E8 N).
+> **Estado del plan (AsOf 2026-08-22):** … **R12-AUTH F1–F10 + F8b–F8e** · **F7b apply local** · **F7c** · **JWT-only** · `scan.completed` worker + cron stamp. **`origin/main` `4e13746`**. Siguiente: monitor resto ventana purge V2 (E8 N).
 > **Supersede:** `plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` (Relevo UNO/DOS ejecutados; Relevo TRES/Fase 6 higiene se absorbe aquí).
 
 ---
