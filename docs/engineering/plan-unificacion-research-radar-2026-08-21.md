@@ -2,9 +2,9 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`, rama del traspaso R-11 → aparcado «Unificación Research→Radar»).
 > **Propósito:** plan director (read-only, **draft**) para consolidar la superficie UX Research→Radar: unificar puente y navegación entre el hub científico `/research` (`features/research`) y el hub operativo `/screeners` (`features/screeners`, nav **Rastreadores**), reutilizando el puente B0 `promote-finalist-to-tracker.ts` ya implementado y el embudo backend/shared ya consolidado. Sin features nuevas (freeze E7).
-> **Estado:** **APARCADO / DRAFT — pendiente de decisión y aprobación del propietario para abrir.** Ninguna fase está abierta ni cerrada. NO abrir código hasta decisión (E1).
-> **AsOf:** 2026-08-21.
-> **Nota de estado vivo:** este plan sigue **APARCADO / DRAFT**. El HEAD de GitHub **no** es `b778292`. Verificar `git rev-parse origin/main`. Release **`v1.3.0`** tag anotado `b778292` (padre `deafa27`). Pista documental Fase 1–3 hecha; código de unificación **no** abierto (E1). El estudio R-12 Track B la trata como capítulo, sin implementar.
+> **Estado:** **APARCADO / DRAFT — Fases 1–3 documentales CERRADAS.** Código condicional F4′–F6′ pendiente de desbloqueo Track B + decisión vocabulario (E1).
+> **AsOf:** 2026-08-22.
+> **Nota de estado vivo:** HEAD = `git rev-parse origin/main` → **`b4efeff`**. Tag **`v1.6.0-beta` → `c3964fc`**. Pista documental F1–F3 ✅; puente B0 operativo. Post-R12: nav «Señales» vs hub interno «Rastreadores» — ver `PROJECT_STATE.md` §2b.
 
 ---
 

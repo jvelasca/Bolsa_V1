@@ -2,7 +2,7 @@
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
 > **AsOf:** 2026-08-22 · **Fuente de coordinación: GitHub `origin/main`** (`git fetch && git rev-parse origin/main`). Partida: **`84ca970`**. Tag **`v1.6.0-beta` → `c3964fc`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`**. **R-13 CERRADA** · **R-12 CERRADA** · **sin ciclo activo predefinido**. Track B producto **BLOQUEADO**. R-7..R-11 cerradas.
-> **PACK de estado global consolidado R-1→R-7 (para auditoría externa / lectura rápida):** [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md) · **R-7 deuda COMPLETA** (solo M-4/T-M4 diferido).
+> **PACK de estado global consolidado R-1→R-13 (para auditoría externa / lectura rápida):** [`audit-pack-estado-global-2026-08-22.md`](./audit-pack-estado-global-2026-08-22.md) · histórico R-1→R-8: [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
 > **Regla del hilo actual (pactada 2026-08-19):** NO tocar código fuera del alcance de la fase declarada. Cada fase se ejecuta EN UN SUBAGENTE acotado, con batería y APROBACIÓN del usuario por commit. Máx. ~3 subagentes en paralelo por chat. Al cerrar un chat se actualiza ESTE documento y el `engineering-index` §5.
@@ -140,16 +140,16 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ---
 
-## 2b. Unificación Research → Radar (DRAFT / APARCADO — pista documental en curso)
+## 2b. Unificación Research → Radar (DRAFT / APARCADO — pista documental CERRADA)
 
-> Plan director vivo (read-only, **draft**): `docs/engineering/plan-unificacion-research-radar-2026-08-21.md`. Planifica «Unificación Research→Radar»: reunificar el embudo científico `/research` y operativo `/screeners`/Radar reutilizando el puente B0 ya implementado (**sin features nuevas**). Estado: **APARCADO / DRAFT — pendiente de decisión explícita del propietario para abrir fases de código (E1).** La documentación de ingeniería sí avanza (pista documental) como **Fase 3** (este cierre).
+> Plan director vivo (read-only, **draft**): `docs/engineering/plan-unificacion-research-radar-2026-08-21.md`. Planifica «Unificación Research→Radar»: reunificar el embudo científico `/research` y operativo `/screeners`/Radar reutilizando el puente B0 ya implementado (**sin features nuevas**). Estado: **APARCADO / DRAFT — pendiente de decisión explícita del propietario para abrir fases de código (E1).** Pista documental F1–F3 **CERRADA** (2026-08-22).
 
 - **Fase 1 ✅ CERRADA (2026-08-21, `b7af24b` plan + `5276d47` cierre).** Trazado e inyección del **mapa de consumidores B0** de `promote-finalist-to-tracker.ts` (§2.2 del plan) + JSDoc `@see` de trazabilidad en el doc-comment de módulo de `use-activate-instrument-tracking.ts` (:4) e `instruments-page.tsx` (:7). Cero cambios de comportamiento.
-- **Fase 2 ✅ CERRADA sin cambios (2026-08-21).** Copy/deep-link de Radar audita y ya coherentes: label **«Rastreadores»** en nav (`app-top-bar.tsx`) y hub (`screeners-page.tsx:9`), ruta `/screeners`. Sin diffs.
-- **Fase 3 📄 EN CURSO (este cierre, docs-only)** — abre la **pista documental**: registra este aparcado en `PROJECT_STATE.md`, enlaza el plan en `engineering-index` §1 y confirma que `research-radar-unification-2026-07-31.md` §3/§4 (B0 ✅ / B1 ✅) es la referencia viva. **Sin tocar código ni contrato.**
-- **Fases siguientes (1.1 on, cuando el propietario abra):** ver §3 del plan. Ninguna abierta.
+- **Fase 2 ✅ CERRADA (2026-08-21; re-audit pendiente post-R12).** Copy/deep-link audita en cierre original; **post-R12 C2/C4** nav usa `SEÑALES_LABEL` (`daily-nav.ts:13`). Hub interno aún «Rastreadores» (`screeners-hub.tsx`, `trackers-panel.tsx`) — deuda copy **F4′** si se desbloquea Track B.
+- **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b4efeff`).** Pista documental registrada en `PROJECT_STATE.md`, `engineering-index` §1 y `research-radar-unification-2026-07-31.md`. Sin tocar código ni contrato.
+- **Fases propuestas (condicionales E1 + desbloqueo Track B):** F4′ copy hub · F5′ toasts B0 · F6′ tests href — ver plan §3 y informe coordinador post-R-13.
 
-> **Estado general:** HEAD vivo = **`origin/main`** (no `5276d47` ni un SHA de traspaso). Release **`v1.3.0`** tag **`b778292`**. La unificación Research→Radar sigue **APARCADA**; el estudio R-12 Track B la trata como capítulo, **sin abrir código** (E1).
+> **Estado general:** HEAD vivo = **`origin/main`** (`b4efeff` al sellado). Tag **`v1.6.0-beta` → `c3964fc`**. La unificación Research→Radar sigue **APARCADA** para código; B0 operativo.
 
 ---
 

@@ -1,5 +1,7 @@
 # Paquete de auditoría — ESTADO GLOBAL consolidado R-1→R-8 (2026-08-20)
 
+> **⚠️ SUPERSEDIDO:** usar [`audit-pack-estado-global-2026-08-22.md`](./audit-pack-estado-global-2026-08-22.md) (R-1→R-13, HEAD `b4efeff`). Este fichero se conserva como histórico.
+>
 > **Propósito:** documento **único** para revisar/consultar el estado global del proyecto tras completar la ola de auditoría de dinero real R-7 **y la ola de prevención de riesgo/fidelidad R-8**. Consolida log de fases, decisiones, deuda cerrada/pendiente, freeze y checklist operativo. Pensado para **pasar a un auditor externo o para lectura rápida de un nuevo chat/agente** sin _documentation archaeology_.
 > **AsOf:** 2026-08-20 · rama `main` · `local main = origin/main = e7b4655` (CONTRACT-STALE: regen `aecbb28` + docs `e7b4655`) · árbol limpio · tag **`v1.1.0`**.
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1` (público).
