@@ -124,30 +124,3 @@ export function applyChartNewTabSeed(
     drawings: [],
   };
 }
-
-export function normalizeChartNewTabSeed(
-  raw?: ChartNewTabSeed | null,
-): ChartNewTabSeed | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  return {
-    timeframe: raw.timeframe,
-    seriesType: normalizeChartSeriesType(raw.seriesType),
-    seriesTypeParams: raw.seriesTypeParams
-      ? normalizeChartSeriesTypeParams(raw.seriesTypeParams)
-      : undefined,
-    chart: raw.chart,
-    indicatorInstances: Array.isArray(raw.indicatorInstances)
-      ? raw.indicatorInstances.map((instance) => ({
-          ...instance,
-          parameters: { ...instance.parameters },
-        }))
-      : [],
-    activeIndicatorTemplateId: raw.activeIndicatorTemplateId ?? null,
-    toolbar: raw.toolbar
-      ? normalizeChartToolbarChartOverrides(raw.toolbar)
-      : undefined,
-    pricePanelHeightPct: raw.pricePanelHeightPct,
-    drawingsLayerHidden: raw.drawingsLayerHidden,
-    drawingsLayerLocked: raw.drawingsLayerLocked,
-  };
-}

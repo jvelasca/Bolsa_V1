@@ -16,15 +16,17 @@ Documentar la **decisión y la hoja de ruta** para levantar el freeze **D4** (au
 
 ## 1. Estado actual (verificado en código)
 
-### 1.1 Gate de acceso — `APP_PASSWORD` (global, un solo operador)
+> **⚠️ HISTÓRICO de apertura D4.** El gate vivo (2026-08-22, `a93ac9f`+) es **JWT-only**. `auth/tokens.py` **no existe**. SHA-256/HMAC de sesión legacy → **401**. `APP_PASSWORD` es flag/seed/fail-closed, no el token de sesión. Ver ADR-027 y `middleware/auth.py`.
 
-| Pieza                    | Evidencia                                                                     | Comportamiento                                                                                                           |
-| ------------------------ | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Password única           | `config.py:35-41` (`APP_PASSWORD`, `APP_AUTH_SECRET`, `APP_AUTH_TTL_SECONDS`) | Si vacía → auth desactivada (salvo `ENVIRONMENT=production` → fail-closed, `config.py:190-203`).                         |
-| Token determinista       | `auth/tokens.py:7-19`                                                         | SHA-256 de `bolsa:{password}:{secret}` — **no es JWT**, no lleva `sub`/`exp` en el token en sí.                          |
-| Cookie HttpOnly (R-8B.2) | `auth/session.py:32-70` · `routes/auth.py:46-73`                              | Valor `exp.token.sig` (HMAC-SHA256); TTL `APP_AUTH_TTL_SECONDS` (default 86400).                                         |
-| Middleware               | `middleware/auth.py:25-56`                                                    | Públicos: health, login/logout/status, docs. Resto: Bearer **o** cookie válida → 401.                                    |
-| Login / status           | `routes/auth.py:46-106`                                                       | Login compara password con `secrets.compare_digest`; body solo `authEnabled` (sin token). Status expone `authenticated`. |
+### 1.1 Gate de acceso — `APP_PASSWORD` (global, un solo operador) — _snapshot pre-JWT-only_
+
+| Pieza              | Evidencia                                                               | Comportamiento (al redactar F1–F3; **ya no es el gate vivo**)            |
+| ------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Password única     | `config.py` (`APP_PASSWORD`, `APP_AUTH_SECRET`, `APP_AUTH_TTL_SECONDS`) | Si vacía → auth desactivada (salvo production fail-closed).              |
+| Token determinista | `auth/tokens.py` (**ELIMINADO** `a93ac9f`)                              | SHA-256 legacy — **retirado**. JWT-only.                                 |
+| Cookie HttpOnly    | `auth/session.py` · `routes/auth.py`                                    | Sesión JWT (ADR-027 C.2), no `exp.token.sig` HMAC.                       |
+| Middleware         | `middleware/auth.py`                                                    | Públicos: health, login/logout/status, docs. Resto: JWT cookie o Bearer. |
+| Login / status     | `routes/auth.py`                                                        | Login JWT; campo `login` opcional (F9). Status `authenticated`.          |
 
 **Nota doc obsoleta:** ADR-004 §0 aún describe token en `sessionStorage` + Bearer; el FE migró a cookie HttpOnly en R-8B.2 (`auth-store.ts`, `auth-gate.tsx`). Bearer sigue como fallback API (`middleware/auth.py:47-49`).
 

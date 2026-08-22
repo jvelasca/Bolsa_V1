@@ -26,7 +26,7 @@ Referencia UX: **ProRealTime** (estructura de menús, espacios de trabajo, propi
 | Bearer como fallback API                                                             | `sub` → principal; admin crea users (sin registro público)       |
 | Sin registro público                                                                 | Opción C híbrida: C.1 instancia → C.2 JWT admin → C.3 multi-user |
 
-**Flujo actual (R-8B.2):** pantalla login → cookie HttpOnly (token HMAC determinista, no JWT) → `/api/auth/status`; Bearer opcional en API.
+**Flujo actual (R-13 / JWT-only, 2026-08-22):** pantalla login → JWT en cookie HttpOnly + Bearer (`auth/jwt.py`, ADR-027). El texto HMAC/SHA-256 de esta fila es **histórico R-8B.2** (pre-`a93ac9f`).
 
 **Flujo objetivo (ADR-027, post-F5):** login → JWT (`sub`, `exp`, `iat`) en cookie HttpOnly + Bearer; transición mantiene fallback `APP_PASSWORD` en C.1–C.2.
 

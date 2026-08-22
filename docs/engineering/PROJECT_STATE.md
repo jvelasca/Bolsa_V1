@@ -1,7 +1,7 @@
 # PROJECT_STATE — Estado vivo del proyecto (fuente única de continuación)
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
-> **AsOf:** 2026-08-22 · **Fuente de coordinación: GitHub `origin/main`** (`git fetch && git rev-parse origin/main`). SHA: **`4e13746`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **R-12** (`plan-r12-auditoria-ux-2026-08-21.md`). Implementación Track A+B: **`48cc255`**. Partida: `f7a86cc`. Track C + copy E8 + gates R12-409 / EXEC-B-CONC / R12-SCHED / **R12-ACCOUNTS** `3c958f1` / **R12-AUTH F1–F10 + F8b–F8e** / **F7b apply local** / **F7c** / **fallback SHA-256 retirado** / **`scan.completed` worker + cron stamp** / pending-delete E8 tests **`851b545`** / purge V2 T+0 19/19 (E8 N). R-7..R-11 cerradas. Relevo UNO (`f7a4ab0`) + DOS (`f7a86cc`) ejecutados (ese plan queda **supersedido** por R-12).
+> **AsOf:** 2026-08-22 · **Fuente de coordinación: GitHub `origin/main`** (`git fetch && git rev-parse origin/main`). Partida R-13: **`5edbcb5`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **R-12 CERRADA** · ciclo vivo **R-13** (`plan-r13-consolidacion-beta-2026-08-22.md`). Track B producto **BLOQUEADO**. R-7..R-11 cerradas. Relevo UNO (`f7a4ab0`) + DOS (`f7a86cc`) ejecutados.
 > **PACK de estado global consolidado R-1→R-7 (para auditoría externa / lectura rápida):** [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md) · **R-7 deuda COMPLETA** (solo M-4/T-M4 diferido).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
@@ -86,7 +86,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 - **Fase 1 ✅ CERRADA (2026-08-21)** — `scripts/verify/verify_ledger_balance_chain.py` ahora valida **invariante A (Σ ledger.amount == Σ portfolios.cash del account)** + **B (cadena balance_after)**, tolerancia `1e-6`, sin backfill (D6). Se limpiaron **15 cuentas `simulated` huérfanas de tests** (m7-uniq/m2-insf/R8C) por path canónico `close_account`→`delete_simulated_account` (criterio v1.3.0/acc_broken) → **EXIT 0 global**. ruff 0 · mypy 0 · detección A-rota validada por mutación. OJO datos: los residuos pueden reaparecer si los tests que no limpian (`test_m7*`/`test_m2*`/`test_r8c*`) corren contra la DB compartida → deuda de higiene (Fase 6).
 - **Fase 2 ✅ CERRADA (2026-08-21)** — `packages/py/infrastructure/tests/test_custody_concurrency_chaos.py`, **5 tests PG real** (patrón `test_concurrency_scenarios`): `test_two_custody_workers_single_charge_no_double_fee` + `test_two_custody_workers_two_accounts_single_charge_each` (2 workers → 1 cargo / 1 obligation APPLIED / cash − fee, nunca −2·fee, Σ==cash, cadena) · `test_redis_down_two_workers_memory_fallback_single_charge` (Redis ausente en dev → fallback memoria natural, exactly one charge) · `test_old_pending_preserved_and_oldest_liquidated_first_insufficient` + `test_oldest_pending_liquidated_before_current_period_full` (transición de periodo PG real, ninguna obligación desaparece, orden `[prior, current]`). Nota: el hueco "2 jobs" se cubre con `ApplyCustodyFees` concurrente (no `RunCustodyJob`, que barre todas las cuentas activas y una residual sin cartera falla `_load_scope`). Batería: ruff 0 · mypy 0 · pytest 5 passed.
-- **Fase 3 ⏳ APLAZADA (2026-08-21, decisión)** — análisis read-only del contrato `409 IDEMPOTENCY_KEY_REUSED` (hoy solo runtime en `bolsa_api/main.py:174-181`; 0 hits en openapi.json/schema.d.ts; deposit/withdraw solo 201/422). Recomendación del subagente: **Opción B1** (declarar el 409 en los write-paths `deposit` `accounts.py:373` · `withdraw` `:395` · trade con regen acotada openapi.json + schema.d.ts, body propio `{detail:str}`; FE ya muestra el detail vía `formatApiErrorDetail api.ts:35`). **Decisión del propietario: mantiene Opción A por ahora; B1 queda para una fase de contrato futura (requiere `contract:gen`/fase pactada).**
+- **Fase 3 (histórico 2026-08-21) → ✅ CERRADA por R12-409 B1 `eb24608`.** El 409 `IDEMPOTENCY_KEY_REUSED` está declarado en OpenAPI (deposit/withdraw/trade, body `{detail: str}`). La nota «Opción A / aplazada» de este párrafo **ya no es el estado vivo**.
 - **Batería coordinador Relevo UNO:** ruff 0 · mypy 0 · pytest infra custodia `16 passed 1 xfailed` · pytest app custodia `19 passed` · `verify_ledger_balance_chain.py` **EXIT 0** · no-regresión OK.
 - **SIGUIENTE (histórico):** Fases 4–5 → ejecutadas en Relevo DOS (`f7a86cc`). Higiene absorbida por **R-12 A5/A6**.
 
@@ -106,9 +106,9 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ---
 
-## 2ac. R-12 — Auditoría residual, higiene y estudio UX (2026-08-21)
+## 2ac. R-12 — Auditoría residual, higiene y estudio UX (2026-08-21) — **CERRADA**
 
-> Plan vivo: [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md). Premisas: `docs/PROJECT_PREMISES.md` ⭐§0. Coordinación: **`origin/main` `4e13746`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Implementación Track A+B: **`48cc255`**. Partida: `f7a86cc`. Tag `v1.3.0` → `b778292`. Núcleo financiero **no se toca** salvo gates restantes. Track B **APROBADO** (2026-08-21). Track C: [`plan-r12-track-c-frontend-2026-08-21.md`](./plan-r12-track-c-frontend-2026-08-21.md) (**C1–C5** `5bc51ff`…`0eb8976` · leftover CORE-R **`8dd3caf`** · copy E8 **`ce601c9`**). **R12-409 B1 HECHO `eb24608`**. **EXEC-B-CONC HECHO `ca60d0a`**. **R12-SCHED / R-8C.2 HECHO `5e52bd6`**. **R12-ACCOUNTS HECHO `3c958f1`**. **R12-AUTH F1–F10 + F8b–F8e** · **F7b apply local** · **F7c** · **fallback SHA-256/HMAC retirado**. **D4 Opción C** — ADR-027 **Aceptado**. Ventana purge V2 T+0 **19/19** (E8 N, sin purge). `scan.completed` worker + cron stamp.
+> Plan **histórico:** [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md). Cierre documental R-13: partida **`5edbcb5`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Implementación Track A+B: **`48cc255`**. Partida R-12: `f7a86cc`. Track B UX **APROBADO**. Track C **C1–C5** + leftover + copy E8. Gates: R12-409 `eb24608` · EXEC-B-CONC `ca60d0a` · R12-SCHED `5e52bd6` · R12-ACCOUNTS `3c958f1` · R12-AUTH F1–F10+F8b–F8e · F7b local · F7c · JWT-only · ADR-027 **Aceptado**. Purge V2 T+0 19/19 (E8 N). **Siguiente vivo: §2ad R-13.**
 
 | Fase                         | Estado                                                                                  | Entregable                                                                                                                      |
 | ---------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -122,6 +122,20 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 | Gates                        | **R12-AUTH F1–F10 + F8b–F8e** · F7b apply local · F7c · JWT-only · ADR-027 **Aceptado** | purge V2 T+0 19/19 (E8 N) · `scan.completed` worker + cron `tracker.user_id` · apply F7b prod = otra ventana (sin host en repo) |
 | Track B estudio UX           | **APROBADO** (2026-08-21)                                                               | `estudio-flujo-semi-vs-tops-2026-08-21.md` (mesa 5 puertas)                                                                     |
 | Track C frontend             | **C1–C5 + leftover CORE-R + copy E8**                                                   | C1–C5 `0eb8976` · leftover **`8dd3caf`** · E8 **`ce601c9`**                                                                     |
+
+---
+
+## 2ad. R-13 — Cierre R-12 y consolidación BETA (2026-08-22)
+
+> Plan vivo: [`plan-r13-consolidacion-beta-2026-08-22.md`](./plan-r13-consolidacion-beta-2026-08-22.md). Traspaso: [`traspaso-relevo-r13-apertura-2026-08-22.md`](./traspaso-relevo-r13-apertura-2026-08-22.md). Partida: **`5edbcb5`**. Serie: A0 docs → A1 inventario → A2 E8 tests. A3 tag **solo con OK**. Track B producto **BLOQUEADO**.
+
+| Fase                   | Estado        | Entregable                                                                                                  |
+| ---------------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| A0 cierre + firma      | HECHA         | premisas ciclo R-13 · SHA `5edbcb5` · README `v1.5.0-beta` · CHANGELOG `[Unreleased]`                       |
+| A1 inventario residual | HECHA         | plan R-13 §4 file:line                                                                                      |
+| A2 E8 micro + tests    | HECHA         | contract + absence; `normalizeChartNewTabSeed` **purged**; extract/apply vivos; pending-delete alto intacto |
+| A3 tag `v1.6.0-beta`   | **GATE**      | no creado; espera OK explícito                                                                              |
+| Track B producto       | **BLOQUEADO** | god-page / Research→Radar                                                                                   |
 
 ---
 

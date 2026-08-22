@@ -9,13 +9,15 @@
 
 ## Contexto
 
-R12-AUTH F1–F3 entregaron **aislamiento mecánico single-tenant** sin identidad real:
+> **Snapshot de apertura D4 (histórico).** El gate vivo es **JWT-only** (`a93ac9f`+): no existe `auth/tokens.py`; SHA-256/HMAC de sesión → 401. Hay tabla `users`, JWT `sub`/`exp`/`sv`, F7c `user_id == principal`. Ver cabecera Estado.
 
-- Tras auth OK (o auth-off): `request.state.principal = Settings.owner_principal()` (default `"app"`, env `APP_OWNER_ID`).
-- No hay tabla `users` ni `request.user`.
-- Token actual: SHA-256 determinista de password global (`auth/tokens.py`) — **no es JWT**, no lleva `sub`/`exp` en el payload.
-- Cookie HttpOnly R-8B.2 (`auth/session.py`, `routes/auth.py`) con valor `exp.token.sig` (HMAC-SHA256); Bearer como fallback API (`middleware/auth.py`).
-- Cuentas: `InvestmentAccountRow.user_id` nullable; legacy `user_id is None` visible para todos los principals (`principal.py:36-38`).
+R12-AUTH F1–F3 entregaron **aislamiento mecánico single-tenant** sin identidad real (punto de partida D4):
+
+- Tras auth OK (o auth-off): `request.state.principal` salía de `Settings.owner_principal()` (default `"app"`).
+- Apertura: sin tabla `users`. **Ya no:** F5+ creó `users` + JWT.
+- Apertura: token SHA-256 (`auth/tokens.py`). **Ya no:** fichero eliminado.
+- Cookie HttpOnly R-8B.2 era `exp.token.sig` HMAC. **Ya no:** JWT (ADR-027 C.2).
+- Cuentas: `user_id` nullable; F7c hace invisible el NULL al principal (excepto bootstrap/admin histórico).
 
 El freeze **D4** (auth JWT / multi-user) quedó diferido hasta decisión del propietario (`plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` §4). R12-AUTH F1–F3 prepararon la tubería `principal → owner_user_id → account_repository`; D4 sustituye **de dónde sale** el principal, no reescribe `ExecuteTrade`.
 

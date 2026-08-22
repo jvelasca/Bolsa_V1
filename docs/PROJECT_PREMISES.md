@@ -9,19 +9,23 @@
 
 ## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-22) — leer primero en TODO trabajo
 
-> **AsOf:** 2026-08-22 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` → **`4e13746`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **BETA / NO en producción**.
-> **Contexto:** R-9 · R-10/v1.2.1 · R-11/v1.3.0 **CERRADAS**. Relevo UNO+DOS del plan post-v1.3.0 **EJECUTADOS** (`f7a4ab0`, `f7a86cc`). Ciclo vivo: **R-12** (`docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`).
+> **AsOf:** 2026-08-22 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` → **`5edbcb5`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **BETA / NO en producción**.
+> **Contexto:** R-9 · R-10/v1.2.1 · R-11/v1.3.0 · **R-12 CERRADAS**. Relevo UNO+DOS ejecutados. Ciclo vivo: **R-13** (`docs/engineering/plan-r13-consolidacion-beta-2026-08-22.md`).
 > **Ancla anti-alucinación:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md`. Una auditoría externa del 2026-08-21 evaluó `75e8c23` (14 commits atrás de `49ecbcd`); una re-auditoría posterior evaluó ~`49ecbcd` y **no ve** Relevo UNO/DOS. El SHA que un agente debe usar es **`origin/main` + `PROJECT_STATE.md` / backlog §0**, no un SHA histórico incrustado en un traspaso.
 > **Idea del proyecto (invariante de producto):** embudo backtesting científico → IA gobernada (LLM propone, motor determinista decide) → confirmación humana → paper. Integridad financiera y trazabilidad son el valor central. Se puede refactorizar lo que haga falta **mientras se preserve esa idea**.
 
-### Ciclo R-12 (refuerza E1–E9; no las sustituye)
+### Ciclo R-13 (refuerza E1–E9; no las sustituye)
 
-- **GitHub es la fuente de coordinación.** Un cambio no existe para el equipo hasta estar en `origin/main`. Working tree local ≠ estado. Tras cada push: actualizar firma en `PROJECT_STATE.md` y backlog §0; verificar `git rev-parse origin/main`.
-- **Subagentes para todo cambio de código.** El coordinador no implementa fases enteras en un hilo saturado. Máx. ~3 subagentes en paralelo, alcances **disjuntos**.
-- **Relevo de chat:** al saturarse, cerrar y abrir otro pegando el `traspaso-relevo-*` + firma (HEAD GitHub, rama, árbol, tag, batería, deuda no-regresión). Riesgo de alucinación objetivo: 0 (documento manda).
-- **Higiene E8 continua:** residuos de test/dev se eliminan por path canónico; módulos/docs obsoletos se archivan o se marcan históricos; no se purga `pending-delete` de riesgo alto sin decisión.
-- **Track B APROBADO** (2026-08-21, línea a línea). Track C: plan [`engineering/plan-r12-track-c-frontend-2026-08-21.md`](./engineering/plan-r12-track-c-frontend-2026-08-21.md). **C1–C5** (`0eb8976`) + leftover CORE-R **`8dd3caf`** + copy E8 **`ce601c9`**. Gates: **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1–F10 + F8b–F8e** · **F7b apply local** · **F7c** (working tree) · **JWT-only gate** · ADR-027 **Aceptado**.
-- **Gates no auto-abiertos:** purge `pending-delete` ventana métricas **T+0 19/19** (E8 sigue N) — plan [`plan-r12-pending-delete-v2-purge-2026-08-22.md`](./engineering/plan-r12-pending-delete-v2-purge-2026-08-22.md). D4 auth **cerrado** (F7c / scan worker en este árbol, pendiente commit) — apply F7b prod no auto.
+- **GitHub es la fuente de coordinación.** SHA de partida R-13: **`5edbcb5`**. Verificar `git rev-parse origin/main`. Working tree ≠ estado.
+- **Serie por defecto.** Una fase = un subagente. Paralelo solo con ficheros disjuntos y sin pisar estado vivo. Tests en cada fase de código. Coordinador re-verifica file:line + batería (no se fía del reporte).
+- **Relevo de chat:** al saturarse, cerrar y abrir otro pegando `traspaso-relevo-r13-apertura-2026-08-22.md` + firma. Documento manda.
+- **R-12 CERRADA** (reparación post-auditoría). No repetir gates ni AUTH ya en `main`.
+- **Track B producto BLOQUEADO** (god-page / Research→Radar) hasta OK línea a línea.
+- **Gates no auto:** purge `pending-delete` (E8 N, ventana V2) · apply F7b prod · tag `v1.6.0-beta` · `PAPER_D_EXECUTE` · gobernanza IA · `contract:gen` salvo fase.
+
+### Ciclo R-12 (histórico — CERRADO 2026-08-22)
+
+R-12 entregó Track A–C, R12-409, EXEC-B-CONC, R12-SCHED, R12-ACCOUNTS, R12-AUTH F1–F10+F8b–F8e, F7b local, F7c, JWT-only. Plan: [`engineering/plan-r12-auditoria-ux-2026-08-21.md`](./engineering/plan-r12-auditoria-ux-2026-08-21.md). Relevo histórico: `traspaso-relevo-r12-apertura-2026-08-21.md`.
 
 ### E1. Nada se implementa sin plan aprobado
 

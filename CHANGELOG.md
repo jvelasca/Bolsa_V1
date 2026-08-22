@@ -2,9 +2,24 @@
 
 All notable releases of Bolsa V1.
 
-## [Unreleased]
+## [Unreleased] — R-13 + JWT post-`v1.5.0-beta` (2026-08-22)
 
-Trabajo post-`v1.5.0-beta`. Ver sección `[1.5.0-beta]` para el cierre R-12 Track C + gates.
+Producto sigue **BETA**. Tag `v1.5.0-beta` → `5e52bd6` **no se retaguea**. Ciclo vivo: R-13 (`plan-r13-consolidacion-beta-2026-08-22.md`). Tag `v1.6.0-beta` **solo con OK** del propietario.
+
+### R-13 consolidación (docs + E8 micro)
+
+- Cierre de R-12 como ciclo de reparación. Firma de partida R-13: `origin/main` **`5edbcb5`**. README alineado a **v1.5.0-beta**. Track B producto (god-page / Research→Radar) **bloqueado**. Tag `v1.6.0-beta` **no creado** (GATE).
+- A2: tests de contrato/ausencia en `chart-new-tab-setup.test.ts`; **purge** de `normalizeChartNewTabSeed` (0 callers). `extractChartNewTabSeed` / `applyChartNewTabSeed` intactos. Pending-delete alto **sin purge**.
+
+### Auth D4 / JWT (después del tag `v1.5.0-beta`, ya en `main`)
+
+- **R12-ACCOUNTS** (`3c958f1`) paquete `bolsa_application/accounts/`
+- **R12-AUTH F1–F3** stamp owner + 404 cuenta ajena + cash/trade scoped
+- **F4** ADR-027 Opción C **Aceptado** · **F5–F7a** tabla `users` + JWT + list/get scoped · **F8–F8e** perfiles, trackers, policies, events, workspaces, list-for-list
+- **F9** FE login campo `login` opcional · **F10** `session_version` + `/auth/refresh` + rate-limit user
+- **F7b** script + apply **local** (103→0 NULL; no prod) · **JWT-only** (`tokens.py` eliminado; SHA-256/HMAC → 401)
+- **F7c** match estricto `user_id == principal` · `scan.completed` `ownerUserId` · cron stamp `tracker.user_id`
+- Pending-delete E8 tests (`851b545`) · purge V2 métricas T+0 19/19 (**E8 N, sin purge**)
 
 ## [1.5.0-beta] — 2026-08-22
 

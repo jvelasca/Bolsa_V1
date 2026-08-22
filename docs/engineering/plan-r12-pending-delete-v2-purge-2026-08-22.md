@@ -29,10 +29,10 @@
 
 ### Micro-candidatos (fuera de matriz riesgo alto)
 
-| Ítem                       | E8 hoy | Evidencia                                                                                                                                                                                      | Acción                            |
-| -------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `ChartInspectorTab` (tipo) | **N**  | Fichero `chart-inspector-nav.ts` **LIVE** — imports en `ui-store`, `workspace-slice-layout`, `chart-inspector-panel`, `chart-toolbar-chart-bar`, etc. Tipo sin usos externos ≠ fichero muerto. | **NO PURGE**                      |
-| `normalizeChartNewTabSeed` | **N**  | **0 call sites** en `apps/` + `packages/`. Export en `chart-new-tab-setup.ts` L128. Inventario exige tests de contrato antes de borrar.                                                        | **NO PURGE** (sin contract tests) |
+| Ítem                       | E8 hoy           | Evidencia                                                                                                                                                                                      | Acción                        |
+| -------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `ChartInspectorTab` (tipo) | **N**            | Fichero `chart-inspector-nav.ts` **LIVE** — imports en `ui-store`, `workspace-slice-layout`, `chart-inspector-panel`, `chart-toolbar-chart-bar`, etc. Tipo sin usos externos ≠ fichero muerto. | **NO PURGE**                  |
+| `normalizeChartNewTabSeed` | **sí (R-13 A2)** | 0 call sites. Contract + absence tests en `chart-new-tab-setup.test.ts`. Función **eliminada**. extract/apply vivos.                                                                           | **PURGED** (solo este helper) |
 
 ---
 
