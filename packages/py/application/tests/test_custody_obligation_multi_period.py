@@ -87,7 +87,8 @@ class _FakeAccountRepo:
     async def touch_activity(self, account_id):  # noqa: ARG001
         self.activities += 1
 
-    async def list_active_accounts(self):
+    async def list_active_accounts(self, *, owner_user_id=None, for_custody_job=False):
+        _ = owner_user_id, for_custody_job
         return [SimpleNamespace(id="acc-1", status="active")]
 
     async def resolve_scope(self, account_id, portfolio_id=None):  # noqa: ARG001

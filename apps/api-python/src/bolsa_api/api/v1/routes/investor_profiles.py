@@ -21,7 +21,7 @@ from bolsa_infrastructure.database.repositories.cognitive_repository import (
 from bolsa_infrastructure.database.repositories.investor_profile_repository import (
     SqlAlchemyInvestorProfileRepository,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -30,6 +30,8 @@ from bolsa_api.api.dependencies import (
     get_list_accounts_use_case,
     require_account_access,
 )
+from bolsa_api.auth.principal import account_visible_to_principal
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.schemas.investor_profiles import (
     AssignProfileDto,
     AssignProfileResponseDto,
@@ -42,6 +44,15 @@ from bolsa_api.schemas.investor_profiles import (
 )
 
 router = APIRouter()
+
+
+def _require_profile_access(
+    profile: InvestorProfileRecord | None,
+    principal: str,
+) -> InvestorProfileRecord:
+    if profile is None or not account_visible_to_principal(profile.user_id, principal):
+        raise HTTPException(status_code=404, detail="Perfil no encontrado")
+    return profile
 
 
 def _to_dto(p: InvestorProfileRecord) -> InvestorProfileDto:
@@ -69,42 +80,50 @@ def _to_dto(p: InvestorProfileRecord) -> InvestorProfileDto:
 
 @router.get("/investor-profiles", response_model=InvestorProfileListResponseDto)
 async def list_investor_profiles(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileListResponseDto:
+    principal = get_request_principal(request)
     store = get_investor_profile_repository(session)
-    rows = await ListInvestorProfiles(store).execute()  # type: ignore[arg-type]
+    rows = await ListInvestorProfiles(store).execute(user_id=principal)  # type: ignore[arg-type]
     return InvestorProfileListResponseDto(data=[_to_dto(r) for r in rows])
 
 
 @router.post("/investor-profiles/ensure-defaults", response_model=InvestorProfileListResponseDto)
 async def ensure_default_profiles(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileListResponseDto:
     """Crea y asigna perfil moderate a cuentas sin active_profile_id (cuentas antiguas)."""
+    principal = get_request_principal(request)
     store = get_investor_profile_repository(session)
-    accounts = await get_list_accounts_use_case(session).execute()
+    accounts = await get_list_accounts_use_case(session).execute(
+        owner_user_id=principal,
+    )
     missing = [(a.id, a.name) for a in accounts if not a.active_profile_id]
     if missing:
         await EnsureDefaultsForAccounts(store).execute(missing)  # type: ignore[arg-type]
-    rows = await ListInvestorProfiles(store).execute()  # type: ignore[arg-type]
+    rows = await ListInvestorProfiles(store).execute(user_id=principal)  # type: ignore[arg-type]
     return InvestorProfileListResponseDto(data=[_to_dto(r) for r in rows])
 
 
 @router.get("/investor-profiles/{profile_id}", response_model=InvestorProfileResponseDto)
 async def get_investor_profile(
     profile_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileResponseDto:
+    principal = get_request_principal(request)
     store = get_investor_profile_repository(session)
     row = await GetInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
-    if row is None:
-        raise HTTPException(status_code=404, detail="Perfil no encontrado")
+    row = _require_profile_access(row, principal)
     return InvestorProfileResponseDto(data=_to_dto(row))
 
 
 @router.post("/investor-profiles", response_model=InvestorProfileResponseDto)
 async def create_investor_profile(
     body: CreateInvestorProfileDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileResponseDto:
     from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_from_declared
@@ -126,6 +145,7 @@ async def create_investor_profile(
         notes=body.notes,
         suggested_policy_template_id=suggested,
         selected_policy_template_id=selected,
+        user_id=get_request_principal(request),
     )
     return InvestorProfileResponseDto(data=_to_dto(row))
 
@@ -134,9 +154,13 @@ async def create_investor_profile(
 async def update_investor_profile(
     profile_id: str,
     body: UpdateInvestorProfileDto,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> InvestorProfileResponseDto:
+    principal = get_request_principal(request)
     store = get_investor_profile_repository(session)
+    existing = await GetInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
+    _require_profile_access(existing, principal)
     kwargs: dict[str, Any] = {}
     if body.name is not None:
         kwargs["name"] = body.name
@@ -167,9 +191,13 @@ async def update_investor_profile(
 @router.delete("/investor-profiles/{profile_id}")
 async def delete_investor_profile(
     profile_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, bool]:
+    principal = get_request_principal(request)
     store = get_investor_profile_repository(session)
+    existing = await GetInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
+    _require_profile_access(existing, principal)
     ok = await DeleteInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
     if not ok:
         raise HTTPException(status_code=404, detail="Perfil no encontrado")
@@ -182,11 +210,15 @@ async def delete_investor_profile(
 )
 async def refresh_observed_profile(
     profile_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     account_id: str | None = Query(default=None, alias="accountId"),
 ) -> InvestorProfileResponseDto:
     """Recalcula Observed desde Decision Memory y persiste observed_json (no toca Declared)."""
+    principal = get_request_principal(request)
     store = get_investor_profile_repository(session)
+    existing = await GetInvestorProfile(store).execute(profile_id)  # type: ignore[arg-type]
+    _require_profile_access(existing, principal)
     cognitive = SqlAlchemyCognitiveRepository(session)
     memories = await cognitive.list_decision_memory(limit=200, account_id=account_id)
     payloads = [

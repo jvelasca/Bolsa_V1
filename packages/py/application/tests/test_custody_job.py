@@ -32,8 +32,18 @@ class _FakeAccountRepo:
         self._accounts = accounts
         self.touches = 0
 
-    async def list_active_accounts(self):
-        return [a for a in self._accounts if a.status == "active"]
+    async def list_active_accounts(self, *, owner_user_id=None, for_custody_job=False):
+        active = [a for a in self._accounts if a.status == "active"]
+        if for_custody_job:
+            return active
+        if owner_user_id is not None:
+            return [
+                a
+                for a in active
+                if getattr(a, "user_id", None) == owner_user_id
+                or getattr(a, "user_id", None) is None
+            ]
+        return active
 
     async def resolve_scope(self, account_id: str, portfolio_id=None):  # noqa: ARG001
         account = next(a for a in self._accounts if a.id == account_id)
@@ -166,6 +176,23 @@ def asyncio_run(coro):
     import asyncio
 
     return asyncio.run(coro)
+
+
+def test_job_custody_system_scope_includes_all_tenant_accounts() -> None:
+    """F8: for_custody_job=True procesa cuentas activas de todos los owners."""
+    user_a_account = _account("acc-a", "active", 0.2)
+    user_a_account.user_id = "user-a"
+    user_b_account = _account("acc-b", "active", 0.2)
+    user_b_account.user_id = "user-b"
+    job, _, _, _, account_repo = _build([user_a_account, user_b_account])
+
+    assert asyncio_run(account_repo.list_active_accounts(owner_user_id="user-a")) == [
+        user_a_account
+    ]
+    result = asyncio_run(job.execute())
+
+    assert result["scanned"] == 2
+    assert {r["accountId"] for r in result["results"]} == {"acc-a", "acc-b"}
 
 
 def test_job_solo_procesa_cuentas_activas() -> None:

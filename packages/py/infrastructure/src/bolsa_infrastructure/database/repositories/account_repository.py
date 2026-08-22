@@ -174,17 +174,34 @@ class SqlAlchemyAccountRepository:
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_account_from_row(row) for row in rows]
 
-    async def list_active_accounts(self) -> list[InvestmentAccount]:
+    async def list_active_accounts(
+        self,
+        *,
+        owner_user_id: str | None = None,
+        for_custody_job: bool = False,
+    ) -> list[InvestmentAccount]:
         """Cuentas ACTIVAS (R-10 F4b): mismo orden que ``list_accounts``, filtrando
-        ``status == "active"`` (literal idéntico al de ``_load_scope``). El job de
-        custodia solo opera sobre este subconjunto, nunca sobre cuentas cerradas."""
-        stmt = (
-            select(InvestmentAccountRow)
-            .where(InvestmentAccountRow.status == "active")
-            .order_by(
-                InvestmentAccountRow.is_default.desc(),
-                InvestmentAccountRow.created_at.asc(),
-            )
+        ``status == "active"`` (literal idéntico al de ``_load_scope``).
+
+        - ``for_custody_job=True``: **system job scope** — todas las cuentas activas
+          (custodia per-account; solo jobs internos, nunca HTTP).
+        - ``owner_user_id`` explícito: misma visibilidad que ``list_accounts`` (F7a).
+        - Sin ``for_custody_job`` y sin ``owner_user_id``: scope al owner bootstrap
+          (nunca lista all-tenants por omisión)."""
+        stmt = select(InvestmentAccountRow).where(
+            InvestmentAccountRow.status == "active",
+        )
+        if for_custody_job:
+            if owner_user_id is not None:
+                raise ValueError(
+                    "for_custody_job y owner_user_id son mutuamente excluyentes",
+                )
+        else:
+            owner = owner_user_id if owner_user_id is not None else _app_owner_id()
+            stmt = stmt.where(_owner_visibility_clause(owner))
+        stmt = stmt.order_by(
+            InvestmentAccountRow.is_default.desc(),
+            InvestmentAccountRow.created_at.asc(),
         )
         rows = (await self._session.execute(stmt)).scalars().all()
         return [_account_from_row(row) for row in rows]

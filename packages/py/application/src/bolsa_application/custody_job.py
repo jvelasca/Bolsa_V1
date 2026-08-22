@@ -46,7 +46,7 @@ class RunCustodyJob:
         self._obligation_repo = custody_obligation_repo
 
     async def execute(self) -> dict[str, Any]:
-        accounts = await self._account_repo.list_active_accounts()
+        accounts = await self._account_repo.list_active_accounts(for_custody_job=True)
         applied_complete = 0
         pending = 0
         skipped = 0

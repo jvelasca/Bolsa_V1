@@ -6,7 +6,10 @@ from uuid import uuid4
 
 import pytest
 from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import InvestmentAccountRow
+from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorProfileRow
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -62,6 +65,46 @@ async def _delete_raw_account(
             await session.commit()
 
 
+async def _insert_raw_profile(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    user_id: str | None,
+    name: str,
+) -> str:
+    profile_id = f"PROF-{uuid4().hex[:12]}"
+    async with factory() as session:
+        session.add(
+            InvestorProfileRow(
+                id=profile_id,
+                name=name,
+                version="1.0.0",
+                user_id=user_id,
+                horizon="swing",
+                objectives=["growth"],
+                risk_tolerance="moderate",
+                experience="intermediate",
+                suggested_policy_template_id="moderate",
+                selected_policy_template_id="moderate",
+                updated_by="user",
+                created_at=_now(),
+                updated_at=_now(),
+            )
+        )
+        await session.commit()
+    return profile_id
+
+
+async def _delete_raw_profile(
+    factory: async_sessionmaker[AsyncSession],
+    profile_id: str,
+) -> None:
+    async with factory() as session:
+        row = await session.get(InvestorProfileRow, profile_id)
+        if row is not None:
+            await session.delete(row)
+            await session.commit()
+
+
 def test_resolve_app_principal_defaults_to_app() -> None:
     get_settings.cache_clear()
     assert resolve_app_principal(get_settings()) == DEFAULT_APP_PRINCIPAL
@@ -88,6 +131,7 @@ def _patch_request_principal(
         "bolsa_api.auth.request_principal.get_request_principal",
         "bolsa_api.api.dependencies.get_request_principal",
         "bolsa_api.api.v1.routes.accounts.get_request_principal",
+        "bolsa_api.api.v1.routes.investor_profiles.get_request_principal",
     ):
         monkeypatch.setattr(target, fake)
 
@@ -142,6 +186,61 @@ async def test_legacy_null_user_id_hidden_from_non_bootstrap_principal(
                 assert legacy_id not in ids
         finally:
             await _delete_raw_account(factory, legacy_id)
+
+
+@pytest.mark.asyncio
+async def test_list_active_accounts_filters_by_owner_user_id() -> None:
+    """F8 G4: list_active_accounts con owner_user_id aplica visibilidad F7a."""
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        user_a_id = await _insert_raw_account(
+            factory, user_id="user-a", name="Active A"
+        )
+        user_b_id = await _insert_raw_account(
+            factory, user_id="user-b", name="Active B"
+        )
+        try:
+            async with factory() as session:
+                repo = SqlAlchemyAccountRepository(session)
+                scoped = await repo.list_active_accounts(owner_user_id="user-a")
+                ids = {a.id for a in scoped}
+                assert user_a_id in ids
+                assert user_b_id not in ids
+
+                system = await repo.list_active_accounts(for_custody_job=True)
+                system_ids = {a.id for a in system}
+                assert user_a_id in system_ids
+                assert user_b_id in system_ids
+        finally:
+            await _delete_raw_account(factory, user_a_id)
+            await _delete_raw_account(factory, user_b_id)
+
+
+@pytest.mark.asyncio
+async def test_user_b_cannot_see_user_a_investor_profiles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F8 G6: perfiles inversor scoped al principal JWT."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        profile_a = await _insert_raw_profile(
+            factory, user_id="user-a", name="Profile A isolation"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(f"/api/investor-profiles/{profile_a}")
+                assert response.status_code == 404
+
+                listed = await client.get("/api/investor-profiles")
+                assert listed.status_code == 200
+                ids = {row["profileId"] for row in listed.json()["data"]}
+                assert profile_a not in ids
+        finally:
+            await _delete_raw_profile(factory, profile_a)
 
 
 @pytest.mark.asyncio
