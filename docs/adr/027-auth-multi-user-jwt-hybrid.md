@@ -3,7 +3,7 @@
 ## Estado
 
 **Aceptado** — 2026-08-22  
-(**F5+F6 implementados; F7+ pendiente según plan D4.**)
+(**F5–F10 + F8b implementados localmente; pendiente commit. Gaps F8 residuales: platform_events/workspaces. Fallback APP_PASSWORD intacto.**)
 
 **Decisión del propietario (2026-08-22):** **Opción C (híbrido)** — fases incrementales C.1 → C.2 → C.3 documentadas en [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](../engineering/plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) §3.
 
@@ -43,12 +43,13 @@ Implementar auth multi-user mediante **Opción C (híbrido)** en tres sub-fases:
 
 Tokens firmados (HS256 inicialmente; rotación documentada en F10). Claims mínimos:
 
-| Claim  | Obligatorio | Semántica                                                      |
-| ------ | ----------- | -------------------------------------------------------------- |
-| `sub`  | Sí          | ID del user (`users.id`) — fuente de `request.state.principal` |
-| `exp`  | Sí          | Expiración UTC (epoch seconds)                                 |
-| `iat`  | Sí          | Emisión UTC                                                    |
-| `role` | No          | Rol opcional (`admin` \| `operator`); enforcement en F10       |
+| Claim  | Obligatorio | Semántica                                                       |
+| ------ | ----------- | --------------------------------------------------------------- |
+| `sub`  | Sí          | ID del user (`users.id`) — fuente de `request.state.principal`  |
+| `exp`  | Sí          | Expiración UTC (epoch seconds)                                  |
+| `iat`  | Sí          | Emisión UTC                                                     |
+| `sv`   | Sí (F10)    | `session_version` del user — revocación logout-all              |
+| `role` | No          | Rol opcional (`admin` \| `operator`); `require_role` helper F10 |
 
 **No incluir** en el JWT: password, email en claro, datos de cuenta. TTL alineado con `APP_AUTH_TTL_SECONDS` (default 86400) salvo decisión F10.
 
@@ -101,7 +102,7 @@ Legacy: cuentas con `user_id is None` son visibles para **cualquier** principal 
 
 **Orden recomendado:** F5 (JWT `sub`) → F6 (list/get scoped) → F7b staging → F7c opcional.
 
-**Jobs:** `list_active_accounts` sin filtro owner (`account_repository.py:168-181`) debe alinearse en **F8**; hasta entonces, documentado como gap G4. Custodia multi-tenant: filtrar por owner o impersonation explícita — inaceptable «all tenants» en producción multi-user.
+**Jobs:** `list_active_accounts` filtrado por owner en **F8** (`5e7c67b`). Custodia multi-tenant: filtrar por owner — **hecho F8**. Trackers/policies scoped en **F8b** (local, pendiente commit).
 
 **Ventana de convivencia C.1–C.3:** legacy NULL permanece bajo F7a hasta F7; no backfill automático en F5–F6.
 
@@ -196,6 +197,7 @@ Legacy: cuentas con `user_id is None` son visibles para **cualquier** principal 
 
 ## Historial
 
-| Fecha      | Evento                                                                                                                 |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------- |
-| 2026-08-22 | ADR creado (Propuesto) en R12-AUTH F4; propietario elige **Opción C (híbrido)**. Pendiente **Aceptado** para abrir F5. |
+| Fecha      | Evento                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-22 | ADR creado (Propuesto) en R12-AUTH F4; propietario elige **Opción C (híbrido)**.                                                     |
+| 2026-08-22 | **Aceptado**; F5–F9 en `main` (`5e7c67b`). **F8b** + **F10** (local): trackers/policies scoped · session_version/refresh/rate-limit. |

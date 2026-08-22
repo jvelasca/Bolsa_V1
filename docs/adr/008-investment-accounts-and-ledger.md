@@ -101,7 +101,7 @@ La lista virtual **lee** posiciones de la cuenta/cartera activa; no es fuente de
 ### 8. Auth y multi-usuario
 
 - `InvestmentAccount.userId: string | null` — null = legacy pre-auth (política de cierre en [ADR-027](./027-auth-multi-user-jwt-hybrid.md) anexo F7).
-- **Multi-user enforced** con identidad JWT (`sub` → principal) según [ADR-027](./027-auth-multi-user-jwt-hybrid.md) (Opción C híbrida; ADR **Propuesto** hasta aceptación F5).
+- **Multi-user enforced** con identidad JWT (`sub` → principal) según [ADR-027](./027-auth-multi-user-jwt-hybrid.md) (Opción C híbrida; ADR **Aceptado**).
 - Índice `(userId, status)` para listar cuentas por usuario en el futuro.
 
 ## Consecuencias

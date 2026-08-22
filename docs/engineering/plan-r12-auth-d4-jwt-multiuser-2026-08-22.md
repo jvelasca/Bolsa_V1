@@ -3,8 +3,8 @@
 > **Padre:** [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md) §2 gate R12-AUTH · [`plan-r12-auth-fase1-2026-08-22.md`](./plan-r12-auth-fase1-2026-08-22.md) (F1–F3 cerradas).
 > **Contexto freeze:** [`plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md`](./plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md) §4 «Auth global → multiusuario real» · [`plan-r8-prevencion-riesgo-2026-08-20.md`](./plan-r8-prevencion-riesgo-2026-08-20.md) R-8B.2 (cookie HttpOnly, **no JWT**).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · 0 commits sin OK del propietario.
-> **AsOf:** 2026-08-22 · R12-AUTH F1 `e52e016` · F2 `9f3354f` · F3 `5fe5ace`.
-> **Decisión propietario (2026-08-22):** **Opción C (híbrido)** · **F4 en curso** — ADR-027 [`docs/adr/027-auth-multi-user-jwt-hybrid.md`](../adr/027-auth-multi-user-jwt-hybrid.md) **Propuesto** (pendiente Aceptado para F5).
+> **AsOf:** 2026-08-22 · R12-AUTH F1 `e52e016` · F2 `9f3354f` · F3 `5fe5ace` · **F5–F9** `5e7c67b`.
+> **Decisión propietario (2026-08-22):** **Opción C (híbrido)** · ADR-027 **Aceptado** · **F4–F10 cerradas** (F8b+F10 local pendiente commit).
 
 ---
 
@@ -156,19 +156,13 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F4 — Decisión + ADR + inventario gaps (docs + tests read-only)
 
-**Estado:** **▶ EN CURSO** (2026-08-22) — propietario eligió **Opción C**; ADR-027 creado (**Propuesto**).
-
-**Qué:** ADR-027 borrador · tabla gaps §1.4 · matriz rutas sin guard · criterios de aceptación multi-user.
-
-**Código:** 0 (o trivial: enlace en `engineering-index`).
-
-**Batería:** revisión estática (`rg require_account_access`, `rg user_id`) · pytest existente verde.
-
-**Hecho cuando:** propietario elige A/B/C (**✅ Opción C**) y **acepta** ADR-027 (Aceptado → gate F5).
+**Estado:** **✅ CERRADA** (`cdda80d`) — Opción C · ADR-027 **Aceptado**.
 
 ---
 
 ### F5 — Identidad mínima (tabla `users` + login JWT, single admin)
+
+**Estado:** **✅ CERRADA** (`02c86fc` / `98b4986`).
 
 **Qué (Opción C.2):**
 
@@ -191,6 +185,8 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F6 — Scoping list/get accounts al principal JWT
 
+**Estado:** **✅ CERRADA** (`98b4986`).
+
 **Qué:**
 
 1. `ListAccounts` / list summaries: pasar `owner_user_id=get_request_principal(request)` desde rutas (`accounts.py:61-76`).
@@ -204,6 +200,8 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 ---
 
 ### F7 — Política legacy `user_id is None` (backfill controlado)
+
+**Estado:** **F7a ✅ CERRADA** (`98b4986`) · F7b/F7c pendientes decisión propietario.
 
 **Qué (decisión en ADR-027 anexo):**
 
@@ -221,6 +219,10 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F8 — Recursos colaterales (`investor_profiles`, trackers, policies, events)
 
+**Estado:** **✅ CERRADA** (`5e7c67b` + **F8b** local) — perfiles inversor + job custodia + **trackers/policies scoped**. **Gaps residuales:** `platform_events` · workspaces · bulk `POST /trackers/schedules/evaluate` sin `trackerId`.
+
+**F8b (trackers + execution_policies):** list/create/get/update/delete scoped por `principal`; repos filtran owner + F7a legacy NULL; tests `test_trackers_policies_isolation.py` (7 passed).
+
 **Qué:** propagar `principal` a repositorios con columna `user_id`; guards en rutas de catálogo; jobs internos filtran por owner cuando apliquen.
 
 **Gap crítico:** `list_active_accounts` (`account_repository.py:168-181`) debe aceptar `owner_user_id` o documentar «job system opera all tenants» (inaceptable en multi-user → filtrar).
@@ -233,6 +235,8 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F9 — Frontend auth (solo si fase pactada)
 
+**Estado:** **✅ CERRADA** (`26494d8`) — login FE con campo `login` opcional.
+
 **Qué:** login por user/password (no password global); bootstrap status con JWT; opcional admin users.
 
 **NO:** refactors shell · contract:gen salvo endpoints nuevos.
@@ -242,6 +246,8 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 ---
 
 ### F10 — Endurecimiento (refresh, revocación, roles)
+
+**Estado:** **✅ CERRADA** (local) — migración `008_users_session_version` · claim JWT `sv` · `POST /api/auth/refresh` · logout invalida sesión · `require_role` helper · rate-limit por user · audit login. **Fallback `APP_PASSWORD` intacto** (opcional diferido).
 
 **Qué:** refresh token rotativo · `session_version` en user · roles (`admin`/`operator`) · rate-limit por user · auditoría login.
 
@@ -294,16 +300,16 @@ Comando base API: `pytest apps/api-python/tests/test_auth.py apps/api-python/tes
 
 ## 9. Gaps documentados (file:line)
 
-| #   | Gap                                                                                 | Evidencia                                                         |
-| --- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| G1  | Principal no derivado de credenciales                                               | `middleware/auth.py:36` siempre `resolve_app_principal(settings)` |
-| G2  | Token no identifica usuario                                                         | `tokens.py:7-10` hash de password global                          |
-| G3  | Sin tabla `users`                                                                   | repo sin `UserRow`                                                |
-| G4  | `list_active_accounts` sin filtro owner                                             | `account_repository.py:168-181`                                   |
-| G5  | Use-cases CRUD sin `owner_user_id` param                                            | `accounts/crud.py:15-16,71-72`                                    |
-| G6  | Perfiles inversor / trackers / policies: `user_id` nullable sin guard HTTP uniforme | `tables.py:492,729,1072` · `investor_profile_repository.py:48-51` |
-| G7  | ADR-004 desactualizado (sessionStorage)                                             | `docs/adr/004-prorealtime-ui-platform.md:28-29` vs R-8B.2         |
-| G8  | Workspaces sin columna `user_id`                                                    | búsqueda modelos workspace: 0 matches                             |
+| #   | Gap                                                                        | Evidencia                                     | Estado F8 |
+| --- | -------------------------------------------------------------------------- | --------------------------------------------- | --------- |
+| G1  | Principal no derivado de credenciales                                      | `middleware/auth.py` JWT → `sub`              | ✅ F5     |
+| G2  | Token no identifica usuario                                                | `jwt.py` + login `users`                      | ✅ F5     |
+| G3  | Sin tabla `users`                                                          | migración + `UserRow`                         | ✅ F5     |
+| G4  | `list_active_accounts` sin filtro owner                                    | `account_repository.py` + `custody_job.py`    | ✅ F8     |
+| G5  | Use-cases CRUD sin `owner_user_id` param                                   | `accounts/crud.py` + rutas F6                 | ✅ F6     |
+| G6  | Perfiles / trackers / policies: `user_id` nullable sin guard HTTP uniforme | perfiles ✅ F8 · trackers/policies ✅ **F8b** | ✅ F8b    |
+| G7  | ADR-004 desactualizado (sessionStorage)                                    | nota cookie HttpOnly añadida F4               | docs OK   |
+| G8  | Workspaces sin columna `user_id`                                           | búsqueda modelos workspace: 0 matches         | abierto   |
 
 ---
 
@@ -321,11 +327,9 @@ Comando base API: `pytest apps/api-python/tests/test_auth.py apps/api-python/tes
 
 ## 11. Primera fase recomendada tras OK del propietario
 
-**F4 (decisión + ADR-027 + inventario gaps)** — **▶ EN CURSO** (Opción C elegida 2026-08-22; ADR-027 **Propuesto** — pendiente **Aceptado**).
+**D4 Opción C — F4–F10 cerradas** (F8b+F10 en working tree local, pendiente commit).
 
-Si el propietario **acepta ADR-027**, la **primera fase con código** es **F5** (tabla `users` + login JWT + middleware `principal=sub`), manteniendo guards F1–F3 y NO-touch money.
-
-Si el propietario elige **permanecer single-tenant (A)**, D4 se **cierra sin F5+**; opcional endurecimiento operativo (rotación secretos, TTL) fuera de este plan.
+**Siguiente R-12 (fuera D4):** ventana métricas purge V2 (E8 N) · gaps F8 residuales (`platform_events`, workspaces) · opcional retirar fallback `APP_PASSWORD` · F7b/F7c legacy NULL.
 
 ---
 
