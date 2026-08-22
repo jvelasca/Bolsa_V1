@@ -13,6 +13,7 @@ import type {
   ExecutionPolicySummaryDto,
   TrackerScheduleKind,
 } from "@bolsa/shared";
+import { SEÑALES_LABEL } from "@/features/confirm/daily-nav";
 import { api, ApiError } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ScreenerPanelShell } from "@/features/screeners/screener-panel-shell";
@@ -292,7 +293,7 @@ export function TrackersPanel({
   return (
     <ScreenerPanelShell
       embedded={embedded}
-      title="Rastreadores guardados"
+      title={`${SEÑALES_LABEL} guardadas`}
       description={
         embedded
           ? undefined

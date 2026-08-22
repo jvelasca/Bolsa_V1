@@ -11,6 +11,7 @@ import {
   buildTrackerFromFinalistSlot,
   screenersHrefAfterTrackerCreate,
 } from "@/features/backtests/promote-finalist-to-tracker";
+import { SEÑALES_LABEL } from "@/features/confirm/daily-nav";
 import { PAPER_PATH_RADAR } from "@/features/settings/paper-paths-copy";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { instrumentTopBacktestsHref } from "@/features/backtests/instrument-strategy-top-panel";
@@ -60,7 +61,7 @@ export function useActivateInstrumentTracking() {
       void queryClient.invalidateQueries({ queryKey: ["trackers"] });
       void queryClient.invalidateQueries({ queryKey: ["tracker"] });
       pushToast(
-        `${PAPER_PATH_RADAR.cta} creado: ${detail.name}. Abre Screeners para escanear / programar.`,
+        `${PAPER_PATH_RADAR.cta} creado: ${detail.name}. Abre ${SEÑALES_LABEL} para escanear / programar.`,
       );
       navigate(screenersHrefAfterTrackerCreate(detail.id));
     },

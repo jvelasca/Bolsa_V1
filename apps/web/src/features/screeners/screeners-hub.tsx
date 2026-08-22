@@ -16,6 +16,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { ScanJobDto, ScanRunResultDto } from "@bolsa/shared";
+import { SEÑALES_LABEL } from "@/features/confirm/daily-nav";
 import { api, ApiError } from "@/lib/api";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { Button } from "@/components/ui/button";
@@ -364,7 +365,7 @@ export function ScreenersHub() {
   const sidebarPanels = [
     sidebarSection(
       "trackers",
-      "Rastreadores",
+      SEÑALES_LABEL,
       Radar,
       <TrackersPanel
         embedded
@@ -485,7 +486,7 @@ export function ScreenersHub() {
           <div className="min-w-0 space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Radar className="h-5 w-5 shrink-0 text-primary" />
-              Ejecutar rastreador
+              Ejecutar escaneo
             </CardTitle>
             <CardDescription className="max-w-2xl">
               Escanea una lista en la última barra. Sync inmediato o cola async

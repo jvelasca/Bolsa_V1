@@ -22,6 +22,7 @@ import { api } from "@/lib/api";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatPct } from "@/features/charts/chart-utils";
+import { SEÑALES_LABEL } from "@/features/confirm/daily-nav";
 import {
   PAPER_PATH_LAB,
   PAPER_PATH_RADAR,
@@ -434,7 +435,7 @@ export function InstrumentStrategyTopPanel({
     onSuccess: (detail) => {
       void queryClient.invalidateQueries({ queryKey: ["trackers"] });
       pushToast(
-        `${PAPER_PATH_RADAR.cta} creado: ${detail.name}. Abre Screeners para escanear / programar.`,
+        `${PAPER_PATH_RADAR.cta} creado: ${detail.name}. Abre ${SEÑALES_LABEL} para escanear / programar.`,
       );
       navigate(screenersHrefAfterTrackerCreate(detail.id));
     },

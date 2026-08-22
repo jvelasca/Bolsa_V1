@@ -4,6 +4,7 @@ import {
   buildTrackerFromFinalistSlot,
   buildTrackerNameFromFinalist,
   kernelTimeframeFromTop,
+  screenersHrefAfterTrackerCreate,
 } from "@/features/backtests/promote-finalist-to-tracker";
 
 const slot1: InstrumentStrategyTopSlotV1 = {
@@ -84,5 +85,38 @@ describe("promote-finalist-to-tracker", () => {
     expect(res.ok).toBe(true);
     if (!res.ok) return;
     expect(res.dto.defaultExecutionPolicyId).toBe("p-alert");
+  });
+});
+
+describe("screenersHrefAfterTrackerCreate", () => {
+  it("returns /screeners when trackerId is missing", () => {
+    expect(screenersHrefAfterTrackerCreate()).toBe("/screeners");
+    expect(screenersHrefAfterTrackerCreate(undefined)).toBe("/screeners");
+    expect(screenersHrefAfterTrackerCreate("")).toBe("/screeners");
+  });
+
+  it("builds /screeners?trackerId=<id> for a given id", () => {
+    expect(screenersHrefAfterTrackerCreate("tracker-abc-123")).toBe(
+      "/screeners?trackerId=tracker-abc-123",
+    );
+  });
+
+  it("encodes trackerId query param when it contains reserved characters", () => {
+    const trackerId = "id&foo=bar";
+    const params = new URLSearchParams({ trackerId });
+    expect(screenersHrefAfterTrackerCreate(trackerId)).toBe(
+      `/screeners?${params.toString()}`,
+    );
+    expect(screenersHrefAfterTrackerCreate(trackerId)).toBe(
+      "/screeners?trackerId=id%26foo%3Dbar",
+    );
+  });
+
+  it("encodes spaces in trackerId", () => {
+    const trackerId = "tracker with spaces";
+    const params = new URLSearchParams({ trackerId });
+    expect(screenersHrefAfterTrackerCreate(trackerId)).toBe(
+      `/screeners?${params.toString()}`,
+    );
   });
 });
