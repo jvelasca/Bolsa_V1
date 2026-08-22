@@ -1,8 +1,9 @@
-"""Principal single-tenant del request (R12-AUTH fase 1).
+"""Principal del request (R12-AUTH).
 
-No hay JWT ni claims: tras el gate ``APP_PASSWORD`` el middleware adjunta
-``request.state.principal`` con ``Settings.owner_principal()`` (default ``app``).
-El mismo valor se estampa en altas nuevas de ``InvestmentAccount.user_id``.
+El middleware inicializa ``request.state.principal`` con
+``Settings.owner_principal()`` (default ``app``). Con auth ON y JWT válido
+lo sustituye por el ``sub`` del token. El mismo valor de propietario se
+estampa en altas nuevas de ``InvestmentAccount.user_id`` cuando aplica.
 """
 
 from __future__ import annotations

@@ -98,18 +98,21 @@ Resultado ventana **2026-08-22:** ver §5 (batería ampliada con `legacy-storage
 
 | Suite                                          | Tests  | Resultado   |
 | ---------------------------------------------- | ------ | ----------- |
-| `legacy-storage-metrics.test.ts`               | 6      | ✅ pass     |
+| `legacy-storage-metrics.test.ts`               | 10     | ✅ pass     |
 | `use-pending-orders.migration.test.ts`         | 4      | ✅ pass     |
 | `workspace-legacy-timeframe-favorites.test.ts` | 5      | ✅ pass     |
-| **Total ventana 2026-08-22**                   | **15** | **✅ pass** |
+| **Total ventana 2026-08-22**                   | **19** | **✅ pass** |
 
-> Re-ejecutar la batería §4 tras cada hito de ventana; actualizar conteos en esta tabla.
+> Re-ejecutar la batería §4 tras cada hito de ventana; actualizar conteos en esta tabla. Conteos re-anotados tras kit de persistencia local (log inspectable).
 
 ---
 
 ## 6. Próximo paso (coordinador)
 
 1. ~~Aprobar instrumentación de métricas (§2.1–2.3) sin tocar migradores.~~ **Métricas implementadas (2026-08-22):** `apps/web/src/lib/legacy-storage-metrics.ts` — opt-in (`localStorage["bolsa-legacy-storage-metrics"]=1` o `VITE_LEGACY_STORAGE_METRICS=1`), sample 1% por defecto, dedupe por sesión; hooks en `use-pending-orders.ts`, `normalizeWorkspace`, `mergeWorkspaceChartState`; tests `legacy-storage-metrics.test.ts`. **Ventana métricas abierta 2026-08-22** — recopilar telemetría 4–8 semanas antes de flags/purge.
-2. Monitorear métricas (opt-in manual o sample) hasta objetivo §2.1–2.3 (**0 blobs activos** en ventana acordada).
-3. Tras ventana + flags (`PENDING_ORDERS_LEGACY_MIGRATION_COMPLETE`, etc.), re-ejecutar subagente purge con este plan como checklist.
-4. **Prohibido:** wipe `localStorage`, quitar migradores, o borrar `chart-inspector-nav.ts` / `presetRuleGroups` sin E8 completo.
+2. **Kit monitor (persistencia local, 2026-08-22):** cada emisión que pasa `shouldEmitLegacyStorageMetric` hace **append** en `localStorage["bolsa-legacy-storage-metrics-log"]` (array `{ ts, name, payload }`, cap 200). **Sin POST** HTTP (`platform_events` es GET-only). **E8 sigue N. 0 purges.** Inventario §1 no cambia.
+3. **Activar opt-in (DevTools → Application → Local Storage, o consola):** `localStorage.setItem("bolsa-legacy-storage-metrics", "1")` y recargar. Sin esa clave, sample 1% (`VITE_LEGACY_STORAGE_METRICS=1` fuerza opt-in de build).
+4. **Leer el log en DevTools:** `JSON.parse(localStorage.getItem("bolsa-legacy-storage-metrics-log") || "[]")`. Vaciar: `localStorage.removeItem("bolsa-legacy-storage-metrics-log")` (o `clearLegacyStorageMetricsLog()`).
+5. Monitorear métricas (opt-in manual o sample) hasta objetivo §2.1–2.3 (**0 blobs activos** en ventana acordada).
+6. Tras ventana + flags (`PENDING_ORDERS_LEGACY_MIGRATION_COMPLETE`, etc.), re-ejecutar subagente purge con este plan como checklist.
+7. **Prohibido:** wipe `localStorage` de claves legacy, quitar migradores, o borrar `chart-inspector-nav.ts` / `presetRuleGroups` sin E8 completo.

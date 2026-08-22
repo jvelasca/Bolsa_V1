@@ -1,7 +1,11 @@
-"""API: autenticación / estado de sesión."""
+"""API: autenticación / estado de sesión.
+
+Con auth ON (``APP_PASSWORD``) el login exige un usuario en ``users`` y
+``verify_password``; la cookie de sesión es el JWT HS256. Sin fila de
+usuario → 401. El status trata autenticado solo si el JWT decodifica.
+"""
 
 import logging
-import secrets
 
 from bolsa_infrastructure.auth.passwords import verify_password
 from bolsa_infrastructure.config import get_settings
@@ -21,8 +25,6 @@ from bolsa_api.auth.session import (
     SESSION_COOKIE_NAME,
     SESSION_COOKIE_PATH,
     cookie_secure,
-    create_session_cookie_value,
-    verify_session_cookie,
 )
 
 router = APIRouter()
@@ -78,10 +80,7 @@ def _session_is_authenticated(request: Request) -> bool:
         dict(request.headers),
         request.cookies.get(SESSION_COOKIE_NAME),
     )
-    claims = decode_access_token(settings, token)
-    if claims is not None:
-        return True
-    return verify_session_cookie(settings, token)
+    return decode_access_token(settings, token) is not None
 
 
 async def _resolve_jwt_user(
@@ -126,42 +125,29 @@ async def login(body: LoginRequestDto, request: Request) -> JSONResponse:
         login_name = (body.login or settings.bootstrap_login()).strip()
         user = await repo.get_by_login(login_name)
 
-        if user is not None:
-            if user.disabled_at is not None:
-                raise HTTPException(status_code=401, detail="Contraseña incorrecta")
-            if not verify_password(body.password, user.password_hash):
-                raise HTTPException(status_code=401, detail="Contraseña incorrecta")
-            jwt_value = encode_access_token(
-                settings,
-                sub=user.id,
-                sv=user.session_version,
-                role=user.role,
-            )
-            logger.info(
-                "auth.login.success user_id=%s login=%s",
-                user.id,
-                user.login,
-            )
-            response = JSONResponse(
-                content=LoginResponseDto(
-                    data=LoginResponseDataDto(auth_enabled=True)
-                ).model_dump(by_alias=True),
-                status_code=200,
-            )
-            _set_session_cookie(response, jwt_value)
-            return response
-
-    if not secrets.compare_digest(body.password, settings.app_password or ""):
-        raise HTTPException(status_code=401, detail="Contraseña incorrecta")
-
-    response = JSONResponse(
-        content=LoginResponseDto(
-            data=LoginResponseDataDto(auth_enabled=auth_enabled)
-        ).model_dump(by_alias=True),
-        status_code=200,
-    )
-    _set_session_cookie(response, create_session_cookie_value(settings))
-    return response
+        if user is None or user.disabled_at is not None:
+            raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+        if not verify_password(body.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Contraseña incorrecta")
+        jwt_value = encode_access_token(
+            settings,
+            sub=user.id,
+            sv=user.session_version,
+            role=user.role,
+        )
+        logger.info(
+            "auth.login.success user_id=%s login=%s",
+            user.id,
+            user.login,
+        )
+        response = JSONResponse(
+            content=LoginResponseDto(
+                data=LoginResponseDataDto(auth_enabled=True)
+            ).model_dump(by_alias=True),
+            status_code=200,
+        )
+        _set_session_cookie(response, jwt_value)
+        return response
 
 
 @router.post("/auth/refresh")

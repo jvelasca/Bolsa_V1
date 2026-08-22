@@ -1,4 +1,4 @@
-"""Gate APP_PASSWORD + JWT (cookie HttpOnly + Bearer, ADR-027 C.2)."""
+"""Gate APP_PASSWORD (auth ON) + JWT (cookie HttpOnly o Bearer, ADR-027 C.2)."""
 
 from collections.abc import Awaitable, Callable
 
@@ -15,8 +15,7 @@ from bolsa_api.auth.jwt import (
     session_version_matches,
 )
 from bolsa_api.auth.principal import resolve_app_principal
-from bolsa_api.auth.session import SESSION_COOKIE_NAME, verify_session_cookie
-from bolsa_api.auth.tokens import verify_access_token
+from bolsa_api.auth.session import SESSION_COOKIE_NAME
 
 PUBLIC_PREFIXES = (
     "/api/health",
@@ -61,7 +60,7 @@ async def _principal_from_jwt(request: Request) -> tuple[str | None, str | None]
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """Adjunta ``request.state.principal`` y exige JWT o gate legacy si hay password."""
+    """Adjunta ``request.state.principal`` y, con auth ON, exige JWT válido."""
 
     async def _dispatch_with_principal_context(
         self,
@@ -97,15 +96,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if jwt_principal is not None:
             request.state.principal = jwt_principal
             request.state.auth_role = jwt_role
-            return await self._dispatch_with_principal_context(request, call_next)
-
-        auth_header = request.headers.get("Authorization", "")
-        token = auth_header.removeprefix("Bearer ").strip()
-        if verify_access_token(settings, token):
-            return await self._dispatch_with_principal_context(request, call_next)
-
-        cookie_value = request.cookies.get(SESSION_COOKIE_NAME)
-        if verify_session_cookie(settings, cookie_value or ""):
             return await self._dispatch_with_principal_context(request, call_next)
 
         return JSONResponse(status_code=401, content={"error": "Unauthorized"})

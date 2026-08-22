@@ -201,7 +201,7 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F7 — Política legacy `user_id is None` (backfill controlado)
 
-**Estado:** **F7a ✅ CERRADA** (`98b4986`) · F7b/F7c pendientes decisión propietario.
+**Estado:** **F7a ✅ CERRADA** (`98b4986`) · **F7b ✅ script** `scripts/verify/backfill_legacy_account_user_id.py` (dry-run default; apply solo con `--apply --i-know-this-is-maintenance`; **no** ejecutado en prod) · F7c pendiente decisión.
 
 **Qué (decisión en ADR-027 anexo):**
 
@@ -247,11 +247,11 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F10 — Endurecimiento (refresh, revocación, roles)
 
-**Estado:** **✅ CERRADA** (`837ec85`) — migración `008_users_session_version` · claim JWT `sv` · `POST /api/auth/refresh` · logout invalida sesión · `require_role` helper · rate-limit por user · audit login. **Fallback `APP_PASSWORD` intacto** (opcional diferido).
+**Estado:** **✅ CERRADA** (`837ec85`) — migración `008_users_session_version` · claim JWT `sv` · `POST /api/auth/refresh` · logout invalida sesión · `require_role` helper · rate-limit por user · audit login. **Fallback SHA-256/HMAC retirado** (JWT-only; `APP_PASSWORD` env intacto como flag/seed/fail-closed).
 
 **Qué:** refresh token rotativo · `session_version` en user · roles (`admin`/`operator`) · rate-limit por user · auditoría login.
 
-**Opcional:** retirar fallback `APP_PASSWORD` legacy.
+**Opcional (hecho):** fallback SHA-256/HMAC retirado. `tokens.py` eliminado.
 
 **Batería:** test_auth completo · penetration checklist OR-S1.
 
@@ -329,7 +329,7 @@ Comando base API: `pytest apps/api-python/tests/test_auth.py apps/api-python/tes
 
 **D4 Opción C — F4–F10 cerradas** en `main` (`2cd20b0` · `837ec85`).
 
-**Siguiente R-12 (fuera D4):** monitor ventana purge V2 (E8 N, abierta 2026-08-22) · opcional retirar fallback `APP_PASSWORD` · F7b/F7c legacy NULL.
+**Siguiente R-12 (fuera D4):** seguir monitor ventana purge V2 (E8 N, log local `bolsa-legacy-storage-metrics-log`) · apply F7b en staging cuando el propietario abra ventana · F7c opcional.
 
 ---
 

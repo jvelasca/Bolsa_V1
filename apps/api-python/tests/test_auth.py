@@ -1,3 +1,7 @@
+import hashlib
+import time
+
+import jwt as pyjwt
 import pytest
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.models import UserRow
@@ -6,17 +10,23 @@ from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
-from bolsa_api.auth import session as session_module
 from bolsa_api.auth.jwt import decode_access_token, encode_access_token
 from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.auth.roles import require_role
-from bolsa_api.auth.session import (
-    SESSION_COOKIE_NAME,
-    cookie_secure,
-    create_session_cookie_value,
-    verify_session_cookie,
-)
+from bolsa_api.auth.session import SESSION_COOKIE_NAME, cookie_secure
 from bolsa_api.main import create_app, lifespan
+
+
+async def _jwt_for_app_user(app) -> str:
+    settings = get_settings()
+    factory = app.state.session_factory
+    async with factory() as session:
+        repo = SqlAlchemyUserRepository(session)
+        user = await repo.get_by_id("app")
+        assert user is not None
+        return encode_access_token(
+            settings, sub=user.id, sv=user.session_version, role=user.role
+        )
 
 
 @pytest.mark.asyncio
@@ -65,6 +75,13 @@ async def test_login_sets_session_cookie_and_omits_token(monkeypatch) -> None:
     assert SESSION_COOKIE_NAME in set_cookie
     assert "HttpOnly" in set_cookie
 
+    cookie = response.cookies.get(SESSION_COOKIE_NAME)
+    assert cookie is not None
+    claims = decode_access_token(get_settings(), cookie)
+    assert claims is not None
+    assert claims["sub"] == "app"
+    assert not cookie.split(".")[0].isdigit()
+
     get_settings.cache_clear()
 
 
@@ -99,8 +116,8 @@ async def test_protected_route_requires_auth_and_accepts_cookie(monkeypatch) -> 
             anon = await client.get("/api/accounts")
             assert anon.status_code == 401
 
-            # Con cookie válida -> el middleware de auth deja pasar (distinto de 401).
-            client.cookies.set(SESSION_COOKIE_NAME, create_session_cookie_value(get_settings()))
+            # Cookie JWT válida -> el middleware de auth deja pasar (distinto de 401).
+            client.cookies.set(SESSION_COOKIE_NAME, await _jwt_for_app_user(app))
             authed = await client.get("/api/accounts")
             assert authed.status_code != 401
 
@@ -123,8 +140,14 @@ async def test_status_reports_authenticated_from_cookie(monkeypatch) -> None:
             assert anon.json()["data"]["authEnabled"] is True
             assert anon.json()["data"]["authenticated"] is False
 
-            # Con cookie válida -> authenticated true.
-            client.cookies.set(SESSION_COOKIE_NAME, create_session_cookie_value(get_settings()))
+            # Cookie HMAC legacy (exp.token.sig) -> no autenticado.
+            client.cookies.set(SESSION_COOKIE_NAME, "1700000000.deadbeef.deadbeef")
+            hmac_status = await client.get("/api/auth/status")
+            assert hmac_status.status_code == 200
+            assert hmac_status.json()["data"]["authenticated"] is False
+
+            # Cookie JWT válida -> authenticated true.
+            client.cookies.set(SESSION_COOKIE_NAME, await _jwt_for_app_user(app))
             authed = await client.get("/api/auth/status")
             assert authed.status_code == 200
             assert authed.json()["data"]["authenticated"] is True
@@ -133,24 +156,29 @@ async def test_status_reports_authenticated_from_cookie(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_expired_session_cookie_rejected(monkeypatch) -> None:
+async def test_expired_jwt_cookie_rejected(monkeypatch) -> None:
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
     get_settings.cache_clear()
+    settings = get_settings()
 
     app = create_app()
     async with lifespan(app):
-        # Crear la cookie con un epoch congelado para fijar su deadline.
-        fixed_epoch = 1_700_000_000.0
-        monkeypatch.setattr(session_module.time, "time", lambda: fixed_epoch)
-        expired_cookie = create_session_cookie_value(get_settings())
+        factory = app.state.session_factory
+        async with factory() as session:
+            repo = SqlAlchemyUserRepository(session)
+            user = await repo.get_by_id("app")
+            assert user is not None
+            sv = user.session_version
 
-        # Avanzar el reloj mucho más allá del TTL para forzar el deadline ya pasado.
-        monkeypatch.setattr(
-            session_module.time, "time", lambda: fixed_epoch + 100_000 + 3600
+        now = int(time.time())
+        expired_cookie = pyjwt.encode(
+            {"sub": "app", "sv": sv, "iat": now - 100, "exp": now - 10, "role": "admin"},
+            settings.jwt_signing_key_resolved(),
+            algorithm="HS256",
         )
-
-        assert verify_session_cookie(get_settings(), expired_cookie) is False
+        assert decode_access_token(settings, expired_cookie) is None
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -161,25 +189,28 @@ async def test_expired_session_cookie_rejected(monkeypatch) -> None:
     get_settings.cache_clear()
 
 
-def test_session_epoch_portability_and_expiry(monkeypatch) -> None:
-    """La sesión usa Unix epoch UTC: portable y expirable sin reloj monotónico."""
+def test_jwt_epoch_portability_and_expiry(monkeypatch) -> None:
+    """El JWT usa Unix epoch UTC en ``exp``: portable y expirable sin reloj monotónico."""
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
     get_settings.cache_clear()
     settings = get_settings()
 
-    fixed_epoch = 1_700_000_000.0
+    now = int(time.time())
+    valid = pyjwt.encode(
+        {"sub": "app", "sv": 1, "iat": now, "exp": now + 3600, "role": "admin"},
+        settings.jwt_signing_key_resolved(),
+        algorithm="HS256",
+    )
+    expired = pyjwt.encode(
+        {"sub": "app", "sv": 1, "iat": now - 100, "exp": now - 10, "role": "admin"},
+        settings.jwt_signing_key_resolved(),
+        algorithm="HS256",
+    )
 
-    # Reloj congelado para generar la cookie con un deadline determinista.
-    monkeypatch.setattr(session_module.time, "time", lambda: fixed_epoch)
-    cookie = create_session_cookie_value(settings)
-
-    # Dentro del TTL (mismo epoch) -> válida.
-    assert verify_session_cookie(settings, cookie) is True
-
-    # Avanzar el reloj más allá del deadline -> expirada.
-    monkeypatch.setattr(session_module.time, "time", lambda: fixed_epoch + 100_000)
-    assert verify_session_cookie(settings, cookie) is False
+    assert decode_access_token(settings, valid) is not None
+    assert decode_access_token(settings, expired) is None
 
     get_settings.cache_clear()
 
@@ -303,7 +334,7 @@ async def test_middleware_accepts_jwt_bearer_and_sets_principal(
 
 
 @pytest.mark.asyncio
-async def test_legacy_login_fallback_when_no_user_row(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_login_without_user_row_returns_401(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_PASSWORD", "s3cret")
     monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
     get_settings.cache_clear()
@@ -319,11 +350,52 @@ async def test_legacy_login_fallback_when_no_user_row(monkeypatch: pytest.Monkey
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post("/api/auth/login", json={"password": "s3cret"})
 
-    assert response.status_code == 200
-    cookie = response.cookies.get(SESSION_COOKIE_NAME) or ""
-    parts = cookie.split(".")
-    assert len(parts) == 3
-    assert parts[0].isdigit()
+    assert response.status_code == 401
+    assert SESSION_COOKIE_NAME not in (response.headers.get("set-cookie") or "")
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_legacy_hmac_cookie_does_not_authenticate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    get_settings.cache_clear()
+
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            client.cookies.set(SESSION_COOKIE_NAME, "1700000000.deadbeef.deadbeef")
+            response = await client.get("/api/accounts")
+            assert response.status_code == 401
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_legacy_sha256_bearer_does_not_authenticate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    get_settings.cache_clear()
+    settings = get_settings()
+    legacy = hashlib.sha256(
+        f"bolsa:{settings.app_password}:{settings.app_auth_secret}".encode()
+    ).hexdigest()
+
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/accounts",
+                headers={"Authorization": f"Bearer {legacy}"},
+            )
+            assert response.status_code == 401
 
     get_settings.cache_clear()
 

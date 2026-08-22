@@ -10,15 +10,17 @@ from bolsa_infrastructure.database.models import InvestmentAccountRow, InvestorP
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
+from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_api.auth.jwt import encode_access_token
 from bolsa_api.auth.principal import (
     DEFAULT_APP_PRINCIPAL,
     account_visible_to_principal,
     resolve_app_principal,
 )
-from bolsa_api.auth.session import SESSION_COOKIE_NAME, create_session_cookie_value
+from bolsa_api.auth.session import SESSION_COOKIE_NAME
 from bolsa_api.main import create_app, lifespan
 
 
@@ -278,7 +280,18 @@ async def test_new_account_stamps_user_id_when_auth_enabled(monkeypatch: pytest.
     async with lifespan(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
-            client.cookies.set(SESSION_COOKIE_NAME, create_session_cookie_value(get_settings()))
+            factory = app.state.session_factory
+            async with factory() as session:
+                repo = SqlAlchemyUserRepository(session)
+                user = await repo.get_by_id("app")
+                assert user is not None
+                token = encode_access_token(
+                    get_settings(),
+                    sub=user.id,
+                    sv=user.session_version,
+                    role=user.role,
+                )
+            client.cookies.set(SESSION_COOKIE_NAME, token)
             created = await client.post(
                 "/api/accounts",
                 json={
@@ -354,9 +367,17 @@ async def test_foreign_account_404_with_session_cookie(monkeypatch: pytest.Monke
         try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
-                client.cookies.set(
-                    SESSION_COOKIE_NAME, create_session_cookie_value(get_settings())
-                )
+                async with factory() as session:
+                    repo = SqlAlchemyUserRepository(session)
+                    user = await repo.get_by_id("app")
+                    assert user is not None
+                    token = encode_access_token(
+                        get_settings(),
+                        sub=user.id,
+                        sv=user.session_version,
+                        role=user.role,
+                    )
+                client.cookies.set(SESSION_COOKIE_NAME, token)
                 response = await client.get(f"/api/accounts/{foreign_id}")
                 assert response.status_code == 404
         finally:

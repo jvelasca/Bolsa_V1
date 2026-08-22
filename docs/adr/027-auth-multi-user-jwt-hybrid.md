@@ -3,7 +3,7 @@
 ## Estado
 
 **Aceptado** — 2026-08-22  
-(**F5–F10 + F8b–F8e en `main` (`e565cf4`). Defer: `scan.completed` worker async. Fallback APP_PASSWORD intacto.**)
+(**F5–F10 + F8b–F8e en `main`. F7b script + fallback SHA-256/HMAC retirado (JWT-only gate). `APP_PASSWORD` env sigue como flag auth-on + seed bootstrap + fail-closed prod. F7c opcional. Defer: `scan.completed` worker async. SHA vivo = `origin/main`.**)
 
 **Decisión del propietario (2026-08-22):** **Opción C (híbrido)** — fases incrementales C.1 → C.2 → C.3 documentadas en [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](../engineering/plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) §3.
 
@@ -64,13 +64,13 @@ Tokens firmados (HS256 inicialmente; rotación documentada en F10). Claims míni
 
 Middleware: JWT válido → `principal = sub`; rutas públicas sin cambio (health, login/logout/status, docs).
 
-### Fallback `APP_PASSWORD` (solo C.1 / transición C.2)
+### Fallback `APP_PASSWORD` (retirado)
 
-Durante **C.1** y ventana acordada en **C.2**:
+El propietario retiró el gate SHA-256 / cookie HMAC (post-F10). Con auth ON:
 
-- Si JWT ausente o inválido **y** `APP_PASSWORD` configurada → gate legacy actual (token SHA-256 determinista + cookie HMAC existente).
-- Principal legacy: user bootstrap `app` (o `APP_OWNER_ID`) — **no** identidad multi-user.
-- **Deprecación:** retirar fallback en **F10** (endurecimiento) salvo OK explícito del propietario para prolongar.
+- Login exige fila en `users` + `verify_password`. Sin usuario → **401**.
+- Middleware autentica **solo** JWT (cookie HttpOnly o Bearer). SHA-256 Bearer y cookie HMAC → **401**.
+- `APP_PASSWORD` **no** autentica: sigue como flag auth-on (`bool(settings.app_password)`), seed `bootstrap_password()`, y fail-closed production (F-SEG-1).
 
 **Prohibido:** fallback legacy en `ENVIRONMENT=production` cuando auth está desactivada (fail-closed ya vigente en `config.py:190-203`).
 
@@ -86,7 +86,7 @@ Sin registro público en ninguna sub-fase C.1–C.3; bootstrap admin vía migrac
 
 ### Deprecación token SHA-256 determinista
 
-`auth/tokens.py` (hash `bolsa:{password}:{secret}`) se retira tras ventana acordada post-F5 (target F10). ADR-027 no autoriza borrado en F5.
+`auth/tokens.py` (hash `bolsa:{password}:{secret}`) **retirado**. Cookie de sesión = JWT HS256.
 
 ## Anexo: Política legacy `user_id is NULL`
 
@@ -150,9 +150,9 @@ Legacy: cuentas con `user_id is None` son visibles para **cualquier** principal 
 
 ### F7 — Política legacy `user_id is NULL`
 
-- [ ] Política F7a, F7b o F7c aplicada según decisión de fase.
-- [ ] Tests legacy + post-backfill en staging si F7b.
-- [ ] **Prohibido** backfill automático en `database_bootstrap`.
+- [x] Política F7a aplicada (`98b4986`). F7b script offline entregado (no hot path). F7c **no** aplicada.
+- [x] Tests post-backfill del script (`test_f7b_legacy_user_id_backfill.py`). Apply en staging/prod = ventana de mantenimiento del propietario (CLI `--apply --i-know-this-is-maintenance`).
+- [x] **Prohibido** backfill automático en `database_bootstrap`.
 
 ## Alternativas consideradas y por qué se descartan
 

@@ -4,11 +4,21 @@
  */
 
 export const LEGACY_STORAGE_METRICS_OPT_IN_KEY = "bolsa-legacy-storage-metrics";
+/** Inspectable local log (no HTTP). Cap keeps DevTools / quota bounded. */
+export const LEGACY_STORAGE_METRICS_LOG_KEY =
+  "bolsa-legacy-storage-metrics-log";
+export const LEGACY_STORAGE_METRICS_LOG_CAP = 200;
 const SESSION_REPORTED_PREFIX = "bolsa-legacy-metric-reported:";
 /** Sample rate when not explicitly opted in (1%). */
 const DEFAULT_SAMPLE_RATE = 0.01;
 
 export type LegacyStorageMetricPayload = Record<string, unknown>;
+
+export type LegacyStorageMetricLogEntry = {
+  ts: string;
+  name: string;
+  payload: LegacyStorageMetricPayload;
+};
 
 export type WorkspaceDeprecatedFieldPresence = {
   chartDataStrip: boolean;
@@ -122,9 +132,57 @@ export function reportMergedWorkspaceDeprecatedFields(
   reportLegacyStorageMetric("workspace_deprecated_fields", presence);
 }
 
+export function readLegacyStorageMetricsLog(): LegacyStorageMetricLogEntry[] {
+  if (!hasBrowserStorage()) return [];
+  try {
+    const raw = localStorage.getItem(LEGACY_STORAGE_METRICS_LOG_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed as LegacyStorageMetricLogEntry[];
+  } catch {
+    return [];
+  }
+}
+
+/** Clear inspectable log — tests and DevTools. */
+export function clearLegacyStorageMetricsLog(): void {
+  if (!hasBrowserStorage()) return;
+  try {
+    localStorage.removeItem(LEGACY_STORAGE_METRICS_LOG_KEY);
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function appendLegacyStorageMetricLog(
+  name: string,
+  payload: LegacyStorageMetricPayload,
+): void {
+  if (!hasBrowserStorage()) return;
+  try {
+    const next: LegacyStorageMetricLogEntry[] = [
+      ...readLegacyStorageMetricsLog(),
+      { ts: new Date().toISOString(), name, payload },
+    ];
+    const trimmed =
+      next.length > LEGACY_STORAGE_METRICS_LOG_CAP
+        ? next.slice(next.length - LEGACY_STORAGE_METRICS_LOG_CAP)
+        : next;
+    localStorage.setItem(
+      LEGACY_STORAGE_METRICS_LOG_KEY,
+      JSON.stringify(trimmed),
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 /**
  * Emit a legacy-storage metric (opt-in or sampled, once per session per name).
  * Always `console.debug` in dev when invoked.
+ * When `shouldEmitLegacyStorageMetric` is true, appends to the local inspectable log.
+ * No client POST for platform_events (GET-only audit bus).
  */
 export function reportLegacyStorageMetric(
   name: string,
@@ -135,7 +193,7 @@ export function reportLegacyStorageMetric(
   }
   if (!shouldEmitLegacyStorageMetric(name)) return;
   markReportedThisSession(name);
-  // No client POST for platform_events (GET-only audit bus); metrics are dev-log + sample.
+  appendLegacyStorageMetricLog(name, payload);
 }
 
 /** Clear session dedupe keys — tests only. */
