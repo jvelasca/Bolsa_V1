@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # TTL de sesión de la cookie HttpOnly stateless (ver bolsa_api.auth.session).
     # 1 día por defecto; 0 o negativo desactiva los Set-Cookie de sesión.
     app_auth_ttl_seconds: int = Field(default=86400, validation_alias="APP_AUTH_TTL_SECONDS")
+    # R12-AUTH F5: clave HS256 dedicada; fallback APP_AUTH_SECRET en transición C.2.
+    jwt_signing_key: str = Field(default="", validation_alias="JWT_SIGNING_KEY")
+    # Bootstrap admin one-shot (ADR-027 C.1): login y password opcionales.
+    app_bootstrap_login: str = Field(default="app", validation_alias="APP_BOOTSTRAP_LOGIN")
+    app_bootstrap_password: str | None = Field(
+        default=None, validation_alias="APP_BOOTSTRAP_PASSWORD"
+    )
     environment: str = "development"
     scan_queue_backend: str = Field(default="postgres", validation_alias="SCAN_QUEUE_BACKEND")
     alert_webhook_timeout_seconds: float = Field(
@@ -218,6 +225,24 @@ class Settings(BaseSettings):
         dejen el mismo ``user_id`` que el modo con ``APP_PASSWORD``.
         """
         return (self.app_owner_id or "").strip() or "app"
+
+    def bootstrap_login(self) -> str:
+        return (self.app_bootstrap_login or "").strip() or "app"
+
+    def bootstrap_password(self) -> str | None:
+        """Contraseña del admin bootstrap: APP_BOOTSTRAP_PASSWORD o APP_PASSWORD."""
+        explicit = (self.app_bootstrap_password or "").strip()
+        if explicit:
+            return explicit
+        legacy = (self.app_password or "").strip()
+        return legacy or None
+
+    def jwt_signing_key_resolved(self) -> str:
+        """Clave HS256: JWT_SIGNING_KEY o APP_AUTH_SECRET (transición)."""
+        dedicated = (self.jwt_signing_key or "").strip()
+        if dedicated:
+            return dedicated
+        return self.app_auth_secret
 
     def __repr__(self) -> str:
         # F-SEG-2: un `repr(Settings)` accidental en un log/traceback no debe exponer

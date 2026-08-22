@@ -1418,3 +1418,18 @@ class CustodyObligationRow(Base):
     __table_args__ = (
         UniqueConstraint("account_id", "period", name="uq_custody_obligations_account_period"),
     )
+
+
+class UserRow(Base):
+    """Usuario autenticado (R12-AUTH F5 / ADR-027)."""
+
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    login: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    password_hash: Mapped[str] = mapped_column("password_hash", String, nullable=False)
+    role: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    disabled_at: Mapped[datetime | None] = mapped_column(
+        "disabled_at", DateTime(timezone=True), nullable=True
+    )

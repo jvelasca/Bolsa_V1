@@ -31,6 +31,7 @@ from sqlalchemy.pool import NullPool
 
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.account_migration import run_account_data_migration
+from bolsa_infrastructure.database.user_bootstrap import ensure_bootstrap_user
 
 _INFRA_ROOT = Path(__file__).resolve().parents[3]
 
@@ -103,6 +104,7 @@ async def database_bootstrap(
             await asyncio.to_thread(ensure_migrated)
             async with session_factory() as session:
                 await run_account_data_migration(session)
+                await ensure_bootstrap_user(session)
         finally:
             try:
                 await conn.execute(

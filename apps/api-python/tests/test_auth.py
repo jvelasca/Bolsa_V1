@@ -1,7 +1,12 @@
 import pytest
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import UserRow
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import delete
 
 from bolsa_api.auth import session as session_module
+from bolsa_api.auth.jwt import decode_access_token, encode_access_token
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.auth.session import (
     SESSION_COOKIE_NAME,
     cookie_secure,
@@ -9,7 +14,6 @@ from bolsa_api.auth.session import (
     verify_session_cookie,
 )
 from bolsa_api.main import create_app, lifespan
-from bolsa_infrastructure.config import get_settings
 
 
 @pytest.mark.asyncio
@@ -218,3 +222,103 @@ def test_cookie_secure_only_in_production() -> None:
     assert cookie_secure(FakeSettings("development")) is False
     assert cookie_secure(FakeSettings("prod")) is True
     assert cookie_secure(FakeSettings("production")) is True
+
+
+@pytest.mark.asyncio
+async def test_jwt_login_with_bootstrap_user(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    get_settings.cache_clear()
+
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/api/auth/login", json={"password": "s3cret"})
+
+    assert response.status_code == 200
+    cookie = response.cookies.get(SESSION_COOKIE_NAME)
+    assert cookie is not None
+    claims = decode_access_token(get_settings(), cookie)
+    assert claims is not None
+    assert claims["sub"] == "app"
+    assert "exp" in claims
+    assert "iat" in claims
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_jwt_login_wrong_password_rejects(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    get_settings.cache_clear()
+
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/api/auth/login", json={"password": "wrong"})
+
+    assert response.status_code == 401
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_middleware_accepts_jwt_bearer_and_sets_principal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    get_settings.cache_clear()
+    settings = get_settings()
+
+    app = create_app()
+    async with lifespan(app):
+        token = encode_access_token(settings, sub="jwt-operator", role="admin")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/accounts",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            assert response.status_code != 401
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_legacy_login_fallback_when_no_user_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    get_settings.cache_clear()
+
+    app = create_app()
+    async with lifespan(app):
+        factory = app.state.session_factory
+        async with factory() as session:
+            await session.execute(delete(UserRow))
+            await session.commit()
+
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post("/api/auth/login", json={"password": "s3cret"})
+
+    assert response.status_code == 200
+    cookie = response.cookies.get(SESSION_COOKIE_NAME) or ""
+    parts = cookie.split(".")
+    assert len(parts) == 3
+    assert parts[0].isdigit()
+
+    get_settings.cache_clear()
+
+
+def test_get_request_principal_reads_request_state() -> None:
+    class FakeRequest:
+        state = type("State", (), {"principal": "jwt-user-42"})()
+
+    assert get_request_principal(FakeRequest()) == "jwt-user-42"  # type: ignore[arg-type]

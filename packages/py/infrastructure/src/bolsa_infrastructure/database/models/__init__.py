@@ -53,6 +53,7 @@ from bolsa_infrastructure.database.models.tables import (
     TrackerDefinitionRow,
     TransactionRow,
     TrialRecordRow,
+    UserRow,
     WorkspaceRow,
 )
 
@@ -111,5 +112,6 @@ __all__ = [
     "TrackerDefinitionRow",
     "TransactionRow",
     "TrialRecordRow",
+    "UserRow",
     "WorkspaceRow",
 ]

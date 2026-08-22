@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
-from bolsa_api.auth.principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -266,6 +265,8 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
+from bolsa_api.auth.request_principal import get_request_principal
+
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     return cast(async_sessionmaker[AsyncSession], request.app.state.session_factory)
@@ -334,7 +335,7 @@ def get_account_id_header(
 async def require_account_access(request: Request, account_id: str) -> str:
     """404 si el ``account_id`` de path no es visible para el principal del request.
 
-    Filas legacy ``user_id is None`` siguen accesibles.
+    Filas legacy ``user_id is None`` solo accesibles al principal bootstrap (F7a).
     """
     factory = get_session_factory(request)
     async with factory() as session:
