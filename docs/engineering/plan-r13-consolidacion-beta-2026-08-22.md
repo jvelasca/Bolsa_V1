@@ -4,7 +4,7 @@
 > **Ancla:** `docs/engineering/PROJECT_STATE.md` §2ad · `docs/engineering/backlog-trabajo-2026-08-20.md` §0 · premisas ⭐§0.
 > **Supersede:** el ciclo vivo deja de ser R-12. R-12 queda **CERRADA** (`plan-r12-auditoria-ux-2026-08-21.md`).
 > **Partida (verificada):** `origin/main` = **`5edbcb5`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292` intacto · `v1.5.0-beta-39-g5edbcb5`.
-> **Estado del plan:** A0–A2 **HECHAS**. A3 tag **GATE** (no creado). Track B producto **BLOQUEADO**.
+> **Estado del plan:** A0–A2 **HECHAS** + A3 **HECHA** (tag `v1.6.0-beta` = `c3964fc` pusheado). Track B producto **BLOQUEADO**.
 
 ---
 
@@ -31,7 +31,7 @@ R-12 cerró la reparación post-auditoría. **Prohibido** reabrir:
 | A0 cierre + firma      | HECHA         | este plan · premisas ciclo R-13 · SHA `5edbcb5` · README `v1.5.0-beta` · CHANGELOG `[Unreleased]` JWT |
 | A1 inventario residual | HECHA         | §4 de este doc (file:line)                                                                            |
 | A2 E8 micro + tests    | HECHA         | `normalizeChartNewTabSeed` purged after contract tests; extract/apply kept                            |
-| A3 tag `v1.6.0-beta`   | **GATE**      | solo OK explícito del propietario; no retaguear `v1.5.0-beta` / `v1.3.0`                              |
+| A3 tag `v1.6.0-beta`   | **HECHA**     | tag `v1.6.0-beta` = `c3964fc` pusheado; `v1.5.0-beta` / `v1.3.0` no retagueados (intactos)            |
 | Track B producto       | **BLOQUEADO** | god-page / Research→Radar: plan propio, OK línea a línea                                              |
 
 ## 3. Inventario residual (resumen A1)

@@ -1,7 +1,7 @@
 # PROJECT_STATE — Estado vivo del proyecto (fuente única de continuación)
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
-> **AsOf:** 2026-08-22 · **Fuente de coordinación: GitHub `origin/main`** (`git fetch && git rev-parse origin/main`). Partida R-13: **`5edbcb5`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **R-12 CERRADA** · ciclo vivo **R-13** (`plan-r13-consolidacion-beta-2026-08-22.md`). Track B producto **BLOQUEADO**. R-7..R-11 cerradas. Relevo UNO (`f7a4ab0`) + DOS (`f7a86cc`) ejecutados.
+> **AsOf:** 2026-08-22 · **Fuente de coordinación: GitHub `origin/main`** (`git fetch && git rev-parse origin/main`). Partida R-13: **`c3964fc`**. Tag **`v1.6.0-beta` → `c3964fc`** (A3 HECHO, pusheado) · tag **`v1.5.0-beta` → `5e52bd6`** intacto · tag **`v1.3.0` → `b778292`** intacto · **R-12 CERRADA** · ciclo vivo **R-13** (`plan-r13-consolidacion-beta-2026-08-22.md`). Track B producto **BLOQUEADO**. R-7..R-11 cerradas. Relevo UNO (`f7a4ab0`) + DOS (`f7a86cc`) ejecutados.
 > **PACK de estado global consolidado R-1→R-7 (para auditoría externa / lectura rápida):** [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md) · **R-7 deuda COMPLETA** (solo M-4/T-M4 diferido).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
@@ -108,7 +108,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ## 2ac. R-12 — Auditoría residual, higiene y estudio UX (2026-08-21) — **CERRADA**
 
-> Plan **histórico:** [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md). Cierre documental R-13: partida **`5edbcb5`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Implementación Track A+B: **`48cc255`**. Partida R-12: `f7a86cc`. Track B UX **APROBADO**. Track C **C1–C5** + leftover + copy E8. Gates: R12-409 `eb24608` · EXEC-B-CONC `ca60d0a` · R12-SCHED `5e52bd6` · R12-ACCOUNTS `3c958f1` · R12-AUTH F1–F10+F8b–F8e · F7b local · F7c · JWT-only · ADR-027 **Aceptado**. Purge V2 T+0 19/19 (E8 N). **Siguiente vivo: §2ad R-13.**
+> Plan **histórico:** [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md). Cierre documental R-13: partida **`5edbcb5`** (histórica). Tag **`v1.5.0-beta` → `5e52bd6`**. A3 tag **`v1.6.0-beta` → `c3964fc`** HECHO y pusheado (véase §2ad). Implementación Track A+B: **`48cc255`**. Partida R-12: `f7a86cc`. Track B UX **APROBADO**. Track C **C1–C5** + leftover + copy E8. Gates: R12-409 `eb24608` · EXEC-B-CONC `ca60d0a` · R12-SCHED `5e52bd6` · R12-ACCOUNTS `3c958f1` · R12-AUTH F1–F10+F8b–F8e · F7b local · F7c · JWT-only · ADR-027 **Aceptado**. Purge V2 T+0 19/19 (E8 N). **Siguiente vivo: §2ad R-13.**
 
 | Fase                         | Estado                                                                                  | Entregable                                                                                                                      |
 | ---------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -127,14 +127,14 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ## 2ad. R-13 — Cierre R-12 y consolidación BETA (2026-08-22)
 
-> Plan vivo: [`plan-r13-consolidacion-beta-2026-08-22.md`](./plan-r13-consolidacion-beta-2026-08-22.md). Traspaso: [`traspaso-relevo-r13-apertura-2026-08-22.md`](./traspaso-relevo-r13-apertura-2026-08-22.md). Partida: **`5edbcb5`**. Serie: A0 docs → A1 inventario → A2 E8 tests. A3 tag **solo con OK**. Track B producto **BLOQUEADO**.
+> Plan vivo: [`plan-r13-consolidacion-beta-2026-08-22.md`](./plan-r13-consolidacion-beta-2026-08-22.md). Traspaso: [`traspaso-relevo-r13-apertura-2026-08-22.md`](./traspaso-relevo-r13-apertura-2026-08-22.md). Partida: **`c3964fc`**. Serie: A0 docs → A1 inventario → A2 E8 tests → **A3 tag HECHO** (`v1.6.0-beta` = `c3964fc`). Track B producto **BLOQUEADO**.
 
 | Fase                   | Estado        | Entregable                                                                                                  |
 | ---------------------- | ------------- | ----------------------------------------------------------------------------------------------------------- |
 | A0 cierre + firma      | HECHA         | premisas ciclo R-13 · SHA `5edbcb5` · README `v1.5.0-beta` · CHANGELOG `[Unreleased]`                       |
 | A1 inventario residual | HECHA         | plan R-13 §4 file:line                                                                                      |
 | A2 E8 micro + tests    | HECHA         | contract + absence; `normalizeChartNewTabSeed` **purged**; extract/apply vivos; pending-delete alto intacto |
-| A3 tag `v1.6.0-beta`   | **GATE**      | no creado; espera OK explícito                                                                              |
+| A3 tag `v1.6.0-beta`   | **HECHA**     | tag `v1.6.0-beta` = `c3964fc` pusheado; `v1.5.0-beta`/`v1.3.0` intactos                                     |
 | Track B producto       | **BLOQUEADO** | god-page / Research→Radar                                                                                   |
 
 ---

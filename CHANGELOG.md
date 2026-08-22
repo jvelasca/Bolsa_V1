@@ -4,11 +4,11 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased] — R-13 + JWT post-`v1.5.0-beta` (2026-08-22)
 
-Producto sigue **BETA**. Tag `v1.5.0-beta` → `5e52bd6` **no se retaguea**. Ciclo vivo: R-13 (`plan-r13-consolidacion-beta-2026-08-22.md`). Tag `v1.6.0-beta` **solo con OK** del propietario.
+Producto sigue **BETA**. **`v1.6.0-beta` lanzado** (A0–A2): tag `v1.6.0-beta` → `c3964fc` CREADO y pusheado (apertura del ciclo R-13 + purge `normalizeChartNewTabSeed`). Tag `v1.5.0-beta` → `5e52bd6` **no se retaguea**. Ciclo vivo: R-13 (`plan-r13-consolidacion-beta-2026-08-22.md`).
 
 ### R-13 consolidación (docs + E8 micro)
 
-- Cierre de R-12 como ciclo de reparación. Firma de partida R-13: `origin/main` **`5edbcb5`**. README alineado a **v1.5.0-beta**. Track B producto (god-page / Research→Radar) **bloqueado**. Tag `v1.6.0-beta` **no creado** (GATE).
+- Cierre de R-12 como ciclo de reparación. Firma de partida R-13: `origin/main` **`5edbcb5`** (histórica) → **`c3964fc`** (A0–A2 + A3). README alineado a **v1.6.0-beta**. Track B producto (god-page / Research→Radar) **bloqueado**. **A3 tag `v1.6.0-beta` = `c3964fc` CREADO** y pusheado; `v1.5.0-beta` / `v1.3.0` intactos.
 - A2: tests de contrato/ausencia en `chart-new-tab-setup.test.ts`; **purge** de `normalizeChartNewTabSeed` (0 callers). `extractChartNewTabSeed` / `applyChartNewTabSeed` intactos. Pending-delete alto **sin purge**.
 
 ### Auth D4 / JWT (después del tag `v1.5.0-beta`, ya en `main`)
