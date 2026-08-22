@@ -3,14 +3,14 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1.
 > **Propósito:** texto de paso oficial para el **NUEVO AGENTE / NUEVO CHAT** (mañana). Leer este doc + backlog §0 + `PROJECT_STATE.md` §2b + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch && git rev-parse origin/main` (no asumir SHA de este fichero).
-> **Estado al redactar (verificado):** `local main = origin/main = 2eba070` · working tree limpio · **R-13 CERRADA** · **Track B EN CURSO** (capítulo Research→Radar F4′–F6′ **HECHO**) · tag **`v1.6.0-beta` → `c3964fc`** intacto.
+> **Estado al redactar (verificado):** `local main = origin/main = 67a1692` · working tree limpio · **R-13 CERRADA** · **Track B EN CURSO** (capítulo Research→Radar F4′–F6′ **HECHO**) · tag **`v1.6.0-beta` → `c3964fc`** intacto.
 > **AsOf:** 2026-08-23.
 
 ---
 
 ## 1. Estado verificado (firma — no adivinar)
 
-- **HEAD/rama:** `main` == `origin/main` == `2eba070`. Árbol limpio tras push.
+- **HEAD/rama:** `main` == `origin/main` == `67a1692`. Árbol limpio tras push.
 - **Commits de hoy (2026-08-22/23, de más nuevo a más antiguo):**
 
   | Commit    | Contenido                                                                                    |
@@ -60,7 +60,7 @@ pnpm --filter @bolsa/web test
 
 ### 4.1 Brief de arranque (nuevo chat principal)
 
-> CONTEXTO (2026-08-23, firma verificada): repo `Bolsa_V1`, `main` = `2eba070`, árbol **limpio**, **R-13 CERRADA**, **Track B EN CURSO**. Research→Radar **F4′–F6′ HECHAS** (`240c846`). Audit-pack v2 (`b2ee0f2`). Tag **`v1.6.0-beta` → `c3964fc`**.
+> CONTEXTO (2026-08-23, firma verificada): repo `Bolsa_V1`, `main` = `67a1692`, árbol **limpio**, **R-13 CERRADA**, **Track B EN CURSO**. Research→Radar **F4′–F6′ HECHAS** (`240c846`). Audit-pack v2 (`b2ee0f2`). Tag **`v1.6.0-beta` → `c3964fc`**.
 > **LEE PRIMERO:** `traspaso-relevo-track-b-f4-f6-apertura-backtests-b1-2026-08-23.md` · backlog §0 · `PROJECT_STATE.md` §2b · `plan-split-backtests-page-2026-08-22.md`.
 > **Tarea inmediata:** abrir **backtests B1** (constantes/tipos) — un subagente, ficheros disjuntos, sin tocar `backtest-orchestration.ts` lógica. Batería web completa. NO commits sin aprobación.
 > **NO tocar:** motor money · gobernanza IA · purge storage alto · `contract:gen` · paralelizar B7+B8.
