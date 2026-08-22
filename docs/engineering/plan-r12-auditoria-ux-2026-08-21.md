@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Ancla:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` · `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/engineering/PROJECT_STATE.md` · premisas E1–E9 + ciclo R-12 en `docs/PROJECT_PREMISES.md` ⭐§0.
 > **Estado de partida (verificado):** `main` local = `origin/main` = **`f7a86cc`** · tag **`v1.3.0` → `b778292`** · árbol limpio al abrir · `v1.3.0-5-gf7a86cc`.
-> **Estado del plan (AsOf 2026-08-22):** … **R12-AUTH F1–F10 + F8b cerrados** (`2cd20b0` · `837ec85`). **`origin/main` `478e504`**. Siguiente: ventana purge V2 · gaps F8 residuales.
+> **Estado del plan (AsOf 2026-08-22):** … **R12-AUTH F1–F10 + F8b–F8e cerrados**. **`origin/main` `01ee1ae`**. Siguiente: monitor ventana purge V2 (E8 N).
 > **Supersede:** `plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` (Relevo UNO/DOS ejecutados; Relevo TRES/Fase 6 higiene se absorbe aquí).
 
 ---

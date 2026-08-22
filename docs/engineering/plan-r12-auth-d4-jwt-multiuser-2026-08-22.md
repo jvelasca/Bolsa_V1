@@ -329,7 +329,7 @@ Comando base API: `pytest apps/api-python/tests/test_auth.py apps/api-python/tes
 
 **D4 Opción C — F4–F10 cerradas** en `main` (`2cd20b0` · `837ec85`).
 
-**Siguiente R-12 (fuera D4):** ventana métricas purge V2 (E8 N) · gaps F8 residuales (`platform_events`, workspaces) · opcional retirar fallback `APP_PASSWORD` · F7b/F7c legacy NULL.
+**Siguiente R-12 (fuera D4):** monitor ventana purge V2 (E8 N, abierta 2026-08-22) · opcional retirar fallback `APP_PASSWORD` · F7b/F7c legacy NULL.
 
 ---
 
