@@ -16,7 +16,7 @@ from bolsa_domain.repositories.tracker_definition_repository import TrackerDefin
 from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
 
 from bolsa_application.execution_router import ExecutionRouter
-from bolsa_application.scan_jobs import EnqueueScanJob
+from bolsa_application.scan_jobs import OWNER_USER_ID_PAYLOAD_KEY, EnqueueScanJob
 from bolsa_application.scans import RunScan, ScanRunResult
 from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
 
@@ -380,8 +380,18 @@ class EnqueueTrackerScanJob:
         self._enqueue_scan = enqueue_scan
 
     async def execute(self, tracker_id: str) -> ScanJobRecord:
+        """Encola un scan del tracker. Estampa ``ownerUserId`` del dueño si el payload no lo trae.
+
+        El worker cron no tiene principal HTTP; ``scan.completed`` toma el user_id del payload.
+        Si ``tracker.user_id`` es None (auth-off / legado) se deja sin estampar.
+        """
         tracker = await self._repository.get_tracker(tracker_id)
         if tracker is None:
             raise ValueError("Rastreador no encontrado")
         payload = tracker_to_scan_payload(tracker)
+        existing = payload.get(OWNER_USER_ID_PAYLOAD_KEY)
+        if not (isinstance(existing, str) and existing.strip()):
+            owner = tracker.user_id
+            if isinstance(owner, str) and owner.strip():
+                payload[OWNER_USER_ID_PAYLOAD_KEY] = owner.strip()
         return await self._enqueue_scan.execute(payload, tracker_definition_id=tracker.id)

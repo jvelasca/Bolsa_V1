@@ -201,7 +201,7 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F7 — Política legacy `user_id is None` (backfill controlado)
 
-**Estado:** **F7a ✅ CERRADA** (`98b4986`) · **F7b ✅ script** `scripts/verify/backfill_legacy_account_user_id.py` (dry-run default; apply solo con `--apply --i-know-this-is-maintenance`; **no** ejecutado en prod) · F7c pendiente decisión.
+**Estado:** **F7a ✅ CERRADA** (`98b4986`) · **F7b ✅ apply local** 2026-08-22 (`bolsa_v1` 103→0 NULL; script `scripts/verify/backfill_legacy_account_user_id.py`; **no prod**) · **F7c ✅** (working tree: `account_visible_to_principal` + `_owner_visibility_clause` match estricto).
 
 **Qué (decisión en ADR-027 anexo):**
 
@@ -329,7 +329,7 @@ Comando base API: `pytest apps/api-python/tests/test_auth.py apps/api-python/tes
 
 **D4 Opción C — F4–F10 cerradas** en `main` (`2cd20b0` · `837ec85`).
 
-**Siguiente R-12 (fuera D4):** seguir monitor ventana purge V2 (E8 N, log local `bolsa-legacy-storage-metrics-log`) · apply F7b en staging cuando el propietario abra ventana · F7c opcional.
+**Siguiente R-12 (fuera D4):** monitor resto ventana purge V2 (E8 N, T+0 19/19) · apply F7b en otros entornos solo con URL explícita (ningún host remoto in-tree).
 
 ---
 

@@ -335,7 +335,7 @@ def get_account_id_header(
 async def require_account_access(request: Request, account_id: str) -> str:
     """404 si el ``account_id`` de path no es visible para el principal del request.
 
-    Filas legacy ``user_id is None`` solo accesibles al principal bootstrap (F7a).
+    Filas legacy ``user_id is None`` nunca visibles (F7c match estricto).
     """
     factory = get_session_factory(request)
     async with factory() as session:

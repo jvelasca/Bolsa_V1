@@ -11,7 +11,7 @@ from bolsa_domain.account_settings import (
     settings_to_dict,
 )
 from bolsa_domain.entities.account import AccountScope, InvestmentAccount, InvestmentPortfolio
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -38,19 +38,13 @@ def _app_owner_id() -> str:
 
 
 def _account_visible_to_owner(user_id: str | None, owner_user_id: str) -> bool:
-    """F7a: filas legacy ``user_id is None`` solo visibles al owner bootstrap."""
-    if user_id == owner_user_id:
-        return True
-    if user_id is None and owner_user_id == _app_owner_id():
-        return True
-    return False
+    """F7c: match estricto ``user_id == owner``; NULL nunca visible."""
+    return user_id == owner_user_id
 
 
 def _owner_visibility_clause(owner_user_id: str) -> Any:
-    clauses = [InvestmentAccountRow.user_id == owner_user_id]
-    if owner_user_id == _app_owner_id():
-        clauses.append(InvestmentAccountRow.user_id.is_(None))
-    return or_(*clauses)
+    """F7c: filtra solo ``user_id == owner`` (legacy NULL excluido)."""
+    return InvestmentAccountRow.user_id == owner_user_id
 
 
 def _account_from_row(row: InvestmentAccountRow) -> InvestmentAccount:
@@ -159,7 +153,7 @@ class SqlAlchemyAccountRepository:
         account_type: str | None = None,
         owner_user_id: str | None = None,
     ) -> list[InvestmentAccount]:
-        """Lista cuentas del owner; legacy ``user_id is None`` solo si owner bootstrap (F7a)."""
+        """Lista cuentas del owner; match estricto ``user_id == owner`` (F7c)."""
         owner = owner_user_id if owner_user_id is not None else _app_owner_id()
         stmt = (
             select(InvestmentAccountRow)
@@ -185,7 +179,7 @@ class SqlAlchemyAccountRepository:
 
         - ``for_custody_job=True``: **system job scope** — todas las cuentas activas
           (custodia per-account; solo jobs internos, nunca HTTP).
-        - ``owner_user_id`` explícito: misma visibilidad que ``list_accounts`` (F7a).
+        - ``owner_user_id`` explícito: misma visibilidad que ``list_accounts`` (F7c).
         - Sin ``for_custody_job`` y sin ``owner_user_id``: scope al owner bootstrap
           (nunca lista all-tenants por omisión)."""
         stmt = select(InvestmentAccountRow).where(

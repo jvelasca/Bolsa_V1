@@ -2,23 +2,16 @@ from datetime import UTC, datetime
 from typing import Any
 
 from bolsa_domain.entities.platform_event import PlatformEventRecord
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_infrastructure.config import get_settings as load_app_settings
 from bolsa_infrastructure.database.models import PlatformEventRow
 from bolsa_infrastructure.ids import new_id
 
 
-def _app_owner_id() -> str:
-    return load_app_settings().owner_principal()
-
-
 def _owner_visibility_clause(owner_user_id: str) -> Any:
-    clauses = [PlatformEventRow.user_id == owner_user_id]
-    if owner_user_id == _app_owner_id():
-        clauses.append(PlatformEventRow.user_id.is_(None))
-    return or_(*clauses)
+    """F7c: filtra solo ``user_id == owner`` (legacy NULL excluido)."""
+    return PlatformEventRow.user_id == owner_user_id
 
 
 class SqlAlchemyPlatformEventRepository:

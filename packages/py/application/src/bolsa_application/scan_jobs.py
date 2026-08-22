@@ -5,6 +5,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from bolsa_analytics.signals.feature_cache import FeatureCache, get_preset_feature_cache
+from bolsa_application.context.principal import (
+    get_current_principal,
+    reset_current_principal,
+    set_current_principal,
+)
 from bolsa_application.execution_router import ExecutionRouter
 from bolsa_application.scan_chunking import (
     JOB_KIND_CHUNK,
@@ -34,6 +39,28 @@ from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
 
 logger = logging.getLogger(__name__)
+
+# Job payload key for the HTTP principal that enqueued the scan. Copied onto child
+# chunk payloads. The worker restores it as ContextVar so ``scan.completed`` stamps
+# ``platform_events.user_id``. Absent when auth is off (no principal) → user_id NULL.
+OWNER_USER_ID_PAYLOAD_KEY = "ownerUserId"
+
+
+def _payload_owner_user_id(payload: dict[str, Any]) -> str | None:
+    raw = payload.get(OWNER_USER_ID_PAYLOAD_KEY)
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def _stamp_payload_owner_user_id(payload: dict[str, Any]) -> dict[str, Any]:
+    """Stamp ``ownerUserId`` from the request principal unless the caller already set it."""
+    if _payload_owner_user_id(payload) is not None:
+        return payload
+    principal = get_current_principal()
+    if not principal:
+        return payload
+    return {**payload, OWNER_USER_ID_PAYLOAD_KEY: principal}
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +92,7 @@ class EnqueueScanJob:
         *,
         tracker_definition_id: str | None = None,
     ) -> ScanJobRecord:
+        """Encola un scan. Estampa ``ownerUserId`` del principal HTTP si el caller no lo trajo."""
         if not payload.get("universe"):
             raise ValueError("payload.universe es obligatorio")
         validate_kernel_timeframe(str(payload.get("timeframe") or "1d"))
@@ -72,6 +100,7 @@ class EnqueueScanJob:
         resolved_tracker_id = tracker_definition_id or payload.get("trackerDefinitionId")
         if resolved_tracker_id is not None:
             payload = {**payload, "trackerDefinitionId": resolved_tracker_id}
+        payload = _stamp_payload_owner_user_id(payload)
 
         list_id, instrument_ids = universe_from_payload(payload)
         resolved_ids = await resolve_scan_universe_instrument_ids(
@@ -164,6 +193,7 @@ class ProcessScanJob:
         self._router = execution_router
 
     async def execute(self, job_id: str | None = None) -> ProcessScanJobResult:
+        """Procesa un job. Restaura ``ownerUserId`` del payload como principal para ``scan.completed``."""
         if job_id is not None:
             job = await self._jobs.claim_by_id(job_id)
         else:
@@ -180,6 +210,15 @@ class ProcessScanJob:
                 error="Los jobs parent no se procesan directamente",
             )
 
+        owner = _payload_owner_user_id(job.payload)
+        token = set_current_principal(owner) if owner else None
+        try:
+            return await self._execute_claimed(job)
+        finally:
+            if token is not None:
+                reset_current_principal(token)
+
+    async def _execute_claimed(self, job: ScanJobRecord) -> ProcessScanJobResult:
         cache_before_hits = self._feature_cache.hits
         cache_before_misses = self._feature_cache.misses
 

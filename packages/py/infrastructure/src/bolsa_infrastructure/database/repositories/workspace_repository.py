@@ -4,23 +4,16 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_infrastructure.config import get_settings as load_app_settings
 from bolsa_infrastructure.database.models import WorkspaceRow
 from bolsa_infrastructure.ids import new_id
 
 
-def _app_owner_id() -> str:
-    return load_app_settings().owner_principal()
-
-
 def _owner_visibility_clause(owner_user_id: str) -> Any:
-    clauses = [WorkspaceRow.user_id == owner_user_id]
-    if owner_user_id == _app_owner_id():
-        clauses.append(WorkspaceRow.user_id.is_(None))
-    return or_(*clauses)
+    """F7c: filtra solo ``user_id == owner`` (legacy NULL excluido)."""
+    return WorkspaceRow.user_id == owner_user_id
 
 
 @dataclass(frozen=True, slots=True)

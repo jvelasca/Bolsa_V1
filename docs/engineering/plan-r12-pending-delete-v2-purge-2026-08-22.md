@@ -3,7 +3,7 @@
 > **Padre:** [`pending-delete/README.md`](./pending-delete/README.md) · inventario [`inventory-r12-2026-08-21.md`](./pending-delete/inventory-r12-2026-08-21.md) · plan R-12 [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md).
 > **Tests protectores:** commit `851b545` — `use-pending-orders.migration.test.ts`, `workspace-legacy-timeframe-favorites.test.ts`.
 > **Re-verificación E8:** 2026-08-22 · HEAD al verificar: `5011ba5`.
-> **Ventana métricas:** **inicio 2026-08-22** (telemetría opt-in desplegada en `0763700`; sin purge).
+> **Ventana métricas:** **inicio 2026-08-22** (telemetría opt-in desplegada en `0763700`; sin purge). **T+0 re-verificado 2026-08-22:** batería §4 **19/19**; E8 sigue **N**.
 > **Resultado:** **0 purges ejecutados.** Ningún ítem de riesgo alto cumple E8 hoy.
 
 ---

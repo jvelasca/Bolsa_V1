@@ -8,7 +8,7 @@ estampa en altas nuevas de ``InvestmentAccount.user_id`` cuando aplica.
 
 from __future__ import annotations
 
-from bolsa_infrastructure.config import Settings, get_settings
+from bolsa_infrastructure.config import Settings
 
 DEFAULT_APP_PRINCIPAL = "app"
 
@@ -25,9 +25,5 @@ def resolve_app_principal(settings: Settings) -> str:
 
 
 def account_visible_to_principal(user_id: str | None, principal: str) -> bool:
-    """True si la cuenta es del ``principal`` (F7a: legacy NULL solo bootstrap)."""
-    if user_id == principal:
-        return True
-    if user_id is None:
-        return principal == resolve_app_principal(get_settings())
-    return False
+    """True si ``user_id == principal`` (F7c: legacy NULL nunca visible)."""
+    return user_id == principal

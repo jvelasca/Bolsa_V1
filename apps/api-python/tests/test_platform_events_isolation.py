@@ -106,7 +106,7 @@ async def test_user_a_sees_own_platform_events(
 async def test_legacy_null_user_id_event_hidden_from_non_bootstrap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F8c F7a: legacy ``user_id is None`` invisible salvo bootstrap."""
+    """F8c F7c: legacy ``user_id is None`` invisible también para no-bootstrap."""
     _patch_request_principal(monkeypatch, "user-b")
     app = create_app()
     async with lifespan(app):
@@ -124,7 +124,8 @@ async def test_legacy_null_user_id_event_hidden_from_non_bootstrap(
 
 
 @pytest.mark.asyncio
-async def test_legacy_null_user_id_event_visible_to_bootstrap() -> None:
+async def test_legacy_null_user_id_event_hidden_from_bootstrap() -> None:
+    """F8c F7c: bootstrap no ve events legacy ``user_id is None``."""
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
@@ -135,7 +136,7 @@ async def test_legacy_null_user_id_event_visible_to_bootstrap() -> None:
                 listed = await client.get("/api/platform-events")
                 assert listed.status_code == 200
                 ids = {row["id"] for row in listed.json()["data"]}
-                assert legacy_id in ids
+                assert legacy_id not in ids
         finally:
             await _delete_raw_platform_event(factory, legacy_id)
 

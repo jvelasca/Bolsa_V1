@@ -113,10 +113,10 @@ def test_resolve_app_principal_defaults_to_app() -> None:
     get_settings.cache_clear()
 
 
-def test_account_visible_to_principal_f7a_soft_legacy() -> None:
+def test_account_visible_to_principal_f7c_strict() -> None:
     get_settings.cache_clear()
     bootstrap = resolve_app_principal(get_settings())
-    assert account_visible_to_principal(None, bootstrap) is True
+    assert account_visible_to_principal(None, bootstrap) is False
     assert account_visible_to_principal(None, "user-b") is False
     assert account_visible_to_principal("user-a", "user-a") is True
     assert account_visible_to_principal("user-a", "user-b") is False
@@ -170,13 +170,13 @@ async def test_user_b_cannot_see_user_a_account_list_and_get(
 async def test_legacy_null_user_id_hidden_from_non_bootstrap_principal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F7a: legacy ``user_id is None`` invisible salvo principal bootstrap."""
+    """F7c: legacy ``user_id is None`` invisible también para no-bootstrap."""
     _patch_request_principal(monkeypatch, "user-b")
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
         legacy_id = await _insert_raw_account(
-            factory, user_id=None, name="Legacy F7a isolation"
+            factory, user_id=None, name="Legacy F7c isolation"
         )
         try:
             transport = ASGITransport(app=app)
@@ -194,7 +194,7 @@ async def test_legacy_null_user_id_hidden_from_non_bootstrap_principal(
 
 @pytest.mark.asyncio
 async def test_list_active_accounts_filters_by_owner_user_id() -> None:
-    """F8 G4: list_active_accounts con owner_user_id aplica visibilidad F7a."""
+    """F8 G4: list_active_accounts con owner_user_id aplica visibilidad F7c."""
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
@@ -329,7 +329,8 @@ async def test_get_foreign_user_id_account_returns_404() -> None:
 
 
 @pytest.mark.asyncio
-async def test_legacy_null_user_id_account_still_gettable() -> None:
+async def test_legacy_null_user_id_account_hidden_from_bootstrap() -> None:
+    """F7c: bootstrap no ve cuentas legacy ``user_id is None`` (404 / no list)."""
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
@@ -340,14 +341,12 @@ async def test_legacy_null_user_id_account_still_gettable() -> None:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.get(f"/api/accounts/{legacy_id}")
-                assert response.status_code == 200
-                assert response.json()["data"]["id"] == legacy_id
-                assert response.json()["data"]["userId"] is None
+                assert response.status_code == 404
 
                 listed = await client.get("/api/accounts")
                 assert listed.status_code == 200
                 ids = {row["id"] for row in listed.json()["data"]}
-                assert legacy_id in ids
+                assert legacy_id not in ids
         finally:
             await _delete_raw_account(factory, legacy_id)
 
@@ -446,7 +445,7 @@ async def test_foreign_account_cash_and_trade_routes_return_404() -> None:
 
 @pytest.mark.asyncio
 async def test_legacy_null_user_id_deposit_not_owner_404() -> None:
-    """Legacy ``user_id is None`` deposit is not hidden; 404 would be owner isolation."""
+    """F7c: deposit sobre cuenta legacy NULL es 404 (huérfano invisible)."""
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
@@ -463,14 +462,14 @@ async def test_legacy_null_user_id_deposit_not_owner_404() -> None:
                         "idempotencyKey": "iso-legacy-dep-001",
                     },
                 )
-                assert response.status_code != 404
-                assert response.status_code in {201, 400, 422}
+                assert response.status_code == 404
         finally:
             await _delete_raw_account(factory, legacy_id)
 
 
 @pytest.mark.asyncio
-async def test_legacy_null_user_id_core_r_still_gettable() -> None:
+async def test_legacy_null_user_id_core_r_hidden_from_bootstrap() -> None:
+    """F7c: core-r sobre cuenta legacy NULL es 404 para bootstrap."""
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
@@ -481,7 +480,6 @@ async def test_legacy_null_user_id_core_r_still_gettable() -> None:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.get(f"/api/accounts/{legacy_id}/core-r")
-                assert response.status_code == 200
-                assert response.json()["data"]["accountId"] == legacy_id
+                assert response.status_code == 404
         finally:
             await _delete_raw_account(factory, legacy_id)

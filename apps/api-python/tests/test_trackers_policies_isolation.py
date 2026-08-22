@@ -244,7 +244,7 @@ async def test_user_b_cannot_see_user_a_trackers(
 async def test_legacy_null_user_id_tracker_hidden_from_non_bootstrap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F8b F7a: legacy tracker ``user_id is None`` invisible salvo bootstrap."""
+    """F8b F7c: legacy tracker ``user_id is None`` invisible también para no-bootstrap."""
     _patch_request_principal(monkeypatch, "user-b")
     app = create_app()
     async with lifespan(app):
@@ -272,7 +272,8 @@ async def test_legacy_null_user_id_tracker_hidden_from_non_bootstrap(
 
 
 @pytest.mark.asyncio
-async def test_legacy_null_user_id_tracker_visible_to_bootstrap() -> None:
+async def test_legacy_null_user_id_tracker_hidden_from_bootstrap() -> None:
+    """F8b F7c: bootstrap no ve trackers legacy ``user_id is None``."""
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
@@ -287,13 +288,12 @@ async def test_legacy_null_user_id_tracker_visible_to_bootstrap() -> None:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.get(f"/api/trackers/{legacy_id}")
-                assert response.status_code == 200
-                assert response.json()["data"]["id"] == legacy_id
+                assert response.status_code == 404
 
                 listed = await client.get("/api/trackers")
                 assert listed.status_code == 200
                 ids = {row["id"] for row in listed.json()["data"]}
-                assert legacy_id in ids
+                assert legacy_id not in ids
         finally:
             await _delete_raw_tracker(factory, legacy_id)
             await _delete_raw_strategy(factory, strategy_id)
@@ -329,6 +329,7 @@ async def test_user_b_cannot_see_user_a_execution_policies(
 async def test_legacy_null_user_id_policy_hidden_from_non_bootstrap(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """F8b F7c: legacy policy ``user_id is None`` invisible también para no-bootstrap."""
     _patch_request_principal(monkeypatch, "user-b")
     app = create_app()
     async with lifespan(app):
@@ -351,7 +352,8 @@ async def test_legacy_null_user_id_policy_hidden_from_non_bootstrap(
 
 
 @pytest.mark.asyncio
-async def test_legacy_null_user_id_policy_visible_to_bootstrap() -> None:
+async def test_legacy_null_user_id_policy_hidden_from_bootstrap() -> None:
+    """F8b F7c: bootstrap no ve policies legacy ``user_id is None``."""
     app = create_app()
     async with lifespan(app):
         factory: async_sessionmaker[AsyncSession] = app.state.session_factory
@@ -362,13 +364,12 @@ async def test_legacy_null_user_id_policy_visible_to_bootstrap() -> None:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
                 response = await client.get(f"/api/execution-policies/{legacy_id}")
-                assert response.status_code == 200
-                assert response.json()["data"]["id"] == legacy_id
+                assert response.status_code == 404
 
                 listed = await client.get("/api/execution-policies")
                 assert listed.status_code == 200
                 ids = {row["id"] for row in listed.json()["data"]}
-                assert legacy_id in ids
+                assert legacy_id not in ids
         finally:
             await _delete_raw_policy(factory, legacy_id)
 

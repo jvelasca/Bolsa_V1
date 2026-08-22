@@ -3,7 +3,7 @@
 ## Estado
 
 **Aceptado** — 2026-08-22  
-(**F5–F10 + F8b–F8e en `main`. F7b script + fallback SHA-256/HMAC retirado (JWT-only gate). `APP_PASSWORD` env sigue como flag auth-on + seed bootstrap + fail-closed prod. F7c opcional. Defer: `scan.completed` worker async. SHA vivo = `origin/main`.**)
+(**F5–F10 + F8b–F8e en `main`. F7b apply local + F7c hard close + `scan.completed` worker `ownerUserId` + cron `EnqueueTrackerScanJob` stamp. Fallback SHA-256/HMAC retirado (JWT-only gate). `APP_PASSWORD` env sigue como flag auth-on + seed bootstrap + fail-closed prod. SHA vivo = `origin/main` (verificar con fetch).**)
 
 **Decisión del propietario (2026-08-22):** **Opción C (híbrido)** — fases incrementales C.1 → C.2 → C.3 documentadas en [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](../engineering/plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) §3.
 
@@ -150,7 +150,7 @@ Legacy: cuentas con `user_id is None` son visibles para **cualquier** principal 
 
 ### F7 — Política legacy `user_id is NULL`
 
-- [x] Política F7a aplicada (`98b4986`). F7b script offline entregado (no hot path). F7c **no** aplicada.
+- [x] Política F7a aplicada (`98b4986`). F7b script offline entregado (no hot path). **F7c aplicada** (working tree: match estricto). Apply F7b **local** 2026-08-22 (`bolsa_v1` 103→0); staging/prod = otra ventana.
 - [x] Tests post-backfill del script (`test_f7b_legacy_user_id_backfill.py`). Apply en staging/prod = ventana de mantenimiento del propietario (CLI `--apply --i-know-this-is-maintenance`).
 - [x] **Prohibido** backfill automático en `database_bootstrap`.
 
