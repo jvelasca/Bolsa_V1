@@ -145,11 +145,11 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 > Plan director vivo (read-only, **draft**): `docs/engineering/plan-unificacion-research-radar-2026-08-21.md`. Planifica «Unificación Research→Radar»: reunificar el embudo científico `/research` y operativo `/screeners`/Radar reutilizando el puente B0 ya implementado (**sin features nuevas**). Estado: **APARCADO / DRAFT — pendiente de decisión explícita del propietario para abrir fases de código (E1).** Pista documental F1–F3 **CERRADA** (2026-08-22).
 
 - **Fase 1 ✅ CERRADA (2026-08-21, `b7af24b` plan + `5276d47` cierre).** Trazado e inyección del **mapa de consumidores B0** de `promote-finalist-to-tracker.ts` (§2.2 del plan) + JSDoc `@see` de trazabilidad en el doc-comment de módulo de `use-activate-instrument-tracking.ts` (:4) e `instruments-page.tsx` (:7). Cero cambios de comportamiento.
-- **Fase 2 ✅ CERRADA (2026-08-21; re-audit pendiente post-R12).** Copy/deep-link audita en cierre original; **post-R12 C2/C4** nav usa `SEÑALES_LABEL` (`daily-nav.ts:13`). Hub interno aún «Rastreadores» (`screeners-hub.tsx`, `trackers-panel.tsx`) — deuda copy **F4′** si se desbloquea Track B.
-- **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b4efeff`).** Pista documental registrada en `PROJECT_STATE.md`, `engineering-index` §1 y `research-radar-unification-2026-07-31.md`. Sin tocar código ni contrato.
-- **Fases propuestas (condicionales E1 + desbloqueo Track B):** F4′ copy hub · F5′ toasts B0 · F6′ tests href — ver plan §3 y informe coordinador post-R-13.
+- **Fase 2 ✅ CERRADA (2026-08-21; re-audit post-R12 en F4′).** Nav `SEÑALES_LABEL` (`daily-nav.ts:13`). Hub interno alineado en F4′ (`240c846`).
+- **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b2ee0f2`).** Pista documental registrada.
+- **F4′–F6′ ✅ CERRADAS (2026-08-23, `240c846`).** Copy hub `/screeners` + toasts B0 + tests `screenersHrefAfterTrackerCreate`. Batería web 754/754.
 
-> **Estado general:** HEAD vivo = **`origin/main`** (`b4efeff` al sellado). Tag **`v1.6.0-beta` → `c3964fc`**. La unificación Research→Radar sigue **APARCADA** para código; B0 operativo.
+> **Estado general:** HEAD vivo = **`origin/main`** (`240c846`). Tag **`v1.6.0-beta` → `c3964fc`**. Research→Radar copy **HECHO**; split `backtests-page` **siguiente** (plan B0, fases B1–B12).
 
 ---
 

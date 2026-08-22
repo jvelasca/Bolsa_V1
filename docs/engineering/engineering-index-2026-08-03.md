@@ -59,7 +59,8 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B (DRAFT)** · B0 plan · B1–B12 pendientes E1 · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-22.md ← **PACK auditoría R-1→R-13** (vivo) · HEAD `b4efeff` · supersedes 2026-08-20
-│   ├── traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md ← relevo vivo post-R-13
+│   ├── traspaso-relevo-track-b-f4-f6-apertura-backtests-b1-2026-08-23.md ← **RELEVO VIVO** post F4′–F6′ · siguiente B1 backtests
+│   ├── traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md ← relevo histórico R-13
 │   ├── traspaso-relevo-r13-apertura-2026-08-22.md ← relevo histórico apertura R-13
 │   ├── plan-r12-auditoria-ux-2026-08-21.md ← **R-12 CERRADA**. Histórico. Purge V2 = monitor (E8 N).
 │   ├── plan-r12-auth-d4-jwt-multiuser-2026-08-22.md ← R-12 D4 **CERRADO**. JWT-only. §1 snapshot pre-JWT es histórico.
