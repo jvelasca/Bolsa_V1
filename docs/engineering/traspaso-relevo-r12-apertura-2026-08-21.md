@@ -4,7 +4,7 @@
 > **Propósito:** texto de paso anti-alucinación. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch` + `git rev-parse origin/main` (no asumir SHA de este fichero).
 > **Firma de partida R-12:** `f7a86cc` · Track A+B **`48cc255`** · tag `v1.3.0` → `b778292`.
-> **AsOf:** `origin/main` = **`ac0fd30`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Gates R12-ACCOUNTS + R12-AUTH **F1–F9** cerrados. D4 **Opción C** · ADR-027 **Aceptado**. Pending-delete E8 **N** (sin purge). Métricas purge V2 **`0763700`**.
+> **AsOf:** `origin/main` = **`837ec85`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Gates R12-ACCOUNTS + R12-AUTH **F1–F10 + F8b** cerrados. D4 **Opción C** · ADR-027 **Aceptado**. Pending-delete E8 **N** (sin purge). Métricas purge V2 **`0763700`**.
 
 ---
 
@@ -13,7 +13,7 @@
 - Track A + B: **`48cc255`**. Track B **APROBADO** (mesa 5 puertas).
 - Track C **C1–C5 en `origin/main`** (`5bc51ff`…`0eb8976`). Leftover CORE-R («Proponer F3» → `/confirm`) **hecho `8dd3caf`**. Copy E8 residual **`ce601c9`**.
 - Gates infra + auth base: **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1** `e52e016` · **F2** `9f3354f` · **F3** `5fe5ace`. Pending-delete E8 tests **`851b545`** (**sin purge**).
-- D4 JWT (Opción C): **F4** `cdda80d` · **F5** `02c86fc` · **F6+F7a** `98b4986` · **F8** `5e7c67b` · **F9** `26494d8`. Stamp docs **`75644c8`** · **`ac0fd30`**.
+- D4 JWT (Opción C): **F4** `cdda80d` · **F5** `02c86fc` · **F6+F7a** `98b4986` · **F8** `5e7c67b` · **F9** `26494d8` · **F8b** `2cd20b0` · **F10** `837ec85`. Stamp docs **`60b758e`** · **`837ec85`**.
 
 | Fase              | SHA       | Qué                                                                 |
 | ----------------- | --------- | ------------------------------------------------------------------- |
@@ -35,8 +35,8 @@
 | R12-AUTH F5       | `02c86fc` | tabla `users` + login JWT + middleware `principal=sub`              |
 | R12-AUTH F6+F7a   | `98b4986` | list/get accounts scoped · legacy NULL solo bootstrap/admin         |
 | R12-AUTH F8       | `5e7c67b` | perfiles inversor scoped · job custodia filtra cuentas              |
-| R12-AUTH F8b      | _(local)_ | trackers + execution_policies scoped por `principal` (G6)           |
-| R12-AUTH F10      | _(local)_ | `session_version` · JWT `sv` · `/auth/refresh` · rate-limit user    |
+| R12-AUTH F8b      | `2cd20b0` | trackers + execution_policies scoped por `principal` (G6)           |
+| R12-AUTH F10      | `837ec85` | `session_version` · JWT `sv` · `/auth/refresh` · rate-limit user    |
 | R12-AUTH F9       | `26494d8` | FE login con campo `login` opcional (JWT)                           |
 | purge V2 métricas | `0763700` | telemetría opt-in legacy storage; **E8 sigue N; sin purge**         |
 | pending-delete E8 | `851b545` | tests migrador; E8 sigue N; **sin purge**                           |
@@ -50,11 +50,10 @@ Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Labo
 ## 3. Texto de paso (pegar en chat nuevo)
 
 > CONTEXTO: Bolsa_V1, R-12. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `plan-r12-auth-d4-jwt-multiuser-2026-08-22.md` · ADR-027 · `PROJECT_PREMISES.md` ⭐§0 · `PROJECT_STATE.md` §2ac · backlog §0.
-> Firma: `git fetch` + `git rev-parse origin/main` · `git status`. **`origin/main` `ac0fd30`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292`. Partida R-12 `f7a86cc`.
-> Hecho: … R12-AUTH F1–F10 + F8b (local) · purge V2 métricas `0763700` (E8 N). Siguiente = **commit(s)** · ventana purge V2 · gaps F8 residuales. **No auto.**
+> Firma: `git fetch` + `git rev-parse origin/main` · `git status`. **`origin/main` `837ec85`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292`. Partida R-12 `f7a86cc`.
+> Hecho: … R12-AUTH F1–F10 + F8b · purge V2 métricas `0763700` (E8 N). Siguiente = ventana purge V2 · gaps F8 residuales. **No auto.**
 
 ## 4. Siguiente (decisión del propietario)
 
-1. **Commit(s)** — docs · F8b · F10 (aprobación propietario).
-2. **Gaps F8 residuales** — `platform_events` · workspaces sin `user_id` · bulk evaluate trackers sin `trackerId`.
-3. **Purge V2** — ventana métricas (E8 N).
+1. **Gaps F8 residuales** — `platform_events` · workspaces sin `user_id` · bulk evaluate trackers sin `trackerId`.
+2. **Purge V2** — ventana métricas (E8 N).

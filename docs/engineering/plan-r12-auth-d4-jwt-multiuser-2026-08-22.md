@@ -4,7 +4,7 @@
 > **Contexto freeze:** [`plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md`](./plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md) §4 «Auth global → multiusuario real» · [`plan-r8-prevencion-riesgo-2026-08-20.md`](./plan-r8-prevencion-riesgo-2026-08-20.md) R-8B.2 (cookie HttpOnly, **no JWT**).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · 0 commits sin OK del propietario.
 > **AsOf:** 2026-08-22 · R12-AUTH F1 `e52e016` · F2 `9f3354f` · F3 `5fe5ace` · **F5–F9** `5e7c67b`.
-> **Decisión propietario (2026-08-22):** **Opción C (híbrido)** · ADR-027 **Aceptado** · **F4–F10 cerradas** (F8b+F10 local pendiente commit).
+> **Decisión propietario (2026-08-22):** **Opción C (híbrido)** · ADR-027 **Aceptado** · **F4–F10 cerradas** en `main` (`2cd20b0` · `837ec85`).
 
 ---
 
@@ -219,7 +219,7 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F8 — Recursos colaterales (`investor_profiles`, trackers, policies, events)
 
-**Estado:** **✅ CERRADA** (`5e7c67b` + **F8b** local) — perfiles inversor + job custodia + **trackers/policies scoped**. **Gaps residuales:** `platform_events` · workspaces · bulk `POST /trackers/schedules/evaluate` sin `trackerId`.
+**Estado:** **✅ CERRADA** (`5e7c67b` + **F8b** `2cd20b0`) — perfiles inversor + job custodia + **trackers/policies scoped**. **Gaps residuales:** `platform_events` · workspaces · bulk `POST /trackers/schedules/evaluate` sin `trackerId`.
 
 **F8b (trackers + execution_policies):** list/create/get/update/delete scoped por `principal`; repos filtran owner + F7a legacy NULL; tests `test_trackers_policies_isolation.py` (7 passed).
 
@@ -247,7 +247,7 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F10 — Endurecimiento (refresh, revocación, roles)
 
-**Estado:** **✅ CERRADA** (local) — migración `008_users_session_version` · claim JWT `sv` · `POST /api/auth/refresh` · logout invalida sesión · `require_role` helper · rate-limit por user · audit login. **Fallback `APP_PASSWORD` intacto** (opcional diferido).
+**Estado:** **✅ CERRADA** (`837ec85`) — migración `008_users_session_version` · claim JWT `sv` · `POST /api/auth/refresh` · logout invalida sesión · `require_role` helper · rate-limit por user · audit login. **Fallback `APP_PASSWORD` intacto** (opcional diferido).
 
 **Qué:** refresh token rotativo · `session_version` en user · roles (`admin`/`operator`) · rate-limit por user · auditoría login.
 
@@ -327,7 +327,7 @@ Comando base API: `pytest apps/api-python/tests/test_auth.py apps/api-python/tes
 
 ## 11. Primera fase recomendada tras OK del propietario
 
-**D4 Opción C — F4–F10 cerradas** (F8b+F10 en working tree local, pendiente commit).
+**D4 Opción C — F4–F10 cerradas** en `main` (`2cd20b0` · `837ec85`).
 
 **Siguiente R-12 (fuera D4):** ventana métricas purge V2 (E8 N) · gaps F8 residuales (`platform_events`, workspaces) · opcional retirar fallback `APP_PASSWORD` · F7b/F7c legacy NULL.
 

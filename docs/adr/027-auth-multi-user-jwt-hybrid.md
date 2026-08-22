@@ -3,7 +3,7 @@
 ## Estado
 
 **Aceptado** — 2026-08-22  
-(**F5–F10 + F8b implementados localmente; pendiente commit. Gaps F8 residuales: platform_events/workspaces. Fallback APP_PASSWORD intacto.**)
+(**F5–F10 + F8b en `main` (`2cd20b0` · `837ec85`). Gaps F8 residuales: platform_events/workspaces. Fallback APP_PASSWORD intacto.**)
 
 **Decisión del propietario (2026-08-22):** **Opción C (híbrido)** — fases incrementales C.1 → C.2 → C.3 documentadas en [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](../engineering/plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) §3.
 
@@ -102,7 +102,7 @@ Legacy: cuentas con `user_id is None` son visibles para **cualquier** principal 
 
 **Orden recomendado:** F5 (JWT `sub`) → F6 (list/get scoped) → F7b staging → F7c opcional.
 
-**Jobs:** `list_active_accounts` filtrado por owner en **F8** (`5e7c67b`). Custodia multi-tenant: filtrar por owner — **hecho F8**. Trackers/policies scoped en **F8b** (local, pendiente commit).
+**Jobs:** `list_active_accounts` filtrado por owner en **F8** (`5e7c67b`). Custodia multi-tenant: filtrar por owner — **hecho F8**. Trackers/policies scoped en **F8b** (`2cd20b0`).
 
 **Ventana de convivencia C.1–C.3:** legacy NULL permanece bajo F7a hasta F7; no backfill automático en F5–F6.
 
@@ -197,7 +197,7 @@ Legacy: cuentas con `user_id is None` son visibles para **cualquier** principal 
 
 ## Historial
 
-| Fecha      | Evento                                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-08-22 | ADR creado (Propuesto) en R12-AUTH F4; propietario elige **Opción C (híbrido)**.                                                     |
-| 2026-08-22 | **Aceptado**; F5–F9 en `main` (`5e7c67b`). **F8b** + **F10** (local): trackers/policies scoped · session_version/refresh/rate-limit. |
+| Fecha      | Evento                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-08-22 | ADR creado (Propuesto) en R12-AUTH F4; propietario elige **Opción C (híbrido)**.                                                                 |
+| 2026-08-22 | **Aceptado**; F5–F9 en `main` (`5e7c67b`). **F8b** `2cd20b0` · **F10** `837ec85`: trackers/policies scoped · session_version/refresh/rate-limit. |

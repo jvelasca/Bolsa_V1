@@ -9,7 +9,7 @@
 
 ## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-22) — leer primero en TODO trabajo
 
-> **AsOf:** 2026-08-22 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` → **`ac0fd30`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **BETA / NO en producción**.
+> **AsOf:** 2026-08-22 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` → **`837ec85`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **BETA / NO en producción**.
 > **Contexto:** R-9 · R-10/v1.2.1 · R-11/v1.3.0 **CERRADAS**. Relevo UNO+DOS del plan post-v1.3.0 **EJECUTADOS** (`f7a4ab0`, `f7a86cc`). Ciclo vivo: **R-12** (`docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`).
 > **Ancla anti-alucinación:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md`. Una auditoría externa del 2026-08-21 evaluó `75e8c23` (14 commits atrás de `49ecbcd`); una re-auditoría posterior evaluó ~`49ecbcd` y **no ve** Relevo UNO/DOS. El SHA que un agente debe usar es **`origin/main` + `PROJECT_STATE.md` / backlog §0**, no un SHA histórico incrustado en un traspaso.
 > **Idea del proyecto (invariante de producto):** embudo backtesting científico → IA gobernada (LLM propone, motor determinista decide) → confirmación humana → paper. Integridad financiera y trazabilidad son el valor central. Se puede refactorizar lo que haga falta **mientras se preserve esa idea**.
@@ -20,8 +20,8 @@
 - **Subagentes para todo cambio de código.** El coordinador no implementa fases enteras en un hilo saturado. Máx. ~3 subagentes en paralelo, alcances **disjuntos**.
 - **Relevo de chat:** al saturarse, cerrar y abrir otro pegando el `traspaso-relevo-*` + firma (HEAD GitHub, rama, árbol, tag, batería, deuda no-regresión). Riesgo de alucinación objetivo: 0 (documento manda).
 - **Higiene E8 continua:** residuos de test/dev se eliminan por path canónico; módulos/docs obsoletos se archivan o se marcan históricos; no se purga `pending-delete` de riesgo alto sin decisión.
-- **Track B APROBADO** (2026-08-21, línea a línea). Track C: plan [`engineering/plan-r12-track-c-frontend-2026-08-21.md`](./engineering/plan-r12-track-c-frontend-2026-08-21.md). **C1–C5** (`0eb8976`) + leftover CORE-R **`8dd3caf`** + copy E8 **`ce601c9`**. Gates: **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1–F9** (`5e7c67b`) · ADR-027 **Aceptado**.
-- **Gates no auto-abiertos:** purge `pending-delete` ventana métricas (E8 sigue N) — plan [`plan-r12-pending-delete-v2-purge-2026-08-22.md`](./engineering/plan-r12-pending-delete-v2-purge-2026-08-22.md). (R12-AUTH **F1–F10 + F8b** local **cerrados** — no reabrir sin fase.)
+- **Track B APROBADO** (2026-08-21, línea a línea). Track C: plan [`engineering/plan-r12-track-c-frontend-2026-08-21.md`](./engineering/plan-r12-track-c-frontend-2026-08-21.md). **C1–C5** (`0eb8976`) + leftover CORE-R **`8dd3caf`** + copy E8 **`ce601c9`**. Gates: **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1–F10 + F8b** (`5e7c67b` · `2cd20b0` · `837ec85`) · ADR-027 **Aceptado**.
+- **Gates no auto-abiertos:** purge `pending-delete` ventana métricas (E8 sigue N) — plan [`plan-r12-pending-delete-v2-purge-2026-08-22.md`](./engineering/plan-r12-pending-delete-v2-purge-2026-08-22.md). (R12-AUTH **F1–F10 + F8b** **cerrados en `main`** — no reabrir sin fase.)
 
 ### E1. Nada se implementa sin plan aprobado
 
