@@ -1,9 +1,11 @@
 """API: autenticación / estado de sesión."""
 
+import logging
 import secrets
 
 from bolsa_infrastructure.auth.passwords import verify_password
 from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import UserRow
 from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -13,6 +15,7 @@ from bolsa_api.auth.jwt import (
     decode_access_token,
     encode_access_token,
     extract_bearer_or_cookie_token,
+    session_version_matches,
 )
 from bolsa_api.auth.session import (
     SESSION_COOKIE_NAME,
@@ -23,6 +26,7 @@ from bolsa_api.auth.session import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class LoginRequestDto(BaseModel):
@@ -74,9 +78,32 @@ def _session_is_authenticated(request: Request) -> bool:
         dict(request.headers),
         request.cookies.get(SESSION_COOKIE_NAME),
     )
-    if decode_access_token(settings, token) is not None:
+    claims = decode_access_token(settings, token)
+    if claims is not None:
         return True
     return verify_session_cookie(settings, token)
+
+
+async def _resolve_jwt_user(
+    request: Request, token: str
+) -> tuple[UserRow | None, dict[str, object] | None]:
+    settings = get_settings()
+    claims = decode_access_token(settings, token)
+    if claims is None:
+        return None, None
+    sub = claims.get("sub")
+    if not isinstance(sub, str) or not sub.strip():
+        return None, None
+
+    factory = request.app.state.session_factory
+    async with factory() as session:
+        repo = SqlAlchemyUserRepository(session)
+        user = await repo.get_by_id(sub.strip())
+        if user is None or user.disabled_at is not None:
+            return None, None
+        if not session_version_matches(claims, user.session_version):
+            return None, None
+        return user, claims
 
 
 @router.post("/auth/login", response_model=LoginResponseDto)
@@ -107,7 +134,13 @@ async def login(body: LoginRequestDto, request: Request) -> JSONResponse:
             jwt_value = encode_access_token(
                 settings,
                 sub=user.id,
+                sv=user.session_version,
                 role=user.role,
+            )
+            logger.info(
+                "auth.login.success user_id=%s login=%s",
+                user.id,
+                user.login,
             )
             response = JSONResponse(
                 content=LoginResponseDto(
@@ -131,14 +164,57 @@ async def login(body: LoginRequestDto, request: Request) -> JSONResponse:
     return response
 
 
+@router.post("/auth/refresh")
+async def refresh(request: Request) -> JSONResponse:
+    """Re-emite JWT con nuevo ``exp`` si el access token (cookie o Bearer) sigue válido."""
+    settings = get_settings()
+    if not settings.app_password:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    token = extract_bearer_or_cookie_token(
+        dict(request.headers),
+        request.cookies.get(SESSION_COOKIE_NAME),
+    )
+    user, _claims = await _resolve_jwt_user(request, token)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    jwt_value = encode_access_token(
+        settings,
+        sub=user.id,
+        sv=user.session_version,
+        role=user.role,
+    )
+    response = JSONResponse(
+        content=LoginResponseDto(
+            data=LoginResponseDataDto(auth_enabled=True)
+        ).model_dump(by_alias=True),
+        status_code=200,
+    )
+    _set_session_cookie(response, jwt_value)
+    return response
+
+
 @router.post("/auth/logout")
-async def logout() -> JSONResponse:
-    """Borra la cookie de sesión. Funciona aunque la auth esté desactivada."""
+async def logout(request: Request) -> JSONResponse:
+    """Borra la cookie de sesión. JWT users: invalida tokens previos (logout-all)."""
+    settings = get_settings()
+    token = extract_bearer_or_cookie_token(
+        dict(request.headers),
+        request.cookies.get(SESSION_COOKIE_NAME),
+    )
+    user, _claims = await _resolve_jwt_user(request, token)
+    if user is not None:
+        factory = request.app.state.session_factory
+        async with factory() as session:
+            repo = SqlAlchemyUserRepository(session)
+            await repo.increment_session_version(user.id)
+
     response = JSONResponse(content={"data": {}}, status_code=200)
     response.delete_cookie(
         SESSION_COOKIE_NAME,
         path=SESSION_COOKIE_PATH,
-        secure=cookie_secure(get_settings()),
+        secure=cookie_secure(settings),
         httponly=True,
         samesite="lax",
     )

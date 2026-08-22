@@ -3,11 +3,16 @@
 from collections.abc import Awaitable, Callable
 
 from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from bolsa_api.auth.jwt import decode_access_token, extract_bearer_or_cookie_token
+from bolsa_api.auth.jwt import (
+    decode_access_token,
+    extract_bearer_or_cookie_token,
+    session_version_matches,
+)
 from bolsa_api.auth.principal import resolve_app_principal
 from bolsa_api.auth.session import SESSION_COOKIE_NAME, verify_session_cookie
 from bolsa_api.auth.tokens import verify_access_token
@@ -16,6 +21,7 @@ PUBLIC_PREFIXES = (
     "/api/health",
     "/api/auth/login",
     "/api/auth/logout",
+    "/api/auth/refresh",
     "/api/auth/status",
     "/api/docs",
     "/api/openapi.json",
@@ -23,7 +29,7 @@ PUBLIC_PREFIXES = (
 )
 
 
-def _principal_from_jwt(request: Request) -> str | None:
+async def _principal_from_jwt(request: Request) -> tuple[str | None, str | None]:
     settings = get_settings()
     token = extract_bearer_or_cookie_token(
         dict(request.headers),
@@ -31,9 +37,26 @@ def _principal_from_jwt(request: Request) -> str | None:
     )
     claims = decode_access_token(settings, token)
     if claims is None:
-        return None
+        return None, None
     sub = claims.get("sub")
-    return sub.strip() if isinstance(sub, str) and sub.strip() else None
+    if not isinstance(sub, str) or not sub.strip():
+        return None, None
+
+    factory = getattr(request.app.state, "session_factory", None)
+    if factory is None:
+        return None, None
+
+    async with factory() as session:
+        repo = SqlAlchemyUserRepository(session)
+        user = await repo.get_by_id(sub.strip())
+        if user is None or user.disabled_at is not None:
+            return None, None
+        if not session_version_matches(claims, user.session_version):
+            return None, None
+
+    role = claims.get("role")
+    role_str = role if isinstance(role, str) else None
+    return sub.strip(), role_str
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -47,6 +70,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         settings = get_settings()
         path = request.url.path
         request.state.principal = resolve_app_principal(settings)
+        request.state.auth_role = None
 
         if not settings.app_password:
             return await call_next(request)
@@ -57,9 +81,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        jwt_principal = _principal_from_jwt(request)
+        jwt_principal, jwt_role = await _principal_from_jwt(request)
         if jwt_principal is not None:
             request.state.principal = jwt_principal
+            request.state.auth_role = jwt_role
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")

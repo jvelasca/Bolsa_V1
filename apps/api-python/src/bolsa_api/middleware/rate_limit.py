@@ -17,10 +17,14 @@ from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
+from bolsa_infrastructure.config import get_settings
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+from bolsa_api.auth.jwt import extract_jwt_sub_from_request
+from bolsa_api.auth.principal import resolve_app_principal
 
 # Prefijos (path) sensibles → máx. requests por ventana. Orden: de más específico a más
 # genérico, porque _limit_for devuelve la primera coincidencia por startswith.
@@ -34,6 +38,7 @@ SENSITIVE_PREFIXES: tuple[tuple[str, int], ...] = (
     # Auth (R-8B.1): login es objetivo de fuerza bruta → límite bajo; status es una
     # lectura barata del FE (AuthGate) → más permisivo.
     ("/api/auth/login", 20),
+    ("/api/auth/refresh", 30),
     ("/api/auth/status", 60),
 )
 
@@ -183,7 +188,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client = get_client_ip(request, self._trusted_proxies)
-        key = f"{client}:{path.split('?')[0]}"
+        path_part = path.split("?")[0]
+        key = _rate_limit_key(request, client, path_part)
 
         if await self._store.check_and_tick(key, limit):
             return JSONResponse(
@@ -240,6 +246,20 @@ def get_client_ip(request: Request, trusted_proxies: str = "") -> str:
             if first:
                 return first
     return peer
+
+
+def _rate_limit_key(request: Request, client_ip: str, path: str) -> str:
+    """Clave de rate-limit; incluye principal JWT si no es el owner bootstrap."""
+    settings = get_settings()
+    default_owner = resolve_app_principal(settings)
+
+    principal = getattr(request.state, "principal", None)
+    if not (isinstance(principal, str) and principal.strip()):
+        principal = extract_jwt_sub_from_request(request)
+
+    if isinstance(principal, str) and principal.strip() and principal.strip() != default_owner:
+        return f"{client_ip}:{principal.strip()}:{path}"
+    return f"{client_ip}:{path}"
 
 
 def _new_redis_client(redis_url: str) -> object:

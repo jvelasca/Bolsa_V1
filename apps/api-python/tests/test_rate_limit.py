@@ -8,6 +8,7 @@ from starlette.requests import Request
 from bolsa_api.middleware.rate_limit import (
     MemoryStore,
     RateLimitMiddleware,
+    _rate_limit_key,
     get_client_ip,
 )
 
@@ -33,6 +34,7 @@ def _middleware() -> RateLimitMiddleware:
         ("/api/sync", 20),
         # Auth (R-8B.1): login y status tienen límites propios
         ("/api/auth/login", 20),
+        ("/api/auth/refresh", 30),
         ("/api/auth/status", 60),
         # Fuera de scope: no debe acotarse
         ("/api/portfolio/positions", None),
@@ -108,4 +110,60 @@ def test_get_client_ip_trims_whitespace_in_xff() -> None:
     """El primer elemento de XFF puede llevar espacios tras la coma inicial."""
     req = _request(host="203.0.113.1", xff=" 70.41.3.18 , 203.0.113.1")
     assert get_client_ip(req, trusted_proxies="203.0.113.1") == "70.41.3.18"
+
+
+def test_rate_limit_key_includes_jwt_principal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    from bolsa_infrastructure.config import get_settings
+
+    get_settings.cache_clear()
+    settings = get_settings()
+    from bolsa_api.auth.jwt import encode_access_token
+
+    token = encode_access_token(settings, sub="operator-7", sv=0, role="operator")
+    req = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/auth/status",
+            "headers": [(b"authorization", f"Bearer {token}".encode())],
+            "client": ("198.51.100.7", 12345),
+            "server": ("127.0.0.1", 8000),
+            "scheme": "http",
+            "query_string": b"",
+        }
+    )
+    key = _rate_limit_key(req, "198.51.100.7", "/api/auth/status")
+    assert key == "198.51.100.7:operator-7:/api/auth/status"
+    get_settings.cache_clear()
+
+
+def test_rate_limit_key_omits_default_owner_principal(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    from bolsa_infrastructure.config import get_settings
+
+    get_settings.cache_clear()
+    settings = get_settings()
+    from bolsa_api.auth.jwt import encode_access_token
+
+    token = encode_access_token(settings, sub="app", sv=0, role="admin")
+    req = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/auth/status",
+            "headers": [(b"authorization", f"Bearer {token}".encode())],
+            "client": ("198.51.100.7", 12345),
+            "server": ("127.0.0.1", 8000),
+            "scheme": "http",
+            "query_string": b"",
+        }
+    )
+    key = _rate_limit_key(req, "198.51.100.7", "/api/auth/status")
+    assert key == "198.51.100.7:/api/auth/status"
+    get_settings.cache_clear()
 

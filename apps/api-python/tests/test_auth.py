@@ -1,12 +1,15 @@
 import pytest
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.models import UserRow
+from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
 from bolsa_api.auth import session as session_module
 from bolsa_api.auth.jwt import decode_access_token, encode_access_token
 from bolsa_api.auth.request_principal import get_request_principal
+from bolsa_api.auth.roles import require_role
 from bolsa_api.auth.session import (
     SESSION_COOKIE_NAME,
     cookie_secure,
@@ -243,6 +246,7 @@ async def test_jwt_login_with_bootstrap_user(monkeypatch: pytest.MonkeyPatch) ->
     claims = decode_access_token(get_settings(), cookie)
     assert claims is not None
     assert claims["sub"] == "app"
+    assert isinstance(claims.get("sv"), int)
     assert "exp" in claims
     assert "iat" in claims
 
@@ -279,7 +283,14 @@ async def test_middleware_accepts_jwt_bearer_and_sets_principal(
 
     app = create_app()
     async with lifespan(app):
-        token = encode_access_token(settings, sub="jwt-operator", role="admin")
+        factory = app.state.session_factory
+        async with factory() as session:
+            repo = SqlAlchemyUserRepository(session)
+            user = await repo.get_by_id("app")
+            assert user is not None
+            sv = user.session_version
+
+        token = encode_access_token(settings, sub="app", sv=sv, role="admin")
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.get(
@@ -322,3 +333,114 @@ def test_get_request_principal_reads_request_state() -> None:
         state = type("State", (), {"principal": "jwt-user-42"})()
 
     assert get_request_principal(FakeRequest()) == "jwt-user-42"  # type: ignore[arg-type]
+
+
+@pytest.mark.asyncio
+async def test_refresh_reissues_jwt_with_new_exp(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    get_settings.cache_clear()
+
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            login = await client.post("/api/auth/login", json={"password": "s3cret"})
+            assert login.status_code == 200
+            old_cookie = login.cookies.get(SESSION_COOKIE_NAME)
+            assert old_cookie is not None
+            old_claims = decode_access_token(get_settings(), old_cookie)
+            assert old_claims is not None
+
+            client.cookies.set(SESSION_COOKIE_NAME, old_cookie)
+            refreshed = await client.post("/api/auth/refresh")
+            assert refreshed.status_code == 200
+            new_cookie = refreshed.cookies.get(SESSION_COOKIE_NAME)
+            assert new_cookie is not None
+            new_claims = decode_access_token(get_settings(), new_cookie)
+            assert new_claims is not None
+            assert new_claims["sub"] == old_claims["sub"]
+            assert new_claims["sv"] == old_claims["sv"]
+            assert new_claims["exp"] >= old_claims["exp"]
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_logout_bumps_session_version_and_invalidates_jwt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    get_settings.cache_clear()
+
+    app = create_app()
+    async with lifespan(app):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            login = await client.post("/api/auth/login", json={"password": "s3cret"})
+            token = login.cookies.get(SESSION_COOKIE_NAME)
+            assert token is not None
+
+            client.cookies.set(SESSION_COOKIE_NAME, token)
+            authed = await client.get("/api/accounts")
+            assert authed.status_code != 401
+
+            client.cookies.set(SESSION_COOKIE_NAME, token)
+            logout = await client.post("/api/auth/logout")
+            assert logout.status_code == 200
+
+            client.cookies.set(SESSION_COOKIE_NAME, token)
+            rejected = await client.get("/api/accounts")
+            assert rejected.status_code == 401
+
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_stale_session_version_jwt_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("APP_PASSWORD", "s3cret")
+    monkeypatch.setenv("APP_AUTH_SECRET", "test-secret")
+    monkeypatch.setenv("JWT_SIGNING_KEY", "jwt-test-key")
+    get_settings.cache_clear()
+    settings = get_settings()
+
+    app = create_app()
+    async with lifespan(app):
+        factory = app.state.session_factory
+        async with factory() as session:
+            repo = SqlAlchemyUserRepository(session)
+            user = await repo.get_by_id("app")
+            assert user is not None
+            stale_sv = user.session_version + 1
+
+        stale_token = encode_access_token(settings, sub="app", sv=stale_sv, role="admin")
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get(
+                "/api/accounts",
+                headers={"Authorization": f"Bearer {stale_token}"},
+            )
+            assert response.status_code == 401
+
+    get_settings.cache_clear()
+
+
+def test_require_role_allows_matching_role() -> None:
+    class FakeRequest:
+        state = type("State", (), {"auth_role": "admin"})()
+
+    require_role(FakeRequest(), "admin")  # type: ignore[arg-type]
+
+
+def test_require_role_rejects_mismatch() -> None:
+    class FakeRequest:
+        state = type("State", (), {"auth_role": "operator"})()
+
+    with pytest.raises(HTTPException) as exc_info:
+        require_role(FakeRequest(), "admin")  # type: ignore[arg-type]
+    assert exc_info.value.status_code == 403

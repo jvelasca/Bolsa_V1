@@ -1429,6 +1429,9 @@ class UserRow(Base):
     login: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column("password_hash", String, nullable=False)
     role: Mapped[str | None] = mapped_column(String, nullable=True)
+    session_version: Mapped[int] = mapped_column(
+        "session_version", Integer, nullable=False, server_default="0"
+    )
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
     disabled_at: Mapped[datetime | None] = mapped_column(
         "disabled_at", DateTime(timezone=True), nullable=True
