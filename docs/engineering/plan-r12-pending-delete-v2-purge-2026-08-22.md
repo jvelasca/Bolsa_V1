@@ -2,7 +2,7 @@
 
 > **Padre:** [`pending-delete/README.md`](./pending-delete/README.md) · inventario [`inventory-r12-2026-08-21.md`](./pending-delete/inventory-r12-2026-08-21.md) · plan R-12 [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md).
 > **Tests protectores:** commit `851b545` — `use-pending-orders.migration.test.ts`, `workspace-legacy-timeframe-favorites.test.ts`.
-> **Re-verificación E8:** 2026-08-22 · HEAD al verificar: `85c11aa`.
+> **Re-verificación E8:** 2026-08-22 · HEAD al verificar: `00e6ec6` (stamp docs).
 > **Resultado:** **0 purges ejecutados.** Ningún ítem de riesgo alto cumple E8 hoy.
 
 ---
