@@ -1002,6 +1002,7 @@ class WorkspaceRow(Base):
     __tablename__ = "workspaces"
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str | None] = mapped_column("user_id", String, nullable=True)
     name: Mapped[str] = mapped_column(String)
     document: Mapped[dict[str, Any]] = mapped_column(JSONB)
     dock_layout: Mapped[dict[str, Any] | None] = mapped_column("dock_layout", JSONB, nullable=True)

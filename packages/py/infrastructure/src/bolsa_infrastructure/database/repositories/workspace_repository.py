@@ -4,11 +4,23 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_infrastructure.config import get_settings as load_app_settings
 from bolsa_infrastructure.database.models import WorkspaceRow
 from bolsa_infrastructure.ids import new_id
+
+
+def _app_owner_id() -> str:
+    return load_app_settings().owner_principal()
+
+
+def _owner_visibility_clause(owner_user_id: str) -> Any:
+    clauses = [WorkspaceRow.user_id == owner_user_id]
+    if owner_user_id == _app_owner_id():
+        clauses.append(WorkspaceRow.user_id.is_(None))
+    return or_(*clauses)
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +38,7 @@ class WorkspaceRecord:
     is_default: bool
     document: dict[str, Any]
     dock_layout: dict[str, Any] | None
+    user_id: str | None
     created_at: str
     updated_at: str
 
@@ -46,6 +59,7 @@ def _to_record(row: WorkspaceRow) -> WorkspaceRecord:
         is_default=row.is_default,
         document=row.document,
         dock_layout=row.dock_layout,
+        user_id=row.user_id,
         created_at=row.created_at.isoformat(),
         updated_at=row.updated_at.isoformat(),
     )
@@ -55,8 +69,12 @@ class SqlAlchemyWorkspaceRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_all(self) -> list[WorkspaceSummary]:
-        stmt = select(WorkspaceRow).order_by(WorkspaceRow.is_default.desc(), WorkspaceRow.name.asc())
+    async def list_all(self, *, owner_user_id: str) -> list[WorkspaceSummary]:
+        stmt = (
+            select(WorkspaceRow)
+            .where(_owner_visibility_clause(owner_user_id))
+            .order_by(WorkspaceRow.is_default.desc(), WorkspaceRow.name.asc())
+        )
         result = await self._session.execute(stmt)
         return [_to_summary(row) for row in result.scalars().all()]
 
@@ -66,9 +84,10 @@ class SqlAlchemyWorkspaceRepository:
         row = result.scalar_one_or_none()
         return _to_record(row) if row else None
 
-    async def get_default(self) -> WorkspaceRecord | None:
+    async def get_default(self, *, owner_user_id: str) -> WorkspaceRecord | None:
         stmt = (
             select(WorkspaceRow)
+            .where(_owner_visibility_clause(owner_user_id))
             .where(WorkspaceRow.is_default.is_(True))
             .order_by(WorkspaceRow.updated_at.desc())
             .limit(1)
@@ -77,7 +96,12 @@ class SqlAlchemyWorkspaceRepository:
         row = result.scalar_one_or_none()
         if row:
             return _to_record(row)
-        stmt_any = select(WorkspaceRow).order_by(WorkspaceRow.updated_at.desc()).limit(1)
+        stmt_any = (
+            select(WorkspaceRow)
+            .where(_owner_visibility_clause(owner_user_id))
+            .order_by(WorkspaceRow.updated_at.desc())
+            .limit(1)
+        )
         result_any = await self._session.execute(stmt_any)
         fallback = result_any.scalar_one_or_none()
         return _to_record(fallback) if fallback else None
@@ -89,13 +113,15 @@ class SqlAlchemyWorkspaceRepository:
         document: dict[str, Any],
         dock_layout: dict[str, Any] | None = None,
         is_default: bool = False,
+        user_id: str,
     ) -> WorkspaceRecord:
         now = datetime.now(UTC)
         if is_default:
-            await self._clear_default_flag()
+            await self._clear_default_flag(owner_user_id=user_id)
 
         row = WorkspaceRow(
             id=new_id(),
+            user_id=user_id,
             name=name.strip(),
             document=document,
             dock_layout=dock_layout,
@@ -111,6 +137,7 @@ class SqlAlchemyWorkspaceRepository:
         self,
         workspace_id: str,
         *,
+        owner_user_id: str,
         name: str | None = None,
         document: dict[str, Any] | None = None,
         dock_layout: dict[str, Any] | None = None,
@@ -130,13 +157,13 @@ class SqlAlchemyWorkspaceRepository:
             row.dock_layout = dock_layout
         if is_default is not None:
             if is_default:
-                await self._clear_default_flag(exclude_id=workspace_id)
+                await self._clear_default_flag(owner_user_id=owner_user_id, exclude_id=workspace_id)
             row.is_default = is_default
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _to_record(row)
 
-    async def delete(self, workspace_id: str) -> bool:
+    async def delete(self, workspace_id: str, *, owner_user_id: str) -> bool:
         stmt = select(WorkspaceRow).where(WorkspaceRow.id == workspace_id)
         result = await self._session.execute(stmt)
         row = result.scalar_one_or_none()
@@ -148,7 +175,12 @@ class SqlAlchemyWorkspaceRepository:
         await self._session.flush()
 
         if was_default:
-            stmt_next = select(WorkspaceRow).order_by(WorkspaceRow.updated_at.desc()).limit(1)
+            stmt_next = (
+                select(WorkspaceRow)
+                .where(_owner_visibility_clause(owner_user_id))
+                .order_by(WorkspaceRow.updated_at.desc())
+                .limit(1)
+            )
             next_result = await self._session.execute(stmt_next)
             next_row = next_result.scalar_one_or_none()
             if next_row:
@@ -156,12 +188,20 @@ class SqlAlchemyWorkspaceRepository:
                 await self._session.flush()
         return True
 
-    async def count(self) -> int:
-        result = await self._session.execute(select(WorkspaceRow.id))
+    async def count(self, *, owner_user_id: str) -> int:
+        stmt = select(WorkspaceRow.id).where(_owner_visibility_clause(owner_user_id))
+        result = await self._session.execute(stmt)
         return len(result.scalars().all())
 
-    async def _clear_default_flag(self, *, exclude_id: str | None = None) -> None:
-        stmt = update(WorkspaceRow).values(is_default=False)
+    async def _clear_default_flag(
+        self,
+        *,
+        owner_user_id: str,
+        exclude_id: str | None = None,
+    ) -> None:
+        stmt = update(WorkspaceRow).values(is_default=False).where(
+            _owner_visibility_clause(owner_user_id),
+        )
         if exclude_id:
             stmt = stmt.where(WorkspaceRow.id != exclude_id)
         await self._session.execute(stmt)
