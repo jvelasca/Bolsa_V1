@@ -3,9 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product/Ops`).
 > **Propósito:** **única fuente de verdad** del «trabajo por delante». Todo el trabajo del proyecto (fases por abrir, deuda inventariada, checklist operativo, freeze) se consolida AQUÍ con **estado + commits + decisiones**, de forma que **ningún subagente ni ningún chat futuro pueda perder el hilo** ni inventarse el estado.
 > **Regla de uso OBLIGATORIA:** antes de abrir cualquier fase, el agente/orquestador **LEE este backlog (read-first)**; al cerrar cualquier fase, **actualiza este backlog (update-last)** con commit, batería y estado. Si un subagente reporta algo que contradice este documento, **el documento manda** (fuente de verdad) y se reconsidera antes de tocar código.
-> **AsOf:** 2026-08-22 · **`origin/main` `98b4986`**. Tag **`v1.5.0-beta` → `5e52bd6`**. R12-AUTH **F5** `02c86fc` · **F6+F7a** `98b4986` · ADR-027 **Aceptado**. Purge V2 métricas `0763700`. Partida: `f7a86cc`.
->
-> **RELEVO → R-12:** D4 Opción C. **F4–F6+F7a HECHOS**. Siguiente = **F8** (jobs/recursos) · **F9** FE · ventana métricas purge V2.
+> **AsOf:** 2026-08-22 · **`origin/main` `5e7c67b`**. R12-AUTH **F5–F9 HECHOS** (`02c86fc`…`5e7c67b`). Siguiente = **F10** · ventana purge V2 métricas.
 
 ## 0. Estado global (leer PRIMERO)
 
