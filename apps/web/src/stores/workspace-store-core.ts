@@ -81,6 +81,10 @@ import {
 import { dedupeChartTabsByInstrument } from "@/lib/chart-tab-uniqueness";
 import { readDrawToolFavoritesLocal } from "@/lib/draw-tool-favorites-storage";
 import {
+  reportLegacyStorageMetric,
+  reportWorkspaceDeprecatedFields,
+} from "@/lib/legacy-storage-metrics";
+import {
   applyDrawToolSessionToUi,
   drawToolSessionFromUi,
   readDrawToolSessionLocal,
@@ -669,6 +673,8 @@ export function normalizeWorkspace(
 ): WorkspaceDocument {
   if (!raw) return DEFAULT_WORKSPACE;
 
+  reportWorkspaceDeprecatedFields(raw);
+
   let charts: ChartTabState[] = [];
   if (raw.charts?.length) {
     charts = raw.charts.map((tab) => normalizeChartTab(tab));
@@ -738,15 +744,26 @@ export function normalizeWorkspace(
     indicatorFavoritesByListId: normalizeIndicatorFavoritesByListId(
       raw.indicatorFavoritesByListId,
     ),
-    chartToolbarGlobal: normalizeChartToolbarGlobalConfig(
-      {
-        ...raw.chartToolbarGlobal,
-        timeframeFavorites:
-          raw.chartToolbarGlobal?.timeframeFavorites ??
-          readLegacyTimeframeFavorites(),
-      },
-      raw.chartDataStrip ?? raw.chartToolbarGlobal?.chartDefaults,
-    ),
+    chartToolbarGlobal: (() => {
+      const legacyTimeframeFavorites =
+        raw.chartToolbarGlobal?.timeframeFavorites == null
+          ? readLegacyTimeframeFavorites()
+          : undefined;
+      if (legacyTimeframeFavorites) {
+        reportLegacyStorageMetric("timeframe_favorites_legacy_blob", {
+          count: legacyTimeframeFavorites.length,
+        });
+      }
+      return normalizeChartToolbarGlobalConfig(
+        {
+          ...raw.chartToolbarGlobal,
+          timeframeFavorites:
+            raw.chartToolbarGlobal?.timeframeFavorites ??
+            legacyTimeframeFavorites,
+        },
+        raw.chartDataStrip ?? raw.chartToolbarGlobal?.chartDefaults,
+      );
+    })(),
     list: {
       ...DEFAULT_LIST_CONFIG,
       ...raw.list,

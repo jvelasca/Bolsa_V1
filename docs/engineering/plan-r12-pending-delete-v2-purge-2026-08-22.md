@@ -104,6 +104,6 @@ Resultado: **9/9 passed** (2 files, 1.57s).
 
 ## 6. Próximo paso (coordinador)
 
-1. Aprobar instrumentación de métricas (§2.1–2.3) sin tocar migradores.
+1. ~~Aprobar instrumentación de métricas (§2.1–2.3) sin tocar migradores.~~ **Métricas implementadas (2026-08-22):** `apps/web/src/lib/legacy-storage-metrics.ts` — opt-in (`localStorage["bolsa-legacy-storage-metrics"]=1` o `VITE_LEGACY_STORAGE_METRICS=1`), sample 1% por defecto, dedupe por sesión; hooks en `use-pending-orders.ts`, `normalizeWorkspace`, `mergeWorkspaceChartState`; tests `legacy-storage-metrics.test.ts`.
 2. Tras ventana + flag, re-ejecutar subagente purge con este plan como checklist.
 3. **Prohibido:** wipe `localStorage`, quitar migradores, o borrar `chart-inspector-nav.ts` / `presetRuleGroups` sin E8 completo.

@@ -17,6 +17,7 @@ import {
   type WorkspaceDocument,
 } from "@bolsa/shared";
 import { sanitizeChartDrawings } from "@bolsa/shared";
+import { reportMergedWorkspaceDeprecatedFields } from "@/lib/legacy-storage-metrics";
 
 /** Une dibujos por id — solo para migraciones puntuales; no usar en borrados. */
 export function mergeDrawingsById(
@@ -438,6 +439,8 @@ export function mergeWorkspaceChartState(
   const olderDoc = preferredNewer ? fallback : preferred;
   const settingsPrimary = preferredNewer ? preferred : fallback;
   const settingsSecondary = preferredNewer ? fallback : preferred;
+
+  reportMergedWorkspaceDeprecatedFields(newerDoc, olderDoc);
 
   const byInstrument = new Map<string, ChartTabState>();
   for (const tab of olderDoc.charts) byInstrument.set(tab.instrumentId, tab);

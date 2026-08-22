@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import type { PendingOrderDto } from "@bolsa/shared";
 import { api } from "@/lib/api";
+import { reportLegacyStorageMetric } from "@/lib/legacy-storage-metrics";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 
 export type PendingOrder = PendingOrderDto & { type: "stop_limit" };
@@ -41,11 +42,16 @@ export function usePendingOrders() {
 
   useEffect(() => {
     if (migratedRef.current || query.isLoading) return;
+    const legacy = readLegacyPendingOrders();
+    if (legacy.length > 0) {
+      reportLegacyStorageMetric("pending_orders_legacy_blob", {
+        count: legacy.length,
+      });
+    }
     if ((query.data?.length ?? 0) > 0) {
       migratedRef.current = true;
       return;
     }
-    const legacy = readLegacyPendingOrders();
     if (!legacy.length) {
       migratedRef.current = true;
       return;
