@@ -174,6 +174,23 @@ class ExecutionRouter:
         self._cognitive_store = cognitive_store
         self._profile_store = profile_store
 
+    async def _publish_policy_event(
+        self,
+        event_type: str,
+        payload: dict[str, Any],
+        policy: ExecutionPolicyRecord,
+        *,
+        correlation_id: str | None = None,
+    ) -> None:
+        if self._event_bus is None:
+            return
+        await self._event_bus.publish(
+            event_type,
+            payload,
+            correlation_id=correlation_id,
+            user_id=policy.user_id,
+        )
+
     async def _persist_gate_memory(
         self,
         guard: CognitiveGuardResult,
@@ -375,11 +392,10 @@ class ExecutionRouter:
         return ExecutionRouteResult(policy_id=policy.id, mode=policy.mode, actions=actions)
 
     async def _emit_signal(self, signal: SignalEventV1, policy: ExecutionPolicyRecord) -> None:
-        if self._event_bus is None:
-            return
-        await self._event_bus.publish(
+        await self._publish_policy_event(
             "signal.emitted",
             signal_event_payload(signal, policyId=policy.id, policyMode=policy.mode),
+            policy,
             correlation_id=signal.id or None,
         )
 
@@ -566,20 +582,20 @@ class ExecutionRouter:
                     lineage=lineage_base,
                 )
             if not guard_decision.allowed:
-                if self._event_bus is not None:
-                    await self._event_bus.publish(
-                        "execution.order_vetoed",
-                        {
-                            **signal_event_payload(signal),
-                            "policyId": policy.id,
-                            "accountId": policy.account_id,
-                            "tradeType": trade_type,
-                            "quantity": quantity,
-                            "cognitiveGate": guard_decision.to_dict(),
-                            "riskEngine": guard_decision.to_dict(),
-                        },
-                        correlation_id=signal.id or None,
-                    )
+                await self._publish_policy_event(
+                    "execution.order_vetoed",
+                    {
+                        **signal_event_payload(signal),
+                        "policyId": policy.id,
+                        "accountId": policy.account_id,
+                        "tradeType": trade_type,
+                        "quantity": quantity,
+                        "cognitiveGate": guard_decision.to_dict(),
+                        "riskEngine": guard_decision.to_dict(),
+                    },
+                    policy,
+                    correlation_id=signal.id or None,
+                )
                 return ExecutionActionResult(
                     instrument_id=signal.instrument_id,
                     signal_kind=str(signal.kind),
@@ -607,18 +623,18 @@ class ExecutionRouter:
                 )
 
         try:
-            if self._event_bus is not None:
-                await self._event_bus.publish(
-                    "execution.order_requested",
-                    {
-                        **signal_event_payload(signal),
-                        "policyId": policy.id,
-                        "accountId": policy.account_id,
-                        "tradeType": trade_type,
-                        "quantity": quantity,
-                    },
-                    correlation_id=signal.id or None,
-                )
+            await self._publish_policy_event(
+                "execution.order_requested",
+                {
+                    **signal_event_payload(signal),
+                    "policyId": policy.id,
+                    "accountId": policy.account_id,
+                    "tradeType": trade_type,
+                    "quantity": quantity,
+                },
+                policy,
+                correlation_id=signal.id or None,
+            )
             result = await self._execute_trade.execute(
                 instrument_id=signal.instrument_id,
                 trade_type=trade_type,
@@ -640,19 +656,19 @@ class ExecutionRouter:
                 reason=str(exc),
             )
 
-        if self._event_bus is not None:
-            await self._event_bus.publish(
-                "execution.order_filled",
-                {
-                    **signal_event_payload(signal),
-                    "policyId": policy.id,
-                    "accountId": policy.account_id,
-                    "transactionId": result.transaction.id,
-                    "tradeType": trade_type,
-                    "quantity": quantity,
-                },
-                correlation_id=result.transaction.id,
-            )
+        await self._publish_policy_event(
+            "execution.order_filled",
+            {
+                **signal_event_payload(signal),
+                "policyId": policy.id,
+                "accountId": policy.account_id,
+                "transactionId": result.transaction.id,
+                "tradeType": trade_type,
+                "quantity": quantity,
+            },
+            policy,
+            correlation_id=result.transaction.id,
+        )
 
         await self._persist_risk_session(
             kind="paper_auto",
@@ -828,18 +844,18 @@ class ExecutionRouter:
             )
 
         if not guard_decision.allowed:
-            if self._event_bus is not None:
-                await self._event_bus.publish(
-                    "execution.live_dry_run_vetoed",
-                    {
-                        **signal_event_payload(signal),
-                        "policyId": policy.id,
-                        "accountId": policy.account_id,
-                        "cognitiveGate": guard_decision.to_dict(),
-                        "riskEngine": guard_decision.to_dict(),
-                    },
-                    correlation_id=signal.id or None,
-                )
+            await self._publish_policy_event(
+                "execution.live_dry_run_vetoed",
+                {
+                    **signal_event_payload(signal),
+                    "policyId": policy.id,
+                    "accountId": policy.account_id,
+                    "cognitiveGate": guard_decision.to_dict(),
+                    "riskEngine": guard_decision.to_dict(),
+                },
+                policy,
+                correlation_id=signal.id or None,
+            )
             return ExecutionActionResult(
                 instrument_id=signal.instrument_id,
                 signal_kind=str(signal.kind),
@@ -847,19 +863,19 @@ class ExecutionRouter:
                 reason=f"Risk Engine VETO: {'; '.join(guard_decision.reasons)}",
             )
 
-        if self._event_bus is not None:
-            await self._event_bus.publish(
-                "execution.live_dry_run_pass",
-                {
-                    **signal_event_payload(signal),
-                    "policyId": policy.id,
-                    "accountId": policy.account_id,
-                    "cognitiveGate": guard_decision.to_dict(),
-                    "riskEngine": guard_decision.to_dict(),
-                    "broker": "none",
-                },
-                correlation_id=signal.id or None,
-            )
+        await self._publish_policy_event(
+            "execution.live_dry_run_pass",
+            {
+                **signal_event_payload(signal),
+                "policyId": policy.id,
+                "accountId": policy.account_id,
+                "cognitiveGate": guard_decision.to_dict(),
+                "riskEngine": guard_decision.to_dict(),
+                "broker": "none",
+            },
+            policy,
+            correlation_id=signal.id or None,
+        )
         return ExecutionActionResult(
             instrument_id=signal.instrument_id,
             signal_kind=str(signal.kind),

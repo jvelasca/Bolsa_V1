@@ -6,6 +6,8 @@ from typing import Any, Protocol
 from bolsa_domain.entities.platform_event import PlatformEventRecord
 from bolsa_domain.repositories.platform_event_repository import PlatformEventRepository
 
+from bolsa_application.context.principal import get_current_principal
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,11 +35,12 @@ class PlatformEventBus:
         correlation_id: str | None = None,
         user_id: str | None = None,
     ) -> PlatformEventRecord:
+        resolved_user_id = user_id if user_id is not None else get_current_principal()
         event = await self._repository.append(
             event_type=event_type,
             payload=payload,
             correlation_id=correlation_id,
-            user_id=user_id,
+            user_id=resolved_user_id,
         )
         for handler in self._handlers:
             try:

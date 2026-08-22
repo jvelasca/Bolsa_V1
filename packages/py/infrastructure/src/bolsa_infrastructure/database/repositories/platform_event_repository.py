@@ -1,12 +1,24 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from bolsa_domain.entities.platform_event import PlatformEventRecord
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.platform_event import PlatformEventRecord
+from bolsa_infrastructure.config import get_settings as load_app_settings
 from bolsa_infrastructure.database.models import PlatformEventRow
 from bolsa_infrastructure.ids import new_id
+
+
+def _app_owner_id() -> str:
+    return load_app_settings().owner_principal()
+
+
+def _owner_visibility_clause(owner_user_id: str) -> Any:
+    clauses = [PlatformEventRow.user_id == owner_user_id]
+    if owner_user_id == _app_owner_id():
+        clauses.append(PlatformEventRow.user_id.is_(None))
+    return or_(*clauses)
 
 
 class SqlAlchemyPlatformEventRepository:
@@ -50,8 +62,11 @@ class SqlAlchemyPlatformEventRepository:
         limit: int = 50,
         event_type: str | None = None,
         correlation_id: str | None = None,
+        owner_user_id: str | None = None,
     ) -> list[PlatformEventRecord]:
         stmt = select(PlatformEventRow).order_by(PlatformEventRow.created_at.desc()).limit(limit)
+        if owner_user_id is not None:
+            stmt = stmt.where(_owner_visibility_clause(owner_user_id))
         if event_type:
             stmt = stmt.where(PlatformEventRow.type == event_type)
         if correlation_id:

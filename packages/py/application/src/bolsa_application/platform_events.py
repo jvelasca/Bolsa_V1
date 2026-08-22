@@ -15,9 +15,11 @@ class ListPlatformEvents:
         limit: int = 50,
         event_type: str | None = None,
         correlation_id: str | None = None,
+        owner_user_id: str | None = None,
     ) -> list[PlatformEventRecord]:
         return await self._repository.list_events(
             limit=min(max(limit, 1), 200),
             event_type=event_type,
             correlation_id=correlation_id,
+            owner_user_id=owner_user_id,
         )

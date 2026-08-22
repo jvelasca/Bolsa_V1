@@ -20,4 +20,5 @@ class PlatformEventRepository(Protocol):
         limit: int = 50,
         event_type: str | None = None,
         correlation_id: str | None = None,
+        owner_user_id: str | None = None,
     ) -> list[PlatformEventRecord]: ...
