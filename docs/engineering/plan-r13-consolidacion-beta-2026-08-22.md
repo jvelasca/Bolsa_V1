@@ -4,7 +4,7 @@
 > **Ancla:** `docs/engineering/PROJECT_STATE.md` §2ad · `docs/engineering/backlog-trabajo-2026-08-20.md` §0 · premisas ⭐§0.
 > **Supersede:** el ciclo vivo deja de ser R-12. R-12 queda **CERRADA** (`plan-r12-auditoria-ux-2026-08-21.md`).
 > **Partida (verificada):** `origin/main` = **`5edbcb5`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292` intacto · `v1.5.0-beta-39-g5edbcb5`.
-> **Estado del plan:** A0–A2 **HECHAS** + A3 **HECHA** (tag `v1.6.0-beta` = `c3964fc` pusheado). Track B producto **BLOQUEADO**.
+> **Estado del plan:** **R-13 COMPLETA y CERRADA (2026-08-22)** — A0–A3 **HECHAS** (tag `v1.6.0-beta` = `c3964fc` pusheado). Track B producto **BLOQUEADO** (ciclo futuro). Traspaso cierre: `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`.
 
 ---
 

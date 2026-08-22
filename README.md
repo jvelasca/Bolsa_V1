@@ -5,7 +5,7 @@ Plataforma personal de gestión bursátil: IBEX, Europa y acciones (sin CFD).
 **Stack actual:** React + Vite (frontend) · **FastAPI Python** (API por defecto) · PostgreSQL.
 
 **Producto (v1.6.0-beta · tag `c3964fc` · 2026-08-22):** Embudo + Lista AUTO · Finalistas · **DÍA D** · **CORE-R v1.12** · **CORE-P** · FA/FIE · DEMO / paper · **Operativa SEMI** (mesa Trading · Señales · Confirmar · Libro) · JWT / multi-user (ADR-027 C) · **Estudio ADR-024** · Asesor/Canales · **prep AUTO A0–A5** (`PAPER_D_EXECUTE` off). Sin broker live.  
-Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · **Fuente de coordinación: GitHub** [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) (`origin/main`) · Estado vivo: [`PROJECT_STATE.md`](./docs/engineering/PROJECT_STATE.md) · Plan R-13: [`plan-r13-consolidacion-beta-2026-08-22.md`](./docs/engineering/plan-r13-consolidacion-beta-2026-08-22.md) · Premisas: [`PROJECT_PREMISES.md`](./docs/PROJECT_PREMISES.md) · ADR-024: [`024-estudio-supervision-universe`](./docs/adr/024-estudio-supervision-universe.md) · HELP: [`docs/HELP.md`](./docs/HELP.md).
+Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · **Fuente de coordinación: GitHub** [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) (`origin/main`) · Estado vivo: [`PROJECT_STATE.md`](./docs/engineering/PROJECT_STATE.md) · Relevo: [`traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`](./docs/engineering/traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md) · Premisas: [`PROJECT_PREMISES.md`](./docs/PROJECT_PREMISES.md) · ADR-024: [`024-estudio-supervision-universe`](./docs/adr/024-estudio-supervision-universe.md) · HELP: [`docs/HELP.md`](./docs/HELP.md).
 
 ## Requisitos
 

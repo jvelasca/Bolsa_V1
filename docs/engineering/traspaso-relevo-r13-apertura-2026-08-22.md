@@ -1,5 +1,7 @@
 # RELEVO / TRASPASO — R-13 consolidación BETA (2026-08-22)
 
+> **⚠️ HISTÓRICO — R-13 CERRADA.** Relevo vivo: [`traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`](./traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md). SHA incrustado puede no ser HEAD. Verificar `git rev-parse origin/main`.
+>
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1.
 > **Propósito:** texto de paso anti-alucinación. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ad + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch && git rev-parse origin/main` (no asumir SHA de este fichero).
