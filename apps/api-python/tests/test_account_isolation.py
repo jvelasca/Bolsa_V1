@@ -5,14 +5,18 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import InvestmentAccountRow
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from bolsa_api.auth.principal import DEFAULT_APP_PRINCIPAL, resolve_app_principal
+from bolsa_api.auth.principal import (
+    DEFAULT_APP_PRINCIPAL,
+    account_visible_to_principal,
+    resolve_app_principal,
+)
 from bolsa_api.auth.session import SESSION_COOKIE_NAME, create_session_cookie_value
 from bolsa_api.main import create_app, lifespan
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import InvestmentAccountRow
 
 
 def _now() -> datetime:
@@ -62,6 +66,82 @@ def test_resolve_app_principal_defaults_to_app() -> None:
     get_settings.cache_clear()
     assert resolve_app_principal(get_settings()) == DEFAULT_APP_PRINCIPAL
     get_settings.cache_clear()
+
+
+def test_account_visible_to_principal_f7a_soft_legacy() -> None:
+    get_settings.cache_clear()
+    bootstrap = resolve_app_principal(get_settings())
+    assert account_visible_to_principal(None, bootstrap) is True
+    assert account_visible_to_principal(None, "user-b") is False
+    assert account_visible_to_principal("user-a", "user-a") is True
+    assert account_visible_to_principal("user-a", "user-b") is False
+    get_settings.cache_clear()
+
+
+def _patch_request_principal(
+    monkeypatch: pytest.MonkeyPatch, principal: str
+) -> None:
+    def fake(_request: object) -> str:
+        return principal
+
+    for target in (
+        "bolsa_api.auth.request_principal.get_request_principal",
+        "bolsa_api.api.dependencies.get_request_principal",
+        "bolsa_api.api.v1.routes.accounts.get_request_principal",
+    ):
+        monkeypatch.setattr(target, fake)
+
+
+@pytest.mark.asyncio
+async def test_user_b_cannot_see_user_a_account_list_and_get(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F6: JWT principal distinto no ve cuentas ajenas en list/get (404)."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        user_a_id = await _insert_raw_account(
+            factory, user_id="user-a", name="User A isolation"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(f"/api/accounts/{user_a_id}")
+                assert response.status_code == 404
+
+                listed = await client.get("/api/accounts")
+                assert listed.status_code == 200
+                ids = {row["id"] for row in listed.json()["data"]}
+                assert user_a_id not in ids
+        finally:
+            await _delete_raw_account(factory, user_a_id)
+
+
+@pytest.mark.asyncio
+async def test_legacy_null_user_id_hidden_from_non_bootstrap_principal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F7a: legacy ``user_id is None`` invisible salvo principal bootstrap."""
+    _patch_request_principal(monkeypatch, "user-b")
+    app = create_app()
+    async with lifespan(app):
+        factory: async_sessionmaker[AsyncSession] = app.state.session_factory
+        legacy_id = await _insert_raw_account(
+            factory, user_id=None, name="Legacy F7a isolation"
+        )
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.get(f"/api/accounts/{legacy_id}")
+                assert response.status_code == 404
+
+                listed = await client.get("/api/accounts")
+                assert listed.status_code == 200
+                ids = {row["id"] for row in listed.json()["data"]}
+                assert legacy_id not in ids
+        finally:
+            await _delete_raw_account(factory, legacy_id)
 
 
 @pytest.mark.asyncio

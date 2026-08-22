@@ -37,11 +37,20 @@ def _app_owner_id() -> str:
     return load_app_settings().owner_principal()
 
 
+def _account_visible_to_owner(user_id: str | None, owner_user_id: str) -> bool:
+    """F7a: filas legacy ``user_id is None`` solo visibles al owner bootstrap."""
+    if user_id == owner_user_id:
+        return True
+    if user_id is None and owner_user_id == _app_owner_id():
+        return True
+    return False
+
+
 def _owner_visibility_clause(owner_user_id: str) -> Any:
-    return or_(
-        InvestmentAccountRow.user_id == owner_user_id,
-        InvestmentAccountRow.user_id.is_(None),
-    )
+    clauses = [InvestmentAccountRow.user_id == owner_user_id]
+    if owner_user_id == _app_owner_id():
+        clauses.append(InvestmentAccountRow.user_id.is_(None))
+    return or_(*clauses)
 
 
 def _account_from_row(row: InvestmentAccountRow) -> InvestmentAccount:
@@ -148,10 +157,10 @@ class SqlAlchemyAccountRepository:
     async def list_accounts(
         self,
         account_type: str | None = None,
-        user_id: str | None = None,
+        owner_user_id: str | None = None,
     ) -> list[InvestmentAccount]:
-        """Lista cuentas del owner (o ``user_id``) más filas legacy ``user_id is None``."""
-        owner = user_id if user_id is not None else _app_owner_id()
+        """Lista cuentas del owner; legacy ``user_id is None`` solo si owner bootstrap (F7a)."""
+        owner = owner_user_id if owner_user_id is not None else _app_owner_id()
         stmt = (
             select(InvestmentAccountRow)
             .where(_owner_visibility_clause(owner))
@@ -190,7 +199,7 @@ class SqlAlchemyAccountRepository:
         if row is None:
             raise ValueError("Cuenta no encontrada")
         owner = owner_user_id if owner_user_id is not None else _app_owner_id()
-        if row.user_id is not None and row.user_id != owner:
+        if not _account_visible_to_owner(row.user_id, owner):
             raise ValueError("Cuenta no encontrada")
         return _account_from_row(row)
 

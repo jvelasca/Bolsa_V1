@@ -26,8 +26,9 @@ import hmac
 import secrets
 import time
 
-from bolsa_api.auth.tokens import create_access_token
 from bolsa_infrastructure.config import Settings
+
+from bolsa_api.auth.tokens import create_access_token
 
 SESSION_COOKIE_NAME = "bolsa_session"
 SESSION_COOKIE_PATH = "/api"

@@ -93,8 +93,15 @@ class ListAccountSummaries:
         self._account_repo = account_repo
         self._portfolio_repo = portfolio_repo
 
-    async def execute(self, account_type: str | None = None) -> list[AccountSummary]:
-        accounts = await self._account_repo.list_accounts(account_type=account_type)
+    async def execute(
+        self,
+        account_type: str | None = None,
+        owner_user_id: str | None = None,
+    ) -> list[AccountSummary]:
+        accounts = await self._account_repo.list_accounts(
+            account_type=account_type,
+            owner_user_id=owner_user_id,
+        )
         items: list[AccountSummary] = []
         for account in accounts:
             scope = await self._account_repo.resolve_scope(account.id, None)

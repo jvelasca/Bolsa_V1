@@ -12,8 +12,15 @@ class ListAccounts:
     def __init__(self, account_repo: SqlAlchemyAccountRepository) -> None:
         self._account_repo = account_repo
 
-    async def execute(self, account_type: str | None = None) -> list[InvestmentAccount]:
-        return await self._account_repo.list_accounts(account_type=account_type)
+    async def execute(
+        self,
+        account_type: str | None = None,
+        owner_user_id: str | None = None,
+    ) -> list[InvestmentAccount]:
+        return await self._account_repo.list_accounts(
+            account_type=account_type,
+            owner_user_id=owner_user_id,
+        )
 
 
 class CreateSimulatedAccount:

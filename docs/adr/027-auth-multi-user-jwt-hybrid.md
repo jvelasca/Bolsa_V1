@@ -2,8 +2,8 @@
 
 ## Estado
 
-**Propuesto** — 2026-08-22  
-(**Fase R12-AUTH F4** en curso; requiere **Aceptado** del propietario antes de implementación F5+.)
+**Aceptado** — 2026-08-22  
+(**F5+F6 implementados; F7+ pendiente según plan D4.**)
 
 **Decisión del propietario (2026-08-22):** **Opción C (híbrido)** — fases incrementales C.1 → C.2 → C.3 documentadas en [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](../engineering/plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) §3.
 

@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -26,6 +26,7 @@ from bolsa_api.api.dependencies import (
     require_account_access,
 )
 from bolsa_api.api.v1.idempotency_responses import IDEMPOTENCY_CONFLICT_RESPONSES
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.schemas.account_mappers import (
     settings_dto_to_domain,
     to_account_summary_dto,
@@ -59,20 +60,30 @@ router = APIRouter()
 
 @router.get("/accounts", response_model=AccountsResponseDto)
 async def list_accounts(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     type: str | None = Query(default=None),
 ) -> AccountsResponseDto:
-    accounts = await get_list_accounts_use_case(session).execute(account_type=type)
+    owner_user_id = get_request_principal(request)
+    accounts = await get_list_accounts_use_case(session).execute(
+        account_type=type,
+        owner_user_id=owner_user_id,
+    )
     return AccountsResponseDto(data=[to_investment_account_dto(a) for a in accounts])
 
 
 @router.get("/accounts/summaries", response_model=AccountSummariesResponseDto)
 async def list_account_summaries(
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     type: str | None = Query(default=None),
 ) -> AccountSummariesResponseDto:
     """Hub equity strip — no per-row HTTP and no custody side-effects."""
-    summaries = await get_list_account_summaries_use_case(session).execute(account_type=type)
+    owner_user_id = get_request_principal(request)
+    summaries = await get_list_account_summaries_use_case(session).execute(
+        account_type=type,
+        owner_user_id=owner_user_id,
+    )
     return AccountSummariesResponseDto(data=[to_account_summary_dto(s) for s in summaries])
 
 
