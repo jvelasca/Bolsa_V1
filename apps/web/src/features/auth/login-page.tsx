@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { BarChart3, Lock } from "lucide-react";
+import { BarChart3, Lock, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/auth-store";
 
 export function LoginPage() {
-  const login = useAuthStore((s) => s.login);
+  const authLogin = useAuthStore((s) => s.login);
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -15,7 +16,7 @@ export function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(password);
+      await authLogin(password, login);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error de acceso");
     } finally {
@@ -38,6 +39,24 @@ export function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
+              <label htmlFor="login" className="text-sm font-medium">
+                Usuario
+              </label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  id="login"
+                  type="text"
+                  value={login}
+                  onChange={(e) => setLogin(e.target.value)}
+                  className="w-full rounded-md border border-border bg-muted/40 py-2 pl-10 pr-3 text-sm outline-none ring-primary focus:ring-1"
+                  placeholder="app"
+                  autoComplete="username"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium">
                 Contraseña
               </label>
@@ -50,7 +69,7 @@ export function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-md border border-border bg-muted/40 py-2 pl-10 pr-3 text-sm outline-none ring-primary focus:ring-1"
                   placeholder="Introduce la contraseña"
-                  autoFocus
+                  autoComplete="current-password"
                 />
               </div>
             </div>

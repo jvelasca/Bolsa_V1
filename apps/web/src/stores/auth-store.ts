@@ -16,7 +16,7 @@ interface AuthState {
   setHydrated: () => void;
   clearBootstrapError: () => void;
   checkAuthRequired: () => Promise<boolean>;
-  login: (password: string) => Promise<void>;
+  login: (password: string, login?: string) => Promise<void>;
 }
 
 async function fetchAuthStatus(): Promise<Response> {
@@ -100,12 +100,16 @@ export const useAuthStore = create<AuthState>()(
           return false;
         }
       },
-      login: async (password: string) => {
+      login: async (password: string, login?: string) => {
+        const trimmedLogin = login?.trim();
+        const payload = trimmedLogin
+          ? { login: trimmedLogin, password }
+          : { password };
         const response = await fetch(`${API_URL}/api/auth/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ password }),
+          body: JSON.stringify(payload),
         });
         if (!response.ok) {
           const body = (await response.json().catch(() => null)) as {
