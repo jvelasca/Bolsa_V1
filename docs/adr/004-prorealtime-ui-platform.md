@@ -19,13 +19,16 @@ Referencia UX: **ProRealTime** (estructura de menús, espacios de trabajo, propi
 
 ### 0. Acceso con contraseña (fase inmediata)
 
-| Ahora | Futuro (ADR-006) |
-|-------|------------------|
-| Un usuario / una contraseña (`APP_PASSWORD` en `.env`) | Multi-usuario, roles, BD `users` |
-| Gate en frontend + middleware FastAPI | JWT / sesiones, gestión de usuarios aparte |
-| Sin registro público | Admin crea usuarios |
+| Ahora (R-8B.2)                                                                       | Roadmap ([ADR-027](./027-auth-multi-user-jwt-hybrid.md))         |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Un operador / `APP_PASSWORD` (`APP_PASSWORD` en `.env`)                              | Multi-usuario JWT, tabla `users`, roles                          |
+| Cookie **HttpOnly** + middleware FastAPI (`auth-store.ts`, `credentials: "include"`) | JWT en cookie HttpOnly **y** Bearer fallback (R-8B.2 compatible) |
+| Bearer como fallback API                                                             | `sub` → principal; admin crea users (sin registro público)       |
+| Sin registro público                                                                 | Opción C híbrida: C.1 instancia → C.2 JWT admin → C.3 multi-user |
 
-**Flujo v1:** pantalla login → token en `sessionStorage` → header `Authorization: Bearer <token>` en API.
+**Flujo actual (R-8B.2):** pantalla login → cookie HttpOnly (token HMAC determinista, no JWT) → `/api/auth/status`; Bearer opcional en API.
+
+**Flujo objetivo (ADR-027, post-F5):** login → JWT (`sub`, `exp`, `iat`) en cookie HttpOnly + Bearer; transición mantiene fallback `APP_PASSWORD` en C.1–C.2.
 
 No bloquea espacios de trabajo ni listas; solo protege la instancia.
 
@@ -65,28 +68,28 @@ interface WorkspaceDocument {
   name: string;
   createdAt: string;
   updatedAt: string;
-  layout: LayoutState;           // paneles, tamaños, tabs activos
+  layout: LayoutState; // paneles, tamaños, tabs activos
   charts: ChartInstanceConfig[]; // N gráficos abiertos
-  lists: ListPanelConfig[];      // listas visibles y columnas
-  preferences: UserPreferences;  // tema, autosave, etc.
+  lists: ListPanelConfig[]; // listas visibles y columnas
+  preferences: UserPreferences; // tema, autosave, etc.
 }
 ```
 
 **Menú Archivo / Espacio de trabajo** (paridad funcional ProRealTime):
 
-| Acción | Comportamiento v1 | Persistencia v1 |
-|--------|-------------------|-----------------|
-| Abrir | Dialog: lista de `.bolsa-workspace.json` locales + recientes | IndexedDB + filesystem (File System Access API donde exista) |
-| Abrir reciente | Submenú últimos 10 | `localStorage` recents |
-| Abrir defecto | Carga `default.bolsa-workspace.json` | Bundled + user override |
-| Guardar | Sobrescribe workspace actual | IndexedDB |
-| Guardar como… | Nuevo nombre / export file | Download JSON |
-| Autoguardado on/off | Cada 60s si dirty | Preference en workspace |
-| Renombrar | Cambia `name` | — |
-| Recargar | Relee desde disco/IDB sin cerrar app | — |
-| Exportar | JSON descargable | — |
-| Abrir en este PC al iniciar | Flag `openOnStartup` | Preference global |
-| Cerrar plataforma | Confirm si dirty | — |
+| Acción                      | Comportamiento v1                                            | Persistencia v1                                              |
+| --------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Abrir                       | Dialog: lista de `.bolsa-workspace.json` locales + recientes | IndexedDB + filesystem (File System Access API donde exista) |
+| Abrir reciente              | Submenú últimos 10                                           | `localStorage` recents                                       |
+| Abrir defecto               | Carga `default.bolsa-workspace.json`                         | Bundled + user override                                      |
+| Guardar                     | Sobrescribe workspace actual                                 | IndexedDB                                                    |
+| Guardar como…               | Nuevo nombre / export file                                   | Download JSON                                                |
+| Autoguardado on/off         | Cada 60s si dirty                                            | Preference en workspace                                      |
+| Renombrar                   | Cambia `name`                                                | —                                                            |
+| Recargar                    | Relee desde disco/IDB sin cerrar app                         | —                                                            |
+| Exportar                    | JSON descargable                                             | —                                                            |
+| Abrir en este PC al iniciar | Flag `openOnStartup`                                         | Preference global                                            |
+| Cerrar plataforma           | Confirm si dirty                                             | —                                                            |
 
 **Fase 2:** sync workspace a backend (`POST /api/workspaces`) cuando exista multi-usuario.
 
@@ -102,16 +105,16 @@ Cada instancia de gráfico = `ChartInstanceConfig` + componente `OhlcvChart` (Li
 
 **Tabs de propiedades** (consenso inicial):
 
-| Tab | Opciones |
-|-----|----------|
-| Cuadrícula y escala | Líneas H/V principales y secundarias; densidad; margen vacío derecho/ superior (% barras) |
-| Cursor | Tipo (crosshair / magnet); snap OHLC; panel info precio on/off; OHLC en tooltip |
-| Iconos en precio | Marcadores: órdenes ejecutadas, alertas (fase alertas) |
-| Barra de título | Símbolo, timeframe, último, %; estilo compacto / expandido |
-| Etiquetas y filigrana | Labels indicadores; watermark texto/logo |
-| Colores | Velas alcista/bajista, fondo, grid, volumen, SMA/EMA/RSI |
-| Datos históricos | Dividendos, vencimientos, settlement (cuando API lo soporte) |
-| Barras de herramientas | Inferior (timeframe, zoom); objetos (líneas, rectángulos — fase dibujo) |
+| Tab                    | Opciones                                                                                  |
+| ---------------------- | ----------------------------------------------------------------------------------------- |
+| Cuadrícula y escala    | Líneas H/V principales y secundarias; densidad; margen vacío derecho/ superior (% barras) |
+| Cursor                 | Tipo (crosshair / magnet); snap OHLC; panel info precio on/off; OHLC en tooltip           |
+| Iconos en precio       | Marcadores: órdenes ejecutadas, alertas (fase alertas)                                    |
+| Barra de título        | Símbolo, timeframe, último, %; estilo compacto / expandido                                |
+| Etiquetas y filigrana  | Labels indicadores; watermark texto/logo                                                  |
+| Colores                | Velas alcista/bajista, fondo, grid, volumen, SMA/EMA/RSI                                  |
+| Datos históricos       | Dividendos, vencimientos, settlement (cuando API lo soporte)                              |
+| Barras de herramientas | Inferior (timeframe, zoom); objetos (líneas, rectángulos — fase dibujo)                   |
 
 Config serializada en workspace; defaults en `packages/shared/src/chart-defaults.ts`.
 
@@ -126,30 +129,40 @@ Una **Lista** es un panel tabular configurable, equivalente ProRealTime "List of
 ```typescript
 interface InstrumentList {
   id: string;
-  name: string;                    // ej. "IBEX 35", "Energía", "Mis favoritos"
-  source: 'catalog' | 'custom';    // catálogo sistema vs usuario
-  instrumentIds: string[];         // orden manual
-  columns: ListColumnId[];         // columnas visibles y orden
-  sort?: { column: ListColumnId; dir: 'asc' | 'desc' };
+  name: string; // ej. "IBEX 35", "Energía", "Mis favoritos"
+  source: "catalog" | "custom"; // catálogo sistema vs usuario
+  instrumentIds: string[]; // orden manual
+  columns: ListColumnId[]; // columnas visibles y orden
+  sort?: { column: ListColumnId; dir: "asc" | "desc" };
   filters?: ListFilter[];
 }
 
 type ListColumnId =
-  | 'symbol' | 'name' | 'lastClose' | 'changePct' | 'changeAbs'
-  | 'volume' | 'barCount' | 'syncStatus' | 'sector' | 'currency'
-  | 'bid' | 'ask' | 'spreadPct';   // XTB cuando live
+  | "symbol"
+  | "name"
+  | "lastClose"
+  | "changePct"
+  | "changeAbs"
+  | "volume"
+  | "barCount"
+  | "syncStatus"
+  | "sector"
+  | "currency"
+  | "bid"
+  | "ask"
+  | "spreadPct"; // XTB cuando live
 ```
 
 **Menú Listas:**
 
-| Acción | Descripción |
-|--------|-------------|
-| Nueva lista | Lista vacía o desde plantilla |
-| Duplicar lista | Copia configuración |
-| Importar IBEX 35 | Lista sistema predefinida (seed actual) |
-| Propiedades lista | Columnas, orden, filtros, color filas |
+| Acción              | Descripción                                        |
+| ------------------- | -------------------------------------------------- |
+| Nueva lista         | Lista vacía o desde plantilla                      |
+| Duplicar lista      | Copia configuración                                |
+| Importar IBEX 35    | Lista sistema predefinida (seed actual)            |
+| Propiedades lista   | Columnas, orden, filtros, color filas              |
 | Enlazar con gráfico | Click fila → cambia instrumento del gráfico activo |
-| Exportar CSV | Exportación local |
+| Exportar CSV        | Exportación local                                  |
 
 **API futura (Sprint Listas):**
 
@@ -182,17 +195,17 @@ Workspace
 
 ## Plan de implementación
 
-| Fase | Entregable | Depende de |
-|------|------------|------------|
-| **UI-0** | Cutover `VITE_API_URL` → Python; retirar TS API | Backend ✓ |
-| **UI-1** | Login contraseña + middleware API | UI-0 |
-| **UI-2** | Application shell (menú Archivo/Espacio/Gráficos/Listas) | UI-1 |
-| **UI-3** | Workspace persist (IndexedDB + export/import) | UI-2 |
-| **UI-4** | Panel Listas (tabla IBEX + columnas configurables) | UI-2 |
-| **UI-5** | Chart properties dialog (grid, cursor, colores) | UI-3 | ✅ |
-| **UI-6** | API `/api/lists` + sync workspace cloud | Auth multi-user | ✅ v1 (sin multi-user) |
-| **UI-7** | Docking paneles redimensionables | UI-2 | ✅ v1 |
-| **UI-8** | Pestañas centrales multi-gráfico | UI-5 | ✅ v1 |
+| Fase     | Entregable                                               | Depende de      |
+| -------- | -------------------------------------------------------- | --------------- | ---------------------- |
+| **UI-0** | Cutover `VITE_API_URL` → Python; retirar TS API          | Backend ✓       |
+| **UI-1** | Login contraseña + middleware API                        | UI-0            |
+| **UI-2** | Application shell (menú Archivo/Espacio/Gráficos/Listas) | UI-1            |
+| **UI-3** | Workspace persist (IndexedDB + export/import)            | UI-2            |
+| **UI-4** | Panel Listas (tabla IBEX + columnas configurables)       | UI-2            |
+| **UI-5** | Chart properties dialog (grid, cursor, colores)          | UI-3            | ✅                     |
+| **UI-6** | API `/api/lists` + sync workspace cloud                  | Auth multi-user | ✅ v1 (sin multi-user) |
+| **UI-7** | Docking paneles redimensionables                         | UI-2            | ✅ v1                  |
+| **UI-8** | Pestañas centrales multi-gráfico                         | UI-5            | ✅ v1                  |
 
 ## Consecuencias
 

@@ -4,6 +4,7 @@
 > **Contexto freeze:** [`plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md`](./plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md) §4 «Auth global → multiusuario real» · [`plan-r8-prevencion-riesgo-2026-08-20.md`](./plan-r8-prevencion-riesgo-2026-08-20.md) R-8B.2 (cookie HttpOnly, **no JWT**).
 > **Premisas:** `docs/PROJECT_PREMISES.md` ⭐§0 · 0 commits sin OK del propietario.
 > **AsOf:** 2026-08-22 · R12-AUTH F1 `e52e016` · F2 `9f3354f` · F3 `5fe5ace`.
+> **Decisión propietario (2026-08-22):** **Opción C (híbrido)** · **F4 en curso** — ADR-027 [`docs/adr/027-auth-multi-user-jwt-hybrid.md`](../adr/027-auth-multi-user-jwt-hybrid.md) **Propuesto** (pendiente Aceptado para F5).
 
 ---
 
@@ -119,18 +120,20 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 **Recomendación de plan:** **Opción C** si el propietario aprueba abrir D4; **Opción A** si la app permanece single-tenant.
 
+**✅ Elegida por el propietario (2026-08-22): Opción C.** Formalizada en ADR-027 (Propuesto).
+
 ---
 
 ## 4. ADR necesarios (antes de código F5+)
 
-| ADR                           | Tema                     | Contenido mínimo                                                                                                                                                           |
-| ----------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **ADR-027** (nuevo)           | Modelo auth multi-user   | Opción elegida (A/B/C) · formato token (JWT claims: `sub`, `exp`, `iat`, opcional `role`) · cookie vs Bearer · rotación claves · compatibilidad R-8B.2 · fail-closed prod. |
-| **ADR-027 anexo**             | Legacy `user_id is None` | Política backfill (§6) · ventana de convivencia · comportamiento jobs.                                                                                                     |
-| **Actualizar ADR-004** §0     | Estado UI auth           | Sustituir `sessionStorage`/Bearer-only por cookie HttpOnly actual + roadmap JWT.                                                                                           |
-| **Actualizar ADR-008** (nota) | Multi-usuario            | Pasar de «nullable preparado» a «enforced con ADR-027».                                                                                                                    |
+| ADR                           | Tema                     | Contenido mínimo                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ADR-027** (nuevo)           | Modelo auth multi-user   | ✅ Creado **Propuesto** [`docs/adr/027-auth-multi-user-jwt-hybrid.md`](../adr/027-auth-multi-user-jwt-hybrid.md) · Opción **C** · JWT claims · cookie/Bearer · fail-closed · anexo legacy NULL · NO-touch · criterios F5–F7. |
+| **ADR-027 anexo**             | Legacy `user_id is None` | Incluido en ADR-027 (F7a/F7b/F7c).                                                                                                                                                                                           |
+| **Actualizar ADR-004** §0     | Estado UI auth           | ✅ Nota cookie HttpOnly + roadmap JWT (2026-08-22).                                                                                                                                                                          |
+| **Actualizar ADR-008** (nota) | Multi-usuario            | ✅ Nota enforced ADR-027 (2026-08-22).                                                                                                                                                                                       |
 
-**Gate:** ningún commit de implementación F5+ sin ADR-027 **Aceptado** por propietario.
+**Gate:** ningún commit de implementación F5+ sin ADR-027 **Aceptado** por propietario (actualmente **Propuesto**).
 
 ---
 
@@ -153,13 +156,15 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F4 — Decisión + ADR + inventario gaps (docs + tests read-only)
 
+**Estado:** **▶ EN CURSO** (2026-08-22) — propietario eligió **Opción C**; ADR-027 creado (**Propuesto**).
+
 **Qué:** ADR-027 borrador · tabla gaps §1.4 · matriz rutas sin guard · criterios de aceptación multi-user.
 
 **Código:** 0 (o trivial: enlace en `engineering-index`).
 
 **Batería:** revisión estática (`rg require_account_access`, `rg user_id`) · pytest existente verde.
 
-**Hecho cuando:** propietario elige A/B/C y aprueba ADR-027.
+**Hecho cuando:** propietario elige A/B/C (**✅ Opción C**) y **acepta** ADR-027 (Aceptado → gate F5).
 
 ---
 
@@ -316,9 +321,9 @@ Comando base API: `pytest apps/api-python/tests/test_auth.py apps/api-python/tes
 
 ## 11. Primera fase recomendada tras OK del propietario
 
-**F4 (decisión + ADR-027 + inventario gaps)** — solo documentación y aprobación explícita de Opción A, B o C.
+**F4 (decisión + ADR-027 + inventario gaps)** — **▶ EN CURSO** (Opción C elegida 2026-08-22; ADR-027 **Propuesto** — pendiente **Aceptado**).
 
-Si el propietario elige **abrir multi-user (B o C)**, la **primera fase con código** es **F5** (tabla `users` + login JWT + middleware `principal=sub`), manteniendo guards F1–F3 y NO-touch money.
+Si el propietario **acepta ADR-027**, la **primera fase con código** es **F5** (tabla `users` + login JWT + middleware `principal=sub`), manteniendo guards F1–F3 y NO-touch money.
 
 Si el propietario elige **permanecer single-tenant (A)**, D4 se **cierra sin F5+**; opcional endurecimiento operativo (rotación secretos, TTL) fuera de este plan.
 
