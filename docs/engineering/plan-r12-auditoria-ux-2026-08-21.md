@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (`Product / Ops`).
 > **Ancla:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md` · `docs/engineering/backlog-trabajo-2026-08-20.md` §0/§1 · `docs/engineering/PROJECT_STATE.md` · premisas E1–E9 + ciclo R-12 en `docs/PROJECT_PREMISES.md` ⭐§0.
 > **Estado de partida (verificado):** `main` local = `origin/main` = **`f7a86cc`** · tag **`v1.3.0` → `b778292`** · árbol limpio al abrir · `v1.3.0-5-gf7a86cc`.
-> **Estado del plan (AsOf 2026-08-22):** Track A (A0–A6) + Track B (estudio teórico) **hechos**. Track B **APROBADO**. Track C **C1–C5** (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9`. Gates **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1** `e52e016` · **F2** `9f3354f` · **F3** `5fe5ace` **cerrados**. Pending-delete E8 tests **`851b545`** (sin purge). HEAD local **`5fe5ace`** · `origin/main` **`8ab6ef3`** hasta push. Tag **`v1.5.0-beta` → `5e52bd6`**. Coordinación: GitHub `origin/main` (E4).
+> **Estado del plan (AsOf 2026-08-22):** Track A (A0–A6) + Track B (estudio teórico) **hechos**. Track B **APROBADO**. Track C **C1–C5** (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9`. Gates **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1** `e52e016` · **F2** `9f3354f` · **F3** `5fe5ace` **cerrados**. Pending-delete E8 tests **`851b545`** (sin purge; plan V2 draft). **`origin/main` `85c11aa`** (push E4 2026-08-22). Tag **`v1.5.0-beta` → `5e52bd6`**. Siguiente decisión: D4 JWT [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](./plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) · purge V2 [`plan-r12-pending-delete-v2-purge-2026-08-22.md`](./plan-r12-pending-delete-v2-purge-2026-08-22.md).
 > **Supersede:** `plan-refactor-refuerzo-post-v1-3-0-2026-08-21.md` (Relevo UNO/DOS ejecutados; Relevo TRES/Fase 6 higiene se absorbe aquí).
 
 ---
@@ -54,15 +54,16 @@ Plantilla de paso:
 
 ### Gates (NO auto-abrir salvo los ya cerrados)
 
-| Gate                             | Recomendación                                                                               | Estado                                     |
-| -------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 409 en OpenAPI                   | Opción B1 (deposit/withdraw/trade)                                                          | ✅ **HECHO** R12-409 B1 (`eb24608`)        |
-| ExecuteTrade / invariante B      | `balance_after` desde cash **post-lock** (`summary.portfolio.cash`)                         | ✅ **HECHO** EXEC-B-CONC (`ca60d0a`)       |
-| scheduler-vs-worker (R-8C.2)     | Una autoridad: crons=`scheduler`; colas=`queue_poll`\|`arq`                                 | ✅ **HECHO** R12-SCHED (`5e52bd6`)         |
-| Split `accounts.py` (~978 LOC)   | Paquete `bolsa_application/accounts/` + fachada                                             | ✅ **HECHO** R12-ACCOUNTS (`3c958f1`)      |
-| Auth User→Account→Resource       | F1 `user_id`/404 (`e52e016`) · F2 más rutas (`9f3354f`) · F3 cash/trade (`5fe5ace`); JWT D4 | ✅ **F1+F2+F3 HECHO** (`5fe5ace`)          |
-| `TRUSTED_PROXIES` prod           | Checklist operativo                                                                         | Fuera de repo                              |
-| SIGKILL real / PG restart mid-tx | Ampliar F4                                                                                  | Opcional; F4 ya cubre rollback equivalente |
+| Gate                               | Recomendación                                                                               | Estado                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 409 en OpenAPI                     | Opción B1 (deposit/withdraw/trade)                                                          | ✅ **HECHO** R12-409 B1 (`eb24608`)               |
+| ExecuteTrade / invariante B        | `balance_after` desde cash **post-lock** (`summary.portfolio.cash`)                         | ✅ **HECHO** EXEC-B-CONC (`ca60d0a`)              |
+| scheduler-vs-worker (R-8C.2)       | Una autoridad: crons=`scheduler`; colas=`queue_poll`\|`arq`                                 | ✅ **HECHO** R12-SCHED (`5e52bd6`)                |
+| Split `accounts.py` (~978 LOC)     | Paquete `bolsa_application/accounts/` + fachada                                             | ✅ **HECHO** R12-ACCOUNTS (`3c958f1`)             |
+| Auth User→Account→Resource         | F1 `user_id`/404 (`e52e016`) · F2 más rutas (`9f3354f`) · F3 cash/trade (`5fe5ace`); JWT D4 | ✅ **F1+F2+F3 HECHO** (`5fe5ace`) · plan D4 draft |
+| Purge `pending-delete` riesgo alto | E8 sigue N; tests `851b545`; plan V2 con métricas/flags                                     | 📄 **plan draft** (sin purge)                     |
+| `TRUSTED_PROXIES` prod             | Checklist operativo                                                                         | Fuera de repo                                     |
+| SIGKILL real / PG restart mid-tx   | Ampliar F4                                                                                  | Opcional; F4 ya cubre rollback equivalente        |
 
 ---
 
@@ -108,6 +109,8 @@ Producto **BETA**. Tag `v1.3.0` intacto sobre `b778292`. Tag **`v1.5.0-beta` →
 - Ancla SHA: `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md`
 - Estudio UX: `docs/engineering/estudio-flujo-semi-vs-tops-2026-08-21.md` (**APROBADO**)
 - Plan Track C: `docs/engineering/plan-r12-track-c-frontend-2026-08-21.md`
+- Plan D4 JWT: `docs/engineering/plan-r12-auth-d4-jwt-multiuser-2026-08-22.md` (draft, sin implementar)
+- Plan purge V2: `docs/engineering/plan-r12-pending-delete-v2-purge-2026-08-22.md` (draft, E8 sigue N)
 - Inventario pending-delete: `docs/engineering/pending-delete/inventory-r12-2026-08-21.md`
 - ADR 026: `docs/adr/026-custodia-obligacion-pendiente.md`
 - Relevo: `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md`

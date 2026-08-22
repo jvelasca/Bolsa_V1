@@ -69,3 +69,5 @@ Batería: pytest isolation + test_auth · ruff zona tocada.
 **NO:** JWT · tabla users · `ai_governance` · `contract:gen` · `PAPER_D_EXECUTE` · purge · reescribir ledger/idempotencia.
 
 Tests: foreign deposit → 404; foreign `X-Account-Id` en trade → 404 (no hace falta un trade válido si el Depends corta antes); legacy `user_id=None` deposit sigue 2xx/4xx de negocio, no 404 de owner.
+
+> Plan D4 (JWT / multi-user, post F1–F3): [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](./plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) — draft, sin implementar hasta OK propietario.

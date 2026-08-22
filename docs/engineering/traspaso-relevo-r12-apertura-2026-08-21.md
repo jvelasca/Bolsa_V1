@@ -4,7 +4,7 @@
 > **Propósito:** texto de paso anti-alucinación. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch` + `git rev-parse origin/main` (no asumir SHA de este fichero).
 > **Firma de partida R-12:** `f7a86cc` · Track A+B **`48cc255`** · tag `v1.3.0` → `b778292`.
-> **AsOf:** HEAD local = **`5fe5ace`** · `origin/main` = **`8ab6ef3`** hasta push · tag **`v1.5.0-beta` → `5e52bd6`** (R12-SCHED; **el tag no se mueve**). Track C C1–C5 · copy E8 · leftover CORE-R · gates R12-409 / EXEC-B-CONC / R12-SCHED / **R12-ACCOUNTS** / **R12-AUTH F1+F2+F3** **cerrados**. Pending-delete E8 tests **sin purge**.
+> **AsOf:** HEAD local = **`85c11aa`** · `origin/main` = **`85c11aa`** (push E4 2026-08-22) · tag **`v1.5.0-beta` → `5e52bd6`** (R12-SCHED; **el tag no se mueve**). Track C C1–C5 · copy E8 · leftover CORE-R · gates R12-409 / EXEC-B-CONC / R12-SCHED / **R12-ACCOUNTS** / **R12-AUTH F1+F2+F3** **cerrados**. Pending-delete E8 tests **sin purge**. Planes D4 JWT + purge V2 **draft** (sin implementar).
 
 ---
 
@@ -41,8 +41,8 @@ Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Labo
 ## 3. Texto de paso (pegar en chat nuevo)
 
 > CONTEXTO: Bolsa_V1, R-12. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `plan-r12-track-c-frontend-2026-08-21.md` · `PROJECT_PREMISES.md` ⭐§0 · `PROJECT_STATE.md` §2ac · backlog §0.
-> Firma: `git fetch` + `git rev-parse HEAD origin/main` · `git status`. HEAD local = **`5fe5ace`** · `origin/main` = **`8ab6ef3`** (push pendiente). Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292` intacto. Partida R-12 `f7a86cc`.
-> Hecho: Track C C1–C5 (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9` + gates **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1** `e52e016` · **F2** `9f3354f` · **F3** `5fe5ace` · pending-delete E8 **`851b545`**. Siguiente = **decisión** (JWT/D4 · purge pending-delete); **no auto**. Abrir chat nuevo si este hilo satura. Fuente viva = `origin/main` tras push.
+> Firma: `git fetch` + `git rev-parse HEAD origin/main` · `git status`. HEAD local = **`85c11aa`** · `origin/main` = **`85c11aa`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292` intacto. Partida R-12 `f7a86cc`.
+> Hecho: Track C C1–C5 (`0eb8976`) + leftover CORE-R `8dd3caf` + copy E8 `ce601c9` + gates **R12-409** `eb24608` · **EXEC-B-CONC** `ca60d0a` · **R12-SCHED** `5e52bd6` · **R12-ACCOUNTS** `3c958f1` · **R12-AUTH F1** `e52e016` · **F2** `9f3354f` · **F3** `5fe5ace` · pending-delete E8 **`851b545`**. Planes draft: **D4 JWT** [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](./plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) · **purge V2** [`plan-r12-pending-delete-v2-purge-2026-08-22.md`](./plan-r12-pending-delete-v2-purge-2026-08-22.md). Siguiente = **OK propietario** (Opción A/B/C D4 · métricas purge V2); **no auto**. Abrir chat nuevo si este hilo satura.
 
 ## 4. Siguiente (decisión del propietario)
 

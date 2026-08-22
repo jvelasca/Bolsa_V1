@@ -1,6 +1,6 @@
 # PENDIENTE DE BORRAR — inventario (2026-07-31)
 
-> **AsOf 2026-08-22 (V2 SAFE, sin purge):** E8 sigue **N** para ítems de riesgo alto.
+> **AsOf 2026-08-22 (V2 SAFE, sin purge):** E8 sigue **N** para ítems de riesgo alto. Plan V2: [`plan-r12-pending-delete-v2-purge-2026-08-22.md`](../plan-r12-pending-delete-v2-purge-2026-08-22.md).
 > Hay readers/migradores runtime reales; no hay métrica de blobs, flag de migración
 > completa ni test de ausencia. **NO PURGE. NO wipe localStorage. NO quitar migradores.**
 >
