@@ -4,7 +4,7 @@
 > **Propósito:** texto de paso anti-alucinación. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2ac + premisas ⭐§0 **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch` + `git rev-parse origin/main` (no asumir SHA de este fichero).
 > **Firma de partida R-12:** `f7a86cc` · Track A+B **`48cc255`** · tag `v1.3.0` → `b778292`.
-> **AsOf:** `origin/main` = **`478e504`**. Tag **`v1.5.0-beta` → `5e52bd6`**. Gates R12-ACCOUNTS + R12-AUTH **F1–F10 + F8b** cerrados. D4 **Opción C** · ADR-027 **Aceptado**. Pending-delete E8 **N** (sin purge). Métricas purge V2 **`0763700`**.
+> **AsOf:** `origin/main` = **`c44b924`** (pre F8c–F8e). Tag **`v1.5.0-beta` → `5e52bd6`**. Gates R12-ACCOUNTS + R12-AUTH **F1–F10 + F8b–F8e** cerrados. D4 **Opción C** · ADR-027 **Aceptado**. Pending-delete E8 **N** (sin purge). Ventana purge V2 métricas **abierta 2026-08-22** (`0763700`).
 
 ---
 
@@ -36,6 +36,9 @@
 | R12-AUTH F6+F7a   | `98b4986` | list/get accounts scoped · legacy NULL solo bootstrap/admin         |
 | R12-AUTH F8       | `5e7c67b` | perfiles inversor scoped · job custodia filtra cuentas              |
 | R12-AUTH F8b      | `2cd20b0` | trackers + execution_policies scoped por `principal` (G6)           |
+| R12-AUTH F8c      | `b44cf52` | `platform_events` scoped por principal + stamp writes               |
+| R12-AUTH F8d      | `c697bae` | workspaces `user_id` migración 009 + CRUD scoped                    |
+| R12-AUTH F8e      | `905acee` | list-for-list trackers + bulk schedule evaluate scoped              |
 | R12-AUTH F10      | `837ec85` | `session_version` · JWT `sv` · `/auth/refresh` · rate-limit user    |
 | R12-AUTH F9       | `26494d8` | FE login con campo `login` opcional (JWT)                           |
 | purge V2 métricas | `0763700` | telemetría opt-in legacy storage; **E8 sigue N; sin purge**         |
@@ -51,9 +54,9 @@ Mesa viva: **Trading · Señales · Confirmar · Libro** | herramientas | **Labo
 
 > CONTEXTO: Bolsa_V1, R-12. Lee `docs/engineering/traspaso-relevo-r12-apertura-2026-08-21.md` · `plan-r12-auth-d4-jwt-multiuser-2026-08-22.md` · ADR-027 · `PROJECT_PREMISES.md` ⭐§0 · `PROJECT_STATE.md` §2ac · backlog §0.
 > Firma: `git fetch` + `git rev-parse origin/main` · `git status`. **`origin/main` `478e504`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag `v1.3.0` → `b778292`. Partida R-12 `f7a86cc`.
-> Hecho: … R12-AUTH F1–F10 + F8b · purge V2 métricas `0763700` (E8 N). Siguiente = ventana purge V2 · gaps F8 residuales. **No auto.**
+> Hecho: … R12-AUTH F1–F10 + F8b–F8e · ventana purge V2 (E8 N, sin purge). Defer: `scan.completed` worker async `user_id` NULL. **No auto.**
 
 ## 4. Siguiente (decisión del propietario)
 
-1. **Gaps F8 residuales** — `platform_events` · workspaces sin `user_id` · bulk evaluate trackers sin `trackerId`.
-2. **Purge V2** — ventana métricas (E8 N).
+1. **Monitor ventana purge V2** — 4–8 semanas métricas opt-in (E8 N).
+2. **Opcional:** F7b backfill legacy NULL · retirar fallback `APP_PASSWORD`.

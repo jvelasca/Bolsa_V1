@@ -3,6 +3,7 @@
 > **Padre:** [`pending-delete/README.md`](./pending-delete/README.md) · inventario [`inventory-r12-2026-08-21.md`](./pending-delete/inventory-r12-2026-08-21.md) · plan R-12 [`plan-r12-auditoria-ux-2026-08-21.md`](./plan-r12-auditoria-ux-2026-08-21.md).
 > **Tests protectores:** commit `851b545` — `use-pending-orders.migration.test.ts`, `workspace-legacy-timeframe-favorites.test.ts`.
 > **Re-verificación E8:** 2026-08-22 · HEAD al verificar: `5011ba5`.
+> **Ventana métricas:** **inicio 2026-08-22** (telemetría opt-in desplegada en `0763700`; sin purge).
 > **Resultado:** **0 purges ejecutados.** Ningún ítem de riesgo alto cumple E8 hoy.
 
 ---
@@ -39,21 +40,21 @@
 
 ### 2.1 `readLegacyPendingOrders` + efecto migrador
 
-| Gate                        | Detalle                                                                                                                                                                                           |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Métrica**                 | Telemetría client-side (opt-in o sample): conteo de sesiones con `localStorage["bolsa-trading-ui"]` presente y `state.pendingOrders.length > 0`. Objetivo: **0 blobs activos** durante N semanas. |
-| **Flag migración completa** | Feature flag o constante de build `PENDING_ORDERS_LEGACY_MIGRATION_COMPLETE` tras ventana de métrica; desactiva lectura sin borrar código hasta fase final.                                       |
-| **Test de ausencia**        | Test que falle si `readLegacyPendingOrders` o `localStorage.getItem("bolsa-trading-ui")` reaparece tras purge; mantener `use-pending-orders.migration.test.ts` como regresión hasta el corte.     |
-| **Timeline sugerido**       | T+0 métrica → T+4–8 semanas ventana → flag ON en staging → T+1 semana prod → purge código + tests de ausencia.                                                                                    |
+| Gate                        | Detalle                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Métrica**                 | Telemetría client-side (opt-in o sample): conteo de sesiones con `localStorage["bolsa-trading-ui"]` presente y `state.pendingOrders.length > 0`. Objetivo: **0 blobs activos** durante N semanas. **Opt-in:** `localStorage["bolsa-legacy-storage-metrics"]=1` **o** `VITE_LEGACY_STORAGE_METRICS=1` en build; sample 1% por defecto si no opt-in; dedupe por sesión (`legacy-storage-metrics.ts`). |
+| **Flag migración completa** | Feature flag o constante de build `PENDING_ORDERS_LEGACY_MIGRATION_COMPLETE` tras ventana de métrica; desactiva lectura sin borrar código hasta fase final.                                                                                                                                                                                                                                         |
+| **Test de ausencia**        | Test que falle si `readLegacyPendingOrders` o `localStorage.getItem("bolsa-trading-ui")` reaparece tras purge; mantener `use-pending-orders.migration.test.ts` como regresión hasta el corte.                                                                                                                                                                                                       |
+| **Timeline sugerido**       | T+0 métrica → T+4–8 semanas ventana → flag ON en staging → T+1 semana prod → purge código + tests de ausencia.                                                                                                                                                                                                                                                                                      |
 
 ### 2.2 `readLegacyTimeframeFavorites` + `LEGACY_TIMEFRAME_FAVORITES_KEY`
 
-| Gate                 | Detalle                                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| **Métrica**          | Conteo de `localStorage["bolsa-chart-timeframe-favorites"]` no vacío al primer `normalizeWorkspace`.                           |
-| **Flag**             | `TIMEFRAME_FAVORITES_LEGACY_MIGRATION_COMPLETE` — skip lectura legacy en normalize.                                            |
-| **Test de ausencia** | Fallo de CI si la clave o la función vuelven tras purge; conservar `workspace-legacy-timeframe-favorites.test.ts` hasta corte. |
-| **Timeline**         | Paralelo a 2.1; puede unificarse en un solo “storage legacy purge” gate.                                                       |
+| Gate                 | Detalle                                                                                                                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Métrica**          | Conteo de `localStorage["bolsa-chart-timeframe-favorites"]` no vacío al primer `normalizeWorkspace`. **Opt-in:** misma clave `bolsa-legacy-storage-metrics=1` o `VITE_LEGACY_STORAGE_METRICS=1`. |
+| **Flag**             | `TIMEFRAME_FAVORITES_LEGACY_MIGRATION_COMPLETE` — skip lectura legacy en normalize.                                                                                                              |
+| **Test de ausencia** | Fallo de CI si la clave o la función vuelven tras purge; conservar `workspace-legacy-timeframe-favorites.test.ts` hasta corte.                                                                   |
+| **Timeline**         | Paralelo a 2.1; puede unificarse en un solo “storage legacy purge” gate.                                                                                                                         |
 
 ### 2.3 Campos workspace (`chartDataStrip`, `chartNewTabSeed`, `newChartConfigSource`)
 
@@ -80,30 +81,35 @@
 
 ---
 
-## 4. Tests ejecutados (protectores, sin cambios de código)
+## 4. Tests ejecutados (protectores + métricas, sin cambios de código purge)
 
 ```bash
 pnpm --filter @bolsa/web exec vitest run \
+  src/lib/legacy-storage-metrics.test.ts \
   src/features/trading/use-pending-orders.migration.test.ts \
   src/stores/workspace-legacy-timeframe-favorites.test.ts
 ```
 
-Resultado: **9/9 passed** (2 files, 1.57s).
+Resultado ventana **2026-08-22:** ver §5 (batería ampliada con `legacy-storage-metrics.test.ts`).
 
 ---
 
 ## 5. Resultados de batería (2026-08-22)
 
-| Suite                                          | Tests | Resultado   |
-| ---------------------------------------------- | ----- | ----------- |
-| `use-pending-orders.migration.test.ts`         | 4     | ✅ pass     |
-| `workspace-legacy-timeframe-favorites.test.ts` | 5     | ✅ pass     |
-| **Total**                                      | **9** | **✅ pass** |
+| Suite                                          | Tests  | Resultado   |
+| ---------------------------------------------- | ------ | ----------- |
+| `legacy-storage-metrics.test.ts`               | 6      | ✅ pass     |
+| `use-pending-orders.migration.test.ts`         | 4      | ✅ pass     |
+| `workspace-legacy-timeframe-favorites.test.ts` | 5      | ✅ pass     |
+| **Total ventana 2026-08-22**                   | **15** | **✅ pass** |
+
+> Re-ejecutar la batería §4 tras cada hito de ventana; actualizar conteos en esta tabla.
 
 ---
 
 ## 6. Próximo paso (coordinador)
 
-1. ~~Aprobar instrumentación de métricas (§2.1–2.3) sin tocar migradores.~~ **Métricas implementadas (2026-08-22):** `apps/web/src/lib/legacy-storage-metrics.ts` — opt-in (`localStorage["bolsa-legacy-storage-metrics"]=1` o `VITE_LEGACY_STORAGE_METRICS=1`), sample 1% por defecto, dedupe por sesión; hooks en `use-pending-orders.ts`, `normalizeWorkspace`, `mergeWorkspaceChartState`; tests `legacy-storage-metrics.test.ts`.
-2. Tras ventana + flag, re-ejecutar subagente purge con este plan como checklist.
-3. **Prohibido:** wipe `localStorage`, quitar migradores, o borrar `chart-inspector-nav.ts` / `presetRuleGroups` sin E8 completo.
+1. ~~Aprobar instrumentación de métricas (§2.1–2.3) sin tocar migradores.~~ **Métricas implementadas (2026-08-22):** `apps/web/src/lib/legacy-storage-metrics.ts` — opt-in (`localStorage["bolsa-legacy-storage-metrics"]=1` o `VITE_LEGACY_STORAGE_METRICS=1`), sample 1% por defecto, dedupe por sesión; hooks en `use-pending-orders.ts`, `normalizeWorkspace`, `mergeWorkspaceChartState`; tests `legacy-storage-metrics.test.ts`. **Ventana métricas abierta 2026-08-22** — recopilar telemetría 4–8 semanas antes de flags/purge.
+2. Monitorear métricas (opt-in manual o sample) hasta objetivo §2.1–2.3 (**0 blobs activos** en ventana acordada).
+3. Tras ventana + flags (`PENDING_ORDERS_LEGACY_MIGRATION_COMPLETE`, etc.), re-ejecutar subagente purge con este plan como checklist.
+4. **Prohibido:** wipe `localStorage`, quitar migradores, o borrar `chart-inspector-nav.ts` / `presetRuleGroups` sin E8 completo.

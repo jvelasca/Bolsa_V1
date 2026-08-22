@@ -219,7 +219,7 @@ F1–F3 entregaron **aislamiento mecánico** sin identidad real:
 
 ### F8 — Recursos colaterales (`investor_profiles`, trackers, policies, events)
 
-**Estado:** **✅ CERRADA** (`5e7c67b` + **F8b** `2cd20b0`) — perfiles inversor + job custodia + **trackers/policies scoped**. **Gaps residuales:** `platform_events` · workspaces · bulk `POST /trackers/schedules/evaluate` sin `trackerId`.
+**Estado:** **✅ CERRADA** (`5e7c67b` + **F8b** `2cd20b0` + **F8e** 2026-08-22) — perfiles inversor + job custodia + **trackers/policies scoped**. **Gaps residuales:** `platform_events` · workspaces.
 
 **F8b (trackers + execution_policies):** list/create/get/update/delete scoped por `principal`; repos filtran owner + F7a legacy NULL; tests `test_trackers_policies_isolation.py` (7 passed).
 
