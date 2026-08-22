@@ -3,7 +3,7 @@
 ## Estado
 
 **Aceptado** — 2026-08-22  
-(**F5–F10 + F8b–F8e en `main` (`01ee1ae`). Defer: `scan.completed` worker async. Fallback APP_PASSWORD intacto.**)
+(**F5–F10 + F8b–F8e en `main` (`656a4bd`). Defer: `scan.completed` worker async. Fallback APP_PASSWORD intacto.**)
 
 **Decisión del propietario (2026-08-22):** **Opción C (híbrido)** — fases incrementales C.1 → C.2 → C.3 documentadas en [`plan-r12-auth-d4-jwt-multiuser-2026-08-22.md`](../engineering/plan-r12-auth-d4-jwt-multiuser-2026-08-22.md) §3.
 

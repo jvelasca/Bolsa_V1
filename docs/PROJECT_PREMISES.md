@@ -9,7 +9,7 @@
 
 ## ⭐ PREMISAS ESENCIALES ACTUALES (2026-08-22) — leer primero en TODO trabajo
 
-> **AsOf:** 2026-08-22 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` → **`01ee1ae`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **BETA / NO en producción**.
+> **AsOf:** 2026-08-22 · **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) rama **`main`**. SHA vivo = `git fetch && git rev-parse origin/main` → **`656a4bd`**. Tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`** intacto · **BETA / NO en producción**.
 > **Contexto:** R-9 · R-10/v1.2.1 · R-11/v1.3.0 **CERRADAS**. Relevo UNO+DOS del plan post-v1.3.0 **EJECUTADOS** (`f7a4ab0`, `f7a86cc`). Ciclo vivo: **R-12** (`docs/engineering/plan-r12-auditoria-ux-2026-08-21.md`).
 > **Ancla anti-alucinación:** `docs/engineering/estado-verificado-auditoria-vs-main-2026-08-21.md`. Una auditoría externa del 2026-08-21 evaluó `75e8c23` (14 commits atrás de `49ecbcd`); una re-auditoría posterior evaluó ~`49ecbcd` y **no ve** Relevo UNO/DOS. El SHA que un agente debe usar es **`origin/main` + `PROJECT_STATE.md` / backlog §0**, no un SHA histórico incrustado en un traspaso.
 > **Idea del proyecto (invariante de producto):** embudo backtesting científico → IA gobernada (LLM propone, motor determinista decide) → confirmación humana → paper. Integridad financiera y trazabilidad son el valor central. Se puede refactorizar lo que haga falta **mientras se preserve esa idea**.
