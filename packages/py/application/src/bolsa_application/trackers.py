@@ -111,8 +111,18 @@ class ListTrackerDefinitionsForList:
     def __init__(self, repository: TrackerDefinitionRepository) -> None:
         self._repository = repository
 
-    async def execute(self, list_id: str, *, limit: int = 50) -> list[TrackerDefinitionRecord]:
-        return await self._repository.list_trackers_for_list(list_id, limit=limit)
+    async def execute(
+        self,
+        list_id: str,
+        *,
+        limit: int = 50,
+        owner_user_id: str | None = None,
+    ) -> list[TrackerDefinitionRecord]:
+        return await self._repository.list_trackers_for_list(
+            list_id,
+            limit=limit,
+            owner_user_id=owner_user_id,
+        )
 
 
 class GetTrackerDefinition:

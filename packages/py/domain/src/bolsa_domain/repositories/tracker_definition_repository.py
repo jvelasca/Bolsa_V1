@@ -14,7 +14,11 @@ class TrackerDefinitionRepository(Protocol):
     ) -> list[TrackerDefinitionRecord]: ...
 
     async def list_trackers_for_list(
-        self, list_id: str, *, limit: int = 50
+        self,
+        list_id: str,
+        *,
+        limit: int = 50,
+        owner_user_id: str | None = None,
     ) -> list[TrackerDefinitionRecord]: ...
 
     async def get_tracker(self, tracker_id: str) -> TrackerDefinitionRecord | None: ...

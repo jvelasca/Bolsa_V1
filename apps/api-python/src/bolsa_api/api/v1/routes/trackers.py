@@ -109,7 +109,11 @@ async def evaluate_tracker_schedules(
         existing = await get_use_case.execute(tracker_id)
         _require_tracker_access(existing, principal)
     use_case: ProcessTrackerSchedules = get_process_tracker_schedules_use_case(session)
-    result = await use_case.execute(tracker_id=tracker_id, force=force)
+    result = await use_case.execute(
+        tracker_id=tracker_id,
+        force=force,
+        owner_user_id=principal,
+    )
     return EvaluateTrackerSchedulesResponseDto(
         data={
             "checkedCount": result.checked_count,

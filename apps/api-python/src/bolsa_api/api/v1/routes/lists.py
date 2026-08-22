@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
@@ -16,6 +16,7 @@ from bolsa_api.api.dependencies import (
     get_list_trackers_for_list_use_case,
     get_remove_instrument_from_list_use_case,
 )
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.schemas.instrument_lifecycle import (
     RemoveInstrumentFromListRequestDto,
     RemoveInstrumentFromListResponseDto,
@@ -181,14 +182,16 @@ async def get_list_quotes(
 @router.get("/lists/{list_id}/trackers", response_model=TrackerDefinitionDetailsListResponseDto)
 async def get_list_trackers(
     list_id: str,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TrackerDefinitionDetailsListResponseDto:
+    principal = get_request_principal(request)
     repo = get_list_repository(session)
     detail = await GetInstrumentList(repo).execute(list_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="List not found")
     use_case: ListTrackerDefinitionsForList = get_list_trackers_for_list_use_case(session)
-    records = await use_case.execute(list_id, limit=50)
+    records = await use_case.execute(list_id, limit=50, owner_user_id=principal)
     return TrackerDefinitionDetailsListResponseDto(
         data=[_tracker_detail(record) for record in records],
     )

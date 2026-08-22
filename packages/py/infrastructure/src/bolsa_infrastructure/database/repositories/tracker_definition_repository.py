@@ -62,6 +62,7 @@ class SqlAlchemyTrackerDefinitionRepository:
         list_id: str,
         *,
         limit: int = 50,
+        owner_user_id: str | None = None,
     ) -> list[TrackerDefinitionRecord]:
         stmt = (
             select(TrackerDefinitionRow)
@@ -69,6 +70,8 @@ class SqlAlchemyTrackerDefinitionRepository:
             .order_by(TrackerDefinitionRow.updated_at.desc())
             .limit(limit)
         )
+        if owner_user_id is not None:
+            stmt = stmt.where(_owner_visibility_clause(owner_user_id))
         result = await self._session.execute(stmt)
         return [self._map(row) for row in result.scalars().all()]
 

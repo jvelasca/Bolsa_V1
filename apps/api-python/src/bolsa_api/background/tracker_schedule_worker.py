@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 async def _run_tracker_schedules_once(session_factory: async_sessionmaker[AsyncSession]) -> int:
     async with session_factory() as session:
         try:
-            result = await get_process_tracker_schedules_use_case(session).execute()
+            result = await get_process_tracker_schedules_use_case(session).execute(
+                owner_user_id=get_settings().owner_principal(),
+            )
             await session.commit()
             if result.enqueued_count:
                 logger.info(

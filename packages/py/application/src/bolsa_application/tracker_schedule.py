@@ -116,12 +116,17 @@ class ProcessTrackerSchedules:
         *,
         tracker_id: str | None = None,
         force: bool = False,
+        owner_user_id: str | None = None,
     ) -> ProcessTrackerSchedulesResult:
         if tracker_id is not None:
             tracker = await self._trackers.get_tracker(tracker_id)
             candidates = [tracker] if tracker is not None else []
         else:
-            candidates = await self._trackers.list_trackers(limit=200, enabled_only=True)
+            candidates = await self._trackers.list_trackers(
+                limit=200,
+                enabled_only=True,
+                owner_user_id=owner_user_id,
+            )
 
         runs: list[TrackerScheduleRunResult] = []
         enqueued = 0
