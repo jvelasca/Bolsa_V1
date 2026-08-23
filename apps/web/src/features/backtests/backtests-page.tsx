@@ -55,13 +55,8 @@ import {
   type ExplorePresetRow,
   type ExploreSortKey,
 } from "@/features/backtests/backtest-explore-value";
-import {
-  buildOptimizeBeforeAfter,
-  type OptimizeBeforeAfterSnapshot,
-} from "@/features/backtests/backtest-optimize-delta";
-import { BacktestOptimizeCompareCard } from "@/features/backtests/backtest-optimize-compare-card";
+import { type OptimizeBeforeAfterSnapshot } from "@/features/backtests/backtest-optimize-delta";
 import type { LabBoardZone } from "@/features/backtests/backtest-lab-board-types";
-import { BacktestOptimizePanel } from "@/features/backtests/backtest-optimize-panel";
 import {
   buildOptimizeSeedFromRun,
   type OptimizeSeed,
@@ -117,7 +112,6 @@ import {
   openHelpAiPlatform,
   useSupervisedF3QueueStore,
 } from "@/stores/supervised-f3-queue-store";
-import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/lib/use-media-query";
 import {
   DEFAULT_PERIOD_PRESET,
@@ -134,6 +128,10 @@ import {
   createBacktestLabNavigationHandlers,
 } from "@/features/backtests/lib/backtest-lab-handlers";
 import { createBacktestPageNavigation } from "@/features/backtests/lib/backtest-page-navigation";
+import {
+  BacktestsPageJobsTab,
+  type BacktestPageJobsViewModel,
+} from "@/features/backtests/backtests-page-jobs-tab";
 import {
   BacktestsPageRunTab,
   type BacktestPageViewModel,
@@ -1429,6 +1427,27 @@ export function BacktestsPage() {
     zonePrefs,
   };
 
+  const jobsTabVm: BacktestPageJobsViewModel = {
+    coachProfilePolicy,
+    instrumentId,
+    instrumentsQuery,
+    labZones,
+    optimizeCompare,
+    optimizeSeed,
+    runMutation,
+    setInitialCash,
+    setInstrumentId,
+    setOptimizeCompare,
+    setOptimizeSeed,
+    setPeriodPreset,
+    setResultFocus,
+    setRunSource,
+    setRunTimeframe,
+    setSavedStrategyId,
+    setTab,
+    setUniverseMode,
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       {diaDVerifyFullBleed ? <DiaDVerifyHost fullBleed /> : null}
@@ -1565,96 +1584,7 @@ export function BacktestsPage() {
 
           {tab === "run" && <BacktestsPageRunTab vm={runTabVm} />}
 
-          {tab === "jobs" && (
-            <div className="mx-auto min-h-0 w-full max-w-[1600px] flex-1 space-y-4 overflow-auto px-1">
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold tracking-tight">
-                    Lab · Optimizar
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Mismo Lab del embudo Coach → Finalistas. Busca Mejor ≥ ancla
-                    (OOS); no escribe Finalistas.
-                  </p>
-                </div>
-                {!optimizeSeed && !(labZones ?? []).some((z) => z.seed) && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setTab("run");
-                      setResultFocus("coach");
-                    }}
-                  >
-                    Ir al Coach
-                  </Button>
-                )}
-              </div>
-              {!optimizeSeed && !(labZones ?? []).some((z) => z.seed) && (
-                <div className="rounded-lg border border-dashed border-border bg-muted/10 px-4 py-3 text-sm">
-                  <p className="font-medium text-foreground">
-                    Sin semilla cargada
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Desde Probar → Coach: «Pasar al Lab» o «Abrir Lab · #1».
-                    También puedes elegir instrumento abajo y lanzar a mano.
-                  </p>
-                </div>
-              )}
-              {optimizeCompare && (
-                <BacktestOptimizeCompareCard
-                  snapshot={optimizeCompare}
-                  onDismiss={() => setOptimizeCompare(null)}
-                  onBackToCoach={() => {
-                    setTab("run");
-                    setResultFocus("coach");
-                  }}
-                />
-              )}
-              <BacktestOptimizePanel
-                instruments={instrumentsQuery.data?.data ?? []}
-                defaultInstrumentId={instrumentId}
-                seed={optimizeSeed}
-                maxDrawdownSoftPct={coachProfilePolicy.maxDrawdownSoftPct}
-                profileId={coachProfilePolicy.profileId}
-                profileHorizon={coachProfilePolicy.horizon}
-                profileRiskTolerance={coachProfilePolicy.riskTolerance}
-                onClearSeed={() => setOptimizeSeed(null)}
-                onOptimizeComplete={({ seed: doneSeed, result }) => {
-                  const snap = buildOptimizeBeforeAfter(doneSeed, result);
-                  if (snap) setOptimizeCompare(snap);
-                }}
-                onAdoptedStrategy={({
-                  strategyId,
-                  instrumentId: nextInstrumentId,
-                  initialCash: cash,
-                  timeframe,
-                  barLimit,
-                  labEvidence,
-                }) => {
-                  setSavedStrategyId(strategyId);
-                  setRunSource("saved");
-                  setInstrumentId(nextInstrumentId);
-                  setInitialCash(String(cash));
-                  setRunTimeframe(timeframe);
-                  setPeriodPreset("all");
-                  setUniverseMode("single");
-                  setTab("run");
-                  setResultFocus("detail");
-                  // Full lab window so indicators warm up. Lab provenance → trial.blocks (P9).
-                  runMutation.mutate({
-                    strategyDefinitionId: strategyId,
-                    instrumentId: nextInstrumentId,
-                    initialCash: cash,
-                    timeframe,
-                    limit: barLimit && barLimit > 0 ? barLimit : 10_000,
-                    labEvidence: labEvidence ?? null,
-                  });
-                }}
-              />
-            </div>
-          )}
+          {tab === "jobs" && <BacktestsPageJobsTab vm={jobsTabVm} />}
 
           {tab === "strategies" && (
             <BacktestLibraryTab
