@@ -10,11 +10,15 @@
 import {
   parseTab,
   isAnalysisResultFocus,
-  type HubTab as HubTabNav,
-  type RunSource as RunSourceNav,
-  type ResultFocus as ResultFocusNav,
-  type UniverseMode as UniverseModeNav,
 } from "@/features/backtests/backtest-hub-nav";
+import {
+  STRATEGY_OPTIONS,
+  type HubTab,
+  type ResultFocus,
+  type RunSource,
+  type StrategiesListFilter,
+  type UniverseMode,
+} from "@/features/backtests/backtests-page.constants";
 import { BacktestHubTabsBar } from "@/features/backtests/backtest-hub-tabs";
 import {
   useMutation,
@@ -194,10 +198,7 @@ import {
 } from "@/features/backtests/backtest-export";
 import { BacktestUniversePicker } from "@/features/backtests/backtest-universe-picker";
 import { BacktestStrategyMatrixPanel } from "@/features/backtests/backtest-strategy-matrix-panel";
-import {
-  BacktestLibraryTab,
-  type StrategiesListFilter as LibraryStrategiesListFilter,
-} from "@/features/backtests/backtest-library-tab";
+import { BacktestLibraryTab } from "@/features/backtests/backtest-library-tab";
 import {
   parseLibraryFilterParam,
   parseLibraryNavFromSearch,
@@ -270,18 +271,6 @@ import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
 import { createBacktestOrchestration } from "@/features/backtests/lib/backtest-orchestration";
-
-const STRATEGY_OPTIONS = Object.entries(BACKTEST_STRATEGIES) as [
-  BacktestStrategyType,
-  { label: string; description: string },
-][];
-
-type HubTab = HubTabNav;
-type RunSource = RunSourceNav;
-type ResultFocus = ResultFocusNav;
-type UniverseMode = UniverseModeNav;
-
-type StrategiesListFilter = LibraryStrategiesListFilter;
 
 export function BacktestsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
