@@ -119,7 +119,7 @@ export function useBacktestUrlSync(params: UseBacktestUrlSyncParams): void {
     patchSearchParams((params) => {
       params.delete("verify");
     });
-    // patchSearchParams se redefine cada render (función declarada en el componente);
+    // patchSearchParams se redefine cada render (factory cada render);
     // añadirla como dep re-dispararía el effect. El guard `searchParams` basta.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, onBacktestsRoute, diaDVerifySession]);

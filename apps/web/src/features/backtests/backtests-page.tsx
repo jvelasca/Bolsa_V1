@@ -13,7 +13,6 @@ import {
 } from "@/features/backtests/backtest-hub-nav";
 import {
   STRATEGY_OPTIONS,
-  type HubTab,
   type ResultFocus,
   type RunSource,
   type StrategiesListFilter,
@@ -250,6 +249,7 @@ import { UniverseChip } from "@/features/platform/universe-chip";
 import { setAdoption } from "@/features/platform/strategy-adoption";
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
 import { createBacktestOrchestration } from "@/features/backtests/lib/backtest-orchestration";
+import { createBacktestPageNavigation } from "@/features/backtests/lib/backtest-page-navigation";
 
 export function BacktestsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -460,6 +460,7 @@ export function BacktestsPage() {
   );
   const batchAbortRef = useRef<AbortController | null>(null);
   const exploreAbortRef = useRef<AbortController | null>(null);
+  const lastBatteryFingerprintRef = useRef<string | null>(null);
 
   const isWide = useMediaQuery("(min-width: 1024px)");
 
@@ -531,74 +532,53 @@ export function BacktestsPage() {
 
   // B3: helpers de nav antes del hook de mutations (antes vivían después;
   // function declarations se hoist-eaban; el hook necesita params explícitos).
-  function patchSearchParams(
-    mutate: (params: URLSearchParams) => void,
-    opts?: { replace?: boolean },
-  ) {
-    // Keep-alive fuera de /backtests: no pisar la URL de Trading/otros hubs.
-    if (!pathname.startsWith("/backtests")) return;
-    // Updater funcional: evita carrera entre setTab + selectInstrument (mismo
-    // searchParams stale → instrumentId se queda en el valor anterior, p.ej. AENA).
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        mutate(next);
-        return next;
-      },
-      { replace: opts?.replace },
-    );
-  }
-
-  /** Abre Biblioteca con filtro / foco (entra en historial ←→). */
-  function openLibrary(opts?: {
-    library?: StrategiesListFilter;
-    strategyId?: string | null;
-    preset?: string | null;
-    q?: string | null;
-  }) {
-    const library = opts?.library ?? "mine";
-    setStrategiesListFilter(library);
-    setLibraryFocusStrategyId(opts?.strategyId ?? null);
-    setLibraryFocusPreset(opts?.preset ?? null);
-    if (opts?.q != null) {
-      setMineFilters((prev) => ({ ...prev, query: opts.q ?? "" }));
-    }
-    patchSearchParams((params) => {
-      params.set("tab", "strategies");
-      params.set("library", library);
-      if (opts?.strategyId) params.set("strategyId", opts.strategyId);
-      else params.delete("strategyId");
-      if (opts?.preset) params.set("preset", opts.preset);
-      else params.delete("preset");
-      if (opts?.q?.trim()) params.set("q", opts.q.trim());
-      else if (opts?.q === "") params.delete("q");
-    });
-  }
-
-  function setTab(next: HubTab) {
-    patchSearchParams((params) => {
-      params.set("tab", next);
-    });
-  }
-
-  function selectRun(
-    id: string,
-    options?: { tab?: HubTab; openAnalysis?: boolean; focus?: ResultFocus },
-  ) {
-    setSelectedId(id);
-    if (options?.openAnalysis) setPreferOpenAnalysis(true);
-    else setPreferOpenAnalysis(false);
-    if (options?.focus) setResultFocus(options.focus);
-    patchSearchParams((params) => {
-      params.set("runId", id);
-      params.set("tab", options?.tab ?? "run");
-      if (options?.focus) params.set("focus", options.focus);
-      if (options?.openAnalysis) params.set("openAnalysis", "1");
-      else params.delete("openAnalysis");
-      // Ver / checklist = Análisis técnico normal (no Verificar D→hoy).
-      params.delete("verify");
-    });
-  }
+  // B6: factory cada render (no hoist); el orden queries → nav → mutations se mantiene.
+  const {
+    patchSearchParams,
+    openLibrary,
+    setTab,
+    selectRun,
+    selectInstrument,
+    openInstrumentInValor,
+  } = createBacktestPageNavigation({
+    pathname,
+    setSearchParams,
+    setStrategiesListFilter,
+    setLibraryFocusStrategyId,
+    setLibraryFocusPreset,
+    setMineFilters,
+    setSelectedId,
+    setPreferOpenAnalysis,
+    setResultFocus,
+    instrumentId,
+    exploreAbortRef,
+    setExploreRunning,
+    setExploreRows,
+    setExploreProgress,
+    setExploreError,
+    setBatchRows,
+    setBatchError,
+    setFocusTimestamp,
+    setOptimizeSeed,
+    setLabZones,
+    setCoachPass,
+    setOptimizeCompare,
+    lastBatteryFingerprintRef,
+    setAssistantProgress,
+    setAwaitingAck,
+    setAwaitingAckStage,
+    setLabImprovedThisCycle,
+    setSemifinalShortcutArmed,
+    setLabOpenedThisRun,
+    assistantChainRef,
+    setAssistantFocus,
+    fullCycleActive,
+    listAutoRef,
+    setFullCycleActive,
+    setAssistantStatus,
+    setInstrumentId,
+    setUniverseMode,
+  });
 
   const {
     runMutation,
@@ -738,7 +718,6 @@ export function BacktestsPage() {
     runTimeframe,
   ].join("|");
   const matrixFingerprintRef = useRef(matrixRunFingerprint);
-  const lastBatteryFingerprintRef = useRef<string | null>(null);
   useEffect(() => {
     if (matrixFingerprintRef.current === matrixRunFingerprint) return;
     matrixFingerprintRef.current = matrixRunFingerprint;
@@ -757,102 +736,6 @@ export function BacktestsPage() {
       })),
     );
   }, [matrixRunFingerprint]);
-
-  // Al elegir un valor: Detalle con vista previa (gráfico + B&H).
-  function selectInstrument(
-    id: string,
-    opts?: {
-      forceClear?: boolean;
-      preserveListAutoFocus?: boolean;
-      skipUrl?: boolean;
-    },
-  ) {
-    const changed = opts?.forceClear || id !== instrumentId;
-    // Siempre limpiar el run seleccionado al cambiar (evita carrera con ?runId= en la URL).
-    if (changed) {
-      // En Lista AUTO no abortamos aquí si vamos a omitir: el arranque explícito
-      // gestiona el ciclo. Abort sí al cambiar de valor a mano.
-      if (!opts?.preserveListAutoFocus) {
-        exploreAbortRef.current?.abort();
-      }
-      setExploreRunning(false);
-      setExploreRows([]);
-      setExploreProgress({ done: 0, total: 0 });
-      setExploreError(null);
-      setBatchRows([]);
-      setBatchError(null);
-      setFocusTimestamp(null);
-      setOptimizeSeed(null);
-      setLabZones(null);
-      setCoachPass("initial");
-      setOptimizeCompare(null);
-      lastBatteryFingerprintRef.current = null;
-      setAssistantProgress(emptyAssistantProgress());
-      setAwaitingAck(false);
-      setAwaitingAckStage(null);
-      setLabImprovedThisCycle(0);
-      setSemifinalShortcutArmed(false);
-      setLabOpenedThisRun(false);
-      assistantChainRef.current = "";
-      setAssistantFocus(null);
-      if (fullCycleActive && !listAutoRef.current) {
-        setFullCycleActive(false);
-        setAssistantStatus(
-          "Instrumento cambiado · ciclo reiniciado. Pulsa Play.",
-        );
-      }
-    }
-    setSelectedId(null);
-    setInstrumentId(id);
-    if (!opts?.preserveListAutoFocus) {
-      setResultFocus("detail");
-    }
-    // Un solo patch URL: setTab + patch en paralelo pisaban instrumentId (stale).
-    if (!opts?.skipUrl) {
-      patchSearchParams((params) => {
-        if (id) params.set("instrumentId", id);
-        else params.delete("instrumentId");
-        params.delete("runId");
-        params.set("tab", "run");
-        if (!opts?.preserveListAutoFocus) {
-          params.set("focus", "detail");
-        }
-      });
-    } else {
-      setTab("run");
-    }
-  }
-
-  /** Desde lista / tablero AUTO / ranking → pestaña Universo Valor + Detalle. */
-  function openInstrumentInValor(
-    id: string,
-    opts?: { runId?: string | null; soft?: boolean },
-  ) {
-    if (!id) return;
-    const campaignLive = Boolean(
-      listAutoRef.current && !listAutoRef.current.aborted,
-    );
-    const soft = Boolean(opts?.soft) || campaignLive;
-    setUniverseMode("single");
-    if (soft) {
-      // No tumba ranking / campaña AUTO: solo cambia el valor activo.
-      setInstrumentId(id);
-      setSelectedId(opts?.runId ?? null);
-      setResultFocus("detail");
-      setTab("run");
-    } else {
-      selectInstrument(id, { skipUrl: true });
-      if (opts?.runId) setSelectedId(opts.runId);
-      setResultFocus("detail");
-    }
-    patchSearchParams((params) => {
-      params.set("instrumentId", id);
-      params.set("focus", "detail");
-      params.set("tab", "run");
-      if (opts?.runId) params.set("runId", opts.runId);
-      else params.delete("runId");
-    });
-  }
 
   useEffect(() => {
     return () => {
