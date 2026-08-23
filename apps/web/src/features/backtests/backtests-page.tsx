@@ -22,6 +22,7 @@ import {
 import { useBacktestPageQueries } from "@/features/backtests/hooks/use-backtest-page-queries";
 import { useBacktestPageMutations } from "@/features/backtests/hooks/use-backtest-page-mutations";
 import { useBacktestDerivedData } from "@/features/backtests/hooks/use-backtest-derived-data";
+import { useBacktestUrlSync } from "@/features/backtests/hooks/use-backtest-url-sync";
 import { BacktestHubTabsBar } from "@/features/backtests/backtest-hub-tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -185,10 +186,7 @@ import {
 import { BacktestUniversePicker } from "@/features/backtests/backtest-universe-picker";
 import { BacktestStrategyMatrixPanel } from "@/features/backtests/backtest-strategy-matrix-panel";
 import { BacktestLibraryTab } from "@/features/backtests/backtest-library-tab";
-import {
-  parseLibraryFilterParam,
-  parseLibraryNavFromSearch,
-} from "@/features/backtests/library-nav";
+import { parseLibraryFilterParam } from "@/features/backtests/library-nav";
 import { BacktestHistoryTab } from "@/features/backtests/backtest-history-tab";
 import {
   STRATEGY_MATRIX_MAX_SELECTED,
@@ -1480,142 +1478,29 @@ export function BacktestsPage() {
     proposeFinalistMutation.mutate(slot);
   }
 
-  // Deep-link: ?focus=finalists|coach|lab|detail|fundamental (solo en /backtests)
-  useEffect(() => {
-    if (!onBacktestsRoute) return;
-    const focus = searchParams.get("focus");
-    if (
-      focus === "coach" ||
-      focus === "lab" ||
-      focus === "finalists" ||
-      focus === "detail" ||
-      focus === "fundamental" ||
-      focus === "ranking" ||
-      focus === "list_auto"
-    ) {
-      setResultFocus(focus);
-    }
-  }, [searchParams, onBacktestsRoute]);
-
-  // ADR-019 U2: ?verify=1 → Análisis técnico + host Verificar (sesión LAB)
-  useEffect(() => {
-    if (!onBacktestsRoute) return;
-    if (searchParams.get("verify") !== "1") return;
-    setTab("run");
-    setResultFocus("detail");
-    // setTab/setResultFocus son setters estables de estado; no requieren dep.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, onBacktestsRoute]);
-
-  // Si la URL pide verify pero no hay sesión LAB, quitar el flag (evita pantallas rotas).
-  useEffect(() => {
-    if (!onBacktestsRoute) return;
-    if (searchParams.get("verify") !== "1") return;
-    if (diaDVerifySession) return;
-    patchSearchParams((params) => {
-      params.delete("verify");
-    });
-    // patchSearchParams se redefine cada render (función declarada en el componente);
-    // añadirla como dep re-dispararía el effect. El guard `searchParams` basta.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, onBacktestsRoute, diaDVerifySession]);
-
-  // Deep-link Biblioteca: ?tab=strategies&library=&strategyId=&preset=&q=
-  useEffect(() => {
-    if (!onBacktestsRoute) return;
-    const nav = parseLibraryNavFromSearch(searchParams);
-    if (!nav) {
-      setLibraryFocusStrategyId(null);
-      setLibraryFocusPreset(null);
-      return;
-    }
-    setStrategiesListFilter(nav.library);
-    setLibraryFocusStrategyId(nav.strategyId ?? null);
-    setLibraryFocusPreset(nav.preset ?? null);
-    if (nav.q != null) {
-      setMineFilters((prev) =>
-        prev.query === nav.q ? prev : { ...prev, query: nav.q ?? "" },
-      );
-    }
-  }, [searchParams, onBacktestsRoute]);
-
-  // Deep-link: ?focus=monitor → abrir Monitor Finalistas (CORE-R cola)
-  useEffect(() => {
-    if (!onBacktestsRoute) return;
-    if (searchParams.get("focus") !== "monitor") return;
-    setTab("run");
-    const id = window.setTimeout(() => {
-      const el = document.getElementById("strategy-monitor-hub");
-      const details = el?.closest("details");
-      if (details) details.open = true;
-      el?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
-    return () => window.clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, onBacktestsRoute]);
-
-  // Deep-link: ?openAnalysis=1 (+ runId) → abrir checklist paper (Camino A).
-  useEffect(() => {
-    if (!onBacktestsRoute || !runIdFromUrl) return;
-    if (isOpenAnalysisQuery(searchParams.get("openAnalysis"))) {
-      setPreferOpenAnalysis(true);
-    }
-  }, [searchParams, runIdFromUrl, onBacktestsRoute]);
-
-  useEffect(() => {
-    if (!onBacktestsRoute) return;
-    // Durante Lista AUTO el valor lo marca la campaña; no dejar que un ?instrumentId=
-    // viejo (p.ej. AENA) revierta el estado entre tickers.
-    if (listAutoRef.current && !listAutoRef.current.aborted) return;
-    const fromUrl = searchParams.get("instrumentId");
-    if (fromUrl && fromUrl !== instrumentId) {
-      setInstrumentId(fromUrl);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, onBacktestsRoute]);
-
-  // Deep-link: /backtests?listId=… (hub Listas → Backtesting).
-  const appliedListIdFromUrlRef = useRef(false);
-  useEffect(() => {
-    if (!onBacktestsRoute || appliedListIdFromUrlRef.current) return;
-    const fromUrl = searchParams.get("listId")?.trim();
-    if (!fromUrl) return;
-    const lists = listsQuery.data?.data ?? [];
-    if (!listsQuery.isSuccess) return;
-    if (!lists.some((list) => list.id === fromUrl)) return;
-    appliedListIdFromUrlRef.current = true;
-    setUniverseMode("list");
-    setListId(fromUrl);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("listId");
-        if (!next.get("tab")) next.set("tab", "run");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [
+  useBacktestUrlSync({
     onBacktestsRoute,
     searchParams,
-    listsQuery.isSuccess,
-    listsQuery.data,
+    setResultFocus,
+    setTab,
+    patchSearchParams,
+    diaDVerifySession,
+    setStrategiesListFilter,
+    setLibraryFocusStrategyId,
+    setLibraryFocusPreset,
+    setMineFilters,
+    setPreferOpenAnalysis,
+    runIdFromUrl,
+    listAutoRef,
+    instrumentId,
+    setInstrumentId,
+    listsQuery,
+    setUniverseMode,
+    setListId,
     setSearchParams,
-  ]);
-
-  // Deep-link: /backtests?runId=… (Research → resultado).
-  // Solo reacciona a cambios de la URL — no re-aplicar un runId viejo cuando
-  // selectInstrument ya puso selectedId=null y el patch de URL aún no ha llegado.
-  useEffect(() => {
-    if (!onBacktestsRoute || !runIdFromUrl) return;
-    setSelectedId((prev) => (prev === runIdFromUrl ? prev : runIdFromUrl));
-  }, [runIdFromUrl, onBacktestsRoute]);
-
-  useEffect(() => {
-    if (!runIdFromUrl || !detail?.id || detail.id !== runIdFromUrl) return;
-    const el = document.getElementById("backtest-result");
-    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [runIdFromUrl, detail?.id]);
+    setSelectedId,
+    detail,
+  });
 
   function goAssistantStep(step: AssistantStepId) {
     setTab("run");
