@@ -2,8 +2,8 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 · traspaso R-13 §3 (Track B BLOQUEADO).
 > **Propósito:** plan director para fragmentar `apps/web/src/features/backtests/backtests-page.tsx` (~4697 LOC) en módulos mantenibles sin cambiar semántica.
-> **Estado:** **EN CURSO.** B0 plan ✅ · **B1–B3 código ✅** (`6271c8c`·`fcdc857`·`bcadea9`) · B4–B12 pendientes. Relevo vivo: `traspaso-relevo-track-b-b1-b3-apertura-b4-2026-08-23.md`.
-> **AsOf:** 2026-08-23 · HEAD vivo = `git rev-parse origin/main` (partida B3 = `bcadea9`).
+> **Estado:** **EN CURSO.** B0 plan ✅ · **B1–B4 código ✅** (`6271c8c`·`fcdc857`·`bcadea9`·`5475c09`) · B5–B12 pendientes. Relevo vivo: `traspaso-relevo-track-b-b4-apertura-b5-2026-08-23.md`.
+> **AsOf:** 2026-08-23 · HEAD vivo = `git rev-parse origin/main` (partida B4 = `5475c09`).
 > **Origen:** informe read-only [Backtests split plan](e5353a50-0ca1-40f4-ae76-ba1a925b4e5a).
 
 ---
@@ -56,8 +56,8 @@ Reducir `backtests-page.tsx` a **~400–600 LOC** (shell + composición). Patró
 | **B1** ✅ | Constantes/tipos (`6271c8c`)  | Bajo         | —                |
 | **B2** ✅ | Queries (`fcdc857`)           | Medio        | —                |
 | **B3** ✅ | Mutations (`bcadea9`)         | Medio        | —                |
-| **B4**    | Derivados                     | Medio        | **SIGUIENTE**    |
-| **B5**    | URL sync                      | **Alto**     | —                |
+| **B4** ✅ | Derivados (`5475c09`)         | Medio        | —                |
+| **B5**    | URL sync                      | **Alto**     | **SIGUIENTE**    |
 | **B6**    | Navegación                    | Alto         | —                |
 | **B7**    | Lista AUTO                    | **Muy alto** | —                |
 | **B8**    | Asistente                     | **Muy alto** | —                |
