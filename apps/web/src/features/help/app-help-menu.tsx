@@ -17,6 +17,7 @@ import { ChartPlatformSection } from "@/features/settings/chart-platform-section
 import { DataCaptureSection } from "@/features/settings/data-capture-section";
 import { WatchlistHelpSection } from "@/features/settings/watchlist-help-section";
 import { HelpSourcesFooter } from "@/features/help/help-sources-footer";
+import { WorkflowModulesSection } from "@/features/help/workflow-modules-section";
 import {
   HELP_CONTENT_AS_OF,
   HELP_SECTIONS,
@@ -95,7 +96,10 @@ function GuideContent() {
         Bolsa V1 es una plataforma personal de gestión bursátil con terminal de
         trading, cuentas simuladas, ledger contable y fiscal. Todo el patrimonio
         y las operaciones se gestionan por <strong>cuenta de inversión</strong>{" "}
-        (modelo estilo XTB).
+        (modelo estilo XTB). Para el recorrido completo (Laboratorio → Trading)
+        y el mapa de módulos, abre{" "}
+        <strong className="text-foreground">Flujo y módulos</strong> en esta
+        ventana.
       </p>
 
       <section>
@@ -828,6 +832,9 @@ function HelpBody({
   switch (section) {
     case "guide":
       content = <GuideContent />;
+      break;
+    case "workflow":
+      content = <WorkflowModulesSection />;
       break;
     case "accounts":
       content = <AccountsContent />;

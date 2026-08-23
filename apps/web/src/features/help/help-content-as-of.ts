@@ -25,6 +25,8 @@
  * foco Cartera→Estudio→resto + scroll bajo cabecera sticky.
  * **2026-08-21** — **R-12 Track C · C5** HELP sync: Confirm primer nivel (`/confirm`) ·
  * Señales/Libro en mesa · AUTO cuenta «No disponible (BETA)» · frase SEMI trader.
+ * **2026-08-24** — Ayuda → **Flujo y módulos** (universos LAB/TRADING · ciclo
+ * investigación→operación · mapa de módulos para usuario básico).
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -65,4 +67,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-21" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-24" as const;

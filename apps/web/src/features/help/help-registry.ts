@@ -16,6 +16,7 @@ export const HELP_CONTENT_AS_OF = HELP_CONTENT_AS_OF_SOURCE;
 
 export type HelpRegistrySectionId =
   | "guide"
+  | "workflow"
   | "accounts"
   | "trading"
   | "watchlist"
@@ -56,6 +57,40 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       { path: "docs/HELP.md", role: "doc", note: "Mapa Ayuda ↔ trackers" },
       { path: "docs/ONBOARDING.md", role: "doc" },
       { path: "docs/UI_PLATFORM.md", role: "doc" },
+    ],
+  },
+  {
+    id: "workflow",
+    label: "Flujo y módulos",
+    kind: "guide",
+    sources: [
+      {
+        path: "docs/engineering/research-lifecycle.md",
+        role: "doc",
+        note: "Flujo operativo LAB → trading",
+      },
+      {
+        path: "docs/adr/019-dual-universes-lab-vs-trading.md",
+        role: "adr",
+        note: "LAB ≠ TRADING",
+      },
+      {
+        path: "docs/engineering/dual-universes-lab-trading-design-2026-08-02.md",
+        role: "doc",
+        note: "Diseño universos UI",
+      },
+      {
+        path: "docs/domain-language.md",
+        role: "doc",
+        note: "Términos y universos",
+      },
+      { path: "docs/ARCHITECTURE.md", role: "doc", note: "Capas monorepo" },
+      { path: "docs/README.md", role: "doc", note: "Índice documentación" },
+      {
+        path: "docs/engineering/demo-operating-modes-brief-2026-08-03.md",
+        role: "doc",
+        note: "MANUAL / SEMI / AUTO",
+      },
     ],
   },
   {
