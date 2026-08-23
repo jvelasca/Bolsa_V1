@@ -149,7 +149,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b2ee0f2`).** Pista documental registrada.
 - **F4′–F6′ ✅ CERRADAS (2026-08-23, `240c846`).** Copy hub `/screeners` + toasts B0 + tests `screenersHrefAfterTrackerCreate`. Batería web 754/754.
 
-> **Estado general:** código B12 local = **`3f9bd7e`** (`origin/main` al stamp = `7e2d24f` B9; B10–B12 local sin push). Tag **`v1.6.0-beta` → `c3964fc`**. Research→Radar copy **HECHO** (`240c846`); split `backtests-page` **B1–B12 HECHAS** (`6271c8c`·`fcdc857`·`bcadea9`·`5475c09`·`ca13981`·`5c03ff7`·`09f908b`·`6e998bd`·`7e2d24f`·`bef3c9f`·`50649a3`·`3f9bd7e`); shell **321 LOC**; **Track B split CERRADO**. Smoke manual pendiente (no bloqueante). Relevo vivo: `traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md`. **Siguiente: decisión de ciclo.**
+> **Estado general:** **`main` == `origin/main` == `bb15d1a`** (B12 código `3f9bd7e` + cierre docs). Tag **`v1.6.0-beta` → `c3964fc`**. Research→Radar copy **HECHO** (`240c846`); split `backtests-page` **B1–B12 HECHAS** (`6271c8c`·`fcdc857`·`bcadea9`·`5475c09`·`ca13981`·`5c03ff7`·`09f908b`·`6e998bd`·`7e2d24f`·`bef3c9f`·`50649a3`·`3f9bd7e`); shell **321 LOC**; **Track B split CERRADO**. Smoke manual pendiente (no bloqueante). Relevo vivo: `traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md`. **Siguiente: decisión de ciclo.**
 
 ---
 

@@ -3,7 +3,7 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 · traspaso R-13 §3 (Track B BLOQUEADO).
 > **Propósito:** plan director para fragmentar `apps/web/src/features/backtests/backtests-page.tsx` (~4697 LOC) en módulos mantenibles sin cambiar semántica.
 > **Estado:** **CERRADO.** B0 plan ✅ · **B1–B12 código ✅** (`6271c8c`·`fcdc857`·`bcadea9`·`5475c09`·`ca13981`·`5c03ff7`·`09f908b`·`6e998bd`·`7e2d24f`·`bef3c9f`·`50649a3`·`3f9bd7e`) · shell 321 LOC · relevo cierre: `traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md`.
-> **AsOf:** 2026-08-24 · HEAD vivo = `git fetch && git rev-parse origin/main` (código B12 local = `3f9bd7e`; origin al stamp = `7e2d24f` B9; B10–B12 local sin push).
+> **AsOf:** 2026-08-24 · HEAD vivo = `git fetch && git rev-parse origin/main` (`bb15d1a`; B12 código `3f9bd7e`).
 > **Origen:** informe read-only [Backtests split plan](e5353a50-0ca1-40f4-ae76-ba1a925b4e5a).
 
 ---

@@ -3,14 +3,14 @@
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1.
 > **Propósito:** texto de paso oficial para el **NUEVO AGENTE / NUEVO CHAT** tras el cierre de **Track B split backtests (B0–B12)**. Leer este doc + backlog §0 + `PROJECT_STATE.md` §2b + `plan-split-backtests-page-2026-08-22.md` **antes de tocar nada**.
 > **Fuente de coordinación:** GitHub [`jvelasca/Bolsa_V1`](https://github.com/jvelasca/Bolsa_V1) `origin/main`. SHA vivo = `git fetch && git rev-parse origin/main` (no asumir SHA de este fichero).
-> **Estado al redactar (verificado):** código B12 **local** = `3f9bd7e` · `origin/main` al stamp = `7e2d24f` (B9; B10–B12 local sin push) · docs stamp pendiente push · **R-13 CERRADA** · **Track B split backtests CERRADO (B0–B12)** · tag **`v1.6.0-beta` → `c3964fc`** intacto.
+> **Estado al redactar (verificado):** `main` == `origin/main` == **`bb15d1a`** (B12 código `3f9bd7e` + cierre docs) · árbol limpio · **R-13 CERRADA** · **Track B split backtests CERRADO (B0–B12)** · tag **`v1.6.0-beta` → `c3964fc`** intacto.
 > **AsOf:** 2026-08-24.
 
 ---
 
 ## 1. Estado verificado (firma — no adivinar)
 
-- **HEAD/rama:** código B12 local = `3f9bd7e` (4 commits ahead de `origin/main` `7e2d24f` B9: `bef3c9f` B10 + `50649a3` B11 + `0723a7e` docs B11 + `3f9bd7e` B12). SHA vivo tras push = `git rev-parse origin/main`.
+- **HEAD/rama:** `main` == `origin/main` == **`bb15d1a`**. Árbol limpio. Serie push B10–B12: `bef3c9f` B10 · `50649a3` B11 · `0723a7e` docs B11 · `3f9bd7e` B12 · `bb15d1a` cierre docs.
 - **Commits split B1–B12 (de más nuevo a más antiguo):**
 
   | Commit    | Contenido                                                                                              |
@@ -104,7 +104,7 @@ pnpm --filter @bolsa/web test
 
 ### 4.1 Brief de arranque (nuevo chat principal)
 
-> CONTEXTO (2026-08-24, firma verificada): repo `Bolsa_V1`, código B12 local = `3f9bd7e`, `origin/main` al stamp = `7e2d24f` (B10–B12 local sin push hasta push coordinador). **Track B split backtests CERRADO (B0–B12)** · B12 `3f9bd7e` shell 321 LOC · tag **`v1.6.0-beta` → `c3964fc`** · **R-13 CERRADA** · Research→Radar F4′–F6′ ✅ (`240c846`). **No hay ciclo activo predefinido.**
+> CONTEXTO (2026-08-24, firma verificada): repo `Bolsa_V1`, `main` == `origin/main` == **`bb15d1a`**, árbol limpio. **Track B split backtests CERRADO (B0–B12)** · B12 código `3f9bd7e` shell 321 LOC · tag **`v1.6.0-beta` → `c3964fc`** · **R-13 CERRADA** · Research→Radar F4′–F6′ ✅ (`240c846`). **No hay ciclo activo predefinido.**
 > **LEE PRIMERO:** este doc (§1–§5) · `docs/engineering/backlog-trabajo-2026-08-20.md` §0 · `docs/PROJECT_PREMISES.md` ⭐§0 · `docs/engineering/PROJECT_STATE.md` §2b.
 > **Tarea inmediata (decisión, NO fase abierta):** confirmar con el propietario **qué ciclo se abre** (auditoría externa · monitor purge/ops · smoke manual backtests · otro). NO abrir código sin plan/decisión (E1).
 > **NO tocar:** purge storage alto · gobernanza IA · motor money · `contract:gen` salvo fase · reabrir split B1–B12.
@@ -131,21 +131,21 @@ pnpm --filter @bolsa/web test
 
 ## 6. Cierres registrados (sesión 2026-08-24)
 
-| Fecha      | Hito                                    | Commit                        |
-| ---------- | --------------------------------------- | ----------------------------- |
-| 2026-08-24 | Split backtests **B12** thin shell      | `3f9bd7e`                     |
-| 2026-08-24 | **Cierre documental** Track B split B12 | (pendiente aprobación commit) |
-| 2026-08-23 | Split backtests **B11** tab `jobs`      | `50649a3`                     |
-| 2026-08-23 | Split backtests **B10** tab `run`       | `bef3c9f`                     |
-| 2026-08-23 | Split backtests **B9** Lab handlers     | `7e2d24f`                     |
-| 2026-08-23 | Split backtests **B8** Asistente        | `6e998bd`                     |
-| 2026-08-23 | Split backtests **B7** Lista AUTO       | `09f908b`                     |
-| 2026-08-23 | Split backtests **B6** navegación       | `5c03ff7`                     |
-| 2026-08-23 | Split backtests **B5** URL sync         | `ca13981`                     |
-| 2026-08-23 | Split backtests **B4** derivados        | `5475c09`                     |
-| 2026-08-23 | Split backtests **B3** mutations        | `bcadea9`                     |
-| 2026-08-23 | Split backtests **B2** queries          | `fcdc857`                     |
-| 2026-08-23 | Split backtests **B1** constantes       | `6271c8c`                     |
-| 2026-08-23 | Track B F4′–F6′ Research→Radar (previo) | `240c846`                     |
+| Fecha      | Hito                                    | Commit    |
+| ---------- | --------------------------------------- | --------- |
+| 2026-08-24 | Split backtests **B12** thin shell      | `3f9bd7e` |
+| 2026-08-24 | **Cierre documental** Track B split B12 | `bb15d1a` |
+| 2026-08-23 | Split backtests **B11** tab `jobs`      | `50649a3` |
+| 2026-08-23 | Split backtests **B10** tab `run`       | `bef3c9f` |
+| 2026-08-23 | Split backtests **B9** Lab handlers     | `7e2d24f` |
+| 2026-08-23 | Split backtests **B8** Asistente        | `6e998bd` |
+| 2026-08-23 | Split backtests **B7** Lista AUTO       | `09f908b` |
+| 2026-08-23 | Split backtests **B6** navegación       | `5c03ff7` |
+| 2026-08-23 | Split backtests **B5** URL sync         | `ca13981` |
+| 2026-08-23 | Split backtests **B4** derivados        | `5475c09` |
+| 2026-08-23 | Split backtests **B3** mutations        | `bcadea9` |
+| 2026-08-23 | Split backtests **B2** queries          | `fcdc857` |
+| 2026-08-23 | Split backtests **B1** constantes       | `6271c8c` |
+| 2026-08-23 | Track B F4′–F6′ Research→Radar (previo) | `240c846` |
 
 > **Track B split backtests CERRADO (B0–B12).** **Siguiente: decisión de ciclo** (patrón post-R-13). No abrir código sin plan/decisión aprobada.
