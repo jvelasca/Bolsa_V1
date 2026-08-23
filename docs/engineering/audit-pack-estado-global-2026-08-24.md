@@ -1,32 +1,32 @@
-# Paquete de auditoría — ESTADO GLOBAL consolidado R-1→R-13 (2026-08-22)
+# Paquete de auditoría — ESTADO GLOBAL consolidado R-1→R-13 + Track B (2026-08-24)
 
-> **⚠️ SUPERSEDIDO:** usar [`audit-pack-estado-global-2026-08-24.md`](./audit-pack-estado-global-2026-08-24.md) (R-1→R-13 + Track B, HEAD `47a3b58`). Este fichero se conserva como histórico.
-> **Propósito:** documento **único** para auditoría externa o lectura rápida tras R-13. Consolida R-1→R-13, deuda cerrada, freeze vigente y checklist operativo.
-> **AsOf:** 2026-08-22 · `origin/main` = **`b4efeff`** · árbol limpio · R-13 **CERRADA**.
+> **Propósito:** documento **único** para auditoría externa o lectura rápida tras R-13 y cierre Track B split backtests. Consolida R-1→R-13, Track B (2026-08-23/24), deuda cerrada, freeze vigente y checklist operativo.
+> **AsOf:** 2026-08-24 · `origin/main` = **`47a3b58`** · árbol limpio · R-13 **CERRADA** · Track B split backtests **CERRADO (B0–B12)**.
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`
 > **Fuentes:** [`PROJECT_STATE.md`](./PROJECT_STATE.md) · [`backlog-trabajo-2026-08-20.md`](./backlog-trabajo-2026-08-20.md) §0 · [`engineering-index-2026-08-03.md`](./engineering-index-2026-08-03.md)
-> **Histórico R-1→R-8:** [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md) (supersedido).
+> **Histórico:** [`audit-pack-estado-global-2026-08-22.md`](./audit-pack-estado-global-2026-08-22.md) (supersedido) · R-1→R-8 en [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md).
 
 ---
 
 ## 0. Resumen ejecutivo
 
-| Pieza                      | Estado                                                 |
-| -------------------------- | ------------------------------------------------------ |
-| **Rama**                   | `main` = `b4efeff` · tag **`v1.6.0-beta` → `c3964fc`** |
-| **R-1..R-8**               | ✅ COMPLETADOS (ver histórico 2026-08-20)              |
-| **R-9**                    | ✅ CERRADA `5c557fa` (F1–F8; F9 diferida → ADR-028)    |
-| **R-10 / v1.2.1**          | ✅ CERRADA tag `2093296`                               |
-| **R-11 / v1.3.0**          | ✅ CERRADA tag `b778292`                               |
-| **R-12**                   | ✅ CERRADA tag `5e52bd6`                               |
-| **R-13**                   | ✅ CERRADA (A0–A3 + docs)                              |
-| **Deuda money/verdad R-7** | ✅ Completa (M-4/T-M4 cerrado R-10 F4b)                |
-| **Auth**                   | ✅ JWT-only (R-12, ADR-027)                            |
-| **Purge storage V2**       | MONITOR (T+0 19/19; E8 N)                              |
-| **Track B producto**       | BLOQUEADO                                              |
-| **Ciclo activo**           | Ninguno — decisión propietario                         |
+| Pieza                       | Estado                                                 |
+| --------------------------- | ------------------------------------------------------ |
+| **Rama**                    | `main` = `47a3b58` · tag **`v1.6.0-beta` → `c3964fc`** |
+| **R-1..R-8**                | ✅ COMPLETADOS (ver histórico 2026-08-20)              |
+| **R-9**                     | ✅ CERRADA `5c557fa` (F1–F8; F9 diferida → ADR-028)    |
+| **R-10 / v1.2.1**           | ✅ CERRADA tag `2093296`                               |
+| **R-11 / v1.3.0**           | ✅ CERRADA tag `b778292`                               |
+| **R-12**                    | ✅ CERRADA tag `5e52bd6`                               |
+| **R-13**                    | ✅ CERRADA (A0–A3 + docs)                              |
+| **Deuda money/verdad R-7**  | ✅ Completa (M-4/T-M4 cerrado R-10 F4b)                |
+| **Auth**                    | ✅ JWT-only (R-12, ADR-027)                            |
+| **Purge storage V2**        | MONITOR (T+0 19/19; E8 N)                              |
+| **Track B split backtests** | ✅ **CERRADO** (B0–B12; shell 321 LOC)                 |
+| **Track B Research→Radar**  | ✅ F4′–F6′ `240c846`                                   |
+| **Ciclo activo**            | Ninguno — decisión propietario                         |
 
-**Mensaje clave:** deuda de dinero real R-6/R-7 **cerrada**. R-8→R-13 añaden prevención (idempotencia, custodia job, JWT, invariantes verify, chaos tests). BETA consolidada en `v1.6.0-beta`. Sin P0 abierto en money-path.
+**Mensaje clave:** deuda de dinero real R-6/R-7 **cerrada**. R-8→R-13 añaden prevención (idempotencia, custodia job, JWT, invariantes verify, chaos tests). BETA consolidada en `v1.6.0-beta`. Track B split backtests **completado** (god-page ~4697→321 LOC shell + módulos). Sin P0 abierto en money-path. Smoke manual backtests **pendiente, no bloqueante**.
 
 ---
 
@@ -74,7 +74,40 @@ A0–A2 inventario + E8 micro · A3 tag `v1.6.0-beta` · cierre documental.
 
 ---
 
-## 4. Deuda cerrada delta (2026-08-20 → 2026-08-22)
+## 4. Track B — producto (2026-08-23/24)
+
+> Planes: [`plan-unificacion-research-radar-2026-08-21.md`](./plan-unificacion-research-radar-2026-08-21.md) · [`plan-split-backtests-page-2026-08-22.md`](./plan-split-backtests-page-2026-08-22.md) (**CERRADO**). Relevo: [`traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md`](./traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md).
+
+### 4.1 Research→Radar F4′–F6′ — `240c846`
+
+Copy unificado Research→Radar en UI (F4′–F6′). **No reabrir.**
+
+### 4.2 Split backtests B0–B12 — **CERRADO**
+
+| Commit    | Fase | Contenido                                                                                    |
+| --------- | ---- | -------------------------------------------------------------------------------------------- |
+| `6271c8c` | B1   | `backtests-page.constants.ts`                                                                |
+| `fcdc857` | B2   | `hooks/use-backtest-page-queries.ts`                                                         |
+| `bcadea9` | B3   | `hooks/use-backtest-page-mutations.ts` + reorder helpers nav                                 |
+| `5475c09` | B4   | `hooks/use-backtest-derived-data.ts` (derivados + anti-stale)                                |
+| `ca13981` | B5   | `hooks/use-backtest-url-sync.ts` (deep-links + guard listAuto)                               |
+| `5c03ff7` | B6   | `lib/backtest-page-navigation.ts` (factory nav helpers)                                      |
+| `09f908b` | B7   | `lib/backtest-list-auto-controller.ts` (factory + effects Lista AUTO)                        |
+| `6e998bd` | B8   | `lib/backtest-assistant-controller.ts` (factory + effects Asistente)                         |
+| `7e2d24f` | B9   | `lib/backtest-lab-handlers.ts` (2 factories Lab: nav + coach)                                |
+| `bef3c9f` | B10  | `backtests-page-run-tab.tsx` (JSX tab `run`; `BacktestPageViewModel` + presentacional)       |
+| `50649a3` | B11  | `backtests-page-jobs-tab.tsx` (JSX tab `jobs`; `BacktestPageJobsViewModel` + presentacional) |
+| `3f9bd7e` | B12  | thin shell vía `useBacktestPageModel`; `backtests-page.tsx` **321 LOC**                      |
+
+**Resultado:** god-page ~**4697→321 LOC** shell + módulos (`use-backtest-page-model.ts` ~1645 LOC orquestador). Criterio plan cumplido: shell ≤ 600 LOC ✅ · export `BacktestsPage` ✅ · consumidor `platform-shell.tsx` intacto ✅.
+
+**Batería B12:** web typecheck 0 · lint 0 · test **754/754**.
+
+**Deuda post-split (no bloqueante):** smoke manual pendiente (play ciclo 1 valor · Lista AUTO pause/resume · deep-links `?runId=` / `?focus=coach` · tabs run/jobs · keep-alive Lista AUTO). Wizards con `STRATEGY_OPTIONS` local — fase dedicada futura.
+
+---
+
+## 5. Deuda cerrada delta (2026-08-20 → 2026-08-24)
 
 | Ítem                       | Commit    | Ciclo      |
 | -------------------------- | --------- | ---------- |
@@ -86,10 +119,12 @@ A0–A2 inventario + E8 micro · A3 tag `v1.6.0-beta` · cierre documental.
 | verify ledger A+B          | `f7a4ab0` | Relevo UNO |
 | Chaos F4–F5                | `f7a86cc` | Relevo DOS |
 | mypy application CI        | `6762614` | R-11 C5    |
+| Track B split backtests    | `3f9bd7e` | B1–B12     |
+| Research→Radar F4′–F6′     | `240c846` | Track B    |
 
 ---
 
-## 5. Deuda / freeze vigente
+## 6. Deuda / freeze vigente
 
 | Ítem                     | Estado                                                       |
 | ------------------------ | ------------------------------------------------------------ |
@@ -97,16 +132,16 @@ A0–A2 inventario + E8 micro · A3 tag `v1.6.0-beta` · cierre documental.
 | Gobernanza IA / Belief/H | Freeze — no tocar                                            |
 | Motor money              | Freeze                                                       |
 | `contract:gen`           | Freeze salvo fase                                            |
-| Track B producto         | **BLOQUEADO**                                                |
+| Track B split backtests  | **CERRADO** — no reabrir B1–B12                              |
 | Purge storage V2         | **MONITOR** 4–8 sem (E8 N)                                   |
 | Apply F7b prod           | Ops — local hecho                                            |
 | R-9 F9 / legacy bridge   | Diferida (ADR-028)                                           |
-| Research→Radar código    | APARCADO (F1–F3 doc ✅)                                      |
+| Smoke manual backtests   | Pendiente — no bloqueante                                    |
 | Ops manuales             | secret scanning UI · TRUSTED_PROXIES prod · BP/.L · logs/dev |
 
 ---
 
-## 6. Auth y multi-tenant
+## 7. Auth y multi-tenant
 
 - **JWT-only** (ADR-027): HMAC legacy retirado R-12.
 - Scoping owner, refresh, F7b backfill local (103→0 NULL).
@@ -114,7 +149,7 @@ A0–A2 inventario + E8 micro · A3 tag `v1.6.0-beta` · cierre documental.
 
 ---
 
-## 7. Núcleo financiero e invariantes
+## 8. Núcleo financiero e invariantes
 
 - `balance_after`: postcondición app (test-suite), no constraint DB.
 - `scripts/verify/verify_ledger_balance_chain.py`: invariantes A+B, EXIT 0 esperado dev limpio.
@@ -124,7 +159,7 @@ A0–A2 inventario + E8 micro · A3 tag `v1.6.0-beta` · cierre documental.
 
 ---
 
-## 8. Checklist operativo manual
+## 9. Checklist operativo manual
 
 Ver [`ops-r1-seguridad-operaciones-2026-08-19.md`](./ops-r1-seguridad-operaciones-2026-08-19.md):
 
@@ -136,7 +171,7 @@ Ver [`ops-r1-seguridad-operaciones-2026-08-19.md`](./ops-r1-seguridad-operacione
 
 ---
 
-## 9. Índice de fuentes por ciclo
+## 10. Índice de fuentes por ciclo
 
 | Ciclo    | Plan                                                                                        | Traspaso                                                                |
 | -------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
@@ -145,15 +180,15 @@ Ver [`ops-r1-seguridad-operaciones-2026-08-19.md`](./ops-r1-seguridad-operacione
 | R-11     | `plan-r11-hardening-auditoria-v1-2-1-2026-08-21.md`                                         | `traspaso-relevo-cierre-r11-c1-c6-d1-d2-siguiente-2026-08-21.md`        |
 | R-12     | `plan-r12-auditoria-ux-2026-08-21.md`                                                       | `traspaso-relevo-r12-apertura-2026-08-21.md`                            |
 | R-13     | `plan-r13-consolidacion-beta-2026-08-22.md`                                                 | `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md` |
-| Track B  | `plan-unificacion-research-radar-2026-08-21.md` · `plan-split-backtests-page-2026-08-22.md` | —                                                                       |
+| Track B  | `plan-unificacion-research-radar-2026-08-21.md` · `plan-split-backtests-page-2026-08-22.md` | `traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md`      |
 | F9       | ADR-028                                                                                     | —                                                                       |
 | Purge V2 | `plan-r12-pending-delete-v2-purge-2026-08-22.md`                                            | `pending-delete/README.md`                                              |
 
 ---
 
-## 10. Batería de referencia (auditor externo)
+## 11. Batería de referencia (auditor externo)
 
-**Firma:** `git rev-parse origin/main` → `b4efeff`
+**Firma:** `git rev-parse origin/main` → `47a3b58`
 
 ```bash
 # Contrato
@@ -179,22 +214,24 @@ pnpm --filter @bolsa/web exec vitest run \
   src/stores/workspace-legacy-timeframe-favorites.test.ts
 ```
 
-**Última batería monitor conocida (2026-08-22):** vitest purge **19/19 pass**.
+**Última batería monitor conocida (2026-08-24):** vitest purge **19/19 pass** · web test **754/754** (B12).
 
 ---
 
 ## Ap. A — Quick lookup commits
 
-| Código      | Commit               |
-| ----------- | -------------------- |
-| M-4/T-M4    | `e12a125`            |
-| R-8C.2      | `5e52bd6`            |
-| R12-409     | `eb24608`            |
-| EXEC-B-CONC | `ca60d0a`            |
-| JWT-only    | R12-AUTH + `a93ac9f` |
+| Código       | Commit               |
+| ------------ | -------------------- |
+| M-4/T-M4     | `e12a125`            |
+| R-8C.2       | `5e52bd6`            |
+| R12-409      | `eb24608`            |
+| EXEC-B-CONC  | `ca60d0a`            |
+| JWT-only     | R12-AUTH + `a93ac9f` |
+| Track B B12  | `3f9bd7e`            |
+| Research F4′ | `240c846`            |
 
 ## Ap. B — Lectura sugerida (30 min)
 
-1. Este doc §0 + §5 + §10
+1. Este doc §0 + §6 + §11
 2. `backlog-trabajo-2026-08-20.md` §0
-3. `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md` §1–§3
+3. `traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md` §1–§3

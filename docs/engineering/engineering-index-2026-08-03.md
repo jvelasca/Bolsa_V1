@@ -58,7 +58,8 @@ Engineering Index  (este doc)
 │   ├── plan-unificacion-research-radar-2026-08-21.md ← **Unificación Research→Radar — DRAFT / APARCADO** · F1–F3 ✅ doc CERRADAS · código F4′–F6′ condicional Track B · `PROJECT_STATE.md` §2b
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
-│   ├── audit-pack-estado-global-2026-08-22.md ← **PACK auditoría R-1→R-13** (vivo) · HEAD `b4efeff` · supersedes 2026-08-20
+│   ├── audit-pack-estado-global-2026-08-24.md ← **PACK auditoría R-1→R-13 + Track B** (vivo) · HEAD `47a3b58` · supersedes 2026-08-22
+│   ├── audit-pack-estado-global-2026-08-22.md ← histórico (pre Track B)
 │   ├── traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md ← **RELEVO VIVO** post B12 · Track B split CERRADO · siguiente decisión de ciclo
 │   ├── traspaso-relevo-track-b-b11-apertura-b12-2026-08-23.md ← relevo histórico post B11 · apertura B12 thin shell (código B12 `3f9bd7e`)
 │   ├── traspaso-relevo-track-b-b10-apertura-b11-2026-08-23.md ← relevo histórico post B10 · apertura B11 JSX tab `jobs` (código B11 `50649a3`)
