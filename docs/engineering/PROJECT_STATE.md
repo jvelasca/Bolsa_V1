@@ -149,7 +149,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b2ee0f2`).** Pista documental registrada.
 - **F4′–F6′ ✅ CERRADAS (2026-08-23, `240c846`).** Copy hub `/screeners` + toasts B0 + tests `screenersHrefAfterTrackerCreate`. Batería web 754/754.
 
-> **Estado general:** HEAD vivo = **`origin/main`** (`67a1692`). Tag **`v1.6.0-beta` → `c3964fc`**. Research→Radar copy **HECHO** (`240c846`); split `backtests-page` **siguiente** (plan B0, fases B1–B12).
+> **Estado general:** HEAD vivo = **`origin/main`** (`bcadea9`). Tag **`v1.6.0-beta` → `c3964fc`**. Research→Radar copy **HECHO** (`240c846`); split `backtests-page` **B1–B3 HECHAS** (`6271c8c`·`fcdc857`·`bcadea9`); **siguiente B4** (plan B0, fases B4–B12). Relevo vivo: `traspaso-relevo-track-b-b1-b3-apertura-b4-2026-08-23.md`.
 
 ---
 

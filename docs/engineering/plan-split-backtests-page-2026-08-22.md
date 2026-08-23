@@ -2,8 +2,8 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 · traspaso R-13 §3 (Track B BLOQUEADO).
 > **Propósito:** plan director para fragmentar `apps/web/src/features/backtests/backtests-page.tsx` (~4697 LOC) en módulos mantenibles sin cambiar semántica.
-> **Estado:** **DRAFT — pendiente OK línea a línea del propietario (E1).** Fase B0 (este doc) lista; B1–B12 sin abrir.
-> **AsOf:** 2026-08-22 · HEAD `b4efeff`.
+> **Estado:** **EN CURSO.** B0 plan ✅ · **B1–B3 código ✅** (`6271c8c`·`fcdc857`·`bcadea9`) · B4–B12 pendientes. Relevo vivo: `traspaso-relevo-track-b-b1-b3-apertura-b4-2026-08-23.md`.
+> **AsOf:** 2026-08-23 · HEAD vivo = `git rev-parse origin/main` (partida B3 = `bcadea9`).
 > **Origen:** informe read-only [Backtests split plan](e5353a50-0ca1-40f4-ae76-ba1a925b4e5a).
 
 ---
@@ -50,21 +50,21 @@ Reducir `backtests-page.tsx` a **~400–600 LOC** (shell + composición). Patró
 
 ## 3. Fases acotadas (una = un subagente)
 
-| Fase    | Alcance                       | Riesgo       | Paralelo         |
-| ------- | ----------------------------- | ------------ | ---------------- |
-| **B0**  | Este plan + mapa consumidores | Ninguno      | —                |
-| **B1**  | Constantes/tipos              | Bajo         | B2               |
-| **B2**  | Queries                       | Medio        | B1               |
-| **B3**  | Mutations                     | Medio        | —                |
-| **B4**  | Derivados                     | Medio        | —                |
-| **B5**  | URL sync                      | **Alto**     | —                |
-| **B6**  | Navegación                    | Alto         | —                |
-| **B7**  | Lista AUTO                    | **Muy alto** | —                |
-| **B8**  | Asistente                     | **Muy alto** | —                |
-| **B9**  | Lab handlers                  | Alto         | —                |
-| **B10** | JSX tab `run`                 | Medio        | B11 (tras B6–B9) |
-| **B11** | JSX tab `jobs`                | Bajo         | B10              |
-| **B12** | Thin shell final              | Medio        | —                |
+| Fase      | Alcance                       | Riesgo       | Paralelo         |
+| --------- | ----------------------------- | ------------ | ---------------- |
+| **B0**    | Este plan + mapa consumidores | Ninguno      | —                |
+| **B1** ✅ | Constantes/tipos (`6271c8c`)  | Bajo         | —                |
+| **B2** ✅ | Queries (`fcdc857`)           | Medio        | —                |
+| **B3** ✅ | Mutations (`bcadea9`)         | Medio        | —                |
+| **B4**    | Derivados                     | Medio        | **SIGUIENTE**    |
+| **B5**    | URL sync                      | **Alto**     | —                |
+| **B6**    | Navegación                    | Alto         | —                |
+| **B7**    | Lista AUTO                    | **Muy alto** | —                |
+| **B8**    | Asistente                     | **Muy alto** | —                |
+| **B9**    | Lab handlers                  | Alto         | —                |
+| **B10**   | JSX tab `run`                 | Medio        | B11 (tras B6–B9) |
+| **B11**   | JSX tab `jobs`                | Bajo         | B10              |
+| **B12**   | Thin shell final              | Medio        | —                |
 
 **No paralelizar B7 y B8** (estado compartido).
 
