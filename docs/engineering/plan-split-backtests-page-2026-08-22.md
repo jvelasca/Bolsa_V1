@@ -2,8 +2,8 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 · traspaso R-13 §3 (Track B BLOQUEADO).
 > **Propósito:** plan director para fragmentar `apps/web/src/features/backtests/backtests-page.tsx` (~4697 LOC) en módulos mantenibles sin cambiar semántica.
-> **Estado:** **EN CURSO.** B0 plan ✅ · **B1–B6 código ✅** (`6271c8c`·`fcdc857`·`bcadea9`·`5475c09`·`ca13981`·`5c03ff7`) · B7–B12 pendientes. Relevo vivo: `traspaso-relevo-track-b-b6-apertura-b7-2026-08-23.md`.
-> **AsOf:** 2026-08-23 · HEAD vivo = `git rev-parse origin/main` (partida B6 = `5c03ff7`).
+> **Estado:** **EN CURSO.** B0 plan ✅ · **B1–B7 código ✅** (`6271c8c`·`fcdc857`·`bcadea9`·`5475c09`·`ca13981`·`5c03ff7`·`09f908b`) · B8–B12 pendientes. Relevo vivo: `traspaso-relevo-track-b-b7-apertura-b8-2026-08-23.md`.
+> **AsOf:** 2026-08-23 · HEAD vivo = `git rev-parse origin/main` (partida B7 = `09f908b`).
 > **Origen:** informe read-only [Backtests split plan](e5353a50-0ca1-40f4-ae76-ba1a925b4e5a).
 
 ---
@@ -59,8 +59,8 @@ Reducir `backtests-page.tsx` a **~400–600 LOC** (shell + composición). Patró
 | **B4** ✅ | Derivados (`5475c09`)         | Medio        | —                |
 | **B5** ✅ | URL sync (`ca13981`)          | **Alto**     | —                |
 | **B6** ✅ | Navegación (`5c03ff7`)        | Alto         | —                |
-| **B7**    | Lista AUTO                    | **Muy alto** | **SIGUIENTE**    |
-| **B8**    | Asistente                     | **Muy alto** | —                |
+| **B7** ✅ | Lista AUTO (`09f908b`)        | **Muy alto** | —                |
+| **B8**    | Asistente                     | **Muy alto** | **SIGUIENTE**    |
 | **B9**    | Lab handlers                  | Alto         | —                |
 | **B10**   | JSX tab `run`                 | Medio        | B11 (tras B6–B9) |
 | **B11**   | JSX tab `jobs`                | Bajo         | B10              |
