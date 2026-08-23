@@ -20,6 +20,7 @@ import {
   type UniverseMode,
 } from "@/features/backtests/backtests-page.constants";
 import { useBacktestPageQueries } from "@/features/backtests/hooks/use-backtest-page-queries";
+import { useBacktestPageMutations } from "@/features/backtests/hooks/use-backtest-page-mutations";
 import { BacktestHubTabsBar } from "@/features/backtests/backtest-hub-tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -32,7 +33,6 @@ import {
 import {
   BACKTEST_STRATEGIES,
   STRATEGY_PRESET_CATEGORY_LABELS,
-  strategyDefinitionFromChartDraft,
   type BacktestStrategyType,
   type ChartDrawing,
   type ChartStrategySetupDraft,
@@ -541,138 +541,111 @@ export function BacktestsPage() {
     slippageBps,
   });
 
-  const runMutation = useMutation({
-    mutationFn: (overrides?: {
-      instrumentId?: string;
-      strategyDefinitionId?: string;
-      initialCash?: number;
-      timeframe?: ChartTimeframe;
-      limit?: number;
-      dateFrom?: string;
-      dateTo?: string;
-      labEvidence?: import("@bolsa/shared").PaperLabEvidenceSnapshot | null;
-    }) => {
-      const window =
-        overrides?.dateFrom != null
-          ? {
-              dateFrom: overrides.dateFrom,
-              ...(overrides.dateTo ? { dateTo: overrides.dateTo } : {}),
-              limit: 10_000,
-            }
-          : overrides?.limit != null && overrides.limit > 0
-            ? { limit: overrides.limit }
-            : resolveBacktestWindow(
-                periodPreset,
-                customDateFrom,
-                customDateTo,
-                diaD,
-              );
-      const nextInstrumentId = overrides?.instrumentId ?? instrumentId;
-      const nextCash = overrides?.initialCash ?? Number(initialCash);
-      const nextTf = overrides?.timeframe ?? runTimeframe;
-      return api.runBacktest({
-        instrumentId: nextInstrumentId,
-        ...(overrides?.strategyDefinitionId
-          ? { strategyDefinitionId: overrides.strategyDefinitionId }
-          : runSource === "saved"
-            ? { strategyDefinitionId: savedStrategyId }
-            : { strategyType }),
-        initialCash: nextCash,
-        commissionBps: Number(commissionBps) || 0,
-        slippageBps: Number(slippageBps) || 0,
-        timeframe: nextTf,
-        ...window,
-        ...(overrides?.labEvidence
-          ? { labEvidence: overrides.labEvidence }
-          : {}),
-      });
-    },
-    onSuccess: (result) => {
-      setBatchRows([]);
-      setExploreRows([]);
-      setResultFocus("detail");
-      // Seed detail cache immediately so the chart does not wait on a second GET.
-      queryClient.setQueryData(["backtest", result.data.id], {
-        data: result.data,
-      });
-      selectRun(result.data.id, { tab: "run" });
-      void pruneHistory(zonePrefs.historyMaxKept);
-      void queryClient.invalidateQueries({ queryKey: ["research"] });
-    },
-  });
+  // B3: helpers de nav antes del hook de mutations (antes vivían después;
+  // function declarations se hoist-eaban; el hook necesita params explícitos).
+  function patchSearchParams(
+    mutate: (params: URLSearchParams) => void,
+    opts?: { replace?: boolean },
+  ) {
+    // Keep-alive fuera de /backtests: no pisar la URL de Trading/otros hubs.
+    if (!pathname.startsWith("/backtests")) return;
+    // Updater funcional: evita carrera entre setTab + selectInstrument (mismo
+    // searchParams stale → instrumentId se queda en el valor anterior, p.ej. AENA).
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        mutate(next);
+        return next;
+      },
+      { replace: opts?.replace },
+    );
+  }
 
-  const createStrategyMutation = useMutation({
-    mutationFn: () =>
-      api.createStrategyFromPreset({
-        name: newStrategyName.trim(),
-        presetKey: newStrategyPreset,
-        commissionBps: Number(commissionBps) || 0,
-        slippageBps: Number(slippageBps) || 0,
-      }),
-    onSuccess: () => {
-      setNewStrategyName("");
-      setCloneOpen(false);
-      openLibrary({ library: "optimized" });
-      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
-    },
-  });
+  /** Abre Biblioteca con filtro / foco (entra en historial ←→). */
+  function openLibrary(opts?: {
+    library?: StrategiesListFilter;
+    strategyId?: string | null;
+    preset?: string | null;
+    q?: string | null;
+  }) {
+    const library = opts?.library ?? "mine";
+    setStrategiesListFilter(library);
+    setLibraryFocusStrategyId(opts?.strategyId ?? null);
+    setLibraryFocusPreset(opts?.preset ?? null);
+    if (opts?.q != null) {
+      setMineFilters((prev) => ({ ...prev, query: opts.q ?? "" }));
+    }
+    patchSearchParams((params) => {
+      params.set("tab", "strategies");
+      params.set("library", library);
+      if (opts?.strategyId) params.set("strategyId", opts.strategyId);
+      else params.delete("strategyId");
+      if (opts?.preset) params.set("preset", opts.preset);
+      else params.delete("preset");
+      if (opts?.q?.trim()) params.set("q", opts.q.trim());
+      else if (opts?.q === "") params.delete("q");
+    });
+  }
 
-  const deployPaperMutation = useMutation({
-    mutationFn: (payload: {
-      strategyId: string;
-      runId?: string;
-      initialDeposit?: number;
-      labEvidence?: import("@bolsa/shared").PaperLabEvidenceSnapshot | null;
-    }) =>
-      payload.runId
-        ? api.deployBacktestPaperAccount(payload.runId, {
-            initialDeposit: payload.initialDeposit,
-            labEvidence: payload.labEvidence ?? undefined,
-          })
-        : api.deployStrategyPaperAccount(payload.strategyId, {
-            initialDeposit: payload.initialDeposit,
-            labEvidence: payload.labEvidence ?? undefined,
-          }),
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
-      navigate(`/accounts?type=paper&selected=${result.data.id}`, {
-        state: {
-          paperLabEvidence: result.data.labEvidence ?? null,
-          paperDeployNote:
-            "Cuenta paper creada. Evidencia lab = provenance, no producción.",
-        },
-      });
-    },
-  });
+  function setTab(next: HubTab) {
+    patchSearchParams((params) => {
+      params.set("tab", next);
+    });
+  }
 
-  const saveChartStrategyMutation = useMutation({
-    mutationFn: ({
-      draft,
-      name,
-    }: {
-      draft: ChartStrategySetupDraft;
-      name: string;
-    }) => {
-      if (draft.inferredPresetKey) {
-        return api.createStrategyFromPreset({
-          name,
-          presetKey: draft.inferredPresetKey,
-          timeframe: draft.timeframe,
-          commissionBps: Number(commissionBps) || 0,
-          slippageBps: Number(slippageBps) || 0,
-        });
-      }
-      return api.createStrategy({
-        name,
-        definition: strategyDefinitionFromChartDraft(draft, name),
-      });
-    },
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ["strategies"] });
-      setSavedStrategyId(result.data.id);
-      setRunSource("saved");
-      setTab("run");
-    },
+  function selectRun(
+    id: string,
+    options?: { tab?: HubTab; openAnalysis?: boolean; focus?: ResultFocus },
+  ) {
+    setSelectedId(id);
+    if (options?.openAnalysis) setPreferOpenAnalysis(true);
+    else setPreferOpenAnalysis(false);
+    if (options?.focus) setResultFocus(options.focus);
+    patchSearchParams((params) => {
+      params.set("runId", id);
+      params.set("tab", options?.tab ?? "run");
+      if (options?.focus) params.set("focus", options.focus);
+      if (options?.openAnalysis) params.set("openAnalysis", "1");
+      else params.delete("openAnalysis");
+      // Ver / checklist = Análisis técnico normal (no Verificar D→hoy).
+      params.delete("verify");
+    });
+  }
+
+  const {
+    runMutation,
+    createStrategyMutation,
+    deployPaperMutation,
+    saveChartStrategyMutation,
+  } = useBacktestPageMutations({
+    queryClient,
+    navigate,
+    instrumentId,
+    initialCash,
+    runTimeframe,
+    periodPreset,
+    customDateFrom,
+    customDateTo,
+    diaD,
+    runSource,
+    savedStrategyId,
+    strategyType,
+    commissionBps,
+    slippageBps,
+    newStrategyName,
+    newStrategyPreset,
+    historyMaxKept: zonePrefs.historyMaxKept,
+    pruneHistory,
+    selectRun,
+    openLibrary,
+    setTab,
+    setBatchRows,
+    setExploreRows,
+    setResultFocus,
+    setNewStrategyName,
+    setCloneOpen,
+    setSavedStrategyId,
+    setRunSource,
   });
 
   function applyChartDraft(draft: ChartStrategySetupDraft) {
@@ -1400,50 +1373,6 @@ export function BacktestsPage() {
     [detail],
   );
 
-  function patchSearchParams(
-    mutate: (params: URLSearchParams) => void,
-    opts?: { replace?: boolean },
-  ) {
-    // Keep-alive fuera de /backtests: no pisar la URL de Trading/otros hubs.
-    if (!pathname.startsWith("/backtests")) return;
-    // Updater funcional: evita carrera entre setTab + selectInstrument (mismo
-    // searchParams stale → instrumentId se queda en el valor anterior, p.ej. AENA).
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        mutate(next);
-        return next;
-      },
-      { replace: opts?.replace },
-    );
-  }
-
-  /** Abre Biblioteca con filtro / foco (entra en historial ←→). */
-  function openLibrary(opts?: {
-    library?: StrategiesListFilter;
-    strategyId?: string | null;
-    preset?: string | null;
-    q?: string | null;
-  }) {
-    const library = opts?.library ?? "mine";
-    setStrategiesListFilter(library);
-    setLibraryFocusStrategyId(opts?.strategyId ?? null);
-    setLibraryFocusPreset(opts?.preset ?? null);
-    if (opts?.q != null) {
-      setMineFilters((prev) => ({ ...prev, query: opts.q ?? "" }));
-    }
-    patchSearchParams((params) => {
-      params.set("tab", "strategies");
-      params.set("library", library);
-      if (opts?.strategyId) params.set("strategyId", opts.strategyId);
-      else params.delete("strategyId");
-      if (opts?.preset) params.set("preset", opts.preset);
-      else params.delete("preset");
-      if (opts?.q?.trim()) params.set("q", opts.q.trim());
-      else if (opts?.q === "") params.delete("q");
-    });
-  }
-
   function setLibraryFilter(next: StrategiesListFilter) {
     setStrategiesListFilter(next);
     setLibraryFocusStrategyId(null);
@@ -1644,31 +1573,6 @@ export function BacktestsPage() {
       trialParams: linkedTrial?.params ?? null,
     });
     openGuidedOptimize(seed);
-  }
-
-  function setTab(next: HubTab) {
-    patchSearchParams((params) => {
-      params.set("tab", next);
-    });
-  }
-
-  function selectRun(
-    id: string,
-    options?: { tab?: HubTab; openAnalysis?: boolean; focus?: ResultFocus },
-  ) {
-    setSelectedId(id);
-    if (options?.openAnalysis) setPreferOpenAnalysis(true);
-    else setPreferOpenAnalysis(false);
-    if (options?.focus) setResultFocus(options.focus);
-    patchSearchParams((params) => {
-      params.set("runId", id);
-      params.set("tab", options?.tab ?? "run");
-      if (options?.focus) params.set("focus", options.focus);
-      if (options?.openAnalysis) params.set("openAnalysis", "1");
-      else params.delete("openAnalysis");
-      // Ver / checklist = Análisis técnico normal (no Verificar D→hoy).
-      params.delete("verify");
-    });
   }
 
   /** Finalistas → Detalle + checklist (Camino A). Sin re-Lab ni deploy directo. */
