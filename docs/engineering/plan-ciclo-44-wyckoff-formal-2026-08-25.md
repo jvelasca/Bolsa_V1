@@ -1,8 +1,8 @@
 # Plan — Ciclo 4.4 Wyckoff formal (más allá del stub reclaim 4.2)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §1 SETUP · §6 (`Wyckoff fases formales = 4.4+`) · relevo [`traspaso-relevo-ciclo-43-armed-2026-08-25.md`](./traspaso-relevo-ciclo-43-armed-2026-08-25.md) · ancla en [`plan-ciclo-43-armed-entrysetup-2026-08-25.md`](./plan-ciclo-43-armed-entrysetup-2026-08-25.md) (D3 difería Wyckoff formal → 4.4+).
-> **AsOf:** 2026-08-25 · feat **`7003ddf`**.
-> **Estado:** **CERRADO** en `7003ddf` (D1–D7 OK · batería **88**). Docs stamp + push en curso.
+> **AsOf:** 2026-08-25 · HEAD **`2135fc5`** = `origin/main`; feat **`7003ddf`**.
+> **Estado:** **CERRADO en origin** (`7003ddf` vía `2135fc5`). D1–D7 OK · batería **88**.
 > **Método:** rebanada fina; SETUP sigue ≠ motor paralelo; Ranking ≠ BUY; sin `contract:gen`; sin LLM.
 
 ---
