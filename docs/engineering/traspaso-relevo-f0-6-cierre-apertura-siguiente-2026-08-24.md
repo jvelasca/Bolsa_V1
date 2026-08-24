@@ -1,5 +1,7 @@
 # RELEVO / TRASPASO — Fase 0 Decision Spine · cierre F0.6 (Decision Board COMPLETA) → apertura fase siguiente
 
+> [!INFO] **SUPERSEDIDO (2026-08-24).** Este relevo se escribió **antes** de ejecutar el **Escalón 3/D1** (VETO de cesta en confirm SEMI). Dicho Escalón ya está **CERRADO y pusheado** (`7530556` + docs `0768a70`). El **relevo vivo** para el siguiente chat es **[`traspaso-relevo-escalon-3-d1-cierre-apertura-siguiente-2026-08-24.md`](./traspaso-relevo-escalon-3-d1-cierre-apertura-siguiente-2026-08-24.md)**, que contiene el texto de arranque actualizado. Este documento queda **histórico**.
+
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
 > **Propósito:** texto de paso para el **NUEVO CHAT** de la **siguiente fase**. La Fase 0 Decision Spine queda **COMPLETA** (documentación F0.1–F0.4 + código PortfolioFit F0.5b + Decision Board F0.6 backend y UI). La fase siguiente **la decide el propietario** a partir del backlog. Read-first antes de escribir código.
 > **AsOf cierre:** 2026-08-24. **F0.1–F0.4 docs COMPLETOS** · **F0.5a métrica decidida** · **F0.5b PortfolioFit v1 CERRADA** · **F0.6a fuente decidida (Decision Board)** · **F0.6b (backend) CERRADA** · **F0.6-UI (web) CERRADA** · **Fase 0 Decision Spine COMPLETA** · **D2 CERRADA con código** (`f7b1f6c`, DecisionPackage = contrato en confirm SEMI).
