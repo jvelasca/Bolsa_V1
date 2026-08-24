@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md`](./traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md).
 > **Política:** [`docs/adr/031-operational-model-tesis-plan-permiso.md`](../adr/031-operational-model-tesis-plan-permiso.md) §6 nota 4.0.
 > **AsOf:** 2026-08-25.
-> **HEAD previo:** `17a386d` = `origin/main`. Working tree **pendiente commit**.
+> **HEAD:** `1cbd021` (local). `origin/main` aún `17a386d`. **Pendiente push.**
 
 ---
 
@@ -25,12 +25,19 @@ Stop estructural determinista + `entry_ready` por bias TA + size con equity. **N
 - ruff touched Python: limpio
 - `pnpm test:decision-spine` → **75 passed** (antes 67)
 
-## 3. Siguiente (E1)
+## 3. Commits
 
-1. **Commit** de este working tree. **No auto-commit.**
-2. Push solo si el propietario lo pide.
-3. Familias EntrySetup / `NO_NEW_LONGS` — **prohibido** sin plan.
+| SHA       | Mensaje                                                                            |
+| --------- | ---------------------------------------------------------------------------------- |
+| `1cbd021` | feat(spine): ADR-031 Ciclo 4.0 structural stop, entry_ready, and size with equity. |
 
-## 4. No tocado
+Stamp SoT post-commit en el commit docs inmediato (HEAD local).
+
+## 4. Siguiente (E1)
+
+1. **Push** de `1cbd021` + stamp — solo si el propietario lo pide.
+2. Familias EntrySetup / `NO_NEW_LONGS` — **prohibido** sin plan.
+
+## 5. No tocado
 
 F9-B · purge · `PAPER_D_EXECUTE` · broker · `contract:gen` · thesis health / MFE · qty del ticket Confirm.

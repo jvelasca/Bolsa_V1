@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-24** HEAD `818b0c7` ADR-031 (stack, spine, tesis≠plan≠permiso, Journal F1–F3, Alembic 010; sin push)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `1cbd021` ADR-031 Ciclo 4.0 (stack, spine, stop/entry_ready/size; pendiente push)
 │   ├── PROJECT_PREMISES.md
 │   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
 │   ├── rfc/*  (constitución)
@@ -60,7 +60,7 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md ← **RELEVO ACTIVO** · ADR-031 Ciclo 4.0 stop estructural + entry_ready + size (working tree, pendiente commit) · HEAD previo `17a386d` = origin/main
+│   ├── traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md ← **RELEVO ACTIVO** · ADR-031 Ciclo 4.0 stop estructural + entry_ready + size · HEAD `1cbd021` (pendiente push; origin/main `17a386d`)
 │   ├── traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md ← histórico · ADR-031 Ciclos 0–3 · Hoy strip
 │   ├── traspaso-relevo-ruff-i001-ci-stamp-24e-2026-08-24.md ← relevo histórico · F9-A3 CI · Ruff I001 · pack 24e · cerrado por ADR-031
 │   ├── traspaso-relevo-ops-alembic-010-f9a3-monitor-purge-2026-08-24.md ← relevo histórico · Alembic `010` · F9-A3 CI · Purge V2 MONITOR · cerrado por 24e
