@@ -2,7 +2,7 @@
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §5 Golden G · §6 · relevo [`traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md`](./traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md).
 > **AsOf:** 2026-08-25 · HEAD **`f02ff1a`** = `origin/main` (Ciclo 4.0 cerrado).
-> **Estado:** **CÓDIGO CERRADO en working tree** (pendiente commit). D1–D6 aprobados 2026-08-25. EntrySetup = 4.2.
+> **Estado:** **CERRADO en origin `97f4862`.** D1–D6 aprobados 2026-08-25. EntrySetup = 4.2.
 > **Método:** rebanada fina; `check_opening` intacto; sin `contract:gen`; sin LLM en SL/size.
 
 ---
