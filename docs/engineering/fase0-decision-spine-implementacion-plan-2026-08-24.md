@@ -1,8 +1,8 @@
 # F0.5/F0.6 — Plan de implementación (código) — CERRADO
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **AsOf:** 2026-08-24 · ancla viva `git fetch; git rev-parse origin/main` = **`36dd6e3`** (`main == origin/main`).
-> **Estado:** **CERRADO.** F0.5b PortfolioFit v1 (`3670a09`) · F0.6b Decision Board backend (`8df8a65`) · F0.6-UI (`672e88f`) · D2/Esc.3/D1/deuda SEMI/D3 cerradas. Cierre de auditoría 2026-08-24: H1 `proposal_sector` en SEMI + H2 fail-closed si `GetPortfolioSummary` lanza (working tree; pendiente commit).
+> **AsOf:** 2026-08-24 · ancla viva `git fetch; git rev-parse origin/main` = **`5e81350`** (`main == origin/main`).
+> **Estado:** **CERRADO.** F0.5b PortfolioFit v1 (`3670a09`) · F0.6b Decision Board backend (`8df8a65`) · F0.6-UI (`672e88f`) · D2/Esc.3/D1/deuda SEMI/D3 cerradas. Cierre auditoría H1/H2 + Prove Spine S0–S3 en `5e81350`.
 > **Base:** [AS-IS F0.1](./fase0-decision-spine-asis-2026-08-24.md) · [TO-BE F0.2](./fase0-decision-spine-tobe-2026-08-24.md) · [Mapping F0.3](./fase0-decision-spine-mapping-2026-08-24.md) · [Descargue F0.4](./fase0-decision-spine-descarga-2026-08-24.md).
 
 ---
@@ -48,7 +48,7 @@
 
 1. Propietario aprobó F0.5 y F0.6. D1/D2/D3 cerradas.
 2. Métrica de encaje y fuente Daily (Decision Board) acordadas.
-3. Código + tests + relevos en `main` hasta `36dd6e3`. H1/H2 en working tree (cierre auditoría).
+3. Código + tests + relevos en `main` hasta `5e81350` (incl. H1/H2 + Prove Spine).
 
 ---
 

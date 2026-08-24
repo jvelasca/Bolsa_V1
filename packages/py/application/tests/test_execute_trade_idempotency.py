@@ -17,15 +17,16 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-
-from bolsa_application.accounts import ExecuteTrade
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     TradeResult,
     Transaction,
 )
+
+from bolsa_application.accounts import ExecuteTrade
+from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
 
 @dataclass
@@ -1047,3 +1048,138 @@ async def test_confirm_apertura_summary_falla_fail_closed() -> None:
     assert result["trade"]["status"] == "rejected_by_gate"
     assert result["trade"]["reason"] == "risk_veto"
     assert result["intent"]["status"] == "rejected_by_gate"
+
+
+# ── H5 — SEMI pasa InvestorProfile a check_opening (mismo SoT que AUTO) ────────
+
+
+def _profile_boundary_summary() -> _FakePortfolioSummary:
+    """Tech al 19% (38/200); fill 4@1 tech → 42/200 = 21%.
+
+    Entre conservative max_sector 20% (VETO) y moderate 30% (ALLOW).
+    """
+    return _FakePortfolioSummary(
+        positions=[
+            _FakePosition("t1", 10.0, "tech"),
+            _FakePosition("t2", 10.0, "tech"),
+            _FakePosition("t3", 10.0, "tech"),
+            _FakePosition("t4", 8.0, "tech"),
+            _FakePosition("h1", 20.0, "health"),
+            _FakePosition("e1", 20.0, "energy"),
+            _FakePosition("c1", 10.0, "cons"),
+        ],
+        total_equity=200.0,
+    )
+
+
+@dataclass
+class _FakeAccountWithProfile:
+    id: str = "acc-1"
+    active_profile_id: str | None = "prof-cons"
+
+
+@dataclass
+class _FakeScopeWithProfile:
+    account: _FakeAccountWithProfile = field(default_factory=_FakeAccountWithProfile)
+
+
+class _FakeAccountsWithProfile:
+    """AccountScopeLookup mínimo (H5) — resolve_scope → active_profile_id."""
+
+    def __init__(self, active_profile_id: str | None = "prof-cons") -> None:
+        self._scope = _FakeScopeWithProfile(
+            account=_FakeAccountWithProfile(active_profile_id=active_profile_id)
+        )
+
+    async def resolve_scope(
+        self, account_id: str, portfolio_id: str | None = None
+    ) -> _FakeScopeWithProfile:
+        return self._scope
+
+
+def _conservative_profile() -> InvestorProfileRecord:
+    """Copia mínima de test_trading_policy_guard._profile (template conservative)."""
+    return InvestorProfileRecord(
+        id="prof-cons",
+        name="Test",
+        version="1.0.0",
+        horizon="swing",
+        objectives=("growth",),
+        risk_tolerance="low",
+        experience="intermediate",
+        suggested_policy_template_id="conservative",
+        selected_policy_template_id="conservative",
+        updated_by="test",
+        created_at="2026-07-23T00:00:00Z",
+        updated_at="2026-07-23T00:00:00Z",
+    )
+
+
+class _FakeProfileStore:
+    """InvestorProfileStore mínimo (H5) — solo get."""
+
+    def __init__(self, profile: InvestorProfileRecord | None) -> None:
+        self._profile = profile
+
+    async def get(self, profile_id: str) -> InvestorProfileRecord | None:
+        if self._profile is not None and self._profile.id == profile_id:
+            return self._profile
+        return None
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_profile_conservative_veto() -> None:
+    """H5 — perfil conservative (max sector 20%) sobre cesta 21% tech → risk_veto."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_profile_boundary_summary(),  # type: ignore[arg-type]
+        instruments=_FakeInstruments({"inst-new": _FakeInstrument("inst-new", "tech")}),
+        accounts=_FakeAccountsWithProfile(),  # type: ignore[arg-type]
+        profile_store=_FakeProfileStore(_conservative_profile()),  # type: ignore[arg-type]
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-H5-VETO",
+            "instrumentId": "inst-new",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
+    assert result["intent"]["status"] == "rejected_by_gate"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_profile_none_allows_same_basket() -> None:
+    """H5 — misma cesta 21% tech sin profile_store → defaults moderate (30%) → fill."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_profile_boundary_summary(),  # type: ignore[arg-type]
+        instruments=_FakeInstruments({"inst-new": _FakeInstrument("inst-new", "tech")}),
+        accounts=_FakeAccountsWithProfile(),  # type: ignore[arg-type]
+        profile_store=None,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-H5-ALLOW",
+            "instrumentId": "inst-new",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["trade"]["status"] == "executed"

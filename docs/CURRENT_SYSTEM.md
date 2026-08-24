@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · ancla viva `git fetch; git rev-parse origin/main` = **`36dd6e3`**. Working tree puede llevar H1/H2 + esta rebanada spine **sin commit**.
+> **AsOf:** 2026-08-24 · ancla viva `git fetch; git rev-parse origin/main` = **`5e81350`** (`main` == `origin/main`). Prove Spine S0–S3 **pusheado**.
 > **Tag:** `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -44,7 +44,7 @@ SEMI y AUTO son **el mismo risk de cesta**, distinta autorización (D1). `Decisi
 - Dos call-sites a `ExecuteTrade` (TO-BE: convergencia **antes** del fill).
 - Dictamen (`DailyOpinionService`) no entra solo al Runtime; puede acabar en SEMI por alarma.
 - Aperturas orphan sin package: `contract=absent`, **sí ejecutan** (H3).
-- Confirm SEMI: `profile=None` (H5); cesta + kill-switch sí.
+- Confirm SEMI: perfil activo vía `active_profile_id` → `check_opening` (H5 CERRADA; mismo SoT AUTO). Sin perfil → defaults moderate.
 - Composite `portfolioConstraints` sigue `not_evaluated`; Fit vive al lado.
 - Sin Data Freshness Gate explícito · sin OrderProposal / Journal / Attribution.
 

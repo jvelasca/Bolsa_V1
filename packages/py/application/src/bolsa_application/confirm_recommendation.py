@@ -9,8 +9,7 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
   recommendation es una **apertura** (`recommend_long`/`recommend_short`), se
   re-ejecuta el risk de cesta (`check_opening` + kill-switch) antes de `ExecuteTrade`;
   si veta → `rejected_by_gate`/`risk_veto`. `exit_hint`/`reduce` NO se someten al
-  VETO (no abren cesta). Perfil de risk no se re-evalúa en esta rebanada
-  (`profile=None`); `portfolio_summary=None` conserva el comportamiento previo.
+  VETO (no abren cesta). `portfolio_summary=None` conserva el comportamiento previo.
 - **H1 (auditoría spine):** el sector de la puesta propuesta se resuelve desde
   `instruments.sector` (mismo dato que AUTO `hit.sector`) y se pasa a
   `check_opening(proposal_sector=...)` para que `MaxSectorExposure` cuente el
@@ -20,6 +19,12 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
   **falla** (excepción), el confirm es fail-closed (`risk_veto`): no hay
   override por indisponibilidad. `portfolio_summary=None` sigue sin aplicar
   cesta (tests / wiring legado).
+- **H5 (auditoría spine):** el confirm SEMI resuelve el `InvestorProfile` activo
+  de la cuenta (`accounts.resolve_scope` → `active_profile_id` →
+  `profile_store.get`) y lo pasa a `check_opening(profile=...)`, mismo SoT que
+  AUTO en `execution_router`. Sin store/accounts inyectados, sin
+  `active_profile_id`, o si la resolución falla → `profile=None` (fail-open
+  solo en perfil; cesta/kill-switch siguen aplicándose con defaults moderate).
 - **Cierre deuda confirm SEMI (Bug 1 + Bug 2):**
   - **Bug 1 (`wait` no trade):** solo las acciones transaccionales
     (`recommend_long`/`recommend_short`/`exit_hint`/`reduce`) pueden llegar a
@@ -45,11 +50,14 @@ from bolsa_analytics.cognitive.decision_session import (
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.cognitive.recommendation import Recommendation
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
+from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
 _CLOSING_ACTIONS = {"exit_hint", "reduce"}
@@ -67,6 +75,19 @@ class InstrumentSectorLookup(Protocol):
     """
 
     async def get_by_id(self, instrument_id: str) -> Any | None: ...
+
+
+class AccountScopeLookup(Protocol):
+    """Puerto mínimo para resolver el scope de cuenta en el confirm SEMI (H5).
+
+    `SqlAlchemyAccountRepository.resolve_scope` cumple el contrato. Solo se
+    usa `scope.account.active_profile_id` (mismo patrón que AUTO
+    `execution_router`).
+    """
+
+    async def resolve_scope(
+        self, account_id: str, portfolio_id: str | None = None
+    ) -> Any: ...
 
 
 def resolve_session_decision_package(
@@ -186,11 +207,15 @@ class ConfirmRecommendationIntent:
         execute_trade: Any | None = None,
         portfolio_summary: GetPortfolioSummary | None = None,
         instruments: InstrumentSectorLookup | None = None,
+        profile_store: InvestorProfileStore | None = None,
+        accounts: AccountScopeLookup | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
         self._portfolio_summary = portfolio_summary
         self._instruments = instruments
+        self._profile_store = profile_store
+        self._accounts = accounts
 
     async def execute(
         self,
@@ -367,13 +392,14 @@ class ConfirmRecommendationIntent:
         Re-ejecuta el risk de cesta (`check_opening`, el mismo que AUTO en
         `execution_router._execute_paper_trade`) para una apertura validada antes de
         tocar `ExecuteTrade`. Devuelve True si la cesta/kill-switch permiten el fill.
-        El perfil de risk NO se re-evalúa (`profile=None`); `exit_hint`/`reduce`
-        quedan fuera (no abren cesta).
+        `exit_hint`/`reduce` quedan fuera (no abren cesta).
 
         H2 / D1: si el summary está inyectado y lanza, se VETA (fail-closed).
         `portfolio_summary=None` no aplica cesta (comportamiento Escalón 3).
         H1: `proposal_sector` se resuelve desde `instruments.sector` cuando hay
         lookup inyectado (mismo dato que AUTO `hit.sector`).
+        H5: `profile` se resuelve desde `active_profile_id` (mismo SoT que AUTO);
+        fallo de resolución → `None` (defaults moderate; no tumba cesta/kill-switch).
         """
         if self._portfolio_summary is None:
             return True
@@ -385,7 +411,7 @@ class ConfirmRecommendationIntent:
         positions = getattr(summary, "positions", None)
         open_positions_count = len(positions) if positions is not None else 0
         decision = check_opening(
-            profile=None,
+            profile=await self._resolve_opening_profile(account_id),
             instrument_id=intent.instrument_id,
             symbol=str(rec.symbol or intent.instrument_id),
             trade_type=str(intent.side),
@@ -400,6 +426,28 @@ class ConfirmRecommendationIntent:
             proposal_sector=await self._resolve_proposal_sector(intent.instrument_id),
         )
         return bool(decision.allowed)
+
+    async def _resolve_opening_profile(
+        self, account_id: str
+    ) -> InvestorProfileRecord | None:
+        """H5 — perfil activo de la cuenta (mismo SoT que AUTO execution_router).
+
+        Fail-open solo en perfil: sin store/accounts, sin `active_profile_id`, o
+        cualquier excepción → `None` (check_opening usa defaults moderate). La
+        cesta y el kill-switch siguen evaluándose con el summary inyectado.
+        """
+        if self._profile_store is None or self._accounts is None or not account_id:
+            return None
+        try:
+            scope = await self._accounts.resolve_scope(account_id)
+            active_profile_id = getattr(
+                getattr(scope, "account", None), "active_profile_id", None
+            )
+            if not active_profile_id:
+                return None
+            return await self._profile_store.get(active_profile_id)
+        except Exception:  # noqa: BLE001 — perfil opcional; no tumba cesta/kill-switch
+            return None
 
     async def _resolve_proposal_sector(self, instrument_id: str) -> str | None:
         """H1 — sector de la puesta nueva desde `instruments.sector` (SoT AUTO).

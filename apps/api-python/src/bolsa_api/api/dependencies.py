@@ -1121,7 +1121,9 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
 
     Escalón 3/D1: inyecta `portfolio_summary` (read-only) para la re-evaluación VETO
     de cesta en el confirm SEMI (solo aperturas). H1: inyecta el repo de instrumentos
-    para resolver `proposal_sector` (mismo SoT que AUTO). No cambia el contrato HTTP.
+    para resolver `proposal_sector` (mismo SoT que AUTO). H5: inyecta accounts +
+    profile_store para pasar el InvestorProfile activo a `check_opening` (mismo SoT
+    que AUTO). No cambia el contrato HTTP.
     """
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
@@ -1130,6 +1132,8 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         execute_trade=get_execute_trade_use_case(session),
         portfolio_summary=get_portfolio_summary_use_case(session),
         instruments=get_instrument_repository(session),
+        accounts=get_account_repository(session),
+        profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
     )
 
 
