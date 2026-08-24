@@ -60,7 +60,16 @@ Engineering Index  (este doc)
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24.md ← **PACK auditoría R-1→R-13 + Track B** (vivo) · HEAD `47a3b58` · supersedes 2026-08-22
 │   ├── audit-pack-estado-global-2026-08-22.md ← histórico (pre Track B)
-│   ├── traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md ← **RELEVO VIVO** post B12 · Track B split CERRADO · siguiente decisión de ciclo
+│   ├── traspaso-relevo-fase0-f01-asis-apertura-f02-2026-08-24.md ← **RELEVO VIVO** Fase 0 · F0.1 AS-IS cerrado · F0.2 TO-BE
+│   ├── fase0-decision-spine-roadmap-2026-08-24.md ← **esquema maestro Fase 0** (roadmap F0.1→F0.2→F0.3→Fit→Daily vista) · verificación del orquestador · docs-only
+│   ├── fase0-decision-spine-tobe-2026-08-24.md ← **F0.2 TO-BE Decision Spine** (arquitectura objetivo; tres colas → DecisionPackage → fill) · docs-only · verificado VERDE vs AS-IS
+│   ├── fase0-decision-spine-mapping-2026-08-24.md ← **F0.3 Mapping** (carta conservar/adaptar/crear/no-op por ítem del AS-IS) · docs-only · Fit único create · verificado VERDE vs AS-IS
+│   ├── fase0-decision-spine-descarga-2026-08-24.md ← **F0.4 Descargue de decisión** (gates+autorización; D1 risk cesta SÍMI y AUTO, sin override) · docs-only · verificado VERDE · D2/D3 pendientes
+│   ├── traspaso-relevo-fase0-cierre-docs-apertura-codigo-2026-08-24.md ← relevo histórico · F0.5 (Fit) abierta · F0.5a métrica = decisión propietario · F0.6 pendiente
+│   ├── traspaso-relevo-f0-5b-cierre-apertura-f0-6-2026-08-24.md ← **RELEVO ACTIVO** · **F0.5b PortfolioFit v1 CERRADA** (`3670a09`) · F0.6 (Daily vista) SIN aprobar
+│   ├── fase0-decision-spine-implementacion-plan-2026-08-24.md ← **PLAN CÓDIGO F0.5/F0.6** (Fit + Daily vista) · **F0.5 CERRADA** · **F0.6 SIN aprobar**
+│   ├── fase0-decision-spine-asis-2026-08-24.md ← **F0.1 AS-IS Decision Spine** (inventario file:line, cero código) · HEAD `f69a7b0`
+│   ├── traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md ← relevo histórico post B12 · Track B split CERRADO
 │   ├── traspaso-relevo-track-b-b11-apertura-b12-2026-08-23.md ← relevo histórico post B11 · apertura B12 thin shell (código B12 `3f9bd7e`)
 │   ├── traspaso-relevo-track-b-b10-apertura-b11-2026-08-23.md ← relevo histórico post B10 · apertura B11 JSX tab `jobs` (código B11 `50649a3`)
 │   ├── traspaso-relevo-track-b-b8-apertura-b9-2026-08-23.md ← relevo histórico post B8 · apertura B9 Lab handlers (código B9 `7e2d24f` sin stamp docs propio)
@@ -165,11 +174,12 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 9.  **Thaw AUTO (prep, flag off):** [camino-d-auto-thaw-checklist-2026-08-04.md](./camino-d-auto-thaw-checklist-2026-08-04.md)
 10. **Triage institucional pre-AUTO (Aud 1+2):** [audit-ext-institutional-pre-auto-triage-2026-08-04.md](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)
 11. **Risk Engine OR-RE v0:** [risk-engine-or-re-2026-08-04.md](./risk-engine-or-re-2026-08-04.md)
-12. **OR-lite + Repro+ + Obs/CI:** [or-lite-repro-obs-2026-08-04.md](./or-lite-repro-obs-2026-08-04.md)
-13. **Prep A2–A5 (flag off):** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed
-14. **Pack auditoría prep AUTO:** [audit-pack-pre-auto-a0-a5-2026-08-04.md](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — SEMI OK · execute AUTO **no**
-15. **Resumen operativo diario (R1–R4):** [daily-ops-report-brief-2026-08-04.md](./daily-ops-report-brief-2026-08-04.md) — Diario · HTML email · PDF opt-in
-16. **Auditoría consolidada interna+externas + plan hardening (2026-08-11):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) — 4 fuentes cruzadas (interna · externa 1 · externa 2 · externa 3) · mapa P0/P1/P2 · plan F1–F5 · decisiones D0–D5 pactadas · checkpoint git `audit-checkpoint-2026-08-11` · NO tocar código
+12. **Fase 0 Decision Spine — F0.1 AS-IS:** [fase0-decision-spine-asis-2026-08-24.md](./fase0-decision-spine-asis-2026-08-24.md) — inventario file:line; cero código
+13. **OR-lite + Repro+ + Obs/CI:** [or-lite-repro-obs-2026-08-04.md](./or-lite-repro-obs-2026-08-04.md)
+14. **Prep A2–A5 (flag off):** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed
+15. **Pack auditoría prep AUTO:** [audit-pack-pre-auto-a0-a5-2026-08-04.md](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — SEMI OK · execute AUTO **no**
+16. **Resumen operativo diario (R1–R4):** [daily-ops-report-brief-2026-08-04.md](./daily-ops-report-brief-2026-08-04.md) — Diario · HTML email · PDF opt-in
+17. **Auditoría consolidada interna+externas + plan hardening (2026-08-11):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) — 4 fuentes cruzadas (interna · externa 1 · externa 2 · externa 3) · mapa P0/P1/P2 · plan F1–F5 · decisiones D0–D5 pactadas · checkpoint git `audit-checkpoint-2026-08-11` · NO tocar código
     >     └── **Plan F1 (integridad financiera):** [plan-f1-integridad-financiera-2026-08-11.md](./plan-f1-integridad-financiera-2026-08-11.md) — micro-cambios M1–M5 (`with_for_update`, `deduct_cash`, `ExecuteTrade`, idempotencia, invariantes) · batería+riesgos+orden commits · pendiente de aprobación
     >         └── **F1 — traspaso de hilo:** [traspaso-f1-integridad-financiera-2026-08-11.md](./traspaso-f1-integridad-financiera-2026-08-11.md) — documento de trabajo F1 (integridad financiera) **CERRADO 2026-08-11** ✅ · rama `stage/f1-integridad-financiera-2026-08-11` creada desde `7edb3d1` · M1 `3d093cb` (with_for_update) · M2 `113e27a` (deduct_cash allow_partial, Opción B) · M3 `5128cf4` (ExecuteTrade saldo real) · M4 `986399d` (idempotencia+contrato estricto, migración Prisma `20260811010000_trade_idempotency`) · M5 `3c59dc8` (suite invariantes contables) · **verificación final**: web 707 ✓ · infra M2+M5 8+8 ✓ · api M4 3 ✓ · ruff 0 nuevos · mypy 0 nuevos (71 pre-existentes base) · **cero regresiones** · commits M1→M5 · ver §9 del traspaso
     >         └── **F2 — traspaso de hilo:** [traspaso-f2-backtest-next-open-2026-08-11.md](./traspaso-f2-backtest-next-open-2026-08-11.md) — documento de trabajo F2 (Rigor científico del backtest, fill `next_open`) **COMPLETADO 2026-08-11** · A `backtest.py` `execution_model` next_open · B grids H0 SMA/RSI/MACD + `optimize.py` · C `vectorbt_sma`/`optuna_sma` shift+open · D fingerprint OHLCV completo + bump manifest 1.1 / engine 0.4.0 · E `test_no_lookahead.py` · F `scripts/research/recalc_trials_next_open.py` · pytest analytics 323✓ + application 222✓ + api offline 9✓ = **554✓ · 0 fallos** · **PR #30 MERGED** (fast-forward en `stage/f1-*`, 6 commits C1–C6, rama `stage/f2-*` eliminada) · **recálculo de trials ejecutado 20/20 (`next_open`, engine 0.4.0)** · fix `distinct` SQLAlchemy 2.0 (`a3573ae`) · deuda: `--mark-legacy` no-op (sin columna, → F3b) · ver §9

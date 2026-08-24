@@ -149,7 +149,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b2ee0f2`).** Pista documental registrada.
 - **F4′–F6′ ✅ CERRADAS (2026-08-23, `240c846`).** Copy hub `/screeners` + toasts B0 + tests `screenersHrefAfterTrackerCreate`. Batería web 754/754.
 
-> **Estado general:** **`main` == `origin/main` == `bb15d1a`** (B12 código `3f9bd7e` + cierre docs). Tag **`v1.6.0-beta` → `c3964fc`**. Research→Radar copy **HECHO** (`240c846`); split `backtests-page` **B1–B12 HECHAS** (`6271c8c`·`fcdc857`·`bcadea9`·`5475c09`·`ca13981`·`5c03ff7`·`09f908b`·`6e998bd`·`7e2d24f`·`bef3c9f`·`50649a3`·`3f9bd7e`); shell **321 LOC**; **Track B split CERRADO**. Smoke manual pendiente (no bloqueante). Relevo vivo: `traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md`. **Siguiente: decisión de ciclo.**
+> **Estado general:** **`main` == `origin/main` == `3670a09`** (F0.5b PortfolioFit v1). Tag **`v1.6.0-beta` → `c3964fc`**. **Fase 0 Decision Spine — tramo DOCS COMPLETO** (F0.1 AS-IS · F0.2 TO-BE · F0.3 Mapping · F0.4 Descarga) · **F0.5a** métrica decidida (concentración cesta activo+sector, VETO) · **F0.5b PortfolioFit v1 CERRADA** (commit `3670a09`, batería 31 passed · ruff 0 · mypy 0 · verificador APROBADO): encaje de cesta consumido por `check_opening`, regla `MaxSectorExposure` (antes sin evaluar) + `MaxConcentration` a nivel cesta. **F0.6 (Daily vista) sigue SIN aprobar.** Relevo: `traspaso-relevo-f0-5b-cierre-apertura-f0-6-2026-08-24.md`.
 
 ---
 
