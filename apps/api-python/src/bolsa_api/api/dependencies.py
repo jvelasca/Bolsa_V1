@@ -433,6 +433,22 @@ def get_decision_board_use_case(session: AsyncSession) -> Any:
     )
 
 
+def get_journal_repository(session: AsyncSession) -> Any:
+    """ADR-029 — repositorio append-only + lectura paginada del journal."""
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalRepository,
+    )
+
+    return SqlAlchemyJournalRepository(session)
+
+
+def get_decision_journal_use_case(session: AsyncSession) -> Any:
+    """ADR-029 F2 — Decision Journal (vista SOLO LECTURA del audit trail)."""
+    from bolsa_application.decision_journal import GetDecisionJournal
+
+    return GetDecisionJournal(get_journal_repository(session))
+
+
 def get_portfolio_summary_use_case(session: AsyncSession) -> GetPortfolioSummary:
     return GetPortfolioSummary(get_account_repository(session), get_portfolio_repository(session))
 
@@ -1067,11 +1083,7 @@ def get_cognitive_repository(session: AsyncSession) -> SqlAlchemyCognitiveReposi
 
 
 def get_journal_writer(session: AsyncSession) -> Any:
-    from bolsa_infrastructure.database.repositories.journal_repository import (
-        SqlAlchemyJournalWriter,
-    )
-
-    return SqlAlchemyJournalWriter(session)
+    return get_journal_repository(session)
 
 
 class _EdgeReportAdapter:

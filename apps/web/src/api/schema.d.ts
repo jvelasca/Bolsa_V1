@@ -201,6 +201,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts/{account_id}/decision-journal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Decision Journal
+         * @description ADR-029 F2 — Decision Journal: audit trail append-only del spine (solo lectura).
+         *
+         *     Lista cronológica descendente de transiciones registradas por JournalWriter.
+         *     No decide ni muta estado.
+         */
+        get: operations["get_decision_journal_api_accounts__account_id__decision_journal_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts/{account_id}/deposits": {
         parameters: {
             query?: never;
@@ -4504,6 +4527,59 @@ export interface components {
         /** DecisionBoardResponseDto */
         DecisionBoardResponseDto: {
             data: components["schemas"]["DecisionBoardDto"];
+        };
+        /**
+         * DecisionJournalEntryDto
+         * @description Wire alineado con ``DecisionJournalEntryV1`` (@bolsa/shared).
+         */
+        DecisionJournalEntryDto: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Actor */
+            actor: string;
+            /**
+             * Artifacttype
+             * @default ART-DECISION-JOURNAL-ENTRY
+             */
+            artifactType: string;
+            /** Createdat */
+            createdAt: string;
+            /** Decisionid */
+            decisionId: string;
+            /** Entryid */
+            entryId: string;
+            /** Eventtype */
+            eventType: string;
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /** Payload */
+            payload?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Schemaversion
+             * @default 1.0.0
+             */
+            schemaVersion: string;
+            /** Sessionid */
+            sessionId?: string | null;
+        };
+        /** DecisionJournalListDto */
+        DecisionJournalListDto: {
+            /** Accountid */
+            accountId: string;
+            /** Entries */
+            entries: components["schemas"]["DecisionJournalEntryDto"][];
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Total */
+            total: number;
+        };
+        /** DecisionJournalListResponseDto */
+        DecisionJournalListResponseDto: {
+            data: components["schemas"]["DecisionJournalListDto"];
         };
         /** DecisionSessionSummaryDto */
         DecisionSessionSummaryDto: {
@@ -9242,6 +9318,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionBoardResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_decision_journal_api_accounts__account_id__decision_journal_get: {
+        parameters: {
+            query?: {
+                instrumentId?: string | null;
+                /** @description ISO-8601 timestamp inclusive lower bound */
+                since?: string | null;
+                eventType?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionJournalListResponseDto"];
                 };
             };
             /** @description Validation Error */

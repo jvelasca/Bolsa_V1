@@ -3421,6 +3421,143 @@
         "title": "DecisionBoardResponseDto",
         "type": "object"
       },
+      "DecisionJournalEntryDto": {
+        "description": "Wire alineado con ``DecisionJournalEntryV1`` (@bolsa/shared).",
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "artifactType": {
+            "default": "ART-DECISION-JOURNAL-ENTRY",
+            "title": "Artifacttype",
+            "type": "string"
+          },
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "decisionId": {
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "entryId": {
+            "title": "Entryid",
+            "type": "string"
+          },
+          "eventType": {
+            "title": "Eventtype",
+            "type": "string"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          },
+          "schemaVersion": {
+            "default": "1.0.0",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "sessionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessionid"
+          }
+        },
+        "required": [
+          "entryId",
+          "decisionId",
+          "eventType",
+          "actor",
+          "createdAt"
+        ],
+        "title": "DecisionJournalEntryDto",
+        "type": "object"
+      },
+      "DecisionJournalListDto": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionJournalEntryDto"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountId",
+          "entries",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DecisionJournalListDto",
+        "type": "object"
+      },
+      "DecisionJournalListResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DecisionJournalListDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "DecisionJournalListResponseDto",
+        "type": "object"
+      },
       "DecisionSessionSummaryDto": {
         "properties": {
           "accountId": {
@@ -17011,6 +17148,122 @@
           }
         },
         "summary": "Get Decision Board",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/api/accounts/{account_id}/decision-journal": {
+      "get": {
+        "description": "ADR-029 F2 — Decision Journal: audit trail append-only del spine (solo lectura).\n\nLista cronológica descendente de transiciones registradas por JournalWriter.\nNo decide ni muta estado.",
+        "operationId": "get_decision_journal_api_accounts__account_id__decision_journal_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instrumentId",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instrumentid"
+            }
+          },
+          {
+            "description": "ISO-8601 timestamp inclusive lower bound",
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ISO-8601 timestamp inclusive lower bound",
+              "title": "Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eventType",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Eventtype"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionJournalListResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Decision Journal",
         "tags": [
           "accounts"
         ]

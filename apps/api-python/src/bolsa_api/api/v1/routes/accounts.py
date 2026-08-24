@@ -12,6 +12,7 @@ from bolsa_api.api.dependencies import (
     get_daily_ops_report_use_case,
     get_db_session,
     get_decision_board_use_case,
+    get_decision_journal_use_case,
     get_delete_account_use_case,
     get_deposit_cash_use_case,
     get_get_account_summary_use_case,
@@ -47,6 +48,7 @@ from bolsa_api.schemas.accounts import (
     DailyOpsDigestNotifyDto,
     DailyOpsDigestNotifyResponseDto,
     DecisionBoardResponseDto,
+    DecisionJournalListResponseDto,
     DepositCashDto,
     LedgerResponseDto,
     SendDailyOpsDigestDto,
@@ -309,6 +311,37 @@ async def get_decision_board(
     bundle = await get_decision_board_use_case(session).execute(account_id)
     data = bundle.to_dict()
     return DecisionBoardResponseDto(data=data)
+
+
+@router.get(
+    "/accounts/{account_id}/decision-journal",
+    response_model=DecisionJournalListResponseDto,
+)
+async def get_decision_journal(
+    account_id: Annotated[str, Depends(require_account_access)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    instrument_id: Annotated[str | None, Query(alias="instrumentId")] = None,
+    since: Annotated[str | None, Query(description="ISO-8601 timestamp inclusive lower bound")] = None,
+    event_type: Annotated[str | None, Query(alias="eventType")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> DecisionJournalListResponseDto:
+    """ADR-029 F2 — Decision Journal: audit trail append-only del spine (solo lectura).
+
+    Lista cronológica descendente de transiciones registradas por JournalWriter.
+    No decide ni muta estado.
+    """
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    result = await get_decision_journal_use_case(session).execute(
+        account_id,
+        instrument_id=instrument_id,
+        since=since,
+        event_type=event_type,
+        limit=limit,
+        offset=offset,
+    )
+    return DecisionJournalListResponseDto(data=result.to_dict())
 
 
 @router.get("/accounts/{account_id}/daily-ops-report.pdf")

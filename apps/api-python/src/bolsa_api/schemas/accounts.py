@@ -398,3 +398,35 @@ class DecisionBoardDto(BaseModel):
 
 class DecisionBoardResponseDto(BaseModel):
     data: DecisionBoardDto
+
+
+class DecisionJournalEntryDto(BaseModel):
+    """Wire alineado con ``DecisionJournalEntryV1`` (@bolsa/shared)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    artifact_type: str = Field(default="ART-DECISION-JOURNAL-ENTRY", alias="artifactType")
+    schema_version: str = Field(default="1.0.0", alias="schemaVersion")
+    entry_id: str = Field(alias="entryId")
+    decision_id: str = Field(alias="decisionId")
+    session_id: str | None = Field(default=None, alias="sessionId")
+    account_id: str | None = Field(default=None, alias="accountId")
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+    event_type: str = Field(alias="eventType")
+    actor: str
+    payload: dict[str, Any] | None = None
+    created_at: str = Field(alias="createdAt")
+
+
+class DecisionJournalListDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    account_id: str = Field(alias="accountId")
+    entries: list[DecisionJournalEntryDto]
+    total: int
+    limit: int
+    offset: int
+
+
+class DecisionJournalListResponseDto(BaseModel):
+    data: DecisionJournalListDto
