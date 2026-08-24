@@ -74,6 +74,8 @@ _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se en
 2. Alarma / Proponer F3 → **Confirmar** (`/confirm`) → humano firma y ejecuta.
 3. Asesor → Opiniones: telemetría proxy (días / precisión / recall) alimenta P1–P4 del thaw.
 
+> **Firma SEMI (contrato):** al **aceptar** (`Confirmar`), la operación firma contra la propuesta original (`DecisionPackage`). Si lo que firmas **no coincide** con lo propuesto (otro valor o cambiar compra↔venta), se **rechaza con «rechazado por el sistema»** y el ítem **sale de la cola** (no se ejecuta nada). Editar tamaño/precio **sí** es válido. Cuando no hay propuesta original (`contract: ausente`) la firma sigue como antes. Detalle: `traspaso-relevo-f0-6-cierre-apertura-siguiente-2026-08-24.md` (D2).
+
 ### AUTO (No disponible · BETA)
 
 No seleccionar ni armar. Pill fija «AUTO · No disponible (BETA)». No confundir con **Lista AUTO** del Laboratorio.
