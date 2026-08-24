@@ -1,8 +1,10 @@
 # RELEVO — TradePlan en propose/confirm + Hoy live (2026-08-24)
 
+> [!INFO] **SUPERSEDIDO (2026-08-25).** El relevo vivo es [`traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md`](./traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md). Este documento queda **histórico**: TradePlan en propose/confirm ya está en `origin/main` (`17a386d`).
+
 > **Padre:** [`traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md`](./traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md).
 > **AsOf:** 2026-08-24.
-> **Código:** working tree (pendiente commit). HEAD local previo `593cbd1` (stamp) sobre `818b0c7` (ADR-031). `origin/main` = `020975c`. **Sin push.**
+> **Código:** cerrado en `17a386d` = `origin/main`.
 
 ---
 

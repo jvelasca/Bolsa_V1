@@ -73,22 +73,24 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 ---
 
-## 5. Golden scenarios (papel; tests v0 cubren A/B/C/H)
+## 5. Golden scenarios (papel; tests cubren A/B/C/H; Ciclo 4.0 vive A/B/D)
 
-| Id    | Nombre                        | Entrada                                                                         | Resultado                                                 |
-| ----- | ----------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| **A** | Breakout perfecto             | Bull, calidad alta, entry ready, stop estructural, Fit OK                       | `TRIGGERED` + size > 0                                    |
-| **B** | Gran activo / mala entrada    | Quality alta, `entry_ready=False`                                               | `WATCH` (no BUY)                                          |
-| **C** | Gran setup / veto cartera     | Fit concentración/sector                                                        | `BLOCKED`                                                 |
-| **D** | Stop demasiado lejos          | Size se reduce; no se mueve el stop (Ciclo 4 si hace falta size-down vs reject) | documentado; v0 size por fórmula, reject si stop inválido |
-| **E** | Posición ganadora T1          | Protección / trail                                                              | **Diferido** Ciclo 5                                      |
-| **F** | Tesis se degrada, precio > SL | `REVIEW`                                                                        | **Diferido** Ciclo 5                                      |
-| **G** | Régimen BULL → BEAR           | `NO_NEW_LONGS`                                                                  | **Diferido** Ciclo 4                                      |
-| **H** | Plan caducado                 | `expiresAt` pasado                                                              | `EXPIRED` / confirm no ejecuta                            |
+| Id    | Nombre                        | Entrada                                                   | Resultado                                      |
+| ----- | ----------------------------- | --------------------------------------------------------- | ---------------------------------------------- |
+| **A** | Breakout perfecto             | Bull, calidad alta, entry ready, stop estructural, Fit OK | `TRIGGERED` + size > 0                         |
+| **B** | Gran activo / mala entrada    | Quality alta, `entry_ready=False`                         | `WATCH` (no BUY)                               |
+| **C** | Gran setup / veto cartera     | Fit concentración/sector                                  | `BLOCKED`                                      |
+| **D** | Stop demasiado lejos          | Size se reduce; no se mueve el stop                       | **Ciclo 4.0:** swing más lejano gana; qty baja |
+| **E** | Posición ganadora T1          | Protección / trail                                        | **Diferido** Ciclo 5                           |
+| **F** | Tesis se degrada, precio > SL | `REVIEW`                                                  | **Diferido** Ciclo 5                           |
+| **G** | Régimen BULL → BEAR           | `NO_NEW_LONGS`                                            | **Diferido** Ciclo 4                           |
+| **H** | Plan caducado                 | `expiresAt` pasado                                        | `EXPIRED` / confirm no ejecuta                 |
 
 ---
 
 ## 6. Qué queda diferido (Ciclo 4+)
+
+**Ciclo 4.0 (esta rebanada):** stop estructural ATR×1.5 + swing 10 barras cerradas (el más lejano), `entry_ready` por bias TA (sin exhaustion), size con `GetPortfolioSummary.total_equity` y `max_risk_per_trade_pct` de la plantilla. Sin familias `EntrySetup`. Confirm rebuild sin barras sigue `WATCH`/`no_stop`. `check_opening` intacto.
 
 No abrir sin fase propia:
 

@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · **ADR-031** tesis ≠ plan ≠ permiso. Ciclos 0–3 en `818b0c7` + stamp `593cbd1` (local, **sin push**; `origin/main` = `020975c`). TradePlan **viaja** en propose/confirm (working tree P1, pendiente commit). Relevo: [`traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md`](./engineering/traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD previo **`17a386d`** = `origin/main` (TradePlan en propose/confirm). Ciclo 4.0 stop/entry_ready/size **en working tree (pendiente commit)**. Relevo: [`traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -55,19 +55,19 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - `pending_orders` fill: `POST /api/pending-orders/{id}/fill` (ya no `executeTrade` directo desde el monitor).
 - Confirm SEMI: perfil activo vía `active_profile_id` → `check_opening` (H5 CERRADA; mismo SoT AUTO). Sin perfil → defaults moderate.
 - Composite `portfolioConstraints` sigue `not_evaluated`; Fit vive al lado.
-- **DS-03 Account Mandate Gate CERRADA (`41adb8e`):** tenure abierto server-side (`mandate_tenures` vía sync cliente) → `check_opening` VETO fail-closed sin mandato / mismatch estrategia AUTO. Adopción UI (`strategy-adoption`) sigue proyección cliente; el gate usa BD. Exits fuera. Batería `pnpm test:decision-spine` **67**.
-- TradePlan v0 en propose/confirm: sin Entry Engine el plan vivo es casi siempre **WATCH** (`no_stop` / `entry`). Decision Board HTTP **no** expone `tradePlan` en sesiones (sin `contract:gen`).
+- **DS-03 Account Mandate Gate CERRADA (`41adb8e`):** tenure abierto server-side (`mandate_tenures` vía sync cliente) → `check_opening` VETO fail-closed sin mandato / mismatch estrategia AUTO. Adopción UI (`strategy-adoption`) sigue proyección cliente; el gate usa BD. Exits fuera. Batería `pnpm test:decision-spine` **75**.
+- TradePlan Ciclo 4.0: stop ATR×1.5 + swing (más lejano), `entry_ready` por bias TA, size con equity de cartera. Confirm rebuild sin barras → `WATCH`/`no_stop`. `suggestedQuantity` del ticket F3 **no** se pisa con `TradePlan.quantity`. Decision Board HTTP **no** expone `tradePlan` en sesiones (sin `contract:gen`).
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). Attribution **sin abrir** (Ciclo 6, ADR-031 §6).
 - Diferido ADR-031: Entry families, `NO_NEW_LONGS`, thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
 
 ## Tests
 
-| Comando                    | Qué cubre                                                                                                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H, AUTO veto, Golden, **DS-05**, **DS-03** |
-| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                  |
-| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                     |
-| `pnpm test:py`             | Pytest amplio                                                                                                                      |
+| Comando                    | Qué cubre                                                                                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H + 4.0 stop/ready/size, AUTO veto, Golden, **DS-05**, **DS-03** |
+| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                        |
+| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                           |
+| `pnpm test:py`             | Pytest amplio                                                                                                                                            |
 
 ## Open risks (ops, no código)
 

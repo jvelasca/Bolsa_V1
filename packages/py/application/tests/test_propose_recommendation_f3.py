@@ -110,6 +110,7 @@ def test_propose_from_ta_bullish_bars():
     assert plan["status"] in {"WATCH", "ARMED", "TRIGGERED", "BLOCKED", "EXPIRED"}
     assert isinstance(plan["whyNot"], list)
     assert plan["decisionId"] == result.package.decision_id
+    assert "structuralStop" in plan
     session_runtime = (payload.get("decisionSession") or {}).get("runtime") or {}
     assert session_runtime.get("tradePlan") == plan
 

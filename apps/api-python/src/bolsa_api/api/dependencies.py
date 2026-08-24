@@ -1135,6 +1135,7 @@ def get_propose_recommendation_use_case(session: AsyncSession) -> Any:
         cognitive_store=cognitive,
         prediction_store=get_prediction_repository(session),
         journal_writer=get_journal_writer(session),
+        portfolio_summary=get_portfolio_summary_use_case(session),
     )
 
 

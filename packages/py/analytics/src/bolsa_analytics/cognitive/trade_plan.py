@@ -6,6 +6,7 @@ No sustituye el spine: mapea tesis + gates a un estado operativo
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
@@ -71,6 +72,89 @@ def compliance_fit_ok(compliance_check: object) -> bool:
     )
 
 
+# Ciclo 4.0 — stop estructural (no familias EntrySetup).
+ATR_MULT = 1.5
+SWING_LOOKBACK = 10
+
+
+def _finite_positive(value: object) -> float | None:
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if number != number or number <= 0:  # NaN or non-positive
+        return None
+    return number
+
+
+def _bar_px(bar: object, attr: str) -> float | None:
+    return _finite_positive(getattr(bar, attr, None))
+
+
+def compute_structural_stop(
+    *,
+    action: str,
+    entry: float | None,
+    atr: float | None = None,
+    bars: Sequence[object] | None = None,
+) -> float | None:
+    """Stop más lejano de ATR×1.5 y swing de 10 barras cerradas.
+
+    No se acerca el stop para caber en el riesgo: se elige el candidato más
+    lejos de ``entry`` (min long / max short). Sin candidatos válidos → None.
+    """
+    if entry is None or entry <= 0:
+        return None
+    direction = _direction_from_action(action)
+    if direction == "none":
+        return None
+
+    candidates: list[float] = []
+    atr_val = _finite_positive(atr)
+    if atr_val is not None:
+        if direction == "long":
+            atr_stop = entry - ATR_MULT * atr_val
+            if atr_stop > 0 and atr_stop < entry:
+                candidates.append(atr_stop)
+        else:
+            atr_stop = entry + ATR_MULT * atr_val
+            if atr_stop > entry:
+                candidates.append(atr_stop)
+
+    if bars is not None and len(bars) >= SWING_LOOKBACK + 1:
+        window = bars[-(SWING_LOOKBACK + 1) : -1]
+        if direction == "long":
+            lows = [_bar_px(bar, "low") for bar in window]
+            valid = [low for low in lows if low is not None and low < entry]
+            if valid:
+                candidates.append(min(valid))
+        else:
+            highs = [_bar_px(bar, "high") for bar in window]
+            valid = [high for high in highs if high is not None and high > entry]
+            if valid:
+                candidates.append(max(valid))
+
+    if not candidates:
+        return None
+    return min(candidates) if direction == "long" else max(candidates)
+
+
+def entry_ready_from_ta(
+    *,
+    action: str,
+    bias: str | None,
+    exhaustion: bool = False,
+) -> bool:
+    """Ciclo 4.0: listo si la acción alinea con bias TA y no hay exhaustion."""
+    if exhaustion:
+        return False
+    if action == "recommend_long":
+        return bias == "bullish"
+    if action == "recommend_short":
+        return bias == "bearish"
+    return False
+
+
 def build_v0_trade_plan_dict(
     *,
     decision_id: str,
@@ -81,13 +165,21 @@ def build_v0_trade_plan_dict(
     opportunity_score: float | None,
     expires_at: str | None,
     expired: bool = False,
+    atr: float | None = None,
+    bars: Sequence[object] | None = None,
+    bias: str | None = None,
+    exhaustion: bool = False,
+    equity: float = 0.0,
+    risk_pct: float = 0.5,
 ) -> dict[str, object]:
-    """TradePlan v0 persistible (PLAN layer; ranking ≠ BUY).
+    """TradePlan persistible (PLAN layer; ranking ≠ BUY).
 
     Freshness/mandate quedan True: esos gates viven en confirm ``check_opening``.
-    ``entry_ready=False`` y ``structural_stop=None`` hasta Entry Engine (Ciclo 4).
-    Equity 0: el propose no inyecta GetAccountSummary en esta rebanada.
+    Sin ATR/barras/bias (rebuild confirm) → ``WATCH`` / ``no_stop`` o ``entry``.
     """
+    structural_stop = compute_structural_stop(
+        action=action, entry=entry, atr=atr, bars=bars
+    )
     plan = build_trade_plan(
         decision_id=decision_id,
         instrument_id=instrument_id,
@@ -96,11 +188,13 @@ def build_v0_trade_plan_dict(
         freshness_ok=True,
         mandate_ok=True,
         expired=expired,
-        entry_ready=False,
+        entry_ready=entry_ready_from_ta(
+            action=action, bias=bias, exhaustion=exhaustion
+        ),
         entry=entry,
-        structural_stop=None,
-        equity=0.0,
-        risk_pct=0.5,
+        structural_stop=structural_stop,
+        equity=equity,
+        risk_pct=risk_pct,
         opportunity_score=opportunity_score,
         expires_at=expires_at,
     )

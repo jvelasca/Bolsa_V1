@@ -107,6 +107,8 @@ from bolsa_analytics.cognitive.trade_plan import (
     build_trade_plan,
     build_v0_trade_plan_dict,
     compute_risk_size,
+    compute_structural_stop,
+    entry_ready_from_ta,
 )
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
 from bolsa_analytics.cognitive.trading_policy_templates import (
@@ -197,7 +199,9 @@ __all__ = [
     "compute_credibility",
     "compute_portfolio_fit",
     "compute_risk_size",
+    "compute_structural_stop",
     "deflated_sharpe_ratio",
+    "entry_ready_from_ta",
     "evaluate_policy_gate",
     "event_decay_weight",
     "gate_decision_package",

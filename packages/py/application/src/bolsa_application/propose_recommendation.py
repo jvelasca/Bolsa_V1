@@ -54,6 +54,17 @@ from bolsa_application.journal_writer import append_journal_event
 _PROPOSE_OVERRIDE_OPTIONS = frozenset({"recommend_long", "recommend_short", "wait"})
 
 
+def _risk_pct_for_policy(policy_version: str | None) -> float:
+    """``max_risk_per_trade_pct`` de la plantilla; unknown → moderate."""
+    from bolsa_analytics.cognitive.trading_policy_templates import get_policy_template
+
+    key = (policy_version or "moderate").strip() or "moderate"
+    try:
+        return float(get_policy_template(key).risk.max_risk_per_trade_pct)
+    except KeyError:
+        return float(get_policy_template("moderate").risk.max_risk_per_trade_pct)
+
+
 class OhlcvBarsPort(Protocol):
     """Puerto (interfaz) Ohlcv Bars Port."""
     async def get_bars(
@@ -162,6 +173,7 @@ class ProposeRecommendationFromTa:
         cognitive_store: Any | None = None,
         prediction_store: Any | None = None,
         journal_writer: Any | None = None,
+        portfolio_summary: Any | None = None,
     ) -> None:
         self._ohlcv = ohlcv
         self._feature_port = feature_port
@@ -174,6 +186,7 @@ class ProposeRecommendationFromTa:
         self._cognitive_store = cognitive_store
         self._prediction_store = prediction_store
         self._journal_writer = journal_writer
+        self._portfolio_summary = portfolio_summary
 
     async def execute(
         self,
@@ -394,6 +407,12 @@ class ProposeRecommendationFromTa:
             opportunity_score=runtime.combined_score,
             expires_at=rec.expires_at,
             expired=False,
+            atr=inputs.atr,
+            bars=ohlcv_bars,
+            bias=assessment.bias,
+            exhaustion=bool(assessment.exhaustion),
+            equity=await self._equity_for_account(account_id),
+            risk_pct=_risk_pct_for_policy(policy_version),
         )
 
         present_types = {a.assessment_type for a in runtime.assessments}
@@ -495,3 +514,16 @@ class ProposeRecommendationFromTa:
             weight_context=weight_ctx,
             trade_plan=trade_plan_dict,
         )
+
+    async def _equity_for_account(self, account_id: str | None) -> float:
+        """Equity de cartera (mismo SoT que confirm). Fallo o sin cuenta → 0."""
+        if not account_id or self._portfolio_summary is None:
+            return 0.0
+        try:
+            summary = await self._portfolio_summary.execute(account_id=account_id)
+        except Exception:  # noqa: BLE001 — propose no tumba por summary
+            return 0.0
+        try:
+            return float(getattr(summary, "total_equity", 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
