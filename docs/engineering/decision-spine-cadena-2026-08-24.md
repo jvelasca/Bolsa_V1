@@ -1,7 +1,7 @@
 # Decision Spine — cadena AS-IS (file:line) y matriz de prueba
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **AsOf:** 2026-08-24 · ancla `origin/main` = `5e81350`.
+> **AsOf:** 2026-08-24 · ancla `origin/main` = `76679d2`.
 > **Alcance:** mapa de la columna que **ya existe**. No inventa `InvestmentDecision` / `OrderProposal` / orquestador.
 > **Suite:** `pnpm test:decision-spine`.
 

@@ -1,9 +1,9 @@
 # Fase 0 — Decision Spine · esquema maestro (roadmap de gestión)
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **AsOf:** 2026-08-24. **Fase 0 COMPLETA** (docs F0.1–F0.4 + código F0.5/F0.6 + D1–D3). Prove Spine S0–S3 en `5e81350`.
-> **HEAD/anchas:** `main == origin/main == 5e81350` · verificado `git fetch; git rev-parse origin/main`.
-> **Documento de gestión del ORQUESTADOR.** No reabrir F0.5/F0.6. La siguiente fase la decide el propietario (E1).
+> **AsOf:** 2026-08-24. **Fase 0 COMPLETA** (docs F0.1–F0.4 + código F0.5/F0.6 + D1–D3). Prove Spine S0–S3 + H5 en `76679d2`.
+> **HEAD/anchas:** `main == origin/main == 76679d2` · verificado `git fetch; git rev-parse origin/main`.
+> **Documento de gestión del ORQUESTADOR.** No reabrir F0.5/F0.6. Siguiente = UX mesa (Ayuda/S/R/firma).
 
 ---
 
@@ -55,12 +55,13 @@
 
 ## 4. Estado de la agenda (log del orquestador)
 
-| Slice               | Estado     | Fecha      | Nota                                                       |
-| ------------------- | ---------- | ---------- | ---------------------------------------------------------- |
-| F0.1                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-asis-2026-08-24.md`                  |
-| F0.2                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-tobe-2026-08-24.md`                  |
-| F0.3                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-mapping-2026-08-24.md`               |
-| F0.4                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-descarga-2026-08-24.md` · D1/D2/D3   |
-| F0.5                | ✅ CERRADO | 2026-08-24 | PortfolioFit v1 `3670a09`                                  |
-| F0.6                | ✅ CERRADO | 2026-08-24 | Decision Board backend `8df8a65` + UI `672e88f`            |
-| Audit H1/H2 + Prove | ✅ CERRADO | 2026-08-24 | `5e81350` · `pnpm test:decision-spine` · siguiente E1 = H5 |
+| Slice               | Estado     | Fecha      | Nota                                                                              |
+| ------------------- | ---------- | ---------- | --------------------------------------------------------------------------------- |
+| F0.1                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-asis-2026-08-24.md`                                         |
+| F0.2                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-tobe-2026-08-24.md`                                         |
+| F0.3                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-mapping-2026-08-24.md`                                      |
+| F0.4                | ✅ CERRADO | 2026-08-24 | `fase0-decision-spine-descarga-2026-08-24.md` · D1/D2/D3                          |
+| F0.5                | ✅ CERRADO | 2026-08-24 | PortfolioFit v1 `3670a09`                                                         |
+| F0.6                | ✅ CERRADO | 2026-08-24 | Decision Board backend `8df8a65` + UI `672e88f`                                   |
+| Audit H1/H2 + Prove | ✅ CERRADO | 2026-08-24 | `5e81350` · `pnpm test:decision-spine`                                            |
+| H5                  | ✅ CERRADO | 2026-08-24 | `76679d2` (código `f56af2f`) · SEMI profile → check_opening · siguiente = UX mesa |

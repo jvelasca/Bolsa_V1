@@ -67,7 +67,7 @@ Engineering Index  (este doc)
 │   ├── fase0-decision-spine-mapping-2026-08-24.md ← **F0.3 Mapping** (carta conservar/adaptar/crear/no-op por ítem del AS-IS) · docs-only · Fit único create · verificado VERDE vs AS-IS
 │   ├── fase0-decision-spine-descarga-2026-08-24.md ← **F0.4 Descargue de decisión** (gates+autorización; D1 risk cesta SEMI y AUTO, sin override) · docs-only · verificado VERDE · **D2 CERRADA con código** (`f7b1f6c`) · **D3 CONFIRMADA (a: Lab/Radar fuera del spine)**
 │   ├── traspaso-relevo-fase0-cierre-docs-apertura-codigo-2026-08-24.md ← relevo histórico · F0.5 (Fit) abierta · F0.5a métrica = decisión propietario · F0.6 pendiente
-│   ├── traspaso-relevo-probar-spine-cierre-apertura-h5-2026-08-24.md ← **RELEVO ACTIVO** · Prove Spine `5e81350` CERRADO · apertura H5
+│   ├── traspaso-relevo-probar-spine-cierre-apertura-h5-2026-08-24.md ← **RELEVO ACTIVO** · Prove+H5 `76679d2` CERRADOS y PUSHEADOS · siguiente UX mesa (Ayuda/S/R/firma)
 │   ├── traspaso-relevo-f0-6-cierre-apertura-siguiente-2026-08-24.md ← relevo histórico · **F0.6 Decision Board COMPLETA** (backend `8df8a65` + UI `672e88f`) · F0.6 CERRADA · siguiente fase por abrir
 │   ├── traspaso-relevo-f0-6b-cierre-apertura-ui-2026-08-24.md ← relevo histórico · **F0.6b Decision Board v1 (backend) CERRADA** (`8df8a65`) · abrió UI web (posteriormente CERRADA `672e88f`)
 │   ├── traspaso-relevo-f0-5b-cierre-apertura-f0-6-2026-08-24.md ← relevo histórico · **F0.5b PortfolioFit v1 CERRADA** (`3670a09`) · F0.6 (Daily vista) abierta

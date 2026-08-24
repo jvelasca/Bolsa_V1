@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · ancla viva `git fetch; git rev-parse origin/main` = **`5e81350`** (`main` == `origin/main`). Prove Spine S0–S3 **pusheado**.
+> **AsOf:** 2026-08-24 · ancla viva `git fetch; git rev-parse origin/main` = **`76679d2`** (`main` == `origin/main`). Prove Spine S0–S3 + H5 **pusheados**.
 > **Tag:** `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
