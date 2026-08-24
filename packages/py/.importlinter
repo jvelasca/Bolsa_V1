@@ -44,3 +44,10 @@ source_modules =
     bolsa_domain
 forbidden_modules =
     bolsa_ai
+
+[importlinter:contract:analytics-market-independence]
+name = analytics y market no se importan entre sí
+type = independence
+modules =
+    bolsa_analytics
+    bolsa_market

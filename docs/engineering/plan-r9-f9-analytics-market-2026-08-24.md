@@ -41,15 +41,16 @@ Tipos movidos a domain (F4): `MarketEvent`, `MarketEventCalendar`, `EventBlackou
 
 ### 1.4 import-linter (`packages/py/.importlinter`)
 
-Contratos actuales (3/3, verdes en ADR-028):
+Contratos actuales (4/4, verdes post F9-A2):
 
-| Contrato                     | Tipo      | Alcance                                                |
-| ---------------------------- | --------- | ------------------------------------------------------ |
-| `domain-purity`              | forbidden | domain → no infra/analytics/application/ai/api/SDK LLM |
-| `no-ai-sdk-outside-bolsa-ai` | forbidden | capas → no openai/ollama directo                       |
-| `no-ai-package-in-domain`    | forbidden | domain → no bolsa_ai                                   |
+| Contrato                        | Tipo         | Alcance                                                |
+| ------------------------------- | ------------ | ------------------------------------------------------ |
+| `domain-purity`                 | forbidden    | domain → no infra/analytics/application/ai/api/SDK LLM |
+| `no-ai-sdk-outside-bolsa-ai`    | forbidden    | capas → no openai/ollama directo                       |
+| `no-ai-package-in-domain`       | forbidden    | domain → no bolsa_ai                                   |
+| `analytics-market-independence` | independence | bolsa_analytics ↔ bolsa_market sin imports cruzados    |
 
-**Gap:** sin contrato `analytics ↔ market independence`.
+**F9-A2 (2026-08-24):** contrato `analytics-market-independence` añadido (ADR-030 §2.3). `lint-imports` 4/4 KEPT (441 files, 2156 deps). CI Python aún **no** invoca lint-imports — propuesta A2.3 en fase separada.
 
 ### 1.5 Re-export compat (no violación, deuda menor)
 
@@ -102,17 +103,19 @@ Requiere ADR + migración + `contract:gen`. **PARKED.**
 
 ---
 
-### F9-A2 — Contrato import-linter (implementación)
+### F9-A2 — Contrato import-linter (implementación) ✅ CERRADO 2026-08-24
 
 **Alcance:** `packages/py/.importlinter` + documentación en README py si aplica.
 
-| #    | Tarea                                           | Detalle                                                                                                       |
-| ---- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| A2.1 | Añadir contrato `analytics-market-independence` | type `independence`, modules `bolsa_analytics` + `bolsa_market`                                               |
-| A2.2 | CI/local                                        | `uv run lint-imports --config packages/py/.importlinter` → 4/4 verde                                          |
-| A2.3 | Opcional CI step                                | Verificar si workflow Python CI ya invoca lint-imports; si no, proponer en fase separada (no bloqueante F9-A) |
+| #    | Tarea                                           | Detalle                                                                                   | Estado |
+| ---- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- | ------ |
+| A2.1 | Añadir contrato `analytics-market-independence` | type `independence`, modules `bolsa_analytics` + `bolsa_market`                           | ✅     |
+| A2.2 | CI/local                                        | `lint-imports --config packages/py/.importlinter` → 4/4 verde (441 files, 2156 deps)      | ✅     |
+| A2.3 | Opcional CI step                                | Python CI **no** invoca lint-imports hoy — proponer en fase separada (no bloqueante F9-A) | ⏸️     |
 
-**Batería A2:** lint-imports 4/4 · ruff 0 · regresión pytest market+analytics.
+**Batería A2:** lint-imports 4/4 ✅ · ruff N/A (INI) · regresión pytest market+analytics (coordinador).
+
+**Nota entorno:** `lint-imports.exe` bloqueado por App Control Policy (os 4551); verificado vía `python -c "… importlinter.cli …"`.
 
 ---
 

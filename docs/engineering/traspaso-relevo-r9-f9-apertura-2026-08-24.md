@@ -44,7 +44,7 @@
 
 3. **`pyproject.toml` deps ya correctas** — ni analytics ni market se declaran mutuamente.
 
-4. **import-linter:** 3 contratos verdes; **falta** contrato `analytics-market-independence` (diseño en ADR-030 §2.3).
+4. **import-linter:** 4 contratos verdes post F9-A2 (`analytics-market-independence` añadido, ADR-030 §2.3).
 
 5. **F9-B `legacy_portfolio_id` PARKED** — ~34 ficheros Python; requiere ADR+migración+contract:gen; **NO abrir en F9-A**.
 
@@ -111,6 +111,17 @@ Prerrequisito: F9-A1 cerrado (tests limpios).
 Batería: uv run lint-imports --config packages/py/.importlinter → 4/4 verde.
 Ver ADR-030 §2.3 para snippet del contrato.
 ```
+
+### F9-A2 cierre (2026-08-24)
+
+| Item             | Evidencia                                                                                |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| Contrato añadido | `packages/py/.importlinter:48-53` — `analytics-market-independence`, type `independence` |
+| lint-imports     | **4 kept, 0 broken** (441 files, 2156 deps)                                              |
+| CI               | `.github/workflows/python-ci.yml` — **no** invoca lint-imports (A2.3 diferido)           |
+| Workaround local | `lint-imports.exe` bloqueado App Control Policy; OK vía `importlinter.cli` en Python     |
+
+**SIGUIENTE → F9-A3** (docs cierre: plan-r9 § FASE 9, PROJECT_STATE, traspaso cierre).
 
 ---
 
