@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · HEAD **`15e86a4`** (DS-05). Ciclo U6 `9e9a346` → DS-05 → **ops propietario CERRADA**. Código U0–U5 `04e441e` · U6 `9e9a346`. Prove Spine S0–S3 + H5 + UX mesa U0–U6 + **DS-05 freshness**.
+> **AsOf:** 2026-08-24 · HEAD **`5100d23`** (`origin/main`). Ciclo **U6** `9e9a346` → **DS-05** `15e86a4` → **ops** `5100d23` **CERRADO**. Código U0–U5 `04e441e` · U6 `9e9a346`. Prove Spine S0–S3 + H5 + UX mesa U0–U6 + **DS-05 freshness**.
 > **Tag:** `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---

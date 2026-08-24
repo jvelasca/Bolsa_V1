@@ -2,8 +2,8 @@
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
 > **Propósito:** cierre del ciclo **U6 → DS-05 → ops propietario**. **Siguiente = decisión del propietario** (idle / nueva fase); no se inventa fase aquí.
-> **AsOf:** 2026-08-24 · HEAD `15e86a4` (DS-05). Secuencia: U6 `9e9a346` → spine residual DS-05 `15e86a4` → **ops propietario (este slice, docs-only)**.
-> **Protocolo:** docs-only · **sin commit** en este slice (coordinador).
+> **AsOf:** 2026-08-24 · HEAD **`5100d23`** (`origin/main`). Secuencia: U6 `9e9a346` → spine residual DS-05 `15e86a4` → **ops propietario `5100d23`** (stamp + runbook, pusheado).
+> **Protocolo:** docs-only en slice inicial · commit final **`5100d23`** (coordinador).
 
 ---
 
@@ -72,7 +72,7 @@ Resumen:
 ## 5. Ciclo cerrado
 
 ```
-U6 (9e9a346) → DS-05 (15e86a4) → ops propietario (checklist + runbook)
+U6 (9e9a346) → DS-05 (15e86a4) → ops propietario (5100d23: checklist + runbook + stamp)
 ```
 
 **Freeze intacto:** sin OrderProposal · `PAPER_D_EXECUTE` off · Lab fuera spine · sin Belief · sin `contract:gen`.
@@ -88,7 +88,7 @@ U6 (9e9a346) → DS-05 (15e86a4) → ops propietario (checklist + runbook)
 ## 7. Texto de arranque (pegar en chat nuevo)
 
 ```
-CONTEXTO: Ciclo U6→DS-05→ops propietario CERRADO (HEAD 15e86a4 + docs ops).
+CONTEXTO: Ciclo U6→DS-05→ops propietario CERRADO (HEAD 5100d23 en origin/main).
 Secret scanning + push protection ENABLED (API 2026-08-24). gitleaks.yml OK.
 TRUSTED_PROXIES prod: runbook listo; valor real pendiente del propietario.
 Freeze: sin OrderProposal · PAPER_D_EXECUTE off · Lab fuera spine · no contract:gen.

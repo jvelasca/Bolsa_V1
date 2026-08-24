@@ -1,5 +1,6 @@
 # Paquete de auditoría — ESTADO GLOBAL post-spine + mesa U0–U5 (2026-08-24b)
 
+> **Superseded by** [`audit-pack-estado-global-2026-08-24c.md`](./audit-pack-estado-global-2026-08-24c.md) **for post-ciclo U6+DS-05+ops** (`origin/main` = `5100d23`). Conservar este archivo como histórico post-spine/mesa U0–U5.
 > **Propósito:** documento **único** para auditoría externa general tras Decision Spine + UX mesa U0–U5. Consolida identidad, freeze, arcos cerrados desde el pack 2026-08-24, verificación y riesgos ops.
 > **AsOf:** 2026-08-24 · `origin/main` = **`04e441e`** · árbol limpio (asumido tras fetch) · R-13 **CERRADA** · Track B **CERRADO** · Fase 0 spine **COMPLETA** · UX mesa **U0–U5 CERRADA**.
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`

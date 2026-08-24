@@ -1,7 +1,7 @@
 # Decision Spine — cadena AS-IS (file:line) y matriz de prueba
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **AsOf:** 2026-08-24 · ancla `origin/main` = `04e441e` (Prove + H5 + UX mesa U0–U5). Código local post-U6 stamp `8f970b7` + **spine residual DS-05** (working tree; commit pendiente coordinador). **Siguiente = ops propietario**.
+> **AsOf:** 2026-08-24 · ancla `origin/main` = **`5100d23`**. Secuencia ciclo: U6 `9e9a346` · DS-05 `15e86a4` · ops `5100d23`. Prove + H5 + UX mesa U0–U6 + **DS-05 freshness** en main. **Ciclo cerrado — idle / decisión de ciclo**.
 > **Alcance:** mapa de la columna que **ya existe**. No inventa `InvestmentDecision` / `OrderProposal` / orquestador.
 > **Suite:** `pnpm test:decision-spine`.
 
