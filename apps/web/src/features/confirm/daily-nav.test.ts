@@ -5,12 +5,14 @@
 import { describe, expect, it } from "vitest";
 import {
   ASESOR_LABEL,
+  ASESOR_PATH,
   ASESOR_TESIS_HINT,
   CONFIRMAR_LABEL,
   DAILY_NAV_ORDER,
   HERRAMIENTAS_NAV_ORDER,
   LABORATORIO_LABEL,
   LAB_TESIS_NAV_ORDER,
+  LEDGER_ASESOR_LINK_LABEL,
   LIBRO_HISTORIAL_HINT,
   LIBRO_HISTORIAL_LABEL,
   LIBRO_HISTORIAL_PATH,
@@ -24,6 +26,8 @@ import {
   SEÑALES_PATH,
   TRADING_NAV_LABEL,
   UNIVERSO_EN_VIGILANCIA,
+  VER_EN_ASESOR_LABEL,
+  asesorHistoryHref,
   formatFueraUniversoOperativaCopy,
 } from "@/features/confirm/daily-nav";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
@@ -33,6 +37,21 @@ describe("daily-nav", () => {
     expect(SEÑALES_LABEL).toBe("Señales");
     expect(SEÑALES_PATH).toBe("/screeners");
     expect(SEÑALES_PATH).not.toBe("/research");
+    expect(ASESOR_PATH).toBe("/research");
+    expect(ASESOR_PATH).not.toBe(SEÑALES_PATH);
+  });
+
+  it("builds Asesor history deep-links for ledger CTAs", () => {
+    expect(asesorHistoryHref()).toBe("/research?tab=history");
+    expect(asesorHistoryHref("trial-abc")).toBe(
+      "/research?tab=history&trialId=trial-abc",
+    );
+    expect(asesorHistoryHref(" id & x ")).toBe(
+      "/research?tab=history&trialId=id+%26+x",
+    );
+    expect(VER_EN_ASESOR_LABEL).toBe("Ver en Asesor");
+    expect(LEDGER_ASESOR_LINK_LABEL).toBe("Ledger Asesor →");
+    expect(VER_EN_ASESOR_LABEL).not.toMatch(/Research/i);
   });
 
   it("relabels the backtesting menu Laboratorio", () => {

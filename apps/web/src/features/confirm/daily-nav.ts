@@ -17,6 +17,10 @@ export const SEÑALES_PATH = "/screeners" as const;
 export const LABORATORIO_LABEL = "Laboratorio" as const;
 
 export const ASESOR_LABEL = "Asesor" as const;
+/** Hub científico / ledger (ruta histórica `/research`; nav «Asesor»). */
+export const ASESOR_PATH = "/research" as const;
+export const VER_EN_ASESOR_LABEL = "Ver en Asesor" as const;
+export const LEDGER_ASESOR_LINK_LABEL = "Ledger Asesor →" as const;
 export const CONFIRMAR_LABEL = "Confirmar" as const;
 export const TRADING_NAV_LABEL = "Trading" as const;
 
@@ -84,6 +88,14 @@ export const LIST_HUB_EXPAND_ACCESOS_TITLE =
   `Accesos: ${SEÑALES_LABEL}, Alertas, ${LABORATORIO_LABEL}` as const;
 
 export const LAB_TESIS_NAV_ORDER = [LABORATORIO_LABEL, ASESOR_LABEL] as const;
+
+/** Deep-link al historial del Asesor (ledger Research API). */
+export function asesorHistoryHref(trialId?: string | null): string {
+  const params = new URLSearchParams({ tab: "history" });
+  const id = trialId?.trim();
+  if (id) params.set("trialId", id);
+  return `${ASESOR_PATH}?${params.toString()}`;
+}
 
 /**
  * Banner Operativa cuando el modo exige pertenecer a Estudio.

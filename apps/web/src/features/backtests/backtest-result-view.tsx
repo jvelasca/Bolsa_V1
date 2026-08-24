@@ -56,6 +56,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { Link } from "react-router-dom";
+import {
+  VER_EN_ASESOR_LABEL,
+  asesorHistoryHref,
+} from "@/features/confirm/daily-nav";
 
 type Props = {
   detail: BacktestRunDetailDto;
@@ -639,13 +643,13 @@ export function BacktestResultView({
     displayTrialId != null && displayTrialId !== "" ? (
       <div className="flex flex-wrap items-center gap-2 text-[11px]">
         <Link
-          to={`/research?tab=history&trialId=${encodeURIComponent(displayTrialId)}`}
+          to={asesorHistoryHref(displayTrialId)}
           className={cn(
             buttonVariants({ variant: "outline", size: "sm" }),
             "h-7 text-[11px]",
           )}
         >
-          Ver en Research
+          {VER_EN_ASESOR_LABEL}
         </Link>
         {linkedTrial ? (
           <span className="min-w-0 truncate text-muted-foreground">

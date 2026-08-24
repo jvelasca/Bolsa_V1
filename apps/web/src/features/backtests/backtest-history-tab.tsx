@@ -4,6 +4,10 @@
 
 import { Link } from "react-router-dom";
 import { BACKTEST_STRATEGIES, type BacktestRunDto } from "@bolsa/shared";
+import {
+  LEDGER_ASESOR_LINK_LABEL,
+  asesorHistoryHref,
+} from "@/features/confirm/daily-nav";
 import { Button } from "@/components/ui/button";
 import { formatPct } from "@/features/charts/chart-utils";
 import { formatDateTimeWith } from "@/lib/format";
@@ -50,10 +54,10 @@ export function BacktestHistoryTab({
             ⚙ Tope {historyMaxKept}
           </Button>
           <Link
-            to="/research?tab=history"
+            to={asesorHistoryHref()}
             className="text-xs font-medium text-primary hover:underline"
           >
-            Ledger Research →
+            {LEDGER_ASESOR_LINK_LABEL}
           </Link>
         </div>
       </div>

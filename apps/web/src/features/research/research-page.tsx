@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { SEÑALES_LABEL, SEÑALES_PATH } from "@/features/confirm/daily-nav";
 
 type HubTab = "dashboard" | "diario" | "history" | "opiniones";
 
@@ -172,9 +173,13 @@ export function ResearchPage() {
           Asesor
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Observatorio del laboratorio y dictámenes del Estudio. Ruta{" "}
-          <code className="text-xs">/research</code> (API sin cambios). Sin
-          Belief ni Discovery Score.
+          Observatorio del laboratorio y dictámenes del Estudio. Para señales
+          operativas del día, usa{" "}
+          <Link to={SEÑALES_PATH} className="text-primary hover:underline">
+            {SEÑALES_LABEL}
+          </Link>
+          . Ruta <code className="text-xs">/research</code> (API sin cambios).
+          Sin Belief ni Discovery Score.
         </p>
       </div>
 

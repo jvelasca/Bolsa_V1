@@ -1,5 +1,10 @@
 import { Link } from "react-router-dom";
 import type { ResearchTrialDto } from "@bolsa/shared";
+import {
+  ASESOR_LABEL,
+  VER_EN_ASESOR_LABEL,
+  asesorHistoryHref,
+} from "@/features/confirm/daily-nav";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { ResearchLabEvidenceSummary } from "@/features/research/research-lab-evidence-summary";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -97,7 +102,7 @@ export function ResearchTrialResultBlock({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Research
+            {ASESOR_LABEL}
           </p>
           <p className="mt-0.5 font-mono text-sm text-foreground">
             trialId: {id ?? "—"}
@@ -123,10 +128,10 @@ export function ResearchTrialResultBlock({
         <div className="flex flex-wrap items-center gap-2">
           {id && (
             <Link
-              to={`/research?tab=history&trialId=${encodeURIComponent(id)}`}
+              to={asesorHistoryHref(id)}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
             >
-              Ver en Research
+              {VER_EN_ASESOR_LABEL}
             </Link>
           )}
           {backtestRunId && (

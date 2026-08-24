@@ -1,5 +1,10 @@
 import { Link } from "react-router-dom";
-import { LABORATORIO_LABEL, SEÑALES_LABEL } from "@/features/confirm/daily-nav";
+import {
+  ASESOR_LABEL,
+  LABORATORIO_LABEL,
+  SEÑALES_LABEL,
+  asesorHistoryHref,
+} from "@/features/confirm/daily-nav";
 import { ScreenersHub } from "@/features/screeners/screeners-hub";
 
 export function ScreenersPage() {
@@ -18,6 +23,13 @@ export function ScreenersPage() {
           . Simulaciones históricas en{" "}
           <Link to="/backtests" className="text-primary hover:underline">
             {LABORATORIO_LABEL}
+          </Link>
+          ; ledger de pruebas en{" "}
+          <Link
+            to={asesorHistoryHref()}
+            className="text-primary hover:underline"
+          >
+            {ASESOR_LABEL}
           </Link>
           .
         </p>

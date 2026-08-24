@@ -58,6 +58,7 @@ import {
 } from "@/features/confirm/confirm-nav";
 import {
   ASESOR_LABEL,
+  ASESOR_PATH,
   ASESOR_TESIS_HINT,
   CONFIRMAR_LABEL,
   LABORATORIO_LABEL,
@@ -305,12 +306,12 @@ const BACKTESTING_MENU: MenuItem[] = [
 const RESEARCH_MENU: MenuItem[] = [
   {
     label: "Resumen",
-    href: "/research?tab=dashboard",
+    href: `${ASESOR_PATH}?tab=dashboard`,
     hint: ASESOR_TESIS_HINT,
   },
-  { label: "Diario", href: "/research?tab=diario" },
-  { label: "Historial", href: "/research?tab=history" },
-  { label: "Opiniones", href: "/research?tab=opiniones" },
+  { label: "Diario", href: `${ASESOR_PATH}?tab=diario` },
+  { label: "Historial", href: `${ASESOR_PATH}?tab=history` },
+  { label: "Opiniones", href: `${ASESOR_PATH}?tab=opiniones` },
 ];
 
 export function AppTopBar() {
