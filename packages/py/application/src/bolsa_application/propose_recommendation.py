@@ -46,6 +46,9 @@ from bolsa_domain.entities.market_event import MarketEventCalendar
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
 
+from bolsa_application.cognitive_persistence import decision_session_to_record
+from bolsa_application.journal_writer import append_journal_event
+
 # Overrides de acción que ProposeRecommendation acepta del cliente (subconjunto de DecisionAction).
 _PROPOSE_OVERRIDE_OPTIONS = frozenset({"recommend_long", "recommend_short", "wait"})
 
@@ -154,6 +157,7 @@ class ProposeRecommendationFromTa:
         news_port: NewsEventRefreshPort | None = None,
         cognitive_store: Any | None = None,
         prediction_store: Any | None = None,
+        journal_writer: Any | None = None,
     ) -> None:
         self._ohlcv = ohlcv
         self._feature_port = feature_port
@@ -165,6 +169,7 @@ class ProposeRecommendationFromTa:
         self._news_port = news_port
         self._cognitive_store = cognitive_store
         self._prediction_store = prediction_store
+        self._journal_writer = journal_writer
 
     async def execute(
         self,
@@ -384,7 +389,6 @@ class ProposeRecommendationFromTa:
             if t not in present_types
         ]
         from bolsa_analytics.cognitive.decision_session import build_propose_session
-        from bolsa_application.cognitive_persistence import decision_session_to_record
 
         # Prediction: fotografía auxiliar — NUNCA entra en WeightRules / Runtime.
         prediction_dicts: list[dict[str, Any]] = []
@@ -444,6 +448,15 @@ class ProposeRecommendationFromTa:
             try:
                 await self._cognitive_store.append_decision_session(
                     decision_session_to_record(session)
+                )
+                await append_journal_event(
+                    self._journal_writer,
+                    event_type="proposal_recorded",
+                    decision_id=runtime.package.decision_id,
+                    session_id=session.session_id,
+                    account_id=account_id,
+                    instrument_id=instrument_id,
+                    payload={"status": "open"},
                 )
             except Exception:  # noqa: BLE001 — propose no tumba por audit
                 pass

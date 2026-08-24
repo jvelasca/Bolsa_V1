@@ -1066,6 +1066,14 @@ def get_cognitive_repository(session: AsyncSession) -> SqlAlchemyCognitiveReposi
     return SqlAlchemyCognitiveRepository(session)
 
 
+def get_journal_writer(session: AsyncSession) -> Any:
+    from bolsa_infrastructure.database.repositories.journal_repository import (
+        SqlAlchemyJournalWriter,
+    )
+
+    return SqlAlchemyJournalWriter(session)
+
+
 class _EdgeReportAdapter:
     """Un EDGE report lookup port que envuelve el CognitiveStore (record→domain)."""
 
@@ -1113,6 +1121,7 @@ def get_propose_recommendation_use_case(session: AsyncSession) -> Any:
         news_port=YahooNewsEventPort(calendar),
         cognitive_store=cognitive,
         prediction_store=get_prediction_repository(session),
+        journal_writer=get_journal_writer(session),
     )
 
 
@@ -1139,6 +1148,7 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        journal_writer=get_journal_writer(session),
     )
 
 
@@ -1172,6 +1182,7 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         cognitive_store=get_cognitive_repository(session),
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        journal_writer=get_journal_writer(session),
     )
 
 

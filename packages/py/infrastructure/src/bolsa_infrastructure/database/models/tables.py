@@ -616,6 +616,28 @@ class DecisionSessionRow(Base):
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
 
 
+class DecisionJournalEntryRow(Base):
+    """ART-DECISION-JOURNAL-ENTRY — audit trail append-only del spine."""
+
+    __tablename__ = "decision_journal_entries"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    decision_id: Mapped[str] = mapped_column("decision_id", String, index=True)
+    session_id: Mapped[str | None] = mapped_column(
+        "session_id",
+        String,
+        ForeignKey("decision_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    account_id: Mapped[str | None] = mapped_column("account_id", String, nullable=True)
+    instrument_id: Mapped[str | None] = mapped_column("instrument_id", String, nullable=True)
+    event_type: Mapped[str] = mapped_column("event_type", String)
+    actor: Mapped[str] = mapped_column(String)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+
+
 class ModelArtifactRow(Base):
     """ART-MODEL — registro cuantitativo (sin binario; payload JSON)."""
 

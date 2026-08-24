@@ -72,6 +72,21 @@ class EdgeReportRecord:
 
 
 @dataclass(frozen=True, slots=True)
+class DecisionJournalEntryRecord:
+    """ART-DECISION-JOURNAL-ENTRY — evento append-only del spine."""
+
+    id: str
+    decision_id: str
+    event_type: str
+    actor: str
+    created_at: str
+    session_id: str | None = None
+    account_id: str | None = None
+    instrument_id: str | None = None
+    payload: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class DecisionSessionRecord:
     """Índice + payload de ART-DECISION-SESSION."""
 

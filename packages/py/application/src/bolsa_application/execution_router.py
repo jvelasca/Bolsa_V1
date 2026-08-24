@@ -49,6 +49,7 @@ from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry
 from bolsa_application.events.payloads import signal_event_payload
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.investor_profiles import InvestorProfileStore
+from bolsa_application.journal_writer import append_journal_event
 from bolsa_application.risk_engine import RiskDecision, check_opening
 from bolsa_application.risk_runtime import (
     claim_auto_execute_idempotency,
@@ -188,6 +189,7 @@ class ExecutionRouter:
         cognitive_store: CognitiveStore | None = None,
         profile_store: InvestorProfileStore | None = None,
         mandates: AccountMandateLookup | None = None,
+        journal_writer: Any | None = None,
     ) -> None:
         self._policies = policy_repo
         self._accounts = account_repo
@@ -202,6 +204,7 @@ class ExecutionRouter:
         self._cognitive_store = cognitive_store
         self._profile_store = profile_store
         self._mandates = mandates
+        self._journal_writer = journal_writer
 
     async def _resolve_account_mandate_for_opening(
         self,
@@ -629,6 +632,19 @@ class ExecutionRouter:
                     require_account_mandate=require_account_mandate,
                     proposal_strategy_id=self._proposal_strategy_id(signal),
                 )
+            auto_decision_id = str(signal.id or idem_key)
+            await append_journal_event(
+                self._journal_writer,
+                event_type="gate_evaluated",
+                decision_id=auto_decision_id,
+                account_id=policy.account_id,
+                instrument_id=signal.instrument_id,
+                payload={
+                    "allowed": guard_decision.allowed,
+                    "verdict": guard_decision.verdict,
+                    "reasons": list(guard_decision.reasons),
+                },
+            )
             guard = guard_decision.guard
             lineage_base = {
                 "signalId": signal.id,
@@ -720,6 +736,18 @@ class ExecutionRouter:
                 price=price,
                 account_id=policy.account_id,
                 idempotency_key=idem_key,
+            )
+            await append_journal_event(
+                self._journal_writer,
+                event_type="executed",
+                decision_id=str(result.transaction.id),
+                account_id=policy.account_id,
+                instrument_id=signal.instrument_id,
+                payload={
+                    "status": "executed",
+                    "transactionId": result.transaction.id,
+                    "idempotencyKey": idem_key,
+                },
             )
         except ValueError as exc:
             # El claim AUTO quedó tomado antes del fill (OR-T4). Si el fill falló

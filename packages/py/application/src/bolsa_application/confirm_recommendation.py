@@ -67,6 +67,7 @@ from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
 from bolsa_application.investor_profiles import InvestorProfileStore
+from bolsa_application.journal_writer import append_journal_event
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
 
@@ -236,6 +237,7 @@ class ConfirmRecommendationIntent:
         accounts: AccountScopeLookup | None = None,
         ohlcv: LatestBarLookup | None = None,
         mandates: AccountMandateLookup | None = None,
+        journal_writer: Any | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
@@ -245,6 +247,7 @@ class ConfirmRecommendationIntent:
         self._accounts = accounts
         self._ohlcv = ohlcv
         self._mandates = mandates
+        self._journal_writer = journal_writer
 
     async def execute(
         self,
@@ -295,6 +298,20 @@ class ConfirmRecommendationIntent:
             if package is not None:
                 contract_status = "present_verified"
         result["intent"]["contract"] = contract_status
+        await append_journal_event(
+            self._journal_writer,
+            event_type=(
+                "contract_verified"
+                if contract_status == "present_verified"
+                else "contract_absent"
+            ),
+            decision_id=rec.decision_id,
+            session_id=session_id,
+            account_id=account_id,
+            instrument_id=rec.instrument_id,
+            actor="human",
+            payload={"contract": contract_status},
+        )
 
         if (
             execute
@@ -350,6 +367,16 @@ class ConfirmRecommendationIntent:
                     "status": "rejected_by_gate",
                     "contract": contract_status,
                 }
+                await append_journal_event(
+                    self._journal_writer,
+                    event_type="risk_veto",
+                    decision_id=rec.decision_id,
+                    session_id=session_id,
+                    account_id=account_id,
+                    instrument_id=rec.instrument_id,
+                    actor="human",
+                    payload={"reason": "risk_veto", "status": "rejected_by_gate"},
+                )
             elif self._execute_trade is None:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
             else:
@@ -380,6 +407,19 @@ class ConfirmRecommendationIntent:
                         "status": "executed",
                         "contract": contract_status,
                     }
+                    await append_journal_event(
+                        self._journal_writer,
+                        event_type="executed",
+                        decision_id=rec.decision_id,
+                        session_id=session_id,
+                        account_id=account_id,
+                        instrument_id=rec.instrument_id,
+                        actor="human",
+                        payload={
+                            "status": "executed",
+                            "transactionId": result["trade"]["transactionId"],
+                        },
+                    )
                 except Exception as exc:  # noqa: BLE001
                     result["trade"] = {"status": "error", "reason": str(exc)}
                     result["intent"] = {
