@@ -22,9 +22,9 @@ Comando: `pnpm test:decision-spine` (32 pytest, sin API live).
 
 OrderProposal · Journal · Attribution · orquestador · Daily Mission · Track B · Belief · `PAPER_D_EXECUTE` · Lab→spine · `contract:gen` · H3 orphan (solo doc).
 
-## 3. Siguiente — H5 · CERRADA (working tree, pendiente commit)
+## 3. H5 · CERRADA (`f56af2f`)
 
-Confirm SEMI resuelve `profile` vía `accounts.resolve_scope` → `active_profile_id` → `profile_store.get` y lo pasa a `check_opening` (`confirm_recommendation.py:_resolve_opening_profile`). Tests: `test_confirm_apertura_profile_conservative_veto` · `…_profile_none_allows_same_basket`. Batería: `pnpm test:decision-spine` **34 passed**.
+Confirm SEMI resuelve `profile` vía `accounts.resolve_scope` → `active_profile_id` → `profile_store.get` → `check_opening`. Tests: `test_confirm_apertura_profile_conservative_veto` · `…_profile_none_allows_same_basket`. Batería: `pnpm test:decision-spine` **34**. Verificador RO **APROBADO**.
 
 ## 4. Anti-sobrecarga
 
