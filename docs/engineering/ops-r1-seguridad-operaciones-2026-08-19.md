@@ -22,24 +22,24 @@ Por tanto, R-1 **no requiere subagente de código ni batería**. Lo que queda so
 
 ## 2. Checklist operativo (acciones manuales pendientes)
 
-### 2.1 GitHub Secret Scanning nativo (UI de GitHub — repositorio público)
+### 2.1 GitHub Secret Scanning nativo — ✅ HABILITADO 2026-08-24 (ops propietario)
 
-- **Qué:** activar "Push protection" y "Secret scanning" en las **Settings del repositorio** (no es archivo de repo).
-- **Dónde:** `Settings → Code security and analysis`.
-- **Pasos:**
-  1. Secret scanning → **Enable** (también para pull requests).
-  2. Push protection → **Enable** (bloquea secretos en push).
-  3. (Opcional) Alertas SIEM/Audit log si el plan lo requiere.
-- **Verificación:** en el repositorio público, visitar `Settings → Code security` y confirmar que ambos radio-buttons están en **Enabled**.
-- **Nota:** el workflow `gitleaks.yml` (push a `main/master/stage/**` + PR) ya ejerce escaneo a nivel de CI; el scanning nativo de GitHub es una **defensa adicional en la capa de plataforma**.
+- **Qué:** secret scanning + push protection en el repositorio `jvelasca/Bolsa_V1` (público).
+- **Estado verificado (GET `gh api repos/jvelasca/Bolsa_V1`):**
+  - `secret_scanning` → **enabled**
+  - `secret_scanning_push_protection` → **enabled**
+- **Cómo se habilitó:** `PATCH repos/jvelasca/Bolsa_V1` con `security_and_analysis[secret_scanning][status]=enabled` y `[secret_scanning_push_protection][status]=enabled`. Los endpoints `PUT` dedicados devolvían **404**; el PATCH del repo sí funcionó con permisos admin.
+- **Verificación UI (propietario):** `Settings → Code security and analysis` → confirmar ambos en **Enabled**. URL directa: `https://github.com/jvelasca/Bolsa_V1/settings/security_analysis`.
+- **Defensa adicional:** workflow `gitleaks.yml` (push a `main/master/stage/**` + PR) sigue activo en CI.
 
 ### 2.2 Definir `TRUSTED_PROXIES` en producción (entorno)
 
 - **Qué:** poblar la variable de entorno `TRUSTED_PROXIES` en el entorno de **producción** con los IP/CIDR de los proxies de borde (reverse proxy / load balancer).
 - **Motivo:** `get_client_ip()` en `middleware/rate_limit.py` (F-SEG-3) solo confía en la primera IP de `X-Forwarded-For` **si el peer inmediato está en `TRUSTED_PROXIES`**; default vacío → en local/CI sin proxy usa `client.host`. Es **anti-spoofing** del rate-limit.
 - **Bloqueado por:** necesitas el valor real (IPs del proxy de borde). Este doc no puede completarlo sin esos datos.
-- **Formato** (separado por comas, según `config.py`): `TRUSTED_PROXIES="10.0.0.1,203.0.113.0/24"`.
-- **Verificación:** tras desplegar con el valor, en `GET /health` o un endpoint medido, confirmar que la IP reportada/limitada corresponde a la real del cliente (no al proxy).
+- **Runbook detallado (2026-08-24):** [`ops-trusted-proxies-prod-runbook-2026-08-24.md`](./ops-trusted-proxies-prod-runbook-2026-08-24.md).
+- **Formato** (separado por comas, según `config.py`): `TRUSTED_PROXIES="10.0.0.1,203.0.113.0/24"` (ejemplo ilustrativo RFC 5737 — **no commitear valores reales**).
+- **Verificación:** tras desplegar con el valor, confirmar que el rate-limit cuenta contra la IP del cliente, no la del proxy.
 
 ### 2.3 Limpieza de `logs/dev/*` — ✅ HECHO 2026-08-24
 
@@ -81,4 +81,4 @@ Por tanto, R-1 **no requiere subagente de código ni batería**. Lo que queda so
 
 ## 4. Relevo / texto de paso
 
-> CONTEXTO: Ops (cierre de deuda operativa) **verificado y documentado**. Estado `main` = `ad8fd23` (working tree limpio). **Sin cambios de código** en esta fase. Todo lo de código (gitleaks.yml, setting TRUSTED_PROXIES) ya estaba implementado. **HECHO 2026-08-24:** (c) logs/dev purgados (4811 archivos/8.88 MB, solo `.gitkeep` restante) · (d) 9 instrumentos LSE `BP/.L`→`BP.L` etc. corregidos en BD (`_backup_instruments_corrupt` guarda, verificado sin duplicados). **Pendiente manual del propietario:** (a) activar GitHub secret scanning nativo en UI (Settings→Code security), (b) definir `TRUSTED_PROXIES` en prod con las IPs del proxy de borde (**bloqueado por el propietario** — dato real no disponible), (e) purga opcional de valores dev en historial git (diferida por decisión).
+> CONTEXTO: Ops propietario **CERRADA** (2026-08-24). Secret scanning + push protection **enabled** vía API. Runbook `TRUSTED_PROXIES`: `ops-trusted-proxies-prod-runbook-2026-08-24.md`. **Pendiente del propietario:** (b) valor real `TRUSTED_PROXIES` en prod cuando exista despliegue con proxy · (e) purga opcional historial git. Relevo: `traspaso-relevo-ops-propietario-cierre-ciclo-2026-08-24.md`.

@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · ancla viva local **post-U6** (`8f970b7` stamp + **DS-05** en working tree; commit coordinador). Código U0–U5 `04e441e` · U6 `9e9a346`. Prove Spine S0–S3 + H5 + UX mesa U0–U6 + **DS-05 freshness**.
+> **AsOf:** 2026-08-24 · HEAD **`15e86a4`** (DS-05). Ciclo U6 `9e9a346` → DS-05 → **ops propietario CERRADA**. Código U0–U5 `04e441e` · U6 `9e9a346`. Prove Spine S0–S3 + H5 + UX mesa U0–U6 + **DS-05 freshness**.
 > **Tag:** `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -60,4 +60,4 @@ SEMI y AUTO son **el mismo risk de cesta**, distinta autorización (D1). `Decisi
 
 ## Open risks (ops, no código)
 
-GitHub secret scanning UI (propietario) · `TRUSTED_PROXIES` prod (IPs reales).
+`TRUSTED_PROXIES` prod — IPs/CIDR reales del edge proxy pendientes del propietario (runbook: `ops-trusted-proxies-prod-runbook-2026-08-24.md`). GitHub secret scanning + push protection **enabled** 2026-08-24 (verificar UI). Purga opcional historial git dev (decisión explícita).
