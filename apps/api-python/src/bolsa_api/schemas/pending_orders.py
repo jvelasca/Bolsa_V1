@@ -31,3 +31,17 @@ class CreatePendingOrderDto(BaseModel):
     quantity: float = Field(gt=0)
     limit_price: float = Field(alias="limitPrice", gt=0)
     expiry_at: str | None = Field(alias="expiryAt", default=None)
+
+
+class FillPendingOrderDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    idempotency_key: str = Field(alias="idempotencyKey", min_length=16, max_length=128)
+
+
+class FillPendingOrderResultDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    status: str
+    reason: str | None = None
+    transaction_id: str | None = Field(default=None, alias="transactionId")

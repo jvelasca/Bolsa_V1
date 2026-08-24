@@ -2171,6 +2171,42 @@ export const api = {
         params: { path: { order_id: id } },
       }),
     ),
+
+  fillPendingOrder: async (
+    orderId: string,
+    body: { idempotencyKey: string },
+  ) => {
+    const accountId = getActiveAccountId();
+    const response = await fetch(
+      `${API_URL}/api/pending-orders/${orderId}/fill`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accountId ? { "X-Account-Id": accountId } : {}),
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!response.ok) {
+      let detail: unknown;
+      try {
+        detail = await response.json();
+      } catch {
+        detail = undefined;
+      }
+      throw new ApiError(
+        formatApiErrorDetail(detail) ?? response.statusText,
+        response.status,
+      );
+    }
+    return (await response.json()) as {
+      status: string;
+      reason: string | null;
+      transactionId: string | null;
+    };
+  },
 };
 
 type WorkspaceDetailApi = {

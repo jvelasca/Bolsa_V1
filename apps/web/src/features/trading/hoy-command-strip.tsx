@@ -1,0 +1,165 @@
+/**
+ * Tira Hoy — compresión Decision Board + cola F3 en la mesa (ADR-031).
+ * No es una sexta puerta: resume y abre el drawer Confirmar.
+ */
+
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import type { HoyQueueItemV1 } from "@bolsa/shared";
+import { mapDecisionBoardToHoyQueue } from "@bolsa/shared";
+import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
+
+const KIND_CLASS: Record<HoyQueueItemV1["kind"], string> = {
+  BUY: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200",
+  ARMED: "bg-sky-500/15 text-sky-800 dark:text-sky-200",
+  WATCH: "bg-amber-500/15 text-amber-900 dark:text-amber-200",
+  REVIEW: "bg-orange-500/15 text-orange-900 dark:text-orange-200",
+  BLOCKED: "bg-rose-500/15 text-rose-800 dark:text-rose-200",
+};
+
+function whyLabel(code: string): string {
+  switch (code) {
+    case "fit":
+      return "No encaja en la cartera";
+    case "entry":
+      return "Entrada aún no lista";
+    case "freshness":
+      return "Datos no frescos";
+    case "mandate":
+      return "Sin mandato abierto";
+    case "expired":
+      return "La decisión caducó";
+    case "no_stop":
+      return "Falta stop estructural";
+    default:
+      return code;
+  }
+}
+
+export function HoyCommandStrip() {
+  const { effectiveAccountId } = useActiveAccount();
+  const [selected, setSelected] = useState<HoyQueueItemV1 | null>(null);
+  const query = useQuery({
+    queryKey: ["decision-board", effectiveAccountId, "hoy"],
+    enabled: Boolean(effectiveAccountId),
+    queryFn: async () => {
+      const res = await api.getDecisionBoard(effectiveAccountId as string);
+      return res.data;
+    },
+    staleTime: 30_000,
+  });
+
+  const items = useMemo(
+    () => (query.data ? mapDecisionBoardToHoyQueue(query.data) : []),
+    [query.data],
+  );
+  const pending = query.data?.buckets.pendingConfirm ?? 0;
+
+  return (
+    <div
+      data-testid="hoy-command-strip"
+      className="flex shrink-0 items-center gap-2 border-b border-border bg-card/80 px-2 py-1 text-xs"
+    >
+      <span className="shrink-0 font-semibold uppercase tracking-wide text-muted-foreground">
+        Hoy
+      </span>
+      {query.isLoading ? (
+        <span className="text-muted-foreground">Cargando cola…</span>
+      ) : items.length === 0 ? (
+        <span className="text-muted-foreground">
+          0 operaciones accionables — puede ser una buena decisión.
+        </span>
+      ) : (
+        <ul className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+          {items.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                data-testid={`hoy-item-${item.symbol}`}
+                className={cn(
+                  "rounded px-1.5 py-0.5 font-medium tabular-nums",
+                  KIND_CLASS[item.kind],
+                )}
+                onClick={() => setSelected(item)}
+              >
+                {item.kind} {item.symbol}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <span className="ml-auto shrink-0 text-muted-foreground">
+        Firma {pending}
+      </span>
+      <button
+        type="button"
+        className="shrink-0 rounded border border-border px-1.5 py-0.5 hover:bg-muted"
+        onClick={() => openConfirmDrawer()}
+      >
+        Firmar
+      </button>
+
+      {selected ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          role="dialog"
+          aria-labelledby="hoy-package-title"
+        >
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-4 shadow-lg">
+            <h2 id="hoy-package-title" className="text-sm font-semibold">
+              {selected.symbol} · {selected.kind}
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Gate {selected.gate} · estado {selected.status}
+            </p>
+            <div className="mt-3">
+              <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                Why not
+              </p>
+              {selected.whyNot.length === 0 ? (
+                <p className="text-sm">Lista para firmar en Confirmar.</p>
+              ) : (
+                <ul className="mt-1 list-disc pl-4 text-sm">
+                  {selected.whyNot.map((code) => (
+                    <li key={code}>{whyLabel(code)}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground"
+                onClick={() => {
+                  openConfirmDrawer();
+                  setSelected(null);
+                }}
+              >
+                Firmar
+              </button>
+              <Link
+                to={CONFIRM_PATH}
+                className="rounded border border-border px-2 py-1 text-xs"
+                onClick={() => setSelected(null)}
+              >
+                Abrir Confirmar
+              </Link>
+              <button
+                type="button"
+                className="ml-auto text-xs text-muted-foreground"
+                onClick={() => setSelected(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

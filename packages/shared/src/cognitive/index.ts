@@ -9,6 +9,8 @@ export * from "./evidence-engine.js";
 export * from "./lab-wfe.js";
 export * from "./facts.js";
 export * from "./decision-package.js";
+export * from "./trade-plan.js";
+export * from "./hoy-queue.js";
 export * from "./decision-memory.js";
 export * from "./apply-gate-to-decision.js";
 export * from "./market-event.js";

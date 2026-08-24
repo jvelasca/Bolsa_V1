@@ -60,7 +60,7 @@ Daily Decision Board (`GetDecisionBoard`, `/decision-board`) es **vista**; no de
 | DS-12–15 | expiry / partial / broker / recon | **Fuera** (no broker)                                                                                                                                  |
 | Residual | Composite `portfolioConstraints`  | Sigue `not_evaluated`; Fit vive al lado — **doc honesty**; no wire en esta rebanada                                                                    |
 | Residual | Dos call-sites `ExecuteTrade`     | **Diferido** (convergencia TO-BE; demasiado grande)                                                                                                    |
-| Residual | H3 orphan apertures               | Freeze: **doc only**; sí ejecutan con `contract=absent`                                                                                                |
+| Residual | H3 orphan apertures               | **Cerrado ADR-031:** store cableado → `orphan_opening_blocked`; tests sin store = legado                                                               |
 
 ---
 

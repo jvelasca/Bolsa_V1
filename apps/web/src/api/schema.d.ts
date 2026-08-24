@@ -2280,6 +2280,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/pending-orders/{order_id}/fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fill Pending Order */
+        post: operations["fill_pending_order_api_pending_orders__order_id__fill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform-events": {
         parameters: {
             query?: never;
@@ -5089,6 +5106,20 @@ export interface components {
             filingId: string;
             /** Instrumentid */
             instrumentId: string;
+        };
+        /** FillPendingOrderDto */
+        FillPendingOrderDto: {
+            /** Idempotencykey */
+            idempotencyKey: string;
+        };
+        /** FillPendingOrderResultDto */
+        FillPendingOrderResultDto: {
+            /** Reason */
+            reason?: string | null;
+            /** Status */
+            status: string;
+            /** Transactionid */
+            transactionId?: string | null;
         };
         /** FundamentalCardDto */
         FundamentalCardDto: {
@@ -13497,6 +13528,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fill_pending_order_api_pending_orders__order_id__fill_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Account-Id"?: string | null;
+            };
+            path: {
+                order_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FillPendingOrderDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FillPendingOrderResultDto"];
+                };
             };
             /** @description Validation Error */
             422: {

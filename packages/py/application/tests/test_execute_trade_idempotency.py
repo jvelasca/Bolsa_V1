@@ -13,13 +13,12 @@ pasaban clave). También se verifica aquí el reenvío de esa clave en ConfirmRe
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-
-from bolsa_application.accounts import ExecuteTrade
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_domain.entities.portfolio import (
@@ -27,6 +26,9 @@ from bolsa_domain.entities.portfolio import (
     TradeResult,
     Transaction,
 )
+
+from bolsa_application.accounts import ExecuteTrade
+from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
 
 @dataclass
@@ -595,10 +597,13 @@ async def test_confirm_with_conflicting_instrument_rejected() -> None:
 
 
 @pytest.mark.asyncio
-async def test_confirm_without_session_executes_with_contract_absent() -> None:
-    """Sin sesión/package (orphan) → el trade NO se bloquea; contrato=absent (visibilidad)."""
+async def test_confirm_without_session_orphan_opening_blocked() -> None:
+    """H3 / ADR-031 — store cableado sin package → no fill (apertura)."""
     fake_trade = _FakeExecuteTrade()
-    use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=_FakeCognitiveStore(None),  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
 
     result = await use_case.execute(
         recommendation_raw={
@@ -612,9 +617,10 @@ async def test_confirm_without_session_executes_with_contract_absent() -> None:
         execute=True,
     )
 
-    assert len(fake_trade.calls) == 1
+    assert len(fake_trade.calls) == 0
     assert result["intent"]["contract"] == "absent"
-    assert result["trade"]["status"] == "executed"
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "orphan_opening_blocked"
 
 
 @pytest.mark.asyncio
@@ -1400,3 +1406,130 @@ async def test_confirm_apertura_mandates_falla_fail_closed() -> None:
     assert len(fake_trade.calls) == 0
     assert result["trade"]["status"] == "rejected_by_gate"
     assert result["trade"]["reason"] == "risk_veto"
+
+
+@pytest.mark.asyncio
+async def test_confirm_expired_recommendation_no_fill() -> None:
+    """ADR-031 TTL — expiresAt en el pasado → expired, sin ExecuteTrade."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
+    past = (datetime.now(UTC) - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-TTL",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 5.0,
+            "suggestedPrice": 12.0,
+            "expiresAt": past,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "expired"
+
+
+@pytest.mark.asyncio
+async def test_confirm_stale_price_vs_last_close() -> None:
+    """ADR-031 — close 100 vs suggested 12 (>2%) → stale_price."""
+
+    class _CloseOhlcv:
+        async def get_latest_bar_date(self, instrument_id: str, *, timeframe: object = None) -> str:
+            return datetime.now(UTC).date().isoformat()
+
+        async def get_latest_close(self, instrument_id: str, *, timeframe: object = None) -> float:
+            return 100.0
+
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        ohlcv=_CloseOhlcv(),  # type: ignore[arg-type]
+    )
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-PX",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 5.0,
+            "suggestedPrice": 12.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["reason"] == "stale_price"
+
+
+@pytest.mark.asyncio
+async def test_confirm_double_execute_concurrent_single_logical_fill() -> None:
+    """Dos confirm concurrentes con el mismo decision_id → un fill + un replay."""
+
+    class _IdempotentFakeExecuteTrade:
+        def __init__(self) -> None:
+            self._lock = asyncio.Lock()
+            self._by_key: dict[str, TradeResult] = {}
+            self.unique_fills = 0
+            self.calls: list[str] = []
+
+        async def execute(self, **kwargs: object) -> TradeResult:
+            key = str(kwargs.get("idempotency_key") or "")
+            await asyncio.sleep(0.02)
+            async with self._lock:
+                existing = self._by_key.get(key)
+                if existing is not None:
+                    self.calls.append("replay")
+                    return existing
+                self.unique_fills += 1
+                tx = Transaction(
+                    id=f"tx-{self.unique_fills}",
+                    type="buy",  # type: ignore[arg-type]
+                    instrument_id="inst-1",
+                    symbol="SYM",
+                    quantity=1.0,
+                    price=10.0,
+                    total=10.0,
+                    executed_at="2026-08-20T08:00:00Z",
+                )
+                result = TradeResult(transaction=tx, summary=_FakeSummary(0.0))
+                self._by_key[key] = result
+                self.calls.append("fill")
+                return result
+
+    fake_trade = _IdempotentFakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-RACE",
+            instrument_id="inst-1",
+            action="recommend_long",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+    raw = {
+        "decisionId": "DEC-RACE",
+        "instrumentId": "inst-1",
+        "action": "recommend_long",
+        "suggestedQuantity": 5.0,
+        "suggestedPrice": 12.0,
+    }
+
+    async def _once() -> dict[str, Any]:
+        return await use_case.execute(
+            recommendation_raw=raw,
+            account_id="acc-1",
+            execute=True,
+            session_id="DSS-1",
+        )
+
+    r1, r2 = await asyncio.gather(_once(), _once())
+    assert fake_trade.unique_fills == 1
+    assert {r1["trade"]["status"], r2["trade"]["status"]} == {"executed"}
+    assert "fill" in fake_trade.calls
+    assert "replay" in fake_trade.calls
+

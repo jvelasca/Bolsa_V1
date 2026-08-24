@@ -95,3 +95,14 @@ class SqlAlchemyPendingOrderRepository:
         await self._session.delete(row)
         await self._session.flush()
         return True
+
+    async def get_by_id(
+        self, order_id: str, account_id: str | None = None
+    ) -> PendingOrderRecord | None:
+        stmt = select(PendingOrderRow).where(PendingOrderRow.id == order_id)
+        if account_id is not None:
+            stmt = stmt.where(PendingOrderRow.account_id == account_id)
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
+        if row is None:
+            return None
+        return _to_record(row)

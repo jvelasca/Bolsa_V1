@@ -70,7 +70,7 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 
 _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se envían solas._
 
-**«Hoy en la mesa»** (Ayuda → Guía y Flujo y módulos): (1) Ver valor en Trading · (2) Leer recomendación / Proponer F3 · (3) Firmar en Confirmar.
+**«Hoy en la mesa»** (Ayuda → Guía y Flujo y módulos): (1) Ver valor en Trading · (2) Leer recomendación / Proponer F3 · (3) Firmar en Confirmar. En la mesa, la tira **Hoy** (ADR-031) resume la cola del día (BUY / WATCH / BLOCKED) sin sustituir esas puertas.
 
 1. Cuenta DEMO activa · modo **SEMI** (barra / Cuentas) · valor en lista **Estudio** (Universo en vigilancia).
 2. Alarma / Proponer F3 → **Confirmar** (panel lateral desde Trading, o página `/confirm`) → humano firma y ejecuta.

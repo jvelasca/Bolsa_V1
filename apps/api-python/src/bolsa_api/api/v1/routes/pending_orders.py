@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Annotated
 
+from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,15 +11,17 @@ from bolsa_api.api.dependencies import (
     get_create_pending_order_use_case,
     get_db_session,
     get_delete_pending_order_use_case,
+    get_fill_pending_order_use_case,
     get_list_pending_orders_use_case,
     require_account_header_access,
 )
 from bolsa_api.schemas.pending_orders import (
     CreatePendingOrderDto,
+    FillPendingOrderDto,
+    FillPendingOrderResultDto,
     PendingOrderDto,
     PendingOrdersResponseDto,
 )
-from bolsa_infrastructure.database.repositories.pending_order_repository import PendingOrderRecord
 
 router = APIRouter()
 
@@ -68,6 +71,31 @@ async def create_pending_order(
         account_id=account_id,
     )
     return PendingOrdersResponseDto(data=[_to_dto(created)])
+
+
+@router.post(
+    "/pending-orders/{order_id}/fill",
+    response_model=FillPendingOrderResultDto,
+)
+async def fill_pending_order(
+    order_id: str,
+    body: FillPendingOrderDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    account_id: Annotated[str | None, Depends(require_account_header_access)],
+) -> FillPendingOrderResultDto:
+    try:
+        result = await get_fill_pending_order_use_case(session).execute(
+            order_id,
+            account_id=account_id,
+            idempotency_key=body.idempotency_key,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FillPendingOrderResultDto(
+        status=str(result["status"]),
+        reason=result.get("reason"),
+        transaction_id=result.get("transactionId"),
+    )
 
 
 @router.delete("/pending-orders/{order_id}", status_code=204)

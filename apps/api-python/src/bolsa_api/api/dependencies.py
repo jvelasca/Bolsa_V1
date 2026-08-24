@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
-from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -67,6 +66,7 @@ from bolsa_application.execution_policies import (
     UpdateExecutionPolicy,
 )
 from bolsa_application.execution_router import ExecuteScanJobHits, ExecutionRouter
+from bolsa_application.fill_pending_order import FillPendingOrder
 from bolsa_application.fx import GetFxRate
 from bolsa_application.get_database_summary import GetDatabaseSummary
 from bolsa_application.get_instrument_data_status import GetInstrumentDataStatus
@@ -265,6 +265,8 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 )
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
+
+from bolsa_api.auth.request_principal import get_request_principal
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
@@ -1323,6 +1325,23 @@ def get_delete_pending_order_use_case(session: AsyncSession) -> DeletePendingOrd
     return DeletePendingOrder(
         get_pending_order_repository(session),
         get_account_repository(session),
+    )
+
+
+def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
+    """ADR-031 — fill de pending_orders con check_opening (aperturas)."""
+    from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
+
+    return FillPendingOrder(
+        get_pending_order_repository(session),
+        get_account_repository(session),
+        execute_trade=get_execute_trade_use_case(session),
+        portfolio_summary=get_portfolio_summary_use_case(session),
+        instruments=get_instrument_repository(session),
+        accounts=get_account_repository(session),
+        profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
+        ohlcv=get_ohlcv_repository(session),
+        mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
     )
 
 

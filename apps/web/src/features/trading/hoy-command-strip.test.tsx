@@ -1,0 +1,63 @@
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
+import type { DecisionBoardV1 } from "@bolsa/shared";
+
+vi.mock("@/lib/api", () => ({
+  api: { getDecisionBoard: vi.fn() },
+}));
+
+vi.mock("@/features/accounts/use-active-account", () => ({
+  useActiveAccount: () => ({
+    effectiveAccountId: "acc1",
+    account: { id: "acc1" },
+    isLoading: false,
+  }),
+}));
+
+import { api } from "@/lib/api";
+import { HoyCommandStrip } from "./hoy-command-strip";
+
+function board(): DecisionBoardV1 {
+  return {
+    accountId: "acc1",
+    generatedAt: "2026-08-24T09:30:00Z",
+    buckets: {
+      pendingConfirm: 1,
+      vetoed: 0,
+      deferred: 0,
+      autoWaiting: 0,
+      total: 1,
+    },
+    semiF3Queue: [
+      { instrumentId: "i1", symbol: "SAN", status: "pending_confirm" },
+    ],
+    decisionSessions: [],
+  };
+}
+
+describe("HoyCommandStrip", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  beforeEach(() => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({ data: board() });
+  });
+
+  it("renders Hoy strip with queue item", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(await screen.findByTestId("hoy-command-strip")).toBeTruthy();
+    expect(await screen.findByTestId("hoy-item-SAN")).toBeTruthy();
+  });
+});

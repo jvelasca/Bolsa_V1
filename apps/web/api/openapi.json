@@ -4965,6 +4965,56 @@
         "title": "FilingSummarizeRequest",
         "type": "object"
       },
+      "FillPendingOrderDto": {
+        "properties": {
+          "idempotencyKey": {
+            "maxLength": 128,
+            "minLength": 16,
+            "title": "Idempotencykey",
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotencyKey"
+        ],
+        "title": "FillPendingOrderDto",
+        "type": "object"
+      },
+      "FillPendingOrderResultDto": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "transactionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transactionid"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "FillPendingOrderResultDto",
+        "type": "object"
+      },
       "FundamentalCardDto": {
         "properties": {
           "assessmentId": {
@@ -23177,6 +23227,74 @@
           }
         },
         "summary": "Delete Pending Order",
+        "tags": [
+          "pending-orders"
+        ]
+      }
+    },
+    "/api/pending-orders/{order_id}/fill": {
+      "post": {
+        "operationId": "fill_pending_order_api_pending_orders__order_id__fill_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "order_id",
+            "required": true,
+            "schema": {
+              "title": "Order Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Account-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FillPendingOrderDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FillPendingOrderResultDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fill Pending Order",
         "tags": [
           "pending-orders"
         ]

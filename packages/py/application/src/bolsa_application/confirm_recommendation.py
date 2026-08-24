@@ -45,11 +45,14 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
     sesión (`recommend_long`→`sell`, `recommend_short`→`buy`). Si no hay package para
     determinarlo → `rejected_by_gate`/`unknown_position_side` (fail-closed, nunca
     se asume el lado).
+- **ADR-031 (Ciclo 1):** TTL `expiresAt` → `expired`; aperturas orphan con store
+  cableado → `orphan_opening_blocked`; último close vs `suggestedPrice` (banda 2 %)
+  → `stale_price`.
 """
 
 from __future__ import annotations
 
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import uuid4
 
@@ -60,6 +63,9 @@ from bolsa_analytics.cognitive.decision_session import (
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.cognitive.recommendation import Recommendation
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
@@ -67,14 +73,15 @@ from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.journal_writer import append_journal_event
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
 _CLOSING_ACTIONS = {"exit_hint", "reduce"}
 # Acciones transaccionales que pueden llegar a `ExecuteTrade` (solo estas)
 # `wait` NO está: una tesis `wait` no abre ni cierra posición (Bug 1).
 _TRADE_ACTIONS = _OPENING_ACTIONS | _CLOSING_ACTIONS
+
+# ADR-031 — banda de revalidación de precio (último close vs suggestedPrice).
+PRICE_REVALIDATION_MAX_REL_DEVIATION = 0.02
 
 
 class InstrumentSectorLookup(Protocol):
@@ -113,6 +120,13 @@ class LatestBarLookup(Protocol):
         *,
         timeframe: Any = ...,
     ) -> str | None: ...
+
+    async def get_latest_close(
+        self,
+        instrument_id: str,
+        *,
+        timeframe: Any = ...,
+    ) -> float | None: ...
 
 
 def resolve_session_decision_package(
@@ -196,6 +210,56 @@ def _reject_reason_for_execute(
     return None
 
 
+def _parse_expires_at(raw: str | None) -> datetime | None:
+    """ISO-8601 → datetime UTC; None si vacío o ilegible."""
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def recommendation_is_expired(expires_at: str | None, *, now: datetime | None = None) -> bool:
+    """True si ``expiresAt`` está en el pasado (TTL ADR-031). Sin fecha → no caduca."""
+    parsed = _parse_expires_at(expires_at)
+    if parsed is None:
+        return False
+    moment = now if now is not None else datetime.now(UTC)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    else:
+        moment = moment.astimezone(UTC)
+    return parsed < moment
+
+
+def price_revalidation_reason(
+    suggested_price: float,
+    last_close: float | None,
+    *,
+    max_rel_deviation: float = PRICE_REVALIDATION_MAX_REL_DEVIATION,
+) -> str | None:
+    """``stale_price`` si el close conocido se desvía más de la banda; None si no aplica.
+
+    ``last_close`` None → no hay dato (compat tests / lookup sin close); no veta.
+    Close ≤ 0 → ``stale_price`` fail-closed.
+    """
+    if last_close is None:
+        return None
+    if last_close <= 0 or suggested_price <= 0:
+        return "stale_price"
+    rel = abs(suggested_price - last_close) / last_close
+    if rel > max_rel_deviation:
+        return "stale_price"
+    return None
+
+
 def _is_opening_action(action: str) -> bool:
     """¿La recommendation abre una posición (sujeta al VETO de cesta en SEMI)?"""
     return action in _OPENING_ACTIONS
@@ -276,6 +340,7 @@ class ConfirmRecommendationIntent:
             symbol=raw.get("symbol"),
             account_id=account_id,
             suggested_price=raw.get("suggestedPrice"),
+            expires_at=raw.get("expiresAt") or raw.get("expires_at"),
             notes=tuple(raw.get("notes") or ()),
         )
         intent = intent_from_recommendation(rec, account_id=account_id, authorized_by="human")
@@ -325,7 +390,25 @@ class ConfirmRecommendationIntent:
                 intent_instrument_id=intent.instrument_id,
                 package=package,
             )
-            if price <= 0:
+            if recommendation_is_expired(rec.expires_at):
+                reject_reason = "expired"
+            elif (
+                reject_reason is None
+                and _is_opening_action(rec.action)
+                and package is None
+                and self._store is not None
+            ):
+                # H3 / ADR-031 — aperturas nuevas fallan cerradas sin DecisionPackage
+                # cuando el store está cableado (producción). Tests sin store = legado.
+                reject_reason = "orphan_opening_blocked"
+            if (
+                reject_reason is None
+                and _is_opening_action(rec.action)
+                and self._ohlcv is not None
+            ):
+                last_close = await self._resolve_latest_close(intent.instrument_id)
+                reject_reason = price_revalidation_reason(price, last_close)
+            if price <= 0 and reject_reason is None:
                 result["trade"] = {
                     "status": "skipped",
                     "reason": "suggestedPrice requerido para ejecutar",
@@ -567,6 +650,30 @@ class ConfirmRecommendationIntent:
         if isinstance(sector, str) and sector.strip():
             return sector.strip()
         return None
+
+    async def _resolve_latest_close(self, instrument_id: str) -> float | None:
+        """Último close D1 para revalidar ``suggestedPrice`` (ADR-031).
+
+        Lookup que lanza o no expone ``get_latest_close`` → None (la banda no veta;
+        DS-05 sigue cubriendo frescura por fecha). Close presente se evalúa en
+        ``price_revalidation_reason``.
+        """
+        if self._ohlcv is None or not instrument_id:
+            return None
+        getter = getattr(self._ohlcv, "get_latest_close", None)
+        if getter is None:
+            return None
+        try:
+            close = await getter(instrument_id)
+        except Exception:  # noqa: BLE001 — precio opcional; DS-05 cubre disponibilidad
+            return None
+        if close is None:
+            return None
+        try:
+            value = float(close)
+        except (TypeError, ValueError):
+            return None
+        return value if value > 0 else None
 
     async def _persist_session(
         self,

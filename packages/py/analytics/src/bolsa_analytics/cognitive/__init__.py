@@ -1,5 +1,13 @@
 """RFC-008 Cognitive Decision Architecture — D1…D7."""
 
+from bolsa_domain.entities.market_event import (
+    EventBlackoutContext,
+    MarketEvent,
+    MarketEventCalendar,
+    build_market_event,
+    event_decay_weight,
+)
+
 from bolsa_analytics.cognitive.auto_live import AutoLiveCheck, check_auto_live
 from bolsa_analytics.cognitive.confidence_lifecycle import (
     ConfidenceEvent,
@@ -94,6 +102,11 @@ from bolsa_analytics.cognitive.stats_suite import (
     walk_forward_efficiency,
 )
 from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_from_declared
+from bolsa_analytics.cognitive.trade_plan import (
+    TradePlan,
+    build_trade_plan,
+    compute_risk_size,
+)
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
 from bolsa_analytics.cognitive.trading_policy_templates import (
     AGGRESSIVE_SWING_POLICY,
@@ -110,13 +123,6 @@ from bolsa_analytics.cognitive.weight_rules import (
     WeightRuleResult,
     resolve_weight_rules,
     weight_rules_for_horizon,
-)
-from bolsa_domain.entities.market_event import (
-    EventBlackoutContext,
-    MarketEvent,
-    MarketEventCalendar,
-    build_market_event,
-    event_decay_weight,
 )
 
 __all__ = [
@@ -161,6 +167,7 @@ __all__ = [
     "ScoreMacroResult",
     "SessionOutcome",
     "StatisticalSuiteResult",
+    "TradePlan",
     "TradingPolicy",
     "TrialRecord",
     "TrialsLog",
@@ -182,10 +189,12 @@ __all__ = [
     "build_memory_entry",
     "build_outcome_from_prices",
     "build_propose_session",
+    "build_trade_plan",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
     "compute_portfolio_fit",
+    "compute_risk_size",
     "deflated_sharpe_ratio",
     "evaluate_policy_gate",
     "event_decay_weight",

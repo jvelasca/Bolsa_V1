@@ -26,9 +26,9 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-24** HEAD `386a959` (stack, spine, JWT, Journal F1–F3, F9-A3 CI, Ruff I001, pytest CI, Alembic 010)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-24** HEAD `020975c` + working tree ADR-031 (stack, spine, tesis≠plan≠permiso, Journal F1–F3, Alembic 010)
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)**
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -60,7 +60,8 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ruff-i001-ci-stamp-24e-2026-08-24.md ← **RELEVO ACTIVO** · F9-A3 CI PUSHEADO · Ruff I001 hygiene · pack 24e · Purge V2 MONITOR · F9-B PARKED
+│   ├── traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md ← **RELEVO ACTIVO** · ADR-031 Ciclos 0–3 en working tree (SIN commit) · tesis ≠ plan ≠ permiso · Hoy strip
+│   ├── traspaso-relevo-ruff-i001-ci-stamp-24e-2026-08-24.md ← relevo histórico · F9-A3 CI · Ruff I001 · pack 24e · cerrado por ADR-031
 │   ├── traspaso-relevo-ops-alembic-010-f9a3-monitor-purge-2026-08-24.md ← relevo histórico · Alembic `010` · F9-A3 CI · Purge V2 MONITOR · cerrado por 24e
 │   ├── traspaso-relevo-order-proposal-journal-cierre-f1-f3-2026-08-24.md ← relevo histórico · Ciclo 1 F1–F3 + F9-A CERRADO · HEAD `8a1e64d`
 │   ├── audit-pack-estado-global-2026-08-24d.md ← histórico pre-Ruff CI unblock · supersedido por 24e

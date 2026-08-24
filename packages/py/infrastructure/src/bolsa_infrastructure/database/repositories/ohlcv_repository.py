@@ -1,12 +1,12 @@
 from datetime import UTC, date, datetime, timedelta
 
+from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+from bolsa_domain.ohlcv_time import format_bar_timestamp, parse_bar_timestamp
+from bolsa_domain.value_objects.timeframe import TimeFrame
 from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.ohlcv_bar import OhlcvBar
-from bolsa_domain.ohlcv_time import format_bar_timestamp, parse_bar_timestamp
-from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.models import OhlcvBarRow
 from bolsa_infrastructure.ids import new_id
 
@@ -96,6 +96,28 @@ class SqlAlchemyOhlcvRepository:
         if row is None:
             return None
         return format_bar_timestamp(row, timeframe)
+
+    async def get_latest_close(
+        self,
+        instrument_id: str,
+        *,
+        timeframe: TimeFrame = TimeFrame.D1,
+    ) -> float | None:
+        """Último close D1 (ADR-031 revalidación de precio en confirm SEMI)."""
+        stmt = (
+            select(OhlcvBarRow.close)
+            .where(
+                OhlcvBarRow.instrument_id == instrument_id,
+                OhlcvBarRow.timeframe == timeframe,
+            )
+            .order_by(OhlcvBarRow.timestamp.desc())
+            .limit(1)
+        )
+        result = await self._session.execute(stmt)
+        close = result.scalar_one_or_none()
+        if close is None:
+            return None
+        return float(close)
 
     async def get_earliest_bar_date(
         self,

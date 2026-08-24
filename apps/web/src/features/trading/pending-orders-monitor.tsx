@@ -101,14 +101,21 @@ export function PendingOrdersMonitor() {
           const cachedKey = orderIdemKeys.current.get(order.id);
           const idemKey = cachedKey ?? createIdempotencyKey();
           if (!cachedKey) orderIdemKeys.current.set(order.id, idemKey);
-          const res = await api.executeTrade({
-            instrumentId: order.instrumentId,
-            type: order.side,
-            quantity: order.quantity,
-            price: order.limitPrice,
+          const fill = await api.fillPendingOrder(order.id, {
             idempotencyKey: idemKey,
           });
-          const txId = res?.data?.transaction?.id;
+          if (fill.status === "rejected_by_gate") {
+            throw new Error(fill.reason ?? "risk_veto");
+          }
+          if (fill.status === "expired") {
+            orderIdemKeys.current.delete(order.id);
+            pushToast(`Orden ${order.symbol} cancelada — vencida`);
+            void queryClient.invalidateQueries({
+              queryKey: ["pending-orders"],
+            });
+            continue;
+          }
+          const txId = fill.transactionId;
           if (txId && effectiveAccountId) {
             linkTradeToMandate({
               transactionId: txId,
@@ -116,12 +123,12 @@ export function PendingOrdersMonitor() {
               accountId: effectiveAccountId,
             });
           }
-          await removePendingOrder(order.id);
           orderIdemKeys.current.delete(order.id);
           errorNotified.current.delete(order.id);
           pushToast(
             `Orden ${order.side === "buy" ? "compra" : "venta"} ${order.symbol} ejecutada @ ${formatPrice(order.limitPrice)}`,
           );
+          void queryClient.invalidateQueries({ queryKey: ["pending-orders"] });
           void queryClient.invalidateQueries({ queryKey: ["portfolio"] });
           void queryClient.invalidateQueries({ queryKey: ["transactions"] });
           void queryClient.invalidateQueries({ queryKey: ["ledger"] });
