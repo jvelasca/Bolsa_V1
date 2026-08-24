@@ -9,7 +9,8 @@ export type MesaTipId =
   | "operativa-recomendacion"
   | "operativa-confirm-drawer"
   | "operativa-fit-chip"
-  | "chart-f3-projection";
+  | "chart-f3-projection"
+  | "confirm-ticket-preview";
 
 export type MesaTip = {
   id: MesaTipId;
@@ -63,6 +64,13 @@ export const MESA_TIPS: Record<MesaTipId, MesaTip> = {
     body: "Si hay una propuesta en cola Confirmar para el valor del gráfico, verás una línea horizontal de precio (p. ej. F3 · LONG @ …). Es solo una pista visual: no ejecuta. El botón Firmar abre Confirmar; la firma SEMI sigue siendo tuya.",
     linkTo: "/confirm",
     linkLabel: "Ir a Confirmar",
+  },
+  "confirm-ticket-preview": {
+    id: "confirm-ticket-preview",
+    title: "Preview de ticket",
+    body: "Antes de firmar verás notional, comisión (perfil de la cuenta) y margen estimado (libre / orden). Es solo información: no envía la orden. Confirmar Intent inspecciona; Confirmar + ejecutar sigue siendo la firma humana SEMI.",
+    linkTo: "/confirm",
+    linkLabel: "Abrir Confirmar",
   },
 };
 

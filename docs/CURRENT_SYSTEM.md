@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · ancla viva `git fetch; git rev-parse origin/main` = **`04e441e`** (`main` == `origin/main`). Prove Spine S0–S3 + H5 + **UX mesa U0–U5** **pusheados**.
+> **AsOf:** 2026-08-24 · ancla viva `origin/main` = **`2c40211`** (stamp docs U5). Código U0–U5 `04e441e`. **U6 ticket preview** en working tree (**commit pendiente coordinador**). Prove Spine S0–S3 + H5 + UX mesa U0–U5 pusheados; U6 lista para commit.
 > **Tag:** `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -17,7 +17,7 @@ Doble cara congelada: **QROS** (Lab, ADR-011) + **Investment OS** (mesa) unidos 
 
 ## Features activas
 
-Embudo / Lista AUTO / Finalistas · DÍA D · CORE-R · CORE-P · FA/FIE · SEMI (Trading · Señales · Confirmar · Libro) · UX mesa U0–U5 (Ayuda tips · S/R presets · Confirm drawer · Fit chips · proyección orden chart F3 post-SEMI preview) · Decision Board **solo lectura** (`/decision-board`) · PortfolioFit v1 (concentración cesta activo+sector, VETO) · paper/DEMO · prep AUTO A0–A5.
+Embudo / Lista AUTO / Finalistas · DÍA D · CORE-R · CORE-P · FA/FIE · SEMI (Trading · Señales · Confirmar · Libro) · UX mesa U0–U6 (Ayuda tips · S/R presets · Confirm drawer · Fit chips · proyección orden chart F3 · **preview ticket margen/comisión** en Confirm/drawer, UI-only) · Decision Board **solo lectura** (`/decision-board`) · PortfolioFit v1 (concentración cesta activo+sector, VETO) · paper/DEMO · prep AUTO A0–A5.
 
 ## Features congeladas
 

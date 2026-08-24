@@ -27,7 +27,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useActiveAccount } from "@/features/accounts/use-active-account";
+import {
+  useActiveAccount,
+  useActiveAccountSettings,
+} from "@/features/accounts/use-active-account";
 import { api } from "@/lib/api";
 import { formatNumber0 } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -53,6 +56,8 @@ import {
   conflictForActive,
   findHmConflicts,
 } from "@/features/trading/semi-hm-conflict";
+import { F3TicketPreviewBlock } from "@/features/trading/f3-ticket-preview-block";
+import { resolveF3TicketPreview } from "@/features/trading/f3-ticket-preview";
 import { PAPER_PATH_SUPERVISED } from "@/features/settings/paper-paths-copy";
 
 type ProposePayload = SupervisedProposePayload;
@@ -161,6 +166,7 @@ function AssessmentBlock({
 
 export function SupervisedF3Panel() {
   const { account, effectiveAccountId } = useActiveAccount();
+  const { settings, currency: accountCurrency } = useActiveAccountSettings();
   const [instrumentId, setInstrumentId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
@@ -195,6 +201,7 @@ export function SupervisedF3Panel() {
     staleTime: 15_000,
   });
   const cash = summaryQuery.data?.data?.cash ?? 0;
+  const summary = summaryQuery.data?.data;
 
   useEffect(() => {
     function refreshBookPrefs() {
@@ -451,6 +458,40 @@ export function SupervisedF3Panel() {
   const ea = pending?.evidenceAssessment as EvidenceAssessmentV1 | undefined;
   const na = pending?.newsAssessment as NewsAssessmentV1 | undefined;
 
+  /** U6 — preview ticket (margen/comisión); no ejecuta. */
+  const ticketPreview = useMemo(() => {
+    if (!pending) return null;
+    const pkg = pending.decisionPackage as
+      | Record<string, unknown>
+      | null
+      | undefined;
+    const resolvedPrice =
+      price.trim() ||
+      (pending.suggestedPrice != null ? String(pending.suggestedPrice) : "") ||
+      (pending.lastClose != null ? String(pending.lastClose) : "");
+    return resolveF3TicketPreview({
+      action: pending.action,
+      packageAction: pkg?.action,
+      quantity,
+      price: resolvedPrice,
+      notional: pending.notional,
+      settings,
+      currency: accountCurrency,
+      leverage: account?.leverage,
+      marginUsed: summary?.marginUsed,
+      freeMargin: summary?.freeMargin,
+    });
+  }, [
+    pending,
+    quantity,
+    price,
+    settings,
+    accountCurrency,
+    account?.leverage,
+    summary?.marginUsed,
+    summary?.freeMargin,
+  ]);
+
   return (
     <Card id="supervised-f3-panel">
       <CardHeader>
@@ -689,6 +730,8 @@ export function SupervisedF3Panel() {
             </label>
           </div>
         </div>
+        {ticketPreview ? <F3TicketPreviewBlock ticket={ticketPreview} /> : null}
+
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

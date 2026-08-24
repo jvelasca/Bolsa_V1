@@ -15,7 +15,7 @@ import {
 afterEach(() => cleanup());
 
 describe("mesa-tip-catalog", () => {
-  it("exposes U1 tip ids plus U3 confirm-drawer, U4 fit-chip and U5 chart-projection tips", () => {
+  it("exposes U1–U6 tip ids (drawer, fit, chart projection, ticket preview)", () => {
     expect(MESA_TIP_IDS).toEqual(
       expect.arrayContaining([
         "operativa-proponer",
@@ -24,9 +24,10 @@ describe("mesa-tip-catalog", () => {
         "operativa-confirm-drawer",
         "operativa-fit-chip",
         "chart-f3-projection",
+        "confirm-ticket-preview",
       ]),
     );
-    expect(MESA_TIP_IDS).toHaveLength(6);
+    expect(MESA_TIP_IDS).toHaveLength(7);
   });
 
   it("returns Spanish copy with optional links", () => {
@@ -49,6 +50,12 @@ describe("mesa-tip-catalog", () => {
     const fit = MESA_TIPS["operativa-fit-chip"];
     expect(fit.body).toMatch(/Fit/i);
     expect(fit.body).toMatch(/PASS/i);
+
+    const ticket = MESA_TIPS["confirm-ticket-preview"];
+    expect(ticket.body).toMatch(/comisión/i);
+    expect(ticket.body).toMatch(/margen/i);
+    expect(ticket.body).toMatch(/no envía/i);
+    expect(ticket.linkTo).toBe("/confirm");
   });
 });
 
