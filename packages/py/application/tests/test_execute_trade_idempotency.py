@@ -17,15 +17,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+
+from bolsa_application.accounts import ExecuteTrade
+from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     TradeResult,
     Transaction,
 )
-
-from bolsa_application.accounts import ExecuteTrade
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
 
 @dataclass
@@ -757,8 +757,13 @@ async def test_confirm_apertura_cesta_permite_fill() -> None:
 
 
 @pytest.mark.asyncio
-async def test_confirm_exit_hint_no_sometido_a_cesta() -> None:
-    """Escalón 3/D1 — exit_hint/reduce NO se someten al VETO de cesta (no abren)."""
+async def test_confirm_exit_hint_orphan_fail_closed_unknown_side() -> None:
+    """Deuda confirm SEMI (Bug 2) — exit_hint sin sesión/package → fail-closed.
+
+    Sin package no se puede saber si el cierre va sell (largo) o buy (corto): se
+    rechaza con `unknown_position_side` en vez de ejecutar un sell a ciegas (que hoy
+    re-abriría un short). Antes (Escalón 3/D1) un orphan `exit_hint` ejecutaba sell.
+    """
     fake_trade = _FakeExecuteTrade()
     use_case = ConfirmRecommendationIntent(
         execute_trade=fake_trade,
@@ -777,7 +782,149 @@ async def test_confirm_exit_hint_no_sometido_a_cesta() -> None:
         execute=True,
     )
 
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "unknown_position_side"
+    assert result["intent"]["status"] == "rejected_by_gate"
+
+
+@pytest.mark.asyncio
+async def test_confirm_wait_no_ejecuta_sell_default() -> None:
+    """Deuda confirm SEMI (Bug 1) — una tesis `wait` NO abre/cierra nada.
+
+    Antes, `intent_from_recommendation` mapeaba `wait` → side=`sell`, así que un
+    confirm `wait` con `suggestedQuantity>0` ejecutaba una venta default. Ahora
+    `wait` no es transaccional: el trade queda vacío y no se llama al ExecuteTrade.
+    """
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-WAIT",
+            "instrumentId": "inst-1",
+            "action": "wait",
+            "suggestedQuantity": 5.0,
+            "suggestedPrice": 10.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"] is None
+    assert result["intent"]["status"] == "authorized"
+
+
+@pytest.mark.asyncio
+async def test_confirm_reduce_short_conflict_no_reapertura() -> None:
+    """Deuda confirm SEMI (Bug 2) — `reduce` de un short NO ejecuta un sell de apertura.
+
+    Package de sesión = `recommend_short` (posición corta). `intent_from_recommendation`
+    mapea `reduce` → sell, pero cerrar/reducir un corto debe ser **buy** (cover). El
+    side `sell` diverge del requerido `buy` → `decision_package_conflict` fail-closed.
+    """
+    fake_trade = _FakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-RED",
+            instrument_id="inst-1",
+            action="recommend_short",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-RED",
+            "instrumentId": "inst-1",
+            "action": "reduce",
+            "suggestedQuantity": 2.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+        session_id="DSS-1",
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "decision_package_conflict"
+    assert result["intent"]["status"] == "rejected_by_gate"
+
+
+@pytest.mark.asyncio
+async def test_confirm_exit_hint_short_conflict_no_reapertura() -> None:
+    """Deuda confirm SEMI (Bug 2) — `exit_hint` de un short NO ejecuta un sell de apertura."""
+    fake_trade = _FakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-EX",
+            instrument_id="inst-1",
+            action="recommend_short",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-EX",
+            "instrumentId": "inst-1",
+            "action": "exit_hint",
+            "suggestedQuantity": 2.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+        session_id="DSS-1",
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "decision_package_conflict"
+
+
+@pytest.mark.asyncio
+async def test_confirm_exit_hint_largo_con_package_ejecuta_sell() -> None:
+    """Deuda confirm SEMI (Bug 2) — cerrar un LARGO con package `recommend_long` es legítimo.
+
+    `exit_hint` de un largo requiere `sell`, que coincide con el intent → se ejecuta.
+    (Antes D2 rechazaba cualquier exit_hint contra un package `recommend_long`.)
+    """
+    fake_trade = _FakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-EXL",
+            instrument_id="inst-1",
+            action="recommend_long",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-EXL",
+            "instrumentId": "inst-1",
+            "action": "exit_hint",
+            "suggestedQuantity": 2.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+        session_id="DSS-1",
+    )
+
     assert len(fake_trade.calls) == 1
+    assert fake_trade.calls[0]["trade_type"] == "sell"
     assert result["trade"]["status"] == "executed"
 
 

@@ -1,13 +1,26 @@
 """F3 — Confirm Recommendation → OrderIntent (+ opcional trade) + DecisionSession.
 
-Escalón 3/D1 — re-evaluación VETO de cesta al confirmar en SEMI: si el use-case
-recibe `portfolio_summary`, y la recommendation es una **apertura**
-(`recommend_long`/`recommend_short`), se re-ejecuta el risk de cesta
-(`check_opening` + kill-switch) antes de tocar `ExecuteTrade`. Si veta → el fill
-se bloquea (`rejected_by_gate`, `risk_veto`), replicando en SEMI el mismo Risk de
-cesta que AUTO (`execution_router.py:560-581`). `exit_hint`/`reduce` NO se someten
-al VETO (no abren cesta). Perfil de risk no se re-evalúa en esta rebanada
-(`profile=None`); `portfolio_summary=None` conserva el comportamiento previo.
+Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deuda):
+
+- **D2 (contrato):** cuando la sesión `propose` persiste un `DecisionPackage`,
+  es la fuente de verdad de la **identidad** (dirección + instrumento) del intent;
+  si diverge → `rejected_by_gate`/`decision_package_conflict` fail-closed.
+- **Escalón 3/D1 (VETO de cesta):** si el use-case recibe `portfolio_summary`, y la
+  recommendation es una **apertura** (`recommend_long`/`recommend_short`), se
+  re-ejecuta el risk de cesta (`check_opening` + kill-switch) antes de `ExecuteTrade`;
+  si veta → `rejected_by_gate`/`risk_veto`. `exit_hint`/`reduce` NO se someten al
+  VETO (no abren cesta). Perfil de risk no se re-evalúa en esta rebanada
+  (`profile=None`); `portfolio_summary=None` conserva el comportamiento previo.
+- **Cierre deuda confirm SEMI (Bug 1 + Bug 2):**
+  - **Bug 1 (`wait` no trade):** solo las acciones transaccionales
+    (`recommend_long`/`recommend_short`/`exit_hint`/`reduce`) pueden llegar a
+    `ExecuteTrade`. Una tesis `wait` (ni siquiera con `suggested_quantity>0`) NO
+    desencadena un sell default: el trade queda `None`.
+  - **Bug 2 (side de `exit_hint`/`reduce`):** el lado de un cierre/reducción es el
+    **inverso** de la posición, que solo se conoce desde el `DecisionPackage` de la
+    sesión (`recommend_long`→`sell`, `recommend_short`→`buy`). Si no hay package para
+    determinarlo → `rejected_by_gate`/`unknown_position_side` (fail-closed, nunca
+    se asume el lado).
 """
 
 from __future__ import annotations
@@ -23,14 +36,17 @@ from bolsa_analytics.cognitive.decision_session import (
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.cognitive.recommendation import Recommendation
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
+_CLOSING_ACTIONS = {"exit_hint", "reduce"}
+# Acciones transaccionales que pueden llegar a `ExecuteTrade` (solo estas)
+# `wait` NO está: una tesis `wait` no abre ni cierra posición (Bug 1).
+_TRADE_ACTIONS = _OPENING_ACTIONS | _CLOSING_ACTIONS
 
 
 def resolve_session_decision_package(
@@ -50,27 +66,68 @@ def resolve_session_decision_package(
     return pkg if isinstance(pkg, dict) else None
 
 
-def _intent_side_matches_package_side(intent_side: str, package_action: str | None) -> bool:
-    """¿La dirección del intent es coherente con la `action` del DecisionPackage?"""
-    if package_action == "recommend_long":
-        return intent_side == "buy"
-    if package_action in {"recommend_short", "exit_hint", "reduce"}:
-        return intent_side == "sell"
-    # wait / desconocida: la tesis no abre posición en esa dirección.
-    return False
+def _required_fill_side(action: str, package_action: str | None) -> tuple[bool, str | None]:
+    """Lado de llenado requerido para `action` dado el `action` de la sesión (`package`).
 
+    Retorna `(determinable, side)`. Con `determinable=False` el contexto NO permite
+    decidir el lado → el confirm debe rechazar (fail-closed), nunca asumir.
 
-def _identity_reconciles(intent: Any, package: dict[str, Any]) -> bool:
-    """El intent respeta la identidad de la tesis del DecisionPackage.
-
-    Solo se concilia la identidad (dirección + instrumento). El sizing/notional
-    NO se concilia: `suggested_quantity`/`suggested_price` son decisión operativa
-    del humano, externos al paquete (edición legítima en el front).
+    - **Aperturas** (`recommend_long`/`recommend_short`): el lado viene de la propia
+      acción (buy/sell). Si existe paquete de sesión, su tesis DEBE ser la misma
+      apertura (fuente de verdad D2); si es incoherente → no determinable (conflict).
+      Sin sesión (orphan) la apertura sigue permitida (contrato `absent`), D2 previo.
+    - **Cierres** (`exit_hint`/`reduce`): el lado es el INVERSO de la posición, que
+      solo se conoce desde el package (long→sell, short→buy). Bug 2: antes se asumía
+      siempre `sell`, lo que re-abría un short en vez de cubrirlo. Sin package el lado
+      es indeterminable → fail-closed (`unknown_position_side`).
     """
-    if not _intent_side_matches_package_side(intent.side, package.get("action")):
-        return False
-    pkg_instrument = package.get("instrumentId")
-    return pkg_instrument is None or pkg_instrument == intent.instrument_id
+    if action in {"recommend_long", "recommend_short"}:
+        if package_action not in (None, action):
+            return False, None  # tesis de sesión incompatible con la apertura confirmada
+        return True, "buy" if action == "recommend_long" else "sell"
+    if action in _CLOSING_ACTIONS:
+        if package_action == "recommend_long":
+            return True, "sell"  # cerrar/reducir un largo = vender
+        if package_action == "recommend_short":
+            return True, "buy"  # cubrir/reducir un corto = comprar (no reabrir)
+        return False, None  # sin posición conocida → no saber el lado
+    # wait / desconocida: no transaccional; no deriva rechazo aquí (Bug 1).
+    return True, None
+
+
+def _reject_reason_for_execute(
+    *,
+    action: str,
+    intent_side: str,
+    intent_instrument_id: str,
+    package: dict[str, Any] | None,
+) -> str | None:
+    """Motivo de rechazo fail-closed antes del fill, o `None` si procede ejecutar.
+
+    Sustituye a `_identity_reconciles` (D2) y cubre además Bug 2 (side de cierre) y
+    la identidad por instrumento. El sizing/notional NO se concilia: es decisión
+    operativa del humano, externa al paquete.
+
+    Retorna:
+      - `"decision_package_conflict"` — lado/tesis/instrumento incoherentes con el package.
+      - `"unknown_position_side"` — cierre (exit_hint/reduce) sin package: no se puede
+        saber si va sell (largo) o buy (corto) → fail-closed.
+      - `"non_trade_action"` — acción no transaccional en un path de execute.
+      - `None` — procede (aún pasará por price/risk/execute gates).
+    """
+    if action not in _TRADE_ACTIONS:
+        return "non_trade_action"
+    pkg_action = None if package is None else package.get("action")
+    determinable, required = _required_fill_side(action, pkg_action)
+    if not determinable:
+        return "decision_package_conflict" if package is not None else "unknown_position_side"
+    if intent_side != required:
+        return "decision_package_conflict"
+    if package is not None:
+        pkg_instrument = package.get("instrumentId")
+        if pkg_instrument is not None and pkg_instrument != intent_instrument_id:
+            return "decision_package_conflict"
+    return None
 
 
 def _is_opening_action(action: str) -> bool:
@@ -163,21 +220,32 @@ class ConfirmRecommendationIntent:
                 contract_status = "present_verified"
         result["intent"]["contract"] = contract_status
 
-        if execute and intent.side in {"buy", "sell"} and intent.quantity > 0:
+        if (
+            execute
+            and rec.action in _TRADE_ACTIONS
+            and intent.side in {"buy", "sell"}
+            and intent.quantity > 0
+        ):
             price = float(rec.suggested_price or 0)
+            reject_reason = _reject_reason_for_execute(
+                action=rec.action,
+                intent_side=intent.side,
+                intent_instrument_id=intent.instrument_id,
+                package=package,
+            )
             if price <= 0:
                 result["trade"] = {
                     "status": "skipped",
                     "reason": "suggestedPrice requerido para ejecutar",
                 }
-            elif package is not None and not _identity_reconciles(intent, package):
-                # La identidad de la tesis debe coincidir con el contrato de la sesión.
+            elif reject_reason is not None:
+                # Identidad D2 (apertura vs tesis) + Bug 2 (side de cierre fail-closed).
+                # El intent refleja el rechazo para que la UI no trate el ítem como
+                # ejecutado/aprobado y lo retire de la cola (mismo patrón que D2/Esc.3).
                 result["trade"] = {
                     "status": "rejected_by_gate",
-                    "reason": "decision_package_conflict",
+                    "reason": reject_reason,
                 }
-                # El intent debe reflejar el rechazo para que la UI no trate el
-                # ítem como ejecutado/aprobado y lo retire de la cola.
                 result["intent"] = {
                     **intent.to_dict(),
                     "status": "rejected_by_gate",
