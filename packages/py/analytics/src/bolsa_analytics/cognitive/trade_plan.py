@@ -85,6 +85,8 @@ BREAKOUT_LOOKBACK = 20
 PULLBACK_ATR_BAND = 1.0
 WYCKOFF_SPRING = 5
 WYCKOFF_PRIOR = 10
+# Ciclo 4.4 — reclaim formal: close ≥ spring ± k×ATR ó fuera del rango spring.
+WYCKOFF_RECLAIM_ATR_K = 0.25
 
 # Ciclo 4.3 — ARMED actionability (entre WATCH entry 0.4 y TRIGGERED ~0.95).
 ARMED_ACTIONABILITY = 0.7
@@ -157,33 +159,96 @@ def _is_pullback(
     return sma - band <= close <= sma
 
 
-def _is_wyckoff_reclaim(*, direction: TradePlanDirection, bars: Sequence[object]) -> bool:
+def _wyckoff_windows(
+    bars: Sequence[object],
+) -> tuple[Sequence[object], Sequence[object], float] | None:
     need = WYCKOFF_SPRING + WYCKOFF_PRIOR + 1
     if len(bars) < need:
-        return False
+        return None
     closed = bars[-need:-1]
     prior = closed[:WYCKOFF_PRIOR]
     spring = closed[WYCKOFF_PRIOR:]
     close = _bar_px(bars[-1], "close")
     if close is None:
+        return None
+    return prior, spring, close
+
+
+def _detect_wyckoff_spring(*, direction: TradePlanDirection, bars: Sequence[object]) -> bool:
+    """Spring: low (long) bajo el mínimo prior, o high (short) sobre el máximo prior."""
+    windows = _wyckoff_windows(bars)
+    if windows is None:
         return False
+    prior, spring, _close = windows
     if direction == "long":
         prior_lows = [_bar_px(bar, "low") for bar in prior]
         spring_lows = [_bar_px(bar, "low") for bar in spring]
         p_ok = [v for v in prior_lows if v is not None]
         s_ok = [v for v in spring_lows if v is not None]
-        if not p_ok or not s_ok:
-            return False
-        spring_low = min(s_ok)
-        return spring_low < min(p_ok) and close > spring_low
+        return bool(p_ok and s_ok) and min(s_ok) < min(p_ok)
     prior_highs = [_bar_px(bar, "high") for bar in prior]
     spring_highs = [_bar_px(bar, "high") for bar in spring]
     p_ok = [v for v in prior_highs if v is not None]
     s_ok = [v for v in spring_highs if v is not None]
-    if not p_ok or not s_ok:
+    return bool(p_ok and s_ok) and max(s_ok) > max(p_ok)
+
+
+def _is_wyckoff_reclaim(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    atr: float | None = None,
+) -> bool:
+    """Ciclo 4.4: spring + reclaim estricto (k×ATR o fuera del rango spring)."""
+    windows = _wyckoff_windows(bars)
+    if windows is None or not _detect_wyckoff_spring(direction=direction, bars=bars):
         return False
-    spring_high = max(s_ok)
-    return spring_high > max(p_ok) and close < spring_high
+    prior, spring, close = windows
+    del prior  # spring gate already checked vs prior
+    atr_val = _finite_positive(atr)
+    if direction == "long":
+        spring_lows = [_bar_px(bar, "low") for bar in spring]
+        spring_highs = [_bar_px(bar, "high") for bar in spring]
+        s_lows = [v for v in spring_lows if v is not None]
+        s_highs = [v for v in spring_highs if v is not None]
+        if not s_lows or not s_highs:
+            return False
+        spring_low = min(s_lows)
+        if close <= spring_low:
+            return False
+        atr_ok = atr_val is not None and close >= spring_low + WYCKOFF_RECLAIM_ATR_K * atr_val
+        range_ok = close > max(s_highs)
+        return atr_ok or range_ok
+    spring_highs = [_bar_px(bar, "high") for bar in spring]
+    spring_lows = [_bar_px(bar, "low") for bar in spring]
+    s_highs = [v for v in spring_highs if v is not None]
+    s_lows = [v for v in spring_lows if v is not None]
+    if not s_highs or not s_lows:
+        return False
+    spring_high = max(s_highs)
+    if close >= spring_high:
+        return False
+    atr_ok = atr_val is not None and close <= spring_high - WYCKOFF_RECLAIM_ATR_K * atr_val
+    range_ok = close < min(s_lows)
+    return atr_ok or range_ok
+
+
+def _detect_wyckoff_sos(*, direction: TradePlanDirection, bars: Sequence[object]) -> bool:
+    """SOS etiqueta/evidencia: close fuera del máximo spring o del prior (long) / espejo short.
+
+    No cambia EntrySetup ni exige entry_ready (D2/D4).
+    """
+    windows = _wyckoff_windows(bars)
+    if windows is None or not _detect_wyckoff_spring(direction=direction, bars=bars):
+        return False
+    prior, spring, close = windows
+    if direction == "long":
+        highs = [_bar_px(bar, "high") for bar in (*prior, *spring)]
+        valid = [v for v in highs if v is not None]
+        return bool(valid) and close > max(valid)
+    lows = [_bar_px(bar, "low") for bar in (*prior, *spring)]
+    valid = [v for v in lows if v is not None]
+    return bool(valid) and close < min(valid)
 
 
 def classify_entry_setup(
@@ -192,7 +257,7 @@ def classify_entry_setup(
     bars: Sequence[object] | None = None,
     atr: float | None = None,
 ) -> EntrySetup:
-    """Ciclo 4.2: breakout > pullback > wyckoff > none. Sin barras → none."""
+    """Ciclo 4.2/4.4: breakout > pullback > wyckoff > none. Sin barras → none."""
     direction = _direction_from_action(action)
     if direction == "none" or bars is None:
         return "none"
@@ -200,7 +265,8 @@ def classify_entry_setup(
         return "breakout"
     if _is_pullback(direction=direction, bars=bars, atr=atr):
         return "pullback"
-    if _is_wyckoff_reclaim(direction=direction, bars=bars):
+    # SOS es evidencia interna; no fuerza EntrySetup (D2).
+    if _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr):
         return "wyckoff"
     return "none"
 

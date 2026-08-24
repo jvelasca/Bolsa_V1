@@ -1,4 +1,4 @@
-"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.3."""
+"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.4."""
 
 from types import SimpleNamespace
 
@@ -6,6 +6,9 @@ from bolsa_analytics.cognitive.trade_plan import (
     ARMED_ACTIONABILITY,
     ATR_MULT,
     BREAKOUT_LOOKBACK,
+    WYCKOFF_PRIOR,
+    WYCKOFF_RECLAIM_ATR_K,
+    WYCKOFF_SPRING,
     build_trade_plan,
     build_v0_trade_plan_dict,
     classify_entry_setup,
@@ -31,6 +34,36 @@ def _breakout_long_bars(entry: float = 100.0) -> list[SimpleNamespace]:
     ]
     last = _bar(close=entry + 1, high=entry + 1, low=entry - 1)
     return [*closed, last]
+
+
+def _wyckoff_spring_base() -> tuple[list[SimpleNamespace], list[SimpleNamespace]]:
+    """Prior 10 (lows 90) + spring 5 (lows 85, highs 88) — spring true long."""
+    prior = [_bar(close=92, high=95, low=90) for _ in range(WYCKOFF_PRIOR)]
+    spring = [_bar(close=86, high=88, low=85) for _ in range(WYCKOFF_SPRING)]
+    return prior, spring
+
+
+def _wyckoff_weak_reclaim_bars() -> list[SimpleNamespace]:
+    """Stub 4.2: close > spring_low pero sin k×ATR ni fuera del rango spring."""
+    prior, spring = _wyckoff_spring_base()
+    # spring_low=85; con atr=2, umbral=85.5 — close=85.2 falla formal
+    last = _bar(close=85.2, high=85.3, low=85.0)
+    return [*prior, *spring, last]
+
+
+def _wyckoff_formal_reclaim_bars() -> list[SimpleNamespace]:
+    """Spring + reclaim formal: close > max(high) del spring."""
+    prior, spring = _wyckoff_spring_base()
+    last = _bar(close=89.0, high=89.0, low=86.0)
+    return [*prior, *spring, last]
+
+
+def _wyckoff_and_breakout_bars() -> list[SimpleNamespace]:
+    """Ambos matchean → prioridad breakout."""
+    pad = [_bar(close=92, high=94, low=90) for _ in range(5)]
+    prior, spring = _wyckoff_spring_base()
+    last = _bar(close=96.0, high=96.0, low=90.0)
+    return [*pad, *prior, *spring, last]
 
 
 def test_compute_risk_size_basic() -> None:
@@ -418,3 +451,58 @@ def test_golden_d_farther_stop_reduces_size_not_stop() -> None:
     assert far["quantity"] < near["quantity"]
     assert far["status"] == "TRIGGERED"
     assert far["entrySetup"] == "breakout"
+
+
+def test_wyckoff_weak_reclaim_is_none() -> None:
+    """Ciclo 4.4: stub 4.2 (close ≈ spring_low) ya no clasifica wyckoff."""
+    atr = 2.0
+    bars = _wyckoff_weak_reclaim_bars()
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "none"
+    # Umbral ATR no alcanzado
+    spring_low = 85.0
+    assert 85.2 < spring_low + WYCKOFF_RECLAIM_ATR_K * atr
+
+
+def test_wyckoff_formal_reclaim_triggered() -> None:
+    plan = build_v0_trade_plan_dict(
+        decision_id="W1",
+        instrument_id="XOM",
+        action="recommend_long",
+        entry=89.0,
+        opportunity_score=80.0,
+        expires_at=None,
+        atr=2.0,
+        bars=_wyckoff_formal_reclaim_bars(),
+        bias="bullish",
+        equity=100_000,
+        risk_pct=0.5,
+    )
+    assert plan["entrySetup"] == "wyckoff"
+    assert plan["status"] == "TRIGGERED"
+    assert plan["quantity"] > 0
+    assert plan["executionAllowed"] is True
+
+
+def test_wyckoff_formal_without_bias_armed() -> None:
+    plan = build_v0_trade_plan_dict(
+        decision_id="W2",
+        instrument_id="XOM",
+        action="recommend_long",
+        entry=89.0,
+        opportunity_score=80.0,
+        expires_at=None,
+        atr=2.0,
+        bars=_wyckoff_formal_reclaim_bars(),
+        bias=None,
+        equity=100_000,
+        risk_pct=0.5,
+    )
+    assert plan["entrySetup"] == "wyckoff"
+    assert plan["status"] == "ARMED"
+    assert plan["quantity"] == 0.0
+    assert "entry" in plan["whyNot"]
+
+
+def test_breakout_priority_over_wyckoff() -> None:
+    bars = _wyckoff_and_breakout_bars()
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=2.0) == "breakout"
