@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · ciclo beta slice **CERRADO** (U6 → DS-05 → ops → DS-03 → higiene → Research→Radar copy). HEAD **`8a1e64d`** = `origin/main`. Ciclo 1 OrderProposal/Journal **F1–F3 CERRADO**. F9-A CERRADO. Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-24 · ciclo beta slice **CERRADO** (U6 → DS-05 → ops → DS-03 → higiene → Research→Radar copy). HEAD **`a3dcc3f`** = `origin/main`. Ciclo 1 OrderProposal/Journal **F1–F3 CERRADO**. F9-A CERRADO (A3 CI `f8c7e3f` PUSHEADO). Ruff I001 CI hygiene `a3dcc3f`. Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
