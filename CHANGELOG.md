@@ -4,7 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
-- **ADR-031 / Ciclo 4.0** (`1cbd021`, pendiente push): stop estructural ATR×1.5 + swing 10 barras (más lejano), `entry_ready` por bias TA, size con equity de cartera. Spine **75**. Sin familias EntrySetup · sin `contract:gen`.
+- **ADR-031 / Ciclo 4.0** (`1cbd021`, en origin vía stamp `d99b1d1`): stop estructural ATR×1.5 + swing 10 barras (más lejano), `entry_ready` por bias TA, size con equity de cartera. Spine **75**. Sin familias EntrySetup · sin `contract:gen`.
 - **ADR-031 / TradePlan en propose+confirm** (`17a386d`): `data.tradePlan` + `runtime.tradePlan`; confirm echo; Hoy prefiere plan vivo. Spine **67**. Sin `contract:gen`.
 - **ADR-031 / TradePlan v0** (`818b0c7`): tesis ≠ plan ≠ permiso. Confirm SEMI: TTL, revalidación de precio, H3 orphan fail-closed. `pending_orders` fill vía `check_opening`. Strip **Hoy** en la mesa. Golden A/B/C/H.
 - **Python CI pytest:** excluye tests DB-gated R12 isolation + F7b backfill del workflow offline (`386a959`) — **569 pass** sin Postgres.

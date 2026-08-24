@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md`](./traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md).
 > **Política:** [`docs/adr/031-operational-model-tesis-plan-permiso.md`](../adr/031-operational-model-tesis-plan-permiso.md) §6 nota 4.0.
 > **AsOf:** 2026-08-25.
-> **HEAD:** `1cbd021` (local). `origin/main` aún `17a386d`. **Pendiente push.**
+> **HEAD:** `d99b1d1` = `origin/main`. Feat `1cbd021` **PUSHEADO**.
 
 ---
 
@@ -30,12 +30,13 @@ Stop estructural determinista + `entry_ready` por bias TA + size con equity. **N
 | SHA       | Mensaje                                                                            |
 | --------- | ---------------------------------------------------------------------------------- |
 | `1cbd021` | feat(spine): ADR-031 Ciclo 4.0 structural stop, entry_ready, and size with equity. |
+| `d99b1d1` | docs: stamp living SoT after Ciclo 4.0 (`1cbd021`).                                |
 
-Stamp SoT post-commit en el commit docs inmediato (HEAD local).
+Push: `17a386d..d99b1d1` → `origin/main`.
 
 ## 4. Siguiente (E1)
 
-1. **Push** de `1cbd021` + stamp — solo si el propietario lo pide.
+1. ~~Commit~~ · ~~Push~~.
 2. Familias EntrySetup / `NO_NEW_LONGS` — **prohibido** sin plan.
 
 ## 5. No tocado
