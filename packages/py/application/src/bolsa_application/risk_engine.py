@@ -16,13 +16,15 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
+from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge.models import TechnicalInputs
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.entities.market_event import MarketEventCalendar
+
 from bolsa_application.trading_policy_guard import (
     CognitiveGuardResult,
     enforce_cognitive_policy_for_opening,
 )
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
-from bolsa_domain.entities.market_event import MarketEventCalendar
 
 RISK_ENGINE_VERSION = "risk_engine_v0"
 RiskVerdict = Literal["ALLOW", "DENY"]
@@ -75,6 +77,8 @@ def check_opening(
     account_max_drawdown_pct: float | None = None,
     kill_switch: bool = False,
     book_max_open_positions: int | None = None,
+    portfolio_positions: list[BasketPosition] | None = None,
+    proposal_sector: str | None = None,
 ) -> RiskDecision:
     """Evalúa una apertura. Exits siguen el bypass del Cognitive Guard."""
     if kill_switch:
@@ -119,6 +123,8 @@ def check_opening(
         account_daily_drawdown_pct=account_daily_drawdown_pct,
         account_weekly_drawdown_pct=account_weekly_drawdown_pct,
         account_max_drawdown_pct=account_max_drawdown_pct,
+        portfolio_positions=portfolio_positions,
+        proposal_sector=proposal_sector,
     )
     if not guard.allowed:
         return RiskDecision(

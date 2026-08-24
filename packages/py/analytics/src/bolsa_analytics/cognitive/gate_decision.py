@@ -43,6 +43,10 @@ class ProposedTradeContext:
     account_daily_drawdown_pct: float | None = None
     account_weekly_drawdown_pct: float | None = None
     account_max_drawdown_pct: float | None = None
+    basket_max_asset_weight_pct: float | None = None
+    basket_max_sector_weight_pct: float | None = None
+    basket_violating_asset: str | None = None
+    basket_violating_sector: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +170,10 @@ def gate_decision_package(
         account_daily_drawdown_pct=trade.account_daily_drawdown_pct,
         account_weekly_drawdown_pct=trade.account_weekly_drawdown_pct,
         account_max_drawdown_pct=trade.account_max_drawdown_pct,
+        basket_max_asset_weight_pct=trade.basket_max_asset_weight_pct,
+        basket_max_sector_weight_pct=trade.basket_max_sector_weight_pct,
+        basket_violating_asset=trade.basket_violating_asset,
+        basket_violating_sector=trade.basket_violating_sector,
     )
 
     if package.action == "recommend_short" and not policy.universe.allow_shorting:

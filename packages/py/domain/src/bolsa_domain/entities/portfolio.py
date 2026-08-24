@@ -23,6 +23,7 @@ class Position:
     market_value: float | None
     unrealized_pnl: float | None
     unrealized_pnl_pct: float | None
+    sector: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

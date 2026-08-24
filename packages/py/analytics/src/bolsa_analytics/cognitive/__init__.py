@@ -1,5 +1,13 @@
 """RFC-008 Cognitive Decision Architecture — D1…D7."""
 
+from bolsa_domain.entities.market_event import (
+    EventBlackoutContext,
+    MarketEvent,
+    MarketEventCalendar,
+    build_market_event,
+    event_decay_weight,
+)
+
 from bolsa_analytics.cognitive.auto_live import AutoLiveCheck, check_auto_live
 from bolsa_analytics.cognitive.confidence_lifecycle import (
     ConfidenceEvent,
@@ -73,6 +81,12 @@ from bolsa_analytics.cognitive.observe_profile import (
 )
 from bolsa_analytics.cognitive.order_intent import OrderIntent, intent_from_recommendation
 from bolsa_analytics.cognitive.policy_gate import evaluate_policy_gate
+from bolsa_analytics.cognitive.portfolio_fit import (
+    UNKNOWN_SECTOR,
+    BasketPosition,
+    PortfolioFitSignal,
+    compute_portfolio_fit,
+)
 from bolsa_analytics.cognitive.psr_dsr import (
     deflated_sharpe_ratio,
     probabilistic_sharpe_ratio,
@@ -105,13 +119,6 @@ from bolsa_analytics.cognitive.weight_rules import (
     resolve_weight_rules,
     weight_rules_for_horizon,
 )
-from bolsa_domain.entities.market_event import (
-    EventBlackoutContext,
-    MarketEvent,
-    MarketEventCalendar,
-    build_market_event,
-    event_decay_weight,
-)
 
 __all__ = [
     "AGGRESSIVE_SWING_POLICY",
@@ -121,6 +128,7 @@ __all__ = [
     "POLICY_TEMPLATES",
     "WEIGHT_RULES_VERSION",
     "AutoLiveCheck",
+    "BasketPosition",
     "BehaviorTradeSample",
     "ConfidenceEvent",
     "ConfidenceState",
@@ -147,6 +155,7 @@ __all__ = [
     "ObservedInvestorProfile",
     "OrderIntent",
     "PolicyBehaviorLimits",
+    "PortfolioFitSignal",
     "ProposedTradeContext",
     "Recommendation",
     "ReplayStep",
@@ -156,6 +165,7 @@ __all__ = [
     "TradingPolicy",
     "TrialRecord",
     "TrialsLog",
+    "UNKNOWN_SECTOR",
     "WeightContext",
     "WeightRuleResult",
     "apply_confidence_event",
@@ -176,6 +186,7 @@ __all__ = [
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
+    "compute_portfolio_fit",
     "deflated_sharpe_ratio",
     "evaluate_policy_gate",
     "event_decay_weight",

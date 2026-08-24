@@ -9,6 +9,7 @@ from typing import Any, Literal
 from bolsa_analytics.cognitive.decision_memory import DecisionMemoryEntry
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.gate_decision import ProposedTradeContext, gate_decision_package
+from bolsa_analytics.cognitive.portfolio_fit import BasketPosition, compute_portfolio_fit
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
 from bolsa_analytics.cognitive.trading_policy_templates import get_policy_template
 from bolsa_analytics.knowledge.decision_package_ta import (
@@ -91,6 +92,8 @@ def enforce_cognitive_policy_for_opening(
     account_daily_drawdown_pct: float | None = None,
     account_weekly_drawdown_pct: float | None = None,
     account_max_drawdown_pct: float | None = None,
+    portfolio_positions: list[BasketPosition] | None = None,
+    proposal_sector: str | None = None,
 ) -> CognitiveGuardResult:
     """
     Evalúa apertura automática. Los `exit` no pasan por veto de universo/blackout
@@ -164,6 +167,24 @@ def enforce_cognitive_policy_for_opening(
     concentration = (notional / equity_v) * 100.0
     risk_pct = concentration * 0.5
 
+    # Encaje de cesta (PortfolioFit v1): as-if fill de la puesta propuesta sobre las
+    # posiciones existentes. La señal alimenta las reglas MaxConcentration (activo) y
+    # MaxSectorExposure (sector) del Policy Gate. El peso del proposal se computa con su
+    # notional (quantity*price); su sector, si se aporta, entra en el agregado por sector.
+    fit = None
+    if portfolio_positions is not None:
+        fit = compute_portfolio_fit(
+            proposal=BasketPosition(
+                instrument_id=instrument_id,
+                market_value=notional,
+                sector=proposal_sector,
+            ),
+            existing=portfolio_positions,
+            equity=equity,
+            max_asset_weight_pct=policy.exposure.max_portfolio_concentration_pct,
+            max_sector_weight_pct=policy.exposure.max_sector_exposure_pct,
+        )
+
     ctx = (
         event_calendar.blackout_context(symbol)
         if event_calendar is not None
@@ -193,6 +214,10 @@ def enforce_cognitive_policy_for_opening(
         account_daily_drawdown_pct=account_daily_drawdown_pct,
         account_weekly_drawdown_pct=account_weekly_drawdown_pct,
         account_max_drawdown_pct=account_max_drawdown_pct,
+        basket_max_asset_weight_pct=None if fit is None else fit.max_asset_weight_pct,
+        basket_max_sector_weight_pct=None if fit is None else fit.max_sector_weight_pct,
+        basket_violating_asset=None if fit is None else fit.violating_asset,
+        basket_violating_sector=None if fit is None else fit.violating_sector,
     )
 
     gated = gate_decision_package(package, policy, trade)

@@ -11,23 +11,8 @@ DENY pre-Gate y en fill; claim de idempotencia AUTO antes del trade.
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.signals.strategy import SignalEventV1
-from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
-from bolsa_application.auto_execute_idempotency import (
-    as_of_from_iso,
-    make_auto_execute_idempotency_key,
-)
-from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry_to_record
-from bolsa_application.events.payloads import signal_event_payload
-from bolsa_application.events.platform_event_bus import PlatformEventBus
-from bolsa_application.investor_profiles import InvestorProfileStore
-from bolsa_application.risk_engine import check_opening
-from bolsa_application.risk_runtime import (
-    claim_auto_execute_idempotency,
-    effective_kill_switch,
-    release_auto_execute_idempotency,
-)
-from bolsa_application.trading_policy_guard import CognitiveGuardResult
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from bolsa_domain.entities.market_event import MarketEventCalendar
 from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
@@ -50,6 +35,23 @@ from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     SignalAlertSubscriptionRecord,
 )
 
+from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
+from bolsa_application.auto_execute_idempotency import (
+    as_of_from_iso,
+    make_auto_execute_idempotency_key,
+)
+from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry_to_record
+from bolsa_application.events.payloads import signal_event_payload
+from bolsa_application.events.platform_event_bus import PlatformEventBus
+from bolsa_application.investor_profiles import InvestorProfileStore
+from bolsa_application.risk_engine import check_opening
+from bolsa_application.risk_runtime import (
+    claim_auto_execute_idempotency,
+    effective_kill_switch,
+    release_auto_execute_idempotency,
+)
+from bolsa_application.trading_policy_guard import CognitiveGuardResult
+
 
 def _book_max_open_positions(policy: ExecutionPolicyRecord) -> int | None:
     """A2: tope Libro desde definition de la política (opcional)."""
@@ -62,6 +64,26 @@ def _book_max_open_positions(policy: ExecutionPolicyRecord) -> int | None:
     except (TypeError, ValueError):
         return None
     return n if n > 0 else None
+
+
+def _basket_positions_from_summary(summary: Any) -> list[BasketPosition] | None:
+    """Construye la cesta de posiciones del Risk de cesta desde un PortfolioSummary.
+
+    Nota: el `sector` viene resuelto desde `instruments.sector` en la capa de
+    infraestructura (field `sector` de `Position`); si no está poblado, la
+    posición entra su market_value como "unknown" en el agregado por sector.
+    """
+    positions = getattr(summary, "positions", None)
+    if positions is None:
+        return None
+    return [
+        BasketPosition(
+            instrument_id=getattr(p, "instrument_id", ""),
+            market_value=getattr(p, "market_value", None),
+            sector=getattr(p, "sector", None),
+        )
+        for p in positions
+    ]
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,6 +229,7 @@ class ExecutionRouter:
             from dataclasses import replace
 
             from bolsa_analytics.cognitive.decision_session import build_auto_session
+
             from bolsa_application.cognitive_persistence import decision_session_to_record
 
             record = memory_entry_to_record(guard.memory, account_id=account_id)
@@ -258,6 +281,7 @@ class ExecutionRouter:
             return
         try:
             from bolsa_analytics.cognitive.decision_session import build_auto_session
+
             from bolsa_application.cognitive_persistence import decision_session_to_record
 
             session = build_auto_session(
@@ -550,6 +574,10 @@ class ExecutionRouter:
                 account_max_drawdown_pct=dds.max_pct,
                 kill_switch=await effective_kill_switch(),
                 book_max_open_positions=_book_max_open_positions(policy),
+                portfolio_positions=_basket_positions_from_summary(summary),
+                proposal_sector=(
+                    hit.get("sector") if isinstance(hit, dict) else None
+                ),
             )
             guard = guard_decision.guard
             lineage_base = {
@@ -808,6 +836,8 @@ class ExecutionRouter:
             account_max_drawdown_pct=dds.max_pct,
             kill_switch=await effective_kill_switch(),
             book_max_open_positions=_book_max_open_positions(policy),
+            portfolio_positions=_basket_positions_from_summary(summary),
+            proposal_sector=hit.get("sector"),
         )
         guard = guard_decision.guard
         lineage_live = {

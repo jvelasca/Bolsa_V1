@@ -82,6 +82,10 @@ def evaluate_policy_gate(
     account_daily_drawdown_pct: float | None = None,
     account_weekly_drawdown_pct: float | None = None,
     account_max_drawdown_pct: float | None = None,
+    basket_max_asset_weight_pct: float | None = None,
+    basket_max_sector_weight_pct: float | None = None,
+    basket_violating_asset: str | None = None,
+    basket_violating_sector: str | None = None,
 ) -> PolicyGateResult:
     rules: list[PolicyRuleResult] = []
     vetos: list[str] = []
@@ -143,14 +147,57 @@ def evaluate_policy_gate(
             open_positions_count < x.max_open_positions,
         )
     )
-    push(
-        _rule(
-            "MaxConcentration",
-            f"{x.max_portfolio_concentration_pct}%",
-            f"{portfolio_concentration_pct}%",
-            portfolio_concentration_pct <= x.max_portfolio_concentration_pct,
+    # Encaje de cesta (PortfolioFit v1): cuando la señal de cesta viene presente,
+    # la concentración por ACTIVO se evalúa a nivel CESTA (no el `portfolio_concentration_pct`
+    # del trade individual). La métrica de exceso por SECTOR es la regla `MaxSectorExposure`.
+    if basket_max_asset_weight_pct is not None:
+        push(
+            _rule(
+                "MaxConcentration",
+                f"{x.max_portfolio_concentration_pct}% cesta",
+                f"{basket_max_asset_weight_pct}% activo",
+                basket_max_asset_weight_pct <= x.max_portfolio_concentration_pct,
+                None
+                if basket_max_asset_weight_pct <= x.max_portfolio_concentration_pct
+                else f"Concentración cesta superada: {basket_violating_asset or '?'} ({basket_max_asset_weight_pct:.2f}%)",
+            )
         )
-    )
+    else:
+        push(
+            _rule(
+                "MaxConcentration",
+                f"{x.max_portfolio_concentration_pct}%",
+                f"{portfolio_concentration_pct}%",
+                portfolio_concentration_pct <= x.max_portfolio_concentration_pct,
+            )
+        )
+
+    # MaxSectorExposure: usa `x.max_sector_exposure_pct` (ExposureConstraints), que hoy
+    # existe pero nunca se evalúa. Si no hay datos de sector o la señal no evaluó, la
+    # regla va SKIPPED (no bloquea por falta de datos), coherente con el fail-closed
+    # del resto del gate (None = SKIPPED).
+    if basket_max_sector_weight_pct is not None:
+        push(
+            _rule(
+                "MaxSectorExposure",
+                f"{x.max_sector_exposure_pct}%",
+                f"{basket_max_sector_weight_pct}%",
+                basket_max_sector_weight_pct <= x.max_sector_exposure_pct,
+                None
+                if basket_max_sector_weight_pct <= x.max_sector_exposure_pct
+                else f"Exposición sector superada: {basket_violating_sector or '?'} ({basket_max_sector_weight_pct:.2f}%)",
+            )
+        )
+    else:
+        rules.append(
+            PolicyRuleResult(
+                rule="MaxSectorExposure",
+                limit=f"{x.max_sector_exposure_pct}%",
+                actual="n/a",
+                status="SKIPPED",
+                message="Sin datos de encaje de cesta por sector",
+            )
+        )
 
     risk = policy.risk
     push(
