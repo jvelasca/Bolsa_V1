@@ -177,6 +177,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts/{account_id}/decision-board": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Decision Board
+         * @description F0.6a — Decision Board: vista de solo lectura de oportunidades pendientes.
+         *
+         *     No decide ni muta estado: agrupa la cola SEMI_F3 por confirmar y las
+         *     decision sessions recientes con el resultado de su gate (PASS/VETO/
+         *     DEFERRED/unknown).
+         */
+        get: operations["get_decision_board_api_accounts__account_id__decision_board_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts/{account_id}/deposits": {
         parameters: {
             query?: never;
@@ -782,9 +806,29 @@ export interface paths {
         put?: never;
         /**
          * Logout
-         * @description Borra la cookie de sesión. Funciona aunque la auth esté desactivada.
+         * @description Borra la cookie de sesión. JWT users: invalida tokens previos (logout-all).
          */
         post: operations["logout_api_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh
+         * @description Re-emite JWT con nuevo ``exp`` si el access token (cookie o Bearer) sigue válido.
+         */
+        post: operations["refresh_api_auth_refresh_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4428,6 +4472,39 @@ export interface components {
             /** Table */
             table: string;
         };
+        /** DecisionBoardBucketCountsDto */
+        DecisionBoardBucketCountsDto: {
+            /** Autowaiting */
+            autoWaiting: number;
+            /** Deferred */
+            deferred: number;
+            /** Pendingconfirm */
+            pendingConfirm: number;
+            /** Total */
+            total: number;
+            /** Vetoed */
+            vetoed: number;
+        };
+        /** DecisionBoardDto */
+        DecisionBoardDto: {
+            /** Accountid */
+            accountId: string;
+            buckets: components["schemas"]["DecisionBoardBucketCountsDto"];
+            /** Decisionsessions */
+            decisionSessions?: components["schemas"]["DecisionSessionViewDto"][];
+            /** Equity */
+            equity?: number | null;
+            /** Freemargin */
+            freeMargin?: number | null;
+            /** Generatedat */
+            generatedAt: string;
+            /** Semif3Queue */
+            semiF3Queue?: components["schemas"]["SemiF3ViewDto"][];
+        };
+        /** DecisionBoardResponseDto */
+        DecisionBoardResponseDto: {
+            data: components["schemas"]["DecisionBoardDto"];
+        };
         /** DecisionSessionSummaryDto */
         DecisionSessionSummaryDto: {
             /** Accountid */
@@ -4442,6 +4519,25 @@ export interface components {
             kind: string;
             /** Recommendationid */
             recommendationId?: string | null;
+            /** Sessionid */
+            sessionId: string;
+            /** Status */
+            status: string;
+            /** Symbol */
+            symbol?: string | null;
+        };
+        /** DecisionSessionViewDto */
+        DecisionSessionViewDto: {
+            /** Createdat */
+            createdAt: string;
+            /** Decisionid */
+            decisionId?: string | null;
+            /** Gate */
+            gate: string;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Kind */
+            kind: string;
             /** Sessionid */
             sessionId: string;
             /** Status */
@@ -6422,6 +6518,8 @@ export interface components {
         };
         /** LoginRequestDto */
         LoginRequestDto: {
+            /** Login */
+            login?: string | null;
             /** Password */
             password: string;
         };
@@ -7701,6 +7799,22 @@ export interface components {
             instrumentIds?: string[] | null;
             /** Listid */
             listId?: string | null;
+        };
+        /** SemiF3ViewDto */
+        SemiF3ViewDto: {
+            /** Extra */
+            extra?: {
+                [key: string]: unknown;
+            };
+            /** Instrumentid */
+            instrumentId?: string | null;
+            /**
+             * Status
+             * @default pending_confirm
+             */
+            status: string;
+            /** Symbol */
+            symbol?: string | null;
         };
         /**
          * SendDailyOpsDigestDto
@@ -9110,6 +9224,37 @@ export interface operations {
             };
         };
     };
+    get_decision_board_api_accounts__account_id__decision_board_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionBoardResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     deposit_cash_api_accounts__account_id__deposits_post: {
         parameters: {
             query?: never;
@@ -10257,6 +10402,26 @@ export interface operations {
         };
     };
     logout_api_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    refresh_api_auth_refresh_post: {
         parameters: {
             query?: never;
             header?: never;

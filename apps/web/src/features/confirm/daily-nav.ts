@@ -73,6 +73,7 @@ export const HERRAMIENTAS_NAV_ORDER = [
   "Cuentas",
   "Alertas",
   "Instrumentos",
+  "Decision Board",
 ] as const;
 
 /**

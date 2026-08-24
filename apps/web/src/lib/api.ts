@@ -1400,6 +1400,14 @@ export const api = {
       }),
     ),
 
+  /** F0.6 — Decision Board (solo lectura): oportunidades pendientes + gates. */
+  getDecisionBoard: (accountId: string) =>
+    call<import("@bolsa/shared").DecisionBoardResponseV1>(() =>
+      client.GET("/api/accounts/{account_id}/decision-board", {
+        params: { path: { account_id: accountId } },
+      }),
+    ),
+
   getAccountLedger: (accountId: string, limit = 50, offset = 0) =>
     call<{ data: import("@bolsa/shared").LedgerEntryDto[] }>(() =>
       client.GET("/api/accounts/{account_id}/ledger", {

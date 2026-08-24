@@ -31,6 +31,7 @@ import { AccountsPage } from "@/features/accounts/accounts-page";
 import { HistoryPage } from "@/features/history/history-page";
 import { TaxReportPage } from "@/features/fiscal/tax-report-page";
 import { OperationsPage } from "@/features/operations/operations-page";
+import { DecisionBoardPage } from "@/features/decision-board/decision-board-page";
 import { ConfirmPage } from "@/features/confirm/confirm-page";
 import { AlertsPage } from "@/features/alerts/alerts-page";
 import { SettingsRedirectPage } from "@/features/settings/settings-redirect-page";
@@ -83,6 +84,8 @@ const router = createBrowserRouter([
       { path: "accounts", element: <AccountsPage /> },
 
       { path: "operations", element: <OperationsPage /> },
+
+      { path: "decision-board", element: <DecisionBoardPage /> },
 
       { path: "confirm", element: <ConfirmPage /> },
 

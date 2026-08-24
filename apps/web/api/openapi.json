@@ -3318,6 +3318,109 @@
         "title": "DatabaseTableCountDto",
         "type": "object"
       },
+      "DecisionBoardBucketCountsDto": {
+        "properties": {
+          "autoWaiting": {
+            "title": "Autowaiting",
+            "type": "integer"
+          },
+          "deferred": {
+            "title": "Deferred",
+            "type": "integer"
+          },
+          "pendingConfirm": {
+            "title": "Pendingconfirm",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "vetoed": {
+            "title": "Vetoed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "pendingConfirm",
+          "vetoed",
+          "deferred",
+          "autoWaiting",
+          "total"
+        ],
+        "title": "DecisionBoardBucketCountsDto",
+        "type": "object"
+      },
+      "DecisionBoardDto": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "buckets": {
+            "$ref": "#/components/schemas/DecisionBoardBucketCountsDto"
+          },
+          "decisionSessions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSessionViewDto"
+            },
+            "title": "Decisionsessions",
+            "type": "array"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
+          "freeMargin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Freemargin"
+          },
+          "generatedAt": {
+            "title": "Generatedat",
+            "type": "string"
+          },
+          "semiF3Queue": {
+            "items": {
+              "$ref": "#/components/schemas/SemiF3ViewDto"
+            },
+            "title": "Semif3Queue",
+            "type": "array"
+          }
+        },
+        "required": [
+          "accountId",
+          "generatedAt",
+          "buckets"
+        ],
+        "title": "DecisionBoardDto",
+        "type": "object"
+      },
+      "DecisionBoardResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DecisionBoardDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "DecisionBoardResponseDto",
+        "type": "object"
+      },
       "DecisionSessionSummaryDto": {
         "properties": {
           "accountId": {
@@ -3393,6 +3496,66 @@
           "createdAt"
         ],
         "title": "DecisionSessionSummaryDto",
+        "type": "object"
+      },
+      "DecisionSessionViewDto": {
+        "properties": {
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "decisionId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decisionid"
+          },
+          "gate": {
+            "title": "Gate",
+            "type": "string"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "sessionId",
+          "kind",
+          "status",
+          "instrumentId",
+          "createdAt",
+          "gate"
+        ],
+        "title": "DecisionSessionViewDto",
         "type": "object"
       },
       "DeclaredProfileDto": {
@@ -9310,6 +9473,18 @@
       },
       "LoginRequestDto": {
         "properties": {
+          "login": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Login"
+          },
           "password": {
             "minLength": 1,
             "title": "Password",
@@ -13093,6 +13268,44 @@
         "title": "ScanUniverseDto",
         "type": "object"
       },
+      "SemiF3ViewDto": {
+        "properties": {
+          "extra": {
+            "additionalProperties": true,
+            "title": "Extra",
+            "type": "object"
+          },
+          "instrumentId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrumentid"
+          },
+          "status": {
+            "default": "pending_confirm",
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "title": "SemiF3ViewDto",
+        "type": "object"
+      },
       "SendDailyOpsDigestDto": {
         "description": "R3/R4 — envío manual del digest HTML (+ PDF opcional).",
         "properties": {
@@ -16760,6 +16973,49 @@
         ]
       }
     },
+    "/api/accounts/{account_id}/decision-board": {
+      "get": {
+        "description": "F0.6a — Decision Board: vista de solo lectura de oportunidades pendientes.\n\nNo decide ni muta estado: agrupa la cola SEMI_F3 por confirmar y las\ndecision sessions recientes con el resultado de su gate (PASS/VETO/\nDEFERRED/unknown).",
+        "operationId": "get_decision_board_api_accounts__account_id__decision_board_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionBoardResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Decision Board",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
     "/api/accounts/{account_id}/deposits": {
       "post": {
         "operationId": "deposit_cash_api_accounts__account_id__deposits_post",
@@ -18420,7 +18676,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "description": "Borra la cookie de sesión. Funciona aunque la auth esté desactivada.",
+        "description": "Borra la cookie de sesión. JWT users: invalida tokens previos (logout-all).",
         "operationId": "logout_api_auth_logout_post",
         "responses": {
           "200": {
@@ -18433,6 +18689,26 @@
           }
         },
         "summary": "Logout",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "description": "Re-emite JWT con nuevo ``exp`` si el access token (cookie o Bearer) sigue válido.",
+        "operationId": "refresh_api_auth_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh",
         "tags": [
           "auth"
         ]

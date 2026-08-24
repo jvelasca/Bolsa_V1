@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   FlaskConical,
+  Gauge,
   LayoutDashboard,
   LineChart,
   List,
@@ -269,6 +270,7 @@ const HERRAMIENTAS_NAV = [
   { to: "/accounts", label: "Cuentas", icon: Wallet },
   { to: "/alerts", label: "Alertas", icon: Bell },
   { to: "/instruments", label: "Instrumentos", icon: BookOpen },
+  { to: "/decision-board", label: "Decision Board", icon: Gauge },
 ] as const;
 
 const LIBRO_MENU: MenuItem[] = LIBRO_NAV.items.map((item) => ({

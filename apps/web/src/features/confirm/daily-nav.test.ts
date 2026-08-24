@@ -84,6 +84,7 @@ describe("daily-nav", () => {
       "Cuentas",
       "Alertas",
       "Instrumentos",
+      "Decision Board",
     ]);
     expect(LAB_TESIS_NAV_ORDER).toEqual([LABORATORIO_LABEL, ASESOR_LABEL]);
     expect(ASESOR_LABEL).toBe("Asesor");

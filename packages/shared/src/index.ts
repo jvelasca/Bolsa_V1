@@ -51,6 +51,7 @@ export * from "./instrument-strategy-top.js";
 export * from "./instrument-narrative.js";
 export * from "./instrument-daily-opinion.js";
 export * from "./daily-ops-report.js";
+export * from "./decision-board.js";
 export * from "./opinion-channel-map.js";
 export * from "./operating-mandate.js";
 export * from "./core-r-api.js";
