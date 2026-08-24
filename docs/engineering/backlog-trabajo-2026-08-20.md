@@ -178,10 +178,10 @@ Origen: auditoría read-only R-7 (3 subagentes + verificación del coordinador).
 
 Pendiente acumulado de R-1/F-WORKER-1 (verificar de nuevo al activarlo, no asumir):
 
-- [ ] Activar **GitHub secret scanning** nativo en la UI.
+- [ ] Activar **GitHub secret scanning** nativo en la UI (requiere sesión GitHub del propietario).
 - [ ] Definir **`TRUSTED_PROXIES` prod** con las IPs del proxy de borde (bloqueado por valores reales del usuario).
-- [ ] Corregir el registro en BD **`BP/.L` → `BP.L`** (dato corrupto, F-WORKER-1) si se quiere dato real.
-- [ ] Limpiar **`logs/dev`** locales (los `dev-*.log` acumulados; gitignore ya cubre `logs/**`).
+- [x] Corregir el registro en BD **`BP/.L` → `BP.L`** (dato corrupto, F-WORKER-1) — **HECHO 2026-08-24**: se corrigieron **9 instrumentos LSE** con patrón de slash (`BP/.L`,`BA/.L`,`AV/.L`,`RR/.L`,`SN/.L`,`JD/.L`,`NG/.L`,`UU/.L`,`BT/A.L`→`BTA.L`) vía `replace(symbol,'/','')`/`replace(yahoo_symbol,'/','')` en `bolsa_v1`; backup en `_backup_instruments_corrupt`; verificado sin duplicados UNIQUE y 0 deny refs en tablas denormalizadas (`symbol`).
+- [x] Limpiar **`logs/dev`** locales — **HECHO 2026-08-24**: purgados 4811 archivos / 8.88 MB bajo `logs/` (dev/api/agent/startup/tests + `.txt` raíz); solo quedan `.gitkeep`; working tree limpio (todo gitignored).
 - [ ] Opcional: purga de **valores dev** en historial git público (filter-repo/BFG — decisión explícita).
 
 ---

@@ -41,28 +41,27 @@ Por tanto, R-1 **no requiere subagente de código ni batería**. Lo que queda so
 - **Formato** (separado por comas, según `config.py`): `TRUSTED_PROXIES="10.0.0.1,203.0.113.0/24"`.
 - **Verificación:** tras desplegar con el valor, en `GET /health` o un endpoint medido, confirmar que la IP reportada/limitada corresponde a la real del cliente (no al proxy).
 
-### 2.3 Limpieza de `logs/dev/*` (~150 MB nominales)
+### 2.3 Limpieza de `logs/dev/*` — ✅ HECHO 2026-08-24
 
 - **Qué:** purgar los logs de desarrollo locales de tu **máquina** (no del repo).
 - **Aclaración importante:** `.gitignore:8-9` ignora `logs/**` (salvo `logs/**/.gitkeep`), por lo que **el working tree del repo está vacío** y los volúmenes están solo en el entorno local de desarrollo.
-- **Pasos:**
-  1. `Remove-Item logs/dev/*.log` (o por tu gestor de sesiones dev; `pruneStampedLogs()` conserva las 10 últimas sesiones automáticamente).
-  2. Confirmar que `logs/dev` queda solo con `.gitkeep`.
-- **Verificación:** `git status` limpio + `logs/dev` sin `*.log`.
-- **Riesgo:** nulo (son logs de sesión dev descartables).
+- **Ejecutado 2026-08-24:** purgados **4811 archivos / 8.88 MB** bajo `logs/` (subcarpetas `dev`·`api`·`agent`·`startup`·`tests` + `.txt` en raíz `dev-repro.txt`/`dev-verify-fix.txt`/`tc.txt`), excluyendo `.gitkeep`.
+- **Verificación:** `git status` limpio (0 cambios, todo gitignored) + solo `.gitkeep` restantes en cada subcarpeta.
+- **Riesgo:** nulo (logs/sesiones dev descartables).
 
-### 2.4 Corrección manual del registro `BP/.L → BP.L` en la BD local
+### 2.4 Corrección manual del registro `BP/.L → BP.L` en la BD local — ✅ HECHO 2026-08-24
 
-- **Qué:** corregir el dato corrupto del auto-sync (F-WORKER-1): el ticker se guardó como `yahoo_symbol='BP/.L'` (slash literal) cuando el válido es `BP.L`.
-- **Dónde:** tu BD de desarrollo (tabla de instrumentos / symbología; columna `yahoo_symbol`).
-- **Motivo:** es un dato manual corrupto, **no** un bug de código (el `yahoo_client` emite `chart/{yahoo_symbol}` fiel a lo almacenado). Corregirlo solo si quieres dato real de `BP`.
-- **Operación sugerida** (ajusta la query a tu esquema; un `UPDATE` puntual y verificado):
+- **Alcance real (verificado, más amplio que el doc original):** no era solo `BP/.L`, sino **9 instrumentos LSE** con patrón de slash en `symbol` y `yahoo_symbol`: `BP/.L`·`BA/.L`·`AV/.L`·`RR/.L`·`SN/.L`·`JD/.L`·`NG/.L`·`UU/.L`·`BT/A.L` (→ `BTA.L`).
+- **Ejecutado en `bolsa_v1` (docker `bolsa-postgres`, user `bolsa`):**
   ```sql
-  UPDATE instrument
-  SET yahoo_symbol = 'BP.L'
-  WHERE yahoo_symbol = 'BP/.L';
+  UPDATE instruments
+  SET symbol = replace(symbol,'/',''), yahoo_symbol = replace(yahoo_symbol,'/',''),
+      updated_at = CURRENT_TIMESTAMP
+  WHERE symbol LIKE '%/%' OR yahoo_symbol LIKE '%/%';
   ```
-- **Verificación:** re-ejecutar auto-sync y confirmar que ya no aparece el warning `BP/.L` (Yahoo 404).
+  `UPDATE 9`. Backup previo en tabla `_backup_instruments_corrupt` (9 filas).
+- **Verificado:** 0 filas con `/` restantes · sin duplicados en `UNIQUE(symbol,exchange)` ni `UNIQUE(yahoo_symbol)` · 0 referencias denormalizadas (`symbol` en decision_sessions/strategy_tops/optimization_runs/pending_orders/price_alerts/signal_alert_subscriptions) con los valores con slash · FKs a `id` intactas (ON UPDATE CASCADE, no se tocó `id`).
+- **Verificación funcional:** re-ejecutar auto-sync de `BP.L` y confirmar que ya no aparece el warning `BP/.L` (Yahoo 404).
 
 ### 2.5 (Opcional) Purga de valores dev en historial git público
 
@@ -82,4 +81,4 @@ Por tanto, R-1 **no requiere subagente de código ni batería**. Lo que queda so
 
 ## 4. Relevo / texto de paso
 
-> CONTEXTO: R-1 (cierre de deuda operativa) **verificado y documentado** en `docs/engineering/ops-r1-seguridad-operaciones-2026-08-19.md`. Estado `main` = `d16c5ff`. **Sin cambios de código** en esta fase. Todo lo de código (gitleaks.yml, setting TRUSTED_PROXIES) ya estaba implementado. Pendiente manual: (a) activar GitHub secret scanning nativo en UI, (b) definir `TRUSTED_PROXIES` en prod con las IPs del proxy de borde (**bloqueado por ti**), (c) limpiar logs dev locales, (d) corregir `BP/.L→BP.L` en BD local si se quiere dato real. **Próxima fase pactada: R-2 = F-DEBT-2/P2.6** (consolidar tipos web-only en `packages/shared`, gate D5 sin tocar wire).
+> CONTEXTO: Ops (cierre de deuda operativa) **verificado y documentado**. Estado `main` = `ad8fd23` (working tree limpio). **Sin cambios de código** en esta fase. Todo lo de código (gitleaks.yml, setting TRUSTED_PROXIES) ya estaba implementado. **HECHO 2026-08-24:** (c) logs/dev purgados (4811 archivos/8.88 MB, solo `.gitkeep` restante) · (d) 9 instrumentos LSE `BP/.L`→`BP.L` etc. corregidos en BD (`_backup_instruments_corrupt` guarda, verificado sin duplicados). **Pendiente manual del propietario:** (a) activar GitHub secret scanning nativo en UI (Settings→Code security), (b) definir `TRUSTED_PROXIES` en prod con las IPs del proxy de borde (**bloqueado por el propietario** — dato real no disponible), (e) purga opcional de valores dev en historial git (diferida por decisión).
