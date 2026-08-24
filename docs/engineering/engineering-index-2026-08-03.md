@@ -64,7 +64,7 @@ Engineering Index  (este doc)
 │   ├── fase0-decision-spine-roadmap-2026-08-24.md ← **esquema maestro Fase 0** (roadmap F0.1→F0.2→F0.3→Fit→Daily vista) · verificación del orquestador · docs-only
 │   ├── fase0-decision-spine-tobe-2026-08-24.md ← **F0.2 TO-BE Decision Spine** (arquitectura objetivo; tres colas → DecisionPackage → fill) · docs-only · verificado VERDE vs AS-IS
 │   ├── fase0-decision-spine-mapping-2026-08-24.md ← **F0.3 Mapping** (carta conservar/adaptar/crear/no-op por ítem del AS-IS) · docs-only · Fit único create · verificado VERDE vs AS-IS
-│   ├── fase0-decision-spine-descarga-2026-08-24.md ← **F0.4 Descargue de decisión** (gates+autorización; D1 risk cesta SÍMI y AUTO, sin override) · docs-only · verificado VERDE · D2/D3 pendientes
+│   ├── fase0-decision-spine-descarga-2026-08-24.md ← **F0.4 Descargue de decisión** (gates+autorización; D1 risk cesta SEMI y AUTO, sin override) · docs-only · verificado VERDE · **D2 CERRADA con código** (`f7b1f6c`) · **D3 CONFIRMADA (a: Lab/Radar fuera del spine)**
 │   ├── traspaso-relevo-fase0-cierre-docs-apertura-codigo-2026-08-24.md ← relevo histórico · F0.5 (Fit) abierta · F0.5a métrica = decisión propietario · F0.6 pendiente
 │   ├── traspaso-relevo-f0-6-cierre-apertura-siguiente-2026-08-24.md ← **RELEVO ACTIVO** · **F0.6 Decision Board COMPLETA** (backend `8df8a65` + UI `672e88f`) · F0.6 CERRADA · siguiente fase por abrir
 │   ├── traspaso-relevo-f0-6b-cierre-apertura-ui-2026-08-24.md ← relevo histórico · **F0.6b Decision Board v1 (backend) CERRADA** (`8df8a65`) · abrió UI web (posteriormente CERRADA `672e88f`)

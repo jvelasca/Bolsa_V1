@@ -25,7 +25,7 @@
 | **D1**       | Risk de cesta (`check_opening`) aplica **igual** en SEMI y AUTO, **sin override** humano.                                                                                                                                                                                                                            | ✅ **ACEPTADA** (2026-08-24)            |
 | **D2**       | Autoridad = **`DecisionPackage`** (contrato) vs `Recommendation` (cara operativa). **CERRADA con código**: en el confirm SEMI con `execute=True`, el package de la sesión `propose` es la fuente de verdad → fail-closed si la identidad diverge; `contract` (present_verified/absent) sin sesión. Commit `f7b1f6c`. | ✅ **CERRADA** (2026-08-24) **f7b1f6c** |
 | **Esc.3/D1** | Re-evaluar gate & risk de cesta en confirm SEMI (**VETO fail-closed**). **CERRADA con código** (`7530556`): aperturas re-ejecutan `check_opening` (cesta+kill-switch, `profile=None`) antes del fill; veta → `rejected_by_gate`/`risk_veto`. `exit_hint`/`reduce` fuera. Sin re-sizing.                              | ✅ **CERRADA** (2026-08-24) **7530556** |
-| **D3**       | Lab/Radar **fuera** del spine (ADR-019).                                                                                                                                                                                                                                                                             | ⏳ recomendada — confirmar              |
+| **D3**       | Lab/Radar **fuera** del spine (ADR-019). **CONFIRMADA (a) por el propietario (2026-08-24)**: el Lab/Radar quedan FUERA del spine (universo laboratorio); el spine gobierna solo el universo TRADING. Registrada en [F0.4 §3](../fase0-decision-spine-descarga-2026-08-24.md).                                        | ✅ **CONFIRMADA** (2026-08-24)          |
 
 > **Queda (deuda diferida del confirm SEMI, candidata a la siguiente fase):**
 >
@@ -35,7 +35,7 @@
 
 ## ⚠️ Instrucción para el nuevo chat (no repetir el tropiezo)
 
-**La siguiente fase está SIN aprobar.** El agente NO debe abrir código ni lanzar subagentes de implementación hasta que el propietario **apruebe la fase** (premisa E1) y **defina el alcance/decisiones bloqueantes** (p. ej. D3, y la prioridad entre `wait`-sin-sesión vs `reduce`/`exit_hint`). PASO 0 siempre: **read-first** del `backlog §0` + `PROJECT_STATE §3` + `PROJECT_PREMISES ⭐§0`, presentar opciones ancladas al código, esperar decisión. NO reabrir F0.5/F0.6/D2/Escalón 3/D1 (cerradas y pusheadas).
+**La siguiente fase está SIN aprobar.** El agente NO debe abrir código ni lanzar subagentes de implementación hasta que el propietario **apruebe la fase** (premisa E1) y **defina el alcance/decisiones bloqueantes**. Nota 2026-08-24: **D3 ya CONFIRMADA** (Lab/Radar fuera del spine, ver tabla); la deuda diferida del confirm SEMI (`wait`-sin-sesión · `reduce`/`exit_hint`) quedó CERRADA en la fase posterior (`traspaso-relevo-cierre-deuda-confirm-semi-siguiente-2026-08-24.md`). PASO 0 siempre: **read-first** del `backlog §0` + `PROJECT_STATE §3` + `PROJECT_PREMISES ⭐§0`, presentar opciones ancladas al código, esperar decisión. NO reabrir F0.5/F0.6/D2/Escalón 3/D1/Cierre deuda confirm SEMI (cerradas y pusheadas).
 
 ## 3. Qué NO tocar (freeze)
 
