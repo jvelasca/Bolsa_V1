@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md`](./traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md).
 > **Plan:** [`plan-ciclo-42-entrysetup-2026-08-25.md`](./plan-ciclo-42-entrysetup-2026-08-25.md) (D1–D6 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** `a7eeaee` (local). `origin/main` aún `f646d2a`. **Pendiente push.**
+> **HEAD:** `4930344` = `origin/main`. Feat `a7eeaee` **PUSHEADO**.
 > **Arranque chat nuevo:** pegar este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
@@ -14,7 +14,7 @@
 | ----- | ------------------ | --------------------------------------------------------------------------------------------- |
 | 4.0   | `1cbd021` (origin) | stop ATR×1.5 + swing lejano · `entry_ready` bias · size equity                                |
 | 4.1   | `97f4862` (origin) | `NO_NEW_LONGS` long + `risk_off`/`crisis` → `BLOCKED`/`regime`                                |
-| 4.2   | `a7eeaee` (local)  | `EntrySetup` breakout/pullback/wyckoff/none · ready = TA **y** setup≠none · JSON `entrySetup` |
+| 4.2   | `a7eeaee` (origin) | `EntrySetup` breakout/pullback/wyckoff/none · ready = TA **y** setup≠none · JSON `entrySetup` |
 
 4.2: prioridad breakout > pullback > wyckoff. **Sin** `ARMED`. **Sin** `contract:gen`. `check_opening` intacto. Stop/size/régimen intactos.
 
@@ -23,17 +23,20 @@
 - ruff touched Python: limpio
 - `pnpm test:decision-spine` → **81 passed** (antes 79)
 
-## 3. Commits locales pendientes de push
+## 3. Commits (en origin)
 
 | SHA       | Mensaje                                                         |
 | --------- | --------------------------------------------------------------- |
 | `a7eeaee` | feat(spine): ADR-031 Ciclo 4.2 EntrySetup refining entry_ready. |
 | `18318a9` | docs: stamp living SoT after Ciclo 4.2 (`a7eeaee`).             |
 | `59d1bb8` | docs: point engineering index at Ciclo 4.2 relevo.              |
+| `4930344` | docs: finalize Ciclo 4.2 handoff relevo SHAs.                   |
+
+Push: `f646d2a..4930344` → `origin/main`.
 
 ## 4. Siguiente (E1) — chat nuevo
 
-1. **Push** `a7eeaee` (+ stamp) solo si el propietario lo pide.
+1. ~~Commit~~ · ~~Push~~.
 2. `ARMED` / Wyckoff formal — **prohibido** sin plan 4.3+.
 3. No abrir: F9-B · purge · `PAPER_D_EXECUTE` · broker · thesis health / MFE · qty Confirm.
 
