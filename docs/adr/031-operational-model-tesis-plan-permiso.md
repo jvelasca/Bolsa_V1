@@ -98,9 +98,11 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 4.3 (cerrado `4eb99a2`):** `ARMED` en ladder — stop válido + `entry_setup≠none` + `!entry_ready` → `ARMED` (qty 0, `whyNot: entry`, actionability 0.7). `TRIGGERED` solo con ready + stop + size. Confirm sin barras no inventa `ARMED`. Wyckoff stub 4.2 intacto. Sin `contract:gen`. `check_opening` intacto.
 
+**Ciclo 4.4 (cerrado `7003ddf`):** Wyckoff formal thin — spring + reclaim estricto (`k×ATR=0.25` o fuera del rango spring) → `entrySetup=wyckoff`. SOS etiqueta interna; LPS diferido. Sin `wyckoffPhase`. Ladder ARMED 4.3 intacta. Sin `contract:gen`. `check_opening` intacto.
+
 No abrir sin fase propia:
 
-- Wyckoff fases formales — 4.4+
+- LPS / state machine Wyckoff multi-sesión — 4.5+
 - Position Manager, Thesis Health, Exit Radar, trailing, T1 parcial, time-stop, bracket
 - MFE/MAE, attribution, expectancy por setup
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
