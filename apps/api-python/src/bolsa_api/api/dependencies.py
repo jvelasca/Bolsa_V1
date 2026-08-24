@@ -418,6 +418,21 @@ def get_daily_ops_report_use_case(session: AsyncSession) -> GetDailyOpsReport:
     )
 
 
+def get_decision_board_use_case(session: AsyncSession) -> Any:
+    """F0.6a — Decision Board (vista SOLO LECTURA del spine de decisiones).
+
+    Inyecta los repos de lectura y, opcionalmente, GetAccountSummary para
+    acompañar la vista con equity/exposición. No escribe estado.
+    """
+    from bolsa_application.decision_board import GetDecisionBoard
+
+    return GetDecisionBoard(
+        get_cognitive_repository(session),
+        get_supervised_f3_repository(session),
+        get_get_account_summary_use_case(session),
+    )
+
+
 def get_portfolio_summary_use_case(session: AsyncSession) -> GetPortfolioSummary:
     return GetPortfolioSummary(get_account_repository(session), get_portfolio_repository(session))
 

@@ -348,3 +348,53 @@ class DailyOpsDigestNotifyDto(BaseModel):
 
 class DailyOpsDigestNotifyResponseDto(BaseModel):
     data: DailyOpsDigestNotifyDto
+
+
+class DecisionBoardBucketCountsDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    pending_confirm: int = Field(alias="pendingConfirm")
+    vetoed: int
+    deferred: int
+    auto_waiting: int = Field(alias="autoWaiting")
+    total: int
+
+
+class DecisionSessionViewDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    session_id: str = Field(alias="sessionId")
+    kind: str
+    status: str
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str | None = None
+    decision_id: str | None = Field(default=None, alias="decisionId")
+    created_at: str = Field(alias="createdAt")
+    gate: str
+
+
+class SemiF3ViewDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    instrument_id: str | None = Field(default=None, alias="instrumentId")
+    symbol: str | None = None
+    status: str = "pending_confirm"
+    extra: dict[str, Any] = Field(default_factory=dict)
+
+
+class DecisionBoardDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    account_id: str = Field(alias="accountId")
+    generated_at: str = Field(alias="generatedAt")
+    buckets: DecisionBoardBucketCountsDto
+    semi_f3_queue: list[SemiF3ViewDto] = Field(alias="semiF3Queue", default_factory=list)
+    decision_sessions: list[DecisionSessionViewDto] = Field(
+        alias="decisionSessions", default_factory=list
+    )
+    equity: float | None = None
+    free_margin: float | None = Field(default=None, alias="freeMargin")
+
+
+class DecisionBoardResponseDto(BaseModel):
+    data: DecisionBoardDto

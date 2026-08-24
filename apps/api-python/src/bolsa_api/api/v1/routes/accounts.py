@@ -11,6 +11,7 @@ from bolsa_api.api.dependencies import (
     get_create_account_use_case,
     get_daily_ops_report_use_case,
     get_db_session,
+    get_decision_board_use_case,
     get_delete_account_use_case,
     get_deposit_cash_use_case,
     get_get_account_summary_use_case,
@@ -45,6 +46,7 @@ from bolsa_api.schemas.accounts import (
     CreateInvestmentAccountDto,
     DailyOpsDigestNotifyDto,
     DailyOpsDigestNotifyResponseDto,
+    DecisionBoardResponseDto,
     DepositCashDto,
     LedgerResponseDto,
     SendDailyOpsDigestDto,
@@ -286,6 +288,27 @@ async def get_daily_ops_report(
             "notes": bundle.notes,
         }
     }
+
+
+@router.get(
+    "/accounts/{account_id}/decision-board",
+    response_model=DecisionBoardResponseDto,
+)
+async def get_decision_board(
+    account_id: Annotated[str, Depends(require_account_access)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> DecisionBoardResponseDto:
+    """F0.6a — Decision Board: vista de solo lectura de oportunidades pendientes.
+
+    No decide ni muta estado: agrupa la cola SEMI_F3 por confirmar y las
+    decision sessions recientes con el resultado de su gate (PASS/VETO/
+    DEFERRED/unknown).
+    """
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    bundle = await get_decision_board_use_case(session).execute(account_id)
+    data = bundle.to_dict()
+    return DecisionBoardResponseDto(data=data)
 
 
 @router.get("/accounts/{account_id}/daily-ops-report.pdf")
