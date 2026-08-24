@@ -1,34 +1,34 @@
-# RELEVO — UX mesa U0–U4 CERRADA → apertura U5
+# RELEVO — UX mesa U0–U4 CERRADA → apertura U5 (HISTÓRICO)
 
+> **HISTÓRICO.** U5 **hecho** en `04e441e`. Relevo vivo: [`traspaso-relevo-ux-mesa-u5-cierre-apertura-ciclo-2026-08-24.md`](./traspaso-relevo-ux-mesa-u5-cierre-apertura-ciclo-2026-08-24.md).
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **Propósito:** texto de paso para el **NUEVO CHAT**. UX mesa **U0–U4** está **en `origin/main`**. **Siguiente = U5** (proyección orden en chart tras preview SEMI) — **no H5**, **no spine code**.
-> **AsOf:** 2026-08-24. **`main` == `origin/main` == `6f26f9d`**. UX mesa U0–U4 **CERRADA y PUSHEADA**.
-> **Protocolo:** máx. 1 writer + 1 verifier RO. Coordinador re-lee file:line. Pre-commit: batería de la fase + update-last.
+> **Propósito (archivo):** texto de paso que abrió U5 tras U0–U4. Conservar como ancla histórica.
+> **AsOf cierre U0–U4:** 2026-08-24. Ancla previa **`6f26f9d`**. U5 cerrado después en **`04e441e`**.
 
 ---
 
-## 1. Qué quedó hecho (mesa)
+## 1. Qué quedó hecho (mesa U0–U4)
 
-| Slice | Entrega                                                      | SHA       |
-| ----- | ------------------------------------------------------------ | --------- |
-| U0    | Stamp living SoT post-H5 (`76679d2`)                         | `c1c4bbd` |
-| U1–U4 | Help tips · S/R presets · Confirm drawer · package Fit chips | `6f26f9d` |
+| Slice | Entrega                                                      | SHA (histórico) |
+| ----- | ------------------------------------------------------------ | --------------- |
+| U0    | Stamp living SoT post-H5 (`76679d2`)                         | `c1c4bbd`       |
+| U1–U4 | Help tips · S/R presets · Confirm drawer · package Fit chips | `6f26f9d`       |
 
-Prove Spine S0–S3 + **H5** siguen **cerrados** (código H5 `f56af2f` · stamp H5 `76679d2`). No reabrir.
+Prove Spine S0–S3 + **H5** cerrados. **U5** = proyección orden chart F3 — **CERRADA** en `04e441e`.
 
 ## 2. Freeze (sigue)
 
 OrderProposal · Journal · Attribution · orquestador · Daily Mission · Track B · Belief · `PAPER_D_EXECUTE` **off** · Lab→spine · `contract:gen` · H3 orphan (solo doc) · bypass de execute desde preview.
 
-## 3. Siguiente · U5 proyección orden chart
+## 3. Siguiente (histórico — ya ejecutado)
 
-**U5** = proyección de la orden en el chart **después** del preview SEMI (post-SEMI preview). Sin execute bypass. Sin tocar risk/spine salvo hallazgo bloqueante.
+**U5** proyección orden chart post-SEMI preview → **hecho** en `04e441e`. Siguiente vivo = **decisión de ciclo**.
 
 ## 4. Anti-sobrecarga
 
-Máx. **2** subagentes (1 writer + 1 verifier RO). No saturar con H5 ni con Lab/Radar.
+Máx. **2** subagentes (1 writer + 1 verifier RO).
 
-## 5. Texto de arranque (pegar en el chat nuevo)
+## 5. Texto de arranque (histórico; no pegar)
 
 ```
 CONTEXTO: origin/main == 6f26f9d. Prove+H5 CERRADOS. UX mesa U0–U4 CERRADA y PUSHEADA

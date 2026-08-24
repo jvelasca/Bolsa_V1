@@ -1,5 +1,6 @@
 # Paquete de auditoría — ESTADO GLOBAL consolidado R-1→R-13 + Track B (2026-08-24)
 
+> **Superseded by** [`audit-pack-estado-global-2026-08-24b.md`](./audit-pack-estado-global-2026-08-24b.md) **for post-spine/mesa** (`origin/main` = `04e441e`, UX U0–U5). Conservar este archivo como histórico R-1→R-13 + Track B.
 > **Propósito:** documento **único** para auditoría externa o lectura rápida tras R-13 y cierre Track B split backtests. Consolida R-1→R-13, Track B (2026-08-23/24), deuda cerrada, freeze vigente y checklist operativo.
 > **AsOf:** 2026-08-24 · `origin/main` = **`47a3b58`** · árbol limpio · R-13 **CERRADA** · Track B split backtests **CERRADO (B0–B12)**.
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`

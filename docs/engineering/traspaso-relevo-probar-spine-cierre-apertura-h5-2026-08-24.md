@@ -1,6 +1,6 @@
 # RELEVO — Prove Spine + H5 CERRADOS → apertura UX mesa
 
-> **HISTÓRICO:** UX mesa U0–U4 entregada — **cerrado por** `traspaso-relevo-ux-mesa-u0-u4-cierre-apertura-u5-2026-08-24.md` (HEAD=`6f26f9d`).
+> **HISTÓRICO:** UX mesa U0–U5 entregada — arco cerrado en `04e441e`. Relevo vivo: `traspaso-relevo-ux-mesa-u5-cierre-apertura-ciclo-2026-08-24.md`.
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
 > **Propósito (histórico):** texto de paso post-H5. Prove Spine (S0–S3) + **H5** en `origin/main`. Apertura UX mesa (Ayuda / S/R / firma) — **no H5**.
 > **AsOf cierre H5:** 2026-08-24. **`main` == `origin/main` == `76679d2`**. H5 **CERRADA y PUSHEADA**.
@@ -29,7 +29,7 @@ Confirm SEMI resuelve `profile` vía `accounts.resolve_scope` → `active_profil
 
 ## 4. Siguiente · UX mesa (histórico — entregada)
 
-U0–U4 entregada en `6f26f9d`. Continuación viva: `traspaso-relevo-ux-mesa-u0-u4-cierre-apertura-u5-2026-08-24.md` (**U5**).
+U0–U4 ancla previa `6f26f9d` · U5 + stamp en `04e441e`. Continuación viva: `traspaso-relevo-ux-mesa-u5-cierre-apertura-ciclo-2026-08-24.md` (**decisión de ciclo**).
 
 ## 5. Anti-sobrecarga
 

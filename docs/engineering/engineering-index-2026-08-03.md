@@ -59,16 +59,18 @@ Engineering Index  (este doc)
 │   ├── plan-unificacion-research-radar-2026-08-21.md ← **Unificación Research→Radar — DRAFT / APARCADO** · F1–F3 ✅ doc CERRADAS · código F4′–F6′ condicional Track B · `PROJECT_STATE.md` §2b
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
-│   ├── audit-pack-estado-global-2026-08-24.md ← **PACK auditoría R-1→R-13 + Track B** (vivo) · HEAD `47a3b58` · supersedes 2026-08-22
+│   ├── audit-pack-estado-global-2026-08-24b.md ← **PACK auditoría vivo** post-spine + mesa U0–U5 · HEAD `04e441e` · supersedes 2026-08-24
+│   ├── audit-pack-estado-global-2026-08-24.md ← histórico R-1→R-13 + Track B (pre-spine/mesa) · HEAD `47a3b58`
 │   ├── audit-pack-estado-global-2026-08-22.md ← histórico (pre Track B)
-│   ├── traspaso-relevo-fase0-f01-asis-apertura-f02-2026-08-24.md ← **RELEVO VIVO** Fase 0 · F0.1 AS-IS cerrado · F0.2 TO-BE
+│   ├── traspaso-relevo-fase0-f01-asis-apertura-f02-2026-08-24.md ← relevo histórico Fase 0 · F0.1 AS-IS cerrado · F0.2 TO-BE
 │   ├── fase0-decision-spine-roadmap-2026-08-24.md ← **esquema maestro Fase 0** (roadmap F0.1→F0.2→F0.3→Fit→Daily vista) · verificación del orquestador · docs-only
 │   ├── fase0-decision-spine-tobe-2026-08-24.md ← **F0.2 TO-BE Decision Spine** (arquitectura objetivo; tres colas → DecisionPackage → fill) · docs-only · verificado VERDE vs AS-IS
 │   ├── fase0-decision-spine-mapping-2026-08-24.md ← **F0.3 Mapping** (carta conservar/adaptar/crear/no-op por ítem del AS-IS) · docs-only · Fit único create · verificado VERDE vs AS-IS
 │   ├── fase0-decision-spine-descarga-2026-08-24.md ← **F0.4 Descargue de decisión** (gates+autorización; D1 risk cesta SEMI y AUTO, sin override) · docs-only · verificado VERDE · **D2 CERRADA con código** (`f7b1f6c`) · **D3 CONFIRMADA (a: Lab/Radar fuera del spine)**
 │   ├── traspaso-relevo-fase0-cierre-docs-apertura-codigo-2026-08-24.md ← relevo histórico · F0.5 (Fit) abierta · F0.5a métrica = decisión propietario · F0.6 pendiente
-│   ├── traspaso-relevo-ux-mesa-u0-u4-cierre-apertura-u5-2026-08-24.md ← **RELEVO ACTIVO** · UX mesa U0–U4 `6f26f9d` CERRADA y PUSHEADA · siguiente U5 proyección orden chart (post-SEMI preview)
-│   ├── traspaso-relevo-probar-spine-cierre-apertura-h5-2026-08-24.md ← relevo histórico · Prove+H5 CERRADOS · apertura UX mesa · **cerrado por** `traspaso-relevo-ux-mesa-u0-u4-cierre-apertura-u5-2026-08-24.md`
+│   ├── traspaso-relevo-ux-mesa-u5-cierre-apertura-ciclo-2026-08-24.md ← **RELEVO ACTIVO** · UX mesa U0–U5 `04e441e` CERRADA y PUSHEADA · siguiente = decisión de ciclo (audit ready)
+│   ├── traspaso-relevo-ux-mesa-u0-u4-cierre-apertura-u5-2026-08-24.md ← relevo histórico · U0–U4 cerró apertura U5 · **cerrado por** `traspaso-relevo-ux-mesa-u5-cierre-apertura-ciclo-2026-08-24.md` (U5 en `04e441e`)
+│   ├── traspaso-relevo-probar-spine-cierre-apertura-h5-2026-08-24.md ← relevo histórico · Prove+H5 CERRADOS · apertura UX mesa · **cerrado por** arco U0–U5
 │   ├── traspaso-relevo-f0-6-cierre-apertura-siguiente-2026-08-24.md ← relevo histórico · **F0.6 Decision Board COMPLETA** (backend `8df8a65` + UI `672e88f`) · F0.6 CERRADA · siguiente fase por abrir
 │   ├── traspaso-relevo-f0-6b-cierre-apertura-ui-2026-08-24.md ← relevo histórico · **F0.6b Decision Board v1 (backend) CERRADA** (`8df8a65`) · abrió UI web (posteriormente CERRADA `672e88f`)
 │   ├── traspaso-relevo-f0-5b-cierre-apertura-f0-6-2026-08-24.md ← relevo histórico · **F0.5b PortfolioFit v1 CERRADA** (`3670a09`) · F0.6 (Daily vista) abierta
