@@ -2,7 +2,7 @@
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §1 SETUP · §6 · relevo [`traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md`](./traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md) · ancla en [`plan-ciclo-41-…`](./plan-ciclo-41-no-new-longs-entrysetup-2026-08-25.md) §5.
 > **AsOf:** 2026-08-25 · HEAD **`f646d2a`** = `origin/main` (4.0+4.1 cerrados).
-> **Estado:** **CÓDIGO CERRADO en working tree** (pendiente commit). D1–D6 OK 2026-08-25. Sin ARMED.
+> **Estado:** **CERRADO en `a7eeaee`** (pendiente push). D1–D6 OK 2026-08-25. Sin ARMED.
 > **Método:** rebanada fina; no sustituye stop/size/`check_opening`; sin `contract:gen`; sin LLM.
 
 ---
