@@ -4,6 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+- **Python CI pytest:** excluye tests DB-gated R12 isolation + F7b backfill del workflow offline (`386a959`) — **569 pass** sin Postgres.
 - **Ruff I001:** import order hygiene en 49 ficheros Python (`a3dcc3f`) — desbloquea gate Import-linter en Python CI (post F9-A3 `f8c7e3f`).
 - **F9-A3:** gate `lint-imports` en Python CI (4 contratos, `packages/py/.importlinter`).
 - Post-`v1.7.0-beta` ya en `main`: OrderProposal/Journal F1–F3 + F9-A1/A2 (`8a1e64d`). Purge V2 sigue MONITOR. F9-B PARKED.

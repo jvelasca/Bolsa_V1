@@ -2,23 +2,23 @@
 
 > **Padre:** [traspaso-relevo-ops-alembic-010-f9a3-monitor-purge-2026-08-24.md](./traspaso-relevo-ops-alembic-010-f9a3-monitor-purge-2026-08-24.md) · [audit-pack-estado-global-2026-08-24e.md](./audit-pack-estado-global-2026-08-24e.md) · [monitor-purge-ops-checklist-2026-08-24.md](./monitor-purge-ops-checklist-2026-08-24.md).
 > **Propósito:** handoff post F9-A3 CI + Ruff I001 import-order hygiene; stamp SoT pack **24e**.
-> **AsOf:** 2026-08-24 · **sin commit** en este slice (docs-only).
+> **AsOf:** 2026-08-24 · **COMMITEADO** en `44b6f84` (docs stamp 24e). Supersedido por pytest CI slice `386a959` — ver backlog §0 RELEVO pytest.
 
 ---
 
 ## 1. Estado verificado (firma)
 
-| Campo             | Valor                                                                                             |
-| ----------------- | ------------------------------------------------------------------------------------------------- |
-| **HEAD**          | `a3dcc3fad6fb96477c3ad25367d8ff681b41e759` = `origin/main`                                        |
-| **Tag**           | `v1.7.0-beta` → `e3b943a` (intacto)                                                               |
-| **F9-A3 CI**      | **PUSHEADO** — `f8c7e3f` (`ci(f9-a3): run import-linter in Python CI.`)                           |
-| **Ruff I001**     | **PUSHEADO** — `a3dcc3f` (`chore(ruff): fix I001 import order for Python CI gate.`) · 49 ficheros |
-| **Alembic `010`** | **APLICADO** en `bolsa_v1` (head; `upgrade head` no-op)                                           |
-| **Import-linter** | **4 kept, 0 broken** (442 files, 2160 deps)                                                       |
-| **Purge V2**      | MONITOR T+2 · E8 **N** · **0 purges** · batería **19/19** · verify **EXIT 0**                     |
-| **F9-B**          | **PARKED** — no abrir sin ADR                                                                     |
-| **Working tree**  | docs-only slice pendiente commit (código limpio en HEAD)                                          |
+| Campo             | Valor                                                                                                     |
+| ----------------- | --------------------------------------------------------------------------------------------------------- |
+| **HEAD**          | `a3dcc3fad6fb96477c3ad25367d8ff681b41e759` = `origin/main` (al cierre de este relevo; vivo **`386a959`**) |
+| **Tag**           | `v1.7.0-beta` → `e3b943a` (intacto)                                                                       |
+| **F9-A3 CI**      | **PUSHEADO** — `f8c7e3f` (`ci(f9-a3): run import-linter in Python CI.`)                                   |
+| **Ruff I001**     | **PUSHEADO** — `a3dcc3f` (`chore(ruff): fix I001 import order for Python CI gate.`) · 49 ficheros         |
+| **Alembic `010`** | **APLICADO** en `bolsa_v1` (head; `upgrade head` no-op)                                                   |
+| **Import-linter** | **4 kept, 0 broken** (442 files, 2160 deps)                                                               |
+| **Purge V2**      | MONITOR T+2 · E8 **N** · **0 purges** · batería **19/19** · verify **EXIT 0**                             |
+| **F9-B**          | **PARKED** — no abrir sin ADR                                                                             |
+| **Working tree**  | **COMMITEADO** `44b6f84` — código limpio en HEAD vivo `386a959`                                           |
 
 ---
 

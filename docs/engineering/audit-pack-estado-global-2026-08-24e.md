@@ -1,7 +1,7 @@
 # Paquete de auditoría — ESTADO GLOBAL post-tag v1.7.0-beta + CI unblock (2026-08-24e)
 
 > **Propósito:** documento **único** para auditoría externa general tras el **cierre y tag** del ciclo beta slice **U6 → DS-05 → ops → DS-03 → higiene → Research→Radar → `v1.7.0-beta`**, más **Ciclo 1 OrderProposal/Journal F1–F3 CERRADO**, **F9-A CERRADO** (incl. CI lint-imports) y **higiene Ruff I001** (Python CI desbloqueado). Consolida identidad, freeze, arcos cerrados, verificación y riesgos ops.
-> **AsOf:** 2026-08-24 · HEAD **`a3dcc3f`** = `origin/main` · tag **`v1.7.0-beta` → `e3b943a`** verificado en `origin` · R-13 **CERRADA** · Track B **CERRADO** · Fase 0 spine **COMPLETA** · UX mesa **U0–U6 CERRADA** · **DS-05/DS-03 CERRADAS** · **ops propietario CERRADA** · **Research→Radar copy CERRADA** · **ciclo beta slice CERRADO y TAGGED** · **Ciclo 1 OrderProposal/Journal F1–F3 CERRADO** · **F9-A CERRADO** · **Python CI Ruff I001 CERRADO**. F9-B **PARKED**.
+> **AsOf:** 2026-08-24 · HEAD **`386a959`** = `origin/main` · tag **`v1.7.0-beta` → `e3b943a`** verificado en `origin` · R-13 **CERRADA** · Track B **CERRADO** · Fase 0 spine **COMPLETA** · UX mesa **U0–U6 CERRADA** · **DS-05/DS-03 CERRADAS** · **ops propietario CERRADA** · **Research→Radar copy CERRADA** · **ciclo beta slice CERRADO y TAGGED** · **Ciclo 1 OrderProposal/Journal F1–F3 CERRADO** · **F9-A CERRADO** · **Python CI VERDE** (Ruff I001 · pytest offline). F9-B **PARKED**.
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`
 > **Fuentes vivas:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [`backlog-trabajo-2026-08-20.md`](./backlog-trabajo-2026-08-20.md) §0 · [`traspaso-relevo-ruff-i001-ci-stamp-24e-2026-08-24.md`](./traspaso-relevo-ruff-i001-ci-stamp-24e-2026-08-24.md) · [`PROJECT_STATE.md`](./PROJECT_STATE.md)
 > **Histórico:** [`audit-pack-estado-global-2026-08-24d.md`](./audit-pack-estado-global-2026-08-24d.md) (pre-CI-unblock; supersedido) · [`audit-pack-estado-global-2026-08-24c.md`](./audit-pack-estado-global-2026-08-24c.md) · [`audit-pack-estado-global-2026-08-24b.md`](./audit-pack-estado-global-2026-08-24b.md) · R-1→R-8: [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md).
@@ -12,7 +12,7 @@
 
 | Pieza                       | Estado                                                                                                                    |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| **Rama**                    | `origin/main` = **`a3dcc3f`** · tag **`v1.7.0-beta` → `e3b943a`** (intacto) · previo **`v1.6.0-beta` → `c3964fc`**        |
+| **Rama**                    | `origin/main` = **`386a959`** · tag **`v1.7.0-beta` → `e3b943a`** (intacto) · previo **`v1.6.0-beta` → `c3964fc`**        |
 | **Identidad**               | QROS + Investment OS + **Decision Spine** · Lab/Radar **fuera** (D3)                                                      |
 | **R-1..R-13**               | ✅ CERRADOS (money-path + JWT + BETA)                                                                                     |
 | **Track B split backtests** | ✅ CERRADO (B0–B12)                                                                                                       |
@@ -27,9 +27,10 @@
 | **Ciclo 1 OP/Journal**      | ✅ **F1–F3 CERRADOS** (`9dc6f49`…`3192d39` + stamp `8a1e64d`) · Alembic `010` en `bolsa_v1`                               |
 | **F9-A analytics↔market**   | ✅ A1+A2+A3 (tests · import-linter 4/4 · CI lint-imports `f8c7e3f`) · **F9-B PARKED**                                     |
 | **Python CI hygiene**       | ✅ Ruff I001 import order (`a3dcc3f`) — desbloquea gate Import-linter en CI                                               |
+| **Python CI pytest**        | ✅ DB-gated tests excluidos offline (`386a959`) — **569 pass** sin Postgres (Ruff · Import-linter · Mypy · Pytest)        |
 | **Freeze**                  | OrderProposal/Journal **cerrado** (ADR-029); `PAPER_D_EXECUTE` off · sin broker live · Belief frozen · Track B no reabrir |
 
-**Mensaje clave:** el núcleo financiero R-7→R-13, el Decision Spine, la mesa U0–U6, ops ejecutable, copy Research→Radar y el tag **`v1.7.0-beta`** están **cerrados** en **`e3b943a`**. Post-tag: **Ciclo 1 F1–F3** + **F9-A** + **CI unblock** en **`a3dcc3f`**. Alembic `010` aplicado en `bolsa_v1`. **BETA / no producción.**
+**Mensaje clave:** el núcleo financiero R-7→R-13, el Decision Spine, la mesa U0–U6, ops ejecutable, copy Research→Radar y el tag **`v1.7.0-beta`** están **cerrados** en **`e3b943a`**. Post-tag: **Ciclo 1 F1–F3** + **F9-A** + **Python CI VERDE** en **`386a959`**. Alembic `010` aplicado en `bolsa_v1`. **BETA / no producción.**
 
 ---
 
@@ -56,7 +57,7 @@ Detalle file:line: [`decision-spine-cadena-2026-08-24.md`](./decision-spine-cade
 | `v1.6.0-beta` | `c3964fc`     | R-13                                                |
 | `v1.7.0-beta` | **`e3b943a`** | beta slice post-R-13 — **tag verificado en origin** |
 
-HEAD **`a3dcc3f`** = `origin/main` (F1–F3 + F9-A + Ruff I001). Tag **`v1.7.0-beta`** permanece en **`e3b943a`**.
+HEAD **`386a959`** = `origin/main` (F1–F3 + F9-A + Python CI VERDE). Tag **`v1.7.0-beta`** permanece en **`e3b943a`**.
 
 ---
 
@@ -80,7 +81,7 @@ R-1→R-13 + Track B: ver pack histórico 2026-08-24.
 
 ## 4. Ciclo 1 — OrderProposal/Journal (CERRADO)
 
-> **Estado:** `origin/main` **`a3dcc3f`** · tag **`v1.7.0-beta` → `e3b943a`** intacto.
+> **Estado:** `origin/main` **`386a959`** · tag **`v1.7.0-beta` → `e3b943a`** intacto · Python CI **VERDE**.
 
 | Ítem                          | Estado                                                                                               |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -117,7 +118,7 @@ Relevo cierre: [`traspaso-relevo-order-proposal-journal-cierre-f1-f3-2026-08-24.
 
 ## 6. Cómo verificar
 
-**Firma release:** `git fetch && git rev-parse origin/main` → **`a3dcc3f`** · `git rev-parse v1.7.0-beta` → **`e3b943a`**
+**Firma release:** `git fetch && git rev-parse origin/main` → **`386a959`** · `git rev-parse v1.7.0-beta` → **`e3b943a`**
 
 ```bash
 pnpm test:decision-spine   # cadena decisión (confirm, Fit, risk, DS-05, DS-03, AUTO veto, Golden) — 53 tests
@@ -145,7 +146,7 @@ Batería money/contrato completa (opcional, pack 2026-08-24 §11): `pnpm contrac
 
 ## 8. Limitaciones conocidas (honestas; no son bugs de esta rebanada)
 
-Copiado de [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) (HEAD `a3dcc3f`):
+Copiado de [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) (HEAD `386a959`):
 
 - Ranking IO sigue en cliente (`operativa-index.ts`).
 - Dos call-sites a `ExecuteTrade` (TO-BE: convergencia **antes** del fill).
@@ -176,7 +177,7 @@ Copiado de [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) (HEAD `a3dcc3f`):
 
 | Pieza             | Commit / nota           |
 | ----------------- | ----------------------- |
-| HEAD / ancla viva | `a3dcc3f`               |
+| HEAD / ancla viva | `386a959`               |
 | Tag latest        | `v1.7.0-beta`=`e3b943a` |
 | Tag previo        | `v1.6.0-beta`=`c3964fc` |
 | Research→Radar    | `2c26fe6`               |
@@ -192,6 +193,7 @@ Copiado de [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) (HEAD `a3dcc3f`):
 | Stamp F1–F3/F9-A  | `8a1e64d`               |
 | F9-A3 CI          | `f8c7e3f`               |
 | Ruff I001 CI      | `a3dcc3f`               |
+| Pytest CI offline | `386a959`               |
 
 ## Ap. B — Lectura sugerida (20–30 min)
 
