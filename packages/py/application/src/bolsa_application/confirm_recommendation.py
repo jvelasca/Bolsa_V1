@@ -30,6 +30,11 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
   `require_fresh_data=True` a `check_opening` (mismo path AUTO). Barra ausente,
   inválida o más vieja que el umbral → `risk_veto` fail-closed. Lookup que
   lanza → veto (como H2). `ohlcv=None` conserva compat (tests / wiring legado).
+- **DS-03 (Account Mandate Gate):** si el use-case recibe `mandates` (lookup de
+  tenure abierto en BD), las aperturas pasan `require_account_mandate=True` a
+  `check_opening` (mismo path AUTO). Sin tenure abierto → `risk_veto`
+  fail-closed. Lookup que lanza → veto (como H2/DS-05). `mandates=None`
+  conserva compat (tests / wiring legado). Exits fuera del gate.
 - **Cierre deuda confirm SEMI (Bug 1 + Bug 2):**
   - **Bug 1 (`wait` no trade):** solo las acciones transaccionales
     (`recommend_long`/`recommend_short`/`exit_hint`/`reduce`) pueden llegar a
@@ -58,6 +63,7 @@ from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
+from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
 from bolsa_application.investor_profiles import InvestorProfileStore
@@ -229,6 +235,7 @@ class ConfirmRecommendationIntent:
         profile_store: InvestorProfileStore | None = None,
         accounts: AccountScopeLookup | None = None,
         ohlcv: LatestBarLookup | None = None,
+        mandates: AccountMandateLookup | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
@@ -237,6 +244,7 @@ class ConfirmRecommendationIntent:
         self._profile_store = profile_store
         self._accounts = accounts
         self._ohlcv = ohlcv
+        self._mandates = mandates
 
     async def execute(
         self,
@@ -423,6 +431,8 @@ class ConfirmRecommendationIntent:
         fallo de resolución → `None` (defaults moderate; no tumba cesta/kill-switch).
         DS-05: con `ohlcv` inyectado, última barra + `require_fresh_data=True`;
         lookup que lanza → veto (fail-closed).
+        DS-03: con `mandates` inyectado, tenure abierto + `require_account_mandate=True`;
+        lookup que lanza → veto (fail-closed).
         """
         if self._portfolio_summary is None:
             return True
@@ -443,6 +453,19 @@ class ConfirmRecommendationIntent:
                 )
             except Exception:  # noqa: BLE001 — DS-05: indisponibilidad = veto
                 return False
+        has_open_mandate = False
+        mandate_strategy_id: str | None = None
+        require_account_mandate = False
+        if self._mandates is not None:
+            require_account_mandate = True
+            try:
+                has_open_mandate, mandate_strategy_id = (
+                    await self._mandates.get_open_mandate_for_instrument(
+                        account_id, intent.instrument_id
+                    )
+                )
+            except Exception:  # noqa: BLE001 — DS-03: indisponibilidad = veto
+                return False
         decision = check_opening(
             profile=await self._resolve_opening_profile(account_id),
             instrument_id=intent.instrument_id,
@@ -459,6 +482,9 @@ class ConfirmRecommendationIntent:
             proposal_sector=await self._resolve_proposal_sector(intent.instrument_id),
             last_bar_timestamp=last_bar_timestamp,
             require_fresh_data=require_fresh_data,
+            has_open_mandate=has_open_mandate,
+            mandate_strategy_id=mandate_strategy_id,
+            require_account_mandate=require_account_mandate,
         )
         return bool(decision.allowed)
 

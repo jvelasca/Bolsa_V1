@@ -4,9 +4,10 @@ DS-01/02/06/09/11 viven en ``test_execute_trade_idempotency.py``.
 DS-04 vive en ``test_risk_engine_portfolio_fit.py`` (+ H1 SEMI sector).
 DS-05 vive aquí (AUTO stale) + ``test_risk_engine.py`` (unit) + SEMI en
 ``test_execute_trade_idempotency.py``.
+DS-03 vive aquí (AUTO no mandate) + unit + SEMI en idempotency.
 DS-08 (este fichero): AUTO + ``check_opening`` DENY → el router **no** llama a ``ExecuteTrade``.
 
-No cubiertos aquí: DS-03 Mandate de cuenta · DS-12..15 broker.
+No cubiertos aquí: DS-12..15 broker.
 Suite: ``pnpm test:decision-spine``.
 """
 
@@ -68,11 +69,16 @@ class _FakeAccountRepo:
 
 
 class _FakeExecuteTrade:
-    def __init__(self) -> None:
+    def __init__(self, *, return_result: bool = False) -> None:
         self.calls: list[dict[str, Any]] = []
+        self._return_result = return_result
 
-    async def execute(self, **kwargs: Any) -> None:
+    async def execute(self, **kwargs: Any) -> Any:
         self.calls.append(kwargs)
+        if not self._return_result:
+            return None
+        tx = type("Tx", (), {"id": "tx-ds03"})()
+        return type("TradeResult", (), {"transaction": tx})()
 
 
 def _sector_gap_summary() -> _FakePortfolioSummary:
@@ -173,3 +179,74 @@ async def test_ds05_auto_stale_data_does_not_execute_trade() -> None:
     assert result.reason.startswith("Risk Engine:")
     assert "data_freshness:stale:" in result.reason
     assert fake_trade.calls == []
+
+
+class _FakeMandatesNoOpen:
+    async def get_open_mandate_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> tuple[bool, str | None]:
+        return False, None
+
+
+class _FakeMandatesOpen:
+    def __init__(self, strategy_id: str = "st-1") -> None:
+        self._strategy_id = strategy_id
+
+    async def get_open_mandate_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> tuple[bool, str | None]:
+        return True, self._strategy_id
+
+
+def _router_with_mandates(
+    summary: _FakePortfolioSummary,
+    trade: _FakeExecuteTrade,
+    mandates: object,
+) -> ExecutionRouter:
+    return ExecutionRouter(
+        policy_repo=object(),  # type: ignore[arg-type]
+        account_repo=_FakeAccountRepo(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=trade,  # type: ignore[arg-type]
+        portfolio_summary=summary,  # type: ignore[arg-type]
+        profile_store=None,
+        mandates=mandates,  # type: ignore[arg-type]
+    )
+
+
+@pytest.mark.asyncio
+async def test_ds03_auto_no_open_mandate_does_not_execute_trade() -> None:
+    """DS-03 — AUTO: sin tenure abierto → skipped; cero ``ExecuteTrade``."""
+    fake_trade = _FakeExecuteTrade()
+    result = await _router_with_mandates(
+        _empty_summary(), fake_trade, _FakeMandatesNoOpen()
+    )._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(),
+        hit={"sector": "tech", "instrumentId": "inst-new"},
+        sizing_value=4.0,
+    )
+
+    assert result.status == "skipped"
+    assert result.reason is not None
+    assert result.reason.startswith("Risk Engine:")
+    assert "account_mandate:no_open_tenure" in result.reason
+    assert fake_trade.calls == []
+
+
+@pytest.mark.asyncio
+async def test_ds03_auto_open_mandate_matching_strategy_executes() -> None:
+    """DS-03 — AUTO: tenure abierto + estrategia alineada → fill."""
+    fake_trade = _FakeExecuteTrade(return_result=True)
+    result = await _router_with_mandates(
+        _empty_summary(), fake_trade, _FakeMandatesOpen("st-1")
+    )._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(),
+        hit={"sector": "tech", "instrumentId": "inst-new"},
+        sizing_value=4.0,
+    )
+
+    assert result.status == "trade_executed"
+    assert len(fake_trade.calls) == 1

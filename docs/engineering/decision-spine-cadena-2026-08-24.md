@@ -1,7 +1,7 @@
 # Decision Spine — cadena AS-IS (file:line) y matriz de prueba
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **AsOf:** 2026-08-24 · ancla `origin/main` = **`5100d23`**. Secuencia ciclo: U6 `9e9a346` · DS-05 `15e86a4` · ops `5100d23`. Prove + H5 + UX mesa U0–U6 + **DS-05 freshness** en main. **Ciclo cerrado — idle / decisión de ciclo**.
+> **AsOf:** 2026-08-24 · ancla working tree DS-03 (post audit-stamp `5100d23`). Secuencia ciclo: U6 `9e9a346` · DS-05 `15e86a4` · ops `5100d23` · **DS-03 mandate** (working tree). Prove + H5 + UX mesa U0–U6 + **DS-05 freshness** + **DS-03 mandate** en spine.
 > **Alcance:** mapa de la columna que **ya existe**. No inventa `InvestmentDecision` / `OrderProposal` / orquestador.
 > **Suite:** `pnpm test:decision-spine`.
 
@@ -20,6 +20,7 @@ Assessment (TA/FA/macro)
     → compute_portfolio_fit                analytics/.../portfolio_fit.py:67
     → check_opening                        application/risk_engine.py:57
          + DS-05 data freshness (last_bar / require_fresh_data)
+         + DS-03 account mandate (tenure BD / require_account_mandate)
          trading_policy_guard.py:174 (Fit → gate)
     → SEMI: ConfirmRecommendationIntent    confirm_recommendation.py
          check_opening en _risk_allows_opening (aperturas)
@@ -27,9 +28,11 @@ Assessment (TA/FA/macro)
          summary lanza → risk_veto (H2)
          profile = accounts.active_profile_id → profile_store (H5)
          ohlcv.get_latest_bar_date → freshness (DS-05)
+         mandates.get_open_mandate → tenure (DS-03)
     → AUTO: ExecutionRouter._execute_paper_trade
          execution_router.py  check_opening DENY → skipped, no ExecuteTrade
          signal.timestamp + require_fresh_data (DS-05)
+         mandate repo + require_account_mandate (DS-03)
          proposal_sector = hit.sector
     → ExecuteTrade                         accounts/trade.py
 ```
@@ -40,24 +43,24 @@ Daily Decision Board (`GetDecisionBoard`, `/decision-board`) es **vista**; no de
 
 ## 2. Matriz «probado / no cubierto»
 
-| Id       | Caso                              | Estado                                                                                                                              |
-| -------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| DS-01    | Apertura SEMI permitida           | Cubierto: `test_confirm_apertura_cesta_permite_fill` · package match                                                                |
-| DS-02    | Risk BLOCK SEMI                   | Cubierto: cesta veto · H2 summary fail-closed                                                                                       |
-| DS-04    | Concentración / sector BLOCK      | Cubierto: `test_risk_engine_portfolio_fit` · H1 SEMI sector · H5 profile conservative                                               |
-| DS-05    | Stale data BLOCK                  | **Cubierto:** `check_opening` freshness gate · AUTO `test_ds05_auto_stale…` · SEMI stale/fresh/ohlcv-fail · unit `test_risk_engine` |
-| DS-06    | SEMI + package identidad          | Cubierto: D2 match/conflict                                                                                                         |
-| DS-08    | AUTO + risk BLOCK no ejecuta      | Cubierto: `test_decision_spine.py` (router DENY → 0 ExecuteTrade)                                                                   |
-| DS-09    | Confirm duplicado                 | Cubierto: idempotency `decision_id`                                                                                                 |
-| DS-11    | Cesta re-evaluada en confirm      | Cubierto: Escalón 3                                                                                                                 |
-| H5       | SEMI profile → check_opening      | Cubierto: `test_confirm_apertura_profile_conservative_veto` · `…_profile_none_allows`                                               |
-| Golden   | Runtime + Fit veredicto estable   | Cubierto: `test_golden_decision_scenario.py`                                                                                        |
-| DS-03    | Mandate de cuenta BLOCK           | **Diferido** (OperatingMandate = playbook ticker, no este gate) — next: ops / fase pactada                                          |
-| DS-07    | AUTO fill ALLOW                   | Implícito en router; no es el hueco DS-08                                                                                           |
-| DS-12–15 | expiry / partial / broker / recon | **Fuera** (no broker)                                                                                                               |
-| Residual | Composite `portfolioConstraints`  | Sigue `not_evaluated`; Fit vive al lado — **doc honesty**; no wire en esta rebanada                                                 |
-| Residual | Dos call-sites `ExecuteTrade`     | **Diferido** (convergencia TO-BE; demasiado grande)                                                                                 |
-| Residual | H3 orphan apertures               | Freeze: **doc only**; sí ejecutan con `contract=absent`                                                                             |
+| Id       | Caso                              | Estado                                                                                                                                                 |
+| -------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| DS-01    | Apertura SEMI permitida           | Cubierto: `test_confirm_apertura_cesta_permite_fill` · package match                                                                                   |
+| DS-02    | Risk BLOCK SEMI                   | Cubierto: cesta veto · H2 summary fail-closed                                                                                                          |
+| DS-04    | Concentración / sector BLOCK      | Cubierto: `test_risk_engine_portfolio_fit` · H1 SEMI sector · H5 profile conservative                                                                  |
+| DS-05    | Stale data BLOCK                  | **Cubierto:** `check_opening` freshness gate · AUTO `test_ds05_auto_stale…` · SEMI stale/fresh/ohlcv-fail · unit `test_risk_engine`                    |
+| DS-06    | SEMI + package identidad          | Cubierto: D2 match/conflict                                                                                                                            |
+| DS-08    | AUTO + risk BLOCK no ejecuta      | Cubierto: `test_decision_spine.py` (router DENY → 0 ExecuteTrade)                                                                                      |
+| DS-09    | Confirm duplicado                 | Cubierto: idempotency `decision_id`                                                                                                                    |
+| DS-11    | Cesta re-evaluada en confirm      | Cubierto: Escalón 3                                                                                                                                    |
+| H5       | SEMI profile → check_opening      | Cubierto: `test_confirm_apertura_profile_conservative_veto` · `…_profile_none_allows`                                                                  |
+| Golden   | Runtime + Fit veredicto estable   | Cubierto: `test_golden_decision_scenario.py`                                                                                                           |
+| DS-03    | Mandate de cuenta BLOCK           | **Cubierto:** `check_opening` mandate gate · tenure BD `mandate_tenures` · AUTO `test_ds03_auto…` · SEMI no-tenure/open/fail · unit `test_risk_engine` |
+| DS-07    | AUTO fill ALLOW                   | Implícito en router; no es el hueco DS-08                                                                                                              |
+| DS-12–15 | expiry / partial / broker / recon | **Fuera** (no broker)                                                                                                                                  |
+| Residual | Composite `portfolioConstraints`  | Sigue `not_evaluated`; Fit vive al lado — **doc honesty**; no wire en esta rebanada                                                                    |
+| Residual | Dos call-sites `ExecuteTrade`     | **Diferido** (convergencia TO-BE; demasiado grande)                                                                                                    |
+| Residual | H3 orphan apertures               | Freeze: **doc only**; sí ejecutan con `contract=absent`                                                                                                |
 
 ---
 

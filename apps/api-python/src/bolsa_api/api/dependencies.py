@@ -1123,9 +1123,11 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
     de cesta en el confirm SEMI (solo aperturas). H1: inyecta el repo de instrumentos
     para resolver `proposal_sector` (mismo SoT que AUTO). H5: inyecta accounts +
     profile_store para pasar el InvestorProfile activo a `check_opening` (mismo SoT
-    que AUTO). DS-05: inyecta OHLCV para última barra → freshness gate fail-closed.
+    que AUTO).     DS-05: inyecta OHLCV para última barra → freshness gate fail-closed.
+    DS-03: inyecta mandate repo → account mandate gate fail-closed (tenure BD).
     No cambia el contrato HTTP.
     """
+    from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
     return ConfirmRecommendationIntent(
@@ -1136,6 +1138,7 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         accounts=get_account_repository(session),
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
+        mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
     )
 
 
@@ -1154,6 +1157,7 @@ def get_investor_profile_repository(
 
 
 def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
+    from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
     from bolsa_application.shared_event_calendar import get_shared_market_event_calendar
 
     return ExecutionRouter(
@@ -1167,6 +1171,7 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         event_calendar=get_shared_market_event_calendar(),
         cognitive_store=get_cognitive_repository(session),
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
+        mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
     )
 
 

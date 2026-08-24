@@ -5,6 +5,8 @@ A2: ``check_opening`` con kill switch efectivo + book maxOpen; DecisionSession e
 DENY pre-Gate y en fill; claim de idempotencia AUTO antes del trade.
 DS-05: aperturas pasan ``signal.timestamp`` + ``require_fresh_data=True`` al
 mismo ``check_opening`` (VETO stale / missing).
+DS-03: aperturas pasan tenure abierto desde BD + ``require_account_mandate=True``
+(VETO sin mandato / mismatch estrategia AUTO).
 
 @see docs/engineering/risk-engine-or-re-2026-08-04.md
 @see docs/engineering/camino-d-a2-a5-prep-2026-08-04.md
@@ -37,6 +39,7 @@ from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     SignalAlertSubscriptionRecord,
 )
 
+from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
 from bolsa_application.auto_execute_idempotency import (
     as_of_from_iso,
@@ -46,7 +49,7 @@ from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry
 from bolsa_application.events.payloads import signal_event_payload
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.investor_profiles import InvestorProfileStore
-from bolsa_application.risk_engine import check_opening
+from bolsa_application.risk_engine import RiskDecision, check_opening
 from bolsa_application.risk_runtime import (
     claim_auto_execute_idempotency,
     effective_kill_switch,
@@ -184,6 +187,7 @@ class ExecutionRouter:
         enforce_cognitive_gate: bool = True,
         cognitive_store: CognitiveStore | None = None,
         profile_store: InvestorProfileStore | None = None,
+        mandates: AccountMandateLookup | None = None,
     ) -> None:
         self._policies = policy_repo
         self._accounts = account_repo
@@ -197,6 +201,32 @@ class ExecutionRouter:
         self._enforce_cognitive_gate = enforce_cognitive_gate
         self._cognitive_store = cognitive_store
         self._profile_store = profile_store
+        self._mandates = mandates
+
+    async def _resolve_account_mandate_for_opening(
+        self,
+        account_id: str,
+        instrument_id: str,
+    ) -> tuple[bool, str | None, bool] | None:
+        """DS-03 — tenure abierto. ``None`` = lookup falló (fail-closed)."""
+        if self._mandates is None:
+            return False, None, False
+        try:
+            has_open, strategy_id = await self._mandates.get_open_mandate_for_instrument(
+                account_id,
+                instrument_id,
+            )
+            return has_open, strategy_id, True
+        except Exception:  # noqa: BLE001
+            return None
+
+    @staticmethod
+    def _proposal_strategy_id(signal: SignalEventV1) -> str | None:
+        raw = getattr(signal, "strategy_definition_id", None)
+        if raw is None:
+            return None
+        text = str(raw).strip()
+        return text or None
 
     async def _publish_policy_event(
         self,
@@ -559,30 +589,46 @@ class ExecutionRouter:
                 )
             except Exception:  # noqa: BLE001
                 pass
-            guard_decision = check_opening(
-                profile=profile,
-                instrument_id=signal.instrument_id,
-                symbol=symbol,
-                trade_type=trade_type,
-                quantity=quantity,
-                price=price,
-                signal_kind=str(signal.kind),
-                equity=equity,
-                open_positions_count=len(summary.positions),
-                event_calendar=self._event_calendar,
-                auto_live=False,  # paper_auto ≠ live; D3 auto-live cuando mode=live_auto
-                account_daily_drawdown_pct=dds.daily_pct,
-                account_weekly_drawdown_pct=dds.weekly_pct,
-                account_max_drawdown_pct=dds.max_pct,
-                kill_switch=await effective_kill_switch(),
-                book_max_open_positions=_book_max_open_positions(policy),
-                portfolio_positions=_basket_positions_from_summary(summary),
-                proposal_sector=(
-                    hit.get("sector") if isinstance(hit, dict) else None
-                ),
-                last_bar_timestamp=getattr(signal, "timestamp", None) or None,
-                require_fresh_data=True,
+            mandate_ctx = await self._resolve_account_mandate_for_opening(
+                policy.account_id or "",
+                signal.instrument_id,
             )
+            if mandate_ctx is None:
+                guard_decision = RiskDecision(
+                    verdict="DENY",
+                    reasons=("account_mandate:lookup_failed",),
+                    guard=None,
+                )
+            else:
+                has_open_mandate, mandate_strategy_id, require_account_mandate = mandate_ctx
+                guard_decision = check_opening(
+                    profile=profile,
+                    instrument_id=signal.instrument_id,
+                    symbol=symbol,
+                    trade_type=trade_type,
+                    quantity=quantity,
+                    price=price,
+                    signal_kind=str(signal.kind),
+                    equity=equity,
+                    open_positions_count=len(summary.positions),
+                    event_calendar=self._event_calendar,
+                    auto_live=False,  # paper_auto ≠ live; D3 auto-live cuando mode=live_auto
+                    account_daily_drawdown_pct=dds.daily_pct,
+                    account_weekly_drawdown_pct=dds.weekly_pct,
+                    account_max_drawdown_pct=dds.max_pct,
+                    kill_switch=await effective_kill_switch(),
+                    book_max_open_positions=_book_max_open_positions(policy),
+                    portfolio_positions=_basket_positions_from_summary(summary),
+                    proposal_sector=(
+                        hit.get("sector") if isinstance(hit, dict) else None
+                    ),
+                    last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                    require_fresh_data=True,
+                    has_open_mandate=has_open_mandate,
+                    mandate_strategy_id=mandate_strategy_id,
+                    require_account_mandate=require_account_mandate,
+                    proposal_strategy_id=self._proposal_strategy_id(signal),
+                )
             guard = guard_decision.guard
             lineage_base = {
                 "signalId": signal.id,
@@ -822,29 +868,45 @@ class ExecutionRouter:
         except Exception:  # noqa: BLE001
             pass
 
-        guard_decision = check_opening(
-            profile=profile,
-            instrument_id=signal.instrument_id,
-            symbol=str(hit.get("symbol") or signal.instrument_id),
-            trade_type=trade_type,
-            quantity=max(quantity, 1e-9),
-            price=price,
-            signal_kind=str(signal.kind),
-            equity=equity,
-            open_positions_count=len(summary.positions),
-            event_calendar=self._event_calendar,
-            auto_live=True,
-            edge_report=edge_report,
-            account_daily_drawdown_pct=dds.daily_pct,
-            account_weekly_drawdown_pct=dds.weekly_pct,
-            account_max_drawdown_pct=dds.max_pct,
-            kill_switch=await effective_kill_switch(),
-            book_max_open_positions=_book_max_open_positions(policy),
-            portfolio_positions=_basket_positions_from_summary(summary),
-            proposal_sector=hit.get("sector"),
-            last_bar_timestamp=getattr(signal, "timestamp", None) or None,
-            require_fresh_data=True,
+        mandate_ctx = await self._resolve_account_mandate_for_opening(
+            policy.account_id,
+            signal.instrument_id,
         )
+        if mandate_ctx is None:
+            guard_decision = RiskDecision(
+                verdict="DENY",
+                reasons=("account_mandate:lookup_failed",),
+                guard=None,
+            )
+        else:
+            has_open_mandate, mandate_strategy_id, require_account_mandate = mandate_ctx
+            guard_decision = check_opening(
+                profile=profile,
+                instrument_id=signal.instrument_id,
+                symbol=str(hit.get("symbol") or signal.instrument_id),
+                trade_type=trade_type,
+                quantity=max(quantity, 1e-9),
+                price=price,
+                signal_kind=str(signal.kind),
+                equity=equity,
+                open_positions_count=len(summary.positions),
+                event_calendar=self._event_calendar,
+                auto_live=True,
+                edge_report=edge_report,
+                account_daily_drawdown_pct=dds.daily_pct,
+                account_weekly_drawdown_pct=dds.weekly_pct,
+                account_max_drawdown_pct=dds.max_pct,
+                kill_switch=await effective_kill_switch(),
+                book_max_open_positions=_book_max_open_positions(policy),
+                portfolio_positions=_basket_positions_from_summary(summary),
+                proposal_sector=hit.get("sector"),
+                last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                require_fresh_data=True,
+                has_open_mandate=has_open_mandate,
+                mandate_strategy_id=mandate_strategy_id,
+                require_account_mandate=require_account_mandate,
+                proposal_strategy_id=self._proposal_strategy_id(signal),
+            )
         guard = guard_decision.guard
         lineage_live = {
             "signalId": signal.id,

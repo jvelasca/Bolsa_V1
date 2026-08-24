@@ -1,7 +1,7 @@
 # PROJECT_STATE — Estado vivo del proyecto (fuente única de continuación)
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
-> **AsOf:** 2026-08-24 · **Fuente de coordinación:** `origin/main` = **`5100d23`**. Código U0–U5 `04e441e` · U6 `9e9a346` · DS-05 `15e86a4`. Tag **`v1.6.0-beta` → `c3964fc`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`**. **R-13 CERRADA** · **R-12 CERRADA** · **UX mesa U0–U6 CERRADA** · **spine residual DS-05 CERRADA** · **ops propietario CERRADA** · **ciclo U6→DS-05→ops CERRADO** · **siguiente = decisión de ciclo / idle**. Track B producto **BLOQUEADO**. R-7..R-11 cerradas.
+> **AsOf:** 2026-08-24 · **Fuente de coordinación:** `origin/main` = **`5100d23`** + working tree **DS-03**. Código U0–U5 `04e441e` · U6 `9e9a346` · DS-05 `15e86a4`. Tag **`v1.6.0-beta` → `c3964fc`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`**. **R-13 CERRADA** · **R-12 CERRADA** · **UX mesa U0–U6 CERRADA** · **spine DS-05 CERRADA** · **spine DS-03 CERRADA (working tree)** · **ops propietario CERRADA** · **ciclo U6→DS-05→ops CERRADO** · **siguiente = higiene dev** (secuencia pactada). Track B producto **BLOQUEADO**. R-7..R-11 cerradas.
 > **PACK de estado global (auditoría externa / post-ciclo U6+DS-05+ops):** [`audit-pack-estado-global-2026-08-24c.md`](./audit-pack-estado-global-2026-08-24c.md) · histórico: [`audit-pack-estado-global-2026-08-24b.md`](./audit-pack-estado-global-2026-08-24b.md) · [`audit-pack-estado-global-2026-08-24.md`](./audit-pack-estado-global-2026-08-24.md) · [`audit-pack-estado-global-2026-08-22.md`](./audit-pack-estado-global-2026-08-22.md) · R-1→R-8: [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
@@ -149,7 +149,11 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b2ee0f2`).** Pista documental registrada.
 - **F4′–F6′ ✅ CERRADAS (2026-08-23, `240c846`).** Copy hub `/screeners` + toasts B0 + tests `screenersHrefAfterTrackerCreate`. Batería web 754/754.
 
-> **Estado general:** HEAD **`5100d23`** (`origin/main`). Tag **`v1.6.0-beta` → `c3964fc`**. **Fase 0 Decision Spine — COMPLETA** · **D2** `f7b1f6c` · **D3 CONFIRMADA** · **Cierre deuda confirm SEMI** · **Prove Spine** · **H5 CERRADA** · **UX mesa U0–U6 CERRADA** · **spine residual DS-05 CERRADA** (`15e86a4`) · **ops propietario CERRADA** (`5100d23`: secret scanning + push protection enabled vía API 2026-08-24; `TRUSTED_PROXIES` runbook entregado, valor prod pendiente). Ciclo **U6→DS-05→ops** completo · **AUDIT-STAMP cerrado**. Relevo vivo: `traspaso-relevo-audit-stamp-ciclo-u6-ds05-ops-2026-08-24.md`. **Siguiente: decisión de ciclo / idle**.
+> **Estado general:** HEAD **`5100d23`** (`origin/main`) + **DS-03 mandate** en working tree (sin commit). Tag **`v1.6.0-beta` → `c3964fc`**. **Fase 0 Decision Spine — COMPLETA** · **DS-05 CERRADA** (`15e86a4`) · **DS-03 CERRADA** (working tree: Account Mandate Gate en `check_opening`, tenure BD) · **ops propietario CERRADA** (`5100d23`). Batería `pnpm test:decision-spine` **53**. Relevo: `traspaso-relevo-spine-ds03-cierre-apertura-higiene-2026-08-24.md`. **Siguiente: higiene dev** (secuencia pactada DS-03 → higiene → Research→Radar → tag beta).
+
+> **Spine DS-03 CERRADA (2026-08-24, working tree):** Account Mandate Gate fail-closed en `check_opening`. SEMI: `mandates.get_open_mandate_for_instrument` · AUTO: mismo + mismatch `signal.strategy_definition_id`. Fuente: `mandate_tenures` (ADR-020 M1b, sync cliente). Exits fuera. Sin `contract:gen` · sin H3 change · sin OrderProposal. Batería **53** passed.
+
+> **Spine residual DS-05 CERRADA (2026-08-24, `15e86a4`):** Data Freshness Gate fail-closed en `check_opening` (umbral 5d). SEMI: OHLCV última barra · AUTO: `signal.timestamp`. Exits fuera. Batería `pnpm test:decision-spine` 43. Cerrado por ops propietario.
 
 ---
 

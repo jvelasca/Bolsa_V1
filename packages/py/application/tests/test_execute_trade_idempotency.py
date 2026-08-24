@@ -1296,3 +1296,107 @@ async def test_confirm_apertura_ohlcv_falla_fail_closed() -> None:
     assert len(fake_trade.calls) == 0
     assert result["trade"]["status"] == "rejected_by_gate"
     assert result["trade"]["reason"] == "risk_veto"
+
+
+# ── DS-03 — Account Mandate Gate en confirm SEMI (mismo check_opening que AUTO) ─
+
+
+class _FakeMandatesNoOpen:
+    async def get_open_mandate_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> tuple[bool, str | None]:
+        return False, None
+
+
+class _FakeMandatesOpen:
+    async def get_open_mandate_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> tuple[bool, str | None]:
+        return True, "st-mandate-1"
+
+
+class _RaisingMandates:
+    async def get_open_mandate_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> tuple[bool, str | None]:
+        raise RuntimeError("mandates unavailable")
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_no_open_mandate_risk_veto() -> None:
+    """DS-03 — mandates inyectado sin tenure abierto → risk_veto; NO fill."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        mandates=_FakeMandatesNoOpen(),
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-DS03-NO-MANDATE",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_open_mandate_permite_fill() -> None:
+    """DS-03 — tenure abierto + cesta OK → fill."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        mandates=_FakeMandatesOpen(),
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-DS03-OPEN",
+            "instrumentId": "inst-new",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["trade"]["status"] == "executed"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_mandates_falla_fail_closed() -> None:
+    """DS-03 — lookup mandates que lanza → risk_veto (fail-closed)."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        mandates=_RaisingMandates(),
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-DS03-MANDATE-FAIL",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
