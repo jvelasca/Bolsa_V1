@@ -25,6 +25,11 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
   AUTO en `execution_router`. Sin store/accounts inyectados, sin
   `active_profile_id`, o si la resolución falla → `profile=None` (fail-open
   solo en perfil; cesta/kill-switch siguen aplicándose con defaults moderate).
+- **DS-05 (Data Freshness Gate):** si el use-case recibe `ohlcv` (lookup de
+  última barra), las aperturas pasan `last_bar_timestamp` +
+  `require_fresh_data=True` a `check_opening` (mismo path AUTO). Barra ausente,
+  inválida o más vieja que el umbral → `risk_veto` fail-closed. Lookup que
+  lanza → veto (como H2). `ohlcv=None` conserva compat (tests / wiring legado).
 - **Cierre deuda confirm SEMI (Bug 1 + Bug 2):**
   - **Bug 1 (`wait` no trade):** solo las acciones transaccionales
     (`recommend_long`/`recommend_short`/`exit_hint`/`reduce`) pueden llegar a
@@ -88,6 +93,20 @@ class AccountScopeLookup(Protocol):
     async def resolve_scope(
         self, account_id: str, portfolio_id: str | None = None
     ) -> Any: ...
+
+
+class LatestBarLookup(Protocol):
+    """Puerto mínimo DS-05 — última barra OHLCV del instrumento (SEMI).
+
+    `SqlAlchemyOhlcvRepository.get_latest_bar_date` cumple el contrato.
+    """
+
+    async def get_latest_bar_date(
+        self,
+        instrument_id: str,
+        *,
+        timeframe: Any = ...,
+    ) -> str | None: ...
 
 
 def resolve_session_decision_package(
@@ -209,6 +228,7 @@ class ConfirmRecommendationIntent:
         instruments: InstrumentSectorLookup | None = None,
         profile_store: InvestorProfileStore | None = None,
         accounts: AccountScopeLookup | None = None,
+        ohlcv: LatestBarLookup | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
@@ -216,6 +236,7 @@ class ConfirmRecommendationIntent:
         self._instruments = instruments
         self._profile_store = profile_store
         self._accounts = accounts
+        self._ohlcv = ohlcv
 
     async def execute(
         self,
@@ -400,6 +421,8 @@ class ConfirmRecommendationIntent:
         lookup inyectado (mismo dato que AUTO `hit.sector`).
         H5: `profile` se resuelve desde `active_profile_id` (mismo SoT que AUTO);
         fallo de resolución → `None` (defaults moderate; no tumba cesta/kill-switch).
+        DS-05: con `ohlcv` inyectado, última barra + `require_fresh_data=True`;
+        lookup que lanza → veto (fail-closed).
         """
         if self._portfolio_summary is None:
             return True
@@ -410,6 +433,16 @@ class ConfirmRecommendationIntent:
         equity = float(getattr(summary, "total_equity", 0) or 0)
         positions = getattr(summary, "positions", None)
         open_positions_count = len(positions) if positions is not None else 0
+        last_bar_timestamp: str | None = None
+        require_fresh_data = False
+        if self._ohlcv is not None:
+            require_fresh_data = True
+            try:
+                last_bar_timestamp = await self._ohlcv.get_latest_bar_date(
+                    intent.instrument_id
+                )
+            except Exception:  # noqa: BLE001 — DS-05: indisponibilidad = veto
+                return False
         decision = check_opening(
             profile=await self._resolve_opening_profile(account_id),
             instrument_id=intent.instrument_id,
@@ -424,6 +457,8 @@ class ConfirmRecommendationIntent:
             kill_switch=await effective_kill_switch(),
             portfolio_positions=_basket_positions_from_summary(summary),
             proposal_sector=await self._resolve_proposal_sector(intent.instrument_id),
+            last_bar_timestamp=last_bar_timestamp,
+            require_fresh_data=require_fresh_data,
         )
         return bool(decision.allowed)
 

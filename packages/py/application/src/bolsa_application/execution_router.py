@@ -3,6 +3,8 @@
 Modos: inform/alert · ``paper_auto`` (fill DEMO vía Risk Engine) · ``live_auto`` dry-run.
 A2: ``check_opening`` con kill switch efectivo + book maxOpen; DecisionSession en
 DENY pre-Gate y en fill; claim de idempotencia AUTO antes del trade.
+DS-05: aperturas pasan ``signal.timestamp`` + ``require_fresh_data=True`` al
+mismo ``check_opening`` (VETO stale / missing).
 
 @see docs/engineering/risk-engine-or-re-2026-08-04.md
 @see docs/engineering/camino-d-a2-a5-prep-2026-08-04.md
@@ -578,6 +580,8 @@ class ExecutionRouter:
                 proposal_sector=(
                     hit.get("sector") if isinstance(hit, dict) else None
                 ),
+                last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                require_fresh_data=True,
             )
             guard = guard_decision.guard
             lineage_base = {
@@ -838,6 +842,8 @@ class ExecutionRouter:
             book_max_open_positions=_book_max_open_positions(policy),
             portfolio_positions=_basket_positions_from_summary(summary),
             proposal_sector=hit.get("sector"),
+            last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+            require_fresh_data=True,
         )
         guard = guard_decision.guard
         lineage_live = {

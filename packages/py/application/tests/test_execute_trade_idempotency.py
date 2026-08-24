@@ -1183,3 +1183,116 @@ async def test_confirm_apertura_profile_none_allows_same_basket() -> None:
 
     assert len(fake_trade.calls) == 1
     assert result["trade"]["status"] == "executed"
+
+
+# ── DS-05 — Data Freshness Gate en confirm SEMI (mismo check_opening que AUTO) ─
+
+
+class _FakeOhlcv:
+    """LatestBarLookup mínimo (DS-05) — get_latest_bar_date."""
+
+    def __init__(self, last_bar: str | None) -> None:
+        self._last_bar = last_bar
+
+    async def get_latest_bar_date(
+        self, instrument_id: str, *, timeframe: object = None
+    ) -> str | None:
+        return self._last_bar
+
+
+class _RaisingOhlcv:
+    async def get_latest_bar_date(
+        self, instrument_id: str, *, timeframe: object = None
+    ) -> str | None:
+        raise RuntimeError("ohlcv unavailable")
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_stale_bar_risk_veto() -> None:
+    """DS-05 — ohlcv inyectado con barra vieja → risk_veto; NO fill."""
+    from datetime import UTC, datetime, timedelta
+
+    from bolsa_application.risk_engine import DATA_FRESHNESS_MAX_AGE_SECONDS
+
+    stale = (
+        datetime.now(UTC) - timedelta(seconds=DATA_FRESHNESS_MAX_AGE_SECONDS + 3600)
+    ).date().isoformat()
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        ohlcv=_FakeOhlcv(stale),
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-DS05-STALE",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
+    assert result["intent"]["status"] == "rejected_by_gate"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_fresh_bar_permite_fill() -> None:
+    """DS-05 — ohlcv con barra reciente + cesta OK → fill."""
+    from datetime import UTC, datetime
+
+    fresh = datetime.now(UTC).date().isoformat()
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        ohlcv=_FakeOhlcv(fresh),
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-DS05-FRESH",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["trade"]["status"] == "executed"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_ohlcv_falla_fail_closed() -> None:
+    """DS-05 — lookup OHLCV que lanza → risk_veto (fail-closed, como H2)."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        ohlcv=_RaisingOhlcv(),
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-DS05-OHLCV-FAIL",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"

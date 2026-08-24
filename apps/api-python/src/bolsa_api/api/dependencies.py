@@ -1123,7 +1123,8 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
     de cesta en el confirm SEMI (solo aperturas). H1: inyecta el repo de instrumentos
     para resolver `proposal_sector` (mismo SoT que AUTO). H5: inyecta accounts +
     profile_store para pasar el InvestorProfile activo a `check_opening` (mismo SoT
-    que AUTO). No cambia el contrato HTTP.
+    que AUTO). DS-05: inyecta OHLCV para última barra → freshness gate fail-closed.
+    No cambia el contrato HTTP.
     """
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
@@ -1134,6 +1135,7 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         instruments=get_instrument_repository(session),
         accounts=get_account_repository(session),
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
+        ohlcv=get_ohlcv_repository(session),
     )
 
 

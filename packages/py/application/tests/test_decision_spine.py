@@ -2,15 +2,18 @@
 
 DS-01/02/06/09/11 viven en ``test_execute_trade_idempotency.py``.
 DS-04 vive en ``test_risk_engine_portfolio_fit.py`` (+ H1 SEMI sector).
+DS-05 vive aquí (AUTO stale) + ``test_risk_engine.py`` (unit) + SEMI en
+``test_execute_trade_idempotency.py``.
 DS-08 (este fichero): AUTO + ``check_opening`` DENY → el router **no** llama a ``ExecuteTrade``.
 
-No cubiertos aquí: DS-03 Mandate de cuenta · DS-05 stale · DS-12..15 broker.
+No cubiertos aquí: DS-03 Mandate de cuenta · DS-12..15 broker.
 Suite: ``pnpm test:decision-spine``.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -18,6 +21,7 @@ from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 from bolsa_application.execution_router import ExecutionRouter
+from bolsa_application.risk_engine import DATA_FRESHNESS_MAX_AGE_SECONDS
 
 
 @dataclass
@@ -33,7 +37,9 @@ class _FakePortfolioSummary:
         self.positions = positions
         self.total_equity = total_equity
 
-    async def execute(self, account_id: str | None = None, portfolio_id: str | None = None) -> _FakePortfolioSummary:
+    async def execute(
+        self, account_id: str | None = None, portfolio_id: str | None = None
+    ) -> _FakePortfolioSummary:
         return self
 
 
@@ -49,7 +55,9 @@ class _FakeScope:
 
 
 class _FakeAccountRepo:
-    async def resolve_scope(self, account_id: str, portfolio_id: str | None = None) -> _FakeScope:
+    async def resolve_scope(
+        self, account_id: str, portfolio_id: str | None = None
+    ) -> _FakeScope:
         return _FakeScope()
 
     async def get_settings_json(self, account_id: str) -> dict[str, Any]:
@@ -82,6 +90,10 @@ def _sector_gap_summary() -> _FakePortfolioSummary:
     )
 
 
+def _empty_summary() -> _FakePortfolioSummary:
+    return _FakePortfolioSummary(positions=[], total_equity=200.0)
+
+
 def _paper_policy() -> ExecutionPolicyRecord:
     return ExecutionPolicyRecord(
         id="pol-ds08",
@@ -98,11 +110,12 @@ def _paper_policy() -> ExecutionPolicyRecord:
     )
 
 
-def _entry_long_signal() -> SignalEventV1:
+def _entry_long_signal(*, timestamp: str | None = None) -> SignalEventV1:
+    ts = timestamp or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return SignalEventV1(
         id="sig-ds08",
         instrument_id="inst-new",
-        timestamp="2026-08-24T12:00:00Z",
+        timestamp=ts,
         kind="entry_long",
         strategy_definition_id="st-1",
         strategy_version=1,
@@ -111,21 +124,23 @@ def _entry_long_signal() -> SignalEventV1:
     )
 
 
-@pytest.mark.asyncio
-async def test_ds08_auto_risk_block_does_not_execute_trade() -> None:
-    """DS-08 — AUTO: ``check_opening`` DENY (sector) → skipped; cero ``ExecuteTrade``."""
-    fake_trade = _FakeExecuteTrade()
-    router = ExecutionRouter(
+def _router(summary: _FakePortfolioSummary, trade: _FakeExecuteTrade) -> ExecutionRouter:
+    return ExecutionRouter(
         policy_repo=object(),  # type: ignore[arg-type]
         account_repo=_FakeAccountRepo(),  # type: ignore[arg-type]
         strategy_repo=object(),  # type: ignore[arg-type]
         backtest_repo=object(),  # type: ignore[arg-type]
-        execute_trade=fake_trade,  # type: ignore[arg-type]
-        portfolio_summary=_sector_gap_summary(),  # type: ignore[arg-type]
+        execute_trade=trade,  # type: ignore[arg-type]
+        portfolio_summary=summary,  # type: ignore[arg-type]
         profile_store=None,
     )
 
-    result = await router._execute_paper_trade(
+
+@pytest.mark.asyncio
+async def test_ds08_auto_risk_block_does_not_execute_trade() -> None:
+    """DS-08 — AUTO: ``check_opening`` DENY (sector) → skipped; cero ``ExecuteTrade``."""
+    fake_trade = _FakeExecuteTrade()
+    result = await _router(_sector_gap_summary(), fake_trade)._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(),
         hit={"sector": "tech", "instrumentId": "inst-new"},
@@ -136,4 +151,25 @@ async def test_ds08_auto_risk_block_does_not_execute_trade() -> None:
     assert result.reason is not None
     assert result.reason.startswith("Risk Engine:")
     assert "Exposición sector superada" in result.reason
+    assert fake_trade.calls == []
+
+
+@pytest.mark.asyncio
+async def test_ds05_auto_stale_data_does_not_execute_trade() -> None:
+    """DS-05 — AUTO: barra/señal más vieja que el umbral → skipped; cero ``ExecuteTrade``."""
+    stale_ts = (
+        datetime.now(UTC) - timedelta(seconds=DATA_FRESHNESS_MAX_AGE_SECONDS + 3600)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fake_trade = _FakeExecuteTrade()
+    result = await _router(_empty_summary(), fake_trade)._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(timestamp=stale_ts),
+        hit={"sector": "tech", "instrumentId": "inst-new"},
+        sizing_value=4.0,
+    )
+
+    assert result.status == "skipped"
+    assert result.reason is not None
+    assert result.reason.startswith("Risk Engine:")
+    assert "data_freshness:stale:" in result.reason
     assert fake_trade.calls == []

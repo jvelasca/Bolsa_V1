@@ -1,18 +1,20 @@
 """OR-RE — Risk Engine façade (pre-Camino D / pre-€).
 
 Toda apertura automática (paper_auto / futuro AUTO Estudio) debe pasar por
-``check_opening``. Reutiliza Policy Gate + long-only; añade kill switch y
-tope Libro DEMO (maxOpen) cuando se aportan.
+``check_opening``. Reutiliza Policy Gate + long-only; añade kill switch,
+tope Libro DEMO (maxOpen) y **DS-05 Data Freshness Gate** cuando se aportan.
 
 Prohibido: Research/dictamen → Broker sin este check.
 
 @see docs/engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md §9.2
 @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md OR-RE
+@see docs/engineering/decision-spine-cadena-2026-08-24.md DS-05
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
@@ -20,6 +22,7 @@ from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 from bolsa_domain.entities.market_event import MarketEventCalendar
+from bolsa_domain.ohlcv_time import parse_bar_timestamp
 
 from bolsa_application.trading_policy_guard import (
     CognitiveGuardResult,
@@ -28,6 +31,42 @@ from bolsa_application.trading_policy_guard import (
 
 RISK_ENGINE_VERSION = "risk_engine_v0"
 RiskVerdict = Literal["ALLOW", "DENY"]
+
+# DS-05 — umbral fail-closed de frescura (alineado con EOD_STALE_MAX_DAYS=5).
+# Cubre fin de semana / festivo corto sin tumbar D1 sano; bloquea barras viejas.
+DATA_FRESHNESS_MAX_AGE_SECONDS = 5 * 24 * 60 * 60
+
+_EXIT_SIGNAL_KINDS = frozenset({"exit", "exit_hint", "reduce"})
+
+
+def data_freshness_veto_reason(
+    last_bar_timestamp: str | None,
+    *,
+    max_age_seconds: int = DATA_FRESHNESS_MAX_AGE_SECONDS,
+    require: bool = False,
+    now: datetime | None = None,
+) -> str | None:
+    """Devuelve reason de VETO DS-05, o None si la barra es aceptable / gate off.
+
+    - ``require=False`` y timestamp ausente → gate off (compat tests / wiring legado).
+    - ``require=True`` y timestamp ausente → ``data_freshness:missing`` (fail-closed).
+    - timestamp presente y edad > umbral → ``data_freshness:stale:...``.
+    """
+    if last_bar_timestamp is None or not str(last_bar_timestamp).strip():
+        return "data_freshness:missing" if require else None
+    try:
+        latest = parse_bar_timestamp(str(last_bar_timestamp).strip())
+    except (TypeError, ValueError):
+        return "data_freshness:invalid_timestamp"
+    moment = now if now is not None else datetime.now(UTC)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    else:
+        moment = moment.astimezone(UTC)
+    age = (moment - latest).total_seconds()
+    if age > max_age_seconds:
+        return f"data_freshness:stale:age_s={int(age)}>{max_age_seconds}"
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,14 +118,45 @@ def check_opening(
     book_max_open_positions: int | None = None,
     portfolio_positions: list[BasketPosition] | None = None,
     proposal_sector: str | None = None,
+    last_bar_timestamp: str | None = None,
+    max_bar_age_seconds: int | None = None,
+    require_fresh_data: bool = False,
+    freshness_now: datetime | None = None,
 ) -> RiskDecision:
-    """Evalúa una apertura. Exits siguen el bypass del Cognitive Guard."""
+    """Evalúa una apertura. Exits siguen el bypass del Cognitive Guard.
+
+    DS-05: si ``require_fresh_data`` o se aporta ``last_bar_timestamp``, VETO
+    fail-closed cuando la barra/quote supera el umbral (o falta el timestamp).
+    No aplica a ``exit`` / ``exit_hint`` / ``reduce`` (no atrapa cierres).
+    """
     if kill_switch:
         return RiskDecision(
             verdict="DENY",
             reasons=("kill_switch_active",),
             guard=None,
         )
+
+    kind = (signal_kind or "").lower()
+    if kind not in _EXIT_SIGNAL_KINDS and (
+        require_fresh_data or last_bar_timestamp is not None
+    ):
+        age_cap = (
+            DATA_FRESHNESS_MAX_AGE_SECONDS
+            if max_bar_age_seconds is None
+            else max_bar_age_seconds
+        )
+        freshness_reason = data_freshness_veto_reason(
+            last_bar_timestamp,
+            max_age_seconds=age_cap,
+            require=require_fresh_data,
+            now=freshness_now,
+        )
+        if freshness_reason is not None:
+            return RiskDecision(
+                verdict="DENY",
+                reasons=(freshness_reason,),
+                guard=None,
+            )
 
     if (
         book_max_open_positions is not None
