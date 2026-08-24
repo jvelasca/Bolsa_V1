@@ -2,7 +2,7 @@ RELEVO / TRASPASO — Ops (deuda operativa, FUERA de repo) CERRADA (parte ejecut
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
 > **Propósito:** texto de paso para el **NUEVO CHAT**. La rebanada **Ops** (backlog §4, checklist de R-1/F-WORKER-1, 100% manual/sin código) se **ejerció** y su **parte ejecutable por el agente quedó CERRADA** (pushes + verificación de entorno read-only). La **sub-verificación abierta se RESOLVIÓ 2026-08-24**: re-sync vivo `idx-ftse100` confirmado sin 404 → `_backup_instruments_corrupt` ELIMINADA. Quedan **2 ítems bloqueados en el propietario** (secret scanning UI · `TRUSTED_PROXIES` prod). La fase siguiente **la decide el propietario**. Read-first antes de escribir código.
-> **AsOf cierre:** 2026-08-24. **HEAD/`main` == `origin/main` == `1cdac2b`**, working tree **limpio**. Todo pusheado: el fix saneo `/` (`3c53f4e` código) + docs (`cd93f51`·`3b708d0`·`5bf0469`·`7363ec6`) + relevo renovado (`1cdac2b`).
+> **AsOf cierre:** 2026-08-24. **HEAD/`main` == `origin/main` == `5b897a4`**, working tree **limpio**. Todos los SNA de la rebanada, incluido el cierre documental de hoy (`5b897a4`), **PUSHEADOS** a `origin/main`.
 > **SHA (esta rebanada Ops):** `b5942cc` (docs Ops deuda operativa) · `3c53f4e` (fix saneo símbolos `/` + limpieza BD) · `cd93f51` (docs fijar SHA) · `3b708d0` (docs relevo renovado) · `5bf0469` (docs backlog update-last push + verif entorno) · `7363ec6` (docs backlog update-last cierre Ops). **Todos PUSHEADOS.**
 
 ---
@@ -18,9 +18,9 @@ El propietario confirmó fase = **Ops** (backlog §4): checklist operativo de R-
 - **Verificación de entorno read-only 2026-08-24 (sin código):** en `bolsa.postgres/bolsa_v1` → **0** instrumentos con `/` en `symbol`/`yahoo_symbol` · los **9 yahoo_symbols limpios** presentes (BP.L · BTA.L · BA.L · AV.L · RR.L · SN.L · JD.L · NG.L · UU.L) con exchange LSE · **`idx-ftse100` = (100) miembros, 0 con slash**. Fix de código confirmado en working tree (`_symbol_parts` en provider FTSE100 + `ImportInstrument.normalize_yahoo_symbol`/`normalize_symbol`). (La tabla `_backup_instruments_corrupt`, red de seguridad, se **ELIMINÓ** tras confirmarse el re-sync — ver Verificación abierta §1.)
 - **Pushes ejecutados y verificados:** todos los commits de la rebanada quedaron **pusheados**; `main == origin/main == 7363ec6`, 0/0, working tree limpio.
 
-### Ítems PENDIENTES del propietario (no ejecutables por el agente)
+### Ítems PENDIENTES del propietario (no ejecutables por el agente) — VERIFICADO 2026-08-24
 
-- **GitHub secret scanning nativo** en UI: `Settings → Code security and analysis` → Secret scanning + Push protection → **Enable** (la CI `gitleaks.yml` ya escanea; esto es defensa de plataforma).
+- **GitHub secret scanning nativo** en UI: estado por API **`disabled`** (`secret_scanning` + `secret_scanning_push_protection`); REST para habilitar devuelve **404** (no hay API pública). → `Settings → Code security and analysis` → Secret scanning + Push protection → **Enable** por el propietario (la CI `gitleaks.yml` ya escanea; esto es defensa de plataforma).
 - **`TRUSTED_PROXIES` prod:** poblar env con las IP/CIDR del proxy de borde (formato `config.py:28`, `"10.0.0.1,203.0.113.0/24"`). **Bloqueado por valores reales del usuario**; default vacío es seguro (rate-limit usa `client.host`).
 - **(Opcional) Purga valores dev** en historial git público (filter-repo/BFG) — diferida por decisión explícita.
 
