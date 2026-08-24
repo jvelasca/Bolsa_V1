@@ -1,8 +1,8 @@
 # PROJECT_STATE — Estado vivo del proyecto (fuente única de continuación)
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
-> **AsOf:** 2026-08-24 · **Fuente de coordinación:** HEAD **`ea9a985`** (post DS-03 + higiene) + working tree Research→Radar copy + stamp tag v1.7.0-beta. Código U0–U5 `04e441e` · U6 `9e9a346` · DS-05 `15e86a4` · DS-03 `41adb8e` · ops `5100d23`. Tag **`v1.7.0-beta`** (stamp preparado; **tag git pendiente coordinador**) · tag **`v1.6.0-beta` → `c3964fc`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`**. **R-13 CERRADA** · **Track B split CERRADO** · **Fase 0 spine COMPLETA** · **UX mesa U0–U6 CERRADA** · **DS-05/DS-03 CERRADAS** · **ops propietario CERRADA** · **higiene dev CERRADA** · **Research→Radar copy CERRADA** · **ciclo beta slice CERRADO** · **siguiente = idle / decisión de ciclo**. R-7..R-11 cerradas.
-> **PACK de estado global (auditoría externa / post-ciclo U6+DS-05+ops):** [`audit-pack-estado-global-2026-08-24c.md`](./audit-pack-estado-global-2026-08-24c.md) · histórico: [`audit-pack-estado-global-2026-08-24b.md`](./audit-pack-estado-global-2026-08-24b.md) · [`audit-pack-estado-global-2026-08-24.md`](./audit-pack-estado-global-2026-08-24.md) · [`audit-pack-estado-global-2026-08-22.md`](./audit-pack-estado-global-2026-08-22.md) · R-1→R-8: [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md).
+> **AsOf:** 2026-08-24 · **Fuente de coordinación:** HEAD **`e3b943a`** = `origin/main` = tag **`v1.7.0-beta`**. Código U0–U5 `04e441e` · U6 `9e9a346` · DS-05 `15e86a4` · DS-03 `41adb8e` · ops `5100d23` · Research→Radar `2c26fe6`. Tag previo **`v1.6.0-beta` → `c3964fc`**. **R-13 CERRADA** · **Track B split CERRADO** · **Fase 0 spine COMPLETA** · **UX mesa U0–U6 CERRADA** · **ciclo beta slice CERRADO y TAGGED** · **Ciclo activo = OrderProposal/Journal F1** (working tree, pendiente commit). R-7..R-11 cerradas.
+> **PACK de estado global (auditoría externa / Ciclo 2):** [`audit-pack-estado-global-2026-08-24d.md`](./audit-pack-estado-global-2026-08-24d.md) · histórico: [`audit-pack-estado-global-2026-08-24c.md`](./audit-pack-estado-global-2026-08-24c.md) · [`audit-pack-estado-global-2026-08-24b.md`](./audit-pack-estado-global-2026-08-24b.md) · [`audit-pack-estado-global-2026-08-24.md`](./audit-pack-estado-global-2026-08-24.md) · R-1→R-8: [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
 > **Regla del hilo actual (pactada 2026-08-19):** NO tocar código fuera del alcance de la fase declarada. Cada fase se ejecuta EN UN SUBAGENTE acotado, con batería y APROBACIÓN del usuario por commit. Máx. ~3 subagentes en paralelo por chat. Al cerrar un chat se actualiza ESTE documento y el `engineering-index` §5.
@@ -32,15 +32,15 @@ Patrón sancionado: **LLM interpreta/propone → motor determinista decide → c
 
 Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO (todo en la rama base arriba):
 
-| Fase          | Contenido                                                                                | Estado                                                                         |
-| ------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| **F1**        | Integridad financiera: `with_for_update`, `deduct_cash`, idempotencia trade, invariantes | ✅ MERGED                                                                      |
-| **F2**        | Backtest `next_open` (fill `open[t+1]`), fingerprint, recálculo de trials                | ✅ MERGED (**NOTA: NO incluye causalidad de indicadores — pendiente F-IND-1**) |
-| **F3a/F3b**   | Workers fuera de FastAPI (D3) + Alembic única autoridad (D2)                             | ✅ MERGED                                                                      |
-| **F4**        | Arquitectura Python: ciclo analytics↔market roto, ruff+mypy gates                        | ✅ MERGED                                                                      |
-| **F5a**       | openapi-fetch cliente completo + contract bidireccional (`contract-check.ts`)            | ✅ MERGED (PR #52/#53)                                                         |
-| **F5b/F5c**   | rate-limit distribuido, upsert bulk, P2.7 amounts, cleanup frontend                      | ✅ MERGED                                                                      |
-| **P2.1/P2.8** | god-components + as-unknown-as                                                           | ✅ MERGED                                                                      |
+| Fase          | Contenido                                                                                | Estado                                                                            |
+| ------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| **F1**        | Integridad financiera: `with_for_update`, `deduct_cash`, idempotencia trade, invariantes | ✅ MERGED                                                                         |
+| **F2**        | Backtest `next_open` (fill `open[t+1]`), fingerprint, recálculo de trials                | ✅ MERGED (causalidad indicadores cubierta por **F-IND-1/2** `79fa155`/`09fb06b`) |
+| **F3a/F3b**   | Workers fuera de FastAPI (D3) + Alembic única autoridad (D2)                             | ✅ MERGED                                                                         |
+| **F4**        | Arquitectura Python: ciclo analytics↔market roto, ruff+mypy gates                        | ✅ MERGED                                                                         |
+| **F5a**       | openapi-fetch cliente completo + contract bidireccional (`contract-check.ts`)            | ✅ MERGED (PR #52/#53)                                                            |
+| **F5b/F5c**   | rate-limit distribuido, upsert bulk, P2.7 amounts, cleanup frontend                      | ✅ MERGED                                                                         |
+| **P2.1/P2.8** | god-components + as-unknown-as                                                           | ✅ MERGED                                                                         |
 
 **Consecuencia clave:** gran parte de los hallazgos de las auditorías externas de 2026-08-11 **ya están corregidos**. La auditoría externa recibida el 2026-08-19 combina hallazgos desactualizados con otros vigentes (ver §4).
 
@@ -160,7 +160,7 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ## 3. Deuda PENDIENTE (priorizada 2026-08-19)
 
-> Orden por **riesgo de dinero / verdad de resultados** (no por severidad rotulada). Prioridad síntoma: **causalidad de indicadores** = único hueco serio de integridad que queda tras F2.
+> Orden por **riesgo de dinero / verdad de resultados** (no por severidad rotulada). **F-IND-1/2 (causalidad indicadores) CERRADOS** (`79fa155`/`09fb06b`); ver audit `audit-f-ind-1-causalidad-indicadores-2026-08-24.md`.
 
 | Código              | Objetivo                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Estado                                       | Riesgo                   | Fracción |
 | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ------------------------ | -------- |
@@ -230,10 +230,11 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 - CORS `allow_methods=["*"]`/`allow_headers=["*"]` → **corregido** (F-SEG-3, `e628ae3`): `main.py` pasa a listas explícitas (`GET/POST/PUT/PATCH/DELETE/OPTIONS`; `Content-Type/Authorization/X-Account-Id/Accept`).
 - Rate-limit confiaba en `client.host` sin `X-Forwarded-For` → **corregido** (F-SEG-3, `e628ae3`): `get_client_ip()` en `rate_limit.py` usa la primera IP del `XFF` **solo** si el peer inmediato está en `TRUSTED_PROXIES` (config nueva, default vacío → dev/local sin proxy usa `client.host`; anti-spoofing).
 - Mojibake `workspace-store-core.ts` → **corregido** (F-HLTH-1, `2400a4b`): 2 strings UI (`Gráfico`) + ~28 JSDoc/comentarios en UTF-8 correcto; lógica intacta.
+- Look-ahead `chikou`/`fractals` en backtest/research → **corregido** (F-IND-1/F-IND-2, `79fa155`/`09fb06b`): metadatos en `indicator-universe.ts`; guardia `_NON_CAUSAL_OUTPUT_LINES` + validador rechaza no causales; batería CI 39 tests. Chart sigue dibujando chikou/fractals (`compute.py:778-784`, `:824-826`).
 
 ### Aún vigentes (hacen el plan)
 
-1. **Look-ahead en `chikou` (Ichimoku) y `fractals`** → F-IND-1/F-IND-2. `compute.py:824-825` (`chikou[index]=bars[index+displacement]`) y `:778-779` (fractals usa `bars[index±2]`). Correcto para visualización; NO como feature causal.
+_(Ningún hallazgo de causalidad de indicadores pendiente — F-IND-1/2 cerrados; look-ahead chikou/fractals excluido de backtest/research.)_
 
 ### Auditoría externa 2 (2026-08-19, segunda ronda) — veredicto verificado
 

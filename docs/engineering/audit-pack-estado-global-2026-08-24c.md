@@ -1,5 +1,6 @@
 # Paquete de auditoría — ESTADO GLOBAL post-ciclo beta v1.7.0-beta (2026-08-24c)
 
+> **Superseded by** [`audit-pack-estado-global-2026-08-24d.md`](./audit-pack-estado-global-2026-08-24d.md) **for post-tag v1.7.0-beta + Ciclo 1 OP/Journal** (`origin/main` = `e3b943a`, tag verificado). Conservar como histórico pre-tag (stamp pendiente).
 > **Propósito:** documento **único** para auditoría externa general tras el ciclo beta slice **U6 → DS-05 → ops → DS-03 → higiene → Research→Radar → stamp tag v1.7.0-beta**. Consolida identidad, freeze, arcos cerrados desde el pack 2026-08-24b, verificación y riesgos ops.
 > **AsOf:** 2026-08-24 · HEAD **`ea9a985`** + stamp tag v1.7.0-beta en working tree · R-13 **CERRADA** · Track B **CERRADO** · Fase 0 spine **COMPLETA** · UX mesa **U0–U6 CERRADA** · **DS-05/DS-03 CERRADAS** · **ops propietario CERRADA** · **Research→Radar copy CERRADA** · **tag `v1.7.0-beta` stamp preparado; tag git pendiente coordinador**.
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`
