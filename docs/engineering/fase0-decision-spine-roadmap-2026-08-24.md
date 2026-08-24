@@ -1,9 +1,9 @@
 # Fase 0 — Decision Spine · esquema maestro (roadmap de gestión)
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **AsOf:** 2026-08-24 (noche). **Siguiente:** F0.2 TO-BE docs-only.
-> **HEAD/anchas:** `main == origin/main == f69a7b0` · verificado `git fetch; git rev-parse origin/main`. Working tree puede tener docs Fase 0 sin commit.
-> **Documento de gestión del ORQUESTADOR.** No es un plan de código: NINGUNA rebanada implementa hasta aprobación explícita del propietario (premisa E1).
+> **AsOf:** 2026-08-24. **Fase 0 COMPLETA** (docs F0.1–F0.4 + código F0.5/F0.6 + D1–D3). Cierre de auditoría H1/H2 en working tree.
+> **HEAD/anchas:** `main == origin/main == 36dd6e3` · verificado `git fetch; git rev-parse origin/main`. Working tree puede tener el parche H1/H2 + stamp docs sin commit.
+> **Documento de gestión del ORQUESTADOR.** No reabrir F0.5/F0.6. La siguiente fase la decide el propietario (E1).
 
 ---
 
@@ -27,7 +27,7 @@
 | **F0.5** | **Fit (PortfolioFit)**    | Único _create_ neto a medio plazo; encaje de cartera                                                      | **código (fase pactada + aprobación)** | F0.4 + decisión   |
 | **F0.6** | **Daily Decision Board**  | Daily como **vista** (No nuovo orquestador)                                                               | **código (vista)**                     | F0.4 + aprobación |
 
-> **Estado 2026-08-24:** F0.1–F0.4 ✅ (docs-only, verificado VERDE). **F0.5/F0.6 = CÓDIGO, NO abiertos** por decisión propietario (`docs_all`): el plan de implementación queda listo en `fase0-decision-spine-implementacion-plan-2026-08-24.md`, pendiente aprobación de fase (premisa E1).
+> **Estado 2026-08-24:** F0.1–F0.4 ✅ docs · **F0.5b CERRADA** (`3670a09`) · **F0.6 COMPLETA** (backend `8df8a65` + UI `672e88f`) · D1/D2/Esc.3/deuda SEMI/D3 ✅. Plan: `fase0-decision-spine-implementacion-plan-2026-08-24.md` (CERRADO).
 
 > **Regla:** Daily es **vista**, no orquestador. **Fit es el único create neto a medio plazo.** El resto del spine es _adaptar/conservar_ módulos existentes.
 
@@ -55,9 +55,12 @@
 
 ## 4. Estado de la agenda (log del orquestador)
 
-| Slice | Estado         | Fecha            | Nota                                                 |
-| ----- | -------------- | ---------------- | ---------------------------------------------------- |
-| F0.1  | ✅ CERRADO     | 2026-08-24       | `fase0-decision-spine-asis-2026-08-24.md`            |
-| F0.2  | ▶ EN CURSO     | 2026-08-24 noche | este hilo: `fase0-decision-spine-tobe-2026-08-24.md` |
-| F0.2  | · verificación | · subagente      | contraste TO-BE vs AS-IS (docs-only)                 |
-| F0.3  | ⏳ pendiente   | —                | no abrir en este hilo si el contexto se satura       |
+| Slice       | Estado         | Fecha      | Nota                                                           |
+| ----------- | -------------- | ---------- | -------------------------------------------------------------- |
+| F0.1        | ✅ CERRADO     | 2026-08-24 | `fase0-decision-spine-asis-2026-08-24.md`                      |
+| F0.2        | ✅ CERRADO     | 2026-08-24 | `fase0-decision-spine-tobe-2026-08-24.md`                      |
+| F0.3        | ✅ CERRADO     | 2026-08-24 | `fase0-decision-spine-mapping-2026-08-24.md`                   |
+| F0.4        | ✅ CERRADO     | 2026-08-24 | `fase0-decision-spine-descarga-2026-08-24.md` · D1/D2/D3       |
+| F0.5        | ✅ CERRADO     | 2026-08-24 | PortfolioFit v1 `3670a09`                                      |
+| F0.6        | ✅ CERRADO     | 2026-08-24 | Decision Board backend `8df8a65` + UI `672e88f`                |
+| Audit H1/H2 | ▶ working tree | 2026-08-24 | `proposal_sector` SEMI + fail-closed summary; pendiente commit |

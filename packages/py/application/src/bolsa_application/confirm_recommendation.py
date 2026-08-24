@@ -11,6 +11,15 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
   si veta → `rejected_by_gate`/`risk_veto`. `exit_hint`/`reduce` NO se someten al
   VETO (no abren cesta). Perfil de risk no se re-evalúa en esta rebanada
   (`profile=None`); `portfolio_summary=None` conserva el comportamiento previo.
+- **H1 (auditoría spine):** el sector de la puesta propuesta se resuelve desde
+  `instruments.sector` (mismo dato que AUTO `hit.sector`) y se pasa a
+  `check_opening(proposal_sector=...)` para que `MaxSectorExposure` cuente el
+  fill nuevo. Sin lookup inyectado o sin sector en DB → `None` (cae a
+  `<unknown>` en Fit; no se inventa un sector).
+- **H2 (auditoría spine, D1):** si `GetPortfolioSummary` está inyectado y
+  **falla** (excepción), el confirm es fail-closed (`risk_veto`): no hay
+  override por indisponibilidad. `portfolio_summary=None` sigue sin aplicar
+  cesta (tests / wiring legado).
 - **Cierre deuda confirm SEMI (Bug 1 + Bug 2):**
   - **Bug 1 (`wait` no trade):** solo las acciones transaccionales
     (`recommend_long`/`recommend_short`/`exit_hint`/`reduce`) pueden llegar a
@@ -26,7 +35,7 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
 from __future__ import annotations
 
 from datetime import UTC
-from typing import Any
+from typing import Any, Protocol
 from uuid import uuid4
 
 from bolsa_analytics.cognitive.decision_session import (
@@ -47,6 +56,17 @@ _CLOSING_ACTIONS = {"exit_hint", "reduce"}
 # Acciones transaccionales que pueden llegar a `ExecuteTrade` (solo estas)
 # `wait` NO está: una tesis `wait` no abre ni cierra posición (Bug 1).
 _TRADE_ACTIONS = _OPENING_ACTIONS | _CLOSING_ACTIONS
+
+
+class InstrumentSectorLookup(Protocol):
+    """Puerto mínimo para resolver `instruments.sector` en el confirm SEMI (H1).
+
+    `SqlAlchemyInstrumentRepository.get_by_id` cumple el contrato. El confirm
+    no depende del Protocol gordo de instrumentos: solo necesita el sector
+    del ticker que se va a abrir, el mismo dato que AUTO lee del scan hit.
+    """
+
+    async def get_by_id(self, instrument_id: str) -> Any | None: ...
 
 
 def resolve_session_decision_package(
@@ -165,10 +185,12 @@ class ConfirmRecommendationIntent:
         cognitive_store: CognitiveStore | None = None,
         execute_trade: Any | None = None,
         portfolio_summary: GetPortfolioSummary | None = None,
+        instruments: InstrumentSectorLookup | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
         self._portfolio_summary = portfolio_summary
+        self._instruments = instruments
 
     async def execute(
         self,
@@ -344,18 +366,21 @@ class ConfirmRecommendationIntent:
 
         Re-ejecuta el risk de cesta (`check_opening`, el mismo que AUTO en
         `execution_router._execute_paper_trade`) para una apertura validada antes de
-        tocar `ExecuteTrade`. Devuelve True si la cesta/kill-switch permiten el fill. El perfil de risk NO se re-evalúa en esta
-        rebanada (`profile=None`); `exit_hint`/`reduce` quedan fuera (no abren cesta).
-        Si el summary o la evaluación fallan de forma recuperable, se mantiene
-        fail-open a la lógica de D2 (no es el gate de identidad): el fill NO se
-        bloquea por una indisponibilidad del summary.
+        tocar `ExecuteTrade`. Devuelve True si la cesta/kill-switch permiten el fill.
+        El perfil de risk NO se re-evalúa (`profile=None`); `exit_hint`/`reduce`
+        quedan fuera (no abren cesta).
+
+        H2 / D1: si el summary está inyectado y lanza, se VETA (fail-closed).
+        `portfolio_summary=None` no aplica cesta (comportamiento Escalón 3).
+        H1: `proposal_sector` se resuelve desde `instruments.sector` cuando hay
+        lookup inyectado (mismo dato que AUTO `hit.sector`).
         """
         if self._portfolio_summary is None:
             return True
         try:
             summary = await self._portfolio_summary.execute(account_id=account_id)
-        except Exception:  # noqa: BLE001 — indisponibilidad de summary no es gate
-            return True
+        except Exception:  # noqa: BLE001 — H2: indisponibilidad = veto, no override
+            return False
         equity = float(getattr(summary, "total_equity", 0) or 0)
         positions = getattr(summary, "positions", None)
         open_positions_count = len(positions) if positions is not None else 0
@@ -372,11 +397,28 @@ class ConfirmRecommendationIntent:
             auto_live=False,
             kill_switch=await effective_kill_switch(),
             portfolio_positions=_basket_positions_from_summary(summary),
-            # El sector de la posición propuesta no está resuelto en el confirm; cae
-            # a "unknown" en el agregado por sector (coherente con el summary sin sector).
-            proposal_sector=None,
+            proposal_sector=await self._resolve_proposal_sector(intent.instrument_id),
         )
         return bool(decision.allowed)
+
+    async def _resolve_proposal_sector(self, instrument_id: str) -> str | None:
+        """H1 — sector de la puesta nueva desde `instruments.sector` (SoT AUTO).
+
+        Lookup best-effort: excepción o instrumento sin sector → `None` (Fit
+        agrupa el notional nuevo bajo `<unknown>`; no se inventa sector).
+        """
+        if self._instruments is None or not instrument_id:
+            return None
+        try:
+            inst = await self._instruments.get_by_id(instrument_id)
+        except Exception:  # noqa: BLE001 — sin sector no bloquea el gate de cesta
+            return None
+        if inst is None:
+            return None
+        sector = getattr(inst, "sector", None)
+        if isinstance(sector, str) and sector.strip():
+            return sector.strip()
+        return None
 
     async def _persist_session(
         self,

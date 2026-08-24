@@ -4,105 +4,106 @@
 
 ## Fuente de verdad (estado actual)
 
-| Documento | Contenido |
-|-----------|-----------|
-| [PROJECT_PREMISES.md](./PROJECT_PREMISES.md) | **Premisas de proyecto** (documentar todo · índice de premisas · repo público) |
-| [AI_PLATFORM_SOLUTION.md](./AI_PLATFORM_SOLUTION.md) | Dictamen IA + estado F1/F2 · UI: Ayuda → Plataforma IA |
-| [HELP.md](./HELP.md) | Mapa Ayuda ↔ trackers ↔ docs (`HELP_CONTENT_AS_OF`) |
-| [rfc/README.md](./rfc/README.md) | Constitución RFC-000…008 · fases código |
-| [API_REFERENCE.md](./API_REFERENCE.md) | Endpoints HTTP |
-| [ONBOARDING.md](./ONBOARDING.md) | Setup primer día |
-| [domain-language.md](./domain-language.md) | **Diccionario QROS** (Scientific / Trading / Infra · universos LAB/TRADING) |
+| Documento                                            | Contenido                                                                                |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| [CURRENT_SYSTEM.md](./CURRENT_SYSTEM.md)             | **Sistema actual** (stack, spine SEMI/AUTO, JWT real, Alembic, tests) — primer SoT corto |
+| [PROJECT_PREMISES.md](./PROJECT_PREMISES.md)         | **Premisas de proyecto** (documentar todo · índice de premisas · repo público)           |
+| [AI_PLATFORM_SOLUTION.md](./AI_PLATFORM_SOLUTION.md) | Dictamen IA + estado F1/F2 · UI: Ayuda → Plataforma IA                                   |
+| [HELP.md](./HELP.md)                                 | Mapa Ayuda ↔ trackers ↔ docs (`HELP_CONTENT_AS_OF`)                                      |
+| [rfc/README.md](./rfc/README.md)                     | Constitución RFC-000…008 · fases código                                                  |
+| [API_REFERENCE.md](./API_REFERENCE.md)               | Endpoints HTTP                                                                           |
+| [ONBOARDING.md](./ONBOARDING.md)                     | Setup primer día                                                                         |
+| [domain-language.md](./domain-language.md)           | **Diccionario QROS** (Scientific / Trading / Infra · universos LAB/TRADING)              |
 
 ## Operación y producto
 
-| Documento | Contenido |
-|-----------|-----------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Capas, monorepo |
-| [DATA_MODEL.md](./DATA_MODEL.md) | Esquema BD |
-| [MARKET_DATA.md](./MARKET_DATA.md) | Yahoo / XTB |
-| [docker.md](./docker.md) | PostgreSQL (+ Ollama opcional aparte) |
-| [UI_PLATFORM.md](./UI_PLATFORM.md) | Shell / barra superior |
-| [UI_PREFS_LOCALSTORAGE.md](./UI_PREFS_LOCALSTORAGE.md) | **Premisa:** UI configurable → `localStorage` (por dispositivo/navegador) |
-| [WORKSPACE_PERSISTENCE.md](./WORKSPACE_PERSISTENCE.md) | Espacios: chip, gestor, arranque, capas |
-| [CHART_DATA_BAR.md](./CHART_DATA_BAR.md) | Barra de datos del gráfico |
-| [CHART_DRAWING_TAXONOMY.md](./CHART_DRAWING_TAXONOMY.md) | Barra de dibujos |
-| [CHART_INDICATORS.md](./CHART_INDICATORS.md) | Indicadores / paneles · catálogo unificado `IND-*` |
-| [CHART_RESPONSIVE.md](./CHART_RESPONSIVE.md) | Responsive del gráfico |
-| [BACKTESTING_DATA_ARCHITECTURE.md](./BACKTESTING_DATA_ARCHITECTURE.md) | Datos BT → IA |
-| [adr/011-quantitative-research-platform.md](./adr/011-quantitative-research-platform.md) | **QROS** — arquitectura (congelado v1.1) |
-| [adr/012-scientific-validation-knowledge-evolution.md](./adr/012-scientific-validation-knowledge-evolution.md) | **Leyes** científicas Evidence→Belief→Knowledge |
-| [adr/013-research-mathematics-statistical-foundations.md](./adr/013-research-mathematics-statistical-foundations.md) | **Matemáticas** research (Discovery Vector, \(V_r\), EIG) — v1.1 |
-| [adr/015-scientific-domain-vs-trading-domain.md](./adr/015-scientific-domain-vs-trading-domain.md) | **Scientific Domain ≠ Trading Domain** |
-| [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md) | **LAB ≠ TRADING** (universos UI; Cartera LAB) |
-| [adr/020-operating-mandate-tenure.md](./adr/020-operating-mandate-tenure.md) | **Mandato operativo** — tenure estrategia×instrumento (TRADING · M1b BD) |
-| [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md) | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual) |
-| [adr/022-estudio-daily-opinion-motor.md](./adr/022-estudio-daily-opinion-motor.md) | **Motor opinión diaria Estudio** — O3-C · D1–Canales cerrados · notificaciones UI · AUTO execute congelado |
-| [adr/024-estudio-supervision-universe.md](./adr/024-estudio-supervision-universe.md) | **Universo único Estudio** — Supervisión ON · 3 capas · sin auto-add gráfico |
-| [engineering/estudio-supervision-model-2026-08-06.md](./engineering/estudio-supervision-model-2026-08-06.md) | **Modelo supervisión** — cadencias vigilia/frescura/redesc. · unsubscribe |
-| [engineering/estudio-process-status-ui-2026-08-06.md](./engineering/estudio-process-status-ui-2026-08-06.md) | **UI procesos** — iconos · subtítulo · Actualizar / Redescubrir · OPERATIVA en barra |
-| [engineering/session-handoff-2026-08-06-estudio-supervision.md](./engineering/session-handoff-2026-08-06-estudio-supervision.md) | Handoff membresía + Supervisión ON |
-| [engineering/session-handoff-2026-08-06-estudio-process-ui.md](./engineering/session-handoff-2026-08-06-estudio-process-ui.md) | **Handoff** UI procesos + modos en barra (retomar agente) |
-| [engineering/visualizados-list-ux-2026-08-06.md](./engineering/visualizados-list-ux-2026-08-06.md) | **Visualizados** — pestañas · Por IO · columnas recomendación · foco lista |
-| [engineering/session-handoff-2026-08-06-visualizados-list-ux.md](./engineering/session-handoff-2026-08-06-visualizados-list-ux.md) | **Handoff** Visualizados / listas UX (retomar agente) |
-| [engineering/audit-resume-premises-2026-08-09.md](./engineering/audit-resume-premises-2026-08-09.md) | **Premisas de continuación** — auditoría APP (nuevo hilo) |
-| [engineering/dev-continuation-plan-2026-08-09.md](./engineering/dev-continuation-plan-2026-08-09.md) | **Plan de continuación 08-09** — estado + próximos pasos (P3/F4.8/F4.9) |
-| [engineering/general-audit-plan-2026-08-10.md](./engineering/general-audit-plan-2026-08-10.md) | **Auditoría general 08-10** — estructura + docs + plan por módulos |
-| [engineering/traspaso-m6-ai-analytics-2026-08-10.md](./engineering/traspaso-m6-ai-analytics-2026-08-10.md) | **Traspaso M6** — AI/analytics (py/ai + py/analytics) |
-| [engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md) | Triage round 3 (A0·N4·Deep) — O3-C ratificado · secuencia Op→Asesor→Canales |
-| [engineering/audit-pack-estudio-asesor-canales-2026-08-04.md](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md) | **Pack auditoría** Estudio→Operativa→Asesor→Canales (+ notif.) previo a AUTO |
-| [engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md) | Pack auditoría prep AUTO A0–A5 (flag off) |
-| [engineering/camino-d-auto-thaw-checklist-2026-08-04.md](./engineering/camino-d-auto-thaw-checklist-2026-08-04.md) | **Checklist thaw** Camino D / AUTO — sin flip `PAPER_D_EXECUTE` |
-| [engineering/camino-d-a2-a5-prep-2026-08-04.md](./engineering/camino-d-a2-a5-prep-2026-08-04.md) | Prep A2–A5 (Risk/idempotencia/kill/ADR-023) · flag off |
-| [adr/023-camino-d-thaw.md](./adr/023-camino-d-thaw.md) | ADR thaw Camino D — **Proposed** (evidencia pendiente) |
-| [engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md](./engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md) | **Triage institucional** Aud 1+2 (CTO/OR) — A0 + OR-lite; catálogo aparcado |
-| [engineering/risk-engine-or-re-2026-08-04.md](./engineering/risk-engine-or-re-2026-08-04.md) | **Risk Engine OR-RE v0** — `check_opening` · kill switch · Gate |
-| [engineering/asesor-ui-2026-08-04.md](./engineering/asesor-ui-2026-08-04.md) | Asesor (ex-Research) · Diario · Opiniones · canales · prefs notificaciones |
-| [engineering/daily-ops-report-brief-2026-08-04.md](./engineering/daily-ops-report-brief-2026-08-04.md) | Resumen operativo diario R1–R4 (web · HTML · PDF) |
-| [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md) | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa) |
-| [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md) | **Paquete auditoría** post-Q0–Q3 + freeze + evidencia smoke |
-| [engineering/engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md) | **Engineering Index** — padre único docs ingeniería (A0 H1) |
-| [engineering/bounded-contexts-2026-08-03.md](./engineering/bounded-contexts-2026-08-03.md) | **Bounded contexts** — dependencias permitidas / prohibidas |
-| [engineering/audit-ext-round2-triage-2026-08-03.md](./engineering/audit-ext-round2-triage-2026-08-03.md) | **Triage round 2** externas A0 · N4 · Deep (errata stack) |
-| [engineering/audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md) | **Respuesta auditoría 1** — gaps reales A/B (ingesta + FIE) vs stack Bolsa_V1 |
-| [engineering/audit2-response-backtests-lab-2026-08-03.md](./engineering/audit2-response-backtests-lab-2026-08-03.md) | **Respuesta auditoría 2** — Lab backtests UI (abort/schema/DD/telemetría) |
-| [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) | **Roadmap mejoras** post-auditorías (Q0–Q3 · horizonte TOP) |
-| [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) | **Freeze** post-Q3: C4 no · Belief no · flags ops off |
-| [engineering/belief-coach-brief-draft-2026-08-03.md](./engineering/belief-coach-brief-draft-2026-08-03.md) | **Futuro** Belief→Coach — brief B1–B8 (congelado; sin implementar) |
-| [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md) | **Biblioteca L0/L1** — Genéricas / Optimizadas / Mis estrategias + prompt |
-| [engineering/demo-operating-modes-brief-2026-08-03.md](./engineering/demo-operating-modes-brief-2026-08-03.md) | **DEMO MANUAL/SEMI/AUTO** — decisiones producto (libro operativo) |
-| [engineering/semi-demo-book-impl-slice1-2026-08-03.md](./engineering/semi-demo-book-impl-slice1-2026-08-03.md) | **SEMI slice 1** — impl + checklist prueba (GO 2026-08-03) |
-| [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md) | **Panel Operativa** — IO · Recomendación/Info · modos en barra/Cuentas |
-| [engineering/chart-top1-indicator-switch-2026-08-03.md](./engineering/chart-top1-indicator-switch-2026-08-03.md) | **Finalista #1** en gráfico — todos / este |
-| [engineering/session-handoff-2026-08-04-operativa.md](./engineering/session-handoff-2026-08-04-operativa.md) | **Handoff** Operativa / IO (2026-08-04) |
-| [engineering/session-handoff-2026-08-03-semi.md](./engineering/session-handoff-2026-08-03-semi.md) | **Handoff SEMI** — retomar sin olvidar |
-| [engineering/dev-logs.md](./engineering/dev-logs.md) | Logs locales `logs/` (no producto; sin README en carpeta) |
-| [engineering/code-documentation-standard-2026-08-03.md](./engineering/code-documentation-standard-2026-08-03.md) | **Docstrings** — política forward-only + lotes de cobertura |
-| [DEV_STARTUP.md](./DEV_STARTUP.md) | F5 / `pnpm dev` · puertos · doctor |
-| [engineering/stability-campaign-protocol-2026-08-02.md](./engineering/stability-campaign-protocol-2026-08-02.md) | Protocolo estabilidad multi-ventana (Q1.2/Q1.3) |
-| [adr/016-research-persistence-model.md](./adr/016-research-persistence-model.md) | **Persistencia** científica (tablas, \(K\), Fase 1) |
-| [adr/025-data-model-source-of-truth.md](./adr/025-data-model-source-of-truth.md) | **Fuente de verdad del modelo** — Prisma dueño del DDL · SQLAlchemy mapeo runtime · Alembic placeholder (M4 08-10) |
-| [adr/017-baseline-v1-5-research-observatory.md](./adr/017-baseline-v1-5-research-observatory.md) | **Baseline v1.5** — laboratorio observable (congelado) |
-| [engineering/research-lifecycle.md](./engineering/research-lifecycle.md) | **Flujo** operativo BT → trials → Observatory · embudo · paper |
-| [engineering/session-handoff-2026-08-01.md](./engineering/session-handoff-2026-08-01.md) | **Handoff** frescura v1.3 · FA · Composite v1.1 |
-| [engineering/session-handoff-2026-07-31.md](./engineering/session-handoff-2026-07-31.md) | Handoff cierre DÍA D v0.11 + CORE-R v1.8 |
-| [engineering/operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md) | Plan smoke UI DÍA D + CORE-R |
-| [engineering/backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md) | **Backtesting DÍA D** — as-of + replay (premisas; Modo A 2026-08-02) |
-| [engineering/dual-universes-lab-trading-design-2026-08-02.md](./engineering/dual-universes-lab-trading-design-2026-08-02.md) | **Dos universos** LAB vs TRADING — diseño UI/carteras/puente |
-| [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md) | **ADR-019** — LAB ≠ TRADING (producto) |
-| [engineering/backtesting-funnel-handoff-2026-07-29.md](./engineering/backtesting-funnel-handoff-2026-07-29.md) | Handoff embudo→Finalistas A/C + Monitor MVP (retomar) |
-| [HYBRID_TRACKERS.md](./HYBRID_TRACKERS.md) | Rastreadores híbridos |
-| [PERFORMANCE.md](./PERFORMANCE.md) | Rendimiento frontend |
-| [CONFIGURATION_MODEL.md](./CONFIGURATION_MODEL.md) | Modelo de configuración |
-| [LEGACY.md](./LEGACY.md) | TS legacy (stub → archive) |
+| Documento                                                                                                                                | Contenido                                                                                                          |
+| ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| [ARCHITECTURE.md](./ARCHITECTURE.md)                                                                                                     | Capas, monorepo                                                                                                    |
+| [DATA_MODEL.md](./DATA_MODEL.md)                                                                                                         | Esquema BD                                                                                                         |
+| [MARKET_DATA.md](./MARKET_DATA.md)                                                                                                       | Yahoo / XTB                                                                                                        |
+| [docker.md](./docker.md)                                                                                                                 | PostgreSQL (+ Ollama opcional aparte)                                                                              |
+| [UI_PLATFORM.md](./UI_PLATFORM.md)                                                                                                       | Shell / barra superior                                                                                             |
+| [UI_PREFS_LOCALSTORAGE.md](./UI_PREFS_LOCALSTORAGE.md)                                                                                   | **Premisa:** UI configurable → `localStorage` (por dispositivo/navegador)                                          |
+| [WORKSPACE_PERSISTENCE.md](./WORKSPACE_PERSISTENCE.md)                                                                                   | Espacios: chip, gestor, arranque, capas                                                                            |
+| [CHART_DATA_BAR.md](./CHART_DATA_BAR.md)                                                                                                 | Barra de datos del gráfico                                                                                         |
+| [CHART_DRAWING_TAXONOMY.md](./CHART_DRAWING_TAXONOMY.md)                                                                                 | Barra de dibujos                                                                                                   |
+| [CHART_INDICATORS.md](./CHART_INDICATORS.md)                                                                                             | Indicadores / paneles · catálogo unificado `IND-*`                                                                 |
+| [CHART_RESPONSIVE.md](./CHART_RESPONSIVE.md)                                                                                             | Responsive del gráfico                                                                                             |
+| [BACKTESTING_DATA_ARCHITECTURE.md](./BACKTESTING_DATA_ARCHITECTURE.md)                                                                   | Datos BT → IA                                                                                                      |
+| [adr/011-quantitative-research-platform.md](./adr/011-quantitative-research-platform.md)                                                 | **QROS** — arquitectura (congelado v1.1)                                                                           |
+| [adr/012-scientific-validation-knowledge-evolution.md](./adr/012-scientific-validation-knowledge-evolution.md)                           | **Leyes** científicas Evidence→Belief→Knowledge                                                                    |
+| [adr/013-research-mathematics-statistical-foundations.md](./adr/013-research-mathematics-statistical-foundations.md)                     | **Matemáticas** research (Discovery Vector, \(V_r\), EIG) — v1.1                                                   |
+| [adr/015-scientific-domain-vs-trading-domain.md](./adr/015-scientific-domain-vs-trading-domain.md)                                       | **Scientific Domain ≠ Trading Domain**                                                                             |
+| [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md)                                                   | **LAB ≠ TRADING** (universos UI; Cartera LAB)                                                                      |
+| [adr/020-operating-mandate-tenure.md](./adr/020-operating-mandate-tenure.md)                                                             | **Mandato operativo** — tenure estrategia×instrumento (TRADING · M1b BD)                                           |
+| [adr/021-dia-d-reconciliation.md](./adr/021-dia-d-reconciliation.md)                                                                     | **Reconciliación DÍA D** — F-hoy · F-D · V (SAME/DRIFT · contrafactual)                                            |
+| [adr/022-estudio-daily-opinion-motor.md](./adr/022-estudio-daily-opinion-motor.md)                                                       | **Motor opinión diaria Estudio** — O3-C · D1–Canales cerrados · notificaciones UI · AUTO execute congelado         |
+| [adr/024-estudio-supervision-universe.md](./adr/024-estudio-supervision-universe.md)                                                     | **Universo único Estudio** — Supervisión ON · 3 capas · sin auto-add gráfico                                       |
+| [engineering/estudio-supervision-model-2026-08-06.md](./engineering/estudio-supervision-model-2026-08-06.md)                             | **Modelo supervisión** — cadencias vigilia/frescura/redesc. · unsubscribe                                          |
+| [engineering/estudio-process-status-ui-2026-08-06.md](./engineering/estudio-process-status-ui-2026-08-06.md)                             | **UI procesos** — iconos · subtítulo · Actualizar / Redescubrir · OPERATIVA en barra                               |
+| [engineering/session-handoff-2026-08-06-estudio-supervision.md](./engineering/session-handoff-2026-08-06-estudio-supervision.md)         | Handoff membresía + Supervisión ON                                                                                 |
+| [engineering/session-handoff-2026-08-06-estudio-process-ui.md](./engineering/session-handoff-2026-08-06-estudio-process-ui.md)           | **Handoff** UI procesos + modos en barra (retomar agente)                                                          |
+| [engineering/visualizados-list-ux-2026-08-06.md](./engineering/visualizados-list-ux-2026-08-06.md)                                       | **Visualizados** — pestañas · Por IO · columnas recomendación · foco lista                                         |
+| [engineering/session-handoff-2026-08-06-visualizados-list-ux.md](./engineering/session-handoff-2026-08-06-visualizados-list-ux.md)       | **Handoff** Visualizados / listas UX (retomar agente)                                                              |
+| [engineering/audit-resume-premises-2026-08-09.md](./engineering/audit-resume-premises-2026-08-09.md)                                     | **Premisas de continuación** — auditoría APP (nuevo hilo)                                                          |
+| [engineering/dev-continuation-plan-2026-08-09.md](./engineering/dev-continuation-plan-2026-08-09.md)                                     | **Plan de continuación 08-09** — estado + próximos pasos (P3/F4.8/F4.9)                                            |
+| [engineering/general-audit-plan-2026-08-10.md](./engineering/general-audit-plan-2026-08-10.md)                                           | **Auditoría general 08-10** — estructura + docs + plan por módulos                                                 |
+| [engineering/traspaso-m6-ai-analytics-2026-08-10.md](./engineering/traspaso-m6-ai-analytics-2026-08-10.md)                               | **Traspaso M6** — AI/analytics (py/ai + py/analytics)                                                              |
+| [engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md](./engineering/audit-ext-round3-triage-estudio-motor-2026-08-04.md)     | Triage round 3 (A0·N4·Deep) — O3-C ratificado · secuencia Op→Asesor→Canales                                        |
+| [engineering/audit-pack-estudio-asesor-canales-2026-08-04.md](./engineering/audit-pack-estudio-asesor-canales-2026-08-04.md)             | **Pack auditoría** Estudio→Operativa→Asesor→Canales (+ notif.) previo a AUTO                                       |
+| [engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md](./engineering/audit-pack-pre-auto-a0-a5-2026-08-04.md)                             | Pack auditoría prep AUTO A0–A5 (flag off)                                                                          |
+| [engineering/camino-d-auto-thaw-checklist-2026-08-04.md](./engineering/camino-d-auto-thaw-checklist-2026-08-04.md)                       | **Checklist thaw** Camino D / AUTO — sin flip `PAPER_D_EXECUTE`                                                    |
+| [engineering/camino-d-a2-a5-prep-2026-08-04.md](./engineering/camino-d-a2-a5-prep-2026-08-04.md)                                         | Prep A2–A5 (Risk/idempotencia/kill/ADR-023) · flag off                                                             |
+| [adr/023-camino-d-thaw.md](./adr/023-camino-d-thaw.md)                                                                                   | ADR thaw Camino D — **Proposed** (evidencia pendiente)                                                             |
+| [engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md](./engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md) | **Triage institucional** Aud 1+2 (CTO/OR) — A0 + OR-lite; catálogo aparcado                                        |
+| [engineering/risk-engine-or-re-2026-08-04.md](./engineering/risk-engine-or-re-2026-08-04.md)                                             | **Risk Engine OR-RE v0** — `check_opening` · kill switch · Gate                                                    |
+| [engineering/asesor-ui-2026-08-04.md](./engineering/asesor-ui-2026-08-04.md)                                                             | Asesor (ex-Research) · Diario · Opiniones · canales · prefs notificaciones                                         |
+| [engineering/daily-ops-report-brief-2026-08-04.md](./engineering/daily-ops-report-brief-2026-08-04.md)                                   | Resumen operativo diario R1–R4 (web · HTML · PDF)                                                                  |
+| [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md)                     | **Auditoría cierre etapa** LAB/DÍA D/Mandato (checklist externa)                                                   |
+| [engineering/audit-pack-post-audits-2026-08-03.md](./engineering/audit-pack-post-audits-2026-08-03.md)                                   | **Paquete auditoría** post-Q0–Q3 + freeze + evidencia smoke                                                        |
+| [engineering/engineering-index-2026-08-03.md](./engineering/engineering-index-2026-08-03.md)                                             | **Engineering Index** — padre único docs ingeniería (A0 H1)                                                        |
+| [engineering/bounded-contexts-2026-08-03.md](./engineering/bounded-contexts-2026-08-03.md)                                               | **Bounded contexts** — dependencias permitidas / prohibidas                                                        |
+| [engineering/audit-ext-round2-triage-2026-08-03.md](./engineering/audit-ext-round2-triage-2026-08-03.md)                                 | **Triage round 2** externas A0 · N4 · Deep (errata stack)                                                          |
+| [engineering/audit1-response-ingest-fie-2026-08-03.md](./engineering/audit1-response-ingest-fie-2026-08-03.md)                           | **Respuesta auditoría 1** — gaps reales A/B (ingesta + FIE) vs stack Bolsa_V1                                      |
+| [engineering/audit2-response-backtests-lab-2026-08-03.md](./engineering/audit2-response-backtests-lab-2026-08-03.md)                     | **Respuesta auditoría 2** — Lab backtests UI (abort/schema/DD/telemetría)                                          |
+| [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md)                 | **Roadmap mejoras** post-auditorías (Q0–Q3 · horizonte TOP)                                                        |
+| [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md)                           | **Freeze** post-Q3: C4 no · Belief no · flags ops off                                                              |
+| [engineering/belief-coach-brief-draft-2026-08-03.md](./engineering/belief-coach-brief-draft-2026-08-03.md)                               | **Futuro** Belief→Coach — brief B1–B8 (congelado; sin implementar)                                                 |
+| [engineering/strategy-library-authoring-brief-2026-08-03.md](./engineering/strategy-library-authoring-brief-2026-08-03.md)               | **Biblioteca L0/L1** — Genéricas / Optimizadas / Mis estrategias + prompt                                          |
+| [engineering/demo-operating-modes-brief-2026-08-03.md](./engineering/demo-operating-modes-brief-2026-08-03.md)                           | **DEMO MANUAL/SEMI/AUTO** — decisiones producto (libro operativo)                                                  |
+| [engineering/semi-demo-book-impl-slice1-2026-08-03.md](./engineering/semi-demo-book-impl-slice1-2026-08-03.md)                           | **SEMI slice 1** — impl + checklist prueba (GO 2026-08-03)                                                         |
+| [engineering/trading-operativa-panel-2026-08-04.md](./engineering/trading-operativa-panel-2026-08-04.md)                                 | **Panel Operativa** — IO · Recomendación/Info · modos en barra/Cuentas                                             |
+| [engineering/chart-top1-indicator-switch-2026-08-03.md](./engineering/chart-top1-indicator-switch-2026-08-03.md)                         | **Finalista #1** en gráfico — todos / este                                                                         |
+| [engineering/session-handoff-2026-08-04-operativa.md](./engineering/session-handoff-2026-08-04-operativa.md)                             | **Handoff** Operativa / IO (2026-08-04)                                                                            |
+| [engineering/session-handoff-2026-08-03-semi.md](./engineering/session-handoff-2026-08-03-semi.md)                                       | **Handoff SEMI** — retomar sin olvidar                                                                             |
+| [engineering/dev-logs.md](./engineering/dev-logs.md)                                                                                     | Logs locales `logs/` (no producto; sin README en carpeta)                                                          |
+| [engineering/code-documentation-standard-2026-08-03.md](./engineering/code-documentation-standard-2026-08-03.md)                         | **Docstrings** — política forward-only + lotes de cobertura                                                        |
+| [DEV_STARTUP.md](./DEV_STARTUP.md)                                                                                                       | F5 / `pnpm dev` · puertos · doctor                                                                                 |
+| [engineering/stability-campaign-protocol-2026-08-02.md](./engineering/stability-campaign-protocol-2026-08-02.md)                         | Protocolo estabilidad multi-ventana (Q1.2/Q1.3)                                                                    |
+| [adr/016-research-persistence-model.md](./adr/016-research-persistence-model.md)                                                         | **Persistencia** científica (tablas, \(K\), Fase 1)                                                                |
+| [adr/025-data-model-source-of-truth.md](./adr/025-data-model-source-of-truth.md)                                                         | **Fuente de verdad del modelo** — Prisma dueño del DDL · SQLAlchemy mapeo runtime · Alembic placeholder (M4 08-10) |
+| [adr/017-baseline-v1-5-research-observatory.md](./adr/017-baseline-v1-5-research-observatory.md)                                         | **Baseline v1.5** — laboratorio observable (congelado)                                                             |
+| [engineering/research-lifecycle.md](./engineering/research-lifecycle.md)                                                                 | **Flujo** operativo BT → trials → Observatory · embudo · paper                                                     |
+| [engineering/session-handoff-2026-08-01.md](./engineering/session-handoff-2026-08-01.md)                                                 | **Handoff** frescura v1.3 · FA · Composite v1.1                                                                    |
+| [engineering/session-handoff-2026-07-31.md](./engineering/session-handoff-2026-07-31.md)                                                 | Handoff cierre DÍA D v0.11 + CORE-R v1.8                                                                           |
+| [engineering/operativa-test-plan-2026-07-31.md](./engineering/operativa-test-plan-2026-07-31.md)                                         | Plan smoke UI DÍA D + CORE-R                                                                                       |
+| [engineering/backtesting-dia-d-premises-2026-07-31.md](./engineering/backtesting-dia-d-premises-2026-07-31.md)                           | **Backtesting DÍA D** — as-of + replay (premisas; Modo A 2026-08-02)                                               |
+| [engineering/dual-universes-lab-trading-design-2026-08-02.md](./engineering/dual-universes-lab-trading-design-2026-08-02.md)             | **Dos universos** LAB vs TRADING — diseño UI/carteras/puente                                                       |
+| [adr/019-dual-universes-lab-vs-trading.md](./adr/019-dual-universes-lab-vs-trading.md)                                                   | **ADR-019** — LAB ≠ TRADING (producto)                                                                             |
+| [engineering/backtesting-funnel-handoff-2026-07-29.md](./engineering/backtesting-funnel-handoff-2026-07-29.md)                           | Handoff embudo→Finalistas A/C + Monitor MVP (retomar)                                                              |
+| [HYBRID_TRACKERS.md](./HYBRID_TRACKERS.md)                                                                                               | Rastreadores híbridos                                                                                              |
+| [PERFORMANCE.md](./PERFORMANCE.md)                                                                                                       | Rendimiento frontend                                                                                               |
+| [CONFIGURATION_MODEL.md](./CONFIGURATION_MODEL.md)                                                                                       | Modelo de configuración                                                                                            |
+| [LEGACY.md](./LEGACY.md)                                                                                                                 | TS legacy (stub → archive)                                                                                         |
 
 ## ADRs y arquitectura
 
-| Documento | Tema |
-|-----------|------|
-| [adr/](./adr/) | Architecture Decision Records |
-| [architecture/investment-platform.md](./architecture/investment-platform.md) | Spec inversión |
-| [architecture/_snapshots/](./architecture/_snapshots/) | Snapshots pre-fase |
+| Documento                                                                    | Tema                          |
+| ---------------------------------------------------------------------------- | ----------------------------- |
+| [adr/](./adr/)                                                               | Architecture Decision Records |
+| [architecture/investment-platform.md](./architecture/investment-platform.md) | Spec inversión                |
+| [architecture/\_snapshots/](./architecture/_snapshots/)                      | Snapshots pre-fase            |
 
 ## Arranque rápido
 

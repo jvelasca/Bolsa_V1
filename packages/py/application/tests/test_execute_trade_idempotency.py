@@ -948,3 +948,102 @@ async def test_confirm_apertura_sin_summary_no_aplica_cesta() -> None:
 
     assert len(fake_trade.calls) == 1
     assert result["trade"]["status"] == "executed"
+
+
+def _sector_gap_summary() -> _FakePortfolioSummary:
+    """Cesta tech al 29% (bajo el 30% moderate). El fill nuevo (2%) solo veta
+    si entra en tech; si cae a `<unknown>` el sector se queda en 29% y ALLOW.
+    """
+    return _FakePortfolioSummary(
+        positions=[
+            _FakePosition("t1", 22.0, "tech"),
+            _FakePosition("t2", 22.0, "tech"),
+            _FakePosition("t3", 14.0, "tech"),
+            _FakePosition("h1", 20.0, "health"),
+            _FakePosition("e1", 20.0, "energy"),
+            _FakePosition("c1", 10.0, "cons"),
+        ],
+        total_equity=200.0,
+    )
+
+
+class _FakeInstrument:
+    def __init__(self, instrument_id: str, sector: str | None) -> None:
+        self.id = instrument_id
+        self.sector = sector
+
+
+class _FakeInstruments:
+    """Lookup mínimo `get_by_id` (H1) — mismo contrato que InstrumentSectorLookup."""
+
+    def __init__(self, by_id: dict[str, _FakeInstrument]) -> None:
+        self._by_id = by_id
+
+    async def get_by_id(self, instrument_id: str) -> _FakeInstrument | None:
+        return self._by_id.get(instrument_id)
+
+
+class _RaisingPortfolioSummary:
+    """H2 — GetPortfolioSummary inyectado que lanza (indisponibilidad)."""
+
+    async def execute(self, account_id: str | None = None, portfolio_id: str | None = None):
+        raise RuntimeError("portfolio summary unavailable")
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_sector_propuesto_veto_como_auto() -> None:
+    """H1 — proposal_sector desde instruments.sector: fill tech sobre cesta 29% → veto.
+
+    Sin este lookup el notional nuevo cae a `<unknown>` y MaxSectorExposure no
+    cuenta el overlap (gap vs AUTO `hit.sector`).
+    """
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_sector_gap_summary(),  # type: ignore[arg-type]
+        instruments=_FakeInstruments({"inst-new": _FakeInstrument("inst-new", "tech")}),
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-H1",
+            "instrumentId": "inst-new",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
+    assert result["intent"]["status"] == "rejected_by_gate"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_summary_falla_fail_closed() -> None:
+    """H2 / D1 — summary inyectado que lanza → risk_veto; no hay override por error."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_RaisingPortfolioSummary(),  # type: ignore[arg-type]
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-H2",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
+    assert result["intent"]["status"] == "rejected_by_gate"

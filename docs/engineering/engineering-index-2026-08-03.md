@@ -26,6 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-24** (stack, spine, JWT vivo, Alembic, limitaciones)
 │   ├── PROJECT_PREMISES.md
 │   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)**
 │   ├── rfc/*  (constitución)
@@ -71,6 +72,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-relevo-f0-5b-cierre-apertura-f0-6-2026-08-24.md ← relevo histórico · **F0.5b PortfolioFit v1 CERRADA** (`3670a09`) · F0.6 (Daily vista) abierta
 │   ├── fase0-decision-spine-implementacion-plan-2026-08-24.md ← **PLAN CÓDIGO F0.5/F0.6** (Fit + Daily vista) · **F0.5 CERRADA** · **F0.6 Decision Board COMPLETA** (backend `8df8a65` + UI `672e88f`)
 │   ├── fase0-decision-spine-asis-2026-08-24.md ← **F0.1 AS-IS Decision Spine** (inventario file:line, cero código) · HEAD `f69a7b0`
+│   ├── decision-spine-cadena-2026-08-24.md ← **mapa file:line Runtime→Package→Gate→confirm/router→fill** + matriz DS-01..11 / Golden · suite `pnpm test:decision-spine`
 │   ├── traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md ← relevo histórico post B12 · Track B split CERRADO
 │   ├── traspaso-relevo-track-b-b11-apertura-b12-2026-08-23.md ← relevo histórico post B11 · apertura B12 thin shell (código B12 `3f9bd7e`)
 │   ├── traspaso-relevo-track-b-b10-apertura-b11-2026-08-23.md ← relevo histórico post B10 · apertura B11 JSX tab `jobs` (código B11 `50649a3`)
@@ -177,6 +179,7 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 10. **Triage institucional pre-AUTO (Aud 1+2):** [audit-ext-institutional-pre-auto-triage-2026-08-04.md](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)
 11. **Risk Engine OR-RE v0:** [risk-engine-or-re-2026-08-04.md](./risk-engine-or-re-2026-08-04.md)
 12. **Fase 0 Decision Spine — F0.1 AS-IS:** [fase0-decision-spine-asis-2026-08-24.md](./fase0-decision-spine-asis-2026-08-24.md) — inventario file:line; cero código
+    12b. **Decision Spine cadena (probar, no reescribir):** [decision-spine-cadena-2026-08-24.md](./decision-spine-cadena-2026-08-24.md) · SoT corto [CURRENT_SYSTEM.md](../CURRENT_SYSTEM.md) · `pnpm test:decision-spine`
 13. **OR-lite + Repro+ + Obs/CI:** [or-lite-repro-obs-2026-08-04.md](./or-lite-repro-obs-2026-08-04.md)
 14. **Prep A2–A5 (flag off):** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed
 15. **Pack auditoría prep AUTO:** [audit-pack-pre-auto-a0-a5-2026-08-04.md](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — SEMI OK · execute AUTO **no**

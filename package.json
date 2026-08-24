@@ -49,6 +49,7 @@
     "test:operativa:smoke": "python scripts/research/verify_dia_d_api_smoke.py",
     "test:semi": "node scripts/research/verify_semi_demo_battery.mjs",
     "test:semi:smoke": "python scripts/research/verify_semi_demo_api_smoke.py",
+    "test:decision-spine": "node scripts/research/verify_decision_spine_battery.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
     "prepare": "husky"

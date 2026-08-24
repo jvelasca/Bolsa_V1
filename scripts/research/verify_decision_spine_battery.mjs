@@ -1,0 +1,64 @@
+#!/usr/bin/env node
+/**
+ * Battery: Decision Spine (Runtime → Package → Gate/Fit → confirm SEMI / router AUTO).
+ *
+ * Usage (repo root):
+ *   pnpm test:decision-spine
+ *   node scripts/research/verify_decision_spine_battery.mjs
+ *
+ * Sin API live. `pnpm test:semi` cubre UI/libro DEMO, no esta columna.
+ *
+ * Docs: docs/engineering/decision-spine-cadena-2026-08-24.md
+ *       docs/CURRENT_SYSTEM.md
+ */
+
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const isWin = process.platform === 'win32';
+
+function run(label, command, args, env = {}) {
+  console.log(`\n── ${label} ──`);
+  console.log(`$ ${command} ${args.join(' ')}`);
+  const result = spawnSync(command, args, {
+    cwd: root,
+    stdio: 'inherit',
+    env: { ...process.env, ...env },
+    shell: isWin,
+  });
+  const code = result.status ?? 1;
+  if (code !== 0) {
+    console.error(`\n✗ FAIL: ${label} (exit ${code})`);
+    return false;
+  }
+  console.log(`✓ OK: ${label}`);
+  return true;
+}
+
+const pyTests = [
+  'packages/py/application/tests/test_decision_spine.py',
+  'packages/py/application/tests/test_golden_decision_scenario.py',
+  'packages/py/application/tests/test_execute_trade_idempotency.py',
+  'packages/py/application/tests/test_risk_engine.py',
+  'packages/py/application/tests/test_risk_engine_portfolio_fit.py',
+  'packages/py/application/tests/test_execution_router.py',
+];
+
+console.log('Bolsa V1 — Decision Spine battery');
+console.log(`root: ${root}`);
+
+const ok = run('1/1 pytest Decision Spine (sin API live)', 'python', [
+  '-m',
+  'pytest',
+  ...pyTests,
+  '-q',
+]);
+
+if (!ok) {
+  console.error('\nDecision Spine battery FAILED');
+  process.exit(1);
+}
+console.log('\nDecision Spine battery OK');
+console.log('Mapa: docs/engineering/decision-spine-cadena-2026-08-24.md');
