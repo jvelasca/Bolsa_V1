@@ -1,8 +1,8 @@
 # Plan — Ciclo 4.3 `ARMED` (refina ladder post-EntrySetup)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §1 SETUP · §6 (`ARMED` / Wyckoff formal = 4.3+) · relevo [`traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md`](./traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md) · ancla en [`plan-ciclo-42-entrysetup-2026-08-25.md`](./plan-ciclo-42-entrysetup-2026-08-25.md) (D4 difería `ARMED`).
-> **AsOf:** 2026-08-25 · HEAD base **`07d1fab`**; feat **`4eb99a2`**.
-> **Estado:** **CERRADO** en `4eb99a2` (D1–D7 OK · batería **84**). Docs stamp + push pendiente.
+> **AsOf:** 2026-08-25 · HEAD **`4fc864b`** = `origin/main`; feat **`4eb99a2`**.
+> **Estado:** **CERRADO en origin** (`4eb99a2` vía `4fc864b`). D1–D7 OK · batería **84**.
 > **Método:** rebanada fina; SETUP sigue ≠ motor paralelo; Ranking ≠ BUY; sin `contract:gen`; sin LLM.
 
 ---

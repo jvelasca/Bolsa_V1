@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. Feat Ciclo 4.3 **`4eb99a2`** · stamp **`f02429b`** (ahead of origin). Relevo vivo: [`traspaso-relevo-ciclo-43-armed-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-43-armed-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`4fc864b`** = `origin/main` (Ciclo 4.3 `4eb99a2`). Relevo vivo: [`traspaso-relevo-ciclo-43-armed-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-43-armed-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
