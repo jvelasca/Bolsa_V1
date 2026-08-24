@@ -1408,6 +1408,34 @@ export const api = {
       }),
     ),
 
+  /** F3 — Decision Journal (solo lectura): audit trail append-only del spine. */
+  getDecisionJournal: (
+    accountId: string,
+    opts?: {
+      instrumentId?: string;
+      since?: string;
+      eventType?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) =>
+    call<{
+      data: {
+        accountId: string;
+        entries: import("@bolsa/shared").DecisionJournalEntryV1[];
+        limit: number;
+        offset: number;
+        total: number;
+      };
+    }>(() =>
+      client.GET("/api/accounts/{account_id}/decision-journal", {
+        params: {
+          path: { account_id: accountId },
+          query: opts,
+        },
+      }),
+    ),
+
   getAccountLedger: (accountId: string, limit = 50, offset = 0) =>
     call<{ data: import("@bolsa/shared").LedgerEntryDto[] }>(() =>
       client.GET("/api/accounts/{account_id}/ledger", {

@@ -272,6 +272,7 @@ const HERRAMIENTAS_NAV = [
   { to: "/alerts", label: "Alertas", icon: Bell },
   { to: "/instruments", label: "Instrumentos", icon: BookOpen },
   { to: "/decision-board", label: "Decision Board", icon: Gauge },
+  { to: "/decision-journal", label: "Decision Journal", icon: BookMarked },
 ] as const;
 
 const LIBRO_MENU: MenuItem[] = LIBRO_NAV.items.map((item) => ({
