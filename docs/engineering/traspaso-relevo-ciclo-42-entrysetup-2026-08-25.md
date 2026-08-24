@@ -28,7 +28,8 @@
 | SHA       | Mensaje                                                         |
 | --------- | --------------------------------------------------------------- |
 | `a7eeaee` | feat(spine): ADR-031 Ciclo 4.2 EntrySetup refining entry_ready. |
-| (stamp)   | docs post-commit si aplica en este handoff                      |
+| `18318a9` | docs: stamp living SoT after Ciclo 4.2 (`a7eeaee`).             |
+| `59d1bb8` | docs: point engineering index at Ciclo 4.2 relevo.              |
 
 ## 4. Siguiente (E1) — chat nuevo
 
