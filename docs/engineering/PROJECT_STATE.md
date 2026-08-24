@@ -1,7 +1,7 @@
 # PROJECT_STATE — Estado vivo del proyecto (fuente única de continuación)
 
 > **Propósito:** Punto de ENTRADA y SALIDA de cada chat/agente/relevo. Es el "único padre" del estado actual, según audit externa 2026-08-19 (evitar _documentation archaeology_).
-> **AsOf:** 2026-08-24 · **Fuente de coordinación:** `origin/main` = **`5100d23`** + working tree **DS-03**. Código U0–U5 `04e441e` · U6 `9e9a346` · DS-05 `15e86a4`. Tag **`v1.6.0-beta` → `c3964fc`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`**. **R-13 CERRADA** · **R-12 CERRADA** · **UX mesa U0–U6 CERRADA** · **spine DS-05 CERRADA** · **spine DS-03 CERRADA (working tree)** · **higiene dev CERRADA** (dato local `bolsa_v1`) · **ops propietario CERRADA** · **ciclo U6→DS-05→ops CERRADO** · **siguiente = Research→Radar** (secuencia pactada). Track B producto **BLOQUEADO**. R-7..R-11 cerradas.
+> **AsOf:** 2026-08-24 · **Fuente de coordinación:** HEAD **`ea9a985`** (post DS-03 + higiene) + working tree Research→Radar copy + stamp tag v1.7.0-beta. Código U0–U5 `04e441e` · U6 `9e9a346` · DS-05 `15e86a4` · DS-03 `41adb8e` · ops `5100d23`. Tag **`v1.7.0-beta`** (stamp preparado; **tag git pendiente coordinador**) · tag **`v1.6.0-beta` → `c3964fc`** · tag **`v1.5.0-beta` → `5e52bd6`** · tag **`v1.3.0` → `b778292`**. **R-13 CERRADA** · **Track B split CERRADO** · **Fase 0 spine COMPLETA** · **UX mesa U0–U6 CERRADA** · **DS-05/DS-03 CERRADAS** · **ops propietario CERRADA** · **higiene dev CERRADA** · **Research→Radar copy CERRADA** · **ciclo beta slice CERRADO** · **siguiente = idle / decisión de ciclo**. R-7..R-11 cerradas.
 > **PACK de estado global (auditoría externa / post-ciclo U6+DS-05+ops):** [`audit-pack-estado-global-2026-08-24c.md`](./audit-pack-estado-global-2026-08-24c.md) · histórico: [`audit-pack-estado-global-2026-08-24b.md`](./audit-pack-estado-global-2026-08-24b.md) · [`audit-pack-estado-global-2026-08-24.md`](./audit-pack-estado-global-2026-08-24.md) · [`audit-pack-estado-global-2026-08-22.md`](./audit-pack-estado-global-2026-08-22.md) · R-1→R-8: [`audit-pack-estado-global-2026-08-20.md`](./audit-pack-estado-global-2026-08-20.md).
 > **Base de referencia (checkpoint):** rama `stage/f1-integridad-financiera-2026-08-11` · commit `4ec0520` (merge PR #53 → openapi-fetch). Árbol limpio en el momento de redactar.
 > **Padre documental:** [Engineering Index](./engineering-index-2026-08-03.md) (este doc es un nodo de estado, no una nueva raíz).
@@ -140,16 +140,17 @@ Plan original de hardening pactado 2026-08-11 (fases F1–F5a). Estado MERGEADO 
 
 ---
 
-## 2b. Unificación Research → Radar (DRAFT / APARCADO — pista documental CERRADA)
+## 2b. Unificación Research → Radar — copy CERRADA (F4′–F6′ + slice 2026-08-24)
 
-> Plan director vivo (read-only, **draft**): `docs/engineering/plan-unificacion-research-radar-2026-08-21.md`. Planifica «Unificación Research→Radar»: reunificar el embudo científico `/research` y operativo `/screeners`/Radar reutilizando el puente B0 ya implementado (**sin features nuevas**). Estado: **APARCADO / DRAFT — pendiente de decisión explícita del propietario para abrir fases de código (E1).** Pista documental F1–F3 **CERRADA** (2026-08-22).
+> Plan director (read-only): `docs/engineering/plan-unificacion-research-radar-2026-08-21.md`. **Dos hubs separados** (Asesor `/research` científico · Señales `/screeners` operativo); unificación = **puente/copy/routing**, no fusión de páginas (D3 Lab/Radar fuera spine).
 
-- **Fase 1 ✅ CERRADA (2026-08-21, `b7af24b` plan + `5276d47` cierre).** Trazado e inyección del **mapa de consumidores B0** de `promote-finalist-to-tracker.ts` (§2.2 del plan) + JSDoc `@see` de trazabilidad en el doc-comment de módulo de `use-activate-instrument-tracking.ts` (:4) e `instruments-page.tsx` (:7). Cero cambios de comportamiento.
+- **Fase 1 ✅ CERRADA (2026-08-21, `b7af24b` plan + `5276d47` cierre).** Mapa consumidores B0 + JSDoc trazabilidad.
 - **Fase 2 ✅ CERRADA (2026-08-21; re-audit post-R12 en F4′).** Nav `SEÑALES_LABEL` (`daily-nav.ts:13`). Hub interno alineado en F4′ (`240c846`).
 - **Fase 3 ✅ CERRADA (docs-only, `49ecbcd` + sellado `b2ee0f2`).** Pista documental registrada.
 - **F4′–F6′ ✅ CERRADAS (2026-08-23, `240c846`).** Copy hub `/screeners` + toasts B0 + tests `screenersHrefAfterTrackerCreate`. Batería web 754/754.
+- **Slice producto copy ✅ CERRADA (2026-08-24, working tree sin commit).** CTAs «Ver en Research»/«Ledger Research» → **Asesor**; helpers `ASESOR_PATH`/`asesorHistoryHref`; cross-links Asesor↔Señales en hubs; nav menú Asesor usa `ASESOR_PATH`. Sin cambio API/rutas backend. Batería: `daily-nav.test.ts` 8/8.
 
-> **Estado general:** HEAD **`5100d23`** (`origin/main`) + **DS-03 mandate** en working tree (sin commit). Tag **`v1.6.0-beta` → `c3964fc`**. **Fase 0 Decision Spine — COMPLETA** · **DS-05 CERRADA** (`15e86a4`) · **DS-03 CERRADA** (working tree: Account Mandate Gate en `check_opening`, tenure BD) · **higiene dev CERRADA** (2026-08-24: R-12 A6 re-verify 0/0 + 3 R8C orphans en `bolsa_v1` local; verify EXIT 0) · **ops propietario CERRADA** (`5100d23`). Batería `pnpm test:decision-spine` **53**. Relevo: `traspaso-relevo-higiene-dev-cierre-apertura-research-radar-2026-08-24.md`. **Siguiente: Research→Radar** (secuencia pactada DS-03 → higiene → Research→Radar → tag beta).
+> **Estado general:** HEAD **`ea9a985`** (post higiene docs) + **Research→Radar** working tree (sin commit). Tag **`v1.6.0-beta` → `c3964fc`**. **Siguiente = tag v1.7.0-beta** (secuencia pactada). Relevo: `traspaso-relevo-research-radar-cierre-apertura-tag-beta-2026-08-24.md`.
 
 > **Spine DS-03 CERRADA (2026-08-24, working tree):** Account Mandate Gate fail-closed en `check_opening`. SEMI: `mandates.get_open_mandate_for_instrument` · AUTO: mismo + mismatch `signal.strategy_definition_id`. Fuente: `mandate_tenures` (ADR-020 M1b, sync cliente). Exits fuera. Sin `contract:gen` · sin H3 change · sin OrderProposal. Batería **53** passed.
 
