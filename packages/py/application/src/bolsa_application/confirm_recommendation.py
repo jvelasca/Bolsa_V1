@@ -12,8 +12,49 @@ from bolsa_analytics.cognitive.decision_session import (
 )
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.recommendation import Recommendation
-from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+
+from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
+
+
+def resolve_session_decision_package(
+    session_record: DecisionSessionRecord | None,
+) -> dict[str, Any] | None:
+    """Extrae el DecisionPackage de una sesión `propose` persistida, si existe.
+
+    El paquete completo (action/instrumentId/decisionId) vive solo en
+    `payload["runtime"]["decisionPackage"]` de la sesión `propose`. Las sesiones
+    `confirm`/`paper_auto`/`live_dry_run` (build_auto_session) no llevan `runtime`,
+    por lo que devuelven None. Retorna None si la sesión no existe o no tiene paquete.
+    """
+    if session_record is None or not session_record.payload:
+        return None
+    runtime = session_record.payload.get("runtime") or {}
+    pkg = runtime.get("decisionPackage")
+    return pkg if isinstance(pkg, dict) else None
+
+
+def _intent_side_matches_package_side(intent_side: str, package_action: str | None) -> bool:
+    """¿La dirección del intent es coherente con la `action` del DecisionPackage?"""
+    if package_action == "recommend_long":
+        return intent_side == "buy"
+    if package_action in {"recommend_short", "exit_hint", "reduce"}:
+        return intent_side == "sell"
+    # wait / desconocida: la tesis no abre posición en esa dirección.
+    return False
+
+
+def _identity_reconciles(intent: Any, package: dict[str, Any]) -> bool:
+    """El intent respeta la identidad de la tesis del DecisionPackage.
+
+    Solo se concilia la identidad (dirección + instrumento). El sizing/notional
+    NO se concilia: `suggested_quantity`/`suggested_price` son decisión operativa
+    del humano, externos al paquete (edición legítima en el front).
+    """
+    if not _intent_side_matches_package_side(intent.side, package.get("action")):
+        return False
+    pkg_instrument = package.get("instrumentId")
+    return pkg_instrument is None or pkg_instrument == intent.instrument_id
 
 
 class ConfirmRecommendationIntent:
@@ -60,10 +101,23 @@ class ConfirmRecommendationIntent:
         )
         intent = intent_from_recommendation(rec, account_id=account_id, authorized_by="human")
         result: dict[str, Any] = {
-            "intent": intent.to_dict(),
+            "intent": {**intent.to_dict(), "contract": "absent"},
             "trade": None,
             "decisionSession": None,
         }
+
+        # D2 — DecisionPackage como contrato (fuente de verdad = sesión `propose`).
+        # Se verifica cuando la sesión persistida expone el paquete; si no hay
+        # sesión/paquete (persist best-effort u orphan), no se bloquea el flujo pero
+        # se marca la ausencia de contrato para visibilidad.
+        contract_status: str = "absent"
+        package: dict[str, Any] | None = None
+        if self._store is not None and session_id:
+            session_record = await self._store.get_decision_session(session_id)
+            package = resolve_session_decision_package(session_record)
+            if package is not None:
+                contract_status = "present_verified"
+        result["intent"]["contract"] = contract_status
 
         if execute and intent.side in {"buy", "sell"} and intent.quantity > 0:
             price = float(rec.suggested_price or 0)
@@ -71,6 +125,19 @@ class ConfirmRecommendationIntent:
                 result["trade"] = {
                     "status": "skipped",
                     "reason": "suggestedPrice requerido para ejecutar",
+                }
+            elif package is not None and not _identity_reconciles(intent, package):
+                # La identidad de la tesis debe coincidir con el contrato de la sesión.
+                result["trade"] = {
+                    "status": "rejected_by_gate",
+                    "reason": "decision_package_conflict",
+                }
+                # El intent debe reflejar el rechazo para que la UI no trate el
+                # ítem como ejecutado/aprobado y lo retire de la cola.
+                result["intent"] = {
+                    **intent.to_dict(),
+                    "status": "rejected_by_gate",
+                    "contract": contract_status,
                 }
             elif self._execute_trade is None:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
@@ -97,10 +164,18 @@ class ConfirmRecommendationIntent:
                         "transactionId": getattr(trade, "transaction_id", None)
                         or getattr(getattr(trade, "transaction", None), "id", None),
                     }
-                    result["intent"] = {**intent.to_dict(), "status": "executed"}
+                    result["intent"] = {
+                        **intent.to_dict(),
+                        "status": "executed",
+                        "contract": contract_status,
+                    }
                 except Exception as exc:  # noqa: BLE001
                     result["trade"] = {"status": "error", "reason": str(exc)}
-                    result["intent"] = {**intent.to_dict(), "status": "rejected_by_gate"}
+                    result["intent"] = {
+                        **intent.to_dict(),
+                        "status": "rejected_by_gate",
+                        "contract": contract_status,
+                    }
 
         execution = {
             "intent": result["intent"],

@@ -14,11 +14,12 @@ pasaban clave). También se verifica aquí el reenvío de esa clave en ConfirmRe
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import pytest
-
 from bolsa_application.accounts import ExecuteTrade
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     TradeResult,
@@ -441,3 +442,208 @@ async def test_confirm_recommendation_forwards_decision_id_as_idempotency_key() 
 
     assert len(fake_trade.calls) == 1
     assert fake_trade.calls[0]["idempotency_key"] == "DEC-123"
+
+
+class _FakeCognitiveStore:
+    """Store en memoria para ConfirmRecommendationIntent (solo get/update)."""
+
+    def __init__(self, session: Any | None = None) -> None:
+        self._session = session
+        self.updated: list[Any] = []
+
+    async def get_decision_session(self, session_id: str) -> Any | None:
+        return self._session
+
+    async def update_decision_session(self, record: Any) -> Any:
+        self.updated.append(record)
+        return record
+
+    async def append_decision_session(self, record: Any) -> Any:
+        return record
+
+
+def _session_record_with_package(
+    *,
+    decision_id: str,
+    instrument_id: str,
+    action: str,
+) -> DecisionSessionRecord:
+    """Sesión `propose` persistida con runtime.decisionPackage."""
+    return DecisionSessionRecord(
+        id="DSS-1",
+        kind="propose",
+        status="open",
+        instrument_id=instrument_id,
+        created_at="2026-08-24T00:00:00Z",
+        decision_id=decision_id,
+        payload={
+            "decisionId": decision_id,
+            "runtime": {
+                "decisionPackage": {
+                    "decisionId": decision_id,
+                    "instrumentId": instrument_id,
+                    "action": action,
+                }
+            },
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_confirm_with_matching_package_executes() -> None:
+    """Package de la sesión coherente con el intent → el trade se ejecuta y contrato=present."""
+    fake_trade = _FakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            action="recommend_long",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-1",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 5.0,
+            "suggestedPrice": 12.0,
+        },
+        account_id="acc-1",
+        execute=True,
+        session_id="DSS-1",
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["intent"]["contract"] == "present_verified"
+    assert result["trade"]["status"] == "executed"
+
+
+@pytest.mark.asyncio
+async def test_confirm_with_conflicting_action_rejected() -> None:
+    """El package de la sesión abre `sell` pero el intent pide `buy` → fail-closed."""
+    fake_trade = _FakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            action="recommend_short",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-1",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 5.0,
+            "suggestedPrice": 12.0,
+        },
+        account_id="acc-1",
+        execute=True,
+        session_id="DSS-1",
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "decision_package_conflict"
+    assert result["intent"]["status"] == "rejected_by_gate"
+
+
+@pytest.mark.asyncio
+async def test_confirm_with_conflicting_instrument_rejected() -> None:
+    """El package de la sesión es para otro instrumento → fail-closed."""
+    fake_trade = _FakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-1",
+            instrument_id="inst-999",
+            action="recommend_long",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-1",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 5.0,
+            "suggestedPrice": 12.0,
+        },
+        account_id="acc-1",
+        execute=True,
+        session_id="DSS-1",
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "decision_package_conflict"
+
+
+@pytest.mark.asyncio
+async def test_confirm_without_session_executes_with_contract_absent() -> None:
+    """Sin sesión/package (orphan) → el trade NO se bloquea; contrato=absent (visibilidad)."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-123",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 5.0,
+            "suggestedPrice": 12.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["intent"]["contract"] == "absent"
+    assert result["trade"]["status"] == "executed"
+
+
+@pytest.mark.asyncio
+async def test_confirm_with_edited_sizing_and_matching_package_executes() -> None:
+    """El sizing editado por el humano NO se concilia: trade ejecuta si identidad coincide."""
+    fake_trade = _FakeExecuteTrade()
+    store = _FakeCognitiveStore(
+        _session_record_with_package(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            action="recommend_long",
+        )
+    )
+    use_case = ConfirmRecommendationIntent(
+        cognitive_store=store,  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-1",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 99.0,  # tamaño editado, ajeno al paquete
+            "suggestedPrice": 7.5,
+        },
+        account_id="acc-1",
+        execute=True,
+        session_id="DSS-1",
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert fake_trade.calls[0]["quantity"] == 99.0
+    assert result["trade"]["status"] == "executed"
