@@ -70,9 +70,7 @@ def compliance_fit_ok(compliance_check: object) -> bool:
     Propose no re-ejecuta cesta: un veto de Fit ya materializado en el package
     marca el plan BLOCKED; ausencia o forma rara no inventa un fail.
     """
-    return not (
-        isinstance(compliance_check, dict) and compliance_check.get("passed") is False
-    )
+    return not (isinstance(compliance_check, dict) and compliance_check.get("passed") is False)
 
 
 # Ciclo 4.0 — stop estructural.
@@ -82,11 +80,14 @@ SWING_LOOKBACK = 10
 # Ciclo 4.1 — Golden G: no nuevos longs en régimen adverso (TradePlan only).
 NO_NEW_LONGS_REGIMES = frozenset({"risk_off", "crisis"})
 
-# Ciclo 4.2 — EntrySetup (refina entry_ready; sin ARMED).
+# Ciclo 4.2 — EntrySetup (refina entry_ready).
 BREAKOUT_LOOKBACK = 20
 PULLBACK_ATR_BAND = 1.0
 WYCKOFF_SPRING = 5
 WYCKOFF_PRIOR = 10
+
+# Ciclo 4.3 — ARMED actionability (entre WATCH entry 0.4 y TRIGGERED ~0.95).
+ARMED_ACTIONABILITY = 0.7
 
 
 def no_new_longs_blocks(*, action: str, market_regime: str | None) -> bool:
@@ -293,9 +294,7 @@ def build_v0_trade_plan_dict(
     Sin ATR/barras/bias (rebuild confirm) → ``WATCH`` / ``no_stop`` o ``entry``.
     Sin ``market_regime`` → no inventa veto ``regime`` (Ciclo 4.1 D6).
     """
-    structural_stop = compute_structural_stop(
-        action=action, entry=entry, atr=atr, bars=bars
-    )
+    structural_stop = compute_structural_stop(action=action, entry=entry, atr=atr, bars=bars)
     setup = classify_entry_setup(action=action, bars=bars, atr=atr)
     plan = build_trade_plan(
         decision_id=decision_id,
@@ -369,7 +368,8 @@ def build_trade_plan(
     """Mapper determinista DecisionPackage + gates → TradePlan v0.
 
     Golden A: entry_ready + stop válido + gates OK → TRIGGERED.
-    Golden B: calidad alta pero entry_ready False → WATCH.
+    Golden B: stop OK + setup none + !entry_ready → WATCH entry.
+    Ciclo 4.3: stop OK + setup ≠ none + !entry_ready → ARMED.
     Golden C: fit_ok False → BLOCKED.
     Golden G: long + risk_off/crisis → BLOCKED (why regime).
     Golden H: expired → EXPIRED.
@@ -460,6 +460,15 @@ def build_trade_plan(
 
     if not entry_ready:
         why.append("entry")
+        # Ciclo 4.3: stop + setup clasificado sin fuego → ARMED; setup none → WATCH.
+        if entry_setup != "none":
+            return _mk(
+                status="ARMED",
+                quantity=0.0,
+                why_not=tuple(why),
+                execution_allowed=False,
+                actionability=ARMED_ACTIONABILITY,
+            )
         return _mk(
             status="WATCH",
             quantity=0.0,

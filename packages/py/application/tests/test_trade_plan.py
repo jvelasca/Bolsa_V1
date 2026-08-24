@@ -1,8 +1,9 @@
-"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.2."""
+"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.3."""
 
 from types import SimpleNamespace
 
 from bolsa_analytics.cognitive.trade_plan import (
+    ARMED_ACTIONABILITY,
     ATR_MULT,
     BREAKOUT_LOOKBACK,
     build_trade_plan,
@@ -25,7 +26,9 @@ def _bar(*, close: float, high: float | None = None, low: float | None = None) -
 
 def _breakout_long_bars(entry: float = 100.0) -> list[SimpleNamespace]:
     """20 cerradas bajo entry + last close por encima del max high."""
-    closed = [_bar(close=entry - 2, high=entry - 1, low=entry - 3) for _ in range(BREAKOUT_LOOKBACK)]
+    closed = [
+        _bar(close=entry - 2, high=entry - 1, low=entry - 3) for _ in range(BREAKOUT_LOOKBACK)
+    ]
     last = _bar(close=entry + 1, high=entry + 1, low=entry - 1)
     return [*closed, last]
 
@@ -183,12 +186,14 @@ def test_golden_h_expired() -> None:
 
 
 def test_structural_stop_atr_long_and_short() -> None:
-    assert compute_structural_stop(
-        action="recommend_long", entry=100.0, atr=2.0
-    ) == 100.0 - ATR_MULT * 2.0
-    assert compute_structural_stop(
-        action="recommend_short", entry=100.0, atr=2.0
-    ) == 100.0 + ATR_MULT * 2.0
+    assert (
+        compute_structural_stop(action="recommend_long", entry=100.0, atr=2.0)
+        == 100.0 - ATR_MULT * 2.0
+    )
+    assert (
+        compute_structural_stop(action="recommend_short", entry=100.0, atr=2.0)
+        == 100.0 + ATR_MULT * 2.0
+    )
 
 
 def test_structural_stop_invalid_atr_without_bars() -> None:
@@ -210,15 +215,10 @@ def test_structural_stop_swing_farther_wins_long() -> None:
 
 def test_entry_ready_from_ta_aligns_bias() -> None:
     assert (
-        entry_ready_from_ta(
-            action="recommend_long", bias="bullish", entry_setup="breakout"
-        )
-        is True
+        entry_ready_from_ta(action="recommend_long", bias="bullish", entry_setup="breakout") is True
     )
     assert (
-        entry_ready_from_ta(
-            action="recommend_long", bias="bearish", entry_setup="breakout"
-        )
+        entry_ready_from_ta(action="recommend_long", bias="bearish", entry_setup="breakout")
         is False
     )
     assert (
@@ -230,26 +230,16 @@ def test_entry_ready_from_ta_aligns_bias() -> None:
         )
         is False
     )
+    assert entry_ready_from_ta(action="recommend_long", bias="bullish", entry_setup="none") is False
     assert (
-        entry_ready_from_ta(
-            action="recommend_long", bias="bullish", entry_setup="none"
-        )
-        is False
-    )
-    assert (
-        entry_ready_from_ta(
-            action="recommend_short", bias="bearish", entry_setup="pullback"
-        )
+        entry_ready_from_ta(action="recommend_short", bias="bearish", entry_setup="pullback")
         is True
     )
     assert entry_ready_from_ta(action="wait", bias="bullish", entry_setup="breakout") is False
 
 
 def test_classify_breakout_and_none() -> None:
-    assert (
-        classify_entry_setup(action="recommend_long", bars=_breakout_long_bars())
-        == "breakout"
-    )
+    assert classify_entry_setup(action="recommend_long", bars=_breakout_long_bars()) == "breakout"
     assert classify_entry_setup(action="recommend_long", bars=None) == "none"
     flat = [_bar(close=100.0, high=100.5, low=99.5) for _ in range(21)]
     assert classify_entry_setup(action="recommend_long", bars=flat, atr=2.0) != "breakout"
@@ -299,7 +289,7 @@ def test_v0_dict_bias_ok_without_setup_watch_entry() -> None:
     assert plan["executionAllowed"] is False
 
 
-def test_v0_dict_bias_mismatch_watch_entry() -> None:
+def test_v0_dict_bias_mismatch_armed() -> None:
     plan = build_v0_trade_plan_dict(
         decision_id="B2",
         instrument_id="NVDA",
@@ -313,9 +303,69 @@ def test_v0_dict_bias_mismatch_watch_entry() -> None:
         equity=100_000,
         risk_pct=0.5,
     )
-    assert plan["status"] == "WATCH"
+    assert plan["status"] == "ARMED"
+    assert plan["entrySetup"] == "breakout"
     assert "entry" in plan["whyNot"]
+    assert plan["quantity"] == 0.0
     assert plan["executionAllowed"] is False
+    assert plan["actionability"] == ARMED_ACTIONABILITY
+
+
+def test_armed_stop_breakout_without_bias() -> None:
+    """Ciclo 4.3: stop + setup ≠ none + !ready → ARMED."""
+    plan = build_v0_trade_plan_dict(
+        decision_id="ARMED1",
+        instrument_id="MSFT",
+        action="recommend_long",
+        entry=100.0,
+        opportunity_score=90.0,
+        expires_at=None,
+        atr=2.0,
+        bars=_breakout_long_bars(100.0),
+        bias=None,
+        equity=100_000,
+        risk_pct=0.5,
+    )
+    assert plan["status"] == "ARMED"
+    assert plan["entrySetup"] == "breakout"
+    assert plan["quantity"] == 0.0
+    assert plan["executionAllowed"] is False
+    assert "entry" in plan["whyNot"]
+    assert plan["actionability"] == ARMED_ACTIONABILITY
+
+
+def test_armed_exhaustion_with_breakout() -> None:
+    plan = build_trade_plan(
+        decision_id="ARMED2",
+        instrument_id="AMD",
+        action="recommend_long",
+        entry_ready=False,
+        entry=100.0,
+        structural_stop=95.0,
+        equity=100_000,
+        entry_setup="breakout",
+    )
+    assert plan.status == "ARMED"
+    assert plan.quantity == 0.0
+    assert plan.execution_allowed is False
+    assert "entry" in plan.why_not
+    assert plan.actionability == ARMED_ACTIONABILITY
+
+
+def test_confirm_rebuild_without_bars_not_armed() -> None:
+    """D5: sin barras → setup none; no inventa ARMED (WATCH/no_stop)."""
+    plan = build_v0_trade_plan_dict(
+        decision_id="CONFIRM",
+        instrument_id="SAP",
+        action="recommend_long",
+        entry=100.0,
+        opportunity_score=None,
+        expires_at=None,
+    )
+    assert plan["status"] == "WATCH"
+    assert plan["entrySetup"] == "none"
+    assert plan["status"] != "ARMED"
+    assert "no_stop" in plan["whyNot"]
 
 
 def test_v0_dict_defaults_watch_no_stop() -> None:
@@ -348,9 +398,7 @@ def test_golden_d_farther_stop_reduces_size_not_stop() -> None:
         risk_pct=0.5,
     )
     # Breakout window (highs < 100) + swing lows at 90 + last breakout close.
-    closed = [
-        _bar(close=98.0, high=99.0, low=90.0) for _ in range(BREAKOUT_LOOKBACK)
-    ]
+    closed = [_bar(close=98.0, high=99.0, low=90.0) for _ in range(BREAKOUT_LOOKBACK)]
     last = _bar(close=101.0, high=101.0, low=99.0)
     far = build_v0_trade_plan_dict(
         decision_id="D2",
