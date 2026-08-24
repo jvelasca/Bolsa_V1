@@ -1,11 +1,11 @@
-"""F2b lite — filing store + extract + heuristic summary."""
+"""F2b lite — filing store I/O + extract."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from bolsa_analytics.knowledge.filing_summary import heuristic_filing_summary
 from bolsa_domain.value_objects.excerpt import prefer_summary_excerpt
+
 from bolsa_market.filing_store import (
     FILING_STORE_VERSION,
     delete_filing,
@@ -67,23 +67,6 @@ def test_pdf_extract_status_is_controlled() -> None:
     assert status in {"unavailable", "empty", "error"}
     if status == "unavailable":
         assert text == ""
-
-
-def test_heuristic_summary_with_extract() -> None:
-    filing = {
-        "kind": "10-K",
-        "originalName": "a.txt",
-        "extractStatus": "ok",
-        "charCount": 100,
-    }
-    out = heuristic_filing_summary(
-        ticker="AAPL",
-        filing=filing,
-        text="ITEM 1A. RISK FACTORS\nSupply chain and FX.",
-    )
-    assert len(out["paragraphs"]) == 3
-    assert "AAPL" in out["paragraphs"][0]
-    assert "Score_FUND" in out["paragraphs"][2]
 
 
 def test_update_last_summary(tmp_path: Path, monkeypatch) -> None:
