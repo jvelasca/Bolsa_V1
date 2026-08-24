@@ -92,11 +92,13 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 4.0 (cerrado `1cbd021`):** stop estructural ATR×1.5 + swing 10 barras cerradas (el más lejano), `entry_ready` por bias TA (sin exhaustion), size con `GetPortfolioSummary.total_equity` y `max_risk_per_trade_pct` de la plantilla. Sin familias `EntrySetup`. Confirm rebuild sin barras sigue `WATCH`/`no_stop`. `check_opening` intacto.
 
-**Ciclo 4.1 (esta rebanada):** `NO_NEW_LONGS` en capa Plan — long + régimen `risk_off`/`crisis` → `BLOCKED` + `whyNot: regime`. Shorts permitidos. Confirm sin régimen no inventa veto. `check_opening` intacto. Sin familias `EntrySetup` (→ 4.2).
+**Ciclo 4.1 (cerrado `97f4862`):** `NO_NEW_LONGS` en capa Plan — long + régimen `risk_off`/`crisis` → `BLOCKED` + `whyNot: regime`. Shorts permitidos. Confirm sin régimen no inventa veto. `check_opening` intacto.
+
+**Ciclo 4.2 (esta rebanada):** `EntrySetup` `breakout|pullback|wyckoff|none` refina `entry_ready` (ta + setup≠none). Campo `entrySetup` en TradePlan. Sin `ARMED`. Sin `contract:gen`. `check_opening` intacto.
 
 No abrir sin fase propia:
 
-- Familias Entry Engine (Breakout / Pullback / Wyckoff como contrato `EntrySetup`) — Ciclo 4.2
+- `ARMED` status machine / Wyckoff fases formales — 4.3+
 - Position Manager, Thesis Health, Exit Radar, trailing, T1 parcial, time-stop, bracket
 - MFE/MAE, attribution, expectancy por setup
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live

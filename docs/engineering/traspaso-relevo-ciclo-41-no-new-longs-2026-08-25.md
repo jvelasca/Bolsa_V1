@@ -33,10 +33,24 @@ Golden G en capa **Plan**: long + `risk_off`/`crisis` → `BLOCKED` + `whyNot: r
 
 Push: `f02ff1a..97f4862` → `origin/main`.
 
+> [!INFO] **SUPERSEDIDO (2026-08-25).** Relevo vivo: [`traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md`](./traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md).
+
+> **Padre:** [`traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md`](./traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md).
+> **Plan:** [`plan-ciclo-41-no-new-longs-entrysetup-2026-08-25.md`](./plan-ciclo-41-no-new-longs-entrysetup-2026-08-25.md) (D1–D6 OK).
+> **Política:** [`docs/adr/031-operational-model-tesis-plan-permiso.md`](../adr/031-operational-model-tesis-plan-permiso.md) Golden G · §6 nota 4.1.
+> **AsOf:** 2026-08-25.
+> **HEAD:** `97f4862` = `origin/main`. **PUSHEADO.**
+
+---
+
+## 1. Qué se cerró
+
+Golden G en capa **Plan**: long + `risk_off`/`crisis` → `BLOCKED` + `whyNot: regime`. Shorts OK. Confirm sin régimen no inventa veto. Propose pasa `macro_assess.regime`. **No** EntrySetup (→ 4.2). **No** `check_opening`.
+
 ## 4. Siguiente (E1)
 
 1. ~~Commit~~ · ~~Push~~.
-2. EntrySetup (Ciclo 4.2) — **prohibido** sin plan E1 propio.
+2. ~~Plan 4.2~~ — ver relevo Ciclo 4.2.
 
 ## 5. No tocado
 

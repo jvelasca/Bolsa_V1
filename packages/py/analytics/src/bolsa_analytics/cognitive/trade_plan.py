@@ -12,6 +12,7 @@ from typing import Literal
 
 TradePlanStatus = Literal["WATCH", "ARMED", "TRIGGERED", "BLOCKED", "EXPIRED"]
 TradePlanDirection = Literal["long", "short", "none"]
+EntrySetup = Literal["breakout", "pullback", "wyckoff", "none"]
 WhyNotCode = Literal[
     "fit",
     "freshness",
@@ -42,6 +43,7 @@ class TradePlan:
     entry: float | None = None
     structural_stop: float | None = None
     expires_at: str | None = None
+    entry_setup: EntrySetup = "none"
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -58,6 +60,7 @@ class TradePlan:
             "entry": self.entry,
             "structuralStop": self.structural_stop,
             "expiresAt": self.expires_at,
+            "entrySetup": self.entry_setup,
         }
 
 
@@ -72,12 +75,18 @@ def compliance_fit_ok(compliance_check: object) -> bool:
     )
 
 
-# Ciclo 4.0 — stop estructural (no familias EntrySetup).
+# Ciclo 4.0 — stop estructural.
 ATR_MULT = 1.5
 SWING_LOOKBACK = 10
 
 # Ciclo 4.1 — Golden G: no nuevos longs en régimen adverso (TradePlan only).
 NO_NEW_LONGS_REGIMES = frozenset({"risk_off", "crisis"})
+
+# Ciclo 4.2 — EntrySetup (refina entry_ready; sin ARMED).
+BREAKOUT_LOOKBACK = 20
+PULLBACK_ATR_BAND = 1.0
+WYCKOFF_SPRING = 5
+WYCKOFF_PRIOR = 10
 
 
 def no_new_longs_blocks(*, action: str, market_regime: str | None) -> bool:
@@ -99,6 +108,100 @@ def _finite_positive(value: object) -> float | None:
 
 def _bar_px(bar: object, attr: str) -> float | None:
     return _finite_positive(getattr(bar, attr, None))
+
+
+def _sma_closes(bars: Sequence[object]) -> float | None:
+    closes = [_bar_px(bar, "close") for bar in bars]
+    valid = [c for c in closes if c is not None]
+    if len(valid) != len(bars) or not valid:
+        return None
+    return sum(valid) / len(valid)
+
+
+def _is_breakout(*, direction: TradePlanDirection, bars: Sequence[object]) -> bool:
+    need = BREAKOUT_LOOKBACK + 1
+    if len(bars) < need:
+        return False
+    window = bars[-(need):-1]
+    last = bars[-1]
+    close = _bar_px(last, "close")
+    if close is None:
+        return False
+    if direction == "long":
+        highs = [_bar_px(bar, "high") for bar in window]
+        valid = [h for h in highs if h is not None]
+        return bool(valid) and close > max(valid)
+    lows = [_bar_px(bar, "low") for bar in window]
+    valid = [low for low in lows if low is not None]
+    return bool(valid) and close < min(valid)
+
+
+def _is_pullback(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    atr: float | None,
+) -> bool:
+    atr_val = _finite_positive(atr)
+    if atr_val is None or len(bars) < BREAKOUT_LOOKBACK + 1:
+        return False
+    window = bars[-(BREAKOUT_LOOKBACK + 1) : -1]
+    close = _bar_px(bars[-1], "close")
+    sma = _sma_closes(window)
+    if close is None or sma is None:
+        return False
+    band = PULLBACK_ATR_BAND * atr_val
+    if direction == "long":
+        return sma <= close <= sma + band
+    return sma - band <= close <= sma
+
+
+def _is_wyckoff_reclaim(*, direction: TradePlanDirection, bars: Sequence[object]) -> bool:
+    need = WYCKOFF_SPRING + WYCKOFF_PRIOR + 1
+    if len(bars) < need:
+        return False
+    closed = bars[-need:-1]
+    prior = closed[:WYCKOFF_PRIOR]
+    spring = closed[WYCKOFF_PRIOR:]
+    close = _bar_px(bars[-1], "close")
+    if close is None:
+        return False
+    if direction == "long":
+        prior_lows = [_bar_px(bar, "low") for bar in prior]
+        spring_lows = [_bar_px(bar, "low") for bar in spring]
+        p_ok = [v for v in prior_lows if v is not None]
+        s_ok = [v for v in spring_lows if v is not None]
+        if not p_ok or not s_ok:
+            return False
+        spring_low = min(s_ok)
+        return spring_low < min(p_ok) and close > spring_low
+    prior_highs = [_bar_px(bar, "high") for bar in prior]
+    spring_highs = [_bar_px(bar, "high") for bar in spring]
+    p_ok = [v for v in prior_highs if v is not None]
+    s_ok = [v for v in spring_highs if v is not None]
+    if not p_ok or not s_ok:
+        return False
+    spring_high = max(s_ok)
+    return spring_high > max(p_ok) and close < spring_high
+
+
+def classify_entry_setup(
+    *,
+    action: str,
+    bars: Sequence[object] | None = None,
+    atr: float | None = None,
+) -> EntrySetup:
+    """Ciclo 4.2: breakout > pullback > wyckoff > none. Sin barras → none."""
+    direction = _direction_from_action(action)
+    if direction == "none" or bars is None:
+        return "none"
+    if _is_breakout(direction=direction, bars=bars):
+        return "breakout"
+    if _is_pullback(direction=direction, bars=bars, atr=atr):
+        return "pullback"
+    if _is_wyckoff_reclaim(direction=direction, bars=bars):
+        return "wyckoff"
+    return "none"
 
 
 def compute_structural_stop(
@@ -154,9 +257,10 @@ def entry_ready_from_ta(
     action: str,
     bias: str | None,
     exhaustion: bool = False,
+    entry_setup: EntrySetup = "none",
 ) -> bool:
-    """Ciclo 4.0: listo si la acción alinea con bias TA y no hay exhaustion."""
-    if exhaustion:
+    """Ciclo 4.0+4.2: bias alineado, sin exhaustion, setup ≠ none."""
+    if exhaustion or entry_setup == "none":
         return False
     if action == "recommend_long":
         return bias == "bullish"
@@ -192,6 +296,7 @@ def build_v0_trade_plan_dict(
     structural_stop = compute_structural_stop(
         action=action, entry=entry, atr=atr, bars=bars
     )
+    setup = classify_entry_setup(action=action, bars=bars, atr=atr)
     plan = build_trade_plan(
         decision_id=decision_id,
         instrument_id=instrument_id,
@@ -201,7 +306,10 @@ def build_v0_trade_plan_dict(
         mandate_ok=True,
         expired=expired,
         entry_ready=entry_ready_from_ta(
-            action=action, bias=bias, exhaustion=exhaustion
+            action=action,
+            bias=bias,
+            exhaustion=exhaustion,
+            entry_setup=setup,
         ),
         entry=entry,
         structural_stop=structural_stop,
@@ -210,6 +318,7 @@ def build_v0_trade_plan_dict(
         opportunity_score=opportunity_score,
         expires_at=expires_at,
         market_regime=market_regime,
+        entry_setup=setup,
     )
     return plan.to_dict()
 
@@ -255,6 +364,7 @@ def build_trade_plan(
     opportunity_score: float | None = None,
     expires_at: str | None = None,
     market_regime: str | None = None,
+    entry_setup: EntrySetup = "none",
 ) -> TradePlan:
     """Mapper determinista DecisionPackage + gates → TradePlan v0.
 
@@ -276,22 +386,39 @@ def build_trade_plan(
         )
     )
 
-    if expired:
-        why.append("expired")
+    def _mk(
+        *,
+        status: TradePlanStatus,
+        quantity: float,
+        why_not: tuple[str, ...],
+        execution_allowed: bool,
+        actionability: float,
+    ) -> TradePlan:
         return TradePlan(
             decision_id=decision_id,
             instrument_id=instrument_id,
             direction=direction,
-            status="EXPIRED",
-            quantity=0.0,
+            status=status,
+            quantity=quantity,
             risk_pct=risk_pct,
-            why_not=tuple(why),
-            execution_allowed=False,
+            why_not=why_not,
+            execution_allowed=execution_allowed,
             opportunity_score=opportunity_score,
-            actionability=0.0,
+            actionability=actionability,
             entry=entry,
             structural_stop=structural_stop,
             expires_at=expires_at,
+            entry_setup=entry_setup,
+        )
+
+    if expired:
+        why.append("expired")
+        return _mk(
+            status="EXPIRED",
+            quantity=0.0,
+            why_not=tuple(why),
+            execution_allowed=False,
+            actionability=0.0,
         )
 
     if no_new_longs_blocks(action=action, market_regime=market_regime):
@@ -303,74 +430,42 @@ def build_trade_plan(
     if not mandate_ok:
         why.append("mandate")
     if why:
-        return TradePlan(
-            decision_id=decision_id,
-            instrument_id=instrument_id,
-            direction=direction,
+        return _mk(
             status="BLOCKED",
             quantity=0.0,
-            risk_pct=risk_pct,
             why_not=tuple(why),
             execution_allowed=False,
-            opportunity_score=opportunity_score,
             actionability=0.0,
-            entry=entry,
-            structural_stop=structural_stop,
-            expires_at=expires_at,
         )
 
     if action in {"wait", "reduce", "exit_hint"} or direction == "none":
         why.append("entry")
-        return TradePlan(
-            decision_id=decision_id,
-            instrument_id=instrument_id,
-            direction=direction,
+        return _mk(
             status="WATCH",
             quantity=0.0,
-            risk_pct=risk_pct,
             why_not=tuple(why),
             execution_allowed=False,
-            opportunity_score=opportunity_score,
             actionability=0.2,
-            entry=entry,
-            structural_stop=structural_stop,
-            expires_at=expires_at,
         )
 
     if not stop_valid:
         why.append("no_stop")
-        return TradePlan(
-            decision_id=decision_id,
-            instrument_id=instrument_id,
-            direction=direction,
+        return _mk(
             status="WATCH",
             quantity=0.0,
-            risk_pct=risk_pct,
             why_not=tuple(why),
             execution_allowed=False,
-            opportunity_score=opportunity_score,
             actionability=0.3,
-            entry=entry,
-            structural_stop=structural_stop,
-            expires_at=expires_at,
         )
 
     if not entry_ready:
         why.append("entry")
-        return TradePlan(
-            decision_id=decision_id,
-            instrument_id=instrument_id,
-            direction=direction,
+        return _mk(
             status="WATCH",
             quantity=0.0,
-            risk_pct=risk_pct,
             why_not=tuple(why),
             execution_allowed=False,
-            opportunity_score=opportunity_score,
             actionability=0.4,
-            entry=entry,
-            structural_stop=structural_stop,
-            expires_at=expires_at,
         )
 
     qty = compute_risk_size(
@@ -379,18 +474,10 @@ def build_trade_plan(
         entry=float(entry),
         stop=float(structural_stop),
     )
-    return TradePlan(
-        decision_id=decision_id,
-        instrument_id=instrument_id,
-        direction=direction,
+    return _mk(
         status="TRIGGERED",
         quantity=qty,
-        risk_pct=risk_pct,
         why_not=(),
         execution_allowed=qty > 0,
-        opportunity_score=opportunity_score,
         actionability=0.95 if qty > 0 else 0.0,
-        entry=entry,
-        structural_stop=structural_stop,
-        expires_at=expires_at,
     )

@@ -23,6 +23,8 @@ export type TradePlanWhyNotV1 =
   | "rr"
   | "regime";
 
+export type EntrySetupV1 = "breakout" | "pullback" | "wyckoff" | "none";
+
 export type TradePlanV1 = {
   decisionId: string;
   instrumentId: string;
@@ -37,4 +39,5 @@ export type TradePlanV1 = {
   entry?: number | null;
   structuralStop?: number | null;
   expiresAt?: string | null;
+  entrySetup?: EntrySetupV1 | null;
 };
