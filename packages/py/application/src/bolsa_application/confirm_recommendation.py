@@ -1,4 +1,14 @@
-"""F3 — Confirm Recommendation → OrderIntent (+ opcional trade) + DecisionSession."""
+"""F3 — Confirm Recommendation → OrderIntent (+ opcional trade) + DecisionSession.
+
+Escalón 3/D1 — re-evaluación VETO de cesta al confirmar en SEMI: si el use-case
+recibe `portfolio_summary`, y la recommendation es una **apertura**
+(`recommend_long`/`recommend_short`), se re-ejecuta el risk de cesta
+(`check_opening` + kill-switch) antes de tocar `ExecuteTrade`. Si veta → el fill
+se bloquea (`rejected_by_gate`, `risk_veto`), replicando en SEMI el mismo Risk de
+cesta que AUTO (`execution_router.py:560-581`). `exit_hint`/`reduce` NO se someten
+al VETO (no abren cesta). Perfil de risk no se re-evalúa en esta rebanada
+(`profile=None`); `portfolio_summary=None` conserva el comportamiento previo.
+"""
 
 from __future__ import annotations
 
@@ -11,10 +21,16 @@ from bolsa_analytics.cognitive.decision_session import (
     build_auto_session,
 )
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
+from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
+from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
+from bolsa_application.risk_engine import check_opening
+from bolsa_application.risk_runtime import effective_kill_switch
+
+_OPENING_ACTIONS = {"recommend_long", "recommend_short"}
 
 
 def resolve_session_decision_package(
@@ -57,6 +73,32 @@ def _identity_reconciles(intent: Any, package: dict[str, Any]) -> bool:
     return pkg_instrument is None or pkg_instrument == intent.instrument_id
 
 
+def _is_opening_action(action: str) -> bool:
+    """¿La recommendation abre una posición (sujeta al VETO de cesta en SEMI)?"""
+    return action in _OPENING_ACTIONS
+
+
+def _basket_positions_from_summary(summary: Any) -> list[BasketPosition] | None:
+    """Construye la cesta de posiciones del Risk de cesta desde un PortfolioSummary.
+
+    Espejo de `execution_router._basket_positions_from_summary`: el `sector` viene
+    resuelto desde `instruments.sector` en la capa de infraestructura (field
+    `sector` de `Position`); si no está poblado, la posición entra su
+    `market_value` como "unknown" en el agregado por sector.
+    """
+    positions = getattr(summary, "positions", None)
+    if positions is None:
+        return None
+    return [
+        BasketPosition(
+            instrument_id=getattr(p, "instrument_id", ""),
+            market_value=getattr(p, "market_value", None),
+            sector=getattr(p, "sector", None),
+        )
+        for p in positions
+    ]
+
+
 class ConfirmRecommendationIntent:
     """Humano confirma Recommendation; audita Session (update o append confirm)."""
 
@@ -65,9 +107,11 @@ class ConfirmRecommendationIntent:
         *,
         cognitive_store: CognitiveStore | None = None,
         execute_trade: Any | None = None,
+        portfolio_summary: GetPortfolioSummary | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
+        self._portfolio_summary = portfolio_summary
 
     async def execute(
         self,
@@ -139,6 +183,29 @@ class ConfirmRecommendationIntent:
                     "status": "rejected_by_gate",
                     "contract": contract_status,
                 }
+            elif (
+                _is_opening_action(rec.action)
+                and self._portfolio_summary is not None
+                and not await self._risk_allows_opening(
+                    rec=rec,
+                    intent=intent,
+                    price=price,
+                    account_id=account_id,
+                )
+            ):
+                # Escalón 3/D1 — re-evaluación VETO de cesta en SEMI (fail-closed).
+                # Solo aperturas (recommend_long/recommend_short); exit_hint/reduce no
+                # abren cesta y quedan fuera de esta rebanada. El intent refleja el
+                # rechazo para que la UI retire el ítem de la cola (mismo patrón que D2).
+                result["trade"] = {
+                    "status": "rejected_by_gate",
+                    "reason": "risk_veto",
+                }
+                result["intent"] = {
+                    **intent.to_dict(),
+                    "status": "rejected_by_gate",
+                    "contract": contract_status,
+                }
             elif self._execute_trade is None:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
             else:
@@ -196,6 +263,52 @@ class ConfirmRecommendationIntent:
                 pass
 
         return result
+
+    async def _risk_allows_opening(
+        self,
+        *,
+        rec: Recommendation,
+        intent: Any,
+        price: float,
+        account_id: str,
+    ) -> bool:
+        """Escalón 3/D1 — re-evaluación VETO de cesta en SEMI (fail-closed).
+
+        Re-ejecuta el risk de cesta (`check_opening`, el mismo que AUTO en
+        `execution_router._execute_paper_trade`) para una apertura validada antes de
+        tocar `ExecuteTrade`. Devuelve True si la cesta/kill-switch permiten el fill. El perfil de risk NO se re-evalúa en esta
+        rebanada (`profile=None`); `exit_hint`/`reduce` quedan fuera (no abren cesta).
+        Si el summary o la evaluación fallan de forma recuperable, se mantiene
+        fail-open a la lógica de D2 (no es el gate de identidad): el fill NO se
+        bloquea por una indisponibilidad del summary.
+        """
+        if self._portfolio_summary is None:
+            return True
+        try:
+            summary = await self._portfolio_summary.execute(account_id=account_id)
+        except Exception:  # noqa: BLE001 — indisponibilidad de summary no es gate
+            return True
+        equity = float(getattr(summary, "total_equity", 0) or 0)
+        positions = getattr(summary, "positions", None)
+        open_positions_count = len(positions) if positions is not None else 0
+        decision = check_opening(
+            profile=None,
+            instrument_id=intent.instrument_id,
+            symbol=str(rec.symbol or intent.instrument_id),
+            trade_type=str(intent.side),
+            quantity=float(intent.quantity),
+            price=float(price),
+            signal_kind=str(rec.action),
+            equity=equity,
+            open_positions_count=open_positions_count,
+            auto_live=False,
+            kill_switch=await effective_kill_switch(),
+            portfolio_positions=_basket_positions_from_summary(summary),
+            # El sector de la posición propuesta no está resuelto en el confirm; cae
+            # a "unknown" en el agregado por sector (coherente con el summary sin sector).
+            proposal_sector=None,
+        )
+        return bool(decision.allowed)
 
     async def _persist_session(
         self,

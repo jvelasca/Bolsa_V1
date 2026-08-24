@@ -1117,12 +1117,17 @@ def get_propose_recommendation_use_case(session: AsyncSession) -> Any:
 
 
 def get_confirm_intent_use_case(session: AsyncSession) -> Any:
-    """F3 confirm — wiring del ConfirmRecommendationIntent (execute_trade flag-safe)."""
+    """F3 confirm — wiring del ConfirmRecommendationIntent (execute_trade flag-safe).
+
+    Escalón 3/D1: inyecta `portfolio_summary` (read-only) para la re-evaluación VETO
+    de cesta en el confirm SEMI (solo aperturas). No cambia el contrato HTTP.
+    """
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
     return ConfirmRecommendationIntent(
         cognitive_store=get_cognitive_repository(session),
         execute_trade=get_execute_trade_use_case(session),
+        portfolio_summary=get_portfolio_summary_use_case(session),
     )
 
 

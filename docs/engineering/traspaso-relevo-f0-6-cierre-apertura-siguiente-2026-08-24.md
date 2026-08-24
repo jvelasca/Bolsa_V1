@@ -41,11 +41,13 @@
 - `pending-delete` · no `regen_full`. Purge storage E8 N.
 - F0.5b (PortfolioFit) y F0.6 (Decision Board) ya cerrados y pusheados: NO reescribir salvo fase pactada que exponga un hueco real.
 
-## 4. Tarea del siguiente chat (fase nueva — SIN aprobar)
+## 4. Tarea del siguiente chat (fase nueva — APROBADA 2026-08-24)
 
-**PASO 0 (obligatorio, sin código):** que el propietario decida **qué fase sigue** y apruebe (con decisiones bloqueantes D2/D3 resueltas si aplican). El agente solo presenta opciones ancladas al backlog y espera decisión. NO abrir código antes.
+**PASO 0 YA RESUELTO en el chat de cierre F0.6:** el propietario aprobó en este chat la **fase siguiente = Escalón 3/D1 — re-evaluar gate & risk de cesta en el confirm SEMI (VETO fail-closed)**, con alcance fijado: **solo cesta+kill-switch** (`portfolio_summary` inyectado, `profile=None`) · **solo órdenes de APERTURA** (`recommend_long`/`recommend_short`; `exit_hint`/`reduce` NO se bloquean) · **sin** re-sizing, **sin** wait-sin-sesión, **sin** reduce/exit_hint-vs-short. Decisión registrada en `backlog §0` (RELEVO Escalón 3/D1).
 
-**Después (con fase aprobada):** implementar la rebanada acordada, una a la vez, path:line verificado, batería, aprobación antes de commit.
+**Queda implementar la rebanada acordada**, una a la vez, path:line verificado, batería, aprobación antes de commit. Gap verificado: `confirm_recommendation.py:122-178` (fill sin `check_opening`); patrón a replicar `execution_router.py:560-581`; TO-BE `fase0-decision-spine-tobe-2026-08-24.md:23,44`.
+
+**Después:** implementar la rebanada acordada, una a la vez, path:line verificado, batería, aprobación antes de commit.
 
 ## 5. Texto de arranque (pegar en el chat nuevo)
 

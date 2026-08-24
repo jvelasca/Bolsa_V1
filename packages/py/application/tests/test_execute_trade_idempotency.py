@@ -17,14 +17,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-from bolsa_application.accounts import ExecuteTrade
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     TradeResult,
     Transaction,
 )
+
+from bolsa_application.accounts import ExecuteTrade
+from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 
 
 @dataclass
@@ -646,4 +647,157 @@ async def test_confirm_with_edited_sizing_and_matching_package_executes() -> Non
 
     assert len(fake_trade.calls) == 1
     assert fake_trade.calls[0]["quantity"] == 99.0
+    assert result["trade"]["status"] == "executed"
+
+
+# ── Escalón 3/D1 — re-evaluación VETO de cesta en el confirm SEMI ──────────────
+# Replica el Risk de cesta de AUTO en el confirm: solo aperturas; exit_hint/reduce
+# quedan fuera; portfolio_summary=None conserva el comportamiento previo.
+
+@dataclass
+class _FakePosition:
+    """Position mínima para construir la cesta del Risk desde un PortfolioSummary."""
+
+    instrument_id: str
+    market_value: float
+    sector: str | None = None
+
+
+class _FakePortfolioSummary:
+    """Fake read-only de `GetPortfolioSummary` para el confirm SEMI."""
+
+    def __init__(self, positions: list[_FakePosition], total_equity: float) -> None:
+        self.positions = positions
+        self.total_equity = total_equity
+
+    async def execute(self, account_id: str | None = None, portfolio_id: str | None = None):
+        return self
+
+
+def _risk_veto_summary() -> _FakePortfolioSummary:
+    """Cesta donde la apertura propuesta supera la exposición de sector (>30% moderate)."""
+    return _FakePortfolioSummary(
+        positions=[
+            _FakePosition("t1", 22.0, "tech"),
+            _FakePosition("t2", 22.0, "tech"),
+            _FakePosition("t3", 22.0, "tech"),
+            _FakePosition("t4", 22.0, "tech"),
+            _FakePosition("h1", 20.0, "health"),
+            _FakePosition("h2", 20.0, "health"),
+            _FakePosition("e1", 20.0, "energy"),
+            _FakePosition("c1", 10.0, "cons"),
+        ],
+        total_equity=200.0,
+    )
+
+
+def _risk_allow_summary() -> _FakePortfolioSummary:
+    """Cesta diversificada: la apertura propuesta no viola concentración ni sector."""
+    return _FakePortfolioSummary(
+        positions=[
+            _FakePosition("a", 4.0, "tech"),
+            _FakePosition("b", 4.0, "health"),
+            _FakePosition("c", 4.0, "energy"),
+            _FakePosition("d", 4.0, "cons"),
+        ],
+        total_equity=200.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_cesta_veto_bloquea_fill() -> None:
+    """Escalón 3/D1 — apertura cuya cesta veta → rejected_by_gate/risk_veto; NO fill."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_veto_summary(),  # type: ignore[arg-type]
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-1",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
+    assert result["intent"]["status"] == "rejected_by_gate"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_cesta_permite_fill() -> None:
+    """Escalón 3/D1 — apertura cuya cesta encaja → fill se ejecuta."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-2",
+            "instrumentId": "inst-new",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["trade"]["status"] == "executed"
+
+
+@pytest.mark.asyncio
+async def test_confirm_exit_hint_no_sometido_a_cesta() -> None:
+    """Escalón 3/D1 — exit_hint/reduce NO se someten al VETO de cesta (no abren)."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_veto_summary(),  # type: ignore[arg-type]
+    )
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-3",
+            "instrumentId": "inst-1",
+            "action": "exit_hint",
+            "suggestedQuantity": 2.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["trade"]["status"] == "executed"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_sin_summary_no_aplica_cesta() -> None:
+    """Escalón 3/D1 — portfolio_summary=None conserva el comportamiento previo (sin veto)."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
+
+    result = await use_case.execute(
+        recommendation_raw={
+            "decisionId": "DEC-4",
+            "instrumentId": "inst-1",
+            "action": "recommend_long",
+            "suggestedQuantity": 4.0,
+            "suggestedPrice": 1.0,
+        },
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
     assert result["trade"]["status"] == "executed"
