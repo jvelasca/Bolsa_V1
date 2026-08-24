@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md`](./traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md).
 > **Plan:** [`plan-ciclo-43-armed-entrysetup-2026-08-25.md`](./plan-ciclo-43-armed-entrysetup-2026-08-25.md) (D1–D7 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** `4eb99a2` (feat) · docs stamp sigue · push pendiente.
+> **HEAD:** `f02429b` (ahead of origin). Feat `4eb99a2` · stamp `f02429b`.
 > **Arranque chat nuevo:** pegar este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
@@ -29,10 +29,11 @@
 | SHA       | Mensaje                                                |
 | --------- | ------------------------------------------------------ |
 | `4eb99a2` | feat(spine): ADR-031 Ciclo 4.3 ARMED readiness ladder. |
+| `f02429b` | docs: stamp living SoT after Ciclo 4.3 (`4eb99a2`).    |
 
 ## 4. Siguiente (E1) — chat nuevo
 
-1. ~~Commit feat~~ · stamp docs · Push.
+1. ~~Commit feat~~ · ~~stamp docs~~ · Push.
 2. Wyckoff formal — **prohibido** sin plan 4.4+.
 3. No abrir: F9-B · purge · `PAPER_D_EXECUTE` · broker · thesis health / MFE · qty Confirm.
 
