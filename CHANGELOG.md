@@ -4,7 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
-- **ADR-031 / TradePlan v0:** tesis ≠ plan ≠ permiso. Confirm SEMI: TTL, revalidación de precio, H3 orphan fail-closed. `pending_orders` fill vía `check_opening`. Strip **Hoy** en la mesa. Golden A/B/C/H.
+- **ADR-031 / TradePlan v0** (`818b0c7`, sin push): tesis ≠ plan ≠ permiso. Confirm SEMI: TTL, revalidación de precio, H3 orphan fail-closed. `pending_orders` fill vía `check_opening`. Strip **Hoy** en la mesa. Golden A/B/C/H.
 - **Python CI pytest:** excluye tests DB-gated R12 isolation + F7b backfill del workflow offline (`386a959`) — **569 pass** sin Postgres.
 - **Ruff I001:** import order hygiene en 49 ficheros Python (`a3dcc3f`) — desbloquea gate Import-linter en Python CI (post F9-A3 `f8c7e3f`).
 - **F9-A3:** gate `lint-imports` en Python CI (4 contratos, `packages/py/.importlinter`).

@@ -3,7 +3,7 @@
 > **Padre:** [`engineering-index-2026-08-03.md`](./engineering-index-2026-08-03.md) §1 (Product / Ops).
 > **Política:** [`docs/adr/031-operational-model-tesis-plan-permiso.md`](../adr/031-operational-model-tesis-plan-permiso.md).
 > **SoT corto:** [`docs/CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Propósito:** texto de paso para el **NUEVO AGENTE / NUEVO CHAT** tras implementar la hoja de ruta operativa (Ciclos 0–3). **Código en working tree, SIN commit.**
+> **Propósito:** texto de paso para el **NUEVO AGENTE / NUEVO CHAT** tras implementar la hoja de ruta operativa (Ciclos 0–3). **Stamp 2026-08-24:** código en **`818b0c7`** (local, **sin push**).
 > **AsOf:** 2026-08-24.
 > **Chat origen:** [Hoja ruta operativa](96e2bb7b-7223-4a9d-ad34-00ecbc90b39b).
 
@@ -11,17 +11,17 @@
 
 ## 1. Estado verificado (firma — no adivinar)
 
-| Campo            | Valor                                                                                                                                   |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **HEAD**         | **`020975c`** = `origin/main` (docs update-last post pytest CI `386a959`). **Verificar:** `git fetch && git rev-parse HEAD origin/main` |
-| **Tag**          | `v1.7.0-beta` → `e3b943a` (intacto). Previo `v1.6.0-beta` → `c3964fc`                                                                   |
-| **Working tree** | **SUCIO** — Ciclos 0–3 ADR-031 **sin commit** (22 modificados + 9 untracked)                                                            |
-| **Alembic**      | `010_decision_journal_entries` en `bolsa_v1` (no-op; este slice no migró)                                                               |
-| **F9-B**         | **PARKED**                                                                                                                              |
-| **Purge V2**     | MONITOR · E8 **N**                                                                                                                      |
-| **Commit**       | **NO pedido** · **NO pusheado**                                                                                                         |
+| Campo            | Valor                                                                                                                           |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **HEAD**         | **`818b0c7`** (ADR-031 Ciclos 0–3). `origin/main` = **`020975c`**. **Verificar:** `git fetch && git rev-parse HEAD origin/main` |
+| **Tag**          | `v1.7.0-beta` → `e3b943a` (intacto). Previo `v1.6.0-beta` → `c3964fc`                                                           |
+| **Working tree** | **LIMPIO** post-`818b0c7` + stamp docs de este cierre                                                                           |
+| **Alembic**      | `010_decision_journal_entries` en `bolsa_v1` (no-op; este slice no migró)                                                       |
+| **F9-B**         | **PARKED**                                                                                                                      |
+| **Purge V2**     | MONITOR · E8 **N**                                                                                                              |
+| **Commit**       | **`818b0c7`** · **NO pusheado**                                                                                                 |
 
-`git status -sb` al redactar: `main...origin/main` con diffs ADR-031 (confirm, fill pending, TradePlan, Hoy, OpenAPI regen, docs).
+`git status -sb` al stamp: `main` 1 commit ahead of `origin/main` (`818b0c7` sobre `020975c`).
 
 ---
 
@@ -125,13 +125,13 @@ Entry families · `NO_NEW_LONGS` · Thesis Health / Exit Radar · MFE-MAE · att
 
 Candidatas ancladas:
 
-| Prioridad | Acción                                                          | Notas                                                                           |
-| --------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **P0**    | **Commit** del working tree ADR-031 (si el propietario lo pide) | Un commit (o split docs/código). Incluir untracked. **No push** salvo petición. |
-| P1        | Smoke navegador tira Hoy + drawer Confirmar + fill pending      | Tras `run-dev`                                                                  |
-| P1        | Cablear TradePlan en `propose` / payload confirm                | Fase acotada; Hoy podría leer el plan de verdad                                 |
-| —         | Ciclo 4+ ADR-031 §6                                             | **Prohibido** sin plan + decisión                                               |
-| Ops       | Purge V2 T+4 sem (~2026-09-19) · `TRUSTED_PROXIES` prod = owner | Sin código                                                                      |
+| Prioridad | Acción                                                          | Notas                                                                    |
+| --------- | --------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| **P0**    | **Commit** del working tree ADR-031                             | **HECHO** `818b0c7`. Stamp docs este cierre. **No push** salvo petición. |
+| P1        | Smoke navegador tira Hoy + drawer Confirmar + fill pending      | Tras `run-dev`                                                           |
+| P1        | Cablear TradePlan en `propose` / payload confirm                | Fase acotada; Hoy podría leer el plan de verdad                          |
+| —         | Ciclo 4+ ADR-031 §6                                             | **Prohibido** sin plan + decisión                                        |
+| Ops       | Purge V2 T+4 sem (~2026-09-19) · `TRUSTED_PROXIES` prod = owner | Sin código                                                               |
 
 ---
 
@@ -140,9 +140,8 @@ Candidatas ancladas:
 ### 7.1 Brief de arranque
 
 ```
-CONTEXTO (2026-08-24): repo Bolsa_V1. HEAD `020975c` = origin/main.
-Tag v1.7.0-beta → e3b943a. Working tree SUCIO: Ciclos 0–3 ADR-031 (tesis ≠ plan ≠ permiso)
-implementados SIN COMMIT.
+CONTEXTO (2026-08-24): repo Bolsa_V1. HEAD local `818b0c7` (ADR-031 Ciclos 0–3) + stamp docs.
+origin/main = `020975c`. Tag v1.7.0-beta → e3b943a. Working tree LIMPIO. Sin push.
 
 LEE PRIMERO (read-first, obligatorio):
 - docs/engineering/traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md
@@ -155,14 +154,14 @@ LEE PRIMERO (read-first, obligatorio):
 IDENTIDAD: QROS (Lab) + Investment OS (mesa) + Decision Spine. TradePlan EXTIENDE el spine,
 no lo sustituye. Ranking ≠ BUY. LAB ≠ TRADING. LLM nunca ejecuta.
 
-HECHO (working tree): TTL + precio 2% + H3 orphan fail-closed (store on) + pending fill
+HECHO (`818b0c7`): TTL + precio 2% + H3 orphan fail-closed (store on) + pending fill
 vía check_opening + TradePlan mapper A/B/C/H + strip Hoy (proyección Decision Board, NO
 mapper live). Batería spine 63. Shared build obligatorio para tests web.
 
 TAREA INMEDIATA: el propietario decide (E1).
-1) Commit del slice ADR-031 (si lo pide) — no push salvo petición.
-2) Smoke Hoy en navegador.
-3) Fase nueva: cablear TradePlan en propose/confirm.
+1) Smoke Hoy en navegador.
+2) Fase nueva: cablear TradePlan en propose/confirm.
+3) Push de `818b0c7` (+ stamp) solo si lo pide.
 NO abrir Ciclo 4+ (Entry / NO_NEW_LONGS / thesis health / MFE / Shadow AUTO / broker)
 sin plan + decisión.
 

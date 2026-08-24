@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · **ADR-031** modelo operativo (tesis ≠ plan ≠ permiso). Ciclo 0–3 **en working tree, sin commit**. Relevo: [`traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md`](./engineering/traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md). HEAD vivo = `git rev-parse HEAD`. Journal F1–F3 CERRADO. F9-A CERRADO. Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-24 · **ADR-031** modelo operativo (tesis ≠ plan ≠ permiso). Ciclo 0–3 **en `818b0c7`** (local, **sin push**; `origin/main` = `020975c`). Relevo: [`traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md`](./engineering/traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md). HEAD vivo = `git rev-parse HEAD`. Journal F1–F3 CERRADO. F9-A CERRADO. Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
