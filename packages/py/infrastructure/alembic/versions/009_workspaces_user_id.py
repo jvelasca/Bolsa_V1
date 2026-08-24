@@ -7,7 +7,6 @@ bootstrap (F7a). Idempotente: omite si la columna ya existe.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "009_workspaces_user_id"

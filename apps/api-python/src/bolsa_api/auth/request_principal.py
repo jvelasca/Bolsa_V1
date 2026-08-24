@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from bolsa_infrastructure.config import get_settings
 from fastapi import Request
 
 from bolsa_api.auth.principal import resolve_app_principal
+from bolsa_infrastructure.config import get_settings
 
 __all__ = ["get_request_principal"]
 

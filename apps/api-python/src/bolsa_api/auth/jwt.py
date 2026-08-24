@@ -6,10 +6,10 @@ import time
 from typing import Any
 
 import jwt
-from bolsa_infrastructure.config import Settings
 from starlette.requests import Request
 
 from bolsa_api.auth.session import SESSION_COOKIE_NAME
+from bolsa_infrastructure.config import Settings
 
 __all__ = [
     "decode_access_token",

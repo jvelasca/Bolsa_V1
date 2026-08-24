@@ -3,9 +3,6 @@ import time
 
 import jwt as pyjwt
 import pytest
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import UserRow
-from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
@@ -15,6 +12,9 @@ from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.auth.roles import require_role
 from bolsa_api.auth.session import SESSION_COOKIE_NAME, cookie_secure
 from bolsa_api.main import create_app, lifespan
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import UserRow
+from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 
 
 async def _jwt_for_app_user(app) -> str:

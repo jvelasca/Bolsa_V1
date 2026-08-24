@@ -10,7 +10,6 @@ from __future__ import annotations
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge import build_technical_assessment, run_decision_runtime
 from bolsa_analytics.knowledge.models import TechnicalInputs
-
 from bolsa_application.risk_engine import RiskDecision, check_opening
 
 # Inputs TA congelados (mismo vector que ``test_technical_assessment_runtime``).

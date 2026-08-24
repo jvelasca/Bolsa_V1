@@ -4,10 +4,6 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from bolsa_infrastructure.database.repositories.mandate_repository import (
-    MandateTenureRecord,
-    MandateTradeLinkRecord,
-)
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +21,10 @@ from bolsa_api.schemas.mandates import (
     SyncMandateBundleDto,
 )
 from bolsa_api.schemas.mappers import to_iso
+from bolsa_infrastructure.database.repositories.mandate_repository import (
+    MandateTenureRecord,
+    MandateTradeLinkRecord,
+)
 
 router = APIRouter()
 

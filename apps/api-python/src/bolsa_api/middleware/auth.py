@@ -2,9 +2,6 @@
 
 from collections.abc import Awaitable, Callable
 
-from bolsa_application.context.principal import reset_current_principal, set_current_principal
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -16,6 +13,9 @@ from bolsa_api.auth.jwt import (
 )
 from bolsa_api.auth.principal import resolve_app_principal
 from bolsa_api.auth.session import SESSION_COOKIE_NAME
+from bolsa_application.context.principal import reset_current_principal, set_current_principal
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 
 PUBLIC_PREFIXES = (
     "/api/health",

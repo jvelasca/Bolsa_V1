@@ -8,18 +8,6 @@ Ver docs/WORKSPACE_PERSISTENCE.md y docs/API_REFERENCE.md § Workspaces.
 
 from typing import Annotated
 
-from bolsa_application.workspaces import (
-    CreateWorkspace,
-    DeleteWorkspace,
-    GetDefaultWorkspace,
-    GetWorkspace,
-    ListWorkspaces,
-    UpdateWorkspace,
-)
-from bolsa_infrastructure.database.repositories.workspace_repository import (
-    WorkspaceRecord,
-    WorkspaceSummary,
-)
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +21,18 @@ from bolsa_api.schemas.workspaces import (
     WorkspaceResponseDto,
     WorkspacesListResponseDto,
     WorkspaceSummaryDto,
+)
+from bolsa_application.workspaces import (
+    CreateWorkspace,
+    DeleteWorkspace,
+    GetDefaultWorkspace,
+    GetWorkspace,
+    ListWorkspaces,
+    UpdateWorkspace,
+)
+from bolsa_infrastructure.database.repositories.workspace_repository import (
+    WorkspaceRecord,
+    WorkspaceSummary,
 )
 
 router = APIRouter()

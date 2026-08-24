@@ -17,7 +17,6 @@ from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable
 from typing import Protocol
 
-from bolsa_infrastructure.config import get_settings
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -25,6 +24,7 @@ from starlette.types import ASGIApp
 
 from bolsa_api.auth.jwt import extract_jwt_sub_from_request
 from bolsa_api.auth.principal import resolve_app_principal
+from bolsa_infrastructure.config import get_settings
 
 # Prefijos (path) sensibles → máx. requests por ventana. Orden: de más específico a más
 # genérico, porque _limit_for devuelve la primera coincidencia por startswith.

@@ -42,12 +42,11 @@ from bolsa_analytics.knowledge.technical_assessment import (
     TechnicalAssessment,
     build_technical_assessment,
 )
+from bolsa_application.cognitive_persistence import decision_session_to_record
+from bolsa_application.journal_writer import append_journal_event
 from bolsa_domain.entities.market_event import MarketEventCalendar
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
-
-from bolsa_application.cognitive_persistence import decision_session_to_record
-from bolsa_application.journal_writer import append_journal_event
 
 # Overrides de acción que ProposeRecommendation acepta del cliente (subconjunto de DecisionAction).
 _PROPOSE_OVERRIDE_OPTIONS = frozenset({"recommend_long", "recommend_short", "wait"})

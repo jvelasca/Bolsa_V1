@@ -4,12 +4,12 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from bolsa_infrastructure.database.models import WorkspaceRow
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.auth.principal import DEFAULT_APP_PRINCIPAL
 from bolsa_api.main import create_app, lifespan
+from bolsa_infrastructure.database.models import WorkspaceRow
 
 
 def _now() -> datetime:

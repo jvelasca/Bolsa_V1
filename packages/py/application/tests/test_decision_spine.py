@@ -18,11 +18,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from bolsa_analytics.signals.strategy import SignalEventV1
-from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
+from bolsa_analytics.signals.strategy import SignalEventV1
 from bolsa_application.execution_router import ExecutionRouter
 from bolsa_application.risk_engine import DATA_FRESHNESS_MAX_AGE_SECONDS
+from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 
 @dataclass

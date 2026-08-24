@@ -2,14 +2,14 @@
 
 from typing import Annotated
 
-from bolsa_application.platform_events import ListPlatformEvents
-from bolsa_domain.entities.platform_event import PlatformEventRecord
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import get_db_session, get_list_platform_events_use_case
 from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_api.schemas.platform_events import PlatformEventDto, PlatformEventsListResponseDto
+from bolsa_application.platform_events import ListPlatformEvents
+from bolsa_domain.entities.platform_event import PlatformEventRecord
 
 router = APIRouter()
 

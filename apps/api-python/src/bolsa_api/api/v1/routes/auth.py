@@ -7,10 +7,6 @@ usuario → 401. El status trata autenticado solo si el JWT decodifica.
 
 import logging
 
-from bolsa_infrastructure.auth.passwords import verify_password
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import UserRow
-from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,6 +22,10 @@ from bolsa_api.auth.session import (
     SESSION_COOKIE_PATH,
     cookie_secure,
 )
+from bolsa_infrastructure.auth.passwords import verify_password
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import UserRow
+from bolsa_infrastructure.database.repositories.user_repository import SqlAlchemyUserRepository
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

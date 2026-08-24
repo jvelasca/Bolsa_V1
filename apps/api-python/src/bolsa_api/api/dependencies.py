@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     )
 
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
+from bolsa_api.auth.request_principal import get_request_principal
 from bolsa_application.account_blob_state import (
     GetAccountCoreRState,
     GetAccountMandates,
@@ -264,8 +265,6 @@ from bolsa_infrastructure.database.repositories.workspace_repository import (
 )
 from bolsa_infrastructure.queue.scan_job_arq import ScanJobArqQueue
 from bolsa_infrastructure.queue.scan_job_redis import ScanJobRedisQueue
-
-from bolsa_api.auth.request_principal import get_request_principal
 
 
 def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:

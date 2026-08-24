@@ -21,15 +21,14 @@ from typing import Any, Literal
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge.models import TechnicalInputs
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
-from bolsa_domain.entities.market_event import MarketEventCalendar
-from bolsa_domain.ohlcv_time import parse_bar_timestamp
-
 from bolsa_application.account_mandate_gate import account_mandate_veto_reason
 from bolsa_application.trading_policy_guard import (
     CognitiveGuardResult,
     enforce_cognitive_policy_for_opening,
 )
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
+from bolsa_domain.entities.market_event import MarketEventCalendar
+from bolsa_domain.ohlcv_time import parse_bar_timestamp
 
 RISK_ENGINE_VERSION = "risk_engine_v0"
 RiskVerdict = Literal["ALLOW", "DENY"]

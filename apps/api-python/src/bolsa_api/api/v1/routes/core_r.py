@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +15,7 @@ from bolsa_api.api.dependencies import (
 )
 from bolsa_api.schemas.core_r import CoreRBundleDto, CoreRBundleResponseDto, SyncCoreRBundleDto
 from bolsa_api.schemas.mappers import to_iso
+from bolsa_application.run_core_r_server_cron import RunCoreRServerCron
 
 router = APIRouter()
 

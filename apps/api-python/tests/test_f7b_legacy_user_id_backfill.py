@@ -11,11 +11,11 @@ from types import ModuleType
 from uuid import uuid4
 
 import pytest
-from bolsa_infrastructure.config import get_settings
-from bolsa_infrastructure.database.models import InvestmentAccountRow
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bolsa_api.main import create_app, lifespan
+from bolsa_infrastructure.config import get_settings
+from bolsa_infrastructure.database.models import InvestmentAccountRow
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _BACKFILL_SCRIPT = _REPO_ROOT / "scripts" / "verify" / "backfill_legacy_account_user_id.py"

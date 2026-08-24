@@ -2,13 +2,13 @@
 
 from datetime import UTC, datetime, timedelta
 
+from bolsa_application.account_mandate_gate import account_mandate_veto_reason
 from bolsa_application.risk_engine import (
     DATA_FRESHNESS_MAX_AGE_SECONDS,
     RISK_ENGINE_VERSION,
     check_opening,
     data_freshness_veto_reason,
 )
-from bolsa_application.account_mandate_gate import account_mandate_veto_reason
 
 
 def test_kill_switch_denies_before_gate() -> None:

@@ -60,9 +60,6 @@ from bolsa_analytics.cognitive.decision_session import (
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.cognitive.recommendation import Recommendation
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
-
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
@@ -70,6 +67,8 @@ from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.journal_writer import append_journal_event
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
 _CLOSING_ACTIONS = {"exit_hint", "reduce"}
