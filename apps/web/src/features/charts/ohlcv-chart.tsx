@@ -47,6 +47,7 @@ import {
 import { ChartDrawingsLayer } from "@/features/charts/chart-drawings-layer";
 import { ChartCrosshairMeasure } from "@/features/charts/chart-crosshair-measure";
 import { ChartCursorStyleOverlay } from "@/features/charts/chart-cursor-style-overlay";
+import { ChartF3OrderProjectionLayer } from "@/features/charts/chart-f3-order-projection-layer";
 import { ChartTimeAxisLabel } from "@/features/charts/chart-time-axis-label";
 import {
   blocksChartPan,
@@ -1084,6 +1085,13 @@ export function OhlcvChart({
           layerLocked={drawingsLayerLocked}
         />
       )}
+      {chartReady && hasChartData(bars) && instrumentId ? (
+        <ChartF3OrderProjectionLayer
+          series={mainSeriesRef.current}
+          instrumentId={instrumentId}
+          chartReady={chartReady}
+        />
+      ) : null}
     </div>
   );
 }

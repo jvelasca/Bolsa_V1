@@ -79,6 +79,8 @@ _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se en
 > **Firma SEMI (contrato):** al **aceptar** (`Confirmar`), la operación firma contra la propuesta original (`DecisionPackage`). Si lo que firmas **no coincide** con lo propuesto (otro valor o cambiar compra↔venta), se **rechaza con «rechazado por el sistema»** y el ítem **sale de la cola** (no se ejecuta nada). Editar tamaño/precio **sí** es válido. Cuando no hay propuesta original (`contract: ausente`) la firma sigue como antes. Detalle: `traspaso-relevo-f0-6-cierre-apertura-siguiente-2026-08-24.md` (D2).
 >
 > **Chips de mesa (U4):** en Operativa (y en la barra del gráfico si hay package en cola) ves la **acción del DecisionPackage** y el **Fit** (PASS/VETO) ya calculado. Sin dato de Fit → `Fit · —` (fail soft; nunca se inventa PASS). No sustituyen la firma en Confirmar.
+>
+> **Proyección F3 en gráfico (U5):** con propuesta en cola para el valor activo, el gráfico muestra una **línea de precio** (p. ej. `F3 · LONG @ …`) y un atajo **Firmar** al panel Confirmar. Solo visual — no ejecuta ni bypasea la firma SEMI.
 
 ### AUTO (No disponible · BETA)
 

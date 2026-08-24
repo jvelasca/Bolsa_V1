@@ -388,6 +388,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
           />
           <div className="flex items-center gap-0.5">
             <MesaTipButton tip="operativa-fit-chip" />
+            <MesaTipButton tip="chart-f3-projection" />
             <MesaTipButton tip="operativa-recomendacion" />
           </div>
         </div>

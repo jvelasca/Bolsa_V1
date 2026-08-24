@@ -15,7 +15,7 @@ import {
 afterEach(() => cleanup());
 
 describe("mesa-tip-catalog", () => {
-  it("exposes U1 tip ids plus U3 confirm-drawer and U4 fit-chip tips", () => {
+  it("exposes U1 tip ids plus U3 confirm-drawer, U4 fit-chip and U5 chart-projection tips", () => {
     expect(MESA_TIP_IDS).toEqual(
       expect.arrayContaining([
         "operativa-proponer",
@@ -23,9 +23,10 @@ describe("mesa-tip-catalog", () => {
         "operativa-recomendacion",
         "operativa-confirm-drawer",
         "operativa-fit-chip",
+        "chart-f3-projection",
       ]),
     );
-    expect(MESA_TIP_IDS).toHaveLength(5);
+    expect(MESA_TIP_IDS).toHaveLength(6);
   });
 
   it("returns Spanish copy with optional links", () => {
