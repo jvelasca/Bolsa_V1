@@ -9,7 +9,6 @@ Usado por POST /api/instruments/import (búsqueda Yahoo en listas).
 """
 from dataclasses import dataclass
 
-from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 from bolsa_domain.entities.instrument import Instrument
 from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from bolsa_domain.value_objects.market import SyncResult
@@ -18,6 +17,32 @@ from bolsa_infrastructure.database.repositories.instrument_repository import (
 )
 from bolsa_infrastructure.ids import new_id
 from bolsa_infrastructure.instrument_search import normalize_isin
+
+from bolsa_application.sync_instrument import SyncInstrumentDailyBars
+
+
+def normalize_yahoo_symbol(value: str) -> str:
+    """Normaliza un símbolo Yahoo eliminando barras no canónicas del sufijo bursátil.
+
+    Algunos providers remotos suministran tickers mangled (``BP/`` · ``BT/A`` ·
+    ``BP/.L`` · ``BT/A.L``) que Yahoo no resuelve (404) y que rebotan en el
+    auto-sync. Se quita cualquier ``/`` para obtener la forma canónica
+    (``BP`` · ``BTA`` · ``BP.L`` · ``BTA.L``).
+    """
+    return value.strip().upper().replace("/", "")
+
+
+def normalize_symbol(value: str, yahoo_symbol: str) -> str:
+    """Normaliza un símbolo de catálogo; si queda vacío, deriva del yahoo_symbol.
+
+    Cuando el símbolo viene vacío se usa el yahoo normalizado sin el sufijo
+    de intercambio (``.MC``/``.MA``) para conservar el catálogo conciso.
+    """
+    out = value.strip().upper().replace("/", "")
+    if out:
+        return out
+    derived = normalize_yahoo_symbol(yahoo_symbol)
+    return derived.replace(".MC", "").replace(".MA", "")
 
 
 def infer_market_meta(yahoo_symbol: str, exchange: str, currency: str) -> tuple[str, str]:
@@ -79,6 +104,9 @@ class ImportInstrument:
         if normalized_isin and len(normalized_isin) != 12:
             normalized_isin = None
 
+        yahoo = normalize_yahoo_symbol(yahoo)
+        normalized_symbol = normalize_symbol(symbol, yahoo)
+
         existing = await self._repo.get_by_yahoo_symbol(yahoo)
         created = False
 
@@ -86,7 +114,7 @@ class ImportInstrument:
             market_exchange, country = infer_market_meta(yahoo, exchange, currency)
             instrument = Instrument(
                 id=new_id(),
-                symbol=symbol.strip().upper() or yahoo.replace(".MC", "").replace(".MA", ""),
+                symbol=normalized_symbol,
                 yahoo_symbol=yahoo,
                 name=name.strip() or symbol,
                 exchange=market_exchange,

@@ -50,7 +50,7 @@ El propietario confirmó fase = **Ops** (backlog §4): checklist operativo de R-
 
 Candidatos registrados (backlog §0 + PROJECT_STATE §3 + DEUDA §4):
 
-- **Ops residual (manual, sin código):** los 2 ítems pendientes del propietario (secret scanning UI · `TRUSTED_PROXIES` prod) + verificar que el auto-sync de `BP.L` ya no emite warning 404.
+- **Ops residual (manual, sin código):** los 2 ítems pendientes del propietario (secret scanning UI · `TRUSTED_PROXIES` prod). **NOTA 2026-08-24:** el tercer ítem (verificar que el auto-sync de `BP.L` ya no emite warning 404) quedó **RESUELTO por una rebanada de código+BD** (backlog §0 RELEVO "FIX SANEADO SÍMBOLOS `/`"): se saneó `_symbol_parts` (provider FTSE100) + `ImportInstrument`, y se limpió la BD (0 símbolos con `/`, `idx-ftse100`=100 limpias). Verificación abierta (entorno): confirmar que el auto-sync de `BP.L` ya no emite 404 (depende de disponibilidad del ticker en Yahoo); si se confirma, puede eliminarse `_backup_instruments_corrupt`.
 - **Unificación Research→Radar** (`plan-unificacion-research-radar-2026-08-21.md`, DRAFT/APARCADO — requiere decisión; enlaza con D3: Lab/Radar universo laboratorio).
 - **F-IND-1 residual** (causalidad indicadores chikou/fractals en research; NOTA en F2).
 - **Limpieza residuos históricos dev** (`m7-win-*`, `M2 *`).

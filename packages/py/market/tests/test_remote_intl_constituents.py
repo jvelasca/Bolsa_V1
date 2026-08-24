@@ -12,6 +12,7 @@ from bolsa_market.indices.remote_market_constituents import (
     NDX_CSV_URL,
     STOXX50E_MIRROR_URL,
     STOXX50E_WIKI_URL,
+    _symbol_parts,
     clear_remote_intl_constituents_cache,
     fetch_dax_members,
     fetch_ndx_members,
@@ -19,6 +20,24 @@ from bolsa_market.indices.remote_market_constituents import (
     fetch_yfiua_members,
     yfiua_csv_url,
 )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected_symbol", "expected_yahoo"),
+    [
+        ("BP.L", "BP", "BP.L"),
+        ("BP/.L", "BP", "BP.L"),
+        ("BP/", "BP", "BP"),
+        ("BT/A.L", "BTA", "BTA.L"),
+        ("  TEF.MC ", "TEF", "TEF.MC"),
+    ],
+)
+def test_symbol_parts_strips_slash_and_whitespace(
+    raw: str, expected_symbol: str, expected_yahoo: str
+) -> None:
+    symbol, yahoo = _symbol_parts(raw)
+    assert symbol == expected_symbol
+    assert yahoo == expected_yahoo
 
 
 @pytest.fixture(autouse=True)

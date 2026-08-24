@@ -83,7 +83,14 @@ NDX_CSV_URL = yfiua_csv_url("nasdaq100")
 
 
 def _symbol_parts(yahoo: str) -> tuple[str, str]:
-    yahoo = yahoo.strip().upper()
+    """Separa símbolo base de exchange y elimina barras no canónicas del ticker.
+
+    Algunos proveedores de constitutivos (CSV yfiua) suministran tickers con
+    slash (``BP/`` · ``BT/A`` · ``BP/.L`` · ``BT/A.L``) que Yahoo resuelve como
+    404. Se quita cualquier ``/`` para obtener la forma canónica de Yahoo
+    (``BP`` · ``BTA`` · ``BP.L`` · ``BTA.L``) en símbolo y yahoo_symbol.
+    """
+    yahoo = yahoo.strip().upper().replace("/", "")
     base = yahoo.split(".", 1)[0]
     return base, yahoo
 
