@@ -11,6 +11,7 @@ from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
 )
+from bolsa_analytics.cognitive.trade_plan import build_v0_trade_plan_dict
 from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_analytics.indicators.compute import OhlcvBar
@@ -42,11 +43,12 @@ from bolsa_analytics.knowledge.technical_assessment import (
     TechnicalAssessment,
     build_technical_assessment,
 )
-from bolsa_application.cognitive_persistence import decision_session_to_record
-from bolsa_application.journal_writer import append_journal_event
 from bolsa_domain.entities.market_event import MarketEventCalendar
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
+
+from bolsa_application.cognitive_persistence import decision_session_to_record
+from bolsa_application.journal_writer import append_journal_event
 
 # Overrides de acción que ProposeRecommendation acepta del cliente (subconjunto de DecisionAction).
 _PROPOSE_OVERRIDE_OPTIONS = frozenset({"recommend_long", "recommend_short", "wait"})
@@ -115,6 +117,7 @@ class ProposeRecommendationResult:
     decision_session: dict[str, Any] | None = None
     combined_score: float | None = None
     weight_context: dict[str, Any] | None = None
+    trade_plan: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -138,6 +141,8 @@ class ProposeRecommendationResult:
             data["combinedScore"] = self.combined_score
         if self.weight_context is not None:
             data["weightContext"] = self.weight_context
+        if self.trade_plan is not None:
+            data["tradePlan"] = self.trade_plan
         return data
 
 
@@ -380,6 +385,16 @@ class ProposeRecommendationFromTa:
             status="awaiting_human",
             edge_report_ref=edge_ref,
         )
+        trade_plan_dict = build_v0_trade_plan_dict(
+            decision_id=runtime.package.decision_id,
+            instrument_id=instrument_id,
+            action=str(runtime.package.action),
+            compliance_check=runtime.package.compliance_check,
+            entry=price,
+            opportunity_score=runtime.combined_score,
+            expires_at=rec.expires_at,
+            expired=False,
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -431,6 +446,7 @@ class ProposeRecommendationFromTa:
                 "decisionPackage": runtime.package.to_dict(),
                 "lastClose": last_close,
                 "predictionsDoNotDecide": True,
+                "tradePlan": trade_plan_dict,
             },
             recommendation=rec.to_dict(),
             policy_gate=runtime.policy_gate,
@@ -477,4 +493,5 @@ class ProposeRecommendationFromTa:
             decision_session=session_dict,
             combined_score=runtime.combined_score,
             weight_context=weight_ctx,
+            trade_plan=trade_plan_dict,
         )

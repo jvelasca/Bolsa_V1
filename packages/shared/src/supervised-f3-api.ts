@@ -19,6 +19,7 @@ import type {
   RecommendationV1,
   TechnicalAssessmentV1,
   DecisionSessionV1,
+  TradePlanV1,
   WeightContextV1,
 } from "./cognitive/index.js";
 
@@ -52,6 +53,8 @@ export type SupervisedProposePayloadDto = RecommendationV1 & {
   decisionSession?: DecisionSessionV1;
   weightContext?: WeightContextV1;
   combinedScore?: number;
+  /** Plan condicional vivo (ADR-031). Ausente → Hoy usa heurística de gate. */
+  tradePlan?: TradePlanV1;
 };
 
 /** Meta de enqueue del web (`SupervisedEnqueueMeta`). */

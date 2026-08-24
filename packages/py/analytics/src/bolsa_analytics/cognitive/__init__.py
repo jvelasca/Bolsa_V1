@@ -105,6 +105,7 @@ from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_fro
 from bolsa_analytics.cognitive.trade_plan import (
     TradePlan,
     build_trade_plan,
+    build_v0_trade_plan_dict,
     compute_risk_size,
 )
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
@@ -190,6 +191,7 @@ __all__ = [
     "build_outcome_from_prices",
     "build_propose_session",
     "build_trade_plan",
+    "build_v0_trade_plan_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",

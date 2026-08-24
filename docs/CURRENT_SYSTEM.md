@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · **ADR-031** modelo operativo (tesis ≠ plan ≠ permiso). Ciclo 0–3 **en `818b0c7`** (local, **sin push**; `origin/main` = `020975c`). Relevo: [`traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md`](./engineering/traspaso-relevo-adr-031-tradeplan-hoy-cierre-apertura-siguiente-2026-08-24.md). HEAD vivo = `git rev-parse HEAD`. Journal F1–F3 CERRADO. F9-A CERRADO. Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-24 · **ADR-031** tesis ≠ plan ≠ permiso. Ciclos 0–3 en `818b0c7` + stamp `593cbd1` (local, **sin push**; `origin/main` = `020975c`). TradePlan **viaja** en propose/confirm (working tree P1, pendiente commit). Relevo: [`traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md`](./engineering/traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -33,7 +33,7 @@ Tres capas (ADR-031): **tesis** (`DecisionPackage`) ≠ **plan** (`TradePlan` v0
 
 ```
 Dato → Assessment → run_decision_runtime → DecisionPackage (tesis)
-  → TradePlan v0 (WATCH|ARMED|TRIGGERED|BLOCKED|EXPIRED + whyNot + size si hay stop)
+  → TradePlan v0 en propose (`data.tradePlan` + `runtime.tradePlan`) y echo en confirm
   → Policy Gate + check_opening (Fit de cesta + DS-05 freshness + DS-03 mandate)
   → ConfirmRecommendationIntent (SEMI, humano; TTL + precio + H3 orphan fail-closed)
      O  ExecutionRouter (AUTO paper, flag off)
@@ -43,7 +43,7 @@ Dato → Assessment → run_decision_runtime → DecisionPackage (tesis)
 
 SEMI y AUTO son **el mismo risk de cesta**, distinta autorización (D1). `DecisionPackage` es el contrato de identidad en el confirm (D2). `TradePlan` **no** sustituye el spine: lo extiende.
 
-Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). No es una sexta puerta; Confirmar sigue siendo la firma.
+Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere `tradePlan` vivo del payload F3; si no hay, heurística de buckets. No es una sexta puerta; Confirmar sigue siendo la firma.
 
 ## Limitaciones conocidas (no son bugs de esta rebanada)
 
@@ -55,7 +55,8 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). No es una
 - `pending_orders` fill: `POST /api/pending-orders/{id}/fill` (ya no `executeTrade` directo desde el monitor).
 - Confirm SEMI: perfil activo vía `active_profile_id` → `check_opening` (H5 CERRADA; mismo SoT AUTO). Sin perfil → defaults moderate.
 - Composite `portfolioConstraints` sigue `not_evaluated`; Fit vive al lado.
-- **DS-03 Account Mandate Gate CERRADA (`41adb8e`):** tenure abierto server-side (`mandate_tenures` vía sync cliente) → `check_opening` VETO fail-closed sin mandato / mismatch estrategia AUTO. Adopción UI (`strategy-adoption`) sigue siendo proyección cliente; el gate usa BD. Exits fuera. Batería `pnpm test:decision-spine` **63**.
+- **DS-03 Account Mandate Gate CERRADA (`41adb8e`):** tenure abierto server-side (`mandate_tenures` vía sync cliente) → `check_opening` VETO fail-closed sin mandato / mismatch estrategia AUTO. Adopción UI (`strategy-adoption`) sigue proyección cliente; el gate usa BD. Exits fuera. Batería `pnpm test:decision-spine` **67**.
+- TradePlan v0 en propose/confirm: sin Entry Engine el plan vivo es casi siempre **WATCH** (`no_stop` / `entry`). Decision Board HTTP **no** expone `tradePlan` en sesiones (sin `contract:gen`).
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). Attribution **sin abrir** (Ciclo 6, ADR-031 §6).
 - Diferido ADR-031: Entry families, `NO_NEW_LONGS`, thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
 

@@ -48,6 +48,8 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
 - **ADR-031 (Ciclo 1):** TTL `expiresAt` → `expired`; aperturas orphan con store
   cableado → `orphan_opening_blocked`; último close vs `suggestedPrice` (banda 2 %)
   → `stale_price`.
+- **ADR-031 TradePlan (E1 P1):** `result["tradePlan"]` es la capa PLAN
+  (WATCH|ARMED|TRIGGERED|BLOCKED|EXPIRED). No sustituye `check_opening`.
 """
 
 from __future__ import annotations
@@ -63,6 +65,7 @@ from bolsa_analytics.cognitive.decision_session import (
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.cognitive.recommendation import Recommendation
+from bolsa_analytics.cognitive.trade_plan import build_v0_trade_plan_dict
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
@@ -239,6 +242,59 @@ def recommendation_is_expired(expires_at: str | None, *, now: datetime | None = 
     return parsed < moment
 
 
+def resolve_confirm_trade_plan(
+    *,
+    raw: dict[str, Any],
+    rec: Recommendation,
+    package: dict[str, Any] | None,
+    session_record: DecisionSessionRecord | None,
+) -> dict[str, Any]:
+    """PLAN layer on confirm: echo propose payload, else rebuild v0.
+
+    Order: ``raw["tradePlan"]`` if dict; else session ``runtime.tradePlan`` if
+    the propose session was already loaded; else ``build_v0_trade_plan_dict``
+    (entry_ready False, structural_stop None). Does not grant permiso —
+    ``check_opening`` remains the authority even if status were TRIGGERED.
+    """
+    incoming = raw.get("tradePlan")
+    if isinstance(incoming, dict):
+        return incoming
+
+    runtime: dict[str, Any] | None = None
+    if session_record is not None and session_record.payload:
+        maybe_runtime = session_record.payload.get("runtime")
+        if isinstance(maybe_runtime, dict):
+            runtime = maybe_runtime
+            session_plan = runtime.get("tradePlan")
+            if isinstance(session_plan, dict):
+                return session_plan
+
+    opportunity: float | None = None
+    if runtime is not None:
+        raw_score = runtime.get("combinedScore")
+        if isinstance(raw_score, int | float):
+            opportunity = float(raw_score)
+
+    compliance = None if package is None else package.get("complianceCheck")
+    entry: float | None = None
+    if rec.suggested_price is not None:
+        try:
+            entry = float(rec.suggested_price)
+        except (TypeError, ValueError):
+            entry = None
+
+    return build_v0_trade_plan_dict(
+        decision_id=rec.decision_id,
+        instrument_id=rec.instrument_id,
+        action=str(rec.action),
+        compliance_check=compliance,
+        entry=entry,
+        opportunity_score=opportunity,
+        expires_at=rec.expires_at,
+        expired=recommendation_is_expired(rec.expires_at),
+    )
+
+
 def price_revalidation_reason(
     suggested_price: float,
     last_close: float | None,
@@ -356,12 +412,19 @@ class ConfirmRecommendationIntent:
         # se marca la ausencia de contrato para visibilidad.
         contract_status: str = "absent"
         package: dict[str, Any] | None = None
+        session_record: DecisionSessionRecord | None = None
         if self._store is not None and session_id:
             session_record = await self._store.get_decision_session(session_id)
             package = resolve_session_decision_package(session_record)
             if package is not None:
                 contract_status = "present_verified"
         result["intent"]["contract"] = contract_status
+        result["tradePlan"] = resolve_confirm_trade_plan(
+            raw=raw,
+            rec=rec,
+            package=package,
+            session_record=session_record,
+        )
         await append_journal_event(
             self._journal_writer,
             event_type=(

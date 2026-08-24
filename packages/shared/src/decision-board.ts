@@ -5,6 +5,8 @@
  * @see apps/api-python/src/bolsa_api/schemas/accounts.py (DecisionBoardDto)
  */
 
+import type { TradePlanV1 } from "./cognitive/trade-plan.js";
+
 export type DecisionGate = "PASS" | "VETO" | "DEFERRED" | "unknown";
 
 export type DecisionBoardBucketCountsV1 = {
@@ -25,6 +27,8 @@ export type DecisionSessionViewV1 = {
   createdAt: string;
   /** TODO(f0.6) normalizar a union DecisionGate cuando el backend lo garantice. */
   gate: string;
+  /** Plan condicional vivo (ADR-031); ausente → Hoy usa heurística de gate. */
+  tradePlan?: TradePlanV1;
 };
 
 export type SemiF3ViewV1 = {

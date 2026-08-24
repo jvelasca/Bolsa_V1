@@ -45,6 +45,7 @@ const pyTests = [
   'packages/py/application/tests/test_risk_engine_portfolio_fit.py',
   'packages/py/application/tests/test_execution_router.py',
   'packages/py/application/tests/test_trade_plan.py',
+  'packages/py/application/tests/test_confirm_trade_plan.py',
   'packages/py/application/tests/test_fill_pending_order.py',
 ];
 

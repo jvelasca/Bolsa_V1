@@ -60,6 +60,53 @@ class TradePlan:
         }
 
 
+def compliance_fit_ok(compliance_check: object) -> bool:
+    """True unless ``compliance_check`` is a dict with ``passed is False``.
+
+    Propose no re-ejecuta cesta: un veto de Fit ya materializado en el package
+    marca el plan BLOCKED; ausencia o forma rara no inventa un fail.
+    """
+    return not (
+        isinstance(compliance_check, dict) and compliance_check.get("passed") is False
+    )
+
+
+def build_v0_trade_plan_dict(
+    *,
+    decision_id: str,
+    instrument_id: str,
+    action: str,
+    compliance_check: object = None,
+    entry: float | None,
+    opportunity_score: float | None,
+    expires_at: str | None,
+    expired: bool = False,
+) -> dict[str, object]:
+    """TradePlan v0 persistible (PLAN layer; ranking ≠ BUY).
+
+    Freshness/mandate quedan True: esos gates viven en confirm ``check_opening``.
+    ``entry_ready=False`` y ``structural_stop=None`` hasta Entry Engine (Ciclo 4).
+    Equity 0: el propose no inyecta GetAccountSummary en esta rebanada.
+    """
+    plan = build_trade_plan(
+        decision_id=decision_id,
+        instrument_id=instrument_id,
+        action=action,
+        fit_ok=compliance_fit_ok(compliance_check),
+        freshness_ok=True,
+        mandate_ok=True,
+        expired=expired,
+        entry_ready=False,
+        entry=entry,
+        structural_stop=None,
+        equity=0.0,
+        risk_pct=0.5,
+        opportunity_score=opportunity_score,
+        expires_at=expires_at,
+    )
+    return plan.to_dict()
+
+
 def compute_risk_size(
     *,
     equity: float,

@@ -44,8 +44,9 @@ def test_propose_from_ta_bullish_bars():
     ohlcv = _FakeOhlcv(bars)
     port = _FakeFeaturePort()
 
-    import bolsa_application.propose_recommendation as mod
     from bolsa_analytics.features.models import FeatureSnapshot
+
+    import bolsa_application.propose_recommendation as mod
 
     real_materialize = mod.materialize_feature_snapshot
 
@@ -103,6 +104,14 @@ def test_propose_from_ta_bullish_bars():
         "reduce",
         "exit_hint",
     }
+    payload = result.to_dict()
+    plan = payload["tradePlan"]
+    assert isinstance(plan, dict)
+    assert plan["status"] in {"WATCH", "ARMED", "TRIGGERED", "BLOCKED", "EXPIRED"}
+    assert isinstance(plan["whyNot"], list)
+    assert plan["decisionId"] == result.package.decision_id
+    session_runtime = (payload.get("decisionSession") or {}).get("runtime") or {}
+    assert session_runtime.get("tradePlan") == plan
 
 
 def test_propose_with_fundamentals_port():
@@ -121,8 +130,9 @@ def test_propose_with_fundamentals_port():
                 "fetchedAt": "2026-07-23T00:00:00Z",
             }
 
-    import bolsa_application.propose_recommendation as mod
     from bolsa_analytics.features.models import FeatureSnapshot
+
+    import bolsa_application.propose_recommendation as mod
 
     real_materialize = mod.materialize_feature_snapshot
 
@@ -193,8 +203,9 @@ def test_propose_with_macro_and_evidence():
         async def latest_edge_report(self, *, strategy_or_signal_ref=None, account_id=None):
             return report
 
-    import bolsa_application.propose_recommendation as mod
     from bolsa_analytics.features.models import FeatureSnapshot
+
+    import bolsa_application.propose_recommendation as mod
 
     real_materialize = mod.materialize_feature_snapshot
 
