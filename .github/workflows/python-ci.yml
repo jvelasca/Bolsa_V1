@@ -8,6 +8,7 @@ on:
       - 'scripts/verify/**'
       - 'pyproject.toml'
       - 'Makefile'
+      - '.github/workflows/python-ci.yml'
   pull_request:
     paths:
       - 'apps/api-python/**'
@@ -15,6 +16,7 @@ on:
       - 'scripts/verify/**'
       - 'pyproject.toml'
       - 'Makefile'
+      - '.github/workflows/python-ci.yml'
 
 jobs:
   quality:
@@ -32,6 +34,11 @@ jobs:
       - name: Ruff
         # Root pyproject select (E/F/I/UP/B); package pyprojects lack lint.select.
         run: uv run ruff check packages/py apps/api-python --config pyproject.toml
+
+      - name: Import-linter
+        # F9-A3: 4 contracts in packages/py/.importlinter (domain purity,
+        # no-ai-sdk, no-ai-in-domain, analytics-market-independence).
+        run: uv run lint-imports --config packages/py/.importlinter
 
       - name: Mypy
         # P1.6 por fases COMPLETADO (2026-08-12): deuda preexistente (~448)

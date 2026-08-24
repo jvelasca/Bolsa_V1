@@ -50,7 +50,7 @@ Contratos actuales (4/4, verdes post F9-A2):
 | `no-ai-package-in-domain`       | forbidden    | domain → no bolsa_ai                                   |
 | `analytics-market-independence` | independence | bolsa_analytics ↔ bolsa_market sin imports cruzados    |
 
-**F9-A2 (2026-08-24):** contrato `analytics-market-independence` añadido (ADR-030 §2.3). `lint-imports` 4/4 KEPT (441 files, 2156 deps). CI Python aún **no** invoca lint-imports — propuesta A2.3 en fase separada.
+**F9-A2 (2026-08-24):** contrato `analytics-market-independence` añadido (ADR-030 §2.3). `lint-imports` 4/4 KEPT. **F9-A3:** Python CI invoca `lint-imports` (`.github/workflows/python-ci.yml`).
 
 ### 1.5 Re-export compat (no violación, deuda menor)
 
@@ -107,11 +107,11 @@ Requiere ADR + migración + `contract:gen`. **PARKED.**
 
 **Alcance:** `packages/py/.importlinter` + documentación en README py si aplica.
 
-| #    | Tarea                                           | Detalle                                                                                   | Estado |
-| ---- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- | ------ |
-| A2.1 | Añadir contrato `analytics-market-independence` | type `independence`, modules `bolsa_analytics` + `bolsa_market`                           | ✅     |
-| A2.2 | CI/local                                        | `lint-imports --config packages/py/.importlinter` → 4/4 verde (441 files, 2156 deps)      | ✅     |
-| A2.3 | Opcional CI step                                | Python CI **no** invoca lint-imports hoy — proponer en fase separada (no bloqueante F9-A) | ⏸️     |
+| #    | Tarea                                           | Detalle                                                                              | Estado |
+| ---- | ----------------------------------------------- | ------------------------------------------------------------------------------------ | ------ |
+| A2.1 | Añadir contrato `analytics-market-independence` | type `independence`, modules `bolsa_analytics` + `bolsa_market`                      | ✅     |
+| A2.2 | CI/local                                        | `lint-imports --config packages/py/.importlinter` → 4/4 verde (441 files, 2156 deps) | ✅     |
+| A2.3 | CI step (F9-A3)                                 | Python CI `uv run lint-imports --config packages/py/.importlinter` — 4/4 verde local | ✅     |
 
 **Batería A2:** lint-imports 4/4 ✅ · ruff N/A (INI) · regresión pytest market+analytics (coordinador).
 
@@ -119,13 +119,18 @@ Requiere ADR + migración + `contract:gen`. **PARKED.**
 
 ---
 
-### F9-A3 — Cierre docs (implementación)
+### F9-A3 — CI lint-imports + cierre docs ✅ CERRADO 2026-08-24
 
-| #    | Tarea                                                   | Detalle                             |
-| ---- | ------------------------------------------------------- | ----------------------------------- |
-| A3.1 | Actualizar `plan-r9-refactor-hardening` § FASE 9 estado | F9-A cerrada                        |
-| A3.2 | `PROJECT_STATE.md` + backlog update-last                | commit coordinador                  |
-| A3.3 | Traspaso cierre F9-A                                    | `traspaso-relevo-r9-f9-cierre-*.md` |
+El relevo post F1–F3 nombra **F9-A3 = lint-imports en CI** (A2.3). El plan original también pedía cierre docs (A3.1–A3.3). Ambos en este slice.
+
+| #     | Tarea                                                   | Detalle                                                            | Estado |
+| ----- | ------------------------------------------------------- | ------------------------------------------------------------------ | ------ |
+| A3.CI | Step Import-linter en `.github/workflows/python-ci.yml` | Tras Ruff; path filter incluye el propio workflow                  | ✅     |
+| A3.1  | Actualizar `plan-r9-refactor-hardening` § FASE 9        | F9-A cerrada · F9-B PARKED                                         | ✅     |
+| A3.2  | `PROJECT_STATE.md` + backlog update-last                | HEAD `8a1e64d`                                                     | ✅     |
+| A3.3  | Traspaso                                                | `traspaso-relevo-ops-alembic-010-f9a3-monitor-purge-2026-08-24.md` | ✅     |
+
+**Batería A3:** lint-imports **4 kept, 0 broken** (442 files, 2160 deps) vía `importlinter.cli` (Windows App Control bloquea `lint-imports.exe`).
 
 ---
 
@@ -159,7 +164,7 @@ Requiere ADR + migración + `contract:gen`. **PARKED.**
 ## 4. Orden de subagentes (implementación)
 
 ```text
-Fase 0 (docs) ──► F9-A1 (tests) ──► F9-A2 (import-linter) ──► F9-A3 (docs cierre)
+Fase 0 (docs) ──► F9-A1 (tests) ──► F9-A2 (import-linter) ──► F9-A3 (CI + docs) ✅
                       │                    │
                       └──── batería ───────┘
 ```

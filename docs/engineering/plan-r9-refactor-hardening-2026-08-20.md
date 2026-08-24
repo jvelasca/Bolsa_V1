@@ -298,6 +298,8 @@ FASE 9  → (opcional/V2) desacoplar analytics↔market + puente legacy    [🟡
 
 **Criterio de aceptación:** `import-linter` verde; dependencias declaradas; sin ciclo analytics↔market.
 
+**Estado (2026-08-24):** **F9-A CERRADA** (A1 tests `703991e` · A2 contrato `a1e1681` · A3 CI lint-imports). **F9-B** (`legacy_portfolio_id`) **PARKED** — no abrir sin ADR (ADR-030). Plan acotado: `plan-r9-f9-analytics-market-2026-08-24.md`.
+
 ---
 
 ## 4. Documentación, DOCSTRINGS y tests (obligatorios por fase)

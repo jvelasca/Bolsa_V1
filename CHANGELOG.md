@@ -4,7 +4,8 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
-Sin cambios pendientes de release. Próximo ciclo: **decisión del propietario** (idle). Ver `traspaso-relevo-tag-v1-7-0-beta-cierre-ciclo-2026-08-24.md`.
+- **F9-A3:** gate `lint-imports` en Python CI (4 contratos, `packages/py/.importlinter`).
+- Post-`v1.7.0-beta` ya en `main`: OrderProposal/Journal F1–F3 + F9-A1/A2 (`8a1e64d`). Purge V2 sigue MONITOR. F9-B PARKED.
 
 ## [1.7.0-beta] — 2026-08-24
 

@@ -1,7 +1,7 @@
 # Monitor — Purge V2 + ops checklist (living)
 
 > **Padre:** [`plan-r12-pending-delete-v2-purge-2026-08-22.md`](./plan-r12-pending-delete-v2-purge-2026-08-22.md) · [`ops-r1-seguridad-operaciones-2026-08-19.md`](./ops-r1-seguridad-operaciones-2026-08-19.md) · [`pending-delete/README.md`](./pending-delete/README.md).
-> **Ciclo:** 3/5 (monitor puro) · **AsOf:** 2026-08-24 · HEAD tag **`v1.7.0-beta` → `e3b943a`**.
+> **Ciclo:** 3/5 (monitor puro) · **AsOf:** 2026-08-24 · HEAD **`8a1e64d`** = `origin/main` · tag **`v1.7.0-beta` → `e3b943a`**.
 > **Regla:** **NO PURGE** sin decisión explícita del propietario + E8 completo. Este doc es read-only salvo actualización de conteos/fechas.
 
 ---
@@ -13,7 +13,7 @@
 | Purge V2 ventana                 | **MONITOR** (inicio 2026-08-22 · objetivo 4–8 semanas) | Recopilar métricas; **0 purges** |
 | E8 riesgo alto                   | **N** (4 ítems + 3 campos workspace)                   | No tocar migradores              |
 | Batería protectora T+0           | **19/19** ✅ (re-verificado 2026-08-24)                | Re-ejecutar cada hito            |
-| `verify_ledger_balance_chain.py` | **EXIT 0** (2026-08-24)                                | Cadencia §5                      |
+| `verify_ledger_balance_chain.py` | **EXIT 0** (re-verificado 2026-08-24 post `8a1e64d`)   | Cadencia §5                      |
 | Secret scanning                  | **enabled** vía API (`5100d23`)                        | Propietario: confirmar UI        |
 | `TRUSTED_PROXIES` prod           | Runbook listo · valor real **BLOQUEADO**               | Propietario only                 |
 | Purga historial git dev          | Opcional · decisión pendiente                          | Propietario only                 |
@@ -129,12 +129,12 @@ pnpm --filter @bolsa/web exec vitest run \
   src/stores/workspace-legacy-timeframe-favorites.test.ts
 ```
 
-| Suite                                          | Tests  | 2026-08-22 T+0 | 2026-08-24 Ciclo 3 |
-| ---------------------------------------------- | ------ | -------------- | ------------------ |
-| `legacy-storage-metrics.test.ts`               | 10     | ✅             | ✅                 |
-| `use-pending-orders.migration.test.ts`         | 4      | ✅             | ✅                 |
-| `workspace-legacy-timeframe-favorites.test.ts` | 5      | ✅             | ✅                 |
-| **Total**                                      | **19** | **19/19**      | **19/19**          |
+| Suite                                          | Tests  | 2026-08-22 T+0 | 2026-08-24 Ciclo 3 | 2026-08-24 post F1–F3 |
+| ---------------------------------------------- | ------ | -------------- | ------------------ | --------------------- |
+| `legacy-storage-metrics.test.ts`               | 10     | ✅             | ✅                 | ✅                    |
+| `use-pending-orders.migration.test.ts`         | 4      | ✅             | ✅                 | ✅                    |
+| `workspace-legacy-timeframe-favorites.test.ts` | 5      | ✅             | ✅                 | ✅                    |
+| **Total**                                      | **19** | **19/19**      | **19/19**          | **19/19**             |
 
 ---
 
@@ -148,7 +148,7 @@ pnpm --filter @bolsa/web exec vitest run \
 | Secret scanning UI                                     | Una vez (confirmación)                          | **Owner**          | Enabled ×2           |
 | `TRUSTED_PROXIES` prod                                 | Cuando exista deploy con proxy                  | **Owner**          | rate-limit coherente |
 
-**Última ejecución verify (2026-08-24):** `verify_ledger_balance_chain.py` → **EXIT 0** — todas las cuentas cumplen A (cash-ledger) y B (cadena balance_after).
+**Última ejecución verify (2026-08-24, post HEAD `8a1e64d`):** `verify_ledger_balance_chain.py` → **EXIT 0** — todas las cuentas cumplen A (cash-ledger) y B (cadena balance_after).
 
 ---
 
@@ -182,7 +182,8 @@ pnpm --filter @bolsa/web exec vitest run \
 
 ## 8. Historial de monitor
 
-| Fecha      | Ciclo | verify EXIT | Batería 19 | Notas                                  |
-| ---------- | ----- | ----------- | ---------- | -------------------------------------- |
-| 2026-08-22 | T+0   | —           | 19/19      | Ventana abierta; E8 N                  |
-| 2026-08-24 | 3/5   | **0**       | **19/19**  | Monitor puro; 0 purges; ops UI pending |
+| Fecha      | Ciclo           | verify EXIT | Batería 19 | Notas                                                       |
+| ---------- | --------------- | ----------- | ---------- | ----------------------------------------------------------- |
+| 2026-08-22 | T+0             | —           | 19/19      | Ventana abierta; E8 N                                       |
+| 2026-08-24 | 3/5             | **0**       | **19/19**  | Monitor puro; 0 purges; ops UI pending                      |
+| 2026-08-24 | post F1–F3/F9-A | **0**       | **19/19**  | Re-verificado HEAD `8a1e64d`; 0 purges; E8 N; Alembic `010` |
