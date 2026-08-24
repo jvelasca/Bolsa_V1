@@ -4,7 +4,8 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
-- **ADR-031 / Ciclo 4.2** (`a7eeaee`, en origin vía `4930344`): `EntrySetup` refina `entry_ready`; campo `entrySetup`. Spine **81**. Sin `ARMED` · sin `contract:gen`.
+- **ADR-031 / Ciclo 4.3** (`4eb99a2`): `ARMED` = stop + setup≠none + !ready (qty 0, actionability 0.7). Spine **84**. Wyckoff stub · sin `contract:gen`.
+- **ADR-031 / Ciclo 4.2** (`a7eeaee`, en origin vía `4930344`): `EntrySetup` refina `entry_ready`; campo `entrySetup`. Spine **81**. Sin `contract:gen`.
 - **ADR-031 / Ciclo 4.1** (`97f4862` = origin/main): Golden G `NO_NEW_LONGS` — long + `risk_off`/`crisis` → `BLOCKED`/`regime`. Spine **79**. Sin EntrySetup · sin `contract:gen`.
 - **ADR-031 / Ciclo 4.0** (`1cbd021`, en origin vía stamp `d99b1d1`): stop estructural ATR×1.5 + swing 10 barras (más lejano), `entry_ready` por bias TA, size con equity de cartera. Spine **75**. Sin familias EntrySetup · sin `contract:gen`.
 - **ADR-031 / TradePlan en propose+confirm** (`17a386d`): `data.tradePlan` + `runtime.tradePlan`; confirm echo; Hoy prefiere plan vivo. Spine **67**. Sin `contract:gen`.

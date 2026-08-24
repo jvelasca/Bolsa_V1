@@ -94,11 +94,13 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 4.1 (cerrado `97f4862`):** `NO_NEW_LONGS` en capa Plan — long + régimen `risk_off`/`crisis` → `BLOCKED` + `whyNot: regime`. Shorts permitidos. Confirm sin régimen no inventa veto. `check_opening` intacto.
 
-**Ciclo 4.2 (esta rebanada):** `EntrySetup` `breakout|pullback|wyckoff|none` refina `entry_ready` (ta + setup≠none). Campo `entrySetup` en TradePlan. Sin `ARMED`. Sin `contract:gen`. `check_opening` intacto.
+**Ciclo 4.2 (cerrado `a7eeaee`):** `EntrySetup` `breakout|pullback|wyckoff|none` refina `entry_ready` (ta + setup≠none). Campo `entrySetup` en TradePlan. Sin `ARMED`. Sin `contract:gen`. `check_opening` intacto.
+
+**Ciclo 4.3 (cerrado `4eb99a2`):** `ARMED` en ladder — stop válido + `entry_setup≠none` + `!entry_ready` → `ARMED` (qty 0, `whyNot: entry`, actionability 0.7). `TRIGGERED` solo con ready + stop + size. Confirm sin barras no inventa `ARMED`. Wyckoff stub 4.2 intacto. Sin `contract:gen`. `check_opening` intacto.
 
 No abrir sin fase propia:
 
-- `ARMED` status machine / Wyckoff fases formales — 4.3+
+- Wyckoff fases formales — 4.4+
 - Position Manager, Thesis Health, Exit Radar, trailing, T1 parcial, time-stop, bracket
 - MFE/MAE, attribution, expectancy por setup
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live

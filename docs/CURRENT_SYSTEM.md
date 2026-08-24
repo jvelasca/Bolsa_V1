@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`4930344`** = `origin/main` (Ciclo 4.2 `a7eeaee`). Relevo vivo: [`traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. Feat Ciclo 4.3 **`4eb99a2`** (ahead of origin). Relevo vivo: [`traspaso-relevo-ciclo-43-armed-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-43-armed-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -17,7 +17,7 @@ Doble cara congelada: **QROS** (Lab, ADR-011) + **Investment OS** (mesa) unidos 
 
 ## Features activas
 
-Embudo / Lista AUTO / Finalistas · DÍA D · CORE-R · CORE-P · FA/FIE · SEMI (Trading · **Señales** `/screeners` · Confirmar · Libro) · strip **Hoy** en mesa (ADR-031; no rival de las 5 puertas) · **Asesor** `/research` (ledger/tesis; nav menú, no bucle diario) · UX mesa U0–U6 (Ayuda tips · S/R presets · Confirm drawer · Fit chips · proyección orden chart F3 · **preview ticket margen/comisión** en Confirm/drawer, UI-only) · Decision Board **solo lectura** (`/decision-board`) · **Decision Journal** **solo lectura** (`/decision-journal`, ADR-029) · **TradePlan v0** (WATCH/TRIGGERED/BLOCKED/EXPIRED) · PortfolioFit v1 (concentración cesta activo+sector, VETO) · **DS-05 Data Freshness Gate** en `check_opening` (SEMI ohlcv + AUTO `signal.timestamp`, VETO >5d) · **DS-03 Account Mandate Gate** en `check_opening` (tenure BD `mandate_tenures`, VETO sin mandato abierto / mismatch AUTO) · paper/DEMO · prep AUTO A0–A5.
+Embudo / Lista AUTO / Finalistas · DÍA D · CORE-R · CORE-P · FA/FIE · SEMI (Trading · **Señales** `/screeners` · Confirmar · Libro) · strip **Hoy** en mesa (ADR-031; no rival de las 5 puertas) · **Asesor** `/research` (ledger/tesis; nav menú, no bucle diario) · UX mesa U0–U6 (Ayuda tips · S/R presets · Confirm drawer · Fit chips · proyección orden chart F3 · **preview ticket margen/comisión** en Confirm/drawer, UI-only) · Decision Board **solo lectura** (`/decision-board`) · **Decision Journal** **solo lectura** (`/decision-journal`, ADR-029) · **TradePlan v0** (WATCH/ARMED/TRIGGERED/BLOCKED/EXPIRED) · PortfolioFit v1 (concentración cesta activo+sector, VETO) · **DS-05 Data Freshness Gate** en `check_opening` (SEMI ohlcv + AUTO `signal.timestamp`, VETO >5d) · **DS-03 Account Mandate Gate** en `check_opening` (tenure BD `mandate_tenures`, VETO sin mandato abierto / mismatch AUTO) · paper/DEMO · prep AUTO A0–A5.
 
 ## Features congeladas
 
@@ -58,18 +58,19 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - **DS-03 Account Mandate Gate CERRADA (`41adb8e`):** tenure abierto server-side (`mandate_tenures` vía sync cliente) → `check_opening` VETO fail-closed sin mandato / mismatch estrategia AUTO. Adopción UI (`strategy-adoption`) sigue proyección cliente; el gate usa BD. Exits fuera. Batería `pnpm test:decision-spine` **75**.
 - TradePlan Ciclo 4.0: stop ATR×1.5 + swing (más lejano), `entry_ready` por bias TA, size con equity de cartera. Confirm rebuild sin barras → `WATCH`/`no_stop`. `suggestedQuantity` del ticket F3 **no** se pisa con `TradePlan.quantity`. Decision Board HTTP **no** expone `tradePlan` en sesiones (sin `contract:gen`).
 - TradePlan Ciclo 4.1: `NO_NEW_LONGS` — long + `risk_off`/`crisis` → `BLOCKED`/`regime`. Shorts OK. Confirm sin régimen no veta. `check_opening` intacto.
-- TradePlan Ciclo 4.2: `entrySetup` breakout/pullback/wyckoff/none; `entry_ready` = bias TA **y** setup≠none. Sin `ARMED`. Sin `contract:gen`.
+- TradePlan Ciclo 4.2: `entrySetup` breakout/pullback/wyckoff/none; `entry_ready` = bias TA **y** setup≠none. Sin `contract:gen`.
+- TradePlan Ciclo 4.3: `ARMED` = stop válido + setup≠none + `!entry_ready` (qty 0, `executionAllowed=false`, `whyNot: entry`, actionability 0.7). Golden A sigue `TRIGGERED`. Confirm sin barras no inventa `ARMED`. Sin Wyckoff formal. Sin `contract:gen`.
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). Attribution **sin abrir** (Ciclo 6, ADR-031 §6).
-- Diferido ADR-031: `ARMED`/Wyckoff formal, thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
+- Diferido ADR-031: Wyckoff formal (4.4+), thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
 
 ## Tests
 
-| Comando                    | Qué cubre                                                                                                                                                                   |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.2 stop/ready/size/regime/setup, AUTO veto, Golden, **DS-05**, **DS-03** |
-| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                           |
-| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                              |
-| `pnpm test:py`             | Pytest amplio                                                                                                                                                               |
+| Comando                    | Qué cubre                                                                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.3 stop/ready/size/regime/setup/ARMED, AUTO veto, Golden, **DS-05**, **DS-03** (**84**) |
+| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                          |
+| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                             |
+| `pnpm test:py`             | Pytest amplio                                                                                                                                                                              |
 
 ## Open risks (ops, no código)
 
