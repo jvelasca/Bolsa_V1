@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-24 · ancla viva `origin/main` = **`2c40211`** (stamp docs U5). Código U0–U5 `04e441e`. **U6 ticket preview** en working tree (**commit pendiente coordinador**). Prove Spine S0–S3 + H5 + UX mesa U0–U5 pusheados; U6 lista para commit.
+> **AsOf:** 2026-08-24 · ancla viva local **`9e9a346`** (U6; ahead of `origin/main` hasta push). Código U0–U5 `04e441e`. **U6 ticket preview CERRADA** (`9e9a346`). Prove Spine S0–S3 + H5 + UX mesa U0–U6.
 > **Tag:** `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---

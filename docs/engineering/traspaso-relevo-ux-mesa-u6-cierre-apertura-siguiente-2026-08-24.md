@@ -1,8 +1,8 @@
-# RELEVO — UX mesa U6 CERRADA (WT) → spine residual
+# RELEVO — UX mesa U6 CERRADA → spine residual
 
 > **Padre:** `docs/engineering/engineering-index-2026-08-03.md` §1 (Product / Ops).
-> **Propósito:** texto de paso para el **NUEVO CHAT** tras U6. Código U6 está en **working tree**; **commit lo hace el coordinador**. **Siguiente = spine residual** (decisión de secuencia del propietario: U6 → spine residual → ops).
-> **AsOf:** 2026-08-24. **`origin/main` == `2c40211`** (stamp docs U5). Ancla código U0–U5 **`04e441e`**. U6 **lista, sin SHA de commit aún**.
+> **Propósito:** texto de paso para el **NUEVO CHAT** tras U6. **Siguiente = spine residual** (decisión de secuencia del propietario: U6 → spine residual → ops).
+> **AsOf:** 2026-08-24. **`main` == `9e9a346`** (U6; ahead of `origin/main` hasta push). Ancla código U0–U5 **`04e441e`**. U6 **CERRADA**.
 > **Protocolo:** máx. 1 writer + 1 verifier RO. Coordinador re-lee file:line. Pre-commit: batería de la fase + update-last.
 
 ---
@@ -42,18 +42,10 @@ Máx. **2** subagentes (1 writer + 1 verifier RO). No reabrir Track B / Belief /
 ## 5. Texto de arranque (pegar en el chat nuevo)
 
 ```
-CONTEXTO: origin/main == 2c40211 (stamp U5). Código U0–U5 ancla 04e441e.
-U6 ticket preview CERRADA en working tree (commit pendiente o ya aplicado por coordinador —
-verificar git log / status). Prove+H5 CERRADOS. Freeze: sin OrderProposal ·
+CONTEXTO: main == 9e9a346 (U6; push pendiente). Código U0–U5 ancla 04e441e.
+U6 ticket preview CERRADA. Prove+H5 CERRADOS. Freeze: sin OrderProposal ·
 PAPER_D_EXECUTE off · Lab fuera spine · no broker live · no bypass execute preview.
 SIGUIENTE: spine residual (huecos DS; no OrderProposal). Luego ops propietario.
 Protocolo 1 writer + 1 verifier RO.
 Read-first: backlog §0 · CURRENT_SYSTEM · PROJECT_STATE · este relevo.
-```
-
-## 6. Suggested commit message (coordinador)
-
-```
-feat(mesa): U6 ticket preview with margin and commission in Confirm.
-
 ```
