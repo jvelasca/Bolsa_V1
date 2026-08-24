@@ -66,8 +66,9 @@ Engineering Index  (este doc)
 │   ├── fase0-decision-spine-mapping-2026-08-24.md ← **F0.3 Mapping** (carta conservar/adaptar/crear/no-op por ítem del AS-IS) · docs-only · Fit único create · verificado VERDE vs AS-IS
 │   ├── fase0-decision-spine-descarga-2026-08-24.md ← **F0.4 Descargue de decisión** (gates+autorización; D1 risk cesta SÍMI y AUTO, sin override) · docs-only · verificado VERDE · D2/D3 pendientes
 │   ├── traspaso-relevo-fase0-cierre-docs-apertura-codigo-2026-08-24.md ← relevo histórico · F0.5 (Fit) abierta · F0.5a métrica = decisión propietario · F0.6 pendiente
-│   ├── traspaso-relevo-f0-5b-cierre-apertura-f0-6-2026-08-24.md ← **RELEVO ACTIVO** · **F0.5b PortfolioFit v1 CERRADA** (`3670a09`) · F0.6 (Daily vista) SIN aprobar
-│   ├── fase0-decision-spine-implementacion-plan-2026-08-24.md ← **PLAN CÓDIGO F0.5/F0.6** (Fit + Daily vista) · **F0.5 CERRADA** · **F0.6 SIN aprobar**
+│   ├── traspaso-relevo-f0-6b-cierre-apertura-ui-2026-08-24.md ← **RELEVO ACTIVO** · **F0.6b Decision Board v1 CERRADA** (`8df8a65`) · endpoint backend listo · UI web PENDIENTE
+│   ├── traspaso-relevo-f0-5b-cierre-apertura-f0-6-2026-08-24.md ← relevo histórico · **F0.5b PortfolioFit v1 CERRADA** (`3670a09`) · F0.6 (Daily vista) abierta
+│   ├── fase0-decision-spine-implementacion-plan-2026-08-24.md ← **PLAN CÓDIGO F0.5/F0.6** (Fit + Daily vista) · **F0.5 CERRADA** · **F0.6b Decision Board v1 CERRADA** · **UI web PENDIENTE**
 │   ├── fase0-decision-spine-asis-2026-08-24.md ← **F0.1 AS-IS Decision Spine** (inventario file:line, cero código) · HEAD `f69a7b0`
 │   ├── traspaso-relevo-track-b-b12-cierre-split-siguiente-2026-08-24.md ← relevo histórico post B12 · Track B split CERRADO
 │   ├── traspaso-relevo-track-b-b11-apertura-b12-2026-08-23.md ← relevo histórico post B11 · apertura B12 thin shell (código B12 `3f9bd7e`)
