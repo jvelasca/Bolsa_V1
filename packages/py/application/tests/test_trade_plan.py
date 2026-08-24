@@ -1,4 +1,4 @@
-"""TradePlan v0 — golden A/B/C/H (ADR-031) + Ciclo 4.0 stop/entry_ready."""
+"""TradePlan v0 — golden A/B/C/H/G (ADR-031) + Ciclo 4.0/4.1."""
 
 from types import SimpleNamespace
 
@@ -9,6 +9,7 @@ from bolsa_analytics.cognitive.trade_plan import (
     compute_risk_size,
     compute_structural_stop,
     entry_ready_from_ta,
+    no_new_longs_blocks,
 )
 
 
@@ -66,6 +67,77 @@ def test_golden_c_portfolio_fit_blocked() -> None:
     assert plan.status == "BLOCKED"
     assert "fit" in plan.why_not
     assert plan.execution_allowed is False
+
+
+def test_golden_g_no_new_longs_risk_off() -> None:
+    plan = build_trade_plan(
+        decision_id="G",
+        instrument_id="SPY",
+        action="recommend_long",
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=95.0,
+        equity=100_000,
+        risk_pct=0.5,
+        market_regime="risk_off",
+    )
+    assert plan.status == "BLOCKED"
+    assert "regime" in plan.why_not
+    assert plan.quantity == 0.0
+    assert plan.execution_allowed is False
+
+
+def test_golden_g_crisis_blocks_long_accumulates_fit() -> None:
+    plan = build_trade_plan(
+        decision_id="G2",
+        instrument_id="QQQ",
+        action="recommend_long",
+        fit_ok=False,
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=95.0,
+        equity=100_000,
+        market_regime="crisis",
+    )
+    assert plan.status == "BLOCKED"
+    assert plan.why_not == ("regime", "fit")
+
+
+def test_golden_g_short_allowed_in_risk_off() -> None:
+    plan = build_trade_plan(
+        decision_id="G3",
+        instrument_id="IWM",
+        action="recommend_short",
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=105.0,
+        equity=100_000,
+        risk_pct=0.5,
+        market_regime="risk_off",
+    )
+    assert plan.status == "TRIGGERED"
+    assert "regime" not in plan.why_not
+    assert plan.quantity > 0
+
+
+def test_golden_g_neutral_and_missing_regime_do_not_block() -> None:
+    assert no_new_longs_blocks(action="recommend_long", market_regime=None) is False
+    assert no_new_longs_blocks(action="recommend_long", market_regime="neutral") is False
+    assert no_new_longs_blocks(action="recommend_long", market_regime="uncertain") is False
+    plan = build_v0_trade_plan_dict(
+        decision_id="G4",
+        instrument_id="MSFT",
+        action="recommend_long",
+        entry=100.0,
+        opportunity_score=90.0,
+        expires_at=None,
+        atr=2.0,
+        bias="bullish",
+        equity=100_000,
+        risk_pct=0.5,
+        market_regime=None,
+    )
+    assert plan["status"] == "TRIGGERED"
 
 
 def test_golden_h_expired() -> None:

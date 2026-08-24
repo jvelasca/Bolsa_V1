@@ -413,6 +413,7 @@ class ProposeRecommendationFromTa:
             exhaustion=bool(assessment.exhaustion),
             equity=await self._equity_for_account(account_id),
             risk_pct=_risk_pct_for_policy(policy_version),
+            market_regime=regime,
         )
 
         present_types = {a.assessment_type for a in runtime.assessments}

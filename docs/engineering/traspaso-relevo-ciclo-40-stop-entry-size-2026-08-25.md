@@ -1,9 +1,11 @@
 # RELEVO — Ciclo 4.0 stop estructural + entry_ready + size (2026-08-25)
 
+> [!INFO] **SUPERSEDIDO (2026-08-25).** El relevo vivo es [`traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md`](./traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md). Ciclo 4.0 quedó en origin (`1cbd021`).
+
 > **Padre:** [`traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md`](./traspaso-relevo-tradeplan-propose-confirm-hoy-2026-08-24.md).
 > **Política:** [`docs/adr/031-operational-model-tesis-plan-permiso.md`](../adr/031-operational-model-tesis-plan-permiso.md) §6 nota 4.0.
 > **AsOf:** 2026-08-25.
-> **HEAD:** `d99b1d1` = `origin/main`. Feat `1cbd021` **PUSHEADO**.
+> **HEAD:** `d99b1d1` = `origin/main` (feat `1cbd021` **PUSHEADO**; update-last posterior puede diferir).
 
 ---
 
@@ -37,7 +39,8 @@ Push: `17a386d..d99b1d1` → `origin/main`.
 ## 4. Siguiente (E1)
 
 1. ~~Commit~~ · ~~Push~~.
-2. Familias EntrySetup / `NO_NEW_LONGS` — **prohibido** sin plan.
+2. Plan **Ciclo 4.1** redactado: [`plan-ciclo-41-no-new-longs-entrysetup-2026-08-25.md`](./plan-ciclo-41-no-new-longs-entrysetup-2026-08-25.md) — **pendiente OK D1–D6**. Sin código hasta aprobación.
+3. EntrySetup completo = **4.2** (fuera de 4.1).
 
 ## 5. No tocado
 

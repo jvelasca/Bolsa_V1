@@ -73,28 +73,30 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 ---
 
-## 5. Golden scenarios (papel; tests cubren A/B/C/H; Ciclo 4.0 vive A/B/D)
+## 5. Golden scenarios (papel; tests cubren A/B/C/D/G/H; E/F diferidos)
 
-| Id    | Nombre                        | Entrada                                                   | Resultado                                      |
-| ----- | ----------------------------- | --------------------------------------------------------- | ---------------------------------------------- |
-| **A** | Breakout perfecto             | Bull, calidad alta, entry ready, stop estructural, Fit OK | `TRIGGERED` + size > 0                         |
-| **B** | Gran activo / mala entrada    | Quality alta, `entry_ready=False`                         | `WATCH` (no BUY)                               |
-| **C** | Gran setup / veto cartera     | Fit concentración/sector                                  | `BLOCKED`                                      |
-| **D** | Stop demasiado lejos          | Size se reduce; no se mueve el stop                       | **Ciclo 4.0:** swing más lejano gana; qty baja |
-| **E** | Posición ganadora T1          | Protección / trail                                        | **Diferido** Ciclo 5                           |
-| **F** | Tesis se degrada, precio > SL | `REVIEW`                                                  | **Diferido** Ciclo 5                           |
-| **G** | Régimen BULL → BEAR           | `NO_NEW_LONGS`                                            | **Diferido** Ciclo 4                           |
-| **H** | Plan caducado                 | `expiresAt` pasado                                        | `EXPIRED` / confirm no ejecuta                 |
+| Id    | Nombre                        | Entrada                                                   | Resultado                                                      |
+| ----- | ----------------------------- | --------------------------------------------------------- | -------------------------------------------------------------- |
+| **A** | Breakout perfecto             | Bull, calidad alta, entry ready, stop estructural, Fit OK | `TRIGGERED` + size > 0                                         |
+| **B** | Gran activo / mala entrada    | Quality alta, `entry_ready=False`                         | `WATCH` (no BUY)                                               |
+| **C** | Gran setup / veto cartera     | Fit concentración/sector                                  | `BLOCKED`                                                      |
+| **D** | Stop demasiado lejos          | Size se reduce; no se mueve el stop                       | **Ciclo 4.0:** swing más lejano gana; qty baja                 |
+| **E** | Posición ganadora T1          | Protección / trail                                        | **Diferido** Ciclo 5                                           |
+| **F** | Tesis se degrada, precio > SL | `REVIEW`                                                  | **Diferido** Ciclo 5                                           |
+| **G** | Régimen BULL → BEAR           | `NO_NEW_LONGS`                                            | **Ciclo 4.1:** long + `risk_off`/`crisis` → `BLOCKED`/`regime` |
+| **H** | Plan caducado                 | `expiresAt` pasado                                        | `EXPIRED` / confirm no ejecuta                                 |
 
 ---
 
 ## 6. Qué queda diferido (Ciclo 4+)
 
-**Ciclo 4.0 (esta rebanada):** stop estructural ATR×1.5 + swing 10 barras cerradas (el más lejano), `entry_ready` por bias TA (sin exhaustion), size con `GetPortfolioSummary.total_equity` y `max_risk_per_trade_pct` de la plantilla. Sin familias `EntrySetup`. Confirm rebuild sin barras sigue `WATCH`/`no_stop`. `check_opening` intacto.
+**Ciclo 4.0 (cerrado `1cbd021`):** stop estructural ATR×1.5 + swing 10 barras cerradas (el más lejano), `entry_ready` por bias TA (sin exhaustion), size con `GetPortfolioSummary.total_equity` y `max_risk_per_trade_pct` de la plantilla. Sin familias `EntrySetup`. Confirm rebuild sin barras sigue `WATCH`/`no_stop`. `check_opening` intacto.
+
+**Ciclo 4.1 (esta rebanada):** `NO_NEW_LONGS` en capa Plan — long + régimen `risk_off`/`crisis` → `BLOCKED` + `whyNot: regime`. Shorts permitidos. Confirm sin régimen no inventa veto. `check_opening` intacto. Sin familias `EntrySetup` (→ 4.2).
 
 No abrir sin fase propia:
 
-- Familias Entry Engine (Breakout / Pullback / Wyckoff como contrato `EntrySetup`) y veto de régimen `NO_NEW_LONGS`
+- Familias Entry Engine (Breakout / Pullback / Wyckoff como contrato `EntrySetup`) — Ciclo 4.2
 - Position Manager, Thesis Health, Exit Radar, trailing, T1 parcial, time-stop, bracket
 - MFE/MAE, attribution, expectancy por setup
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live

@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`d99b1d1`** = `origin/main` (stamp post Ciclo 4.0 `1cbd021`). Relevo: [`traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. Ciclo 4.1 `NO_NEW_LONGS` **en working tree (pendiente commit)**; 4.0 en origin (`1cbd021`). Relevo vivo: [`traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -57,17 +57,18 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - Composite `portfolioConstraints` sigue `not_evaluated`; Fit vive al lado.
 - **DS-03 Account Mandate Gate CERRADA (`41adb8e`):** tenure abierto server-side (`mandate_tenures` vía sync cliente) → `check_opening` VETO fail-closed sin mandato / mismatch estrategia AUTO. Adopción UI (`strategy-adoption`) sigue proyección cliente; el gate usa BD. Exits fuera. Batería `pnpm test:decision-spine` **75**.
 - TradePlan Ciclo 4.0: stop ATR×1.5 + swing (más lejano), `entry_ready` por bias TA, size con equity de cartera. Confirm rebuild sin barras → `WATCH`/`no_stop`. `suggestedQuantity` del ticket F3 **no** se pisa con `TradePlan.quantity`. Decision Board HTTP **no** expone `tradePlan` en sesiones (sin `contract:gen`).
+- TradePlan Ciclo 4.1: `NO_NEW_LONGS` — long + `risk_off`/`crisis` → `BLOCKED`/`regime`. Shorts OK. Confirm sin régimen no veta. `check_opening` intacto.
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). Attribution **sin abrir** (Ciclo 6, ADR-031 §6).
-- Diferido ADR-031: Entry families, `NO_NEW_LONGS`, thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
+- Diferido ADR-031: EntrySetup 4.2, thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
 
 ## Tests
 
-| Comando                    | Qué cubre                                                                                                                                                |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H + 4.0 stop/ready/size, AUTO veto, Golden, **DS-05**, **DS-03** |
-| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                        |
-| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                           |
-| `pnpm test:py`             | Pytest amplio                                                                                                                                            |
+| Comando                    | Qué cubre                                                                                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0 stop/ready/size + 4.1 regime, AUTO veto, Golden, **DS-05**, **DS-03** |
+| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                       |
+| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                          |
+| `pnpm test:py`             | Pytest amplio                                                                                                                                                           |
 
 ## Open risks (ops, no código)
 

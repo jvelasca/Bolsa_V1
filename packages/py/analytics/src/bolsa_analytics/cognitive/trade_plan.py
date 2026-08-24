@@ -76,6 +76,16 @@ def compliance_fit_ok(compliance_check: object) -> bool:
 ATR_MULT = 1.5
 SWING_LOOKBACK = 10
 
+# Ciclo 4.1 — Golden G: no nuevos longs en régimen adverso (TradePlan only).
+NO_NEW_LONGS_REGIMES = frozenset({"risk_off", "crisis"})
+
+
+def no_new_longs_blocks(*, action: str, market_regime: str | None) -> bool:
+    """True si long y régimen en risk_off/crisis. Sin régimen → no veta (D6)."""
+    if market_regime is None or market_regime not in NO_NEW_LONGS_REGIMES:
+        return False
+    return _direction_from_action(action) == "long"
+
 
 def _finite_positive(value: object) -> float | None:
     try:
@@ -171,11 +181,13 @@ def build_v0_trade_plan_dict(
     exhaustion: bool = False,
     equity: float = 0.0,
     risk_pct: float = 0.5,
+    market_regime: str | None = None,
 ) -> dict[str, object]:
     """TradePlan persistible (PLAN layer; ranking ≠ BUY).
 
     Freshness/mandate quedan True: esos gates viven en confirm ``check_opening``.
     Sin ATR/barras/bias (rebuild confirm) → ``WATCH`` / ``no_stop`` o ``entry``.
+    Sin ``market_regime`` → no inventa veto ``regime`` (Ciclo 4.1 D6).
     """
     structural_stop = compute_structural_stop(
         action=action, entry=entry, atr=atr, bars=bars
@@ -197,6 +209,7 @@ def build_v0_trade_plan_dict(
         risk_pct=risk_pct,
         opportunity_score=opportunity_score,
         expires_at=expires_at,
+        market_regime=market_regime,
     )
     return plan.to_dict()
 
@@ -241,12 +254,14 @@ def build_trade_plan(
     risk_pct: float = 0.5,
     opportunity_score: float | None = None,
     expires_at: str | None = None,
+    market_regime: str | None = None,
 ) -> TradePlan:
     """Mapper determinista DecisionPackage + gates → TradePlan v0.
 
     Golden A: entry_ready + stop válido + gates OK → TRIGGERED.
     Golden B: calidad alta pero entry_ready False → WATCH.
     Golden C: fit_ok False → BLOCKED.
+    Golden G: long + risk_off/crisis → BLOCKED (why regime).
     Golden H: expired → EXPIRED.
     """
     why: list[str] = []
@@ -279,6 +294,8 @@ def build_trade_plan(
             expires_at=expires_at,
         )
 
+    if no_new_longs_blocks(action=action, market_regime=market_regime):
+        why.append("regime")
     if not fit_ok:
         why.append("fit")
     if not freshness_ok:
