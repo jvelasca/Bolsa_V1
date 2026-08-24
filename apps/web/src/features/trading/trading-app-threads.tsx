@@ -3,7 +3,7 @@
  *
  * Anchos reservados para que la barra no «salte» al cambiar conteos.
  * CORE-R v1.5: chip siempre visible → Ayuda · Monitor.
- * F3: cola Confirm SEMI → `/confirm` (R-12 C1).
+ * F3: cola Confirm SEMI → panel lateral (U3); página `/confirm` en nav.
  *
  * @see trading-status-bar.tsx
  */
@@ -16,11 +16,9 @@ import {
   formatCoreRStatusTitle,
   openHelpBacktesting,
 } from "@/features/backtests/core-r-status";
+import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { TradingBackgroundStatus } from "@/features/trading/trading-background-status";
-import {
-  openHelpAiPlatform,
-  useSupervisedF3QueueStore,
-} from "@/stores/supervised-f3-queue-store";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { useCoreRReviewQueueStore } from "@/stores/core-r-review-queue-store";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import { cn } from "@/lib/utils";
@@ -103,7 +101,8 @@ export function TradingAppThreads() {
 
       <button
         type="button"
-        onClick={() => openHelpAiPlatform({ panel: "supervised-f3" })}
+        data-testid="trading-threads-confirm-drawer"
+        onClick={() => openConfirmDrawer()}
         className={cn(
           "flex h-5 shrink-0 items-center justify-center gap-0.5 rounded px-0.5 text-[10px] tabular-nums hover:bg-accent",
           SLOT_F3,
@@ -113,8 +112,8 @@ export function TradingAppThreads() {
         )}
         title={
           f3Count > 0
-            ? `Cola Confirm F3 · ${f3Count} pendiente(s)\nClic → Confirmar`
-            : "Cola Confirm F3 vacía\nClic → Confirmar"
+            ? `Cola Confirm F3 · ${f3Count} pendiente(s)\nClic → panel Confirmar`
+            : "Cola Confirm F3 vacía\nClic → panel Confirmar"
         }
       >
         <BrainCircuit className="h-3 w-3 shrink-0 opacity-70" aria-hidden />

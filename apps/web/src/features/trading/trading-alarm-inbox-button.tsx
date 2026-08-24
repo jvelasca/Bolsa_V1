@@ -14,9 +14,9 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { useAlertsStore } from "@/stores/alerts-store";
 import {
-  openHelpAiPlatform,
   type SupervisedProposePayload,
   useSupervisedF3QueueStore,
 } from "@/stores/supervised-f3-queue-store";
@@ -225,7 +225,7 @@ export function TradingAlarmInboxButton({ className }: { className?: string }) {
       pushToast(
         `${PAPER_PATH_SUPERVISED.cta} · ${item.symbol}: ${payload.action} → Supervisado F3`,
       );
-      openHelpAiPlatform({ panel: "supervised-f3" });
+      openConfirmDrawer();
       setOpen(false);
     },
     onError: (err: Error, item) => {

@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
 import { HELP_CONTENT_AS_OF } from "@/features/help/help-registry";
 
 function RouteLink({ to, children }: { to: string; children: ReactNode }) {
@@ -34,6 +35,8 @@ function ModuleCard({
 export function WorkflowModulesSection() {
   return (
     <div className="space-y-5 text-sm">
+      <HoyEnLaMesaBlock />
+
       <p className="text-muted-foreground">
         Bolsa V1 combina <strong className="text-foreground">investigar</strong>{" "}
         (simular estrategias en el pasado) con{" "}

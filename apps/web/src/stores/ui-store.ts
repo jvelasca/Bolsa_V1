@@ -24,6 +24,8 @@ interface UiState {
   chartDrawTool: ChartDrawTool;
   /** Última herramienta elegida por grupo (para recordar sin forzar al abrir el menú). */
   lastDrawToolByGroup: Partial<Record<DrawingToolGroupId, ChartDrawTool>>;
+  /** Etiqueta pendiente para el próximo hline/hray (presets Soporte/Resistencia). */
+  chartDrawPendingLabel: string | null;
   selectedDrawingId: string | null;
   openDrawingEditorId: string | null;
   selectedIndicatorInstanceId: string | null;
@@ -55,6 +57,7 @@ interface UiState {
   openInstrumentSyncDialog: (instrumentId: string, symbol: string) => void;
   closeInstrumentSyncDialog: () => void;
   setChartDrawTool: (tool: ChartDrawTool) => void;
+  setChartDrawPendingLabel: (label: string | null) => void;
   focusDrawing: (drawingId: string) => void;
   setSelectedDrawingId: (id: string | null) => void;
   setOpenDrawingEditorId: (id: string | null) => void;
@@ -83,6 +86,7 @@ export const useUiStore = create<UiState>()(
       instrumentSyncTarget: null,
       chartDrawTool: "select",
       lastDrawToolByGroup: { cursor: "select" },
+      chartDrawPendingLabel: null,
       selectedDrawingId: null,
       openDrawingEditorId: null,
       selectedIndicatorInstanceId: null,
@@ -128,16 +132,23 @@ export const useUiStore = create<UiState>()(
             chartDrawTool: tool,
             lastDrawToolByGroup,
           });
+          const keepLabel = tool === "hline" || tool === "hray";
           return {
             chartDrawTool: tool,
             lastDrawToolByGroup,
+            chartDrawPendingLabel: keepLabel
+              ? state.chartDrawPendingLabel
+              : null,
             selectedDrawingId: null,
             openDrawingEditorId: null,
           };
         }),
+      setChartDrawPendingLabel: (label) =>
+        set({ chartDrawPendingLabel: label }),
       focusDrawing: (drawingId) =>
         set(() => ({
           chartDrawTool: "select",
+          chartDrawPendingLabel: null,
           selectedDrawingId: drawingId,
           selectedIndicatorInstanceId: null,
         })),

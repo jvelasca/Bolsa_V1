@@ -27,6 +27,10 @@
  * Señales/Libro en mesa · AUTO cuenta «No disponible (BETA)» · frase SEMI trader.
  * **2026-08-24** — Ayuda → **Flujo y módulos** (universos LAB/TRADING · ciclo
  * investigación→operación · mapa de módulos para usuario básico).
+ * **2026-08-24b** — U1 Ayuda de mesa: bloque **«Hoy en la mesa»** (Guía + Flujo)
+ * · coach-marks `MesaTipButton` (Proponer F3 · Confirmar · Recomendación).
+ * **2026-08-24c** — U3 Confirmar **panel lateral** desde Operativa / chip F3
+ * (mismo SEMI; `/confirm` sigue como página completa).
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -67,4 +71,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-24" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-24c" as const;

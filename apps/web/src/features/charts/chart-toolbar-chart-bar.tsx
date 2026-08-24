@@ -39,6 +39,8 @@ import { ChartSeriesTypeZone } from "@/features/charts/chart-series-type-zone";
 import { ChartTimeframeBar } from "@/features/charts/chart-timeframe-bar";
 import { chartTradingViewUrl } from "@/features/charts/chart-trading-view-url";
 import { useInspectorBarShortcutFavorites } from "@/features/charts/use-inspector-bar-shortcut-favorites";
+import { DecisionPackageChipsBar } from "@/features/trading/decision-package-chips-bar";
+import { useDecisionPackageChips } from "@/features/trading/use-decision-package-chips";
 import {
   CHART_TOOLBAR_EMBEDDED_CLASS,
   CHART_TOOLBAR_SECTION_DIVIDER,
@@ -181,6 +183,9 @@ export function ChartToolbarChartBar({
   const openInfoDialog = useTradingUiStore((s) => s.openInfoDialog);
   const { favorites: inspectorShortcutFavorites } =
     useInspectorBarShortcutFavorites();
+  const packageChips = useDecisionPackageChips({
+    instrumentId: instrumentId ?? instrument?.id,
+  });
 
   const isShortcutActive = (target: ChartInspectorNavigateInput) =>
     inspectorOpen && activeShortcutKey === inspectorNavigateKey(target);
@@ -271,6 +276,19 @@ export function ChartToolbarChartBar({
       zoneBlock(
         <ChartInstrumentZone instrument={instrument} listLabel={listLabel} />,
         "chart-toolbar-data-zone",
+      ),
+    );
+  }
+
+  if (packageChips.action || packageChips.fit) {
+    dataZones.push(
+      zoneBlock(
+        <DecisionPackageChipsBar
+          action={packageChips.action}
+          fit={packageChips.fit}
+          density="compact"
+        />,
+        "chart-toolbar-data-zone shrink-0",
       ),
     );
   }

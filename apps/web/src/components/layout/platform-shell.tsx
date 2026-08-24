@@ -48,6 +48,7 @@ import { BacktestsPage } from "@/features/backtests/backtests-page";
 
 import { CoreRSchedulerHost } from "@/features/backtests/core-r-scheduler-host";
 import { SupervisedF3QueueHost } from "@/features/trading/supervised-f3-queue-host";
+import { ConfirmDrawerHost } from "@/features/confirm/confirm-drawer-host";
 import {
   BOLSA_NAVIGATE_EVENT,
   CONFIRM_PATH,
@@ -174,6 +175,8 @@ export function PlatformShell() {
       <VisualizationLogDialog />
 
       <OrderDialog />
+
+      <ConfirmDrawerHost />
 
       <InstrumentInfoDialog />
 

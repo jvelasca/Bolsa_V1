@@ -1,0 +1,41 @@
+/**
+ * Bloque compacto «Hoy en la mesa» — 3 pasos SEMI (Ayuda → Guía / Flujo).
+ */
+
+import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
+
+function RouteLink({ to, children }: { to: string; children: ReactNode }) {
+  return (
+    <Link to={to} className="font-medium text-primary hover:underline">
+      {children}
+    </Link>
+  );
+}
+
+/** Tres pasos del día en mesa (Trading → Proponer → Confirmar). */
+export function HoyEnLaMesaBlock() {
+  return (
+    <section
+      className="rounded-md border border-border bg-muted/25 px-3 py-2.5"
+      data-testid="hoy-en-la-mesa"
+    >
+      <h3 className="text-sm font-semibold text-foreground">Hoy en la mesa</h3>
+      <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+        <li>
+          <strong className="text-foreground">Ver valor</strong> en{" "}
+          <RouteLink to="/trading">Trading</RouteLink> (gráfico + Operativa).
+        </li>
+        <li>
+          <strong className="text-foreground">Leer recomendación</strong> /{" "}
+          <strong className="text-foreground">Proponer F3</strong>.
+        </li>
+        <li>
+          <strong className="text-foreground">Firmar</strong> en{" "}
+          <RouteLink to="/confirm">Confirmar</RouteLink> (página o panel desde
+          Trading) — SEMI: la app propone, tú firmas; nunca sola.
+        </li>
+      </ol>
+    </section>
+  );
+}

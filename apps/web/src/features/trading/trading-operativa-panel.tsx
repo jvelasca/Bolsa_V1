@@ -33,6 +33,7 @@ import {
   demoBookRequiresEstudioMembership,
 } from "@/features/trading/demo-book-prefs";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
+import { MesaTipButton } from "@/features/help/mesa-tip-button";
 import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
 import { TradingOperativaSection } from "@/features/trading/trading-operativa-section";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
@@ -60,9 +61,12 @@ import { loadBacktestRunContext } from "@/features/backtests/backtest-run-contex
 import { useDiaDTradingSessionStore } from "@/stores/dia-d-trading-session-store";
 import { useAlertsStore } from "@/stores/alerts-store";
 import {
-  openHelpAiPlatform,
-  useSupervisedF3QueueStore,
-} from "@/stores/supervised-f3-queue-store";
+  formatConfirmDrawerCtaLabel,
+  openConfirmDrawer,
+} from "@/features/confirm/confirm-drawer";
+import { DecisionPackageChipsBar } from "@/features/trading/decision-package-chips-bar";
+import { useDecisionPackageChips } from "@/features/trading/use-decision-package-chips";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { cn } from "@/lib/utils";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { InstrumentDailyOpinionHintV1 } from "@bolsa/shared";
@@ -179,6 +183,10 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     { enabled: Boolean(instrumentId) && !scoresLoading },
   );
   const activeOpinion = opinionsQuery.data?.[0];
+  const packageChips = useDecisionPackageChips({
+    instrumentId,
+    opinionGateStatus: activeOpinion?.gateStatus ?? null,
+  });
 
   useEffect(() => {
     if (!effectiveAccountId) return;
@@ -235,7 +243,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
       pushToast(
         `Operativa · ${payload.symbol ?? symbol}: ${payload.action} → Confirm`,
       );
-      openHelpAiPlatform({ panel: "supervised-f3" });
+      openConfirmDrawer();
     },
     onError: (e: Error) => {
       pushToast(`Operativa · ${symbol}: ${e.message}`);
@@ -373,6 +381,17 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         title="Recomendación"
         summary={pulseSummary}
       >
+        <div className="flex flex-wrap items-center justify-between gap-1">
+          <DecisionPackageChipsBar
+            action={packageChips.action}
+            fit={packageChips.fit}
+          />
+          <div className="flex items-center gap-0.5">
+            <MesaTipButton tip="operativa-fit-chip" />
+            <MesaTipButton tip="operativa-recomendacion" />
+          </div>
+        </div>
+
         <OperativaPulseBlock
           io={rankResult?.io ?? null}
           ta={rankResult?.ta ?? null}
@@ -428,39 +447,46 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         />
 
         <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            data-testid="operativa-proponer-f3"
-            className="rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1 text-left font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
-            disabled={
-              proposeMutation.isPending ||
-              !effectiveAccountId ||
-              (requiresEstudio && !inEstudio) ||
-              !canEnqueueConfirm
-            }
-            title={
-              !canEnqueueConfirm
-                ? "Cambia a SEMI en Configuración para Proponer F3"
-                : requiresEstudio && !inEstudio
-                  ? "Añade el valor a Estudio primero"
-                  : "Propose → cola Confirm (Camino C)"
-            }
-            onClick={() => proposeMutation.mutate()}
-          >
-            {proposeMutation.isPending
-              ? "Proponiendo…"
-              : !canEnqueueConfirm
-                ? "Proponer F3 (pasa a SEMI)"
-                : "Proponer F3 → Confirm"}
-          </button>
-          <button
-            type="button"
-            data-testid="operativa-cola-confirm"
-            className="rounded-md border border-border px-2 py-1 text-left font-medium text-foreground hover:bg-accent"
-            onClick={() => openHelpAiPlatform({ panel: "supervised-f3" })}
-          >
-            Cola Confirm{confirmQueueCount > 0 ? ` (${confirmQueueCount})` : ""}
-          </button>
+          <div className="flex items-start gap-1">
+            <button
+              type="button"
+              data-testid="operativa-proponer-f3"
+              className="min-w-0 flex-1 rounded-md border border-emerald-700/35 bg-emerald-500/10 px-2 py-1 text-left font-medium text-emerald-950 hover:bg-emerald-500/20 disabled:opacity-50 dark:text-emerald-50"
+              disabled={
+                proposeMutation.isPending ||
+                !effectiveAccountId ||
+                (requiresEstudio && !inEstudio) ||
+                !canEnqueueConfirm
+              }
+              title={
+                !canEnqueueConfirm
+                  ? "Cambia a SEMI en Configuración para Proponer F3"
+                  : requiresEstudio && !inEstudio
+                    ? "Añade el valor a Estudio primero"
+                    : "Propose → cola Confirm (Camino C)"
+              }
+              onClick={() => proposeMutation.mutate()}
+            >
+              {proposeMutation.isPending
+                ? "Proponiendo…"
+                : !canEnqueueConfirm
+                  ? "Proponer F3 (pasa a SEMI)"
+                  : "Proponer F3 → Confirm"}
+            </button>
+            <MesaTipButton tip="operativa-proponer" className="mt-0.5" />
+          </div>
+          <div className="flex items-start gap-1">
+            <button
+              type="button"
+              data-testid="operativa-cola-confirm"
+              className="min-w-0 flex-1 rounded-md border border-border px-2 py-1 text-left font-medium text-foreground hover:bg-accent"
+              title="Abre Confirmar al lado de la mesa (mismo flujo SEMI)"
+              onClick={() => openConfirmDrawer()}
+            >
+              {formatConfirmDrawerCtaLabel(confirmQueueCount)}
+            </button>
+            <MesaTipButton tip="operativa-confirm-drawer" className="mt-0.5" />
+          </div>
           <Link
             to={instrumentTopBacktestsHref(instrumentId, timeframe)}
             className="rounded-md border border-sky-600/30 bg-sky-500/10 px-2 py-1 font-medium text-sky-950 hover:bg-sky-500/20 dark:text-sky-50"

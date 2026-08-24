@@ -30,6 +30,8 @@ import { useDrawToolFavorites } from "@/features/charts/use-draw-tool-favorites"
 import { ChartDrawToolStyleBar } from "@/features/charts/chart-draw-tool-style-bar";
 import { CHART_ZONE_DROPDOWN_PANEL_CLASS } from "@/features/charts/chart-bar-zone-styles";
 import { isShapeDrawTool } from "@/features/charts/chart-draw-tool-utils";
+import { SR_PRESETS } from "@/features/charts/chart-sr-presets";
+import { applySrPreset } from "@/features/charts/apply-sr-preset";
 
 function DrawingToolFlyout({
   openGroup,
@@ -384,6 +386,7 @@ function FamilyRailBlock({
 
 export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
   const tool = useUiStore((s) => s.chartDrawTool);
+  const pendingLabel = useUiStore((s) => s.chartDrawPendingLabel);
   const setTool = useUiStore((s) => s.setChartDrawTool);
   const lastByGroup = useUiStore((s) => s.lastDrawToolByGroup);
   const selectedId = useUiStore((s) => s.selectedDrawingId);
@@ -527,6 +530,38 @@ export function ChartDrawingSidebar({ chartId }: { chartId: string }) {
         {cursorBlock && (
           <FamilyRailBlock block={cursorBlock} {...familyBlockProps} />
         )}
+
+        <div
+          className="flex w-full flex-col items-center gap-0.5 px-0.5"
+          data-testid="chart-sr-presets"
+        >
+          {SR_PRESETS.map((preset) => {
+            const active =
+              tool === preset.tool && pendingLabel === preset.label;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                title={preset.title}
+                aria-label={preset.title}
+                data-testid={`chart-sr-preset-${preset.id}`}
+                onClick={() => {
+                  applySrPreset(preset.id);
+                  closeFlyout();
+                }}
+                className={cn(
+                  "flex h-7 w-7 items-center justify-center rounded text-[10px] font-bold tracking-wide transition-colors hover:bg-accent",
+                  active && "ring-1 ring-primary/50",
+                )}
+                style={{ color: preset.color }}
+              >
+                {preset.shortLabel}
+              </button>
+            );
+          })}
+        </div>
+
+        <RailSeparator />
 
         <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden px-0.5">
           {toolFamilyBlocks.map((block) => (

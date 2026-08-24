@@ -78,6 +78,7 @@ import {
   defaultInfoLineLabel,
   lineAngleDegrees,
 } from "@/features/charts/chart-drawing-regression";
+import { useUiStore } from "@/stores/ui-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 interface ChartDrawingsLayerProps {
@@ -162,6 +163,8 @@ export function ChartDrawingsLayer({
   onInteractionCaptureChange,
 }: ChartDrawingsLayerProps) {
   const [, bump] = useReducer((n: number) => n + 1, 0);
+  const pendingLabel = useUiStore((s) => s.chartDrawPendingLabel);
+  const clearPendingLabel = useUiStore((s) => s.setChartDrawPendingLabel);
   const stepRef = useRef(0);
   const [draftStart, setDraftStart] = useState<ChartDrawingPoint | null>(null);
   const [draftEnd, setDraftEnd] = useState<ChartDrawingPoint | null>(null);
@@ -257,10 +260,16 @@ export function ChartDrawingsLayer({
     const semanticId = drawingType
       ? semanticIdForDrawingType(drawingType)
       : semanticIdForDrawTool(tool);
+    const withPendingLabel =
+      pendingLabel &&
+      (drawingType === "hline" ||
+        drawingType === "hray" ||
+        (!drawingType && (tool === "hline" || tool === "hray")));
     return {
       id: newChartDrawingId(),
       ...resolvedStyle,
       ...(semanticId ? { semanticId } : {}),
+      ...(withPendingLabel ? { label: pendingLabel, text: pendingLabel } : {}),
     };
   };
 
@@ -473,6 +482,9 @@ export function ChartDrawingsLayer({
     onAdd(drawing);
     rememberDrawStyleFromDrawing(drawing, tool);
     onDrawingAdded?.(drawing.id);
+    if (pendingLabel && (drawing.type === "hline" || drawing.type === "hray")) {
+      clearPendingLabel(null);
+    }
   };
 
   const finishInteraction = () => {

@@ -10,12 +10,10 @@ import { BrainCircuit, Loader2 } from "lucide-react";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { IconButton } from "@/components/ui/icon-button";
 import { AiInfoButton } from "@/features/ai/ai-info-button";
+import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
 import { useAlertsStore } from "@/stores/alerts-store";
-import {
-  openHelpAiPlatform,
-  useSupervisedF3QueueStore,
-} from "@/stores/supervised-f3-queue-store";
+import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
 import { cn } from "@/lib/utils";
 
 export function ChartInstrumentAiButton({
@@ -52,7 +50,7 @@ export function ChartInstrumentAiButton({
       pushToast(
         `IA · ${payload.symbol ?? symbol}: ${payload.action} → Supervisado F3`,
       );
-      openHelpAiPlatform({ panel: "supervised-f3" });
+      openConfirmDrawer();
     },
     onError: (e: Error) => {
       pushToast(`IA · ${symbol}: ${e.message}`);

@@ -17,6 +17,7 @@ import { ChartPlatformSection } from "@/features/settings/chart-platform-section
 import { DataCaptureSection } from "@/features/settings/data-capture-section";
 import { WatchlistHelpSection } from "@/features/settings/watchlist-help-section";
 import { HelpSourcesFooter } from "@/features/help/help-sources-footer";
+import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
 import { WorkflowModulesSection } from "@/features/help/workflow-modules-section";
 import {
   HELP_CONTENT_AS_OF,
@@ -92,6 +93,8 @@ function OpenConfigLink({
 function GuideContent() {
   return (
     <div className="space-y-5 text-sm">
+      <HoyEnLaMesaBlock />
+
       <p className="text-muted-foreground">
         Bolsa V1 es una plataforma personal de gestión bursátil con terminal de
         trading, cuentas simuladas, ledger contable y fiscal. Todo el patrimonio
