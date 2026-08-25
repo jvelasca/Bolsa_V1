@@ -1,6 +1,6 @@
 # ADR-033: Operational Authority — Position persistida / una cadena / pending ≠ stop (contrato v1.10)
 
-**Estado:** Accepted — **H1+H2+P1+P2+P3 CERRADOS**; P4 no implementado  
+**Estado:** Accepted — **H1+H2+P1+P2+P3+P4 CERRADOS** (tag `v1.10-beta`)  
 **Fecha:** 2026-08-25  
 **Contexto:** Auditoría externa de discontinuidad operativa post-`v1.9-beta`. F1–F4 + ExitPermission **existen como factories**. El producto sigue rompiéndose al fill: holding plano, etiqueta «stop» sin stop, ticket que no firma el riesgo del plan.
 

@@ -1,8 +1,8 @@
 # RELEVO — tag v1.10-beta → auditoría (2026-08-25)
 
-> **Padre:** [`audit-ext-v19-ops-discontinuity-triage-2026-08-25.md`](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
+> **Padre:** [`audit-pack-estado-global-2026-08-25-v110.md`](./audit-pack-estado-global-2026-08-25-v110.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
 > **Estado:** **PUBLICACIÓN.** Tag `v1.10-beta` para auditar Operational Authority v1.10 (H1→P4). **Release tag CI GREEN.**
-> **Arranque chat nuevo:** este fichero + ADR-033 + `CURRENT_SYSTEM.md` + roadmap v1.10.
+> **Arranque chat nuevo:** este fichero + pack v110 + ADR-033 + `CURRENT_SYSTEM.md` + roadmap v1.10.
 
 ---
 
@@ -13,15 +13,15 @@
 
 ## 1. Release
 
-| Pieza        | Valor                                  |
-| ------------ | -------------------------------------- |
-| Tag          | `v1.10-beta` → `047ddb6`               |
-| Release base | `2ea53be2` (stamp funcional H1→P4)     |
-| Previo       | `v1.9-beta` → `7d90d965`               |
-| Pack auditor | triage v19 + relevos H1–P4             |
-| Spine        | `pnpm test:decision-spine` **260**     |
-| Shared       | `@bolsa/shared` (ver CI)               |
-| CI tag       | `release-tag-ci.yml` (sin path-filter) |
+| Pieza        | Valor                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------- |
+| Tag          | `v1.10-beta` → `047ddb6`                                                                       |
+| Release base | `2ea53be2` (stamp funcional H1→P4)                                                             |
+| Previo       | `v1.9-beta` → `7d90d965`                                                                       |
+| Pack auditor | [`audit-pack-estado-global-2026-08-25-v110.md`](./audit-pack-estado-global-2026-08-25-v110.md) |
+| Spine        | `pnpm test:decision-spine` **260**                                                             |
+| Shared       | `@bolsa/shared` (ver CI)                                                                       |
+| CI tag       | `release-tag-ci.yml` (sin path-filter)                                                         |
 
 ## 2. Freeze
 
@@ -29,6 +29,6 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · broker **no** · thin 5.
 
 ## 3. E1
 
-1. Auditar contra ADR-033 + tag + Actions GREEN.
+1. Auditar contra pack v110 + ADR-033 + tag + Actions GREEN.
 2. Seguir SEMI operado (checklists P4) · wire broker (mucho más tarde).
 3. No módulos thin nuevos.
