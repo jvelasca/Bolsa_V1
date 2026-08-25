@@ -63,6 +63,7 @@ Engineering Index  (este doc)
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
 │   ├── deuda-thaw-estricto-runbook-2026-08-25.md ← **DEUDA ESTRICTO** tracking P1–P5 (60d/50/70/55 · MaxDD) · W2–W4 · snapshot `scripts/thaw_estricto_snapshot.mjs` · **no** Accept estricto aún
+│   ├── plan-ciclo-a3-wire-auto-arm-ui-2026-08-25.md ← **PROPUESTO** Ciclo A3-wire · cablear `ACTIVAR AUTO` al panel (honesty BETA-D) · D1–D8 pendientes
 │   ├── traspaso-relevo-cierre-post-e1-2026-08-25.md ← cierre chat post E1 (push · deuda · proxies) · CAMBIAR CHAT
 │   ├── traspaso-relevo-thaw-beta-d-2026-08-25.md ← thaw BETA-D CERRADO · ADR-023 Accepted parcial · estricto deuda → runbook
 │   ├── traspaso-relevo-ciclo-8-2-bracket-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 8.2 Bracket thin · CERRADO `73044a7` · growth thin 8.0–8.2 · park plena
