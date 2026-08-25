@@ -62,9 +62,10 @@ async function main() {
   let healthRisk = {};
   try {
     const health = await fetchJson('/api/health');
-    healthRisk = health?.components?.risk ?? {};
+    const risk = health?.components?.risk ?? {};
+    healthRisk = risk?.details ?? risk;
     console.log(
-      `health.paperDExecuteEnv=${healthRisk.paperDExecuteEnv ?? '?'} kill=${healthRisk.killSwitchEffective ?? '?'}`,
+      `health.paperDExecuteEnv=${healthRisk.paperDExecuteEnv ?? '?'} kill=${healthRisk.effective ?? healthRisk.killSwitchEffective ?? '?'}`,
     );
   } catch (e) {
     console.log(`health: UNAVAILABLE (${e instanceof Error ? e.message : e})`);
