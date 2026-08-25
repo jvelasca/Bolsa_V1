@@ -5,6 +5,7 @@
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`
 > **Fuentes vivas:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [`CHANGELOG.md`](../../CHANGELOG.md) · ADR-023 · ADR-031 · relevo A3-wire.
 > **Histórico pack:** [`audit-pack-estado-global-2026-08-24e.md`](./audit-pack-estado-global-2026-08-24e.md) (pre-1.8).
+> **Consolidación posterior (no tag):** [`audit-pack-estado-global-2026-08-25-v181.md`](./audit-pack-estado-global-2026-08-25-v181.md).
 
 ---
 

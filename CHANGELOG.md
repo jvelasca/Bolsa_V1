@@ -4,6 +4,8 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+Consolidación v1.8.1 **código listo** (C1–C5 + ADR-032). Stamp C6 en [`audit-pack-estado-global-2026-08-25-v181.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v181.md). Tag **`v1.8.1-beta` parked** (no promover esta sección a `[1.8.1-beta]` sin palabra del dueño).
+
 ### Ciclo C4 — TradePlan shape canónico
 
 - Hoy `readCanonicalTradePlan`: canónico sesiones = `session.tradePlan`; F3 = `extra.payload.tradePlan`. Fallbacks (`extra.tradePlan`, payload top-level) marcados `legacy`, no borrados.
