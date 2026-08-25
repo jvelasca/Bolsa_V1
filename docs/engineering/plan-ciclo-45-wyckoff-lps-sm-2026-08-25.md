@@ -1,8 +1,8 @@
 # Plan — Ciclo 4.5 LPS / state machine Wyckoff (thin)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §1 SETUP · §6 (`LPS / state machine Wyckoff multi-sesión = 4.5+`, prohibido sin plan + decisión) · relevo [`traspaso-relevo-ciclo-44-wyckoff-formal-2026-08-25.md`](./traspaso-relevo-ciclo-44-wyckoff-formal-2026-08-25.md) · ancla en [`plan-ciclo-44-wyckoff-formal-2026-08-25.md`](./plan-ciclo-44-wyckoff-formal-2026-08-25.md) (D2 difería LPS → 4.5+; D3 sin `wyckoffPhase`).
-> **AsOf:** 2026-08-25 · HEAD origin **`2135fc5`**; feat 4.4 **`7003ddf`**. Código 4.5 **local** (sin commit).
-> **Estado:** **CERRADO en working tree** (D1–D8 OK · batería **92**). Commit/push solo con OK propietario.
+> **AsOf:** 2026-08-25 · HEAD local feat **`baaa9b4`** (docs stamp pendiente push). Feat 4.4 **`7003ddf`** en origin.
+> **Estado:** **CERRADO** (D1–D8 OK · batería **92** · feat `baaa9b4`). Push solo con OK propietario.
 > **Método:** rebanada fina; SETUP sigue ≠ motor paralelo; Ranking ≠ BUY; sin `contract:gen`; sin LLM.
 
 ---
