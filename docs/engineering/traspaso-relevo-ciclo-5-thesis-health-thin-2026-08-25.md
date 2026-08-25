@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md).
 > **Plan:** [`plan-ciclo-5-thesis-health-thin-2026-08-25.md`](./plan-ciclo-5-thesis-health-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** stamp docs (este commit) · feat **`a2f32bb`** **PUSHEADO** (o en vuelo).
+> **HEAD:** `fa385a8` = `origin/main`. Feat `a2f32bb` **PUSHEADO**.
 > **Arranque:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §5–6.
 
 ---
@@ -30,11 +30,13 @@
 | SHA       | Mensaje                                                       |
 | --------- | ------------------------------------------------------------- |
 | `a2f32bb` | feat(spine): ADR-031 Ciclo 5.0 Thesis Health thin (Golden F). |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 5.0 (`a2f32bb`).           |
+| `fa385a8` | docs: stamp living SoT after Ciclo 5.0 (`a2f32bb`).           |
+
+Push: `c654c6d..fa385a8` → `origin/main` (luego update-last).
 
 ## 4. E1
 
-1. ~~Commit feat~~ · ~~Push~~ (tras stamp).
+1. ~~Commit~~ · ~~Push~~.
 2. Siguiente crecimiento: **Ciclo 5.1 Golden E** (protect / T1 thin) — plan propio.
 3. Park hasta fin 5.x: ExecuteTrade converge · Actionability/IO · Shadow AUTO · MFE plena.
 4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.

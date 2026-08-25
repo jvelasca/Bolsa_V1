@@ -1,8 +1,8 @@
 # Plan — Ciclo 5.0 Thesis Health thin (Golden F advisory)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §5 Golden **F** · §6 (Position Manager / Thesis Health / Exit Radar — parked; **esta** rebanada abre solo Thesis Health **advisory thin**) · relevo [`traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md) §4 E1 · síntesis subagentes AS-IS PM + integridad parked 2026-08-25.
-> **AsOf:** 2026-08-25 · HEAD **`a2f32bb`** feat Ciclo 5.0.
-> **Estado:** **CERRADO en código** (`a2f32bb`; stamp docs siguiente). D1–D8 OK · batería **121**.
+> **AsOf:** 2026-08-25 · HEAD **`fa385a8`** = `origin/main`; feat **`a2f32bb`**.
+> **Estado:** **CERRADO en origin** (`a2f32bb` vía `fa385a8`). D1–D8 OK · batería **121**.
 > **Método:** rebanada fina crecimiento; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; **sin** trailing/T1/MFE; **sin** ExecuteTrade converge (integridad = fase posterior).
 > **Secuencia dueño:** (1) crecer Ciclo 5.x poco a poco · (2) luego integridad (ExecuteTrade / Actionability / Shadow).
 
