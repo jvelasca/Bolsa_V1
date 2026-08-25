@@ -30,11 +30,13 @@
 | SHA       | Mensaje                                             |
 | --------- | --------------------------------------------------- |
 | `e813aa3` | feat(spine): ADR-031 Ciclo 5.2 Exit Radar thin.     |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 5.2 (`e813aa3`). |
+| `50004da` | docs: stamp living SoT after Ciclo 5.2 (`e813aa3`). |
+
+Push: `e937f72..ac55254` → `origin/main`.
 
 ## 4. E1
 
-1. ~~Commit feat~~ · Push + stamp docs.
+1. ~~Commit~~ · ~~Push~~.
 2. Siguiente: **MFE thin** o cierre línea 5.x → integridad ExecuteTrade.
 3. Park: Actionability/IO · Shadow AUTO · trailing continuo / bracket.
 4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
