@@ -30,11 +30,13 @@
 | SHA       | Mensaje                                             |
 | --------- | --------------------------------------------------- |
 | `fd44a03` | feat(spine): ADR-031 Ciclo 5.3 MFE/MAE thin.        |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 5.3 (`fd44a03`). |
+| `0af42c5` | docs: stamp living SoT after Ciclo 5.3 (`fd44a03`). |
+
+Push: `13a69f9..ceb2605` → `origin/main`.
 
 ## 4. E1
 
-1. ~~Commit feat~~ · Push + stamp docs.
+1. ~~Commit~~ · ~~Push~~.
 2. **Siguiente:** cierre línea **5.x** → integridad **ExecuteTrade**.
 3. Park: expectancy plena · Actionability/IO · Shadow AUTO · trailing continuo / bracket.
 4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
