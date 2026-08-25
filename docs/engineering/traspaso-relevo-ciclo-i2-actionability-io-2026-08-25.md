@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md).
 > **Plan:** [`plan-ciclo-i2-actionability-io-2026-08-25.md`](./plan-ciclo-i2-actionability-io-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD origin:** `05e354c`. Feat I2 **`e31840d`** (local, no push). Stamp SHA en update-last.
+> **HEAD origin:** `05e354c`. Feat I2 **`e31840d`** · stamp **`cfc8042`** (local, no push).
 > **Estado:** **CERRADO en `e31840d`.** Integridad parked (I3 Shadow solo explícito).
 > **Fase:** **integridad**.
 > **Nombre:** no confundir con hub Instrumentos (`instruments-hub-scores.ts`).
@@ -34,15 +34,16 @@
 
 ## 3. Commits
 
-| SHA       | Mensaje                                         |
-| --------- | ----------------------------------------------- |
-| `e31840d` | feat(spine): ADR-031 Ciclo I2 Actionability/IO. |
+| SHA       | Mensaje                                            |
+| --------- | -------------------------------------------------- |
+| `e31840d` | feat(spine): ADR-031 Ciclo I2 Actionability/IO.    |
+| `cfc8042` | docs: stamp living SoT after Ciclo I2 (`e31840d`). |
 
-Stamp docs: este ciclo (SHA en update-last). **No push** salvo decisión explícita.
+**No push** salvo decisión explícita.
 
 ## 4. E1
 
-1. ~~Feat I2~~ · stamp SHA · push (decisión explícita).
+1. ~~Feat I2~~ · ~~stamp SHA~~ · push (decisión explícita).
 2. Park: Shadow AUTO (**I3, solo si explícito**) · expectancy plena · trail continuo · bracket.
 3. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
 

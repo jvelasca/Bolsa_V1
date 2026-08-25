@@ -1,7 +1,7 @@
 # Plan — Ciclo I2 Actionability / Índice Operativo (integridad)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §4–6 · relevo [`traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md`](./traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md) · cierre I1 [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md).
-> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I2 **`e31840d`** (local, no push).
+> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I2 **`e31840d`** · stamp **`cfc8042`** (local, no push).
 > **Estado:** **CERRADO en `e31840d`.** D1–D8 OK.
 > **Método:** integridad thin; Ranking ≠ BUY; sin Shadow AUTO; sin broker; sin reabrir 5.x / I1.
 > **Nombre:** integridad **I2** ≠ hub Instrumentos histórico (`use-instruments-hub-scores.ts`, ya shipped).
@@ -50,9 +50,10 @@ No Shadow · no broker · no reabrir I1/5.x · no LLM · no contract:gen.
 
 ## 3. Commits
 
-| SHA       | Mensaje                                         |
-| --------- | ----------------------------------------------- |
-| `e31840d` | feat(spine): ADR-031 Ciclo I2 Actionability/IO. |
+| SHA       | Mensaje                                            |
+| --------- | -------------------------------------------------- |
+| `e31840d` | feat(spine): ADR-031 Ciclo I2 Actionability/IO.    |
+| `cfc8042` | docs: stamp living SoT after Ciclo I2 (`e31840d`). |
 
 ## 4. Freeze
 
