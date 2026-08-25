@@ -223,6 +223,19 @@ def extract_session_mfe_mae(
     return None
 
 
+def extract_session_expectancy(
+    payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Lee ``runtime.expectancy`` (Ciclo 8.0 advisory). Sin inventar."""
+    runtime = _session_runtime(payload)
+    if runtime is None:
+        return None
+    raw = runtime.get("expectancy")
+    if isinstance(raw, dict) and raw:
+        return dict(raw)
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class DecisionSessionView:
     """Una sesión de decisión reciente expuesta en el tablero."""
@@ -241,6 +254,7 @@ class DecisionSessionView:
     protect_plan: dict[str, Any] | None = None
     exit_radar: dict[str, Any] | None = None
     mfe_mae: dict[str, Any] | None = None
+    expectancy: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -265,6 +279,8 @@ class DecisionSessionView:
             data["exitRadar"] = self.exit_radar
         if self.mfe_mae is not None:
             data["mfeMae"] = self.mfe_mae
+        if self.expectancy is not None:
+            data["expectancy"] = self.expectancy
         return data
 
 
@@ -433,6 +449,7 @@ class GetDecisionBoard:
                     protect_plan=extract_session_protect_plan(rec.payload),
                     exit_radar=extract_session_exit_radar(rec.payload),
                     mfe_mae=extract_session_mfe_mae(rec.payload),
+                    expectancy=extract_session_expectancy(rec.payload),
                 )
             )
 

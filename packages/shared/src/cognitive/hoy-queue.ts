@@ -7,7 +7,8 @@
  * Ciclo 5.0: thesisHealth advisory (Golden F) — ≠ cola REVIEW de EXPIRED.
  * Ciclo 5.1: protectPlan advisory (Golden E) — no muta structuralStop.
  * Ciclo 5.2: exitRadar advisory — no auto-exit.
- * Ciclo 5.3: mfeMae metrics — no CTA / no expectancy.
+ * Ciclo 5.3: mfeMae metrics — no CTA / no expectancy plena.
+ * Ciclo 8.0: expectancy thin advisory — ≠ permiso / no auto-exit.
  */
 
 import type {
@@ -38,6 +39,11 @@ import type {
   ExitRadarWhyV1,
 } from "./exit-radar.js";
 import type { MfeMaeStatusV1, MfeMaeV1, MfeMaeWhyV1 } from "./mfe-mae.js";
+import type {
+  ExpectancyStatusV1,
+  ExpectancyV1,
+  ExpectancyWhyV1,
+} from "./expectancy.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
@@ -65,6 +71,8 @@ export type HoyQueueItemV1 = {
   exitRadar?: ExitRadarV1 | null;
   /** Ciclo 5.3 — MFE/MAE metrics (not an action CTA). */
   mfeMae?: MfeMaeV1 | null;
+  /** Ciclo 8.0 — Expectancy thin (≠ permiso). */
+  expectancy?: ExpectancyV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -517,6 +525,88 @@ function readMfeMaeFromF3Row(row: SemiF3ViewV1): MfeMaeV1 | null {
   return readMfeMaeFromPayloadish(flattened.payload);
 }
 
+const EXPECTANCY_STATUSES = new Set<ExpectancyStatusV1>([
+  "none",
+  "thin",
+  "ready",
+]);
+const EXPECTANCY_WHYS = new Set<ExpectancyWhyV1>([
+  "missing_inputs",
+  "thin_sample",
+  "live_proxy",
+  "aggregated",
+  "not_permission",
+]);
+
+function asExpectancy(value: unknown): ExpectancyV1 | null {
+  if (!isRecord(value)) return null;
+  const status = value.status;
+  if (
+    typeof status !== "string" ||
+    !EXPECTANCY_STATUSES.has(status as ExpectancyStatusV1)
+  ) {
+    return null;
+  }
+  const whyRaw = value.why;
+  const why: ExpectancyWhyV1[] = Array.isArray(whyRaw)
+    ? whyRaw.filter(
+        (code): code is ExpectancyWhyV1 =>
+          typeof code === "string" &&
+          EXPECTANCY_WHYS.has(code as ExpectancyWhyV1),
+      )
+    : [];
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const nRaw = value.n;
+  const n =
+    typeof nRaw === "number" && Number.isFinite(nRaw) && nRaw >= 0
+      ? Math.floor(nRaw)
+      : 0;
+  const setupRaw = value.entrySetup;
+  const entrySetup =
+    typeof setupRaw === "string" && setupRaw.trim() ? setupRaw.trim() : null;
+  return {
+    status: status as ExpectancyStatusV1,
+    entrySetup,
+    n,
+    expectancyR: numOrNull(value.expectancyR),
+    winRate: numOrNull(value.winRate),
+    avgWinR: numOrNull(value.avgWinR),
+    avgLossR: numOrNull(value.avgLossR),
+    currentR: numOrNull(value.currentR),
+    why,
+  };
+}
+
+function readExpectancyFromPayloadish(value: unknown): ExpectancyV1 | null {
+  if (!isRecord(value)) return null;
+  const top = asExpectancy(value.expectancy);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = asExpectancy(runtime.expectancy);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return asExpectancy(value.runtime.expectancy);
+  }
+  return null;
+}
+
+function readExpectancyFromF3Row(row: SemiF3ViewV1): ExpectancyV1 | null {
+  const extra = row.extra;
+  if (isRecord(extra)) {
+    const fromPayload = readExpectancyFromPayloadish(extra.payload);
+    if (fromPayload) return fromPayload;
+    const fromExtra = asExpectancy(extra.expectancy);
+    if (fromExtra) return fromExtra;
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  return readExpectancyFromPayloadish(flattened.payload);
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -573,6 +663,7 @@ function toHoyItem(
   protectPlan: ProtectPlanV1 | null,
   exitRadar: ExitRadarV1 | null,
   mfeMae: MfeMaeV1 | null,
+  expectancy: ExpectancyV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -587,6 +678,7 @@ function toHoyItem(
       protectPlan,
       exitRadar,
       mfeMae,
+      expectancy,
     };
   }
   return {
@@ -601,6 +693,7 @@ function toHoyItem(
     protectPlan,
     exitRadar,
     mfeMae,
+    expectancy,
   };
 }
 
@@ -625,6 +718,7 @@ export function mapDecisionBoardToHoyQueue(
         readProtectPlanFromF3Row(row),
         readExitRadarFromF3Row(row),
         readMfeMaeFromF3Row(row),
+        readExpectancyFromF3Row(row),
       ),
     );
   }
@@ -650,6 +744,7 @@ export function mapDecisionBoardToHoyQueue(
         asProtectPlan(session.protectPlan),
         asExitRadar(session.exitRadar),
         asMfeMae(session.mfeMae),
+        asExpectancy(session.expectancy),
       ),
     );
   }

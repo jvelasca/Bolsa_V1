@@ -65,6 +65,11 @@ from bolsa_analytics.cognitive.mfe_mae import (
     build_mfe_mae_dict,
     map_mfe_mae,
 )
+from bolsa_analytics.cognitive.expectancy import (
+    EXPECTANCY_KEY,
+    build_expectancy_dict,
+    map_expectancy,
+)
 from bolsa_analytics.cognitive.gate_decision import (
     GatedDecision,
     ProposedTradeContext,
@@ -220,6 +225,7 @@ __all__ = [
     "build_protect_plan_dict",
     "build_exit_radar_dict",
     "build_mfe_mae_dict",
+    "build_expectancy_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
@@ -239,6 +245,7 @@ __all__ = [
     "map_protect_plan",
     "map_exit_radar",
     "map_mfe_mae",
+    "map_expectancy",
     "monte_carlo_permutation_p_value",
     "new_session_id",
     "observe_investor_profile",
@@ -256,6 +263,7 @@ __all__ = [
     "PROTECT_PLAN_KEY",
     "EXIT_RADAR_KEY",
     "MFE_MAE_KEY",
+    "EXPECTANCY_KEY",
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",

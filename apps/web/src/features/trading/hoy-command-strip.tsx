@@ -8,6 +8,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type {
   ExitRadarV1,
+  ExpectancyV1,
   HoyQueueItemV1,
   HoySetupEvidenceV1,
   MfeMaeV1,
@@ -112,6 +113,17 @@ function mfeMaeLine(metrics: MfeMaeV1): string {
   return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
+function expectancyLine(exp: ExpectancyV1): string {
+  const parts: string[] = [];
+  if (exp.entrySetup) parts.push(exp.entrySetup);
+  if (exp.expectancyR != null) parts.push(`E ${exp.expectancyR}R`);
+  parts.push(`n=${exp.n}`);
+  if (exp.winRate != null) parts.push(`WR ${(exp.winRate * 100).toFixed(0)}%`);
+  if (exp.status === "thin") parts.push("thin");
+  parts.push("≠ permiso");
+  return parts.join(" · ");
+}
+
 export function HoyCommandStrip() {
   const { effectiveAccountId } = useActiveAccount();
   const [selected, setSelected] = useState<HoyQueueItemV1 | null>(null);
@@ -203,6 +215,16 @@ export function HoyCommandStrip() {
                 </p>
                 <p className="mt-1 text-sm tabular-nums">
                   {mfeMaeLine(selected.mfeMae)}
+                </p>
+              </div>
+            ) : null}
+            {selected.expectancy && selected.expectancy.status !== "none" ? (
+              <div className="mt-3" data-testid="hoy-expectancy">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Expectativa
+                </p>
+                <p className="mt-1 text-sm tabular-nums">
+                  {expectancyLine(selected.expectancy)}
                 </p>
               </div>
             ) : null}

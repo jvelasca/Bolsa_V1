@@ -384,6 +384,8 @@ class DecisionSessionViewDto(BaseModel):
     exit_radar: dict[str, Any] | None = Field(default=None, alias="exitRadar")
     # Ciclo 5.3 — MFE/MAE metrics advisory thin.
     mfe_mae: dict[str, Any] | None = Field(default=None, alias="mfeMae")
+    # Ciclo 8.0 — Expectancy thin advisory (≠ permiso).
+    expectancy: dict[str, Any] | None = Field(default=None, alias="expectancy")
 
 
 class SemiF3ViewDto(BaseModel):

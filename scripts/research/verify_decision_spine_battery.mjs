@@ -55,6 +55,7 @@ const pyTests = [
   'packages/py/analytics/tests/test_protect_plan.py',
   'packages/py/analytics/tests/test_exit_radar.py',
   'packages/py/analytics/tests/test_mfe_mae.py',
+  'packages/py/analytics/tests/test_expectancy.py',
 ];
 
 console.log('Bolsa V1 — Decision Spine battery');

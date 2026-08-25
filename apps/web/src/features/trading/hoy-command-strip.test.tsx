@@ -348,4 +348,61 @@ describe("HoyCommandStrip", () => {
     expect(metrics.textContent).toMatch(/Excursión/i);
     expect(metrics.textContent).toMatch(/MFE 1\.8R · MAE 0\.2R · favorable/i);
   });
+
+  it("Ciclo 8.0: dialog shows Expectativa when expectancy.status!=none", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                  entrySetup: "breakout",
+                },
+                expectancy: {
+                  status: "thin",
+                  entrySetup: "breakout",
+                  n: 1,
+                  expectancyR: 0.8,
+                  winRate: 1,
+                  avgWinR: 0.8,
+                  avgLossR: null,
+                  currentR: 0.8,
+                  why: ["not_permission", "live_proxy", "thin_sample"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const exp = await screen.findByTestId("hoy-expectancy");
+    expect(exp).toBeTruthy();
+    expect(exp.textContent).toMatch(/Expectativa/i);
+    expect(exp.textContent).toMatch(/breakout/i);
+    expect(exp.textContent).toMatch(/≠ permiso/);
+  });
 });

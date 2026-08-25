@@ -10,11 +10,15 @@ from bolsa_analytics.cognitive.exit_radar import (
     EXIT_RADAR_KEY,
     build_exit_radar_dict,
 )
+from bolsa_analytics.cognitive.expectancy import (
+    EXPECTANCY_KEY,
+    build_expectancy_dict,
+)
+from bolsa_analytics.cognitive.macro_inputs import MacroInputs
 from bolsa_analytics.cognitive.mfe_mae import (
     MFE_MAE_KEY,
     build_mfe_mae_dict,
 )
-from bolsa_analytics.cognitive.macro_inputs import MacroInputs
 from bolsa_analytics.cognitive.protect_plan import (
     PROTECT_PLAN_KEY,
     build_protect_plan_dict,
@@ -194,6 +198,8 @@ class ProposeRecommendationResult:
     exit_radar: dict[str, Any] | None = None
     # Ciclo 5.3 — MFE/MAE metrics advisory; no expectancy.
     mfe_mae: dict[str, Any] | None = None
+    # Ciclo 8.0 — Expectancy thin advisory; ≠ permiso.
+    expectancy: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -229,6 +235,8 @@ class ProposeRecommendationResult:
             data[EXIT_RADAR_KEY] = self.exit_radar
         if self.mfe_mae is not None:
             data[MFE_MAE_KEY] = self.mfe_mae
+        if self.expectancy is not None:
+            data[EXPECTANCY_KEY] = self.expectancy
         return data
 
 
@@ -569,6 +577,41 @@ class ProposeRecommendationFromTa:
             last_close=float(last_close) if last_close is not None else None,
             bars=ohlcv_bars,
         )
+        entry_setup_raw = (
+            trade_plan_dict.get("entrySetup")
+            if isinstance(trade_plan_dict, dict)
+            else None
+        )
+        if not isinstance(entry_setup_raw, str):
+            entry_setup_raw = (
+                trade_plan_dict.get("entry_setup")
+                if isinstance(trade_plan_dict, dict)
+                else None
+            )
+        entry_setup = (
+            entry_setup_raw.strip()
+            if isinstance(entry_setup_raw, str) and entry_setup_raw.strip()
+            else None
+        )
+        current_r_raw = mfe_mae.get("currentR") if isinstance(mfe_mae, dict) else None
+        try:
+            current_r = float(current_r_raw) if current_r_raw is not None else None
+        except (TypeError, ValueError):
+            current_r = None
+        expectancy_samples: list[dict[str, Any]] = []
+        if (
+            entry_setup is not None
+            and entry_setup != "none"
+            and current_r is not None
+        ):
+            expectancy_samples.append(
+                {"entrySetup": entry_setup, "rMultiple": current_r}
+            )
+        expectancy = build_expectancy_dict(
+            samples=expectancy_samples,
+            focus_setup=entry_setup,
+            current_r=current_r,
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -611,6 +654,7 @@ class ProposeRecommendationFromTa:
             PROTECT_PLAN_KEY: protect_plan,
             EXIT_RADAR_KEY: exit_radar,
             MFE_MAE_KEY: mfe_mae,
+            EXPECTANCY_KEY: expectancy,
         }
         if wyckoff_anchor is not None:
             session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
@@ -685,6 +729,7 @@ class ProposeRecommendationFromTa:
             protect_plan=protect_plan,
             exit_radar=exit_radar,
             mfe_mae=mfe_mae,
+            expectancy=expectancy,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:
