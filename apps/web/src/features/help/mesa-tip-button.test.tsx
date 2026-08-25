@@ -25,9 +25,10 @@ describe("mesa-tip-catalog", () => {
         "operativa-fit-chip",
         "chart-f3-projection",
         "confirm-ticket-preview",
+        "confirm-risk-signature",
       ]),
     );
-    expect(MESA_TIP_IDS).toHaveLength(7);
+    expect(MESA_TIP_IDS).toHaveLength(8);
   });
 
   it("returns Spanish copy with optional links", () => {

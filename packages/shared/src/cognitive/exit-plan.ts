@@ -140,6 +140,8 @@ function collectReasons(
     ) {
       fired.add("TARGET_2");
     }
+    // H2: T2 no interpreta T1 a ciegas (no reduce mitad por atajo T1).
+    if (fired.has("TARGET_2")) fired.delete("TARGET_1");
   }
 
   const now = typeof signals.now === "string" ? signals.now.trim() : "";

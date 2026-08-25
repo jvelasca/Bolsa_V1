@@ -7,14 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
+    get_account_repository,
     get_db_session,
     get_execute_gated_portfolio_trade_use_case,
     get_list_transactions_use_case,
     get_portfolio_summary_use_case,
+    get_position_state_repository,
     require_account_header_access,
 )
 from bolsa_api.api.v1.idempotency_responses import IDEMPOTENCY_CONFLICT_RESPONSES
 from bolsa_api.schemas.extra_mappers import (
+    attach_operational_positions,
     to_portfolio_summary_dto,
     to_trade_response_data,
     to_transaction_dto,
@@ -46,7 +49,13 @@ async def get_portfolio(
 
     summary = await use_case.execute(account_id=account_id)
 
-    return PortfolioSummaryResponseDto(data=to_portfolio_summary_dto(summary))
+    dto = to_portfolio_summary_dto(summary)
+    scope = await get_account_repository(session).resolve_scope(account_id)
+    records = await get_position_state_repository(session).list_open_for_account(
+        scope.account.id
+    )
+    attach_operational_positions(dto, records)
+    return PortfolioSummaryResponseDto(data=dto)
 
 
 

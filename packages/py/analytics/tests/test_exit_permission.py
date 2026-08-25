@@ -104,8 +104,28 @@ def test_deny_position_closed() -> None:
     assert perm.reasons == ("position_closed",)
 
 
-def test_deny_kill_switch() -> None:
+def test_allow_human_full_exit_with_kill_switch() -> None:
     perm = check_exit_permission(_exit_triggered(), kill_switch=True)
+    assert perm.verdict == "ALLOW"
+    assert perm.action == "full_exit"
+
+
+def test_allow_human_protect_with_kill_switch() -> None:
+    exit_plan = build_exit_plan_from_position(
+        _open_long(), trail_hint=True, trail_stop=100.0
+    )
+    perm = check_exit_permission(exit_plan, kill_switch=True)
+    assert perm.allowed is True
+    assert perm.action == "protect"
+
+
+def test_deny_kill_switch_for_auto() -> None:
+    perm = check_exit_permission(
+        _exit_triggered(),
+        kill_switch=True,
+        auto_execute=True,
+        paper_d_execute=True,
+    )
     assert perm.reasons == ("kill_switch",)
 
 

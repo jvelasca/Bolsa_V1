@@ -1,6 +1,6 @@
 # Ayuda en la app — coordinación con trackers y docs
 
-> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-25** (v1.8 Decision Spine · AUTO BETA-D · Hoy honesty)  
+> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-25** (v1.8 Decision Spine · AUTO BETA-D · Hoy honesty · H1 pending ≠ stop · H2 kill switch asimétrico · P1 posición persistida · P2 firma de riesgo · P3 cadena de salida)  
 > Mesa diaria: **Trading** · **Señales** (`/screeners`) · **Confirmar** (`/confirm`) · **Libro** (`/operations` + `/history`). Menús: **Laboratorio** (`/backtests`, alias Backtesting) · **Asesor**. Confirm es primer nivel (no solo Ayuda → Plataforma IA). **AUTO cuenta** = UI BETA-D: armar con frase `ACTIVAR AUTO` en Cuentas → Operativa; execute solo con `PAPER_D_EXECUTE=1` (default off). Distinto de Lista AUTO Lab. SEMI: _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se envían solas._ En Ayuda (Guía y **Flujo y módulos**) aparece el bloque **«Hoy en la mesa»** (3 pasos: Trading → Proponer F3 → Confirmar). Tira **Hoy** = proyección del Decision Board (sin TradePlan vivo → WATCH, nunca BUY). Tips «?» de mesa en Operativa / Confirmar. Desde **Operativa** / chip **F3** de la barra Trading se abre Confirmar en **panel lateral** (mismo flujo SEMI; la página `/confirm` sigue en el menú). Ayuda sigue con Datos de mercado · Watchlist · Análisis del valor · Laboratorio (Play · Lista AUTO · Finalistas · Monitor · DÍA D) · Trading (Operativa · Estudio ADR-024) · Plataforma IA (docs/tracker; firma en `/confirm`).  
 > **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
 > **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho.  
@@ -87,6 +87,16 @@ _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se en
 Cuentas → Operativa → Auto: escribir **`ACTIVAR AUTO`** para armar (local). Execute DEMO solo si `PAPER_D_EXECUTE=1`. Sin esa env, la UI puede armarse pero el servidor **no** ejecuta. No confundir con **Lista AUTO** del Laboratorio. Broker live **no**. Thaw estricto (60d/50/70/55) **abierto**.
 
 **Decision Spine (v1.8):** tesis (`DecisionPackage`) ≠ plan (`TradePlan` v0: WATCH / ARMED / TRIGGERED / BLOCKED / EXPIRED) ≠ permiso (`check_opening`). Ranking / TOP / dictamen **no** son BUY. Thesis Health · Exit Radar · Bracket en Hoy son **avisos**, no firman ni mutan el stop.
+
+**Orden pendiente a precio (H1 · ADR-033):** el diálogo de operación y Operaciones muestran una orden con **precio límite**, no un «stop». No protege la posición; se ejecuta si el mercado alcanza ese precio. El stop del plan vive en PositionState (cuando esté cableado), no en `pending_orders`.
+
+**Kill switch (H2 · ADR-033):** bloquea **aperturas** nuevas y **automatismos** AUTO. No niega a ciegas el desriesgo humano en SEMI (salir / proteger / reducir). Cuentas → Operativa.
+
+**Posición persistida (P1 · ADR-033):** tras un fill de apertura con TradePlan TRIGGERED (Confirm SEMI, o pending con snapshot), Operaciones muestra stop / T1 / T2 / estado del plan. Qty y P&L siguen el holding (contabilidad). Sin plan → «sin plan persistido».
+
+**Firma de riesgo (P2 · ADR-033):** al firmar en Confirmar, el tamaño es el del TradePlan (riesgo € / distancia al stop), no un % de caja. El ticket muestra qty sugerida/máx, stop, pérdida estimada y R. Superar el plan exige un motivo. Sin plan TRIGGERED, el ticket no inventa stop ni R.
+
+**Cadena de salida (P3 · ADR-033):** ExitPlan propone (mantener / proteger / reducir / salir) → ExitPermission valida → tú firmas en Confirmar. No es auto-exit. Lab Señales (`evaluate-exits`) y thin «Salida» de Hoy **no** son este puerto. Tras un cierre o reduce firmado, el plan persistido se actualiza (PARTIAL / CLOSED). La columna Salida en Operaciones es aviso, no un botón que ejecute.
 
 **Estudio** = lista API canónica (universo supervisable). Abrir/cerrar gráfico **no** cambia membresía. Selección → **Pasar a Estudio** / **A Estudio** (alta = Actualizar ligero de esos valores; Redescubrir sigue manual). SEMI/AUTO exigen pertenencia; MANUAL no.
 

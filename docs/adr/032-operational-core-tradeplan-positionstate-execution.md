@@ -2,8 +2,8 @@
 
 **Estado:** Accepted — **F1–F4 + ExitPermission + INFRA implementados** (2026-08-25); broker adapter sigue parked  
 **Fecha:** 2026-08-25  
-**Enmienda:** 2026-08-25 — F1–F4 + ExitPermission + CI-by-tag. Gap: [`adr-032-audit-gap-2026-08-25.md`](../engineering/adr-032-audit-gap-2026-08-25.md).  
-**Contexto:** Cadena post-entrada modelada: PositionState → ExitPlan → ExitPermission → ExecutionPlan PAPER. Falta broker adapter + wire producto.
+**Enmienda:** 2026-08-25 — F1–F4 + ExitPermission + CI-by-tag. Gap campos: [`adr-032-audit-gap-2026-08-25.md`](../engineering/adr-032-audit-gap-2026-08-25.md). **Enmienda 2:** 2026-08-25 — factories ≠ autoridad; constitución v1.10 = [ADR-033](./033-operational-authority-position-persistence.md) · gap [`adr-032-ops-authority-gap-2026-08-25.md`](../engineering/adr-032-ops-authority-gap-2026-08-25.md).  
+**Contexto:** Cadena post-entrada **modelada**. Autoridad persistente + honesty pending = ADR-033 (no este ADR).
 
 **Depende de:** [ADR-031](./031-operational-model-tesis-plan-permiso.md) · [RFC-008](../rfc/008-cognitive-decision-architecture.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [roadmap v1.8.1](../engineering/roadmap-v181-operational-consolidation-2026-08-25.md).
 
@@ -180,9 +180,9 @@ C2 Alembic-only y C3–C6 de v1.8.1 **no** implementan PositionState.
 
 ## 11. Consecuencias
 
-- Un ADR más no compite con `CURRENT_SYSTEM`: este documento fija **contrato v1.9**; el estado vivo sigue en [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md). ADR-031 sigue siendo la política de las **tres capas de apertura**.
-- Implementar TradePlan v1 / PositionState / ExitPlan / ExecutionPlan exige **fase propia** (plan D1–D8) que cite este ADR. Hasta entonces: cero runtime. Secuencia: F1 TradePlan v1 → F2 PositionState → F3 ExitPlan → F4 ExecutionPlan PAPER. [`roadmap-v19-operational-core-2026-08-25.md`](../engineering/roadmap-v19-operational-core-2026-08-25.md).
-- El siguiente chat no «continúa 8.3». El siguiente crecimiento de modelo es **dentro** de los objetos de §1–§4, no un thin más.
+- Un ADR más no compite con `CURRENT_SYSTEM`: este documento fija **contrato v1.9 (modelo)**; el estado vivo sigue en [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md). ADR-031 = tres capas de apertura. **Autoridad post-fill** = [ADR-033](./033-operational-authority-position-persistence.md).
+- Implementar TradePlan v1 / PositionState / ExitPlan / ExecutionPlan exigió fase propia bajo este ADR. **CERRADO.** No reabrir para campos extra del auditor de discontinuidad.
+- El siguiente chat no «continúa wire ExitPermission» ni construye la consola. Siguiente = **H1** honesty pending (roadmap v1.10).
 - **ActionIdentity** (v1.9, no Hoy ahora): `instrument + positionId + actionType`. Dedup por `symbol` en Hoy v1.8.1 **intacta**.
 - **ActionabilityScore v1** (predictivo) **prohibido** hasta existir Opportunity + Setup + Entry quality + Risk + R/R + Portfolio fit + Freshness + Liquidity. Hoy = ordinal de `status`.
 - Conceptos críticos (Spine, TradePlan, AUTO, Hoy, Risk gate): consistencia **CODE + TEST + HELP + ADR**.

@@ -1861,6 +1861,17 @@
             "title": "Recommendation",
             "type": "object"
           },
+          "riskOverrideReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Riskoverridereason"
+          },
           "sessionId": {
             "anyOf": [
               {
@@ -11384,6 +11395,105 @@
         "title": "PortfolioSummaryResponseDto",
         "type": "object"
       },
+      "OperationalPositionDto": {
+        "properties": {
+          "currentStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentstop"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target1"
+          },
+          "target2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target2"
+          },
+          "tradePlanId": {
+            "title": "Tradeplanid",
+            "type": "string"
+          },
+          "exitPlan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalExitPlanDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "direction",
+          "currentStop",
+          "target1",
+          "target2",
+          "tradePlanId"
+        ],
+        "title": "OperationalPositionDto",
+        "type": "object"
+      },
+      "OperationalExitPlanDto": {
+        "properties": {
+          "primaryReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primaryreason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestedAction": {
+            "title": "Suggestedaction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "suggestedAction",
+          "primaryReason"
+        ],
+        "title": "OperationalExitPlanDto",
+        "type": "object"
+      },
       "PositionDto": {
         "properties": {
           "avgCost": {
@@ -11453,6 +11563,16 @@
               }
             ],
             "title": "Unrealizedpnlpct"
+          },
+          "operational": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalPositionDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [

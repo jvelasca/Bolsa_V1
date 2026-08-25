@@ -50,10 +50,18 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
   → `stale_price`.
 - **ADR-031 TradePlan (E1 P1):** `result["tradePlan"]` es la capa PLAN
   (WATCH|ARMED|TRIGGERED|BLOCKED|EXPIRED). No sustituye `check_opening`.
+- **P2 firma de riesgo (ADR-033 §6):** execute de aperturas con TradePlan
+  TRIGGERED + quantity>0 bloquea qty/pérdida por encima del plan sin
+  `risk_override_reason`. Motivo `risk_signature` (≠ `risk_veto`).
+- **P3 cadena de salida (ADR-033 §4):** execute de `exit_hint`/`reduce` con
+  Position persistida pasa ExitPlan (`manual`) → ExitPermission. Motivo
+  `exit_permission` (≠ `risk_veto` ≠ `risk_signature`). Sin fila → legado.
+  Tras fill: `applyReduce`. Lab `EvaluatePositionExits` intacto.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -64,6 +72,7 @@ from bolsa_analytics.cognitive.decision_session import (
 )
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.recommendation import Recommendation
+from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
 from bolsa_analytics.cognitive.trade_plan import (
     WYCKOFF_SPRING_ANCHOR_KEY,
     build_v0_trade_plan_dict,
@@ -74,6 +83,7 @@ from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
+from bolsa_application.evaluate_exit_plan import semi_exit_permission
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.journal_writer import (
     append_journal_event,
@@ -84,6 +94,15 @@ from bolsa_application.opening_permission import (
     InstrumentSectorLookup,
     LatestBarLookup,
     allow_opening_fill,
+)
+from bolsa_application.persist_position_from_exit import (
+    PersistPositionFromExitInput,
+    row_position_state,
+)
+from bolsa_application.persist_position_from_fill import (
+    PersistPositionFromFillInput,
+    ledger_position_id_from_trade,
+    open_transaction_id_from_trade,
 )
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
@@ -140,6 +159,19 @@ def _required_fill_side(action: str, package_action: str | None) -> tuple[bool, 
         return False, None  # sin posición conocida → no saber el lado
     # wait / desconocida: no transaccional; no deriva rechazo aquí (Bug 1).
     return True, None
+
+
+def _package_action_from_position_direction(
+    direction: object,
+    *,
+    instrument_id: str,
+) -> dict[str, Any] | None:
+    """P4 — inferir tesis de cierre desde Position persistida (≠ package de sesión)."""
+    if direction == "long":
+        return {"action": "recommend_long", "instrumentId": instrument_id}
+    if direction == "short":
+        return {"action": "recommend_short", "instrumentId": instrument_id}
+    return None
 
 
 def _reject_reason_for_execute(
@@ -288,6 +320,30 @@ def _is_opening_action(action: str) -> bool:
     return action in _OPENING_ACTIONS
 
 
+def _is_closing_action(action: str) -> bool:
+    """¿La recommendation cierra o reduce (cadena P3, no cesta)?"""
+    return action in _CLOSING_ACTIONS
+
+
+def risk_signature_reject_reason(
+    *,
+    trade_plan: dict[str, Any] | None,
+    signed_qty: float,
+    signed_price: float,
+    override_reason: str | None,
+) -> str | None:
+    """P2: ``risk_signature`` si el tamaño firmado supera el plan sin override."""
+    verdict = evaluate_risk_signature(
+        trade_plan,
+        signed_qty=signed_qty,
+        signed_price=signed_price,
+        override_reason=override_reason,
+    )
+    if verdict.get("allowed") is True:
+        return None
+    return "risk_signature"
+
+
 class ConfirmRecommendationIntent:
     """Humano confirma Recommendation; audita Session (update o append confirm)."""
 
@@ -303,6 +359,8 @@ class ConfirmRecommendationIntent:
         ohlcv: LatestBarLookup | None = None,
         mandates: AccountMandateLookup | None = None,
         journal_writer: Any | None = None,
+        position_from_fill: Any | None = None,
+        position_from_exit: Any | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
@@ -313,6 +371,8 @@ class ConfirmRecommendationIntent:
         self._ohlcv = ohlcv
         self._mandates = mandates
         self._journal_writer = journal_writer
+        self._position_from_fill = position_from_fill
+        self._position_from_exit = position_from_exit
 
     async def execute(
         self,
@@ -321,6 +381,7 @@ class ConfirmRecommendationIntent:
         account_id: str,
         execute: bool = False,
         session_id: str | None = None,
+        risk_override_reason: str | None = None,
     ) -> dict[str, Any]:
         raw = recommendation_raw
         metrics = raw.get("metrics") or {}
@@ -364,6 +425,19 @@ class ConfirmRecommendationIntent:
             package = resolve_session_decision_package(session_record)
             if package is not None:
                 contract_status = "present_verified"
+        side_package = await self._effective_package_for_side(
+            rec=rec,
+            account_id=account_id,
+            package=package,
+        )
+        if _is_closing_action(rec.action):
+            _, required_side = _required_fill_side(
+                rec.action,
+                None if side_package is None else side_package.get("action"),
+            )
+            if required_side is not None and intent.side != required_side:
+                intent = replace(intent, side=required_side)  # type: ignore[arg-type]
+                result["intent"] = {**intent.to_dict(), "contract": contract_status}
         result["intent"]["contract"] = contract_status
         result["tradePlan"] = resolve_confirm_trade_plan(
             raw=raw,
@@ -420,7 +494,7 @@ class ConfirmRecommendationIntent:
                 action=rec.action,
                 intent_side=intent.side,
                 intent_instrument_id=intent.instrument_id,
-                package=package,
+                package=side_package,
             )
             if recommendation_is_expired(rec.expires_at):
                 reject_reason = "expired"
@@ -523,6 +597,82 @@ class ConfirmRecommendationIntent:
                         base={"reason": "risk_veto", "status": "rejected_by_gate"},
                     ),
                 )
+            elif (
+                _is_opening_action(rec.action)
+                and risk_signature_reject_reason(
+                    trade_plan=trade_plan_dict if isinstance(trade_plan_dict, dict) else None,
+                    signed_qty=float(intent.quantity),
+                    signed_price=price,
+                    override_reason=risk_override_reason,
+                )
+                is not None
+            ):
+                # P2 — sizing vs TradePlan (≠ check_opening / risk_veto).
+                result["trade"] = {
+                    "status": "rejected_by_gate",
+                    "reason": "risk_signature",
+                }
+                result["intent"] = {
+                    **intent.to_dict(),
+                    "status": "rejected_by_gate",
+                    "contract": contract_status,
+                }
+                await append_journal_event(
+                    self._journal_writer,
+                    event_type="human_reject",
+                    decision_id=rec.decision_id,
+                    session_id=session_id,
+                    account_id=account_id,
+                    instrument_id=rec.instrument_id,
+                    actor="human",
+                    payload=attribution_setup_payload(
+                        trade_plan_dict,
+                        session_payload=session_payload,
+                        base={"reason": "risk_signature", "status": "rejected_by_gate"},
+                    ),
+                )
+            elif (
+                _is_closing_action(rec.action)
+                and (exit_perm := await self._semi_exit_permission(
+                    rec=rec,
+                    intent=intent,
+                    price=price,
+                    account_id=account_id,
+                ))
+                is not None
+                and not exit_perm.allowed
+            ):
+                # P3 — ExitPlan + ExitPermission (≠ check_opening / risk_signature).
+                result["trade"] = {
+                    "status": "rejected_by_gate",
+                    "reason": "exit_permission",
+                    "exitPermission": exit_perm.to_dict(),
+                }
+                result["intent"] = {
+                    **intent.to_dict(),
+                    "status": "rejected_by_gate",
+                    "contract": contract_status,
+                }
+                await append_journal_event(
+                    self._journal_writer,
+                    event_type="human_reject",
+                    decision_id=rec.decision_id,
+                    session_id=session_id,
+                    account_id=account_id,
+                    instrument_id=rec.instrument_id,
+                    actor="human",
+                    payload=attribution_setup_payload(
+                        trade_plan_dict,
+                        session_payload=session_payload,
+                        base={
+                            "reason": "exit_permission",
+                            "status": "rejected_by_gate",
+                            "exitPlanId": exit_perm.exit_plan_id,
+                            "exitAction": exit_perm.action,
+                            "exitReasons": list(exit_perm.reasons),
+                        },
+                    ),
+                )
             elif self._execute_trade is None:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
             else:
@@ -579,12 +729,64 @@ class ConfirmRecommendationIntent:
                         payload=attribution_setup_payload(
                             trade_plan_dict,
                             session_payload=session_payload,
-                            base={
-                                "status": "executed",
-                                "transactionId": result["trade"]["transactionId"],
-                            },
+                            base=await self._executed_journal_base(
+                                rec=rec,
+                                intent=intent,
+                                price=price,
+                                account_id=account_id,
+                                transaction_id=result["trade"]["transactionId"],
+                            ),
                         ),
                     )
+                    if self._position_from_fill is not None and _is_opening_action(
+                        rec.action
+                    ):
+                        tx_id = open_transaction_id_from_trade(trade) or result[
+                            "trade"
+                        ].get("transactionId")
+                        if isinstance(tx_id, str) and tx_id.strip():
+                            filled_at = getattr(
+                                getattr(trade, "transaction", None),
+                                "executed_at",
+                                None,
+                            )
+                            await self._position_from_fill.persist(
+                                PersistPositionFromFillInput(
+                                    account_id=account_id,
+                                    trade_plan=trade_plan_dict
+                                    if isinstance(trade_plan_dict, dict)
+                                    else None,
+                                    fill_price=price,
+                                    fill_quantity=float(intent.quantity),
+                                    filled_at=str(filled_at) if filled_at else None,
+                                    open_transaction_id=tx_id,
+                                    ledger_position_id=ledger_position_id_from_trade(
+                                        trade, intent.instrument_id
+                                    ),
+                                )
+                            )
+                    if self._position_from_exit is not None and _is_closing_action(
+                        rec.action
+                    ):
+                        tx_id = open_transaction_id_from_trade(trade) or result[
+                            "trade"
+                        ].get("transactionId")
+                        if isinstance(tx_id, str) and tx_id.strip():
+                            filled_at = getattr(
+                                getattr(trade, "transaction", None),
+                                "executed_at",
+                                None,
+                            )
+                            await self._position_from_exit.persist(
+                                PersistPositionFromExitInput(
+                                    account_id=account_id,
+                                    instrument_id=intent.instrument_id,
+                                    fill_quantity=float(intent.quantity),
+                                    fill_price=price,
+                                    exit_transaction_id=tx_id,
+                                    filled_at=str(filled_at) if filled_at else None,
+                                )
+                            )
                 except Exception as exc:  # noqa: BLE001
                     result["trade"] = {"status": "error", "reason": str(exc)}
                     result["intent"] = {
@@ -612,6 +814,78 @@ class ConfirmRecommendationIntent:
                 pass
 
         return result
+
+    async def _effective_package_for_side(
+        self,
+        *,
+        rec: Recommendation,
+        account_id: str,
+        package: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        """Package de sesión o, en cierres P4, dirección desde Position persistida."""
+        if package is not None:
+            return package
+        if not _is_closing_action(rec.action) or self._position_from_exit is None:
+            return None
+        row = await self._position_from_exit.get_open(
+            account_id, str(rec.instrument_id or "")
+        )
+        if row is None:
+            return None
+        state = row_position_state(row)
+        return _package_action_from_position_direction(
+            state.get("direction"),
+            instrument_id=str(rec.instrument_id or ""),
+        )
+
+    async def _semi_exit_permission(
+        self,
+        *,
+        rec: Recommendation,
+        intent: Any,
+        price: float,
+        account_id: str,
+    ) -> Any | None:
+        """P3 — None = sin cadena (sin Position). Objeto = ExitPermission."""
+        if self._position_from_exit is None:
+            return None
+        row = await self._position_from_exit.get_open(
+            account_id, str(intent.instrument_id or rec.instrument_id)
+        )
+        if row is None:
+            return None
+        return semi_exit_permission(
+            row_position_state(row),
+            mark_price=price,
+        )
+
+    async def _executed_journal_base(
+        self,
+        *,
+        rec: Recommendation,
+        intent: Any,
+        price: float,
+        account_id: str,
+        transaction_id: Any,
+    ) -> dict[str, Any]:
+        base: dict[str, Any] = {
+            "status": "executed",
+            "transactionId": transaction_id,
+        }
+        if not _is_closing_action(rec.action):
+            return base
+        perm = await self._semi_exit_permission(
+            rec=rec,
+            intent=intent,
+            price=price,
+            account_id=account_id,
+        )
+        if perm is None:
+            return base
+        base["exitPlanId"] = perm.exit_plan_id
+        base["exitAction"] = perm.action
+        base["exitVerdict"] = perm.verdict
+        return base
 
     async def _risk_allows_opening(
         self,

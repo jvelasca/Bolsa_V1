@@ -42,6 +42,26 @@ def _round4(value: float) -> float:
     return round(value * 10000) / 10000
 
 
+def _is_audited_override(override: object | None) -> bool:
+    """H2: reason no vacío. No persiste."""
+    if not isinstance(override, dict):
+        return False
+    reason = override.get("reason")
+    return isinstance(reason, str) and bool(reason.strip())
+
+
+def _stop_worsens(
+    direction: TradePlanDirection, current: float | None, nxt: float
+) -> bool:
+    if current is None or current <= 0:
+        return False
+    if direction == "long":
+        return nxt < current - 1e-9
+    if direction == "short":
+        return nxt > current + 1e-9
+    return False
+
+
 def _now_iso(at: str | None = None) -> str:
     if isinstance(at, str) and at.strip():
         return at
@@ -144,6 +164,80 @@ class PositionState:
         }
 
 
+def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | None:
+    """P3 — rehidrata JSONB persistido. Inverso de ``to_dict``. Sin campos nuevos.
+
+    Claves de bookkeeping (``_…``) se ignoran. Dict inválido → None.
+    """
+    if not isinstance(raw, dict):
+        return None
+    direction = raw.get("direction")
+    if direction not in ("long", "short"):
+        return None
+    status = raw.get("status")
+    if status not in ("OPEN", "PARTIAL", "PROTECTED", "CLOSED"):
+        return None
+    position_id = raw.get("positionId")
+    trade_plan_id = raw.get("tradePlanId")
+    instrument_id = raw.get("instrumentId")
+    if not isinstance(position_id, str) or not position_id.strip():
+        return None
+    if not isinstance(trade_plan_id, str) or not trade_plan_id.strip():
+        return None
+    if not isinstance(instrument_id, str) or not instrument_id.strip():
+        return None
+    qty = _finite_positive(raw.get("quantity"))
+    remaining = _finite(raw.get("remainingQuantity"))
+    if qty is None or remaining is None or remaining < 0:
+        return None
+    exit_status = raw.get("exitStatus")
+    if exit_status not in ("none", "hint", "armed", "done"):
+        exit_status = "none"
+    created = raw.get("createdAt")
+    updated = raw.get("updatedAt")
+    if not isinstance(created, str) or not created.strip():
+        return None
+    if not isinstance(updated, str) or not updated.strip():
+        updated = created
+    mfe_raw = raw.get("mfeMae")
+    mfe_mae: dict[str, object]
+    if isinstance(mfe_raw, dict):
+        mfe_mae = dict(mfe_raw)
+    else:
+        mfe_mae = {"mfeR": None, "maeR": None, "source": "none"}
+    realized = _finite(raw.get("realizedR"))
+    if realized is None:
+        realized = 0.0
+    stub_health = raw.get("thesisHealth")
+    stub_protect = raw.get("protectionState")
+    stub_trail = raw.get("trailing")
+    return PositionState(
+        position_id=position_id.strip(),
+        trade_plan_id=trade_plan_id.strip(),
+        instrument_id=instrument_id.strip(),
+        direction=direction,  # type: ignore[arg-type]
+        status=status,  # type: ignore[arg-type]
+        planned_entry=_finite(raw.get("plannedEntry")),
+        actual_entry=_finite(raw.get("actualEntry")),
+        initial_stop=_finite(raw.get("initialStop")),
+        current_stop=_finite(raw.get("currentStop")),
+        target1=_finite(raw.get("target1")),
+        target2=_finite(raw.get("target2")),
+        quantity=_round4(qty),
+        remaining_quantity=_round4(remaining),
+        initial_risk=_finite(raw.get("initialRisk")),
+        realized_r=_round4(realized),
+        unrealized_r=_finite(raw.get("unrealizedR")),
+        mfe_mae=mfe_mae,
+        thesis_health=dict(stub_health) if isinstance(stub_health, dict) else {"status": "none"},
+        protection_state=dict(stub_protect) if isinstance(stub_protect, dict) else {"status": "none"},
+        trailing=dict(stub_trail) if isinstance(stub_trail, dict) else {"status": "none"},
+        exit_status=exit_status,  # type: ignore[arg-type]
+        created_at=created.strip(),
+        updated_at=updated.strip() if isinstance(updated, str) else created.strip(),
+    )
+
+
 def build_position_state_from_fill(
     trade_plan: dict[str, object] | None,
     *,
@@ -151,12 +245,20 @@ def build_position_state_from_fill(
     fill_quantity: float | None,
     filled_at: str | None = None,
     position_id: str | None = None,
+    override: dict[str, object] | None = None,
 ) -> PositionState | None:
-    """Factory F2: TradePlan dict + fill → OPEN. Sin plan/fill válido → None."""
+    """Factory F2: TradePlan dict + fill → OPEN.
+
+    H2: exige status TRIGGERED, o override auditado. WATCH/ARMED no nacen.
+    Sin plan/fill válido → None.
+    """
     if not isinstance(trade_plan, dict):
         return None
     direction = trade_plan.get("direction")
     if direction not in ("long", "short"):
+        return None
+    status = trade_plan.get("status")
+    if status != "TRIGGERED" and not _is_audited_override(override):
         return None
     price = _finite_positive(fill_price)
     qty = _finite_positive(fill_quantity)
@@ -318,12 +420,20 @@ def apply_position_current_stop(
     stop: float,
     *,
     at: str | None = None,
+    override: dict[str, object] | None = None,
 ) -> PositionState | None:
-    """F2.1 current_stop geométrico → posible PROTECTED (BE)."""
+    """F2.1 current_stop geométrico → posible PROTECTED (BE).
+
+    H2: no empeora el stop sin override auditado.
+    """
     if position is None or position.status == "CLOSED":
         return None
     stop_p = _finite_positive(stop)
     if stop_p is None:
+        return None
+    if _stop_worsens(position.direction, position.current_stop, stop_p) and not _is_audited_override(
+        override
+    ):
         return None
 
     next_pos = replace(

@@ -20,6 +20,7 @@ from bolsa_api.api.dependencies import (
     get_list_account_summaries_use_case,
     get_list_accounts_use_case,
     get_list_ledger_use_case,
+    get_record_session_verdict_use_case,
     get_set_default_account_use_case,
     get_tax_report_use_case,
     get_update_account_settings_use_case,
@@ -52,6 +53,8 @@ from bolsa_api.schemas.accounts import (
     DepositCashDto,
     LedgerResponseDto,
     SendDailyOpsDigestDto,
+    SessionVerdictBodyDto,
+    SessionVerdictResponseDto,
     TaxReportResponseDto,
     UpdateAccountSettingsDto,
     UpdateInvestmentAccountDto,
@@ -342,6 +345,29 @@ async def get_decision_journal(
         offset=offset,
     )
     return DecisionJournalListResponseDto(data=result.to_dict())
+
+
+@router.post(
+    "/accounts/{account_id}/session-verdict",
+    response_model=SessionVerdictResponseDto,
+)
+async def record_session_verdict(
+    account_id: Annotated[str, Depends(require_account_access)],
+    body: SessionVerdictBodyDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> SessionVerdictResponseDto:
+    """P4 — «No operar hoy» u otro veredicto de sesión → Decision Journal."""
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    try:
+        result = await get_record_session_verdict_use_case(session).execute(
+            account_id=account_id,
+            verdict=body.verdict,
+            note=body.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return SessionVerdictResponseDto(data=result)
 
 
 @router.get("/accounts/{account_id}/daily-ops-report.pdf")

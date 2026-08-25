@@ -9,6 +9,11 @@ from bolsa_domain.entities.market_event import (
 )
 
 from bolsa_analytics.cognitive.auto_live import AutoLiveCheck, check_auto_live
+from bolsa_analytics.cognitive.bracket_plan import (
+    BRACKET_PLAN_KEY,
+    build_bracket_plan_dict,
+    map_bracket_plan,
+)
 from bolsa_analytics.cognitive.confidence_lifecycle import (
     ConfidenceEvent,
     ConfidenceState,
@@ -54,6 +59,21 @@ from bolsa_analytics.cognitive.evidence_engine import (
     EvidenceEngineInput,
     EvidenceEngineResult,
     run_evidence_suite,
+)
+from bolsa_analytics.cognitive.execution_plan import (
+    EXECUTION_PLAN_KEY,
+    ExecutionPlan,
+    build_execution_plan_from_exit_plan,
+)
+from bolsa_analytics.cognitive.exit_permission import (
+    EXIT_PERMISSION_KEY,
+    ExitPermission,
+    check_exit_permission,
+)
+from bolsa_analytics.cognitive.exit_plan import (
+    EXIT_PLAN_KEY,
+    ExitPlan,
+    build_exit_plan_from_position,
 )
 from bolsa_analytics.cognitive.exit_radar import (
     EXIT_RADAR_KEY,
@@ -102,6 +122,11 @@ from bolsa_analytics.cognitive.portfolio_fit import (
     PortfolioFitSignal,
     compute_portfolio_fit,
 )
+from bolsa_analytics.cognitive.position_state import (
+    POSITION_STATE_KEY,
+    PositionState,
+    build_position_state_from_fill,
+)
 from bolsa_analytics.cognitive.protect_plan import (
     PROTECT_PLAN_KEY,
     build_protect_plan_dict,
@@ -116,6 +141,7 @@ from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
 )
+from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
 from bolsa_analytics.cognitive.score_macro import ScoreMacroResult, score_macro_from_facts
 from bolsa_analytics.cognitive.stats_suite import (
     monte_carlo_permutation_p_value,
@@ -137,26 +163,6 @@ from bolsa_analytics.cognitive.trade_plan import (
     entry_ready_from_ta,
     no_new_longs_blocks,
 )
-from bolsa_analytics.cognitive.position_state import (
-    POSITION_STATE_KEY,
-    PositionState,
-    build_position_state_from_fill,
-)
-from bolsa_analytics.cognitive.exit_plan import (
-    EXIT_PLAN_KEY,
-    ExitPlan,
-    build_exit_plan_from_position,
-)
-from bolsa_analytics.cognitive.execution_plan import (
-    EXECUTION_PLAN_KEY,
-    ExecutionPlan,
-    build_execution_plan_from_exit_plan,
-)
-from bolsa_analytics.cognitive.exit_permission import (
-    EXIT_PERMISSION_KEY,
-    ExitPermission,
-    check_exit_permission,
-)
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
 from bolsa_analytics.cognitive.trading_policy_templates import (
     AGGRESSIVE_SWING_POLICY,
@@ -164,11 +170,6 @@ from bolsa_analytics.cognitive.trading_policy_templates import (
     MODERATE_POLICY,
     POLICY_TEMPLATES,
     get_policy_template,
-)
-from bolsa_analytics.cognitive.bracket_plan import (
-    BRACKET_PLAN_KEY,
-    build_bracket_plan_dict,
-    map_bracket_plan,
 )
 from bolsa_analytics.cognitive.trail_plan import (
     TRAIL_PLAN_KEY,
@@ -260,6 +261,7 @@ __all__ = [
     "build_trade_plan",
     "build_v0_trade_plan_dict",
     "build_position_state_from_fill",
+    "evaluate_risk_signature",
     "build_exit_plan_from_position",
     "build_execution_plan_from_exit_plan",
     "check_exit_permission",

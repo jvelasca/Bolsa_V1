@@ -16,6 +16,7 @@ import { ChartsZone } from "@/features/trading/charts-zone";
 import { OperationsPanel } from "@/features/trading/operations-panel";
 import { TradingOperativaPanel } from "@/features/trading/trading-operativa-panel";
 import { HoyCommandStrip } from "@/features/trading/hoy-command-strip";
+import { MesaOperationalBar } from "@/features/operations/mesa-operational-bar";
 import { useChartListMembershipSync } from "@/features/trading/lists-tab/use-chart-list-membership-sync";
 import { useChartVisualizationSync } from "@/features/trading/lists-tab/use-chart-visualization-sync";
 
@@ -159,6 +160,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
       <HoyCommandStrip />
+      <MesaOperationalBar className="mx-2 mb-1 shrink-0" />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
           ref={leftColumnRef}

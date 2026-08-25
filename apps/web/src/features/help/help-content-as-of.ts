@@ -41,6 +41,13 @@
  * **2026-08-25e** — F3 ExitPlan: razones canónicas ≠ auto-exit; thin «Salida» ≠ ExitPlan.
  * **2026-08-25f** — F4 ExecutionPlan PAPER: plan de envío ≠ broker ≠ ExecuteTrade.
  * **2026-08-25g** — ExitPermission: veto salida ≠ check_opening ≠ auto-exit.
+ * **2026-08-25h** — H1: orden pendiente a precio ≠ stop de posición (ADR-033).
+ * **2026-08-25i** — H2: kill switch bloquea aperturas/AUTO; SEMI desriesgo humano permitido.
+ * **2026-08-25j** — P1: tras fill, Operaciones muestra stop/T1/T2 del plan persistido; holding ≠ plan.
+ * **2026-08-25k** — P2: al firmar, el tamaño es el riesgo del TradePlan, no % caja; override con motivo.
+ * **2026-08-25l** — P3: cadena de salida ExitPlan → ExitPermission → SEMI; Lab/thin «Salida» ≠ puerto; no auto-exit CTA.
+ * **2026-08-25m** — P4.1: Operaciones posiciones primero; CTAs → Confirm; cola entradas read-only; «No operar» → Journal.
+ * **2026-08-25n** — P4.2: barra estado global; filtros cola entradas; Proteger + override stop en Confirm.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *

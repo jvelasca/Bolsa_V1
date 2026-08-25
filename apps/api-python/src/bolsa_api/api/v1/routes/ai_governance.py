@@ -397,6 +397,7 @@ async def confirm_intent(
         account_id=body.account_id,
         execute=body.execute,
         session_id=body.session_id,
+        risk_override_reason=body.risk_override_reason,
     )
     return {"data": result}
 

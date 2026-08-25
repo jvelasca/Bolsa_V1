@@ -824,12 +824,11 @@ async def test_confirm_wait_no_ejecuta_sell_default() -> None:
 
 
 @pytest.mark.asyncio
-async def test_confirm_reduce_short_conflict_no_reapertura() -> None:
-    """Deuda confirm SEMI (Bug 2) — `reduce` de un short NO ejecuta un sell de apertura.
+async def test_confirm_reduce_short_covers_not_reopen() -> None:
+    """Bug 2 — `reduce` de un short cubre con **buy** (no reabre con sell).
 
-    Package de sesión = `recommend_short` (posición corta). `intent_from_recommendation`
-    mapea `reduce` → sell, pero cerrar/reducir un corto debe ser **buy** (cover). El
-    side `sell` diverge del requerido `buy` → `decision_package_conflict` fail-closed.
+    Package de sesión = `recommend_short`. `intent_from_recommendation` mapea
+    `reduce` → sell por defecto; Confirm corrige el lado desde el package.
     """
     fake_trade = _FakeExecuteTrade()
     store = _FakeCognitiveStore(
@@ -857,15 +856,15 @@ async def test_confirm_reduce_short_conflict_no_reapertura() -> None:
         session_id="DSS-1",
     )
 
-    assert len(fake_trade.calls) == 0
-    assert result["trade"]["status"] == "rejected_by_gate"
-    assert result["trade"]["reason"] == "decision_package_conflict"
-    assert result["intent"]["status"] == "rejected_by_gate"
+    assert len(fake_trade.calls) == 1
+    assert fake_trade.calls[0]["trade_type"] == "buy"
+    assert result["trade"]["status"] == "executed"
+    assert result["intent"]["side"] == "buy"
 
 
 @pytest.mark.asyncio
-async def test_confirm_exit_hint_short_conflict_no_reapertura() -> None:
-    """Deuda confirm SEMI (Bug 2) — `exit_hint` de un short NO ejecuta un sell de apertura."""
+async def test_confirm_exit_hint_short_covers_not_reopen() -> None:
+    """Bug 2 — `exit_hint` de un short cubre con **buy**."""
     fake_trade = _FakeExecuteTrade()
     store = _FakeCognitiveStore(
         _session_record_with_package(
@@ -892,9 +891,9 @@ async def test_confirm_exit_hint_short_conflict_no_reapertura() -> None:
         session_id="DSS-1",
     )
 
-    assert len(fake_trade.calls) == 0
-    assert result["trade"]["status"] == "rejected_by_gate"
-    assert result["trade"]["reason"] == "decision_package_conflict"
+    assert len(fake_trade.calls) == 1
+    assert fake_trade.calls[0]["trade_type"] == "buy"
+    assert result["trade"]["status"] == "executed"
 
 
 @pytest.mark.asyncio

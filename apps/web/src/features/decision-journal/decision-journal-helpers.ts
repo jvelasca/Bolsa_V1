@@ -57,6 +57,8 @@ export function eventTypeBadgeClasses(eventType: string): string {
       return "bg-rose-500/15 text-rose-800 dark:text-rose-200";
     case "contract_absent":
       return "bg-amber-500/15 text-amber-900 dark:text-amber-200";
+    case "session_verdict":
+      return "bg-indigo-500/15 text-indigo-800 dark:text-indigo-200";
     default:
       return "bg-muted text-muted-foreground";
   }

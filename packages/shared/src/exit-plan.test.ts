@@ -103,16 +103,27 @@ describe("F3 buildExitPlanFromPosition", () => {
     expect(plan?.suggestedQty).toBe(5);
   });
 
-  it("TARGET_2 without T1 touch still TRIGGERED full_exit", () => {
+  it("TARGET_2 subsumes T1 — full_exit remaining, not half-reduce", () => {
     const plan = buildExitPlanFromPosition(openLong(), {
       markPrice: 110,
       exitPlanId: "ex-t2",
     });
-    // mark >= T1 and T2 → primary TARGET_1 wins precedence over TARGET_2
-    expect(plan?.primaryReason).toBe("TARGET_1");
-    expect(plan?.reasons).toEqual(
-      expect.arrayContaining(["TARGET_1", "TARGET_2"]),
-    );
+    expect(plan?.primaryReason).toBe("TARGET_2");
+    expect(plan?.reasons).toContain("TARGET_2");
+    expect(plan?.reasons).not.toContain("TARGET_1");
+    expect(plan?.suggestedAction).toBe("full_exit");
+    expect(plan?.suggestedQty).toBe(10);
+  });
+
+  it("TARGET_2 alone (T1 not touched) is still full_exit", () => {
+    const pos = buildPositionStateFromFill(
+      triggeredPlan({ target1: 120, target2: 110 }),
+      { price: 100, quantity: 10, positionId: "pos-t2only" },
+    )!;
+    const plan = buildExitPlanFromPosition(pos, { markPrice: 110 });
+    expect(plan?.primaryReason).toBe("TARGET_2");
+    expect(plan?.suggestedAction).toBe("full_exit");
+    expect(plan?.suggestedQty).toBe(10);
   });
 
   it("MANUAL beats STRUCTURAL_STOP in primaryReason", () => {

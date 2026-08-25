@@ -15,7 +15,7 @@ import { buildExitPlanFromPosition } from "./cognitive/exit-plan.js";
 import { buildPositionStateFromFill } from "./cognitive/position-state.js";
 import type { TradePlanV1 } from "./cognitive/trade-plan.js";
 
-function triggeredPlan(): TradePlanV1 {
+function triggeredPlan(overrides: Partial<TradePlanV1> = {}): TradePlanV1 {
   return {
     decisionId: "dec-1",
     instrumentId: "MSFT",
@@ -29,6 +29,7 @@ function triggeredPlan(): TradePlanV1 {
     structuralStop: 95,
     target1: 105,
     target2: 110,
+    ...overrides,
   };
 }
 
@@ -137,6 +138,23 @@ describe("F4 buildExecutionPlanFromExitPlan", () => {
 
   it("null exit → null", () => {
     expect(buildExecutionPlanFromExitPlan(null)).toBeNull();
+  });
+
+  it("short full_exit → side buy (H2)", () => {
+    const short = buildPositionStateFromFill(
+      triggeredPlan({
+        direction: "short",
+        structuralStop: 105,
+        target1: 95,
+        target2: 90,
+      }),
+      { price: 100, quantity: 10, positionId: "pos-s" },
+    )!;
+    const exit = buildExitPlanFromPosition(short, { markPrice: 105 });
+    expect(exit?.suggestedAction).toBe("full_exit");
+    const plan = buildExecutionPlanFromExitPlan(exit);
+    expect(plan?.side).toBe("buy");
+    expect(plan?.intentKind).toBe("market_exit");
   });
 });
 

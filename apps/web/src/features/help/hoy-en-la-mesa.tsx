@@ -45,7 +45,25 @@ export function HoyEnLaMesaBlock() {
         / PROTECTED / CLOSED; mark/reduce ≠ orden broker. ExitPlan = razones
         canónicas (≠ auto-exit; thin «Salida» ≠ ExitPlan). ExecutionPlan PAPER =
         plan de envío (≠ broker; ≠ ExecuteTrade). ExitPermission = veto de
-        salida (≠ check_opening; ≠ auto-exit).
+        salida (≠ check_opening; ≠ auto-exit). Kill switch bloquea aperturas y
+        AUTO; el desriesgo humano SEMI (salir / proteger) no se niega a ciegas.
+        Tras un fill, Operaciones muestra stop / T1 / T2 del plan persistido;
+        qty/P&L sigue siendo el holding (contabilidad). Al firmar en Confirmar,
+        el tamaño es el riesgo del TradePlan (no % caja); superar el plan exige
+        motivo. Cadena de salida: ExitPlan propone, ExitPermission valida, tú
+        firmas en SEMI (no es auto-exit; thin «Salida» y Lab Señales no son este
+        puerto). Tras un cierre firmado, el plan se reduce o cierra.{" "}
+        <strong className="text-foreground">Operaciones</strong> (
+        <RouteLink to="/operations">Libro · Operaciones</RouteLink>) abre por
+        posiciones: R/stop/T1/T2, advisory Salida, CTAs Revisar/Reducir/Salir
+        encolan Confirm (no ejecutan).{" "}
+        <strong className="text-foreground">Proteger</strong> encola stop amend
+        advisory cuando ExitPlan o protectPlan lo sugieren. Barra operativa
+        global (Trading + Operaciones): patrimonio, P&amp;L, cola Confirm,
+        excepciones. Cola de entradas con filtros por estado/gate/símbolo
+        (Vigilar…Descartado). «No operar hoy» → Journal{" "}
+        <code className="text-[10px]">session_verdict</code> — 0 BUY puede ser
+        un día excelente.
       </p>
     </section>
   );

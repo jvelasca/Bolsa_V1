@@ -2,6 +2,11 @@
 
 from typing import Any
 
+from bolsa_application.optimize import OptimizeGridTrial, OptimizeSmaGridResult
+from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
+from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
+from bolsa_domain.value_objects.market import InstrumentLiveQuote, MarketProviderStatus, SyncResult
+
 from bolsa_api.schemas.backtests import (
     BacktestEquityPointDto,
     BacktestRunDetailDto,
@@ -18,15 +23,13 @@ from bolsa_api.schemas.market import (
     XtbQuoteDto,
 )
 from bolsa_api.schemas.portfolio import (
+    OperationalExitPlanDto,
+    OperationalPositionDto,
     PortfolioDto,
     PortfolioSummaryDto,
     PositionDto,
     TransactionDto,
 )
-from bolsa_application.optimize import OptimizeGridTrial, OptimizeSmaGridResult
-from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
-from bolsa_domain.entities.portfolio import PortfolioSummary, TradeResult, Transaction
-from bolsa_domain.value_objects.market import InstrumentLiveQuote, MarketProviderStatus, SyncResult
 
 
 def to_sync_result_dto(result: SyncResult) -> SyncResultDto:
@@ -108,6 +111,57 @@ def to_portfolio_summary_dto(summary: PortfolioSummary) -> PortfolioSummaryDto:
         total_unrealized_pnl=summary.total_unrealized_pnl,
         total_equity=summary.total_equity,
     )
+
+
+def attach_operational_positions(
+    dto: PortfolioSummaryDto,
+    records: list[Any],
+) -> PortfolioSummaryDto:
+    """P1 — adjunta snapshot de autoridad al holding, por instrumento."""
+    from bolsa_application.evaluate_exit_plan import advisory_exit_plan
+
+    by_instrument: dict[str, Any] = {}
+    for rec in records:
+        iid = getattr(rec, "instrument_id", None)
+        if isinstance(iid, str) and iid:
+            by_instrument[iid] = rec
+    for pos in dto.positions:
+        rec = by_instrument.get(pos.instrument_id)
+        if rec is None:
+            continue
+        state = getattr(rec, "position_state", None) or {}
+        adv = advisory_exit_plan(state if isinstance(state, dict) else None, mark_price=pos.last_price)
+        exit_plan = None
+        if isinstance(adv, dict):
+            exit_plan = OperationalExitPlanDto(
+                status=str(adv.get("status") or ""),
+                suggested_action=str(adv.get("suggestedAction") or "hold"),
+                primary_reason=adv.get("primaryReason")
+                if isinstance(adv.get("primaryReason"), str)
+                else None,
+            )
+        pos.operational = OperationalPositionDto(
+            status=str(state.get("status") or getattr(rec, "status", "") or ""),
+            direction=str(state.get("direction") or ""),
+            current_stop=_finite_or_none(state.get("currentStop")),
+            target1=_finite_or_none(state.get("target1")),
+            target2=_finite_or_none(state.get("target2")),
+            trade_plan_id=str(
+                state.get("tradePlanId") or getattr(rec, "trade_plan_id", "") or ""
+            ),
+            unrealized_r=_finite_or_none(state.get("unrealizedR")),
+            exit_plan=exit_plan,
+        )
+    return dto
+
+
+def _finite_or_none(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    n = float(value)
+    if n != n:  # NaN
+        return None
+    return n
 
 
 def to_transaction_dto(transaction: Transaction) -> TransactionDto:

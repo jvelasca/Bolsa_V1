@@ -10,7 +10,8 @@ export type MesaTipId =
   | "operativa-confirm-drawer"
   | "operativa-fit-chip"
   | "chart-f3-projection"
-  | "confirm-ticket-preview";
+  | "confirm-ticket-preview"
+  | "confirm-risk-signature";
 
 export type MesaTip = {
   id: MesaTipId;
@@ -69,6 +70,13 @@ export const MESA_TIPS: Record<MesaTipId, MesaTip> = {
     id: "confirm-ticket-preview",
     title: "Preview de ticket",
     body: "Antes de firmar verás notional, comisión (perfil de la cuenta) y margen estimado (libre / orden). Es solo información: no envía la orden. Confirmar Intent inspecciona; Confirmar + ejecutar sigue siendo la firma humana SEMI.",
+    linkTo: "/confirm",
+    linkLabel: "Abrir Confirmar",
+  },
+  "confirm-risk-signature": {
+    id: "confirm-risk-signature",
+    title: "Firma de riesgo",
+    body: "Con TradePlan TRIGGERED, el tamaño es el riesgo del plan (qty / stop / pérdida €), no un % de caja. Superar el plan exige un motivo. Sin plan, el ticket no inventa stop ni R.",
     linkTo: "/confirm",
     linkLabel: "Abrir Confirmar",
   },

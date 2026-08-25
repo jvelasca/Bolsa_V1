@@ -1080,8 +1080,78 @@ class PendingOrderRow(Base):
     limit_price: Mapped[Decimal] = mapped_column("limit_price", Numeric(18, 6))
     expiry_at: Mapped[datetime | None] = mapped_column("expiry_at", DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True))
+    trade_plan_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        "trade_plan_snapshot",
+        JSONB,
+        nullable=True,
+    )
 
     instrument: Mapped[InstrumentRow] = relationship()
+
+
+class PositionStateRow(Base):
+    """P1 — PositionState durable (ADR-033). Ledger ``positions`` sigue qty/avg_cost."""
+
+    __tablename__ = "position_states"
+    __table_args__ = (
+        UniqueConstraint(
+            "open_transaction_id",
+            name="position_states_open_transaction_id_key",
+        ),
+        Index(
+            "position_states_account_instrument_open_uidx",
+            "account_id",
+            "instrument_id",
+            unique=True,
+            postgresql_where=text("status <> 'CLOSED'"),
+        ),
+        Index(
+            "position_states_account_created_idx",
+            "account_id",
+            text("created_at DESC"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column(
+        "account_id",
+        ForeignKey("investment_accounts.id"),
+        nullable=False,
+    )
+    instrument_id: Mapped[str] = mapped_column(
+        "instrument_id",
+        ForeignKey("instruments.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    ledger_position_id: Mapped[str | None] = mapped_column(
+        "ledger_position_id",
+        ForeignKey("positions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    open_transaction_id: Mapped[str] = mapped_column(
+        "open_transaction_id",
+        ForeignKey("transactions.id"),
+        nullable=False,
+    )
+    trade_plan_id: Mapped[str] = mapped_column("trade_plan_id", String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    trade_plan_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        "trade_plan_snapshot",
+        JSONB,
+        nullable=False,
+    )
+    position_state: Mapped[dict[str, Any]] = mapped_column(
+        "position_state",
+        JSONB,
+        nullable=False,
+    )
+    birth_override_reason: Mapped[str | None] = mapped_column(
+        "birth_override_reason",
+        Text,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column("created_at", DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True), nullable=False)
 
 
 class InvestorProfileRow(Base):

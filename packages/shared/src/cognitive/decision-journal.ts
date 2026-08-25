@@ -11,7 +11,8 @@ export type JournalEventType =
   | "risk_veto"
   | "contract_verified"
   | "contract_absent"
-  | "executed";
+  | "executed"
+  | "session_verdict";
 
 export type JournalActor = "human" | "system";
 

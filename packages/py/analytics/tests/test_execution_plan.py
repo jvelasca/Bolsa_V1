@@ -11,8 +11,8 @@ from bolsa_analytics.cognitive.exit_plan import build_exit_plan_from_position
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 
 
-def _plan() -> dict[str, object]:
-    return {
+def _plan(**overrides: object) -> dict[str, object]:
+    base: dict[str, object] = {
         "decisionId": "dec-1",
         "instrumentId": "MSFT",
         "direction": "long",
@@ -22,6 +22,8 @@ def _plan() -> dict[str, object]:
         "target1": 105.0,
         "target2": 110.0,
     }
+    base.update(overrides)
+    return base
 
 
 def _open_long():
@@ -137,6 +139,28 @@ def test_force_broker_blocked() -> None:
 
 def test_null_exit() -> None:
     assert build_execution_plan_from_exit_plan(None) is None
+
+
+def test_short_full_exit_side_buy() -> None:
+    pos = build_position_state_from_fill(
+        _plan(
+            direction="short",
+            structuralStop=105.0,
+            target1=95.0,
+            target2=90.0,
+        ),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-s",
+    )
+    assert pos is not None
+    exit_plan = build_exit_plan_from_position(pos, mark_price=105.0)
+    assert exit_plan is not None
+    assert exit_plan.suggested_action == "full_exit"
+    plan = build_execution_plan_from_exit_plan(exit_plan)
+    assert plan is not None
+    assert plan.side == "buy"
+    assert plan.intent_kind == "market_exit"
 
 
 def test_pipeline_stages() -> None:

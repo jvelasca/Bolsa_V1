@@ -37,5 +37,17 @@ describe("help C1 v1.8 sync", () => {
     expect(text).toMatch(/ExitPermission/i);
     expect(text).toMatch(/veto de salida/i);
     expect(text).toMatch(/≠ check_opening/i);
+    expect(text).toMatch(/Kill switch bloquea aperturas/i);
+    expect(text).toMatch(/desriesgo humano SEMI/i);
+    expect(text).toMatch(/plan persistido/i);
+    expect(text).toMatch(/riesgo del TradePlan/i);
+    expect(text).toMatch(/% caja/i);
+    expect(text).toMatch(/Cadena de salida/i);
+    expect(text).toMatch(/no es auto-exit/i);
+    expect(text).toMatch(/Operaciones/i);
+    expect(text).toMatch(/Proteger/i);
+    expect(text).toMatch(/filtros/i);
+    expect(text).toMatch(/No operar hoy/i);
+    expect(text).toMatch(/session_verdict/i);
   });
 });

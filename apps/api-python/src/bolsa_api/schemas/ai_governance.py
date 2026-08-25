@@ -107,6 +107,7 @@ class ConfirmIntentRequest(BaseModel):
     account_id: str = Field(alias="accountId")
     execute: bool = False
     session_id: str | None = Field(default=None, alias="sessionId")
+    risk_override_reason: str | None = Field(default=None, alias="riskOverrideReason")
 
 
 class BacktestCoachAnalyzeRequest(BaseModel):

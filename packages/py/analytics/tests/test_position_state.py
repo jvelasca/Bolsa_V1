@@ -5,6 +5,7 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_mark,
     apply_position_reduce,
     build_position_state_from_fill,
+    position_state_from_dict,
 )
 
 
@@ -199,3 +200,72 @@ def test_short_be_stop() -> None:
     assert short is not None
     assert apply_position_current_stop(short, 100.0).status == "PROTECTED"  # type: ignore[union-attr]
     assert apply_position_current_stop(short, 102.0).status == "OPEN"  # type: ignore[union-attr]
+
+
+def test_from_fill_rejects_watch_armed() -> None:
+    fill = dict(fill_price=100.0, fill_quantity=1.0)
+    assert build_position_state_from_fill(_plan(status="WATCH"), **fill) is None
+    assert build_position_state_from_fill(_plan(status="ARMED"), **fill) is None
+    assert build_position_state_from_fill(_plan(status="BLOCKED"), **fill) is None
+
+
+def test_from_fill_watch_with_override() -> None:
+    pos = build_position_state_from_fill(
+        _plan(status="WATCH"),
+        fill_price=100.0,
+        fill_quantity=1.0,
+        position_id="ov-1",
+        override={"reason": "manual_fill_after_review"},
+    )
+    assert pos is not None
+    assert pos.status == "OPEN"
+    assert pos.position_id == "ov-1"
+
+
+def test_from_fill_empty_override_rejected() -> None:
+    assert (
+        build_position_state_from_fill(
+            _plan(status="WATCH"),
+            fill_price=100.0,
+            fill_quantity=1.0,
+            override={"reason": "  "},
+        )
+        is None
+    )
+
+
+def test_long_stop_cannot_worsen() -> None:
+    assert apply_position_current_stop(_open_long(), 94.0) is None
+    worse = apply_position_current_stop(
+        _open_long(), 94.0, override={"reason": "gap_widen"}
+    )
+    assert worse is not None
+    assert worse.current_stop == 94.0
+
+
+def test_short_stop_cannot_worsen() -> None:
+    short = build_position_state_from_fill(
+        _plan(direction="short", entry=100.0, structuralStop=105.0),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="s2",
+    )
+    assert short is not None
+    assert apply_position_current_stop(short, 106.0) is None
+    worse = apply_position_current_stop(
+        short, 106.0, override={"reason": "widen"}
+    )
+    assert worse is not None
+    assert worse.current_stop == 106.0
+
+
+def test_from_dict_roundtrip_ignores_bookkeeping() -> None:
+    pos = _open_long()
+    blob = dict(pos.to_dict())
+    blob["_lastExitTransactionId"] = "tx-exit-1"
+    restored = position_state_from_dict(blob)
+    assert restored is not None
+    assert restored.position_id == pos.position_id
+    assert restored.remaining_quantity == pos.remaining_quantity
+    assert restored.status == "OPEN"
+    assert position_state_from_dict({"direction": "long"}) is None

@@ -98,14 +98,31 @@ def test_target1_reduce() -> None:
     assert plan.suggested_qty == 5.0
 
 
-def test_target1_and_target2_precedence() -> None:
+def test_target2_subsumes_t1_full_exit() -> None:
     plan = build_exit_plan_from_position(
         _open_long(), mark_price=110.0, exit_plan_id="ex-t2"
     )
     assert plan is not None
-    assert plan.primary_reason == "TARGET_1"
-    assert "TARGET_1" in plan.reasons
+    assert plan.primary_reason == "TARGET_2"
     assert "TARGET_2" in plan.reasons
+    assert "TARGET_1" not in plan.reasons
+    assert plan.suggested_action == "full_exit"
+    assert plan.suggested_qty == 10.0
+
+
+def test_target2_alone_full_exit() -> None:
+    pos = build_position_state_from_fill(
+        _plan(target1=120.0, target2=110.0),
+        fill_price=100.0,
+        fill_quantity=10.0,
+        position_id="pos-t2only",
+    )
+    assert pos is not None
+    plan = build_exit_plan_from_position(pos, mark_price=110.0)
+    assert plan is not None
+    assert plan.primary_reason == "TARGET_2"
+    assert plan.suggested_action == "full_exit"
+    assert plan.suggested_qty == 10.0
 
 
 def test_manual_beats_structural_stop() -> None:

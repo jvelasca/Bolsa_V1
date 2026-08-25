@@ -114,6 +114,10 @@ class ExecutionPlan:
         }
 
 
+def _closing_side(direction: TradePlanDirection) -> ExecutionSide:
+    return "buy" if direction == "short" else "sell"
+
+
 def _resolve_actionable(
     exit_plan: ExitPlan,
 ) -> tuple[ExecutionIntentKind, ExecutionSide, float | None, float | None, ExecutionPlanStatus] | None:
@@ -127,7 +131,7 @@ def _resolve_actionable(
         kind: ExecutionIntentKind = (
             "reduce" if exit_plan.suggested_action == "reduce" else "market_exit"
         )
-        return kind, "sell", _round4(qty), None, "PAPER_READY"
+        return kind, _closing_side(exit_plan.direction), _round4(qty), None, "PAPER_READY"
     if exit_plan.status == "ARMED" and exit_plan.suggested_action == "protect":
         stop = exit_plan.suggested_stop
         limit = _round4(stop) if stop is not None and stop > 0 else None

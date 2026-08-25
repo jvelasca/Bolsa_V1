@@ -245,6 +245,25 @@ export interface PortfolioDto {
   cash: number;
 }
 
+export interface OperationalExitPlanDto {
+  status: string;
+  suggestedAction: string;
+  primaryReason: string | null;
+  /** P4.2 — advisory stop sugerido (protect); puede no venir del wire aún. */
+  suggestedStop?: number | null;
+}
+
+export interface OperationalPositionDto {
+  status: string;
+  direction: string;
+  currentStop: number | null;
+  target1: number | null;
+  target2: number | null;
+  tradePlanId: string;
+  unrealizedR?: number | null;
+  exitPlan?: OperationalExitPlanDto | null;
+}
+
 export interface PositionDto {
   id: string;
   instrumentId: string;
@@ -256,6 +275,7 @@ export interface PositionDto {
   marketValue: number | null;
   unrealizedPnl: number | null;
   unrealizedPnlPct: number | null;
+  operational?: OperationalPositionDto | null;
 }
 
 export interface TransactionDto {

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +23,7 @@ class PendingOrderRecord:
     limit_price: float
     expiry_at: str | None
     created_at: str
+    trade_plan_snapshot: dict[str, Any] | None = None
 
 
 def _to_record(row: PendingOrderRow) -> PendingOrderRecord:
@@ -35,6 +37,9 @@ def _to_record(row: PendingOrderRow) -> PendingOrderRecord:
         limit_price=float(row.limit_price),
         expiry_at=row.expiry_at.isoformat() if row.expiry_at else None,
         created_at=row.created_at.isoformat(),
+        trade_plan_snapshot=dict(row.trade_plan_snapshot)
+        if isinstance(row.trade_plan_snapshot, dict)
+        else None,
     )
 
 
@@ -67,6 +72,7 @@ class SqlAlchemyPendingOrderRepository:
         quantity: float,
         limit_price: float,
         expiry_at: datetime | None,
+        trade_plan_snapshot: dict[str, Any] | None = None,
     ) -> PendingOrderRecord:
         now = datetime.now(UTC)
         row = PendingOrderRow(
@@ -80,6 +86,7 @@ class SqlAlchemyPendingOrderRepository:
             limit_price=Decimal(str(limit_price)),
             expiry_at=expiry_at,
             created_at=now,
+            trade_plan_snapshot=trade_plan_snapshot,
         )
         self._session.add(row)
         await self._session.flush()

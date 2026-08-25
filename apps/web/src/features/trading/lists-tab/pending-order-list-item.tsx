@@ -35,7 +35,7 @@ export function PendingOrderListItem({
           <div className="min-w-0 truncate">
             <span className="text-xs font-semibold">{order.symbol}</span>
             <span className="ml-1 text-[10px] text-muted-foreground">
-              {sideLabel} limitada · {order.quantity} @{" "}
+              {sideLabel} a precio · {order.quantity} @{" "}
               {formatPrice(order.limitPrice)}
             </span>
           </div>

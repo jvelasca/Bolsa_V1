@@ -4,6 +4,47 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.10-beta] — 2026-08-25
+
+Operational Authority v1.10 (H1→P4 Consola de Mesa P4.1+P4.2). Producto sigue **BETA / no producción**. Tag anotado **`v1.10-beta` → `PLACEHOLDER_SHA`**. Partida: **`v1.9-beta` → `7d90d965`**. Spine **`pnpm test:decision-spine` = 260**. **No** broker · **No** auto-exit CTA producto · thin 5.x/8.x congelados · Confirm = única firma.
+
+### P4 — Consola de Mesa (P4.1 + P4.2)
+
+- Operaciones enriquecido (R, stop, T1/T2, salida advisory); CTAs Revisar/Reducir/Salir → cola Confirm; barra operativa; cola entradas read-only; «No operar hoy» → Journal; barra estado global; filtros cola; Proteger + preview stop en Confirm.
+- Plan: [`plan-p4-consola-mesa-2026-08-25.md`](./docs/engineering/plan-p4-consola-mesa-2026-08-25.md) · ADR-033 §7.
+
+### P3 — Una cadena de salida
+
+- Confirm SEMI `exit_hint`/`reduce`: ExitPlan (`manual`) → ExitPermission → fill. Motivo `exit_permission`. Persist `applyReduce`. Operaciones: columna Salida advisory (sin CTA). Lab `evaluate-exits` intacto.
+- Plan: [`plan-p3-cadena-salida-2026-08-25.md`](./docs/engineering/plan-p3-cadena-salida-2026-08-25.md) · ADR-033 §4.
+
+### P2 — Riesgo al firmar
+
+- Ticket F3: qty/stop/pérdida €/R del TradePlan TRIGGERED. % caja deja de ser SoT. Override con motivo. Gate Confirm `risk_signature`.
+- Plan: [`plan-p2-riesgo-al-firmar-2026-08-25.md`](./docs/engineering/plan-p2-riesgo-al-firmar-2026-08-25.md) · ADR-033 §6.
+
+### P1 — Position durable + wire fill
+
+- Alembic `011`: tabla `position_states` (snapshot TradePlan + PositionState + `open_transaction_id`). Ledger `positions` intacto.
+- Wire: Confirm SEMI apertura y FillPendingOrder (si hay snapshot) → `from_fill` (H2). Operaciones muestra stop / T1 / T2.
+- Plan: [`plan-p1-position-durable-2026-08-25.md`](./docs/engineering/plan-p1-position-durable-2026-08-25.md) · ADR-033 §2.
+
+### H2 — Invariantes factories
+
+- Guards ADR-033 §5 en factories TS+Py: `from_fill` exige TRIGGERED (o override); stop no empeora; T2 no ataja T1; short close=`buy`; kill switch asimétrico.
+- Cero Alembic · cero wire Confirm · cero UI mesa.
+- Plan: [`plan-h2-invariantes-factories-2026-08-25.md`](./docs/engineering/plan-h2-invariantes-factories-2026-08-25.md) · ADR-033.
+
+### H1 — Honesty pending ≠ stop
+
+- UI/HELP: «Orden pendiente a precio» (antes Stop/Limitada). Solo `limitPrice`; no es stop de posición.
+- Plan: [`plan-h1-honesty-pending-2026-08-25.md`](./docs/engineering/plan-h1-honesty-pending-2026-08-25.md) · ADR-033.
+
+### Docs — Operational Authority v1.10 (D0)
+
+- Triage auditoría de discontinuidad decisión→posición: factories F1–F4 ≠ autoridad viva; ADR-033 + roadmap v1.10.
+- [ADR-033](./docs/adr/033-operational-authority-position-persistence.md) docs-only · [roadmap v1.10](./docs/engineering/roadmap-v110-operational-authority-2026-08-25.md) · fase v1.10 cerrada en tag.
+
 ## [1.9-beta] — 2026-08-25
 
 Operational Core v1.9 (modelo post-entrada) + INFRA CI-by-tag. Producto sigue **BETA / no producción**. Tag anotado **`v1.9-beta` → `7d90d965`**. Partida: **`v1.8.1-beta` → `e78fbb9`**. Spine **`pnpm test:decision-spine` = 217**. Shared **134**. Pack: [`audit-pack-estado-global-2026-08-25-v19.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v19.md). **No** broker · **No** auto-exit producto · thin 5.x/8.x congelados.

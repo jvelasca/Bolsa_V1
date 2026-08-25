@@ -2,7 +2,7 @@
 
 > **Padre:** [`audit-ext-v181-triage-2026-08-25.md`](./audit-ext-v181-triage-2026-08-25.md) · ADR-032 · gap [`adr-032-audit-gap-2026-08-25.md`](./adr-032-audit-gap-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **FASE ABIERTA — F1–F4 + ExitPermission + INFRA cerrados.** Tag partida **`v1.8.1-beta`**. Broker adapter **no**. Tag `v1.9-beta` = decisión owner + workflow GREEN.
+> **Estado:** **FASE CERRADA (modelo).** F1–F4 + ExitPermission + INFRA cerrados. Tag **`v1.9-beta` → `7d90d965`**. Broker adapter **no**. Siguiente fase: [`roadmap-v110-operational-authority-2026-08-25.md`](./roadmap-v110-operational-authority-2026-08-25.md).
 > **Método:** operación **realmente modelada**, no otro módulo thin. No thaw. No broker. No LLM.
 
 ---
@@ -69,4 +69,4 @@ Hoy / ActionQueue / C1 honesty **intactos** hasta que F2+ActionIdentity lo justi
 
 ## 3. Siguiente rebanada
 
-El siguiente chat **elige** operar SEMI · tag `v1.9-beta` (owner) · o wire ExitPermission→Execution (fase). Relevo: [`traspaso-relevo-exit-permission-2026-08-25.md`](./traspaso-relevo-exit-permission-2026-08-25.md).
+**Cerrado.** No wire ExitPermission ni Consola de Mesa desde este roadmap. Fase viva = v1.10 Operational Authority (H1 honesty pending). Relevo: [`traspaso-relevo-audit-ext-v19-ops-discontinuity-2026-08-25.md`](./traspaso-relevo-audit-ext-v19-ops-discontinuity-2026-08-25.md).

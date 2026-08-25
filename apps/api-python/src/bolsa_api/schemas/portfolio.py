@@ -12,6 +12,31 @@ class PortfolioDto(BaseModel):
     cash: float
 
 
+class OperationalExitPlanDto(BaseModel):
+    """P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    status: str
+    suggested_action: str = Field(alias="suggestedAction")
+    primary_reason: str | None = Field(alias="primaryReason")
+
+
+class OperationalPositionDto(BaseModel):
+    """P1 — snapshot de autoridad post-fill (no es el holding ledger)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    status: str
+    direction: str
+    current_stop: float | None = Field(alias="currentStop")
+    target1: float | None = None
+    target2: float | None = None
+    trade_plan_id: str = Field(alias="tradePlanId")
+    unrealized_r: float | None = Field(default=None, alias="unrealizedR")
+    exit_plan: OperationalExitPlanDto | None = Field(default=None, alias="exitPlan")
+
+
 class PositionDto(BaseModel):
     model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
 
@@ -25,6 +50,7 @@ class PositionDto(BaseModel):
     market_value: float | None = Field(alias="marketValue")
     unrealized_pnl: float | None = Field(alias="unrealizedPnl")
     unrealized_pnl_pct: float | None = Field(alias="unrealizedPnlPct")
+    operational: OperationalPositionDto | None = None
 
 
 class PortfolioSummaryDto(BaseModel):

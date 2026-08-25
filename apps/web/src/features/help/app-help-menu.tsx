@@ -648,8 +648,19 @@ function TradingContent() {
             Compra/venta a mercado desde el diálogo de operación en el gráfico.
           </li>
           <li>
-            Órdenes pendientes en el panel inferior; cotizaciones live en lote
-            (~15 s).
+            <strong className="text-foreground">
+              Orden pendiente a precio
+            </strong>{" "}
+            (panel inferior / diálogo): solo un precio límite.{" "}
+            <strong className="text-foreground">No es un stop</strong> de
+            posición ni OCO; se ejecuta si el mercado alcanza ese precio. Tras
+            un fill con plan, Operaciones muestra stop / T1 / T2 del plan
+            persistido (no es el holding qty/P&L). Si no hay plan, verás «sin
+            plan persistido». Al firmar, el tamaño es el riesgo del plan (no %
+            de caja); superar qty o pérdida exige un motivo. Salir o reducir se
+            firma en Confirmar: ExitPlan propone, ExitPermission valida; no es
+            auto-exit (Señales / thin «Salida» no son ese puerto). Tras el
+            cierre, Operaciones actualiza remaining / CLOSED.
           </li>
           <li>
             Confirmación opcional con comisiones:{" "}

@@ -83,11 +83,15 @@ function nowIso(at?: string | null): string {
   return new Date().toISOString();
 }
 
+function closingSide(direction: TradePlanDirectionV1): "buy" | "sell" {
+  return direction === "short" ? "buy" : "sell";
+}
+
 type Actionable =
   | {
       kind: "order";
       intentKind: "market_exit" | "reduce";
-      side: "sell";
+      side: "buy" | "sell";
       quantity: number;
       status: "PAPER_READY";
     }
@@ -112,7 +116,7 @@ function resolveActionable(exitPlan: ExitPlanV1): Actionable | null {
       kind: "order",
       intentKind:
         exitPlan.suggestedAction === "reduce" ? "reduce" : "market_exit",
-      side: "sell",
+      side: closingSide(exitPlan.direction),
       quantity: round4(qty),
       status: "PAPER_READY",
     };
@@ -200,7 +204,7 @@ export function buildExecutionPlanFromExitPlan(
       venue: "PAPER",
       status: "PAPER_READY",
       intentKind: actionable.intentKind,
-      side: "sell",
+      side: actionable.side,
       quantity: actionable.quantity,
       limitPrice: null,
       blockedReason: null,

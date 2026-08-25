@@ -47,6 +47,11 @@ const pyTests = [
   'packages/py/application/tests/test_trade_plan.py',
   'packages/py/application/tests/test_confirm_trade_plan.py',
   'packages/py/application/tests/test_fill_pending_order.py',
+  'packages/py/application/tests/test_persist_position_from_fill.py',
+  'packages/py/application/tests/test_confirm_risk_signature.py',
+  'packages/py/application/tests/test_confirm_exit_chain.py',
+  'packages/py/application/tests/test_persist_position_from_exit.py',
+  'packages/py/application/tests/test_record_session_verdict.py',
   'packages/py/application/tests/test_opening_permission.py',
   'packages/py/application/tests/test_execute_gated_portfolio_trade.py',
   'packages/py/application/tests/test_decision_board_session_echo.py',
@@ -62,6 +67,7 @@ const pyTests = [
   'packages/py/analytics/tests/test_exit_plan.py',
   'packages/py/analytics/tests/test_execution_plan.py',
   'packages/py/analytics/tests/test_exit_permission.py',
+  'packages/py/analytics/tests/test_risk_signature.py',
 ];
 
 console.log('Bolsa V1 — Decision Spine battery');

@@ -1352,6 +1352,7 @@ export const api = {
     accountId: string;
     execute?: boolean;
     sessionId?: string;
+    riskOverrideReason?: string | null;
   }) =>
     call<{
       data: {
@@ -1433,6 +1434,23 @@ export const api = {
           path: { account_id: accountId },
           query: opts,
         },
+      }),
+    ),
+
+  recordSessionVerdict: (
+    accountId: string,
+    body: { verdict: "no_trade"; note?: string },
+  ) =>
+    call<{
+      data: {
+        decisionId: string;
+        sessionVerdict: string;
+        recordedAt: string;
+      };
+    }>(() =>
+      client.POST("/api/accounts/{account_id}/session-verdict", {
+        params: { path: { account_id: accountId } },
+        body: apiBody(body),
       }),
     ),
 

@@ -160,6 +160,9 @@ def _collect_reasons(
             position.direction, mark_price, position.target2
         ):
             fired.add("TARGET_2")
+        # H2: T2 no interpreta T1 a ciegas (no reduce mitad por atajo T1).
+        if "TARGET_2" in fired:
+            fired.discard("TARGET_1")
 
     now_s = now.strip() if isinstance(now, str) else ""
     exp_s = expires_at.strip() if isinstance(expires_at, str) else ""

@@ -228,7 +228,7 @@ export function OrderDialog() {
             isFxConversion: needsFx,
             orderLabel:
               pendingConfirm.kind === "pending"
-                ? `${pendingConfirm.side === "buy" ? "Compra" : "Venta"} limitada`
+                ? `${pendingConfirm.side === "buy" ? "Compra" : "Venta"} a precio`
                 : undefined,
           }}
           error={error}
@@ -256,7 +256,7 @@ export function OrderDialog() {
       <DialogTabs
         tabs={[
           { id: "market", label: "Orden de mercado" },
-          { id: "stop_limit", label: "Orden Stop/Limitada" },
+          { id: "stop_limit", label: "Orden pendiente a precio" },
         ]}
         active={mode}
         onChange={(id) => setMode(id as OrderMode)}
@@ -264,7 +264,12 @@ export function OrderDialog() {
 
       {mode === "stop_limit" && (
         <div className="mb-4 space-y-3">
-          <FieldRow label="Precio límite / stop">
+          <p className="text-[10px] text-muted-foreground">
+            No es un stop de posición: solo se ejecuta si el mercado alcanza
+            este precio. El stop del plan vive en la posición (cuando exista),
+            no aquí.
+          </p>
+          <FieldRow label="Precio límite">
             <input
               className={inputClassName}
               value={limitPrice}
@@ -390,7 +395,8 @@ export function OrderDialog() {
           className="rounded-lg bg-red-600/90 py-3 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-50"
           onClick={() => requestAction("sell")}
         >
-          VENTA {lastPrice ? formatPrice(lastPrice) : ""}
+          {mode === "market" ? "VENTA" : "VENTA A PRECIO"}{" "}
+          {lastPrice ? formatPrice(lastPrice) : ""}
         </button>
         <button
           type="button"
@@ -398,7 +404,7 @@ export function OrderDialog() {
           className="rounded-lg bg-emerald-600/90 py-3 text-sm font-semibold text-white hover:bg-emerald-600 disabled:opacity-50"
           onClick={() => requestAction("buy")}
         >
-          {mode === "market" ? "COMPRA" : "COMPRA LIMITADA"}{" "}
+          {mode === "market" ? "COMPRA" : "COMPRA A PRECIO"}{" "}
           {lastPrice ? formatPrice(lastPrice) : ""}
         </button>
       </div>

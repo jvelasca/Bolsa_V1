@@ -226,6 +226,9 @@ from bolsa_infrastructure.database.repositories.portfolio_repository import (
 from bolsa_infrastructure.database.repositories.position_policy_repository import (
     SqlAlchemyPositionPolicyRepository,
 )
+from bolsa_infrastructure.database.repositories.position_state_repository import (
+    SqlAlchemyPositionStateRepository,
+)
 from bolsa_infrastructure.database.repositories.research_evidence_repository import (
     SqlAlchemyResearchEvidenceRepository,
 )
@@ -448,6 +451,13 @@ def get_decision_journal_use_case(session: AsyncSession) -> Any:
     from bolsa_application.decision_journal import GetDecisionJournal
 
     return GetDecisionJournal(get_journal_repository(session))
+
+
+def get_record_session_verdict_use_case(session: AsyncSession) -> Any:
+    """P4 — veredicto de sesión append-only."""
+    from bolsa_application.record_session_verdict import RecordSessionVerdict
+
+    return RecordSessionVerdict(journal_writer=get_journal_repository(session))
 
 
 def get_portfolio_summary_use_case(session: AsyncSession) -> GetPortfolioSummary:
@@ -1168,7 +1178,13 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
     """
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+    from bolsa_application.persist_position_from_exit import PersistPositionFromExit
+    from bolsa_application.persist_position_from_fill import PersistPositionFromFill
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
 
+    repo = SqlAlchemyPositionStateRepository(session)
     return ConfirmRecommendationIntent(
         cognitive_store=get_cognitive_repository(session),
         execute_trade=get_execute_trade_use_case(session),
@@ -1179,6 +1195,8 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
         journal_writer=get_journal_writer(session),
+        position_from_fill=PersistPositionFromFill(repo),
+        position_from_exit=PersistPositionFromExit(repo),
     )
 
 
@@ -1327,6 +1345,10 @@ def get_pending_order_repository(session: AsyncSession) -> SqlAlchemyPendingOrde
     return SqlAlchemyPendingOrderRepository(session)
 
 
+def get_position_state_repository(session: AsyncSession) -> SqlAlchemyPositionStateRepository:
+    return SqlAlchemyPositionStateRepository(session)
+
+
 def get_list_pending_orders_use_case(session: AsyncSession) -> ListPendingOrders:
     return ListPendingOrders(get_pending_order_repository(session), get_account_repository(session))
 
@@ -1348,6 +1370,10 @@ def get_delete_pending_order_use_case(session: AsyncSession) -> DeletePendingOrd
 def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
     """ADR-031 — fill de pending_orders con check_opening (aperturas)."""
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
+    from bolsa_application.persist_position_from_fill import PersistPositionFromFill
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
 
     return FillPendingOrder(
         get_pending_order_repository(session),
@@ -1359,6 +1385,9 @@ def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        position_from_fill=PersistPositionFromFill(
+            SqlAlchemyPositionStateRepository(session)
+        ),
     )
 
 

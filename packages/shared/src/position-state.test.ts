@@ -202,3 +202,62 @@ describe("F2.1 applyPositionCurrentStop", () => {
     expect(applyPositionCurrentStop(short, 102)!.status).toBe("OPEN");
   });
 });
+
+describe("H2 invariantes from_fill / stop", () => {
+  it("WATCH / ARMED / BLOCKED do not birth a position", () => {
+    const fill = { price: 100, quantity: 1 };
+    expect(
+      buildPositionStateFromFill(triggeredPlan({ status: "WATCH" }), fill),
+    ).toBeNull();
+    expect(
+      buildPositionStateFromFill(triggeredPlan({ status: "ARMED" }), fill),
+    ).toBeNull();
+    expect(
+      buildPositionStateFromFill(triggeredPlan({ status: "BLOCKED" }), fill),
+    ).toBeNull();
+  });
+
+  it("WATCH births with audited override", () => {
+    const pos = buildPositionStateFromFill(
+      triggeredPlan({ status: "WATCH" }),
+      { price: 100, quantity: 1, positionId: "ov-1" },
+      { reason: "manual_fill_after_review" },
+    );
+    expect(pos?.status).toBe("OPEN");
+    expect(pos?.positionId).toBe("ov-1");
+  });
+
+  it("empty override reason is not audited", () => {
+    expect(
+      buildPositionStateFromFill(
+        triggeredPlan({ status: "WATCH" }),
+        { price: 100, quantity: 1 },
+        { reason: "  " },
+      ),
+    ).toBeNull();
+  });
+
+  it("long stop cannot worsen without override", () => {
+    expect(applyPositionCurrentStop(openLong(), 94)).toBeNull();
+    const worse = applyPositionCurrentStop(openLong(), 94, null, {
+      reason: "gap_widen",
+    });
+    expect(worse?.currentStop).toBe(94);
+  });
+
+  it("short stop cannot worsen without override", () => {
+    const short = buildPositionStateFromFill(
+      triggeredPlan({
+        direction: "short",
+        entry: 100,
+        structuralStop: 105,
+      }),
+      { price: 100, quantity: 10, positionId: "s2" },
+    )!;
+    expect(applyPositionCurrentStop(short, 106)).toBeNull();
+    expect(
+      applyPositionCurrentStop(short, 106, null, { reason: "widen" })
+        ?.currentStop,
+    ).toBe(106);
+  });
+});

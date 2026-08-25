@@ -27,6 +27,11 @@ from bolsa_application.opening_permission import (
     LatestBarLookup,
     allow_opening_fill,
 )
+from bolsa_application.persist_position_from_fill import (
+    PersistPositionFromFillInput,
+    ledger_position_id_from_trade,
+    open_transaction_id_from_trade,
+)
 
 
 def _order_expired(order: PendingOrderRecord, *, now: datetime | None = None) -> bool:
@@ -61,6 +66,7 @@ class FillPendingOrder:
         accounts: AccountScopeLookup | None = None,
         ohlcv: LatestBarLookup | None = None,
         mandates: AccountMandateLookup | None = None,
+        position_from_fill: Any | None = None,
     ) -> None:
         self._repo = repo
         self._account_repo = account_repo
@@ -71,6 +77,7 @@ class FillPendingOrder:
         self._accounts = accounts
         self._ohlcv = ohlcv
         self._mandates = mandates
+        self._position_from_fill = position_from_fill
 
     async def execute(
         self,
@@ -107,9 +114,33 @@ class FillPendingOrder:
             idempotency_key=idempotency_key,
         )
         await self._repo.delete(order.id, account_id=scope.account.id)
-        tx_id = getattr(trade, "transaction_id", None) or getattr(
-            getattr(trade, "transaction", None), "id", None
-        )
+        tx_id = open_transaction_id_from_trade(trade) or getattr(
+            trade, "transaction_id", None
+        ) or getattr(getattr(trade, "transaction", None), "id", None)
+        if (
+            self._position_from_fill is not None
+            and _pending_is_opening(order)
+            and isinstance(tx_id, str)
+            and tx_id.strip()
+        ):
+            filled_at = getattr(
+                getattr(trade, "transaction", None), "executed_at", None
+            )
+            await self._position_from_fill.persist(
+                PersistPositionFromFillInput(
+                    account_id=scope.account.id,
+                    trade_plan=order.trade_plan_snapshot
+                    if isinstance(order.trade_plan_snapshot, dict)
+                    else None,
+                    fill_price=float(order.limit_price),
+                    fill_quantity=float(order.quantity),
+                    filled_at=str(filled_at) if filled_at else None,
+                    open_transaction_id=tx_id,
+                    ledger_position_id=ledger_position_id_from_trade(
+                        trade, order.instrument_id
+                    ),
+                )
+            )
         return {"status": "executed", "reason": None, "transactionId": tx_id}
 
     async def _risk_allows_opening(
@@ -130,3 +161,17 @@ class FillPendingOrder:
             price=float(order.limit_price),
             signal_kind="recommend_long",
         )
+
+
+def _pending_is_opening(order: PendingOrderRecord) -> bool:
+    """Apertura: buy+long o sell+short, con snapshot de plan."""
+    plan = order.trade_plan_snapshot
+    if not isinstance(plan, dict):
+        return False
+    direction = str(plan.get("direction") or "").lower()
+    side = str(order.side).lower()
+    if direction == "long" and side == "buy":
+        return True
+    if direction == "short" and side == "sell":
+        return True
+    return False

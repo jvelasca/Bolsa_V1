@@ -108,8 +108,28 @@ describe("F5 checkExitPermission", () => {
     expect(perm.reasons).toEqual(["position_closed"]);
   });
 
-  it("DENY kill_switch", () => {
+  it("ALLOW human SEMI full_exit with kill_switch (H2 asymmetric)", () => {
     const perm = checkExitPermission(exitTriggered(), { killSwitch: true });
+    expect(perm.verdict).toBe("ALLOW");
+    expect(perm.action).toBe("full_exit");
+  });
+
+  it("ALLOW human protect with kill_switch", () => {
+    const exit = buildExitPlanFromPosition(openLong(), {
+      trailHint: true,
+      trailStop: 100,
+    });
+    const perm = checkExitPermission(exit, { killSwitch: true });
+    expect(perm.allowed).toBe(true);
+    expect(perm.action).toBe("protect");
+  });
+
+  it("DENY kill_switch for AUTO even with PAPER_D", () => {
+    const perm = checkExitPermission(exitTriggered(), {
+      killSwitch: true,
+      autoExecute: true,
+      paperDExecute: true,
+    });
     expect(perm.reasons).toEqual(["kill_switch"]);
   });
 

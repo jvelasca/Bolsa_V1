@@ -3990,6 +3990,8 @@ export interface components {
             recommendation: {
                 [key: string]: unknown;
             };
+            /** Riskoverridereason */
+            riskOverrideReason?: string | null;
             /** Sessionid */
             sessionId?: string | null;
         };
@@ -7189,6 +7191,31 @@ export interface components {
         PortfolioSummaryResponseDto: {
             data: components["schemas"]["PortfolioSummaryDto"];
         };
+        /** OperationalPositionDto */
+        OperationalPositionDto: {
+            /** Currentstop */
+            currentStop: number | null;
+            /** Direction */
+            direction: string;
+            exitPlan?: components["schemas"]["OperationalExitPlanDto"] | null;
+            /** Status */
+            status: string;
+            /** Target1 */
+            target1: number | null;
+            /** Target2 */
+            target2: number | null;
+            /** Tradeplanid */
+            tradePlanId: string;
+        };
+        /** OperationalExitPlanDto */
+        OperationalExitPlanDto: {
+            /** Primaryreason */
+            primaryReason: string | null;
+            /** Status */
+            status: string;
+            /** Suggestedaction */
+            suggestedAction: string;
+        };
         /** PositionDto */
         PositionDto: {
             /** Avgcost */
@@ -7211,6 +7238,7 @@ export interface components {
             unrealizedPnl: number | null;
             /** Unrealizedpnlpct */
             unrealizedPnlPct: number | null;
+            operational?: components["schemas"]["OperationalPositionDto"] | null;
         };
         /** PositionPoliciesListResponseDto */
         PositionPoliciesListResponseDto: {

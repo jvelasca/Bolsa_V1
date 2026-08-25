@@ -104,7 +104,13 @@ def check_exit_permission(
     if position_closed:
         return _deny(["position_closed"], exit_plan, at)
 
-    if kill_switch:
+    action = _resolve_action(exit_plan)
+    human_derisk = (not auto_execute) and action in (
+        "full_exit",
+        "reduce",
+        "protect",
+    )
+    if kill_switch and not human_derisk:
         return _deny(["kill_switch"], exit_plan, at)
 
     if broker_requested:
@@ -121,7 +127,6 @@ def check_exit_permission(
     if execution_plan is not None and execution_plan.status == "BLOCKED":
         return _deny(["execution_blocked"], exit_plan, at)
 
-    action = _resolve_action(exit_plan)
     if action == "none":
         return _deny(["not_actionable"], exit_plan, at)
 

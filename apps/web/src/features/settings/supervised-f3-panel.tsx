@@ -20,6 +20,7 @@ import type {
   NewsAssessmentV1,
   TechnicalAssessmentV1,
 } from "@bolsa/shared";
+import { evaluateRiskSignature } from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -57,7 +58,10 @@ import {
   findHmConflicts,
 } from "@/features/trading/semi-hm-conflict";
 import { F3TicketPreviewBlock } from "@/features/trading/f3-ticket-preview-block";
+import { F3RiskSignatureBlock } from "@/features/trading/f3-risk-signature-block";
+import { F3ProtectStopBlock } from "@/features/trading/f3-protect-stop-block";
 import { resolveF3TicketPreview } from "@/features/trading/f3-ticket-preview";
+import { asOperativaProtectMeta } from "@/features/operations/propose-position-exit";
 import { PAPER_PATH_SUPERVISED } from "@/features/settings/paper-paths-copy";
 
 type ProposePayload = SupervisedProposePayload;
@@ -170,6 +174,7 @@ export function SupervisedF3Panel() {
   const [instrumentId, setInstrumentId] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [price, setPrice] = useState("");
+  const [riskOverrideReason, setRiskOverrideReason] = useState("");
   const [includeFund, setIncludeFund] = useState(true);
   const [includeMacro, setIncludeMacro] = useState(true);
   const [includeEvidence, setIncludeEvidence] = useState(true);
@@ -219,6 +224,10 @@ export function SupervisedF3Panel() {
   }, []);
 
   useEffect(() => {
+    setRiskOverrideReason("");
+  }, [activeId]);
+
+  useEffect(() => {
     if (!activeId) return;
     const item = queueItems.find((i) => i.id === activeId);
     if (item) {
@@ -226,18 +235,30 @@ export function SupervisedF3Panel() {
       setInstrumentId(item.payload.instrumentId);
       const px = item.payload.suggestedPrice ?? item.payload.lastClose ?? null;
       if (px != null) setPrice(String(px));
-      const book = loadDemoBookPrefs();
-      if (px != null && cash > 0) {
-        const q = suggestQuantityFromCash({
-          cash,
-          price: Number(px),
-          sizePctOfCash: book.defaultSizePctOfCash,
-        });
-        if (q > 0) setQuantity(String(q));
-        else if (item.payload.suggestedQuantity)
+      const plan = item.payload.tradePlan;
+      const planQty =
+        plan?.status === "TRIGGERED" &&
+        typeof plan.quantity === "number" &&
+        Number.isFinite(plan.quantity) &&
+        plan.quantity > 0
+          ? plan.quantity
+          : null;
+      if (planQty != null) {
+        setQuantity(String(planQty));
+      } else {
+        const book = loadDemoBookPrefs();
+        if (px != null && cash > 0) {
+          const q = suggestQuantityFromCash({
+            cash,
+            price: Number(px),
+            sizePctOfCash: book.defaultSizePctOfCash,
+          });
+          if (q > 0) setQuantity(String(q));
+          else if (item.payload.suggestedQuantity)
+            setQuantity(String(item.payload.suggestedQuantity));
+        } else if (item.payload.suggestedQuantity) {
           setQuantity(String(item.payload.suggestedQuantity));
-      } else if (item.payload.suggestedQuantity) {
-        setQuantity(String(item.payload.suggestedQuantity));
+        }
       }
     }
   }, [activeId, queueItems, cash]);
@@ -364,6 +385,9 @@ export function SupervisedF3Panel() {
         accountId: effectiveAccountId,
         execute,
         sessionId: recommendation.decisionSession?.sessionId,
+        riskOverrideReason: riskOverrideReason.trim()
+          ? riskOverrideReason.trim()
+          : undefined,
       });
     },
     onSuccess: (res) => {
@@ -491,6 +515,41 @@ export function SupervisedF3Panel() {
     summary?.marginUsed,
     summary?.freeMargin,
   ]);
+
+  const riskSignature = useMemo(() => {
+    const qty = Number(quantity);
+    const parsedPrice = price.trim() ? Number(price) : null;
+    const px =
+      parsedPrice != null && Number.isFinite(parsedPrice)
+        ? parsedPrice
+        : (pending?.suggestedPrice ?? pending?.lastClose ?? NaN);
+    return evaluateRiskSignature({
+      tradePlan: pending?.tradePlan,
+      signedQty: Number.isFinite(qty) ? qty : NaN,
+      signedPrice: typeof px === "number" ? px : NaN,
+      overrideReason: riskOverrideReason,
+    });
+  }, [
+    pending?.tradePlan,
+    quantity,
+    price,
+    pending?.suggestedPrice,
+    pending?.lastClose,
+    riskOverrideReason,
+  ]);
+
+  const executeBlockedByRisk =
+    Boolean(pending) &&
+    (pending?.action === "recommend_long" ||
+      pending?.action === "recommend_short") &&
+    !riskSignature.allowed;
+
+  const protectMeta = useMemo(() => asOperativaProtectMeta(pending), [pending]);
+
+  const executeBlockedByProtect =
+    Boolean(protectMeta) &&
+    protectMeta!.stopOverrideRequired &&
+    !riskOverrideReason.trim();
 
   return (
     <Card id="supervised-f3-panel">
@@ -731,6 +790,22 @@ export function SupervisedF3Panel() {
           </div>
         </div>
         {ticketPreview ? <F3TicketPreviewBlock ticket={ticketPreview} /> : null}
+        {pending ? (
+          <F3RiskSignatureBlock
+            signature={riskSignature}
+            currency={accountCurrency}
+            overrideReason={riskOverrideReason}
+            onOverrideReasonChange={setRiskOverrideReason}
+          />
+        ) : null}
+        {protectMeta ? (
+          <F3ProtectStopBlock
+            meta={protectMeta}
+            currency={accountCurrency}
+            overrideReason={riskOverrideReason}
+            onOverrideReasonChange={setRiskOverrideReason}
+          />
+        ) : null}
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -756,12 +831,18 @@ export function SupervisedF3Panel() {
               !pending ||
               confirm.isPending ||
               pending.action === "wait" ||
-              !canExecute
+              !canExecute ||
+              executeBlockedByRisk ||
+              executeBlockedByProtect
             }
             title={
-              canExecute
-                ? "Ejecutar en DEMO (SEMI)"
-                : "Cambia a SEMI en Libro DEMO"
+              executeBlockedByProtect
+                ? "Stop empeora el actual: escribe un motivo de override"
+                : executeBlockedByRisk
+                  ? "Supera el plan: escribe un motivo de override"
+                  : canExecute
+                    ? "Ejecutar en DEMO (SEMI)"
+                    : "Cambia a SEMI en Libro DEMO"
             }
             onClick={() => confirm.mutate(true)}
           >

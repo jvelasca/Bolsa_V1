@@ -94,6 +94,7 @@ function deny(
 
 /**
  * Gate F5: ¿podemos salir / mutar stop ahora?
+ * H2: kill switch no niega desriesgo humano SEMI (protect/reduce/full_exit).
  * No ejecuta. No muta planes. Sin ExitPlan → DENY.
  */
 export function checkExitPermission(
@@ -111,7 +112,11 @@ export function checkExitPermission(
     return deny(["position_closed"], exitPlan, at);
   }
 
-  if (sig.killSwitch === true) {
+  const action = resolveAction(exitPlan);
+  const humanDerisk =
+    sig.autoExecute !== true &&
+    (action === "full_exit" || action === "reduce" || action === "protect");
+  if (sig.killSwitch === true && !humanDerisk) {
     return deny(["kill_switch"], exitPlan, at);
   }
 

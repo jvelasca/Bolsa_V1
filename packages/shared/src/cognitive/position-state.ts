@@ -56,6 +56,19 @@ export type PositionFillV1 = {
   positionId?: string | null;
 };
 
+/** Override auditado (H2 / ADR-033 §5). Reason no vacío. No persiste. */
+export type FactoryOverrideV1 = {
+  reason: string;
+};
+
+export function isAuditedOverride(
+  override: FactoryOverrideV1 | null | undefined,
+): boolean {
+  return (
+    typeof override?.reason === "string" && override.reason.trim().length > 0
+  );
+}
+
 function finite(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
@@ -118,16 +131,41 @@ export function derivePositionStatus(
   return "OPEN";
 }
 
+/** H2 — long: new stop lower than current; short: new stop higher. */
+export function doesStopWorsen(
+  direction: TradePlanDirectionV1 | string,
+  current: number | null | undefined,
+  next: number,
+): boolean {
+  if (!finite(current) || current <= 0) return false;
+  if (direction === "long") return next < current - 1e-9;
+  if (direction === "short") return next > current + 1e-9;
+  return false;
+}
+
+function stopWorsens(
+  direction: TradePlanDirectionV1,
+  current: number | null | undefined,
+  next: number,
+): boolean {
+  return doesStopWorsen(direction, current, next);
+}
+
 /**
  * Factory F2: TradePlan + fill → PositionState OPEN.
+ * H2: exige status TRIGGERED, o override auditado. WATCH/ARMED no nacen.
  * Sin plan / sin fill válido → null (no inventa posición).
  */
 export function buildPositionStateFromFill(
   tradePlan: TradePlanV1 | null | undefined,
   fill: PositionFillV1 | null | undefined,
+  override?: FactoryOverrideV1 | null,
 ): PositionStateV1 | null {
   if (!tradePlan) return null;
   if (tradePlan.direction !== "long" && tradePlan.direction !== "short") {
+    return null;
+  }
+  if (tradePlan.status !== "TRIGGERED" && !isAuditedOverride(override)) {
     return null;
   }
   if (!fill || !finite(fill.price) || fill.price <= 0) return null;
@@ -267,15 +305,23 @@ export function applyPositionReduce(
 
 /**
  * F2.1 currentStop geométrico → posible PROTECTED (BE).
- * No lee thin. CLOSED / stop inválido → null.
+ * H2: no empeora el stop sin override auditado.
+ * No lee thin. CLOSED / stop inválido / empeora → null.
  */
 export function applyPositionCurrentStop(
   position: PositionStateV1 | null | undefined,
   stop: number,
   at?: string | null,
+  override?: FactoryOverrideV1 | null,
 ): PositionStateV1 | null {
   if (!position || position.status === "CLOSED") return null;
   if (!finite(stop) || stop <= 0) return null;
+  if (
+    stopWorsens(position.direction, position.currentStop, stop) &&
+    !isAuditedOverride(override)
+  ) {
+    return null;
+  }
 
   const next: PositionStateV1 = {
     ...position,

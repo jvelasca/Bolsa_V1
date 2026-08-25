@@ -176,7 +176,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "docs/engineering/risk-engine-or-re-2026-08-04.md",
         role: "doc",
-        note: "Risk Engine check_opening · kill switch",
+        note: "Risk Engine check_opening · kill switch (aperturas/AUTO; SEMI desriesgo OK)",
       },
       {
         path: "apps/web/src/features/trading/demo-book-mode-panel.tsx",

@@ -11,6 +11,9 @@ import {
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { OperationsPanel } from "@/features/trading/operations-panel";
+import { MesaOperationalBar } from "@/features/operations/mesa-operational-bar";
+import { MesaEntryQueuePanel } from "@/features/operations/mesa-entry-queue-panel";
+import { NoTradeSessionButton } from "@/features/operations/no-trade-session-button";
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 
@@ -23,8 +26,24 @@ export function OperationsPage() {
     queryFn: api.getPortfolio,
   });
 
+  const killQuery = useQuery({
+    queryKey: ["risk-kill-switch"],
+    queryFn: () => api.getRiskKillSwitch(),
+    staleTime: 15_000,
+  });
+
+  const boardQuery = useQuery({
+    queryKey: ["decision-board", accountScope],
+    queryFn: () => api.getDecisionBoard(accountScope!),
+    enabled: Boolean(accountScope),
+    staleTime: 15_000,
+  });
+
   const summary = portfolioQuery.data?.data;
   const positionsCount = summary?.positions.length ?? 0;
+  const killOn = killQuery.data?.data?.enabled === true;
+  const vetoed = boardQuery.data?.data?.buckets?.vetoed ?? 0;
+  const entriesBlocked = killOn || vetoed > 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -34,11 +53,12 @@ export function OperationsPage() {
             Libro · Operaciones
           </h2>
           <p className="text-sm text-muted-foreground">
-            Posiciones abiertas y órdenes pendientes del Libro
+            Posiciones primero — plan persistido, desriesgo vía Confirmar
             {account ? ` · ${account.name}` : ""}.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <NoTradeSessionButton />
           <Link
             to="/trading"
             className="inline-flex items-center gap-1 text-primary hover:underline"
@@ -55,6 +75,8 @@ export function OperationsPage() {
           </Link>
         </div>
       </div>
+
+      <MesaOperationalBar positionsCount={positionsCount} />
 
       {summary && (
         <div className="grid gap-3 sm:grid-cols-3">
@@ -85,20 +107,32 @@ export function OperationsPage() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Panel de operaciones</CardTitle>
-          <CardDescription>
-            Misma vista que en Trading — posiciones en cartera y órdenes
-            stop/limitadas.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="h-[min(480px,60vh)] min-h-[280px]">
-            <OperationsPanel />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Posiciones</CardTitle>
+            <CardDescription>
+              Plan persistido + advisory ExitPlan. CTAs encolan Confirm — no
+              ejecutan solos.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="h-[min(480px,60vh)] min-h-[280px]">
+              <OperationsPanel />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Entradas</CardTitle>
+            <CardDescription>Proyección Decision Board</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MesaEntryQueuePanel entriesBlocked={entriesBlocked} />
+          </CardContent>
+        </Card>
+      </div>
 
       <p className="text-xs text-muted-foreground">
         <Link to="/overview" className="text-primary hover:underline">

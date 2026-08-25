@@ -449,3 +449,24 @@ class DecisionJournalListDto(BaseModel):
 
 class DecisionJournalListResponseDto(BaseModel):
     data: DecisionJournalListDto
+
+
+class SessionVerdictBodyDto(BaseModel):
+    """P4 — veredicto explícito de sesión (sin fill)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    verdict: str = Field(description="no_trade")
+    note: str | None = None
+
+
+class SessionVerdictResultDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    decision_id: str = Field(alias="decisionId")
+    session_verdict: str = Field(alias="sessionVerdict")
+    recorded_at: str = Field(alias="recordedAt")
+
+
+class SessionVerdictResponseDto(BaseModel):
+    data: SessionVerdictResultDto
