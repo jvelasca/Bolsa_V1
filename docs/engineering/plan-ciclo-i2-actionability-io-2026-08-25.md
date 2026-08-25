@@ -1,7 +1,7 @@
 # Plan — Ciclo I2 Actionability / Índice Operativo (integridad)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §4–6 · relevo [`traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md`](./traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md) · cierre I1 [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md).
-> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I1 **`2bd5cd8`** (local, no push).
+> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I1 **`2bd5cd8`** · stamp **`8fce269`** (local, no push).
 > **Estado:** **D1–D8 BORRADOR — esperar OK.** Sin código I2.
 > **Método:** integridad thin; Ranking ≠ BUY; sin Shadow AUTO; sin broker; sin reabrir 5.x / I1.
 > **Nombre:** integridad **I2** ≠ hub Instrumentos histórico (`use-instruments-hub-scores.ts`, ya shipped).

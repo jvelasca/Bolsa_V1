@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md).
 > **Plan:** [`plan-ciclo-i2-actionability-io-2026-08-25.md`](./plan-ciclo-i2-actionability-io-2026-08-25.md) (**D1–D8 BORRADOR**).
 > **AsOf:** 2026-08-25.
-> **HEAD origin:** `05e354c`. Feat I1 **`2bd5cd8`** (local, no push).
+> **HEAD origin:** `05e354c`. Feat I1 **`2bd5cd8`** · stamp **`8fce269`** (local, no push).
 > **Fase:** **integridad**. Sin código I2 hasta OK.
 > **Nombre:** no confundir con hub Instrumentos (`instruments-hub-scores.ts`).
 

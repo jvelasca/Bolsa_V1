@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local feat I1 `2bd5cd8` · origin `05e354c` · I2 Actionability/IO (D1–D8 BORRADOR)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `8fce269` · feat I1 `2bd5cd8` · origin `05e354c` · I2 Actionability/IO (D1–D8 BORRADOR)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
