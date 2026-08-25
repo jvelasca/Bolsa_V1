@@ -9,6 +9,7 @@ from bolsa_analytics.knowledge.fundamental_copilot import (
     heuristic_fundamental_explanation,
     validate_copilot_does_not_invent_roe,
 )
+
 from bolsa_application.get_instrument_fundamentals import GetInstrumentFundamentals
 
 

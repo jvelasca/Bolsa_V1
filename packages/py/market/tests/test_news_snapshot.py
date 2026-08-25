@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from bolsa_domain.entities.market_event import MarketEventCalendar
+
 from bolsa_market.news_snapshot import (
     heuristic_title_sentiment,
     news_items_to_events,

@@ -64,7 +64,7 @@ export function MesaOperationalBar({
   const exceptions = deferred + autoWaiting;
   const regimeHint = board ? deriveMesaRegimeHint(board) : null;
   const vetoed = board?.buckets?.vetoed ?? 0;
-  const killOn = killQuery.data?.data?.enabled === true;
+  const killOn = killQuery.data?.effective === true;
 
   return (
     <div

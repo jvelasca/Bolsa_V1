@@ -20,8 +20,9 @@ from uuid import uuid4
 
 from bolsa_analytics.knowledge.composite_score import build_composite_card
 from bolsa_analytics.signals.fundamental_screener import week_key_utc
-from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
+
+from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
 
 PAPER_D_PROPOSE_VERSION = "paper_d_propose_v2"
 PAPER_D_EXECUTE_ENV = "PAPER_D_EXECUTE"

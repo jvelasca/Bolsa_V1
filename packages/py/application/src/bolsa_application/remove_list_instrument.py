@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, cast
 
+from bolsa_infrastructure.database.models import InstrumentListItemRow, InstrumentRow, OhlcvBarRow
+from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
 from sqlalchemy import delete, func, select
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +16,6 @@ from bolsa_application.instrument_lifecycle import (
     GetInstrumentRemovalPreview,
     InstrumentRemovalPreview,
 )
-from bolsa_infrastructure.database.models import InstrumentListItemRow, InstrumentRow, OhlcvBarRow
-from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
 
 
 @dataclass(frozen=True, slots=True)

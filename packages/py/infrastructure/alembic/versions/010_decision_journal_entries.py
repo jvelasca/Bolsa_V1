@@ -6,8 +6,9 @@ Idempotente: omite si la tabla ya existe.
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
+
+from alembic import op
 
 revision = "010_decision_journal_entries"
 down_revision = "009_workspaces_user_id"

@@ -3,10 +3,6 @@
 from dataclasses import dataclass
 from typing import Any
 
-from bolsa_application.execution_router import ExecutionRouter
-from bolsa_application.scan_jobs import OWNER_USER_ID_PAYLOAD_KEY, EnqueueScanJob
-from bolsa_application.scans import RunScan, ScanRunResult
-from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
 from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 from bolsa_domain.platform_kernel import (
     KERNEL_EVALUATION_MODES,
@@ -18,6 +14,11 @@ from bolsa_domain.repositories.execution_policy_repository import ExecutionPolic
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
 from bolsa_domain.repositories.tracker_definition_repository import TrackerDefinitionRepository
 from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
+
+from bolsa_application.execution_router import ExecutionRouter
+from bolsa_application.scan_jobs import OWNER_USER_ID_PAYLOAD_KEY, EnqueueScanJob
+from bolsa_application.scans import RunScan, ScanRunResult
+from bolsa_application.tracker_alarms import execution_route_to_dict, route_tracker_alarms
 
 
 def _validate_universe(universe: dict[str, Any]) -> None:

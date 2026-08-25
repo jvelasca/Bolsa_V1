@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from bolsa_domain.value_objects.excerpt import prefer_summary_excerpt
+
 from bolsa_market.filing_store import (
     FILING_STORE_VERSION,
     delete_filing,

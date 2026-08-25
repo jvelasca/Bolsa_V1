@@ -10,6 +10,7 @@ profile=None → política por defecto `moderate`:
 """
 
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
+
 from bolsa_application.risk_engine import RiskDecision, check_opening
 
 

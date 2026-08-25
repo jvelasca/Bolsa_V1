@@ -6,9 +6,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from bolsa_market.filing_store import save_filing
 
 from bolsa_application.instrument_filings import AskInstrumentFiling
-from bolsa_market.filing_store import save_filing
 
 
 class _FakeInstruments:

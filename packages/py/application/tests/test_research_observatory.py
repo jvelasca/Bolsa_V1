@@ -59,15 +59,16 @@ async def db_session():
 
 @pytest.mark.asyncio
 async def test_research_list_filter_and_summary(db_session) -> None:
+    from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
+    from bolsa_infrastructure.database.repositories.research_trial_repository import (
+        SqlAlchemyResearchTrialRepository,
+    )
+
     from bolsa_application.research_trials import (
         GetInstrumentResearchSummary,
         GetLaboratoryResearchSummary,
         GetResearchTrial,
         ListResearchTrials,
-    )
-    from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
-    from bolsa_infrastructure.database.repositories.research_trial_repository import (
-        SqlAlchemyResearchTrialRepository,
     )
 
     try:

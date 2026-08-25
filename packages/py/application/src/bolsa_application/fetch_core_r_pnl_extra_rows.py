@@ -5,6 +5,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
+    SqlAlchemyInstrumentStrategyTopRepository,
+)
+
 from bolsa_application.accounts import ListAccountSummaries
 from bolsa_application.core_r_server_tick import (
     CORE_R_PNL_LIST_CAP,
@@ -13,9 +17,6 @@ from bolsa_application.core_r_server_tick import (
     find_paper_for_top_slots,
 )
 from bolsa_application.lists import GetInstrumentList
-from bolsa_infrastructure.database.repositories.instrument_strategy_top_repository import (
-    SqlAlchemyInstrumentStrategyTopRepository,
-)
 
 logger = logging.getLogger(__name__)
 

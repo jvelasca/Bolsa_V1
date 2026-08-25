@@ -21,6 +21,7 @@ migración está históricamente aplicada y no se re-ejecuta.
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "002_research_data_epoch"

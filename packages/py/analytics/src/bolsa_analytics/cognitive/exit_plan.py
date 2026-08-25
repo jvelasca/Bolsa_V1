@@ -8,7 +8,7 @@ Thin exitRadar / trail / protect siguen advisory aparte; este módulo
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
@@ -70,7 +70,7 @@ def _round4(value: float) -> float:
 def _now_iso(at: str | None = None) -> str:
     if isinstance(at, str) and at.strip():
         return at
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _stop_touched(direction: TradePlanDirection, mark: float, stop: float) -> bool:

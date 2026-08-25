@@ -2,9 +2,6 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy.exc import IntegrityError
-
-from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
 from bolsa_domain.account_settings import settings_from_dict
 from bolsa_domain.entities.account import AccountScope
 from bolsa_infrastructure.database.db_errors import is_unique_violation
@@ -18,6 +15,9 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
+from sqlalchemy.exc import IntegrityError
+
+from bolsa_application.risk_runtime import claim_custody_charge, release_custody_charge
 
 from .idempotency import _idempotent_savepoint
 

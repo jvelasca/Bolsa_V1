@@ -10,9 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from bolsa_domain.entities.account import LedgerEntry
 
 from bolsa_application.accounts import DepositCashToAccount, WithdrawCashFromAccount
-from bolsa_domain.entities.account import LedgerEntry
 
 
 @dataclass

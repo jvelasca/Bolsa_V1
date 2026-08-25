@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from bolsa_analytics.cognitive import build_memory_entry
+from bolsa_domain.entities.cognitive_artifacts import DecisionMemoryRecord
+
 from bolsa_application.cognitive_persistence import memory_entry_to_record
 from bolsa_application.trading_policy_guard import CognitiveGuardResult
-from bolsa_domain.entities.cognitive_artifacts import DecisionMemoryRecord
 
 
 class _FakeStore:

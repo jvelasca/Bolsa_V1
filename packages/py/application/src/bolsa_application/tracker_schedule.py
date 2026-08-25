@@ -6,13 +6,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
-from bolsa_application.sync_scheduler import is_post_market_window
-from bolsa_application.trackers import EnqueueTrackerScanJob
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
 from bolsa_domain.repositories.tracker_definition_repository import TrackerDefinitionRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
+
+from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
+from bolsa_application.sync_scheduler import is_post_market_window
+from bolsa_application.trackers import EnqueueTrackerScanJob
 
 TrackerScheduleStatus = Literal["enqueued", "skipped", "no_bars", "not_due", "error"]
 

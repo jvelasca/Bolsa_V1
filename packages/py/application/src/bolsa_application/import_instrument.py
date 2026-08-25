@@ -9,7 +9,6 @@ Usado por POST /api/instruments/import (búsqueda Yahoo en listas).
 """
 from dataclasses import dataclass
 
-from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 from bolsa_domain.entities.instrument import Instrument
 from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from bolsa_domain.value_objects.market import SyncResult
@@ -18,6 +17,8 @@ from bolsa_infrastructure.database.repositories.instrument_repository import (
 )
 from bolsa_infrastructure.ids import new_id
 from bolsa_infrastructure.instrument_search import normalize_isin
+
+from bolsa_application.sync_instrument import SyncInstrumentDailyBars
 
 
 def normalize_yahoo_symbol(value: str) -> str:

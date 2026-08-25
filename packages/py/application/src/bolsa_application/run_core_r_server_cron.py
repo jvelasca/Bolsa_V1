@@ -4,12 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from bolsa_application.accounts import ListAccountSummaries
-from bolsa_application.core_r_server_tick import apply_server_tick, scheduler_due
-from bolsa_application.fetch_core_r_pnl_extra_rows import fetch_core_r_pnl_extra_rows
-from bolsa_application.lists import GetInstrumentList
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -21,6 +15,12 @@ from bolsa_infrastructure.database.repositories.list_repository import SqlAlchem
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from bolsa_application.accounts import ListAccountSummaries
+from bolsa_application.core_r_server_tick import apply_server_tick, scheduler_due
+from bolsa_application.fetch_core_r_pnl_extra_rows import fetch_core_r_pnl_extra_rows
+from bolsa_application.lists import GetInstrumentList
 
 
 class RunCoreRServerCron:

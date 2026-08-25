@@ -1,10 +1,11 @@
+from bolsa_domain.platform_kernel import MAX_SCAN_INSTRUMENTS_CHUNK
+
 from bolsa_application.scan_chunking import (
     chunk_scan_payload,
     merge_scan_result_dicts,
     should_chunk_universe,
     split_instrument_chunks,
 )
-from bolsa_domain.platform_kernel import MAX_SCAN_INSTRUMENTS_CHUNK
 
 
 def test_should_chunk_universe() -> None:

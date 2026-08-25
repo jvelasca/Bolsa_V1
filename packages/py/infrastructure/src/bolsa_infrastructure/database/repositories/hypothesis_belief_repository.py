@@ -2,10 +2,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.hypothesis_belief import BeliefHistoryEntry, HypothesisBelief
 from bolsa_infrastructure.database.models import BeliefHistoryRow, HypothesisBeliefRow
 from bolsa_infrastructure.ids import new_id
 

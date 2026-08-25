@@ -19,7 +19,6 @@ import asyncio
 import re
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import (
@@ -29,6 +28,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from alembic import command
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.account_migration import run_account_data_migration
 from bolsa_infrastructure.database.user_bootstrap import ensure_bootstrap_user

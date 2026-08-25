@@ -6,9 +6,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from bolsa_domain.entities.cognitive_artifacts import (
     ConfidenceStateRecord,
     DecisionMemoryRecord,
@@ -16,6 +13,9 @@ from bolsa_domain.entities.cognitive_artifacts import (
     EdgeReportRecord,
     TrialRecordPersist,
 )
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_infrastructure.database.models import (
     ConfidenceStateRow,
     DecisionMemoryRow,

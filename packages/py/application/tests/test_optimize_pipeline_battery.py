@@ -15,6 +15,7 @@ from bolsa_analytics.optimize.walk_forward import (
     aggregate_walk_forward_metrics,
     split_walk_forward_bars,
 )
+
 from bolsa_application.optimization_runs import (
     estimate_trials_total_from_payload,
     optimize_result_to_dict,
@@ -375,7 +376,6 @@ def test_assembly_trials_total_scales_with_cpcv() -> None:
 
 def test_assembly_pbo_cscv_from_score_matrix() -> None:
     import numpy as np
-
     from bolsa_analytics.optimize.pbo import estimate_pbo_cscv
 
     matrix = np.zeros((4, 5))

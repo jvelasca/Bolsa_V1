@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from bolsa_application.accounts import GetAccountSummary, ListLedgerEntries
 from bolsa_domain.entities.account import AccountSummary, LedgerEntry
 from bolsa_infrastructure.alerts.estudio_opinion_email import map_opinion_to_channel
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
@@ -19,6 +18,8 @@ from bolsa_infrastructure.database.repositories.instrument_daily_opinion_reposit
 from bolsa_infrastructure.database.repositories.supervised_f3_repository import (
     SqlAlchemySupervisedF3Repository,
 )
+
+from bolsa_application.accounts import GetAccountSummary, ListLedgerEntries
 
 DAILY_OPS_REPORT_SCHEMA = "daily_ops_report_v1"
 WEEK_DAYS = 7

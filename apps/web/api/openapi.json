@@ -1740,6 +1740,17 @@
             "title": "Confidence",
             "type": "string"
           },
+          "indiceOperativo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indiceoperativo"
+          },
           "instrumentId": {
             "title": "Instrumentid",
             "type": "string"
@@ -3648,6 +3659,18 @@
       },
       "DecisionSessionViewDto": {
         "properties": {
+          "bracketPlan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bracketplan"
+          },
           "createdAt": {
             "title": "Createdat",
             "type": "string"
@@ -3663,6 +3686,30 @@
             ],
             "title": "Decisionid"
           },
+          "exitRadar": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exitradar"
+          },
+          "expectancy": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectancy"
+          },
           "gate": {
             "title": "Gate",
             "type": "string"
@@ -3674,6 +3721,30 @@
           "kind": {
             "title": "Kind",
             "type": "string"
+          },
+          "mfeMae": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfemae"
+          },
+          "protectPlan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protectplan"
           },
           "sessionId": {
             "title": "Sessionid",
@@ -3693,6 +3764,54 @@
               }
             ],
             "title": "Symbol"
+          },
+          "thesisHealth": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesishealth"
+          },
+          "tradePlan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tradeplan"
+          },
+          "trailPlan": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trailplan"
+          },
+          "wyckoffSpringAnchor": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wyckoffspringanchor"
           }
         },
         "required": [
@@ -10347,6 +10466,116 @@
         "title": "OosMetricsDto",
         "type": "object"
       },
+      "OperationalExitPlanDto": {
+        "description": "P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits).",
+        "properties": {
+          "primaryReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primaryreason"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestedAction": {
+            "title": "Suggestedaction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "suggestedAction",
+          "primaryReason"
+        ],
+        "title": "OperationalExitPlanDto",
+        "type": "object"
+      },
+      "OperationalPositionDto": {
+        "description": "P1 — snapshot de autoridad post-fill (no es el holding ledger).",
+        "properties": {
+          "currentStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currentstop"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "exitPlan": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalExitPlanDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target1"
+          },
+          "target2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target2"
+          },
+          "tradePlanId": {
+            "title": "Tradeplanid",
+            "type": "string"
+          },
+          "unrealizedR": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealizedr"
+          }
+        },
+        "required": [
+          "status",
+          "direction",
+          "currentStop",
+          "tradePlanId"
+        ],
+        "title": "OperationalPositionDto",
+        "type": "object"
+      },
       "OpinionTelemetryDto": {
         "description": "A0 — acierto dictamen (proxy 5d).",
         "properties": {
@@ -11395,105 +11624,6 @@
         "title": "PortfolioSummaryResponseDto",
         "type": "object"
       },
-      "OperationalPositionDto": {
-        "properties": {
-          "currentStop": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Currentstop"
-          },
-          "direction": {
-            "title": "Direction",
-            "type": "string"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "target1": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Target1"
-          },
-          "target2": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Target2"
-          },
-          "tradePlanId": {
-            "title": "Tradeplanid",
-            "type": "string"
-          },
-          "exitPlan": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OperationalExitPlanDto"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "status",
-          "direction",
-          "currentStop",
-          "target1",
-          "target2",
-          "tradePlanId"
-        ],
-        "title": "OperationalPositionDto",
-        "type": "object"
-      },
-      "OperationalExitPlanDto": {
-        "properties": {
-          "primaryReason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Primaryreason"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "suggestedAction": {
-            "title": "Suggestedaction",
-            "type": "string"
-          }
-        },
-        "required": [
-          "status",
-          "suggestedAction",
-          "primaryReason"
-        ],
-        "title": "OperationalExitPlanDto",
-        "type": "object"
-      },
       "PositionDto": {
         "properties": {
           "avgCost": {
@@ -11534,6 +11664,16 @@
             "title": "Name",
             "type": "string"
           },
+          "operational": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationalPositionDto"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "quantity": {
             "title": "Quantity",
             "type": "number"
@@ -11563,16 +11703,6 @@
               }
             ],
             "title": "Unrealizedpnlpct"
-          },
-          "operational": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OperationalPositionDto"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
@@ -13670,6 +13800,67 @@
           }
         },
         "title": "SendDailyOpsDigestDto",
+        "type": "object"
+      },
+      "SessionVerdictBodyDto": {
+        "description": "P4 — veredicto explícito de sesión (sin fill).",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "verdict": {
+            "description": "no_trade",
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict"
+        ],
+        "title": "SessionVerdictBodyDto",
+        "type": "object"
+      },
+      "SessionVerdictResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SessionVerdictResultDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SessionVerdictResponseDto",
+        "type": "object"
+      },
+      "SessionVerdictResultDto": {
+        "properties": {
+          "decisionId": {
+            "title": "Decisionid",
+            "type": "string"
+          },
+          "recordedAt": {
+            "title": "Recordedat",
+            "type": "string"
+          },
+          "sessionVerdict": {
+            "title": "Sessionverdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "decisionId",
+          "sessionVerdict",
+          "recordedAt"
+        ],
+        "title": "SessionVerdictResultDto",
         "type": "object"
       },
       "SignalAlertSubscriptionDto": {
@@ -17722,6 +17913,59 @@
         "summary": "Sync Account Mandates",
         "tags": [
           "mandates"
+        ]
+      }
+    },
+    "/api/accounts/{account_id}/session-verdict": {
+      "post": {
+        "description": "P4 — «No operar hoy» u otro veredicto de sesión → Decision Journal.",
+        "operationId": "record_session_verdict_api_accounts__account_id__session_verdict_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionVerdictBodyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionVerdictResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Session Verdict",
+        "tags": [
+          "accounts"
         ]
       }
     },

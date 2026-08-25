@@ -3,9 +3,10 @@
 import logging
 from typing import Any, Protocol
 
-from bolsa_application.context.principal import get_current_principal
 from bolsa_domain.entities.platform_event import PlatformEventRecord
 from bolsa_domain.repositories.platform_event_repository import PlatformEventRepository
+
+from bolsa_application.context.principal import get_current_principal
 
 logger = logging.getLogger(__name__)
 

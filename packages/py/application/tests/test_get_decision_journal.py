@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
 from bolsa_application.decision_journal import GetDecisionJournal
-from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 
 
 def _entry(

@@ -5,8 +5,8 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from bolsa_analytics.cognitive.edge_report import StatisticalSuiteResult
+
 from bolsa_application.optimization_runs import ProcessOptimizationRun
 from bolsa_application.optimize import OptimizeGridTrial, OptimizeSmaGridResult
 from bolsa_application.persist_lab_edge_report import (

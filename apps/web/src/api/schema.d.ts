@@ -296,6 +296,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts/{account_id}/session-verdict": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record Session Verdict
+         * @description P4 — «No operar hoy» u otro veredicto de sesión → Decision Journal.
+         */
+        post: operations["record_session_verdict_api_accounts__account_id__session_verdict_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts/{account_id}/settings": {
         parameters: {
             query?: never;
@@ -3941,6 +3961,8 @@ export interface components {
              * @enum {string}
              */
             confidence: "HIGH" | "MEDIUM" | "LOW";
+            /** Indiceoperativo */
+            indiceOperativo?: number | null;
             /** Instrumentid */
             instrumentId: string;
             /**
@@ -4623,22 +4645,58 @@ export interface components {
         };
         /** DecisionSessionViewDto */
         DecisionSessionViewDto: {
+            /** Bracketplan */
+            bracketPlan?: {
+                [key: string]: unknown;
+            } | null;
             /** Createdat */
             createdAt: string;
             /** Decisionid */
             decisionId?: string | null;
+            /** Exitradar */
+            exitRadar?: {
+                [key: string]: unknown;
+            } | null;
+            /** Expectancy */
+            expectancy?: {
+                [key: string]: unknown;
+            } | null;
             /** Gate */
             gate: string;
             /** Instrumentid */
             instrumentId: string;
             /** Kind */
             kind: string;
+            /** Mfemae */
+            mfeMae?: {
+                [key: string]: unknown;
+            } | null;
+            /** Protectplan */
+            protectPlan?: {
+                [key: string]: unknown;
+            } | null;
             /** Sessionid */
             sessionId: string;
             /** Status */
             status: string;
             /** Symbol */
             symbol?: string | null;
+            /** Thesishealth */
+            thesisHealth?: {
+                [key: string]: unknown;
+            } | null;
+            /** Tradeplan */
+            tradePlan?: {
+                [key: string]: unknown;
+            } | null;
+            /** Trailplan */
+            trailPlan?: {
+                [key: string]: unknown;
+            } | null;
+            /** Wyckoffspringanchor */
+            wyckoffSpringAnchor?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** DeclaredProfileDto */
         DeclaredProfileDto: {
@@ -6876,6 +6934,39 @@ export interface components {
             tradeCount: number;
         };
         /**
+         * OperationalExitPlanDto
+         * @description P3 — advisory ExitPlan (no es CTA; ≠ Lab evaluate-exits).
+         */
+        OperationalExitPlanDto: {
+            /** Primaryreason */
+            primaryReason: string | null;
+            /** Status */
+            status: string;
+            /** Suggestedaction */
+            suggestedAction: string;
+        };
+        /**
+         * OperationalPositionDto
+         * @description P1 — snapshot de autoridad post-fill (no es el holding ledger).
+         */
+        OperationalPositionDto: {
+            /** Currentstop */
+            currentStop: number | null;
+            /** Direction */
+            direction: string;
+            exitPlan?: components["schemas"]["OperationalExitPlanDto"] | null;
+            /** Status */
+            status: string;
+            /** Target1 */
+            target1?: number | null;
+            /** Target2 */
+            target2?: number | null;
+            /** Tradeplanid */
+            tradePlanId: string;
+            /** Unrealizedr */
+            unrealizedR?: number | null;
+        };
+        /**
          * OpinionTelemetryDto
          * @description A0 — acierto dictamen (proxy 5d).
          */
@@ -7191,31 +7282,6 @@ export interface components {
         PortfolioSummaryResponseDto: {
             data: components["schemas"]["PortfolioSummaryDto"];
         };
-        /** OperationalPositionDto */
-        OperationalPositionDto: {
-            /** Currentstop */
-            currentStop: number | null;
-            /** Direction */
-            direction: string;
-            exitPlan?: components["schemas"]["OperationalExitPlanDto"] | null;
-            /** Status */
-            status: string;
-            /** Target1 */
-            target1: number | null;
-            /** Target2 */
-            target2: number | null;
-            /** Tradeplanid */
-            tradePlanId: string;
-        };
-        /** OperationalExitPlanDto */
-        OperationalExitPlanDto: {
-            /** Primaryreason */
-            primaryReason: string | null;
-            /** Status */
-            status: string;
-            /** Suggestedaction */
-            suggestedAction: string;
-        };
         /** PositionDto */
         PositionDto: {
             /** Avgcost */
@@ -7230,6 +7296,7 @@ export interface components {
             marketValue: number | null;
             /** Name */
             name: string;
+            operational?: components["schemas"]["OperationalPositionDto"] | null;
             /** Quantity */
             quantity: number;
             /** Symbol */
@@ -7238,7 +7305,6 @@ export interface components {
             unrealizedPnl: number | null;
             /** Unrealizedpnlpct */
             unrealizedPnlPct: number | null;
-            operational?: components["schemas"]["OperationalPositionDto"] | null;
         };
         /** PositionPoliciesListResponseDto */
         PositionPoliciesListResponseDto: {
@@ -7969,6 +8035,32 @@ export interface components {
             notifyDigestEnabled: boolean;
             /** Notifyemail */
             notifyEmail?: string | null;
+        };
+        /**
+         * SessionVerdictBodyDto
+         * @description P4 — veredicto explícito de sesión (sin fill).
+         */
+        SessionVerdictBodyDto: {
+            /** Note */
+            note?: string | null;
+            /**
+             * Verdict
+             * @description no_trade
+             */
+            verdict: string;
+        };
+        /** SessionVerdictResponseDto */
+        SessionVerdictResponseDto: {
+            data: components["schemas"]["SessionVerdictResultDto"];
+        };
+        /** SessionVerdictResultDto */
+        SessionVerdictResultDto: {
+            /** Decisionid */
+            decisionId: string;
+            /** Recordedat */
+            recordedAt: string;
+            /** Sessionverdict */
+            sessionVerdict: string;
         };
         /** SignalAlertSubscriptionDto */
         SignalAlertSubscriptionDto: {
@@ -9594,6 +9686,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MandateBundleResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_session_verdict_api_accounts__account_id__session_verdict_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SessionVerdictBodyDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionVerdictResponseDto"];
                 };
             };
             /** @description Validation Error */

@@ -7,8 +7,8 @@ este módulo **no** importa ni copia esos mappers.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from typing import Literal
-from datetime import datetime, timezone
 from uuid import uuid4
 
 PositionStatus = Literal["OPEN", "PARTIAL", "PROTECTED", "CLOSED"]
@@ -65,7 +65,7 @@ def _stop_worsens(
 def _now_iso(at: str | None = None) -> str:
     if isinstance(at, str) and at.strip():
         return at
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def signed_r_from_price(
@@ -287,7 +287,7 @@ def build_position_state_from_fill(
 
     now = filled_at if isinstance(filled_at, str) and filled_at else ""
     if not now:
-        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     stub = {"status": "none"}
     qty_r = _round4(qty)

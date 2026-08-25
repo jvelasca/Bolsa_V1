@@ -41,7 +41,7 @@ export function OperationsPage() {
 
   const summary = portfolioQuery.data?.data;
   const positionsCount = summary?.positions.length ?? 0;
-  const killOn = killQuery.data?.data?.enabled === true;
+  const killOn = killQuery.data?.effective === true;
   const vetoed = boardQuery.data?.data?.buckets?.vetoed ?? 0;
   const entriesBlocked = killOn || vetoed > 0;
 

@@ -1,8 +1,8 @@
 import pytest
+from bolsa_domain.entities.platform_event import PlatformEventRecord
 
 from bolsa_application.context.principal import reset_current_principal, set_current_principal
 from bolsa_application.events.platform_event_bus import PlatformEventBus
-from bolsa_domain.entities.platform_event import PlatformEventRecord
 
 
 class InMemoryPlatformEventRepository:

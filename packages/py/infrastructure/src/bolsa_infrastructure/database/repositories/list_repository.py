@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, cast
 
+from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from sqlalchemy import delete, func, select
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from bolsa_infrastructure.database.models import (
     InstrumentListItemRow,
     InstrumentListRow,

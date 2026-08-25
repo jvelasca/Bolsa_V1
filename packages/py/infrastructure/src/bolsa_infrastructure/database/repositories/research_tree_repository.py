@@ -1,11 +1,11 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from bolsa_domain.entities.research_tree import ResearchTreeEdge
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import ColumnElement
 
-from bolsa_domain.entities.research_tree import ResearchTreeEdge
 from bolsa_infrastructure.database.models import ResearchTreeEdgeRow
 from bolsa_infrastructure.ids import new_id
 

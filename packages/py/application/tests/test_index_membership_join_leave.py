@@ -5,8 +5,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
-from bolsa_application.market_indices import SubscribeMarketIndex, SyncSubscribedCatalogIndices
 from bolsa_domain.entities.instrument import Instrument
 from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from bolsa_infrastructure.database.repositories.list_repository import (
@@ -14,6 +12,8 @@ from bolsa_infrastructure.database.repositories.list_repository import (
     InstrumentListSummary,
 )
 from bolsa_market.indices.curated_ibex35 import IBEX35_CURATED
+
+from bolsa_application.market_indices import SubscribeMarketIndex, SyncSubscribedCatalogIndices
 
 
 def _meta(iid: str, yahoo: str, symbol: str) -> InstrumentWithMeta:

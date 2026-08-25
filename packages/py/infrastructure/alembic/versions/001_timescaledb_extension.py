@@ -9,8 +9,9 @@ cadena Alembic (autoridad D2/F3b) sea ejecutable en el entorno real sin romper e
 
 from __future__ import annotations
 
-from alembic import op
 from sqlalchemy import text
+
+from alembic import op
 
 revision = "001_timescaledb_extension"
 down_revision = None

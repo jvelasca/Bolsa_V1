@@ -8,16 +8,17 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from bolsa_domain.entities.market_event import (
+    MarketEvent,
+    MarketEventCalendar,
+    event_decay_weight,
+)
+
 from bolsa_analytics.knowledge.assessment import Assessment
 from bolsa_analytics.knowledge.technical_assessment import (
     BEARISH_THRESHOLD,
     BULLISH_THRESHOLD,
     DirectionalBias,
-)
-from bolsa_domain.entities.market_event import (
-    MarketEvent,
-    MarketEventCalendar,
-    event_decay_weight,
 )
 
 

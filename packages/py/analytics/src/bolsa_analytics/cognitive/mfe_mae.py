@@ -5,7 +5,8 @@ Read-only metrics: peak favorable/adverse in R. No protect/exit tips, no fill ga
 
 from __future__ import annotations
 
-from typing import Any, Literal, Sequence
+from collections.abc import Sequence
+from typing import Any, Literal
 
 MfeMaeStatus = Literal["none", "observe", "favorable", "adverse"]
 MfeMaeSource = Literal["bars", "close_proxy", "none"]
@@ -78,8 +79,8 @@ def map_mfe_mae(
                     high = float(bar["high"])
                     low = float(bar["low"])
                 else:
-                    high = float(getattr(bar, "high"))
-                    low = float(getattr(bar, "low"))
+                    high = float(bar.high)
+                    low = float(bar.low)
             except (KeyError, TypeError, ValueError, AttributeError):
                 continue
             used_bars = True

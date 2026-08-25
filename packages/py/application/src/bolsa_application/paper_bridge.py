@@ -2,11 +2,6 @@
 
 from typing import Any
 
-from bolsa_application.paper_lab_evidence import (
-    LAB_EVIDENCE_SETTINGS_KEY,
-    lab_evidence_snapshot_from_blocks,
-    merge_lab_evidence_snapshots,
-)
 from bolsa_domain.entities.account import InvestmentAccount
 from bolsa_domain.repositories.research_trial_repository import ResearchTrialRepository
 from bolsa_infrastructure.database.repositories.account_repository import (
@@ -17,6 +12,12 @@ from bolsa_infrastructure.database.repositories.backtest_repository import (
 )
 from bolsa_infrastructure.database.repositories.strategy_definition_repository import (
     SqlAlchemyStrategyDefinitionRepository,
+)
+
+from bolsa_application.paper_lab_evidence import (
+    LAB_EVIDENCE_SETTINGS_KEY,
+    lab_evidence_snapshot_from_blocks,
+    merge_lab_evidence_snapshots,
 )
 
 

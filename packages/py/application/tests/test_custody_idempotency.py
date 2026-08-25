@@ -12,6 +12,7 @@ Tres sub-casos:
 from __future__ import annotations
 
 import pytest
+from bolsa_domain.account_settings import settings_from_dict
 from sqlalchemy.exc import IntegrityError
 
 from bolsa_application.accounts import ApplyCustodyFees
@@ -24,7 +25,6 @@ from bolsa_application.risk_runtime import (
     release_auto_execute_idempotency,
     release_custody_charge,
 )
-from bolsa_domain.account_settings import settings_from_dict
 
 
 class _UniqueViolationOrig:

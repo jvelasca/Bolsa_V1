@@ -332,6 +332,7 @@ class LoadEffectivenessFromStore:
         refresh_observed: bool = True,
     ) -> dict[str, Any]:
         from bolsa_analytics.cognitive.investor_profile import ObservedInvestorProfile
+
         from bolsa_application.investor_profiles import RefreshObservedProfile
 
         stats = await self._store.persistence_stats(account_id=account_id)

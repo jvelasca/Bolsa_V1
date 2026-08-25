@@ -38,7 +38,13 @@ vi.mock("@/lib/api", () => ({
         decisionSessions: [],
       },
     })),
-    getRiskKillSwitch: vi.fn(async () => ({ data: { enabled: false } })),
+    getRiskKillSwitch: vi.fn(async () => ({
+      effective: false,
+      env: false,
+      runtimeMemory: false,
+      redis: null,
+      paperDExecuteEnv: false,
+    })),
   },
 }));
 

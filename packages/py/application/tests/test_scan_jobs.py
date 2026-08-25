@@ -2,6 +2,9 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from bolsa_domain.entities.platform_event import PlatformEventRecord
+from bolsa_domain.platform_kernel import MAX_SCAN_INSTRUMENTS_CHUNK
+from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
 
 from bolsa_application.context.principal import (
     get_current_principal,
@@ -12,9 +15,6 @@ from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.scan_chunking import JOB_KIND_CHUNK
 from bolsa_application.scan_jobs import EnqueueScanJob, ProcessScanJob
 from bolsa_application.scans import ScanRunResult
-from bolsa_domain.entities.platform_event import PlatformEventRecord
-from bolsa_domain.platform_kernel import MAX_SCAN_INSTRUMENTS_CHUNK
-from bolsa_infrastructure.database.repositories.scan_job_repository import ScanJobRecord
 
 
 class InMemoryPlatformEventRepository:

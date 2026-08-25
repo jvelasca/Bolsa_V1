@@ -3,8 +3,8 @@
 from dataclasses import replace
 
 from bolsa_analytics.cognitive.execution_plan import build_execution_plan_from_exit_plan
-from bolsa_analytics.cognitive.exit_plan import build_exit_plan_from_position
 from bolsa_analytics.cognitive.exit_permission import check_exit_permission
+from bolsa_analytics.cognitive.exit_plan import build_exit_plan_from_position
 from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 
 

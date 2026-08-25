@@ -5,8 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-
 from bolsa_analytics.signals.fundamental_gate import build_fundamental_gate
+
 from bolsa_application.run_fundamental_screener import RunFundamentalScreener
 
 

@@ -5,14 +5,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog } from "@/components/ui/dialog";
 import { api } from "@/lib/api";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 
@@ -65,47 +58,39 @@ export function NoTradeSessionButton({ className }: NoTradeSessionButtonProps) {
       {feedback && !open && (
         <p className="text-[10px] text-muted-foreground">{feedback}</p>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>No operar hoy</DialogTitle>
-            <DialogDescription>
-              Registra un veredicto explícito de sesión en el Decision Journal.
-              No ejecuta órdenes ni inventa BUY — 0 operaciones puede ser un día
-              excelente.
-            </DialogDescription>
-          </DialogHeader>
-          <label className="block space-y-1 text-sm">
-            <span className="text-muted-foreground">Nota (opcional)</span>
-            <textarea
-              className="min-h-[72px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Ej. mercado sin edge, esperar confirmación macro…"
-            />
-          </label>
-          {mutation.isError && (
-            <p className="text-sm text-destructive">
-              {(mutation.error as Error).message}
-            </p>
-          )}
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-            >
-              {mutation.isPending ? "Registrando…" : "Registrar veredicto"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="No operar hoy"
+        description="Registra un veredicto explícito de sesión en el Decision Journal. No ejecuta órdenes ni inventa BUY — 0 operaciones puede ser un día excelente."
+        className="max-w-md"
+      >
+        <label className="block space-y-1 text-sm">
+          <span className="text-muted-foreground">Nota (opcional)</span>
+          <textarea
+            className="min-h-[72px] w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Ej. mercado sin edge, esperar confirmación macro…"
+          />
+        </label>
+        {mutation.isError && (
+          <p className="mt-2 text-sm text-destructive">
+            {(mutation.error as Error).message}
+          </p>
+        )}
+        <div className="mt-4 flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            {mutation.isPending ? "Registrando…" : "Registrar veredicto"}
+          </Button>
+        </div>
       </Dialog>
     </>
   );

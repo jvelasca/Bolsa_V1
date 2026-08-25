@@ -15,9 +15,10 @@ from bolsa_analytics.signals.fundamental_screener import (
     evaluate_fundamental_candidate,
     week_key_utc,
 )
+from bolsa_domain.repositories.instrument_repository import InstrumentRepository
+
 from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
 from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
-from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 
 
 class _ListRepo(Protocol):

@@ -76,7 +76,7 @@ function setupLine(setup: HoySetupEvidenceV1): string {
 }
 
 function thesisHealthLine(health: ThesisHealthV1): string {
-  const parts = [health.hint];
+  const parts: string[] = [health.hint];
   if (health.why.length > 0) {
     parts.push(health.why.join(", "));
   }
@@ -133,7 +133,7 @@ function expectancyLine(exp: ExpectancyV1): string {
 }
 
 function trailPlanLine(plan: TrailPlanV1): string {
-  const parts = [plan.status];
+  const parts: string[] = [plan.status];
   if (plan.peakMfeR != null) parts.push(`peak ${plan.peakMfeR}R`);
   if (plan.lockedR != null) parts.push(`lock ${plan.lockedR}R`);
   if (plan.suggestedTrailStop != null) {

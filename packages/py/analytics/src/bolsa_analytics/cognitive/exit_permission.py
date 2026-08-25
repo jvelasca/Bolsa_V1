@@ -7,7 +7,7 @@ Simétrico a check_opening (apertura), distinto de él.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from bolsa_analytics.cognitive.execution_plan import ExecutionPlan
@@ -31,7 +31,7 @@ EXIT_PERMISSION_KEY = "exitPermission"
 def _now_iso(at: str | None = None) -> str:
     if isinstance(at, str) and at.strip():
         return at
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @dataclass(frozen=True, slots=True)

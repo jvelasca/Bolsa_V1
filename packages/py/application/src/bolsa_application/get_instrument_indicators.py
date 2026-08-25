@@ -8,8 +8,9 @@ from bolsa_analytics.indicators import (
     build_indicator_series,
     latest_indicator_signals,
 )
-from bolsa_application.get_ohlcv_bars import GetOhlcvBars
 from bolsa_domain.value_objects.timeframe import TimeFrame
+
+from bolsa_application.get_ohlcv_bars import GetOhlcvBars
 
 
 @dataclass(frozen=True, slots=True)

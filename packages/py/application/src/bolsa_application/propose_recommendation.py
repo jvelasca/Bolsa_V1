@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
+from bolsa_analytics.cognitive.bracket_plan import (
+    BRACKET_PLAN_KEY,
+    build_bracket_plan_dict,
+)
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.exit_radar import (
     EXIT_RADAR_KEY,
@@ -40,10 +44,6 @@ from bolsa_analytics.cognitive.trade_plan import (
 from bolsa_analytics.cognitive.trail_plan import (
     TRAIL_PLAN_KEY,
     build_trail_plan_dict,
-)
-from bolsa_analytics.cognitive.bracket_plan import (
-    BRACKET_PLAN_KEY,
-    build_bracket_plan_dict,
 )
 from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter

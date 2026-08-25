@@ -25,10 +25,10 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+from bolsa_domain.errors import IdempotencyKeyExists
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.errors import IdempotencyKeyExists
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
     LedgerEntryRow,

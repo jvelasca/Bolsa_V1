@@ -1,12 +1,13 @@
 """Use-cases de listas / universos."""
 
-from bolsa_application.market_indices import SyncSubscribedCatalogIndices
 from bolsa_domain.repositories.instrument_repository import InstrumentWithMeta
 from bolsa_infrastructure.database.repositories.list_repository import (
     InstrumentListDetail,
     InstrumentListSummary,
     SqlAlchemyListRepository,
 )
+
+from bolsa_application.market_indices import SyncSubscribedCatalogIndices
 
 # Reservado salvo la lista canónica ADR-024 (id = estudio).
 _RESERVED_ESTUDIO_NAMES = frozenset({"estudio", "en estudio"})

@@ -12,14 +12,14 @@ Fakes en memoria (patrón de `test_list_account_summaries.py`), sin DB.
 from __future__ import annotations
 
 import pytest
-
-from bolsa_application.accounts import _account_summary_from_portfolio
 from bolsa_domain.entities.account import (
     AccountSummary,
     InvestmentAccount,
     InvestmentPortfolio,
 )
 from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, Position
+
+from bolsa_application.accounts import _account_summary_from_portfolio
 
 
 def _account(*, leverage: float = 1.0, margin_call_level_pct: float | None = 100.0) -> InvestmentAccount:

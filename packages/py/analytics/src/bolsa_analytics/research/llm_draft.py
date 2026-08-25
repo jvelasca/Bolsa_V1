@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from bolsa_ai import get_default_proxy
+
 from bolsa_analytics.research.prompt_draft import (
     _ENGINE_LABELS,
     PromptDraftResult,

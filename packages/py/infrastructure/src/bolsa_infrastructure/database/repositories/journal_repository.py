@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bolsa_domain.entities.cognitive_artifacts import DecisionJournalEntryRecord
 from bolsa_infrastructure.database.models import DecisionJournalEntryRow
 
 

@@ -7,9 +7,9 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+from bolsa_domain.value_objects.timeframe import TimeFrame
 from pydantic import ValidationError
 
-from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_market.ingest import OhlcvBarIngest
 from bolsa_market.ohlcv_quarantine import get_ohlcv_quarantine_stats
 from bolsa_market.yahoo_client import (
