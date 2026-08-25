@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md`](./traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md).
 > **Plan:** [`plan-ciclo-i3-shadow-honesty-2026-08-25.md`](./plan-ciclo-i3-shadow-honesty-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD origin:** `05e354c`. Feat I3 **`26901aa`** (local, no push).
+> **HEAD origin:** `05e354c`. Feat I3 **`26901aa`** · stamp **`95e4720`** (local, no push).
 > **Estado:** **CERRADO en `26901aa`.** Línea integridad → [`traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md`](./traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md).
 > **Fase:** **integridad**. **No** flip `PAPER_D_EXECUTE`.
 
@@ -31,15 +31,16 @@
 
 ## 3. Commits
 
-| SHA       | Mensaje                                                 |
-| --------- | ------------------------------------------------------- |
-| `26901aa` | feat(spine): ADR-031 Ciclo I3 Shadow honesty (no thaw). |
+| SHA       | Mensaje                                                                 |
+| --------- | ----------------------------------------------------------------------- |
+| `26901aa` | feat(spine): ADR-031 Ciclo I3 Shadow honesty (no thaw).                 |
+| `95e4720` | docs: stamp living SoT after Ciclo I3 (`26901aa`) and close I1-I3 line. |
 
-Stamp + cierre de línea: este ciclo de docs (SHA en update-last). **No push** salvo decisión explícita.
+**No push** salvo decisión explícita.
 
 ## 4. E1
 
-1. ~~Feat I3~~ · stamp SHA · push (decisión explícita).
+1. ~~Feat I3~~ · ~~stamp SHA~~ · push (decisión explícita).
 2. ~~Integridad I1–I3~~ → relevo [cierre de línea](./traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md). **No** I4 thaw.
 3. Fork: push · ops `TRUSTED_PROXIES` · residual exits solo si se nombra · crecimiento solo si se nombra · thaw solo con «thaw».
 

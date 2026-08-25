@@ -2,7 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **HEAD origin:** `05e354c`. Feat I3 **`26901aa`** (local, no push). `main` ahead de origin (I1+I2+I3).
+> **HEAD origin:** `05e354c`. Feat I3 **`26901aa`** · stamp **`95e4720`** (local, no push). `main` ahead de origin (I1+I2+I3).
 > **Estado:** **LÍNEA INTEGRIDAD I1–I3 CERRADA.** No hay I4 automático.
 > **Arranque chat nuevo:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 

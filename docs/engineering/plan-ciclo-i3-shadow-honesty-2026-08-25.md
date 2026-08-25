@@ -1,7 +1,7 @@
 # Plan — Ciclo I3 Shadow honesty (integridad, **sin thaw**)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §6 · [ADR-023](../adr/023-camino-d-thaw.md) (**Proposed**, P1–P10 vacíos) · relevo [`traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md) · cierre I2 [`traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md`](./traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md).
-> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I3 **`26901aa`** (local, no push).
+> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I3 **`26901aa`** · stamp **`95e4720`** (local, no push).
 > **Estado:** **CERRADO en `26901aa`.** D1–D8 OK. **No thaw.**
 > **Método:** integridad thin; Ranking ≠ BUY; Shadow **off**; sin broker; I1/I2 intactos.
 > **Nombre:** I3 = cerrar bypass AUTO **sin** thaw Camino D.
@@ -41,9 +41,10 @@ No PAPER_D_EXECUTE on · no broker · no reabrir I1/I2 · no LLM.
 
 ## 3. Commits
 
-| SHA       | Mensaje                                                 |
-| --------- | ------------------------------------------------------- |
-| `26901aa` | feat(spine): ADR-031 Ciclo I3 Shadow honesty (no thaw). |
+| SHA       | Mensaje                                                                 |
+| --------- | ----------------------------------------------------------------------- |
+| `26901aa` | feat(spine): ADR-031 Ciclo I3 Shadow honesty (no thaw).                 |
+| `95e4720` | docs: stamp living SoT after Ciclo I3 (`26901aa`) and close I1-I3 line. |
 
 ## 4. Freeze
 
