@@ -25,6 +25,7 @@ from bolsa_api.schemas.position_policies import (
     PositionPolicySummaryDto,
     UpdatePositionPolicyRequestDto,
 )
+from bolsa_application.paper_auto_http_gate import PaperAutoEnvBlockedError
 from bolsa_application.position_exit_evaluator import EvaluatePositionExits
 from bolsa_application.position_policies import (
     CreatePositionPolicy,
@@ -161,6 +162,8 @@ async def evaluate_position_exits(
             execute_trades=execute_trades,
             timeframe=timeframe,
         )
+    except PaperAutoEnvBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

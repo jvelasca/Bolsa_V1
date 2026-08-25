@@ -11,6 +11,7 @@ from bolsa_analytics.signals.strategy import SignalEventV1, _to_signal_event_v1
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.execution_router import ExecutionActionResult, ExecutionRouter
 from bolsa_application.get_ohlcv_bars import GetOhlcvBars
+from bolsa_application.paper_auto_http_gate import require_http_paper_auto_env
 from bolsa_application.position_policies import GetPositionPolicyForHolding
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
@@ -244,6 +245,14 @@ class EvaluatePositionExits:
                 continue
 
             if policy.mode == "full_auto" and policy.execution_policy_id:
+                # RX1: same honesty as I3 — paper_auto fill needs PAPER_D_EXECUTE.
+                # Gate before Router (not inside it); eval-only never reaches here.
+                exec_policy = await self._execution_policies.get_policy(
+                    policy.execution_policy_id
+                )
+                require_http_paper_auto_env(
+                    exec_policy.mode if exec_policy is not None else None
+                )
                 try:
                     route = await self._router.execute(
                         policy.execution_policy_id,
