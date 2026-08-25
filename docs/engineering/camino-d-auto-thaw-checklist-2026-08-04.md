@@ -60,7 +60,7 @@ Secuencia producto acordada: **SEMI primero** (ya cerrado) → **auditoría de l
 | **A0** | Telemetría acierto dictamen (D6) — dash Asesor           | **Hecho** · `GET …/telemetry`                                                                                 |
 | **A1** | Libro UI modo AUTO (disabled hasta flags) + copy riesgos | **Hecho** · `DemoBookModePanel` + `demo-book-auto-copy`                                                       |
 | **A2** | Camino D detrás `PAPER_D_EXECUTE` **vía Risk Engine**    | **Hecho (flag off)** · idempotencia + DecisionSession fill/DENY · [prep](./camino-d-a2-a5-prep-2026-08-04.md) |
-| **A3** | Kill switch + confirmación doble                         | **Hecho** · API/UI kill + armado local `ACTIVAR AUTO`                                                         |
+| **A3** | Kill switch + confirmación doble                         | **Hecho + A3-wire** · API/UI kill + armado local `ACTIVAR AUTO` cableado al panel Operativa (2026-08-25)      |
 | **A4** | ADR thaw + freeze amend + ayuda HELP                     | **Hecho BETA-D** · [ADR-023](../adr/023-camino-d-thaw.md) Accepted · estricto deuda                           |
 | **A5** | Opt-in DEMO controlado (1 cuenta)                        | **Hecho (doc+gate)** · `PAPER_D_ACCOUNT_ID`                                                                   |
 
