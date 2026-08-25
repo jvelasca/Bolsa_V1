@@ -9,12 +9,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from fastapi import FastAPI
+from httpx import AsyncClient
+
 from bolsa_domain.entities.ohlcv_bar import OhlcvBar
 from bolsa_infrastructure.database.repositories.ohlcv_repository import (
     SqlAlchemyOhlcvRepository,
 )
-from fastapi import FastAPI
-from httpx import AsyncClient
 
 
 async def seed_http_opening_allow(

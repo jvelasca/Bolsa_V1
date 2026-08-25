@@ -2,23 +2,6 @@
 
 from typing import Annotated
 
-from bolsa_application.execution_policies import (
-    CreateExecutionPolicy,
-    DeleteExecutionPolicy,
-    GetExecutionPolicy,
-    ListExecutionPolicies,
-    UpdateExecutionPolicy,
-)
-from bolsa_application.execution_router import (
-    ExecuteScanJobHits,
-    ExecutionActionResult,
-    ExecutionRouter,
-)
-from bolsa_application.paper_auto_http_gate import (
-    PaperAutoEnvBlockedError,
-    require_http_paper_auto_env,
-)
-from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,6 +29,23 @@ from bolsa_api.schemas.execution_policies import (
     RouteSignalsResponseDto,
     UpdateExecutionPolicyRequestDto,
 )
+from bolsa_application.execution_policies import (
+    CreateExecutionPolicy,
+    DeleteExecutionPolicy,
+    GetExecutionPolicy,
+    ListExecutionPolicies,
+    UpdateExecutionPolicy,
+)
+from bolsa_application.execution_router import (
+    ExecuteScanJobHits,
+    ExecutionActionResult,
+    ExecutionRouter,
+)
+from bolsa_application.paper_auto_http_gate import (
+    PaperAutoEnvBlockedError,
+    require_http_paper_auto_env,
+)
+from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 router = APIRouter()
 

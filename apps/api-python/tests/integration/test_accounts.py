@@ -1,8 +1,8 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
+from tests.opening_gate_seed import seed_http_opening_allow
 
 from bolsa_api.main import create_app, lifespan
-from tests.opening_gate_seed import seed_http_opening_allow
 
 STANDARD_ES_SETTINGS = {
     "commission": {

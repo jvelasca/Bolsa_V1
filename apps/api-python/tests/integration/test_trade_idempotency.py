@@ -8,10 +8,10 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
+from tests.opening_gate_seed import seed_http_opening_allow
 
 from bolsa_api.main import create_app, lifespan
 from bolsa_api.schemas.portfolio import TradeRequestDto
-from tests.opening_gate_seed import seed_http_opening_allow
 
 
 async def _first_instrument_id(client: AsyncClient) -> str:
