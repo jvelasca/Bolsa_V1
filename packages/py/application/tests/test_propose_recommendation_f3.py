@@ -113,6 +113,11 @@ def test_propose_from_ta_bullish_bars():
     assert "structuralStop" in plan
     session_runtime = (payload.get("decisionSession") or {}).get("runtime") or {}
     assert session_runtime.get("tradePlan") == plan
+    # Ciclo 4.8: echo thin F3 = runtime (ambos None si no hay spring).
+    session_anchor = session_runtime.get("wyckoffSpringAnchor")
+    assert payload.get("wyckoffSpringAnchor") == session_anchor
+    if session_anchor is not None:
+        assert "effort" in session_anchor
 
 
 def test_propose_with_fundamentals_port():

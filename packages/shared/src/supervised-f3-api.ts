@@ -55,6 +55,11 @@ export type SupervisedProposePayloadDto = RecommendationV1 & {
   combinedScore?: number;
   /** Plan condicional vivo (ADR-031). Ausente → Hoy usa heurística de gate. */
   tradePlan?: TradePlanV1;
+  /**
+   * Ciclo 4.8 — echo thin del spring anchor (runtime). No tipado OpenAPI /
+   * contract:gen; blob opaco round-trip F3.
+   */
+  wyckoffSpringAnchor?: Record<string, unknown>;
 };
 
 /** Meta de enqueue del web (`SupervisedEnqueueMeta`). */

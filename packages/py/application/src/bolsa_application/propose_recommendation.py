@@ -165,6 +165,8 @@ class ProposeRecommendationResult:
     combined_score: float | None = None
     weight_context: dict[str, Any] | None = None
     trade_plan: dict[str, Any] | None = None
+    # Ciclo 4.8 — echo thin para F3/Hoy (no TradePlan / no contract:gen).
+    wyckoff_spring_anchor: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -190,6 +192,8 @@ class ProposeRecommendationResult:
             data["weightContext"] = self.weight_context
         if self.trade_plan is not None:
             data["tradePlan"] = self.trade_plan
+        if self.wyckoff_spring_anchor is not None:
+            data[WYCKOFF_SPRING_ANCHOR_KEY] = self.wyckoff_spring_anchor
         return data
 
 
@@ -572,6 +576,7 @@ class ProposeRecommendationFromTa:
             combined_score=runtime.combined_score,
             weight_context=weight_ctx,
             trade_plan=trade_plan_dict,
+            wyckoff_spring_anchor=wyckoff_anchor,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:

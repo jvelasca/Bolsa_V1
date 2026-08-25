@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 from bolsa_application.decision_board import GetDecisionBoard, extract_gate_outcome
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 
 # --------------------------------------------------------------------------- #
@@ -336,7 +336,12 @@ def test_bundle_to_dict_shape() -> None:
             "total": 2,
         },
         "semiF3Queue": [
-            {"instrumentId": "i1", "symbol": "AAA", "status": "pending_confirm"}
+            {
+                "instrumentId": "i1",
+                "symbol": "AAA",
+                "status": "pending_confirm",
+                "extra": {},
+            }
         ],
         "decisionSessions": [
             {

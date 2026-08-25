@@ -2,16 +2,25 @@
  * Proyección Decision Board → cola Hoy (ADR-031 Ciclo 3).
  * No es un motor: comprime buckets existentes a BUY / ARMED / WATCH / REVIEW / BLOCKED.
  * Prefiere un TradePlan vivo cuando el payload ya lo trae; si no, heurística de gate.
+ * Ciclo 4.8: Setup thin (entrySetup + phase/effort del anchor) — no whyNot nuevos.
  */
 
 import type { DecisionBoardV1, SemiF3ViewV1 } from "../decision-board.js";
 import type {
+  EntrySetupV1,
   TradePlanStatusV1,
   TradePlanV1,
   TradePlanWhyNotV1,
 } from "./trade-plan.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
+
+/** Evidencia SETUP en superficie Hoy (runtime echo; no contrato TradePlan). */
+export type HoySetupEvidenceV1 = {
+  entrySetup?: EntrySetupV1 | null;
+  phase?: string | null;
+  effort?: string | null;
+};
 
 export type HoyQueueItemV1 = {
   id: string;
@@ -20,6 +29,8 @@ export type HoyQueueItemV1 = {
   status: TradePlanStatusV1;
   whyNot: TradePlanWhyNotV1[];
   gate: string;
+  /** Ciclo 4.8 — bloque Setup en el dialog Hoy. */
+  setup?: HoySetupEvidenceV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -40,6 +51,23 @@ const PLAN_WHY_NOT = new Set<TradePlanWhyNotV1>([
   "orphan",
   "rr",
   "regime",
+]);
+
+const ENTRY_SETUPS = new Set<EntrySetupV1>([
+  "breakout",
+  "pullback",
+  "wyckoff",
+  "none",
+]);
+
+const SETUP_PHASES = new Set(["none", "spring", "reclaim", "sos", "lps"]);
+
+const SETUP_EFFORTS = new Set([
+  "none",
+  "spring_low_effort",
+  "spring_high_effort",
+  "result_ok",
+  "result_weak",
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -93,6 +121,76 @@ function readTradePlanFromF3Row(row: SemiF3ViewV1): TradePlanV1 | null {
   return asLiveTradePlan(flattened.tradePlan);
 }
 
+function asEntrySetup(value: unknown): EntrySetupV1 | null {
+  return typeof value === "string" && ENTRY_SETUPS.has(value as EntrySetupV1)
+    ? (value as EntrySetupV1)
+    : null;
+}
+
+function readAnchor(raw: unknown): { phase?: string; effort?: string } | null {
+  if (!isRecord(raw)) return null;
+  const out: { phase?: string; effort?: string } = {};
+  if (typeof raw.phase === "string" && SETUP_PHASES.has(raw.phase)) {
+    out.phase = raw.phase;
+  }
+  if (typeof raw.effort === "string" && SETUP_EFFORTS.has(raw.effort)) {
+    out.effort = raw.effort;
+  }
+  return out.phase !== undefined || out.effort !== undefined ? out : null;
+}
+
+/** Anchor: payload.wyckoffSpringAnchor → decisionSession.runtime → runtime. */
+function readAnchorFromPayloadish(value: unknown): {
+  phase?: string;
+  effort?: string;
+} | null {
+  if (!isRecord(value)) return null;
+  const top = readAnchor(value.wyckoffSpringAnchor);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = readAnchor(runtime.wyckoffSpringAnchor);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return readAnchor(value.runtime.wyckoffSpringAnchor);
+  }
+  return null;
+}
+
+function readSetupFromF3Row(row: SemiF3ViewV1): HoySetupEvidenceV1 | null {
+  const live = readTradePlanFromF3Row(row);
+  const entrySetup = asEntrySetup(live?.entrySetup);
+  const extra = row.extra;
+  let anchor: { phase?: string; effort?: string } | null = null;
+  if (isRecord(extra)) {
+    anchor =
+      readAnchorFromPayloadish(extra.payload) ??
+      readAnchor(extra.wyckoffSpringAnchor) ??
+      readAnchorFromPayloadish(extra);
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  if (!anchor) {
+    anchor = readAnchorFromPayloadish(flattened.payload);
+  }
+  if (!entrySetup && !anchor) return null;
+  return {
+    entrySetup: entrySetup ?? null,
+    phase: anchor?.phase ?? null,
+    effort: anchor?.effort ?? null,
+  };
+}
+
+function readSetupFromSessionTradePlan(
+  tradePlan: TradePlanV1 | null,
+): HoySetupEvidenceV1 | null {
+  const entrySetup = asEntrySetup(tradePlan?.entrySetup);
+  if (!entrySetup) return null;
+  return { entrySetup, phase: null, effort: null };
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -144,6 +242,7 @@ function toHoyItem(
   gate: string,
   live: TradePlanV1 | null,
   heuristicKind: HoyActionKindV1,
+  setup: HoySetupEvidenceV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -153,6 +252,7 @@ function toHoyItem(
       status: live.status,
       whyNot: live.whyNot,
       gate,
+      setup,
     };
   }
   return {
@@ -162,6 +262,7 @@ function toHoyItem(
     status: statusFromKind(heuristicKind),
     whyNot: whyNotFromKind(heuristicKind),
     gate,
+    setup,
   };
 }
 
@@ -181,6 +282,7 @@ export function mapDecisionBoardToHoyQueue(
         row.status,
         readTradePlanFromF3Row(row),
         kind,
+        readSetupFromF3Row(row),
       ),
     );
   }
@@ -193,13 +295,15 @@ export function mapDecisionBoardToHoyQueue(
     else if (session.kind.includes("paper") || session.kind.includes("auto"))
       bucket = "auto";
     const kind = kindFromGate(gate, bucket);
+    const live = asLiveTradePlan(session.tradePlan);
     items.push(
       toHoyItem(
         session.sessionId,
         session.symbol ?? session.instrumentId,
         gate,
-        asLiveTradePlan(session.tradePlan),
+        live,
         kind,
+        readSetupFromSessionTradePlan(live),
       ),
     );
   }

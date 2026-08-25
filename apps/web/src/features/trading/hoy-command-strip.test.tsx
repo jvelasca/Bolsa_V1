@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
@@ -31,7 +31,30 @@ function board(): DecisionBoardV1 {
       total: 1,
     },
     semiF3Queue: [
-      { instrumentId: "i1", symbol: "SAN", status: "pending_confirm" },
+      {
+        instrumentId: "i1",
+        symbol: "SAN",
+        status: "pending_confirm",
+        extra: {
+          payload: {
+            tradePlan: {
+              decisionId: "d1",
+              instrumentId: "i1",
+              direction: "long",
+              status: "ARMED",
+              quantity: 0,
+              riskPct: 0,
+              whyNot: ["entry"],
+              executionAllowed: false,
+              entrySetup: "wyckoff",
+            },
+            wyckoffSpringAnchor: {
+              phase: "reclaim",
+              effort: "result_ok",
+            },
+          },
+        },
+      },
     ],
     decisionSessions: [],
   };
@@ -59,5 +82,23 @@ describe("HoyCommandStrip", () => {
     );
     expect(await screen.findByTestId("hoy-command-strip")).toBeTruthy();
     expect(await screen.findByTestId("hoy-item-SAN")).toBeTruthy();
+  });
+
+  it("Ciclo 4.8: dialog shows Setup block from F3 echo", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    expect(await screen.findByTestId("hoy-setup")).toBeTruthy();
+    expect(
+      screen.getByText(/wyckoff · fase reclaim · result ok/i),
+    ).toBeTruthy();
   });
 });

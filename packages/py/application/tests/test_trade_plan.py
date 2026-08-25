@@ -1,4 +1,4 @@
-"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.7."""
+"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.8."""
 
 from types import SimpleNamespace
 
@@ -13,6 +13,7 @@ from bolsa_analytics.cognitive.trade_plan import (
     _is_wyckoff_reclaim,
     _locate_wyckoff_spring,
     _resolve_wyckoff_spring,
+    _wyckoff_effort_evidence,
     _wyckoff_phase_evidence,
     build_trade_plan,
     build_v0_trade_plan_dict,
@@ -26,12 +27,21 @@ from bolsa_analytics.cognitive.trade_plan import (
 )
 
 
-def _bar(*, close: float, high: float | None = None, low: float | None = None) -> SimpleNamespace:
-    return SimpleNamespace(
+def _bar(
+    *,
+    close: float,
+    high: float | None = None,
+    low: float | None = None,
+    volume: float | None = None,
+) -> SimpleNamespace:
+    ns = SimpleNamespace(
         close=close,
         high=close if high is None else high,
         low=close if low is None else low,
     )
+    if volume is not None:
+        ns.volume = volume
+    return ns
 
 
 def _breakout_long_bars(entry: float = 100.0) -> list[SimpleNamespace]:
@@ -719,4 +729,61 @@ def test_wyckoff_snapshot_anchor_roundtrip() -> None:
         "springLow": 85.0,
         "springHigh": 88.0,
         "phase": snap["phase"],
+        "effort": snap["effort"],
     }
+    assert snap["effort"] in {
+        "none",
+        "spring_low_effort",
+        "spring_high_effort",
+        "result_ok",
+        "result_weak",
+    }
+
+
+def test_wyckoff_effort_high_without_reclaim() -> None:
+    """Ciclo 4.8: spring con más volumen que prior → spring_high_effort; setup none."""
+    prior = [_bar(close=92, high=95, low=90, volume=100) for _ in range(WYCKOFF_PRIOR)]
+    spring = [_bar(close=86, high=88, low=85, volume=200) for _ in range(WYCKOFF_SPRING)]
+    last = _bar(close=85.2, high=85.3, low=85.0, volume=90)  # weak reclaim
+    bars = [*prior, *spring, last]
+    atr = 2.0
+    assert _is_wyckoff_reclaim(direction="long", bars=bars, atr=atr) is False
+    assert _wyckoff_effort_evidence(direction="long", bars=bars, atr=atr) == (
+        "spring_high_effort"
+    )
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "none"
+
+
+def test_wyckoff_effort_result_ok_on_reclaim() -> None:
+    """Ciclo 4.8: reclaim + last vol < spring → result_ok; setup sigue wyckoff."""
+    prior = [_bar(close=92, high=95, low=90, volume=100) for _ in range(WYCKOFF_PRIOR)]
+    spring = [_bar(close=86, high=88, low=85, volume=180) for _ in range(WYCKOFF_SPRING)]
+    last = _bar(close=89.0, high=89.0, low=86.0, volume=80)
+    bars = [*prior, *spring, last]
+    atr = 2.0
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "wyckoff"
+    assert _wyckoff_effort_evidence(direction="long", bars=bars, atr=atr) == "result_ok"
+    snap = snapshot_wyckoff_spring_anchor(direction="long", bars=bars, atr=atr)
+    assert snap is not None
+    assert snap["effort"] == "result_ok"
+
+
+def test_wyckoff_effort_not_a_gate() -> None:
+    """Effort etiqueta: result_weak no bloquea EntrySetup=wyckoff."""
+    prior = [_bar(close=92, high=95, low=90, volume=50) for _ in range(WYCKOFF_PRIOR)]
+    spring = [_bar(close=86, high=88, low=85, volume=60) for _ in range(WYCKOFF_SPRING)]
+    last = _bar(close=89.0, high=89.0, low=86.0, volume=200)  # high vol reclaim
+    bars = [*prior, *spring, last]
+    atr = 2.0
+    assert _wyckoff_effort_evidence(direction="long", bars=bars, atr=atr) == "result_weak"
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "wyckoff"
+
+
+def test_wyckoff_effort_range_fallback_without_volume() -> None:
+    """Sin volumen: ratio de rango prior/spring; reclaim → result_* por rango last."""
+    prior, spring = _wyckoff_spring_base()  # sin volume
+    last = _bar(close=89.0, high=89.2, low=88.8)  # rango 0.4 << spring ~3
+    bars = [*prior, *spring, last]
+    atr = 2.0
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "wyckoff"
+    assert _wyckoff_effort_evidence(direction="long", bars=bars, atr=atr) == "result_ok"

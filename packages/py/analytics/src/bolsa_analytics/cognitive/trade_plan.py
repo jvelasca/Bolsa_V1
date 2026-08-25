@@ -15,6 +15,14 @@ TradePlanDirection = Literal["long", "short", "none"]
 EntrySetup = Literal["breakout", "pullback", "wyckoff", "none"]
 # Ciclo 4.5/4.6 — evidencia SM (interno; no JSON TradePlan).
 WyckoffPhaseEvidence = Literal["none", "spring", "reclaim", "sos", "lps"]
+# Ciclo 4.8 — effort-result (etiqueta en runtime; no gate / no TradePlan).
+WyckoffEffortEvidence = Literal[
+    "none",
+    "spring_low_effort",
+    "spring_high_effort",
+    "result_ok",
+    "result_weak",
+]
 WhyNotCode = Literal[
     "fit",
     "freshness",
@@ -93,12 +101,24 @@ WYCKOFF_RECLAIM_ATR_K = 0.25
 WYCKOFF_LPS_ATR_EPS = 0.0
 # Ciclo 4.6 — scan lookback (cerradas); last aparte. Cabe en propose bar_limit=120.
 WYCKOFF_LOOKBACK = 40
+# Ciclo 4.8 — umbrales effort (volumen preferido; rango/ATR fallback).
+WYCKOFF_EFFORT_HIGH_RATIO = 1.25
+WYCKOFF_EFFORT_LOW_RATIO = 0.75
 
 # Ciclo 4.3 — ARMED actionability (entre WATCH entry 0.4 y TRIGGERED ~0.95).
 ARMED_ACTIONABILITY = 0.7
 
 # Ciclo 4.7 — clave runtime en DecisionSession (no TradePlan / no contract:gen).
 WYCKOFF_SPRING_ANCHOR_KEY = "wyckoffSpringAnchor"
+WYCKOFF_EFFORT_VALUES = frozenset(
+    {
+        "none",
+        "spring_low_effort",
+        "spring_high_effort",
+        "result_ok",
+        "result_weak",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +150,17 @@ def _finite_positive(value: object) -> float | None:
 
 def _bar_px(bar: object, attr: str) -> float | None:
     return _finite_positive(getattr(bar, attr, None))
+
+
+def _bar_volume(bar: object) -> float | None:
+    """Volumen ≥0; 0 / ausente → None (no cuenta en medias)."""
+    try:
+        number = float(getattr(bar, "volume", None))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if number != number or number <= 0:  # NaN or non-positive
+        return None
+    return number
 
 
 def _sma_closes(bars: Sequence[object]) -> float | None:
@@ -313,6 +344,9 @@ def parse_wyckoff_spring_anchor(raw: object) -> dict[str, object] | None:
     phase = raw.get("phase")
     if phase in ("none", "spring", "reclaim", "sos", "lps"):
         out["phase"] = phase
+    effort = raw.get("effort")
+    if effort in WYCKOFF_EFFORT_VALUES:
+        out["effort"] = effort
     return out
 
 
@@ -323,7 +357,7 @@ def snapshot_wyckoff_spring_anchor(
     atr: float | None = None,
     prior: dict[str, object] | None = None,
 ) -> dict[str, object] | None:
-    """Ciclo 4.7: foto del spring resuelto para ``DecisionSession.runtime``."""
+    """Ciclo 4.7/4.8: foto del spring resuelto para ``DecisionSession.runtime``."""
     locate = _resolve_wyckoff_spring(direction=direction, bars=bars, prior=prior)
     if locate is None:
         return None
@@ -337,6 +371,9 @@ def snapshot_wyckoff_spring_anchor(
         "springLow": min(spring_lows),
         "springHigh": max(spring_highs),
         "phase": _wyckoff_phase_evidence(
+            direction=direction, bars=bars, atr=atr, prior=prior
+        ),
+        "effort": _wyckoff_effort_evidence(
             direction=direction, bars=bars, atr=atr, prior=prior
         ),
     }
@@ -482,6 +519,94 @@ def _wyckoff_phase_evidence(
     if _detect_wyckoff_sos(direction=direction, bars=bars, prior=prior):
         return "sos"
     return "reclaim"
+
+
+def _mean_bar_volume(bars: Sequence[object]) -> float | None:
+    vals = [v for v in (_bar_volume(bar) for bar in bars) if v is not None]
+    if not vals:
+        return None
+    return sum(vals) / len(vals)
+
+
+def _mean_bar_range(bars: Sequence[object]) -> float | None:
+    ranges: list[float] = []
+    for bar in bars:
+        high = _bar_px(bar, "high")
+        low = _bar_px(bar, "low")
+        if high is not None and low is not None and high >= low:
+            ranges.append(high - low)
+    if not ranges:
+        return None
+    return sum(ranges) / len(ranges)
+
+
+def _wyckoff_effort_ratio(
+    *,
+    spring: Sequence[object],
+    prior_bars: Sequence[object],
+    atr: float | None,
+) -> float | None:
+    """Ratio spring/prior: volumen si hay; si no, rango; si no, rango/ATR."""
+    spring_vol = _mean_bar_volume(spring)
+    prior_vol = _mean_bar_volume(prior_bars)
+    if spring_vol is not None and prior_vol is not None and prior_vol > 0:
+        return spring_vol / prior_vol
+    spring_range = _mean_bar_range(spring)
+    prior_range = _mean_bar_range(prior_bars)
+    if spring_range is not None and prior_range is not None and prior_range > 0:
+        return spring_range / prior_range
+    atr_val = _finite_positive(atr)
+    if spring_range is not None and atr_val is not None and atr_val > 0:
+        return spring_range / atr_val
+    return None
+
+
+def _wyckoff_effort_evidence(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    atr: float | None = None,
+    prior: dict[str, object] | None = None,
+) -> WyckoffEffortEvidence:
+    """Ciclo 4.8: effort-result etiqueta sobre spring resuelto. No gate.
+
+    Con reclaim: ``result_ok`` si el last muestra menos esfuerzo que el spring
+    (volumen o rango); si no ``result_weak``. Sin reclaim: high/low vs prior.
+    """
+    locate = _resolve_wyckoff_spring(direction=direction, bars=bars, prior=prior)
+    if locate is None or direction == "none":
+        return "none"
+    if _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr, prior=prior):
+        last = bars[-1]
+        last_vol = _bar_volume(last)
+        spring_vol = _mean_bar_volume(locate.spring)
+        if last_vol is not None and spring_vol is not None:
+            return "result_ok" if last_vol < spring_vol else "result_weak"
+        last_high = _bar_px(last, "high")
+        last_low = _bar_px(last, "low")
+        spring_range = _mean_bar_range(locate.spring)
+        if (
+            last_high is not None
+            and last_low is not None
+            and spring_range is not None
+            and spring_range > 0
+        ):
+            return (
+                "result_ok"
+                if (last_high - last_low) < spring_range
+                else "result_weak"
+            )
+        return "result_weak"
+    ratio = _wyckoff_effort_ratio(
+        spring=locate.spring, prior_bars=locate.prior, atr=atr
+    )
+    if ratio is None:
+        return "none"
+    if ratio >= WYCKOFF_EFFORT_HIGH_RATIO:
+        return "spring_high_effort"
+    if ratio <= WYCKOFF_EFFORT_LOW_RATIO:
+        return "spring_low_effort"
+    return "none"
 
 
 def classify_entry_setup(

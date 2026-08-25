@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import type { HoyQueueItemV1 } from "@bolsa/shared";
+import type { HoyQueueItemV1, HoySetupEvidenceV1 } from "@bolsa/shared";
 import { mapDecisionBoardToHoyQueue } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,22 @@ function whyLabel(code: string): string {
     default:
       return code;
   }
+}
+
+function setupLine(setup: HoySetupEvidenceV1): string {
+  const parts: string[] = [];
+  if (setup.entrySetup && setup.entrySetup !== "none") {
+    parts.push(setup.entrySetup);
+  } else if (setup.entrySetup === "none") {
+    parts.push("none");
+  }
+  if (setup.phase && setup.phase !== "none") {
+    parts.push(`fase ${setup.phase}`);
+  }
+  if (setup.effort && setup.effort !== "none") {
+    parts.push(setup.effort.replaceAll("_", " "));
+  }
+  return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
 export function HoyCommandStrip() {
@@ -117,6 +133,14 @@ export function HoyCommandStrip() {
             <p className="mt-1 text-xs text-muted-foreground">
               Gate {selected.gate} · estado {selected.status}
             </p>
+            {selected.setup ? (
+              <div className="mt-3" data-testid="hoy-setup">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Setup
+                </p>
+                <p className="mt-1 text-sm">{setupLine(selected.setup)}</p>
+              </div>
+            ) : null}
             <div className="mt-3">
               <p className="text-[10px] font-semibold uppercase text-muted-foreground">
                 Why not

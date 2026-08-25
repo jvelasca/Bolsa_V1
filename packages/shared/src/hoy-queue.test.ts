@@ -83,4 +83,42 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.kind).toBe("BUY");
     expect(items[0]?.status).toBe("TRIGGERED");
   });
+
+  it("Ciclo 4.8: surfaces entrySetup + phase/effort from F3 payload anchor", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        decisionSessions: [],
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: watchPlan({
+                  entrySetup: "wyckoff",
+                  status: "ARMED",
+                  whyNot: ["entry"],
+                }),
+                wyckoffSpringAnchor: {
+                  direction: "long",
+                  ice: 85,
+                  springLow: 85,
+                  springHigh: 88,
+                  phase: "lps",
+                  effort: "result_ok",
+                },
+              },
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.setup).toEqual({
+      entrySetup: "wyckoff",
+      phase: "lps",
+      effort: "result_ok",
+    });
+  });
 });

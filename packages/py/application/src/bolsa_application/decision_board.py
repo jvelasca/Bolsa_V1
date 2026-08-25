@@ -175,12 +175,15 @@ class SemiF3View:
         object.__setattr__(self, "extra", dict(extra or {}))
 
     def to_dict(self) -> dict[str, Any]:
-        data = dict(self.extra)
+        # Nested ``extra`` matches SemiF3ViewDto / Hoy (payload+tradePlan+anchor).
+        data: dict[str, Any] = {
+            "status": self.status,
+            "extra": dict(self.extra),
+        }
         if self.instrument_id:
             data["instrumentId"] = self.instrument_id
         if self.symbol:
             data["symbol"] = self.symbol
-        data["status"] = self.status
         return data
 
 
