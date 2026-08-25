@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `PLACEHOLDER_STAMP` · feat 8.0 `cf880eb` · RX1 `9289b53` · origin `05e354c` · Ciclo 8.0 Expectancy thin · I1–I3 + RX1 intactos
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `827132c` · feat 8.0 `cf880eb` · RX1 `9289b53` · origin `05e354c` · Ciclo 8.0 Expectancy thin · I1–I3 + RX1 intactos
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md

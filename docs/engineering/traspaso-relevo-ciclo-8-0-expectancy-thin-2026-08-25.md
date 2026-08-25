@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md`](./roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md) · plan [`plan-ciclo-8-0-expectancy-thin-2026-08-25.md`](./plan-ciclo-8-0-expectancy-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD tip:** local (ahead origin). Feat `cf880eb` · stamp `PLACEHOLDER_STAMP`. **No push.**
+> **HEAD tip:** local (ahead origin). Feat `cf880eb` · stamp `827132c`. **No push.**
 > **Estado:** **CERRADO** — 8.0 Expectancy thin. Park → **8.1 trail** · **8.2 bracket**.
 > **Arranque chat nuevo:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6 + roadmap 8.x.
 
@@ -34,10 +34,10 @@
 
 ## 3. Commits
 
-| SHA                 | Mensaje                                             |
-| ------------------- | --------------------------------------------------- |
-| `cf880eb`           | feat(spine): ADR-031 Ciclo 8.0 Expectancy thin.     |
-| `PLACEHOLDER_STAMP` | docs: stamp living SoT after Ciclo 8.0 (`cf880eb`). |
+| SHA       | Mensaje                                             |
+| --------- | --------------------------------------------------- |
+| `cf880eb` | feat(spine): ADR-031 Ciclo 8.0 Expectancy thin.     |
+| `827132c` | docs: stamp living SoT after Ciclo 8.0 (`cf880eb`). |
 
 **No push.**
 
