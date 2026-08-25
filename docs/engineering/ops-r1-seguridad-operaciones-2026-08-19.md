@@ -34,11 +34,11 @@ Por tanto, R-1 **no requiere subagente de código ni batería**. Lo que queda so
 
 ### 2.2 Definir `TRUSTED_PROXIES` en producción (entorno)
 
-- **Qué:** poblar la variable de entorno `TRUSTED_PROXIES` en el entorno de **producción** con los IP/CIDR de los proxies de borde (reverse proxy / load balancer).
+- **Qué:** poblar la variable de entorno `TRUSTED_PROXIES` en el entorno de **producción** con las **IPs exactas** del peer inmediato (reverse proxy / load balancer). El matcher actual es igualdad de string — **no CIDR**.
 - **Motivo:** `get_client_ip()` en `middleware/rate_limit.py` (F-SEG-3) solo confía en la primera IP de `X-Forwarded-For` **si el peer inmediato está en `TRUSTED_PROXIES`**; default vacío → en local/CI sin proxy usa `client.host`. Es **anti-spoofing** del rate-limit.
 - **Bloqueado por:** necesitas el valor real (IPs del proxy de borde). Este doc no puede completarlo sin esos datos.
-- **Runbook detallado (2026-08-24):** [`ops-trusted-proxies-prod-runbook-2026-08-24.md`](./ops-trusted-proxies-prod-runbook-2026-08-24.md).
-- **Formato** (separado por comas, según `config.py`): `TRUSTED_PROXIES="10.0.0.1,203.0.113.0/24"` (ejemplo ilustrativo RFC 5737 — **no commitear valores reales**).
+- **Runbook detallado (E1.3):** [`ops-trusted-proxies-prod-runbook-2026-08-24.md`](./ops-trusted-proxies-prod-runbook-2026-08-24.md).
+- **Formato** (coma-separado): `TRUSTED_PROXIES="10.0.0.1,203.0.113.50"` (RFC 5737 ilustrativo — **no commitear valores reales**).
 - **Verificación:** tras desplegar con el valor, confirmar que el rate-limit cuenta contra la IP del cliente, no la del proxy.
 
 ### 2.3 Limpieza de `logs/dev/*` — ✅ HECHO 2026-08-24
