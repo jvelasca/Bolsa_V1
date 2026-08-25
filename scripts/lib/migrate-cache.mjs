@@ -1,6 +1,6 @@
 /**
- * Cache de migraciones Prisma: si el árbol de migrations/ no cambió, skip deploy.
- * Acelera `pnpm dev` / F5 en warm start (Prisma deploy vacío sigue costando varios segundos).
+ * Cache de migraciones Alembic: si el árbol de versions/ no cambió, skip upgrade.
+ * Acelera `pnpm dev` / F5 en warm start.
  */
 
 import { createHash } from 'node:crypto';
@@ -9,36 +9,25 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  statSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './logger.mjs';
 
 const CACHE_DIR = join(ROOT, '.cache');
-const STAMP_PATH = join(CACHE_DIR, 'prisma-migrate-stamp.json');
-const MIGRATIONS_DIR = join(ROOT, 'packages', 'database', 'prisma', 'migrations');
+const STAMP_PATH = join(CACHE_DIR, 'alembic-migrate-stamp.json');
+const MIGRATIONS_DIR = join(ROOT, 'packages', 'py', 'infrastructure', 'alembic', 'versions');
 
 export function migrationsFingerprint(dir = MIGRATIONS_DIR) {
   if (!existsSync(dir)) return 'missing';
-  const names = readdirSync(dir).filter((name) => {
-    try {
-      return statSync(join(dir, name)).isDirectory();
-    } catch {
-      return false;
-    }
-  });
+  const names = readdirSync(dir).filter((name) => name.endsWith('.py'));
   names.sort();
   const hash = createHash('sha1');
   hash.update(names.join('\n'));
   for (const name of names) {
-    const sql = join(dir, name, 'migration.sql');
-    if (!existsSync(sql)) continue;
     hash.update(name);
-    hash.update(readFileSync(sql));
+    hash.update(readFileSync(join(dir, name)));
   }
-  const lock = join(dir, 'migration_lock.toml');
-  if (existsSync(lock)) hash.update(readFileSync(lock));
   return hash.digest('hex');
 }
 

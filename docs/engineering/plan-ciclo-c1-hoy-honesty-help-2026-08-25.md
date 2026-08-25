@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-v181-operational-consolidation-2026-08-25.md`](./roadmap-v181-operational-consolidation-2026-08-25.md) · ADR-031 §4 Daily Command.
 > **AsOf:** 2026-08-25.
-> **Estado:** **CÓDIGO LISTO** (commit pendiente) · D1–D8 OK · tests shared 68 + help C1.
+> **Estado:** **CERRADO** en `659e6c4`. D1–D8 OK · tests shared 68 + help C1.
 > **Método:** rebanada P0 de auditoría v1.8; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; **sin** ActionQueue plena; **sin** DTO canónico; **sin** thaw.
 
 ---

@@ -2,7 +2,8 @@
 
 > **Padre:** [`plan-ciclo-c1-hoy-honesty-help-2026-08-25.md`](./plan-ciclo-c1-hoy-honesty-help-2026-08-25.md) · [`roadmap-v181-operational-consolidation-2026-08-25.md`](./roadmap-v181-operational-consolidation-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **CÓDIGO LISTO** (commit pendiente). Cambiar de chat opcional tras commit.
+> **HEAD:** `659e6c4`.  
+> **Estado:** **CERRADO.** Siguiente: C2 Alembic + ADR-032 (ola 1).
 > **Arranque:** este fichero + `CURRENT_SYSTEM.md` + roadmap v1.8.1.
 
 ---
@@ -27,6 +28,6 @@
 
 ## 2. E1 (chat nuevo)
 
-1. Commit C1 (si el dueño lo pide).
-2. Ciclo **C2** Alembic — o C3 ActionQueue.
-3. **No** TradePlan v1 / PositionState todavía (v1.9).
+1. Ciclo **C2** Alembic (ola 1A).
+2. ADR-032 contrato v1.9 docs-only (ola 1B, paralelo a C2).
+3. **No** TradePlan v1 / PositionState código todavía.

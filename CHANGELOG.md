@@ -4,6 +4,15 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+### Ciclo C2 — Alembic única autoridad
+
+- Públicos `pnpm db:push` / `db:migrate` / `db:migrate:deploy` fail-closed (`Prisma schema is not authoritative. Use Alembic.`).
+- Bootstrap (`setup` / `db-ensure` / `db-check`) aplica schema vía `ensure_migrated`. Prisma queda seed + `db:generate`. ADR-025 enmendado.
+
+### Docs
+
+- ADR-032 Operational Core (v1.9 contrato, **docs-only**, no implementado): TradePlan / PositionState / ExecutionPlan. Thin congelados. NO TRADE first-class.
+
 ### Ciclo C1 — Hoy honesty + HELP (v1.8.1 P0)
 
 - Hoy: F3/sesión **sin** TradePlan vivo → `WATCH` (nunca BUY/ARMED heurístico). BLOCKED/WATCH de proyección → `whyNot: legacy_projection` (no `fit` ficticio).

@@ -25,14 +25,14 @@ Planes / handoffs / `plan-ciclo-*` = **contexto histórico**.
 
 ## 1. Secuencia
 
-| Slice  | Nombre                    | Qué                                                                                      | Estado           |
-| ------ | ------------------------- | ---------------------------------------------------------------------------------------- | ---------------- |
-| **C1** | Hoy honesty + HELP        | F3 sin TradePlan → WATCH (nunca BUY) · whyNot heurístico `legacy_projection` · HELP v1.8 | **CÓDIGO LISTO** |
-| **C2** | Alembic única autoridad   | Retirar/renombrar `db:push` / `db:migrate` Prisma públicos                               | parked           |
-| **C3** | ActionQueue               | Prioridad determinista · cola completa ≠ slice UI top-N                                  | parked           |
-| **C4** | Contratos / shape drift   | TradePlan DTO canónico · ir reduciendo payload/extra/runtime dual                        | parked           |
-| **C5** | Honesty métricas          | MFE real ≠ proxy · Expectancy sample-quality en UI                                       | parked           |
-| **C6** | Stamp + tag `v1.8.1-beta` | Audit pack · CHANGELOG · tag                                                             | parked           |
+| Slice  | Nombre                    | Qué                                                                                      | Estado                |
+| ------ | ------------------------- | ---------------------------------------------------------------------------------------- | --------------------- |
+| **C1** | Hoy honesty + HELP        | F3 sin TradePlan → WATCH (nunca BUY) · whyNot heurístico `legacy_projection` · HELP v1.8 | **CERRADO `659e6c4`** |
+| **C2** | Alembic única autoridad   | Retirar/renombrar `db:push` / `db:migrate` Prisma públicos                               | **CÓDIGO LISTO**      |
+| **C3** | ActionQueue               | Prioridad determinista · cola completa ≠ slice UI top-N                                  | parked                |
+| **C4** | Contratos / shape drift   | TradePlan DTO canónico · ir reduciendo payload/extra/runtime dual                        | parked                |
+| **C5** | Honesty métricas          | MFE real ≠ proxy · Expectancy sample-quality en UI                                       | parked                |
+| **C6** | Stamp + tag `v1.8.1-beta` | Audit pack · CHANGELOG · tag                                                             | parked                |
 
 **Fuera de v1.8.1 (v1.9 Operational Core):** TradePlan v1 (target / R/R / sizing completo) · PositionState · ExitPlan. **No** Wyckoff 2 · **no** Expectancy/Trail/Bracket 2.
 

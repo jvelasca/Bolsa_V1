@@ -13,4 +13,4 @@ if (result.dockerStarted) {
   logInfo('db-start', 'Docker Desktop se abrió automáticamente');
 }
 
-logInfo('db-start', 'PostgreSQL en marcha. Siguiente: pnpm db:push && pnpm db:seed');
+logInfo('db-start', 'PostgreSQL en marcha. Siguiente: pnpm db:ensure (Alembic + seed)');

@@ -27,10 +27,10 @@ async function ensurePing() {
 function applyMigrations({ label }) {
   const { skip, fp } = shouldSkipMigrateDeploy();
   if (skip && !forceMigrate) {
-    logInfo('db-ensure', `Migraciones al día — skip Prisma deploy (${label})`);
+    logInfo('db-ensure', `Migraciones al día — skip Alembic upgrade (${label})`);
     return;
   }
-  logInfo('db-ensure', 'Aplicando migraciones Prisma...');
+  logInfo('db-ensure', 'Aplicando migraciones Alembic...');
   runDbMigrateDeploy();
   writeMigrateStamp(fp);
 }

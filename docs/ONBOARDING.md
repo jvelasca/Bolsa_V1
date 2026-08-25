@@ -7,13 +7,13 @@ Para cualquier informático que retome el proyecto sin contexto previo.
 
 ## 1. Prerrequisitos
 
-| Herramienta | Versión | Para qué |
-|-------------|---------|----------|
-| Node.js | ≥ 20 | Frontend, scripts, Prisma |
-| pnpm | ≥ 10 | Monorepo |
-| Python | ≥ 3.11 | API FastAPI |
-| Docker Desktop | Reciente | PostgreSQL local |
-| Git | Cualquiera | Control de versiones |
+| Herramienta    | Versión    | Para qué                  |
+| -------------- | ---------- | ------------------------- |
+| Node.js        | ≥ 20       | Frontend, scripts, Prisma |
+| pnpm           | ≥ 10       | Monorepo                  |
+| Python         | ≥ 3.11     | API FastAPI               |
+| Docker Desktop | Reciente   | PostgreSQL local          |
+| Git            | Cualquiera | Control de versiones      |
 
 ## 2. Setup en 10 minutos
 
@@ -35,9 +35,9 @@ Abrir http://localhost:5173. Si queda en "Cargando…", ver `pnpm health` y [doc
 
 ### Acceso (OR-S1)
 
-| Entorno | `APP_PASSWORD` |
-|---------|----------------|
-| Local solo | Vacío OK (sin login) |
+| Entorno                              | `APP_PASSWORD`                                                                                                                   |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| Local solo                           | Vacío OK (sin login)                                                                                                             |
 | **Demo compartida / staging / prod** | **Obligatorio** — sin él, `GET /api/health` → `components.auth` = `degraded` si `ENVIRONMENT` no es `development`/`local`/`test` |
 
 También define `APP_AUTH_SECRET` (no uses el default en demos). Ver `.env.example`.
@@ -51,7 +51,7 @@ Bolsa_V1/
 │   └── api-python/          ← FastAPI REST (ACTIVO)
 ├── packages/
 │   ├── shared/              ← DTOs TypeScript compartidos
-│   ├── database/            ← Prisma schema + seed
+│   ├── database/            ← Prisma tooling (seed / generate; DDL = Alembic)
 │   └── py/                  ← domain, application, infrastructure, analytics, market, ai
 ├── scripts/                 ← run-dev, db-ensure, health
 └── docs/                    ← Documentación
@@ -75,19 +75,19 @@ Bolsa_V1/
 
 ## 5. Archivos que debes leer primero
 
-| Orden | Archivo | Por qué |
-|-------|---------|---------|
-| 1 | `docs/AI_PLATFORM_SOLUTION.md` | Estado plataforma + IA |
-| 2 | `docs/HELP.md` | Ayuda app ↔ trackers (`HELP_CONTENT_AS_OF`) |
-| 3 | `docs/rfc/README.md` | Constitución RFC-000…007 |
-| 4 | `scripts/run-dev.mjs` | Cómo arranca dev |
-| 5 | `apps/web/src/lib/api.ts` | Contrato frontend ↔ backend |
-| 6 | `apps/api-python/src/bolsa_api/main.py` | Entry point API |
-| 7 | `apps/api-python/src/bolsa_api/api/v1/router.py` | Routers HTTP |
-| 8 | `packages/py/application/` | Lógica de negocio |
-| 9 | `packages/py/ai/` | AIGovernanceProxy (F1) |
-| 10 | `packages/database/prisma/schema.prisma` | Modelo de datos |
-| 11 | `docs/UI_PLATFORM.md` | UI trading |
+| Orden | Archivo                                          | Por qué                                     |
+| ----- | ------------------------------------------------ | ------------------------------------------- |
+| 1     | `docs/AI_PLATFORM_SOLUTION.md`                   | Estado plataforma + IA                      |
+| 2     | `docs/HELP.md`                                   | Ayuda app ↔ trackers (`HELP_CONTENT_AS_OF`) |
+| 3     | `docs/rfc/README.md`                             | Constitución RFC-000…007                    |
+| 4     | `scripts/run-dev.mjs`                            | Cómo arranca dev                            |
+| 5     | `apps/web/src/lib/api.ts`                        | Contrato frontend ↔ backend                 |
+| 6     | `apps/api-python/src/bolsa_api/main.py`          | Entry point API                             |
+| 7     | `apps/api-python/src/bolsa_api/api/v1/router.py` | Routers HTTP                                |
+| 8     | `packages/py/application/`                       | Lógica de negocio                           |
+| 9     | `packages/py/ai/`                                | AIGovernanceProxy (F1)                      |
+| 10    | `packages/py/infrastructure/alembic/`            | Modelo de datos (Alembic DDL)               |
+| 11    | `docs/UI_PLATFORM.md`                            | UI trading                                  |
 
 ## 6. Capas Python (clean architecture)
 
@@ -113,36 +113,36 @@ ai/               →  AIGovernanceProxy, Prompt Registry, adapters LLM
 
 **Premisa UI:** preferencias y chrome configurables → `localStorage` del navegador (por máquina/perfil). Ver [UI_PREFS_LOCALSTORAGE.md](./UI_PREFS_LOCALSTORAGE.md). El documento del workspace (contenido) va al servidor.
 
-| Store | Clave localStorage | Contenido |
-|-------|-------------------|-----------|
-| `auth-store` | `bolsa-auth` | Token JWT |
-| `workspace-store` | `bolsa-workspace-meta` (+ API) | Metadatos locales + documento en servidor |
-| `trading-ui-store` | `trading-ui-store` | Órdenes pendientes |
-| `trading-layout-store` | `bolsa-trading-layout-v1` | Visibilidad/tamaño paneles |
-| `ui-store` | — (memoria) / sesión dibujo | Diálogos abiertos, herramienta dibujo |
-| `alerts-store` | — | Cache alertas UI |
+| Store                  | Clave localStorage             | Contenido                                 |
+| ---------------------- | ------------------------------ | ----------------------------------------- |
+| `auth-store`           | `bolsa-auth`                   | Token JWT                                 |
+| `workspace-store`      | `bolsa-workspace-meta` (+ API) | Metadatos locales + documento en servidor |
+| `trading-ui-store`     | `trading-ui-store`             | Órdenes pendientes                        |
+| `trading-layout-store` | `bolsa-trading-layout-v1`      | Visibilidad/tamaño paneles                |
+| `ui-store`             | — (memoria) / sesión dibujo    | Diálogos abiertos, herramienta dibujo     |
+| `alerts-store`         | —                              | Cache alertas UI                          |
 
 ## 8. Base de datos
 
-- **Bootstrap:** `pnpm db:push` (Prisma) + `pnpm db:seed` (IBEX 35).
-- **Runtime:** SQLAlchemy en Python (todas las lecturas/escrituras de la API).
+- **Bootstrap:** `pnpm db:ensure` (Docker + Alembic `upgrade head` + seed IBEX 35). Schema = Alembic, no `pnpm db:push`.
+- **Runtime:** SQLAlchemy en Python (todas las lecturas/escrituras de la API). Prisma = seed/`db:generate` only.
 - **Conexión:** `DATABASE_URL` en `.env`.
 - **UI explorar datos:** `pnpm db:studio` (Prisma Studio).
 
 Tablas principales: `instruments`, `ohlcv_bars`, `data_sync_logs`, `instrument_lists`, `portfolio_*`, `price_alerts`, `backtest_runs`.
 
-Ver [DATA_MODEL.md](./DATA_MODEL.md) (parcial — contrastar con `schema.prisma`).
+Ver [DATA_MODEL.md](./DATA_MODEL.md) (parcial — contrastar con Alembic / `tables.py`).
 
 ## 9. Comandos del día a día
 
-| Comando | Cuándo |
-|---------|--------|
-| `pnpm dev` | Desarrollo normal |
-| `pnpm test:py` | Tras cambios Python |
-| `pnpm typecheck` | Tras cambios TS |
-| `pnpm db:ensure` | BD caída o clone nuevo |
-| `pnpm health` | Verificar API + web |
-| `node scripts/dev-api-python.mjs` | Solo backend |
+| Comando                           | Cuándo                 |
+| --------------------------------- | ---------------------- |
+| `pnpm dev`                        | Desarrollo normal      |
+| `pnpm test:py`                    | Tras cambios Python    |
+| `pnpm typecheck`                  | Tras cambios TS        |
+| `pnpm db:ensure`                  | BD caída o clone nuevo |
+| `pnpm health`                     | Verificar API + web    |
+| `node scripts/dev-api-python.mjs` | Solo backend           |
 
 ## 10. Añadir una feature — plantilla
 
@@ -165,13 +165,13 @@ Ver [DATA_MODEL.md](./DATA_MODEL.md) (parcial — contrastar con `schema.prisma`
 
 ## 11. Debugging frecuente
 
-| Síntoma | Causa probable | Solución |
-|---------|----------------|----------|
-| 404 en `/api/alerts` o `/import` | API vieja en :8000 | Matar uvicorn duplicados, `pnpm dev` |
-| Web "Cargando…" infinito | `VITE_API_URL` mal o API caída | Revisar `.env`, reiniciar dev |
-| Gráfico vacío | Sin sync Yahoo | Diálogo sync o botón en chart |
-| `docker compose` falla | Docker apagado | Abrir Docker Desktop, `pnpm db:ensure` |
-| Typecheck falla en shared | Tipos no compilados | `pnpm --filter @bolsa/shared build` |
+| Síntoma                          | Causa probable                 | Solución                               |
+| -------------------------------- | ------------------------------ | -------------------------------------- |
+| 404 en `/api/alerts` o `/import` | API vieja en :8000             | Matar uvicorn duplicados, `pnpm dev`   |
+| Web "Cargando…" infinito         | `VITE_API_URL` mal o API caída | Revisar `.env`, reiniciar dev          |
+| Gráfico vacío                    | Sin sync Yahoo                 | Diálogo sync o botón en chart          |
+| `docker compose` falla           | Docker apagado                 | Abrir Docker Desktop, `pnpm db:ensure` |
+| Typecheck falla en shared        | Tipos no compilados            | `pnpm --filter @bolsa/shared build`    |
 
 ## 12. Más lectura
 

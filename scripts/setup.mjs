@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { ensureProjectDatabase, printDockerInstallHelp } from './lib/docker.mjs';
-import { runDbGenerate, runDbPush, runDbSeed } from './lib/db.mjs';
+import { runDbGenerate, runDbMigrateDeploy, runDbSeed } from './lib/db.mjs';
 import { ensureLogDirs, logInfo, logError, ROOT, writeAgentLog } from './lib/logger.mjs';
 import { runPnpm } from './lib/pnpm.mjs';
 
@@ -38,7 +38,7 @@ if (!db.ok) {
 
 try {
   runDbGenerate();
-  runDbPush();
+  runDbMigrateDeploy();
   runDbSeed();
 } catch (error) {
   logError('setup', error instanceof Error ? error.message : 'Error en BD');

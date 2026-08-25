@@ -101,7 +101,7 @@ apps/api-python   → FastAPI REST (API por defecto)
 apps/web          → React + shell ProRealTime
 packages/py/      → domain, application, infrastructure, analytics, market
 packages/shared   → DTOs TypeScript
-packages/database → Prisma schema + seed PostgreSQL
+packages/database → Prisma tooling (seed / generate; DDL = Alembic)
 scripts/          → run-dev, db-ensure, health-check, research batteries
 docs/             → arquitectura, cutover, ADRs, engineering
 ```

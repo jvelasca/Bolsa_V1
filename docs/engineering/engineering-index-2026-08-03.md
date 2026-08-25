@@ -30,7 +30,7 @@ Engineering Index  (este doc)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 docs-only / TradePlan·PositionState·Execution)**
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -65,7 +65,10 @@ Engineering Index  (este doc)
 │   ├── roadmap-v181-operational-consolidation-2026-08-25.md ← **FASE ABIERTA** v1.8.1 consolidación (C1–C6) · no thin nuevos
 │   ├── plan-ciclo-c1-hoy-honesty-help-2026-08-25.md ← **C1** Hoy nunca BUY sin TradePlan · HELP 2026-08-25
 │   ├── traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md ← relevo C1
-│   ├── plan-ciclo-c2-alembic-authority-2026-08-25.md ← **C2 ABIERTA** Alembic-only · Prisma público fail-closed
+│   ├── traspaso-relevo-adr-032-operational-core-docs-2026-08-25.md ← **ADR-032** Proposed/Accepted docs-only v1.9 Operational Core · sin código
+│   ├── plan-ciclo-c2-alembic-authority-2026-08-25.md ← **C2 CÓDIGO LISTO** Alembic-only · Prisma público fail-closed
+│   ├── traspaso-relevo-ciclo-c2-alembic-authority-2026-08-25.md ← relevo C2 · E1 = C3
+│   ├── traspaso-relevo-ciclo-c2-alembic-authority-2026-08-25.md ← relevo C2 · E1=C3
 │   ├── plan-ciclo-c3-action-queue-2026-08-25.md ← **C3 ABIERTA** ActionQueue + Hoy slice
 │   ├── plan-ciclo-c5-metrics-honesty-2026-08-25.md ← **C5 ABIERTA** MFE source · expectancy sampleQuality
 │   ├── plan-ciclo-c4-shape-canonical-2026-08-25.md ← **C4 ABIERTA** TradePlan reader canónico · sin contract:gen

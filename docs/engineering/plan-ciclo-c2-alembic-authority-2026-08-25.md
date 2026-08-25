@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-v181-operational-consolidation-2026-08-25.md`](./roadmap-v181-operational-consolidation-2026-08-25.md) · [`traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md`](./traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **ABIERTA**.
+> **Estado:** **CÓDIGO LISTO**.
 > **Método:** P1 arquitectura; Ranking ≠ BUY; **no** reescribir Alembic `010`; sin `contract:gen`; sin LLM; **no** tocar spine/Hoy/TradePlan.
 
 ---

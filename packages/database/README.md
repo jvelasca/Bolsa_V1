@@ -1,18 +1,21 @@
-# packages/database — Prisma (tooling)
+# packages/database — Prisma (tooling seed/generate)
 
-Este paquete **no es runtime** de la aplicación. Se usa únicamente para:
+Este paquete **no es runtime** y **no es autoridad de schema**. Se usa únicamente para:
 
-- **Migraciones** SQL (`prisma migrate`)
-- **Seed** del catálogo IBEX (`prisma db seed`)
-- **Inspección** ocasional del esquema (`scripts/inspect_db.py`)
+- **Generate** del Prisma Client (`pnpm db:generate`)
+- **Seed** del catálogo IBEX (`pnpm db:seed`)
+- **Inspección** ocasional (`pnpm db:studio`)
+
+El DDL lo aplica **Alembic** (`bolsa_infrastructure.database.migrations.ensure_migrated` / `alembic upgrade head`). Comandos públicos `db:push` / `db:migrate` / `db:migrate:deploy` **fail-closed**.
 
 La API FastAPI (`apps/api-python`) accede a PostgreSQL vía **SQLAlchemy** en `packages/py/infrastructure`, no vía Prisma Client.
 
 ## Comandos habituales
 
 ```bash
-pnpm db:ensure          # Docker + migrate + seed (desde raíz)
-pnpm --filter @bolsa/database exec prisma migrate deploy
+pnpm db:ensure          # Docker + Alembic upgrade + seed (desde raíz)
+pnpm db:generate        # Prisma Client (seed)
+pnpm db:seed            # Catálogo IBEX
 ```
 
-Tras cambiar `prisma/schema.prisma`, genera migración y aplica desde la raíz del monorepo.
+Emergencia (no públicos): `legacy:prisma:*` en este `package.json`.

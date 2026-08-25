@@ -26,7 +26,7 @@ if (!result.ok) {
   process.exit(1);
 }
 
-logInfo('db-check', 'PostgreSQL listo. Aplicando migraciones y seed...');
+logInfo('db-check', 'PostgreSQL listo. Aplicando migraciones Alembic y seed...');
 
 try {
   runDbMigrateDeploy();
