@@ -1,8 +1,8 @@
 # Plan — Ciclo 4.9 Board session TradePlan echo (mesa / Daily Command)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §4 Daily Command · §6 (Actionability server diferida; ranking IO puede seguir en cliente) · relevo [`traspaso-relevo-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md`](./traspaso-relevo-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md) §4 E1 · síntesis subagentes 2026-08-25 (mesa integrity + audit docs).
-> **AsOf:** 2026-08-25 · feat **`e569003`**; D1–D8 **OK**.
-> **Estado:** **CERRADO** en `e569003`. Batería spine **106**.
+> **AsOf:** 2026-08-25 · HEAD **`b708719`** = `origin/main`; feat **`e569003`**.
+> **Estado:** **CERRADO en origin** (`e569003` vía `b708719`). D1–D8 OK · batería **106**.
 > **Método:** rebanada fina mesa; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; sin Ciclo 5 PM.
 > **Secuencia:** (A) echo `tradePlan` (+ anchor thin) en sesiones Board · (B) labels WhyNot en Hoy.
 

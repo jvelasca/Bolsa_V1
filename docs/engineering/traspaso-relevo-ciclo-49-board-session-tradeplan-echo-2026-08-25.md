@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md`](./traspaso-relevo-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md).
 > **Plan:** [`plan-ciclo-49-board-session-tradeplan-echo-2026-08-25.md`](./plan-ciclo-49-board-session-tradeplan-echo-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** stamp docs (este commit). Feat `e569003` **PUSHEADO** con el push.
+> **HEAD:** `b708719` = `origin/main`. Feat `e569003` **PUSHEADO**.
 > **Arranque chat nuevo:** pegar este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
@@ -32,7 +32,7 @@
 | SHA       | Mensaje                                                     |
 | --------- | ----------------------------------------------------------- |
 | `e569003` | feat(mesa): ADR-031 Ciclo 4.9 Board session TradePlan echo. |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 4.9 (`e569003`).         |
+| `b708719` | docs: stamp living SoT after Ciclo 4.9 (`e569003`).         |
 
 Push: `37e6fbc..` → `origin/main` (incl. update-last).
 
