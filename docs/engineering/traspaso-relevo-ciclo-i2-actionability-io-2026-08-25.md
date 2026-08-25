@@ -44,7 +44,7 @@
 ## 4. E1
 
 1. ~~Feat I2~~ · ~~stamp SHA~~ · push (decisión explícita).
-2. Park: Shadow AUTO (**I3, solo si explícito**) · expectancy plena · trail continuo · bracket.
+2. Park: thaw AUTO real (checklist + ADR-023) · expectancy plena · trail continuo · bracket. Handoff honesty → [`traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md) (**no thaw**).
 3. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
 
 ## 5. Freeze
