@@ -3,9 +3,14 @@
  * No es un motor: comprime buckets existentes a BUY / ARMED / WATCH / REVIEW / BLOCKED.
  * Prefiere un TradePlan vivo cuando el payload ya lo trae; si no, heurística de gate.
  * Ciclo 4.8: Setup thin (entrySetup + phase/effort del anchor) — no whyNot nuevos.
+ * Ciclo 4.9: sesiones Board echo tradePlan + anchor → Hoy deja heurística cuando hay plan.
  */
 
-import type { DecisionBoardV1, SemiF3ViewV1 } from "../decision-board.js";
+import type {
+  DecisionBoardV1,
+  DecisionSessionViewV1,
+  SemiF3ViewV1,
+} from "../decision-board.js";
 import type {
   EntrySetupV1,
   TradePlanStatusV1,
@@ -183,12 +188,18 @@ function readSetupFromF3Row(row: SemiF3ViewV1): HoySetupEvidenceV1 | null {
   };
 }
 
-function readSetupFromSessionTradePlan(
+function readSetupFromSession(
+  session: DecisionSessionViewV1,
   tradePlan: TradePlanV1 | null,
 ): HoySetupEvidenceV1 | null {
   const entrySetup = asEntrySetup(tradePlan?.entrySetup);
-  if (!entrySetup) return null;
-  return { entrySetup, phase: null, effort: null };
+  const anchor = readAnchor(session.wyckoffSpringAnchor);
+  if (!entrySetup && !anchor) return null;
+  return {
+    entrySetup: entrySetup ?? null,
+    phase: anchor?.phase ?? null,
+    effort: anchor?.effort ?? null,
+  };
 }
 
 function kindFromGate(
@@ -303,7 +314,7 @@ export function mapDecisionBoardToHoyQueue(
         gate,
         live,
         kind,
-        readSetupFromSessionTradePlan(live),
+        readSetupFromSession(session, live),
       ),
     );
   }

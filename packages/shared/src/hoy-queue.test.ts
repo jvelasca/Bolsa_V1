@@ -121,4 +121,42 @@ describe("mapDecisionBoardToHoyQueue", () => {
       effort: "result_ok",
     });
   });
+
+  it("Ciclo 4.9: prefers session tradePlan over gate heuristic + Setup from anchor", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-blocked",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "BLOCKED",
+              whyNot: ["regime"],
+              entrySetup: "wyckoff",
+              executionAllowed: false,
+            }),
+            wyckoffSpringAnchor: {
+              phase: "sos",
+              effort: "spring_high_effort",
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("BLOCKED");
+    expect(items[0]?.kind).not.toBe("BUY");
+    expect(items[0]?.whyNot).toEqual(["regime"]);
+    expect(items[0]?.setup).toEqual({
+      entrySetup: "wyckoff",
+      phase: "sos",
+      effort: "spring_high_effort",
+    });
+  });
 });

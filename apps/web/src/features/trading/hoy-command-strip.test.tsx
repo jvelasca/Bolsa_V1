@@ -101,4 +101,47 @@ describe("HoyCommandStrip", () => {
       screen.getByText(/wyckoff · fase reclaim · result ok/i),
     ).toBeTruthy();
   });
+
+  it("Ciclo 4.9: WhyNot labels regime/orphan/rr", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "BLOCKED",
+                  quantity: 0,
+                  riskPct: 0,
+                  whyNot: ["regime", "orphan", "rr"],
+                  executionAllowed: false,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    expect(await screen.findByText("Régimen no admite longs")).toBeTruthy();
+    expect(screen.getByText("Sin paquete de decisión")).toBeTruthy();
+    expect(screen.getByText("Riesgo/beneficio insuficiente")).toBeTruthy();
+  });
 });

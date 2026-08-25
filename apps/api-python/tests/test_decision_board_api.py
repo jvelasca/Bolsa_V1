@@ -35,6 +35,12 @@ def _bundle_dict() -> dict[str, Any]:
                 "decisionId": "DEC-1",
                 "createdAt": "2026-08-24T09:00:00Z",
                 "gate": "VETO",
+                "tradePlan": {
+                    "status": "BLOCKED",
+                    "whyNot": ["regime"],
+                    "executionAllowed": False,
+                },
+                "wyckoffSpringAnchor": {"phase": "reclaim", "effort": "none"},
             }
         ],
         "equity": 1000.0,
@@ -48,6 +54,10 @@ def test_decision_board_dto_maps_without_error() -> None:
     assert dto.buckets.vetoed == 1
     assert dto.semi_f3_queue[0].instrument_id == "i1"
     assert dto.decision_sessions[0].gate == "VETO"
+    assert dto.decision_sessions[0].trade_plan is not None
+    assert dto.decision_sessions[0].trade_plan["status"] == "BLOCKED"
+    assert dto.decision_sessions[0].wyckoff_spring_anchor is not None
+    assert dto.decision_sessions[0].wyckoff_spring_anchor["phase"] == "reclaim"
     assert dto.equity == 1000.0
 
     dumped = dto.model_dump(by_alias=True)
@@ -55,7 +65,26 @@ def test_decision_board_dto_maps_without_error() -> None:
     assert dumped["buckets"]["pendingConfirm"] == 1
     assert dumped["semiF3Queue"][0]["status"] == "pending_confirm"
     assert dumped["decisionSessions"][0]["createdAt"] == "2026-08-24T09:00:00Z"
+    assert dumped["decisionSessions"][0]["tradePlan"]["whyNot"] == ["regime"]
+    assert dumped["decisionSessions"][0]["wyckoffSpringAnchor"]["effort"] == "none"
     assert dumped["freeMargin"] == 500.0
+
+
+def test_decision_board_session_dto_omits_absent_plan() -> None:
+    raw = {
+        "sessionId": "s2",
+        "kind": "propose",
+        "status": "open",
+        "instrumentId": "inst-2",
+        "createdAt": "2026-08-24T09:00:00Z",
+        "gate": "PASS",
+    }
+    from bolsa_api.schemas.accounts import DecisionSessionViewDto
+
+    dto = DecisionSessionViewDto.model_validate(raw)
+    dumped = dto.model_dump(by_alias=True, exclude_none=True)
+    assert "tradePlan" not in dumped
+    assert "wyckoffSpringAnchor" not in dumped
 
 
 def test_decision_board_response_dto_wraps_data() -> None:

@@ -371,6 +371,11 @@ class DecisionSessionViewDto(BaseModel):
     decision_id: str | None = Field(default=None, alias="decisionId")
     created_at: str = Field(alias="createdAt")
     gate: str
+    # Ciclo 4.9 — echo thin; dict libre (sin contract:gen). Ausente → Hoy heurística.
+    trade_plan: dict[str, Any] | None = Field(default=None, alias="tradePlan")
+    wyckoff_spring_anchor: dict[str, Any] | None = Field(
+        default=None, alias="wyckoffSpringAnchor"
+    )
 
 
 class SemiF3ViewDto(BaseModel):

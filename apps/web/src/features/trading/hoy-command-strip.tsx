@@ -36,6 +36,12 @@ function whyLabel(code: string): string {
       return "La decisión caducó";
     case "no_stop":
       return "Falta stop estructural";
+    case "regime":
+      return "Régimen no admite longs";
+    case "orphan":
+      return "Sin paquete de decisión";
+    case "rr":
+      return "Riesgo/beneficio insuficiente";
     default:
       return code;
   }

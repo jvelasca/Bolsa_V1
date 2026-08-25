@@ -29,6 +29,8 @@ export type DecisionSessionViewV1 = {
   gate: string;
   /** Plan condicional vivo (ADR-031); ausente → Hoy usa heurística de gate. */
   tradePlan?: TradePlanV1;
+  /** Ciclo 4.9 — echo runtime Setup (phase/effort); no tipado canónico. */
+  wyckoffSpringAnchor?: Record<string, unknown>;
 };
 
 export type SemiF3ViewV1 = {

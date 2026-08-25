@@ -127,6 +127,42 @@ def _resolve_policy_gate(gate: dict[str, Any] | None) -> GateOutcome | None:
     return None
 
 
+def _session_runtime(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    """``payload.runtime`` dict o ``None`` (Ciclo 4.9 Board echo)."""
+    if not isinstance(payload, dict):
+        return None
+    runtime = payload.get("runtime")
+    return runtime if isinstance(runtime, dict) else None
+
+
+def extract_session_trade_plan(payload: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Lee ``runtime.tradePlan`` (camel o snake) para echo Hoy. Sin inventar."""
+    runtime = _session_runtime(payload)
+    if runtime is None:
+        return None
+    raw = runtime.get("tradePlan")
+    if not isinstance(raw, dict):
+        raw = runtime.get("trade_plan")
+    if isinstance(raw, dict) and raw:
+        return dict(raw)
+    return None
+
+
+def extract_session_wyckoff_anchor(
+    payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Lee ``runtime.wyckoffSpringAnchor`` para Setup thin en sesiones."""
+    runtime = _session_runtime(payload)
+    if runtime is None:
+        return None
+    raw = runtime.get("wyckoffSpringAnchor")
+    if not isinstance(raw, dict):
+        raw = runtime.get("wyckoff_spring_anchor")
+    if isinstance(raw, dict) and raw:
+        return dict(raw)
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class DecisionSessionView:
     """Una sesión de decisión reciente expuesta en el tablero."""
@@ -139,9 +175,11 @@ class DecisionSessionView:
     decision_id: str | None
     created_at: str
     gate: GateOutcome
+    trade_plan: dict[str, Any] | None = None
+    wyckoff_spring_anchor: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "sessionId": self.session_id,
             "kind": self.kind,
             "status": self.status,
@@ -151,6 +189,11 @@ class DecisionSessionView:
             "createdAt": self.created_at,
             "gate": self.gate,
         }
+        if self.trade_plan is not None:
+            data["tradePlan"] = self.trade_plan
+        if self.wyckoff_spring_anchor is not None:
+            data["wyckoffSpringAnchor"] = self.wyckoff_spring_anchor
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,6 +355,8 @@ class GetDecisionBoard:
                     decision_id=rec.decision_id,
                     created_at=rec.created_at,
                     gate=gate,
+                    trade_plan=extract_session_trade_plan(rec.payload),
+                    wyckoff_spring_anchor=extract_session_wyckoff_anchor(rec.payload),
                 )
             )
 
@@ -378,4 +423,6 @@ __all__ = [
     "GetDecisionBoard",
     "SemiF3View",
     "extract_gate_outcome",
+    "extract_session_trade_plan",
+    "extract_session_wyckoff_anchor",
 ]
