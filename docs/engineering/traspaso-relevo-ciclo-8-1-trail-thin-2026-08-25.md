@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md`](./roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md) · plan [`plan-ciclo-8-1-trail-thin-2026-08-25.md`](./plan-ciclo-8-1-trail-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD tip:** local (ahead origin). Feat `655832c`. **No push.**
+> **HEAD tip:** local (ahead origin). Feat `655832c` · stamp `24b900a`. **No push.**
 > **Estado:** **CERRADO** — 8.1 Trail thin advisory. Park → **8.2 bracket** · trail **plena** (broker mutate).
 > **Arranque chat nuevo:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6 + roadmap 8.x.
 
@@ -34,10 +34,10 @@
 
 ## 3. Commits
 
-| SHA       | Mensaje                                    |
-| --------- | ------------------------------------------ |
-| `655832c` | feat(spine): ADR-031 Ciclo 8.1 Trail thin. |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 8.1.    |
+| SHA       | Mensaje                                             |
+| --------- | --------------------------------------------------- |
+| `655832c` | feat(spine): ADR-031 Ciclo 8.1 Trail thin.          |
+| `24b900a` | docs: stamp living SoT after Ciclo 8.1 (`655832c`). |
 
 **No push.**
 

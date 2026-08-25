@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `655832c` · feat 8.1 Trail thin · 8.0 `cf880eb` · RX1 `9289b53` · origin `05e354c` · I1–I3 + RX1 intactos
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `24b900a` · feat 8.1 `655832c` · 8.0 `cf880eb` · RX1 `9289b53` · origin `05e354c` · I1–I3 + RX1 intactos
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
