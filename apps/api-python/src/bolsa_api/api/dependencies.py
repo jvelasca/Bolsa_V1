@@ -506,6 +506,22 @@ def get_execute_trade_use_case(session: AsyncSession) -> ExecuteTrade:
     )
 
 
+def get_execute_gated_portfolio_trade_use_case(session: AsyncSession) -> Any:
+    """I1 — POST /portfolio/trade: check_opening en buys (mismo SoT Confirm/Fill)."""
+    from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
+    from bolsa_application.execute_gated_portfolio_trade import ExecuteGatedPortfolioTrade
+
+    return ExecuteGatedPortfolioTrade(
+        get_execute_trade_use_case(session),
+        portfolio_summary=get_portfolio_summary_use_case(session),
+        instruments=get_instrument_repository(session),
+        accounts=get_account_repository(session),
+        profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
+        ohlcv=get_ohlcv_repository(session),
+        mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+    )
+
+
 def get_instrument_repository(session: AsyncSession) -> SqlAlchemyInstrumentRepository:
     return SqlAlchemyInstrumentRepository(session)
 

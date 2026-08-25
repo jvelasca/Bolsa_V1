@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from bolsa_api.main import create_app, lifespan
+from tests.opening_gate_seed import seed_http_opening_allow
 
 
 async def _first_instrument_id(client: AsyncClient) -> str:
@@ -29,6 +30,7 @@ async def test_position_policy_buy_and_evaluate_exits_flow() -> None:
             account_id = create_account.json()["data"]["id"]
 
             instrument_id = await _first_instrument_id(client)
+            await seed_http_opening_allow(app, client, account_id, instrument_id)
 
             trade = await client.post(
                 "/api/portfolio/trade",
@@ -117,6 +119,7 @@ async def test_evaluate_exits_without_policy_reports_no_policy() -> None:
             )
             account_id = create_account.json()["data"]["id"]
             instrument_id = await _first_instrument_id(client)
+            await seed_http_opening_allow(app, client, account_id, instrument_id)
 
             await client.post(
                 "/api/portfolio/trade",

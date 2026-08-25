@@ -2,12 +2,13 @@
 
 from typing import Annotated
 
+from bolsa_application.execute_gated_portfolio_trade import OpeningVetoedError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
     get_db_session,
-    get_execute_trade_use_case,
+    get_execute_gated_portfolio_trade_use_case,
     get_list_transactions_use_case,
     get_portfolio_summary_use_case,
     require_account_header_access,
@@ -24,7 +25,6 @@ from bolsa_api.schemas.portfolio import (
     TradeResponseDto,
     TransactionsResponseDto,
 )
-from bolsa_application.accounts import ExecuteTrade
 
 router = APIRouter()
 
@@ -83,41 +83,25 @@ async def list_transactions(
     response_model=TradeResponseDto,
     responses=IDEMPOTENCY_CONFLICT_RESPONSES,
 )
-
 async def execute_trade(
-
     body: TradeRequestDto,
-
     session: Annotated[AsyncSession, Depends(get_db_session)],
-
     account_id: Annotated[str | None, Depends(require_account_header_access)],
-
 ) -> TradeResponseDto:
-
-    use_case: ExecuteTrade = get_execute_trade_use_case(session)
-
+    use_case = get_execute_gated_portfolio_trade_use_case(session)
     try:
-
         result = await use_case.execute(
-
             instrument_id=body.instrument_id,
-
             trade_type=body.type,
-
             quantity=body.quantity,
-
             price=body.price,
-
             account_id=account_id,
-
             idempotency_key=body.idempotency_key,
-
         )
-
+    except OpeningVetoedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ValueError as exc:
-
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-
     return TradeResponseDto(data=to_trade_response_data(result))
 
 

@@ -47,6 +47,8 @@ const pyTests = [
   'packages/py/application/tests/test_trade_plan.py',
   'packages/py/application/tests/test_confirm_trade_plan.py',
   'packages/py/application/tests/test_fill_pending_order.py',
+  'packages/py/application/tests/test_opening_permission.py',
+  'packages/py/application/tests/test_execute_gated_portfolio_trade.py',
   'packages/py/application/tests/test_decision_board_session_echo.py',
   'packages/py/application/tests/test_decision_journal.py',
   'packages/py/analytics/tests/test_thesis_health.py',

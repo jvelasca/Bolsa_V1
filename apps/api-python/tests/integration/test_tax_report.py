@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from bolsa_api.main import create_app, lifespan
+from tests.opening_gate_seed import seed_http_opening_allow
 
 
 async def _first_instrument_id(client: AsyncClient) -> str:
@@ -47,6 +48,7 @@ async def test_tax_report_after_round_trip_trade() -> None:
             assert create.status_code == 201
             account_id = create.json()["data"]["id"]
             instrument_id = await _first_instrument_id(client)
+            await seed_http_opening_allow(app, client, account_id, instrument_id)
 
             buy = await client.post(
                 "/api/portfolio/trade",

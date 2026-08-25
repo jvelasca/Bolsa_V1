@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD tip **`05e354c`** = `origin/main` (Ciclo 5.3 `fd44a03`; línea 5.x cerrada). Relevo vivo: [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md) (integridad; D1–D8). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD tip **`05e354c`** = `origin/main` (Ciclo 5.3 `fd44a03`; línea 5.x cerrada). Relevo vivo: [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md) (I1 código; D1–D8 OK; stamp SHA pendiente). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -38,6 +38,7 @@ Dato → Assessment → run_decision_runtime → DecisionPackage (tesis)
   → ConfirmRecommendationIntent (SEMI, humano; TTL + precio + H3 orphan fail-closed)
      O  ExecutionRouter (AUTO paper, flag off)
      O  FillPendingOrder (pending_orders; mismo check_opening en aperturas)
+     O  POST /portfolio/trade (ExecuteGatedPortfolioTrade; buy = mismo gate, sell = skip)
   → ExecuteTrade (ledger paper)
 ```
 
@@ -48,7 +49,7 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 ## Limitaciones conocidas (no son bugs de esta rebanada)
 
 - Ranking IO sigue en cliente (`operativa-index.ts`).
-- Tres call-sites spine a `ExecuteTrade` (Confirm · ExecutionRouter · FillPendingOrder) + HTTP crudo `POST /portfolio/trade` (sin `check_opening`). TO-BE convergencia pre-fill / unificación de puertos — **parked M–L** (no thin post-Ciclo 6).
+- **Ciclo I1:** `POST /portfolio/trade` buy pasa `check_opening` (mismo helper que Confirm/Fill: Fit + DS-05 + DS-03). Sell no abre cesta. Spine 3 intactos. Router AUTO no fusionado. `PAPER_D_EXECUTE` off.
 - Dictamen (`DailyOpinionService`) no entra solo al Runtime; puede acabar en SEMI por alarma.
 - Aperturas orphan sin package: con store cableado (producción) → **`orphan_opening_blocked`** (H3, ADR-031). Wiring de test sin store = legado.
 - Confirm SEMI: TTL `expiresAt` y revalidación de último close vs `suggestedPrice` (banda 2 %).
@@ -71,16 +72,16 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - **Ciclo 5.2 Exit Radar thin:** mapper (`mapExitRadar` / `map_exit_radar`) → `runtime.exitRadar`; prioridad exit > time_stop > trail; Hoy «Salida» si status≠none. Trail tip @ MFE≥1.5R; time-stop por `expiresAt`; exit por thesis/T1 explícito. **No** auto-exit · **no** EvaluatePositionExits · **no** mutar stop. `check_opening` intacto.
 - **Ciclo 5.3 MFE/MAE thin:** mapper (`mapMfeMae` / `map_mfe_mae`) → `runtime.mfeMae`; peak MFE/MAE desde barras (fallback close_proxy); Hoy «Excursión» métricas (no CTA). **No** expectancy · **no** journal MFE · **no** mutar stop. `check_opening` intacto.
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **Expectancy plena** sigue parked.
-- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing continuo / bracket / T1 parcial fill, thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, Shadow AUTO, broker, ExecuteTrade converge. **No** reabrir Wyckoff thin por defecto.
+- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing continuo / bracket / T1 parcial fill, thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, Shadow AUTO, broker. **ExecuteTrade converge I1 cerrado** (HTTP buy gated). **No** reabrir Wyckoff thin por defecto.
 
 ## Tests
 
-| Comando                    | Qué cubre                                                                                                                                                                                                                                                             |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.8 + Board echo 4.9 + Journal Attribution 6 + Thesis Health 5.0 + Protect/T1 5.1 + Exit Radar 5.2 + MFE/MAE 5.3, AUTO veto, Golden, **DS-05**, **DS-03** (**135**) |
-| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                                                                                     |
-| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                                                                                        |
-| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                                                                                         |
+| Comando                    | Qué cubre                                                                                                                                                                                                                                                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.8 + Board echo 4.9 + Journal Attribution 6 + Thesis Health 5.0 + Protect/T1 5.1 + Exit Radar 5.2 + MFE/MAE 5.3 + I1 opening helper / HTTP gated trade, AUTO veto, Golden, **DS-05**, **DS-03** (**144**) |
+| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                                                                                                                            |
+| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                                                                                                                               |
+| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                                                                                                                                |
 
 ## Open risks (ops, no código)
 

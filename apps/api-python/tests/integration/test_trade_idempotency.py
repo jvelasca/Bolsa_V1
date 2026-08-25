@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from bolsa_api.main import create_app, lifespan
 from bolsa_api.schemas.portfolio import TradeRequestDto
+from tests.opening_gate_seed import seed_http_opening_allow
 
 
 async def _first_instrument_id(client: AsyncClient) -> str:
@@ -60,6 +61,7 @@ async def test_trade_idempotency_single_transaction() -> None:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             account_id = await _make_account(client)
             instrument_id = await _first_instrument_id(client)
+            await seed_http_opening_allow(app, client, account_id, instrument_id)
             headers = {"X-Account-Id": account_id}
             payload = {
                 "instrumentId": instrument_id,

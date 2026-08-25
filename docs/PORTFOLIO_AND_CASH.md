@@ -15,21 +15,21 @@ LedgerEntry[] (auditoría append-only, por cuenta)
 
 ## Scope HTTP
 
-| Header | Efecto |
-|--------|--------|
+| Header         | Efecto                                                                                                                              |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `X-Account-Id` | Cuenta activa (default si omitido). Trades, resumen `/api/portfolio`, transacciones y ledger usan la cartera default de esa cuenta. |
 
 El frontend envía el header desde Zustand (`active-account-store`).
 
 ## Tipos de movimiento de efectivo
 
-| Kind | API | Conserva total cuenta | Ledger |
-|------|-----|----------------------|--------|
-| **Depósito externo** | `POST /api/accounts/{id}/deposits` | No (inyecta capital) | `deposit`, `referenceType: external` |
-| **Retirada externa** | `POST /api/accounts/{id}/withdrawals` | No (extrae capital) | `withdrawal`, `referenceType: external` |
-| **Depósito inicial cuenta** | `POST /api/accounts` | No (creación) | `deposit`, `referenceType: manual` |
-| **Operación** | `POST /api/portfolio/trade` | — | `buy`/`sell` + `fee` |
-| **Custodia anual** | automático en summary/tax | — | `fee`, `referenceType: custody` |
+| Kind                        | API                                   | Conserva total cuenta                                  | Ledger                                  |
+| --------------------------- | ------------------------------------- | ------------------------------------------------------ | --------------------------------------- |
+| **Depósito externo**        | `POST /api/accounts/{id}/deposits`    | No (inyecta capital)                                   | `deposit`, `referenceType: external`    |
+| **Retirada externa**        | `POST /api/accounts/{id}/withdrawals` | No (extrae capital)                                    | `withdrawal`, `referenceType: external` |
+| **Depósito inicial cuenta** | `POST /api/accounts`                  | No (creación)                                          | `deposit`, `referenceType: manual`      |
+| **Operación**               | `POST /api/portfolio/trade`           | Buy: `check_opening` (I1). Sell: sin gate de apertura. | `buy`/`sell` + `fee`                    |
+| **Custodia anual**          | automático en summary/tax             | —                                                      | `fee`, `referenceType: custody`         |
 
 ## Reglas de negocio
 
@@ -42,18 +42,18 @@ El frontend envía el header desde Zustand (`active-account-store`).
 
 ## API resumida
 
-| Método | Ruta |
-|--------|------|
-| GET | `/api/accounts` |
-| POST | `/api/accounts` |
-| GET | `/api/accounts/{id}` |
-| PATCH | `/api/accounts/{id}` |
-| POST | `/api/accounts/{id}/close` |
-| DELETE | `/api/accounts/{id}` |
-| POST | `/api/accounts/{id}/deposits` |
-| POST | `/api/accounts/{id}/withdrawals` |
-| GET | `/api/accounts/{id}/ledger?limit=&offset=` |
-| GET | `/api/accounts/{id}/summary` |
+| Método | Ruta                                       |
+| ------ | ------------------------------------------ |
+| GET    | `/api/accounts`                            |
+| POST   | `/api/accounts`                            |
+| GET    | `/api/accounts/{id}`                       |
+| PATCH  | `/api/accounts/{id}`                       |
+| POST   | `/api/accounts/{id}/close`                 |
+| DELETE | `/api/accounts/{id}`                       |
+| POST   | `/api/accounts/{id}/deposits`              |
+| POST   | `/api/accounts/{id}/withdrawals`           |
+| GET    | `/api/accounts/{id}/ledger?limit=&offset=` |
+| GET    | `/api/accounts/{id}/summary`               |
 
 ## Tipos TypeScript
 
@@ -61,11 +61,11 @@ Ver `packages/shared/src/portfolio-cash.ts` y `packages/shared/src/accounts.ts`.
 
 ## UI
 
-| Pantalla | Funcionalidad |
-|----------|---------------|
-| `/accounts` | Hub master-detail: lista de cuentas + detalle (resumen, posiciones, movimientos, configuración) |
-| `/history` | Ledger y operaciones de la cuenta activa |
-| Barra trading | Selector de cuenta (scope global) |
+| Pantalla      | Funcionalidad                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `/accounts`   | Hub master-detail: lista de cuentas + detalle (resumen, posiciones, movimientos, configuración) |
+| `/history`    | Ledger y operaciones de la cuenta activa                                                        |
+| Barra trading | Selector de cuenta (scope global)                                                               |
 
 ## Pendiente (fuera de alcance actual)
 

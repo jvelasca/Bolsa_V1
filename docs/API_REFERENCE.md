@@ -205,11 +205,11 @@ UI: **Configuración → BD**.
 
 ## Portfolio
 
-| Método | Ruta                                 | Descripción                                    |
-| ------ | ------------------------------------ | ---------------------------------------------- |
-| GET    | `/api/portfolio`                     | Resumen cartera (scoped por headers)           |
-| GET    | `/api/portfolio/transactions?limit=` | Historial operaciones                          |
-| POST   | `/api/portfolio/trade`               | Compra/venta simulada (+ comisiones en ledger) |
+| Método | Ruta                                 | Descripción                                                                                     |
+| ------ | ------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| GET    | `/api/portfolio`                     | Resumen cartera (scoped por headers)                                                            |
+| GET    | `/api/portfolio/transactions?limit=` | Historial operaciones                                                                           |
+| POST   | `/api/portfolio/trade`               | Compra/venta paper. **Buy** pasa `check_opening` (403 `risk_veto` si veta). Sell no abre cesta. |
 
 Body trade: `{ instrumentId, type: "buy"|"sell", quantity, price }`.
 

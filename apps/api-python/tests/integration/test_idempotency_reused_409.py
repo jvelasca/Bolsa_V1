@@ -10,6 +10,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from bolsa_api.main import create_app, lifespan
+from tests.opening_gate_seed import seed_http_opening_allow
 
 NO_FEE_SETTINGS = {
     "commission": {
@@ -57,6 +58,7 @@ async def test_trade_reused_key_different_price_returns_409() -> None:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             account_id = await _make_account(client)
             instrument_id = await _first_instrument_id(client)
+            await seed_http_opening_allow(app, client, account_id, instrument_id)
             headers = {"X-Account-Id": account_id}
             payload = {
                 "instrumentId": instrument_id,
@@ -86,6 +88,7 @@ async def test_trade_reused_key_same_payload_still_replays_200() -> None:
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             account_id = await _make_account(client)
             instrument_id = await _first_instrument_id(client)
+            await seed_http_opening_allow(app, client, account_id, instrument_id)
             headers = {"X-Account-Id": account_id}
             payload = {
                 "instrumentId": instrument_id,

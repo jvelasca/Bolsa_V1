@@ -120,6 +120,8 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.3 MFE/MAE thin (cerrado `fd44a03`):** mapper → `runtime.mfeMae` · peak MFE/MAE (barras / close_proxy) · Hoy «Excursión» métricas · **sin** expectancy · **sin** CTA acción · `check_opening` intacto.
 
+**Ciclo I1 ExecuteTrade converge (cerrado en working tree, stamp SHA pendiente):** `allow_opening_fill` compartido Confirm + Fill + HTTP. `POST /portfolio/trade` buy → `check_opening` (403 `risk_veto`); sell skip. Router AUTO no fusionado. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
+
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
@@ -127,7 +129,6 @@ No abrir sin fase propia:
 - Thesis Health **plena** (persistencia Confidence lifecycle cableada)
 - Expectancy por setup (Attribution **plena**; MFE/MAE thin = 5.3)
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
-- ExecuteTrade converge (integridad post-crecimiento)
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 
@@ -138,4 +139,4 @@ Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en 
 ## 7. Consecuencias
 
 - Un ADR más no compite con `CURRENT_SYSTEM`: este documento fija **política**; el estado vivo sigue en [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-- Código: tipos en `@bolsa/shared` + mapper puro en `bolsa_analytics.cognitive.trade_plan`; confirm/fill no duplican autoridad de `check_opening`.
+- Código: tipos en `@bolsa/shared` + mapper puro en `bolsa_analytics.cognitive.trade_plan`; confirm/fill/HTTP buy no duplican autoridad de `check_opening` (`allow_opening_fill`).

@@ -2,6 +2,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from bolsa_api.main import create_app, lifespan
+from tests.opening_gate_seed import seed_http_opening_allow
 
 STANDARD_ES_SETTINGS = {
     "commission": {
@@ -103,6 +104,7 @@ async def test_create_account_with_settings_and_trade_fees() -> None:
             assert patch.status_code == 200
 
             instrument_id = await _first_instrument_id(client)
+            await seed_http_opening_allow(app, client, account_id, instrument_id)
             trade = await client.post(
                 "/api/portfolio/trade",
                 headers={"X-Account-Id": account_id},

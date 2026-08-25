@@ -34,6 +34,8 @@ Assessment (TA/FA/macro)
          signal.timestamp + require_fresh_data (DS-05)
          mandate repo + require_account_mandate (DS-03)
          proposal_sector = hit.sector
+    → HTTP: ExecuteGatedPortfolioTrade     execute_gated_portfolio_trade.py
+         buy → allow_opening_fill → check_opening; sell skip
     → ExecuteTrade                         accounts/trade.py
 ```
 
@@ -59,7 +61,7 @@ Daily Decision Board (`GetDecisionBoard`, `/decision-board`) es **vista**; no de
 | DS-07    | AUTO fill ALLOW                   | Implícito en router; no es el hueco DS-08                                                                                                              |
 | DS-12–15 | expiry / partial / broker / recon | **Fuera** (no broker)                                                                                                                                  |
 | Residual | Composite `portfolioConstraints`  | Sigue `not_evaluated`; Fit vive al lado — **doc honesty**; no wire en esta rebanada                                                                    |
-| Residual | Dos call-sites `ExecuteTrade`     | **Diferido** (convergencia TO-BE; demasiado grande)                                                                                                    |
+| Residual | ExecuteTrade HTTP                 | **I1 cerrado:** buy gated (`allow_opening_fill`); sell skip; Router AUTO no fusionado                                                                  |
 | Residual | H3 orphan apertures               | **Cerrado ADR-031:** store cableado → `orphan_opening_blocked`; tests sin store = legado                                                               |
 
 ---
