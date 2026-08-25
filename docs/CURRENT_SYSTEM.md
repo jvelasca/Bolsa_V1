@@ -21,7 +21,7 @@ Embudo / Lista AUTO / Finalistas · DÍA D · CORE-R · CORE-P · FA/FIE · SEMI
 
 ## Features congeladas
 
-`PAPER_D_EXECUTE` **default off** (opt-in local tras ADR-023 BETA-D) · sin broker live · Belief / gobernanza IA · Track B B1–B12 cerrado (no reabrir) · `pending-delete` E8 N · purge storage N · thaw **estricto** (60d/50/70/55) sigue deuda.
+`PAPER_D_EXECUTE` **default off** (opt-in local tras ADR-023 BETA-D) · sin broker live · Belief / gobernanza IA · Track B B1–B12 cerrado (no reabrir) · `pending-delete` E8 N · purge storage N · thaw **estricto** (60d/50/70/55) sigue deuda — [`deuda-thaw-estricto-runbook-2026-08-25.md`](./engineering/deuda-thaw-estricto-runbook-2026-08-25.md).
 
 ## Auth (real)
 
@@ -77,7 +77,7 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - **Ciclo 8.1 Trail thin:** mapper (`mapTrailPlan` / `map_trail_plan`) → `runtime.trailPlan`; ratchet peakMfeR−1R; status tip@1.5R / ratchet≥2R; Hoy «Trail» (hint only). Alinea Exit Radar tip; **no** muta `structuralStop` · **no** broker · **no** EvaluatePositionExits. `check_opening` intacto.
 - **Ciclo 8.2 Bracket thin:** mapper (`mapBracketPlan` / `map_bracket_plan`) → `runtime.bracketPlan`; picture entry/stop/T1(1R)/T2(2R) + leg fracs display-only; Hoy «Bracket». Alinea Protect T1; **no** OCO · **no** broker · **sin** CTA. `check_opening` intacto. **Línea crecimiento thin 8.0–8.2 CERRADA.**
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **Expectancy plena** (journal aggregate) sigue parked tras 8.0 thin.
-- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing **plena** broker / mutar stop (tras 8.1 thin), bracket **plena** OCO / piernas (tras 8.2 thin), thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, thaw **estricto** 60d/50/70/55 (deuda; BETA-D Accepted — [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md)), broker live. **Línea integridad I1–I3 CERRADA** + residual **RX1**. **Ciclo 8.0–8.2 CERRADOS.** **No** auto-exit producto. **No** reabrir Wyckoff thin por defecto.
+- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing **plena** broker / mutar stop (tras 8.1 thin), bracket **plena** OCO / piernas (tras 8.2 thin), thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, thaw **estricto** 60d/50/70/55 (deuda abierta — runbook [`deuda-thaw-estricto-runbook-2026-08-25.md`](./engineering/deuda-thaw-estricto-runbook-2026-08-25.md); BETA-D Accepted — [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md)), broker live. **Línea integridad I1–I3 CERRADA** + residual **RX1**. **Ciclo 8.0–8.2 CERRADOS.** **No** auto-exit producto. **No** reabrir Wyckoff thin por defecto.
 
 ## Tests
 
@@ -90,4 +90,4 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 
 ## Open risks (ops, no código)
 
-`TRUSTED_PROXIES` prod — **BLOCKED_ON_OWNER** (IPs exactas del peer; matcher actual ≠ CIDR). In-repo DONE: código + default vacío + secret scanning. Runbook E1.3: [`ops-trusted-proxies-prod-runbook-2026-08-24.md`](./engineering/ops-trusted-proxies-prod-runbook-2026-08-24.md). Purga opcional historial git dev (decisión explícita). **Thaw Camino D BETA-D:** ADR-023 **Accepted** · perfil [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md) (P1'–P5' PASS + W2–W4) · UI AUTO on · `PAPER_D_EXECUTE` opt-in local (default off) · estricto sigue FAIL.
+`TRUSTED_PROXIES` prod — **BLOCKED_ON_OWNER** (IPs exactas del peer; matcher actual ≠ CIDR). In-repo DONE: código + default vacío + secret scanning. Runbook E1.3: [`ops-trusted-proxies-prod-runbook-2026-08-24.md`](./engineering/ops-trusted-proxies-prod-runbook-2026-08-24.md). Purga opcional historial git dev (decisión explícita). **Thaw Camino D BETA-D:** ADR-023 **Accepted** · perfil [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md) (P1'–P5' PASS + W2–W4) · UI AUTO on · `PAPER_D_EXECUTE` opt-in local (default off). **Deuda estricto** (60d/50/70/55 · MaxDD): [`deuda-thaw-estricto-runbook-2026-08-25.md`](./engineering/deuda-thaw-estricto-runbook-2026-08-25.md) · baseline FAIL [`thaw-p1-p5-measurement-2026-08-25.md`](./engineering/thaw-p1-p5-measurement-2026-08-25.md) (28d · 0 SEMI · prec null · recall 0% · MaxDD inválido).

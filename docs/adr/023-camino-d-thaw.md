@@ -15,7 +15,7 @@ Prep A0–A5 cerrada en código. La barra **estricta** P1–P5 (60d / 50 SEMI / 
 3. Opt-in: `PAPER_D_EXECUTE=1` **y** opcional `PAPER_D_ACCOUNT_ID=<cuenta DEMO>`. Default de repo **sigue off**.
 4. Doble confirmación UI (armado local) obligatoria antes de modo AUTO efectivo.
 5. Freeze amend: Camino D thaw **parcial / BETA-D** (no broker live · no claim precisión Estudio).
-6. Thaw **estricto** (filas 60/50/70/55) permanece **deuda** — no sustituido.
+6. Thaw **estricto** (filas 60/50/70/55) permanece **deuda** — no sustituido. Tracking: [`deuda-thaw-estricto-runbook-2026-08-25.md`](../engineering/deuda-thaw-estricto-runbook-2026-08-25.md) (baseline + re-medida + DoD para levantar W2–W4). **No** Accept estricto hasta DoD.
 
 ## Evidencia
 
@@ -46,6 +46,10 @@ Prep A0–A5 cerrada en código. La barra **estricta** P1–P5 (60d / 50 SEMI / 
 - AUTO DEMO: UI on + `PAPER_D_EXECUTE=1` local + armado; sin broker.
 - No afirmar precisión/recall Estudio hasta re-medida A0 con `stance=buy`.
 - No flip silencioso: default código/env example permanece off salvo opt-in local.
+
+## Deuda estricto (abierta)
+
+Baseline FAIL 2026-08-25: 28d · 0 SEMI Confirm live · precisión null · recall 0% · MaxDD cash inválido (0 trades). Waivers W2–W4 vigentes hasta re-medida verde. Runbook: [`deuda-thaw-estricto-runbook-2026-08-25.md`](../engineering/deuda-thaw-estricto-runbook-2026-08-25.md). Helper: `node scripts/thaw_estricto_snapshot.mjs`.
 
 ## No incluye
 

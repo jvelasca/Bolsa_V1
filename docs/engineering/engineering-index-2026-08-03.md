@@ -62,6 +62,8 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
+│   ├── deuda-thaw-estricto-runbook-2026-08-25.md ← **DEUDA ESTRICTO** tracking P1–P5 (60d/50/70/55 · MaxDD) · W2–W4 · snapshot `scripts/thaw_estricto_snapshot.mjs` · **no** Accept estricto aún
+│   ├── traspaso-relevo-thaw-beta-d-2026-08-25.md ← thaw BETA-D CERRADO · ADR-023 Accepted parcial · estricto deuda → runbook
 │   ├── traspaso-relevo-ciclo-8-2-bracket-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 8.2 Bracket thin · CERRADO `73044a7` · growth thin 8.0–8.2 · park plena
 │   ├── plan-ciclo-8-2-bracket-thin-2026-08-25.md ← plan 8.2 · D1–D8 OK · CERRADO en `73044a7`
 │   ├── traspaso-relevo-ciclo-8-1-trail-thin-2026-08-25.md ← histórico · Ciclo 8.1 Trail thin · CERRADO `655832c`
@@ -234,13 +236,13 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 6.  Diseño interno: [estudio-daily-opinion-alarms-design-2026-08-04.md](./estudio-daily-opinion-alarms-design-2026-08-04.md)
 7.  **Asesor UI:** [asesor-ui-2026-08-04.md](./asesor-ui-2026-08-04.md) (ex-Research · tab Opiniones)
 8.  **Pack cierre Estudio/Asesor/Canales:** [audit-pack-estudio-asesor-canales-2026-08-04.md](./audit-pack-estudio-asesor-canales-2026-08-04.md)
-9.  **Thaw AUTO BETA-D:** [camino-d-auto-thaw-checklist-2026-08-04.md](./camino-d-auto-thaw-checklist-2026-08-04.md) · adaptado [`thaw-beta-adapted-remeasure-2026-08-25.md`](./thaw-beta-adapted-remeasure-2026-08-25.md) · estricto FAIL [`thaw-p1-p5-measurement-2026-08-25.md`](./thaw-p1-p5-measurement-2026-08-25.md)
+9.  **Thaw AUTO BETA-D:** [camino-d-auto-thaw-checklist-2026-08-04.md](./camino-d-auto-thaw-checklist-2026-08-04.md) · adaptado [`thaw-beta-adapted-remeasure-2026-08-25.md`](./thaw-beta-adapted-remeasure-2026-08-25.md) · estricto FAIL [`thaw-p1-p5-measurement-2026-08-25.md`](./thaw-p1-p5-measurement-2026-08-25.md) · **deuda estricto** [`deuda-thaw-estricto-runbook-2026-08-25.md`](./deuda-thaw-estricto-runbook-2026-08-25.md) (tracking P1–P5 · W2–W4 · snapshot `scripts/thaw_estricto_snapshot.mjs`)
 10. **Triage institucional pre-AUTO (Aud 1+2):** [audit-ext-institutional-pre-auto-triage-2026-08-04.md](./audit-ext-institutional-pre-auto-triage-2026-08-04.md)
 11. **Risk Engine OR-RE v0:** [risk-engine-or-re-2026-08-04.md](./risk-engine-or-re-2026-08-04.md)
 12. **Fase 0 Decision Spine — F0.1 AS-IS:** [fase0-decision-spine-asis-2026-08-24.md](./fase0-decision-spine-asis-2026-08-24.md) — inventario file:line; cero código
     12b. **Decision Spine cadena (probar, no reescribir):** [decision-spine-cadena-2026-08-24.md](./decision-spine-cadena-2026-08-24.md) · SoT corto [CURRENT_SYSTEM.md](../CURRENT_SYSTEM.md) · `pnpm test:decision-spine`
 13. **OR-lite + Repro+ + Obs/CI:** [or-lite-repro-obs-2026-08-04.md](./or-lite-repro-obs-2026-08-04.md)
-14. **Prep A2–A5 (flag off):** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) Proposed
+14. **Prep A2–A5 + ADR-023 BETA-D:** [camino-d-a2-a5-prep-2026-08-04.md](./camino-d-a2-a5-prep-2026-08-04.md) · [ADR-023](../adr/023-camino-d-thaw.md) **Accepted BETA-D** · estricto deuda [`deuda-thaw-estricto-runbook-2026-08-25.md`](./deuda-thaw-estricto-runbook-2026-08-25.md)
 15. **Pack auditoría prep AUTO:** [audit-pack-pre-auto-a0-a5-2026-08-04.md](./audit-pack-pre-auto-a0-a5-2026-08-04.md) — SEMI OK · execute AUTO **no**
 16. **Resumen operativo diario (R1–R4):** [daily-ops-report-brief-2026-08-04.md](./daily-ops-report-brief-2026-08-04.md) — Diario · HTML email · PDF opt-in
 17. **Auditoría consolidada interna+externas + plan hardening (2026-08-11):** [audit-consolidado-internas-externas-2026-08-11.md](./audit-consolidado-internas-externas-2026-08-11.md) — 4 fuentes cruzadas (interna · externa 1 · externa 2 · externa 3) · mapa P0/P1/P2 · plan F1–F5 · decisiones D0–D5 pactadas · checkpoint git `audit-checkpoint-2026-08-11` · NO tocar código

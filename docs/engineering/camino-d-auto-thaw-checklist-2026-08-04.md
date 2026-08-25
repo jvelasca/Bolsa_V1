@@ -1,6 +1,6 @@
 # Checklist thaw — Camino D / AUTO execute (2026-08-04)
 
-> **Estado:** **THAW BETA-D** · ADR-023 **Accepted** (parcial) · UI AUTO on · `PAPER_D_EXECUTE` **opt-in** (default off) · estricto P1–P5 sigue FAIL.  
+> **Estado:** **THAW BETA-D** · ADR-023 **Accepted** (parcial) · UI AUTO on · `PAPER_D_EXECUTE` **opt-in** (default off) · estricto P1–P5 sigue FAIL — tracking [`deuda-thaw-estricto-runbook-2026-08-25.md`](./deuda-thaw-estricto-runbook-2026-08-25.md).  
 > **AsOf:** 2026-08-25 (adaptado) · medición [`thaw-beta-adapted-remeasure-2026-08-25.md`](./thaw-beta-adapted-remeasure-2026-08-25.md)  
 > **Padres:** [triage §2.3](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [freeze](./post-audit-decision-freeze-2026-08-03.md) · [audit pack canales](./audit-pack-estudio-asesor-canales-2026-08-04.md) · diseño §9  
 > **Regla:** execute AUTO solo con opt-in env + armado UI; no broker; thaw estricto no cerrado.

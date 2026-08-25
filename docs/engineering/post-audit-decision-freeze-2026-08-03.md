@@ -29,7 +29,7 @@ Brief de producto listo para cuando toque reabrir (2026-08-03, **sin implementar
 5. **Revisar esta ficha** solo si aparece: necesidad real de cron 24/7, experimento de costes v2, brief Belief, o thaw AUTO con evidencia (checklist completa).
 6. **Docstrings:** lotes 1–4 cerrados — solo forward-only al tocar código ([estándar](./code-documentation-standard-2026-08-03.md)).
 7. **Auditorías institucionales 2026-08-04 (CTO/OR):** triage [audit-ext-institutional-pre-auto-triage](./audit-ext-institutional-pre-auto-triage-2026-08-04.md) — **no** abrir blockchain ledger / Monte Carlo / OTel / chaos como gate de Camino D; sí A0 + OR-lite.
-8. **Thaw Camino D BETA-D (2026-08-25):** [ADR-023](../adr/023-camino-d-thaw.md) **Accepted — BETA parcial**. Perfil adaptado [`thaw-beta-adapted-remeasure-2026-08-25.md`](./thaw-beta-adapted-remeasure-2026-08-25.md) (P1'–P5' + W2–W4). UI Libro AUTO on; `PAPER_D_EXECUTE` **opt-in local** (default off). **No** broker live. Thaw estricto (60d/50/70/55) sigue deuda.
+8. **Thaw Camino D BETA-D (2026-08-25):** [ADR-023](../adr/023-camino-d-thaw.md) **Accepted — BETA parcial**. Perfil adaptado [`thaw-beta-adapted-remeasure-2026-08-25.md`](./thaw-beta-adapted-remeasure-2026-08-25.md) (P1'–P5' + W2–W4). UI Libro AUTO on; `PAPER_D_EXECUTE` **opt-in local** (default off). **No** broker live. Thaw estricto (60d/50/70/55) sigue deuda — tracking [`deuda-thaw-estricto-runbook-2026-08-25.md`](./deuda-thaw-estricto-runbook-2026-08-25.md).
 
 ## Qué no hacer
 
