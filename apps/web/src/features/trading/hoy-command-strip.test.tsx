@@ -144,4 +144,53 @@ describe("HoyCommandStrip", () => {
     expect(screen.getByText("Sin paquete de decisión")).toBeTruthy();
     expect(screen.getByText("Riesgo/beneficio insuficiente")).toBeTruthy();
   });
+
+  it("Ciclo 5.0: dialog shows Revisar tesis when thesisHealth.status=review", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "WATCH",
+                  quantity: 0,
+                  riskPct: 0,
+                  whyNot: ["entry"],
+                  executionAllowed: false,
+                },
+                thesisHealth: {
+                  hint: "reduce",
+                  status: "review",
+                  why: ["confidence_degraded", "stop_intact"],
+                  confidence: 0.3,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    expect(await screen.findByTestId("hoy-thesis-review")).toBeTruthy();
+    expect(screen.getByText(/Revisar tesis/i)).toBeTruthy();
+    expect(screen.getByText(/reduce · confidence_degraded/i)).toBeTruthy();
+  });
 });

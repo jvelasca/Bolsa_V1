@@ -4,6 +4,7 @@
  * Prefiere un TradePlan vivo cuando el payload ya lo trae; si no, heurística de gate.
  * Ciclo 4.8: Setup thin (entrySetup + phase/effort del anchor) — no whyNot nuevos.
  * Ciclo 4.9: sesiones Board echo tradePlan + anchor → Hoy deja heurística cuando hay plan.
+ * Ciclo 5.0: thesisHealth advisory (Golden F) — ≠ cola REVIEW de EXPIRED.
  */
 
 import type {
@@ -17,6 +18,12 @@ import type {
   TradePlanV1,
   TradePlanWhyNotV1,
 } from "./trade-plan.js";
+import type { ConfidenceHint } from "./confidence-state.js";
+import type {
+  ThesisHealthStatusV1,
+  ThesisHealthV1,
+  ThesisHealthWhyV1,
+} from "./thesis-health.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
@@ -36,6 +43,8 @@ export type HoyQueueItemV1 = {
   gate: string;
   /** Ciclo 4.8 — bloque Setup en el dialog Hoy. */
   setup?: HoySetupEvidenceV1 | null;
+  /** Ciclo 5.0 — advisory; status review ≠ kind REVIEW. */
+  thesisHealth?: ThesisHealthV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -202,6 +211,81 @@ function readSetupFromSession(
   };
 }
 
+const THESIS_HINTS = new Set<ConfidenceHint>([
+  "hold",
+  "tighten",
+  "reduce",
+  "exit",
+  "expire",
+]);
+
+const THESIS_WHYS = new Set<ThesisHealthWhyV1>([
+  "confidence_degraded",
+  "stop_intact",
+  "hard_exit",
+  "expired",
+]);
+
+function asThesisHealth(value: unknown): ThesisHealthV1 | null {
+  if (!isRecord(value)) return null;
+  const hint = value.hint;
+  const status = value.status;
+  if (
+    typeof hint !== "string" ||
+    !THESIS_HINTS.has(hint as ConfidenceHint) ||
+    (status !== "ok" && status !== "review")
+  ) {
+    return null;
+  }
+  const whyRaw = value.why;
+  const why: ThesisHealthWhyV1[] = Array.isArray(whyRaw)
+    ? whyRaw.filter(
+        (code): code is ThesisHealthWhyV1 =>
+          typeof code === "string" &&
+          THESIS_WHYS.has(code as ThesisHealthWhyV1),
+      )
+    : [];
+  const confidence =
+    typeof value.confidence === "number" && Number.isFinite(value.confidence)
+      ? value.confidence
+      : 0;
+  return {
+    hint: hint as ConfidenceHint,
+    status: status as ThesisHealthStatusV1,
+    why,
+    confidence,
+  };
+}
+
+function readThesisHealthFromPayloadish(value: unknown): ThesisHealthV1 | null {
+  if (!isRecord(value)) return null;
+  const top = asThesisHealth(value.thesisHealth);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = asThesisHealth(runtime.thesisHealth);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return asThesisHealth(value.runtime.thesisHealth);
+  }
+  return null;
+}
+
+function readThesisHealthFromF3Row(row: SemiF3ViewV1): ThesisHealthV1 | null {
+  const extra = row.extra;
+  if (isRecord(extra)) {
+    const fromPayload = readThesisHealthFromPayloadish(extra.payload);
+    if (fromPayload) return fromPayload;
+    const fromExtra = asThesisHealth(extra.thesisHealth);
+    if (fromExtra) return fromExtra;
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  return readThesisHealthFromPayloadish(flattened.payload);
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -254,6 +338,7 @@ function toHoyItem(
   live: TradePlanV1 | null,
   heuristicKind: HoyActionKindV1,
   setup: HoySetupEvidenceV1 | null,
+  thesisHealth: ThesisHealthV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -264,6 +349,7 @@ function toHoyItem(
       whyNot: live.whyNot,
       gate,
       setup,
+      thesisHealth,
     };
   }
   return {
@@ -274,6 +360,7 @@ function toHoyItem(
     whyNot: whyNotFromKind(heuristicKind),
     gate,
     setup,
+    thesisHealth,
   };
 }
 
@@ -294,6 +381,7 @@ export function mapDecisionBoardToHoyQueue(
         readTradePlanFromF3Row(row),
         kind,
         readSetupFromF3Row(row),
+        readThesisHealthFromF3Row(row),
       ),
     );
   }
@@ -315,6 +403,7 @@ export function mapDecisionBoardToHoyQueue(
         live,
         kind,
         readSetupFromSession(session, live),
+        asThesisHealth(session.thesisHealth),
       ),
     );
   }

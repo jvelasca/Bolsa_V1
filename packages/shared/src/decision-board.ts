@@ -6,6 +6,7 @@
  */
 
 import type { TradePlanV1 } from "./cognitive/trade-plan.js";
+import type { ThesisHealthV1 } from "./cognitive/thesis-health.js";
 
 export type DecisionGate = "PASS" | "VETO" | "DEFERRED" | "unknown";
 
@@ -31,6 +32,8 @@ export type DecisionSessionViewV1 = {
   tradePlan?: TradePlanV1;
   /** Ciclo 4.9 — echo runtime Setup (phase/effort); no tipado canónico. */
   wyckoffSpringAnchor?: Record<string, unknown>;
+  /** Ciclo 5.0 — Thesis Health advisory (Golden F); ≠ TradePlan.status. */
+  thesisHealth?: ThesisHealthV1 | Record<string, unknown>;
 };
 
 export type SemiF3ViewV1 = {

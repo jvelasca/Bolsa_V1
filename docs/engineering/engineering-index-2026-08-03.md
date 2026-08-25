@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `59cdab6` Ciclo 7 `eef94ec` (spine honesty)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** Ciclo 5.0 Thesis Health (previo stamp `c654c6d` / Ciclo 7)
 │   ├── PROJECT_PREMISES.md
 │   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
 │   ├── rfc/*  (constitución)
@@ -60,7 +60,9 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 7 spine honesty · feat `eef94ec`
+│   ├── traspaso-relevo-ciclo-5-thesis-health-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 5.0 Thesis Health · Golden F
+│   ├── plan-ciclo-5-thesis-health-thin-2026-08-25.md ← plan 5.0 · D1–D8 OK · código listo (pendiente commit)
+│   ├── traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md ← histórico · Ciclo 7 spine honesty · feat `eef94ec`
 │   ├── plan-ciclo-7-spine-honesty-2026-08-25.md ← plan 7 · D1–D8 OK · CERRADO en `eef94ec`
 │   ├── traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md ← histórico · Ciclo 6 Attribution thin · feat `7de91e5`
 │   ├── plan-ciclo-6-attribution-journal-thin-2026-08-25.md ← plan Ciclo 6 · D1–D8 OK · CERRADO en `7de91e5`

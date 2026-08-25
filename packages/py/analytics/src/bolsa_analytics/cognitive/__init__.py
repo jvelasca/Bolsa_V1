@@ -102,6 +102,11 @@ from bolsa_analytics.cognitive.stats_suite import (
     walk_forward_efficiency,
 )
 from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_from_declared
+from bolsa_analytics.cognitive.thesis_health import (
+    THESIS_HEALTH_KEY,
+    build_thesis_health_dict,
+    map_thesis_health,
+)
 from bolsa_analytics.cognitive.trade_plan import (
     TradePlan,
     build_trade_plan,
@@ -196,6 +201,7 @@ __all__ = [
     "build_propose_session",
     "build_trade_plan",
     "build_v0_trade_plan_dict",
+    "build_thesis_health_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
@@ -211,6 +217,7 @@ __all__ = [
     "gate_decision_package",
     "get_policy_template",
     "intent_from_recommendation",
+    "map_thesis_health",
     "monte_carlo_permutation_p_value",
     "new_session_id",
     "observe_investor_profile",
@@ -224,6 +231,7 @@ __all__ = [
     "score_macro_from_facts",
     "suggest_policy_template_from_declared",
     "summarize_session_outcomes",
+    "THESIS_HEALTH_KEY",
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",

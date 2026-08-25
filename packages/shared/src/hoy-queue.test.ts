@@ -159,4 +159,55 @@ describe("mapDecisionBoardToHoyQueue", () => {
       effort: "spring_high_effort",
     });
   });
+
+  it("Ciclo 5.0: surfaces thesisHealth review without changing EXPIRED→REVIEW kind", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-health",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "WATCH",
+              whyNot: ["entry"],
+              structuralStop: 90,
+              entry: 100,
+            }),
+            thesisHealth: {
+              hint: "reduce",
+              status: "review",
+              why: ["confidence_degraded", "stop_intact"],
+              confidence: 0.3,
+            },
+          },
+          {
+            sessionId: "s-expired",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i3",
+            symbol: "TEF",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "EXPIRED",
+              whyNot: ["expired"],
+            }),
+          },
+        ],
+      }),
+    );
+    const health = items.find((i) => i.symbol === "BBVA");
+    const expired = items.find((i) => i.symbol === "TEF");
+    expect(health?.kind).toBe("WATCH");
+    expect(health?.kind).not.toBe("REVIEW");
+    expect(health?.thesisHealth?.status).toBe("review");
+    expect(expired?.kind).toBe("REVIEW");
+    expect(expired?.thesisHealth ?? null).toBeNull();
+  });
 });

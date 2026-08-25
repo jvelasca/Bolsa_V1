@@ -6,7 +6,11 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import type { HoyQueueItemV1, HoySetupEvidenceV1 } from "@bolsa/shared";
+import type {
+  HoyQueueItemV1,
+  HoySetupEvidenceV1,
+  ThesisHealthV1,
+} from "@bolsa/shared";
 import { mapDecisionBoardToHoyQueue } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -61,6 +65,14 @@ function setupLine(setup: HoySetupEvidenceV1): string {
     parts.push(setup.effort.replaceAll("_", " "));
   }
   return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+function thesisHealthLine(health: ThesisHealthV1): string {
+  const parts = [health.hint];
+  if (health.why.length > 0) {
+    parts.push(health.why.join(", "));
+  }
+  return parts.join(" · ");
 }
 
 export function HoyCommandStrip() {
@@ -145,6 +157,16 @@ export function HoyCommandStrip() {
                   Setup
                 </p>
                 <p className="mt-1 text-sm">{setupLine(selected.setup)}</p>
+              </div>
+            ) : null}
+            {selected.thesisHealth?.status === "review" ? (
+              <div className="mt-3" data-testid="hoy-thesis-review">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Revisar tesis
+                </p>
+                <p className="mt-1 text-sm">
+                  {thesisHealthLine(selected.thesisHealth)}
+                </p>
               </div>
             ) : null}
             <div className="mt-3">

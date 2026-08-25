@@ -376,6 +376,8 @@ class DecisionSessionViewDto(BaseModel):
     wyckoff_spring_anchor: dict[str, Any] | None = Field(
         default=None, alias="wyckoffSpringAnchor"
     )
+    # Ciclo 5.0 — Thesis Health advisory thin (sin contract:gen).
+    thesis_health: dict[str, Any] | None = Field(default=None, alias="thesisHealth")
 
 
 class SemiF3ViewDto(BaseModel):

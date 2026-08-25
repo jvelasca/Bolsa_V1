@@ -11,6 +11,10 @@ from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
 )
+from bolsa_analytics.cognitive.thesis_health import (
+    THESIS_HEALTH_KEY,
+    build_thesis_health_dict,
+)
 from bolsa_analytics.cognitive.trade_plan import (
     WYCKOFF_SPRING_ANCHOR_KEY,
     build_v0_trade_plan_dict,
@@ -170,6 +174,8 @@ class ProposeRecommendationResult:
     trade_plan: dict[str, Any] | None = None
     # Ciclo 4.8 — echo thin para F3/Hoy (no TradePlan / no contract:gen).
     wyckoff_spring_anchor: dict[str, Any] | None = None
+    # Ciclo 5.0 — Thesis Health advisory (Golden F); no fill gate.
+    thesis_health: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -197,6 +203,8 @@ class ProposeRecommendationResult:
             data["tradePlan"] = self.trade_plan
         if self.wyckoff_spring_anchor is not None:
             data[WYCKOFF_SPRING_ANCHOR_KEY] = self.wyckoff_spring_anchor
+        if self.thesis_health is not None:
+            data[THESIS_HEALTH_KEY] = self.thesis_health
         return data
 
 
@@ -476,6 +484,33 @@ class ProposeRecommendationFromTa:
             atr=inputs.atr,
             prior=wyckoff_prior,
         )
+        plan_direction = (
+            "long"
+            if str(runtime.package.action) == "recommend_long"
+            else "short"
+            if str(runtime.package.action) == "recommend_short"
+            else "none"
+        )
+        structural_stop_raw = (
+            trade_plan_dict.get("structuralStop")
+            if isinstance(trade_plan_dict, dict)
+            else None
+        )
+        try:
+            structural_stop = (
+                float(structural_stop_raw)
+                if structural_stop_raw is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            structural_stop = None
+        thesis_health = build_thesis_health_dict(
+            confidence=float(runtime.package.overall_confidence),
+            direction=plan_direction,
+            last_close=float(last_close) if last_close is not None else None,
+            structural_stop=structural_stop,
+            hard_exit=str(runtime.package.action) == "exit_hint",
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -514,6 +549,7 @@ class ProposeRecommendationFromTa:
             "lastClose": last_close,
             "predictionsDoNotDecide": True,
             "tradePlan": trade_plan_dict,
+            THESIS_HEALTH_KEY: thesis_health,
         }
         if wyckoff_anchor is not None:
             session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
@@ -584,6 +620,7 @@ class ProposeRecommendationFromTa:
             weight_context=weight_ctx,
             trade_plan=trade_plan_dict,
             wyckoff_spring_anchor=wyckoff_anchor,
+            thesis_health=thesis_health,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:
