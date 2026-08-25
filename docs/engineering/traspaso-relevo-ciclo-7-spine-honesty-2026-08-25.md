@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md`](./traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md).
 > **Plan:** [`plan-ciclo-7-spine-honesty-2026-08-25.md`](./plan-ciclo-7-spine-honesty-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **HEAD:** stamp docs (este commit). Feat `eef94ec` **PUSHEADO** con el push.
+> **HEAD:** `59cdab6` = `origin/main`. Feat `eef94ec` **PUSHEADO**.
 > **Arranque:** este fichero + `CURRENT_SYSTEM.md`.
 
 ---
@@ -27,9 +27,9 @@
 | SHA       | Mensaje                                                      |
 | --------- | ------------------------------------------------------------ |
 | `eef94ec` | feat(spine): ADR-031 Ciclo 7 Composite/ExecuteTrade honesty. |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 7 (`eef94ec`).            |
+| `59cdab6` | docs: stamp living SoT after Ciclo 7 (`eef94ec`).            |
 
-Push: `9156a2e..` → `origin/main` (incl. update-last).
+Push: `9156a2e..59cdab6` → `origin/main` (luego update-last).
 
 ## 4. E1
 

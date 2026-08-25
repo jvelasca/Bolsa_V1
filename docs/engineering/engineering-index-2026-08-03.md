@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** Ciclo 7 `eef94ec` (spine honesty)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `59cdab6` Ciclo 7 `eef94ec` (spine honesty)
 │   ├── PROJECT_PREMISES.md
 │   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
 │   ├── rfc/*  (constitución)

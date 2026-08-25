@@ -1,8 +1,8 @@
 # Plan — Ciclo 7 Spine honesty (Composite stub + ExecuteTrade map)
 
 > **Padre:** ADR-031 · relevo [`traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md`](./traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md) · síntesis E1 2026-08-25 (dual ExecuteTrade park · portfolioConstraints ship-now).
-> **AsOf:** 2026-08-25 · feat **`eef94ec`**; D1–D8 **OK**.
-> **Estado:** **CERRADO** en `eef94ec`.
+> **AsOf:** 2026-08-25 · HEAD **`59cdab6`** = `origin/main`; feat **`eef94ec`**.
+> **Estado:** **CERRADO en origin** (`eef94ec` vía `59cdab6`).
 > **Método:** higiene docs + copy UI; Ranking ≠ BUY; sin money path; sin `contract:gen`.
 
 ---
