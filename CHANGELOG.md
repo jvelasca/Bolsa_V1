@@ -6,7 +6,7 @@ All notable releases of Bolsa V1.
 
 ## [1.8.1-beta] — 2026-08-25
 
-Operational Consolidation post-`v1.8.0-beta`. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.1-beta`** (SHA pin en living SoT). Partida: **`v1.8.0-beta` → `8c8b789`**. Spine battery **`pnpm test:decision-spine` = 161**. Pack: [`audit-pack-estado-global-2026-08-25-v181.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v181.md). **No** módulos thin nuevos. **No** PositionState/ExecutionPlan (ADR-032 docs-only).
+Operational Consolidation post-`v1.8.0-beta`. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.1-beta` → `e78fbb9`**. Partida: **`v1.8.0-beta` → `8c8b789`**. Spine battery **`pnpm test:decision-spine` = 161**. Pack: [`audit-pack-estado-global-2026-08-25-v181.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v181.md). **No** módulos thin nuevos. **No** PositionState/ExecutionPlan (ADR-032 docs-only).
 
 ### Ciclo C4 — TradePlan shape canónico
 

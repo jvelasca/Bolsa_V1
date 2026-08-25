@@ -13,13 +13,13 @@
 
 ## 1. Release
 
-| Pieza        | Valor                                              |
-| ------------ | -------------------------------------------------- |
-| Tag          | `v1.8.1-beta` → _(SHA pin tras commit de release)_ |
-| Previo       | `v1.8.0-beta` → `8c8b789`                          |
-| Pack auditor | `audit-pack-estado-global-2026-08-25-v181.md`      |
-| Spine        | `pnpm test:decision-spine` **161**                 |
-| Shared       | `@bolsa/shared` **84**                             |
+| Pieza        | Valor                                         |
+| ------------ | --------------------------------------------- |
+| Tag          | `v1.8.1-beta` → `e78fbb9`                     |
+| Previo       | `v1.8.0-beta` → `8c8b789`                     |
+| Pack auditor | `audit-pack-estado-global-2026-08-25-v181.md` |
+| Spine        | `pnpm test:decision-spine` **161**            |
+| Shared       | `@bolsa/shared` **84**                        |
 
 ## 2. Freeze
 
