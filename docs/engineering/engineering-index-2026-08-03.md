@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `9289b53` · feat RX1 `9289b53` · I3 `26901aa` · origin `05e354c` · I1–I3 + RX1 exits honesty
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `26ecd29` · feat RX1 `9289b53` · I3 `26901aa` · origin `05e354c` · I1–I3 + RX1 exits honesty
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md

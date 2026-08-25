@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md`](./traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md).
 > **Plan:** [`plan-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md`](./plan-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD origin:** `05e354c`. Feat RX1 **`9289b53`** (local, no push).
+> **HEAD origin:** `05e354c`. Feat RX1 **`9289b53`** · stamp **`26ecd29`** (local, no push).
 > **Estado:** **CERRADO en `9289b53`.** Residual I3 D4 park → honesty. **No** thaw · **no** I4 · **no** auto-exit producto.
 > **Fase:** **integridad residual**. **No** flip `PAPER_D_EXECUTE`.
 
@@ -35,7 +35,7 @@
 | SHA       | Mensaje                                                           |
 | --------- | ----------------------------------------------------------------- |
 | `9289b53` | feat(spine): ADR-031 Ciclo RX1 exits full_auto honesty (no thaw). |
-| _(docs)_  | stamp SoT                                                         |
+| `26ecd29` | docs: stamp living SoT after Ciclo RX1 (`9289b53`).               |
 
 **No push** salvo decisión explícita.
 
