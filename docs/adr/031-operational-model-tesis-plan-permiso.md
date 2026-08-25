@@ -122,6 +122,8 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 8.0 Expectancy thin (cerrado `cf880eb`):** mapper → `runtime.expectancy` · live proxy setup+`currentR` · Hoy «Expectativa» · **≠ permiso** · **sin** trail/bracket · **sin** journal histórica · `check_opening` intacto.
 
+**Ciclo 8.1 Trail thin (cerrado `655832c`):** mapper → `runtime.trailPlan` · ratchet peakMfeR−1R · tip@1.5R / ratchet≥2R · Hoy «Trail» · **hint only** · alinea Exit Radar tip · **sin** mutar `structuralStop` · **sin** broker · **sin** EvaluatePositionExits · `check_opening` intacto.
+
 **Ciclo I1 ExecuteTrade converge (cerrado `2bd5cd8`):** `allow_opening_fill` compartido Confirm + Fill + HTTP. `POST /portfolio/trade` buy → `check_opening` (403 `risk_veto`); sell skip. Router AUTO no fusionado. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
 **Ciclo I2 Actionability/IO (cerrado `e31840d`):** fórmula `compute_indice_operativo` + echo `indiceOperativo` en chip Composite. Rank Estudio sigue cliente. IO ≠ permiso. `TradePlan.actionability` intacta. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
@@ -133,14 +135,14 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
-- Trailing continuo broker (**Ciclo 8.1 parked**), bracket / T1 parcial fill (**Ciclo 8.2 parked**)
+- Trailing **plena** broker / mutar stop (tras **Ciclo 8.1 thin**), bracket / T1 parcial fill (**Ciclo 8.2 parked**)
 - Thesis Health **plena** (persistencia Confidence lifecycle cableada)
 - Expectancy **plena** por setup (journal/fills aggregate; thin = **8.0**)
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 
-Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · Actionability TradePlan es server · fórmula IO es server (chip) · rank Estudio puede seguir en cliente · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect / Exit Radar / MFE-MAE / Expectancy thin ≠ permiso.
+Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · Actionability TradePlan es server · fórmula IO es server (chip) · rank Estudio puede seguir en cliente · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect / Exit Radar / MFE-MAE / Expectancy / Trail thin ≠ permiso.
 
 ---
 

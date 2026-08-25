@@ -2,7 +2,7 @@
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §6 · roadmap [`roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md`](./roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md) · relevo [`traspaso-relevo-ciclo-8-0-expectancy-thin-2026-08-25.md`](./traspaso-relevo-ciclo-8-0-expectancy-thin-2026-08-25.md) §4 E1.
 > **AsOf:** 2026-08-25.
-> **Estado:** **CERRADO** (D1–D8 OK) · batería **155**.
+> **Estado:** **CERRADO** (D1–D8 OK) · feat `655832c` · batería **155**.
 > **Método:** espejo 5.1 Protect / 5.2 Exit Radar / 8.0 Expectancy; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; **sin** mutar stop; **sin** broker trail; **sin** EvaluatePositionExits; **sin** thaw.
 > **Elección thin:** trail **continuo advisory** = ratchet de `suggestedTrailStop` desde peak MFE (cushion 1R). Exit Radar 5.2 tip @ 1.5R (= entry±0.5R) se **alinea**, no se duplica como segunda tip fija. Mutación broker / `structuralStop` = **fuera** (plena / 8.1 plena parked).
 
