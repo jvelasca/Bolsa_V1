@@ -459,4 +459,68 @@ describe("HoyCommandStrip", () => {
     expect(trail.textContent).toMatch(/ratchet/i);
     expect(trail.textContent).toMatch(/hint only/i);
   });
+
+  it("Ciclo 8.2: dialog shows Bracket when bracketPlan.status!=none", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                },
+                bracketPlan: {
+                  status: "picture",
+                  entry: 100,
+                  stop: 90,
+                  target1: 110,
+                  target2: 120,
+                  target1R: 1,
+                  target2R: 2,
+                  legT1QtyFrac: 0.5,
+                  legT2QtyFrac: 0.5,
+                  why: [
+                    "aligned_protect_t1",
+                    "display_only",
+                    "not_permission",
+                    "hint_only",
+                    "no_broker_oco",
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const bracket = await screen.findByTestId("hoy-bracket-plan");
+    expect(bracket).toBeTruthy();
+    expect(bracket.textContent).toMatch(/Bracket/i);
+    expect(bracket.textContent).toMatch(/T1 110/);
+    expect(bracket.textContent).toMatch(/T2 120/);
+    expect(bracket.textContent).toMatch(/display only/i);
+  });
 });

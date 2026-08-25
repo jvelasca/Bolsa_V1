@@ -251,6 +251,21 @@ def extract_session_trail_plan(
     return None
 
 
+def extract_session_bracket_plan(
+    payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Lee ``runtime.bracketPlan`` (Ciclo 8.2 advisory). Sin inventar."""
+    runtime = _session_runtime(payload)
+    if runtime is None:
+        return None
+    raw = runtime.get("bracketPlan")
+    if not isinstance(raw, dict):
+        raw = runtime.get("bracket_plan")
+    if isinstance(raw, dict) and raw:
+        return dict(raw)
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class DecisionSessionView:
     """Una sesión de decisión reciente expuesta en el tablero."""
@@ -271,6 +286,7 @@ class DecisionSessionView:
     mfe_mae: dict[str, Any] | None = None
     expectancy: dict[str, Any] | None = None
     trail_plan: dict[str, Any] | None = None
+    bracket_plan: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -299,6 +315,8 @@ class DecisionSessionView:
             data["expectancy"] = self.expectancy
         if self.trail_plan is not None:
             data["trailPlan"] = self.trail_plan
+        if self.bracket_plan is not None:
+            data["bracketPlan"] = self.bracket_plan
         return data
 
 
@@ -469,6 +487,7 @@ class GetDecisionBoard:
                     mfe_mae=extract_session_mfe_mae(rec.payload),
                     expectancy=extract_session_expectancy(rec.payload),
                     trail_plan=extract_session_trail_plan(rec.payload),
+                    bracket_plan=extract_session_bracket_plan(rec.payload),
                 )
             )
 

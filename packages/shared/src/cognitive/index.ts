@@ -23,6 +23,7 @@ export * from "./exit-radar.js";
 export * from "./mfe-mae.js";
 export * from "./expectancy.js";
 export * from "./trail-plan.js";
+export * from "./bracket-plan.js";
 export * from "./effectiveness.js";
 export * from "./observe-profile.js";
 export * from "./recommendation.js";

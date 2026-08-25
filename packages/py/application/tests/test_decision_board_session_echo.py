@@ -9,6 +9,7 @@ from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 from bolsa_application.decision_board import (
     GetDecisionBoard,
+    extract_session_bracket_plan,
     extract_session_exit_radar,
     extract_session_expectancy,
     extract_session_mfe_mae,
@@ -122,6 +123,24 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
         "trailDistanceR": 1.0,
         "why": ["not_permission", "hint_only", "ratchet_lock"],
     }
+    bracket_plan = {
+        "status": "picture",
+        "entry": 100.0,
+        "stop": 90.0,
+        "target1": 110.0,
+        "target2": 120.0,
+        "target1R": 1.0,
+        "target2R": 2.0,
+        "legT1QtyFrac": 0.5,
+        "legT2QtyFrac": 0.5,
+        "why": [
+            "aligned_protect_t1",
+            "display_only",
+            "not_permission",
+            "hint_only",
+            "no_broker_oco",
+        ],
+    }
     sessions = [
         _session(
             session_id="s-plan",
@@ -136,6 +155,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
                     "mfeMae": mfe_mae,
                     "expectancy": expectancy,
                     "trailPlan": trail_plan,
+                    "bracketPlan": bracket_plan,
                 },
             },
         ),
@@ -158,6 +178,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert by_id["s-plan"].mfe_mae == mfe_mae
     assert by_id["s-plan"].expectancy == expectancy
     assert by_id["s-plan"].trail_plan == trail_plan
+    assert by_id["s-plan"].bracket_plan == bracket_plan
     dumped = by_id["s-plan"].to_dict()
     assert dumped["tradePlan"]["status"] == "BLOCKED"
     assert dumped["wyckoffSpringAnchor"]["phase"] == "lps"
@@ -167,6 +188,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert dumped["mfeMae"]["status"] == "favorable"
     assert dumped["expectancy"]["status"] == "thin"
     assert dumped["trailPlan"]["status"] == "ratchet"
+    assert dumped["bracketPlan"]["status"] == "picture"
     assert "tradePlan" not in by_id["s-empty"].to_dict()
     assert "wyckoffSpringAnchor" not in by_id["s-empty"].to_dict()
     assert "thesisHealth" not in by_id["s-empty"].to_dict()
@@ -175,6 +197,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert "mfeMae" not in by_id["s-empty"].to_dict()
     assert "expectancy" not in by_id["s-empty"].to_dict()
     assert "trailPlan" not in by_id["s-empty"].to_dict()
+    assert "bracketPlan" not in by_id["s-empty"].to_dict()
 
 
 def test_extract_session_trade_plan_helpers() -> None:
@@ -205,3 +228,14 @@ def test_extract_session_trade_plan_helpers() -> None:
     assert extract_session_trail_plan(
         {"runtime": {"trail_plan": {"status": "tip", "lockedR": 0.5}}}
     ) == {"status": "tip", "lockedR": 0.5}
+    assert extract_session_bracket_plan(
+        {
+            "runtime": {
+                "bracket_plan": {
+                    "status": "picture",
+                    "target1": 110.0,
+                    "target2": 120.0,
+                }
+            }
+        }
+    ) == {"status": "picture", "target1": 110.0, "target2": 120.0}

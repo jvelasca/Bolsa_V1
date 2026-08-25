@@ -10,6 +10,7 @@
  * Ciclo 5.3: mfeMae metrics — no CTA / no expectancy plena.
  * Ciclo 8.0: expectancy thin advisory — ≠ permiso / no auto-exit.
  * Ciclo 8.1: trailPlan advisory ratchet — hint only / no stop mutate.
+ * Ciclo 8.2: bracketPlan advisory picture — display only / no OCO.
  */
 
 import type {
@@ -50,6 +51,11 @@ import type {
   TrailPlanV1,
   TrailPlanWhyV1,
 } from "./trail-plan.js";
+import type {
+  BracketPlanStatusV1,
+  BracketPlanV1,
+  BracketPlanWhyV1,
+} from "./bracket-plan.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
@@ -81,6 +87,8 @@ export type HoyQueueItemV1 = {
   expectancy?: ExpectancyV1 | null;
   /** Ciclo 8.1 — Trail thin ratchet (hint only). */
   trailPlan?: TrailPlanV1 | null;
+  /** Ciclo 8.2 — Bracket thin picture (display only). */
+  bracketPlan?: BracketPlanV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -691,6 +699,80 @@ function readTrailPlanFromF3Row(row: SemiF3ViewV1): TrailPlanV1 | null {
   return readTrailPlanFromPayloadish(flattened.payload);
 }
 
+const BRACKET_PLAN_STATUSES = new Set<BracketPlanStatusV1>(["none", "picture"]);
+const BRACKET_PLAN_WHYS = new Set<BracketPlanWhyV1>([
+  "missing_inputs",
+  "aligned_protect_t1",
+  "display_only",
+  "not_permission",
+  "hint_only",
+  "no_broker_oco",
+]);
+
+function asBracketPlan(value: unknown): BracketPlanV1 | null {
+  if (!isRecord(value)) return null;
+  const status = value.status;
+  if (
+    typeof status !== "string" ||
+    !BRACKET_PLAN_STATUSES.has(status as BracketPlanStatusV1)
+  ) {
+    return null;
+  }
+  const whyRaw = value.why;
+  const why: BracketPlanWhyV1[] = Array.isArray(whyRaw)
+    ? whyRaw.filter(
+        (code): code is BracketPlanWhyV1 =>
+          typeof code === "string" &&
+          BRACKET_PLAN_WHYS.has(code as BracketPlanWhyV1),
+      )
+    : [];
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const t1r = value.target1R;
+  const t2r = value.target2R;
+  return {
+    status: status as BracketPlanStatusV1,
+    entry: numOrNull(value.entry),
+    stop: numOrNull(value.stop),
+    target1: numOrNull(value.target1),
+    target2: numOrNull(value.target2),
+    target1R: typeof t1r === "number" && Number.isFinite(t1r) ? t1r : 1,
+    target2R: typeof t2r === "number" && Number.isFinite(t2r) ? t2r : 2,
+    legT1QtyFrac: numOrNull(value.legT1QtyFrac),
+    legT2QtyFrac: numOrNull(value.legT2QtyFrac),
+    why,
+  };
+}
+
+function readBracketPlanFromPayloadish(value: unknown): BracketPlanV1 | null {
+  if (!isRecord(value)) return null;
+  const top = asBracketPlan(value.bracketPlan);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = asBracketPlan(runtime.bracketPlan);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return asBracketPlan(value.runtime.bracketPlan);
+  }
+  return null;
+}
+
+function readBracketPlanFromF3Row(row: SemiF3ViewV1): BracketPlanV1 | null {
+  const extra = row.extra;
+  if (isRecord(extra)) {
+    const fromPayload = readBracketPlanFromPayloadish(extra.payload);
+    if (fromPayload) return fromPayload;
+    const fromExtra = asBracketPlan(extra.bracketPlan);
+    if (fromExtra) return fromExtra;
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  return readBracketPlanFromPayloadish(flattened.payload);
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -749,6 +831,7 @@ function toHoyItem(
   mfeMae: MfeMaeV1 | null,
   expectancy: ExpectancyV1 | null,
   trailPlan: TrailPlanV1 | null,
+  bracketPlan: BracketPlanV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -765,6 +848,7 @@ function toHoyItem(
       mfeMae,
       expectancy,
       trailPlan,
+      bracketPlan,
     };
   }
   return {
@@ -781,6 +865,7 @@ function toHoyItem(
     mfeMae,
     expectancy,
     trailPlan,
+    bracketPlan,
   };
 }
 
@@ -807,6 +892,7 @@ export function mapDecisionBoardToHoyQueue(
         readMfeMaeFromF3Row(row),
         readExpectancyFromF3Row(row),
         readTrailPlanFromF3Row(row),
+        readBracketPlanFromF3Row(row),
       ),
     );
   }
@@ -834,6 +920,7 @@ export function mapDecisionBoardToHoyQueue(
         asMfeMae(session.mfeMae),
         asExpectancy(session.expectancy),
         asTrailPlan(session.trailPlan),
+        asBracketPlan(session.bracketPlan),
       ),
     );
   }

@@ -388,6 +388,8 @@ class DecisionSessionViewDto(BaseModel):
     expectancy: dict[str, Any] | None = Field(default=None, alias="expectancy")
     # Ciclo 8.1 — Trail thin advisory ratchet (hint only).
     trail_plan: dict[str, Any] | None = Field(default=None, alias="trailPlan")
+    # Ciclo 8.2 — Bracket thin advisory picture (display only).
+    bracket_plan: dict[str, Any] | None = Field(default=None, alias="bracketPlan")
 
 
 class SemiF3ViewDto(BaseModel):

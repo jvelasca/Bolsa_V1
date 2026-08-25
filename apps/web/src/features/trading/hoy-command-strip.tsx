@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type {
+  BracketPlanV1,
   ExitRadarV1,
   ExpectancyV1,
   HoyQueueItemV1,
@@ -136,6 +137,21 @@ function trailPlanLine(plan: TrailPlanV1): string {
   return parts.join(" · ");
 }
 
+function bracketPlanLine(plan: BracketPlanV1): string {
+  const parts: string[] = [];
+  if (plan.entry != null) parts.push(`entry ${plan.entry}`);
+  if (plan.stop != null) parts.push(`stop ${plan.stop}`);
+  if (plan.target1 != null) parts.push(`T1 ${plan.target1}`);
+  if (plan.target2 != null) parts.push(`T2 ${plan.target2}`);
+  if (plan.legT1QtyFrac != null && plan.legT2QtyFrac != null) {
+    parts.push(
+      `legs ${Math.round(plan.legT1QtyFrac * 100)}/${Math.round(plan.legT2QtyFrac * 100)}`,
+    );
+  }
+  parts.push("display only");
+  return parts.length > 1 ? parts.join(" · ") : "—";
+}
+
 export function HoyCommandStrip() {
   const { effectiveAccountId } = useActiveAccount();
   const [selected, setSelected] = useState<HoyQueueItemV1 | null>(null);
@@ -247,6 +263,16 @@ export function HoyCommandStrip() {
                 </p>
                 <p className="mt-1 text-sm tabular-nums">
                   {trailPlanLine(selected.trailPlan)}
+                </p>
+              </div>
+            ) : null}
+            {selected.bracketPlan && selected.bracketPlan.status !== "none" ? (
+              <div className="mt-3" data-testid="hoy-bracket-plan">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Bracket
+                </p>
+                <p className="mt-1 text-sm tabular-nums">
+                  {bracketPlanLine(selected.bracketPlan)}
                 </p>
               </div>
             ) : null}

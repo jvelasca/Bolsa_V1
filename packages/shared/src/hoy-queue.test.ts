@@ -404,4 +404,54 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.trailPlan?.suggestedTrailStop).toBe(115);
     expect(items[0]?.trailPlan?.lockedR).toBe(1.5);
   });
+
+  it("Ciclo 8.2: surfaces bracketPlan picture without changing kind", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-bracket",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i3",
+            symbol: "SAN",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              entry: 100,
+              structuralStop: 90,
+              executionAllowed: true,
+            }),
+            bracketPlan: {
+              status: "picture",
+              entry: 100,
+              stop: 90,
+              target1: 110,
+              target2: 120,
+              target1R: 1,
+              target2R: 2,
+              legT1QtyFrac: 0.5,
+              legT2QtyFrac: 0.5,
+              why: [
+                "aligned_protect_t1",
+                "display_only",
+                "not_permission",
+                "hint_only",
+                "no_broker_oco",
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("BUY");
+    expect(items[0]?.bracketPlan?.status).toBe("picture");
+    expect(items[0]?.bracketPlan?.target1).toBe(110);
+    expect(items[0]?.bracketPlan?.target2).toBe(120);
+    expect(items[0]?.bracketPlan?.legT1QtyFrac).toBe(0.5);
+  });
 });

@@ -145,6 +145,11 @@ from bolsa_analytics.cognitive.trading_policy_templates import (
     POLICY_TEMPLATES,
     get_policy_template,
 )
+from bolsa_analytics.cognitive.bracket_plan import (
+    BRACKET_PLAN_KEY,
+    build_bracket_plan_dict,
+    map_bracket_plan,
+)
 from bolsa_analytics.cognitive.trail_plan import (
     TRAIL_PLAN_KEY,
     build_trail_plan_dict,
@@ -232,6 +237,7 @@ __all__ = [
     "build_mfe_mae_dict",
     "build_expectancy_dict",
     "build_trail_plan_dict",
+    "build_bracket_plan_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
@@ -253,6 +259,7 @@ __all__ = [
     "map_mfe_mae",
     "map_expectancy",
     "map_trail_plan",
+    "map_bracket_plan",
     "monte_carlo_permutation_p_value",
     "new_session_id",
     "observe_investor_profile",
@@ -272,6 +279,7 @@ __all__ = [
     "MFE_MAE_KEY",
     "EXPECTANCY_KEY",
     "TRAIL_PLAN_KEY",
+    "BRACKET_PLAN_KEY",
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",

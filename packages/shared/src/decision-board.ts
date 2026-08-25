@@ -12,6 +12,7 @@ import type { ExitRadarV1 } from "./cognitive/exit-radar.js";
 import type { MfeMaeV1 } from "./cognitive/mfe-mae.js";
 import type { ExpectancyV1 } from "./cognitive/expectancy.js";
 import type { TrailPlanV1 } from "./cognitive/trail-plan.js";
+import type { BracketPlanV1 } from "./cognitive/bracket-plan.js";
 
 export type DecisionGate = "PASS" | "VETO" | "DEFERRED" | "unknown";
 
@@ -49,6 +50,8 @@ export type DecisionSessionViewV1 = {
   expectancy?: ExpectancyV1 | Record<string, unknown>;
   /** Ciclo 8.1 — Trail thin advisory ratchet; hint only; no stop mutate. */
   trailPlan?: TrailPlanV1 | Record<string, unknown>;
+  /** Ciclo 8.2 — Bracket thin advisory picture; display only; no OCO. */
+  bracketPlan?: BracketPlanV1 | Record<string, unknown>;
 };
 
 export type SemiF3ViewV1 = {

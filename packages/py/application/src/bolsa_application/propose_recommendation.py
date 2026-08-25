@@ -41,6 +41,10 @@ from bolsa_analytics.cognitive.trail_plan import (
     TRAIL_PLAN_KEY,
     build_trail_plan_dict,
 )
+from bolsa_analytics.cognitive.bracket_plan import (
+    BRACKET_PLAN_KEY,
+    build_bracket_plan_dict,
+)
 from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_analytics.indicators.compute import OhlcvBar
@@ -206,6 +210,8 @@ class ProposeRecommendationResult:
     expectancy: dict[str, Any] | None = None
     # Ciclo 8.1 — Trail thin advisory ratchet; hint only; no stop mutate.
     trail_plan: dict[str, Any] | None = None
+    # Ciclo 8.2 — Bracket thin advisory picture; display only; no OCO.
+    bracket_plan: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -245,6 +251,8 @@ class ProposeRecommendationResult:
             data[EXPECTANCY_KEY] = self.expectancy
         if self.trail_plan is not None:
             data[TRAIL_PLAN_KEY] = self.trail_plan
+        if self.bracket_plan is not None:
+            data[BRACKET_PLAN_KEY] = self.bracket_plan
         return data
 
 
@@ -632,6 +640,11 @@ class ProposeRecommendationFromTa:
             peak_mfe_r=peak_mfe_r,
             current_r=current_r,
         )
+        bracket_plan = build_bracket_plan_dict(
+            direction=plan_direction,
+            entry=entry_px,
+            structural_stop=structural_stop,
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -676,6 +689,7 @@ class ProposeRecommendationFromTa:
             MFE_MAE_KEY: mfe_mae,
             EXPECTANCY_KEY: expectancy,
             TRAIL_PLAN_KEY: trail_plan,
+            BRACKET_PLAN_KEY: bracket_plan,
         }
         if wyckoff_anchor is not None:
             session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
@@ -752,6 +766,7 @@ class ProposeRecommendationFromTa:
             mfe_mae=mfe_mae,
             expectancy=expectancy,
             trail_plan=trail_plan,
+            bracket_plan=bracket_plan,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:
