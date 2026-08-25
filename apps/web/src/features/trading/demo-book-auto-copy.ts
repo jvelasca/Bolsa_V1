@@ -14,15 +14,15 @@ export const DEMO_BOOK_AUTO_UNAVAILABLE_LABEL = "No disponible";
 
 /** Tooltip de mesa — AUTO DEMO condicionado. */
 export const DEMO_BOOK_AUTO_TOOLTIP =
-  "AUTO DEMO (BETA-D): requiere armado local + PAPER_D_EXECUTE=1 en API. SEMI = firma humana.";
+  "AUTO DEMO (BETA-D): escribe «ACTIVAR AUTO» para armar; execute solo con PAPER_D_EXECUTE=1. SEMI = firma humana.";
 
 /** Líneas de riesgo del panel. */
 export const DEMO_BOOK_AUTO_RISK_LINES = [
   "AUTO DEMO es thaw parcial (ADR-023 BETA-D): no broker live.",
-  "Execute solo con PAPER_D_EXECUTE=1 + Gate / kill switch.",
+  "Armado UI (frase ACTIVAR AUTO) obligatorio; execute solo con PAPER_D_EXECUTE=1 + Gate / kill switch.",
   "Sin claim de precisión Estudio (P3'/P4' diferidos).",
 ] as const;
 
 /** Pie del panel Config operativa. */
 export const DEMO_BOOK_AUTO_FOOTER =
-  "SEMI = Confirm humano. AUTO = DEMO BETA-D (flag + armado).";
+  "SEMI = Confirm humano. AUTO = armar con «ACTIVAR AUTO» + PAPER_D_EXECUTE=1 (BETA-D).";

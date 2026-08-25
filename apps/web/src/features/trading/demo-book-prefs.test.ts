@@ -1,14 +1,25 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
+  AUTO_ARM_CONFIRM_PHRASE,
+  tryArmAuto,
+} from "@/features/trading/demo-book-auto-arm";
+import {
+  DEMO_BOOK_PREFS_KEY,
   defaultDemoBookPrefs,
   demoBookAllowsEnqueueConfirm,
   demoBookAllowsExecute,
   demoBookRequiresEstudioMembership,
+  loadDemoBookPrefs,
   normalizeDemoBookPrefs,
+  patchDemoBookPrefs,
   suggestQuantityFromCash,
 } from "@/features/trading/demo-book-prefs";
 
 describe("demo-book-prefs", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it("defaults to SEMI with 10 positions and 10% size", () => {
     const d = defaultDemoBookPrefs();
     expect(d.mode).toBe("semi");
@@ -27,9 +38,29 @@ describe("demo-book-prefs", () => {
     expect(n.defaultSizePctOfCash).toBe(1);
   });
 
-  it("A1: coerces stored auto → semi while AUTO UI disabled", () => {
+  it("A3-wire: coerces stored auto → semi when not armed", () => {
     const n = normalizeDemoBookPrefs({ mode: "auto" });
     expect(n.mode).toBe("semi");
+  });
+
+  it("A3-wire: patch auto without arm stays semi", () => {
+    const next = patchDemoBookPrefs({ mode: "auto" });
+    expect(next.mode).toBe("semi");
+    expect(loadDemoBookPrefs().mode).toBe("semi");
+  });
+
+  it("A3-wire: exact phrase arms then auto persists; leave auto disarms", () => {
+    expect(tryArmAuto(AUTO_ARM_CONFIRM_PHRASE).ok).toBe(true);
+    const armed = patchDemoBookPrefs({ mode: "auto" });
+    expect(armed.mode).toBe("auto");
+    expect(JSON.parse(localStorage.getItem(DEMO_BOOK_PREFS_KEY)!).mode).toBe(
+      "auto",
+    );
+
+    const back = patchDemoBookPrefs({ mode: "semi" });
+    expect(back.mode).toBe("semi");
+    // Leaving auto clears arm; re-patch auto without re-arm must fail closed.
+    expect(patchDemoBookPrefs({ mode: "auto" }).mode).toBe("semi");
   });
 
   it("gates enqueue / execute by mode", () => {

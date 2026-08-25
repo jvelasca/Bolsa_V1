@@ -1,17 +1,20 @@
 /**
- * Preferencias del libro operativo de la cuenta activa DEMO — MANUAL / SEMI (/ AUTO reserved).
+ * Preferencias del libro operativo de la cuenta activa DEMO — MANUAL / SEMI / AUTO.
  *
- * Slice 1 + A1: localStorage. Canal de ejecución SEMI = Camino C (F3 Confirm).
- * AUTO no es seleccionable en UI (`DEMO_BOOK_AUTO_UI_ENABLED`); si llega `mode: auto`
- * en storage se coacciona a SEMI hasta thaw.
- * UI: panel Operativa → Configuración (cabecera muestra el modo; título = nombre de cuenta).
+ * Slice 1 + A1 + A3-wire: localStorage. Canal SEMI = Camino C (F3 Confirm).
+ * AUTO (BETA-D): UI on solo si `DEMO_BOOK_AUTO_UI_ENABLED` **y** armado local A3
+ * (`loadAutoArm().armed`). Sin armado, `mode: auto` en storage se coacciona a SEMI.
+ * Execute sigue detrás de `PAPER_D_EXECUTE` (server); arm ≠ execute.
  *
  * @see docs/engineering/demo-operating-modes-brief-2026-08-03.md
- * @see docs/engineering/semi-demo-book-impl-slice1-2026-08-03.md
- * @see docs/engineering/trading-operativa-panel-2026-08-04.md
- * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A1
+ * @see docs/engineering/plan-ciclo-a3-wire-auto-arm-ui-2026-08-25.md
+ * @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md §3 A3
  */
 
+import {
+  loadAutoArm,
+  disarmAutoArm,
+} from "@/features/trading/demo-book-auto-arm";
 import { DEMO_BOOK_AUTO_UI_ENABLED } from "@/features/trading/demo-book-auto-copy";
 
 export const DEMO_BOOK_PREFS_KEY = "bolsa-demo-book-prefs-v1";
@@ -63,9 +66,10 @@ export function normalizeDemoBookPrefs(raw: unknown): DemoBookPrefs {
     o.mode === "manual" || o.mode === "semi" || o.mode === "auto"
       ? o.mode
       : d.mode;
-  // A1: no persistir AUTO seleccionable hasta DEMO_BOOK_AUTO_UI_ENABLED.
+  // A1 + A3-wire: AUTO solo si UI flag on **y** armado local.
+  const autoAllowed = DEMO_BOOK_AUTO_UI_ENABLED && loadAutoArm().armed === true;
   const mode: DemoBookMode =
-    modeRaw === "auto" && !DEMO_BOOK_AUTO_UI_ENABLED ? "semi" : modeRaw;
+    modeRaw === "auto" && !autoAllowed ? "semi" : modeRaw;
   const countryPrefer: DemoBookCountryPrefer =
     o.countryPrefer === "home_first" ||
     o.countryPrefer === "europe_first" ||
@@ -141,7 +145,12 @@ export function saveDemoBookPrefs(prefs: DemoBookPrefs): void {
 export function patchDemoBookPrefs(
   patch: Partial<DemoBookPrefs>,
 ): DemoBookPrefs {
-  const next = normalizeDemoBookPrefs({ ...loadDemoBookPrefs(), ...patch });
+  const current = loadDemoBookPrefs();
+  const next = normalizeDemoBookPrefs({ ...current, ...patch });
+  // D3: salir de Auto desarma el armado local (no deja armed huérfano).
+  if (current.mode === "auto" && next.mode !== "auto") {
+    disarmAutoArm();
+  }
   saveDemoBookPrefs(next);
   return next;
 }

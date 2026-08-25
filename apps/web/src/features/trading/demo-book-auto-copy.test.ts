@@ -15,7 +15,8 @@ describe("demo-book-auto-copy (ADR-023 BETA-D thaw)", () => {
   it("exposes conditional DEMO AUTO copy with execute gate jargon", () => {
     expect(DEMO_BOOK_AUTO_UNAVAILABLE_LABEL).toMatch(/No disponible/);
     expect(DEMO_BOOK_AUTO_TOOLTIP).toMatch(/PAPER_D_EXECUTE/);
-    expect(DEMO_BOOK_AUTO_FOOTER).toMatch(/BETA-D|AUTO/);
+    expect(DEMO_BOOK_AUTO_TOOLTIP).toMatch(/ACTIVAR AUTO/);
+    expect(DEMO_BOOK_AUTO_FOOTER).toMatch(/ACTIVAR AUTO/);
     expect(
       DEMO_BOOK_AUTO_RISK_LINES.some((line) => /PAPER_D_EXECUTE/.test(line)),
     ).toBe(true);
