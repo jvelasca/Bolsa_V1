@@ -6,7 +6,7 @@ All notable releases of Bolsa V1.
 
 ## [1.8.0-beta] — 2026-08-25
 
-Post-`v1.7.0-beta` spine growth + integrity + Camino D thaw parcial. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.0-beta` → tip stamp** (ver `git rev-parse v1.8.0-beta`). Partida: **`v1.7.0-beta` → `e3b943a`**. Spine battery **`pnpm test:decision-spine` = 159**.
+Post-`v1.7.0-beta` spine growth + integrity + Camino D thaw parcial. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.0-beta` → `8c8b789`**. Partida: **`v1.7.0-beta` → `e3b943a`**. Spine battery **`pnpm test:decision-spine` = 159**.
 
 ### Decision Spine — TradePlan / mesa / journal
 

@@ -15,7 +15,7 @@
 
 | Pieza        | Valor                                         |
 | ------------ | --------------------------------------------- |
-| Tag          | `v1.8.0-beta`                                 |
+| Tag          | `v1.8.0-beta` → `8c8b789`                     |
 | Previo       | `v1.7.0-beta` → `e3b943a`                     |
 | Pack auditor | `audit-pack-estado-global-2026-08-25-v180.md` |
 

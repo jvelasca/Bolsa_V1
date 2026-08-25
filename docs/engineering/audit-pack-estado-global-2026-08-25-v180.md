@@ -1,7 +1,7 @@
 # Paquete de auditoría — ESTADO GLOBAL post-tag v1.8.0-beta (2026-08-25)
 
 > **Propósito:** documento **único** para auditoría externa general tras el tag **`v1.8.0-beta`**. Consolida identidad, freeze, arcos cerrados desde `v1.7.0-beta`, verificación y riesgos ops.
-> **AsOf:** 2026-08-25 · tag **`v1.8.0-beta`** (SHA del stamp — ver `git rev-parse v1.8.0-beta`) · previo **`v1.7.0-beta` → `e3b943a`**.
+> **AsOf:** 2026-08-25 · tag **`v1.8.0-beta` → `8c8b789`** · previo **`v1.7.0-beta` → `e3b943a`**.
 > **Repo:** `https://github.com/jvelasca/Bolsa_V1`
 > **Fuentes vivas:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [`CHANGELOG.md`](../../CHANGELOG.md) · ADR-023 · ADR-031 · relevo A3-wire.
 > **Histórico pack:** [`audit-pack-estado-global-2026-08-24e.md`](./audit-pack-estado-global-2026-08-24e.md) (pre-1.8).
@@ -10,18 +10,18 @@
 
 ## 0. Resumen ejecutivo
 
-| Pieza                                                   | Estado                                                                               |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| **Rama / tag**                                          | `origin/main` = tip stamp · **`v1.8.0-beta`** · previo **`v1.7.0-beta` → `e3b943a`** |
-| **Identidad**                                           | QROS + Investment OS + Decision Spine · Lab/Radar fuera (D3) · LLM no ejecuta        |
-| **R-1..R-13 + Track B + U0–U6 + DS-05/03**              | ✅ heredados de v1.7                                                                 |
-| **TradePlan 4.x–4.9 + 5.x thin + 6 + 7 + 8.0–8.2 thin** | ✅ CERRADOS                                                                          |
-| **Integridad I1–I3 + RX1**                              | ✅ CERRADOS                                                                          |
-| **ADR-023 BETA-D + A3-wire**                            | ✅ Accepted parcial · UI arm `ACTIVAR AUTO` · execute opt-in                         |
-| **Thaw estricto 60/50/70/55**                           | ❌ deuda abierta (W2–W4) — runbook                                                   |
-| **Broker live**                                         | ❌ no                                                                                |
-| **Batería spine**                                       | `pnpm test:decision-spine` **159**                                                   |
-| **Alembic**                                             | `010` en `bolsa_v1`                                                                  |
+| Pieza                                                   | Estado                                                                                               |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Rama / tag**                                          | `origin/main` tip ≥ `8c8b789` · **`v1.8.0-beta` → `8c8b789`** · previo **`v1.7.0-beta` → `e3b943a`** |
+| **Identidad**                                           | QROS + Investment OS + Decision Spine · Lab/Radar fuera (D3) · LLM no ejecuta                        |
+| **R-1..R-13 + Track B + U0–U6 + DS-05/03**              | ✅ heredados de v1.7                                                                                 |
+| **TradePlan 4.x–4.9 + 5.x thin + 6 + 7 + 8.0–8.2 thin** | ✅ CERRADOS                                                                                          |
+| **Integridad I1–I3 + RX1**                              | ✅ CERRADOS                                                                                          |
+| **ADR-023 BETA-D + A3-wire**                            | ✅ Accepted parcial · UI arm `ACTIVAR AUTO` · execute opt-in                                         |
+| **Thaw estricto 60/50/70/55**                           | ❌ deuda abierta (W2–W4) — runbook                                                                   |
+| **Broker live**                                         | ❌ no                                                                                                |
+| **Batería spine**                                       | `pnpm test:decision-spine` **159**                                                                   |
+| **Alembic**                                             | `010` en `bolsa_v1`                                                                                  |
 
 **Mensaje clave:** núcleo financiero + spine + mesa + honesty execute + thaw **parcial** BETA-D están tagged en **`v1.8.0-beta`**. Estricto y broker siguen fuera. **BETA / no producción.**
 
