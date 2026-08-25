@@ -10,12 +10,12 @@
 
 **NOT READY TO THAW.**
 
-P1–P5 have **no measured evidence** attached in repo (rows still ☐ in ADR-023). Prep A0–A5 code behind flags is present; that does **not** satisfy the product gate.
+P1–P5 were **measured** 2026-08-25 against live `bolsa_v1` — all fail or invalid. Detail: [`thaw-p1-p5-measurement-2026-08-25.md`](./thaw-p1-p5-measurement-2026-08-25.md). Prep A0–A5 code behind flags is present; that does **not** satisfy the product gate.
 
 **Actual thaw** requires, in order:
 
-1. Owner fills P1–P10 with concrete evidence (attach numbers / run IDs / dates).
-2. Owner says the literal word **thaw**.
+1. Owner accumulates until P1–P5 pass (see measurement «Qué falta»).
+2. Owner says the literal word **thaw** again with green rows.
 3. Then: ADR-023 → Accepted, freeze amend (Camino D thaw parcial), and only then opt-in `PAPER_D_EXECUTE=1` on a controlled DEMO.
 
 This audit did **not** flip env, did **not** Accept ADR-023, did **not** amend freeze to authorize execute.
@@ -41,11 +41,11 @@ Legend: ✅ evidence · ⚠ partial · ☐ empty · ❌ blocked
 
 | #       | Criterio                                  | Status | Evidence                                                                                                                                                                                                                                                                                                               |
 | ------- | ----------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **P1**  | ≥60 días DEMO con dictámenes estables     | ☐      | **No data in repo.** Telemetry _capability_ exists (`daily_opinion_telemetry.py` → `daysWithOpinions`; `GET …/telemetry`). ADR-023 row «P1 ≥60d» = `—` / ☐. No dump of day counts meeting ≥60.                                                                                                                         |
-| **P2**  | ≥50 operaciones SEMI Confirm (fills DEMO) | ☐      | **No data in repo.** Outcomes / DecisionSession / ledger DEMO counts not attached anywhere under `docs/` or committed metrics. Checklist & ADR rows ☐.                                                                                                                                                                 |
-| **P3**  | Precisión BUY proxy 5d ≥70%               | ☐      | **No data in repo.** A0 exposes `buyPrecision5d` but no recorded sample ≥70%. ADR-023 «P3» = ☐.                                                                                                                                                                                                                        |
-| **P4**  | Recall ≥55%                               | ☐      | **No data in repo.** A0 exposes `buyRecall5d` / recall move sample; no attached ≥55%. ADR-023 «P4» = ☐.                                                                                                                                                                                                                |
-| **P5**  | MaxDD DEMO ≤ min(10%, 1.2× MaxDD Lab)     | ☐      | **No data in repo.** No DEMO equity-curve MaxDD vs Lab comparison committed. ADR-023 «P5» = ☐.                                                                                                                                                                                                                         |
+| **P1**  | ≥60 días DEMO con dictámenes estables     | ❌     | **Measured:** 28 distinct opinion days (`2026-07-22`…`2026-08-25`); A0 `daysWithOpinions=28`. Need ≥60.                                                                                                                                                                                                                |
+| **P2**  | ≥50 operaciones SEMI Confirm (fills DEMO) | ❌     | **Measured:** 0 `confirm` sessions · 0 journal · 0 buys on `default-account-seed`. 16 propose-only sessions.                                                                                                                                                                                                           |
+| **P3**  | Precisión BUY proxy 5d ≥70%               | ❌     | **Measured:** `buyPrecision5d=null` · `alarmaBuyCount=0` · no `stance=buy` rows in opinions.                                                                                                                                                                                                                           |
+| **P4**  | Recall ≥55%                               | ❌     | **Measured:** `buyRecall5d=0.0` (0 caught / 4650 moves ≥+2%/5d).                                                                                                                                                                                                                                                       |
+| **P5**  | MaxDD DEMO ≤ min(10%, 1.2× MaxDD Lab)     | ⚠      | **Measured:** cash proxy 0.2% on seed (deposit+fee only; 0 trades). Lab MaxDD n/d — **not a valid trading MaxDD**.                                                                                                                                                                                                     |
 | **P6**  | 0 violaciones Gate en execute de prueba   | ⚠      | **Prep code + unit tests**, not product proof of zero violations on real AUTO executes (execute path still env-blocked). Risk Engine / `check_opening`: `risk_engine.py`, `test_risk_engine.py`, I1–I3 honesty (`paper_auto_http_gate.py`, RX1). Checklist marks ☐; cannot claim ✅ without measured test-execute log. |
 | **P7**  | Kill switch &lt;1 s (UI + flag server)    | ⚠      | **Prep.** API `GET/POST /api/risk/kill-switch` (`routes/risk.py` · `risk_runtime.py`); UI Operativa / `demo-book-mode-panel.tsx`. **No** documented latency run proving &lt;1 s. Checklist: «Prep».                                                                                                                    |
 | **P8**  | Confirmación doble UI para activar AUTO   | ⚠      | **Prep.** Armado local `ACTIVAR AUTO` — `demo-book-auto-arm.ts`; pill still off (`DEMO_BOOK_AUTO_UI_ENABLED=false` in `demo-book-auto-copy.ts`). Arm ≠ execute. Checklist: «Prep · pill sigue off».                                                                                                                    |
@@ -67,16 +67,16 @@ Legend: ✅ evidence · ⚠ partial · ☐ empty · ❌ blocked
 
 ## Gate summary
 
-| Gate                  | Result                                  |
-| --------------------- | --------------------------------------- |
-| P1–P5 product metrics | **FAIL** — all ☐ empty                  |
-| P6–P8 prep vs product | **PARTIAL** — code/prep only            |
-| P9–P10 governance     | **PARTIAL** — drafts only; not Accepted |
-| `PAPER_D_EXECUTE`     | **OFF** (defaults unchanged)            |
-| **Thaw**              | **NOT READY**                           |
+| Gate                  | Result                                               |
+| --------------------- | ---------------------------------------------------- |
+| P1–P5 product metrics | **FAIL** — measured 2026-08-25 (see measurement doc) |
+| P6–P8 prep vs product | **PARTIAL** — code/prep only                         |
+| P9–P10 governance     | **PARTIAL** — drafts only; not Accepted              |
+| `PAPER_D_EXECUTE`     | **OFF** (defaults unchanged)                         |
+| **Thaw**              | **NOT READY**                                        |
 
 ---
 
 ## Next step (owner)
 
-Fill P1–P5 evidence (run Asesor telemetry + SEMI fill counts + DEMO MaxDD), then say the literal word **thaw** before any ADR Accept / freeze amend / `PAPER_D_EXECUTE=1`.
+Close gaps in [`thaw-p1-p5-measurement-2026-08-25.md`](./thaw-p1-p5-measurement-2026-08-25.md) §«Qué falta», then say **thaw** again before any ADR Accept / env flip.

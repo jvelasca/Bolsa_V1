@@ -90,4 +90,4 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 
 ## Open risks (ops, no código)
 
-`TRUSTED_PROXIES` prod — IPs/CIDR reales del edge proxy pendientes del propietario (runbook: `ops-trusted-proxies-prod-runbook-2026-08-24.md`). GitHub secret scanning + push protection **enabled** 2026-08-24 (verificar UI). Purga opcional historial git dev (decisión explícita). **Thaw Camino D:** checklist audit [`thaw-readiness-audit-2026-08-25.md`](./engineering/thaw-readiness-audit-2026-08-25.md) → **NOT READY** (P1–P5 ☐); `PAPER_D_EXECUTE` off; thaw solo con palabra **thaw** + P1–P10 filled.
+`TRUSTED_PROXIES` prod — IPs/CIDR reales del edge proxy pendientes del propietario (runbook: `ops-trusted-proxies-prod-runbook-2026-08-24.md`). GitHub secret scanning + push protection **enabled** 2026-08-24 (verificar UI). Purga opcional historial git dev (decisión explícita). **Thaw Camino D:** medición P1–P5 [`thaw-p1-p5-measurement-2026-08-25.md`](./engineering/thaw-p1-p5-measurement-2026-08-25.md) → **FAIL** (28d · 0 SEMI fills · precision null · recall 0%); `PAPER_D_EXECUTE` off; ADR-023 Proposed.
