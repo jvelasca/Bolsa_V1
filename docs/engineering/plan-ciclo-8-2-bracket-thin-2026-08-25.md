@@ -2,7 +2,7 @@
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §6 · roadmap [`roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md`](./roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md) · relevo [`traspaso-relevo-ciclo-8-1-trail-thin-2026-08-25.md`](./traspaso-relevo-ciclo-8-1-trail-thin-2026-08-25.md) §4 E1.
 > **AsOf:** 2026-08-25.
-> **Estado:** **CERRADO** (D1–D8 OK) · batería **159**.
+> **Estado:** **CERRADO** (D1–D8 OK) · feat `73044a7` · batería **159**.
 > **Método:** espejo 5.1 Protect / 8.0–8.1; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; **sin** broker OCO; **sin** ejecución de piernas; **sin** EvaluatePositionExits; **sin** thaw.
 > **Elección thin:** bracket **picture advisory** = entry / stop / T1(1R) / T2(2R) + fracciones de pierna display-only. T1 **alinea** Protect 5.1 (`entry±1R`). OCO broker / salida escalonada ejecutada = **fuera** (plena parked).
 

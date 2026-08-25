@@ -2,7 +2,7 @@
 
 > **Padre:** [`traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md`](./traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md) §2 E1.4 · ADR-031 §6.
 > **AsOf:** 2026-08-25.
-> **Estado:** fase **abierta** · **8.0 Expectancy thin CERRADO**; **8.1 Trail thin CERRADO**; 8.2 **parked**.
+> **Estado:** fase **cerrada (thin)** · **8.0 Expectancy thin CERRADO**; **8.1 Trail thin CERRADO**; **8.2 Bracket thin CERRADO**. Plena parked.
 > **Método:** rebanadas finas tipo 5.0–5.3 / Ciclo 6. **No** reabrir Wyckoff 4.x · **no** re-hacer mappers 5.0–5.3 · **no** thaw AUTO.
 
 ---
@@ -15,7 +15,7 @@ Integridad I1–I3 + RX1 cerraron honesty de execute. El dueño **nombró** crec
 | ------- | -------------------- | ---------------------------------------------------------------------------------------- | ----------- |
 | **8.0** | Expectancy thin      | Mapper agregado thin (setup + R) → `runtime.expectancy` · Hoy/Board advisory · ≠ permiso | **CERRADO** |
 | **8.1** | Trail continuo       | Advisory ratchet `trailPlan` (peak MFE−1R); **no** muta stop · alinea Exit Radar tip     | **CERRADO** |
-| **8.2** | Bracket / T1 parcial | Órdenes bracket · fill parcial T1                                                        | **parked**  |
+| **8.2** | Bracket / T1 picture | Advisory picture entry/stop/T1/T2 + leg fracs; **no** OCO · **no** broker                | **CERRADO** |
 
 ---
 
@@ -36,11 +36,11 @@ Integridad I1–I3 + RX1 cerraron honesty de execute. El dueño **nombró** crec
 
 1. ~~Plan D1–D8 8.0~~ → feat 8.0 → stamp → relevo 8.0.
 2. ~~Plan D1–D8 8.1~~ → feat 8.1 → stamp → relevo 8.1.
-3. **Solo si se nombra:** 8.2 Bracket (plan propio).
-4. Expectancy **plena** (journal aggregate) / trail **plena** (broker mutate) = fases posteriores si se piden.
+3. ~~Plan D1–D8 8.2~~ → feat 8.2 → stamp → relevo 8.2.
+4. Expectancy / trail / bracket **plena** = fases posteriores si se piden.
 
 ---
 
 ## 3. Freeze de fase
 
-LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · SETUP Wyckoff cerrada · 5.x advisory intactos · Attribution 6 intacta · I1–I3 + RX1 intactos · Shadow AUTO **off** · `PAPER_D_EXECUTE` **off** · 8.0/8.1 ≠ permiso · 8.2 parked · trail plena parked.
+LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · SETUP Wyckoff cerrada · 5.x advisory intactos · Attribution 6 intacta · I1–I3 + RX1 intactos · Shadow AUTO **off** · `PAPER_D_EXECUTE` **off** · 8.0–8.2 thin ≠ permiso · plena parked.
