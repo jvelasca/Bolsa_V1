@@ -104,9 +104,11 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 4.6 (cerrado `fb6e801`):** SM Wyckoff lookback — `_locate_wyckoff_spring` (`WYCKOFF_LOOKBACK=40`) localiza spring vivo; reclaim/SOS/LPS sobre ese evento; hielo roto en cerradas posteriores → ninguna (no resucita). LPS sigue etiqueta. Sin persistencia store. Sin `wyckoffPhase`. Sin `contract:gen`. `check_opening` intacto.
 
+**Ciclo 4.7 (cerrado `604fd90`):** thesis binding thin — `_resolve_wyckoff_spring` + `wyckoffSpringAnchor` en `DecisionSession.runtime` (JSONB); prior bound por `decision_id` si hielo intacto; hielo roto → none (no resucita ni cae a locate). LPS etiqueta. Sin Alembic. Sin `wyckoffPhase` en TradePlan. Sin `contract:gen`. `check_opening` intacto.
+
 No abrir sin fase propia:
 
-- Persistencia fase Wyckoff / binding tesis (store) — 4.7+
+- Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — 4.8+
 - Position Manager, Thesis Health, Exit Radar, trailing, T1 parcial, time-stop, bracket
 - MFE/MAE, attribution, expectancy por setup
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live

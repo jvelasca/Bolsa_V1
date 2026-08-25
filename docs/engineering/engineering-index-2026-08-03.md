@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `a7eeaee` Ciclo 4.2 EntrySetup (local, pendiente push)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD Ciclo 4.7 `604fd90` thesis binding
 │   ├── PROJECT_PREMISES.md
 │   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
 │   ├── rfc/*  (constitución)
@@ -60,13 +60,15 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md ← **RELEVO ACTIVO** · ADR-031 Ciclo 4.6 SM lookback · feat `fb6e801`
+│   ├── traspaso-relevo-ciclo-47-wyckoff-thesis-binding-2026-08-25.md ← **RELEVO ACTIVO** · ADR-031 Ciclo 4.7 thesis binding · feat `604fd90`
+│   ├── traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md ← histórico · Ciclo 4.6 SM lookback · feat `fb6e801`
 │   ├── traspaso-relevo-ciclo-45-wyckoff-lps-sm-2026-08-25.md ← histórico · Ciclo 4.5 LPS/SM thin · feat `baaa9b4`
 │   ├── traspaso-relevo-ciclo-44-wyckoff-formal-2026-08-25.md ← histórico · Ciclo 4.4 Wyckoff formal · feat `7003ddf`
 │   ├── traspaso-relevo-ciclo-43-armed-2026-08-25.md ← histórico · Ciclo 4.3 ARMED · `4eb99a2` en origin
 │   ├── traspaso-relevo-ciclo-42-entrysetup-2026-08-25.md ← histórico · Ciclo 4.2 EntrySetup · `a7eeaee` en origin
 │   ├── traspaso-relevo-ciclo-41-no-new-longs-2026-08-25.md ← histórico · Ciclo 4.1 NO_NEW_LONGS · `97f4862` en origin
 │   ├── traspaso-relevo-ciclo-40-stop-entry-size-2026-08-25.md ← histórico · Ciclo 4.0 stop/entry_ready/size · `1cbd021` en origin
+│   ├── plan-ciclo-47-wyckoff-thesis-binding-2026-08-25.md ← plan 4.7 thesis binding · CERRADO en `604fd90`
 │   ├── plan-ciclo-46-wyckoff-sm-multi-sesion-2026-08-25.md ← plan 4.6 SM lookback · CERRADO en `fb6e801`
 │   ├── plan-ciclo-45-wyckoff-lps-sm-2026-08-25.md ← plan 4.5 LPS/SM Wyckoff · CERRADO en `baaa9b4`
 │   ├── plan-ciclo-44-wyckoff-formal-2026-08-25.md ← plan 4.4 CERRADO en `7003ddf`
