@@ -3,7 +3,8 @@
 > **Padre:** [`traspaso-relevo-ciclo-5-3-mfe-mae-thin-2026-08-25.md`](./traspaso-relevo-ciclo-5-3-mfe-mae-thin-2026-08-25.md) · honesty [`traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md).
 > **Plan:** [`plan-ciclo-i1-executetrade-converge-2026-08-25.md`](./plan-ciclo-i1-executetrade-converge-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD origin:** `05e354c`. I1 en working tree (feat + stamp SHA pendientes).
+> **HEAD origin:** `05e354c`. Feat I1 **`2bd5cd8`** (local, no push). Stamp SHA en update-last.
+> **Estado:** **CERRADO en `2bd5cd8`.** Handoff → [`traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md`](./traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md).
 > **Fase:** **integridad** (crecimiento 5.0–5.3 **cerrado**).
 
 ---
@@ -31,12 +32,16 @@
 
 ## 3. Commits
 
-Pendiente feat + stamp docs (D8). No inventar SHA.
+| SHA       | Mensaje                                              |
+| --------- | ---------------------------------------------------- |
+| `2bd5cd8` | feat(spine): ADR-031 Ciclo I1 ExecuteTrade converge. |
+
+Stamp docs + handoff I2: este ciclo de docs (SHA en update-last). **No push** salvo decisión explícita.
 
 ## 4. E1
 
-1. Commit · stamp SHA · push (decisión explícita).
-2. **I2 Actionability / Ranking IO server** — si thin.
+1. ~~Feat I1~~ · stamp SHA · push (decisión explícita).
+2. **I2 Actionability / Ranking IO** — D1–D8 en relevo I2 (**esperar OK**).
 3. Park: Shadow AUTO (I3, explícito) · expectancy plena · trail continuo · bracket.
 4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
 

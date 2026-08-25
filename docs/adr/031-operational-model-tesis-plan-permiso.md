@@ -120,7 +120,9 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.3 MFE/MAE thin (cerrado `fd44a03`):** mapper → `runtime.mfeMae` · peak MFE/MAE (barras / close_proxy) · Hoy «Excursión» métricas · **sin** expectancy · **sin** CTA acción · `check_opening` intacto.
 
-**Ciclo I1 ExecuteTrade converge (cerrado en working tree, stamp SHA pendiente):** `allow_opening_fill` compartido Confirm + Fill + HTTP. `POST /portfolio/trade` buy → `check_opening` (403 `risk_veto`); sell skip. Router AUTO no fusionado. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
+**Ciclo I1 ExecuteTrade converge (cerrado `2bd5cd8`):** `allow_opening_fill` compartido Confirm + Fill + HTTP. `POST /portfolio/trade` buy → `check_opening` (403 `risk_veto`); sell skip. Router AUTO no fusionado. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
+
+**Ciclo I2 Actionability/IO (D1–D8 BORRADOR):** `TradePlan.actionability` ya es server (4.3). Ranking IO (`computeIndiceOperativo`) sigue cliente. No implementar hasta OK. Plan: [`plan-ciclo-i2-actionability-io-2026-08-25.md`](../engineering/plan-ciclo-i2-actionability-io-2026-08-25.md).
 
 No abrir sin fase propia:
 

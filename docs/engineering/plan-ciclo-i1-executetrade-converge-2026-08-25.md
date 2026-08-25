@@ -1,8 +1,8 @@
 # Plan — Ciclo I1 ExecuteTrade converge (integridad)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) · relevo [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md) · honesty Ciclo 7 (mapa 3+1) · cierre crecimiento 5.0–5.3.
-> **AsOf:** 2026-08-25 · origin **`05e354c`**; I1 en working tree (stamp SHA pendiente).
-> **Estado:** **D1–D8 OK · código I1.** Batería `pnpm test:decision-spine` **144**.
+> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I1 **`2bd5cd8`** (local, no push).
+> **Estado:** **CERRADO en `2bd5cd8`.** D1–D8 OK · batería **144**.
 > **Método:** integridad thin; Ranking ≠ BUY; sin Shadow AUTO; sin broker; sin reabrir 5.x.
 > **Secuencia dueño:** crecimiento 5.x ✅ · **I1 (este)** · I2 Actionability · I3 Shadow (explícito).
 
@@ -52,6 +52,12 @@ No Shadow · no broker · no reabrir 5.x · no LLM.
 
 ---
 
-## 3. Freeze
+## 3. Commits
+
+| SHA       | Mensaje                                              |
+| --------- | ---------------------------------------------------- |
+| `2bd5cd8` | feat(spine): ADR-031 Ciclo I1 ExecuteTrade converge. |
+
+## 4. Freeze
 
 LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · SETUP Wyckoff cerrada · Shadow AUTO off · advisory 5.x ≠ permiso · `PAPER_D_EXECUTE` off.
