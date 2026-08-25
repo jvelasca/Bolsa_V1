@@ -140,6 +140,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 No abrir sin fase propia:
 
+- **v1.9 Operational Core (docs-only, no código):** [ADR-032](./032-operational-core-tradeplan-positionstate-execution.md) — TradePlan v1 · PositionState · ExitPlan · ExecutionPlan. Implementación solo con fase propia bajo ese ADR.
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
 - Trailing **plena** broker / mutar stop (tras **Ciclo 8.1 thin**), bracket **plena** OCO / piernas (tras **Ciclo 8.2 thin**)
 - Thesis Health **plena** (persistencia Confidence lifecycle cableada)
