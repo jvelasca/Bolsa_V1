@@ -13,6 +13,8 @@ from typing import Literal
 TradePlanStatus = Literal["WATCH", "ARMED", "TRIGGERED", "BLOCKED", "EXPIRED"]
 TradePlanDirection = Literal["long", "short", "none"]
 EntrySetup = Literal["breakout", "pullback", "wyckoff", "none"]
+# Ciclo 4.5 — evidencia SM single-window (interno; no JSON TradePlan).
+WyckoffPhaseEvidence = Literal["none", "spring", "reclaim", "sos", "lps"]
 WhyNotCode = Literal[
     "fit",
     "freshness",
@@ -87,6 +89,8 @@ WYCKOFF_SPRING = 5
 WYCKOFF_PRIOR = 10
 # Ciclo 4.4 — reclaim formal: close ≥ spring ± k×ATR ó fuera del rango spring.
 WYCKOFF_RECLAIM_ATR_K = 0.25
+# Ciclo 4.5 — LPS thin: close ≥ pullback extreme ± eps×ATR (0 = solo ≥/≤ extreme).
+WYCKOFF_LPS_ATR_EPS = 0.0
 
 # Ciclo 4.3 — ARMED actionability (entre WATCH entry 0.4 y TRIGGERED ~0.95).
 ARMED_ACTIONABILITY = 0.7
@@ -251,13 +255,73 @@ def _detect_wyckoff_sos(*, direction: TradePlanDirection, bars: Sequence[object]
     return bool(valid) and close < min(valid)
 
 
+def _detect_wyckoff_lps(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    atr: float | None = None,
+) -> bool:
+    """LPS etiqueta: pullback sobre hielo (long) / bajo techo (short) tras reclaim formal.
+
+    Misma ventana prior+spring+last. Sin reclaim → False. No fuerza EntrySetup (D2).
+    """
+    if not _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr):
+        return False
+    windows = _wyckoff_windows(bars)
+    if windows is None:
+        return False
+    _prior, spring, close = windows
+    atr_val = _finite_positive(atr)
+    eps = WYCKOFF_LPS_ATR_EPS * atr_val if atr_val is not None else 0.0
+    if direction == "long":
+        spring_lows = [_bar_px(bar, "low") for bar in spring]
+        s_lows = [v for v in spring_lows if v is not None]
+        last_low = _bar_px(bars[-1], "low")
+        if not s_lows or last_low is None:
+            return False
+        ice = min(s_lows)
+        if last_low <= ice:
+            return False
+        return close >= last_low + eps
+    spring_highs = [_bar_px(bar, "high") for bar in spring]
+    s_highs = [v for v in spring_highs if v is not None]
+    last_high = _bar_px(bars[-1], "high")
+    if not s_highs or last_high is None:
+        return False
+    ceiling = max(s_highs)
+    if last_high >= ceiling:
+        return False
+    return close <= last_high - eps
+
+
+def _wyckoff_phase_evidence(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    atr: float | None = None,
+) -> WyckoffPhaseEvidence:
+    """SM single-window: spring → reclaim → sos? → lps? Recalculada cada classify.
+
+    Interno / tests. No se expone en TradePlan JSON (D4).
+    """
+    if direction == "none" or not _detect_wyckoff_spring(direction=direction, bars=bars):
+        return "none"
+    if not _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr):
+        return "spring"
+    if _detect_wyckoff_lps(direction=direction, bars=bars, atr=atr):
+        return "lps"
+    if _detect_wyckoff_sos(direction=direction, bars=bars):
+        return "sos"
+    return "reclaim"
+
+
 def classify_entry_setup(
     *,
     action: str,
     bars: Sequence[object] | None = None,
     atr: float | None = None,
 ) -> EntrySetup:
-    """Ciclo 4.2/4.4: breakout > pullback > wyckoff > none. Sin barras → none."""
+    """Ciclo 4.2/4.4/4.5: breakout > pullback > wyckoff > none. Sin barras → none."""
     direction = _direction_from_action(action)
     if direction == "none" or bars is None:
         return "none"
@@ -265,7 +329,7 @@ def classify_entry_setup(
         return "breakout"
     if _is_pullback(direction=direction, bars=bars, atr=atr):
         return "pullback"
-    # SOS es evidencia interna; no fuerza EntrySetup (D2).
+    # SOS/LPS son evidencia interna; no fuerzan EntrySetup (4.4 D2 / 4.5 D2).
     if _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr):
         return "wyckoff"
     return "none"

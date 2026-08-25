@@ -1,4 +1,4 @@
-"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.4."""
+"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.5."""
 
 from types import SimpleNamespace
 
@@ -9,6 +9,8 @@ from bolsa_analytics.cognitive.trade_plan import (
     WYCKOFF_PRIOR,
     WYCKOFF_RECLAIM_ATR_K,
     WYCKOFF_SPRING,
+    _detect_wyckoff_lps,
+    _wyckoff_phase_evidence,
     build_trade_plan,
     build_v0_trade_plan_dict,
     classify_entry_setup,
@@ -52,9 +54,16 @@ def _wyckoff_weak_reclaim_bars() -> list[SimpleNamespace]:
 
 
 def _wyckoff_formal_reclaim_bars() -> list[SimpleNamespace]:
-    """Spring + reclaim formal: close > max(high) del spring."""
+    """Spring + reclaim formal: close > max(high) del spring; low > ice → LPS."""
     prior, spring = _wyckoff_spring_base()
     last = _bar(close=89.0, high=89.0, low=86.0)
+    return [*prior, *spring, last]
+
+
+def _wyckoff_reclaim_without_lps_bars() -> list[SimpleNamespace]:
+    """Reclaim formal (close fuera rango) pero wick bajo spring_low → LPS false."""
+    prior, spring = _wyckoff_spring_base()
+    last = _bar(close=89.0, high=89.0, low=84.0)  # ice=85
     return [*prior, *spring, last]
 
 
@@ -506,3 +515,34 @@ def test_wyckoff_formal_without_bias_armed() -> None:
 def test_breakout_priority_over_wyckoff() -> None:
     bars = _wyckoff_and_breakout_bars()
     assert classify_entry_setup(action="recommend_long", bars=bars, atr=2.0) == "breakout"
+
+
+def test_wyckoff_reclaim_without_lps_still_wyckoff() -> None:
+    """Ciclo 4.5 D2: LPS no es gate — reclaim sin LPS sigue wyckoff."""
+    atr = 2.0
+    bars = _wyckoff_reclaim_without_lps_bars()
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "wyckoff"
+    assert _detect_wyckoff_lps(direction="long", bars=bars, atr=atr) is False
+    assert _wyckoff_phase_evidence(direction="long", bars=bars, atr=atr) == "reclaim"
+
+
+def test_wyckoff_lps_true_with_reclaim() -> None:
+    """Spring + reclaim + low sobre hielo → LPS etiqueta; setup sigue wyckoff."""
+    atr = 2.0
+    bars = _wyckoff_formal_reclaim_bars()
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "wyckoff"
+    assert _detect_wyckoff_lps(direction="long", bars=bars, atr=atr) is True
+    assert _wyckoff_phase_evidence(direction="long", bars=bars, atr=atr) == "lps"
+
+
+def test_wyckoff_lps_false_without_reclaim() -> None:
+    """Sin reclaim formal → LPS false; setup none."""
+    atr = 2.0
+    bars = _wyckoff_weak_reclaim_bars()
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "none"
+    assert _detect_wyckoff_lps(direction="long", bars=bars, atr=atr) is False
+    assert _wyckoff_phase_evidence(direction="long", bars=bars, atr=atr) == "spring"
+
+
+def test_wyckoff_phase_evidence_none_without_bars() -> None:
+    assert _wyckoff_phase_evidence(direction="long", bars=[], atr=2.0) == "none"
