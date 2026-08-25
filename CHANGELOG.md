@@ -4,19 +4,35 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
-- **ADR-031 / Ciclo 4.6** (`fb6e801`, en origin vía `dd5b8e8`): SM Wyckoff lookback (`WYCKOFF_LOOKBACK=40`); spring vivo + reclaim; hielo roto → none. Spine **94**. Sin store · sin `wyckoffPhase` · sin `contract:gen`.
-- **ADR-031 / Ciclo 4.5** (`baaa9b4`, en origin vía `5d6f4dc`): LPS etiqueta + SM single-window Wyckoff; `wyckoff` = spring+reclaim 4.4 intacto. Spine **92**. Sin `wyckoffPhase` · sin `contract:gen`.
-- **ADR-031 / Ciclo 4.4** (`7003ddf`, en origin vía `2135fc5`): Wyckoff formal — spring + reclaim estricto (`k×ATR=0.25` o fuera rango spring). SOS etiqueta; LPS diferido. Spine **88**. Sin `contract:gen`.
-- **ADR-031 / Ciclo 4.3** (`4eb99a2`, en origin vía `4fc864b`): `ARMED` = stop + setup≠none + !ready (qty 0, actionability 0.7). Spine **84**. Sin `contract:gen`.
-- **ADR-031 / Ciclo 4.2** (`a7eeaee`, en origin vía `4930344`): `EntrySetup` refina `entry_ready`; campo `entrySetup`. Spine **81**. Sin `contract:gen`.
-- **ADR-031 / Ciclo 4.1** (`97f4862` = origin/main): Golden G `NO_NEW_LONGS` — long + `risk_off`/`crisis` → `BLOCKED`/`regime`. Spine **79**. Sin EntrySetup · sin `contract:gen`.
-- **ADR-031 / Ciclo 4.0** (`1cbd021`, en origin vía stamp `d99b1d1`): stop estructural ATR×1.5 + swing 10 barras (más lejano), `entry_ready` por bias TA, size con equity de cartera. Spine **75**. Sin familias EntrySetup · sin `contract:gen`.
-- **ADR-031 / TradePlan en propose+confirm** (`17a386d`): `data.tradePlan` + `runtime.tradePlan`; confirm echo; Hoy prefiere plan vivo. Spine **67**. Sin `contract:gen`.
-- **ADR-031 / TradePlan v0** (`818b0c7`): tesis ≠ plan ≠ permiso. Confirm SEMI: TTL, revalidación de precio, H3 orphan fail-closed. `pending_orders` fill vía `check_opening`. Strip **Hoy** en la mesa. Golden A/B/C/H.
-- **Python CI pytest:** excluye tests DB-gated R12 isolation + F7b backfill del workflow offline (`386a959`) — **569 pass** sin Postgres.
-- **Ruff I001:** import order hygiene en 49 ficheros Python (`a3dcc3f`) — desbloquea gate Import-linter en Python CI (post F9-A3 `f8c7e3f`).
-- **F9-A3:** gate `lint-imports` en Python CI (4 contratos, `packages/py/.importlinter`).
-- Post-`v1.7.0-beta` ya en `main`: OrderProposal/Journal F1–F3 + F9-A1/A2 (`8a1e64d`). Purge V2 sigue MONITOR. F9-B PARKED.
+## [1.8.0-beta] — 2026-08-25
+
+Post-`v1.7.0-beta` spine growth + integrity + Camino D thaw parcial. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.0-beta` → tip stamp** (ver `git rev-parse v1.8.0-beta`). Partida: **`v1.7.0-beta` → `e3b943a`**. Spine battery **`pnpm test:decision-spine` = 159**.
+
+### Decision Spine — TradePlan / mesa / journal
+
+- TradePlan v0 + Ciclos **4.0–4.9** (stop ATR/swing, EntrySetup, ARMED, Wyckoff formal→effort, Board echo).
+- Ciclos **5.0–5.3** thin: Thesis Health · Protect/T1 · Exit Radar · MFE/MAE (advisory; ≠ permiso).
+- Ciclo **6** Attribution journal thin · Ciclo **7** Spine honesty.
+- Ciclos **8.0–8.2** thin: Expectancy · Trail · Bracket (advisory; sin OCO/broker). **Línea crecimiento thin CERRADA.**
+
+### Integridad execute / honesty
+
+- **I1** ExecuteTrade converge (`check_opening` en buy HTTP).
+- **I2** Actionability / Indice Operativo server.
+- **I3** Shadow honesty — HTTP `paper_auto` exige `PAPER_D_EXECUTE`.
+- **RX1** exits `full_auto` honesty — mismo env gate antes del Router. **No** auto-exit producto.
+
+### Thaw Camino D (ADR-023)
+
+- Medición estricta P1–P5 **FAIL** · perfil **BETA-D Accepted** (P1'–P5' + W2–W4).
+- UI Libro AUTO on · execute **opt-in** `PAPER_D_EXECUTE=1` (default repo off).
+- **A3-wire** (`d704263`): frase exacta `ACTIVAR AUTO` obligatoria antes de `mode:auto`; disarm al salir. Arm ≠ execute.
+- Deuda estricto tracking: runbook + `scripts/thaw_estricto_snapshot.mjs` (W2–W4 vigentes).
+
+### Ops / docs
+
+- `TRUSTED_PROXIES` runbook exact-string · valor prod **OWNER**.
+- Pack auditoría: [`audit-pack-estado-global-2026-08-25-v180.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v180.md).
 
 ## [1.7.0-beta] — 2026-08-24
 

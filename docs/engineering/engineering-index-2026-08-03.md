@@ -61,13 +61,14 @@ Engineering Index  (este doc)
 │   ├── plan-unificacion-research-radar-2026-08-21.md ← **Unificación Research→Radar — DRAFT / APARCADO** · F1–F3 ✅ doc CERRADAS · código F4′–F6′ condicional Track B · `PROJECT_STATE.md` §2b
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
-│   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
+│   ├── audit-pack-estado-global-2026-08-25-v180.md ← **PACK auditoría vivo** post-tag v1.8.0-beta · spine 159 · BETA-D + A3-wire · supersedes 24e
+│   ├── traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md ← **RELEVO ACTIVO** tag v1.8.0-beta → auditoría externa
+│   ├── audit-pack-estado-global-2026-08-24e.md ← histórico post-tag v1.7.0-beta + CI
 │   ├── deuda-thaw-estricto-runbook-2026-08-25.md ← **DEUDA ESTRICTO** tracking P1–P5 (60d/50/70/55 · MaxDD) · W2–W4 · snapshot `scripts/thaw_estricto_snapshot.mjs` · **no** Accept estricto aún
 │   ├── plan-ciclo-a3-wire-auto-arm-ui-2026-08-25.md ← **CERRADO** Ciclo A3-wire · armado `ACTIVAR AUTO` obligatorio (honesty BETA-D)
-│   ├── traspaso-relevo-ciclo-a3-wire-auto-arm-ui-2026-08-25.md ← **RELEVO ACTIVO** · A3-wire CERRADO · arm UI ≠ execute
+│   ├── traspaso-relevo-ciclo-a3-wire-auto-arm-ui-2026-08-25.md ← histórico · A3-wire CERRADO · arm UI ≠ execute
 │   ├── traspaso-relevo-cierre-post-e1-2026-08-25.md ← cierre chat post E1 (push · deuda · proxies) · histórico
-│   ├── traspaso-relevo-thaw-beta-d-2026-08-25.md ← thaw BETA-D CERRADO · ADR-023 Accepted parcial · estricto deuda → runbook
-│   ├── traspaso-relevo-ciclo-8-2-bracket-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 8.2 Bracket thin · CERRADO `73044a7` · growth thin 8.0–8.2 · park plena
+│   ├── traspaso-relevo-thaw-beta-d-2026-08-25.md ← thaw BETA-D CERRADO · ADR-023 Accepted parcial · estricto deuda → runbook│   ├── traspaso-relevo-ciclo-8-2-bracket-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 8.2 Bracket thin · CERRADO `73044a7` · growth thin 8.0–8.2 · park plena
 │   ├── plan-ciclo-8-2-bracket-thin-2026-08-25.md ← plan 8.2 · D1–D8 OK · CERRADO en `73044a7`
 │   ├── traspaso-relevo-ciclo-8-1-trail-thin-2026-08-25.md ← histórico · Ciclo 8.1 Trail thin · CERRADO `655832c`
 │   ├── plan-ciclo-8-1-trail-thin-2026-08-25.md ← plan 8.1 · D1–D8 OK · CERRADO en `655832c`

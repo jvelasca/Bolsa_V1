@@ -4,7 +4,7 @@ Plataforma personal de gestión bursátil: IBEX, Europa y acciones (sin CFD).
 
 **Stack actual:** React + Vite (frontend) · **FastAPI Python** (API por defecto) · PostgreSQL.
 
-**Producto (v1.6.0-beta · tag `c3964fc` · 2026-08-22):** Embudo + Lista AUTO · Finalistas · **DÍA D** · **CORE-R v1.12** · **CORE-P** · FA/FIE · DEMO / paper · **Operativa SEMI** (mesa Trading · Señales · Confirmar · Libro) · JWT / multi-user (ADR-027 C) · **Estudio ADR-024** · Asesor/Canales · **prep AUTO A0–A5** (`PAPER_D_EXECUTE` off). Sin broker live.  
+**Producto (v1.8.0-beta · 2026-08-25):** Embudo + Lista AUTO · Finalistas · **DÍA D** · **CORE-R** · **CORE-P** · FA/FIE · DEMO / paper · **Operativa SEMI** + **AUTO UI BETA-D** (armado `ACTIVAR AUTO` · execute opt-in `PAPER_D_EXECUTE`) · Decision Spine (TradePlan · Fit · DS-05/03 · I1–I3/RX1) · JWT / multi-user (ADR-027 C) · Estudio ADR-024 · Asesor/Señales. Sin broker live. Thaw estricto en deuda.
 Changelog: [`CHANGELOG.md`](./CHANGELOG.md) · **Sistema actual (SoT corto):** [`docs/CURRENT_SYSTEM.md`](./docs/CURRENT_SYSTEM.md) · **Fuente de coordinación: GitHub** [jvelasca/Bolsa_V1](https://github.com/jvelasca/Bolsa_V1) (`origin/main`) · Estado vivo: [`PROJECT_STATE.md`](./docs/engineering/PROJECT_STATE.md) · Relevo: [`traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`](./docs/engineering/traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md) · Premisas: [`PROJECT_PREMISES.md`](./docs/PROJECT_PREMISES.md) · ADR-024: [`024-estudio-supervision-universe`](./docs/adr/024-estudio-supervision-universe.md) · HELP: [`docs/HELP.md`](./docs/HELP.md).
 
 ## Requisitos

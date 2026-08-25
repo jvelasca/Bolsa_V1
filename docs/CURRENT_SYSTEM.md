@@ -2,8 +2,9 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-023 Accepted BETA-D** ([thaw adaptado](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md)) · **A3-wire** `d704263` ([relevo](./engineering/traspaso-relevo-ciclo-a3-wire-auto-arm-ui-2026-08-25.md)). Alembic `010` en `bolsa_v1`.
-> **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-023 Accepted BETA-D** · **A3-wire** `d704263`. Alembic `010` en `bolsa_v1`.
+> **Tag:** **`v1.8.0-beta`** (stamp release — ver `git rev-parse v1.8.0-beta`). Previo: **`v1.7.0-beta` → `e3b943a`**. **BETA / no producción.**
+> **Auditoría:** [`audit-pack-estado-global-2026-08-25-v180.md`](./engineering/audit-pack-estado-global-2026-08-25-v180.md) · relevo [`traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md`](./engineering/traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md).
 
 ---
 
