@@ -1194,8 +1194,8 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
         journal_writer=get_journal_writer(session),
-        position_from_fill=PersistPositionFromFill(repo),
-        position_from_exit=PersistPositionFromExit(repo),
+        position_from_fill=PersistPositionFromFill(repo),  # type: ignore[arg-type]
+        position_from_exit=PersistPositionFromExit(repo),  # type: ignore[arg-type]
     )
 
 
@@ -1384,7 +1384,7 @@ def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
-        position_from_fill=PersistPositionFromFill(
+        position_from_fill=PersistPositionFromFill(  # type: ignore[arg-type]
             SqlAlchemyPositionStateRepository(session)
         ),
     )

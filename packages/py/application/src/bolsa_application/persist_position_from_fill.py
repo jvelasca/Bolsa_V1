@@ -85,7 +85,7 @@ class PersistPositionFromFill:
                 return open_row
 
         reason = (inp.override_reason or "").strip()
-        override = {"reason": reason} if reason else None
+        override: dict[str, object] | None = {"reason": reason} if reason else None
         state = build_position_state_from_fill(
             plan,
             fill_price=inp.fill_price,

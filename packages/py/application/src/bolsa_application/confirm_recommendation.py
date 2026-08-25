@@ -832,6 +832,8 @@ class ConfirmRecommendationIntent:
         if row is None:
             return None
         state = row_position_state(row)
+        if state is None:
+            return None
         return _package_action_from_position_direction(
             state.get("direction"),
             instrument_id=str(rec.instrument_id or ""),

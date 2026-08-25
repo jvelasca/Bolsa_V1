@@ -543,13 +543,15 @@ class ProposeRecommendationFromTa:
             if isinstance(trade_plan_dict, dict)
             else None
         )
-        try:
-            structural_stop = (
-                float(structural_stop_raw)
-                if structural_stop_raw is not None
-                else None
-            )
-        except (TypeError, ValueError):
+        structural_stop: float | None
+        if isinstance(structural_stop_raw, (int, float)):
+            structural_stop = float(structural_stop_raw)
+        elif isinstance(structural_stop_raw, str):
+            try:
+                structural_stop = float(structural_stop_raw)
+            except ValueError:
+                structural_stop = None
+        else:
             structural_stop = None
         thesis_health = build_thesis_health_dict(
             confidence=float(runtime.package.overall_confidence),
@@ -561,9 +563,15 @@ class ProposeRecommendationFromTa:
         entry_raw = (
             trade_plan_dict.get("entry") if isinstance(trade_plan_dict, dict) else None
         )
-        try:
-            entry_px = float(entry_raw) if entry_raw is not None else None
-        except (TypeError, ValueError):
+        entry_px: float | None
+        if isinstance(entry_raw, (int, float)):
+            entry_px = float(entry_raw)
+        elif isinstance(entry_raw, str):
+            try:
+                entry_px = float(entry_raw)
+            except ValueError:
+                entry_px = None
+        else:
             entry_px = None
         protect_plan = build_protect_plan_dict(
             direction=plan_direction,
