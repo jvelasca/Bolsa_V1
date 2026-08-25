@@ -1,4 +1,4 @@
-# Engineering Index — índice maestro de docs
+﻿# Engineering Index — índice maestro de docs
 
 > **AsOf:** 2026-08-03  
 > **Propósito:** un **padre único** para la documentación de ingeniería (respuesta a auditoría externa A0 H1).  
@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `26ecd29` · feat RX1 `9289b53` · I3 `26901aa` · origin `05e354c` · I1–I3 + RX1 exits honesty
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `PLACEHOLDER_STAMP` · feat 8.0 `cf880eb` · RX1 `9289b53` · origin `05e354c` · Ciclo 8.0 Expectancy thin · I1–I3 + RX1 intactos
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -62,7 +62,10 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md ← **RELEVO ACTIVO** · RX1 exits honesty · CERRADO `9289b53` · **no thaw** · **no** I4
+│   ├── traspaso-relevo-ciclo-8-0-expectancy-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 8.0 Expectancy thin · CERRADO `cf880eb` · park 8.1/8.2
+│   ├── plan-ciclo-8-0-expectancy-thin-2026-08-25.md ← plan 8.0 · D1–D8 OK · CERRADO en `cf880eb`
+│   ├── roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md ← roadmap fase 8.x · 8.1 trail · 8.2 bracket parked
+│   ├── traspaso-relevo-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md ← histórico · RX1 exits honesty · CERRADO `9289b53` · **no thaw** · **no** I4
 │   ├── plan-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md ← plan RX1 · D1–D8 OK · CERRADO en `9289b53`
 │   ├── traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md ← histórico · cierre línea I1–I3 · residual exits → RX1
 │   ├── traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md ← histórico · I3 Shadow honesty · CERRADO `26901aa` · **no thaw**

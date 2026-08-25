@@ -1,4 +1,4 @@
-# ADR-031: Modelo operativo — tesis ≠ plan ≠ permiso (TradePlan v0)
+﻿# ADR-031: Modelo operativo — tesis ≠ plan ≠ permiso (TradePlan v0)
 
 **Estado:** Aceptado  
 **Fecha:** 2026-08-24  
@@ -118,7 +118,9 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.2 Exit Radar thin (cerrado `e813aa3`):** mapper → `runtime.exitRadar` · Hoy «Salida» · prioridad exit > time_stop > trail · **sin** auto-exit · **sin** EvaluatePositionExits · **sin** mutar stop · `check_opening` intacto.
 
-**Ciclo 5.3 MFE/MAE thin (cerrado `fd44a03`):** mapper → `runtime.mfeMae` · peak MFE/MAE (barras / close_proxy) · Hoy «Excursión» métricas · **sin** expectancy · **sin** CTA acción · `check_opening` intacto.
+**Ciclo 5.3 MFE/MAE thin (cerrado `fd44a03`):** mapper → `runtime.mfeMae` · peak MFE/MAE (barras / close_proxy) · Hoy «Excursión» métricas · **sin** expectancy plena · **sin** CTA acción · `check_opening` intacto.
+
+**Ciclo 8.0 Expectancy thin (cerrado `cf880eb`):** mapper → `runtime.expectancy` · live proxy setup+`currentR` · Hoy «Expectativa» · **≠ permiso** · **sin** trail/bracket · **sin** journal histórica · `check_opening` intacto.
 
 **Ciclo I1 ExecuteTrade converge (cerrado `2bd5cd8`):** `allow_opening_fill` compartido Confirm + Fill + HTTP. `POST /portfolio/trade` buy → `check_opening` (403 `risk_veto`); sell skip. Router AUTO no fusionado. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
@@ -131,14 +133,14 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
-- Trailing continuo broker, bracket, T1 parcial fill
+- Trailing continuo broker (**Ciclo 8.1 parked**), bracket / T1 parcial fill (**Ciclo 8.2 parked**)
 - Thesis Health **plena** (persistencia Confidence lifecycle cableada)
-- Expectancy por setup (Attribution **plena**; MFE/MAE thin = 5.3)
+- Expectancy **plena** por setup (journal/fills aggregate; thin = **8.0**)
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 
-Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · Actionability TradePlan es server · fórmula IO es server (chip) · rank Estudio puede seguir en cliente · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect / Exit Radar / MFE-MAE ≠ permiso.
+Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · Actionability TradePlan es server · fórmula IO es server (chip) · rank Estudio puede seguir en cliente · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect / Exit Radar / MFE-MAE / Expectancy thin ≠ permiso.
 
 ---
 

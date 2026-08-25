@@ -1,8 +1,8 @@
-# Plan — Ciclo 8.0 Expectancy thin (advisory)
+﻿# Plan — Ciclo 8.0 Expectancy thin (advisory)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §6 · roadmap [`roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md`](./roadmap-ciclo-8-crecimiento-expectancy-trail-bracket-2026-08-25.md) · relevo integridad E1.4.
 > **AsOf:** 2026-08-25.
-> **Estado:** **CERRADO** (D1–D8 OK) · feat `PLACEHOLDER_FEAT` · batería **149**.
+> **Estado:** **CERRADO** (D1–D8 OK) · feat `cf880eb` · batería **149**.
 > **Método:** espejo 5.3 / Ciclo 6; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; **sin** trail/bracket; **sin** journal histórica plena; **sin** thaw.
 > **Elección thin:** agregado puro setup+R (media R = expectancy clásica en R) sobre samples; propose alimenta **live proxy** (1 sample: `entrySetup` + `mfeMae.currentR`). El mismo mapper servirá expectancy plena cuando haya N samples de journal.
 
