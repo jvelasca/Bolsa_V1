@@ -10,6 +10,12 @@ from collections.abc import Sequence
 from typing import Any, Literal
 
 ExpectancyStatus = Literal["none", "thin", "ready"]
+ExpectancySampleQuality = Literal[
+    "insufficient",
+    "preliminary",
+    "developing",
+    "useful",
+]
 ExpectancyWhy = Literal[
     "missing_inputs",
     "thin_sample",
@@ -19,8 +25,23 @@ ExpectancyWhy = Literal[
 ]
 
 EXPECTANCY_KEY = "expectancy"
-# Below this N the surface is honest "thin" (not plena).
+# Thin-surface ready threshold. `status: ready` is NOT statistically useful (C5).
 _READY_MIN_N = 5
+
+
+def sample_quality_from_n(n: int) -> ExpectancySampleQuality:
+    """Honesty bands (convention, not closed science).
+
+    n<20 insufficient · 20–49 preliminary · 50–99 developing · 100+ useful.
+    Independent of ``status`` (ready uses _READY_MIN_N=5).
+    """
+    if n < 20:
+        return "insufficient"
+    if n < 50:
+        return "preliminary"
+    if n < 100:
+        return "developing"
+    return "useful"
 
 
 def map_expectancy(
@@ -83,6 +104,7 @@ def map_expectancy(
             "avgLossR": None,
             "currentR": cur,
             "why": ["missing_inputs"],
+            "sampleQuality": sample_quality_from_n(0),
         }
 
     n = len(matched)
@@ -114,6 +136,7 @@ def map_expectancy(
         "avgLossR": avg_loss,
         "currentR": cur,
         "why": why,
+        "sampleQuality": sample_quality_from_n(n),
     }
 
 

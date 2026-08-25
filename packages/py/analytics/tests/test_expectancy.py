@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bolsa_analytics.cognitive.expectancy import map_expectancy
+from bolsa_analytics.cognitive.expectancy import map_expectancy, sample_quality_from_n
 
 
 def test_missing_inputs_none() -> None:
@@ -10,6 +10,7 @@ def test_missing_inputs_none() -> None:
     assert out["status"] == "none"
     assert out["n"] == 0
     assert out["why"] == ["missing_inputs"]
+    assert out["sampleQuality"] == "insufficient"
 
 
 def test_live_proxy_thin_sample() -> None:
@@ -28,6 +29,7 @@ def test_live_proxy_thin_sample() -> None:
     assert "live_proxy" in out["why"]
     assert "thin_sample" in out["why"]
     assert "not_permission" in out["why"]
+    assert out["sampleQuality"] == "insufficient"
 
 
 def test_aggregate_mean_r_and_ready() -> None:
@@ -49,6 +51,7 @@ def test_aggregate_mean_r_and_ready() -> None:
     assert "aggregated" in out["why"]
     assert "not_permission" in out["why"]
     assert "thin_sample" not in out["why"]
+    assert out["sampleQuality"] == "insufficient"
 
 
 def test_focus_none_setup_ignored() -> None:
@@ -59,6 +62,7 @@ def test_focus_none_setup_ignored() -> None:
     )
     assert out["status"] == "none"
     assert out["why"] == ["missing_inputs"]
+    assert out["sampleQuality"] == "insufficient"
 
 
 def test_snake_keys_accepted() -> None:
@@ -71,3 +75,32 @@ def test_snake_keys_accepted() -> None:
     assert out["expectancyR"] == -0.2
     assert out["winRate"] == 0.0
     assert out["avgLossR"] == -0.2
+    assert out["sampleQuality"] == "insufficient"
+
+
+def test_sample_quality_bands() -> None:
+    assert sample_quality_from_n(0) == "insufficient"
+    assert sample_quality_from_n(19) == "insufficient"
+    assert sample_quality_from_n(20) == "preliminary"
+    assert sample_quality_from_n(49) == "preliminary"
+    assert sample_quality_from_n(50) == "developing"
+    assert sample_quality_from_n(99) == "developing"
+    assert sample_quality_from_n(100) == "useful"
+
+
+def _n_samples(n: int, setup: str = "pullback") -> list[dict[str, float | str]]:
+    return [
+        {"entrySetup": setup, "rMultiple": 1.0 if i % 2 == 0 else -0.5}
+        for i in range(n)
+    ]
+
+
+def test_sample_quality_via_mapper_n() -> None:
+    prelim = map_expectancy(samples=_n_samples(20))
+    assert prelim["sampleQuality"] == "preliminary"
+    assert prelim["status"] == "ready"
+    developing = map_expectancy(samples=_n_samples(50))
+    assert developing["sampleQuality"] == "developing"
+    useful = map_expectancy(samples=_n_samples(100))
+    assert useful["sampleQuality"] == "useful"
+    assert useful["status"] == "ready"

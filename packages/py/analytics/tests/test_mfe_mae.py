@@ -19,6 +19,7 @@ def test_peak_from_bars_favorable() -> None:
     assert out["currentR"] == 0.8
     assert "peak_from_bars" in out["why"]
     assert "mfe_ge_1_5r" in out["why"]
+    assert out["source"] == "bars"
 
 
 def test_adverse_when_mae_ge_1r() -> None:
@@ -32,6 +33,7 @@ def test_adverse_when_mae_ge_1r() -> None:
     assert out["status"] == "adverse"
     assert out["maeR"] == 1.2
     assert "mae_ge_1r" in out["why"]
+    assert out["source"] == "bars"
 
 
 def test_close_proxy_without_bars() -> None:
@@ -45,6 +47,7 @@ def test_close_proxy_without_bars() -> None:
     assert out["mfeR"] == 0.5
     assert out["maeR"] == 0.0
     assert "close_proxy" in out["why"]
+    assert out["source"] == "close_proxy"
 
 
 def test_short_peak_from_bars() -> None:
@@ -59,9 +62,11 @@ def test_short_peak_from_bars() -> None:
     assert out["maeR"] == 0.3
     assert out["status"] == "favorable"
     assert "peak_from_bars" in out["why"]
+    assert out["source"] == "bars"
 
 
 def test_missing_inputs_is_none() -> None:
     out = map_mfe_mae(direction="long", entry=100.0)
     assert out["status"] == "none"
     assert "missing_inputs" in out["why"]
+    assert out["source"] == "none"

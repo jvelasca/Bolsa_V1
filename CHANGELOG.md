@@ -4,6 +4,13 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+### Ciclo C5 — MFE/Expectancy honesty
+
+- `MfeMae.source`: `bars` | `close_proxy` | `none`. Hoy Excursión añade sufijo `proxy` si close_proxy. Proxy no se presenta como peak de barras.
+- Expectancy `sampleQuality`: insufficient (n<20) / preliminary (20–49) / developing (50–99) / useful (n≥100). `status: ready` (READY_MIN_N=5) no significa estadísticamente útil.
+- UI Expectativa: «muestra insuficiente (n=…)» antes de E±R si insufficient. Sigue `≠ permiso`. Parsers `asMfeMae` / `asExpectancy` fail-soft.
+- Advisory ≠ permiso. **No** mezclar proxy y bars en agregados futuros. Sin journal histórica.
+
 ### Ciclo C3 — ActionQueue
 
 - `buildActionQueue(board)` devuelve la cola completa ordenada (prioridad D2 + `actionability` del plan vivo; dedup por símbolo post-sort).

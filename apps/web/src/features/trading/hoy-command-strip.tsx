@@ -114,12 +114,16 @@ function mfeMaeLine(metrics: MfeMaeV1): string {
   if (metrics.status !== "observe") {
     parts.push(metrics.status);
   }
+  if (metrics.source === "close_proxy") parts.push("proxy");
   return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
 function expectancyLine(exp: ExpectancyV1): string {
   const parts: string[] = [];
   if (exp.entrySetup) parts.push(exp.entrySetup);
+  if (exp.sampleQuality === "insufficient") {
+    parts.push(`muestra insuficiente (n=${exp.n})`);
+  }
   if (exp.expectancyR != null) parts.push(`E ${exp.expectancyR}R`);
   parts.push(`n=${exp.n}`);
   if (exp.winRate != null) parts.push(`WR ${(exp.winRate * 100).toFixed(0)}%`);

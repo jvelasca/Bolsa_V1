@@ -374,6 +374,7 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.mfeMae?.status).toBe("favorable");
     expect(items[0]?.mfeMae?.mfeR).toBe(1.8);
     expect(items[0]?.mfeMae?.maeR).toBe(0.2);
+    expect(items[0]?.mfeMae?.source).toBe("bars");
   });
 
   it("Ciclo 8.0: surfaces expectancy thin without changing kind", () => {
@@ -417,6 +418,103 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.expectancy?.status).toBe("thin");
     expect(items[0]?.expectancy?.expectancyR).toBe(0.8);
     expect(items[0]?.expectancy?.n).toBe(1);
+    expect(items[0]?.expectancy?.sampleQuality).toBe("insufficient");
+  });
+
+  it("Ciclo C5: asMfeMae infers source from why when missing", () => {
+    const proxy = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-proxy",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              executionAllowed: true,
+            }),
+            mfeMae: {
+              status: "observe",
+              mfeR: 0.5,
+              maeR: 0,
+              currentR: 0.5,
+              why: ["close_proxy"],
+            },
+          },
+        ],
+      }),
+    );
+    expect(proxy[0]?.mfeMae?.source).toBe("close_proxy");
+
+    const none = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-none",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i3",
+            symbol: "IBE",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({ status: "WATCH", whyNot: ["entry"] }),
+            mfeMae: {
+              status: "none",
+              mfeR: null,
+              maeR: null,
+              currentR: null,
+              why: ["missing_inputs"],
+            },
+          },
+        ],
+      }),
+    );
+    expect(none[0]?.mfeMae?.source).toBe("none");
+  });
+
+  it("Ciclo C5: asExpectancy derives sampleQuality from n when missing", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-ready-insuff",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              executionAllowed: true,
+              entrySetup: "pullback",
+            }),
+            expectancy: {
+              status: "ready",
+              entrySetup: "pullback",
+              n: 5,
+              expectancyR: 0.4,
+              winRate: 0.6,
+              avgWinR: 1.17,
+              avgLossR: -0.75,
+              currentR: null,
+              why: ["not_permission", "aggregated"],
+            },
+          },
+        ],
+      }),
+    );
+    expect(items[0]?.expectancy?.status).toBe("ready");
+    expect(items[0]?.expectancy?.sampleQuality).toBe("insufficient");
   });
 
   it("Ciclo 8.1: surfaces trailPlan ratchet without changing kind", () => {

@@ -7,6 +7,9 @@ import type { TradePlanDirectionV1 } from "./trade-plan.js";
 
 export type MfeMaeStatusV1 = "none" | "observe" | "favorable" | "adverse";
 
+/** How peaks were measured. `close_proxy` is not a bar peak. */
+export type MfeMaeSourceV1 = "bars" | "close_proxy" | "none";
+
 export type MfeMaeWhyV1 =
   | "peak_from_bars"
   | "close_proxy"
@@ -25,6 +28,8 @@ export type MfeMaeV1 = {
   maeR: number | null;
   currentR: number | null;
   why: MfeMaeWhyV1[];
+  /** Ciclo C5: bars vs close_proxy vs none. Do not mix in future aggregates. */
+  source: MfeMaeSourceV1;
 };
 
 export type MapMfeMaeInput = {
@@ -43,8 +48,35 @@ function round4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }
 
+function missingMfeMae(): MfeMaeV1 {
+  return {
+    status: "none",
+    mfeR: null,
+    maeR: null,
+    currentR: null,
+    why: ["missing_inputs"],
+    source: "none",
+  };
+}
+
+const MFE_SOURCES = new Set<MfeMaeSourceV1>(["bars", "close_proxy", "none"]);
+
+/** Fail-soft: explicit source, else infer from why, else none. */
+export function inferMfeMaeSource(
+  why: readonly string[],
+  source?: unknown,
+): MfeMaeSourceV1 {
+  if (typeof source === "string" && MFE_SOURCES.has(source as MfeMaeSourceV1)) {
+    return source as MfeMaeSourceV1;
+  }
+  if (why.includes("close_proxy")) return "close_proxy";
+  if (why.includes("peak_from_bars")) return "bars";
+  return "none";
+}
+
 /**
  * Peak MFE/MAE in R from bars when available; else lastClose proxy.
+ * `source` distinguishes bar peaks from close_proxy (not interchangeable).
  * Does not emit protect/trail suggestions.
  */
 export function mapMfeMae(input: MapMfeMaeInput): MfeMaeV1 {
@@ -58,24 +90,12 @@ export function mapMfeMae(input: MapMfeMaeInput): MfeMaeV1 {
     !finite(entry) ||
     !finite(stop)
   ) {
-    return {
-      status: "none",
-      mfeR: null,
-      maeR: null,
-      currentR: null,
-      why: ["missing_inputs"],
-    };
+    return missingMfeMae();
   }
 
   const R = Math.abs(entry - stop);
   if (R <= 0) {
-    return {
-      status: "none",
-      mfeR: null,
-      maeR: null,
-      currentR: null,
-      why: ["missing_inputs"],
-    };
+    return missingMfeMae();
   }
 
   const sign = direction === "long" ? 1 : -1;
@@ -110,22 +130,19 @@ export function mapMfeMae(input: MapMfeMaeInput): MfeMaeV1 {
   let mfeR: number;
   let maeR: number;
 
+  let source: MfeMaeSourceV1;
   if (usedBars) {
     why.push("peak_from_bars");
+    source = "bars";
     mfeR = round4(Math.max(peakFav, 0) / R);
     maeR = round4(Math.max(peakAdv, 0) / R);
   } else if (currentR != null) {
     why.push("close_proxy");
+    source = "close_proxy";
     mfeR = round4(Math.max(currentR, 0));
     maeR = round4(Math.max(-currentR, 0));
   } else {
-    return {
-      status: "none",
-      mfeR: null,
-      maeR: null,
-      currentR: null,
-      why: ["missing_inputs"],
-    };
+    return missingMfeMae();
   }
 
   if (maeR >= 1) why.push("mae_ge_1r");
@@ -141,5 +158,6 @@ export function mapMfeMae(input: MapMfeMaeInput): MfeMaeV1 {
     maeR,
     currentR,
     why,
+    source,
   };
 }

@@ -15,6 +15,7 @@
  * Ciclo 8.2: bracketPlan advisory picture — display only / no OCO.
  * Ciclo C3: buildActionQueue = cola completa ordenada (D2+D3);
  * mapDecisionBoardToHoyQueue = slice. Dedup por símbolo post-sort.
+ * Ciclo C5: asMfeMae/asExpectancy parse source + sampleQuality fail-soft.
  */
 
 import type {
@@ -44,12 +45,20 @@ import type {
   ExitRadarV1,
   ExitRadarWhyV1,
 } from "./exit-radar.js";
-import type { MfeMaeStatusV1, MfeMaeV1, MfeMaeWhyV1 } from "./mfe-mae.js";
 import type {
+  MfeMaeSourceV1,
+  MfeMaeStatusV1,
+  MfeMaeV1,
+  MfeMaeWhyV1,
+} from "./mfe-mae.js";
+import { inferMfeMaeSource } from "./mfe-mae.js";
+import type {
+  ExpectancySampleQualityV1,
   ExpectancyStatusV1,
   ExpectancyV1,
   ExpectancyWhyV1,
 } from "./expectancy.js";
+import { inferExpectancySampleQuality } from "./expectancy.js";
 import type {
   TrailPlanStatusV1,
   TrailPlanV1,
@@ -508,12 +517,14 @@ function asMfeMae(value: unknown): MfeMaeV1 | null {
     : [];
   const numOrNull = (v: unknown): number | null =>
     typeof v === "number" && Number.isFinite(v) ? v : null;
+  const source: MfeMaeSourceV1 = inferMfeMaeSource(why, value.source);
   return {
     status: status as MfeMaeStatusV1,
     mfeR: numOrNull(value.mfeR),
     maeR: numOrNull(value.maeR),
     currentR: numOrNull(value.currentR),
     why,
+    source,
   };
 }
 
@@ -586,6 +597,10 @@ function asExpectancy(value: unknown): ExpectancyV1 | null {
   const setupRaw = value.entrySetup;
   const entrySetup =
     typeof setupRaw === "string" && setupRaw.trim() ? setupRaw.trim() : null;
+  const sampleQuality: ExpectancySampleQualityV1 = inferExpectancySampleQuality(
+    n,
+    value.sampleQuality,
+  );
   return {
     status: status as ExpectancyStatusV1,
     entrySetup,
@@ -596,6 +611,7 @@ function asExpectancy(value: unknown): ExpectancyV1 | null {
     avgLossR: numOrNull(value.avgLossR),
     currentR: numOrNull(value.currentR),
     why,
+    sampleQuality,
   };
 }
 

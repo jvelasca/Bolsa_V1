@@ -5,7 +5,14 @@
 
 import type { EntrySetupV1 } from "./trade-plan.js";
 
+/** Surface flag. `ready` (n ≥ READY_MIN_N) is not statistically useful — see sampleQuality. */
 export type ExpectancyStatusV1 = "none" | "thin" | "ready";
+
+export type ExpectancySampleQualityV1 =
+  | "insufficient"
+  | "preliminary"
+  | "developing"
+  | "useful";
 
 export type ExpectancyWhyV1 =
   | "missing_inputs"
@@ -29,6 +36,8 @@ export type ExpectancyV1 = {
   avgLossR: number | null;
   currentR: number | null;
   why: ExpectancyWhyV1[];
+  /** Ciclo C5 honesty. Independent of `status` (ready ≠ useful). */
+  sampleQuality: ExpectancySampleQualityV1;
 };
 
 export type MapExpectancyInput = {
@@ -37,7 +46,41 @@ export type MapExpectancyInput = {
   currentR?: number | null;
 };
 
+/** Thin-surface ready threshold. Not a claim of statistical usefulness (C5). */
 const READY_MIN_N = 5;
+
+const SAMPLE_QUALITIES = new Set<ExpectancySampleQualityV1>([
+  "insufficient",
+  "preliminary",
+  "developing",
+  "useful",
+]);
+
+/**
+ * Honesty bands (convention, not closed science).
+ * n<20 insufficient · 20–49 preliminary · 50–99 developing · 100+ useful.
+ * `status: ready` uses READY_MIN_N=5 and MUST NOT be treated as useful.
+ */
+export function sampleQualityFromN(n: number): ExpectancySampleQualityV1 {
+  if (n < 20) return "insufficient";
+  if (n < 50) return "preliminary";
+  if (n < 100) return "developing";
+  return "useful";
+}
+
+/** Fail-soft: explicit sampleQuality, else derive from n. */
+export function inferExpectancySampleQuality(
+  n: number,
+  sampleQuality?: unknown,
+): ExpectancySampleQualityV1 {
+  if (
+    typeof sampleQuality === "string" &&
+    SAMPLE_QUALITIES.has(sampleQuality as ExpectancySampleQualityV1)
+  ) {
+    return sampleQuality as ExpectancySampleQualityV1;
+  }
+  return sampleQualityFromN(n);
+}
 
 function finite(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -84,6 +127,7 @@ export function mapExpectancy(input: MapExpectancyInput): ExpectancyV1 {
       avgLossR: null,
       currentR,
       why: ["missing_inputs"],
+      sampleQuality: sampleQualityFromN(0),
     };
   }
 
@@ -125,5 +169,6 @@ export function mapExpectancy(input: MapExpectancyInput): ExpectancyV1 {
     avgLossR,
     currentR,
     why,
+    sampleQuality: sampleQualityFromN(n),
   };
 }

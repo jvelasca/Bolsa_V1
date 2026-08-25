@@ -403,7 +403,58 @@ describe("HoyCommandStrip", () => {
     expect(exp).toBeTruthy();
     expect(exp.textContent).toMatch(/Expectativa/i);
     expect(exp.textContent).toMatch(/breakout/i);
+    expect(exp.textContent).toMatch(/muestra insuficiente \(n=1\)/);
+    expect(exp.textContent).toMatch(/muestra insuficiente \(n=1\).*E 0\.8R/);
     expect(exp.textContent).toMatch(/≠ permiso/);
+  });
+
+  it("Ciclo C5: Excursión appends proxy when source is close_proxy", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                },
+                mfeMae: {
+                  status: "observe",
+                  mfeR: 0.5,
+                  maeR: 0,
+                  currentR: 0.5,
+                  why: ["close_proxy"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const metrics = await screen.findByTestId("hoy-mfe-mae");
+    expect(metrics.textContent).toMatch(/MFE 0\.5R · MAE 0R · proxy/i);
   });
 
   it("Ciclo 8.1: dialog shows Trail when trailPlan.status!=none", async () => {
