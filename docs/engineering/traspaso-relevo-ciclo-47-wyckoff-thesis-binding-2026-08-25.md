@@ -40,7 +40,8 @@ Push: `e98b027..` → `origin/main` (incl. update-last).
 ## 4. Siguiente (E1) — chat nuevo
 
 1. ~~Commit~~ · ~~Push~~.
-2. No abrir: Alembic / tabla Wyckoff · `wyckoffPhase` contrato · F9-B · purge · `PAPER_D_EXECUTE` · broker · thesis health / MFE · qty Confirm · Ciclo 5 PM.
+2. ~~Plan 4.8~~ → relevo [`traspaso-relevo-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md`](./traspaso-relevo-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md) (feat `b381d06`).
+3. No abrir: Alembic / tabla Wyckoff · `wyckoffPhase` contrato · F9-B · purge · `PAPER_D_EXECUTE` · broker · thesis health / MFE · qty Confirm · Ciclo 5 PM.
 
 ## 5. Freeze / no tocado
 

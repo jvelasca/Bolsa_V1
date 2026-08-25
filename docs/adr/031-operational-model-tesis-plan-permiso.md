@@ -106,16 +106,18 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 4.7 (cerrado `604fd90`):** thesis binding thin — `_resolve_wyckoff_spring` + `wyckoffSpringAnchor` en `DecisionSession.runtime` (JSONB); prior bound por `decision_id` si hielo intacto; hielo roto → none (no resucita ni cae a locate). LPS etiqueta. Sin Alembic. Sin `wyckoffPhase` en TradePlan. Sin `contract:gen`. `check_opening` intacto.
 
+**Ciclo 4.8 (cerrado `b381d06`):** surface + effort-result — `_wyckoff_effort_evidence` en anchor; echo F3; Hoy Setup (`entrySetup` + phase + effort); Board `extra` anidado. Effort/LPS etiqueta. **Línea SETUP Wyckoff 4.0–4.8 CERRADA.** Sin Alembic. Sin `wyckoffPhase` TradePlan. Sin `contract:gen`. `check_opening` intacto.
+
 No abrir sin fase propia:
 
-- Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — 4.8+
+- Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
 - Position Manager, Thesis Health, Exit Radar, trailing, T1 parcial, time-stop, bracket
 - MFE/MAE, attribution, expectancy por setup
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 
-Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en cliente hasta Actionability en servidor.
+Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en cliente hasta Actionability en servidor · **SETUP Wyckoff cerrado**.
 
 ---
 
