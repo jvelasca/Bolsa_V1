@@ -97,10 +97,13 @@ WYCKOFF_LOOKBACK = 40
 # Ciclo 4.3 — ARMED actionability (entre WATCH entry 0.4 y TRIGGERED ~0.95).
 ARMED_ACTIONABILITY = 0.7
 
+# Ciclo 4.7 — clave runtime en DecisionSession (no TradePlan / no contract:gen).
+WYCKOFF_SPRING_ANCHOR_KEY = "wyckoffSpringAnchor"
+
 
 @dataclass(frozen=True, slots=True)
 class _WyckoffSpringLocate:
-    """Spring vivo localizado en lookback (4.6). No se serializa en TradePlan."""
+    """Spring vivo localizado en lookback (4.6/4.7). No se serializa en TradePlan."""
 
     prior: tuple[object, ...]
     spring: tuple[object, ...]
@@ -247,11 +250,13 @@ def _locate_wyckoff_spring(
     *,
     direction: TradePlanDirection,
     bars: Sequence[object],
+    ice_target: float | None = None,
 ) -> _WyckoffSpringLocate | None:
-    """Ciclo 4.6: spring vivo más reciente en lookback. Sin persistencia.
+    """Ciclo 4.6: spring vivo más reciente en lookback.
 
-    Escanea de más reciente a más antigua. Si el primer spring tiene hielo
-    roto → None (no resucita springs más viejos).
+    Escanea de más reciente a más antigua. Si el primer candidato aceptado
+    tiene hielo roto → None (no resucita springs más viejos).
+    Con ``ice_target`` (4.7): solo acepta springs con ese hielo (binding).
     """
     need = WYCKOFF_PRIOR + WYCKOFF_SPRING + 1
     if direction == "none" or len(bars) < need:
@@ -273,6 +278,8 @@ def _locate_wyckoff_spring(
         ice = _ice_from_spring(direction=direction, spring=spring)
         if ice is None:
             continue
+        if ice_target is not None and ice != ice_target:
+            continue
         # Hielo: solo cerradas posteriores. Last wick bajo ice → LPS false, no mata locate.
         if _ice_broken(direction=direction, ice=ice, post_bars=scan[spring_end:]):
             return None
@@ -285,9 +292,86 @@ def _locate_wyckoff_spring(
     return None
 
 
-def _detect_wyckoff_spring(*, direction: TradePlanDirection, bars: Sequence[object]) -> bool:
-    """Spring vivo en lookback (4.6) o ventana corta (compat)."""
-    return _locate_wyckoff_spring(direction=direction, bars=bars) is not None
+def parse_wyckoff_spring_anchor(raw: object) -> dict[str, object] | None:
+    """Normaliza anchor de sesión cognitiva. Forma rara → None (fail-closed)."""
+    if not isinstance(raw, dict):
+        return None
+    direction = raw.get("direction")
+    if direction not in ("long", "short"):
+        return None
+    ice = _finite_positive(raw.get("ice"))
+    spring_low = _finite_positive(raw.get("springLow"))
+    spring_high = _finite_positive(raw.get("springHigh"))
+    if ice is None or spring_low is None or spring_high is None:
+        return None
+    out: dict[str, object] = {
+        "direction": direction,
+        "ice": ice,
+        "springLow": spring_low,
+        "springHigh": spring_high,
+    }
+    phase = raw.get("phase")
+    if phase in ("none", "spring", "reclaim", "sos", "lps"):
+        out["phase"] = phase
+    return out
+
+
+def snapshot_wyckoff_spring_anchor(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    atr: float | None = None,
+    prior: dict[str, object] | None = None,
+) -> dict[str, object] | None:
+    """Ciclo 4.7: foto del spring resuelto para ``DecisionSession.runtime``."""
+    locate = _resolve_wyckoff_spring(direction=direction, bars=bars, prior=prior)
+    if locate is None:
+        return None
+    spring_lows = [v for v in (_bar_px(bar, "low") for bar in locate.spring) if v is not None]
+    spring_highs = [v for v in (_bar_px(bar, "high") for bar in locate.spring) if v is not None]
+    if not spring_lows or not spring_highs:
+        return None
+    return {
+        "direction": direction,
+        "ice": locate.ice,
+        "springLow": min(spring_lows),
+        "springHigh": max(spring_highs),
+        "phase": _wyckoff_phase_evidence(
+            direction=direction, bars=bars, atr=atr, prior=prior
+        ),
+    }
+
+
+def _resolve_wyckoff_spring(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    prior: dict[str, object] | None = None,
+) -> _WyckoffSpringLocate | None:
+    """Ciclo 4.7: prior bound (mismo ice) si vivo; si hielo roto → None; sin prior → 4.6.
+
+    No cae a locate genérico tras prior muerto (no resucita). No inventa spring
+    si el bound ya no está en el lookback.
+    """
+    if direction == "none":
+        return None
+    anchor = parse_wyckoff_spring_anchor(prior) if prior is not None else None
+    if anchor is None:
+        return _locate_wyckoff_spring(direction=direction, bars=bars)
+    if anchor["direction"] != direction:
+        return None
+    ice = float(anchor["ice"])  # type: ignore[arg-type]
+    return _locate_wyckoff_spring(direction=direction, bars=bars, ice_target=ice)
+
+
+def _detect_wyckoff_spring(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    prior: dict[str, object] | None = None,
+) -> bool:
+    """Spring vivo (4.6 scan o 4.7 bound)."""
+    return _resolve_wyckoff_spring(direction=direction, bars=bars, prior=prior) is not None
 
 
 def _is_wyckoff_reclaim(
@@ -295,9 +379,10 @@ def _is_wyckoff_reclaim(
     direction: TradePlanDirection,
     bars: Sequence[object],
     atr: float | None = None,
+    prior: dict[str, object] | None = None,
 ) -> bool:
-    """Ciclo 4.4/4.6: spring localizado + reclaim estricto (k×ATR o fuera del rango spring)."""
-    locate = _locate_wyckoff_spring(direction=direction, bars=bars)
+    """Ciclo 4.4/4.6/4.7: spring resuelto + reclaim estricto (k×ATR o fuera del rango spring)."""
+    locate = _resolve_wyckoff_spring(direction=direction, bars=bars, prior=prior)
     if locate is None:
         return False
     spring = locate.spring
@@ -322,20 +407,25 @@ def _is_wyckoff_reclaim(
     return atr_ok or range_ok
 
 
-def _detect_wyckoff_sos(*, direction: TradePlanDirection, bars: Sequence[object]) -> bool:
+def _detect_wyckoff_sos(
+    *,
+    direction: TradePlanDirection,
+    bars: Sequence[object],
+    prior: dict[str, object] | None = None,
+) -> bool:
     """SOS etiqueta/evidencia: close fuera del máximo spring o del prior (long) / espejo short.
 
     No cambia EntrySetup ni exige entry_ready (D2/D4).
     """
-    locate = _locate_wyckoff_spring(direction=direction, bars=bars)
+    locate = _resolve_wyckoff_spring(direction=direction, bars=bars, prior=prior)
     if locate is None:
         return False
-    prior, spring, close = locate.prior, locate.spring, locate.close
+    prior_bars, spring, close = locate.prior, locate.spring, locate.close
     if direction == "long":
-        highs = [_bar_px(bar, "high") for bar in (*prior, *spring)]
+        highs = [_bar_px(bar, "high") for bar in (*prior_bars, *spring)]
         valid = [v for v in highs if v is not None]
         return bool(valid) and close > max(valid)
-    lows = [_bar_px(bar, "low") for bar in (*prior, *spring)]
+    lows = [_bar_px(bar, "low") for bar in (*prior_bars, *spring)]
     valid = [v for v in lows if v is not None]
     return bool(valid) and close < min(valid)
 
@@ -345,14 +435,15 @@ def _detect_wyckoff_lps(
     direction: TradePlanDirection,
     bars: Sequence[object],
     atr: float | None = None,
+    prior: dict[str, object] | None = None,
 ) -> bool:
     """LPS etiqueta: pullback sobre hielo (long) / bajo techo (short) tras reclaim formal.
 
-    Sobre spring localizado (4.6). Sin reclaim → False. No fuerza EntrySetup (D2).
+    Sobre spring resuelto (4.6/4.7). Sin reclaim → False. No fuerza EntrySetup (D2).
     """
-    if not _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr):
+    if not _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr, prior=prior):
         return False
-    locate = _locate_wyckoff_spring(direction=direction, bars=bars)
+    locate = _resolve_wyckoff_spring(direction=direction, bars=bars, prior=prior)
     if locate is None:
         return False
     close = locate.close
@@ -374,18 +465,21 @@ def _wyckoff_phase_evidence(
     direction: TradePlanDirection,
     bars: Sequence[object],
     atr: float | None = None,
+    prior: dict[str, object] | None = None,
 ) -> WyckoffPhaseEvidence:
-    """SM lookback (4.6): spring → reclaim → sos? → lps? Recalculada cada classify.
+    """SM (4.6/4.7): spring → reclaim → sos? → lps? Sobre spring resuelto.
 
-    Interno / tests. No se expone en TradePlan JSON (D4).
+    Interno / tests / runtime sesión. No se expone en TradePlan JSON (D4).
     """
-    if direction == "none" or _locate_wyckoff_spring(direction=direction, bars=bars) is None:
+    if direction == "none" or _resolve_wyckoff_spring(
+        direction=direction, bars=bars, prior=prior
+    ) is None:
         return "none"
-    if not _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr):
+    if not _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr, prior=prior):
         return "spring"
-    if _detect_wyckoff_lps(direction=direction, bars=bars, atr=atr):
+    if _detect_wyckoff_lps(direction=direction, bars=bars, atr=atr, prior=prior):
         return "lps"
-    if _detect_wyckoff_sos(direction=direction, bars=bars):
+    if _detect_wyckoff_sos(direction=direction, bars=bars, prior=prior):
         return "sos"
     return "reclaim"
 
@@ -395,8 +489,9 @@ def classify_entry_setup(
     action: str,
     bars: Sequence[object] | None = None,
     atr: float | None = None,
+    wyckoff_prior: dict[str, object] | None = None,
 ) -> EntrySetup:
-    """Ciclo 4.2/4.4/4.6: breakout > pullback > wyckoff > none. Sin barras → none."""
+    """Ciclo 4.2–4.7: breakout > pullback > wyckoff > none. Sin barras → none."""
     direction = _direction_from_action(action)
     if direction == "none" or bars is None:
         return "none"
@@ -405,7 +500,9 @@ def classify_entry_setup(
     if _is_pullback(direction=direction, bars=bars, atr=atr):
         return "pullback"
     # SOS/LPS son evidencia interna; no fuerzan EntrySetup (4.4 D2 / 4.5 D2).
-    if _is_wyckoff_reclaim(direction=direction, bars=bars, atr=atr):
+    if _is_wyckoff_reclaim(
+        direction=direction, bars=bars, atr=atr, prior=wyckoff_prior
+    ):
         return "wyckoff"
     return "none"
 
@@ -492,15 +589,19 @@ def build_v0_trade_plan_dict(
     equity: float = 0.0,
     risk_pct: float = 0.5,
     market_regime: str | None = None,
+    wyckoff_prior: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """TradePlan persistible (PLAN layer; ranking ≠ BUY).
 
     Freshness/mandate quedan True: esos gates viven en confirm ``check_opening``.
     Sin ATR/barras/bias (rebuild confirm) → ``WATCH`` / ``no_stop`` o ``entry``.
     Sin ``market_regime`` → no inventa veto ``regime`` (Ciclo 4.1 D6).
+    ``wyckoff_prior`` (Ciclo 4.7): anchor de sesión; sin barras → classify none (D8).
     """
     structural_stop = compute_structural_stop(action=action, entry=entry, atr=atr, bars=bars)
-    setup = classify_entry_setup(action=action, bars=bars, atr=atr)
+    setup = classify_entry_setup(
+        action=action, bars=bars, atr=atr, wyckoff_prior=wyckoff_prior
+    )
     plan = build_trade_plan(
         decision_id=decision_id,
         instrument_id=instrument_id,

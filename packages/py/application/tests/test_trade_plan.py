@@ -1,4 +1,4 @@
-"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.6."""
+"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.7."""
 
 from types import SimpleNamespace
 
@@ -10,7 +10,9 @@ from bolsa_analytics.cognitive.trade_plan import (
     WYCKOFF_RECLAIM_ATR_K,
     WYCKOFF_SPRING,
     _detect_wyckoff_lps,
+    _is_wyckoff_reclaim,
     _locate_wyckoff_spring,
+    _resolve_wyckoff_spring,
     _wyckoff_phase_evidence,
     build_trade_plan,
     build_v0_trade_plan_dict,
@@ -19,6 +21,8 @@ from bolsa_analytics.cognitive.trade_plan import (
     compute_structural_stop,
     entry_ready_from_ta,
     no_new_longs_blocks,
+    parse_wyckoff_spring_anchor,
+    snapshot_wyckoff_spring_anchor,
 )
 
 
@@ -593,3 +597,126 @@ def test_wyckoff_aged_ice_broken_is_none() -> None:
     assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "none"
     assert _detect_wyckoff_lps(direction="long", bars=bars, atr=atr) is False
     assert _wyckoff_phase_evidence(direction="long", bars=bars, atr=atr) == "none"
+
+
+def _wyckoff_dual_spring_bars() -> list[SimpleNamespace]:
+    """Spring viejo (ice=85) + pad + spring nuevo (ice=87) + reclaim last.
+
+    Locate 4.6 elige el más reciente (87). Binding 4.7 puede fijar 85.
+    """
+    old_prior, old_spring = _wyckoff_spring_base()  # ice 85
+    pad = _wyckoff_aged_pad(8)
+    # Nuevo spring: prior lows 92, spring lows 87
+    new_prior = [_bar(close=94, high=96, low=92) for _ in range(WYCKOFF_PRIOR)]
+    new_spring = [_bar(close=88, high=90, low=87) for _ in range(WYCKOFF_SPRING)]
+    last = _bar(close=91.0, high=91.0, low=88.0)  # reclaim fuera rango new spring
+    return [*old_prior, *old_spring, *pad, *new_prior, *new_spring, last]
+
+
+def test_wyckoff_resolve_without_prior_matches_locate() -> None:
+    """Ciclo 4.7: sin prior → mismo spring que locate 4.6."""
+    bars = _wyckoff_formal_reclaim_bars()
+    located = _locate_wyckoff_spring(direction="long", bars=bars)
+    resolved = _resolve_wyckoff_spring(direction="long", bars=bars)
+    assert located is not None and resolved is not None
+    assert resolved.ice == located.ice
+
+
+def test_wyckoff_bound_prior_prefers_older_spring() -> None:
+    """Ciclo 4.7: prior + hielo vivo → spring bound aunque locate prefiera otro."""
+    atr = 2.0
+    bars = _wyckoff_dual_spring_bars()
+    fresh = _locate_wyckoff_spring(direction="long", bars=bars)
+    assert fresh is not None and fresh.ice == 87.0
+    prior = {
+        "direction": "long",
+        "ice": 85.0,
+        "springLow": 85.0,
+        "springHigh": 88.0,
+    }
+    bound = _resolve_wyckoff_spring(direction="long", bars=bars, prior=prior)
+    assert bound is not None and bound.ice == 85.0
+    assert _is_wyckoff_reclaim(direction="long", bars=bars, atr=atr, prior=prior) is True
+    # Sin prior el reclaim usa el spring fresco (87); con prior se queda en 85.
+    assert _resolve_wyckoff_spring(direction="long", bars=bars).ice == 87.0
+    assert _wyckoff_phase_evidence(
+        direction="long", bars=bars, atr=atr, prior=prior
+    ) in ("reclaim", "sos", "lps")
+    # Serie solo-wyckoff: classify con prior sigue wyckoff (regresión setup).
+    solo = _wyckoff_formal_reclaim_bars()
+    assert (
+        classify_entry_setup(
+            action="recommend_long", bars=solo, atr=atr, wyckoff_prior=prior
+        )
+        == "wyckoff"
+    )
+
+def test_wyckoff_bound_prior_ice_broken_is_none() -> None:
+    """Ciclo 4.7: prior con hielo roto → none; no resucita ni cae a locate."""
+    atr = 2.0
+    bars = _wyckoff_aged_ice_broken_bars()
+    prior = {
+        "direction": "long",
+        "ice": 85.0,
+        "springLow": 85.0,
+        "springHigh": 88.0,
+    }
+    assert _resolve_wyckoff_spring(direction="long", bars=bars, prior=prior) is None
+    assert (
+        classify_entry_setup(
+            action="recommend_long", bars=bars, atr=atr, wyckoff_prior=prior
+        )
+        == "none"
+    )
+
+
+def test_wyckoff_breakout_still_beats_bound_prior() -> None:
+    """Prioridad breakout > pullback > wyckoff intacta con binding."""
+    bars = _wyckoff_and_breakout_bars()
+    prior = snapshot_wyckoff_spring_anchor(
+        direction="long", bars=_wyckoff_formal_reclaim_bars(), atr=2.0
+    )
+    assert prior is not None
+    assert (
+        classify_entry_setup(
+            action="recommend_long", bars=bars, atr=2.0, wyckoff_prior=prior
+        )
+        == "breakout"
+    )
+
+
+def test_wyckoff_confirm_rebuild_without_bars_ignores_prior() -> None:
+    """Ciclo 4.7 D8: sin barras → none aunque haya prior (no inventa setup)."""
+    prior = {
+        "direction": "long",
+        "ice": 85.0,
+        "springLow": 85.0,
+        "springHigh": 88.0,
+        "phase": "reclaim",
+    }
+    assert parse_wyckoff_spring_anchor(prior) is not None
+    plan = build_v0_trade_plan_dict(
+        decision_id="d1",
+        instrument_id="i1",
+        action="recommend_long",
+        entry=90.0,
+        opportunity_score=0.5,
+        expires_at=None,
+        bars=None,
+        wyckoff_prior=prior,
+    )
+    assert plan["entrySetup"] == "none"
+
+
+def test_wyckoff_snapshot_anchor_roundtrip() -> None:
+    bars = _wyckoff_formal_reclaim_bars()
+    snap = snapshot_wyckoff_spring_anchor(direction="long", bars=bars, atr=2.0)
+    assert snap is not None
+    assert snap["ice"] == 85.0
+    assert parse_wyckoff_spring_anchor(snap) == {
+        "direction": "long",
+        "ice": 85.0,
+        "springLow": 85.0,
+        "springHigh": 88.0,
+        "phase": snap["phase"],
+    }

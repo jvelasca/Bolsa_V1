@@ -11,7 +11,12 @@ from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
 )
-from bolsa_analytics.cognitive.trade_plan import build_v0_trade_plan_dict
+from bolsa_analytics.cognitive.trade_plan import (
+    WYCKOFF_SPRING_ANCHOR_KEY,
+    build_v0_trade_plan_dict,
+    parse_wyckoff_spring_anchor,
+    snapshot_wyckoff_spring_anchor,
+)
 from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_analytics.indicators.compute import OhlcvBar
@@ -63,6 +68,37 @@ def _risk_pct_for_policy(policy_version: str | None) -> float:
         return float(get_policy_template(key).risk.max_risk_per_trade_pct)
     except KeyError:
         return float(get_policy_template("moderate").risk.max_risk_per_trade_pct)
+
+
+async def _wyckoff_prior_for_decision(
+    store: Any | None,
+    *,
+    decision_id: str,
+    instrument_id: str,
+) -> dict[str, object] | None:
+    """Ciclo 4.7: última sesión del mismo decision_id con anchor en runtime."""
+    if store is None or not decision_id:
+        return None
+    list_fn = getattr(store, "list_decision_sessions", None)
+    if list_fn is None:
+        return None
+    try:
+        rows = await list_fn(limit=50, instrument_id=instrument_id)
+    except Exception:  # noqa: BLE001 — propose no tumba por audit
+        return None
+    for row in rows:
+        if getattr(row, "decision_id", None) != decision_id:
+            continue
+        payload = getattr(row, "payload", None)
+        if not isinstance(payload, dict):
+            continue
+        runtime = payload.get("runtime")
+        if not isinstance(runtime, dict):
+            continue
+        anchor = parse_wyckoff_spring_anchor(runtime.get(WYCKOFF_SPRING_ANCHOR_KEY))
+        if anchor is not None:
+            return anchor
+    return None
 
 
 class OhlcvBarsPort(Protocol):
@@ -398,6 +434,11 @@ class ProposeRecommendationFromTa:
             status="awaiting_human",
             edge_report_ref=edge_ref,
         )
+        wyckoff_prior = await _wyckoff_prior_for_decision(
+            self._cognitive_store,
+            decision_id=runtime.package.decision_id,
+            instrument_id=instrument_id,
+        )
         trade_plan_dict = build_v0_trade_plan_dict(
             decision_id=runtime.package.decision_id,
             instrument_id=instrument_id,
@@ -414,6 +455,19 @@ class ProposeRecommendationFromTa:
             equity=await self._equity_for_account(account_id),
             risk_pct=_risk_pct_for_policy(policy_version),
             market_regime=regime,
+            wyckoff_prior=wyckoff_prior,
+        )
+        wyckoff_anchor = snapshot_wyckoff_spring_anchor(
+            direction=(
+                "long"
+                if str(runtime.package.action) == "recommend_long"
+                else "short"
+                if str(runtime.package.action) == "recommend_short"
+                else "none"
+            ),
+            bars=ohlcv_bars,
+            atr=inputs.atr,
+            prior=wyckoff_prior,
         )
 
         present_types = {a.assessment_type for a in runtime.assessments}
@@ -447,6 +501,16 @@ class ProposeRecommendationFromTa:
             except Exception:  # noqa: BLE001 — prediction best-effort
                 pass
 
+        session_runtime: dict[str, Any] = {
+            "combinedScore": runtime.combined_score,
+            "decisionPackage": runtime.package.to_dict(),
+            "lastClose": last_close,
+            "predictionsDoNotDecide": True,
+            "tradePlan": trade_plan_dict,
+        }
+        if wyckoff_anchor is not None:
+            session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
+
         session = build_propose_session(
             instrument_id=instrument_id,
             symbol=resolved_symbol,
@@ -461,13 +525,7 @@ class ProposeRecommendationFromTa:
             assessments=[a.to_assessment_dict() for a in runtime.assessments],
             evidence=None if evidence_assess is None else evidence_assess.to_dict(),
             predictions=prediction_dicts,
-            runtime={
-                "combinedScore": runtime.combined_score,
-                "decisionPackage": runtime.package.to_dict(),
-                "lastClose": last_close,
-                "predictionsDoNotDecide": True,
-                "tradePlan": trade_plan_dict,
-            },
+            runtime=session_runtime,
             recommendation=rec.to_dict(),
             policy_gate=runtime.policy_gate,
             lineage={

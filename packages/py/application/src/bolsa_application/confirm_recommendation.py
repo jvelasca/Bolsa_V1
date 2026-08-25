@@ -65,7 +65,11 @@ from bolsa_analytics.cognitive.decision_session import (
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.cognitive.recommendation import Recommendation
-from bolsa_analytics.cognitive.trade_plan import build_v0_trade_plan_dict
+from bolsa_analytics.cognitive.trade_plan import (
+    WYCKOFF_SPRING_ANCHOR_KEY,
+    build_v0_trade_plan_dict,
+    parse_wyckoff_spring_anchor,
+)
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
@@ -270,10 +274,12 @@ def resolve_confirm_trade_plan(
                 return session_plan
 
     opportunity: float | None = None
+    wyckoff_prior: dict[str, object] | None = None
     if runtime is not None:
         raw_score = runtime.get("combinedScore")
         if isinstance(raw_score, int | float):
             opportunity = float(raw_score)
+        wyckoff_prior = parse_wyckoff_spring_anchor(runtime.get(WYCKOFF_SPRING_ANCHOR_KEY))
 
     compliance = None if package is None else package.get("complianceCheck")
     entry: float | None = None
@@ -292,6 +298,7 @@ def resolve_confirm_trade_plan(
         opportunity_score=opportunity,
         expires_at=rec.expires_at,
         expired=recommendation_is_expired(rec.expires_at),
+        wyckoff_prior=wyckoff_prior,
     )
 
 
