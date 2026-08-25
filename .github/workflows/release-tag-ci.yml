@@ -1,0 +1,233 @@
+# INFRA — CI reproducible por tag (ADR triage v1.8.1 / roadmap v1.9).
+# Dispara en push de tags v* SIN path-filter (docs-only stamp también certifica).
+# Path-filters de frontend-ci / python-ci diarios quedan intactos.
+name: Release tag CI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: release-tag-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: security (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  shared:
+    name: shared (build/typecheck/test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm --filter @bolsa/shared build
+
+      - name: Typecheck shared
+        run: pnpm --filter @bolsa/shared typecheck
+
+      - name: Test shared
+        run: pnpm --filter @bolsa/shared test
+
+  spine:
+    name: decision-spine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install JS dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Expose uv venv on PATH
+        run: echo "${{ github.workspace }}/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Decision Spine battery
+        run: pnpm test:decision-spine
+
+  frontend:
+    name: frontend (typecheck/lint/test/build + contract:check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.12.1
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm --filter @bolsa/shared build
+
+      - name: Typecheck web
+        run: pnpm --filter @bolsa/web typecheck
+
+      - name: Lint web
+        run: pnpm --filter @bolsa/web lint
+
+      - name: Test web
+        run: pnpm --filter @bolsa/web test
+
+      - name: Contract check (no gen)
+        run: pnpm --filter @bolsa/web contract:check
+
+      - name: Build web
+        run: pnpm --filter @bolsa/web build
+
+  python:
+    name: python (ruff/imports/mypy/pytest offline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Ruff
+        run: uv run ruff check packages/py apps/api-python --config pyproject.toml
+
+      - name: Import-linter
+        run: uv run lint-imports --config packages/py/.importlinter
+
+      - name: Mypy
+        run: >
+          uv run mypy
+          packages/py/domain/src
+          packages/py/market/src
+          packages/py/infrastructure/src
+          packages/py/application/src
+          apps/api-python/src
+          --follow-imports=silent
+
+      - name: Pytest offline
+        run: >
+          uv run pytest
+          packages/py/market/tests
+          packages/py/analytics/tests
+          packages/py/infrastructure/tests/test_verify_financial_invariants.py
+          apps/api-python/tests
+          --ignore=apps/api-python/tests/integration
+          --ignore=apps/api-python/tests/test_lists.py
+          --ignore=apps/api-python/tests/test_workspaces.py
+          --ignore=apps/api-python/tests/test_health.py
+          --ignore=apps/api-python/tests/test_auth.py
+          --ignore=apps/api-python/tests/test_account_isolation.py
+          --ignore=apps/api-python/tests/test_ai_authoring.py
+          --ignore=apps/api-python/tests/test_f7b_legacy_user_id_backfill.py
+          --ignore=apps/api-python/tests/test_platform_events_isolation.py
+          --ignore=apps/api-python/tests/test_trackers_policies_isolation.py
+          --ignore=apps/api-python/tests/test_workspaces_isolation.py
+          -q
+
+  certify:
+    name: certify (aggregate + artifact)
+    runs-on: ubuntu-latest
+    needs: [security, shared, spine, frontend, python]
+    if: always()
+    steps:
+      - name: Fail if any required job failed
+        if: >
+          needs.security.result != 'success' ||
+          needs.shared.result != 'success' ||
+          needs.spine.result != 'success' ||
+          needs.frontend.result != 'success' ||
+          needs.python.result != 'success'
+        run: |
+          echo "Release tag CI not GREEN"
+          echo "security=${{ needs.security.result }}"
+          echo "shared=${{ needs.shared.result }}"
+          echo "spine=${{ needs.spine.result }}"
+          echo "frontend=${{ needs.frontend.result }}"
+          echo "python=${{ needs.python.result }}"
+          exit 1
+
+      - name: Write summary artifact
+        env:
+          TAG_NAME: ${{ github.ref_type == 'tag' && github.ref_name || format('dispatch-{0}', github.sha) }}
+          JOB_SECURITY: ${{ needs.security.result }}
+          JOB_SHARED: ${{ needs.shared.result }}
+          JOB_SPINE: ${{ needs.spine.result }}
+          JOB_FRONTEND: ${{ needs.frontend.result }}
+          JOB_PYTHON: ${{ needs.python.result }}
+        run: |
+          mkdir -p artifacts
+          python3 - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          summary = {
+              "workflow": "release-tag-ci",
+              "tag": os.environ["TAG_NAME"],
+              "sha": os.environ["GITHUB_SHA"],
+              "ref": os.environ["GITHUB_REF"],
+              "asOf": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "status": "GREEN",
+              "jobs": {
+                  "security": os.environ["JOB_SECURITY"],
+                  "shared": os.environ["JOB_SHARED"],
+                  "spine": os.environ["JOB_SPINE"],
+                  "frontend": os.environ["JOB_FRONTEND"],
+                  "python": os.environ["JOB_PYTHON"],
+              },
+          }
+          path = "artifacts/release-tag-ci-summary.json"
+          with open(path, "w", encoding="utf-8") as fh:
+              json.dump(summary, fh, indent=2)
+              fh.write("\n")
+          print(open(path, encoding="utf-8").read())
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-tag-ci-summary
+          path: artifacts/release-tag-ci-summary.json
+          if-no-files-found: error

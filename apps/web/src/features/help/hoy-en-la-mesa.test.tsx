@@ -21,11 +21,21 @@ describe("help C1 v1.8 sync", () => {
         <HoyEnLaMesaBlock />
       </MemoryRouter>,
     );
-    expect(screen.getByTestId("hoy-en-la-mesa").textContent).toMatch(
-      /BUY solo con TradePlan TRIGGERED/i,
-    );
-    expect(screen.getByTestId("hoy-en-la-mesa").textContent).toMatch(
-      /nunca BUY/i,
-    );
+    const text = screen.getByTestId("hoy-en-la-mesa").textContent ?? "";
+    expect(text).toMatch(/BUY solo con TradePlan TRIGGERED/i);
+    expect(text).toMatch(/nunca BUY/i);
+    expect(text).toMatch(/T1\/T2 del plan son del TradePlan/i);
+    expect(text).toMatch(/PositionState/i);
+    expect(text).toMatch(/OPEN[\s\S]*PARTIAL[\s\S]*PROTECTED[\s\S]*CLOSED/i);
+    expect(text).toMatch(/mark\/reduce ≠ orden broker/i);
+    expect(text).toMatch(/ExitPlan/i);
+    expect(text).toMatch(/razones canónicas/i);
+    expect(text).toMatch(/≠ auto-exit/i);
+    expect(text).toMatch(/ExecutionPlan/i);
+    expect(text).toMatch(/plan de envío/i);
+    expect(text).toMatch(/≠ broker/i);
+    expect(text).toMatch(/ExitPermission/i);
+    expect(text).toMatch(/veto de salida/i);
+    expect(text).toMatch(/≠ check_opening/i);
   });
 });

@@ -39,7 +39,13 @@ export function HoyEnLaMesaBlock() {
       <p className="mt-2 text-xs text-muted-foreground">
         La tira <strong className="text-foreground">Hoy</strong> proyecta el
         Decision Board: BUY solo con TradePlan TRIGGERED. Sin plan → WATCH
-        (nunca BUY). Thesis Health / Exit / Bracket son avisos, no permiso.
+        (nunca BUY). T1/T2 del plan son del TradePlan, no permiso. Thesis Health
+        / Exit / Bracket son avisos, no permiso. Posición abierta
+        (PositionState) ≠ TradePlan; thin ≠ PositionState. Ciclo OPEN / PARTIAL
+        / PROTECTED / CLOSED; mark/reduce ≠ orden broker. ExitPlan = razones
+        canónicas (≠ auto-exit; thin «Salida» ≠ ExitPlan). ExecutionPlan PAPER =
+        plan de envío (≠ broker; ≠ ExecuteTrade). ExitPermission = veto de
+        salida (≠ check_opening; ≠ auto-exit).
       </p>
     </section>
   );

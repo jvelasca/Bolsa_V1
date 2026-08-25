@@ -32,9 +32,15 @@
  * **2026-08-24c** — U3 Confirmar **panel lateral** desde Operativa / chip F3
  * (mismo SEMI; `/confirm` sigue como página completa).
  * **2026-08-25** — v1.8.0-beta: AUTO UI BETA-D (`ACTIVAR AUTO` + `PAPER_D_EXECUTE`
- * opt-in) · Decision Spine (tesis ≠ plan ≠ permiso) · TradePlan v0 · tira Hoy
+ * opt-in) · Decision Spine (tesis ≠ plan ≠ permiso) · TradePlan · tira Hoy
  * (proyección; sin plan → WATCH, nunca BUY) · advisory Thesis Health / Exit /
  * Bracket ≠ permiso. Ciclo C1 HELP sync.
+ * **2026-08-25b** — F1 TradePlan v1: T1/T2 / R/R en el plan ≠ permiso.
+ * **2026-08-25c** — F2 PositionState: posición abierta ≠ TradePlan; thin ≠ PositionState.
+ * **2026-08-25d** — F2.1: OPEN/PARTIAL/PROTECTED/CLOSED; mark/reduce ≠ orden.
+ * **2026-08-25e** — F3 ExitPlan: razones canónicas ≠ auto-exit; thin «Salida» ≠ ExitPlan.
+ * **2026-08-25f** — F4 ExecutionPlan PAPER: plan de envío ≠ broker ≠ ExecuteTrade.
+ * **2026-08-25g** — ExitPermission: veto salida ≠ check_opening ≠ auto-exit.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *

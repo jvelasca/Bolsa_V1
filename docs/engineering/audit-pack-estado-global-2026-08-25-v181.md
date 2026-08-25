@@ -25,7 +25,7 @@
 | **@bolsa/shared vitest**   | **84**                                                                                               |
 | **Prisma fail-closed**     | `node scripts/research/verify_prisma_not_authoritative.mjs` OK                                       |
 
-**Mensaje clave:** consolidación operativa tagged en **`v1.8.1-beta`**. No más módulos thin. Siguiente fase = **v1.9 Operational Core** (ADR-032) **o** operar SEMI. **No** optimizar el modelo con demo. **BETA / no producción.**
+**Mensaje clave:** consolidación operativa tagged en **`v1.8.1-beta`**. **Auditoría externa 2026-08-25 RATIFICADA** ([`audit-ext-v181-triage-2026-08-25.md`](./audit-ext-v181-triage-2026-08-25.md)): C1–C6 cerrados; no otra ronda de limpieza. No más módulos thin. Siguiente fase = **v1.9 Operational Core** (ADR-032, diseño primero) **o** operar SEMI. **No** optimizar el modelo con demo. **BETA / no producción.**
 
 ---
 
@@ -77,6 +77,7 @@ node scripts/research/verify_prisma_not_authoritative.mjs
 
 ## 4. Siguiente
 
-1. **v1.9 Operational Core** bajo ADR-032 (TradePlan v1 · PositionState · ExitPlan / ExecutionPlan) — fase propia, no un mapper thin.
+1. **v1.9 Operational Core** bajo ADR-032 (TradePlan v1 → PositionState → ExitPlan → ExecutionPlan PAPER) — diseño D0 **hecho**; código = fase propia, no un mapper thin. [`roadmap-v19-operational-core-2026-08-25.md`](./roadmap-v19-operational-core-2026-08-25.md).
 2. **O** operar SEMI con el modelo actual (no reabrir crecimiento advisory).
 3. TRUSTED_PROXIES prod y thaw estricto siguen ops/deuda.
+4. Backlog infra (antes de `v1.9-beta`): CI reproducible por tag — el stamp `e78fbb9` no dispara path-filters; 161+84 son evidencia **local**.

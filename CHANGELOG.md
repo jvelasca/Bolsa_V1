@@ -4,6 +4,57 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.9-beta] — 2026-08-25
+
+Operational Core v1.9 (modelo post-entrada) + INFRA CI-by-tag. Producto sigue **BETA / no producción**. Tag **`v1.9-beta`**. Partida: **`v1.8.1-beta` → `e78fbb9`**. Spine **`pnpm test:decision-spine` = 217**. Shared **134**. Pack: [`audit-pack-estado-global-2026-08-25-v19.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v19.md). **No** broker · **No** auto-exit producto · thin 5.x/8.x congelados.
+
+### ExitPermission (Operational Core)
+
+- Gate puro `checkExitPermission` / `check_exit_permission` (TS + Py): ALLOW/DENY post-ExitPlan.
+- Reasons: `not_actionable` · `position_closed` · `kill_switch` · `broker_not_allowed` · `paper_auto_env_blocked` · `execution_blocked` · `missing_exit_plan`.
+- **≠** `check_opening` · **≠** auto-exit · **≠** ExecuteTrade · sin wire Confirm / EvaluatePositionExits.
+- Plan: [`plan-exit-permission-2026-08-25.md`](./docs/engineering/plan-exit-permission-2026-08-25.md).
+
+### INFRA — CI reproducible por tag
+
+- Workflow [`.github/workflows/release-tag-ci.yml`](./.github/workflows/release-tag-ci.yml): `on: push tags v*` **sin** path-filter + `workflow_dispatch`.
+- Gates: gitleaks · shared · `test:decision-spine` · frontend · python offline · job `certify` + artefacto summary.
+- Path-filters diarios (`frontend-ci` / `python-ci`) **intactos**.
+- Plan: [`plan-infra-ci-by-tag-2026-08-25.md`](./docs/engineering/plan-infra-ci-by-tag-2026-08-25.md).
+
+### F4 — ExecutionPlan → PAPER (Operational Core)
+
+- Objeto nuevo `ExecutionPlan` (TS + Py): factory `buildExecutionPlanFromExitPlan` / `build_execution_plan_from_exit_plan`.
+- `venue: PAPER` · status `DRAFT`/`PAPER_READY`→`JOURNALED`→`REPLAYED`→`VALIDATED` · broker → `BLOCKED`.
+- Stages puros (refs opcionales, sin I/O). **No** ExecuteTrade · **No** `PAPER_D_EXECUTE` on · **No** OCO.
+- Plan: [`plan-f4-execution-plan-paper-2026-08-25.md`](./docs/engineering/plan-f4-execution-plan-paper-2026-08-25.md).
+
+### F3 — ExitPlan (Operational Core)
+
+- Objeto nuevo `ExitPlan` (TS + Py): factory `buildExitPlanFromPosition` / `build_exit_plan_from_position`.
+- Razones canónicas · status `IDLE`/`HINT`/`ARMED`/`TRIGGERED`/`DONE` · `suggestedAction` advisory.
+- Plan: [`plan-f3-exit-plan-2026-08-25.md`](./docs/engineering/plan-f3-exit-plan-2026-08-25.md).
+
+### F2.1 — PositionState transitions
+
+- API pura `applyMark` / `applyReduce` / `applyCurrentStop` (TS + Py).
+- Plan: [`plan-f2-1-position-state-transitions-2026-08-25.md`](./docs/engineering/plan-f2-1-position-state-transitions-2026-08-25.md).
+
+### F2 — PositionState (Operational Core)
+
+- Factory `build_position_state_from_fill` / `buildPositionStateFromFill` → `OPEN`.
+- Plan: [`plan-f2-position-state-2026-08-25.md`](./docs/engineering/plan-f2-position-state-2026-08-25.md).
+
+### F1 — TradePlan v1 (Operational Core)
+
+- Campos gap ADR-032 §1 **dentro** de TradePlan.
+- Plan: [`plan-f1-tradeplan-v1-2026-08-25.md`](./docs/engineering/plan-f1-tradeplan-v1-2026-08-25.md).
+
+### Docs — auditoría externa v1.8.1 + diseño v1.9
+
+- Consolidación v1.8.1 **cerrada** por auditoría externa. Triage: [`audit-ext-v181-triage-2026-08-25.md`](./docs/engineering/audit-ext-v181-triage-2026-08-25.md).
+- ADR-032 + gap + roadmap v1.9. **F1–F4 + ExitPermission + INFRA** en este tag; broker adapter sigue no.
+
 ## [1.8.1-beta] — 2026-08-25
 
 Operational Consolidation post-`v1.8.0-beta`. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.1-beta` → `e78fbb9`**. Partida: **`v1.8.0-beta` → `8c8b789`**. Spine battery **`pnpm test:decision-spine` = 161**. Pack: [`audit-pack-estado-global-2026-08-25-v181.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v181.md). **No** módulos thin nuevos. **No** PositionState/ExecutionPlan (ADR-032 docs-only).

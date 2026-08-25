@@ -1,8 +1,9 @@
 # ADR-032: Operational Core — TradePlan / PositionState / Execution (contrato v1.9)
 
-**Estado:** Proposed/Accepted **docs-only** para v1.9 (**no implementado**)  
+**Estado:** Accepted — **F1–F4 + ExitPermission + INFRA implementados** (2026-08-25); broker adapter sigue parked  
 **Fecha:** 2026-08-25  
-**Contexto:** Tras ADR-031 (tesis ≠ plan ≠ permiso) y la consolidación v1.8.1, el crecimiento thin 5.x/8.x ya no es el camino. Falta el **contrato** del núcleo operativo post-entrada, sin código, sin mappers nuevos, sin `contract:gen`.
+**Enmienda:** 2026-08-25 — F1–F4 + ExitPermission + CI-by-tag. Gap: [`adr-032-audit-gap-2026-08-25.md`](../engineering/adr-032-audit-gap-2026-08-25.md).  
+**Contexto:** Cadena post-entrada modelada: PositionState → ExitPlan → ExitPermission → ExecutionPlan PAPER. Falta broker adapter + wire producto.
 
 **Depende de:** [ADR-031](./031-operational-model-tesis-plan-permiso.md) · [RFC-008](../rfc/008-cognitive-decision-architecture.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [roadmap v1.8.1](../engineering/roadmap-v181-operational-consolidation-2026-08-25.md).
 
@@ -23,9 +24,9 @@ Después:          PositionState → ExitPlan → ExitPermission → Execution
 | **Antes**        | `TradePlan`       | ¿Qué haríamos **si** entramos?           | **v0 viva** (WATCH…EXPIRED + stop + qty + whyNot) |
 | **Antes**        | `check_opening`   | ¿Podemos llenar ahora?                   | Único veto de fill (SEMI = AUTO)                  |
 | **Después**      | `PositionState`   | ¿Qué ocurre **tras** entrar?             | **Contrato**; thin 5.x/8.x = stand-in, no SoT     |
-| **Después**      | `ExitPlan`        | Si ocurre Y, ¿cómo salimos / protegemos? | Parked (no mapper thin aislado)                   |
-| **Después**      | `ExitPermission`  | ¿Podemos salir / mutar stop ahora?       | Parked (`EvaluatePositionExits` ≠ producto)       |
-| **Envío futuro** | `ExecutionPlan`   | ¿Cómo se envía al broker / paper?        | Parked (no OCO ahora)                             |
+| **Después**      | `ExitPlan`        | Si ocurre Y, ¿cómo salimos / protegemos? | **F3** razones canónicas; ≠ execution             |
+| **Después**      | `ExitPermission`  | ¿Podemos salir / mutar stop ahora?       | **Implementado** (`check_exit_permission`)        |
+| **Envío futuro** | `ExecutionPlan`   | ¿Cómo se envía al broker / paper?        | **F4** PAPER only; broker blocked                 |
 
 Este documento **acepta el contrato**. No genera tipos, dataclasses, tablas ni mappers.
 
@@ -45,48 +46,57 @@ Campos canónicos vivos (ADR-031 + ciclos 4.0–4.9 + C1):
 
 BUY operativo sigue = `TradePlan.status == TRIGGERED` **y** `check_opening` ALLOW **y** firma humana (SEMI). Ranking / TOP / dictamen **no** son BUY.
 
-### 2.2 v1 (parked — no implementar)
+### 2.2 v1 (F1 — implementado 2026-08-25)
 
-Cuando una **fase propia** lo abra, el crecimiento entra **dentro** de TradePlan, no en un mapper hermano:
+Crecimiento **dentro** de TradePlan, no en un mapper hermano. Contrato de campos (auditoría ext v1.8.1; plan [`plan-f1-tradeplan-v1-2026-08-25.md`](../engineering/plan-f1-tradeplan-v1-2026-08-25.md)):
 
-- `target1` / `target2`
-- R/R explícito
-- sizing completo: cash, lote, liquidez, cartera (no solo `risk_amount / (entry − stop)`)
+| Campo                                     | Notas                                                                      |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| `instrument` / `direction`                | Alias de identidad v0; no duplicar SoT                                     |
+| `thesisId`                                | Vínculo tesis ≠ plan; default = `decisionId`                               |
+| `entry` · `entryCondition`                | Condición evaluable (`ready`/`wait`/`none`); `entrySetup` v0 no desaparece |
+| `structuralStop`                          | Conservar                                                                  |
+| `target1` / `target2`                     | ±1R / ±2R en el plan                                                       |
+| `initialRiskR` · `riskPct` · `riskAmount` | Riesgo explícito + sizing                                                  |
+| `quantity` · `positionValue`              | Size + nocional                                                            |
+| `expectedRR`                              | R/R vs T1                                                                  |
+| `expiresAt`                               | Conservar                                                                  |
+| `portfolioFit`                            | Snapshot; el veto sigue en `check_opening`                                 |
+| `executionConstraints`                    | TTL — **no** es orden                                                      |
 
-**No** en v1 por defecto: trailing broker, OCO, `wyckoffPhase` en contrato, Alembic Wyckoff.
+**No** en v1: trailing broker, OCO, `wyckoffPhase` en contrato, Alembic Wyckoff, ActionabilityScore predictivo.
 
 ---
 
-## 3. PositionState — «qué ocurre tras entrar»
+## 3. PositionState — «qué ocurre tras entrar» (**F2 + F2.1**)
 
-**Lista de contrato**, no dataclass, no mapper, no tabla.
+Factory pura `build_position_state_from_fill` / `buildPositionStateFromFill` → `OPEN`. Transiciones F2.1: `applyMark` / `applyReduce` / `applyCurrentStop` → `PARTIAL` / `PROTECTED` (BE geométrico) / `CLOSED`. Planes: [`plan-f2-position-state-2026-08-25.md`](../engineering/plan-f2-position-state-2026-08-25.md) · [`plan-f2-1-position-state-transitions-2026-08-25.md`](../engineering/plan-f2-1-position-state-transitions-2026-08-25.md). **No** Alembic · **no** `contract:gen` · thin 5.x/8.x **no** promocionados · **no** ExitPlan.
 
-Campos canónicos (nombres de intención; shape FE/BE se decide en la fase de implementación):
+| Campo                                                          | Intención                                                                         |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `positionId` · `tradePlanId`                                   | Identidad (`tradePlanId` = `decisionId` del plan)                                 |
+| `status`                                                       | `OPEN` \| `PARTIAL` \| `PROTECTED` \| `CLOSED` (F2 emite OPEN; F2.1 transiciones) |
+| `plannedEntry` / `actualEntry`                                 | Plan vs fill                                                                      |
+| `initialStop` / `currentStop`                                  | Foto al nacer; F2.1 `applyCurrentStop` (BE → PROTECTED)                           |
+| `initialRisk`                                                  | `\|actualEntry − initialStop\|`                                                   |
+| `realizedR` / `unrealizedR`                                    | 0 / null al abrir; F2.1 mark + reduce                                             |
+| `quantity` / `remainingQuantity`                               | Size al fill                                                                      |
+| `target1` / `target2`                                          | Del TradePlan F1                                                                  |
+| `MFE` / `MAE`                                                  | Slot con `source: none` (C5)                                                      |
+| `thesisHealth` / `protectionState` / `trailing` / `exitStatus` | Stubs `none` — ≠ mappers thin                                                     |
+| `createdAt` / `updatedAt`                                      | Auditoría temporal                                                                |
 
-| Campo          | Intención                                             |
-| -------------- | ----------------------------------------------------- |
-| `entry`        | Precio / zona de entrada materializada                |
-| `current`      | Precio / mark actual                                  |
-| `initialRisk`  | 1R al entrar (`\|entry − structuralStop\|`)           |
-| `currentR`     | R abierto ahora                                       |
-| `MFE` / `MAE`  | Excursión favorable / adversa (reales, no solo proxy) |
-| `thesisHealth` | Salud de la tesis **con** posición abierta            |
-| `protection`   | Protección (stop de protect, BE, reduce)              |
-| `target`       | Objetivos vivos (T1/T2) una vez dentro                |
-| `trailing`     | Trail / ratchet **de posición**, no del plan previo   |
-| `exit status`  | Estado de salida (none / hint / armed / done)         |
-
-Hoy, los bloques `runtime.thesisHealth` / `protectPlan` / `exitRadar` / `mfeMae` / `expectancy` / `trailPlan` / `bracketPlan` (ciclos **5.0–5.3** y **8.0–8.2**) son **stand-in advisory**. **No** son la arquitectura final de PositionState. No mutan `structuralStop`. No son permiso. No se «promueven» a núcleo copiando el mapper thin.
+Los bloques `runtime.thesisHealth` / `protectPlan` / … siguen **stand-in advisory**. No mutan stops. No son permiso.
 
 ---
 
 ## 4. ExitPlan · ExitPermission · ExecutionPlan
 
-- **`ExitPlan`:** plan condicional de salida (simétrico a TradePlan, **después** de entrar). Crece **aquí** cuando arranque la fase — no como `map_exit_plan` aislado hoy.
-- **`ExitPermission`:** veto de salida / mutación de stop. Distinto de `check_opening` (apertura). RX1 / `EvaluatePositionExits` con `executeTrades=true` **no** son el producto auto-exit.
-- **`ExecutionPlan`:** camino de **envío** futuro (paper / broker). **No** OCO ahora. **No** `PAPER_D_EXECUTE` on. **No** broker live.
+- **`ExitPlan` (F3 — implementado 2026-08-25):** plan condicional de salida (simétrico a TradePlan, **después** de entrar). Factory `build_exit_plan_from_position` / `buildExitPlanFromPosition`. Razones canónicas: `STRUCTURAL_STOP` · `THESIS_INVALIDATION` · `TARGET_1` · `TARGET_2` · `TRAIL` · `TIME_STOP` · `PORTFOLIO_RISK` · `MANUAL`. Status `IDLE`/`HINT`/`ARMED`/`TRIGGERED`/`DONE`. `suggestedAction` advisory. Plan: [`plan-f3-exit-plan-2026-08-25.md`](../engineering/plan-f3-exit-plan-2026-08-25.md). **ExitPlan ≠ execution.** **No** muta PositionState. Thin exitRadar **≠** ExitPlan.
+- **`ExitPermission` (implementado 2026-08-25):** veto de salida / mutación de stop. `check_exit_permission` / `checkExitPermission`. Distinto de `check_opening` (apertura). Plan: [`plan-exit-permission-2026-08-25.md`](../engineering/plan-exit-permission-2026-08-25.md). RX1 / `EvaluatePositionExits` con `executeTrades=true` **no** son el producto auto-exit. ALLOW ≠ ExecuteTrade.
+- **`ExecutionPlan` (F4 — implementado 2026-08-25):** camino de **envío PAPER**. Factory `build_execution_plan_from_exit_plan` / `buildExecutionPlanFromExitPlan`. Pipeline `PAPER_READY` → Journal → Replay → Validation. Broker → `BLOCKED` (`broker_not_allowed`). Plan: [`plan-f4-execution-plan-paper-2026-08-25.md`](../engineering/plan-f4-execution-plan-paper-2026-08-25.md). **No** OCO. **No** `PAPER_D_EXECUTE` on. **No** ExecuteTrade. **No** broker live. El LLM **nunca** emite una orden.
 
-Cadena post-entrada completa = PositionState → ExitPlan → ExitPermission → Execution. Ningún eslabón se implementa en este ADR.
+Cadena post-entrada = PositionState → ExitPlan → ExitPermission → Execution. Broker adapter + wire producto siguen parked.
 
 ---
 
@@ -171,5 +181,8 @@ C2 Alembic-only y C3–C6 de v1.8.1 **no** implementan PositionState.
 ## 11. Consecuencias
 
 - Un ADR más no compite con `CURRENT_SYSTEM`: este documento fija **contrato v1.9**; el estado vivo sigue en [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md). ADR-031 sigue siendo la política de las **tres capas de apertura**.
-- Implementar TradePlan v1 / PositionState / ExitPlan / ExecutionPlan exige **fase propia** (plan D1–D8) que cite este ADR. Hasta entonces: cero runtime.
+- Implementar TradePlan v1 / PositionState / ExitPlan / ExecutionPlan exige **fase propia** (plan D1–D8) que cite este ADR. Hasta entonces: cero runtime. Secuencia: F1 TradePlan v1 → F2 PositionState → F3 ExitPlan → F4 ExecutionPlan PAPER. [`roadmap-v19-operational-core-2026-08-25.md`](../engineering/roadmap-v19-operational-core-2026-08-25.md).
 - El siguiente chat no «continúa 8.3». El siguiente crecimiento de modelo es **dentro** de los objetos de §1–§4, no un thin más.
+- **ActionIdentity** (v1.9, no Hoy ahora): `instrument + positionId + actionType`. Dedup por `symbol` en Hoy v1.8.1 **intacta**.
+- **ActionabilityScore v1** (predictivo) **prohibido** hasta existir Opportunity + Setup + Entry quality + Risk + R/R + Portfolio fit + Freshness + Liquidity. Hoy = ordinal de `status`.
+- Conceptos críticos (Spine, TradePlan, AUTO, Hoy, Risk gate): consistencia **CODE + TEST + HELP + ADR**.

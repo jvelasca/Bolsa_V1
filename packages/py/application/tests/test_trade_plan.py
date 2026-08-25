@@ -787,3 +787,133 @@ def test_wyckoff_effort_range_fallback_without_volume() -> None:
     atr = 2.0
     assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "wyckoff"
     assert _wyckoff_effort_evidence(direction="long", bars=bars, atr=atr) == "result_ok"
+
+
+# --- F1 TradePlan v1 (ADR-032 gap §1) ---
+
+
+def test_f1_triggered_geometry_targets_and_sizing() -> None:
+    """F1: T1/T2 ±1R/±2R, initialRiskR, expectedRR, riskAmount, positionValue."""
+    plan = build_trade_plan(
+        decision_id="F1A",
+        instrument_id="MSFT",
+        action="recommend_long",
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=95.0,
+        equity=100_000,
+        risk_pct=0.5,
+        expires_at="2026-08-26T12:00:00Z",
+        entry_setup="breakout",
+    )
+    assert plan.status == "TRIGGERED"
+    assert plan.thesis_id == "F1A"
+    assert plan.entry_condition == "ready"
+    assert plan.initial_risk_r == 5.0
+    assert plan.target1 == 105.0
+    assert plan.target2 == 110.0
+    assert plan.expected_rr == 1.0
+    assert plan.risk_amount == 500.0
+    assert plan.quantity == 100.0
+    assert plan.position_value == 10_000.0
+    assert plan.portfolio_fit == {"status": "allow"}
+    assert plan.execution_constraints == {"expiresAt": "2026-08-26T12:00:00Z"}
+    d = plan.to_dict()
+    assert d["thesisId"] == "F1A"
+    assert d["entryCondition"] == "ready"
+    assert d["target1"] == 105.0
+    assert d["target2"] == 110.0
+    assert d["initialRiskR"] == 5.0
+    assert d["expectedRR"] == 1.0
+    assert d["riskAmount"] == 500.0
+    assert d["positionValue"] == 10_000.0
+
+
+def test_f1_short_geometry() -> None:
+    plan = build_trade_plan(
+        decision_id="F1S",
+        instrument_id="XYZ",
+        action="recommend_short",
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=105.0,
+        equity=100_000,
+        risk_pct=0.5,
+        entry_setup="breakout",
+    )
+    assert plan.target1 == 95.0
+    assert plan.target2 == 90.0
+    assert plan.initial_risk_r == 5.0
+    assert plan.entry_condition == "ready"
+
+
+def test_f1_no_geometry_null_targets() -> None:
+    plan = build_trade_plan(
+        decision_id="F1N",
+        instrument_id="MSFT",
+        action="recommend_long",
+        entry_ready=False,
+        entry=100.0,
+        structural_stop=None,
+        entry_setup="none",
+    )
+    assert plan.status == "WATCH"
+    assert plan.entry_condition == "wait"
+    assert plan.target1 is None
+    assert plan.target2 is None
+    assert plan.initial_risk_r is None
+    assert plan.expected_rr is None
+    assert plan.position_value is None
+
+
+def test_f1_armed_wait_with_targets() -> None:
+    plan = build_trade_plan(
+        decision_id="F1W",
+        instrument_id="MSFT",
+        action="recommend_long",
+        entry_ready=False,
+        entry=100.0,
+        structural_stop=95.0,
+        entry_setup="pullback",
+    )
+    assert plan.status == "ARMED"
+    assert plan.entry_condition == "wait"
+    assert plan.target1 == 105.0
+    assert plan.quantity == 0.0
+    assert plan.position_value is None
+
+
+def test_f1_portfolio_fit_veto_snapshot() -> None:
+    plan = build_v0_trade_plan_dict(
+        decision_id="F1V",
+        instrument_id="MSFT",
+        action="recommend_long",
+        compliance_check={"passed": False, "vetoReasons": ["basket_asset"]},
+        entry=100.0,
+        opportunity_score=80.0,
+        expires_at=None,
+        atr=2.0,
+        bars=_breakout_long_bars(),
+        bias="bullish",
+        equity=100_000,
+    )
+    assert plan["status"] == "BLOCKED"
+    assert plan["portfolioFit"] == {"status": "veto", "reason": "basket_asset"}
+    assert plan["thesisId"] == "F1V"
+
+
+def test_f1_thesis_id_override() -> None:
+    plan = build_trade_plan(
+        decision_id="dec-1",
+        instrument_id="MSFT",
+        action="recommend_long",
+        entry_ready=True,
+        entry=100.0,
+        structural_stop=95.0,
+        equity=100_000,
+        entry_setup="breakout",
+        thesis_id="thesis-9",
+    )
+    assert plan.thesis_id == "thesis-9"
+    assert plan.to_dict()["thesisId"] == "thesis-9"
+    assert plan.to_dict()["decisionId"] == "dec-1"

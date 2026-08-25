@@ -1,7 +1,9 @@
-"""TradePlan v0 — plan condicional sobre DecisionPackage (ADR-031).
+"""TradePlan — plan condicional sobre DecisionPackage (ADR-031 / ADR-032 F1).
 
 No sustituye el spine: mapea tesis + gates a un estado operativo
 (WATCH / ARMED / TRIGGERED / BLOCKED / EXPIRED) y un size por stop estructural.
+F1 añade targets / R/R / sizing / fit snapshot / constraints **dentro** del plan
+(no mapper hermano). Tesis ≠ plan ≠ permiso.
 """
 
 from __future__ import annotations
@@ -13,6 +15,8 @@ from typing import Literal
 TradePlanStatus = Literal["WATCH", "ARMED", "TRIGGERED", "BLOCKED", "EXPIRED"]
 TradePlanDirection = Literal["long", "short", "none"]
 EntrySetup = Literal["breakout", "pullback", "wyckoff", "none"]
+# F1 — condición evaluable (setup v0 no desaparece).
+EntryCondition = Literal["ready", "wait", "none"]
 # Ciclo 4.5/4.6 — evidencia SM (interno; no JSON TradePlan).
 WyckoffPhaseEvidence = Literal["none", "spring", "reclaim", "sos", "lps"]
 # Ciclo 4.8 — effort-result (etiqueta en runtime; no gate / no TradePlan).
@@ -36,10 +40,14 @@ WhyNotCode = Literal[
     "legacy_projection",  # proyección Hoy; el mapper TradePlan no lo emite
 ]
 
+# F1 — misma geometría que bracket thin 8.2; campos del plan, no OCO.
+PLAN_T1_R = 1.0
+PLAN_T2_R = 2.0
+
 
 @dataclass(frozen=True, slots=True)
 class TradePlan:
-    """Plan operativo mínimo (v0)."""
+    """Plan operativo (v0 status machine + F1 sizing/targets)."""
 
     decision_id: str
     instrument_id: str
@@ -55,6 +63,17 @@ class TradePlan:
     structural_stop: float | None = None
     expires_at: str | None = None
     entry_setup: EntrySetup = "none"
+    # F1 (ADR-032 gap §1) — opcionales; null-safe sin geometry.
+    thesis_id: str | None = None
+    entry_condition: EntryCondition = "none"
+    target1: float | None = None
+    target2: float | None = None
+    initial_risk_r: float | None = None
+    risk_amount: float | None = None
+    position_value: float | None = None
+    expected_rr: float | None = None
+    portfolio_fit: dict[str, object] | None = None
+    execution_constraints: dict[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -72,6 +91,16 @@ class TradePlan:
             "structuralStop": self.structural_stop,
             "expiresAt": self.expires_at,
             "entrySetup": self.entry_setup,
+            "thesisId": self.thesis_id if self.thesis_id is not None else self.decision_id,
+            "entryCondition": self.entry_condition,
+            "target1": self.target1,
+            "target2": self.target2,
+            "initialRiskR": self.initial_risk_r,
+            "riskAmount": self.risk_amount,
+            "positionValue": self.position_value,
+            "expectedRR": self.expected_rr,
+            "portfolioFit": self.portfolio_fit,
+            "executionConstraints": self.execution_constraints,
         }
 
 
@@ -716,6 +745,7 @@ def build_v0_trade_plan_dict(
     risk_pct: float = 0.5,
     market_regime: str | None = None,
     wyckoff_prior: dict[str, object] | None = None,
+    thesis_id: str | None = None,
 ) -> dict[str, object]:
     """TradePlan persistible (PLAN layer; ranking ≠ BUY).
 
@@ -723,16 +753,18 @@ def build_v0_trade_plan_dict(
     Sin ATR/barras/bias (rebuild confirm) → ``WATCH`` / ``no_stop`` o ``entry``.
     Sin ``market_regime`` → no inventa veto ``regime`` (Ciclo 4.1 D6).
     ``wyckoff_prior`` (Ciclo 4.7): anchor de sesión; sin barras → classify none (D8).
+    F1: thesisId / targets / R/R / sizing / portfolioFit snapshot / constraints.
     """
     structural_stop = compute_structural_stop(action=action, entry=entry, atr=atr, bars=bars)
     setup = classify_entry_setup(
         action=action, bars=bars, atr=atr, wyckoff_prior=wyckoff_prior
     )
+    fit_ok = compliance_fit_ok(compliance_check)
     plan = build_trade_plan(
         decision_id=decision_id,
         instrument_id=instrument_id,
         action=action,
-        fit_ok=compliance_fit_ok(compliance_check),
+        fit_ok=fit_ok,
         freshness_ok=True,
         mandate_ok=True,
         expired=expired,
@@ -750,6 +782,8 @@ def build_v0_trade_plan_dict(
         expires_at=expires_at,
         market_regime=market_regime,
         entry_setup=setup,
+        thesis_id=thesis_id,
+        portfolio_fit=snapshot_portfolio_fit(compliance_check, fit_ok=fit_ok),
     )
     return plan.to_dict()
 
@@ -768,6 +802,77 @@ def compute_risk_size(
     if per_share <= 0:
         return 0.0
     return (equity * (risk_pct / 100.0)) / per_share
+
+
+def _round4(value: float) -> float:
+    return round(value * 10000) / 10000
+
+
+def snapshot_portfolio_fit(
+    compliance_check: object = None,
+    *,
+    fit_ok: bool = True,
+) -> dict[str, object]:
+    """Snapshot informativo; el veto de fill sigue en ``check_opening``."""
+    if isinstance(compliance_check, dict):
+        if compliance_check.get("skipped") is True:
+            out: dict[str, object] = {"status": "skipped"}
+            reason = compliance_check.get("reason")
+            if isinstance(reason, str) and reason:
+                out["reason"] = reason
+            return out
+        if compliance_check.get("passed") is False:
+            out = {"status": "veto"}
+            reasons = compliance_check.get("vetoReasons")
+            if reasons is None:
+                reasons = compliance_check.get("reasons")
+            if isinstance(reasons, list) and reasons:
+                out["reason"] = str(reasons[0])
+            elif isinstance(reasons, str) and reasons:
+                out["reason"] = reasons
+            return out
+        if compliance_check.get("passed") is True:
+            return {"status": "allow"}
+    return {"status": "allow" if fit_ok else "veto"}
+
+
+def resolve_entry_condition(
+    *,
+    direction: TradePlanDirection,
+    entry_ready: bool,
+) -> EntryCondition:
+    if direction == "none":
+        return "none"
+    return "ready" if entry_ready else "wait"
+
+
+def compute_plan_geometry(
+    *,
+    direction: TradePlanDirection,
+    entry: float | None,
+    structural_stop: float | None,
+) -> tuple[float | None, float | None, float | None, float | None]:
+    """``(initialRiskR, target1, target2, expectedRR)`` — misma fórmula ±1R/±2R que 8.2."""
+    if direction not in ("long", "short") or entry is None or structural_stop is None:
+        return None, None, None, None
+    try:
+        e = float(entry)
+        stop = float(structural_stop)
+    except (TypeError, ValueError):
+        return None, None, None, None
+    risk_r = abs(e - stop)
+    if risk_r <= 0:
+        return None, None, None, None
+    sign = 1.0 if direction == "long" else -1.0
+    target1 = _round4(e + sign * PLAN_T1_R * risk_r)
+    target2 = _round4(e + sign * PLAN_T2_R * risk_r)
+    return _round4(risk_r), target1, target2, _round4(PLAN_T1_R)
+
+
+def _execution_constraints(expires_at: str | None) -> dict[str, object] | None:
+    if not expires_at:
+        return None
+    return {"expiresAt": expires_at}
 
 
 def _direction_from_action(action: str) -> TradePlanDirection:
@@ -796,8 +901,10 @@ def build_trade_plan(
     expires_at: str | None = None,
     market_regime: str | None = None,
     entry_setup: EntrySetup = "none",
+    thesis_id: str | None = None,
+    portfolio_fit: dict[str, object] | None = None,
 ) -> TradePlan:
-    """Mapper determinista DecisionPackage + gates → TradePlan v0.
+    """Mapper determinista DecisionPackage + gates → TradePlan (v0 status + F1).
 
     Golden A: entry_ready + stop válido + gates OK → TRIGGERED.
     Golden B: stop OK + setup none + !entry_ready → WATCH entry.
@@ -817,6 +924,26 @@ def build_trade_plan(
             or (direction == "short" and structural_stop > entry)
         )
     )
+    initial_risk_r, target1, target2, expected_rr = compute_plan_geometry(
+        direction=direction,
+        entry=entry,
+        structural_stop=structural_stop,
+    )
+    entry_condition = resolve_entry_condition(
+        direction=direction, entry_ready=entry_ready
+    )
+    risk_amount = (
+        equity * (risk_pct / 100.0)
+        if equity > 0 and risk_pct > 0
+        else None
+    )
+    fit_snap = (
+        portfolio_fit
+        if portfolio_fit is not None
+        else snapshot_portfolio_fit(fit_ok=fit_ok)
+    )
+    constraints = _execution_constraints(expires_at)
+    resolved_thesis = thesis_id if thesis_id is not None else decision_id
 
     def _mk(
         *,
@@ -825,7 +952,13 @@ def build_trade_plan(
         why_not: tuple[str, ...],
         execution_allowed: bool,
         actionability: float,
+        entry_condition_override: EntryCondition | None = None,
     ) -> TradePlan:
+        position_value = (
+            _round4(quantity * float(entry))
+            if quantity > 0 and entry is not None and entry > 0
+            else None
+        )
         return TradePlan(
             decision_id=decision_id,
             instrument_id=instrument_id,
@@ -841,6 +974,20 @@ def build_trade_plan(
             structural_stop=structural_stop,
             expires_at=expires_at,
             entry_setup=entry_setup,
+            thesis_id=resolved_thesis,
+            entry_condition=(
+                entry_condition_override
+                if entry_condition_override is not None
+                else entry_condition
+            ),
+            target1=target1 if stop_valid else None,
+            target2=target2 if stop_valid else None,
+            initial_risk_r=initial_risk_r if stop_valid else None,
+            risk_amount=risk_amount,
+            position_value=position_value,
+            expected_rr=expected_rr if stop_valid else None,
+            portfolio_fit=fit_snap,
+            execution_constraints=constraints,
         )
 
     if expired:
@@ -851,6 +998,7 @@ def build_trade_plan(
             why_not=tuple(why),
             execution_allowed=False,
             actionability=0.0,
+            entry_condition_override="none",
         )
 
     if no_new_longs_blocks(action=action, market_regime=market_regime):
@@ -878,6 +1026,7 @@ def build_trade_plan(
             why_not=tuple(why),
             execution_allowed=False,
             actionability=0.2,
+            entry_condition_override="none",
         )
 
     if not stop_valid:

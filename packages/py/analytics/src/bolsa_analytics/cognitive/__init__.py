@@ -137,6 +137,26 @@ from bolsa_analytics.cognitive.trade_plan import (
     entry_ready_from_ta,
     no_new_longs_blocks,
 )
+from bolsa_analytics.cognitive.position_state import (
+    POSITION_STATE_KEY,
+    PositionState,
+    build_position_state_from_fill,
+)
+from bolsa_analytics.cognitive.exit_plan import (
+    EXIT_PLAN_KEY,
+    ExitPlan,
+    build_exit_plan_from_position,
+)
+from bolsa_analytics.cognitive.execution_plan import (
+    EXECUTION_PLAN_KEY,
+    ExecutionPlan,
+    build_execution_plan_from_exit_plan,
+)
+from bolsa_analytics.cognitive.exit_permission import (
+    EXIT_PERMISSION_KEY,
+    ExitPermission,
+    check_exit_permission,
+)
 from bolsa_analytics.cognitive.trading_policy import TradingPolicy
 from bolsa_analytics.cognitive.trading_policy_templates import (
     AGGRESSIVE_SWING_POLICY,
@@ -208,6 +228,14 @@ __all__ = [
     "SessionOutcome",
     "StatisticalSuiteResult",
     "TradePlan",
+    "PositionState",
+    "POSITION_STATE_KEY",
+    "ExitPlan",
+    "EXIT_PLAN_KEY",
+    "ExecutionPlan",
+    "EXECUTION_PLAN_KEY",
+    "ExitPermission",
+    "EXIT_PERMISSION_KEY",
     "TradingPolicy",
     "TrialRecord",
     "TrialsLog",
@@ -231,6 +259,10 @@ __all__ = [
     "build_propose_session",
     "build_trade_plan",
     "build_v0_trade_plan_dict",
+    "build_position_state_from_fill",
+    "build_exit_plan_from_position",
+    "build_execution_plan_from_exit_plan",
+    "check_exit_permission",
     "build_thesis_health_dict",
     "build_protect_plan_dict",
     "build_exit_radar_dict",

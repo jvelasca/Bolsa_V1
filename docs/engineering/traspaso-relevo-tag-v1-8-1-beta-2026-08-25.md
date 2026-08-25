@@ -1,8 +1,8 @@
 # RELEVO — tag v1.8.1-beta → auditoría externa (2026-08-25)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-25-v181.md`](./audit-pack-estado-global-2026-08-25-v181.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **TAG LISTO** para auditoría externa. Consolidación C1–C6 cerrada.
-> **Arranque chat nuevo:** este fichero + pack v181 + ADR-032 + `CURRENT_SYSTEM.md`.
+> **Estado:** **HISTÓRICO.** Tag publicado; auditoría externa **recibida y ratificada** ([`audit-ext-v181-triage-2026-08-25.md`](./audit-ext-v181-triage-2026-08-25.md)). Relevo vivo: [`traspaso-relevo-audit-ext-v181-cierre-apertura-v19-2026-08-25.md`](./traspaso-relevo-audit-ext-v181-cierre-apertura-v19-2026-08-25.md).
+> **Arranque chat nuevo:** relevo v1.9 + triage ext + ADR-032 + `CURRENT_SYSTEM.md`.
 
 ---
 
@@ -27,6 +27,6 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · broker **no** · estrict
 
 ## 3. E1
 
-1. Auditar contra pack v181 + tag.
-2. Siguiente fase: **v1.9** ADR-032 **o** operar SEMI.
+1. ~~Auditar contra pack v181 + tag.~~ **Hecho** (triage ext 2026-08-25).
+2. Siguiente fase: **v1.9** diseño/F1 **o** operar SEMI — ver relevo vivo.
 3. No módulos thin nuevos.

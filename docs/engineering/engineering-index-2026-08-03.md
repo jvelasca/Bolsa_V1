@@ -26,11 +26,11 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `06fb4fc` · feat 8.2 `73044a7` · 8.1 `655832c` · 8.0 `cf880eb` · RX1 `9289b53` · origin `05e354c` · growth thin 8.0–8.2 CERRADA · I1–I3 + RX1 intactos
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** tag `v1.8.1-beta` · C1–C6 CERRADOS (audit ext) · ADR-032 docs-only · next = v1.9 diseño
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 docs-only / TradePlan·PositionState·Execution)**
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 docs-only · campos FASE 1–4 post-audit ext)**
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -63,8 +63,12 @@ Engineering Index  (este doc)
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-25-v180.md ← **PACK auditoría vivo** post-tag v1.8.0-beta · spine 159 · BETA-D + A3-wire · supersedes 24e
 │   ├── roadmap-v181-operational-consolidation-2026-08-25.md ← **FASE CERRADA** v1.8.1 (C1–C6) · tag `v1.8.1-beta` · no thin nuevos
-│   ├── audit-pack-estado-global-2026-08-25-v181.md ← pack consolidación v1.8.1 · tag `v1.8.1-beta`
-│   ├── traspaso-relevo-tag-v1-8-1-beta-2026-08-25.md ← **RELEVO** tag v1.8.1-beta → auditoría externa
+│   ├── audit-pack-estado-global-2026-08-25-v181.md ← pack consolidación v1.8.1 · tag `v1.8.1-beta` · **audit ext RATIFICADA**
+│   ├── audit-ext-v181-triage-2026-08-25.md ← **TRIAGE** auditoría externa post-tag v1.8.1 · consolidación CERRADA · no otra limpieza
+│   ├── adr-032-audit-gap-2026-08-25.md ← gap ADR-032 vs FASE 1–4 auditor · docs-only
+│   ├── roadmap-v19-operational-core-2026-08-25.md ← **FASE ABIERTA** v1.9 · F1+F2+F2.1 **CERRADOS** · F3+ no
+│   ├── traspaso-relevo-audit-ext-v181-cierre-apertura-v19-2026-08-25.md ← **RELEVO ACTIVO** · v1.8.1 cerrada · apertura diseño v1.9
+│   ├── traspaso-relevo-tag-v1-8-1-beta-2026-08-25.md ← **HISTÓRICO** tag v1.8.1-beta (audit recibida)
 │   ├── plan-ciclo-c1-hoy-honesty-help-2026-08-25.md ← **C1** Hoy nunca BUY sin TradePlan · HELP 2026-08-25
 │   ├── traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md ← relevo C1
 │   ├── traspaso-relevo-adr-032-operational-core-docs-2026-08-25.md ← **ADR-032** Proposed/Accepted docs-only v1.9 Operational Core · sin código
@@ -78,7 +82,7 @@ Engineering Index  (este doc)
 │   ├── plan-ciclo-c4-shape-canonical-2026-08-25.md ← **C4 CÓDIGO LISTO** TradePlan reader canónico · planSource · sin contract:gen
 │   ├── traspaso-relevo-ciclo-c4-shape-canonical-2026-08-25.md ← relevo C4 · E1 = C6 coordinador
 │   ├── plan-ciclo-c6-stamp-v181-2026-08-25.md ← **C6 CERRADO** stamp pack · tag `v1.8.1-beta`
-│   ├── traspaso-relevo-ciclo-c6-stamp-v181-2026-08-25.md ← relevo C6 · E1 = auditoría / v1.9 ADR-032
+│   ├── traspaso-relevo-ciclo-c6-stamp-v181-2026-08-25.md ← relevo C6 · E1 = auditoría (hecha) / v1.9 ADR-032
 │   ├── traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md ← **RELEVO** tag v1.8.0-beta → auditoría externa
 │   ├── audit-pack-estado-global-2026-08-24e.md ← histórico post-tag v1.7.0-beta + CI
 │   ├── deuda-thaw-estricto-runbook-2026-08-25.md ← **DEUDA ESTRICTO** tracking P1–P5 (60d/50/70/55 · MaxDD) · W2–W4 · snapshot `scripts/thaw_estricto_snapshot.mjs` · **no** Accept estricto aún
@@ -304,3 +308,4 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
     >             └── **P2.8 — plan/cierre:** [plan-p2.8-as-unknown-as-2026-08-12.md](./plan-p2.8-as-unknown-as-2026-08-12.md) — plan + **CIERRE P2.8 (sopa «as unknown as») COMPLETADO 2026-08-12** · rama `stage/p2.8-as-unknown-as-2026-08-12` desde base `30a0804` (tip P2.1) · **7 bridges de serialización TS↔Py eliminados** vía DTOs concretos en `packages/shared` (A1: fidelidad FE 1:1 con wire, sin tocar BE/OpenAPI; decisión usuario): `core-r-api.ts` (CoreRQueueItemDto/CoreRReportDto/CoreRReportsMapDto/CoreRSchedulerPrefsDto) · `supervised-f3-api.ts` (SupervisedF3QueueItemDto) · nuevos `dia-d-evidence-api.ts` + `coach-facts-api.ts` · **`api.ts`** tipado con DTOs concretos (syncAccountCoreR/syncAccountSupervisedF3/persistDiaDSessionEvidence/analyzeBacktestCoach, retirado `Record`) · **2 casts residuales confinados** en helpers nombrados (`toF3ItemDto`/`toCoachFactsRecord`, blobs abiertos) · **`contract-check.ts`** + sentinelas G4/G5 · `contract:check` **ROJO por drift F5b heredado** (`exclusiveMinimum` Deposit/Withdraw, `gt=0`; decisión `cd_exclude`) · batería: shared typecheck✓ build✓ test **10✓** + web typecheck✓ lint **0 errores** test **714✓** (141 f) build✓ · commits (3) · residue: drift contrato F5b (regen+commit), P2.6 duplicación TS↔Py / consolidación tipos web-only, F5a §6 openapi-fetch · ver §8
     >                 └── **F5b-drift — traspaso de hilo:** [traspaso-f5b-drift-contrato-2026-08-12.md](./traspaso-f5b-drift-contrato-2026-08-12.md) — **COMPLETADO + MERGEADO 2026-08-12** · rama `stage/f5b-drift-contrato-2026-08-12` desde base `01cb72a` (tip P2.8) · **regen del `openapi.json`** contra FastAPI vivo (`contract:gen`, `PYTHONIOENCODING=utf-8`) para desbloquear `contract:check` (drift F5b heredado: `Deposit/Withdraw.amount → gt=0` faltaba `exclusiveMinimum: 0.0`) · diff mínimo = **2 inserciones** (`exclusiveMinimum: 0.0` en Deposit/Withdraw) · `schema.d.ts` **sin cambio** (cero impacto tipos FE) · batería: contract:check **VERDE** (antes ROJO) · web typecheck✓ lint 0 errores test **714✓** (141 f) ✓ · commits `9c3f643`+`aabc3f1` · **PR #37 MERGED** (fast-forward `01cb72a → aabc3f1`, mergeCommit `aabc3f1`) · base viva `stage/f1-*` ahora `aabc3f1` · tree limpio · deuda sin resolver: P2.6 duplicación TS↔Py/consolidación tipos web-only, F5a §6 fidelidad+openapi-fetch, P1.9 API thin, P1.3 auth full (D4), mypy por fases · ver §7
     >                 └── **P1.6 — plan/cierre:** [plan-p1.6-mypy-fases-2026-08-12.md](./plan-p1.6-mypy-fases-2026-08-12.md) + **CIERRE P1.6 (mypy por fases) COMPLETADO 2026-08-12** · objetivo: gate mypy **BLOQUEANTE** full-tree (antes `continue-on-error: true`) · ~448 preexistentes → **0 errores en 243 files** (domain/market/infrastructure/apps-api-python) · estrategia: 4 worktrees aislados (`wt-mypy-{domain,market,infrastructure,api-python}`) + 4 subagentes (evita colisión checkout compartido) · pattern fixes: `type-arg`/`arg-type` (guards `X | None`)/`no-untyped-def`/`Mapped` SQLAlchemy 2.0 · **PRs #45–#48 MERGED** (#48 → base `441c590`) · gate CI final `python-ci.yml` bloqueante full-tree (PR **#49**) + retirada de gate scoped F4+F5b · batería: ruff **0** · mypy **0/243** · pytest **451✓** · cierre ola: #42 docs + #43 fix auto-sync + #49 gate (#43 rebase p/ desbloquear quality I001) · base final `6a89f6c` · **0 PRs abiertos** · deuda: P1.9 API thin, P1.3 auth D4, F5a §6 openapi-fetch/DTOs, P2.6 web types · ver §9/§7
+19. **Auditoría externa post-tag v1.8.1-beta (2026-08-25):** [triage](./audit-ext-v181-triage-2026-08-25.md) · [roadmap v1.9](./roadmap-v19-operational-core-2026-08-25.md) · **F1** [plan](./plan-f1-tradeplan-v1-2026-08-25.md) · **F2** [plan](./plan-f2-position-state-2026-08-25.md) · **F2.1** [plan](./plan-f2-1-position-state-transitions-2026-08-25.md) / [relevo](./traspaso-relevo-f2-1-position-state-transitions-2026-08-25.md) **CERRADOS** · F3 ExitPlan / INFRA siguientes · CI-by-tag backlog

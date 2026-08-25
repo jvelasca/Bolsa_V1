@@ -1,0 +1,334 @@
+"""PositionState — autoridad post-entrada (ADR-032 F2 + F2.1).
+
+Tesis ≠ plan ≠ permiso ≠ posición. Thin 5.x/8.x siguen advisory aparte;
+este módulo **no** importa ni copia esos mappers.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from typing import Literal
+from datetime import datetime, timezone
+from uuid import uuid4
+
+PositionStatus = Literal["OPEN", "PARTIAL", "PROTECTED", "CLOSED"]
+PositionExitStatus = Literal["none", "hint", "armed", "done"]
+TradePlanDirection = Literal["long", "short", "none"]
+
+POSITION_STATE_KEY = "positionState"
+
+
+def _finite_positive(value: object) -> float | None:
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if number != number or number <= 0:
+        return None
+    return number
+
+
+def _finite(value: object) -> float | None:
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if number != number:
+        return None
+    return number
+
+
+def _round4(value: float) -> float:
+    return round(value * 10000) / 10000
+
+
+def _now_iso(at: str | None = None) -> str:
+    if isinstance(at, str) and at.strip():
+        return at
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def signed_r_from_price(
+    direction: TradePlanDirection,
+    entry: float | None,
+    risk: float | None,
+    price: float,
+) -> float | None:
+    """R firmado vs entry/risk. Sin inputs válidos → None."""
+    if direction not in ("long", "short"):
+        return None
+    if entry is None or risk is None or risk <= 0:
+        return None
+    if price <= 0:
+        return None
+    raw = (price - entry) / risk if direction == "long" else (entry - price) / risk
+    return _round4(raw)
+
+
+def _is_break_even_stop(position: PositionState) -> bool:
+    entry = position.actual_entry
+    stop = position.current_stop
+    if entry is None or stop is None:
+        return False
+    if position.direction == "long":
+        return stop >= entry
+    if position.direction == "short":
+        return stop <= entry
+    return False
+
+
+def derive_position_status(position: PositionState) -> PositionStatus:
+    """Precedencia F2.1: CLOSED > BE→PROTECTED > PARTIAL > OPEN."""
+    if position.status == "CLOSED" or position.remaining_quantity <= 0:
+        return "CLOSED"
+    if _is_break_even_stop(position):
+        return "PROTECTED"
+    if position.remaining_quantity < position.quantity:
+        return "PARTIAL"
+    return "OPEN"
+
+
+@dataclass(frozen=True, slots=True)
+class PositionState:
+    """Ciclo de vida de posición abierta (F2 + F2.1)."""
+
+    position_id: str
+    trade_plan_id: str
+    instrument_id: str
+    direction: TradePlanDirection
+    status: PositionStatus
+    planned_entry: float | None
+    actual_entry: float | None
+    initial_stop: float | None
+    current_stop: float | None
+    target1: float | None
+    target2: float | None
+    quantity: float
+    remaining_quantity: float
+    initial_risk: float | None
+    realized_r: float
+    unrealized_r: float | None
+    mfe_mae: dict[str, object]
+    thesis_health: dict[str, object] | None
+    protection_state: dict[str, object] | None
+    trailing: dict[str, object] | None
+    exit_status: PositionExitStatus
+    created_at: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "positionId": self.position_id,
+            "tradePlanId": self.trade_plan_id,
+            "instrumentId": self.instrument_id,
+            "direction": self.direction,
+            "status": self.status,
+            "plannedEntry": self.planned_entry,
+            "actualEntry": self.actual_entry,
+            "initialStop": self.initial_stop,
+            "currentStop": self.current_stop,
+            "target1": self.target1,
+            "target2": self.target2,
+            "quantity": self.quantity,
+            "remainingQuantity": self.remaining_quantity,
+            "initialRisk": self.initial_risk,
+            "realizedR": self.realized_r,
+            "unrealizedR": self.unrealized_r,
+            "mfeMae": dict(self.mfe_mae),
+            "thesisHealth": self.thesis_health,
+            "protectionState": self.protection_state,
+            "trailing": self.trailing,
+            "exitStatus": self.exit_status,
+            "createdAt": self.created_at,
+            "updatedAt": self.updated_at,
+        }
+
+
+def build_position_state_from_fill(
+    trade_plan: dict[str, object] | None,
+    *,
+    fill_price: float | None,
+    fill_quantity: float | None,
+    filled_at: str | None = None,
+    position_id: str | None = None,
+) -> PositionState | None:
+    """Factory F2: TradePlan dict + fill → OPEN. Sin plan/fill válido → None."""
+    if not isinstance(trade_plan, dict):
+        return None
+    direction = trade_plan.get("direction")
+    if direction not in ("long", "short"):
+        return None
+    price = _finite_positive(fill_price)
+    qty = _finite_positive(fill_quantity)
+    if price is None or qty is None:
+        return None
+
+    decision_id = trade_plan.get("decisionId")
+    if not isinstance(decision_id, str) or not decision_id.strip():
+        return None
+    instrument_id = trade_plan.get("instrumentId")
+    if not isinstance(instrument_id, str) or not instrument_id.strip():
+        return None
+
+    planned_entry = _finite(trade_plan.get("entry"))
+    planned_stop = _finite(trade_plan.get("structuralStop"))
+    actual_entry = _round4(price)
+    initial_stop = planned_stop
+    if initial_stop is not None:
+        initial_risk = _round4(abs(actual_entry - initial_stop))
+    elif planned_entry is not None and planned_stop is not None:
+        initial_risk = _round4(abs(planned_entry - planned_stop))
+    else:
+        initial_risk = None
+    if initial_risk is not None and initial_risk <= 0:
+        initial_risk = None
+
+    now = filled_at if isinstance(filled_at, str) and filled_at else ""
+    if not now:
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    stub = {"status": "none"}
+    qty_r = _round4(qty)
+    pid = position_id.strip() if isinstance(position_id, str) and position_id.strip() else str(uuid4())
+
+    return PositionState(
+        position_id=pid,
+        trade_plan_id=decision_id,
+        instrument_id=instrument_id,
+        direction=direction,  # type: ignore[arg-type]
+        status="OPEN",
+        planned_entry=planned_entry,
+        actual_entry=actual_entry,
+        initial_stop=initial_stop,
+        current_stop=initial_stop,
+        target1=_finite(trade_plan.get("target1")),
+        target2=_finite(trade_plan.get("target2")),
+        quantity=qty_r,
+        remaining_quantity=qty_r,
+        initial_risk=initial_risk,
+        realized_r=0.0,
+        unrealized_r=None,
+        mfe_mae={"mfeR": None, "maeR": None, "source": "none"},
+        thesis_health=dict(stub),
+        protection_state=dict(stub),
+        trailing=dict(stub),
+        exit_status="none",
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def apply_position_mark(
+    position: PositionState | None,
+    mark_price: float,
+    *,
+    at: str | None = None,
+) -> PositionState | None:
+    """F2.1 mark → unrealized_r + picos MFE/MAE. No cambia status."""
+    if position is None or position.status == "CLOSED":
+        return None
+    price = _finite_positive(mark_price)
+    if price is None:
+        return None
+
+    unrealized = signed_r_from_price(
+        position.direction,
+        position.actual_entry,
+        position.initial_risk,
+        price,
+    )
+
+    mfe_mae = dict(position.mfe_mae)
+    if unrealized is not None:
+        prev_mfe = _finite(mfe_mae.get("mfeR"))
+        prev_mae = _finite(mfe_mae.get("maeR"))
+        base_mfe = prev_mfe if prev_mfe is not None else unrealized
+        base_mae = prev_mae if prev_mae is not None else unrealized
+        source = mfe_mae.get("source")
+        if source == "none":
+            source = "close_proxy"
+        elif source not in ("bars", "close_proxy"):
+            source = "close_proxy"
+        mfe_mae = {
+            "mfeR": _round4(max(base_mfe, unrealized)),
+            "maeR": _round4(min(base_mae, unrealized)),
+            "source": source,
+        }
+
+    return replace(
+        position,
+        unrealized_r=unrealized,
+        mfe_mae=mfe_mae,
+        updated_at=_now_iso(at),
+    )
+
+
+def apply_position_reduce(
+    position: PositionState | None,
+    qty: float,
+    *,
+    exit_price: float | None = None,
+    at: str | None = None,
+) -> PositionState | None:
+    """F2.1 reduce → remaining / realized_r / PARTIAL|CLOSED."""
+    if position is None or position.status == "CLOSED":
+        return None
+    cut_in = _finite_positive(qty)
+    if cut_in is None:
+        return None
+    if cut_in > position.remaining_quantity + 1e-12:
+        return None
+
+    cut = _round4(min(cut_in, position.remaining_quantity))
+    remaining = _round4(position.remaining_quantity - cut)
+    realized = position.realized_r
+    exit_p = _finite_positive(exit_price) if exit_price is not None else None
+    if exit_p is not None and position.quantity > 0:
+        slice_r = signed_r_from_price(
+            position.direction,
+            position.actual_entry,
+            position.initial_risk,
+            exit_p,
+        )
+        if slice_r is not None:
+            realized = _round4(realized + slice_r * (cut / position.quantity))
+
+    updated = _now_iso(at)
+    if remaining <= 0:
+        return replace(
+            position,
+            remaining_quantity=0.0,
+            realized_r=realized,
+            status="CLOSED",
+            exit_status="done",
+            updated_at=updated,
+        )
+
+    next_pos = replace(
+        position,
+        remaining_quantity=remaining,
+        realized_r=realized,
+        updated_at=updated,
+    )
+    return replace(next_pos, status=derive_position_status(next_pos))
+
+
+def apply_position_current_stop(
+    position: PositionState | None,
+    stop: float,
+    *,
+    at: str | None = None,
+) -> PositionState | None:
+    """F2.1 current_stop geométrico → posible PROTECTED (BE)."""
+    if position is None or position.status == "CLOSED":
+        return None
+    stop_p = _finite_positive(stop)
+    if stop_p is None:
+        return None
+
+    next_pos = replace(
+        position,
+        current_stop=_round4(stop_p),
+        updated_at=_now_iso(at),
+    )
+    return replace(next_pos, status=derive_position_status(next_pos))
