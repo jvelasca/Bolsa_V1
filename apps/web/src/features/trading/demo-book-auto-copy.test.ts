@@ -7,18 +7,17 @@ import {
   DEMO_BOOK_AUTO_UNAVAILABLE_LABEL,
 } from "@/features/trading/demo-book-auto-copy";
 
-describe("demo-book-auto-copy (R-12 C3)", () => {
-  it("keeps AUTO UI disabled until thaw", () => {
-    expect(DEMO_BOOK_AUTO_UI_ENABLED).toBe(false);
+describe("demo-book-auto-copy (ADR-023 BETA-D thaw)", () => {
+  it("enables AUTO UI after BETA-D thaw", () => {
+    expect(DEMO_BOOK_AUTO_UI_ENABLED).toBe(true);
   });
 
-  it("exposes BETA unavailable copy without execute-flag jargon", () => {
-    expect(DEMO_BOOK_AUTO_UNAVAILABLE_LABEL).toMatch(/BETA/);
+  it("exposes conditional DEMO AUTO copy with execute gate jargon", () => {
     expect(DEMO_BOOK_AUTO_UNAVAILABLE_LABEL).toMatch(/No disponible/);
-    expect(DEMO_BOOK_AUTO_TOOLTIP).not.toMatch(/PAPER_D_EXECUTE/);
-    expect(DEMO_BOOK_AUTO_FOOTER).not.toMatch(/PAPER_D_EXECUTE/);
-    for (const line of DEMO_BOOK_AUTO_RISK_LINES) {
-      expect(line).not.toMatch(/PAPER_D_EXECUTE/);
-    }
+    expect(DEMO_BOOK_AUTO_TOOLTIP).toMatch(/PAPER_D_EXECUTE/);
+    expect(DEMO_BOOK_AUTO_FOOTER).toMatch(/BETA-D|AUTO/);
+    expect(
+      DEMO_BOOK_AUTO_RISK_LINES.some((line) => /PAPER_D_EXECUTE/.test(line)),
+    ).toBe(true);
   });
 });

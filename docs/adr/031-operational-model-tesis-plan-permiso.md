@@ -130,7 +130,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo I2 Actionability/IO (cerrado `e31840d`):** fórmula `compute_indice_operativo` + echo `indiceOperativo` en chip Composite. Rank Estudio sigue cliente. IO ≠ permiso. `TradePlan.actionability` intacta. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
-**Ciclo I3 Shadow honesty (cerrado `26901aa`):** HTTP `paper_auto` (`/route`, scan-execute) exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked`). Gate fuera del Router. **No thaw.** ADR-023 Proposed. Sin Alembic / `contract:gen`. `check_opening` intacto. **Línea integridad I1–I3 cerrada.**
+**Ciclo I3 Shadow honesty (cerrado `26901aa`):** HTTP `paper_auto` (`/route`, scan-execute) exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked`). Gate fuera del Router. En su día **no thaw**. ADR-023 pasó a **Accepted BETA-D** 2026-08-25 (opt-in env; UI AUTO on). Sin Alembic / `contract:gen`. `check_opening` intacto. **Línea integridad I1–I3 cerrada.**
 
 **Ciclo RX1 exits full_auto honesty (cerrado `9289b53`):** `EvaluatePositionExits` con `executeTrades=true` + `full_auto` + linked `paper_auto` → mismo env gate antes del Router (HTTP 403). Eval-only intacto. **No** thaw · **no** auto-exit producto · **no** Exit Radar wire. Sin Alembic / `contract:gen`. `check_opening` intacto.
 
@@ -140,7 +140,7 @@ No abrir sin fase propia:
 - Trailing **plena** broker / mutar stop (tras **Ciclo 8.1 thin**), bracket **plena** OCO / piernas (tras **Ciclo 8.2 thin**)
 - Thesis Health **plena** (persistencia Confidence lifecycle cableada)
 - Expectancy **plena** por setup (journal/fills aggregate; thin = **8.0**)
-- Shadow AUTO / `PAPER_D_EXECUTE` / broker live
+- Shadow AUTO thaw **estricto** (60d/50/70/55) / broker live — BETA-D parcial Accepted (ADR-023); execute sigue opt-in `PAPER_D_EXECUTE`
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 

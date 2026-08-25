@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD local **`06fb4fc`** (stamp 8.2; feat `73044a7`; 8.1 `655832c`; 8.0 `cf880eb`; RX1 `9289b53`; origin aún `05e354c`). Relevo vivo: [`traspaso-relevo-ciclo-8-2-bracket-thin-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-8-2-bracket-thin-2026-08-25.md) (Bracket thin advisory; **display only** · growth thin 8.0–8.2 **CERRADA** · park plena). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-023 Accepted BETA-D** ([thaw adaptado](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md)). HEAD local post-thaw stamp (ver git). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -17,11 +17,11 @@ Doble cara congelada: **QROS** (Lab, ADR-011) + **Investment OS** (mesa) unidos 
 
 ## Features activas
 
-Embudo / Lista AUTO / Finalistas · DÍA D · CORE-R · CORE-P · FA/FIE · SEMI (Trading · **Señales** `/screeners` · Confirmar · Libro) · strip **Hoy** en mesa (ADR-031; no rival de las 5 puertas) · **Asesor** `/research` (ledger/tesis; nav menú, no bucle diario) · UX mesa U0–U6 (Ayuda tips · S/R presets · Confirm drawer · Fit chips · proyección orden chart F3 · **preview ticket margen/comisión** en Confirm/drawer, UI-only) · Decision Board **solo lectura** (`/decision-board`) · **Decision Journal** **solo lectura** (`/decision-journal`, ADR-029) · **TradePlan v0** (WATCH/ARMED/TRIGGERED/BLOCKED/EXPIRED) · PortfolioFit v1 (concentración cesta activo+sector, VETO) · **DS-05 Data Freshness Gate** en `check_opening` (SEMI ohlcv + AUTO `signal.timestamp`, VETO >5d) · **DS-03 Account Mandate Gate** en `check_opening` (tenure BD `mandate_tenures`, VETO sin mandato abierto / mismatch AUTO) · paper/DEMO · prep AUTO A0–A5.
+Embudo / Lista AUTO / Finalistas · DÍA D · CORE-R · CORE-P · FA/FIE · SEMI (Trading · **Señales** `/screeners` · Confirmar · Libro) · strip **Hoy** en mesa (ADR-031; no rival de las 5 puertas) · **Asesor** `/research` (ledger/tesis; nav menú, no bucle diario) · UX mesa U0–U6 (Ayuda tips · S/R presets · Confirm drawer · Fit chips · proyección orden chart F3 · **preview ticket margen/comisión** en Confirm/drawer, UI-only) · Decision Board **solo lectura** (`/decision-board`) · **Decision Journal** **solo lectura** (`/decision-journal`, ADR-029) · **TradePlan v0** (WATCH/ARMED/TRIGGERED/BLOCKED/EXPIRED) · PortfolioFit v1 (concentración cesta activo+sector, VETO) · **DS-05 Data Freshness Gate** en `check_opening` (SEMI ohlcv + AUTO `signal.timestamp`, VETO >5d) · **DS-03 Account Mandate Gate** en `check_opening` (tenure BD `mandate_tenures`, VETO sin mandato abierto / mismatch AUTO) · paper/DEMO · **Libro AUTO UI (thaw BETA-D)** — pill seleccionable tras armado; execute solo con `PAPER_D_EXECUTE=1` opt-in.
 
 ## Features congeladas
 
-`PAPER_D_EXECUTE` **off** · sin broker live · Belief / gobernanza IA · Track B B1–B12 cerrado (no reabrir) · `pending-delete` E8 N · purge storage N.
+`PAPER_D_EXECUTE` **default off** (opt-in local tras ADR-023 BETA-D) · sin broker live · Belief / gobernanza IA · Track B B1–B12 cerrado (no reabrir) · `pending-delete` E8 N · purge storage N · thaw **estricto** (60d/50/70/55) sigue deuda.
 
 ## Auth (real)
 
@@ -77,7 +77,7 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - **Ciclo 8.1 Trail thin:** mapper (`mapTrailPlan` / `map_trail_plan`) → `runtime.trailPlan`; ratchet peakMfeR−1R; status tip@1.5R / ratchet≥2R; Hoy «Trail» (hint only). Alinea Exit Radar tip; **no** muta `structuralStop` · **no** broker · **no** EvaluatePositionExits. `check_opening` intacto.
 - **Ciclo 8.2 Bracket thin:** mapper (`mapBracketPlan` / `map_bracket_plan`) → `runtime.bracketPlan`; picture entry/stop/T1(1R)/T2(2R) + leg fracs display-only; Hoy «Bracket». Alinea Protect T1; **no** OCO · **no** broker · **sin** CTA. `check_opening` intacto. **Línea crecimiento thin 8.0–8.2 CERRADA.**
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **Expectancy plena** (journal aggregate) sigue parked tras 8.0 thin.
-- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing **plena** broker / mutar stop (tras 8.1 thin), bracket **plena** OCO / piernas (tras 8.2 thin), thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, Shadow AUTO **thaw** (ADR-023 Proposed; audit E1.5 [`thaw-readiness-audit-2026-08-25.md`](./engineering/thaw-readiness-audit-2026-08-25.md) = **NOT READY**), broker. **Línea integridad I1–I3 CERRADA** + residual **RX1** exits honesty (`9289b53`). **Ciclo 8.0–8.2 CERRADOS (growth thin E1.4).** **No** I4 thaw por defecto. **No** auto-exit producto. **No** reabrir Wyckoff thin por defecto.
+- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing **plena** broker / mutar stop (tras 8.1 thin), bracket **plena** OCO / piernas (tras 8.2 thin), thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, thaw **estricto** 60d/50/70/55 (deuda; BETA-D Accepted — [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md)), broker live. **Línea integridad I1–I3 CERRADA** + residual **RX1**. **Ciclo 8.0–8.2 CERRADOS.** **No** auto-exit producto. **No** reabrir Wyckoff thin por defecto.
 
 ## Tests
 
@@ -90,4 +90,4 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 
 ## Open risks (ops, no código)
 
-`TRUSTED_PROXIES` prod — IPs/CIDR reales del edge proxy pendientes del propietario (runbook: `ops-trusted-proxies-prod-runbook-2026-08-24.md`). GitHub secret scanning + push protection **enabled** 2026-08-24 (verificar UI). Purga opcional historial git dev (decisión explícita). **Thaw Camino D:** medición P1–P5 [`thaw-p1-p5-measurement-2026-08-25.md`](./engineering/thaw-p1-p5-measurement-2026-08-25.md) → **FAIL** (28d · 0 SEMI fills · precision null · recall 0%); `PAPER_D_EXECUTE` off; ADR-023 Proposed.
+`TRUSTED_PROXIES` prod — IPs/CIDR reales del edge proxy pendientes del propietario (runbook: `ops-trusted-proxies-prod-runbook-2026-08-24.md`). GitHub secret scanning + push protection **enabled** 2026-08-24 (verificar UI). Purga opcional historial git dev (decisión explícita). **Thaw Camino D BETA-D:** ADR-023 **Accepted** · perfil [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md) (P1'–P5' PASS + W2–W4) · UI AUTO on · `PAPER_D_EXECUTE` opt-in local (default off) · estricto sigue FAIL.

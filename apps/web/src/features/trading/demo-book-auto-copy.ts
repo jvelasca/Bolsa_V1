@@ -1,27 +1,28 @@
 /**
- * R-12 C3 — copy de mesa para AUTO de cuenta (libro operativo).
- * AUTO no está disponible en BETA: no se presenta como modo usable.
- * `DEMO_BOOK_AUTO_UI_ENABLED` permanece false; no thaw de execute.
+ * Libro DEMO — modo AUTO (cuenta).
+ * Thaw BETA-D (ADR-023 Accepted 2026-08-25): UI seleccionable tras armado local.
+ * Execute sigue detrás de `PAPER_D_EXECUTE=1` (opt-in; default off).
  *
  * No confundir con Lista AUTO del Laboratorio (`list-auto-activity-store`).
  */
 
-/** Flag de producto: no habilitar pill AUTO hasta thaw explícito. */
-export const DEMO_BOOK_AUTO_UI_ENABLED = false;
+/** Flag de producto: pill AUTO habilitada tras thaw BETA-D. */
+export const DEMO_BOOK_AUTO_UI_ENABLED = true;
 
-/** R-12 C3 — etiqueta trader: AUTO de cuenta no usable en BETA. */
-export const DEMO_BOOK_AUTO_UNAVAILABLE_LABEL = "No disponible (BETA)";
+/** Etiqueta si un build legacy desactiva el flag. */
+export const DEMO_BOOK_AUTO_UNAVAILABLE_LABEL = "No disponible";
 
-/** R-12 C3 — tooltip de mesa. Sin jerga de ops; SEMI = firma humana. */
+/** Tooltip de mesa — AUTO DEMO condicionado. */
 export const DEMO_BOOK_AUTO_TOOLTIP =
-  "AUTO no está disponible en BETA. Usa SEMI: la app propone y tú firmas.";
+  "AUTO DEMO (BETA-D): requiere armado local + PAPER_D_EXECUTE=1 en API. SEMI = firma humana.";
 
-/** R-12 C3 — líneas cortas si el panel las muestra. Sin jerga de execute/ops. */
+/** Líneas de riesgo del panel. */
 export const DEMO_BOOK_AUTO_RISK_LINES = [
-  "AUTO no está disponible en BETA.",
-  "SEMI: tú firmas cada operación (Confirm).",
+  "AUTO DEMO es thaw parcial (ADR-023 BETA-D): no broker live.",
+  "Execute solo con PAPER_D_EXECUTE=1 + Gate / kill switch.",
+  "Sin claim de precisión Estudio (P3'/P4' diferidos).",
 ] as const;
 
-/** R-12 C3 — pie del panel Config operativa. */
+/** Pie del panel Config operativa. */
 export const DEMO_BOOK_AUTO_FOOTER =
-  "SEMI = Confirm humano. AUTO no disponible (BETA).";
+  "SEMI = Confirm humano. AUTO = DEMO BETA-D (flag + armado).";

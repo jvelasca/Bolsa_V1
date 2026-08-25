@@ -1,9 +1,9 @@
 # Checklist thaw — Camino D / AUTO execute (2026-08-04)
 
-> **Estado:** **PREP** · `PAPER_D_EXECUTE` sigue **off** · no hay ADR de thaw todavía.  
-> **AsOf:** 2026-08-04  
+> **Estado:** **THAW BETA-D** · ADR-023 **Accepted** (parcial) · UI AUTO on · `PAPER_D_EXECUTE` **opt-in** (default off) · estricto P1–P5 sigue FAIL.  
+> **AsOf:** 2026-08-25 (adaptado) · medición [`thaw-beta-adapted-remeasure-2026-08-25.md`](./thaw-beta-adapted-remeasure-2026-08-25.md)  
 > **Padres:** [triage §2.3](./audit-ext-round3-triage-estudio-motor-2026-08-04.md) · [freeze](./post-audit-decision-freeze-2026-08-03.md) · [audit pack canales](./audit-pack-estudio-asesor-canales-2026-08-04.md) · diseño §9  
-> **Regla:** ningún commit activa execute AUTO sin filas ✅ abajo + amend explícito del freeze + ADR thaw.
+> **Regla:** execute AUTO solo con opt-in env + armado UI; no broker; thaw estricto no cerrado.
 
 ---
 
@@ -31,8 +31,8 @@ Secuencia producto acordada: **SEMI primero** (ya cerrado) → **auditoría de l
 | P6  | **0** violaciones Gate en cualquier execute de prueba  | Logs Gate + tests                                     | ☐                                                      |
 | P7  | Kill switch **&lt; 1 s** (UI + flag server)            | Runbook + prueba                                      | **Prep** · UI Operativa + `POST /api/risk/kill-switch` |
 | P8  | Confirmación doble UI para activar AUTO                | Diseño UX + flag                                      | **Prep** · armado local; pill sigue off                |
-| P9  | ADR de thaw con evidencia adjunta                      | `docs/adr/023-camino-d-thaw.md`                       | **Proposed** · evidencia ☐                             |
-| P10 | Amend freeze: Camino D **thaw parcial / condicionado** | [freeze](./post-audit-decision-freeze-2026-08-03.md)  | **Nota prep** · no Accepted                            |
+| P9  | ADR de thaw con evidencia adjunta                      | `docs/adr/023-camino-d-thaw.md`                       | **Accepted BETA-D** · estricto ❌ · adaptado ✅        |
+| P10 | Amend freeze: Camino D **thaw parcial / condicionado** | [freeze](./post-audit-decision-freeze-2026-08-03.md)  | **Amend BETA-D** §8                                    |
 
 > Si P1–P5 no se pueden medir aún: **implementar telemetría (D6 métricas)** antes de execute. No inventar % a ojo.
 
@@ -61,7 +61,7 @@ Secuencia producto acordada: **SEMI primero** (ya cerrado) → **auditoría de l
 | **A1** | Libro UI modo AUTO (disabled hasta flags) + copy riesgos | **Hecho** · `DemoBookModePanel` + `demo-book-auto-copy`                                                       |
 | **A2** | Camino D detrás `PAPER_D_EXECUTE` **vía Risk Engine**    | **Hecho (flag off)** · idempotencia + DecisionSession fill/DENY · [prep](./camino-d-a2-a5-prep-2026-08-04.md) |
 | **A3** | Kill switch + confirmación doble                         | **Hecho** · API/UI kill + armado local `ACTIVAR AUTO`                                                         |
-| **A4** | ADR thaw + freeze amend + ayuda HELP                     | **Borrador** · [ADR-023](../adr/023-camino-d-thaw.md) Proposed · evidencia P1–P5 ☐                            |
+| **A4** | ADR thaw + freeze amend + ayuda HELP                     | **Hecho BETA-D** · [ADR-023](../adr/023-camino-d-thaw.md) Accepted · estricto deuda                           |
 | **A5** | Opt-in DEMO controlado (1 cuenta)                        | **Hecho (doc+gate)** · `PAPER_D_ACCOUNT_ID`                                                                   |
 
 **Congelado hasta A4:** Belief, `CORE_R_CRON`, Strategy Studio, `COST_MODEL_V2`, SMS.

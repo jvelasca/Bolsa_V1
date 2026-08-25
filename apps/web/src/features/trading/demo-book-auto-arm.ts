@@ -1,6 +1,6 @@
 /**
  * A3 — armado local AUTO (doble confirmación) + preferencias.
- * No habilita execute; `DEMO_BOOK_AUTO_UI_ENABLED` sigue false hasta thaw.
+ * Tras thaw BETA-D: UI on; execute sigue detrás de `PAPER_D_EXECUTE`.
  */
 
 export const DEMO_BOOK_AUTO_ARM_KEY = "bolsa-demo-book-auto-arm-v1";
