@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md`](./traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md).
 > **Plan:** [`plan-ciclo-5-2-exit-radar-thin-2026-08-25.md`](./plan-ciclo-5-2-exit-radar-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** pendiente commit/push (feat local). Previo SoT `e937f72` = `origin/main`.
+> **HEAD:** stamp docs (este commit) · feat **`e813aa3`**.
 > **Arranque:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §5–6.
 
 ---
@@ -27,14 +27,14 @@
 
 ## 3. Commits
 
-| SHA           | Mensaje                                         |
-| ------------- | ----------------------------------------------- |
-| _(pendiente)_ | feat(spine): ADR-031 Ciclo 5.2 Exit Radar thin. |
-| _(pendiente)_ | docs: stamp living SoT after Ciclo 5.2.         |
+| SHA       | Mensaje                                             |
+| --------- | --------------------------------------------------- |
+| `e813aa3` | feat(spine): ADR-031 Ciclo 5.2 Exit Radar thin.     |
+| _(stamp)_ | docs: stamp living SoT after Ciclo 5.2 (`e813aa3`). |
 
 ## 4. E1
 
-1. Commit · Push (cuando propietario pida).
+1. ~~Commit feat~~ · Push + stamp docs.
 2. Siguiente: **MFE thin** o cierre línea 5.x → integridad ExecuteTrade.
 3. Park: Actionability/IO · Shadow AUTO · trailing continuo / bracket.
 4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.

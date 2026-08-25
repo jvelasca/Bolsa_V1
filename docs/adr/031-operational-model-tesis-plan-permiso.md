@@ -116,7 +116,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.1 Protect/T1 thin (cerrado `12d05d2`):** mapper Golden E → `runtime.protectPlan` · Hoy «Proteger» si MFE≥1R · T1=entry±1R · `suggestedProtectStop=entry` · **sin** mutar `structuralStop` · sin trail/exit · `check_opening` intacto.
 
-**Ciclo 5.2 Exit Radar thin (cerrado — ver relevo):** mapper → `runtime.exitRadar` · Hoy «Salida» · prioridad exit > time_stop > trail · **sin** auto-exit · **sin** EvaluatePositionExits · **sin** mutar stop · `check_opening` intacto.
+**Ciclo 5.2 Exit Radar thin (cerrado `e813aa3`):** mapper → `runtime.exitRadar` · Hoy «Salida» · prioridad exit > time_stop > trail · **sin** auto-exit · **sin** EvaluatePositionExits · **sin** mutar stop · `check_opening` intacto.
 
 No abrir sin fase propia:
 

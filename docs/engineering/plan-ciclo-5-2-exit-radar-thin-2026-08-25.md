@@ -1,8 +1,8 @@
 # Plan — Ciclo 5.2 Exit Radar thin (trail / time-stop / exit hint advisory)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §5–6 (Exit Radar / trailing / time-stop parked; **esta** rebanada abre solo Exit Radar **advisory thin**) · relevo [`traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md`](./traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md) §4 E1 · síntesis subagente AS-IS 2026-08-25.
-> **AsOf:** 2026-08-25 · HEAD local post-implementación Ciclo 5.2; previo **`e937f72`** = `origin/main`.
-> **Estado:** **CÓDIGO LISTO — pendiente commit** (D1–D8 OK · batería **130**).
+> **AsOf:** 2026-08-25 · HEAD **`e813aa3`** feat Ciclo 5.2.
+> **Estado:** **CERRADO en código** (`e813aa3`; stamp docs siguiente). D1–D8 OK · batería **130**.
 > **Método:** espejo 5.0/5.1; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; **sin** auto-exit; **sin** EvaluatePositionExits; **sin** ExecuteTrade converge.
 > **Secuencia:** 5.0 F ✅ · 5.1 E ✅ · **5.2 (este)** · MFE / 5.x cierre · luego integridad.
 
