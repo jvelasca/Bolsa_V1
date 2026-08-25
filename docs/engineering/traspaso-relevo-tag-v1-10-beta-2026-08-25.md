@@ -15,7 +15,7 @@
 
 | Pieza        | Valor                                  |
 | ------------ | -------------------------------------- |
-| Tag          | `v1.10-beta` → `PLACEHOLDER_SHA`       |
+| Tag          | `v1.10-beta` → `2ea53be2`              |
 | Previo       | `v1.9-beta` → `7d90d965`               |
 | Pack auditor | triage v19 + relevos H1–P4             |
 | Spine        | `pnpm test:decision-spine` **260**     |

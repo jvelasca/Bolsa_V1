@@ -2,7 +2,7 @@
 
 > **Padre:** [`audit-ext-v19-ops-discontinuity-triage-2026-08-25.md`](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · ADR-033 · gap [`adr-032-ops-authority-gap-2026-08-25.md`](./adr-032-ops-authority-gap-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **FASE CERRADA — H1→P4 CERRADOS.** Tag **`v1.10-beta` → `PLACEHOLDER_SHA`**. Partida **`v1.9-beta` → `7d90d965`**. Broker adapter **no**.
+> **Estado:** **FASE CERRADA — H1→P4 CERRADOS.** Tag **`v1.10-beta` → `2ea53be2`**. Partida **`v1.9-beta` → `7d90d965`**. Broker adapter **no**.
 > **Método:** operación **realmente gobernada**, no otra factory ni god page. No thaw. No broker. No LLM.
 
 ---

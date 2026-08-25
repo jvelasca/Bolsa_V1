@@ -6,7 +6,7 @@ All notable releases of Bolsa V1.
 
 ## [1.10-beta] — 2026-08-25
 
-Operational Authority v1.10 (H1→P4 Consola de Mesa P4.1+P4.2). Producto sigue **BETA / no producción**. Tag anotado **`v1.10-beta` → `PLACEHOLDER_SHA`**. Partida: **`v1.9-beta` → `7d90d965`**. Spine **`pnpm test:decision-spine` = 260**. **No** broker · **No** auto-exit CTA producto · thin 5.x/8.x congelados · Confirm = única firma.
+Operational Authority v1.10 (H1→P4 Consola de Mesa P4.1+P4.2). Producto sigue **BETA / no producción**. Tag anotado **`v1.10-beta` → `2ea53be2`**. Partida: **`v1.9-beta` → `7d90d965`**. Spine **`pnpm test:decision-spine` = 260**. **No** broker · **No** auto-exit CTA producto · thin 5.x/8.x congelados · Confirm = única firma.
 
 ### P4 — Consola de Mesa (P4.1 + P4.2)
 
