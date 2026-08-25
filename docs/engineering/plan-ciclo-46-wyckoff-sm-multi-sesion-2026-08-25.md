@@ -1,8 +1,8 @@
 # Plan — Ciclo 4.6 SM Wyckoff multi-sesión (thin, scan lookback)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §1 SETUP · §6 (`SM Wyckoff multi-sesión / fase persistida = 4.6+`, prohibido sin plan + decisión) · relevo [`traspaso-relevo-ciclo-45-wyckoff-lps-sm-2026-08-25.md`](./traspaso-relevo-ciclo-45-wyckoff-lps-sm-2026-08-25.md) · ancla en [`plan-ciclo-45-wyckoff-lps-sm-2026-08-25.md`](./plan-ciclo-45-wyckoff-lps-sm-2026-08-25.md) (D3 difería multi-sesión → 4.6+; D4 sin `wyckoffPhase`).
-> **AsOf:** 2026-08-25 · HEAD local **Ciclo 4.6** (feat pend. commit); base `daa5353` / feat 4.5 **`baaa9b4`**.
-> **Estado:** **CÓDIGO CERRADO** · D1–D8 OK · batería **94**. Commit/push solo con OK propietario.
+> **AsOf:** 2026-08-25 · HEAD **`fb6e801`** (feat); stamp docs en curso. Base previa `daa5353` / feat 4.5 **`baaa9b4`**.
+> **Estado:** **CERRADO** (`fb6e801`). D1–D8 OK · batería **94**.
 > **Método:** rebanada fina; SETUP sigue ≠ motor paralelo; Ranking ≠ BUY; sin `contract:gen`; sin LLM.
 
 ---

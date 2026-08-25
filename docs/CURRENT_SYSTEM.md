@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`5d6f4dc`** = `origin/main` (Ciclo 4.5 `baaa9b4`). Relevo vivo: [`traspaso-relevo-ciclo-45-wyckoff-lps-sm-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-45-wyckoff-lps-sm-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`fb6e801`** = local (Ciclo 4.6; stamp post-push). Relevo vivo: [`traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -62,17 +62,18 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - TradePlan Ciclo 4.3: `ARMED` = stop válido + setup≠none + `!entry_ready` (qty 0, `executionAllowed=false`, `whyNot: entry`, actionability 0.7). Golden A sigue `TRIGGERED`. Confirm sin barras no inventa `ARMED`. Sin `contract:gen`.
 - TradePlan Ciclo 4.4: Wyckoff formal — spring + reclaim estricto (`WYCKOFF_RECLAIM_ATR_K=0.25` **o** close fuera del rango spring). SOS etiqueta interna. Sin `wyckoffPhase`. Sin `contract:gen`.
 - TradePlan Ciclo 4.5: LPS etiqueta + SM single-window (`spring→reclaim→sos?→lps?`); `wyckoff` sigue = spring+reclaim. Sin multi-sesión. Sin `wyckoffPhase`. Sin `contract:gen`.
+- TradePlan Ciclo 4.6: `_locate_wyckoff_spring` lookback 40; reclaim/SOS/LPS sobre spring vivo; hielo roto (cerradas) → none. LPS etiqueta. Sin store. Sin `wyckoffPhase`. Sin `contract:gen`.
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). Attribution **sin abrir** (Ciclo 6, ADR-031 §6).
-- Diferido ADR-031: SM Wyckoff multi-sesión (4.6+), thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
+- Diferido ADR-031: fase Wyckoff persistida (4.7+), thesis health / exit radar, MFE-MAE, Shadow AUTO, broker.
 
 ## Tests
 
-| Comando                    | Qué cubre                                                                                                                                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.5 stop/ready/size/regime/setup/ARMED/wyckoff/LPS, AUTO veto, Golden, **DS-05**, **DS-03** (**92**) |
-| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                      |
-| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                         |
-| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                          |
+| Comando                    | Qué cubre                                                                                                                                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.6 stop/ready/size/regime/setup/ARMED/wyckoff/LPS/lookback, AUTO veto, Golden, **DS-05**, **DS-03** (**94**) |
+| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                               |
+| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                                  |
+| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                                   |
 
 ## Open risks (ops, no código)
 

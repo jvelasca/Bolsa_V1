@@ -4,6 +4,7 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+- **ADR-031 / Ciclo 4.6** (`fb6e801`, pend. push): SM Wyckoff lookback (`WYCKOFF_LOOKBACK=40`); spring vivo + reclaim; hielo roto → none. Spine **94**. Sin store · sin `wyckoffPhase` · sin `contract:gen`.
 - **ADR-031 / Ciclo 4.5** (`baaa9b4`, en origin vía `5d6f4dc`): LPS etiqueta + SM single-window Wyckoff; `wyckoff` = spring+reclaim 4.4 intacto. Spine **92**. Sin `wyckoffPhase` · sin `contract:gen`.
 - **ADR-031 / Ciclo 4.4** (`7003ddf`, en origin vía `2135fc5`): Wyckoff formal — spring + reclaim estricto (`k×ATR=0.25` o fuera rango spring). SOS etiqueta; LPS diferido. Spine **88**. Sin `contract:gen`.
 - **ADR-031 / Ciclo 4.3** (`4eb99a2`, en origin vía `4fc864b`): `ARMED` = stop + setup≠none + !ready (qty 0, actionability 0.7). Spine **84**. Sin `contract:gen`.
