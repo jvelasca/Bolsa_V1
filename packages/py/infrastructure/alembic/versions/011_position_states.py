@@ -6,9 +6,8 @@ Idempotente: omite tabla/columna/índices si ya existen.
 from __future__ import annotations
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision = "011_position_states"
 down_revision = "010_decision_journal_entries"

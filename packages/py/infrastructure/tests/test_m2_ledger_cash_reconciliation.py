@@ -232,7 +232,6 @@ async def test_deposit_cash_to_account_reconcilia(db_session: AsyncSession) -> N
     Limpieza (R000): la cuenta simulada se cierra y borra físicamente al final.
     """
     from bolsa_application.accounts import DepositCashToAccount
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -268,7 +267,6 @@ async def test_withdraw_cash_from_account_reconcilia(db_session: AsyncSession) -
     Limpieza (R000): la cuenta simulada se cierra y borra físicamente al final.
     """
     from bolsa_application.accounts import WithdrawCashFromAccount
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -304,7 +302,6 @@ async def test_execute_trade_con_fees_reconcilia(db_session: AsyncSession) -> No
     Limpieza (R000): la cuenta simulada (y el instrument asociado) se limpia al final.
     """
     from bolsa_application.accounts import ExecuteTrade
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -346,7 +343,6 @@ async def test_apply_custody_fees_reconcilia(db_session: AsyncSession) -> None:
     Limpieza (R000): la cuenta simulada se cierra y borra físicamente al final.
     """
     from bolsa_application.accounts import ApplyCustodyFees
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -393,7 +389,6 @@ async def test_custody_cash_insuficiente_no_escribe_ledger(db_session: AsyncSess
     Limpieza (R000): la cuenta simulada se cierra y borra físicamente al final.
     """
     from bolsa_application.accounts import ApplyCustodyFees
-
     from bolsa_infrastructure.database.models import (
         CustodyObligationRow,
         LedgerEntryRow,

@@ -3,10 +3,11 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_domain.entities.account import CashMovementResult, LedgerEntry
 from bolsa_domain.entities.portfolio import Transaction
 from bolsa_domain.errors import IdempotencyKeyReused
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @asynccontextmanager

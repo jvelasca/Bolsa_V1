@@ -16,10 +16,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from bolsa_domain.account_settings import default_account_settings, settings_to_dict
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_domain.account_settings import default_account_settings, settings_to_dict
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.database.models import (
     InvestmentAccountRow,

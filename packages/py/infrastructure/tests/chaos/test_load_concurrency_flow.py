@@ -49,11 +49,11 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
-from bolsa_domain.account_settings import AccountSettings
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import AsyncAdaptedQueuePool
 
+from bolsa_domain.account_settings import AccountSettings
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
     InvestmentAccountRow,
@@ -348,7 +348,6 @@ async def _deposit_worker(
 ) -> None:
     """Un depósito real en sesión/transacción independiente."""
     from bolsa_application.accounts import DepositCashToAccount
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -377,7 +376,6 @@ async def _withdraw_worker(
     """Un retiro real en sesión independiente. Devuelve True si se aplicó, False si se
     rechazó por efectivo insuficiente (``ValueError``) — nunca deja cash negativa."""
     from bolsa_application.accounts import WithdrawCashFromAccount
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -415,7 +413,6 @@ async def _trade_worker(
 ) -> None:
     """Un trade real (``ExecuteTrade``) en sesión/transacción independiente."""
     from bolsa_application.accounts import ExecuteTrade
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -452,7 +449,6 @@ async def _seed_buy(
 ) -> None:
     """Compra de siembra vía use-case ``ExecuteTrade`` (escribe ledger, mantiene Σ==cash)."""
     from bolsa_application.accounts import ExecuteTrade
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -498,7 +494,6 @@ async def _custody_worker(
 ) -> bool:
     """Ejecuta ``ApplyCustodyFees.execute`` en una sesión independiente (devuelve applied)."""
     from bolsa_application.accounts import ApplyCustodyFees
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )

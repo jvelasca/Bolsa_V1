@@ -7,6 +7,12 @@ from bolsa_analytics.backtest import BacktestBarInput, BacktestCostModel, run_ba
 from bolsa_analytics.cost_model_v2 import cost_v2_from_fixed
 from bolsa_analytics.research import BarFingerprint, build_run_manifest, compute_data_version
 from bolsa_analytics.signals.preset_catalog import is_valid_preset_key
+from bolsa_application.dataset_metadata import (
+    dataset_metadata_from_bars,
+    merge_dataset_into_blocks,
+)
+from bolsa_application.paper_lab_evidence import trial_blocks_from_lab_evidence_snapshot
+from bolsa_application.research_evidence import emit_evidence_for_trial
 from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail
 from bolsa_domain.platform_kernel import MIN_SCAN_BARS
 from bolsa_domain.repositories.backtest_repository import BacktestRepository
@@ -17,13 +23,6 @@ from bolsa_domain.repositories.strategy_definition_repository import StrategyDef
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.config import get_settings
 from bolsa_infrastructure.ids import new_id
-
-from bolsa_application.dataset_metadata import (
-    dataset_metadata_from_bars,
-    merge_dataset_into_blocks,
-)
-from bolsa_application.paper_lab_evidence import trial_blocks_from_lab_evidence_snapshot
-from bolsa_application.research_evidence import emit_evidence_for_trial
 
 
 class ListBacktestRuns:

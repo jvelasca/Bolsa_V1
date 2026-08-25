@@ -2,11 +2,11 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail, BacktestTrade
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from bolsa_domain.entities.backtest import BacktestRun, BacktestRunDetail, BacktestTrade
 from bolsa_infrastructure.database.models import BacktestRunRow, BacktestTradeRow
 from bolsa_infrastructure.ids import new_id
 

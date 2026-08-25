@@ -3,14 +3,14 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
-from bolsa_domain.entities.research_tree import MklSyncEvent
 
 from bolsa_application.mkl_sync import (
     MATH_VERSION_MKL_SYNC_V0,
     SyncKnowledgeToMkl,
     build_mkl_fact_payload,
 )
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
+from bolsa_domain.entities.research_tree import MklSyncEvent
 
 
 def _node(**overrides) -> KnowledgeNode:

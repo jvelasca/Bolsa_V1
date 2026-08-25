@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import pytest
+
+from bolsa_application.sync_scheduler import ProcessNextSyncQueueItem
 from bolsa_domain.value_objects.market import SyncResult
 from bolsa_infrastructure.database.repositories.sync_scheduler_repository import (
     SyncQueueItemRecord,
     SyncSettingsRecord,
 )
-
-from bolsa_application.sync_scheduler import ProcessNextSyncQueueItem
 
 
 class _FakeSchedulerRepo:

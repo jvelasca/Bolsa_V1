@@ -10,7 +10,6 @@ se ejecuta en ``user_bootstrap.ensure_bootstrap_user`` al arranque (no aquí).
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "007_users_table"

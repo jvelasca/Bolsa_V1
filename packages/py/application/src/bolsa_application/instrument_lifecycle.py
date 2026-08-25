@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from sqlalchemy import func, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from bolsa_infrastructure.database.models import (
     InstrumentListItemRow,
     InstrumentListRow,
@@ -16,8 +19,6 @@ from bolsa_infrastructure.database.models import (
     SignalAlertSubscriptionRow,
     TrackerDefinitionRow,
 )
-from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @dataclass(frozen=True, slots=True)

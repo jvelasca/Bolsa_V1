@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 
+from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 from bolsa_application.persist_position_from_exit import (
     LAST_EXIT_TRANSACTION_KEY,
     PersistPositionFromExit,

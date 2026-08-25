@@ -16,7 +16,6 @@ Idempotente (mismo patrón que ``004``): si la tabla ya existe, no se re-crea.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "005_custody_obligation"

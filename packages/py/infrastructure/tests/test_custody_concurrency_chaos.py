@@ -54,10 +54,10 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import pytest
-from bolsa_domain.account_settings import AccountSettings
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_domain.account_settings import AccountSettings
 from bolsa_infrastructure.database.models import (
     CustodyObligationRow,
     InstrumentRow,
@@ -264,7 +264,6 @@ async def _seed_buy(
     M-2 (``Σ ledger == Σ cash``). El use-case de application sí escribe el ledger.
     """
     from bolsa_application.accounts import ExecuteTrade
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )
@@ -308,7 +307,6 @@ async def _custody_job_for_one(
 ) -> bool:
     """Ejecuta ``ApplyCustodyFees.execute`` en una sesión independiente (devuelve applied)."""
     from bolsa_application.accounts import ApplyCustodyFees
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )

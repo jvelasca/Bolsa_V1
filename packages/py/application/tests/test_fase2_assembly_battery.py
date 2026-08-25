@@ -3,12 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_domain.entities.hypothesis import Hypothesis
-from bolsa_domain.entities.hypothesis_belief import HypothesisBelief
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
-from bolsa_domain.entities.research_evidence import ResearchEvidence
-from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
-from bolsa_domain.entities.research_trial import ResearchTrial
 
 from bolsa_application.belief_engine import (
     PRIOR_BELIEF,
@@ -25,6 +19,12 @@ from bolsa_application.research_evidence import (
     classify_evidence_from_blocks,
 )
 from bolsa_application.research_tree import consolidation_tree_edge_specs
+from bolsa_domain.entities.hypothesis import Hypothesis
+from bolsa_domain.entities.hypothesis_belief import HypothesisBelief
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
+from bolsa_domain.entities.research_evidence import ResearchEvidence
+from bolsa_domain.entities.research_tree import MklSyncEvent, ResearchTreeEdge
+from bolsa_domain.entities.research_trial import ResearchTrial
 
 
 def test_piece_chain_levels_and_draft():

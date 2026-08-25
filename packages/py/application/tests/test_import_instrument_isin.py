@@ -1,9 +1,9 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from bolsa_domain.entities.instrument import Instrument
 
 from bolsa_application.import_instrument import ImportInstrument
+from bolsa_domain.entities.instrument import Instrument
 
 
 @pytest.mark.asyncio

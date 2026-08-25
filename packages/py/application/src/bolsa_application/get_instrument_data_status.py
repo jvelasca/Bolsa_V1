@@ -6,6 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
+from bolsa_application.get_instrument_detail import GetInstrumentDetail
 from bolsa_domain.ohlcv_time import is_cache_stale
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
@@ -15,8 +16,6 @@ from bolsa_market.market_calendar import expected_last_daily_bar
 from bolsa_market.providers import XtbBridgeClient
 from bolsa_market.sanity import run_sanity_checks
 from bolsa_market.xtb_symbols import to_xtb_symbol
-
-from bolsa_application.get_instrument_detail import GetInstrumentDetail
 
 FreshnessStatus = Literal["current", "stale", "empty", "error", "gap_detected", "syncing"]
 

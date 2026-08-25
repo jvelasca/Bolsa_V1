@@ -7,8 +7,8 @@ from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
-from bolsa_analytics.signals.fundamental_gate import build_fundamental_gate
 
+from bolsa_analytics.signals.fundamental_gate import build_fundamental_gate
 from bolsa_application.fa_weekly_pipeline import (
     FA_WEEKLY_PIPELINE_VERSION,
     RunFaWeeklyPipeline,

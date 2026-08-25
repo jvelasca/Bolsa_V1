@@ -2,11 +2,11 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any, Literal
 
-from bolsa_domain.entities.research_trial import ResearchTrial
 from sqlalchemy import Float, and_, asc, cast, desc, func, nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import ColumnElement
 
+from bolsa_domain.entities.research_trial import ResearchTrial
 from bolsa_infrastructure.database.models import InstrumentRow, ResearchTrialRow
 from bolsa_infrastructure.ids import new_id
 

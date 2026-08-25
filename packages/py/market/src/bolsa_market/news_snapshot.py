@@ -13,7 +13,6 @@ from bolsa_domain.entities.market_event import (
     MarketEventCalendar,
     build_market_event,
 )
-
 from bolsa_market.yahoo_client import YahooFinanceClient, get_yahoo_finance_client
 
 _CACHE: dict[str, tuple[float, list[MarketEvent]]] = {}

@@ -5,12 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
+from bolsa_analytics.cognitive.position_state import build_position_state_from_fill
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_application.evaluate_exit_plan import advisory_exit_plan, semi_exit_permission
 from bolsa_application.persist_position_from_exit import PersistPositionFromExit
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 
 class _FakeExecuteTrade:

@@ -1,6 +1,5 @@
-from bolsa_domain.platform_kernel import validate_execution_mode
-
 from bolsa_application.execution_router import signal_kind_to_trade_type
+from bolsa_domain.platform_kernel import validate_execution_mode
 
 
 def test_signal_kind_to_trade_type() -> None:

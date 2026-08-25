@@ -6,17 +6,17 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from bolsa_analytics.signals.evaluate import SignalEvent
-from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
-from bolsa_domain.entities.ohlcv_bar import OhlcvBar
-from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, Position
-from bolsa_domain.entities.position_policy import PositionPolicyRecord
 
+from bolsa_analytics.signals.evaluate import SignalEvent
 from bolsa_application.paper_auto_http_gate import (
     PAPER_AUTO_ENV_BLOCKED,
     PaperAutoEnvBlockedError,
 )
 from bolsa_application.position_exit_evaluator import EvaluatePositionExits
+from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
+from bolsa_domain.entities.ohlcv_bar import OhlcvBar
+from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, Position
+from bolsa_domain.entities.position_policy import PositionPolicyRecord
 
 
 def _portfolio_with_long() -> PortfolioSummary:

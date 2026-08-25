@@ -3,8 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_domain.entities.hypothesis_belief import HypothesisBelief
-from bolsa_domain.entities.research_evidence import ResearchEvidence
 
 from bolsa_application.belief_engine import (
     MATH_VERSION_BELIEF_V0,
@@ -14,6 +12,8 @@ from bolsa_application.belief_engine import (
     evidence_support_sign,
     update_belief_from_evidence,
 )
+from bolsa_domain.entities.hypothesis_belief import HypothesisBelief
+from bolsa_domain.entities.research_evidence import ResearchEvidence
 
 
 def _evidence(**overrides) -> ResearchEvidence:
@@ -137,9 +137,8 @@ async def test_update_noop_without_hypothesis():
 
 @pytest.mark.asyncio
 async def test_emit_evidence_updates_belief():
-    from bolsa_domain.entities.research_trial import ResearchTrial
-
     from bolsa_application.research_evidence import emit_evidence_for_trial
+    from bolsa_domain.entities.research_trial import ResearchTrial
 
     trial = ResearchTrial(
         id="trial-1",

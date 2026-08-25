@@ -17,7 +17,6 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
-from bolsa_domain.account_settings import settings_from_dict
 
 from bolsa_application.accounts import ApplyCustodyFees
 from bolsa_application.custody_job import RunCustodyJob
@@ -25,6 +24,7 @@ from bolsa_application.risk_runtime import (
     clear_custody_memory_for_tests,
     clear_idempotency_memory_for_tests,
 )
+from bolsa_domain.account_settings import settings_from_dict
 
 
 def _now() -> datetime:

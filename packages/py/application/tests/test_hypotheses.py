@@ -3,8 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_domain.entities.hypothesis import Hypothesis
-from bolsa_domain.entities.research_trial import ResearchTrial
 
 from bolsa_application.hypotheses import (
     CreateHypothesis,
@@ -12,6 +10,8 @@ from bolsa_application.hypotheses import (
     UpdateHypothesis,
     normalize_falsifiers,
 )
+from bolsa_domain.entities.hypothesis import Hypothesis
+from bolsa_domain.entities.research_trial import ResearchTrial
 
 
 def test_normalize_falsifiers_requires_one():
@@ -176,9 +176,8 @@ async def test_link_trial_missing_hypothesis():
 @pytest.mark.asyncio
 async def test_run_and_save_passes_hypothesis_id(monkeypatch: pytest.MonkeyPatch) -> None:
     from bolsa_analytics.backtest import BacktestEngineResult, BacktestEquityPoint
-    from bolsa_domain.entities.backtest import BacktestRunDetail
-
     from bolsa_application.backtests import RunAndSaveBacktest
+    from bolsa_domain.entities.backtest import BacktestRunDetail
 
     def _bar(ts: str, close: float) -> MagicMock:
         bar = MagicMock()

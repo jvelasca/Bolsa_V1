@@ -8,7 +8,6 @@ ya existe.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "008_users_session_version"

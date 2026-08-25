@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 _PLAN_STATUSES = {"WATCH", "ARMED", "TRIGGERED", "BLOCKED", "EXPIRED"}
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 from bolsa_analytics.cognitive.edge_report import StatisticalSuiteResult
-
 from bolsa_application.cognitive_persistence import CognitiveStore, PersistEdgeReport
 
 LAB_PERSIST_NOTE = "lab_lite · provenance only · not auto-live · not production gate"

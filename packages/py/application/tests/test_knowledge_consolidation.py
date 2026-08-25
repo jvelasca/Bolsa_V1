@@ -3,10 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from bolsa_domain.entities.hypothesis import Hypothesis
-from bolsa_domain.entities.hypothesis_belief import HypothesisBelief
-from bolsa_domain.entities.knowledge_node import KnowledgeNode
-from bolsa_domain.entities.research_evidence import ResearchEvidence
 
 from bolsa_application.knowledge_consolidation import (
     MATH_VERSION_CONSOLIDATION_V0,
@@ -14,6 +10,10 @@ from bolsa_application.knowledge_consolidation import (
     evaluate_consolidation_eligibility,
     initial_knowledge_confidence,
 )
+from bolsa_domain.entities.hypothesis import Hypothesis
+from bolsa_domain.entities.hypothesis_belief import HypothesisBelief
+from bolsa_domain.entities.knowledge_node import KnowledgeNode
+from bolsa_domain.entities.research_evidence import ResearchEvidence
 
 
 def _hyp(**overrides) -> Hypothesis:

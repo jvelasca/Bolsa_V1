@@ -1,7 +1,6 @@
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 
 from bolsa_application.context.principal import (
     get_current_principal,
@@ -14,6 +13,7 @@ from bolsa_application.trackers import (
     build_tracker_definition_dict,
     tracker_to_scan_payload,
 )
+from bolsa_domain.entities.tracker_definition import TrackerDefinitionRecord
 
 
 def _tracker(*, user_id: str | None) -> TrackerDefinitionRecord:

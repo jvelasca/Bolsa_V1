@@ -41,6 +41,10 @@ from bolsa_analytics.signals.strategy import (
     StrategyBarInput,
     evaluate_strategy_last_bar,
 )
+from bolsa_application.events.payloads import scan_completed_payload
+from bolsa_application.events.platform_event_bus import PlatformEventBus
+from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
+from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
 from bolsa_domain.platform_kernel import MIN_SCAN_BARS, validate_kernel_timeframe
 from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.repositories.ohlcv_repository import OhlcvRepository
@@ -49,11 +53,6 @@ from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.repositories.list_repository import SqlAlchemyListRepository
 from bolsa_infrastructure.ids import new_id
 from bolsa_market.market_calendar import expected_last_daily_bar
-
-from bolsa_application.events.payloads import scan_completed_payload
-from bolsa_application.events.platform_event_bus import PlatformEventBus
-from bolsa_application.refresh_instrument_fundamentals import RefreshFundamentalsBatch
-from bolsa_application.scan_universe import resolve_scan_universe_instrument_ids
 
 
 @dataclass(frozen=True, slots=True)

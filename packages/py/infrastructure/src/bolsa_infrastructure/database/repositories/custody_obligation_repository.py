@@ -11,10 +11,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from bolsa_domain.entities.account import CustodyObligation
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_domain.entities.account import CustodyObligation
 from bolsa_infrastructure.database.models import CustodyObligationRow
 
 

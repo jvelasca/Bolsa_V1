@@ -9,7 +9,6 @@ from bolsa_analytics.signals.feature_cache import (
     InMemoryFeatureCache,
     set_global_feature_cache,
 )
-
 from bolsa_infrastructure.cache.redis_feature_cache import RedisFeatureCache
 from bolsa_infrastructure.config import Settings, get_settings
 

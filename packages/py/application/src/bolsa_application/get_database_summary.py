@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from bolsa_infrastructure.database.models import OhlcvBarRow
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from bolsa_infrastructure.database.models import OhlcvBarRow
 
 TABLE_LABELS: tuple[tuple[str, str], ...] = (
     ("instruments", "Instrumentos"),

@@ -6,6 +6,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+
+from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
+from bolsa_application.fill_pending_order import FillPendingOrder
+from bolsa_application.persist_position_from_fill import (
+    PersistPositionFromFill,
+    PersistPositionFromFillInput,
+)
 from bolsa_domain.entities.portfolio import (
     Portfolio,
     PortfolioSummary,
@@ -14,13 +21,6 @@ from bolsa_domain.entities.portfolio import (
 )
 from bolsa_infrastructure.database.repositories.pending_order_repository import (
     PendingOrderRecord,
-)
-
-from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
-from bolsa_application.fill_pending_order import FillPendingOrder
-from bolsa_application.persist_position_from_fill import (
-    PersistPositionFromFill,
-    PersistPositionFromFillInput,
 )
 
 

@@ -13,13 +13,12 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
-from bolsa_domain.entities.investor_profile import InvestorProfileRecord
-
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
+from bolsa_domain.entities.investor_profile import InvestorProfileRecord
 
 
 class InstrumentSectorLookup(Protocol):

@@ -5,12 +5,12 @@ from __future__ import annotations
 from typing import Any, Literal
 
 import pytest
-from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, TradeResult, Transaction
 
 from bolsa_application.execute_gated_portfolio_trade import (
     ExecuteGatedPortfolioTrade,
     OpeningVetoedError,
 )
+from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, TradeResult, Transaction
 
 
 class _FakeExecuteTrade:

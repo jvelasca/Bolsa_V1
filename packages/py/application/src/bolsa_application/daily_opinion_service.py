@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+from bolsa_application.daily_opinion_stance import (
+    ENGINE_VERSION,
+    StanceInput,
+    compute_stance,
+)
 from bolsa_domain.value_objects.timeframe import TimeFrame
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
     InstrumentDailyOpinionRecord,
@@ -20,12 +25,6 @@ from bolsa_infrastructure.database.repositories.instrument_strategy_top_reposito
 )
 from bolsa_infrastructure.database.repositories.ohlcv_repository import (
     SqlAlchemyOhlcvRepository,
-)
-
-from bolsa_application.daily_opinion_stance import (
-    ENGINE_VERSION,
-    StanceInput,
-    compute_stance,
 )
 
 SOURCE_ON_DEMAND = "on_demand"

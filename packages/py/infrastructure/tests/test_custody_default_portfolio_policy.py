@@ -24,10 +24,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-from bolsa_domain.account_settings import AccountSettings
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_domain.account_settings import AccountSettings
 from bolsa_infrastructure.database.models import (
     CustodyObligationRow,
     InvestmentPortfolioRow,
@@ -182,7 +182,6 @@ async def _apply_custody_fees(
 ) -> bool:
     """``ApplyCustodyFees.execute`` en sesión independiente (mismo patrón que chaos)."""
     from bolsa_application.accounts import ApplyCustodyFees
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )

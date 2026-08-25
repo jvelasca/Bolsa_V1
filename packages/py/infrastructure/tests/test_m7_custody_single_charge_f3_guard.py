@@ -31,11 +31,11 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from bolsa_domain.account_settings import AccountSettings
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bolsa_domain.account_settings import AccountSettings
 from bolsa_infrastructure.database.models import (
     InvestmentPortfolioRow,
     PortfolioRow,
@@ -223,7 +223,6 @@ async def test_recargo_forzado_no_deja_cash_descontado(db_session: AsyncSession)
     (``_cleanup_account`` + commit) aunque el cuerpo hizo commits intermedios.
     """
     from bolsa_application.accounts import ApplyCustodyFees
-
     from bolsa_infrastructure.database.repositories.account_repository import (
         SqlAlchemyAccountRepository,
     )

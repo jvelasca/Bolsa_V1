@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
+
 from bolsa_infrastructure.database.models import Base
 
 revision = "003_prisma_schema_baseline"

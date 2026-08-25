@@ -78,8 +78,6 @@ from bolsa_analytics.cognitive.trade_plan import (
     build_v0_trade_plan_dict,
     parse_wyckoff_spring_anchor,
 )
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
@@ -104,6 +102,7 @@ from bolsa_application.persist_position_from_fill import (
     ledger_position_id_from_trade,
     open_transaction_id_from_trade,
 )
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
 _CLOSING_ACTIONS = {"exit_hint", "reduce"}

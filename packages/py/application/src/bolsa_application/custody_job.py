@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from bolsa_application.accounts import ApplyCustodyFees
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -27,8 +28,6 @@ from bolsa_infrastructure.database.repositories.ledger_repository import SqlAlch
 from bolsa_infrastructure.database.repositories.portfolio_repository import (
     SqlAlchemyPortfolioRepository,
 )
-
-from bolsa_application.accounts import ApplyCustodyFees
 
 
 class RunCustodyJob:

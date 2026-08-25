@@ -28,7 +28,6 @@ puede hacerse a ciegas; el error es descriptivo y pide reconciliación manual.
 from __future__ import annotations
 
 import sqlalchemy as sa
-
 from alembic import op
 
 revision = "004_ledger_reference_unique"

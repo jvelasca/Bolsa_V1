@@ -45,10 +45,10 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
-from bolsa_domain.account_settings import AccountSettings
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bolsa_domain.account_settings import AccountSettings
 from bolsa_infrastructure.database.models import (
     InstrumentRow,
     InvestmentPortfolioRow,
@@ -389,7 +389,6 @@ async def test_deposit_withdraw_racing_misma_cuenta() -> None:
             DepositCashToAccount,
             WithdrawCashFromAccount,
         )
-
         from bolsa_infrastructure.database.repositories.account_repository import (
             SqlAlchemyAccountRepository,
         )
@@ -578,7 +577,6 @@ async def test_custody_trade_racing_no_doble_cargo() -> None:
             await setup.commit()
 
         from bolsa_application.accounts import ApplyCustodyFees, ExecuteTrade
-
         from bolsa_infrastructure.database.repositories.account_repository import (
             SqlAlchemyAccountRepository,
         )

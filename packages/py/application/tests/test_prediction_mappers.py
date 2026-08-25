@@ -4,7 +4,6 @@ from datetime import UTC
 
 from bolsa_analytics.prediction import PredictionService
 from bolsa_analytics.prediction.heuristic import heuristic_model_artifact
-
 from bolsa_application.prediction_mappers import model_artifact_to_record, prediction_to_record
 
 

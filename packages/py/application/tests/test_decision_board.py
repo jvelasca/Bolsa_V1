@@ -6,9 +6,9 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 from bolsa_application.decision_board import GetDecisionBoard, extract_gate_outcome
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 
 # --------------------------------------------------------------------------- #

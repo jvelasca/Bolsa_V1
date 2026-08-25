@@ -1,11 +1,11 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from bolsa_analytics.backtest import BacktestEngineResult, BacktestEquityPoint
+from bolsa_application.backtests import RunAndSaveBacktest
 from bolsa_domain.entities.backtest import BacktestRunDetail
 from bolsa_domain.entities.research_trial import ResearchTrial
-
-from bolsa_application.backtests import RunAndSaveBacktest
 
 
 def _bar(ts: str, close: float) -> MagicMock:

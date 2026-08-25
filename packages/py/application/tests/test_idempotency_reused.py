@@ -13,11 +13,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pytest
+
+from bolsa_application.accounts import DepositCashToAccount, ExecuteTrade, WithdrawCashFromAccount
 from bolsa_domain.entities.account import LedgerEntry
 from bolsa_domain.entities.portfolio import Portfolio, TradeResult, Transaction
 from bolsa_domain.errors import IdempotencyKeyReused
-
-from bolsa_application.accounts import DepositCashToAccount, ExecuteTrade, WithdrawCashFromAccount
 
 
 @dataclass

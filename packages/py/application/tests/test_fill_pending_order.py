@@ -6,12 +6,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+
+from bolsa_application.fill_pending_order import FillPendingOrder
 from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, TradeResult, Transaction
 from bolsa_infrastructure.database.repositories.pending_order_repository import (
     PendingOrderRecord,
 )
-
-from bolsa_application.fill_pending_order import FillPendingOrder
 
 
 @dataclass

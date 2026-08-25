@@ -6,15 +6,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.cognitive_artifacts import (
-    DecisionJournalEntryRecord,
-    DecisionSessionRecord,
-)
 
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_application.journal_writer import append_journal_event
 from bolsa_application.order_proposal_mapper import session_to_order_proposal
 from bolsa_application.propose_recommendation import ProposeRecommendationFromTa
+from bolsa_domain.entities.cognitive_artifacts import (
+    DecisionJournalEntryRecord,
+    DecisionSessionRecord,
+)
 
 
 class InMemoryJournalWriter:
@@ -133,9 +133,8 @@ async def test_propose_hook_records_proposal_journal(monkeypatch: pytest.MonkeyP
     """Smoke: propose best-effort journal tras append_decision_session."""
     from datetime import UTC, datetime
 
-    from bolsa_analytics.features.models import FeatureSnapshot
-
     import bolsa_application.propose_recommendation as mod
+    from bolsa_analytics.features.models import FeatureSnapshot
 
     bars = []
     for _i in range(80):

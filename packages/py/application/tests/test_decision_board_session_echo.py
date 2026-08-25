@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 from bolsa_application.decision_board import (
     GetDecisionBoard,
@@ -19,6 +18,7 @@ from bolsa_application.decision_board import (
     extract_session_trail_plan,
     extract_session_wyckoff_anchor,
 )
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 
 def _session(

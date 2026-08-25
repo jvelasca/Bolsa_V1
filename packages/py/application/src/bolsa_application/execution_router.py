@@ -17,6 +17,24 @@ from typing import Any, Literal
 
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.signals.strategy import SignalEventV1
+from bolsa_application.account_mandate_gate import AccountMandateLookup
+from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
+from bolsa_application.auto_execute_idempotency import (
+    as_of_from_iso,
+    make_auto_execute_idempotency_key,
+)
+from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry_to_record
+from bolsa_application.events.payloads import signal_event_payload
+from bolsa_application.events.platform_event_bus import PlatformEventBus
+from bolsa_application.investor_profiles import InvestorProfileStore
+from bolsa_application.journal_writer import append_journal_event
+from bolsa_application.risk_engine import RiskDecision, check_opening
+from bolsa_application.risk_runtime import (
+    claim_auto_execute_idempotency,
+    effective_kill_switch,
+    release_auto_execute_idempotency,
+)
+from bolsa_application.trading_policy_guard import CognitiveGuardResult
 from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from bolsa_domain.entities.market_event import MarketEventCalendar
 from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
@@ -38,25 +56,6 @@ from bolsa_infrastructure.database.repositories.scan_job_repository import (
 from bolsa_infrastructure.database.repositories.signal_alert_repository import (
     SignalAlertSubscriptionRecord,
 )
-
-from bolsa_application.account_mandate_gate import AccountMandateLookup
-from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
-from bolsa_application.auto_execute_idempotency import (
-    as_of_from_iso,
-    make_auto_execute_idempotency_key,
-)
-from bolsa_application.cognitive_persistence import CognitiveStore, memory_entry_to_record
-from bolsa_application.events.payloads import signal_event_payload
-from bolsa_application.events.platform_event_bus import PlatformEventBus
-from bolsa_application.investor_profiles import InvestorProfileStore
-from bolsa_application.journal_writer import append_journal_event
-from bolsa_application.risk_engine import RiskDecision, check_opening
-from bolsa_application.risk_runtime import (
-    claim_auto_execute_idempotency,
-    effective_kill_switch,
-    release_auto_execute_idempotency,
-)
-from bolsa_application.trading_policy_guard import CognitiveGuardResult
 
 
 def _book_max_open_positions(policy: ExecutionPolicyRecord) -> int | None:
@@ -264,7 +263,6 @@ class ExecutionRouter:
             from dataclasses import replace
 
             from bolsa_analytics.cognitive.decision_session import build_auto_session
-
             from bolsa_application.cognitive_persistence import decision_session_to_record
 
             record = memory_entry_to_record(guard.memory, account_id=account_id)
@@ -316,7 +314,6 @@ class ExecutionRouter:
             return
         try:
             from bolsa_analytics.cognitive.decision_session import build_auto_session
-
             from bolsa_application.cognitive_persistence import decision_session_to_record
 
             session = build_auto_session(
