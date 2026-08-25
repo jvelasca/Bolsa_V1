@@ -24,6 +24,7 @@ import {
   eventTypeBadgeClasses,
   formatEventTypeLabel,
   formatJournalDateTime,
+  formatJournalSetupLine,
   openDecisionReplay,
 } from "@/features/decision-journal/decision-journal-helpers";
 
@@ -57,6 +58,7 @@ function ActorBadge({ actor }: { actor: string }) {
 
 function JournalEntryRow({ entry }: { entry: DecisionJournalEntryV1 }) {
   const hasSession = Boolean(entry.sessionId?.trim());
+  const setupLine = formatJournalSetupLine(entry.payload);
 
   return (
     <li
@@ -76,6 +78,11 @@ function JournalEntryRow({ entry }: { entry: DecisionJournalEntryV1 }) {
         </span>
       </div>
       <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground">
+        {setupLine ? (
+          <p data-testid="journal-setup">
+            <span className="text-foreground/70">Setup:</span> {setupLine}
+          </p>
+        ) : null}
         <p>
           <span className="text-foreground/70">decisionId:</span>{" "}
           <code className="text-[10px]">{entry.decisionId}</code>
@@ -166,7 +173,9 @@ export function DecisionJournalPage() {
           Session = foto del razonamiento · Journal = historial de transiciones
         </p>
         <p className="mt-1 text-xs text-muted-foreground/80">
-          Audit trail append-only del Decision Spine (solo lectura).
+          Audit trail append-only del Decision Spine (solo lectura). Setup en
+          payload cuando existe; Replay abre el outcome de sesión si hay
+          sessionId.
         </p>
       </div>
 

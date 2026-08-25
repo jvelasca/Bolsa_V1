@@ -17,6 +17,31 @@ export function formatEventTypeLabel(eventType: string): string {
   return eventType.replace(/_/g, " ");
 }
 
+/** Ciclo 6 — línea Setup desde payload journal (si hay campos). */
+export function formatJournalSetupLine(
+  payload: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const parts: string[] = [];
+  const entrySetup = payload.entrySetup;
+  if (typeof entrySetup === "string" && entrySetup.trim()) {
+    parts.push(entrySetup.trim());
+  }
+  const status = payload.tradePlanStatus;
+  if (typeof status === "string" && status.trim()) {
+    parts.push(status.trim());
+  }
+  const phase = payload.phase;
+  if (typeof phase === "string" && phase.trim() && phase !== "none") {
+    parts.push(`fase ${phase.trim()}`);
+  }
+  const effort = payload.effort;
+  if (typeof effort === "string" && effort.trim() && effort !== "none") {
+    parts.push(effort.trim().replaceAll("_", " "));
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export function eventTypeBadgeClasses(eventType: string): string {
   switch (eventType as JournalEventType) {
     case "proposal_recorded":

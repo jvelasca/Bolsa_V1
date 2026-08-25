@@ -127,6 +127,25 @@ describe("DecisionJournalPage", () => {
     expect(screen.getByTestId("actor-system")).toBeTruthy();
   });
 
+  it("muestra Setup line desde payload attribution", async () => {
+    vi.mocked(api.getDecisionJournal).mockResolvedValue(
+      makeJournalResponse([
+        makeEntry({
+          payload: {
+            entrySetup: "wyckoff",
+            tradePlanStatus: "ARMED",
+            phase: "lps",
+          },
+        }),
+      ]) as never,
+    );
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("journal-setup")).toBeTruthy(),
+    );
+    expect(screen.getByText(/wyckoff · ARMED · fase lps/i)).toBeTruthy();
+  });
+
   it("muestra link Abrir Replay cuando hay sessionId", async () => {
     const spy = vi.fn();
     window.addEventListener("bolsa:open-help", spy);

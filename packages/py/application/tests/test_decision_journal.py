@@ -6,15 +6,15 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from bolsa_domain.entities.cognitive_artifacts import (
+    DecisionJournalEntryRecord,
+    DecisionSessionRecord,
+)
 
 from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
 from bolsa_application.journal_writer import append_journal_event
 from bolsa_application.order_proposal_mapper import session_to_order_proposal
 from bolsa_application.propose_recommendation import ProposeRecommendationFromTa
-from bolsa_domain.entities.cognitive_artifacts import (
-    DecisionJournalEntryRecord,
-    DecisionSessionRecord,
-)
 
 
 class InMemoryJournalWriter:
@@ -133,8 +133,9 @@ async def test_propose_hook_records_proposal_journal(monkeypatch: pytest.MonkeyP
     """Smoke: propose best-effort journal tras append_decision_session."""
     from datetime import UTC, datetime
 
-    import bolsa_application.propose_recommendation as mod
     from bolsa_analytics.features.models import FeatureSnapshot
+
+    import bolsa_application.propose_recommendation as mod
 
     bars = []
     for _i in range(80):
@@ -258,7 +259,11 @@ async def test_confirm_hook_contract_and_executed_journal():
     )
     event_types = [e.event_type for e in journal.entries]
     assert "contract_absent" in event_types
+    assert "human_confirm" in event_types
     assert "executed" in event_types
+    executed = next(e for e in journal.entries if e.event_type == "executed")
+    assert executed.payload is not None
+    assert executed.payload.get("status") == "executed"
 
 
 @pytest.mark.asyncio
@@ -312,3 +317,27 @@ async def test_confirm_hook_risk_veto_journal():
         session_id=None,
     )
     assert any(e.event_type == "risk_veto" for e in journal.entries)
+    assert any(e.event_type == "gate_evaluated" for e in journal.entries)
+    assert any(e.event_type == "human_confirm" for e in journal.entries)
+
+
+def test_attribution_setup_payload_from_plan_and_anchor():
+    from bolsa_application.journal_writer import attribution_setup_payload
+
+    snap = attribution_setup_payload(
+        {
+            "entrySetup": "wyckoff",
+            "status": "ARMED",
+        },
+        anchor={"phase": "lps", "effort": "result_ok"},
+        base={"status": "open"},
+    )
+    assert snap["status"] == "open"
+    assert snap["entrySetup"] == "wyckoff"
+    assert snap["tradePlanStatus"] == "ARMED"
+    assert snap["phase"] == "lps"
+    assert snap["effort"] == "result_ok"
+    assert attribution_setup_payload(None) == {}
+    assert attribution_setup_payload({"status": "WATCH"}) == {
+        "tradePlanStatus": "WATCH"
+    }

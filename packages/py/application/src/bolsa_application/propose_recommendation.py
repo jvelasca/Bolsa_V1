@@ -53,7 +53,10 @@ from bolsa_domain.repositories.instrument_repository import InstrumentRepository
 from bolsa_domain.value_objects.timeframe import TimeFrame
 
 from bolsa_application.cognitive_persistence import decision_session_to_record
-from bolsa_application.journal_writer import append_journal_event
+from bolsa_application.journal_writer import (
+    append_journal_event,
+    attribution_setup_payload,
+)
 
 # Overrides de acción que ProposeRecommendation acepta del cliente (subconjunto de DecisionAction).
 _PROPOSE_OVERRIDE_OPTIONS = frozenset({"recommend_long", "recommend_short", "wait"})
@@ -553,7 +556,11 @@ class ProposeRecommendationFromTa:
                     session_id=session.session_id,
                     account_id=account_id,
                     instrument_id=instrument_id,
-                    payload={"status": "open"},
+                    payload=attribution_setup_payload(
+                        trade_plan_dict if isinstance(trade_plan_dict, dict) else None,
+                        anchor=wyckoff_anchor if isinstance(wyckoff_anchor, dict) else None,
+                        base={"status": "open"},
+                    ),
                 )
             except Exception:  # noqa: BLE001 — propose no tumba por audit
                 pass

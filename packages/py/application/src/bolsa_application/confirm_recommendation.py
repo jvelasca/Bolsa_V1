@@ -77,7 +77,10 @@ from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
 from bolsa_application.investor_profiles import InvestorProfileStore
-from bolsa_application.journal_writer import append_journal_event
+from bolsa_application.journal_writer import (
+    append_journal_event,
+    attribution_setup_payload,
+)
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
 
@@ -432,6 +435,14 @@ class ConfirmRecommendationIntent:
             package=package,
             session_record=session_record,
         )
+        session_payload = (
+            session_record.payload
+            if session_record is not None and isinstance(session_record.payload, dict)
+            else None
+        )
+        trade_plan_dict = (
+            result["tradePlan"] if isinstance(result.get("tradePlan"), dict) else None
+        )
         await append_journal_event(
             self._journal_writer,
             event_type=(
@@ -445,6 +456,21 @@ class ConfirmRecommendationIntent:
             instrument_id=rec.instrument_id,
             actor="human",
             payload={"contract": contract_status},
+        )
+        # Ciclo 6 — firma humana (execute=False o intent autorizado).
+        await append_journal_event(
+            self._journal_writer,
+            event_type="human_confirm",
+            decision_id=rec.decision_id,
+            session_id=session_id,
+            account_id=account_id,
+            instrument_id=rec.instrument_id,
+            actor="human",
+            payload=attribution_setup_payload(
+                trade_plan_dict,
+                session_payload=session_payload,
+                base={"execute": bool(execute)},
+            ),
         )
 
         if (
@@ -496,6 +522,20 @@ class ConfirmRecommendationIntent:
                     "status": "rejected_by_gate",
                     "contract": contract_status,
                 }
+                await append_journal_event(
+                    self._journal_writer,
+                    event_type="human_reject",
+                    decision_id=rec.decision_id,
+                    session_id=session_id,
+                    account_id=account_id,
+                    instrument_id=rec.instrument_id,
+                    actor="human",
+                    payload=attribution_setup_payload(
+                        trade_plan_dict,
+                        session_payload=session_payload,
+                        base={"reason": reject_reason, "status": "rejected_by_gate"},
+                    ),
+                )
             elif (
                 _is_opening_action(rec.action)
                 and self._portfolio_summary is not None
@@ -521,13 +561,31 @@ class ConfirmRecommendationIntent:
                 }
                 await append_journal_event(
                     self._journal_writer,
+                    event_type="gate_evaluated",
+                    decision_id=rec.decision_id,
+                    session_id=session_id,
+                    account_id=account_id,
+                    instrument_id=rec.instrument_id,
+                    actor="human",
+                    payload=attribution_setup_payload(
+                        trade_plan_dict,
+                        session_payload=session_payload,
+                        base={"allowed": False, "reason": "risk_veto"},
+                    ),
+                )
+                await append_journal_event(
+                    self._journal_writer,
                     event_type="risk_veto",
                     decision_id=rec.decision_id,
                     session_id=session_id,
                     account_id=account_id,
                     instrument_id=rec.instrument_id,
                     actor="human",
-                    payload={"reason": "risk_veto", "status": "rejected_by_gate"},
+                    payload=attribution_setup_payload(
+                        trade_plan_dict,
+                        session_payload=session_payload,
+                        base={"reason": "risk_veto", "status": "rejected_by_gate"},
+                    ),
                 )
             elif self._execute_trade is None:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
@@ -541,6 +599,21 @@ class ConfirmRecommendationIntent:
                     # session_id están, se genera una clave uuid4-siempre-no-vacía para que
                     # el fill nunca invoque execute_trade con ""/whitespace/Nones.
                     idem_key = rec.decision_id or session_id or f"confirm-{uuid4().hex}"
+                    if _is_opening_action(rec.action) and self._portfolio_summary is not None:
+                        await append_journal_event(
+                            self._journal_writer,
+                            event_type="gate_evaluated",
+                            decision_id=rec.decision_id,
+                            session_id=session_id,
+                            account_id=account_id,
+                            instrument_id=rec.instrument_id,
+                            actor="human",
+                            payload=attribution_setup_payload(
+                                trade_plan_dict,
+                                session_payload=session_payload,
+                                base={"allowed": True},
+                            ),
+                        )
                     trade = await self._execute_trade.execute(
                         instrument_id=intent.instrument_id,
                         trade_type=intent.side,
@@ -567,10 +640,14 @@ class ConfirmRecommendationIntent:
                         account_id=account_id,
                         instrument_id=rec.instrument_id,
                         actor="human",
-                        payload={
-                            "status": "executed",
-                            "transactionId": result["trade"]["transactionId"],
-                        },
+                        payload=attribution_setup_payload(
+                            trade_plan_dict,
+                            session_payload=session_payload,
+                            base={
+                                "status": "executed",
+                                "transactionId": result["trade"]["transactionId"],
+                            },
+                        ),
                     )
                 except Exception as exc:  # noqa: BLE001
                     result["trade"] = {"status": "error", "reason": str(exc)}

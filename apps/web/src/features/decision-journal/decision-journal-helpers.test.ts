@@ -4,6 +4,7 @@ import {
   eventTypeBadgeClasses,
   formatEventTypeLabel,
   formatJournalDateTime,
+  formatJournalSetupLine,
   openDecisionReplay,
 } from "@/features/decision-journal/decision-journal-helpers";
 
@@ -21,6 +22,19 @@ describe("decision-journal-helpers", () => {
   it("formatEventTypeLabel reemplaza guiones bajos", () => {
     expect(formatEventTypeLabel("human_confirm")).toBe("human confirm");
     expect(formatEventTypeLabel("gate_evaluated")).toBe("gate evaluated");
+  });
+
+  it("formatJournalSetupLine construye setup · status · phase · effort", () => {
+    expect(
+      formatJournalSetupLine({
+        entrySetup: "wyckoff",
+        tradePlanStatus: "ARMED",
+        phase: "lps",
+        effort: "result_ok",
+      }),
+    ).toBe("wyckoff · ARMED · fase lps · result ok");
+    expect(formatJournalSetupLine({ status: "open" })).toBeNull();
+    expect(formatJournalSetupLine(null)).toBeNull();
   });
 
   it("eventTypeBadgeClasses asigna colores por tipo", () => {
