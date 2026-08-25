@@ -4,6 +4,11 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+### Ciclo C3 — ActionQueue
+
+- `buildActionQueue(board)` devuelve la cola completa ordenada (prioridad D2 + `actionability` del plan vivo; dedup por símbolo post-sort).
+- Hoy (`mapDecisionBoardToHoyQueue`, default 8) es un **slice** de esa cola, no una agregación que corta a 8 antes de ordenar. C1 intacto: sin TradePlan vivo → WATCH (nunca BUY/ARMED inventados). Sin HTTP ActionQueue.
+
 ### Ciclo C2 — Alembic única autoridad
 
 - Públicos `pnpm db:push` / `db:migrate` / `db:migrate:deploy` fail-closed (`Prisma schema is not authoritative. Use Alembic.`).

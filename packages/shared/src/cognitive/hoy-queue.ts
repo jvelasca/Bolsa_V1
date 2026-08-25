@@ -13,6 +13,8 @@
  * Ciclo 8.0: expectancy thin advisory — ≠ permiso / no auto-exit.
  * Ciclo 8.1: trailPlan advisory ratchet — hint only / no stop mutate.
  * Ciclo 8.2: bracketPlan advisory picture — display only / no OCO.
+ * Ciclo C3: buildActionQueue = cola completa ordenada (D2+D3);
+ * mapDecisionBoardToHoyQueue = slice. Dedup por símbolo post-sort.
  */
 
 import type {
@@ -869,21 +871,42 @@ function toHoyItem(
   };
 }
 
-/** Mapea el Decision Board a ítems de la tira Hoy (máx. 8). */
-export function mapDecisionBoardToHoyQueue(
+type HoyQueueCandidate = {
+  item: HoyQueueItemV1;
+  actionability: number | null;
+};
+
+function liveActionability(live: TradePlanV1 | null): number | null {
+  const value = live?.actionability;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** D2: first matching band wins. Lower number = higher priority. */
+function actionBand(item: HoyQueueItemV1): number {
+  if (item.exitRadar?.status === "exit_hint") return 1;
+  if (item.kind === "REVIEW") return 2;
+  if (item.kind === "BUY") return 3;
+  if (item.kind === "ARMED") return 4;
+  if (item.protectPlan?.status === "protect_hint") return 5;
+  if (item.thesisHealth?.status === "review") return 6;
+  if (item.kind === "WATCH") return 7;
+  return 8;
+}
+
+function collectHoyQueueCandidates(
   board: DecisionBoardV1,
-  limit = 8,
-): HoyQueueItemV1[] {
-  const items: HoyQueueItemV1[] = [];
+): HoyQueueCandidate[] {
+  const items: HoyQueueCandidate[] = [];
 
   for (const row of board.semiF3Queue) {
     const kind = kindFromGate("unknown", "pending");
-    items.push(
-      toHoyItem(
+    const live = readTradePlanFromF3Row(row);
+    items.push({
+      item: toHoyItem(
         `f3-${row.instrumentId ?? row.symbol ?? items.length}`,
         row.symbol ?? row.instrumentId ?? "—",
         row.status,
-        readTradePlanFromF3Row(row),
+        live,
         kind,
         readSetupFromF3Row(row),
         readThesisHealthFromF3Row(row),
@@ -894,7 +917,8 @@ export function mapDecisionBoardToHoyQueue(
         readTrailPlanFromF3Row(row),
         readBracketPlanFromF3Row(row),
       ),
-    );
+      actionability: liveActionability(live),
+    });
   }
 
   for (const session of board.decisionSessions) {
@@ -906,8 +930,8 @@ export function mapDecisionBoardToHoyQueue(
       bucket = "auto";
     const kind = kindFromGate(gate, bucket);
     const live = asLiveTradePlan(session.tradePlan);
-    items.push(
-      toHoyItem(
+    items.push({
+      item: toHoyItem(
         session.sessionId,
         session.symbol ?? session.instrumentId,
         gate,
@@ -922,17 +946,48 @@ export function mapDecisionBoardToHoyQueue(
         asTrailPlan(session.trailPlan),
         asBracketPlan(session.bracketPlan),
       ),
-    );
+      actionability: liveActionability(live),
+    });
   }
 
+  return items;
+}
+
+/**
+ * Cola completa ordenada (Ciclo C3). Prioridad D2, desempate actionability
+ * del plan vivo, luego orden estable. Dedup por símbolo después de ordenar.
+ */
+export function buildActionQueue(board: DecisionBoardV1): HoyQueueItemV1[] {
+  const ranked = collectHoyQueueCandidates(board).map((entry, index) => ({
+    ...entry,
+    index,
+    band: actionBand(entry.item),
+  }));
+  ranked.sort((a, b) => {
+    if (a.band !== b.band) return a.band - b.band;
+    const aOk = a.actionability !== null && Number.isFinite(a.actionability);
+    const bOk = b.actionability !== null && Number.isFinite(b.actionability);
+    if (aOk && bOk && a.actionability !== b.actionability) {
+      return (b.actionability as number) - (a.actionability as number);
+    }
+    return a.index - b.index;
+  });
   const seen = new Set<string>();
-  const deduped: HoyQueueItemV1[] = [];
-  for (const item of items) {
-    const key = `${item.symbol}:${item.kind}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(item);
-    if (deduped.length >= limit) break;
+  const out: HoyQueueItemV1[] = [];
+  for (const row of ranked) {
+    if (seen.has(row.item.symbol)) continue;
+    seen.add(row.item.symbol);
+    out.push(row.item);
   }
-  return deduped;
+  return out;
+}
+
+/** Slice visual Hoy (default 8) de `buildActionQueue`. */
+export function mapDecisionBoardToHoyQueue(
+  board: DecisionBoardV1,
+  limit = 8,
+): HoyQueueItemV1[] {
+  const queue = buildActionQueue(board);
+  if (!Number.isFinite(limit)) return queue;
+  return queue.slice(0, Math.max(0, limit));
 }

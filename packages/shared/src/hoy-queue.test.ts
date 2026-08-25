@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { DecisionBoardV1 } from "./decision-board.js";
+import type {
+  DecisionBoardV1,
+  DecisionSessionViewV1,
+} from "./decision-board.js";
 import type { TradePlanV1 } from "./cognitive/trade-plan.js";
-import { mapDecisionBoardToHoyQueue } from "./cognitive/hoy-queue.js";
+import {
+  buildActionQueue,
+  mapDecisionBoardToHoyQueue,
+} from "./cognitive/hoy-queue.js";
 
 function board(partial: Partial<DecisionBoardV1> = {}): DecisionBoardV1 {
   return {
@@ -42,6 +48,22 @@ function watchPlan(overrides: Partial<TradePlanV1> = {}): TradePlanV1 {
     riskPct: 0,
     whyNot: ["no_stop"],
     executionAllowed: false,
+    ...overrides,
+  };
+}
+
+function session(
+  symbol: string,
+  overrides: Partial<DecisionSessionViewV1> = {},
+): DecisionSessionViewV1 {
+  return {
+    sessionId: `s-${symbol}`,
+    kind: "propose",
+    status: "open",
+    instrumentId: `i-${symbol}`,
+    symbol,
+    createdAt: "2026-08-24T08:00:00Z",
+    gate: "PASS",
     ...overrides,
   };
 }
@@ -485,5 +507,204 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.bracketPlan?.target1).toBe(110);
     expect(items[0]?.bracketPlan?.target2).toBe(120);
     expect(items[0]?.bracketPlan?.legT1QtyFrac).toBe(0.5);
+  });
+});
+
+describe("buildActionQueue / C3", () => {
+  it("sorts by D2 bands regardless of arrival order", () => {
+    const items = buildActionQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          session("BLK", { gate: "VETO" }),
+          session("WAT"),
+          session("THS", {
+            tradePlan: watchPlan({ status: "WATCH", whyNot: ["entry"] }),
+            thesisHealth: {
+              hint: "reduce",
+              status: "review",
+              why: ["confidence_degraded"],
+              confidence: 0.3,
+            },
+          }),
+          session("PRT", {
+            tradePlan: watchPlan({ status: "WATCH", whyNot: ["entry"] }),
+            protectPlan: {
+              status: "protect_hint",
+              target1: 110,
+              suggestedProtectStop: 100,
+              rMultiple: 1,
+              why: ["mfe_ge_1r"],
+            },
+          }),
+          session("ARM", {
+            tradePlan: watchPlan({
+              status: "ARMED",
+              whyNot: ["entry"],
+              actionability: 0.7,
+            }),
+          }),
+          session("BUY", {
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              executionAllowed: true,
+              actionability: 0.95,
+            }),
+          }),
+          session("REV", {
+            tradePlan: watchPlan({ status: "EXPIRED", whyNot: ["expired"] }),
+          }),
+          session("EXT", {
+            tradePlan: watchPlan({ status: "WATCH", whyNot: ["entry"] }),
+            exitRadar: {
+              status: "exit_hint",
+              suggestedTrailStop: null,
+              target1: 110,
+              rMultiple: 1.2,
+              why: ["thesis_exit"],
+            },
+          }),
+        ],
+      }),
+    );
+    expect(items.map((i) => i.symbol)).toEqual([
+      "EXT",
+      "REV",
+      "BUY",
+      "ARM",
+      "PRT",
+      "THS",
+      "WAT",
+      "BLK",
+    ]);
+    expect(items[0]?.exitRadar?.status).toBe("exit_hint");
+    expect(items[1]?.kind).toBe("REVIEW");
+    expect(items[2]?.kind).toBe("BUY");
+    expect(items[3]?.kind).toBe("ARMED");
+    expect(items[7]?.kind).toBe("BLOCKED");
+  });
+
+  it("tie-breaks live actionability descending; missing stays stable", () => {
+    const items = buildActionQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          session("LOW", {
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              executionAllowed: true,
+              actionability: 0.5,
+            }),
+          }),
+          session("HIGH", {
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              executionAllowed: true,
+              actionability: 0.95,
+            }),
+          }),
+          session("NONE", {
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              executionAllowed: true,
+            }),
+          }),
+        ],
+      }),
+    );
+    expect(items.map((i) => i.symbol)).toEqual(["HIGH", "LOW", "NONE"]);
+  });
+
+  it("dedups by symbol after sort, keeping the higher band", () => {
+    const items = buildActionQueue(
+      board({
+        semiF3Queue: [
+          { instrumentId: "i-san", symbol: "SAN", status: "pending_confirm" },
+        ],
+        decisionSessions: [
+          session("SAN", {
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              executionAllowed: true,
+            }),
+          }),
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.symbol).toBe("SAN");
+    expect(items[0]?.kind).toBe("BUY");
+  });
+
+  it("slices after full sort so late high-band items are not dropped", () => {
+    const watches = Array.from({ length: 8 }, (_, i) => ({
+      instrumentId: `i-${i}`,
+      symbol: `W${i}`,
+      status: "pending_confirm",
+    }));
+    const source = board({
+      semiF3Queue: watches,
+      decisionSessions: [
+        session("EXT", {
+          tradePlan: watchPlan({ status: "WATCH", whyNot: ["entry"] }),
+          exitRadar: {
+            status: "exit_hint",
+            suggestedTrailStop: null,
+            target1: 110,
+            rMultiple: 1.2,
+            why: ["thesis_exit"],
+          },
+        }),
+      ],
+    });
+    const full = buildActionQueue(source);
+    const slice = mapDecisionBoardToHoyQueue(source, 8);
+    expect(full).toHaveLength(9);
+    expect(full[0]?.symbol).toBe("EXT");
+    expect(slice).toHaveLength(8);
+    expect(slice[0]?.symbol).toBe("EXT");
+    expect(slice).toEqual(full.slice(0, 8));
+  });
+
+  it("Hoy default 8 is a slice; unlimited matches buildActionQueue", () => {
+    const decisionSessions = Array.from({ length: 10 }, (_, i) =>
+      session(`S${i}`),
+    );
+    const source = board({ semiF3Queue: [], decisionSessions });
+    const full = buildActionQueue(source);
+    const hoy = mapDecisionBoardToHoyQueue(source);
+    const unlimited = mapDecisionBoardToHoyQueue(
+      source,
+      Number.POSITIVE_INFINITY,
+    );
+    expect(full).toHaveLength(10);
+    expect(hoy).toHaveLength(8);
+    expect(hoy).toEqual(full.slice(0, 8));
+    expect(unlimited).toEqual(full);
+  });
+
+  it("never emits BUY or ARMED without a live plan (C1 intact)", () => {
+    const items = buildActionQueue(
+      board({
+        semiF3Queue: [
+          { instrumentId: "i1", symbol: "SAN", status: "pending_confirm" },
+        ],
+        decisionSessions: [
+          session("ITX", { kind: "paper_auto", gate: "PASS" }),
+        ],
+      }),
+    );
+    expect(items.map((i) => i.kind)).toEqual(["WATCH", "WATCH"]);
+    expect(items.every((i) => i.kind !== "BUY" && i.kind !== "ARMED")).toBe(
+      true,
+    );
+    expect(items.every((i) => i.whyNot.includes("legacy_projection"))).toBe(
+      true,
+    );
   });
 });

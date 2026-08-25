@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-v181-operational-consolidation-2026-08-25.md`](./roadmap-v181-operational-consolidation-2026-08-25.md) · C1 [`traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md`](./traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **ABIERTA**.
+> **Estado:** **CÓDIGO LISTO**.
 > **Método:** proyección Hoy; Ranking ≠ BUY; C1 intacto (nunca BUY sin plan); sin backend HTTP; sin `contract:gen`; sin LLM.
 
 ---
