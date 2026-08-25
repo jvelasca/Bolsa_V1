@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `e813aa3` Ciclo 5.2 Exit Radar
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `50004da` Ciclo 5.2 `e813aa3` (Exit Radar)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
