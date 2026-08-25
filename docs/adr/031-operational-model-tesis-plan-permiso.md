@@ -114,7 +114,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.0 Thesis Health thin (cerrado `a2f32bb`):** mapper Golden F → `runtime.thesisHealth` · Board/Hoy «Revisar tesis» · **sin** `TradePlan.status=REVIEW` · sin trail/T1/MFE · `check_opening` intacto.
 
-**Ciclo 5.1 Protect/T1 thin (cerrado — ver relevo):** mapper Golden E → `runtime.protectPlan` · Hoy «Proteger» si MFE≥1R · T1=entry±1R · `suggestedProtectStop=entry` · **sin** mutar `structuralStop` · sin trail/exit · `check_opening` intacto.
+**Ciclo 5.1 Protect/T1 thin (cerrado `12d05d2`):** mapper Golden E → `runtime.protectPlan` · Hoy «Proteger» si MFE≥1R · T1=entry±1R · `suggestedProtectStop=entry` · **sin** mutar `structuralStop` · sin trail/exit · `check_opening` intacto.
 
 No abrir sin fase propia:
 

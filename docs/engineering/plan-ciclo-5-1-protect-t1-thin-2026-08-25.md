@@ -1,8 +1,8 @@
 # Plan — Ciclo 5.1 Protect / T1 thin (Golden E advisory)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §5 Golden **E** · §6 (trailing / T1 / Exit Radar parked; **esta** rebanada abre solo Protect/T1 **advisory thin**) · relevo [`traspaso-relevo-ciclo-5-thesis-health-thin-2026-08-25.md`](./traspaso-relevo-ciclo-5-thesis-health-thin-2026-08-25.md) §4 E1 · síntesis subagente AS-IS Golden E 2026-08-25.
-> **AsOf:** 2026-08-25 · HEAD local post-implementación Ciclo 5.1; previo **`8fa8b7e`** = `origin/main`.
-> **Estado:** **CÓDIGO LISTO — pendiente commit** (D1–D8 OK · batería **125**).
+> **AsOf:** 2026-08-25 · HEAD **`12d05d2`** feat Ciclo 5.1.
+> **Estado:** **CERRADO en código** (`12d05d2`; stamp docs siguiente). D1–D8 OK · batería **125**.
 > **Método:** rebanada fina crecimiento; Ranking ≠ BUY; sin Alembic; sin `contract:gen`; sin LLM; **sin** mutar structuralStop; **sin** ExecuteTrade converge.
 > **Secuencia dueño:** 5.0 F ✅ · **5.1 E (este)** · 5.2+ Exit/trail · MFE · luego integridad.
 
