@@ -1,8 +1,8 @@
 # Plan — Ciclo 4.8 Wyckoff surface + effort-result (cierre línea SETUP)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §1 SETUP · §6 (`Alembic / tabla dedicada Wyckoff / wyckoffPhase en contrato FE — 4.8+`, prohibido sin plan + decisión) · relevo [`traspaso-relevo-ciclo-47-wyckoff-thesis-binding-2026-08-25.md`](./traspaso-relevo-ciclo-47-wyckoff-thesis-binding-2026-08-25.md) · ancla en [`plan-ciclo-47-wyckoff-thesis-binding-2026-08-25.md`](./plan-ciclo-47-wyckoff-thesis-binding-2026-08-25.md) (excluye UI Why / effort-result → 4.8+).
-> **AsOf:** 2026-08-25 · feat **`b381d06`**; D1–D8 **OK**.
-> **Estado:** **CERRADO** en `b381d06`. Batería spine **104**.
+> **AsOf:** 2026-08-25 · HEAD **`a10c356`** = `origin/main`; feat **`b381d06`**.
+> **Estado:** **CERRADO en origin** (`b381d06` vía `a10c356`). D1–D8 OK · batería **104**.
 > **Método:** rebanada fina de **cierre**; SETUP sigue ≠ motor paralelo; Ranking ≠ BUY; sin `contract:gen`; sin LLM.
 > **Secuencia pedida (1+2+3):** (1) evidencia en superficie Hoy · (2) effort-result / volumen thin · (3) **cerrar** la línea Wyckoff SETUP; siguiente arco ADR-031 **fuera** de este plan (no Ciclo 5 PM).
 
