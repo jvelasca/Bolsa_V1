@@ -112,7 +112,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 6 Attribution thin (cerrado `7de91e5`):** snapshot setup en journal payloads · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup + Replay. **Sin** MFE/expectancy. Sin Alembic. Sin `contract:gen`. `check_opening` intacto.
 
-**Ciclo 5.0 Thesis Health thin (cerrado — ver relevo):** mapper Golden F → `runtime.thesisHealth` · Board/Hoy «Revisar tesis» · **sin** `TradePlan.status=REVIEW` · sin trail/T1/MFE · `check_opening` intacto.
+**Ciclo 5.0 Thesis Health thin (cerrado `a2f32bb`):** mapper Golden F → `runtime.thesisHealth` · Board/Hoy «Revisar tesis» · **sin** `TradePlan.status=REVIEW` · sin trail/T1/MFE · `check_opening` intacto.
 
 No abrir sin fase propia:
 
