@@ -405,4 +405,58 @@ describe("HoyCommandStrip", () => {
     expect(exp.textContent).toMatch(/breakout/i);
     expect(exp.textContent).toMatch(/≠ permiso/);
   });
+
+  it("Ciclo 8.1: dialog shows Trail when trailPlan.status!=none", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                },
+                trailPlan: {
+                  status: "ratchet",
+                  suggestedTrailStop: 115,
+                  lockedR: 1.5,
+                  peakMfeR: 2.5,
+                  currentR: 2.0,
+                  trailDistanceR: 1,
+                  why: ["not_permission", "hint_only", "ratchet_lock"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const trail = await screen.findByTestId("hoy-trail-plan");
+    expect(trail).toBeTruthy();
+    expect(trail.textContent).toMatch(/Trail/i);
+    expect(trail.textContent).toMatch(/ratchet/i);
+    expect(trail.textContent).toMatch(/hint only/i);
+  });
 });

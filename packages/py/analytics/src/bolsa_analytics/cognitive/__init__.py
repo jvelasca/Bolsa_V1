@@ -60,11 +60,6 @@ from bolsa_analytics.cognitive.exit_radar import (
     build_exit_radar_dict,
     map_exit_radar,
 )
-from bolsa_analytics.cognitive.mfe_mae import (
-    MFE_MAE_KEY,
-    build_mfe_mae_dict,
-    map_mfe_mae,
-)
 from bolsa_analytics.cognitive.expectancy import (
     EXPECTANCY_KEY,
     build_expectancy_dict,
@@ -88,6 +83,11 @@ from bolsa_analytics.cognitive.market_state import (
     build_market_state,
     classify_regime,
     validate_context,
+)
+from bolsa_analytics.cognitive.mfe_mae import (
+    MFE_MAE_KEY,
+    build_mfe_mae_dict,
+    map_mfe_mae,
 )
 from bolsa_analytics.cognitive.observe_profile import (
     BehaviorTradeSample,
@@ -144,6 +144,11 @@ from bolsa_analytics.cognitive.trading_policy_templates import (
     MODERATE_POLICY,
     POLICY_TEMPLATES,
     get_policy_template,
+)
+from bolsa_analytics.cognitive.trail_plan import (
+    TRAIL_PLAN_KEY,
+    build_trail_plan_dict,
+    map_trail_plan,
 )
 from bolsa_analytics.cognitive.trials_log import TrialRecord, TrialsLog
 from bolsa_analytics.cognitive.weight_rules import (
@@ -226,6 +231,7 @@ __all__ = [
     "build_exit_radar_dict",
     "build_mfe_mae_dict",
     "build_expectancy_dict",
+    "build_trail_plan_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
@@ -246,6 +252,7 @@ __all__ = [
     "map_exit_radar",
     "map_mfe_mae",
     "map_expectancy",
+    "map_trail_plan",
     "monte_carlo_permutation_p_value",
     "new_session_id",
     "observe_investor_profile",
@@ -264,6 +271,7 @@ __all__ = [
     "EXIT_RADAR_KEY",
     "MFE_MAE_KEY",
     "EXPECTANCY_KEY",
+    "TRAIL_PLAN_KEY",
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",

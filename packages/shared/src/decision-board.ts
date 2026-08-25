@@ -11,6 +11,7 @@ import type { ProtectPlanV1 } from "./cognitive/protect-plan.js";
 import type { ExitRadarV1 } from "./cognitive/exit-radar.js";
 import type { MfeMaeV1 } from "./cognitive/mfe-mae.js";
 import type { ExpectancyV1 } from "./cognitive/expectancy.js";
+import type { TrailPlanV1 } from "./cognitive/trail-plan.js";
 
 export type DecisionGate = "PASS" | "VETO" | "DEFERRED" | "unknown";
 
@@ -46,6 +47,8 @@ export type DecisionSessionViewV1 = {
   mfeMae?: MfeMaeV1 | Record<string, unknown>;
   /** Ciclo 8.0 — Expectancy thin advisory; ≠ permiso. */
   expectancy?: ExpectancyV1 | Record<string, unknown>;
+  /** Ciclo 8.1 — Trail thin advisory ratchet; hint only; no stop mutate. */
+  trailPlan?: TrailPlanV1 | Record<string, unknown>;
 };
 
 export type SemiF3ViewV1 = {

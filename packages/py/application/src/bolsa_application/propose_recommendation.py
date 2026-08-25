@@ -37,6 +37,10 @@ from bolsa_analytics.cognitive.trade_plan import (
     parse_wyckoff_spring_anchor,
     snapshot_wyckoff_spring_anchor,
 )
+from bolsa_analytics.cognitive.trail_plan import (
+    TRAIL_PLAN_KEY,
+    build_trail_plan_dict,
+)
 from bolsa_analytics.features.compute_bridge import materialize_feature_snapshot
 from bolsa_analytics.features.online_adapter import OnlineFeatureAdapter
 from bolsa_analytics.indicators.compute import OhlcvBar
@@ -200,6 +204,8 @@ class ProposeRecommendationResult:
     mfe_mae: dict[str, Any] | None = None
     # Ciclo 8.0 — Expectancy thin advisory; ≠ permiso.
     expectancy: dict[str, Any] | None = None
+    # Ciclo 8.1 — Trail thin advisory ratchet; hint only; no stop mutate.
+    trail_plan: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -237,6 +243,8 @@ class ProposeRecommendationResult:
             data[MFE_MAE_KEY] = self.mfe_mae
         if self.expectancy is not None:
             data[EXPECTANCY_KEY] = self.expectancy
+        if self.trail_plan is not None:
+            data[TRAIL_PLAN_KEY] = self.trail_plan
         return data
 
 
@@ -612,6 +620,18 @@ class ProposeRecommendationFromTa:
             focus_setup=entry_setup,
             current_r=current_r,
         )
+        peak_mfe_raw = mfe_mae.get("mfeR") if isinstance(mfe_mae, dict) else None
+        try:
+            peak_mfe_r = float(peak_mfe_raw) if peak_mfe_raw is not None else None
+        except (TypeError, ValueError):
+            peak_mfe_r = None
+        trail_plan = build_trail_plan_dict(
+            direction=plan_direction,
+            entry=entry_px,
+            structural_stop=structural_stop,
+            peak_mfe_r=peak_mfe_r,
+            current_r=current_r,
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -655,6 +675,7 @@ class ProposeRecommendationFromTa:
             EXIT_RADAR_KEY: exit_radar,
             MFE_MAE_KEY: mfe_mae,
             EXPECTANCY_KEY: expectancy,
+            TRAIL_PLAN_KEY: trail_plan,
         }
         if wyckoff_anchor is not None:
             session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
@@ -730,6 +751,7 @@ class ProposeRecommendationFromTa:
             exit_radar=exit_radar,
             mfe_mae=mfe_mae,
             expectancy=expectancy,
+            trail_plan=trail_plan,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:

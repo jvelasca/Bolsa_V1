@@ -15,6 +15,7 @@ from bolsa_application.decision_board import (
     extract_session_protect_plan,
     extract_session_thesis_health,
     extract_session_trade_plan,
+    extract_session_trail_plan,
     extract_session_wyckoff_anchor,
 )
 
@@ -112,6 +113,15 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
         "currentR": 0.8,
         "why": ["not_permission", "live_proxy", "thin_sample"],
     }
+    trail_plan = {
+        "status": "ratchet",
+        "suggestedTrailStop": 115.0,
+        "lockedR": 1.5,
+        "peakMfeR": 2.5,
+        "currentR": 2.0,
+        "trailDistanceR": 1.0,
+        "why": ["not_permission", "hint_only", "ratchet_lock"],
+    }
     sessions = [
         _session(
             session_id="s-plan",
@@ -125,6 +135,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
                     "exitRadar": exit_radar,
                     "mfeMae": mfe_mae,
                     "expectancy": expectancy,
+                    "trailPlan": trail_plan,
                 },
             },
         ),
@@ -146,6 +157,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert by_id["s-plan"].exit_radar == exit_radar
     assert by_id["s-plan"].mfe_mae == mfe_mae
     assert by_id["s-plan"].expectancy == expectancy
+    assert by_id["s-plan"].trail_plan == trail_plan
     dumped = by_id["s-plan"].to_dict()
     assert dumped["tradePlan"]["status"] == "BLOCKED"
     assert dumped["wyckoffSpringAnchor"]["phase"] == "lps"
@@ -154,6 +166,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert dumped["exitRadar"]["status"] == "trail_hint"
     assert dumped["mfeMae"]["status"] == "favorable"
     assert dumped["expectancy"]["status"] == "thin"
+    assert dumped["trailPlan"]["status"] == "ratchet"
     assert "tradePlan" not in by_id["s-empty"].to_dict()
     assert "wyckoffSpringAnchor" not in by_id["s-empty"].to_dict()
     assert "thesisHealth" not in by_id["s-empty"].to_dict()
@@ -161,6 +174,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert "exitRadar" not in by_id["s-empty"].to_dict()
     assert "mfeMae" not in by_id["s-empty"].to_dict()
     assert "expectancy" not in by_id["s-empty"].to_dict()
+    assert "trailPlan" not in by_id["s-empty"].to_dict()
 
 
 def test_extract_session_trade_plan_helpers() -> None:
@@ -188,3 +202,6 @@ def test_extract_session_trade_plan_helpers() -> None:
     assert extract_session_expectancy(
         {"runtime": {"expectancy": {"status": "thin", "n": 1, "expectancyR": 0.2}}}
     ) == {"status": "thin", "n": 1, "expectancyR": 0.2}
+    assert extract_session_trail_plan(
+        {"runtime": {"trail_plan": {"status": "tip", "lockedR": 0.5}}}
+    ) == {"status": "tip", "lockedR": 0.5}

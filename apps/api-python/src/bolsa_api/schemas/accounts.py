@@ -386,6 +386,8 @@ class DecisionSessionViewDto(BaseModel):
     mfe_mae: dict[str, Any] | None = Field(default=None, alias="mfeMae")
     # Ciclo 8.0 — Expectancy thin advisory (≠ permiso).
     expectancy: dict[str, Any] | None = Field(default=None, alias="expectancy")
+    # Ciclo 8.1 — Trail thin advisory ratchet (hint only).
+    trail_plan: dict[str, Any] | None = Field(default=None, alias="trailPlan")
 
 
 class SemiF3ViewDto(BaseModel):

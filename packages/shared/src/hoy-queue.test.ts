@@ -364,4 +364,44 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.expectancy?.expectancyR).toBe(0.8);
     expect(items[0]?.expectancy?.n).toBe(1);
   });
+
+  it("Ciclo 8.1: surfaces trailPlan ratchet without changing kind", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-trail",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              entry: 100,
+              structuralStop: 90,
+              executionAllowed: true,
+            }),
+            trailPlan: {
+              status: "ratchet",
+              suggestedTrailStop: 115,
+              lockedR: 1.5,
+              peakMfeR: 2.5,
+              currentR: 2.0,
+              trailDistanceR: 1,
+              why: ["not_permission", "hint_only", "ratchet_lock"],
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("BUY");
+    expect(items[0]?.trailPlan?.status).toBe("ratchet");
+    expect(items[0]?.trailPlan?.suggestedTrailStop).toBe(115);
+    expect(items[0]?.trailPlan?.lockedR).toBe(1.5);
+  });
 });

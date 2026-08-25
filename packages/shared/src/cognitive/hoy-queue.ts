@@ -9,6 +9,7 @@
  * Ciclo 5.2: exitRadar advisory — no auto-exit.
  * Ciclo 5.3: mfeMae metrics — no CTA / no expectancy plena.
  * Ciclo 8.0: expectancy thin advisory — ≠ permiso / no auto-exit.
+ * Ciclo 8.1: trailPlan advisory ratchet — hint only / no stop mutate.
  */
 
 import type {
@@ -44,6 +45,11 @@ import type {
   ExpectancyV1,
   ExpectancyWhyV1,
 } from "./expectancy.js";
+import type {
+  TrailPlanStatusV1,
+  TrailPlanV1,
+  TrailPlanWhyV1,
+} from "./trail-plan.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
@@ -73,6 +79,8 @@ export type HoyQueueItemV1 = {
   mfeMae?: MfeMaeV1 | null;
   /** Ciclo 8.0 — Expectancy thin (≠ permiso). */
   expectancy?: ExpectancyV1 | null;
+  /** Ciclo 8.1 — Trail thin ratchet (hint only). */
+  trailPlan?: TrailPlanV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -607,6 +615,82 @@ function readExpectancyFromF3Row(row: SemiF3ViewV1): ExpectancyV1 | null {
   return readExpectancyFromPayloadish(flattened.payload);
 }
 
+const TRAIL_PLAN_STATUSES = new Set<TrailPlanStatusV1>([
+  "none",
+  "tip",
+  "ratchet",
+]);
+const TRAIL_PLAN_WHYS = new Set<TrailPlanWhyV1>([
+  "missing_inputs",
+  "mfe_lt_1_5r",
+  "aligned_exit_radar_tip",
+  "ratchet_lock",
+  "not_permission",
+  "hint_only",
+]);
+
+function asTrailPlan(value: unknown): TrailPlanV1 | null {
+  if (!isRecord(value)) return null;
+  const status = value.status;
+  if (
+    typeof status !== "string" ||
+    !TRAIL_PLAN_STATUSES.has(status as TrailPlanStatusV1)
+  ) {
+    return null;
+  }
+  const whyRaw = value.why;
+  const why: TrailPlanWhyV1[] = Array.isArray(whyRaw)
+    ? whyRaw.filter(
+        (code): code is TrailPlanWhyV1 =>
+          typeof code === "string" &&
+          TRAIL_PLAN_WHYS.has(code as TrailPlanWhyV1),
+      )
+    : [];
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const distRaw = value.trailDistanceR;
+  const trailDistanceR =
+    typeof distRaw === "number" && Number.isFinite(distRaw) ? distRaw : 1;
+  return {
+    status: status as TrailPlanStatusV1,
+    suggestedTrailStop: numOrNull(value.suggestedTrailStop),
+    lockedR: numOrNull(value.lockedR),
+    peakMfeR: numOrNull(value.peakMfeR),
+    currentR: numOrNull(value.currentR),
+    trailDistanceR,
+    why,
+  };
+}
+
+function readTrailPlanFromPayloadish(value: unknown): TrailPlanV1 | null {
+  if (!isRecord(value)) return null;
+  const top = asTrailPlan(value.trailPlan);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = asTrailPlan(runtime.trailPlan);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return asTrailPlan(value.runtime.trailPlan);
+  }
+  return null;
+}
+
+function readTrailPlanFromF3Row(row: SemiF3ViewV1): TrailPlanV1 | null {
+  const extra = row.extra;
+  if (isRecord(extra)) {
+    const fromPayload = readTrailPlanFromPayloadish(extra.payload);
+    if (fromPayload) return fromPayload;
+    const fromExtra = asTrailPlan(extra.trailPlan);
+    if (fromExtra) return fromExtra;
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  return readTrailPlanFromPayloadish(flattened.payload);
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -664,6 +748,7 @@ function toHoyItem(
   exitRadar: ExitRadarV1 | null,
   mfeMae: MfeMaeV1 | null,
   expectancy: ExpectancyV1 | null,
+  trailPlan: TrailPlanV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -679,6 +764,7 @@ function toHoyItem(
       exitRadar,
       mfeMae,
       expectancy,
+      trailPlan,
     };
   }
   return {
@@ -694,6 +780,7 @@ function toHoyItem(
     exitRadar,
     mfeMae,
     expectancy,
+    trailPlan,
   };
 }
 
@@ -719,6 +806,7 @@ export function mapDecisionBoardToHoyQueue(
         readExitRadarFromF3Row(row),
         readMfeMaeFromF3Row(row),
         readExpectancyFromF3Row(row),
+        readTrailPlanFromF3Row(row),
       ),
     );
   }
@@ -745,6 +833,7 @@ export function mapDecisionBoardToHoyQueue(
         asExitRadar(session.exitRadar),
         asMfeMae(session.mfeMae),
         asExpectancy(session.expectancy),
+        asTrailPlan(session.trailPlan),
       ),
     );
   }

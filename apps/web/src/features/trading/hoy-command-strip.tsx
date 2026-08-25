@@ -14,6 +14,7 @@ import type {
   MfeMaeV1,
   ProtectPlanV1,
   ThesisHealthV1,
+  TrailPlanV1,
 } from "@bolsa/shared";
 import { mapDecisionBoardToHoyQueue } from "@bolsa/shared";
 import { api } from "@/lib/api";
@@ -124,6 +125,17 @@ function expectancyLine(exp: ExpectancyV1): string {
   return parts.join(" · ");
 }
 
+function trailPlanLine(plan: TrailPlanV1): string {
+  const parts = [plan.status];
+  if (plan.peakMfeR != null) parts.push(`peak ${plan.peakMfeR}R`);
+  if (plan.lockedR != null) parts.push(`lock ${plan.lockedR}R`);
+  if (plan.suggestedTrailStop != null) {
+    parts.push(`trail @ ${plan.suggestedTrailStop}`);
+  }
+  parts.push("hint only");
+  return parts.join(" · ");
+}
+
 export function HoyCommandStrip() {
   const { effectiveAccountId } = useActiveAccount();
   const [selected, setSelected] = useState<HoyQueueItemV1 | null>(null);
@@ -225,6 +237,16 @@ export function HoyCommandStrip() {
                 </p>
                 <p className="mt-1 text-sm tabular-nums">
                   {expectancyLine(selected.expectancy)}
+                </p>
+              </div>
+            ) : null}
+            {selected.trailPlan && selected.trailPlan.status !== "none" ? (
+              <div className="mt-3" data-testid="hoy-trail-plan">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Trail
+                </p>
+                <p className="mt-1 text-sm tabular-nums">
+                  {trailPlanLine(selected.trailPlan)}
                 </p>
               </div>
             ) : null}
