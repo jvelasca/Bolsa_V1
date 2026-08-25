@@ -42,7 +42,7 @@
 ## 4. E1
 
 1. ~~Feat I1~~ · ~~stamp SHA~~ · push (decisión explícita).
-2. **I2 Actionability / Ranking IO** — D1–D8 en relevo I2 (**esperar OK**).
+2. ~~I2 Actionability / Ranking IO~~ (relevo I2; stamp SHA pendiente).
 3. Park: Shadow AUTO (I3, explícito) · expectancy plena · trail continuo · bracket.
 4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
 

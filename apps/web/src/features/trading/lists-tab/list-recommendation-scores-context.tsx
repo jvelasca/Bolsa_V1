@@ -16,7 +16,7 @@ import {
   opinionByInstrumentId,
   useInstrumentDailyOpinions,
 } from "@/features/trading/use-instrument-daily-opinions";
-import { computeIndiceOperativo } from "@/features/trading/operativa-index";
+import { resolveIndiceOperativo } from "@/features/trading/operativa-index";
 import { useListColumnLayoutContext } from "@/features/trading/lists-tab/list-column-layout-context";
 
 export type ListRecommendationRow = {
@@ -98,7 +98,8 @@ export function ListRecommendationScoresProvider({
       const fa = faByInstrument.get(id);
       const ta = taByInstrument.get(id);
       const opinion = opinionsById.get(id);
-      const io = computeIndiceOperativo({
+      const io = resolveIndiceOperativo({
+        indiceOperativo: ta?.indiceOperativo,
         compositeDisplay100: ta?.compositeDisplay100,
         distress: fa?.distress,
       });

@@ -45,8 +45,8 @@ import { OperativaDictamenBlock } from "@/features/trading/operativa-dictamen";
 import { OperativaOutcomesBlock } from "@/features/trading/operativa-outcomes";
 import { useInstrumentDailyOpinions } from "@/features/trading/use-instrument-daily-opinions";
 import {
-  computeIndiceOperativo,
   rankIndiceOperativo,
+  resolveIndiceOperativo,
   type OperativaScoreRow,
 } from "@/features/trading/operativa-index";
 import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
@@ -141,7 +141,8 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         const fa = faByInstrument.get(id);
         return {
           instrumentId: id,
-          io: computeIndiceOperativo({
+          io: resolveIndiceOperativo({
+            indiceOperativo: ta?.indiceOperativo,
             compositeDisplay100: ta?.compositeDisplay100,
             distress: fa?.distress,
           }),

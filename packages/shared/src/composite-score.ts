@@ -72,6 +72,11 @@ export interface CompositeCardDto {
   /** Combined ∈ [-1, +1]. */
   combinedScore: number | null;
   scoreDisplay100: number | null;
+  /**
+   * Índice Operativo 0–100 (Ciclo I2). Echo del chip / card.
+   * Ranking Estudio sigue en cliente. ≠ actionability. ≠ permiso.
+   */
+  indiceOperativo?: number | null;
   legs: CompositeLegV1[];
   weights: CompositeWeightsV1;
   metadata: CompositeCardMetadataV1;
@@ -88,6 +93,11 @@ export interface CompositeChipDto {
   ticker: string;
   /** Combined 0–100 (neutral 50). */
   scoreDisplay100?: number | null;
+  /**
+   * Índice Operativo 0–100 (Ciclo I2). Composite + suelo distress FA ≤ 40.
+   * Ranking Estudio sigue en cliente. ≠ TradePlan.actionability. ≠ permiso.
+   */
+  indiceOperativo?: number | null;
   confidence: CompositeDataConfidence;
   combinedScore?: number | null;
   regime: string;

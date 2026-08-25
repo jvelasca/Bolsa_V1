@@ -39,7 +39,7 @@ import {
   toggleFavoriteBuiltinFilter,
   toggleFavoriteListId,
 } from "@/features/instruments/instruments-hub-filter-bar";
-import { computeIndiceOperativo } from "@/features/trading/operativa-index";
+import { resolveIndiceOperativo } from "@/features/trading/operativa-index";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import {
   pickListChips,
@@ -565,7 +565,8 @@ export function InstrumentsPage() {
       const ta = taByInstrument.get(id);
       map.set(
         id,
-        computeIndiceOperativo({
+        resolveIndiceOperativo({
+          indiceOperativo: ta?.indiceOperativo,
           compositeDisplay100: ta?.compositeDisplay100,
           distress: fa?.distress,
         }),

@@ -40,6 +40,25 @@ export function computeIndiceOperativo(input: {
 }
 
 /**
+ * Prefiere IO server (chip Composite, Ciclo I2). Fallback: fórmula cliente.
+ * Ranking Estudio sigue en cliente. IO ≠ permiso.
+ */
+export function resolveIndiceOperativo(input: {
+  indiceOperativo?: number | null;
+  compositeDisplay100: number | null | undefined;
+  distress?: boolean;
+}): number | null {
+  const server = input.indiceOperativo;
+  if (server != null && Number.isFinite(server)) {
+    return Math.round(Math.max(0, Math.min(100, server)));
+  }
+  return computeIndiceOperativo({
+    compositeDisplay100: input.compositeDisplay100,
+    distress: input.distress,
+  });
+}
+
+/**
  * Ordena por IO desc (null al final). Empate: instrumentId estable.
  * Rank 1 = mejor IO.
  */

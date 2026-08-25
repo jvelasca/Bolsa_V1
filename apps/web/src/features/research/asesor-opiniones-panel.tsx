@@ -21,7 +21,7 @@ import {
   useInstrumentDailyOpinions,
 } from "@/features/trading/use-instrument-daily-opinions";
 import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
-import { computeIndiceOperativo } from "@/features/trading/operativa-index";
+import { resolveIndiceOperativo } from "@/features/trading/operativa-index";
 import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
 import { demoBookAllowsEnqueueConfirm } from "@/features/trading/demo-book-prefs";
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
@@ -102,7 +102,8 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
       studyIds.map((id) => {
         const fa = faByInstrument.get(id);
         const ta = taByInstrument.get(id);
-        const io = computeIndiceOperativo({
+        const io = resolveIndiceOperativo({
+          indiceOperativo: ta?.indiceOperativo,
           compositeDisplay100: ta?.compositeDisplay100,
           distress: fa?.distress,
         });

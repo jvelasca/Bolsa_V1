@@ -5,7 +5,7 @@
  * Mejor IO → índice menor (pestaña más a la izquierda).
  */
 
-import { computeIndiceOperativo } from "@/features/trading/operativa-index";
+import { resolveIndiceOperativo } from "@/features/trading/operativa-index";
 
 export type IoSortRow = {
   instrumentId: string;
@@ -51,8 +51,9 @@ export function orderInstrumentIdsByIo(
 }
 
 export function ioFromCompositeAndFa(input: {
+  indiceOperativo?: number | null;
   compositeDisplay100: number | null | undefined;
   distress?: boolean;
 }): number | null {
-  return computeIndiceOperativo(input);
+  return resolveIndiceOperativo(input);
 }

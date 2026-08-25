@@ -68,6 +68,22 @@ describe("instruments-hub-scores", () => {
     ] as CompositeChipDto[]);
     expect(ta.get("1")?.technicalDisplay100).toBe(61);
     expect(ta.get("1")?.compositeDisplay100).toBe(55);
+    expect(ta.get("1")?.indiceOperativo).toBeNull();
+
+    const taIo = indexTaScores([
+      {
+        instrumentId: "2",
+        ticker: "ACS",
+        scoreDisplay100: 80,
+        indiceOperativo: 40,
+        confidence: "LOW",
+        combinedScore: 0.2,
+        regime: "neutral",
+        paperDUnlocked: true,
+        technicalDisplay100: 70,
+      },
+    ] as CompositeChipDto[]);
+    expect(taIo.get("2")?.indiceOperativo).toBe(40);
   });
 
   it("sorts hub by scoreFa", () => {

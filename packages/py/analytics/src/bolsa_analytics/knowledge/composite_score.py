@@ -23,6 +23,7 @@ from bolsa_analytics.cognitive.weight_rules import (
 from bolsa_analytics.knowledge.fundamental_assessment import build_fundamental_assessment
 from bolsa_analytics.knowledge.fundamental_card import fund_score_to_display_100
 from bolsa_analytics.knowledge.fundamental_inputs import FundamentalInputs
+from bolsa_analytics.knowledge.indice_operativo import compute_indice_operativo
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_analytics.knowledge.technical_assessment import build_technical_assessment
 
@@ -344,12 +345,16 @@ def build_composite_card(
         f"horizon={horizon} regime={regime}",
     )
 
+    score_display_100 = fund_score_to_display_100(combined)
     return {
         "schemaVersion": COMPOSITE_SCHEMA_VERSION,
         "instrumentId": instrument_id,
         "ticker": ticker,
         "combinedScore": combined,
-        "scoreDisplay100": fund_score_to_display_100(combined),
+        "scoreDisplay100": score_display_100,
+        "indiceOperativo": compute_indice_operativo(
+            score_display_100, distress=fund_distress
+        ),
         "legs": legs,
         "weights": {
             "ta": round(wr.w_ta, 4),
@@ -400,10 +405,15 @@ def _leg_score_display100(legs: Any, key: str) -> int | None:
 
 def composite_to_chip(card: dict[str, Any]) -> dict[str, Any]:
     meta = card.get("metadata") if isinstance(card.get("metadata"), dict) else {}
+    score_display = card.get("scoreDisplay100")
+    io = card.get("indiceOperativo")
+    if io is None:
+        io = compute_indice_operativo(score_display, distress=False)
     return {
         "instrumentId": card.get("instrumentId"),
         "ticker": card.get("ticker"),
-        "scoreDisplay100": card.get("scoreDisplay100"),
+        "scoreDisplay100": score_display,
+        "indiceOperativo": io,
         "confidence": meta.get("confidence") or "LOW",
         "combinedScore": card.get("combinedScore"),
         "regime": meta.get("regime") or "neutral",

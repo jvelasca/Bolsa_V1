@@ -130,6 +130,7 @@ export async function fetchIoByInstrumentIds(
     out.set(
       id,
       ioFromCompositeAndFa({
+        indiceOperativo: ta?.indiceOperativo,
         compositeDisplay100: ta?.compositeDisplay100,
         distress: fa?.distress,
       }),

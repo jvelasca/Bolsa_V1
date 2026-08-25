@@ -20,6 +20,8 @@ export type HubTaScore = {
   technicalDisplay100: number | null;
   /** Combined Composite 0–100 (tooltip / sort opcional). */
   compositeDisplay100: number | null;
+  /** IO server 0–100 si el chip lo trae (Ciclo I2). */
+  indiceOperativo?: number | null;
 };
 
 export function chunkIds(ids: string[], size: number): string[][] {
@@ -53,6 +55,7 @@ export function indexTaScores(
     map.set(chip.instrumentId, {
       technicalDisplay100: chip.technicalDisplay100 ?? null,
       compositeDisplay100: chip.scoreDisplay100 ?? null,
+      indiceOperativo: chip.indiceOperativo ?? null,
     });
   }
   return map;

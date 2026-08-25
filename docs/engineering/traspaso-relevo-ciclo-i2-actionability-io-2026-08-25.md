@@ -1,35 +1,43 @@
 # RELEVO — Ciclo I2 Actionability / Índice Operativo (integridad post-I1)
 
 > **Padre:** [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md).
-> **Plan:** [`plan-ciclo-i2-actionability-io-2026-08-25.md`](./plan-ciclo-i2-actionability-io-2026-08-25.md) (**D1–D8 BORRADOR**).
+> **Plan:** [`plan-ciclo-i2-actionability-io-2026-08-25.md`](./plan-ciclo-i2-actionability-io-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD origin:** `05e354c`. Feat I1 **`2bd5cd8`** · stamp **`8fce269`** (local, no push).
-> **Fase:** **integridad**. Sin código I2 hasta OK.
+> **HEAD origin:** `05e354c`. Feat I1 **`2bd5cd8`** · stamp I1 **`8fce269`**. I2 en working tree (feat + stamp SHA pendientes).
+> **Fase:** **integridad**.
 > **Nombre:** no confundir con hub Instrumentos (`instruments-hub-scores.ts`).
 
 ---
 
 ## 0. Contexto
 
-**I1 CERRADO** (`2bd5cd8`): HTTP buy gated. Batería spine **144**.
+**I1 CERRADO** (`2bd5cd8`). Actionability TradePlan ya era server (4.3). I2 cierra la **fórmula IO**.
 
-Actionability TradePlan **ya es server**. El hueco real es la **fórmula IO** (cliente) y un freeze ADR que habla de «hasta Actionability en servidor».
+## 1. Qué se cerró (I2)
 
-## 1. Qué se pide (aún no cerrado)
+| Pieza   | Qué                                                                                    |
+| ------- | -------------------------------------------------------------------------------------- |
+| Fórmula | `compute_indice_operativo` — Composite 0–100 + suelo distress ≤ 40 (paridad TS)        |
+| Echo    | `indiceOperativo` en card + chip Composite (`fund_distress` de `build_composite_card`) |
+| FE      | `resolveIndiceOperativo` (server preferente; `computeIndiceOperativo` fallback)        |
+| Rank    | `rankIndiceOperativo` **sigue cliente**. Sin HTTP de rank. IO ≠ permiso.               |
 
-Ver plan §1 D1–D8. Default thin: twin Python + echo `indiceOperativo` en chip Composite; rank Estudio sigue cliente; IO ≠ permiso.
+**Sin** Shadow AUTO · **sin** broker · **sin** Alembic / `contract:gen` · **sin** tocar `check_opening` / I1.
 
 ## 2. Batería
 
-Pre-I2: `pnpm test:decision-spine` → **144 passed** (I1).
+- pytest `test_indice_operativo` + `test_composite_score_f3` + `test_get_instrument_composite_f3` → **10 passed**
+- vitest operativa-index + hub-scores + fetch-io → **11 passed**
+- ruff I2 touched: 0
+- `pnpm test:decision-spine` **no** tocada (**144**)
 
 ## 3. Commits
 
-I2 no empezado. No inventar SHA.
+Pendiente feat + stamp docs (D8). No inventar SHA.
 
-## 4. E1 (tras cierre I2)
+## 4. E1
 
-1. Commit · stamp · push (decisión explícita).
+1. Commit · stamp SHA · push (decisión explícita).
 2. Park: Shadow AUTO (**I3, solo si explícito**) · expectancy plena · trail continuo · bracket.
 3. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
 

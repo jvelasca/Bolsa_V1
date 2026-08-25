@@ -9,6 +9,7 @@ from bolsa_analytics.knowledge.composite_score import (
     liquidity_score_from_mcap,
     regime_to_score,
 )
+from bolsa_analytics.knowledge.indice_operativo import compute_indice_operativo
 from bolsa_analytics.knowledge.models import TechnicalInputs
 
 
@@ -112,6 +113,9 @@ def test_composite_with_ta_and_fund():
     assert chip["ticker"] == "ACME"
     assert chip["technicalDisplay100"] is not None
     assert 0 <= chip["technicalDisplay100"] <= 100
+    assert chip["indiceOperativo"] is not None
+    assert chip["indiceOperativo"] == card["indiceOperativo"]
+    assert 0 <= chip["indiceOperativo"] <= 100
 
 
 def test_composite_fund_only_missing_ta():
@@ -142,3 +146,27 @@ def test_crisis_veto_warning():
     )
     assert card["weights"]["vetoNewLong"] is True
     assert any("veto" in w.lower() for w in card["warnings"])
+
+
+def test_chip_indice_operativo_applies_distress_floor():
+    card = build_composite_card(
+        instrument_id="inst-distress",
+        ticker="DIST",
+        fundamentals=_fund(
+            trailingPe=80.0,
+            debtToEquity=5.0,
+            currentRatio=0.4,
+            altmanZ=0.8,
+        ),
+        technical=_bullish_ta(),
+        horizon="swing",
+        regime="neutral",
+    )
+    chip = composite_to_chip(card)
+    expected = compute_indice_operativo(
+        card["scoreDisplay100"], distress=True
+    )
+    assert chip["indiceOperativo"] == expected
+    assert expected is not None
+    assert expected <= 40
+

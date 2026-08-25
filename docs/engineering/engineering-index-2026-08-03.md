@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `8fce269` · feat I1 `2bd5cd8` · origin `05e354c` · I2 Actionability/IO (D1–D8 BORRADOR)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `8fce269` · feat I1 `2bd5cd8` · origin `05e354c` · I2 Actionability/IO (D1–D8 OK; stamp pendiente)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -62,8 +62,8 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md ← **RELEVO ACTIVO** · I2 Actionability/IO · D1–D8 BORRADOR (esperar OK)
-│   ├── plan-ciclo-i2-actionability-io-2026-08-25.md ← plan I2 · D1–D8 BORRADOR
+│   ├── traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md ← **RELEVO ACTIVO** · I2 Actionability/IO · D1–D8 OK · código; stamp SHA pendiente
+│   ├── plan-ciclo-i2-actionability-io-2026-08-25.md ← plan I2 · D1–D8 OK
 │   ├── traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md ← histórico · I1 ExecuteTrade · CERRADO `2bd5cd8`
 │   ├── plan-ciclo-i1-executetrade-converge-2026-08-25.md ← plan I1 · D1–D8 OK · CERRADO en `2bd5cd8`
 │   ├── traspaso-relevo-ciclo-5-3-mfe-mae-thin-2026-08-25.md ← Ciclo 5.3 MFE/MAE · CERRADO `fd44a03` (tip `05e354c`) · línea 5.x cerrada

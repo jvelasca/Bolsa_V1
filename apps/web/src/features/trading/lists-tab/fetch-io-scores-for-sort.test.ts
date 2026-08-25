@@ -125,4 +125,31 @@ describe("fetchIoByInstrumentIds", () => {
     );
     expect(io.get("z")).toBe(40);
   });
+
+  it("prefers server indiceOperativo over FA distress fallback", async () => {
+    const io = await fetchIoByInstrumentIds(
+      ["s"],
+      {
+        queryFundamentals: async () => ({ data: [] }),
+        queryComposite: async () => ({ data: [] }),
+        yieldBetweenChunks: async () => undefined,
+      },
+      {
+        fa: new Map([
+          ["s", { scoreDisplay100: 80, isStale: false, distress: false }],
+        ]),
+        ta: new Map([
+          [
+            "s",
+            {
+              technicalDisplay100: 90,
+              compositeDisplay100: 90,
+              indiceOperativo: 40,
+            },
+          ],
+        ]),
+      },
+    );
+    expect(io.get("s")).toBe(40);
+  });
 });

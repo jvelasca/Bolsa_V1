@@ -18,6 +18,7 @@ class CompositeChipDto(BaseModel):
     regime: str = "neutral"
     paper_d_unlocked: bool = Field(default=False, alias="paperDUnlocked")
     technical_display_100: int | None = Field(default=None, alias="technicalDisplay100")
+    indice_operativo: int | None = Field(default=None, alias="indiceOperativo")
 
 
 class QueryInstrumentCompositeDto(BaseModel):

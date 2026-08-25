@@ -68,4 +68,4 @@ Daily Decision Board (`GetDecisionBoard`, `/decision-board`) es **vista**; no de
 
 ## 3. Qué no es esta columna
 
-Ranking IO cliente · Daily Mission / Confirm All · OrderProposal nuevo · Decision Journal · Attribution · `evaluate_investment_decision` orquestador · LLM → orden.
+Ranking Estudio cliente · Daily Mission / Confirm All · OrderProposal nuevo · Decision Journal · Attribution · `evaluate_investment_decision` orquestador · LLM → orden.

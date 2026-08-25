@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeIndiceOperativo,
+  resolveIndiceOperativo,
   estudioRankProgressPct,
   formatEstudioRankLabel,
   rankIndiceOperativo,
@@ -17,6 +18,23 @@ describe("operativa-index", () => {
       computeIndiceOperativo({ compositeDisplay100: 80, distress: true }),
     ).toBe(40);
     expect(computeIndiceOperativo({ compositeDisplay100: null })).toBeNull();
+  });
+
+  it("resolveIndiceOperativo prefers server field over client formula", () => {
+    expect(
+      resolveIndiceOperativo({
+        indiceOperativo: 40,
+        compositeDisplay100: 90,
+        distress: false,
+      }),
+    ).toBe(40);
+    expect(
+      resolveIndiceOperativo({
+        indiceOperativo: null,
+        compositeDisplay100: 80,
+        distress: true,
+      }),
+    ).toBe(40);
   });
 
   it("ranks by IO desc and formats label", () => {

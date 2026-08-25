@@ -122,7 +122,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo I1 ExecuteTrade converge (cerrado `2bd5cd8`):** `allow_opening_fill` compartido Confirm + Fill + HTTP. `POST /portfolio/trade` buy → `check_opening` (403 `risk_veto`); sell skip. Router AUTO no fusionado. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
-**Ciclo I2 Actionability/IO (D1–D8 BORRADOR):** `TradePlan.actionability` ya es server (4.3). Ranking IO (`computeIndiceOperativo`) sigue cliente. No implementar hasta OK. Plan: [`plan-ciclo-i2-actionability-io-2026-08-25.md`](../engineering/plan-ciclo-i2-actionability-io-2026-08-25.md).
+**Ciclo I2 Actionability/IO (código; stamp SHA pendiente):** fórmula `compute_indice_operativo` + echo `indiceOperativo` en chip Composite. Rank Estudio sigue cliente. IO ≠ permiso. `TradePlan.actionability` intacta. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
 No abrir sin fase propia:
 
@@ -134,7 +134,7 @@ No abrir sin fase propia:
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 
-Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en cliente hasta Actionability en servidor · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect / Exit Radar / MFE-MAE ≠ permiso.
+Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · Actionability TradePlan es server · fórmula IO es server (chip) · rank Estudio puede seguir en cliente · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect / Exit Radar / MFE-MAE ≠ permiso.
 
 ---
 
