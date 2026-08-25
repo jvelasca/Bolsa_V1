@@ -1,7 +1,7 @@
 # RELEVO — tag v1.10-beta → auditoría (2026-08-25)
 
 > **Padre:** [`audit-ext-v19-ops-discontinuity-triage-2026-08-25.md`](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN.** Tag `v1.10-beta` para auditar Operational Authority v1.10 (H1→P4).
+> **Estado:** **PUBLICACIÓN.** Tag `v1.10-beta` para auditar Operational Authority v1.10 (H1→P4). **Release tag CI GREEN.**
 > **Arranque chat nuevo:** este fichero + ADR-033 + `CURRENT_SYSTEM.md` + roadmap v1.10.
 
 ---
@@ -15,7 +15,8 @@
 
 | Pieza        | Valor                                  |
 | ------------ | -------------------------------------- |
-| Tag          | `v1.10-beta` → `2ea53be2`              |
+| Tag          | `v1.10-beta` → `047ddb6`               |
+| Release base | `2ea53be2` (stamp funcional H1→P4)     |
 | Previo       | `v1.9-beta` → `7d90d965`               |
 | Pack auditor | triage v19 + relevos H1–P4             |
 | Spine        | `pnpm test:decision-spine` **260**     |

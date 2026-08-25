@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-v110-operational-authority-2026-08-25.md`](./roadmap-v110-operational-authority-2026-08-25.md) · ADR-033 §7 · gap [`adr-032-ops-authority-gap-2026-08-25.md`](./adr-032-ops-authority-gap-2026-08-25.md) §2.1 · relevo [`traspaso-relevo-p3-cadena-salida-2026-08-25.md`](./traspaso-relevo-p3-cadena-salida-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **P4.1 CERRADO (código).** P4.2+ pendiente.
+> **Estado:** **P4.1 + P4.2 CERRADOS (código + tag).** P4.3+ (protect persist, broker) fuera.
 > **Método:** claridad 10s · **no** god page · **no** sexta puerta · Confirmar sigue siendo la firma. Reutiliza P1–P3 (Position + cadena salida). Cero broker · cero `stopPrice` / OCO · cero auto-exit CTA.
 
 ---
