@@ -1,4 +1,4 @@
-"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.5."""
+"""TradePlan v0 — golden A/B/C/D/G/H (ADR-031) + Ciclo 4.0–4.6."""
 
 from types import SimpleNamespace
 
@@ -10,6 +10,7 @@ from bolsa_analytics.cognitive.trade_plan import (
     WYCKOFF_RECLAIM_ATR_K,
     WYCKOFF_SPRING,
     _detect_wyckoff_lps,
+    _locate_wyckoff_spring,
     _wyckoff_phase_evidence,
     build_trade_plan,
     build_v0_trade_plan_dict,
@@ -73,6 +74,31 @@ def _wyckoff_and_breakout_bars() -> list[SimpleNamespace]:
     prior, spring = _wyckoff_spring_base()
     last = _bar(close=96.0, high=96.0, low=90.0)
     return [*pad, *prior, *spring, last]
+
+
+def _wyckoff_aged_pad(n: int = 12) -> list[SimpleNamespace]:
+    """Barras post-spring sobre hielo (no rompen ice=85; no inventan breakout)."""
+    return [_bar(close=87.0, high=88.0, low=86.0) for _ in range(n)]
+
+
+def _wyckoff_aged_reclaim_bars() -> list[SimpleNamespace]:
+    """Spring fuera de las últimas 16 + pad sobre hielo + reclaim last."""
+    prior, spring = _wyckoff_spring_base()
+    pad = _wyckoff_aged_pad(12)
+    last = _bar(close=93.0, high=93.0, low=86.0)
+    return [*prior, *spring, *pad, last]
+
+
+def _wyckoff_aged_ice_broken_bars() -> list[SimpleNamespace]:
+    """Spring envejecido + cerradas que tocan el hielo (empate) → estructura muerta.
+
+    Lows posteriores = ice (no forman spring nuevo: spring_min == prior_min).
+    """
+    prior, spring = _wyckoff_spring_base()
+    # ice=85; low==85 rompe hielo y no crea spring nuevo vs prior de 85s
+    touch = [_bar(close=86.0, high=87.0, low=85.0) for _ in range(8)]
+    last = _bar(close=93.0, high=93.0, low=86.0)
+    return [*prior, *spring, *touch, last]
 
 
 def test_compute_risk_size_basic() -> None:
@@ -546,3 +572,24 @@ def test_wyckoff_lps_false_without_reclaim() -> None:
 
 def test_wyckoff_phase_evidence_none_without_bars() -> None:
     assert _wyckoff_phase_evidence(direction="long", bars=[], atr=2.0) == "none"
+
+
+def test_wyckoff_aged_spring_still_wyckoff() -> None:
+    """Ciclo 4.6: spring fuera de ventana 16 + reclaim + hielo vivo → wyckoff."""
+    atr = 2.0
+    bars = _wyckoff_aged_reclaim_bars()
+    assert len(bars) > WYCKOFF_PRIOR + WYCKOFF_SPRING + 1
+    assert _locate_wyckoff_spring(direction="long", bars=bars) is not None
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "wyckoff"
+    assert _detect_wyckoff_lps(direction="long", bars=bars, atr=atr) is True
+    assert _wyckoff_phase_evidence(direction="long", bars=bars, atr=atr) == "lps"
+
+
+def test_wyckoff_aged_ice_broken_is_none() -> None:
+    """Ciclo 4.6: cerrada posterior perfora hielo → no wyckoff; LPS false."""
+    atr = 2.0
+    bars = _wyckoff_aged_ice_broken_bars()
+    assert _locate_wyckoff_spring(direction="long", bars=bars) is None
+    assert classify_entry_setup(action="recommend_long", bars=bars, atr=atr) == "none"
+    assert _detect_wyckoff_lps(direction="long", bars=bars, atr=atr) is False
+    assert _wyckoff_phase_evidence(direction="long", bars=bars, atr=atr) == "none"
