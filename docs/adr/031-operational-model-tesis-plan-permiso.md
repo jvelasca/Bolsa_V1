@@ -108,6 +108,8 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 4.8 (cerrado `b381d06`):** surface + effort-result — `_wyckoff_effort_evidence` en anchor; echo F3; Hoy Setup (`entrySetup` + phase + effort); Board `extra` anidado. Effort/LPS etiqueta. **Línea SETUP Wyckoff 4.0–4.8 CERRADA.** Sin Alembic. Sin `wyckoffPhase` TradePlan. Sin `contract:gen`. `check_opening` intacto.
 
+**Ciclo 4.9 (cerrado `e569003`):** mesa Board session echo — `tradePlan` + `wyckoffSpringAnchor` desde `runtime` en `DecisionSessionView` / DTO a mano; Hoy usa plan vivo (heurística solo sin plan); WhyNot labels `regime`/`orphan`/`rr`. Sin Alembic. Sin `contract:gen`. Sin Actionability/IO server. `check_opening` intacto.
+
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)

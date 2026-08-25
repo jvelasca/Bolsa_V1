@@ -43,7 +43,7 @@ Push: `7ada26d..` → `origin/main` (incl. update-last).
 
 1. ~~Commit~~ · ~~Push~~.
 2. **Línea SETUP Wyckoff 4.0–4.8 cerrada** — no abrir 4.9 Wyckoff / Alembic / `wyckoffPhase` contrato por defecto.
-3. Elegir **otro arco** ADR-031 (mesa/attribution/integrity…). **No** Ciclo 5 PM · F9-B · purge · broker · `PAPER_D_EXECUTE` · thesis health / MFE · qty Confirm.
+3. ~~Plan 4.9~~ → relevo [`traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md`](./traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md) (feat `e569003`). **No** Ciclo 5 PM · F9-B · purge · broker · `PAPER_D_EXECUTE` · thesis health / MFE · qty Confirm.
 
 ## 5. Freeze / no tocado
 
