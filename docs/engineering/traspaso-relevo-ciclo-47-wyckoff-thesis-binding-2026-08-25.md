@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md`](./traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md).
 > **Plan:** [`plan-ciclo-47-wyckoff-thesis-binding-2026-08-25.md`](./plan-ciclo-47-wyckoff-thesis-binding-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** stamp docs (este commit). Feat `604fd90` **PUSHEADO** con el push.
+> **HEAD:** `f0ba3e5` = `origin/main`. Feat `604fd90` **PUSHEADO**.
 > **Arranque chat nuevo:** pegar este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
@@ -33,7 +33,7 @@
 | SHA       | Mensaje                                                |
 | --------- | ------------------------------------------------------ |
 | `604fd90` | feat(spine): ADR-031 Ciclo 4.7 Wyckoff thesis binding. |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 4.7 (`604fd90`).    |
+| `f0ba3e5` | docs: stamp living SoT after Ciclo 4.7 (`604fd90`).    |
 
 Push: `e98b027..` → `origin/main` (incl. update-last).
 

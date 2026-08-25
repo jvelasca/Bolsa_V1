@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD stamp docs = `origin/main` (Ciclo 4.7 `604fd90`). Relevo vivo: [`traspaso-relevo-ciclo-47-wyckoff-thesis-binding-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-47-wyckoff-thesis-binding-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`f0ba3e5`** = `origin/main` (Ciclo 4.7 `604fd90`). Relevo vivo: [`traspaso-relevo-ciclo-47-wyckoff-thesis-binding-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-47-wyckoff-thesis-binding-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---

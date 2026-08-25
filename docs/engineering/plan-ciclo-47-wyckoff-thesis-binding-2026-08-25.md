@@ -1,8 +1,8 @@
 # Plan — Ciclo 4.7 Wyckoff thesis binding (thin, sesión cognitiva)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §1 SETUP · §6 (`Persistencia fase Wyckoff / binding tesis (store) — 4.7+`, prohibido sin plan + decisión) · relevo [`traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md`](./traspaso-relevo-ciclo-46-wyckoff-sm-lookback-2026-08-25.md) · ancla en [`plan-ciclo-46-wyckoff-sm-multi-sesion-2026-08-25.md`](./plan-ciclo-46-wyckoff-sm-multi-sesion-2026-08-25.md) (D3 difería persistencia → 4.7+; D4 sin `wyckoffPhase`).
-> **AsOf:** 2026-08-25 · HEAD **`604fd90`** feat; stamp docs en este ciclo. Feat **`604fd90`**.
-> **Estado:** **CERRADO** (`604fd90`). D1–D8 OK · batería **100**.
+> **AsOf:** 2026-08-25 · HEAD **`f0ba3e5`** = `origin/main`; feat **`604fd90`**.
+> **Estado:** **CERRADO en origin** (`604fd90` vía `f0ba3e5`). D1–D8 OK · batería **100**.
 > **Método:** rebanada fina; SETUP sigue ≠ motor paralelo; Ranking ≠ BUY; sin `contract:gen`; sin LLM.
 
 ---
