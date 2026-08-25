@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md`](./traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md).
 > **Plan:** [`plan-ciclo-6-attribution-journal-thin-2026-08-25.md`](./plan-ciclo-6-attribution-journal-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** stamp docs (este commit). Feat `7de91e5` **PUSHEADO** con el push.
+> **HEAD:** `4a66945` = `origin/main`. Feat `7de91e5` **PUSHEADO**.
 > **Arranque chat nuevo:** pegar este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
@@ -31,7 +31,7 @@
 | SHA       | Mensaje                                                  |
 | --------- | -------------------------------------------------------- |
 | `7de91e5` | feat(journal): ADR-031 Ciclo 6 Attribution Journal thin. |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 6 (`7de91e5`).        |
+| `4a66945` | docs: stamp living SoT after Ciclo 6 (`7de91e5`).        |
 
 Push: `78e1fd6..` → `origin/main` (incl. update-last).
 

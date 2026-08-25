@@ -1,8 +1,8 @@
 # Plan — Ciclo 6 Attribution Journal thin (setup snapshot + trail)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §6 (MFE/MAE, attribution, expectancy — parked juntos; **esta** rebanada abre solo Attribution **thin**, no MFE) · [ADR-029](../adr/029-order-proposal-decision-journal.md) · relevo [`traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md`](./traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md) §4 · síntesis subagente Attribution 2026-08-25.
-> **AsOf:** 2026-08-25 · feat **`7de91e5`**; D1–D8 **OK**.
-> **Estado:** **CERRADO** en `7de91e5`. Batería spine **117**.
+> **AsOf:** 2026-08-25 · HEAD **`4a66945`** = `origin/main`; feat **`7de91e5`**.
+> **Estado:** **CERRADO en origin** (`7de91e5` vía `4a66945`). D1–D8 OK · batería **117**.
 > **Método:** rebanada fina journal; Ranking ≠ BUY; sin Alembic si solo JSONB payload; sin `contract:gen`; sin LLM; **sin** Ciclo 5 PM / MFE-MAE / expectancy.
 > **Secuencia:** (1) snapshot setup en payloads journal · (2) higiene trail `human_*` · (3 opcional) puente read-only SessionOutcome en UI.
 
