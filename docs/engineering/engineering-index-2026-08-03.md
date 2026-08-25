@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `fd44a03` Ciclo 5.3 MFE/MAE
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `0af42c5` Ciclo 5.3 `fd44a03` (MFE/MAE)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md

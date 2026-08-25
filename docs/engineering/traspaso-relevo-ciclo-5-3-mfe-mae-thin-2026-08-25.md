@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md`](./traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md).
 > **Plan:** [`plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md`](./plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** stamp docs (este commit) · feat **`fd44a03`**.
+> **HEAD:** `0af42c5` = `origin/main`. Feat `fd44a03` **PUSHEADO**.
 > **Arranque:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
