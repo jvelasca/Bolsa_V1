@@ -55,6 +55,11 @@ from bolsa_analytics.cognitive.evidence_engine import (
     EvidenceEngineResult,
     run_evidence_suite,
 )
+from bolsa_analytics.cognitive.exit_radar import (
+    EXIT_RADAR_KEY,
+    build_exit_radar_dict,
+    map_exit_radar,
+)
 from bolsa_analytics.cognitive.gate_decision import (
     GatedDecision,
     ProposedTradeContext,
@@ -208,6 +213,7 @@ __all__ = [
     "build_v0_trade_plan_dict",
     "build_thesis_health_dict",
     "build_protect_plan_dict",
+    "build_exit_radar_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
@@ -225,6 +231,7 @@ __all__ = [
     "intent_from_recommendation",
     "map_thesis_health",
     "map_protect_plan",
+    "map_exit_radar",
     "monte_carlo_permutation_p_value",
     "new_session_id",
     "observe_investor_profile",
@@ -240,6 +247,7 @@ __all__ = [
     "summarize_session_outcomes",
     "THESIS_HEALTH_KEY",
     "PROTECT_PLAN_KEY",
+    "EXIT_RADAR_KEY",
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",

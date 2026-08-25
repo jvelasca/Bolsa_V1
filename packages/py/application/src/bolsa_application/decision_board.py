@@ -193,6 +193,21 @@ def extract_session_protect_plan(
     return None
 
 
+def extract_session_exit_radar(
+    payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Lee ``runtime.exitRadar`` (Ciclo 5.2 advisory). Sin inventar."""
+    runtime = _session_runtime(payload)
+    if runtime is None:
+        return None
+    raw = runtime.get("exitRadar")
+    if not isinstance(raw, dict):
+        raw = runtime.get("exit_radar")
+    if isinstance(raw, dict) and raw:
+        return dict(raw)
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class DecisionSessionView:
     """Una sesión de decisión reciente expuesta en el tablero."""
@@ -209,6 +224,7 @@ class DecisionSessionView:
     wyckoff_spring_anchor: dict[str, Any] | None = None
     thesis_health: dict[str, Any] | None = None
     protect_plan: dict[str, Any] | None = None
+    exit_radar: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -229,6 +245,8 @@ class DecisionSessionView:
             data["thesisHealth"] = self.thesis_health
         if self.protect_plan is not None:
             data["protectPlan"] = self.protect_plan
+        if self.exit_radar is not None:
+            data["exitRadar"] = self.exit_radar
         return data
 
 
@@ -395,6 +413,7 @@ class GetDecisionBoard:
                     wyckoff_spring_anchor=extract_session_wyckoff_anchor(rec.payload),
                     thesis_health=extract_session_thesis_health(rec.payload),
                     protect_plan=extract_session_protect_plan(rec.payload),
+                    exit_radar=extract_session_exit_radar(rec.payload),
                 )
             )
 
@@ -465,4 +484,5 @@ __all__ = [
     "extract_session_wyckoff_anchor",
     "extract_session_thesis_health",
     "extract_session_protect_plan",
+    "extract_session_exit_radar",
 ]

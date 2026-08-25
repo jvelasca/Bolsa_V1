@@ -116,10 +116,12 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.1 Protect/T1 thin (cerrado `12d05d2`):** mapper Golden E → `runtime.protectPlan` · Hoy «Proteger» si MFE≥1R · T1=entry±1R · `suggestedProtectStop=entry` · **sin** mutar `structuralStop` · sin trail/exit · `check_opening` intacto.
 
+**Ciclo 5.2 Exit Radar thin (cerrado — ver relevo):** mapper → `runtime.exitRadar` · Hoy «Salida» · prioridad exit > time_stop > trail · **sin** auto-exit · **sin** EvaluatePositionExits · **sin** mutar stop · `check_opening` intacto.
+
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
-- Exit Radar, trailing, time-stop, bracket, T1 parcial fill (→ 5.2+)
+- Trailing continuo broker, bracket, T1 parcial fill
 - Thesis Health **plena** (persistencia Confidence lifecycle cableada)
 - MFE/MAE, expectancy por setup (Attribution **plena**)
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
@@ -127,7 +129,7 @@ No abrir sin fase propia:
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 
-Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en cliente hasta Actionability en servidor · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect ≠ permiso.
+Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en cliente hasta Actionability en servidor · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect / Exit Radar ≠ permiso.
 
 ---
 

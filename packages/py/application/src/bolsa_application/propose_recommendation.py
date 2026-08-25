@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
+from bolsa_analytics.cognitive.exit_radar import (
+    EXIT_RADAR_KEY,
+    build_exit_radar_dict,
+)
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
 from bolsa_analytics.cognitive.protect_plan import (
     PROTECT_PLAN_KEY,
@@ -182,6 +186,8 @@ class ProposeRecommendationResult:
     thesis_health: dict[str, Any] | None = None
     # Ciclo 5.1 — Protect/T1 advisory (Golden E); no stop mutate.
     protect_plan: dict[str, Any] | None = None
+    # Ciclo 5.2 — Exit Radar advisory; no auto-exit.
+    exit_radar: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -213,6 +219,8 @@ class ProposeRecommendationResult:
             data[THESIS_HEALTH_KEY] = self.thesis_health
         if self.protect_plan is not None:
             data[PROTECT_PLAN_KEY] = self.protect_plan
+        if self.exit_radar is not None:
+            data[EXIT_RADAR_KEY] = self.exit_radar
         return data
 
 
@@ -532,6 +540,20 @@ class ProposeRecommendationFromTa:
             structural_stop=structural_stop,
             last_close=float(last_close) if last_close is not None else None,
         )
+        expires_raw = (
+            trade_plan_dict.get("expiresAt") if isinstance(trade_plan_dict, dict) else None
+        )
+        expires_at = expires_raw if isinstance(expires_raw, str) else None
+        exit_radar = build_exit_radar_dict(
+            direction=plan_direction,
+            entry=entry_px,
+            structural_stop=structural_stop,
+            last_close=float(last_close) if last_close is not None else None,
+            expires_at=expires_at,
+            thesis_hint=str(thesis_health.get("hint")) if isinstance(thesis_health, dict) else None,
+            target1=protect_plan.get("target1") if isinstance(protect_plan, dict) else None,
+            r_multiple=protect_plan.get("rMultiple") if isinstance(protect_plan, dict) else None,
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -572,6 +594,7 @@ class ProposeRecommendationFromTa:
             "tradePlan": trade_plan_dict,
             THESIS_HEALTH_KEY: thesis_health,
             PROTECT_PLAN_KEY: protect_plan,
+            EXIT_RADAR_KEY: exit_radar,
         }
         if wyckoff_anchor is not None:
             session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
@@ -644,6 +667,7 @@ class ProposeRecommendationFromTa:
             wyckoff_spring_anchor=wyckoff_anchor,
             thesis_health=thesis_health,
             protect_plan=protect_plan,
+            exit_radar=exit_radar,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:

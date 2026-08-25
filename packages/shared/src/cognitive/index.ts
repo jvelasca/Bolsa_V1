@@ -19,6 +19,7 @@ export * from "./market-state.js";
 export * from "./confidence-state.js";
 export * from "./thesis-health.js";
 export * from "./protect-plan.js";
+export * from "./exit-radar.js";
 export * from "./effectiveness.js";
 export * from "./observe-profile.js";
 export * from "./recommendation.js";

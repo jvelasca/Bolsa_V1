@@ -247,4 +247,40 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.protectPlan?.status).toBe("protect_hint");
     expect(items[0]?.protectPlan?.target1).toBe(110);
   });
+
+  it("Ciclo 5.2: surfaces exitRadar trail_hint", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-exit",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              entry: 100,
+              structuralStop: 90,
+              executionAllowed: true,
+            }),
+            exitRadar: {
+              status: "trail_hint",
+              suggestedTrailStop: 105,
+              target1: 110,
+              rMultiple: 1.5,
+              why: ["mfe_ge_1_5r"],
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.exitRadar?.status).toBe("trail_hint");
+    expect(items[0]?.exitRadar?.suggestedTrailStop).toBe(105);
+  });
 });

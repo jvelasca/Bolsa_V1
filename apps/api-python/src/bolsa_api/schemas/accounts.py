@@ -380,6 +380,8 @@ class DecisionSessionViewDto(BaseModel):
     thesis_health: dict[str, Any] | None = Field(default=None, alias="thesisHealth")
     # Ciclo 5.1 — Protect/T1 advisory thin.
     protect_plan: dict[str, Any] | None = Field(default=None, alias="protectPlan")
+    # Ciclo 5.2 — Exit Radar advisory thin.
+    exit_radar: dict[str, Any] | None = Field(default=None, alias="exitRadar")
 
 
 class SemiF3ViewDto(BaseModel):

@@ -246,4 +246,55 @@ describe("HoyCommandStrip", () => {
     expect(protect.textContent).toMatch(/Proteger/i);
     expect(protect.textContent).toMatch(/1R · T1 110 · proteger @ 100/i);
   });
+
+  it("Ciclo 5.2: dialog shows Salida when exitRadar.status!=none", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                },
+                exitRadar: {
+                  status: "trail_hint",
+                  suggestedTrailStop: 105,
+                  target1: 110,
+                  rMultiple: 1.5,
+                  why: ["mfe_ge_1_5r"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const salida = await screen.findByTestId("hoy-exit-radar");
+    expect(salida).toBeTruthy();
+    expect(salida.textContent).toMatch(/Salida/i);
+    expect(salida.textContent).toMatch(/trail hint/i);
+  });
 });

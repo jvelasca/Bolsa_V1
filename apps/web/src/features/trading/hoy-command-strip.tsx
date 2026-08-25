@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type {
+  ExitRadarV1,
   HoyQueueItemV1,
   HoySetupEvidenceV1,
   ProtectPlanV1,
@@ -88,6 +89,16 @@ function protectPlanLine(plan: ProtectPlanV1): string {
     parts.push(`proteger @ ${plan.suggestedProtectStop}`);
   }
   return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+function exitRadarLine(radar: ExitRadarV1): string {
+  const parts = [radar.status.replaceAll("_", " ")];
+  if (radar.rMultiple != null) parts.push(`${radar.rMultiple}R`);
+  if (radar.suggestedTrailStop != null) {
+    parts.push(`trail @ ${radar.suggestedTrailStop}`);
+  }
+  if (radar.why.length > 0) parts.push(radar.why.join(", "));
+  return parts.join(" · ");
 }
 
 export function HoyCommandStrip() {
@@ -191,6 +202,16 @@ export function HoyCommandStrip() {
                 </p>
                 <p className="mt-1 text-sm">
                   {protectPlanLine(selected.protectPlan)}
+                </p>
+              </div>
+            ) : null}
+            {selected.exitRadar && selected.exitRadar.status !== "none" ? (
+              <div className="mt-3" data-testid="hoy-exit-radar">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Salida
+                </p>
+                <p className="mt-1 text-sm">
+                  {exitRadarLine(selected.exitRadar)}
                 </p>
               </div>
             ) : null}

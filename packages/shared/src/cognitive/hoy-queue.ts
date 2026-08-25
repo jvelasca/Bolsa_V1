@@ -6,6 +6,7 @@
  * Ciclo 4.9: sesiones Board echo tradePlan + anchor → Hoy deja heurística cuando hay plan.
  * Ciclo 5.0: thesisHealth advisory (Golden F) — ≠ cola REVIEW de EXPIRED.
  * Ciclo 5.1: protectPlan advisory (Golden E) — no muta structuralStop.
+ * Ciclo 5.2: exitRadar advisory — no auto-exit.
  */
 
 import type {
@@ -30,6 +31,11 @@ import type {
   ProtectPlanV1,
   ProtectPlanWhyV1,
 } from "./protect-plan.js";
+import type {
+  ExitRadarStatusV1,
+  ExitRadarV1,
+  ExitRadarWhyV1,
+} from "./exit-radar.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
@@ -53,6 +59,8 @@ export type HoyQueueItemV1 = {
   thesisHealth?: ThesisHealthV1 | null;
   /** Ciclo 5.1 — advisory protect/T1. */
   protectPlan?: ProtectPlanV1 | null;
+  /** Ciclo 5.2 — advisory exit/trail/time-stop. */
+  exitRadar?: ExitRadarV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -365,6 +373,76 @@ function readProtectPlanFromF3Row(row: SemiF3ViewV1): ProtectPlanV1 | null {
   return readProtectPlanFromPayloadish(flattened.payload);
 }
 
+const EXIT_STATUSES = new Set<ExitRadarStatusV1>([
+  "none",
+  "trail_hint",
+  "time_stop_hint",
+  "exit_hint",
+]);
+const EXIT_WHYS = new Set<ExitRadarWhyV1>([
+  "thesis_exit",
+  "beyond_target1",
+  "expired",
+  "mfe_ge_1_5r",
+  "missing_inputs",
+]);
+
+function asExitRadar(value: unknown): ExitRadarV1 | null {
+  if (!isRecord(value)) return null;
+  const status = value.status;
+  if (
+    typeof status !== "string" ||
+    !EXIT_STATUSES.has(status as ExitRadarStatusV1)
+  ) {
+    return null;
+  }
+  const whyRaw = value.why;
+  const why: ExitRadarWhyV1[] = Array.isArray(whyRaw)
+    ? whyRaw.filter(
+        (code): code is ExitRadarWhyV1 =>
+          typeof code === "string" && EXIT_WHYS.has(code as ExitRadarWhyV1),
+      )
+    : [];
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  return {
+    status: status as ExitRadarStatusV1,
+    suggestedTrailStop: numOrNull(value.suggestedTrailStop),
+    target1: numOrNull(value.target1),
+    rMultiple: numOrNull(value.rMultiple),
+    why,
+  };
+}
+
+function readExitRadarFromPayloadish(value: unknown): ExitRadarV1 | null {
+  if (!isRecord(value)) return null;
+  const top = asExitRadar(value.exitRadar);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = asExitRadar(runtime.exitRadar);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return asExitRadar(value.runtime.exitRadar);
+  }
+  return null;
+}
+
+function readExitRadarFromF3Row(row: SemiF3ViewV1): ExitRadarV1 | null {
+  const extra = row.extra;
+  if (isRecord(extra)) {
+    const fromPayload = readExitRadarFromPayloadish(extra.payload);
+    if (fromPayload) return fromPayload;
+    const fromExtra = asExitRadar(extra.exitRadar);
+    if (fromExtra) return fromExtra;
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  return readExitRadarFromPayloadish(flattened.payload);
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -419,6 +497,7 @@ function toHoyItem(
   setup: HoySetupEvidenceV1 | null,
   thesisHealth: ThesisHealthV1 | null,
   protectPlan: ProtectPlanV1 | null,
+  exitRadar: ExitRadarV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -431,6 +510,7 @@ function toHoyItem(
       setup,
       thesisHealth,
       protectPlan,
+      exitRadar,
     };
   }
   return {
@@ -443,6 +523,7 @@ function toHoyItem(
     setup,
     thesisHealth,
     protectPlan,
+    exitRadar,
   };
 }
 
@@ -465,6 +546,7 @@ export function mapDecisionBoardToHoyQueue(
         readSetupFromF3Row(row),
         readThesisHealthFromF3Row(row),
         readProtectPlanFromF3Row(row),
+        readExitRadarFromF3Row(row),
       ),
     );
   }
@@ -488,6 +570,7 @@ export function mapDecisionBoardToHoyQueue(
         readSetupFromSession(session, live),
         asThesisHealth(session.thesisHealth),
         asProtectPlan(session.protectPlan),
+        asExitRadar(session.exitRadar),
       ),
     );
   }
