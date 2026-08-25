@@ -3,7 +3,7 @@
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
 > **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-032** Operational Core v1.9 · **F1–F4** · **ExitPermission** · **INFRA CI-by-tag** · **ADR-023 Accepted BETA-D** · **A3-wire** `d704263` · **C1–C6** consolidación v1.8.1 **CERRADA**. Alembic `010` en `bolsa_v1`.
-> **Tag:** **`v1.9-beta`** (SHA se pinea tras publish). Previo: **`v1.8.1-beta` → `e78fbb9`**. **BETA / no producción.** Roadmap: [`roadmap-v19-operational-core-2026-08-25.md`](./engineering/roadmap-v19-operational-core-2026-08-25.md). Pack: [`audit-pack-estado-global-2026-08-25-v19.md`](./engineering/audit-pack-estado-global-2026-08-25-v19.md).
+> **Tag:** **`v1.9-beta` → `7d90d965`**. Previo: **`v1.8.1-beta` → `e78fbb9`**. **BETA / no producción.** Roadmap: [`roadmap-v19-operational-core-2026-08-25.md`](./engineering/roadmap-v19-operational-core-2026-08-25.md). Pack: [`audit-pack-estado-global-2026-08-25-v19.md`](./engineering/audit-pack-estado-global-2026-08-25-v19.md).
 > **Auditoría:** pack v1.9 [`audit-pack-estado-global-2026-08-25-v19.md`](./engineering/audit-pack-estado-global-2026-08-25-v19.md) · relevo tag [`traspaso-relevo-tag-v1-9-beta-2026-08-25.md`](./engineering/traspaso-relevo-tag-v1-9-beta-2026-08-25.md) · triage v1.8.1 [`audit-ext-v181-triage-2026-08-25.md`](./engineering/audit-ext-v181-triage-2026-08-25.md).
 
 ---

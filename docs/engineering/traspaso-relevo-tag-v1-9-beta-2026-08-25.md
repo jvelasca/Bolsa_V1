@@ -15,7 +15,7 @@
 
 | Pieza        | Valor                                        |
 | ------------ | -------------------------------------------- |
-| Tag          | `v1.9-beta` (SHA se pinea tras push)         |
+| Tag          | `v1.9-beta` → `7d90d965`                     |
 | Previo       | `v1.8.1-beta` → `e78fbb9`                    |
 | Pack auditor | `audit-pack-estado-global-2026-08-25-v19.md` |
 | Spine        | `pnpm test:decision-spine` **217**           |

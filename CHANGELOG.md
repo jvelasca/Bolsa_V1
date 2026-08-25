@@ -6,7 +6,7 @@ All notable releases of Bolsa V1.
 
 ## [1.9-beta] — 2026-08-25
 
-Operational Core v1.9 (modelo post-entrada) + INFRA CI-by-tag. Producto sigue **BETA / no producción**. Tag **`v1.9-beta`**. Partida: **`v1.8.1-beta` → `e78fbb9`**. Spine **`pnpm test:decision-spine` = 217**. Shared **134**. Pack: [`audit-pack-estado-global-2026-08-25-v19.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v19.md). **No** broker · **No** auto-exit producto · thin 5.x/8.x congelados.
+Operational Core v1.9 (modelo post-entrada) + INFRA CI-by-tag. Producto sigue **BETA / no producción**. Tag anotado **`v1.9-beta` → `7d90d965`**. Partida: **`v1.8.1-beta` → `e78fbb9`**. Spine **`pnpm test:decision-spine` = 217**. Shared **134**. Pack: [`audit-pack-estado-global-2026-08-25-v19.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v19.md). **No** broker · **No** auto-exit producto · thin 5.x/8.x congelados.
 
 ### ExitPermission (Operational Core)
 

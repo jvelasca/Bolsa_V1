@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.9-beta (Operational Core)
 
-> **AsOf:** 2026-08-25 · **Tag:** `v1.9-beta` (SHA se pinea tras publish).
+> **AsOf:** 2026-08-25 · **Tag:** `v1.9-beta` → `7d90d965`.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · roadmap [`roadmap-v19-operational-core-2026-08-25.md`](./roadmap-v19-operational-core-2026-08-25.md) · ADR-032.
 > **Para:** auditoría externa / GitHub Actions Release tag CI.
 
