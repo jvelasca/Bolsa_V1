@@ -1,8 +1,8 @@
 # Plan — Ciclo I2 Actionability / Índice Operativo (integridad)
 
 > **Padre:** [ADR-031](../adr/031-operational-model-tesis-plan-permiso.md) §4–6 · relevo [`traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md`](./traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md) · cierre I1 [`traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md`](./traspaso-relevo-ciclo-i1-executetrade-converge-2026-08-25.md).
-> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I1 **`2bd5cd8`** · stamp I1 **`8fce269`** (local, no push).
-> **Estado:** **D1–D8 OK · código I2.** Stamp SHA pendiente.
+> **AsOf:** 2026-08-25 · origin **`05e354c`**; feat I2 **`e31840d`** (local, no push).
+> **Estado:** **CERRADO en `e31840d`.** D1–D8 OK.
 > **Método:** integridad thin; Ranking ≠ BUY; sin Shadow AUTO; sin broker; sin reabrir 5.x / I1.
 > **Nombre:** integridad **I2** ≠ hub Instrumentos histórico (`use-instruments-hub-scores.ts`, ya shipped).
 > **Secuencia dueño:** I1 ✅ · **I2 (este)** · I3 Shadow (explícito).
@@ -48,6 +48,12 @@ No Shadow · no broker · no reabrir I1/5.x · no LLM · no contract:gen.
 
 ---
 
-## 3. Freeze
+## 3. Commits
+
+| SHA       | Mensaje                                         |
+| --------- | ----------------------------------------------- |
+| `e31840d` | feat(spine): ADR-031 Ciclo I2 Actionability/IO. |
+
+## 4. Freeze
 
 LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · SETUP Wyckoff cerrada · Shadow AUTO off · advisory 5.x ≠ permiso · `PAPER_D_EXECUTE` off · I1 `check_opening` intacto.

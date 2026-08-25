@@ -122,7 +122,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo I1 ExecuteTrade converge (cerrado `2bd5cd8`):** `allow_opening_fill` compartido Confirm + Fill + HTTP. `POST /portfolio/trade` buy → `check_opening` (403 `risk_veto`); sell skip. Router AUTO no fusionado. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
-**Ciclo I2 Actionability/IO (código; stamp SHA pendiente):** fórmula `compute_indice_operativo` + echo `indiceOperativo` en chip Composite. Rank Estudio sigue cliente. IO ≠ permiso. `TradePlan.actionability` intacta. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
+**Ciclo I2 Actionability/IO (cerrado `e31840d`):** fórmula `compute_indice_operativo` + echo `indiceOperativo` en chip Composite. Rank Estudio sigue cliente. IO ≠ permiso. `TradePlan.actionability` intacta. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
 No abrir sin fase propia:
 
