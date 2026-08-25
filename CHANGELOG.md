@@ -4,6 +4,12 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+### Ciclo C4 — TradePlan shape canónico
+
+- Hoy `readCanonicalTradePlan`: canónico sesiones = `session.tradePlan`; F3 = `extra.payload.tradePlan`. Fallbacks (`extra.tradePlan`, payload top-level) marcados `legacy`, no borrados.
+- `HoyQueueItem.planSource`: `live` (objeto TradePlan en canónico o fallback permitido) | `projection` (sin plan → C1 WATCH, nunca BUY/ARMED).
+- **No** Pydantic DTO · **no** OpenAPI · **no** `contract:gen` (contrato fuerte = ADR-032 / v1.9). Confirm/propose/spine/`check_opening` intactos. C1/C3/C5 intactos.
+
 ### Ciclo C5 — MFE/Expectancy honesty
 
 - `MfeMae.source`: `bars` | `close_proxy` | `none`. Hoy Excursión añade sufijo `proxy` si close_proxy. Proxy no se presenta como peak de barras.

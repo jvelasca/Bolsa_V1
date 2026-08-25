@@ -45,6 +45,8 @@ Campos canónicos:
 - `expiresAt` (TTL de sesión; típico barra diaria + 1)
 - `whyNot[]`: `fit` / `freshness` / `mandate` / `entry` / `no_stop` / `expired` / `orphan` / `rr` / `regime` / `legacy_projection` (solo proyección Hoy; el mapper no lo emite)
 
+**Ciclo C4 (v1.8.1):** caminos de lectura Hoy — canónico: sesiones `session.tradePlan` (echo `runtime.tradePlan`); F3 `extra.payload.tradePlan`. Otros nidos = fallback **legacy** (no autoridad; no borrados). `HoyQueueItem.planSource`: `live` | `projection`. **No** Pydantic DTO / OpenAPI / `contract:gen` (contrato fuerte = [ADR-032](./032-operational-core-tradeplan-positionstate-execution.md) / v1.9).
+
 **No** en v0: T2, trailing, thesis-health, MFE/MAE, attribution, familias Entry Engine completas, `NO_NEW_LONGS` por régimen (Ciclo 4+).
 
 Jerarquía de perfil (ya cierta en código; solo nombrar):
@@ -137,6 +139,8 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 **Ciclo RX1 exits full_auto honesty (cerrado `9289b53`):** `EvaluatePositionExits` con `executeTrades=true` + `full_auto` + linked `paper_auto` → mismo env gate antes del Router (HTTP 403). Eval-only intacto. **No** thaw · **no** auto-exit producto · **no** Exit Radar wire. Sin Alembic / `contract:gen`. `check_opening` intacto.
 
 **Ciclo C1 Hoy honesty (v1.8.1 P0):** proyección Hoy sin TradePlan vivo → WATCH; `whyNot: legacy_projection`. HELP v1.8. `check_opening` intacto. ActionQueue / DTO canónico / Alembic-only = slices posteriores.
+
+**Ciclo C4 shape canónico (v1.8.1):** reader `readCanonicalTradePlan` · `planSource` live/projection · sin Pydantic DTO / `contract:gen`. C1/C3/C5 intactos. `check_opening` intacto.
 
 No abrir sin fase propia:
 

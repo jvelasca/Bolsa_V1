@@ -73,7 +73,8 @@ Engineering Index  (este doc)
 │   ├── traspaso-relevo-ciclo-c3-action-queue-2026-08-25.md ← relevo C3 · E1 = C5
 │   ├── plan-ciclo-c5-metrics-honesty-2026-08-25.md ← **C5 CÓDIGO LISTO** MFE source · expectancy sampleQuality
 │   ├── traspaso-relevo-ciclo-c5-metrics-honesty-2026-08-25.md ← relevo C5 · E1 = C4
-│   ├── plan-ciclo-c4-shape-canonical-2026-08-25.md ← **C4 ABIERTA** TradePlan reader canónico · sin contract:gen
+│   ├── plan-ciclo-c4-shape-canonical-2026-08-25.md ← **C4 CÓDIGO LISTO** TradePlan reader canónico · planSource · sin contract:gen
+│   ├── traspaso-relevo-ciclo-c4-shape-canonical-2026-08-25.md ← relevo C4 · E1 = C6 coordinador
 │   ├── plan-ciclo-c6-stamp-v181-2026-08-25.md ← **C6** stamp pack · tag solo owner
 │   ├── traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md ← **RELEVO** tag v1.8.0-beta → auditoría externa
 │   ├── audit-pack-estado-global-2026-08-24e.md ← histórico post-tag v1.7.0-beta + CI

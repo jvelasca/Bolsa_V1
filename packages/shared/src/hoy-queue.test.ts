@@ -7,6 +7,7 @@ import type { TradePlanV1 } from "./cognitive/trade-plan.js";
 import {
   buildActionQueue,
   mapDecisionBoardToHoyQueue,
+  readCanonicalTradePlan,
 } from "./cognitive/hoy-queue.js";
 
 function board(partial: Partial<DecisionBoardV1> = {}): DecisionBoardV1 {
@@ -79,9 +80,11 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(pending?.kind).toBe("WATCH");
     expect(pending?.status).toBe("WATCH");
     expect(pending?.whyNot).toEqual(["legacy_projection"]);
+    expect(pending?.planSource).toBe("projection");
     const blocked = items.find((i) => i.kind === "BLOCKED");
     expect(blocked?.whyNot).toEqual(["legacy_projection"]);
     expect(blocked?.whyNot).not.toContain("fit");
+    expect(blocked?.planSource).toBe("projection");
   });
 
   it("prefers live TradePlan WATCH over heuristic BUY for pending F3", () => {
@@ -103,6 +106,7 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.kind).not.toBe("BUY");
     expect(items[0]?.status).toBe("WATCH");
     expect(items[0]?.whyNot).toContain("no_stop");
+    expect(items[0]?.planSource).toBe("live");
   });
 
   it("maps pending F3 without tradePlan to WATCH, never heuristic BUY", () => {
@@ -112,6 +116,7 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.kind).not.toBe("BUY");
     expect(items[0]?.status).toBe("WATCH");
     expect(items[0]?.whyNot).toEqual(["legacy_projection"]);
+    expect(items[0]?.planSource).toBe("projection");
   });
 
   it("does not invent ARMED from auto/paper session without TradePlan", () => {
@@ -136,6 +141,7 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.kind).not.toBe("ARMED");
     expect(items[0]?.kind).not.toBe("BUY");
     expect(items[0]?.whyNot).toEqual(["legacy_projection"]);
+    expect(items[0]?.planSource).toBe("projection");
   });
 
   it("Ciclo 4.8: surfaces entrySetup + phase/effort from F3 payload anchor", () => {
@@ -207,6 +213,7 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.kind).toBe("BLOCKED");
     expect(items[0]?.kind).not.toBe("BUY");
     expect(items[0]?.whyNot).toEqual(["regime"]);
+    expect(items[0]?.planSource).toBe("live");
     expect(items[0]?.setup).toEqual({
       entrySetup: "wyckoff",
       phase: "sos",
@@ -608,6 +615,115 @@ describe("mapDecisionBoardToHoyQueue", () => {
   });
 });
 
+describe("Ciclo C4 / readCanonicalTradePlan", () => {
+  it("nested F3 extra.payload.tradePlan TRIGGERED is live BUY", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        decisionSessions: [],
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: watchPlan({
+                  status: "TRIGGERED",
+                  whyNot: [],
+                  executionAllowed: true,
+                }),
+              },
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.planSource).toBe("live");
+    expect(items[0]?.kind).toBe("BUY");
+    expect(items[0]?.status).toBe("TRIGGERED");
+    const read = readCanonicalTradePlan({
+      instrumentId: "i1",
+      symbol: "SAN",
+      status: "pending_confirm",
+      extra: {
+        payload: {
+          tradePlan: watchPlan({
+            status: "TRIGGERED",
+            whyNot: [],
+            executionAllowed: true,
+          }),
+        },
+      },
+    });
+    expect(read.planSource).toBe("live");
+    expect(read.plan?.status).toBe("TRIGGERED");
+  });
+
+  it("nested F3 extra.payload.tradePlan ARMED is live ARMED", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        decisionSessions: [],
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: watchPlan({
+                  status: "ARMED",
+                  whyNot: ["entry"],
+                  entrySetup: "wyckoff",
+                }),
+              },
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.planSource).toBe("live");
+    expect(items[0]?.kind).toBe("ARMED");
+    expect(items[0]?.status).toBe("ARMED");
+  });
+
+  it("no plan → WATCH with planSource projection (C1 intact)", () => {
+    const items = mapDecisionBoardToHoyQueue(board({ decisionSessions: [] }));
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("WATCH");
+    expect(items[0]?.kind).not.toBe("BUY");
+    expect(items[0]?.kind).not.toBe("ARMED");
+    expect(items[0]?.planSource).toBe("projection");
+    expect(items[0]?.whyNot).toEqual(["legacy_projection"]);
+  });
+
+  it("legacy extra.tradePlan fallback remains live (not deleted)", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        decisionSessions: [],
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              tradePlan: watchPlan({
+                status: "TRIGGERED",
+                whyNot: [],
+                executionAllowed: true,
+              }),
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.planSource).toBe("live");
+    expect(items[0]?.kind).toBe("BUY");
+  });
+});
+
 describe("buildActionQueue / C3", () => {
   it("sorts by D2 bands regardless of arrival order", () => {
     const items = buildActionQueue(
@@ -804,5 +920,6 @@ describe("buildActionQueue / C3", () => {
     expect(items.every((i) => i.whyNot.includes("legacy_projection"))).toBe(
       true,
     );
+    expect(items.every((i) => i.planSource === "projection")).toBe(true);
   });
 });

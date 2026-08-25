@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-v181-operational-consolidation-2026-08-25.md`](./roadmap-v181-operational-consolidation-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **ABIERTA**.
+> **Estado:** **CÓDIGO LISTO**.
 > **Método:** reducir ambigüedad de shapes; **sin** `contract:gen`; sin Pydantic DTO nuevo; C1/C3/C5 intactos.
 
 ---

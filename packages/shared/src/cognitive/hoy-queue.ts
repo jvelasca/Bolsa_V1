@@ -15,6 +15,9 @@
  * Ciclo 8.2: bracketPlan advisory picture — display only / no OCO.
  * Ciclo C3: buildActionQueue = cola completa ordenada (D2+D3);
  * mapDecisionBoardToHoyQueue = slice. Dedup por símbolo post-sort.
+ * Ciclo C4: readCanonicalTradePlan — sesiones session.tradePlan; F3
+ * extra.payload.tradePlan. Resto = fallback legacy (no borrar).
+ * planSource live | projection (sin plan → C1 WATCH).
  * Ciclo C5: asMfeMae/asExpectancy parse source + sampleQuality fail-soft.
  */
 
@@ -72,6 +75,14 @@ import type {
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
+/** C4: live = TradePlan object on canonical or still-allowed fallback path. */
+export type HoyPlanSourceV1 = "live" | "projection";
+
+export type CanonicalTradePlanReadV1 = {
+  plan: TradePlanV1 | null;
+  planSource: HoyPlanSourceV1;
+};
+
 /** Evidencia SETUP en superficie Hoy (runtime echo; no contrato TradePlan). */
 export type HoySetupEvidenceV1 = {
   entrySetup?: EntrySetupV1 | null;
@@ -102,6 +113,8 @@ export type HoyQueueItemV1 = {
   trailPlan?: TrailPlanV1 | null;
   /** Ciclo 8.2 — Bracket thin picture (display only). */
   bracketPlan?: BracketPlanV1 | null;
+  /** C4: live = found TradePlan; projection = no plan (C1 WATCH). */
+  planSource: HoyPlanSourceV1;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -175,22 +188,50 @@ function tradePlanFromPayloadish(value: unknown): TradePlanV1 | null {
   return asLiveTradePlan(value.tradePlan);
 }
 
-/** F3: extra.payload.tradePlan → extra.tradePlan → top-level payload (flatten). */
-function readTradePlanFromF3Row(row: SemiF3ViewV1): TradePlanV1 | null {
-  const extra = row.extra;
+function isSessionView(host: unknown): host is DecisionSessionViewV1 {
+  return isRecord(host) && typeof host.sessionId === "string";
+}
+
+function asCanonicalRead(plan: TradePlanV1 | null): CanonicalTradePlanReadV1 {
+  return plan
+    ? { plan, planSource: "live" }
+    : { plan: null, planSource: "projection" };
+}
+
+/**
+ * C4: canonical TradePlan reader for Hoy.
+ * Authority: sessions = `session.tradePlan` (Board echo of runtime.tradePlan);
+ * F3 = `extra.payload.tradePlan`. Remaining paths are legacy fallbacks (kept).
+ * Live = a real TradePlan on canonical or still-allowed fallback; projection = none.
+ */
+export function readCanonicalTradePlan(
+  host: DecisionSessionViewV1 | SemiF3ViewV1,
+): CanonicalTradePlanReadV1 {
+  if (isSessionView(host)) {
+    return asCanonicalRead(asLiveTradePlan(host.tradePlan));
+  }
+
+  const extra = host.extra;
   if (isRecord(extra)) {
     const fromPayload = tradePlanFromPayloadish(extra.payload);
-    if (fromPayload) return fromPayload;
+    if (fromPayload) return asCanonicalRead(fromPayload);
+    // legacy: extra.tradePlan (flatten on extra; not F3 authority)
     const fromExtra = asLiveTradePlan(extra.tradePlan);
-    if (fromExtra) return fromExtra;
+    if (fromExtra) return asCanonicalRead(fromExtra);
   }
-  const flattened = row as SemiF3ViewV1 & {
+  const flattened = host as SemiF3ViewV1 & {
     payload?: unknown;
     tradePlan?: unknown;
   };
+  // legacy: top-level payload.tradePlan (F3 flatten)
   const fromTopPayload = tradePlanFromPayloadish(flattened.payload);
-  if (fromTopPayload) return fromTopPayload;
-  return asLiveTradePlan(flattened.tradePlan);
+  if (fromTopPayload) return asCanonicalRead(fromTopPayload);
+  // legacy: top-level tradePlan on the F3 row
+  return asCanonicalRead(asLiveTradePlan(flattened.tradePlan));
+}
+
+function readTradePlanFromF3Row(row: SemiF3ViewV1): TradePlanV1 | null {
+  return readCanonicalTradePlan(row).plan;
 }
 
 function asEntrySetup(value: unknown): EntrySetupV1 | null {
@@ -841,6 +882,7 @@ function toHoyItem(
   symbol: string,
   gate: string,
   live: TradePlanV1 | null,
+  planSource: HoyPlanSourceV1,
   heuristicKind: HoyActionKindV1,
   setup: HoySetupEvidenceV1 | null,
   thesisHealth: ThesisHealthV1 | null,
@@ -867,6 +909,7 @@ function toHoyItem(
       expectancy,
       trailPlan,
       bracketPlan,
+      planSource,
     };
   }
   return {
@@ -884,6 +927,7 @@ function toHoyItem(
     expectancy,
     trailPlan,
     bracketPlan,
+    planSource,
   };
 }
 
@@ -916,13 +960,15 @@ function collectHoyQueueCandidates(
 
   for (const row of board.semiF3Queue) {
     const kind = kindFromGate("unknown", "pending");
-    const live = readTradePlanFromF3Row(row);
+    const read = readCanonicalTradePlan(row);
+    const live = read.plan;
     items.push({
       item: toHoyItem(
         `f3-${row.instrumentId ?? row.symbol ?? items.length}`,
         row.symbol ?? row.instrumentId ?? "—",
         row.status,
         live,
+        read.planSource,
         kind,
         readSetupFromF3Row(row),
         readThesisHealthFromF3Row(row),
@@ -945,13 +991,15 @@ function collectHoyQueueCandidates(
     else if (session.kind.includes("paper") || session.kind.includes("auto"))
       bucket = "auto";
     const kind = kindFromGate(gate, bucket);
-    const live = asLiveTradePlan(session.tradePlan);
+    const read = readCanonicalTradePlan(session);
+    const live = read.plan;
     items.push({
       item: toHoyItem(
         session.sessionId,
         session.symbol ?? session.instrumentId,
         gate,
         live,
+        read.planSource,
         kind,
         readSetupFromSession(session, live),
         asThesisHealth(session.thesisHealth),
