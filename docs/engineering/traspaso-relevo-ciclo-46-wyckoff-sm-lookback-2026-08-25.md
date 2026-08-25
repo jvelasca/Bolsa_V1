@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-45-wyckoff-lps-sm-2026-08-25.md`](./traspaso-relevo-ciclo-45-wyckoff-lps-sm-2026-08-25.md).
 > **Plan:** [`plan-ciclo-46-wyckoff-sm-multi-sesion-2026-08-25.md`](./plan-ciclo-46-wyckoff-sm-multi-sesion-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** stamp post-feat · feat `fb6e801` (push en curso).
+> **HEAD:** `dd5b8e8` = `origin/main`. Feat `fb6e801` **PUSHEADO**.
 > **Arranque chat nuevo:** pegar este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
@@ -32,11 +32,13 @@
 | SHA       | Mensaje                                             |
 | --------- | --------------------------------------------------- |
 | `fb6e801` | feat(spine): ADR-031 Ciclo 4.6 SM Wyckoff lookback. |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 4.6 (`fb6e801`). |
+| `dd5b8e8` | docs: stamp living SoT after Ciclo 4.6 (`fb6e801`). |
+
+Push: `daa5353..` → `origin/main` (incl. update-last).
 
 ## 4. Siguiente (E1) — chat nuevo
 
-1. ~~Commit feat~~ · Push (stamp + feat).
+1. ~~Commit~~ · ~~Push~~.
 2. Persistencia fase Wyckoff / thesis binding — **prohibido** sin plan 4.7+.
 3. No abrir: F9-B · purge · `PAPER_D_EXECUTE` · broker · thesis health / MFE · qty Confirm · Ciclo 5 PM.
 
