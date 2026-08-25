@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `12d05d2` Ciclo 5.1 Protect/T1 (Golden E)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `626aca0` Ciclo 5.1 `12d05d2` (Protect/T1)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
