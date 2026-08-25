@@ -1177,8 +1177,14 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
     """
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
     from bolsa_application.confirm_recommendation import ConfirmRecommendationIntent
-    from bolsa_application.persist_position_from_exit import PersistPositionFromExit
-    from bolsa_application.persist_position_from_fill import PersistPositionFromFill
+    from bolsa_application.persist_position_from_exit import (
+        PersistPositionFromExit,
+        PositionStateExitStore,
+    )
+    from bolsa_application.persist_position_from_fill import (
+        PersistPositionFromFill,
+        PositionStateStore,
+    )
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
@@ -1194,8 +1200,8 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
         journal_writer=get_journal_writer(session),
-        position_from_fill=PersistPositionFromFill(repo),  # type: ignore[arg-type]
-        position_from_exit=PersistPositionFromExit(repo),  # type: ignore[arg-type]
+        position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
+        position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )
 
 
@@ -1369,7 +1375,10 @@ def get_delete_pending_order_use_case(session: AsyncSession) -> DeletePendingOrd
 def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
     """ADR-031 — fill de pending_orders con check_opening (aperturas)."""
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
-    from bolsa_application.persist_position_from_fill import PersistPositionFromFill
+    from bolsa_application.persist_position_from_fill import (
+        PersistPositionFromFill,
+        PositionStateStore,
+    )
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
@@ -1384,8 +1393,8 @@ def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
-        position_from_fill=PersistPositionFromFill(  # type: ignore[arg-type]
-            SqlAlchemyPositionStateRepository(session)
+        position_from_fill=PersistPositionFromFill(
+            cast(PositionStateStore, SqlAlchemyPositionStateRepository(session))
         ),
     )
 
