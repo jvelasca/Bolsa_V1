@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `b708719` Ciclo 4.9 `e569003` (Board session echo)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** Ciclo 6 `7de91e5` (Attribution Journal thin)
 │   ├── PROJECT_PREMISES.md
 │   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)**
 │   ├── rfc/*  (constitución)
@@ -60,7 +60,9 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md ← **RELEVO ACTIVO** · ADR-031 Ciclo 4.9 Board echo · feat `e569003`
+│   ├── traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 6 Attribution thin · feat `7de91e5`
+│   ├── plan-ciclo-6-attribution-journal-thin-2026-08-25.md ← plan Ciclo 6 · D1–D8 OK · CERRADO en `7de91e5`
+│   ├── traspaso-relevo-ciclo-49-board-session-tradeplan-echo-2026-08-25.md ← histórico · Ciclo 4.9 Board echo · feat `e569003`
 │   ├── plan-ciclo-49-board-session-tradeplan-echo-2026-08-25.md ← plan 4.9 mesa · D1–D8 OK · CERRADO en `e569003`
 │   ├── traspaso-relevo-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md ← histórico · Ciclo 4.8 surface+effort · feat `b381d06`
 │   ├── plan-ciclo-48-wyckoff-surface-effort-cierre-2026-08-25.md ← plan 4.8 · D1–D8 OK · CERRADO en `b381d06`

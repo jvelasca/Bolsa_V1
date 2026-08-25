@@ -110,11 +110,13 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 4.9 (cerrado `e569003`):** mesa Board session echo — `tradePlan` + `wyckoffSpringAnchor` desde `runtime` en `DecisionSessionView` / DTO a mano; Hoy usa plan vivo (heurística solo sin plan); WhyNot labels `regime`/`orphan`/`rr`. Sin Alembic. Sin `contract:gen`. Sin Actionability/IO server. `check_opening` intacto.
 
+**Ciclo 6 Attribution thin (cerrado `7de91e5`):** snapshot setup en journal payloads · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup + Replay. **Sin** MFE/expectancy. Sin Alembic. Sin `contract:gen`. `check_opening` intacto.
+
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
 - Position Manager, Thesis Health, Exit Radar, trailing, T1 parcial, time-stop, bracket
-- MFE/MAE, attribution, expectancy por setup
+- MFE/MAE, expectancy por setup (Attribution **plena**)
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8

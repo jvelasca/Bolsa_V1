@@ -40,7 +40,7 @@ Push: `37e6fbc..` → `origin/main` (incl. update-last).
 
 1. ~~Commit~~ · ~~Push~~.
 2. **No** Wyckoff thin · **no** Ciclo 5 PM.
-3. Candidatos: Attribution Ciclo 6 (brief primero) · dual ExecuteTrade (grande) · Actionability/IO (park).
+3. ~~Attribution~~ → relevo [`traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md`](./traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md) (feat `7de91e5`).
 
 ## 5. Freeze / no tocado
 
