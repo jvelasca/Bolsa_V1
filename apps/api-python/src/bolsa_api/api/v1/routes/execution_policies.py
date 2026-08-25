@@ -2,6 +2,23 @@
 
 from typing import Annotated
 
+from bolsa_application.execution_policies import (
+    CreateExecutionPolicy,
+    DeleteExecutionPolicy,
+    GetExecutionPolicy,
+    ListExecutionPolicies,
+    UpdateExecutionPolicy,
+)
+from bolsa_application.execution_router import (
+    ExecuteScanJobHits,
+    ExecutionActionResult,
+    ExecutionRouter,
+)
+from bolsa_application.paper_auto_http_gate import (
+    PaperAutoEnvBlockedError,
+    require_http_paper_auto_env,
+)
+from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,19 +46,6 @@ from bolsa_api.schemas.execution_policies import (
     RouteSignalsResponseDto,
     UpdateExecutionPolicyRequestDto,
 )
-from bolsa_application.execution_policies import (
-    CreateExecutionPolicy,
-    DeleteExecutionPolicy,
-    GetExecutionPolicy,
-    ListExecutionPolicies,
-    UpdateExecutionPolicy,
-)
-from bolsa_application.execution_router import (
-    ExecuteScanJobHits,
-    ExecutionActionResult,
-    ExecutionRouter,
-)
-from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
 
 router = APIRouter()
 
@@ -214,7 +218,11 @@ async def route_signals_through_policy(
     principal = get_request_principal(request)
     get_use_case: GetExecutionPolicy = get_execution_policy_use_case(session)
     existing = await get_use_case.execute(policy_id)
-    _require_policy_access(existing, principal)
+    existing = _require_policy_access(existing, principal)
+    try:
+        require_http_paper_auto_env(existing.mode)
+    except PaperAutoEnvBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     use_case: ExecutionRouter = get_execution_router_use_case(session)
     try:
         result = await use_case.execute(policy_id, body.hits)
@@ -239,7 +247,11 @@ async def execute_scan_job_hits(
     principal = get_request_principal(request)
     get_use_case: GetExecutionPolicy = get_execution_policy_use_case(session)
     existing = await get_use_case.execute(body.policy_id)
-    _require_policy_access(existing, principal)
+    existing = _require_policy_access(existing, principal)
+    try:
+        require_http_paper_auto_env(existing.mode)
+    except PaperAutoEnvBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     use_case: ExecuteScanJobHits = get_execute_scan_job_hits_use_case(session)
     try:
         result = await use_case.execute(job_id, body.policy_id)

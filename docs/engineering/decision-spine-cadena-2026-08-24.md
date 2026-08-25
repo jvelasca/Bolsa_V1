@@ -62,6 +62,7 @@ Daily Decision Board (`GetDecisionBoard`, `/decision-board`) es **vista**; no de
 | DS-12–15 | expiry / partial / broker / recon | **Fuera** (no broker)                                                                                                                                  |
 | Residual | Composite `portfolioConstraints`  | Sigue `not_evaluated`; Fit vive al lado — **doc honesty**; no wire en esta rebanada                                                                    |
 | Residual | ExecuteTrade HTTP                 | **I1 cerrado:** buy gated (`allow_opening_fill`); sell skip; Router AUTO no fusionado                                                                  |
+| Residual | HTTP Router `paper_auto`          | **I3:** `/route` + scan-execute exigen `PAPER_D_EXECUTE` (403); inform/alert/live_auto no; **no thaw**                                                 |
 | Residual | H3 orphan apertures               | **Cerrado ADR-031:** store cableado → `orphan_opening_blocked`; tests sin store = legado                                                               |
 
 ---

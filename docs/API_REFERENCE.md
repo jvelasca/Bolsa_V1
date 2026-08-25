@@ -327,17 +327,17 @@ Validación kernel: `timeframe` ∈ `{1d, 1wk}`; universo vía `listId` o `instr
 
 Políticas de ejecución manual/auto sobre señales de scan.
 
-| Método | Ruta                                 | Descripción                             |
-| ------ | ------------------------------------ | --------------------------------------- |
-| GET    | `/api/execution-policies`            | Listado (`?enabled_only=true` opcional) |
-| GET    | `/api/execution-policies/{id}`       | Detalle + `ExecutionPolicyV1`           |
-| POST   | `/api/execution-policies`            | Crear (201)                             |
-| PATCH  | `/api/execution-policies/{id}`       | Actualizar                              |
-| DELETE | `/api/execution-policies/{id}`       | Eliminar (204)                          |
-| POST   | `/api/execution-policies/{id}/route` | Enrutar hits → inform/alert/paper       |
-| POST   | `/api/scans/jobs/{jobId}/execute`    | Ejecutar hits de job completado         |
+| Método | Ruta                                 | Descripción                                                                              |
+| ------ | ------------------------------------ | ---------------------------------------------------------------------------------------- |
+| GET    | `/api/execution-policies`            | Listado (`?enabled_only=true` opcional)                                                  |
+| GET    | `/api/execution-policies/{id}`       | Detalle + `ExecutionPolicyV1`                                                            |
+| POST   | `/api/execution-policies`            | Crear (201)                                                                              |
+| PATCH  | `/api/execution-policies/{id}`       | Actualizar                                                                               |
+| DELETE | `/api/execution-policies/{id}`       | Eliminar (204)                                                                           |
+| POST   | `/api/execution-policies/{id}/route` | Enrutar hits. `paper_auto` exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked` si off) |
+| POST   | `/api/scans/jobs/{jobId}/execute`    | Igual: hits de job completado; mismo gate `paper_auto`                                   |
 
-Modos: `inform_only`, `alert`, `paper_auto` (live reservado). `paper_auto` requiere `accountId` paper/simulated.
+Modos: `inform_only`, `alert`, `paper_auto` (live reservado). `paper_auto` requiere `accountId` paper/simulated **y** `PAPER_D_EXECUTE=1` en estos HTTP (Ciclo I3; **no** es thaw).
 
 ---
 

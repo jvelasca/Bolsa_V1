@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD local **`a4762e8`** (I2 cerrado; origin aún `05e354c`). Relevo vivo: [`traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md) (integridad I3; **D1–D8 BORRADOR, esperar OK; no thaw**). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD local **`a4762e8`** (I2 cerrado; origin aún `05e354c`). Relevo vivo: [`traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md) (integridad I3; D1–D8 OK; stamp SHA pendiente; **no thaw**). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -50,6 +50,7 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 
 - Ranking Estudio (`rankIndiceOperativo`) sigue en cliente. **Fórmula IO** es server (`indiceOperativo` en chip Composite; FE `resolveIndiceOperativo`). ≠ Actionability. ≠ permiso. **Ciclo I2 (`e31840d`).**
 - **Ciclo I1 (`2bd5cd8`):** `POST /portfolio/trade` buy pasa `check_opening` (mismo helper que Confirm/Fill: Fit + DS-05 + DS-03). Sell no abre cesta. Spine 3 intactos. Router AUTO no fusionado. `PAPER_D_EXECUTE` off.
+- **Ciclo I3:** HTTP `paper_auto` (`/execution-policies/{id}/route`, `/scans/jobs/{id}/execute`) exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked` si off). `inform`/`alert`/`live_auto` no. Router no fusionado. **No thaw.**
 - Dictamen (`DailyOpinionService`) no entra solo al Runtime; puede acabar en SEMI por alarma.
 - Aperturas orphan sin package: con store cableado (producción) → **`orphan_opening_blocked`** (H3, ADR-031). Wiring de test sin store = legado.
 - Confirm SEMI: TTL `expiresAt` y revalidación de último close vs `suggestedPrice` (banda 2 %).
@@ -72,7 +73,7 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - **Ciclo 5.2 Exit Radar thin:** mapper (`mapExitRadar` / `map_exit_radar`) → `runtime.exitRadar`; prioridad exit > time_stop > trail; Hoy «Salida» si status≠none. Trail tip @ MFE≥1.5R; time-stop por `expiresAt`; exit por thesis/T1 explícito. **No** auto-exit · **no** EvaluatePositionExits · **no** mutar stop. `check_opening` intacto.
 - **Ciclo 5.3 MFE/MAE thin:** mapper (`mapMfeMae` / `map_mfe_mae`) → `runtime.mfeMae`; peak MFE/MAE desde barras (fallback close_proxy); Hoy «Excursión» métricas (no CTA). **No** expectancy · **no** journal MFE · **no** mutar stop. `check_opening` intacto.
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **Expectancy plena** sigue parked.
-- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing continuo / bracket / T1 parcial fill, thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, Shadow AUTO **thaw** (ADR-023 Proposed), broker. **ExecuteTrade converge I1 cerrado (`2bd5cd8`)**. **I2 Actionability/IO cerrado (`e31840d`)**. I3 = honesty HTTP Router (**no** flip flag). **No** reabrir Wyckoff thin por defecto.
+- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing continuo / bracket / T1 parcial fill, thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, Shadow AUTO **thaw** (ADR-023 Proposed), broker. **I1** `2bd5cd8` · **I2** `e31840d` · **I3** HTTP paper_auto gated (stamp SHA pendiente). **No** reabrir Wyckoff thin por defecto.
 
 ## Tests
 

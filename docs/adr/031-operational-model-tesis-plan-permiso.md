@@ -124,7 +124,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo I2 Actionability/IO (cerrado `e31840d`):** fórmula `compute_indice_operativo` + echo `indiceOperativo` en chip Composite. Rank Estudio sigue cliente. IO ≠ permiso. `TradePlan.actionability` intacta. Sin Alembic / `contract:gen` / Shadow. `check_opening` intacto.
 
-**Ciclo I3 Shadow honesty (D1–D8 BORRADOR):** **no thaw.** HTTP `paper_auto` (`/route`, scan-execute) hoy sin `PAPER_D_EXECUTE`; Paper D sí lo exige. Plan: [`plan-ciclo-i3-shadow-honesty-2026-08-25.md`](../engineering/plan-ciclo-i3-shadow-honesty-2026-08-25.md).
+**Ciclo I3 Shadow honesty (código; stamp SHA pendiente):** HTTP `paper_auto` (`/route`, scan-execute) exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked`). Gate fuera del Router. **No thaw.** ADR-023 Proposed. Sin Alembic / `contract:gen`. `check_opening` intacto.
 
 No abrir sin fase propia:
 
