@@ -75,16 +75,16 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 ## 5. Golden scenarios (papel; tests cubren A/B/C/D/G/H; E/F diferidos)
 
-| Id    | Nombre                        | Entrada                                                   | Resultado                                                                 |
-| ----- | ----------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **A** | Breakout perfecto             | Bull, calidad alta, entry ready, stop estructural, Fit OK | `TRIGGERED` + size > 0                                                    |
-| **B** | Gran activo / mala entrada    | Quality alta, `entry_ready=False`                         | `WATCH` (no BUY)                                                          |
-| **C** | Gran setup / veto cartera     | Fit concentración/sector                                  | `BLOCKED`                                                                 |
-| **D** | Stop demasiado lejos          | Size se reduce; no se mueve el stop                       | **Ciclo 4.0:** swing más lejano gana; qty baja                            |
-| **E** | Posición ganadora T1          | Protección / trail                                        | **Diferido** Ciclo 5.1+                                                   |
-| **F** | Tesis se degrada, precio > SL | `REVIEW`                                                  | **Ciclo 5.0:** advisory `thesisHealth.status=review` (≠ TradePlan ladder) |
-| **G** | Régimen BULL → BEAR           | `NO_NEW_LONGS`                                            | **Ciclo 4.1:** long + `risk_off`/`crisis` → `BLOCKED`/`regime`            |
-| **H** | Plan caducado                 | `expiresAt` pasado                                        | `EXPIRED` / confirm no ejecuta                                            |
+| Id    | Nombre                        | Entrada                                                   | Resultado                                                                               |
+| ----- | ----------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **A** | Breakout perfecto             | Bull, calidad alta, entry ready, stop estructural, Fit OK | `TRIGGERED` + size > 0                                                                  |
+| **B** | Gran activo / mala entrada    | Quality alta, `entry_ready=False`                         | `WATCH` (no BUY)                                                                        |
+| **C** | Gran setup / veto cartera     | Fit concentración/sector                                  | `BLOCKED`                                                                               |
+| **D** | Stop demasiado lejos          | Size se reduce; no se mueve el stop                       | **Ciclo 4.0:** swing más lejano gana; qty baja                                          |
+| **E** | Posición ganadora T1          | Protección / trail                                        | **Ciclo 5.1:** advisory `protectPlan` (T1 + protect_hint; sin mutar stop; trail → 5.2+) |
+| **F** | Tesis se degrada, precio > SL | `REVIEW`                                                  | **Ciclo 5.0:** advisory `thesisHealth.status=review` (≠ TradePlan ladder)               |
+| **G** | Régimen BULL → BEAR           | `NO_NEW_LONGS`                                            | **Ciclo 4.1:** long + `risk_off`/`crisis` → `BLOCKED`/`regime`                          |
+| **H** | Plan caducado                 | `expiresAt` pasado                                        | `EXPIRED` / confirm no ejecuta                                                          |
 
 ---
 
@@ -114,10 +114,12 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.0 Thesis Health thin (cerrado `a2f32bb`):** mapper Golden F → `runtime.thesisHealth` · Board/Hoy «Revisar tesis» · **sin** `TradePlan.status=REVIEW` · sin trail/T1/MFE · `check_opening` intacto.
 
+**Ciclo 5.1 Protect/T1 thin (cerrado — ver relevo):** mapper Golden E → `runtime.protectPlan` · Hoy «Proteger» si MFE≥1R · T1=entry±1R · `suggestedProtectStop=entry` · **sin** mutar `structuralStop` · sin trail/exit · `check_opening` intacto.
+
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)
-- Position Manager, Exit Radar, trailing, T1 parcial, time-stop, bracket (Golden **E** → 5.1+)
+- Exit Radar, trailing, time-stop, bracket, T1 parcial fill (→ 5.2+)
 - Thesis Health **plena** (persistencia Confidence lifecycle cableada)
 - MFE/MAE, expectancy por setup (Attribution **plena**)
 - Shadow AUTO / `PAPER_D_EXECUTE` / broker live
@@ -125,7 +127,7 @@ No abrir sin fase propia:
 - Reescritura de `bolsa_application/`, microservicios, LLM en la decisión crítica
 - F9-B, purge storage E8
 
-Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en cliente hasta Actionability en servidor · **SETUP Wyckoff cerrado** · advisory Thesis Health ≠ permiso.
+Freeze vigente: LAB ≠ TRADING · LLM no ejecuta · ranking IO puede seguir en cliente hasta Actionability en servidor · **SETUP Wyckoff cerrado** · advisory Thesis Health / Protect ≠ permiso.
 
 ---
 

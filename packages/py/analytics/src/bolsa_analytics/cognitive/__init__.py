@@ -87,6 +87,11 @@ from bolsa_analytics.cognitive.portfolio_fit import (
     PortfolioFitSignal,
     compute_portfolio_fit,
 )
+from bolsa_analytics.cognitive.protect_plan import (
+    PROTECT_PLAN_KEY,
+    build_protect_plan_dict,
+    map_protect_plan,
+)
 from bolsa_analytics.cognitive.psr_dsr import (
     deflated_sharpe_ratio,
     probabilistic_sharpe_ratio,
@@ -202,6 +207,7 @@ __all__ = [
     "build_trade_plan",
     "build_v0_trade_plan_dict",
     "build_thesis_health_dict",
+    "build_protect_plan_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
@@ -218,6 +224,7 @@ __all__ = [
     "get_policy_template",
     "intent_from_recommendation",
     "map_thesis_health",
+    "map_protect_plan",
     "monte_carlo_permutation_p_value",
     "new_session_id",
     "observe_investor_profile",
@@ -232,6 +239,7 @@ __all__ = [
     "suggest_policy_template_from_declared",
     "summarize_session_outcomes",
     "THESIS_HEALTH_KEY",
+    "PROTECT_PLAN_KEY",
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",

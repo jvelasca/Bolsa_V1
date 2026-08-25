@@ -7,6 +7,10 @@ from typing import Any, Protocol, cast
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
+from bolsa_analytics.cognitive.protect_plan import (
+    PROTECT_PLAN_KEY,
+    build_protect_plan_dict,
+)
 from bolsa_analytics.cognitive.recommendation import (
     Recommendation,
     recommendation_from_decision_package,
@@ -176,6 +180,8 @@ class ProposeRecommendationResult:
     wyckoff_spring_anchor: dict[str, Any] | None = None
     # Ciclo 5.0 — Thesis Health advisory (Golden F); no fill gate.
     thesis_health: dict[str, Any] | None = None
+    # Ciclo 5.1 — Protect/T1 advisory (Golden E); no stop mutate.
+    protect_plan: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -205,6 +211,8 @@ class ProposeRecommendationResult:
             data[WYCKOFF_SPRING_ANCHOR_KEY] = self.wyckoff_spring_anchor
         if self.thesis_health is not None:
             data[THESIS_HEALTH_KEY] = self.thesis_health
+        if self.protect_plan is not None:
+            data[PROTECT_PLAN_KEY] = self.protect_plan
         return data
 
 
@@ -511,6 +519,19 @@ class ProposeRecommendationFromTa:
             structural_stop=structural_stop,
             hard_exit=str(runtime.package.action) == "exit_hint",
         )
+        entry_raw = (
+            trade_plan_dict.get("entry") if isinstance(trade_plan_dict, dict) else None
+        )
+        try:
+            entry_px = float(entry_raw) if entry_raw is not None else None
+        except (TypeError, ValueError):
+            entry_px = None
+        protect_plan = build_protect_plan_dict(
+            direction=plan_direction,
+            entry=entry_px,
+            structural_stop=structural_stop,
+            last_close=float(last_close) if last_close is not None else None,
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -550,6 +571,7 @@ class ProposeRecommendationFromTa:
             "predictionsDoNotDecide": True,
             "tradePlan": trade_plan_dict,
             THESIS_HEALTH_KEY: thesis_health,
+            PROTECT_PLAN_KEY: protect_plan,
         }
         if wyckoff_anchor is not None:
             session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
@@ -621,6 +643,7 @@ class ProposeRecommendationFromTa:
             trade_plan=trade_plan_dict,
             wyckoff_spring_anchor=wyckoff_anchor,
             thesis_health=thesis_health,
+            protect_plan=protect_plan,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:

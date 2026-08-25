@@ -5,6 +5,7 @@
  * Ciclo 4.8: Setup thin (entrySetup + phase/effort del anchor) — no whyNot nuevos.
  * Ciclo 4.9: sesiones Board echo tradePlan + anchor → Hoy deja heurística cuando hay plan.
  * Ciclo 5.0: thesisHealth advisory (Golden F) — ≠ cola REVIEW de EXPIRED.
+ * Ciclo 5.1: protectPlan advisory (Golden E) — no muta structuralStop.
  */
 
 import type {
@@ -24,6 +25,11 @@ import type {
   ThesisHealthV1,
   ThesisHealthWhyV1,
 } from "./thesis-health.js";
+import type {
+  ProtectPlanStatusV1,
+  ProtectPlanV1,
+  ProtectPlanWhyV1,
+} from "./protect-plan.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
@@ -45,6 +51,8 @@ export type HoyQueueItemV1 = {
   setup?: HoySetupEvidenceV1 | null;
   /** Ciclo 5.0 — advisory; status review ≠ kind REVIEW. */
   thesisHealth?: ThesisHealthV1 | null;
+  /** Ciclo 5.1 — advisory protect/T1. */
+  protectPlan?: ProtectPlanV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -286,6 +294,77 @@ function readThesisHealthFromF3Row(row: SemiF3ViewV1): ThesisHealthV1 | null {
   return readThesisHealthFromPayloadish(flattened.payload);
 }
 
+const PROTECT_STATUSES = new Set<ProtectPlanStatusV1>(["none", "protect_hint"]);
+const PROTECT_WHYS = new Set<ProtectPlanWhyV1>(["mfe_ge_1r", "missing_inputs"]);
+
+function asProtectPlan(value: unknown): ProtectPlanV1 | null {
+  if (!isRecord(value)) return null;
+  const status = value.status;
+  if (
+    typeof status !== "string" ||
+    !PROTECT_STATUSES.has(status as ProtectPlanStatusV1)
+  ) {
+    return null;
+  }
+  const whyRaw = value.why;
+  const why: ProtectPlanWhyV1[] = Array.isArray(whyRaw)
+    ? whyRaw.filter(
+        (code): code is ProtectPlanWhyV1 =>
+          typeof code === "string" &&
+          PROTECT_WHYS.has(code as ProtectPlanWhyV1),
+      )
+    : [];
+  const target1 =
+    typeof value.target1 === "number" && Number.isFinite(value.target1)
+      ? value.target1
+      : null;
+  const suggestedProtectStop =
+    typeof value.suggestedProtectStop === "number" &&
+    Number.isFinite(value.suggestedProtectStop)
+      ? value.suggestedProtectStop
+      : null;
+  const rMultiple =
+    typeof value.rMultiple === "number" && Number.isFinite(value.rMultiple)
+      ? value.rMultiple
+      : null;
+  return {
+    status: status as ProtectPlanStatusV1,
+    target1,
+    suggestedProtectStop,
+    rMultiple,
+    why,
+  };
+}
+
+function readProtectPlanFromPayloadish(value: unknown): ProtectPlanV1 | null {
+  if (!isRecord(value)) return null;
+  const top = asProtectPlan(value.protectPlan);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = asProtectPlan(runtime.protectPlan);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return asProtectPlan(value.runtime.protectPlan);
+  }
+  return null;
+}
+
+function readProtectPlanFromF3Row(row: SemiF3ViewV1): ProtectPlanV1 | null {
+  const extra = row.extra;
+  if (isRecord(extra)) {
+    const fromPayload = readProtectPlanFromPayloadish(extra.payload);
+    if (fromPayload) return fromPayload;
+    const fromExtra = asProtectPlan(extra.protectPlan);
+    if (fromExtra) return fromExtra;
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  return readProtectPlanFromPayloadish(flattened.payload);
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -339,6 +418,7 @@ function toHoyItem(
   heuristicKind: HoyActionKindV1,
   setup: HoySetupEvidenceV1 | null,
   thesisHealth: ThesisHealthV1 | null,
+  protectPlan: ProtectPlanV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -350,6 +430,7 @@ function toHoyItem(
       gate,
       setup,
       thesisHealth,
+      protectPlan,
     };
   }
   return {
@@ -361,6 +442,7 @@ function toHoyItem(
     gate,
     setup,
     thesisHealth,
+    protectPlan,
   };
 }
 
@@ -382,6 +464,7 @@ export function mapDecisionBoardToHoyQueue(
         kind,
         readSetupFromF3Row(row),
         readThesisHealthFromF3Row(row),
+        readProtectPlanFromF3Row(row),
       ),
     );
   }
@@ -404,6 +487,7 @@ export function mapDecisionBoardToHoyQueue(
         kind,
         readSetupFromSession(session, live),
         asThesisHealth(session.thesisHealth),
+        asProtectPlan(session.protectPlan),
       ),
     );
   }

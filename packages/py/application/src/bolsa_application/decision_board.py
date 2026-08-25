@@ -178,6 +178,21 @@ def extract_session_thesis_health(
     return None
 
 
+def extract_session_protect_plan(
+    payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Lee ``runtime.protectPlan`` (Ciclo 5.1 advisory). Sin inventar."""
+    runtime = _session_runtime(payload)
+    if runtime is None:
+        return None
+    raw = runtime.get("protectPlan")
+    if not isinstance(raw, dict):
+        raw = runtime.get("protect_plan")
+    if isinstance(raw, dict) and raw:
+        return dict(raw)
+    return None
+
+
 @dataclass(frozen=True, slots=True)
 class DecisionSessionView:
     """Una sesión de decisión reciente expuesta en el tablero."""
@@ -193,6 +208,7 @@ class DecisionSessionView:
     trade_plan: dict[str, Any] | None = None
     wyckoff_spring_anchor: dict[str, Any] | None = None
     thesis_health: dict[str, Any] | None = None
+    protect_plan: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -211,6 +227,8 @@ class DecisionSessionView:
             data["wyckoffSpringAnchor"] = self.wyckoff_spring_anchor
         if self.thesis_health is not None:
             data["thesisHealth"] = self.thesis_health
+        if self.protect_plan is not None:
+            data["protectPlan"] = self.protect_plan
         return data
 
 
@@ -376,6 +394,7 @@ class GetDecisionBoard:
                     trade_plan=extract_session_trade_plan(rec.payload),
                     wyckoff_spring_anchor=extract_session_wyckoff_anchor(rec.payload),
                     thesis_health=extract_session_thesis_health(rec.payload),
+                    protect_plan=extract_session_protect_plan(rec.payload),
                 )
             )
 
@@ -445,4 +464,5 @@ __all__ = [
     "extract_session_trade_plan",
     "extract_session_wyckoff_anchor",
     "extract_session_thesis_health",
+    "extract_session_protect_plan",
 ]

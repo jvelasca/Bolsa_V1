@@ -210,4 +210,41 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(expired?.kind).toBe("REVIEW");
     expect(expired?.thesisHealth ?? null).toBeNull();
   });
+
+  it("Ciclo 5.1: surfaces protectPlan protect_hint without changing kind", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-protect",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              entry: 100,
+              structuralStop: 90,
+              executionAllowed: true,
+            }),
+            protectPlan: {
+              status: "protect_hint",
+              target1: 110,
+              suggestedProtectStop: 100,
+              rMultiple: 1,
+              why: ["mfe_ge_1r"],
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("BUY");
+    expect(items[0]?.protectPlan?.status).toBe("protect_hint");
+    expect(items[0]?.protectPlan?.target1).toBe(110);
+  });
 });

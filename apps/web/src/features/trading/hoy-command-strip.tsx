@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import type {
   HoyQueueItemV1,
   HoySetupEvidenceV1,
+  ProtectPlanV1,
   ThesisHealthV1,
 } from "@bolsa/shared";
 import { mapDecisionBoardToHoyQueue } from "@bolsa/shared";
@@ -73,6 +74,20 @@ function thesisHealthLine(health: ThesisHealthV1): string {
     parts.push(health.why.join(", "));
   }
   return parts.join(" · ");
+}
+
+function protectPlanLine(plan: ProtectPlanV1): string {
+  const parts: string[] = [];
+  if (plan.rMultiple != null) {
+    parts.push(`${plan.rMultiple}R`);
+  }
+  if (plan.target1 != null) {
+    parts.push(`T1 ${plan.target1}`);
+  }
+  if (plan.suggestedProtectStop != null) {
+    parts.push(`proteger @ ${plan.suggestedProtectStop}`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
 export function HoyCommandStrip() {
@@ -166,6 +181,16 @@ export function HoyCommandStrip() {
                 </p>
                 <p className="mt-1 text-sm">
                   {thesisHealthLine(selected.thesisHealth)}
+                </p>
+              </div>
+            ) : null}
+            {selected.protectPlan?.status === "protect_hint" ? (
+              <div className="mt-3" data-testid="hoy-protect">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Proteger
+                </p>
+                <p className="mt-1 text-sm">
+                  {protectPlanLine(selected.protectPlan)}
                 </p>
               </div>
             ) : null}

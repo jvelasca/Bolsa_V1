@@ -193,4 +193,57 @@ describe("HoyCommandStrip", () => {
     expect(screen.getByText(/Revisar tesis/i)).toBeTruthy();
     expect(screen.getByText(/reduce · confidence_degraded/i)).toBeTruthy();
   });
+
+  it("Ciclo 5.1: dialog shows Proteger when protectPlan.status=protect_hint", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                  entry: 100,
+                  structuralStop: 90,
+                },
+                protectPlan: {
+                  status: "protect_hint",
+                  target1: 110,
+                  suggestedProtectStop: 100,
+                  rMultiple: 1,
+                  why: ["mfe_ge_1r"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const protect = await screen.findByTestId("hoy-protect");
+    expect(protect).toBeTruthy();
+    expect(protect.textContent).toMatch(/Proteger/i);
+    expect(protect.textContent).toMatch(/1R · T1 110 · proteger @ 100/i);
+  });
 });

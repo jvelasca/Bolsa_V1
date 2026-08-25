@@ -378,6 +378,8 @@ class DecisionSessionViewDto(BaseModel):
     )
     # Ciclo 5.0 — Thesis Health advisory thin (sin contract:gen).
     thesis_health: dict[str, Any] | None = Field(default=None, alias="thesisHealth")
+    # Ciclo 5.1 — Protect/T1 advisory thin.
+    protect_plan: dict[str, Any] | None = Field(default=None, alias="protectPlan")
 
 
 class SemiF3ViewDto(BaseModel):

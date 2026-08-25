@@ -7,6 +7,7 @@
 
 import type { TradePlanV1 } from "./cognitive/trade-plan.js";
 import type { ThesisHealthV1 } from "./cognitive/thesis-health.js";
+import type { ProtectPlanV1 } from "./cognitive/protect-plan.js";
 
 export type DecisionGate = "PASS" | "VETO" | "DEFERRED" | "unknown";
 
@@ -34,6 +35,8 @@ export type DecisionSessionViewV1 = {
   wyckoffSpringAnchor?: Record<string, unknown>;
   /** Ciclo 5.0 — Thesis Health advisory (Golden F); ≠ TradePlan.status. */
   thesisHealth?: ThesisHealthV1 | Record<string, unknown>;
+  /** Ciclo 5.1 — Protect/T1 advisory (Golden E); no muta structuralStop. */
+  protectPlan?: ProtectPlanV1 | Record<string, unknown>;
 };
 
 export type SemiF3ViewV1 = {

@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`fa385a8`** = `origin/main` (Ciclo 5.0 `a2f32bb`). Relevo vivo: [`traspaso-relevo-ciclo-5-thesis-health-thin-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-5-thesis-health-thin-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. Ciclo 5.1 Protect/T1 thin listo (pendiente commit). Relevo vivo: [`traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md). Previo origin: **`8fa8b7e`**. Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -67,17 +67,18 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - TradePlan Ciclo 4.8 (**cierre línea SETUP Wyckoff**): `_wyckoff_effort_evidence` en anchor (`effort`); echo `wyckoffSpringAnchor` en propose/F3; Hoy dialog Setup (`entrySetup` + phase + effort); Board `semiF3.extra` anidado. Effort/LPS **etiqueta**. Sin Alembic. Sin `wyckoffPhase` TradePlan. Sin `contract:gen`.
 - Mesa Ciclo 4.9: Board sesiones echo `tradePlan` + `wyckoffSpringAnchor` desde `runtime` (`DecisionSessionViewDto` a mano); Hoy usa plan vivo (deja heurística); WhyNot labels `regime`/`orphan`/`rr`. Sin Alembic. Sin `contract:gen`. Sin Actionability/IO server.
 - **Ciclo 5.0 Thesis Health thin:** mapper Golden F (`mapThesisHealth` / `map_thesis_health`) → `runtime.thesisHealth` en propose; Board/Hoy echo; dialog «Revisar tesis» si `status=review`. **No** `TradePlan.status=REVIEW`. **No** trail/T1/MFE. `check_opening` intacto. Cola Hoy `REVIEW` (EXPIRED) ≠ thesis review.
+- **Ciclo 5.1 Protect/T1 thin:** mapper Golden E (`mapProtectPlan` / `map_protect_plan`) → `runtime.protectPlan`; Board/Hoy «Proteger» si `status=protect_hint` (MFE≥1R). T1 = entry±1R; `suggestedProtectStop=entry`. **No** muta `structuralStop`. **No** trail/exit. `check_opening` intacto.
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **MFE/expectancy** siguen parked.
-- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), Position Manager / Exit Radar / trailing / T1 (Golden E → 5.1+), thesis health **plena** (persistencia Confidence lifecycle), MFE-MAE/expectancy plena, Shadow AUTO, broker, ExecuteTrade converge. **No** reabrir Wyckoff thin por defecto.
+- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), Exit Radar / trailing / time-stop / bracket (5.2+), thesis health **plena** (persistencia Confidence lifecycle), MFE-MAE/expectancy plena, Shadow AUTO, broker, ExecuteTrade converge. **No** reabrir Wyckoff thin por defecto.
 
 ## Tests
 
-| Comando                    | Qué cubre                                                                                                                                                                                                             |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.8 + Board echo 4.9 + Journal Attribution 6 + Thesis Health 5.0, AUTO veto, Golden, **DS-05**, **DS-03** (**121**) |
-| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                                     |
-| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                                        |
-| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                                         |
+| Comando                    | Qué cubre                                                                                                                                                                                                                              |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.8 + Board echo 4.9 + Journal Attribution 6 + Thesis Health 5.0 + Protect/T1 5.1, AUTO veto, Golden, **DS-05**, **DS-03** (**125**) |
+| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                                                      |
+| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                                                         |
+| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                                                          |
 
 ## Open risks (ops, no código)
 

@@ -9,6 +9,7 @@ from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 from bolsa_application.decision_board import (
     GetDecisionBoard,
+    extract_session_protect_plan,
     extract_session_trade_plan,
     extract_session_thesis_health,
     extract_session_wyckoff_anchor,
@@ -76,6 +77,13 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
         "why": ["confidence_degraded", "stop_intact"],
         "confidence": 0.3,
     }
+    protect = {
+        "status": "protect_hint",
+        "target1": 110.0,
+        "suggestedProtectStop": 100.0,
+        "rMultiple": 1.0,
+        "why": ["mfe_ge_1r"],
+    }
     sessions = [
         _session(
             session_id="s-plan",
@@ -85,6 +93,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
                     "tradePlan": plan,
                     "wyckoffSpringAnchor": anchor,
                     "thesisHealth": health,
+                    "protectPlan": protect,
                 },
             },
         ),
@@ -102,13 +111,16 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert by_id["s-plan"].trade_plan == plan
     assert by_id["s-plan"].wyckoff_spring_anchor == anchor
     assert by_id["s-plan"].thesis_health == health
+    assert by_id["s-plan"].protect_plan == protect
     dumped = by_id["s-plan"].to_dict()
     assert dumped["tradePlan"]["status"] == "BLOCKED"
     assert dumped["wyckoffSpringAnchor"]["phase"] == "lps"
     assert dumped["thesisHealth"]["status"] == "review"
+    assert dumped["protectPlan"]["status"] == "protect_hint"
     assert "tradePlan" not in by_id["s-empty"].to_dict()
     assert "wyckoffSpringAnchor" not in by_id["s-empty"].to_dict()
     assert "thesisHealth" not in by_id["s-empty"].to_dict()
+    assert "protectPlan" not in by_id["s-empty"].to_dict()
 
 
 def test_extract_session_trade_plan_helpers() -> None:
@@ -124,3 +136,6 @@ def test_extract_session_trade_plan_helpers() -> None:
     assert extract_session_thesis_health(
         {"runtime": {"thesis_health": {"status": "review", "hint": "exit"}}}
     ) == {"status": "review", "hint": "exit"}
+    assert extract_session_protect_plan(
+        {"runtime": {"protect_plan": {"status": "protect_hint", "target1": 110}}}
+    ) == {"status": "protect_hint", "target1": 110}
