@@ -3,7 +3,7 @@
 > **Padre:** [`traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md`](./traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md).
 > **Plan:** [`plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md`](./plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** feat WIP (pendiente commit). Previo origin: **`13a69f9`**.
+> **HEAD:** stamp docs (este commit) · feat **`fd44a03`**.
 > **Arranque:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §6.
 
 ---
@@ -27,14 +27,14 @@
 
 ## 3. Commits
 
-| SHA       | Mensaje                                      |
-| --------- | -------------------------------------------- |
-| _(feat)_  | feat(spine): ADR-031 Ciclo 5.3 MFE/MAE thin. |
-| _(stamp)_ | docs: stamp living SoT after Ciclo 5.3.      |
+| SHA       | Mensaje                                             |
+| --------- | --------------------------------------------------- |
+| `fd44a03` | feat(spine): ADR-031 Ciclo 5.3 MFE/MAE thin.        |
+| _(stamp)_ | docs: stamp living SoT after Ciclo 5.3 (`fd44a03`). |
 
 ## 4. E1
 
-1. Commit feat · stamp · push.
+1. ~~Commit feat~~ · Push + stamp docs.
 2. **Siguiente:** cierre línea **5.x** → integridad **ExecuteTrade**.
 3. Park: expectancy plena · Actionability/IO · Shadow AUTO · trailing continuo / bracket.
 4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.

@@ -118,7 +118,7 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo 5.2 Exit Radar thin (cerrado `e813aa3`):** mapper → `runtime.exitRadar` · Hoy «Salida» · prioridad exit > time_stop > trail · **sin** auto-exit · **sin** EvaluatePositionExits · **sin** mutar stop · `check_opening` intacto.
 
-**Ciclo 5.3 MFE/MAE thin (cerrado WIP):** mapper → `runtime.mfeMae` · peak MFE/MAE (barras / close_proxy) · Hoy «Excursión» métricas · **sin** expectancy · **sin** CTA acción · `check_opening` intacto.
+**Ciclo 5.3 MFE/MAE thin (cerrado `fd44a03`):** mapper → `runtime.mfeMae` · peak MFE/MAE (barras / close_proxy) · Hoy «Excursión» métricas · **sin** expectancy · **sin** CTA acción · `check_opening` intacto.
 
 No abrir sin fase propia:
 
