@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`4a66945`** = `origin/main` (Ciclo 6 `7de91e5`). Relevo vivo: [`traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-6-attribution-journal-thin-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD stamp docs = `origin/main` (Ciclo 7 `eef94ec`). Relevo vivo: [`traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -48,13 +48,13 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 ## Limitaciones conocidas (no son bugs de esta rebanada)
 
 - Ranking IO sigue en cliente (`operativa-index.ts`).
-- Dos call-sites a `ExecuteTrade` (TO-BE: convergencia **antes** del fill) — diferido.
+- Tres call-sites spine a `ExecuteTrade` (Confirm · ExecutionRouter · FillPendingOrder) + HTTP crudo `POST /portfolio/trade` (sin `check_opening`). TO-BE convergencia pre-fill / unificación de puertos — **parked M–L** (no thin post-Ciclo 6).
 - Dictamen (`DailyOpinionService`) no entra solo al Runtime; puede acabar en SEMI por alarma.
 - Aperturas orphan sin package: con store cableado (producción) → **`orphan_opening_blocked`** (H3, ADR-031). Wiring de test sin store = legado.
 - Confirm SEMI: TTL `expiresAt` y revalidación de último close vs `suggestedPrice` (banda 2 %).
 - `pending_orders` fill: `POST /api/pending-orders/{id}/fill` (ya no `executeTrade` directo desde el monitor).
 - Confirm SEMI: perfil activo vía `active_profile_id` → `check_opening` (H5 CERRADA; mismo SoT AUTO). Sin perfil → defaults moderate.
-- Composite `portfolioConstraints` sigue `not_evaluated`; Fit vive al lado.
+- Composite `portfolioConstraints` sigue `not_evaluated` (peso 0); Fit real en `check_opening`. Nota/UI: no es «pendiente de puntuar en Composite».
 - **DS-03 Account Mandate Gate CERRADA (`41adb8e`):** tenure abierto server-side (`mandate_tenures` vía sync cliente) → `check_opening` VETO fail-closed sin mandato / mismatch estrategia AUTO. Adopción UI (`strategy-adoption`) sigue proyección cliente; el gate usa BD. Exits fuera. Batería `pnpm test:decision-spine` **75**.
 - TradePlan Ciclo 4.0: stop ATR×1.5 + swing (más lejano), `entry_ready` por bias TA, size con equity de cartera. Confirm rebuild sin barras → `WATCH`/`no_stop`. `suggestedQuantity` del ticket F3 **no** se pisa con `TradePlan.quantity`. Decision Board HTTP **sí** expone `tradePlan` (+ anchor) en sesiones desde Ciclo 4.9 (sin `contract:gen`).
 - TradePlan Ciclo 4.1: `NO_NEW_LONGS` — long + `risk_off`/`crisis` → `BLOCKED`/`regime`. Shorts OK. Confirm sin régimen no veta. `check_opening` intacto.

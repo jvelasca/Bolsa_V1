@@ -39,7 +39,7 @@ Push: `78e1fd6..` → `origin/main` (incl. update-last).
 
 1. ~~Commit~~ · ~~Push~~.
 2. **MFE / expectancy / Ciclo 5 PM** siguen parked.
-3. Candidatos: dual ExecuteTrade (grande) · Actionability/IO (park) · Shadow AUTO (frozen).
+3. ~~Honesty~~ → relevo [`traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-7-spine-honesty-2026-08-25.md) (feat `eef94ec`). Park: dual ExecuteTrade · Actionability/IO · Shadow AUTO.
 
 ## 5. Freeze
 
