@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `95e4720` · feat I3 `26901aa` · origin `05e354c` · línea integridad I1–I3 CERRADA
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD local `9289b53` · feat RX1 `9289b53` · I3 `26901aa` · origin `05e354c` · I1–I3 + RX1 exits honesty
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -62,7 +62,9 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md ← **RELEVO ACTIVO** · cierre línea I1–I3 (`95e4720`) · no I4 automático · no thaw
+│   ├── traspaso-relevo-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md ← **RELEVO ACTIVO** · RX1 exits honesty · CERRADO `9289b53` · **no thaw** · **no** I4
+│   ├── plan-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md ← plan RX1 · D1–D8 OK · CERRADO en `9289b53`
+│   ├── traspaso-relevo-cierre-integridad-i1-i3-2026-08-25.md ← histórico · cierre línea I1–I3 · residual exits → RX1
 │   ├── traspaso-relevo-ciclo-i3-shadow-honesty-2026-08-25.md ← histórico · I3 Shadow honesty · CERRADO `26901aa` · **no thaw**
 │   ├── plan-ciclo-i3-shadow-honesty-2026-08-25.md ← plan I3 · D1–D8 OK · CERRADO en `26901aa`
 │   ├── traspaso-relevo-ciclo-i2-actionability-io-2026-08-25.md ← histórico · I2 Actionability/IO · CERRADO `e31840d` (stamp `cfc8042`)

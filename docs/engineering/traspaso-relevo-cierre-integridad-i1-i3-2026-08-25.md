@@ -22,20 +22,20 @@ No queda un bypass HTTP de **apertura paper** al nivel de I1/I3. Seguir con «I4
 
 ## 1. Qué queda (no es el siguiente por defecto)
 
-| Tema                                        | Por qué no es I4 automático                                                          |
-| ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Thaw Camino D / `PAPER_D_EXECUTE=1`         | ADR-023 **Proposed**, P1–P10 vacíos. Solo con la palabra **thaw** + checklist.       |
-| Exits `full_auto` → Router                  | I3 D4 **park**. Es auto-salida, no el hueco de apertura HTTP.                        |
-| Fusionar `ExecutionRouter` con Confirm/Fill | I1 D3 / I3 D3 **no**. Knobs AUTO distintos.                                          |
-| Expectancy / trail / bracket                | Crecimiento parked (5.x **cerrada**). Fase nueva si se pide, no «seguir integridad». |
-| `TRUSTED_PROXIES` / secret scanning UI      | Ops, no código de ciclo.                                                             |
-| **Push** `origin/main`                      | `main` local **ahead**; decisión explícita (**push**).                               |
+| Tema                                        | Por qué no es I4 automático                                                                                                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Thaw Camino D / `PAPER_D_EXECUTE=1`         | ADR-023 **Proposed**, P1–P10 vacíos. Solo con la palabra **thaw** + checklist.                                                                                                                    |
+| Exits `full_auto` → Router                  | I3 D4 **park** → **RX1** (honesty residual, no thaw): ver [`traspaso-relevo-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md`](./traspaso-relevo-ciclo-rx1-exits-full-auto-honesty-2026-08-25.md). |
+| Fusionar `ExecutionRouter` con Confirm/Fill | I1 D3 / I3 D3 **no**. Knobs AUTO distintos.                                                                                                                                                       |
+| Expectancy / trail / bracket                | Crecimiento parked (5.x **cerrada**). Fase nueva si se pide, no «seguir integridad».                                                                                                              |
+| `TRUSTED_PROXIES` / secret scanning UI      | Ops, no código de ciclo.                                                                                                                                                                          |
+| **Push** `origin/main`                      | `main` local **ahead**; decisión explícita (**push**).                                                                                                                                            |
 
 ## 2. E1 — fork (el dueño elige)
 
 1. **Push** I1–I3 a origin (si se pide).
 2. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
-3. Residual integridad **solo si se nombra:** exits `full_auto` / `EvaluatePositionExits` (no auto-exit por «seguimos»).
+3. ~~Residual exits `full_auto`~~ → **RX1** (si se nombró). No auto-exit producto por «seguimos».
 4. Crecimiento **solo si se nombra:** expectancy plena · trail · bracket (plan D1–D8, no reabrir Wyckoff/5.x por defecto).
 5. **Thaw AUTO** solo con «thaw» + ADR-023 / checklist. Un «seguimos» **no** basta.
 

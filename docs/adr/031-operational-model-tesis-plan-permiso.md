@@ -126,6 +126,8 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 
 **Ciclo I3 Shadow honesty (cerrado `26901aa`):** HTTP `paper_auto` (`/route`, scan-execute) exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked`). Gate fuera del Router. **No thaw.** ADR-023 Proposed. Sin Alembic / `contract:gen`. `check_opening` intacto. **Línea integridad I1–I3 cerrada.**
 
+**Ciclo RX1 exits full_auto honesty (cerrado `9289b53`):** `EvaluatePositionExits` con `executeTrades=true` + `full_auto` + linked `paper_auto` → mismo env gate antes del Router (HTTP 403). Eval-only intacto. **No** thaw · **no** auto-exit producto · **no** Exit Radar wire. Sin Alembic / `contract:gen`. `check_opening` intacto.
+
 No abrir sin fase propia:
 
 - Alembic / tabla dedicada Wyckoff / `wyckoffPhase` en contrato FE — **parked** (no 4.9 por defecto)

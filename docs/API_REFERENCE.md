@@ -356,9 +356,9 @@ Política sobre una posición ya abierta (cuenta + instrumento).
 
 Modos: `manual`, `exit_strategy` (+ `exitStrategyDefinitionId`), `full_auto` (+ `executionPolicyId`).
 
-| Método | Ruta                                    | Descripción                                                     |
-| ------ | --------------------------------------- | --------------------------------------------------------------- |
-| POST   | `/api/position-policies/evaluate-exits` | Evalúa salidas (`?accountId=&executeTrades=false&timeframe=1d`) |
+| Método | Ruta                                    | Descripción                                                                                                                                                                                                  |
+| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/api/position-policies/evaluate-exits` | Evalúa salidas (`?accountId=&executeTrades=false&timeframe=1d`). Con `executeTrades=true` + `full_auto` + policy `paper_auto` exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked`; Ciclo RX1, **no** thaw) |
 
 ---
 
