@@ -62,8 +62,9 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-25-v180.md ← **PACK auditoría vivo** post-tag v1.8.0-beta · spine 159 · BETA-D + A3-wire · supersedes 24e
-│   ├── roadmap-v181-operational-consolidation-2026-08-25.md ← **FASE CERRADA en código** v1.8.1 (C1–C5 + C6 stamp) · tag parked · no thin nuevos
-│   ├── audit-pack-estado-global-2026-08-25-v181.md ← pack consolidación v1.8.1 · tag `v1.8.1-beta` parked
+│   ├── roadmap-v181-operational-consolidation-2026-08-25.md ← **FASE CERRADA** v1.8.1 (C1–C6) · tag `v1.8.1-beta` · no thin nuevos
+│   ├── audit-pack-estado-global-2026-08-25-v181.md ← pack consolidación v1.8.1 · tag `v1.8.1-beta`
+│   ├── traspaso-relevo-tag-v1-8-1-beta-2026-08-25.md ← **RELEVO** tag v1.8.1-beta → auditoría externa
 │   ├── plan-ciclo-c1-hoy-honesty-help-2026-08-25.md ← **C1** Hoy nunca BUY sin TradePlan · HELP 2026-08-25
 │   ├── traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md ← relevo C1
 │   ├── traspaso-relevo-adr-032-operational-core-docs-2026-08-25.md ← **ADR-032** Proposed/Accepted docs-only v1.9 Operational Core · sin código
@@ -76,8 +77,8 @@ Engineering Index  (este doc)
 │   ├── traspaso-relevo-ciclo-c5-metrics-honesty-2026-08-25.md ← relevo C5 · E1 = C4
 │   ├── plan-ciclo-c4-shape-canonical-2026-08-25.md ← **C4 CÓDIGO LISTO** TradePlan reader canónico · planSource · sin contract:gen
 │   ├── traspaso-relevo-ciclo-c4-shape-canonical-2026-08-25.md ← relevo C4 · E1 = C6 coordinador
-│   ├── plan-ciclo-c6-stamp-v181-2026-08-25.md ← **C6 CERRADO documental** stamp pack · tag parked
-│   ├── traspaso-relevo-ciclo-c6-stamp-v181-2026-08-25.md ← relevo C6 · E1 = tag/push owner o v1.9 ADR-032
+│   ├── plan-ciclo-c6-stamp-v181-2026-08-25.md ← **C6 CERRADO** stamp pack · tag `v1.8.1-beta`
+│   ├── traspaso-relevo-ciclo-c6-stamp-v181-2026-08-25.md ← relevo C6 · E1 = auditoría / v1.9 ADR-032
 │   ├── traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md ← **RELEVO** tag v1.8.0-beta → auditoría externa
 │   ├── audit-pack-estado-global-2026-08-24e.md ← histórico post-tag v1.7.0-beta + CI
 │   ├── deuda-thaw-estricto-runbook-2026-08-25.md ← **DEUDA ESTRICTO** tracking P1–P5 (60d/50/70/55 · MaxDD) · W2–W4 · snapshot `scripts/thaw_estricto_snapshot.mjs` · **no** Accept estricto aún

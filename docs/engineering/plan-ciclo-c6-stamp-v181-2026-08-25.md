@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-v181-operational-consolidation-2026-08-25.md`](./roadmap-v181-operational-consolidation-2026-08-25.md).
 > **AsOf:** 2026-08-25.
-> **Estado:** **CERRADO documental**. Tag `v1.8.1-beta` parked.
+> **Estado:** **CERRADO**. Tag **`v1.8.1-beta`**.
 > **Método:** stamp documental; **tag solo con palabra del dueño**; **no push** salvo petición.
 
 ---

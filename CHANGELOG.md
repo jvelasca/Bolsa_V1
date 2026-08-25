@@ -4,7 +4,9 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
-Consolidación v1.8.1 **código listo** (C1–C5 + ADR-032). Stamp C6 en [`audit-pack-estado-global-2026-08-25-v181.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v181.md). Tag **`v1.8.1-beta` parked** (no promover esta sección a `[1.8.1-beta]` sin palabra del dueño).
+## [1.8.1-beta] — 2026-08-25
+
+Operational Consolidation post-`v1.8.0-beta`. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.1-beta`** (SHA pin en living SoT). Partida: **`v1.8.0-beta` → `8c8b789`**. Spine battery **`pnpm test:decision-spine` = 161**. Pack: [`audit-pack-estado-global-2026-08-25-v181.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v181.md). **No** módulos thin nuevos. **No** PositionState/ExecutionPlan (ADR-032 docs-only).
 
 ### Ciclo C4 — TradePlan shape canónico
 
