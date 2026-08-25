@@ -36,6 +36,11 @@ export function HoyEnLaMesaBlock() {
           Trading) — SEMI: la app propone, tú firmas; nunca sola.
         </li>
       </ol>
+      <p className="mt-2 text-xs text-muted-foreground">
+        La tira <strong className="text-foreground">Hoy</strong> proyecta el
+        Decision Board: BUY solo con TradePlan TRIGGERED. Sin plan → WATCH
+        (nunca BUY). Thesis Health / Exit / Bracket son avisos, no permiso.
+      </p>
     </section>
   );
 }

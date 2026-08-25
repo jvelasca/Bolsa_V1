@@ -24,13 +24,17 @@
  * **2026-08-06d** — Visualizados = pestañas · Por IO · columnas recomendación ·
  * foco Cartera→Estudio→resto + scroll bajo cabecera sticky.
  * **2026-08-21** — **R-12 Track C · C5** HELP sync: Confirm primer nivel (`/confirm`) ·
- * Señales/Libro en mesa · AUTO cuenta «No disponible (BETA)» · frase SEMI trader.
+ * Señales/Libro en mesa · AUTO cuenta entonces «No disponible (BETA)» (supersedido 2026-08-25 BETA-D) · frase SEMI trader.
  * **2026-08-24** — Ayuda → **Flujo y módulos** (universos LAB/TRADING · ciclo
  * investigación→operación · mapa de módulos para usuario básico).
  * **2026-08-24b** — U1 Ayuda de mesa: bloque **«Hoy en la mesa»** (Guía + Flujo)
  * · coach-marks `MesaTipButton` (Proponer F3 · Confirmar · Recomendación).
  * **2026-08-24c** — U3 Confirmar **panel lateral** desde Operativa / chip F3
  * (mismo SEMI; `/confirm` sigue como página completa).
+ * **2026-08-25** — v1.8.0-beta: AUTO UI BETA-D (`ACTIVAR AUTO` + `PAPER_D_EXECUTE`
+ * opt-in) · Decision Spine (tesis ≠ plan ≠ permiso) · TradePlan v0 · tira Hoy
+ * (proyección; sin plan → WATCH, nunca BUY) · advisory Thesis Health / Exit /
+ * Bracket ≠ permiso. Ciclo C1 HELP sync.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -71,4 +75,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-24c" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-25" as const;

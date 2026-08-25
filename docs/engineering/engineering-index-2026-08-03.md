@@ -62,7 +62,15 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-25-v180.md ← **PACK auditoría vivo** post-tag v1.8.0-beta · spine 159 · BETA-D + A3-wire · supersedes 24e
-│   ├── traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md ← **RELEVO ACTIVO** tag v1.8.0-beta → auditoría externa
+│   ├── roadmap-v181-operational-consolidation-2026-08-25.md ← **FASE ABIERTA** v1.8.1 consolidación (C1–C6) · no thin nuevos
+│   ├── plan-ciclo-c1-hoy-honesty-help-2026-08-25.md ← **C1** Hoy nunca BUY sin TradePlan · HELP 2026-08-25
+│   ├── traspaso-relevo-ciclo-c1-hoy-honesty-help-2026-08-25.md ← relevo C1
+│   ├── plan-ciclo-c2-alembic-authority-2026-08-25.md ← **C2 ABIERTA** Alembic-only · Prisma público fail-closed
+│   ├── plan-ciclo-c3-action-queue-2026-08-25.md ← **C3 ABIERTA** ActionQueue + Hoy slice
+│   ├── plan-ciclo-c5-metrics-honesty-2026-08-25.md ← **C5 ABIERTA** MFE source · expectancy sampleQuality
+│   ├── plan-ciclo-c4-shape-canonical-2026-08-25.md ← **C4 ABIERTA** TradePlan reader canónico · sin contract:gen
+│   ├── plan-ciclo-c6-stamp-v181-2026-08-25.md ← **C6** stamp pack · tag solo owner
+│   ├── traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md ← **RELEVO** tag v1.8.0-beta → auditoría externa
 │   ├── audit-pack-estado-global-2026-08-24e.md ← histórico post-tag v1.7.0-beta + CI
 │   ├── deuda-thaw-estricto-runbook-2026-08-25.md ← **DEUDA ESTRICTO** tracking P1–P5 (60d/50/70/55 · MaxDD) · W2–W4 · snapshot `scripts/thaw_estricto_snapshot.mjs` · **no** Accept estricto aún
 │   ├── plan-ciclo-a3-wire-auto-arm-ui-2026-08-25.md ← **CERRADO** Ciclo A3-wire · armado `ACTIVAR AUTO` obligatorio (honesty BETA-D)

@@ -47,13 +47,19 @@ function watchPlan(overrides: Partial<TradePlanV1> = {}): TradePlanV1 {
 }
 
 describe("mapDecisionBoardToHoyQueue", () => {
-  it("maps F3 queue to BUY and veto sessions to BLOCKED", () => {
+  it("maps F3 without TradePlan to WATCH and veto sessions to BLOCKED", () => {
     const items = mapDecisionBoardToHoyQueue(board());
     const kinds = items.map((i) => i.kind);
-    expect(kinds).toContain("BUY");
+    expect(kinds).toContain("WATCH");
+    expect(kinds).not.toContain("BUY");
     expect(kinds).toContain("BLOCKED");
+    const pending = items.find((i) => i.symbol === "SAN");
+    expect(pending?.kind).toBe("WATCH");
+    expect(pending?.status).toBe("WATCH");
+    expect(pending?.whyNot).toEqual(["legacy_projection"]);
     const blocked = items.find((i) => i.kind === "BLOCKED");
-    expect(blocked?.whyNot).toContain("fit");
+    expect(blocked?.whyNot).toEqual(["legacy_projection"]);
+    expect(blocked?.whyNot).not.toContain("fit");
   });
 
   it("prefers live TradePlan WATCH over heuristic BUY for pending F3", () => {
@@ -77,11 +83,37 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.whyNot).toContain("no_stop");
   });
 
-  it("keeps heuristic BUY for pending F3 when tradePlan is absent", () => {
+  it("maps pending F3 without tradePlan to WATCH, never heuristic BUY", () => {
     const items = mapDecisionBoardToHoyQueue(board({ decisionSessions: [] }));
     expect(items).toHaveLength(1);
-    expect(items[0]?.kind).toBe("BUY");
-    expect(items[0]?.status).toBe("TRIGGERED");
+    expect(items[0]?.kind).toBe("WATCH");
+    expect(items[0]?.kind).not.toBe("BUY");
+    expect(items[0]?.status).toBe("WATCH");
+    expect(items[0]?.whyNot).toEqual(["legacy_projection"]);
+  });
+
+  it("does not invent ARMED from auto/paper session without TradePlan", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-auto",
+            kind: "paper_auto",
+            status: "open",
+            instrumentId: "i9",
+            symbol: "ITX",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("WATCH");
+    expect(items[0]?.kind).not.toBe("ARMED");
+    expect(items[0]?.kind).not.toBe("BUY");
+    expect(items[0]?.whyNot).toEqual(["legacy_projection"]);
   });
 
   it("Ciclo 4.8: surfaces entrySetup + phase/effort from F3 payload anchor", () => {

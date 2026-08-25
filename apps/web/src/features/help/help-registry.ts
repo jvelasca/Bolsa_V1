@@ -171,7 +171,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "docs/adr/023-camino-d-thaw.md",
         role: "adr",
-        note: "Thaw Camino D · Proposed · evidencia ☐",
+        note: "Thaw Camino D · Accepted BETA-D · execute opt-in",
       },
       {
         path: "docs/engineering/risk-engine-or-re-2026-08-04.md",
@@ -181,7 +181,7 @@ export const HELP_SECTIONS: HelpSectionMeta[] = [
       {
         path: "apps/web/src/features/trading/demo-book-mode-panel.tsx",
         role: "code",
-        note: "MANUAL/SEMI · AUTO No disponible (BETA) · kill (Cuentas)",
+        note: "MANUAL/SEMI · AUTO BETA-D arm ACTIVAR AUTO · kill (Cuentas)",
       },
       {
         path: "apps/web/src/features/trading/trading-status-bar.tsx",

@@ -414,9 +414,10 @@ function TradingContent() {
           del valor). Barra inferior: badge{" "}
           <strong className="text-foreground">OPERATIVA: Semi</strong> → clic
           abre Cuentas · Config · Operativa (sizing · kill switch).{" "}
-          <strong className="text-foreground">AUTO</strong> = «No disponible
-          (BETA)» (no armable). Usa SEMI +{" "}
-          <RouteLink to="/confirm">Confirmar</RouteLink>.
+          <strong className="text-foreground">AUTO</strong> = BETA-D: armar con
+          frase <code>ACTIVAR AUTO</code> (Cuentas → Operativa); execute solo
+          con <code>PAPER_D_EXECUTE=1</code>. Arm ≠ permiso. El camino diario
+          sigue SEMI + <RouteLink to="/confirm">Confirmar</RouteLink>.
         </p>
         <p className="mt-2 text-muted-foreground">
           <em>
@@ -452,9 +453,10 @@ function TradingContent() {
             Tú las firmas aquí. Nunca se envían solas.»
           </li>
           <li>
-            <strong className="text-foreground">AUTO</strong> — «No disponible
-            (BETA)»: pill no seleccionable. No confundir con Lista AUTO del
-            Laboratorio. Thaw / execute solo en ops (fuera de mesa diaria).
+            <strong className="text-foreground">AUTO</strong> — BETA-D: pill
+            armable con <code>ACTIVAR AUTO</code>; execute opt-in{" "}
+            <code>PAPER_D_EXECUTE=1</code> (default off). No confundir con Lista
+            AUTO del Laboratorio. Thaw estricto sigue deuda.
           </li>
           <li>
             <strong className="text-foreground">Asesor → Diario</strong> —

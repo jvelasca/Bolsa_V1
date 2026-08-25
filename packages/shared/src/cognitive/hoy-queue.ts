@@ -1,7 +1,9 @@
 /**
  * Proyección Decision Board → cola Hoy (ADR-031 Ciclo 3).
  * No es un motor: comprime buckets existentes a BUY / ARMED / WATCH / REVIEW / BLOCKED.
- * Prefiere un TradePlan vivo cuando el payload ya lo trae; si no, heurística de gate.
+ * Prefiere un TradePlan vivo cuando el payload ya lo trae; si no, WATCH
+ * (Ciclo C1: nunca BUY/ARMED por fallback). BLOCKED heurístico → whyNot
+ * `legacy_projection`, no `fit`.
  * Ciclo 4.8: Setup thin (entrySetup + phase/effort del anchor) — no whyNot nuevos.
  * Ciclo 4.9: sesiones Board echo tradePlan + anchor → Hoy deja heurística cuando hay plan.
  * Ciclo 5.0: thesisHealth advisory (Golden F) — ≠ cola REVIEW de EXPIRED.
@@ -109,6 +111,7 @@ const PLAN_WHY_NOT = new Set<TradePlanWhyNotV1>([
   "orphan",
   "rr",
   "regime",
+  "legacy_projection",
 ]);
 
 const ENTRY_SETUPS = new Set<EntrySetupV1>([
@@ -778,10 +781,8 @@ function kindFromGate(
   bucket: "pending" | "vetoed" | "deferred" | "auto",
 ): HoyActionKindV1 {
   if (bucket === "vetoed" || gate.toUpperCase() === "VETO") return "BLOCKED";
-  if (bucket === "deferred" || gate.toUpperCase() === "DEFERRED")
-    return "WATCH";
-  if (bucket === "auto") return "ARMED";
-  return "BUY";
+  // C1: sin TradePlan vivo no hay BUY ni ARMED. pending_confirm ≠ TRIGGERED.
+  return "WATCH";
 }
 
 function kindFromPlanStatus(status: TradePlanStatusV1): HoyActionKindV1 {
@@ -813,8 +814,7 @@ function statusFromKind(kind: HoyActionKindV1): TradePlanStatusV1 {
 }
 
 function whyNotFromKind(kind: HoyActionKindV1): TradePlanWhyNotV1[] {
-  if (kind === "BLOCKED") return ["fit"];
-  if (kind === "WATCH") return ["entry"];
+  if (kind === "BLOCKED" || kind === "WATCH") return ["legacy_projection"];
   return [];
 }
 

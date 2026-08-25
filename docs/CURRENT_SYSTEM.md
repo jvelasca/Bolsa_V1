@@ -2,8 +2,8 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-023 Accepted BETA-D** · **A3-wire** `d704263`. Alembic `010` en `bolsa_v1`.
-> **Tag:** **`v1.8.0-beta` → `8c8b789`**. Previo: **`v1.7.0-beta` → `e3b943a`**. **BETA / no producción.**
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-023 Accepted BETA-D** · **A3-wire** `d704263` · **C1 Hoy honesty** (v1.8.1 P0). Alembic `010` en `bolsa_v1`.
+> **Tag:** **`v1.8.0-beta` → `8c8b789`**. Previo: **`v1.7.0-beta` → `e3b943a`**. **BETA / no producción.** Consolidación: [`roadmap-v181-operational-consolidation-2026-08-25.md`](./engineering/roadmap-v181-operational-consolidation-2026-08-25.md).
 > **Auditoría:** [`audit-pack-estado-global-2026-08-25-v180.md`](./engineering/audit-pack-estado-global-2026-08-25-v180.md) · relevo [`traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md`](./engineering/traspaso-relevo-tag-v1-8-0-beta-2026-08-25.md).
 
 ---
@@ -45,7 +45,7 @@ Dato → Assessment → run_decision_runtime → DecisionPackage (tesis)
 
 SEMI y AUTO son **el mismo risk de cesta**, distinta autorización (D1). `DecisionPackage` es el contrato de identidad en el confirm (D2). `TradePlan` **no** sustituye el spine: lo extiende.
 
-Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere `tradePlan` vivo del payload F3; si no hay, heurística de buckets. No es una sexta puerta; Confirmar sigue siendo la firma.
+Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere `tradePlan` vivo del payload F3; **sin plan → WATCH** (nunca BUY/ARMED inventados; Ciclo C1). Heurística BLOCKED/WATCH usa `whyNot: legacy_projection`, no `fit` ficticio. No es una sexta puerta; Confirmar sigue siendo la firma.
 
 ## Limitaciones conocidas (no son bugs de esta rebanada)
 
@@ -69,16 +69,17 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - TradePlan Ciclo 4.6: `_locate_wyckoff_spring` lookback 40; reclaim/SOS/LPS sobre spring vivo; hielo roto (cerradas) → none. LPS etiqueta. Sin store. Sin `wyckoffPhase`. Sin `contract:gen`.
 - TradePlan Ciclo 4.7: `_resolve_wyckoff_spring` + `wyckoffSpringAnchor` en `DecisionSession.runtime`; bound por `decision_id` si hielo intacto; hielo roto → none. Sin Alembic. Sin `wyckoffPhase` en TradePlan. Sin `contract:gen`.
 - TradePlan Ciclo 4.8 (**cierre línea SETUP Wyckoff**): `_wyckoff_effort_evidence` en anchor (`effort`); echo `wyckoffSpringAnchor` en propose/F3; Hoy dialog Setup (`entrySetup` + phase + effort); Board `semiF3.extra` anidado. Effort/LPS **etiqueta**. Sin Alembic. Sin `wyckoffPhase` TradePlan. Sin `contract:gen`.
-- Mesa Ciclo 4.9: Board sesiones echo `tradePlan` + `wyckoffSpringAnchor` desde `runtime` (`DecisionSessionViewDto` a mano); Hoy usa plan vivo (deja heurística); WhyNot labels `regime`/`orphan`/`rr`. Sin Alembic. Sin `contract:gen`. Sin Actionability/IO server.
+- **Ciclo 4.9:** Board sesiones echo `tradePlan` + `wyckoffSpringAnchor` desde `runtime` (`DecisionSessionViewDto` a mano); Hoy usa plan vivo. **Ciclo C1:** sin plan → WATCH (nunca BUY). WhyNot labels `regime`/`orphan`/`rr`/`legacy_projection`. Sin Alembic. Sin `contract:gen`. Sin Actionability/IO server.
 - **Ciclo 5.0 Thesis Health thin:** mapper Golden F (`mapThesisHealth` / `map_thesis_health`) → `runtime.thesisHealth` en propose; Board/Hoy echo; dialog «Revisar tesis» si `status=review`. **No** `TradePlan.status=REVIEW`. **No** trail/T1/MFE. `check_opening` intacto. Cola Hoy `REVIEW` (EXPIRED) ≠ thesis review.
 - **Ciclo 5.1 Protect/T1 thin:** mapper Golden E (`mapProtectPlan` / `map_protect_plan`) → `runtime.protectPlan`; Board/Hoy «Proteger» si `status=protect_hint` (MFE≥1R). T1 = entry±1R; `suggestedProtectStop=entry`. **No** muta `structuralStop`. **No** trail/exit. `check_opening` intacto.
 - **Ciclo 5.2 Exit Radar thin:** mapper (`mapExitRadar` / `map_exit_radar`) → `runtime.exitRadar`; prioridad exit > time_stop > trail; Hoy «Salida» si status≠none. Trail tip @ MFE≥1.5R; time-stop por `expiresAt`; exit por thesis/T1 explícito. **No** auto-exit · **no** EvaluatePositionExits · **no** mutar stop. `check_opening` intacto.
 - **Ciclo 5.3 MFE/MAE thin:** mapper (`mapMfeMae` / `map_mfe_mae`) → `runtime.mfeMae`; peak MFE/MAE desde barras (fallback close_proxy); Hoy «Excursión» métricas (no CTA). **No** expectancy plena · **no** journal MFE · **no** mutar stop. `check_opening` intacto.
 - **Ciclo 8.0 Expectancy thin:** mapper (`mapExpectancy` / `map_expectancy`) → `runtime.expectancy`; live proxy setup+`currentR`; Hoy «Expectativa» (≠ permiso). **No** trail · **no** bracket · **no** journal histórica. `check_opening` intacto.
 - **Ciclo 8.1 Trail thin:** mapper (`mapTrailPlan` / `map_trail_plan`) → `runtime.trailPlan`; ratchet peakMfeR−1R; status tip@1.5R / ratchet≥2R; Hoy «Trail» (hint only). Alinea Exit Radar tip; **no** muta `structuralStop` · **no** broker · **no** EvaluatePositionExits. `check_opening` intacto.
-- **Ciclo 8.2 Bracket thin:** mapper (`mapBracketPlan` / `map_bracket_plan`) → `runtime.bracketPlan`; picture entry/stop/T1(1R)/T2(2R) + leg fracs display-only; Hoy «Bracket». Alinea Protect T1; **no** OCO · **no** broker · **sin** CTA. `check_opening` intacto. **Línea crecimiento thin 8.0–8.2 CERRADA.**
+- **Ciclo 8.2 Bracket thin:** mapper (`mapBracketPlan` / `map_bracket_plan`) → `runtime.bracketPlan`; picture entry/stop/T1(1R)/T2(2R) + leg fracs display-only; Hoy «Bracket». Alinea Protect T1; **no** OCO · **no** broker · **sin** CTA. `check_opening` intacto. **Línea crecimiento thin 8.0–8.2 CERRADA.** **Congelada** hasta TradePlan v1 / PositionState / ExecutionPlan (v1.8.1 consolidación; no un mapper thin más).
+- **Ciclo C1 Hoy honesty + HELP (`v1.8.1` P0):** F3/sesión sin TradePlan vivo → `WATCH` (nunca BUY/ARMED heurístico). BLOCKED/WATCH sin plan → `whyNot: legacy_projection`. HELP_CONTENT_AS_OF **2026-08-25** (AUTO BETA-D, spine, Hoy). Actionability v0 = ordinal de status, no score predictivo. Planes `plan-ciclo-*` = contexto histórico; autoridad = este fichero → ADR → código → tests.
 - OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **Expectancy plena** (journal aggregate) sigue parked tras 8.0 thin.
-- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing **plena** broker / mutar stop (tras 8.1 thin), bracket **plena** OCO / piernas (tras 8.2 thin), thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, thaw **estricto** 60d/50/70/55 (deuda abierta — runbook [`deuda-thaw-estricto-runbook-2026-08-25.md`](./engineering/deuda-thaw-estricto-runbook-2026-08-25.md); BETA-D Accepted — [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md)), broker live. **Línea integridad I1–I3 CERRADA** + residual **RX1**. **Ciclo 8.0–8.2 CERRADOS.** **No** auto-exit producto. **No** reabrir Wyckoff thin por defecto.
+- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing **plena** broker / mutar stop (tras 8.1 thin), bracket **plena** OCO / piernas (tras 8.2 thin), thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, thaw **estricto** 60d/50/70/55 (deuda abierta — runbook [`deuda-thaw-estricto-runbook-2026-08-25.md`](./engineering/deuda-thaw-estricto-runbook-2026-08-25.md); BETA-D Accepted — [`thaw-beta-adapted-remeasure-2026-08-25.md`](./engineering/thaw-beta-adapted-remeasure-2026-08-25.md)), broker live. **Línea integridad I1–I3 CERRADA** + residual **RX1**. **Ciclo 8.0–8.2 CERRADOS.** **C1 Hoy honesty** en curso (v1.8.1). **No** auto-exit producto. **No** reabrir Wyckoff thin ni añadir módulos thin.
 
 ## Tests
 

@@ -21,7 +21,9 @@ export type TradePlanWhyNotV1 =
   | "expired"
   | "orphan"
   | "rr"
-  | "regime";
+  | "regime"
+  /** Proyección Hoy sin TradePlan vivo — no es un veto real del mapper. */
+  | "legacy_projection";
 
 export type EntrySetupV1 = "breakout" | "pullback" | "wyckoff" | "none";
 
@@ -35,6 +37,7 @@ export type TradePlanV1 = {
   whyNot: TradePlanWhyNotV1[];
   executionAllowed: boolean;
   opportunityScore?: number | null;
+  /** v0 = ordinal de status (WATCH 0.4 / ARMED 0.7 / TRIGGERED 0.95), no score predictivo. */
   actionability?: number | null;
   entry?: number | null;
   structuralStop?: number | null;

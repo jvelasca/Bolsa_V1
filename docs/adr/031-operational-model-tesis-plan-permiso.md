@@ -43,7 +43,7 @@ Campos canónicos:
 - `structuralStop` obligatorio para `TRIGGERED`; no se acerca el stop para caber en el riesgo — se reduce size o se rechaza
 - `quantity` = `risk_amount / (entry − stop)` cuando hay stop válido
 - `expiresAt` (TTL de sesión; típico barra diaria + 1)
-- `whyNot[]`: `fit` / `freshness` / `mandate` / `entry` / `no_stop` / `expired` / `orphan`
+- `whyNot[]`: `fit` / `freshness` / `mandate` / `entry` / `no_stop` / `expired` / `orphan` / `rr` / `regime` / `legacy_projection` (solo proyección Hoy; el mapper no lo emite)
 
 **No** en v0: T2, trailing, thesis-health, MFE/MAE, attribution, familias Entry Engine completas, `NO_NEW_LONGS` por régimen (Ciclo 4+).
 
@@ -70,6 +70,8 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 **No** es una god-page ni una sexta puerta. Las 5 puertas aprobadas (Trading · Señales · Confirmar · Libro + Lab fuera) se mantienen.
 
 **Hoy** = strip de compresión en la mesa (`TradingLayout`) sobre `GetDecisionBoard` + cola F3. Click → panel Why / Why not + firmar (drawer Confirmar existente).
+
+**Ciclo C1 (v1.8.1 P0):** sin `TradePlan` vivo → `WATCH` (nunca BUY/ARMED por heurística de gate). WhyNot de proyección = `legacy_projection` (no fingir `fit`). BUY operativo sigue = `TradePlan.status == TRIGGERED` **y** `check_opening` ALLOW **y** firma humana (SEMI).
 
 ---
 
@@ -133,6 +135,8 @@ LLM **nunca** calcula SL/TP/size ni salta un gate. Como mucho, revisor narrativo
 **Ciclo I3 Shadow honesty (cerrado `26901aa`):** HTTP `paper_auto` (`/route`, scan-execute) exige `PAPER_D_EXECUTE` (403 `paper_auto_env_blocked`). Gate fuera del Router. En su día **no thaw**. ADR-023 pasó a **Accepted BETA-D** 2026-08-25 (opt-in env; UI AUTO on). Sin Alembic / `contract:gen`. `check_opening` intacto. **Línea integridad I1–I3 cerrada.**
 
 **Ciclo RX1 exits full_auto honesty (cerrado `9289b53`):** `EvaluatePositionExits` con `executeTrades=true` + `full_auto` + linked `paper_auto` → mismo env gate antes del Router (HTTP 403). Eval-only intacto. **No** thaw · **no** auto-exit producto · **no** Exit Radar wire. Sin Alembic / `contract:gen`. `check_opening` intacto.
+
+**Ciclo C1 Hoy honesty (v1.8.1 P0):** proyección Hoy sin TradePlan vivo → WATCH; `whyNot: legacy_projection`. HELP v1.8. `check_opening` intacto. ActionQueue / DTO canónico / Alembic-only = slices posteriores.
 
 No abrir sin fase propia:
 

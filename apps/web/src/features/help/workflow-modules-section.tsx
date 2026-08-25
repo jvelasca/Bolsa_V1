@@ -252,13 +252,21 @@ export function WorkflowModulesSection() {
             Confirmar.
           </li>
           <li>
-            <strong className="text-foreground">AUTO</strong> — no disponible
-            (BETA). No confundir con Lista AUTO del Laboratorio.
+            <strong className="text-foreground">AUTO</strong> — BETA-D: armar
+            con <code>ACTIVAR AUTO</code>; execute solo con{" "}
+            <code>PAPER_D_EXECUTE=1</code>. No confundir con Lista AUTO del
+            Laboratorio.
           </li>
         </ul>
         <p className="mt-2 text-xs text-muted-foreground">
           Badge <code className="text-[10px]">OPERATIVA: …</code> en la barra
           inferior de Trading → clic abre Cuentas · Operativa.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          <strong className="text-foreground">Decision Spine:</strong> tesis
+          (paquete) ≠ plan (TradePlan) ≠ permiso (Confirmar /{" "}
+          <code className="text-[10px]">check_opening</code>). Ranking no es
+          BUY. Hoy sin plan = WATCH.
         </p>
       </section>
 

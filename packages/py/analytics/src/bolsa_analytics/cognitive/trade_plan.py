@@ -33,6 +33,7 @@ WhyNotCode = Literal[
     "orphan",
     "rr",
     "regime",
+    "legacy_projection",  # proyección Hoy; el mapper TradePlan no lo emite
 ]
 
 

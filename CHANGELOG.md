@@ -4,6 +4,12 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+### Ciclo C1 — Hoy honesty + HELP (v1.8.1 P0)
+
+- Hoy: F3/sesión **sin** TradePlan vivo → `WATCH` (nunca BUY/ARMED heurístico). BLOCKED/WATCH de proyección → `whyNot: legacy_projection` (no `fit` ficticio).
+- Ayuda: `HELP_CONTENT_AS_OF = 2026-08-25` — AUTO BETA-D (`ACTIVAR AUTO` + `PAPER_D_EXECUTE` opt-in), Decision Spine, TradePlan, Hoy proyección.
+- Roadmap consolidación: [`roadmap-v181-operational-consolidation-2026-08-25.md`](./docs/engineering/roadmap-v181-operational-consolidation-2026-08-25.md). **No** módulos thin nuevos.
+
 ## [1.8.0-beta] — 2026-08-25
 
 Post-`v1.7.0-beta` spine growth + integrity + Camino D thaw parcial. Producto sigue **BETA / no producción**. Tag anotado **`v1.8.0-beta` → `8c8b789`**. Partida: **`v1.7.0-beta` → `e3b943a`**. Spine battery **`pnpm test:decision-spine` = 159**.

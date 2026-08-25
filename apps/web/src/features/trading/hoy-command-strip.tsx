@@ -52,6 +52,8 @@ function whyLabel(code: string): string {
       return "Sin paquete de decisión";
     case "rr":
       return "Riesgo/beneficio insuficiente";
+    case "legacy_projection":
+      return "Sin plan vivo (proyección; motivo desconocido)";
     default:
       return code;
   }
