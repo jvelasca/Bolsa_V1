@@ -327,7 +327,7 @@ def build_composite_card(
             None,
             status="not_evaluated",
             method=None,
-            note="Stub F3: políticas de cartera no puntúan aún",
+            note="Stub Composite: Fit de cesta vive en check_opening (PortfolioFit), no en esta pata",
         ),
     ]
 

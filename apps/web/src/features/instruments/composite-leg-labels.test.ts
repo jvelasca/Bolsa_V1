@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { formatCompositeLegMethod } from "@/features/instruments/composite-leg-labels";
+import {
+  formatCompositeLegMethod,
+  formatCompositeLegStatus,
+} from "@/features/instruments/composite-leg-labels";
 
 describe("formatCompositeLegMethod", () => {
   it("maps ADV v1.1 buckets", () => {
@@ -17,5 +20,15 @@ describe("formatCompositeLegMethod", () => {
     expect(formatCompositeLegMethod(null)).toBeNull();
     expect(formatCompositeLegMethod("")).toBeNull();
     expect(formatCompositeLegMethod("custom_x")).toBe("custom_x");
+  });
+});
+
+describe("formatCompositeLegStatus", () => {
+  it("Ciclo 7: not_evaluated → honesty Fit en gate", () => {
+    expect(formatCompositeLegStatus("not_evaluated")).toBe(
+      "no en Composite (Fit en gate)",
+    );
+    expect(formatCompositeLegStatus("ok")).toBe("ok");
+    expect(formatCompositeLegStatus("missing")).toBe("faltante");
   });
 });

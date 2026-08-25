@@ -106,6 +106,7 @@ def test_composite_with_ta_and_fund():
     assert ta_leg["status"] == "ok"
     port = next(L for L in card["legs"] if L["key"] == "portfolioConstraints")
     assert port["status"] == "not_evaluated"
+    assert "check_opening" in (port.get("note") or "") or "Fit" in (port.get("note") or "")
     chip = composite_to_chip(card)
     assert chip["paperDUnlocked"] is True
     assert chip["ticker"] == "ACME"

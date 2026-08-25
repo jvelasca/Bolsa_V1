@@ -21,7 +21,10 @@ import type {
 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { AiInfoButton } from "@/features/ai/ai-info-button";
-import { formatCompositeLegMethod } from "@/features/instruments/composite-leg-labels";
+import {
+  formatCompositeLegMethod,
+  formatCompositeLegStatus,
+} from "@/features/instruments/composite-leg-labels";
 import { useEnsureInstrumentFundamentals } from "@/features/instruments/use-ensure-instrument-fundamentals";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -770,7 +773,7 @@ export function FundamentalCardPanel({
                     <p className="mt-0.5 text-sm tabular-nums text-foreground">
                       {leg.score != null ? fmtNum(leg.score, 2) : "—"}
                       <span className="ml-1 text-[10px] text-muted-foreground">
-                        · {leg.status}
+                        · {formatCompositeLegStatus(leg.status)}
                         {leg.weight > 0 ? ` · w${fmtNum(leg.weight, 2)}` : ""}
                         {methodLabel ? ` · ${methodLabel}` : ""}
                       </span>

@@ -27,3 +27,22 @@ export function formatCompositeLegMethod(
   const key = method.trim();
   return LIQUIDITY_METHOD_LABELS[key] ?? key;
 }
+
+/** Ciclo 7 — honesty de status de pierna Composite (esp. portfolioConstraints). */
+export function formatCompositeLegStatus(
+  status: string | null | undefined,
+): string {
+  if (!status || !status.trim()) return "—";
+  switch (status.trim()) {
+    case "not_evaluated":
+      return "no en Composite (Fit en gate)";
+    case "stub":
+      return "stub";
+    case "missing":
+      return "faltante";
+    case "ok":
+      return "ok";
+    default:
+      return status.trim();
+  }
+}
