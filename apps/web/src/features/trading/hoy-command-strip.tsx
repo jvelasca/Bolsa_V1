@@ -10,6 +10,7 @@ import type {
   ExitRadarV1,
   HoyQueueItemV1,
   HoySetupEvidenceV1,
+  MfeMaeV1,
   ProtectPlanV1,
   ThesisHealthV1,
 } from "@bolsa/shared";
@@ -101,6 +102,16 @@ function exitRadarLine(radar: ExitRadarV1): string {
   return parts.join(" · ");
 }
 
+function mfeMaeLine(metrics: MfeMaeV1): string {
+  const parts: string[] = [];
+  if (metrics.mfeR != null) parts.push(`MFE ${metrics.mfeR}R`);
+  if (metrics.maeR != null) parts.push(`MAE ${metrics.maeR}R`);
+  if (metrics.status !== "observe") {
+    parts.push(metrics.status);
+  }
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
 export function HoyCommandStrip() {
   const { effectiveAccountId } = useActiveAccount();
   const [selected, setSelected] = useState<HoyQueueItemV1 | null>(null);
@@ -183,6 +194,16 @@ export function HoyCommandStrip() {
                   Setup
                 </p>
                 <p className="mt-1 text-sm">{setupLine(selected.setup)}</p>
+              </div>
+            ) : null}
+            {selected.mfeMae && selected.mfeMae.status !== "none" ? (
+              <div className="mt-3" data-testid="hoy-mfe-mae">
+                <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+                  Excursión
+                </p>
+                <p className="mt-1 text-sm tabular-nums">
+                  {mfeMaeLine(selected.mfeMae)}
+                </p>
               </div>
             ) : null}
             {selected.thesisHealth?.status === "review" ? (

@@ -9,6 +9,7 @@ import type { TradePlanV1 } from "./cognitive/trade-plan.js";
 import type { ThesisHealthV1 } from "./cognitive/thesis-health.js";
 import type { ProtectPlanV1 } from "./cognitive/protect-plan.js";
 import type { ExitRadarV1 } from "./cognitive/exit-radar.js";
+import type { MfeMaeV1 } from "./cognitive/mfe-mae.js";
 
 export type DecisionGate = "PASS" | "VETO" | "DEFERRED" | "unknown";
 
@@ -40,6 +41,8 @@ export type DecisionSessionViewV1 = {
   protectPlan?: ProtectPlanV1 | Record<string, unknown>;
   /** Ciclo 5.2 — Exit Radar advisory; no auto-exit. */
   exitRadar?: ExitRadarV1 | Record<string, unknown>;
+  /** Ciclo 5.3 — MFE/MAE metrics; no expectancy. */
+  mfeMae?: MfeMaeV1 | Record<string, unknown>;
 };
 
 export type SemiF3ViewV1 = {

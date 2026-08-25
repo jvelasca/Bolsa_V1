@@ -283,4 +283,42 @@ describe("mapDecisionBoardToHoyQueue", () => {
     expect(items[0]?.exitRadar?.status).toBe("trail_hint");
     expect(items[0]?.exitRadar?.suggestedTrailStop).toBe(105);
   });
+
+  it("Ciclo 5.3: surfaces mfeMae metrics without changing kind", () => {
+    const items = mapDecisionBoardToHoyQueue(
+      board({
+        semiF3Queue: [],
+        decisionSessions: [
+          {
+            sessionId: "s-mfe",
+            kind: "propose",
+            status: "open",
+            instrumentId: "i2",
+            symbol: "BBVA",
+            createdAt: "2026-08-24T08:00:00Z",
+            gate: "PASS",
+            tradePlan: watchPlan({
+              status: "TRIGGERED",
+              whyNot: [],
+              entry: 100,
+              structuralStop: 90,
+              executionAllowed: true,
+            }),
+            mfeMae: {
+              status: "favorable",
+              mfeR: 1.8,
+              maeR: 0.2,
+              currentR: 0.8,
+              why: ["peak_from_bars", "mfe_ge_1_5r"],
+            },
+          },
+        ],
+      }),
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.kind).toBe("BUY");
+    expect(items[0]?.mfeMae?.status).toBe("favorable");
+    expect(items[0]?.mfeMae?.mfeR).toBe(1.8);
+    expect(items[0]?.mfeMae?.maeR).toBe(0.2);
+  });
 });

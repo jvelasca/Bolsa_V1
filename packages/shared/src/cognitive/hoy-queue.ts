@@ -7,6 +7,7 @@
  * Ciclo 5.0: thesisHealth advisory (Golden F) — ≠ cola REVIEW de EXPIRED.
  * Ciclo 5.1: protectPlan advisory (Golden E) — no muta structuralStop.
  * Ciclo 5.2: exitRadar advisory — no auto-exit.
+ * Ciclo 5.3: mfeMae metrics — no CTA / no expectancy.
  */
 
 import type {
@@ -36,6 +37,7 @@ import type {
   ExitRadarV1,
   ExitRadarWhyV1,
 } from "./exit-radar.js";
+import type { MfeMaeStatusV1, MfeMaeV1, MfeMaeWhyV1 } from "./mfe-mae.js";
 
 export type HoyActionKindV1 = "BUY" | "ARMED" | "WATCH" | "REVIEW" | "BLOCKED";
 
@@ -61,6 +63,8 @@ export type HoyQueueItemV1 = {
   protectPlan?: ProtectPlanV1 | null;
   /** Ciclo 5.2 — advisory exit/trail/time-stop. */
   exitRadar?: ExitRadarV1 | null;
+  /** Ciclo 5.3 — MFE/MAE metrics (not an action CTA). */
+  mfeMae?: MfeMaeV1 | null;
 };
 
 const PLAN_STATUSES = new Set<TradePlanStatusV1>([
@@ -443,6 +447,76 @@ function readExitRadarFromF3Row(row: SemiF3ViewV1): ExitRadarV1 | null {
   return readExitRadarFromPayloadish(flattened.payload);
 }
 
+const MFE_STATUSES = new Set<MfeMaeStatusV1>([
+  "none",
+  "observe",
+  "favorable",
+  "adverse",
+]);
+const MFE_WHYS = new Set<MfeMaeWhyV1>([
+  "peak_from_bars",
+  "close_proxy",
+  "mae_ge_1r",
+  "mfe_ge_1_5r",
+  "missing_inputs",
+]);
+
+function asMfeMae(value: unknown): MfeMaeV1 | null {
+  if (!isRecord(value)) return null;
+  const status = value.status;
+  if (
+    typeof status !== "string" ||
+    !MFE_STATUSES.has(status as MfeMaeStatusV1)
+  ) {
+    return null;
+  }
+  const whyRaw = value.why;
+  const why: MfeMaeWhyV1[] = Array.isArray(whyRaw)
+    ? whyRaw.filter(
+        (code): code is MfeMaeWhyV1 =>
+          typeof code === "string" && MFE_WHYS.has(code as MfeMaeWhyV1),
+      )
+    : [];
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  return {
+    status: status as MfeMaeStatusV1,
+    mfeR: numOrNull(value.mfeR),
+    maeR: numOrNull(value.maeR),
+    currentR: numOrNull(value.currentR),
+    why,
+  };
+}
+
+function readMfeMaeFromPayloadish(value: unknown): MfeMaeV1 | null {
+  if (!isRecord(value)) return null;
+  const top = asMfeMae(value.mfeMae);
+  if (top) return top;
+  if (isRecord(value.decisionSession)) {
+    const runtime = value.decisionSession.runtime;
+    if (isRecord(runtime)) {
+      const fromSession = asMfeMae(runtime.mfeMae);
+      if (fromSession) return fromSession;
+    }
+  }
+  if (isRecord(value.runtime)) {
+    return asMfeMae(value.runtime.mfeMae);
+  }
+  return null;
+}
+
+function readMfeMaeFromF3Row(row: SemiF3ViewV1): MfeMaeV1 | null {
+  const extra = row.extra;
+  if (isRecord(extra)) {
+    const fromPayload = readMfeMaeFromPayloadish(extra.payload);
+    if (fromPayload) return fromPayload;
+    const fromExtra = asMfeMae(extra.mfeMae);
+    if (fromExtra) return fromExtra;
+  }
+  const flattened = row as SemiF3ViewV1 & { payload?: unknown };
+  return readMfeMaeFromPayloadish(flattened.payload);
+}
+
 function kindFromGate(
   gate: string,
   bucket: "pending" | "vetoed" | "deferred" | "auto",
@@ -498,6 +572,7 @@ function toHoyItem(
   thesisHealth: ThesisHealthV1 | null,
   protectPlan: ProtectPlanV1 | null,
   exitRadar: ExitRadarV1 | null,
+  mfeMae: MfeMaeV1 | null,
 ): HoyQueueItemV1 {
   if (live) {
     return {
@@ -511,6 +586,7 @@ function toHoyItem(
       thesisHealth,
       protectPlan,
       exitRadar,
+      mfeMae,
     };
   }
   return {
@@ -524,6 +600,7 @@ function toHoyItem(
     thesisHealth,
     protectPlan,
     exitRadar,
+    mfeMae,
   };
 }
 
@@ -547,6 +624,7 @@ export function mapDecisionBoardToHoyQueue(
         readThesisHealthFromF3Row(row),
         readProtectPlanFromF3Row(row),
         readExitRadarFromF3Row(row),
+        readMfeMaeFromF3Row(row),
       ),
     );
   }
@@ -571,6 +649,7 @@ export function mapDecisionBoardToHoyQueue(
         asThesisHealth(session.thesisHealth),
         asProtectPlan(session.protectPlan),
         asExitRadar(session.exitRadar),
+        asMfeMae(session.mfeMae),
       ),
     );
   }

@@ -10,6 +10,7 @@ from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 from bolsa_application.decision_board import (
     GetDecisionBoard,
     extract_session_exit_radar,
+    extract_session_mfe_mae,
     extract_session_protect_plan,
     extract_session_trade_plan,
     extract_session_thesis_health,
@@ -92,6 +93,13 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
         "rMultiple": 1.5,
         "why": ["mfe_ge_1_5r"],
     }
+    mfe_mae = {
+        "status": "favorable",
+        "mfeR": 1.8,
+        "maeR": 0.2,
+        "currentR": 0.8,
+        "why": ["peak_from_bars", "mfe_ge_1_5r"],
+    }
     sessions = [
         _session(
             session_id="s-plan",
@@ -103,6 +111,7 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
                     "thesisHealth": health,
                     "protectPlan": protect,
                     "exitRadar": exit_radar,
+                    "mfeMae": mfe_mae,
                 },
             },
         ),
@@ -122,17 +131,20 @@ async def test_board_echoes_runtime_trade_plan_and_anchor() -> None:
     assert by_id["s-plan"].thesis_health == health
     assert by_id["s-plan"].protect_plan == protect
     assert by_id["s-plan"].exit_radar == exit_radar
+    assert by_id["s-plan"].mfe_mae == mfe_mae
     dumped = by_id["s-plan"].to_dict()
     assert dumped["tradePlan"]["status"] == "BLOCKED"
     assert dumped["wyckoffSpringAnchor"]["phase"] == "lps"
     assert dumped["thesisHealth"]["status"] == "review"
     assert dumped["protectPlan"]["status"] == "protect_hint"
     assert dumped["exitRadar"]["status"] == "trail_hint"
+    assert dumped["mfeMae"]["status"] == "favorable"
     assert "tradePlan" not in by_id["s-empty"].to_dict()
     assert "wyckoffSpringAnchor" not in by_id["s-empty"].to_dict()
     assert "thesisHealth" not in by_id["s-empty"].to_dict()
     assert "protectPlan" not in by_id["s-empty"].to_dict()
     assert "exitRadar" not in by_id["s-empty"].to_dict()
+    assert "mfeMae" not in by_id["s-empty"].to_dict()
 
 
 def test_extract_session_trade_plan_helpers() -> None:
@@ -154,3 +166,6 @@ def test_extract_session_trade_plan_helpers() -> None:
     assert extract_session_exit_radar(
         {"runtime": {"exit_radar": {"status": "exit_hint", "why": ["thesis_exit"]}}}
     ) == {"status": "exit_hint", "why": ["thesis_exit"]}
+    assert extract_session_mfe_mae(
+        {"runtime": {"mfe_mae": {"status": "observe", "mfeR": 0.5}}}
+    ) == {"status": "observe", "mfeR": 0.5}

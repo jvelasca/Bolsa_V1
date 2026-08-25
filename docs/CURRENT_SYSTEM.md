@@ -2,7 +2,7 @@
 
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
-> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **`50004da`** = `origin/main` (Ciclo 5.2 `e813aa3`). Relevo vivo: [`traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md). Alembic `010` en `bolsa_v1`.
+> **AsOf:** 2026-08-25 · **ADR-031** tesis ≠ plan ≠ permiso. HEAD **WIP** Ciclo 5.3 MFE/MAE thin. Relevo vivo: [`traspaso-relevo-ciclo-5-3-mfe-mae-thin-2026-08-25.md`](./engineering/traspaso-relevo-ciclo-5-3-mfe-mae-thin-2026-08-25.md). Alembic `010` en `bolsa_v1`.
 > **Tag:** **`v1.7.0-beta` → `e3b943a`** (en origin). Previo: `v1.6.0-beta` → `c3964fc`. **BETA / no producción.**
 
 ---
@@ -69,17 +69,18 @@ Mesa: strip **Hoy** en Trading (compresión Decision Board + cola F3). Prefiere 
 - **Ciclo 5.0 Thesis Health thin:** mapper Golden F (`mapThesisHealth` / `map_thesis_health`) → `runtime.thesisHealth` en propose; Board/Hoy echo; dialog «Revisar tesis» si `status=review`. **No** `TradePlan.status=REVIEW`. **No** trail/T1/MFE. `check_opening` intacto. Cola Hoy `REVIEW` (EXPIRED) ≠ thesis review.
 - **Ciclo 5.1 Protect/T1 thin:** mapper Golden E (`mapProtectPlan` / `map_protect_plan`) → `runtime.protectPlan`; Board/Hoy «Proteger» si `status=protect_hint` (MFE≥1R). T1 = entry±1R; `suggestedProtectStop=entry`. **No** muta `structuralStop`. **No** trail/exit. `check_opening` intacto.
 - **Ciclo 5.2 Exit Radar thin:** mapper (`mapExitRadar` / `map_exit_radar`) → `runtime.exitRadar`; prioridad exit > time_stop > trail; Hoy «Salida» si status≠none. Trail tip @ MFE≥1.5R; time-stop por `expiresAt`; exit por thesis/T1 explícito. **No** auto-exit · **no** EvaluatePositionExits · **no** mutar stop. `check_opening` intacto.
-- OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **MFE/expectancy** siguen parked.
-- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing continuo / bracket / T1 parcial fill, thesis health **plena** (persistencia Confidence lifecycle), MFE-MAE/expectancy plena, Shadow AUTO, broker, ExecuteTrade converge. **No** reabrir Wyckoff thin por defecto.
+- **Ciclo 5.3 MFE/MAE thin:** mapper (`mapMfeMae` / `map_mfe_mae`) → `runtime.mfeMae`; peak MFE/MAE desde barras (fallback close_proxy); Hoy «Excursión» métricas (no CTA). **No** expectancy · **no** journal MFE · **no** mutar stop. `check_opening` intacto.
+- OrderProposal / Journal **F1–F3 CERRADOS** (timeline `/decision-journal` read-only; Alembic `010` en `bolsa_v1`). **Attribution thin Ciclo 6:** snapshot setup en payloads (`entrySetup`/`tradePlanStatus`/phase/effort) · `human_confirm`/`human_reject` · SEMI `gate_evaluated` · UI Setup line + Replay. **Expectancy plena** sigue parked.
+- Diferido ADR-031: Alembic/tabla Wyckoff / `wyckoffPhase` contrato (parked), trailing continuo / bracket / T1 parcial fill, thesis health **plena** (persistencia Confidence lifecycle), expectancy **plena**, Shadow AUTO, broker, ExecuteTrade converge. **No** reabrir Wyckoff thin por defecto.
 
 ## Tests
 
-| Comando                    | Qué cubre                                                                                                                                                                                                                                               |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.8 + Board echo 4.9 + Journal Attribution 6 + Thesis Health 5.0 + Protect/T1 5.1 + Exit Radar 5.2, AUTO veto, Golden, **DS-05**, **DS-03** (**130**) |
-| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                                                                       |
-| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                                                                          |
-| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                                                                           |
+| Comando                    | Qué cubre                                                                                                                                                                                                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:decision-spine` | Cadena decisión: confirm SEMI (TTL/precio/H3), Fit, risk, pending fill, TradePlan A/B/C/H/G + 4.0–4.8 + Board echo 4.9 + Journal Attribution 6 + Thesis Health 5.0 + Protect/T1 5.1 + Exit Radar 5.2 + MFE/MAE 5.3, AUTO veto, Golden, **DS-05**, **DS-03** (**135**) |
+| `pnpm test:semi`           | UI/libro DEMO F3 (no es el spine)                                                                                                                                                                                                                                     |
+| `pnpm test:operativa`      | DÍA D + CORE-R                                                                                                                                                                                                                                                        |
+| `pnpm test:py`             | Pytest amplio                                                                                                                                                                                                                                                         |
 
 ## Open risks (ops, no código)
 

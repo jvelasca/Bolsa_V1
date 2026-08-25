@@ -297,4 +297,55 @@ describe("HoyCommandStrip", () => {
     expect(salida.textContent).toMatch(/Salida/i);
     expect(salida.textContent).toMatch(/trail hint/i);
   });
+
+  it("Ciclo 5.3: dialog shows Excursión metrics when mfeMae.status!=none", async () => {
+    vi.mocked(api.getDecisionBoard).mockResolvedValue({
+      data: {
+        ...board(),
+        semiF3Queue: [
+          {
+            instrumentId: "i1",
+            symbol: "SAN",
+            status: "pending_confirm",
+            extra: {
+              payload: {
+                tradePlan: {
+                  decisionId: "d1",
+                  instrumentId: "i1",
+                  direction: "long",
+                  status: "TRIGGERED",
+                  quantity: 10,
+                  riskPct: 1,
+                  whyNot: [],
+                  executionAllowed: true,
+                },
+                mfeMae: {
+                  status: "favorable",
+                  mfeR: 1.8,
+                  maeR: 0.2,
+                  currentR: 0.8,
+                  why: ["peak_from_bars", "mfe_ge_1_5r"],
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <HoyCommandStrip />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByTestId("hoy-item-SAN"));
+    const metrics = await screen.findByTestId("hoy-mfe-mae");
+    expect(metrics).toBeTruthy();
+    expect(metrics.textContent).toMatch(/Excursión/i);
+    expect(metrics.textContent).toMatch(/MFE 1\.8R · MAE 0\.2R · favorable/i);
+  });
 });

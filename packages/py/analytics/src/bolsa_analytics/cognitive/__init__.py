@@ -60,6 +60,11 @@ from bolsa_analytics.cognitive.exit_radar import (
     build_exit_radar_dict,
     map_exit_radar,
 )
+from bolsa_analytics.cognitive.mfe_mae import (
+    MFE_MAE_KEY,
+    build_mfe_mae_dict,
+    map_mfe_mae,
+)
 from bolsa_analytics.cognitive.gate_decision import (
     GatedDecision,
     ProposedTradeContext,
@@ -214,6 +219,7 @@ __all__ = [
     "build_thesis_health_dict",
     "build_protect_plan_dict",
     "build_exit_radar_dict",
+    "build_mfe_mae_dict",
     "check_auto_live",
     "classify_regime",
     "compute_credibility",
@@ -232,6 +238,7 @@ __all__ = [
     "map_thesis_health",
     "map_protect_plan",
     "map_exit_radar",
+    "map_mfe_mae",
     "monte_carlo_permutation_p_value",
     "new_session_id",
     "observe_investor_profile",
@@ -248,6 +255,7 @@ __all__ = [
     "THESIS_HEALTH_KEY",
     "PROTECT_PLAN_KEY",
     "EXIT_RADAR_KEY",
+    "MFE_MAE_KEY",
     "validate_context",
     "walk_forward_efficiency",
     "weight_rules_for_horizon",

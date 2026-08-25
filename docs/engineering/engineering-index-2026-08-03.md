@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD `50004da` Ciclo 5.2 `e813aa3` (Exit Radar)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** HEAD WIP Ciclo 5.3 MFE/MAE
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -62,7 +62,9 @@ Engineering Index  (este doc)
 │   ├── plan-split-backtests-page-2026-08-22.md ← **Split god-page Track B — CERRADO** · B0 plan · **B1–B12 ✅** (`3f9bd7e` shell 321 LOC) · origen informe read-only post-R-13
 │   ├── plan-r13-consolidacion-beta-2026-08-22.md ← **R-13 (2026-08-22) — CERRADA** consolidación BETA. A0–A3 HECHAS · tag `v1.6.0-beta` = `c3964fc`. Track B BLOQUEADO. Traspaso cierre `traspaso-relevo-cierre-r13-consolidacion-beta-siguiente-2026-08-22.md`
 │   ├── audit-pack-estado-global-2026-08-24e.md ← **PACK auditoría vivo** post-tag v1.7.0-beta + Ciclo 1 F1–F3 CERRADO + F9-A3 CI + Ruff I001 · HEAD `386a959` · tag `e3b943a` · supersedes 24d
-│   ├── traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 5.2 Exit Radar · feat `e813aa3`
+│   ├── traspaso-relevo-ciclo-5-3-mfe-mae-thin-2026-08-25.md ← **RELEVO ACTIVO** · Ciclo 5.3 MFE/MAE · D1–D8 OK · CERRADO en código
+│   ├── plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md ← plan 5.3 · D1–D8 OK · CERRADO en código
+│   ├── traspaso-relevo-ciclo-5-2-exit-radar-thin-2026-08-25.md ← Ciclo 5.2 Exit Radar · CERRADO `e813aa3` (tip `13a69f9`)
 │   ├── plan-ciclo-5-2-exit-radar-thin-2026-08-25.md ← plan 5.2 · D1–D8 OK · CERRADO en `e813aa3`
 │   ├── traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md ← histórico · Ciclo 5.1 Protect/T1 · feat `12d05d2`
 │   ├── plan-ciclo-5-1-protect-t1-thin-2026-08-25.md ← plan 5.1 · D1–D8 OK · CERRADO en `12d05d2`

@@ -3,8 +3,9 @@
 > **Padre:** [`traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md`](./traspaso-relevo-ciclo-5-1-protect-t1-thin-2026-08-25.md).
 > **Plan:** [`plan-ciclo-5-2-exit-radar-thin-2026-08-25.md`](./plan-ciclo-5-2-exit-radar-thin-2026-08-25.md) (D1–D8 OK).
 > **AsOf:** 2026-08-25.
-> **HEAD:** `50004da` = `origin/main`. Feat `e813aa3` **PUSHEADO**.
-> **Arranque:** este fichero + `CURRENT_SYSTEM.md` + ADR-031 §5–6.
+> **HEAD tip:** `13a69f9` = `origin/main`. Feat `e813aa3` · stamp `50004da` **PUSHEADOS**.
+> **Estado:** **CERRADO** — handoff → [`plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md`](./plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md).
+> **Arranque próximo:** plan 5.3 + `CURRENT_SYSTEM.md` + ADR-031 §5–6.
 
 ---
 
@@ -27,19 +28,22 @@
 
 ## 3. Commits
 
-| SHA       | Mensaje                                             |
-| --------- | --------------------------------------------------- |
-| `e813aa3` | feat(spine): ADR-031 Ciclo 5.2 Exit Radar thin.     |
-| `50004da` | docs: stamp living SoT after Ciclo 5.2 (`e813aa3`). |
+| SHA       | Mensaje                                                   |
+| --------- | --------------------------------------------------------- |
+| `e813aa3` | feat(spine): ADR-031 Ciclo 5.2 Exit Radar thin.           |
+| `50004da` | docs: stamp living SoT after Ciclo 5.2 (`e813aa3`).       |
+| `ac55254` | docs: update-last SHAs after Ciclo 5.2 stamp (`50004da`). |
+| `13a69f9` | docs: close Ciclo 5.2 relevo push range (`ac55254`).      |
 
-Push: `e937f72..ac55254` → `origin/main`.
+Push: `e937f72..13a69f9` → `origin/main`.
 
 ## 4. E1
 
 1. ~~Commit~~ · ~~Push~~.
-2. Siguiente: **MFE thin** o cierre línea 5.x → integridad ExecuteTrade.
-3. Park: Actionability/IO · Shadow AUTO · trailing continuo / bracket.
-4. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
+2. **Siguiente:** Ciclo **5.3 MFE/MAE thin** — plan [`plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md`](./plan-ciclo-5-3-mfe-mae-thin-2026-08-25.md) (D1–D8).
+3. Tras 5.3: **cierre línea 5.x** → integridad ExecuteTrade.
+4. Park: Actionability/IO · Shadow AUTO · trailing continuo / bracket · expectancy plena.
+5. Ops-only: `TRUSTED_PROXIES` · secret scanning UI.
 
 ## 5. Freeze
 

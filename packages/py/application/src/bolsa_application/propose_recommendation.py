@@ -10,6 +10,10 @@ from bolsa_analytics.cognitive.exit_radar import (
     EXIT_RADAR_KEY,
     build_exit_radar_dict,
 )
+from bolsa_analytics.cognitive.mfe_mae import (
+    MFE_MAE_KEY,
+    build_mfe_mae_dict,
+)
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
 from bolsa_analytics.cognitive.protect_plan import (
     PROTECT_PLAN_KEY,
@@ -188,6 +192,8 @@ class ProposeRecommendationResult:
     protect_plan: dict[str, Any] | None = None
     # Ciclo 5.2 — Exit Radar advisory; no auto-exit.
     exit_radar: dict[str, Any] | None = None
+    # Ciclo 5.3 — MFE/MAE metrics advisory; no expectancy.
+    mfe_mae: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = self.recommendation.to_dict()
@@ -221,6 +227,8 @@ class ProposeRecommendationResult:
             data[PROTECT_PLAN_KEY] = self.protect_plan
         if self.exit_radar is not None:
             data[EXIT_RADAR_KEY] = self.exit_radar
+        if self.mfe_mae is not None:
+            data[MFE_MAE_KEY] = self.mfe_mae
         return data
 
 
@@ -554,6 +562,13 @@ class ProposeRecommendationFromTa:
             target1=protect_plan.get("target1") if isinstance(protect_plan, dict) else None,
             r_multiple=protect_plan.get("rMultiple") if isinstance(protect_plan, dict) else None,
         )
+        mfe_mae = build_mfe_mae_dict(
+            direction=plan_direction,
+            entry=entry_px,
+            structural_stop=structural_stop,
+            last_close=float(last_close) if last_close is not None else None,
+            bars=ohlcv_bars,
+        )
 
         present_types = {a.assessment_type for a in runtime.assessments}
         missing = [
@@ -595,6 +610,7 @@ class ProposeRecommendationFromTa:
             THESIS_HEALTH_KEY: thesis_health,
             PROTECT_PLAN_KEY: protect_plan,
             EXIT_RADAR_KEY: exit_radar,
+            MFE_MAE_KEY: mfe_mae,
         }
         if wyckoff_anchor is not None:
             session_runtime[WYCKOFF_SPRING_ANCHOR_KEY] = wyckoff_anchor
@@ -668,6 +684,7 @@ class ProposeRecommendationFromTa:
             thesis_health=thesis_health,
             protect_plan=protect_plan,
             exit_radar=exit_radar,
+            mfe_mae=mfe_mae,
         )
 
     async def _equity_for_account(self, account_id: str | None) -> float:
