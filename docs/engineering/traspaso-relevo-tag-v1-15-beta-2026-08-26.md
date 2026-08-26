@@ -29,10 +29,10 @@ pnpm --filter @bolsa/web test -- daily-nav mesa-hoy
 
 ## 3. Release
 
-| Pieza  | Valor                            |
-| ------ | -------------------------------- |
-| Tag    | `v1.15-beta` → _(pin tras push)_ |
-| Previo | `v1.14-beta` → `772a3a73`        |
+| Pieza  | Valor                     |
+| ------ | ------------------------- |
+| Tag    | `v1.15-beta` → `fc2ed753` |
+| Previo | `v1.14-beta` → `772a3a73` |
 
 ### Owner: publicado
 
