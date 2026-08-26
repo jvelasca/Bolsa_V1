@@ -1,7 +1,7 @@
 # RELEVO — tag v1.13-beta → auditoría (2026-08-26)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-26-v113.md`](./audit-pack-estado-global-2026-08-26-v113.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN.** Stamp release en curso · tag `v1.13-beta` · pin SHA tras Release tag CI GREEN.
+> **Estado:** **PUBLICACIÓN.** Tag `v1.13-beta` → `c8d5800`. **Release tag CI GREEN.**
 > **Arranque chat nuevo / auditor:** pack v113 + ADR-035 §8 + `CURRENT_SYSTEM.md` + roadmap v1.13 + tag + Actions GREEN.
 
 ---
@@ -17,18 +17,18 @@
 
 | Pieza        | Valor                                                                                          |
 | ------------ | ---------------------------------------------------------------------------------------------- |
-| Tag          | `v1.13-beta` → **TBD** (pin docs tras CI GREEN)                                                |
+| Tag          | `v1.13-beta` → `c8d5800`                                                                       |
 | Previo       | `v1.12-beta` → `369b5d1`                                                                       |
 | Pack auditor | [`audit-pack-estado-global-2026-08-26-v113.md`](./audit-pack-estado-global-2026-08-26-v113.md) |
 | Spine        | `pnpm test:decision-spine` **483** (2026-08-26)                                                |
 | Alembic      | `013` + `014`                                                                                  |
 | CI tag       | `release-tag-ci.yml` (sin path-filter)                                                         |
 
-### Owner: publicar
+### Owner: publicado
 
 ```bash
-git tag v1.13-beta
-git push origin v1.13-beta   # Actions → GREEN → pin docs SHA (como v1.12)
+git tag v1.13-beta          # c8d5800
+git push origin v1.13-beta  # Actions → GREEN → pin docs SHA
 ```
 
 ## 2. Freeze

@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.13 (Durable Execution)
 
-> **AsOf:** 2026-08-26 · **Tag:** **`v1.13-beta`** — stamp release (SHA pin tras Release CI GREEN). Partida **`v1.12-beta` → `369b5d1`**.
+> **AsOf:** 2026-08-26 · **Tag:** **`v1.13-beta` → `c8d5800`** (Release tag CI GREEN). Partida **`v1.12-beta` → `369b5d1`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · roadmap [`roadmap-v113-durable-execution-2026-08-26.md`](./roadmap-v113-durable-execution-2026-08-26.md) · ADR-035 §8 · triage [`audit-ext-v112-durable-execution-triage-2026-08-26.md`](./audit-ext-v112-durable-execution-triage-2026-08-26.md) · pack previo [`audit-pack-estado-global-2026-08-26-v112.md`](./audit-pack-estado-global-2026-08-26-v112.md).
 > **Para:** auditoría externa / GitHub Actions Release tag CI · cierre de fase V1.13.
 
@@ -131,7 +131,7 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · TradePlan ≠ permiso ·
 
 ## 8. Checklist auditor (E1)
 
-1. Checkout tag **`v1.13-beta`** (SHA pin tras Release CI GREEN; owner publica).
+1. Checkout tag **`v1.13-beta` → `c8d5800`**.
 2. Verificar GitHub Actions **`release-tag-ci.yml`** GREEN en el push del tag.
 3. Ejecutar `pnpm test:decision-spine` → esperar **483** passed.
 4. Contrastar ADR-035 §8 (DEX-1…DEX-5 CERRADOS) con código: PG intents, cert cross-PID, Incident resolve/clear, Confirm coordinators, property suite.

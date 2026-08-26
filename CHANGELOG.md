@@ -6,7 +6,7 @@ All notable releases of Bolsa V1.
 
 ## [1.13-beta] — 2026-08-26
 
-Durable Execution v1.13 (D0 + DEX-1…DEX-5). Producto sigue **BETA / no producción**. Tag anotado **`v1.13-beta`** (SHA al stamp; pin post Release tag CI GREEN). Partida: **`v1.12-beta` → `369b5d1`**. Spine **`pnpm test:decision-spine` = 483**. Pack: [`audit-pack-estado-global-2026-08-26-v113.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v113.md). OR-2 cerrado vía DEX-1+DEX-2. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**. LIVE **experimental**. AUTO **off**.
+Durable Execution v1.13 (D0 + DEX-1…DEX-5). Producto sigue **BETA / no producción**. Tag anotado **`v1.13-beta` → `c8d5800`** (Release tag CI GREEN). Partida: **`v1.12-beta` → `369b5d1`**. Spine **`pnpm test:decision-spine` = 483**. Pack: [`audit-pack-estado-global-2026-08-26-v113.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v113.md). OR-2 cerrado vía DEX-1+DEX-2. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**. LIVE **experimental**. AUTO **off**.
 
 ### Docs — Pack auditor v113 Durable Execution (2026-08-26)
 

@@ -1,6 +1,6 @@
 # ADR-035: Operational Reliability — validar el sistema (contrato v1.12)
 
-**Estado:** Accepted — **D0 docs CERRADO.** **OR-1/3/4/5/6 CERRADOS** (código). **OR-2 cerrado vía DEX-1+DEX-2** (PG + cert cross-PID). Fase v1.12 **cerrada en pack + tag** (`v1.12-beta`). Post-audit: V1.13 Durable Execution (**DEX-1…DEX-5 CERRADOS**; pack v113 stampado; tag `v1.13-beta` pendiente owner).  
+**Estado:** Accepted — **D0 docs CERRADO.** **OR-1/3/4/5/6 CERRADOS** (código). **OR-2 cerrado vía DEX-1+DEX-2** (PG + cert cross-PID). Fase v1.12 **cerrada en pack + tag** (`v1.12-beta` → `369b5d1`). Post-audit: V1.13 Durable Execution (**DEX-1…DEX-5 CERRADOS**; pack v113; tag **`v1.13-beta` → `c8d5800`**).  
 **Fecha:** 2026-08-26  
 **Contexto:** Auditoría externa post-`v1.11-beta` (`76d0f951`). Operational Integrity (ADR-034) **cerrada**. El modelo sobrevive al fill; falta demostrar que sobrevive a timeout, retry, crash, drift y estado de broker desconocido. Auditoría post-`v1.12-beta` (`369b5d1`): concepto DurableSubmitIntent OK; durabilidad física = DEX-1; cert cross-PID = DEX-2.
 
@@ -99,7 +99,7 @@ Auditoría externa contra código `369b5d1`: OR-2 **PARTIAL / CONDITIONALLY CLOS
 
 **Siguiente fase:** pack auditor v113 (cierre) — [`roadmap-v113-durable-execution-2026-08-26.md`](../engineering/roadmap-v113-durable-execution-2026-08-26.md) · triage [`audit-ext-v112-durable-execution-triage-2026-08-26.md`](../engineering/audit-ext-v112-durable-execution-triage-2026-08-26.md).
 
-DEX-1…DEX-5: PG `submit_intents` (**DEX-1 CERRADO**) → crash tests cross-PID (**DEX-2 CERRADO**) → Incident resolution (**DEX-3 CERRADO**) → Confirm decomposition (**DEX-4 CERRADO**) → operational invariants (**DEX-5 CERRADO**). Pack auditor [`audit-pack-estado-global-2026-08-26-v113.md`](../engineering/audit-pack-estado-global-2026-08-26-v113.md). Tag `v1.13-beta` = owner. **No** ADR-036 (esta sección extiende el contrato).
+DEX-1…DEX-5: PG `submit_intents` (**DEX-1 CERRADO**) → crash tests cross-PID (**DEX-2 CERRADO**) → Incident resolution (**DEX-3 CERRADO**) → Confirm decomposition (**DEX-4 CERRADO**) → operational invariants (**DEX-5 CERRADO**). Pack auditor [`audit-pack-estado-global-2026-08-26-v113.md`](../engineering/audit-pack-estado-global-2026-08-26-v113.md). Tag **`v1.13-beta` → `c8d5800`**. **No** ADR-036 (esta sección extiende el contrato).
 
 **DEX-1 (2026-08-26):** Alembic `013` · `PostgresSubmitIntentStore` · fases `send_attempted` + `send_attempted_at` · Confirm DI PG. Relevo [`traspaso-relevo-dex1-pg-submit-intents-2026-08-26.md`](../engineering/traspaso-relevo-dex1-pg-submit-intents-2026-08-26.md).
 
