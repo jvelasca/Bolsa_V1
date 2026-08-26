@@ -1,14 +1,14 @@
 # RELEVO — tag v1.16-beta → auditoría (2026-08-26)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-26-v116.md`](./audit-pack-estado-global-2026-08-26-v116.md) · [`traspaso-relevo-tag-v1-15-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-15-beta-2026-08-26.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PRE-TAG** — docs release preparados (MD-7 / F7). SHA **TBD** hasta commit owner. **No** `git tag` hasta aviso explícito.
+> **Estado:** **PUBLICACIÓN** — tag `v1.16-beta` → `11ee5ff`. **Release tag CI:** pendiente pin GREEN.
 > **Arranque chat nuevo / auditor:** pack v116 + ADR-037 + `CURRENT_SYSTEM.md` + relevos MD-1…MD-5 + este relevo.
 
 ---
 
 ## 0. Confirmación
 
-- **MD-0 + MD-1…MD-5:** código + tests + relevos epic; working tree sin commit.
+- **MD-0 + MD-1…MD-5:** código + tests + relevos epic; commit **`11ee5ff`**.
 - DEX-1…DEX-5 **intactos**. Confirm/DEX/SubmitIntent **sin cambios de contrato**.
 - Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. LIVE **experimental**. AUTO **off**.
 - Limitaciones P1/P2 **declaradas** (no ocultas): chip DS-05 · sanity E2E · what-if sin gates reales · Libro `showRoute`.
@@ -18,19 +18,17 @@
 
 | Pieza        | Valor                                                                                          |
 | ------------ | ---------------------------------------------------------------------------------------------- |
-| Tag          | `v1.16-beta` → **SHA TBD** (pin tras commit + tag)                                             |
+| Tag          | `v1.16-beta` → `11ee5ff`                                                                       |
 | Previo       | `v1.15-beta` → `fc2ed753`                                                                      |
 | Pack auditor | [`audit-pack-estado-global-2026-08-26-v116.md`](./audit-pack-estado-global-2026-08-26-v116.md) |
 | Spine        | `pnpm test:decision-spine` **485** (2026-08-26)                                                |
 | Backend F5   | pytest **72** passed (2026-08-26)                                                              |
 | CI tag       | `release-tag-ci.yml` (sin path-filter)                                                         |
 
-### Owner: publicar (cuando apruebe)
+### Owner: publicado
 
 ```bash
-# 1. Commit working tree (estrategia: único o por epic — preferencia owner)
-# 2. Anotar SHA en este relevo + pack v116 + CURRENT_SYSTEM + CHANGELOG
-git tag v1.16-beta          # SHA TBD
+git tag v1.16-beta          # 11ee5ff
 git push origin main v1.16-beta  # Actions → GREEN → pin docs CI URL
 ```
 

@@ -6,12 +6,12 @@ All notable releases of Bolsa V1.
 
 ## [1.16-beta] — 2026-08-26
 
-Mesa desk V1.16–V1.19 (ADR-037 extensiones) + backend paralelo auditoría V1.15. Producto sigue **BETA / no producción**. Tag objetivo **`v1.16-beta` → SHA TBD** (pendiente commit + gate owner). Partida: **`v1.15-beta` → `fc2ed753`**. Spine **`pnpm test:decision-spine` = 485**. Pack: [`audit-pack-estado-global-2026-08-26-v116.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v116.md). Confirm/DEX/SubmitIntent **intactos**. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. AUTO **off**.
+Mesa desk V1.16–V1.19 (ADR-037 extensiones) + backend paralelo auditoría V1.15. Producto sigue **BETA / no producción**. Tag **`v1.16-beta` → `11ee5ff`**. Partida: **`v1.15-beta` → `fc2ed753`**. Spine **`pnpm test:decision-spine` = 485**. Pack: [`audit-pack-estado-global-2026-08-26-v116.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v116.md). Confirm/DEX/SubmitIntent **intactos**. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. AUTO **off**.
 
 ### Docs — Pack auditor v116 Mesa desk (2026-08-26)
 
 - Pack [`audit-pack-estado-global-2026-08-26-v116.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v116.md): stamp global · scorecard MD-1…5 · limitaciones P1/P2.
-- Relevo tag [`traspaso-relevo-tag-v1-16-beta-2026-08-26.md`](./docs/engineering/traspaso-relevo-tag-v1-16-beta-2026-08-26.md) — SHA TBD hasta commit owner.
+- Relevo tag [`traspaso-relevo-tag-v1-16-beta-2026-08-26.md`](./docs/engineering/traspaso-relevo-tag-v1-16-beta-2026-08-26.md) — tag `v1.16-beta` → `11ee5ff`.
 - Spine verificado **485**. Limitaciones: chip DS-05 P1 · sanity E2E P1 · what-if sin gates · Libro showRoute post-tag.
 
 ### MD-1 — V1.16 Mesa desk cierre (Operational UX II)
