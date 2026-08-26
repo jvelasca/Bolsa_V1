@@ -20,28 +20,6 @@ from typing import Any, Literal
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.signals.strategy import SignalEventV1
-from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
-from bolsa_domain.entities.market_event import MarketEventCalendar
-from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
-from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
-from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
-from bolsa_infrastructure.alerts.alert_channels import (
-    AlertChannelDispatchResult,
-    SignalAlertChannelDispatcher,
-)
-from bolsa_infrastructure.database.repositories.account_repository import (
-    SqlAlchemyAccountRepository,
-)
-from bolsa_infrastructure.database.repositories.backtest_repository import (
-    SqlAlchemyBacktestRepository,
-)
-from bolsa_infrastructure.database.repositories.scan_job_repository import (
-    SqlAlchemyScanJobRepository,
-)
-from bolsa_infrastructure.database.repositories.signal_alert_repository import (
-    SignalAlertSubscriptionRecord,
-)
-
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import ExecuteTrade, GetPortfolioSummary
 from bolsa_application.auto_execute_idempotency import (
@@ -68,6 +46,27 @@ from bolsa_application.risk_runtime import (
     release_auto_execute_idempotency,
 )
 from bolsa_application.trading_policy_guard import CognitiveGuardResult
+from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
+from bolsa_domain.entities.market_event import MarketEventCalendar
+from bolsa_domain.platform_kernel import PAPER_ACCOUNT_TYPES
+from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
+from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
+from bolsa_infrastructure.alerts.alert_channels import (
+    AlertChannelDispatchResult,
+    SignalAlertChannelDispatcher,
+)
+from bolsa_infrastructure.database.repositories.account_repository import (
+    SqlAlchemyAccountRepository,
+)
+from bolsa_infrastructure.database.repositories.backtest_repository import (
+    SqlAlchemyBacktestRepository,
+)
+from bolsa_infrastructure.database.repositories.scan_job_repository import (
+    SqlAlchemyScanJobRepository,
+)
+from bolsa_infrastructure.database.repositories.signal_alert_repository import (
+    SignalAlertSubscriptionRecord,
+)
 
 
 def _book_max_open_positions(policy: ExecutionPolicyRecord) -> int | None:
@@ -341,7 +340,6 @@ class ExecutionRouter:
             from dataclasses import replace
 
             from bolsa_analytics.cognitive.decision_session import build_auto_session
-
             from bolsa_application.cognitive_persistence import decision_session_to_record
 
             record = memory_entry_to_record(guard.memory, account_id=account_id)
@@ -393,7 +391,6 @@ class ExecutionRouter:
             return
         try:
             from bolsa_analytics.cognitive.decision_session import build_auto_session
-
             from bolsa_application.cognitive_persistence import decision_session_to_record
 
             session = build_auto_session(
