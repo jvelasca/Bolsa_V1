@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.12-beta` → `164e2ad` · ADR-034 OI-1…OE-1 CERRADOS · ADR-035 D0+OR-1…OR-6 CERRADOS · next = thaw estricto (deuda) / operar SEMI
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.12-beta` → `369b5d1` · ADR-034 OI-1…OE-1 CERRADOS · ADR-035 D0+OR-1…OR-6 CERRADOS · next = thaw estricto (deuda) / operar SEMI
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
@@ -77,7 +77,7 @@ Engineering Index  (este doc)
 │   ├── traspaso-relevo-tag-v1-11-beta-2026-08-26.md ← **HISTÓRICO** tag v1.11-beta → auditoría
 │   ├── audit-ext-v111-operational-reliability-triage-2026-08-26.md ← **TRIAGE** auditoría 1 post-v1.11 · RATIFICADO · v1.12
 │   ├── roadmap-v112-operational-reliability-2026-08-26.md ← **FASE CERRADA** v1.12 · D0+OR-1…OR-6 · tag `v1.12-beta`
-│   ├── audit-pack-estado-global-2026-08-26-v112.md ← pack Operational Reliability · tag `v1.12-beta` → `164e2ad`
+│   ├── audit-pack-estado-global-2026-08-26-v112.md ← pack Operational Reliability · tag `v1.12-beta` → `369b5d1`
 │   ├── traspaso-relevo-tag-v1-12-beta-2026-08-26.md ← **PUBLICACIÓN** tag v1.12-beta → auditoría
 │   ├── plan-or1-e2e-idempotency-2026-08-26.md ← **OR-1 CERRADO** · retry Confirm paper · spine 372
 │   ├── traspaso-relevo-or1-e2e-idempotency-2026-08-26.md ← **HISTÓRICO** OR-1 → chat OR-2
@@ -346,4 +346,4 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 19. **Auditoría externa post-tag v1.8.1-beta (2026-08-25):** [triage](./audit-ext-v181-triage-2026-08-25.md) · [roadmap v1.9](./roadmap-v19-operational-core-2026-08-25.md) · **F1–F4 + ExitPermission + INFRA CERRADOS** (modelo). Tag `v1.9-beta`.
 20. **Auditoría discontinuidad operativa (2026-08-25):** [triage](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · [roadmap v1.10](./roadmap-v110-operational-authority-2026-08-25.md) · [ADR-033](../adr/033-operational-authority-position-persistence.md) · **H1→P4 CERRADOS**. Tag `v1.10-beta` → `047ddb6`.
 21. **Operational Integrity v1.11 (2026-08-26):** [roadmap](./roadmap-v111-operational-integrity-2026-08-26.md) · [ADR-034](../adr/034-operational-integrity-continuity.md) · [pack](./audit-pack-estado-global-2026-08-26-v111.md) · [relevo tag](./traspaso-relevo-tag-v1-11-beta-2026-08-26.md) · **OI-1…OE-1 CERRADOS**. Tag `v1.11-beta` → `76d0f951`.
-22. **Operational Reliability v1.12 (2026-08-26):** [triage](./audit-ext-v111-operational-reliability-triage-2026-08-26.md) · [roadmap](./roadmap-v112-operational-reliability-2026-08-26.md) · [ADR-035](../adr/035-operational-reliability.md) · [pack](./audit-pack-estado-global-2026-08-26-v112.md) · [relevo tag](./traspaso-relevo-tag-v1-12-beta-2026-08-26.md) · **D0 + OR-1…OR-6 CERRADOS**. Tag `v1.12-beta` → `164e2ad`. Partida `v1.11-beta` → `76d0f951`. Spine **433**. Next = thaw estricto (deuda) / operar SEMI.
+22. **Operational Reliability v1.12 (2026-08-26):** [triage](./audit-ext-v111-operational-reliability-triage-2026-08-26.md) · [roadmap](./roadmap-v112-operational-reliability-2026-08-26.md) · [ADR-035](../adr/035-operational-reliability.md) · [pack](./audit-pack-estado-global-2026-08-26-v112.md) · [relevo tag](./traspaso-relevo-tag-v1-12-beta-2026-08-26.md) · **D0 + OR-1…OR-6 CERRADOS**. Tag `v1.12-beta` → `369b5d1`. Partida `v1.11-beta` → `76d0f951`. Spine **433**. Next = thaw estricto (deuda) / operar SEMI.

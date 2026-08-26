@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.12-beta (Operational Reliability)
 
-> **AsOf:** 2026-08-26 · **Tag:** **`v1.12-beta` → `164e2ad`**.
+> **AsOf:** 2026-08-26 · **Tag:** **`v1.12-beta` → `369b5d1`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · roadmap [`roadmap-v112-operational-reliability-2026-08-26.md`](./roadmap-v112-operational-reliability-2026-08-26.md) · ADR-035 · pack previo [`audit-pack-estado-global-2026-08-26-v111.md`](./audit-pack-estado-global-2026-08-26-v111.md).
 > **Partida:** `v1.11-beta` → `76d0f951`.
 > **Para:** auditoría externa / GitHub Actions Release tag CI.
@@ -120,7 +120,7 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · TradePlan ≠ permiso ·
 
 ## 7. Checklist auditor (E1)
 
-1. Checkout tag **`v1.12-beta`** (`164e2ad`).
+1. Checkout tag **`v1.12-beta`** (`369b5d1`).
 2. Verificar GitHub Actions **`release-tag-ci.yml`** GREEN en el push del tag.
 3. Ejecutar `pnpm test:decision-spine` → esperar **433** passed.
 4. Contrastar ADR-035 (OR-1…OR-6) con código: idempotencia, DurableSubmitIntent, state machine, opening veto, suite A–L, readiness + CTA.
