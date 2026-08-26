@@ -1,8 +1,8 @@
 # RELEVO — tag v1.14-beta (candidato post-P1) (2026-08-26)
 
 > **Padre:** [`traspaso-relevo-tag-v1-13-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-13-beta-2026-08-26.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PRE-TAG** — código local post-`v1.13-beta`; pin SHA al publicar.
-> **Arranque chat nuevo:** `CURRENT_SYSTEM.md` + este relevo + pack v113.
+> **Estado:** **PUBLICACIÓN** — tag `v1.14-beta` → `772a3a73`. **Release tag CI:** pendiente pin GREEN.
+> **Arranque chat nuevo / auditor:** `CURRENT_SYSTEM.md` + este relevo + pack v113.
 
 ---
 
@@ -25,17 +25,26 @@ LAB ≠ TRADING · Confirm = firma · `PAPER_D_EXECUTE` default off · AUTO off 
 
 ## 2. Verificación pre-tag
 
+Spine **483** (2026-08-26, local pre-push).
+
 ```bash
-pnpm test:decision-spine   # expect 483
+pnpm test:decision-spine   # 483
 pnpm --filter @bolsa/web test -- src/features/decision-journal
 ```
 
-## 3. Publicación (owner)
+## 3. Release
+
+| Pieza  | Valor                     |
+| ------ | ------------------------- |
+| Tag    | `v1.14-beta` → `772a3a73` |
+| Previo | `v1.13-beta` → `c8d5800`  |
+| Spine  | **483**                   |
+
+### Owner: publicado
 
 ```bash
-git tag v1.14-beta
-git push origin v1.14-beta
-# Actions GREEN → pin SHA en este doc + CURRENT_SYSTEM.md
+git tag v1.14-beta          # 772a3a73
+git push origin v1.14-beta  # Actions → GREEN → pin docs CI URL
 ```
 
 ## 4. Auditoría rápida — sin refactors pendientes obligatorios
