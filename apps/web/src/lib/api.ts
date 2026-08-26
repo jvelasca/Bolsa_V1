@@ -1553,6 +1553,31 @@ export const api = {
       }),
     ),
 
+  /** ADR-036 — Tesis: última sesión propose por instrumento (solo lectura). */
+  getDecisionStudies: (
+    accountId: string,
+    opts?: {
+      listId?: string;
+      q?: string;
+      period?: string;
+      opinion?: string;
+      status?: string;
+      strengthBand?: string;
+      from?: string;
+      to?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) =>
+    call<import("@bolsa/shared").DecisionJournalStudyListResponseV1>(() =>
+      client.GET("/api/accounts/{account_id}/decision-studies", {
+        params: {
+          path: { account_id: accountId },
+          query: opts,
+        },
+      }),
+    ),
+
   recordSessionVerdict: (
     accountId: string,
     body: { verdict: "no_trade"; note?: string },

@@ -452,6 +452,18 @@ def get_decision_journal_use_case(session: AsyncSession) -> Any:
     return GetDecisionJournal(get_journal_repository(session))
 
 
+def get_decision_journal_studies_use_case(session: AsyncSession) -> Any:
+    """ADR-036 — Tesis (vista SOLO LECTURA sobre decision_sessions)."""
+    from bolsa_application.decision_journal_studies import GetDecisionJournalStudies
+
+    return GetDecisionJournalStudies(
+        get_cognitive_repository(session),
+        instruments=get_instrument_repository(session),
+        lists=get_list_repository(session),
+        positions=get_position_state_repository(session),
+    )
+
+
 def get_record_session_verdict_use_case(session: AsyncSession) -> Any:
     """P4 — veredicto de sesión append-only."""
     from bolsa_application.record_session_verdict import RecordSessionVerdict

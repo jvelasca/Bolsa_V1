@@ -67,3 +67,49 @@ def test_decision_journal_list_response_dto_wraps_data() -> None:
     dumped = resp.model_dump(by_alias=True)
     assert dumped["data"]["total"] == 1
     assert dumped["data"]["entries"][0]["entryId"] == "JNL-1"
+
+
+def test_decision_study_list_dto_maps_without_error() -> None:
+    from bolsa_api.schemas.accounts import (
+        DecisionJournalStudyListDto,
+        DecisionJournalStudyListResponseDto,
+    )
+
+    payload = {
+        "accountId": "acc-1",
+        "studies": [
+            {
+                "artifactType": "ART-DECISION-JOURNAL-STUDY",
+                "schemaVersion": "1.0.0",
+                "sessionId": "s1",
+                "decisionId": "d1",
+                "instrumentId": "inst-1",
+                "symbol": "AAPL",
+                "name": "Apple",
+                "studiedAt": "2026-08-26T09:32:00Z",
+                "ageMs": 1000,
+                "period": "daily",
+                "timeframe": "1d",
+                "opinion": "neutral",
+                "status": "neutral",
+                "strength": 6.1,
+                "strengthBand": "strong",
+                "hasOperationalPlan": False,
+                "userThesis": None,
+                "analysisNotes": [],
+                "trends": [],
+                "consensus": {"bullish": 0, "bearish": 0, "neutral": 1, "total": 1},
+                "indicators": {"primary": None, "confirmation": None},
+                "invalidation": [],
+            }
+        ],
+        "total": 1,
+        "limit": 50,
+        "offset": 0,
+    }
+    dto = DecisionJournalStudyListDto.model_validate(payload)
+    assert dto.studies[0].session_id == "s1"
+    assert dto.studies[0].has_operational_plan is False
+    resp = DecisionJournalStudyListResponseDto(data=payload)
+    dumped = resp.model_dump(by_alias=True)
+    assert dumped["data"]["studies"][0]["sessionId"] == "s1"

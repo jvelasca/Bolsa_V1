@@ -42,3 +42,11 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · Confirm = firma · `PAPE
 3. No Accept estricto sin DoD §4 + palabra **thaw**.
 4. No módulos thin nuevos · no reabrir OR-1/3/4/5/6 ni DEX-1…5 a ciegas.
 5. Candidatas post-tag: UI Mesa incidente · OperationalPolicy · mass sim · thaw (solo con palabra explícita).
+
+## 4. Post-tag cerrado (no mezclar con DEX)
+
+| Epic                                     | Estado                   | Relevo                                                                                               |
+| ---------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| **Decision Journal 2.0 Tesis** (ADR-036) | **CERRADO** (2026-08-26) | [`traspaso-relevo-journal-20-tesis-2026-08-26.md`](./traspaso-relevo-journal-20-tesis-2026-08-26.md) |
+
+Solo lectura · sin Alembic · spine **483** tras J4 · DEX-1…5 **no reabiertos**.

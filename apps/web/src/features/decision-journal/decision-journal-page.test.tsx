@@ -7,11 +7,35 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { DecisionJournalEntryV1 } from "@bolsa/shared";
+import { MemoryRouter } from "react-router-dom";
+import type {
+  DecisionJournalEntryV1,
+  DecisionJournalStudyViewV1,
+} from "@bolsa/shared";
+import { NO_OPERATIONAL_PLAN_COPY } from "@bolsa/shared";
+
+vi.mock("lightweight-charts", () => ({
+  createChart: () => ({
+    addSeries: () => ({
+      setData: vi.fn(),
+      createPriceLine: vi.fn(() => ({})),
+      removePriceLine: vi.fn(),
+    }),
+    applyOptions: vi.fn(),
+    timeScale: () => ({ fitContent: vi.fn() }),
+    remove: vi.fn(),
+  }),
+  ColorType: { Solid: "solid" },
+  LineStyle: { Solid: 0, Dashed: 2 },
+  CandlestickSeries: "Candlestick",
+}));
 
 vi.mock("@/lib/api", () => ({
   api: {
     getDecisionJournal: vi.fn(),
+    getDecisionStudies: vi.fn(),
+    getLists: vi.fn(),
+    getOhlcv: vi.fn(),
   },
 }));
 
@@ -22,6 +46,12 @@ vi.mock("@/features/accounts/use-active-account", () => ({
     isLoading: false,
     accounts: [],
   }),
+}));
+
+vi.mock("@/stores/workspace-store", () => ({
+  useWorkspaceStore: (
+    selector: (s: { openChartTab: () => string }) => unknown,
+  ) => selector({ openChartTab: vi.fn(() => "tab-1") }),
 }));
 
 import { api } from "@/lib/api";
@@ -35,7 +65,9 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <DecisionJournalPage />
+      <MemoryRouter>
+        <DecisionJournalPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -72,62 +104,129 @@ function makeJournalResponse(
   };
 }
 
+function makeStudy(
+  overrides: Partial<DecisionJournalStudyViewV1> = {},
+): DecisionJournalStudyViewV1 {
+  return {
+    artifactType: "ART-DECISION-JOURNAL-STUDY",
+    schemaVersion: "1.0.0",
+    sessionId: "s-watch",
+    decisionId: "d1",
+    instrumentId: "inst-1",
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    studiedAt: "2026-08-26T09:32:00Z",
+    ageMs: 7200000,
+    period: "daily",
+    timeframe: "1d",
+    opinion: "neutral",
+    status: "neutral",
+    strength: 6.1,
+    strengthBand: "strong",
+    vigencia: null,
+    entry: null,
+    stop: null,
+    target1: null,
+    target2: null,
+    expectedRR: null,
+    riskAmount: null,
+    hasOperationalPlan: false,
+    userThesis: null,
+    decisionSummary: "Sin ventaja suficiente.",
+    analysisNotes: ["Sin ventaja suficiente."],
+    trends: [],
+    consensus: { bullish: 0, bearish: 0, neutral: 1, total: 1 },
+    indicators: { primary: null, confirmation: null },
+    invalidation: [],
+    nextReviewAt: null,
+    tradePlanStatus: "WATCH",
+    action: "wait",
+    ...overrides,
+  };
+}
+
 describe("DecisionJournalPage", () => {
   beforeEach(() => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+        unobserve() {}
+      },
+    );
     vi.clearAllMocks();
+    vi.mocked(api.getLists).mockResolvedValue({ data: [] } as never);
+    vi.mocked(api.getDecisionStudies).mockResolvedValue({
+      data: { accountId: "acc1", studies: [], total: 0, limit: 50, offset: 0 },
+    } as never);
+    vi.mocked(api.getDecisionJournal).mockResolvedValue(
+      makeJournalResponse() as never,
+    );
+    vi.mocked(api.getOhlcv).mockResolvedValue({
+      data: [],
+      meta: { timeframe: "1d", count: 0 },
+    } as never);
   });
 
   afterEach(() => cleanup());
 
-  it("muestra el copy UX Session vs Journal", async () => {
-    vi.mocked(api.getDecisionJournal).mockResolvedValue(
-      makeJournalResponse() as never,
-    );
+  it("muestra Tesis como pestaña por defecto y copy de seguimiento", async () => {
     renderPage();
-
     await waitFor(() =>
       expect(screen.getByTestId("decision-journal")).toBeTruthy(),
     );
-    expect(screen.getByText(/Session = foto del razonamiento/i)).toBeTruthy();
-    expect(
-      screen.getByText(/Journal = historial de transiciones/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/Seguimiento de análisis y tesis/i)).toBeTruthy();
+    expect(screen.getByTestId("tab-tesis")).toBeTruthy();
+    expect(screen.getByTestId("journal-study-filters")).toBeTruthy();
   });
 
-  it("renderiza entradas con badges de eventType y actor", async () => {
+  it("WATCH no pinta objetivos operativos", async () => {
+    vi.mocked(api.getDecisionStudies).mockResolvedValue({
+      data: {
+        accountId: "acc1",
+        studies: [makeStudy()],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      },
+    } as never);
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("study-row")).toBeTruthy());
+    expect(screen.getByText("AAPL")).toBeTruthy();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByTestId("study-row"));
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-ficha")).toBeTruthy(),
+    );
+    expect(screen.getByTestId("no-operational-plan").textContent).toBe(
+      NO_OPERATIONAL_PLAN_COPY,
+    );
+    expect(screen.queryByTestId("ficha-invalidation")).toBeNull();
+    expect(screen.queryByText(/mi tesis/i)).toBeNull();
+    expect(screen.queryByText(/supertrend/i)).toBeNull();
+    expect(screen.queryByText(/12 indicadores/i)).toBeNull();
+    expect(screen.getByTestId("ficha-analysis")).toBeTruthy();
+  });
+
+  it("Historial técnico conserva Replay y oculta IDs bajo información técnica", async () => {
+    const spy = vi.fn();
+    window.addEventListener("bolsa:open-help", spy);
     vi.mocked(api.getDecisionJournal).mockResolvedValue(
       makeJournalResponse([
-        makeEntry({
-          entryId: "e1",
-          eventType: "human_confirm",
-          actor: "human",
-        }),
-        makeEntry({
-          entryId: "e2",
-          eventType: "risk_veto",
-          actor: "system",
-          sessionId: null,
-        }),
+        makeEntry({ entryId: "e1", sessionId: "sess-replay-1" }),
       ]) as never,
     );
     renderPage();
-
-    await waitFor(() =>
-      expect(screen.getAllByTestId("journal-entry")).toHaveLength(2),
-    );
-
-    expect(screen.getByTestId("event-human_confirm")).toBeTruthy();
-    expect(screen.getByTestId("event-human_confirm").className).toMatch(
-      /emerald/,
-    );
-    expect(screen.getByTestId("actor-human")).toBeTruthy();
-
-    expect(screen.getByTestId("event-risk_veto")).toBeTruthy();
-    expect(screen.getByTestId("event-risk_veto").className).toMatch(/rose/);
-    expect(screen.getByTestId("actor-system")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("tab-historial"));
+    await waitFor(() => expect(screen.getByTestId("open-replay")).toBeTruthy());
+    expect(screen.getByTestId("journal-technical-details")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("open-replay"));
+    expect(spy).toHaveBeenCalledOnce();
+    window.removeEventListener("bolsa:open-help", spy);
   });
 
-  it("muestra Setup line desde payload attribution", async () => {
+  it("muestra Setup line en historial", async () => {
     vi.mocked(api.getDecisionJournal).mockResolvedValue(
       makeJournalResponse([
         makeEntry({
@@ -140,82 +239,47 @@ describe("DecisionJournalPage", () => {
       ]) as never,
     );
     renderPage();
+    fireEvent.click(screen.getByTestId("tab-historial"));
     await waitFor(() =>
       expect(screen.getByTestId("journal-setup")).toBeTruthy(),
     );
     expect(screen.getByText(/wyckoff · ARMED · fase lps/i)).toBeTruthy();
   });
 
-  it("muestra link Abrir Replay cuando hay sessionId", async () => {
-    const spy = vi.fn();
-    window.addEventListener("bolsa:open-help", spy);
-
-    vi.mocked(api.getDecisionJournal).mockResolvedValue(
-      makeJournalResponse([
-        makeEntry({ entryId: "e1", sessionId: "sess-replay-1" }),
-      ]) as never,
-    );
+  it("muestra estado vacío de tesis", async () => {
     renderPage();
-
-    await waitFor(() => expect(screen.getByTestId("open-replay")).toBeTruthy());
-
-    fireEvent.click(screen.getByTestId("open-replay"));
-    expect(spy).toHaveBeenCalledOnce();
-    const event = spy.mock.calls[0]![0] as CustomEvent;
-    expect(event.detail.sessionId).toBe("sess-replay-1");
-
-    window.removeEventListener("bolsa:open-help", spy);
-  });
-
-  it("no muestra Abrir Replay sin sessionId", async () => {
-    vi.mocked(api.getDecisionJournal).mockResolvedValue(
-      makeJournalResponse([
-        makeEntry({ entryId: "e1", sessionId: null }),
-      ]) as never,
-    );
-    renderPage();
-
     await waitFor(() =>
-      expect(screen.getByTestId("journal-entry")).toBeTruthy(),
+      expect(screen.getByTestId("studies-empty")).toBeTruthy(),
     );
-    expect(screen.queryByTestId("open-replay")).toBeNull();
   });
 
-  it("muestra Cargando… mientras isLoading", () => {
+  it("muestra error de tesis", async () => {
+    vi.mocked(api.getDecisionStudies).mockRejectedValue(new Error("boom"));
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByTestId("studies-error")).toBeTruthy(),
+    );
+  });
+
+  it("muestra Cargando… en historial", () => {
     vi.mocked(api.getDecisionJournal).mockImplementation(
       () => new Promise(() => {}) as never,
     );
     renderPage();
+    fireEvent.click(screen.getByTestId("tab-historial"));
     expect(screen.getByText("Cargando…")).toBeTruthy();
   });
 
-  it("muestra mensaje de error cuando la petición falla", async () => {
+  it("muestra mensaje de error del journal técnico", async () => {
     vi.mocked(api.getDecisionJournal).mockRejectedValue(new Error("boom"));
     renderPage();
-
+    fireEvent.click(screen.getByTestId("tab-historial"));
     await waitFor(() =>
       expect(screen.getByTestId("journal-error")).toBeTruthy(),
     );
-    expect(screen.getByTestId("journal-error").textContent).toMatch(
-      /No se pudo cargar el Decision Journal/i,
-    );
   });
 
-  it("muestra estado vacío cuando no hay entradas", async () => {
-    vi.mocked(api.getDecisionJournal).mockResolvedValue(
-      makeJournalResponse([]) as never,
-    );
-    renderPage();
-
-    await waitFor(() =>
-      expect(screen.getByTestId("journal-empty")).toBeTruthy(),
-    );
-    expect(screen.getByTestId("journal-empty").textContent).toMatch(
-      /Sin entradas en el journal/i,
-    );
-  });
-
-  it("muestra meta con total de entradas", async () => {
+  it("muestra meta con total de entradas en historial", async () => {
     vi.mocked(api.getDecisionJournal).mockResolvedValue({
       data: {
         accountId: "acc1",
@@ -226,15 +290,12 @@ describe("DecisionJournalPage", () => {
       },
     } as never);
     renderPage();
-
+    fireEvent.click(screen.getByTestId("tab-historial"));
     await waitFor(() =>
       expect(screen.getByTestId("journal-meta")).toBeTruthy(),
     );
     expect(screen.getByTestId("journal-meta").textContent).toMatch(
       /42 entradas/,
-    );
-    expect(screen.getByTestId("journal-meta").textContent).toMatch(
-      /mostrando 1/,
     );
   });
 });

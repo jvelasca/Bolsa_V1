@@ -248,6 +248,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts/{account_id}/decision-studies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Decision Studies
+         * @description ADR-036 — Tesis: última sesión propose por instrumento (solo lectura).
+         *
+         *     No muta journal, TradePlan ni Position. Geometría WATCH queda vacía.
+         */
+        get: operations["get_decision_studies_api_accounts__account_id__decision_studies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts/{account_id}/deposits": {
         parameters: {
             query?: never;
@@ -4742,6 +4764,107 @@ export interface components {
         /** DecisionJournalListResponseDto */
         DecisionJournalListResponseDto: {
             data: components["schemas"]["DecisionJournalListDto"];
+        };
+        /**
+         * DecisionJournalStudyDto
+         * @description Wire alineado con ``DecisionJournalStudyViewV1`` (@bolsa/shared).
+         */
+        DecisionJournalStudyDto: {
+            /** Action */
+            action?: string | null;
+            /** Agems */
+            ageMs?: number | null;
+            /** Analysisnotes */
+            analysisNotes?: string[];
+            /**
+             * Artifacttype
+             * @default ART-DECISION-JOURNAL-STUDY
+             */
+            artifactType: string;
+            /** Consensus */
+            consensus?: {
+                [key: string]: unknown;
+            };
+            /** Decisionid */
+            decisionId?: string | null;
+            /** Decisionsummary */
+            decisionSummary?: string | null;
+            /** Entry */
+            entry?: number | null;
+            /** Expectedrr */
+            expectedRR?: number | null;
+            /** Hasoperationalplan */
+            hasOperationalPlan: boolean;
+            /** Indicators */
+            indicators?: {
+                [key: string]: unknown;
+            };
+            /** Instrumentid */
+            instrumentId: string;
+            /** Invalidation */
+            invalidation?: string[];
+            /** Name */
+            name?: string | null;
+            /** Nextreviewat */
+            nextReviewAt?: string | null;
+            /** Opinion */
+            opinion?: string | null;
+            /** Period */
+            period?: string | null;
+            /** Riskamount */
+            riskAmount?: number | null;
+            /**
+             * Schemaversion
+             * @default 1.0.0
+             */
+            schemaVersion: string;
+            /** Sessionid */
+            sessionId: string;
+            /** Status */
+            status: string;
+            /** Stop */
+            stop?: number | null;
+            /** Strength */
+            strength?: number | null;
+            /** Strengthband */
+            strengthBand?: string | null;
+            /** Studiedat */
+            studiedAt: string;
+            /** Symbol */
+            symbol?: string | null;
+            /** Target1 */
+            target1?: number | null;
+            /** Target2 */
+            target2?: number | null;
+            /** Timeframe */
+            timeframe?: string | null;
+            /** Tradeplanstatus */
+            tradePlanStatus?: string | null;
+            /** Trends */
+            trends?: {
+                [key: string]: unknown;
+            }[];
+            /** Userthesis */
+            userThesis?: unknown | null;
+            /** Vigencia */
+            vigencia?: string | null;
+        };
+        /** DecisionJournalStudyListDto */
+        DecisionJournalStudyListDto: {
+            /** Accountid */
+            accountId: string;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+            /** Studies */
+            studies: components["schemas"]["DecisionJournalStudyDto"][];
+            /** Total */
+            total: number;
+        };
+        /** DecisionJournalStudyListResponseDto */
+        DecisionJournalStudyListResponseDto: {
+            data: components["schemas"]["DecisionJournalStudyListDto"];
         };
         /** DecisionSessionSummaryDto */
         DecisionSessionSummaryDto: {
@@ -9700,6 +9823,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionJournalListResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_decision_studies_api_accounts__account_id__decision_studies_get: {
+        parameters: {
+            query?: {
+                listId?: string | null;
+                q?: string | null;
+                period?: string | null;
+                opinion?: string | null;
+                status?: string | null;
+                strengthBand?: string | null;
+                from?: string | null;
+                to?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionJournalStudyListResponseDto"];
                 };
             };
             /** @description Validation Error */

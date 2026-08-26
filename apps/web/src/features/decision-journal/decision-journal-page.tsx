@@ -1,214 +1,268 @@
 /**
- * F3 — Decision Journal (web, solo lectura).
- *
- * Timeline cronológico del audit trail append-only del Decision Spine.
- * NO escribe ni confirma nada: se limita a `GET /api/accounts/{account_id}/decision-journal`.
- *
- * @see packages/shared/src/cognitive/decision-journal.ts (DecisionJournalEntryV1)
+ * Decision Journal 2.0 — Tesis (vista) + Historial técnico (ADR-029).
+ * Solo lectura. No muta TradePlan ni journal.
  */
 
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { RefreshCw } from "lucide-react";
+import type { DecisionJournalStudyViewV1 } from "@bolsa/shared";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
-import type { DecisionJournalEntryV1 } from "@bolsa/shared";
+import { JournalTimeline } from "@/features/decision-journal/journal-timeline";
 import {
-  actorBadgeClasses,
-  eventTypeBadgeClasses,
-  formatEventTypeLabel,
-  formatJournalDateTime,
-  formatJournalSetupLine,
-  openDecisionReplay,
-} from "@/features/decision-journal/decision-journal-helpers";
+  DEFAULT_JOURNAL_STUDY_FILTERS,
+  JournalStudiesFilters,
+  type JournalStudyFilters,
+} from "@/features/decision-journal/journal-studies-filters";
+import { JournalStudiesTable } from "@/features/decision-journal/journal-studies-table";
+import { DecisionFichaPanel } from "@/features/decision-journal/decision-ficha-panel";
 
-function EventTypeBadge({ eventType }: { eventType: string }) {
-  return (
-    <span
-      data-testid={`event-${eventType}`}
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-        eventTypeBadgeClasses(eventType),
-      )}
-    >
-      {formatEventTypeLabel(eventType)}
-    </span>
-  );
-}
-
-function ActorBadge({ actor }: { actor: string }) {
-  return (
-    <span
-      data-testid={`actor-${actor}`}
-      className={cn(
-        "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-        actorBadgeClasses(actor),
-      )}
-    >
-      {actor}
-    </span>
-  );
-}
-
-function JournalEntryRow({ entry }: { entry: DecisionJournalEntryV1 }) {
-  const hasSession = Boolean(entry.sessionId?.trim());
-  const setupLine = formatJournalSetupLine(entry.payload);
-
-  return (
-    <li
-      data-testid="journal-entry"
-      data-entry-id={entry.entryId}
-      className="relative border-l-2 border-border/60 pl-4 pb-4 last:pb-0"
-    >
-      <span
-        className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-primary"
-        aria-hidden
-      />
-      <div className="flex flex-wrap items-center gap-2">
-        <EventTypeBadge eventType={entry.eventType} />
-        <ActorBadge actor={entry.actor} />
-        <span className="text-[10px] tabular-nums text-muted-foreground">
-          {formatJournalDateTime(entry.createdAt)}
-        </span>
-      </div>
-      <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground">
-        {setupLine ? (
-          <p data-testid="journal-setup">
-            <span className="text-foreground/70">Setup:</span> {setupLine}
-          </p>
-        ) : null}
-        <p>
-          <span className="text-foreground/70">decisionId:</span>{" "}
-          <code className="text-[10px]">{entry.decisionId}</code>
-        </p>
-        {entry.instrumentId ? (
-          <p>
-            <span className="text-foreground/70">instrumentId:</span>{" "}
-            <code className="text-[10px]">{entry.instrumentId}</code>
-          </p>
-        ) : null}
-        {hasSession ? (
-          <p className="flex flex-wrap items-center gap-1">
-            <span className="text-foreground/70">sessionId:</span>{" "}
-            <code className="text-[10px]">{entry.sessionId}</code>
-            <button
-              type="button"
-              data-testid="open-replay"
-              className="text-[10px] text-primary underline-offset-2 hover:underline"
-              onClick={() => openDecisionReplay(entry.sessionId!)}
-            >
-              Abrir Replay
-            </button>
-          </p>
-        ) : null}
-        {entry.payload && Object.keys(entry.payload).length > 0 ? (
-          <details className="mt-1">
-            <summary className="cursor-pointer text-[10px] text-foreground/60">
-              payload
-            </summary>
-            <pre className="mt-1 max-h-32 overflow-auto rounded bg-muted/50 p-2 text-[9px]">
-              {JSON.stringify(entry.payload, null, 2)}
-            </pre>
-          </details>
-        ) : null}
-      </div>
-    </li>
-  );
-}
-
-function JournalTimeline({ entries }: { entries: DecisionJournalEntryV1[] }) {
-  return (
-    <Card className="rounded-xl border border-border bg-card">
-      <CardHeader>
-        <CardTitle className="text-sm">Timeline</CardTitle>
-        <CardDescription>
-          Transiciones registradas, más recientes primero.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {entries.length === 0 ? (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="journal-empty"
-          >
-            Sin entradas en el journal para esta cuenta.
-          </p>
-        ) : (
-          <ol className="space-y-0" data-testid="journal-timeline">
-            {entries.map((entry) => (
-              <JournalEntryRow key={entry.entryId} entry={entry} />
-            ))}
-          </ol>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+type JournalTab = "tesis" | "historial";
 
 export function DecisionJournalPage() {
   const { effectiveAccountId } = useActiveAccount();
+  const [tab, setTab] = useState<JournalTab>("tesis");
+  const [filters, setFilters] = useState<JournalStudyFilters>(
+    DEFAULT_JOURNAL_STUDY_FILTERS,
+  );
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [selected, setSelected] = useState<DecisionJournalStudyViewV1 | null>(
+    null,
+  );
+  const [fichaCollapsed, setFichaCollapsed] = useState(false);
+  const [listPct, setListPct] = useState(62);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedQ(filters.q), 250);
+    return () => window.clearTimeout(handle);
+  }, [filters.q]);
+
+  const listsQuery = useQuery({
+    queryKey: ["lists"],
+    queryFn: () => api.getLists(),
+  });
+
+  const studiesQuery = useQuery({
+    queryKey: [
+      "decision-studies",
+      effectiveAccountId,
+      filters.listId,
+      debouncedQ,
+      filters.period,
+      filters.opinion,
+      filters.status,
+      filters.strengthBand,
+      filters.dateFrom,
+      filters.dateTo,
+    ],
+    enabled: Boolean(effectiveAccountId) && tab === "tesis",
+    queryFn: () =>
+      api.getDecisionStudies(effectiveAccountId!, {
+        listId: filters.listId === "todas" ? undefined : filters.listId,
+        q: debouncedQ.trim() || undefined,
+        period: filters.period === "all" ? undefined : filters.period,
+        opinion: filters.opinion === "all" ? undefined : filters.opinion,
+        status: filters.status === "all" ? undefined : filters.status,
+        strengthBand:
+          filters.strengthBand === "all" ? undefined : filters.strengthBand,
+        from: filters.dateFrom
+          ? `${filters.dateFrom}T00:00:00.000Z`
+          : undefined,
+        to: filters.dateTo ? `${filters.dateTo}T23:59:59.000Z` : undefined,
+      }),
+    refetchInterval: 60_000,
+  });
 
   const journalQuery = useQuery({
     queryKey: ["decision-journal", effectiveAccountId],
-    enabled: Boolean(effectiveAccountId),
+    enabled: Boolean(effectiveAccountId) && tab === "historial",
     queryFn: () => api.getDecisionJournal(effectiveAccountId!),
     refetchInterval: 60_000,
   });
 
+  const studies = studiesQuery.data?.data.studies ?? [];
   const journal = journalQuery.data?.data;
+  const lists = useMemo(
+    () =>
+      (listsQuery.data?.data ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+      })),
+    [listsQuery.data],
+  );
+
+  const showFicha = Boolean(selected) && !fichaCollapsed;
 
   return (
-    <div className="space-y-4 p-4 sm:p-6" data-testid="decision-journal">
-      <div>
-        <h1 className="font-serif text-2xl font-semibold text-foreground sm:text-3xl">
-          Decision Journal
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Session = foto del razonamiento · Journal = historial de transiciones
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground/80">
-          Audit trail append-only del Decision Spine (solo lectura). Setup en
-          payload cuando existe; Replay abre el outcome de sesión si hay
-          sessionId.
-        </p>
+    <div
+      className="flex min-h-0 flex-1 flex-col space-y-3 p-4 sm:p-6"
+      data-testid="decision-journal"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="font-serif text-2xl font-semibold text-foreground sm:text-3xl">
+            Decision Journal
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Seguimiento de análisis y tesis
+          </p>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            void studiesQuery.refetch();
+            void journalQuery.refetch();
+          }}
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Actualizar
+        </Button>
       </div>
 
-      {journalQuery.isLoading && !journal ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
-      ) : null}
+      <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-0.5">
+        <button
+          type="button"
+          data-testid="tab-tesis"
+          className={cn(
+            "rounded-md px-3 py-1.5 text-xs font-medium",
+            tab === "tesis"
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground",
+          )}
+          onClick={() => setTab("tesis")}
+        >
+          Tesis
+        </button>
+        <button
+          type="button"
+          data-testid="tab-historial"
+          className={cn(
+            "rounded-md px-3 py-1.5 text-xs font-medium",
+            tab === "historial"
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground",
+          )}
+          onClick={() => setTab("historial")}
+        >
+          Historial técnico
+        </button>
+      </div>
 
-      {journalQuery.isError ? (
-        <Card className="rounded-xl border border-destructive/40 bg-destructive/5 p-4">
-          <p className="text-sm text-destructive" data-testid="journal-error">
-            No se pudo cargar el Decision Journal. Revisa la API.
-          </p>
-        </Card>
-      ) : null}
+      {tab === "tesis" ? (
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <JournalStudiesFilters
+            value={filters}
+            onChange={setFilters}
+            lists={lists}
+          />
 
-      {journal ? (
+          {studiesQuery.isLoading && studies.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Cargando tesis…</p>
+          ) : null}
+
+          {studiesQuery.isError ? (
+            <Card className="rounded-xl border-destructive/40 bg-destructive/5 p-4">
+              <p
+                className="text-sm text-destructive"
+                data-testid="studies-error"
+              >
+                No se pudo cargar las tesis. Revisa la API.
+              </p>
+            </Card>
+          ) : null}
+
+          <div className="flex min-h-[28rem] flex-1 overflow-hidden rounded-xl border border-border">
+            <div
+              className="min-w-0 overflow-auto"
+              style={{ width: showFicha ? `${listPct}%` : "100%" }}
+            >
+              <JournalStudiesTable
+                studies={studies}
+                selectedSessionId={selected?.sessionId ?? null}
+                onSelect={(study) => {
+                  setSelected(study);
+                  setFichaCollapsed(false);
+                }}
+              />
+            </div>
+            {selected && fichaCollapsed ? (
+              <button
+                type="button"
+                className="w-8 border-l border-border bg-muted/30 text-[10px] text-muted-foreground"
+                onClick={() => setFichaCollapsed(false)}
+                aria-label="Mostrar ficha"
+              >
+                Ficha
+              </button>
+            ) : null}
+            {showFicha && selected ? (
+              <>
+                <PanelResizeHandle
+                  label="Redimensionar ficha"
+                  onDrag={(delta) => {
+                    const root = 900;
+                    setListPct((pct) =>
+                      Math.min(78, Math.max(36, pct + (delta / root) * 100)),
+                    );
+                  }}
+                />
+                <div
+                  className="min-h-0 min-w-0"
+                  style={{ width: `${100 - listPct}%` }}
+                >
+                  <DecisionFichaPanel
+                    study={selected}
+                    onClose={() => setSelected(null)}
+                    onCollapse={() => setFichaCollapsed(true)}
+                  />
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      ) : (
         <>
-          <Card
-            className="rounded-xl border-border bg-card px-4 py-3"
-            data-testid="journal-meta"
-          >
-            <p className="text-xs text-muted-foreground">
-              Cuenta <code className="text-[10px]">{journal.accountId}</code>
-              {" · "}
-              {journal.total} entrada{journal.total === 1 ? "" : "s"}
-              {journal.total > journal.entries.length
-                ? ` (mostrando ${journal.entries.length})`
-                : null}
-            </p>
-          </Card>
-          <JournalTimeline entries={journal.entries} />
+          {journalQuery.isLoading && !journal ? (
+            <p className="text-sm text-muted-foreground">Cargando…</p>
+          ) : null}
+          {journalQuery.isError ? (
+            <Card className="rounded-xl border-destructive/40 bg-destructive/5 p-4">
+              <p
+                className="text-sm text-destructive"
+                data-testid="journal-error"
+              >
+                No se pudo cargar el Decision Journal. Revisa la API.
+              </p>
+            </Card>
+          ) : null}
+          {journal ? (
+            <>
+              <Card
+                className="rounded-xl border-border bg-card px-4 py-3"
+                data-testid="journal-meta"
+              >
+                <p className="text-xs text-muted-foreground">
+                  Cuenta{" "}
+                  <code className="text-[10px]">{journal.accountId}</code>
+                  {" · "}
+                  {journal.total} entrada{journal.total === 1 ? "" : "s"}
+                  {journal.total > journal.entries.length
+                    ? ` (mostrando ${journal.entries.length})`
+                    : null}
+                </p>
+              </Card>
+              <JournalTimeline entries={journal.entries} />
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
     </div>
   );
 }

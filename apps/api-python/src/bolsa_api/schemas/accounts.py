@@ -451,6 +451,60 @@ class DecisionJournalListResponseDto(BaseModel):
     data: DecisionJournalListDto
 
 
+class DecisionJournalStudyDto(BaseModel):
+    """Wire alineado con ``DecisionJournalStudyViewV1`` (@bolsa/shared)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    artifact_type: str = Field(default="ART-DECISION-JOURNAL-STUDY", alias="artifactType")
+    schema_version: str = Field(default="1.0.0", alias="schemaVersion")
+    session_id: str = Field(alias="sessionId")
+    decision_id: str | None = Field(default=None, alias="decisionId")
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str | None = None
+    name: str | None = None
+    studied_at: str = Field(alias="studiedAt")
+    age_ms: int | None = Field(default=None, alias="ageMs")
+    period: str | None = None
+    timeframe: str | None = None
+    opinion: str | None = None
+    status: str
+    strength: float | None = None
+    strength_band: str | None = Field(default=None, alias="strengthBand")
+    vigencia: str | None = None
+    entry: float | None = None
+    stop: float | None = None
+    target1: float | None = None
+    target2: float | None = None
+    expected_rr: float | None = Field(default=None, alias="expectedRR")
+    risk_amount: float | None = Field(default=None, alias="riskAmount")
+    has_operational_plan: bool = Field(alias="hasOperationalPlan")
+    user_thesis: Any | None = Field(default=None, alias="userThesis")
+    decision_summary: str | None = Field(default=None, alias="decisionSummary")
+    analysis_notes: list[str] = Field(default_factory=list, alias="analysisNotes")
+    trends: list[dict[str, Any]] = Field(default_factory=list)
+    consensus: dict[str, Any] = Field(default_factory=dict)
+    indicators: dict[str, Any] = Field(default_factory=dict)
+    invalidation: list[str] = Field(default_factory=list)
+    next_review_at: str | None = Field(default=None, alias="nextReviewAt")
+    trade_plan_status: str | None = Field(default=None, alias="tradePlanStatus")
+    action: str | None = None
+
+
+class DecisionJournalStudyListDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    account_id: str = Field(alias="accountId")
+    studies: list[DecisionJournalStudyDto]
+    total: int
+    limit: int
+    offset: int
+
+
+class DecisionJournalStudyListResponseDto(BaseModel):
+    data: DecisionJournalStudyListDto
+
+
 class SessionVerdictBodyDto(BaseModel):
     """P4 — veredicto explícito de sesión (sin fill)."""
 

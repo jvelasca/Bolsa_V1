@@ -3,6 +3,11 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    effective_broker_venue_async,
+    normalize_broker_venue,
+)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +19,7 @@ from bolsa_api.api.dependencies import (
     get_daily_ops_report_use_case,
     get_db_session,
     get_decision_board_use_case,
+    get_decision_journal_studies_use_case,
     get_decision_journal_use_case,
     get_delete_account_use_case,
     get_deposit_cash_use_case,
@@ -52,6 +58,7 @@ from bolsa_api.schemas.accounts import (
     DailyOpsDigestNotifyResponseDto,
     DecisionBoardResponseDto,
     DecisionJournalListResponseDto,
+    DecisionJournalStudyListResponseDto,
     DepositCashDto,
     LedgerResponseDto,
     SendDailyOpsDigestDto,
@@ -63,11 +70,6 @@ from bolsa_api.schemas.accounts import (
     WithdrawCashDto,
 )
 from bolsa_api.schemas.ai_governance import AiEffectivenessResponseDto
-from bolsa_application.broker_venue_runtime import (
-    account_broker_venue_from_settings,
-    effective_broker_venue_async,
-    normalize_broker_venue,
-)
 
 router = APIRouter()
 
@@ -414,6 +416,46 @@ async def get_decision_journal(
         offset=offset,
     )
     return DecisionJournalListResponseDto(data=result.to_dict())
+
+
+@router.get(
+    "/accounts/{account_id}/decision-studies",
+    response_model=DecisionJournalStudyListResponseDto,
+)
+async def get_decision_studies(
+    account_id: Annotated[str, Depends(require_account_access)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    list_id: Annotated[str | None, Query(alias="listId")] = None,
+    q: Annotated[str | None, Query()] = None,
+    period: Annotated[str | None, Query()] = None,
+    opinion: Annotated[str | None, Query()] = None,
+    status: Annotated[str | None, Query()] = None,
+    strength_band: Annotated[str | None, Query(alias="strengthBand")] = None,
+    date_from: Annotated[str | None, Query(alias="from")] = None,
+    date_to: Annotated[str | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> DecisionJournalStudyListResponseDto:
+    """ADR-036 — Tesis: última sesión propose por instrumento (solo lectura).
+
+    No muta journal, TradePlan ni Position. Geometría WATCH queda vacía.
+    """
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    result = await get_decision_journal_studies_use_case(session).execute(
+        account_id,
+        list_id=list_id,
+        q=q,
+        period=period,
+        opinion=opinion,
+        status=status,
+        strength_band=strength_band,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+        offset=offset,
+    )
+    return DecisionJournalStudyListResponseDto(data=result.to_dict())
 
 
 @router.post(
