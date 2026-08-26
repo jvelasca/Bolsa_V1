@@ -300,5 +300,5 @@ async def recon_status_for_incident_clear(
     """Status recon relevante para clear según kind del incidente."""
     aid = incident.account_id
     if incident.kind == "portfolio_drift":
-        return await portfolio_recon.portfolio_recon_status(aid)  # type: ignore[no-any-return]
-    return await live_recon.live_recon_status(aid)  # type: ignore[no-any-return]
+        return await portfolio_recon.portfolio_recon_status(aid)  # type: ignore[attr-defined,no-any-return]
+    return await live_recon.live_recon_status(aid)  # type: ignore[attr-defined,no-any-return]
