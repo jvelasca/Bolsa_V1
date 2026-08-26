@@ -50,3 +50,24 @@ def semi_exit_permission(
         auto_execute=False,
         position_closed=pos.status == "CLOSED",
     )
+
+
+def semi_protect_permission(
+    position_state: dict[str, Any] | None,
+    *,
+    suggested_stop: float,
+) -> Any:
+    """Confirm SEMI protect: ExitPlan ARMED/protect sin fill ledger."""
+    pos = position_state_from_dict(position_state)
+    if pos is None:
+        return check_exit_permission(None)
+    plan = build_exit_plan_from_position(
+        pos,
+        trail_hint=True,
+        trail_stop=suggested_stop,
+    )
+    return check_exit_permission(
+        plan,
+        auto_execute=False,
+        position_closed=pos.status == "CLOSED",
+    )

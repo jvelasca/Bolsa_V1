@@ -48,6 +48,34 @@
  * **2026-08-25l** — P3: cadena de salida ExitPlan → ExitPermission → SEMI; Lab/thin «Salida» ≠ puerto; no auto-exit CTA.
  * **2026-08-25m** — P4.1: Operaciones posiciones primero; CTAs → Confirm; cola entradas read-only; «No operar» → Journal.
  * **2026-08-25n** — P4.2: barra estado global; filtros cola entradas; Proteger + override stop en Confirm.
+ * **2026-08-26** — OI-1: manual HTTP/pending alinean ledger↔PositionState; Confirm no miente post-fill;
+ * Proteger persiste stop operativo (≠ broker); origen manual honesto en Operaciones.
+ * **2026-08-26b** — OI-2: apertura SEMI exige TradePlan TRIGGERED en firma de riesgo;
+ * sin plan → bloqueo `no_tradeplan` (manual HTTP sin cambio).
+ * **2026-08-26c** — OI-3: excepción de execute → UNKNOWN (nunca ERROR ni
+ * «no se ejecutó»); ExecutionRecord ≠ ExecutionPlan.
+ * **2026-08-26d** — OI-4: PaperOrder CREATED→FILLED; orden creada ≠ fill;
+ * venue PAPER (≠ broker).
+ * **2026-08-26e** — OI-5: PositionRevision historia auditada de stop/status;
+ * Proteger deja huella en snapshot (≠ reconciliación).
+ * **2026-08-26f** — OI-6: PortfolioReconciliation detect/report
+ * (cash/holdings/PositionState); no auto-heal · ≠ broker · ≠ ADR-021.
+ * **2026-08-26g** — PaperBroker: venue PAPER (CREATED→fill→FILLED) antes de
+ * BrokerAdapter; ≠ broker live · ≠ IBrokerAdapter.
+ * **2026-08-26h** — BrokerAdapter: puerto Paper | Live; mesa usa paper
+ * (PaperBroker). Mock live = no envío (`not_wired`) ≠ broker live.
+ * **2026-08-26i** — PH-1: Proteger con persist None (H2) no dice
+ * `protect_applied`; stop no cambió.
+ * **2026-08-26j** — XL-1: XtbBrokerAdapter LIVE vía bridge; rejected/submitted
+ * ≠ fill ledger; mock bridge fail-closed; ≠ thaw.
+ * **2026-08-26k** — LR-1: LiveLedgerReconciliation live↔ledger detect/report;
+ * sin bridge → unavailable (no clean falso); ≠ OI-6 paper interno.
+ * **2026-08-26l** — XL-2: bridge filled → execute_trade ledger; submitted
+ * sigue ≠ fill; boom → UNKNOWN.
+ * **2026-08-26m** — VS-1: mesa Paper|Live (BROKER_VENUE + toggle); default
+ * paper; Live sin URL → not_wired; ≠ thaw PAPER_D_EXECUTE.
+ * **2026-08-26n** — OE-1: Autoeval SEMI·AUTO (barra + GET /risk/ops-self-eval);
+ * measure ≠ Accept estricto · ≠ flip env.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -88,4 +116,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-25" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-26" as const;

@@ -1,6 +1,11 @@
 import { createServer } from 'node:http';
+import { randomUUID } from 'node:crypto';
 
 const PORT = Number(process.env.XTB_BRIDGE_PORT ?? 3002);
+/** Fail-closed: mock rechaza órdenes salvo XTB_BRIDGE_ALLOW_ORDERS=1. */
+const ALLOW_ORDERS = process.env.XTB_BRIDGE_ALLOW_ORDERS === '1';
+/** Con ALLOW + FILL: responde filled (ledger vía adapter XL-2). */
+const FILL_ORDERS = process.env.XTB_BRIDGE_FILL_ORDERS === '1';
 
 function hashSeed(text) {
   let hash = 0;
@@ -85,6 +90,74 @@ const server = createServer((req, res) => {
     }
 
     sendJson(res, 200, { bars });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/account/cash') {
+    sendJson(res, 200, {
+      cash: Number(process.env.XTB_BRIDGE_MOCK_CASH ?? 0),
+      currency: 'EUR',
+    });
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/account/positions') {
+    let positions = [];
+    try {
+      positions = JSON.parse(process.env.XTB_BRIDGE_MOCK_POSITIONS ?? '[]');
+    } catch {
+      positions = [];
+    }
+    sendJson(res, 200, { positions });
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/orders') {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      let parsed = {};
+      try {
+        parsed = body ? JSON.parse(body) : {};
+      } catch {
+        sendJson(res, 400, { status: 'rejected', reason: 'invalid_json' });
+        return;
+      }
+      if (!ALLOW_ORDERS) {
+        sendJson(res, 200, {
+          status: 'rejected',
+          reason: 'live_orders_disabled',
+          instrumentId: parsed.instrumentId ?? null,
+        });
+        return;
+      }
+      const venueOrderId = `xtb-mock-${randomUUID().slice(0, 8)}`;
+      const echo = {
+        venueOrderId,
+        instrumentId: parsed.instrumentId ?? null,
+        side: parsed.side ?? null,
+        quantity: parsed.quantity ?? null,
+      };
+      if (FILL_ORDERS) {
+        const filled = {
+          status: 'filled',
+          reason: 'live_filled',
+          ...echo,
+        };
+        if (parsed.price != null && parsed.price !== '') {
+          filled.fillPrice = parsed.price;
+        }
+        sendJson(res, 200, filled);
+        return;
+      }
+      sendJson(res, 200, {
+        status: 'submitted',
+        reason: 'live_submitted_no_fill',
+        ...echo,
+      });
+    });
     return;
   }
 

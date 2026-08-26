@@ -27,6 +27,18 @@ def test_no_plan_when_missing() -> None:
     assert s["stop"] is None
 
 
+def test_no_plan_fail_closed_when_required() -> None:
+    s = evaluate_risk_signature(
+        None,
+        signed_qty=10.0,
+        signed_price=100.0,
+        require_triggered_plan=True,
+    )
+    assert s["mode"] == "no_plan"
+    assert s["allowed"] is False
+    assert s["blockReason"] == "no_tradeplan"
+
+
 def test_no_plan_when_watch() -> None:
     s = evaluate_risk_signature(
         _plan(status="WATCH"), signed_qty=10.0, signed_price=100.0

@@ -10,6 +10,8 @@ from bolsa_application.execute_gated_portfolio_trade import (
     ExecuteGatedPortfolioTrade,
     OpeningVetoedError,
 )
+from bolsa_application.persist_position_from_exit import PersistPositionFromExit
+from bolsa_application.persist_position_from_fill import PersistPositionFromFill
 from bolsa_domain.entities.portfolio import Portfolio, PortfolioSummary, TradeResult, Transaction
 
 
@@ -108,3 +110,56 @@ async def test_gated_http_sell_skips_opening_gate() -> None:
     assert result.transaction.id == "tx-http"
     assert len(trade.calls) == 1
     assert trade.calls[0]["trade_type"] == "sell"
+
+
+class _FillStore:
+    def __init__(self) -> None:
+        self.inserts: list[dict] = []
+        self.open_by_instrument: dict[tuple[str, str], dict] = {}
+
+    async def get_by_open_transaction_id(self, open_transaction_id: str):
+        return None
+
+    async def get_open_for_instrument(self, account_id: str, instrument_id: str):
+        return self.open_by_instrument.get((account_id, instrument_id))
+
+    async def insert(self, **kwargs):
+        row = {"id": kwargs.get("position_id") or "pos-new", **kwargs}
+        self.open_by_instrument[(kwargs["account_id"], kwargs["instrument_id"])] = row
+        self.inserts.append(kwargs)
+        return row
+
+
+class _ExitStore:
+    def __init__(self, row=None):
+        self.row = row
+        self.updates = []
+
+    async def get_open_for_instrument(self, account_id: str, instrument_id: str):
+        return self.row
+
+    async def update_state(self, *, position_id: str, status: str, position_state: dict):
+        self.updates.append({"status": status})
+        return self.row
+
+
+@pytest.mark.asyncio
+async def test_gated_http_buy_persists_manual_position() -> None:
+    trade = _FakeExecuteTrade()
+    fill_store = _FillStore()
+    uc = ExecuteGatedPortfolioTrade(
+        trade,  # type: ignore[arg-type]
+        portfolio_summary=_AllowSummary(),
+        position_from_fill=PersistPositionFromFill(fill_store),
+        position_from_exit=PersistPositionFromExit(_ExitStore()),
+    )
+    await uc.execute(
+        instrument_id="inst-1",
+        trade_type="buy",
+        quantity=2.0,
+        price=10.0,
+        account_id="acc-1",
+        idempotency_key="k" * 16,
+    )
+    assert len(fill_store.inserts) == 1
+    assert fill_store.inserts[0]["birth_override_reason"] == "human_manual"

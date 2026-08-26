@@ -44,6 +44,64 @@ vi.mock("@/lib/api", () => ({
       runtimeMemory: false,
       redis: null,
       paperDExecuteEnv: false,
+      brokerVenue: "paper",
+    })),
+    getBrokerVenue: vi.fn(async () => ({
+      brokerVenue: "paper",
+      env: "paper",
+      runtimeMemory: null,
+      redis: null,
+    })),
+    setBrokerVenue: vi.fn(async (venue: "paper" | "live") => ({
+      brokerVenue: venue,
+      env: "paper",
+      runtimeMemory: venue,
+      redis: venue,
+    })),
+    getOpsSelfEval: vi.fn(async () => ({
+      schemaVersion: "ops_self_eval_v0",
+      rule: "measure ≠ Accept",
+      accountId: "acc-1",
+      lookbackDays: 120,
+      lanes: {
+        semi: {
+          mark: "WARN",
+          confirmSeed: 1,
+          journalSeed: 8,
+          buysSeed: 0,
+          tradeLike: 0,
+        },
+        auto: {
+          mark: "FAIL",
+          paperDExecuteEnv: false,
+          executeOptIn: false,
+          strictAcceptReady: false,
+          p1: { daysWithOpinions: 28, mark: "FAIL", need: 60 },
+          p2: { confirmSeed: 1, mark: "FAIL", need: 50 },
+          p3: {
+            buyPrecision5d: null,
+            alarmaBuyCount: 0,
+            matureBuySample: 0,
+            mark: "FAIL",
+            need: 0.7,
+          },
+          p4: { buyRecall5d: 0, mark: "FAIL", need: 0.55 },
+          p5: {
+            tradeLike: 0,
+            cashMaxDdFrac: 0.002,
+            mark: "WARN",
+            note: null,
+          },
+        },
+      },
+      runtime: {
+        killSwitchEffective: false,
+        brokerVenue: "paper",
+        accountVenuePreference: null,
+        paperDExecuteEnv: false,
+        confirmPathHonesty: "SEMI",
+      },
+      portfolioReconciliation: { status: "not_wired" },
     })),
   },
 }));
@@ -75,5 +133,22 @@ describe("MesaOperationalBar P4.2", () => {
     expect(text).toMatch(/Excepciones \(1\)/i);
     expect(text).toMatch(/Veto entradas \(1\)/i);
     expect(text).toMatch(/Posiciones\s+2/i);
+  });
+
+  it("shows OE-1 Autoeval SEMI/AUTO marks", async () => {
+    renderBar();
+    const chip = await screen.findByTestId("mesa-ops-self-eval");
+    await waitFor(() => {
+      expect(chip.textContent ?? "").toMatch(/SEMI WARN/i);
+    });
+    expect(chip.textContent ?? "").toMatch(/AUTO FAIL/i);
+  });
+
+  it("shows Paper|Live venue toggle (VS-1)", async () => {
+    renderBar();
+    const venue = await screen.findByTestId("mesa-broker-venue");
+    expect(venue).toBeTruthy();
+    expect(screen.getByTestId("mesa-broker-venue-paper")).toBeTruthy();
+    expect(screen.getByTestId("mesa-broker-venue-live")).toBeTruthy();
   });
 });

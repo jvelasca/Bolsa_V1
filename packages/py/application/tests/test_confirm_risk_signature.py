@@ -88,7 +88,7 @@ async def test_execute_qty_at_plan_fills_without_override() -> None:
 
 
 @pytest.mark.asyncio
-async def test_no_plan_does_not_cap_qty() -> None:
+async def test_no_plan_opening_rejected_at_confirm() -> None:
     fake = _FakeExecuteTrade()
     uc = ConfirmRecommendationIntent(execute_trade=fake)
     result = await uc.execute(
@@ -96,8 +96,9 @@ async def test_no_plan_does_not_cap_qty() -> None:
         account_id="acc-1",
         execute=True,
     )
-    assert result["trade"]["status"] == "executed"
-    assert fake.calls[0]["quantity"] == 99.0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_signature"
+    assert fake.calls == []
 
 
 @pytest.mark.asyncio

@@ -170,13 +170,13 @@ Lab MaxDD: adjuntar medición Lab comparable (trial / Lab Health / informe acord
 
 Registrar cada semana en nota corta (chat o anexo dated) — **números medidos**, no objetivos inventados.
 
-| Semana                  | P1 días | P2 confirm seed | alarmaBuy / matureBuy | Prec / Recall | P5 trade_like · MaxDD  | Notas                                                      |
-| ----------------------- | ------: | --------------: | --------------------- | ------------- | ---------------------- | ---------------------------------------------------------- |
-| **Baseline 2026-08-25** |      28 |               0 | 0 / 0                 | null / 0.0    | 0 · 0.2% cash inválido | BETA-D + W2–W4                                             |
-| **W+1 2026-08-25**      |      28 |               0 | 0 / 0                 | null / 0.0    | 0 · 0.2% cash inválido | same-day remeasure · all FAIL/WARN · unchanged vs baseline |
-| W+2                     |         |                 |                       |               |                        |                                                            |
-| W+3                     |         |                 |                       |               |                        |                                                            |
-| W+4                     |         |                 |                       |               |                        |                                                            |
+| Semana                  | P1 días | P2 confirm seed | alarmaBuy / matureBuy | Prec / Recall | P5 trade_like · MaxDD  | Notas                                                                                                                                                                                                  |
+| ----------------------- | ------: | --------------: | --------------------- | ------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Baseline 2026-08-25** |      28 |               0 | 0 / 0                 | null / 0.0    | 0 · 0.2% cash inválido | BETA-D + W2–W4                                                                                                                                                                                         |
+| **W+1 2026-08-25**      |      28 |               0 | 0 / 0                 | null / 0.0    | 0 · 0.2% cash inválido | same-day remeasure · all FAIL/WARN · unchanged vs baseline                                                                                                                                             |
+| **W+2 2026-08-26**      |      28 |               1 | ? / ? (API down)      | ? / ?         | 0 · 0.2% cash inválido | SQL OK · API :8000 down · confirm 0→1 · journal_seed=8 · buys_seed=0 · buys_testish=49 · no Accept · plan [`plan-thaw-estricto-remeasure-2026-08-26.md`](./plan-thaw-estricto-remeasure-2026-08-26.md) |
+| W+3                     |         |                 |                       |               |                        |                                                                                                                                                                                                        |
+| W+4                     |         |                 |                       |               |                        |                                                                                                                                                                                                        |
 
 **Trayectoria owner (acciones, no métricas fake):**
 

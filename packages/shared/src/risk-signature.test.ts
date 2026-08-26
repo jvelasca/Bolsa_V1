@@ -37,7 +37,19 @@ describe("evaluateRiskSignature", () => {
     expect(s.stop).toBeNull();
   });
 
-  it("no_plan when status is WATCH even with quantity", () => {
+  it("no_plan fail-closed when requireTriggeredPlan (SEMI opening)", () => {
+    const s = evaluateRiskSignature({
+      tradePlan: null,
+      signedQty: 10,
+      signedPrice: 100,
+      requireTriggeredPlan: true,
+    });
+    expect(s.mode).toBe("no_plan");
+    expect(s.allowed).toBe(false);
+    expect(s.blockReason).toBe("no_tradeplan");
+  });
+
+  it("no_plan when status is WATCH (display-only, no requireTriggeredPlan)", () => {
     const s = evaluateRiskSignature({
       tradePlan: triggeredPlan({ status: "WATCH", quantity: 10 }),
       signedQty: 10,

@@ -4,6 +4,126 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.11-beta] — 2026-08-26
+
+Operational Integrity v1.11 (OI-1…OE-1). Producto sigue **BETA / no producción**. Tag **`v1.11-beta`** (SHA al publicar). Partida: **`v1.10-beta` → `047ddb6`**. Spine **`pnpm test:decision-spine` = 367**. Pack: [`audit-pack-estado-global-2026-08-26-v111.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v111.md). Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**.
+
+### OI-1 — Continuidad operativa (v1.11)
+
+- **Manual trade:** `POST /portfolio/trade` y pending sin plan nacen PositionState con override `human_manual`.
+- **Pending SELL / manual sell:** cierran o reducen Position persistida vía `post_fill_position_sync`.
+- **Confirm honesty:** fill ejecutado no se reporta como error si falla persist/journal posterior (`positionPersist`).
+- **Proteger:** Confirm persiste stop operativo (H2); botón «Confirmar protección»; cero ledger.
+- **Lab:** `evaluate-exits` con `executeTrades` persiste exit si `trade_executed` (Lab ≠ mesa).
+- ADR-034 · plan [`plan-oi1-continuity-2026-08-26.md`](./docs/engineering/plan-oi1-continuity-2026-08-26.md) · spine **273**.
+
+### OI-2 — Risk signature honesty (v1.11)
+
+- **SEMI opening:** `risk_signature` con `require_triggered_plan` — sin TradePlan TRIGGERED → `rejected_by_gate` / `no_tradeplan`.
+- **Manual HTTP:** sin cambio (no pasa por `risk_signature`).
+- **UI:** copy `no_tradeplan` en F3 risk block y supervised panel.
+- Plan [`plan-oi2-risk-signature-honesty-2026-08-26.md`](./docs/engineering/plan-oi2-risk-signature-honesty-2026-08-26.md) · spine **274**.
+
+### OI-3 — ExecutionRecord UNKNOWN ≠ ERROR (v1.11)
+
+- **Confirm:** excepción de `execute_trade` → `trade.status=unknown` + `executionRecord.outcome=unknown` (nunca `error`, nunca `rejected_by_gate`).
+- **Gate/skip** antes de enviar → `not_executed`. Fill OK + persist falla → `executed` (OI-1).
+- **UI/HELP:** copy «no asumir que no se ejecutó».
+- Plan [`plan-oi3-execution-record-2026-08-26.md`](./docs/engineering/plan-oi3-execution-record-2026-08-26.md) · spine **283**.
+
+### OI-4 — PaperOrder CREATED→FILLED (v1.11)
+
+- **Confirm / FillPending:** al enviar nace `paperOrder` CREATED; fill → FILLED. Gate/skip → no hay orden. Excepción de envío → CREATED (fill no confirmado).
+- **UI/HELP:** CREATED ≠ FILLED; orden creada no es fill. Venue PAPER ≠ broker.
+- Plan [`plan-oi4-order-lifecycle-2026-08-26.md`](./docs/engineering/plan-oi4-order-lifecycle-2026-08-26.md) · spine **291**.
+
+### OI-5 — Position revisions (v1.11)
+
+- **PositionRevision:** historia append-only de stop/status en `PositionState.revisions` (JSON snapshot).
+- **applyCurrentStop / applyReduce:** append solo si hay cambio real; mark no; protect → `origin=protect`.
+- **UI/HELP:** stop/status con historia auditada; Proteger deja huella.
+- Plan [`plan-oi5-position-revisions-2026-08-26.md`](./docs/engineering/plan-oi5-position-revisions-2026-08-26.md) · spine **306**.
+
+### OI-6 — Portfolio reconciliation (v1.11)
+
+- **PortfolioReconciliation:** detect/report cash ↔ ledger ↔ holdings ↔ PositionState (OPEN). Add-on / holding sin OPEN → `expected`.
+- **No** auto-heal · **no** broker · **no** Alembic · ≠ ADR-021 DÍA D.
+- Use-case `ReconcilePortfolioIntegrity` + spine tests.
+- Plan [`plan-oi6-reconciliation-2026-08-26.md`](./docs/engineering/plan-oi6-reconciliation-2026-08-26.md) · spine **317**.
+
+### PaperBroker — venue PAPER (v1.11)
+
+- **PaperBroker.submit:** CREATED → ledger fill → FILLED; excepción → CREATED + `unknown`.
+- Confirm / FillPending adjuntan `paperOrder` + `paperBroker` (`venue: PAPER`, ≠ broker live).
+- **No** `IBrokerAdapter` · **no** broker live · **no** thaw `PAPER_D_EXECUTE`.
+- Plan [`plan-paperbroker-2026-08-26.md`](./docs/engineering/plan-paperbroker-2026-08-26.md) · spine **322**.
+
+### BrokerAdapter — puerto Paper | Live (v1.11)
+
+- **IBrokerAdapter:** Confirm / FillPending envían por el puerto (default paper = PaperBroker).
+- **Mock LIVE:** `not_wired` — nunca llama `execute_trade` (≠ broker live / XTB).
+- Receipt `brokerAdapter` (`venue: PAPER|LIVE`). Gate/skip → sin receipt.
+- **No** live · **no** thaw `PAPER_D_EXECUTE`.
+- Plan [`plan-brokeradapter-2026-08-26.md`](./docs/engineering/plan-brokeradapter-2026-08-26.md) · spine **331**.
+
+### PH-1 — Confirm protect honesty (v1.11)
+
+- **Proteger:** si H2/`persist` → `None` (o excepción), Confirm no dice `protect_applied`. `skipped` / `stop_not_applied`. Cero ledger: el éxito es persistir.
+- **UI:** log «stop no aplicado»; no saca de cola ni graba mandato.
+- Plan [`plan-confirm-protect-honesty-2026-08-26.md`](./docs/engineering/plan-confirm-protect-honesty-2026-08-26.md) · spine **334**.
+
+### XL-1 — Broker live XTB (v1.11)
+
+- **XtbBrokerAdapter:** `venue: LIVE`, `adapter: xtb`; POST bridge `/orders`.
+- Fail-closed: mock `live_orders_disabled`; `submitted` ≠ fill.
+- Confirm/FillPending: rejected→skipped; submitted→unknown `live_submitted_no_fill`; pending intacta.
+- **No** thaw `PAPER_D_EXECUTE` · mesa default paper.
+- Plan [`plan-broker-live-xtb-2026-08-26.md`](./docs/engineering/plan-broker-live-xtb-2026-08-26.md) · spine **341**.
+
+### LR-1 — Live reconciliation (v1.11)
+
+- **LiveLedgerReconciliation:** live cash/positions ↔ ledger; `clean`/`drift`/`unavailable`.
+- Detect/report only · **no** heal · **no** trade · bridge `GET /account/cash|positions`.
+- Plan [`plan-lr1-live-reconciliation-2026-08-26.md`](./docs/engineering/plan-lr1-live-reconciliation-2026-08-26.md).
+
+### XL-2 — XTB fill → ledger (v1.11)
+
+- Bridge `filled` (opt-in FILL) → `execute_trade` → Confirm/FillPending `executed`.
+- `submitted` sigue ≠ fill · boom → `unknown` (OI-3).
+- Plan [`plan-xl2-xtb-fill-ledger-2026-08-26.md`](./docs/engineering/plan-xl2-xtb-fill-ledger-2026-08-26.md).
+
+### VS-1 — Venue selector Paper | Live (v1.11)
+
+- `BROKER_VENUE` + runtime · DI Confirm/FillPending · mesa toggle Paper|Live.
+- Live → Xtb (sin URL → `not_wired`) · default paper · ≠ thaw `PAPER_D_EXECUTE`.
+- Plan [`plan-vs1-venue-selector-2026-08-26.md`](./docs/engineering/plan-vs1-venue-selector-2026-08-26.md) · spine **362**.
+
+### RV-1 — Redis persist broker venue (v1.11)
+
+- Key `bolsa:risk:broker_venue` · coalesce `memory ?? redis ?? env ?? paper` · DI async.
+- Per-account venue **parked**. Plan [`plan-rv1-redis-venue-2026-08-26.md`](./docs/engineering/plan-rv1-redis-venue-2026-08-26.md).
+
+### JP-1 — PositionState JSONB → columnas hot (v1.11)
+
+- Alembic `012`: `direction` · `current_stop` · `remaining_quantity` · `quantity` · `initial_stop` · `actual_entry`.
+- Dual-write + backfill; JSONB `position_state` sigue SoT. Plan [`plan-jp1-position-jsonb-columns-2026-08-26.md`](./docs/engineering/plan-jp1-position-jsonb-columns-2026-08-26.md).
+
+### Thaw stamp — `PAPER_D_EXECUTE` DEMO opt-in (v1.11)
+
+- Docs/ops: DEMO opt-in **autorizado**; repo default **OFF**; ≠ venue Live · ≠ thaw estricto P1–P5.
+- Plan [`plan-thaw-paper-d-execute-stamp-2026-08-26.md`](./docs/engineering/plan-thaw-paper-d-execute-stamp-2026-08-26.md).
+
+### PA-1 — Preferencia venue por cuenta (v1.11)
+
+- `settings_json.brokerVenue` (`paper`|`live`); coalesce `memory ?? redis ?? account ?? env ?? paper`.
+- Lazy Confirm/Fill; mesa/API risk = override **global**. UI preferencia cuenta **opcional**.
+- Plan [`plan-pa1-per-account-venue-2026-08-26.md`](./docs/engineering/plan-pa1-per-account-venue-2026-08-26.md).
+
+### OE-1 — Ops Autoeval SEMI·AUTO (v1.11)
+
+- `GET /api/risk/ops-self-eval` + `scripts/ops_operativa_self_eval.mjs` + chip mesa. Measure ≠ Accept.
+- Recon OI-6 en informe `not_wired`. Plan [`plan-oe1-ops-autoeval-2026-08-26.md`](./docs/engineering/plan-oe1-ops-autoeval-2026-08-26.md).
+
 ## [1.10-beta] — 2026-08-25
 
 Operational Authority v1.10 (H1→P4 Consola de Mesa P4.1+P4.2). Producto sigue **BETA / no producción**. Tag anotado **`v1.10-beta` → `047ddb6`** (Release tag CI GREEN). Partida: **`v1.9-beta` → `7d90d965`**. Spine **`pnpm test:decision-spine` = 260**. Shared **156**. Pack: [`audit-pack-estado-global-2026-08-25-v110.md`](./docs/engineering/audit-pack-estado-global-2026-08-25-v110.md). **No** broker · **No** auto-exit CTA producto · thin 5.x/8.x congelados · Confirm = única firma.

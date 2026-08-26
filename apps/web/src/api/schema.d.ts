@@ -79,6 +79,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts/{account_id}/broker-venue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Account Broker Venue
+         * @description PA-1 — preferencia cuenta + venue efectivo (global override gana).
+         */
+        get: operations["get_account_broker_venue_api_accounts__account_id__broker_venue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Patch Account Broker Venue
+         * @description PA-1 — escribe settings_json.brokerVenue vía merge (≠ POST /risk/broker-venue).
+         */
+        patch: operations["patch_account_broker_venue_api_accounts__account_id__broker_venue_patch"];
+        trace?: never;
+    };
     "/api/accounts/{account_id}/close": {
         parameters: {
             query?: never;
@@ -2912,6 +2936,30 @@ export interface paths {
         patch: operations["link_trial_hypothesis_api_research_trials__trial_id__hypothesis_patch"];
         trace?: never;
     };
+    "/api/risk/broker-venue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Broker Venue
+         * @description Lee venue efectivo (memory ?? redis ?? env ``BROKER_VENUE``; default paper).
+         */
+        get: operations["get_broker_venue_api_risk_broker_venue_get"];
+        put?: never;
+        /**
+         * Post Broker Venue
+         * @description Fija override Paper|Live (memoria + Redis best-effort).
+         */
+        post: operations["post_broker_venue_api_risk_broker_venue_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/risk/kill-switch": {
         parameters: {
             query?: never;
@@ -2930,6 +2978,26 @@ export interface paths {
          * @description Activa o desactiva el kill switch runtime (memoria + Redis si hay).
          */
         post: operations["post_kill_switch_api_risk_kill_switch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/risk/ops-self-eval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ops Self Eval
+         * @description OE-1 — scorecard SEMI + AUTO (read-only). measure ≠ Accept · ≠ flip env.
+         */
+        get: operations["get_ops_self_eval_api_risk_ops_self_eval_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3394,6 +3462,30 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccountBrokerVenueBody
+         * @description PA-1 — preferencia Paper|Live en settings_json.brokerVenue (≠ override global mesa).
+         */
+        AccountBrokerVenueBody: {
+            /**
+             * Venue
+             * @description Preferencia por cuenta
+             * @enum {string}
+             */
+            venue: "paper" | "live";
+        };
+        /** AccountBrokerVenueResponse */
+        AccountBrokerVenueResponse: {
+            /** Accountid */
+            accountId: string;
+            /**
+             * Effective
+             * @enum {string}
+             */
+            effective: "paper" | "live";
+            /** Preference */
+            preference?: ("paper" | "live") | null;
+        };
         /** AccountResponseDto */
         AccountResponseDto: {
             data: components["schemas"]["InvestmentAccountDto"];
@@ -3818,6 +3910,35 @@ export interface components {
              * @default 10-K
              */
             kind: string;
+        };
+        /** BrokerVenueBody */
+        BrokerVenueBody: {
+            /**
+             * Venue
+             * @enum {string}
+             */
+            venue: "paper" | "live";
+        };
+        /** BrokerVenueResponse */
+        BrokerVenueResponse: {
+            /**
+             * Brokervenue
+             * @enum {string}
+             */
+            brokerVenue: "paper" | "live";
+            /**
+             * Env
+             * @enum {string}
+             */
+            env: "paper" | "live";
+            /** Redis */
+            redis?: ("paper" | "live") | null;
+            /** Runtimememory */
+            runtimeMemory?: ("paper" | "live") | null;
+            /** Updated */
+            updated?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** CashMovementResponseDto */
         CashMovementResponseDto: {
@@ -6416,6 +6537,12 @@ export interface components {
          * @description Estado efectivo del kill switch + lectura de ``PAPER_D_EXECUTE`` (solo info).
          */
         KillSwitchResponse: {
+            /**
+             * Brokervenue
+             * @default paper
+             * @enum {string}
+             */
+            brokerVenue: "paper" | "live";
             /** Effective */
             effective: boolean;
             /** Env */
@@ -9234,6 +9361,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssignProfileResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_account_broker_venue_api_accounts__account_id__broker_venue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountBrokerVenueResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_account_broker_venue_api_accounts__account_id__broker_venue_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountBrokerVenueBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountBrokerVenueResponse"];
                 };
             };
             /** @description Validation Error */
@@ -15041,6 +15234,59 @@ export interface operations {
             };
         };
     };
+    get_broker_venue_api_risk_broker_venue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerVenueResponse"];
+                };
+            };
+        };
+    };
+    post_broker_venue_api_risk_broker_venue_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrokerVenueBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrokerVenueResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_kill_switch_api_risk_kill_switch_get: {
         parameters: {
             query?: never;
@@ -15081,6 +15327,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KillSwitchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ops_self_eval_api_risk_ops_self_eval_get: {
+        parameters: {
+            query?: {
+                accountId?: string;
+                lookbackDays?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

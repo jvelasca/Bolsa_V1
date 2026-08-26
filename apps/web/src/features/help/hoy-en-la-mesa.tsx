@@ -50,9 +50,22 @@ export function HoyEnLaMesaBlock() {
         Tras un fill, Operaciones muestra stop / T1 / T2 del plan persistido;
         qty/P&L sigue siendo el holding (contabilidad). Al firmar en Confirmar,
         el tamaño es el riesgo del TradePlan (no % caja); superar el plan exige
-        motivo. Cadena de salida: ExitPlan propone, ExitPermission valida, tú
-        firmas en SEMI (no es auto-exit; thin «Salida» y Lab Señales no son este
-        puerto). Tras un cierre firmado, el plan se reduce o cierra.{" "}
+        motivo. Si el envío paper revienta, el resultado es desconocido — no
+        asumir que no se ejecutó (UNKNOWN ≠ ERROR). PaperOrder CREATED ≠ FILLED:
+        orden creada no es fill (paper, ≠ broker). Stop/status de posición
+        tienen historia auditada (PositionRevision); Proteger deja huella en el
+        snapshot. PortfolioReconciliation detecta deriva paper
+        (cash/holdings/posición) — informe, no auto-heal (≠ broker). El envío
+        paper pasa por PaperBroker (venue PAPER ≠ broker live). Confirm envía
+        por BrokerAdapter (paper | live mock | XTB); el mock live no envía; XTB
+        rejected/submitted no es fill ledger; filled sí escribe ledger.
+        Live↔ledger se reporta (LiveLedgerReconciliation) sin auto-heal. Mesa
+        elige Paper|Live (default paper; Live sin bridge → not_wired). Proteger:
+        si H2 no persiste el stop (persist None), Confirm no dice
+        protect_applied — el stop no cambió. Cadena de salida: ExitPlan propone,
+        ExitPermission valida, tú firmas en SEMI (no es auto-exit; thin «Salida»
+        y Lab Señales no son este puerto). Tras un cierre firmado, el plan se
+        reduce o cierra.{" "}
         <strong className="text-foreground">Operaciones</strong> (
         <RouteLink to="/operations">Libro · Operaciones</RouteLink>) abre por
         posiciones: R/stop/T1/T2, advisory Salida, CTAs Revisar/Reducir/Salir
@@ -63,7 +76,10 @@ export function HoyEnLaMesaBlock() {
         excepciones. Cola de entradas con filtros por estado/gate/símbolo
         (Vigilar…Descartado). «No operar hoy» → Journal{" "}
         <code className="text-[10px]">session_verdict</code> — 0 BUY puede ser
-        un día excelente.
+        un día excelente. <strong className="text-foreground">Autoeval</strong>{" "}
+        en la barra operativa (SEMI · AUTO) es scorecard read-only: rojo ≠
+        permiso thaw; measure ≠ Accept estricto;{" "}
+        <code className="text-[10px]">PAPER_D_EXECUTE</code> default off.
       </p>
     </section>
   );

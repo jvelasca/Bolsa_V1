@@ -391,7 +391,7 @@ async def confirm_intent(
     """F3 — humano confirma Recommendation → OrderIntent (+ opcional ExecuteTrade) + Session."""
     from bolsa_api.api.dependencies import get_confirm_intent_use_case
 
-    use_case = get_confirm_intent_use_case(session)
+    use_case = await get_confirm_intent_use_case(session)
     result = await use_case.execute(
         recommendation_raw=body.recommendation,
         account_id=body.account_id,

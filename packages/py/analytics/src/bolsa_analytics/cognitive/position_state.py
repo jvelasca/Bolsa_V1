@@ -11,6 +11,14 @@ from datetime import UTC, datetime
 from typing import Literal
 from uuid import uuid4
 
+from bolsa_analytics.cognitive.position_revision import (
+    PositionRevision,
+    PositionRevisionOrigin,
+    build_position_revision,
+    revisions_from_raw,
+    stop_or_status_changed,
+)
+
 PositionStatus = Literal["OPEN", "PARTIAL", "PROTECTED", "CLOSED"]
 PositionExitStatus = Literal["none", "hint", "armed", "done"]
 TradePlanDirection = Literal["long", "short", "none"]
@@ -135,6 +143,7 @@ class PositionState:
     exit_status: PositionExitStatus
     created_at: str
     updated_at: str
+    revisions: tuple[PositionRevision, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -161,6 +170,7 @@ class PositionState:
             "exitStatus": self.exit_status,
             "createdAt": self.created_at,
             "updatedAt": self.updated_at,
+            "revisions": [r.to_dict() for r in self.revisions],
         }
 
 
@@ -235,6 +245,7 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         exit_status=exit_status,  # type: ignore[arg-type]
         created_at=created.strip(),
         updated_at=updated.strip() if isinstance(updated, str) else created.strip(),
+        revisions=revisions_from_raw(raw.get("revisions")),
     )
 
 
@@ -317,7 +328,35 @@ def build_position_state_from_fill(
         exit_status="none",
         created_at=now,
         updated_at=now,
+        revisions=(),
     )
+
+
+def _with_revision_if_changed(
+    previous: PositionState,
+    next_pos: PositionState,
+    *,
+    origin: PositionRevisionOrigin,
+    reason: str | None,
+    at: str,
+) -> PositionState:
+    if not stop_or_status_changed(
+        previous_stop=previous.current_stop,
+        next_stop=next_pos.current_stop,
+        previous_status=previous.status,
+        next_status=next_pos.status,
+    ):
+        return next_pos
+    rev = build_position_revision(
+        at=at,
+        previous_stop=previous.current_stop,
+        next_stop=next_pos.current_stop,
+        previous_status=previous.status,
+        next_status=next_pos.status,
+        origin=origin,
+        reason=reason,
+    )
+    return replace(next_pos, revisions=previous.revisions + (rev,))
 
 
 def apply_position_mark(
@@ -371,8 +410,13 @@ def apply_position_reduce(
     *,
     exit_price: float | None = None,
     at: str | None = None,
+    origin: PositionRevisionOrigin = "reduce",
+    reason: str | None = None,
 ) -> PositionState | None:
-    """F2.1 reduce → remaining / realized_r / PARTIAL|CLOSED."""
+    """F2.1 reduce → remaining / realized_r / PARTIAL|CLOSED.
+
+    OI-5: append revisión si status cambia.
+    """
     if position is None or position.status == "CLOSED":
         return None
     cut_in = _finite_positive(qty)
@@ -397,7 +441,7 @@ def apply_position_reduce(
 
     updated = _now_iso(at)
     if remaining <= 0:
-        return replace(
+        next_pos = replace(
             position,
             remaining_quantity=0.0,
             realized_r=realized,
@@ -405,14 +449,28 @@ def apply_position_reduce(
             exit_status="done",
             updated_at=updated,
         )
+        return _with_revision_if_changed(
+            position,
+            next_pos,
+            origin=origin,
+            reason=reason,
+            at=updated,
+        )
 
-    next_pos = replace(
+    mid = replace(
         position,
         remaining_quantity=remaining,
         realized_r=realized,
         updated_at=updated,
     )
-    return replace(next_pos, status=derive_position_status(next_pos))
+    next_pos = replace(mid, status=derive_position_status(mid))
+    return _with_revision_if_changed(
+        position,
+        next_pos,
+        origin=origin,
+        reason=reason,
+        at=updated,
+    )
 
 
 def apply_position_current_stop(
@@ -421,24 +479,50 @@ def apply_position_current_stop(
     *,
     at: str | None = None,
     override: dict[str, object] | None = None,
+    origin: PositionRevisionOrigin | None = None,
+    reason: str | None = None,
 ) -> PositionState | None:
     """F2.1 current_stop geométrico → posible PROTECTED (BE).
 
     H2: no empeora el stop sin override auditado.
+    OI-5: append revisión si stop o status cambian de verdad.
     """
     if position is None or position.status == "CLOSED":
         return None
     stop_p = _finite_positive(stop)
     if stop_p is None:
         return None
-    if _stop_worsens(position.direction, position.current_stop, stop_p) and not _is_audited_override(
-        override
-    ):
+    worsens = _stop_worsens(position.direction, position.current_stop, stop_p)
+    if worsens and not _is_audited_override(override):
         return None
 
-    next_pos = replace(
+    updated = _now_iso(at)
+    mid = replace(
         position,
         current_stop=_round4(stop_p),
-        updated_at=_now_iso(at),
+        updated_at=updated,
     )
-    return replace(next_pos, status=derive_position_status(next_pos))
+    next_pos = replace(mid, status=derive_position_status(mid))
+
+    resolved_origin: PositionRevisionOrigin
+    if origin is not None:
+        resolved_origin = origin
+    elif worsens:
+        resolved_origin = "override"
+    else:
+        resolved_origin = "stop"
+
+    override_reason = None
+    if isinstance(override, dict):
+        raw_reason = override.get("reason")
+        if isinstance(raw_reason, str) and raw_reason.strip():
+            override_reason = raw_reason.strip()
+    resolved_reason = reason if reason is not None else override_reason
+
+    return _with_revision_if_changed(
+        position,
+        next_pos,
+        origin=resolved_origin,
+        reason=resolved_reason,
+        at=updated,
+    )

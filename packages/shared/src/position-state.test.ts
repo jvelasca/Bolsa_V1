@@ -70,6 +70,7 @@ describe("F2 buildPositionStateFromFill", () => {
     expect(p.protectionState).toEqual({ status: "none" });
     expect(p.trailing).toEqual({ status: "none" });
     expect(p.exitStatus).toBe("none");
+    expect(p.revisions).toEqual([]);
     expect(p.createdAt).toBe("2026-08-25T15:00:00Z");
   });
 
@@ -243,6 +244,7 @@ describe("H2 invariantes from_fill / stop", () => {
       reason: "gap_widen",
     });
     expect(worse?.currentStop).toBe(94);
+    expect(worse?.revisions[0]?.origin).toBe("override");
   });
 
   it("short stop cannot worsen without override", () => {
@@ -259,5 +261,13 @@ describe("H2 invariantes from_fill / stop", () => {
       applyPositionCurrentStop(short, 106, null, { reason: "widen" })
         ?.currentStop,
     ).toBe(106);
+  });
+
+  it("OI-5 applyCurrentStop appends revision on real stop change", () => {
+    const nxt = applyPositionCurrentStop(openLong(), 97, "t-rev");
+    expect(nxt?.revisions).toHaveLength(1);
+    expect(nxt?.revisions[0]?.previousStop).toBe(95);
+    expect(nxt?.revisions[0]?.nextStop).toBe(97);
+    expect(nxt?.revisions[0]?.origin).toBe("stop");
   });
 });

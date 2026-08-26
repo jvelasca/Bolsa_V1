@@ -141,6 +141,8 @@ class Settings(BaseSettings):
     risk_kill_switch: bool = Field(
         default=False, validation_alias="RISK_KILL_SWITCH"
     )
+    # VS-1 — venue Paper | Live (default paper; live = XTB bridge).
+    broker_venue: str = Field(default="paper", validation_alias="BROKER_VENUE")
     # D2 — batch EOD dictámenes Estudio. Off-by-default (ADR-022 / triage).
     estudio_eod_opinion_enabled: bool = Field(
         default=False, validation_alias="ESTUDIO_EOD_OPINION_ENABLED"

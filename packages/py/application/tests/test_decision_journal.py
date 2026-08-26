@@ -241,6 +241,16 @@ async def test_confirm_hook_contract_and_executed_journal():
         "action": "recommend_long",
         "suggestedQuantity": 5,
         "suggestedPrice": 100.0,
+        "tradePlan": {
+            "decisionId": "dec-1",
+            "instrumentId": "inst-1",
+            "direction": "long",
+            "status": "TRIGGERED",
+            "quantity": 10.0,
+            "entry": 100.0,
+            "structuralStop": 95.0,
+            "riskAmount": 50.0,
+        },
         "metrics": {
             "confidence": 0.8,
             "consensus": 0.7,

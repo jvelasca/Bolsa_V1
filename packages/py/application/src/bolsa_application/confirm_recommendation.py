@@ -57,6 +57,22 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
   Position persistida pasa ExitPlan (`manual`) → ExitPermission. Motivo
   `exit_permission` (≠ `risk_veto` ≠ `risk_signature`). Sin fila → legado.
   Tras fill: `applyReduce`. Lab `EvaluatePositionExits` intacto.
+- **OI-1 continuidad (ADR-034):** manual HTTP/pending sync PositionState;
+  Confirm no pisa `trade.executed` si persist falla; Proteger persiste stop
+  (ExitPermission protect, cero ledger); Lab executeTrades → exit persist.
+- **PH-1 protect honesty:** `persist` → None (H2) o excepción → no
+  `protect_applied` (cero ledger: el éxito es persistir). `skipped` /
+  `stop_not_applied` | `persist_error`.
+- **OI-3 ExecutionRecord (ADR-034):** excepción de `execute_trade` →
+  `trade.status=unknown` (nunca `error`, nunca `rejected_by_gate`). ERROR solo
+  si el envío no se intentó. `executionRecord` adjunta el outcome honesto.
+- **OI-4 PaperOrder (ADR-034):** al enviar se crea `paperOrder` CREATED;
+  fill → FILLED. Excepción de envío → CREATED (fill no confirmado). Gate/skip
+  → no hay `paperOrder`. CREATED ≠ FILLED.
+- **BrokerAdapter (ADR-034 / XL-1):** Confirm envía vía `IBrokerAdapter` (default
+  paper = PaperBroker). Adjunta `brokerAdapter` + `paperBroker` en paper.
+  Mock LIVE → `live_not_wired`. XTB → rejected/submitted sin ledger
+  (`submitted` ≠ fill).
 """
 
 from __future__ import annotations
@@ -70,6 +86,7 @@ from bolsa_analytics.cognitive.decision_session import (
     attach_execution_to_payload,
     build_auto_session,
 )
+from bolsa_analytics.cognitive.execution_record import build_execution_record
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
 from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
@@ -80,8 +97,13 @@ from bolsa_analytics.cognitive.trade_plan import (
 )
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
+from bolsa_application.broker_adapter import IBrokerAdapter, resolve_broker_adapter
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    effective_broker_venue_async,
+)
 from bolsa_application.cognitive_persistence import CognitiveStore, decision_session_to_record
-from bolsa_application.evaluate_exit_plan import semi_exit_permission
+from bolsa_application.evaluate_exit_plan import semi_exit_permission, semi_protect_permission
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.journal_writer import (
     append_journal_event,
@@ -100,8 +122,8 @@ from bolsa_application.persist_position_from_exit import (
 from bolsa_application.persist_position_from_fill import (
     PersistPositionFromFillInput,
     ledger_position_id_from_trade,
-    open_transaction_id_from_trade,
 )
+from bolsa_application.persist_position_from_protect import PersistPositionFromProtectInput
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
@@ -112,6 +134,28 @@ _TRADE_ACTIONS = _OPENING_ACTIONS | _CLOSING_ACTIONS
 
 # ADR-031 — banda de revalidación de precio (último close vs suggestedPrice).
 PRICE_REVALIDATION_MAX_REL_DEVIATION = 0.02
+
+
+def _attach_execution_record(result: dict[str, Any]) -> None:
+    """OI-3 — foto honesta del intento. Protect no es fill ledger."""
+    trade = result.get("trade")
+    if not isinstance(trade, dict):
+        return
+    status = trade.get("status")
+    reason = trade.get("reason") if isinstance(trade.get("reason"), str) else None
+    tx = trade.get("transactionId")
+    tx_id = tx if isinstance(tx, str) and tx.strip() else None
+    if status == "executed":
+        rec = build_execution_record(filled=True, transaction_id=tx_id)
+    elif status == "unknown":
+        rec = build_execution_record(send_attempted=True, exception=reason)
+    elif status == "error":
+        rec = build_execution_record(exception=reason)
+    elif status in {"rejected_by_gate", "skipped"}:
+        rec = build_execution_record(not_executed_reason=reason)
+    else:
+        return
+    result["executionRecord"] = rec.to_dict()
 
 
 def resolve_session_decision_package(
@@ -324,6 +368,19 @@ def _is_closing_action(action: str) -> bool:
     return action in _CLOSING_ACTIONS
 
 
+def extract_operativa_protect_meta(raw: dict[str, Any]) -> dict[str, Any] | None:
+    """OI-1 — meta protect desde Consola (``wait`` + ``operativaIntent=protect``)."""
+    pkg = raw.get("decisionPackage")
+    if not isinstance(pkg, dict):
+        return None
+    if pkg.get("operativaIntent") != "protect":
+        return None
+    stop = pkg.get("suggestedStop")
+    if not isinstance(stop, (int, float)) or float(stop) <= 0:
+        return None
+    return pkg
+
+
 def risk_signature_reject_reason(
     *,
     trade_plan: dict[str, Any] | None,
@@ -337,6 +394,7 @@ def risk_signature_reject_reason(
         signed_qty=signed_qty,
         signed_price=signed_price,
         override_reason=override_reason,
+        require_triggered_plan=True,
     )
     if verdict.get("allowed") is True:
         return None
@@ -360,9 +418,12 @@ class ConfirmRecommendationIntent:
         journal_writer: Any | None = None,
         position_from_fill: Any | None = None,
         position_from_exit: Any | None = None,
+        position_from_protect: Any | None = None,
+        broker_adapter: IBrokerAdapter | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
+        self._broker_adapter = broker_adapter
         self._portfolio_summary = portfolio_summary
         self._instruments = instruments
         self._profile_store = profile_store
@@ -372,6 +433,22 @@ class ConfirmRecommendationIntent:
         self._journal_writer = journal_writer
         self._position_from_fill = position_from_fill
         self._position_from_exit = position_from_exit
+        self._position_from_protect = position_from_protect
+
+    async def _resolve_broker_adapter_for_account(self, account_id: str) -> IBrokerAdapter:
+        """PA-1: adapter inyectado (tests) o lazy resolve tras account_id."""
+        if self._broker_adapter is not None:
+            return self._broker_adapter
+        account_venue: str | None = None
+        getter = getattr(self._accounts, "get_settings_json", None) if self._accounts else None
+        if getter is not None:
+            try:
+                settings = await getter(account_id)
+                account_venue = account_broker_venue_from_settings(settings)
+            except Exception:  # noqa: BLE001 — preferencia opcional; fallback coalesce
+                account_venue = None
+        venue = await effective_broker_venue_async(account_venue=account_venue)
+        return resolve_broker_adapter(self._execute_trade, venue=venue)
 
     async def execute(
         self,
@@ -482,7 +559,121 @@ class ConfirmRecommendationIntent:
             ),
         )
 
-        if (
+        protect_meta = extract_operativa_protect_meta(raw)
+        if execute and protect_meta is not None:
+            suggested_stop = float(
+                protect_meta.get("suggestedStop") or rec.suggested_price or 0
+            )
+            if suggested_stop <= 0:
+                result["trade"] = {
+                    "status": "skipped",
+                    "reason": "suggestedStop requerido para proteger",
+                }
+            elif self._position_from_protect is None:
+                result["trade"] = {
+                    "status": "skipped",
+                    "reason": "position_from_protect no configurado",
+                }
+            else:
+                row = await self._position_from_protect.get_open(
+                    account_id, str(rec.instrument_id or "")
+                )
+                state_blob = row_position_state(row)
+                exit_perm = semi_protect_permission(
+                    state_blob,
+                    suggested_stop=suggested_stop,
+                )
+                if not exit_perm.allowed:
+                    result["trade"] = {
+                        "status": "rejected_by_gate",
+                        "reason": "exit_permission",
+                        "exitPermission": exit_perm.to_dict(),
+                    }
+                    result["intent"] = {
+                        **intent.to_dict(),
+                        "status": "rejected_by_gate",
+                        "contract": contract_status,
+                    }
+                    await append_journal_event(
+                        self._journal_writer,
+                        event_type="human_reject",
+                        decision_id=rec.decision_id,
+                        session_id=session_id,
+                        account_id=account_id,
+                        instrument_id=rec.instrument_id,
+                        actor="human",
+                        payload=attribution_setup_payload(
+                            trade_plan_dict,
+                            session_payload=session_payload,
+                            base={
+                                "reason": "exit_permission",
+                                "status": "rejected_by_gate",
+                                "exitPlanId": exit_perm.exit_plan_id,
+                                "exitAction": exit_perm.action,
+                                "exitReasons": list(exit_perm.reasons),
+                            },
+                        ),
+                    )
+                else:
+                    position_persist: dict[str, Any] = {"status": "applied"}
+                    applied_row: Any | None = None
+                    try:
+                        applied_row = await self._position_from_protect.persist(
+                            PersistPositionFromProtectInput(
+                                account_id=account_id,
+                                instrument_id=str(rec.instrument_id or ""),
+                                suggested_stop=suggested_stop,
+                                override_reason=risk_override_reason,
+                            )
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        position_persist = {"status": "error", "reason": str(exc)}
+                        result["trade"] = {
+                            "status": "skipped",
+                            "reason": "persist_error",
+                        }
+                        result["positionPersist"] = position_persist
+                    else:
+                        if applied_row is None:
+                            position_persist = {
+                                "status": "skipped",
+                                "reason": "stop_not_applied",
+                            }
+                            result["trade"] = {
+                                "status": "skipped",
+                                "reason": "stop_not_applied",
+                            }
+                            result["positionPersist"] = position_persist
+                        else:
+                            await append_journal_event(
+                                self._journal_writer,
+                                event_type="protect_applied",
+                                decision_id=rec.decision_id,
+                                session_id=session_id,
+                                account_id=account_id,
+                                instrument_id=rec.instrument_id,
+                                actor="human",
+                                payload=attribution_setup_payload(
+                                    trade_plan_dict,
+                                    session_payload=session_payload,
+                                    base={
+                                        "suggestedStop": suggested_stop,
+                                        "currentStop": protect_meta.get(
+                                            "currentStop"
+                                        ),
+                                        "overrideReason": risk_override_reason,
+                                    },
+                                ),
+                            )
+                            result["trade"] = {"status": "protect_applied"}
+                            result["intent"] = {
+                                **intent.to_dict(),
+                                "status": "executed",
+                                "contract": contract_status,
+                            }
+                            result["positionPersist"] = position_persist
+
+        elif (
             execute
             and rec.action in _TRADE_ACTIONS
             and intent.side in {"buy", "sell"}
@@ -672,18 +863,12 @@ class ConfirmRecommendationIntent:
                         },
                     ),
                 )
-            elif self._execute_trade is None:
+            elif self._broker_adapter is None and self._execute_trade is None:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
             else:
+                idem_key = rec.decision_id or session_id or f"confirm-{uuid4().hex}"
+                trade = None
                 try:
-                    # B-4: la clave de idempotencia es la identidad lógica de la decisión
-                    # (decision_id, con fallback a session_id). Un doble confirm de la misma
-                    # decisión rejuega el trade original en vez de duplicarlo (guard DB de
-                    # ExecuteTrade.find_transaction_by_idempotency).
-                    # R-11 C2: el repo de trades exige clave NO vacía. Si ni decision_id ni
-                    # session_id están, se genera una clave uuid4-siempre-no-vacía para que
-                    # el fill nunca invoque execute_trade con ""/whitespace/Nones.
-                    idem_key = rec.decision_id or session_id or f"confirm-{uuid4().hex}"
                     if _is_opening_action(rec.action) and self._portfolio_summary is not None:
                         await append_journal_event(
                             self._journal_writer,
@@ -699,100 +884,142 @@ class ConfirmRecommendationIntent:
                                 base={"allowed": True},
                             ),
                         )
-                    trade = await self._execute_trade.execute(
-                        instrument_id=intent.instrument_id,
-                        trade_type=intent.side,
-                        quantity=intent.quantity,
-                        price=price,
-                        account_id=account_id,
-                        idempotency_key=idem_key,
-                    )
-                    result["trade"] = {
-                        "status": "executed",
-                        "transactionId": getattr(trade, "transaction_id", None)
-                        or getattr(getattr(trade, "transaction", None), "id", None),
-                    }
-                    result["intent"] = {
-                        **intent.to_dict(),
-                        "status": "executed",
-                        "contract": contract_status,
-                    }
-                    await append_journal_event(
-                        self._journal_writer,
-                        event_type="executed",
-                        decision_id=rec.decision_id,
-                        session_id=session_id,
-                        account_id=account_id,
-                        instrument_id=rec.instrument_id,
-                        actor="human",
-                        payload=attribution_setup_payload(
-                            trade_plan_dict,
-                            session_payload=session_payload,
-                            base=await self._executed_journal_base(
-                                rec=rec,
-                                intent=intent,
-                                price=price,
-                                account_id=account_id,
-                                transaction_id=result["trade"]["transactionId"],
-                            ),
-                        ),
-                    )
-                    if self._position_from_fill is not None and _is_opening_action(
-                        rec.action
-                    ):
-                        tx_id = open_transaction_id_from_trade(trade) or result[
-                            "trade"
-                        ].get("transactionId")
-                        if isinstance(tx_id, str) and tx_id.strip():
-                            filled_at = getattr(
-                                getattr(trade, "transaction", None),
-                                "executed_at",
-                                None,
-                            )
-                            await self._position_from_fill.persist(
-                                PersistPositionFromFillInput(
-                                    account_id=account_id,
-                                    trade_plan=trade_plan_dict
-                                    if isinstance(trade_plan_dict, dict)
-                                    else None,
-                                    fill_price=price,
-                                    fill_quantity=float(intent.quantity),
-                                    filled_at=str(filled_at) if filled_at else None,
-                                    open_transaction_id=tx_id,
-                                    ledger_position_id=ledger_position_id_from_trade(
-                                        trade, intent.instrument_id
-                                    ),
-                                )
-                            )
-                    if self._position_from_exit is not None and _is_closing_action(
-                        rec.action
-                    ):
-                        tx_id = open_transaction_id_from_trade(trade) or result[
-                            "trade"
-                        ].get("transactionId")
-                        if isinstance(tx_id, str) and tx_id.strip():
-                            filled_at = getattr(
-                                getattr(trade, "transaction", None),
-                                "executed_at",
-                                None,
-                            )
-                            await self._position_from_exit.persist(
-                                PersistPositionFromExitInput(
-                                    account_id=account_id,
-                                    instrument_id=intent.instrument_id,
-                                    fill_quantity=float(intent.quantity),
-                                    fill_price=price,
-                                    exit_transaction_id=tx_id,
-                                    filled_at=str(filled_at) if filled_at else None,
-                                )
-                            )
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:  # noqa: BLE001 — pre-send; no se llamó execute
                     result["trade"] = {"status": "error", "reason": str(exc)}
                     result["intent"] = {
                         **intent.to_dict(),
-                        "status": "rejected_by_gate",
+                        "status": "error",
                         "contract": contract_status,
                     }
+                else:
+                    adapter = await self._resolve_broker_adapter_for_account(account_id)
+                    pb = await adapter.submit(
+                        instrument_id=intent.instrument_id,
+                        side=intent.side,
+                        quantity=float(intent.quantity),
+                        price=price,
+                        account_id=account_id,
+                        idempotency_key=idem_key,
+                        intent_id=intent.intent_id,
+                    )
+                    result["brokerAdapter"] = pb.receipt().to_dict()
+                    if pb.paper_order is not None:
+                        result["paperOrder"] = pb.paper_order.to_dict()
+                    if pb.paper_receipt is not None:
+                        result["paperBroker"] = pb.paper_receipt.to_dict()
+                    if pb.status == "not_wired":
+                        result["trade"] = {
+                            "status": "skipped",
+                            "reason": pb.reason or "live_not_wired",
+                        }
+                    elif pb.status == "rejected":
+                        result["trade"] = {
+                            "status": "skipped",
+                            "reason": pb.reason or "live_rejected",
+                        }
+                    elif pb.status == "submitted":
+                        # Venue aceptó; sin ledger en XL-1 → unknown (≠ executed).
+                        trade_payload: dict[str, Any] = {
+                            "status": "unknown",
+                            "reason": pb.reason or "live_submitted_no_fill",
+                        }
+                        if pb.venue_order_id:
+                            trade_payload["venueOrderId"] = pb.venue_order_id
+                        result["trade"] = trade_payload
+                        result["intent"] = {
+                            **intent.to_dict(),
+                            "status": "unknown",
+                            "contract": contract_status,
+                        }
+                    elif pb.status == "unknown":
+                        result["trade"] = {"status": "unknown", "reason": pb.reason}
+                        result["intent"] = {
+                            **intent.to_dict(),
+                            "status": "unknown",
+                            "contract": contract_status,
+                        }
+                    else:
+                        trade = pb.trade
+                        tx_id = pb.transaction_id
+                        result["trade"] = {
+                            "status": "executed",
+                            "transactionId": tx_id,
+                        }
+                        result["intent"] = {
+                            **intent.to_dict(),
+                            "status": "executed",
+                            "contract": contract_status,
+                        }
+                        position_persist = {"status": "applied"}
+                        try:
+                            await append_journal_event(
+                                self._journal_writer,
+                                event_type="executed",
+                                decision_id=rec.decision_id,
+                                session_id=session_id,
+                                account_id=account_id,
+                                instrument_id=rec.instrument_id,
+                                actor="human",
+                                payload=attribution_setup_payload(
+                                    trade_plan_dict,
+                                    session_payload=session_payload,
+                                    base=await self._executed_journal_base(
+                                        rec=rec,
+                                        intent=intent,
+                                        price=price,
+                                        account_id=account_id,
+                                        transaction_id=tx_id,
+                                    ),
+                                ),
+                            )
+                            if self._position_from_fill is not None and _is_opening_action(
+                                rec.action
+                            ):
+                                if isinstance(tx_id, str) and tx_id.strip():
+                                    filled_at = getattr(
+                                        getattr(trade, "transaction", None),
+                                        "executed_at",
+                                        None,
+                                    )
+                                    await self._position_from_fill.persist(
+                                        PersistPositionFromFillInput(
+                                            account_id=account_id,
+                                            trade_plan=trade_plan_dict
+                                            if isinstance(trade_plan_dict, dict)
+                                            else None,
+                                            fill_price=price,
+                                            fill_quantity=float(intent.quantity),
+                                            filled_at=str(filled_at) if filled_at else None,
+                                            open_transaction_id=tx_id,
+                                            ledger_position_id=ledger_position_id_from_trade(
+                                                trade, intent.instrument_id
+                                            ),
+                                        )
+                                    )
+                            if self._position_from_exit is not None and _is_closing_action(
+                                rec.action
+                            ):
+                                if isinstance(tx_id, str) and tx_id.strip():
+                                    filled_at = getattr(
+                                        getattr(trade, "transaction", None),
+                                        "executed_at",
+                                        None,
+                                    )
+                                    await self._position_from_exit.persist(
+                                        PersistPositionFromExitInput(
+                                            account_id=account_id,
+                                            instrument_id=intent.instrument_id,
+                                            fill_quantity=float(intent.quantity),
+                                            fill_price=price,
+                                            exit_transaction_id=tx_id,
+                                            filled_at=str(filled_at) if filled_at else None,
+                                        )
+                                    )
+                        except Exception as exc:  # noqa: BLE001
+                            position_persist = {"status": "error", "reason": str(exc)}
+                        result["positionPersist"] = position_persist
+
+        _attach_execution_record(result)
 
         execution = {
             "intent": result["intent"],

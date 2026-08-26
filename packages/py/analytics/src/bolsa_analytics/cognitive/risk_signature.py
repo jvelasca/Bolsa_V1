@@ -39,10 +39,13 @@ def evaluate_risk_signature(
     signed_qty: float,
     signed_price: float,
     override_reason: str | None = None,
+    require_triggered_plan: bool = False,
 ) -> dict[str, Any]:
     """Evalúa qty/precio firmados contra el TradePlan.
 
-    Sin TRIGGERED + quantity>0 → ``no_plan`` (no inventa stop/R; allowed).
+    Sin TRIGGERED + quantity>0 → ``no_plan``.
+    Con ``require_triggered_plan=True`` (SEMI apertura): ``no_plan`` → DENY
+    ``no_tradeplan`` (manual HTTP no usa este gate).
     """
     plan = _plan_dict(trade_plan)
     qty = _finite(signed_qty)
@@ -62,9 +65,9 @@ def evaluate_risk_signature(
             "signedLossAtStop": None,
             "signedR": None,
             "overrideRequired": False,
-            "allowed": True,
+            "allowed": not require_triggered_plan,
             "excess": None,
-            "blockReason": None,
+            "blockReason": "no_tradeplan" if require_triggered_plan else None,
         }
 
     stop = _finite(plan.get("structuralStop") if plan else None)

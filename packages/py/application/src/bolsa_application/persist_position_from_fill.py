@@ -63,6 +63,13 @@ class PersistPositionFromFill:
     def __init__(self, store: PositionStateStore) -> None:
         self._store = store
 
+    async def get_open(self, account_id: str, instrument_id: str) -> Any | None:
+        acc = account_id.strip() if account_id else ""
+        inst = instrument_id.strip() if instrument_id else ""
+        if not acc or not inst:
+            return None
+        return await self._store.get_open_for_instrument(acc, inst)
+
     async def persist(self, inp: PersistPositionFromFillInput) -> Any | None:
         tx_id = inp.open_transaction_id.strip() if inp.open_transaction_id else ""
         if not tx_id or not inp.account_id.strip():

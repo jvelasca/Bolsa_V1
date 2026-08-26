@@ -31,6 +31,57 @@ from bolsa_domain.entities.portfolio import (
 )
 
 
+def _triggered_trade_plan(
+    *,
+    decision_id: str,
+    instrument_id: str,
+    quantity: float,
+    entry: float = 100.0,
+    stop: float | None = None,
+    risk_amount: float = 500.0,
+) -> dict[str, Any]:
+    """OI-2 — apertura SEMI exige TRIGGERED + quantity para risk_signature."""
+    effective_stop = stop if stop is not None else max(0.01, entry * 0.95)
+    return {
+        "decisionId": decision_id,
+        "instrumentId": instrument_id,
+        "direction": "long",
+        "status": "TRIGGERED",
+        "quantity": quantity,
+        "entry": entry,
+        "structuralStop": effective_stop,
+        "riskAmount": risk_amount,
+    }
+
+
+def _opening_recommendation(
+    *,
+    decision_id: str,
+    instrument_id: str,
+    quantity: float,
+    price: float,
+    plan_quantity: float | None = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    pq = plan_quantity if plan_quantity is not None else max(quantity, 10.0)
+    return {
+        "decisionId": decision_id,
+        "instrumentId": instrument_id,
+        "action": "recommend_long",
+        "suggestedQuantity": quantity,
+        "suggestedPrice": price,
+        "tradePlan": _triggered_trade_plan(
+            decision_id=decision_id,
+            instrument_id=instrument_id,
+            quantity=pq,
+            entry=price,
+            stop=max(0.01, price * 0.9),
+            risk_amount=max(500.0, pq * max(abs(price - max(0.01, price * 0.9)), 1.0) * 2),
+        ),
+        **extra,
+    }
+
+
 @dataclass
 class _FakeAccount:
     id: str = "acc-1"
@@ -433,13 +484,12 @@ async def test_confirm_recommendation_forwards_decision_id_as_idempotency_key() 
     use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
 
     await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-123",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 5.0,
-            "suggestedPrice": 12.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-123",
+            instrument_id="inst-1",
+            quantity=5.0,
+            price=12.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -510,13 +560,12 @@ async def test_confirm_with_matching_package_executes() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-1",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 5.0,
-            "suggestedPrice": 12.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            quantity=5.0,
+            price=12.0,
+        ),
         account_id="acc-1",
         execute=True,
         session_id="DSS-1",
@@ -544,13 +593,12 @@ async def test_confirm_with_conflicting_action_rejected() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-1",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 5.0,
-            "suggestedPrice": 12.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            quantity=5.0,
+            price=12.0,
+        ),
         account_id="acc-1",
         execute=True,
         session_id="DSS-1",
@@ -579,13 +627,12 @@ async def test_confirm_with_conflicting_instrument_rejected() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-1",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 5.0,
-            "suggestedPrice": 12.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            quantity=5.0,
+            price=12.0,
+        ),
         account_id="acc-1",
         execute=True,
         session_id="DSS-1",
@@ -606,13 +653,12 @@ async def test_confirm_without_session_orphan_opening_blocked() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-123",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 5.0,
-            "suggestedPrice": 12.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-123",
+            instrument_id="inst-1",
+            quantity=5.0,
+            price=12.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -640,13 +686,13 @@ async def test_confirm_with_edited_sizing_and_matching_package_executes() -> Non
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-1",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 99.0,  # tamaño editado, ajeno al paquete
-            "suggestedPrice": 7.5,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            quantity=99.0,
+            price=7.5,
+            plan_quantity=100.0,
+        ),
         account_id="acc-1",
         execute=True,
         session_id="DSS-1",
@@ -721,13 +767,12 @@ async def test_confirm_apertura_cesta_veto_bloquea_fill() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-1",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-1",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -748,13 +793,12 @@ async def test_confirm_apertura_cesta_permite_fill() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-2",
-            "instrumentId": "inst-new",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-2",
+            instrument_id="inst-new",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -941,13 +985,12 @@ async def test_confirm_apertura_sin_summary_no_aplica_cesta() -> None:
     use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-4",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-4",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1011,13 +1054,12 @@ async def test_confirm_apertura_sector_propuesto_veto_como_auto() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-H1",
-            "instrumentId": "inst-new",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-H1",
+            instrument_id="inst-new",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1038,13 +1080,12 @@ async def test_confirm_apertura_summary_falla_fail_closed() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-H2",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-H2",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1145,13 +1186,12 @@ async def test_confirm_apertura_profile_conservative_veto() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-H5-VETO",
-            "instrumentId": "inst-new",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-H5-VETO",
+            instrument_id="inst-new",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1175,13 +1215,12 @@ async def test_confirm_apertura_profile_none_allows_same_basket() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-H5-ALLOW",
-            "instrumentId": "inst-new",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-H5-ALLOW",
+            instrument_id="inst-new",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1230,13 +1269,12 @@ async def test_confirm_apertura_stale_bar_risk_veto() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-DS05-STALE",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-DS05-STALE",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1261,13 +1299,12 @@ async def test_confirm_apertura_fresh_bar_permite_fill() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-DS05-FRESH",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-DS05-FRESH",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1287,13 +1324,12 @@ async def test_confirm_apertura_ohlcv_falla_fail_closed() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-DS05-OHLCV-FAIL",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-DS05-OHLCV-FAIL",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1338,13 +1374,12 @@ async def test_confirm_apertura_no_open_mandate_risk_veto() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-DS03-NO-MANDATE",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-DS03-NO-MANDATE",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1365,13 +1400,12 @@ async def test_confirm_apertura_open_mandate_permite_fill() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-DS03-OPEN",
-            "instrumentId": "inst-new",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-DS03-OPEN",
+            instrument_id="inst-new",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1391,13 +1425,12 @@ async def test_confirm_apertura_mandates_falla_fail_closed() -> None:
     )
 
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-DS03-MANDATE-FAIL",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 4.0,
-            "suggestedPrice": 1.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-DS03-MANDATE-FAIL",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1414,15 +1447,16 @@ async def test_confirm_expired_recommendation_no_fill() -> None:
     use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
     past = (datetime.now(UTC) - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    raw = _opening_recommendation(
+        decision_id="DEC-TTL",
+        instrument_id="inst-1",
+        quantity=5.0,
+        price=12.0,
+    )
+    raw["expiresAt"] = past
+
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-TTL",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 5.0,
-            "suggestedPrice": 12.0,
-            "expiresAt": past,
-        },
+        recommendation_raw=raw,
         account_id="acc-1",
         execute=True,
     )
@@ -1449,13 +1483,12 @@ async def test_confirm_stale_price_vs_last_close() -> None:
         ohlcv=_CloseOhlcv(),  # type: ignore[arg-type]
     )
     result = await use_case.execute(
-        recommendation_raw={
-            "decisionId": "DEC-PX",
-            "instrumentId": "inst-1",
-            "action": "recommend_long",
-            "suggestedQuantity": 5.0,
-            "suggestedPrice": 12.0,
-        },
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-PX",
+            instrument_id="inst-1",
+            quantity=5.0,
+            price=12.0,
+        ),
         account_id="acc-1",
         execute=True,
     )
@@ -1510,13 +1543,12 @@ async def test_confirm_double_execute_concurrent_single_logical_fill() -> None:
         cognitive_store=store,  # type: ignore[arg-type]
         execute_trade=fake_trade,
     )
-    raw = {
-        "decisionId": "DEC-RACE",
-        "instrumentId": "inst-1",
-        "action": "recommend_long",
-        "suggestedQuantity": 5.0,
-        "suggestedPrice": 12.0,
-    }
+    raw = _opening_recommendation(
+        decision_id="DEC-RACE",
+        instrument_id="inst-1",
+        quantity=5.0,
+        price=12.0,
+    )
 
     async def _once() -> dict[str, Any]:
         return await use_case.execute(

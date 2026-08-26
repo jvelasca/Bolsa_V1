@@ -1,12 +1,14 @@
 """API: cuentas DEMO/trading (CRUD + resumen)."""
 
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bolsa_api.api.dependencies import (
+    get_account_repository,
     get_close_account_use_case,
     get_create_account_use_case,
     get_daily_ops_report_use_case,
@@ -61,8 +63,25 @@ from bolsa_api.schemas.accounts import (
     WithdrawCashDto,
 )
 from bolsa_api.schemas.ai_governance import AiEffectivenessResponseDto
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    effective_broker_venue_async,
+    normalize_broker_venue,
+)
 
 router = APIRouter()
+
+
+class AccountBrokerVenueBody(BaseModel):
+    """PA-1 — preferencia Paper|Live en settings_json.brokerVenue (≠ override global mesa)."""
+
+    venue: Literal["paper", "live"] = Field(..., description="Preferencia por cuenta")
+
+
+class AccountBrokerVenueResponse(BaseModel):
+    accountId: str
+    preference: Literal["paper", "live"] | None = None
+    effective: Literal["paper", "live"]
 
 
 @router.get("/accounts", response_model=AccountsResponseDto)
@@ -201,6 +220,56 @@ async def update_account_settings(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return AccountResponseDto(data=to_investment_account_dto(account))
+
+
+@router.get(
+    "/accounts/{account_id}/broker-venue",
+    response_model=AccountBrokerVenueResponse,
+)
+async def get_account_broker_venue(
+    account_id: Annotated[str, Depends(require_account_access)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AccountBrokerVenueResponse:
+    """PA-1 — preferencia cuenta + venue efectivo (global override gana)."""
+    try:
+        settings = await get_account_repository(session).get_settings_json(account_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    pref_raw = account_broker_venue_from_settings(settings)
+    preference: Literal["paper", "live"] | None = (
+        normalize_broker_venue(pref_raw) if pref_raw is not None else None
+    )
+    effective = await effective_broker_venue_async(account_venue=pref_raw)
+    return AccountBrokerVenueResponse(
+        accountId=account_id,
+        preference=preference,
+        effective=effective,
+    )
+
+
+@router.patch(
+    "/accounts/{account_id}/broker-venue",
+    response_model=AccountBrokerVenueResponse,
+)
+async def patch_account_broker_venue(
+    account_id: Annotated[str, Depends(require_account_access)],
+    body: AccountBrokerVenueBody,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> AccountBrokerVenueResponse:
+    """PA-1 — escribe settings_json.brokerVenue vía merge (≠ POST /risk/broker-venue)."""
+    chosen = normalize_broker_venue(body.venue)
+    try:
+        await get_account_repository(session).merge_settings_json(
+            account_id, {"brokerVenue": chosen}
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    effective = await effective_broker_venue_async(account_venue=chosen)
+    return AccountBrokerVenueResponse(
+        accountId=account_id,
+        preference=chosen,
+        effective=effective,
+    )
 
 
 @router.post("/accounts/{account_id}/close", response_model=AccountResponseDto)

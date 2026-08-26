@@ -519,7 +519,19 @@ def get_execute_gated_portfolio_trade_use_case(session: AsyncSession) -> Any:
     """I1 — POST /portfolio/trade: check_opening en buys (mismo SoT Confirm/Fill)."""
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
     from bolsa_application.execute_gated_portfolio_trade import ExecuteGatedPortfolioTrade
+    from bolsa_application.persist_position_from_exit import (
+        PersistPositionFromExit,
+        PositionStateExitStore,
+    )
+    from bolsa_application.persist_position_from_fill import (
+        PersistPositionFromFill,
+        PositionStateStore,
+    )
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
 
+    repo = SqlAlchemyPositionStateRepository(session)
     return ExecuteGatedPortfolioTrade(
         get_execute_trade_use_case(session),
         portfolio_summary=get_portfolio_summary_use_case(session),
@@ -528,6 +540,8 @@ def get_execute_gated_portfolio_trade_use_case(session: AsyncSession) -> Any:
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
+        position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )
 
 
@@ -1164,7 +1178,7 @@ def get_propose_recommendation_use_case(session: AsyncSession) -> Any:
     )
 
 
-def get_confirm_intent_use_case(session: AsyncSession) -> Any:
+async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
     """F3 confirm — wiring del ConfirmRecommendationIntent (execute_trade flag-safe).
 
     Escalón 3/D1: inyecta `portfolio_summary` (read-only) para la re-evaluación VETO
@@ -1173,6 +1187,8 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
     profile_store para pasar el InvestorProfile activo a `check_opening` (mismo SoT
     que AUTO).     DS-05: inyecta OHLCV para última barra → freshness gate fail-closed.
     DS-03: inyecta mandate repo → account mandate gate fail-closed (tenure BD).
+    PA-1: broker_adapter=None → Confirm lazy-resolve venue tras account_id
+    (memory ?? redis ?? settings_json.brokerVenue ?? env ?? paper).
     No cambia el contrato HTTP.
     """
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
@@ -1185,14 +1201,20 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         PersistPositionFromFill,
         PositionStateStore,
     )
+    from bolsa_application.persist_position_from_protect import (
+        PersistPositionFromProtect,
+        PositionStateProtectStore,
+    )
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
 
     repo = SqlAlchemyPositionStateRepository(session)
+    execute_trade = get_execute_trade_use_case(session)
     return ConfirmRecommendationIntent(
         cognitive_store=get_cognitive_repository(session),
-        execute_trade=get_execute_trade_use_case(session),
+        execute_trade=execute_trade,
+        broker_adapter=None,
         portfolio_summary=get_portfolio_summary_use_case(session),
         instruments=get_instrument_repository(session),
         accounts=get_account_repository(session),
@@ -1202,6 +1224,7 @@ def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         journal_writer=get_journal_writer(session),
         position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
+        position_from_protect=PersistPositionFromProtect(cast(PositionStateProtectStore, repo)),
     )
 
 
@@ -1297,6 +1320,15 @@ def get_delete_position_policy_use_case(session: AsyncSession) -> DeletePosition
 
 
 def get_evaluate_position_exits_use_case(session: AsyncSession) -> EvaluatePositionExits:
+    from bolsa_application.persist_position_from_exit import (
+        PersistPositionFromExit,
+        PositionStateExitStore,
+    )
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+
+    repo = SqlAlchemyPositionStateRepository(session)
     return EvaluatePositionExits(
         get_portfolio_summary_use_case(session),
         get_position_policy_for_holding_use_case(session),
@@ -1304,6 +1336,7 @@ def get_evaluate_position_exits_use_case(session: AsyncSession) -> EvaluatePosit
         get_execution_policy_repository(session),
         get_ohlcv_bars_use_case(session),
         get_execution_router_use_case(session),
+        position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )
 
 
@@ -1372,9 +1405,16 @@ def get_delete_pending_order_use_case(session: AsyncSession) -> DeletePendingOrd
     )
 
 
-def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
-    """ADR-031 — fill de pending_orders con check_opening (aperturas)."""
+async def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
+    """ADR-031 — fill de pending_orders con check_opening (aperturas).
+
+    PA-1: broker_adapter=None → Fill lazy-resolve venue tras account_id.
+    """
     from bolsa_application.account_mandate_gate import SqlAlchemyAccountMandateLookup
+    from bolsa_application.persist_position_from_exit import (
+        PersistPositionFromExit,
+        PositionStateExitStore,
+    )
     from bolsa_application.persist_position_from_fill import (
         PersistPositionFromFill,
         PositionStateStore,
@@ -1383,19 +1423,21 @@ def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingOrder:
         SqlAlchemyPositionStateRepository,
     )
 
+    repo = SqlAlchemyPositionStateRepository(session)
+    execute_trade = get_execute_trade_use_case(session)
     return FillPendingOrder(
         get_pending_order_repository(session),
         get_account_repository(session),
-        execute_trade=get_execute_trade_use_case(session),
+        execute_trade=execute_trade,
+        broker_adapter=None,
         portfolio_summary=get_portfolio_summary_use_case(session),
         instruments=get_instrument_repository(session),
         accounts=get_account_repository(session),
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
-        position_from_fill=PersistPositionFromFill(
-            cast(PositionStateStore, SqlAlchemyPositionStateRepository(session))
-        ),
+        position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
+        position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )
 
 

@@ -1,8 +1,8 @@
 /**
- * P4 — barra operativa: estado global mesa (read-only).
+ * P4 — barra operativa: estado global mesa (read-only) + VS-1 venue Paper|Live.
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { deriveMesaRegimeHint } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -16,12 +16,15 @@ type MesaOperationalBarProps = {
   className?: string;
 };
 
+type BrokerVenue = "paper" | "live";
+
 export function MesaOperationalBar({
   positionsCount: positionsCountProp,
   className,
 }: MesaOperationalBarProps) {
   const { effectiveAccountId } = useActiveAccount();
   const accountScope = useActiveAccountQueryKey();
+  const qc = useQueryClient();
 
   const summaryQuery = useQuery({
     queryKey: ["account-summary", effectiveAccountId],
@@ -50,6 +53,27 @@ export function MesaOperationalBar({
     staleTime: 15_000,
   });
 
+  const venueQuery = useQuery({
+    queryKey: ["broker-venue"],
+    queryFn: () => api.getBrokerVenue(),
+    staleTime: 15_000,
+  });
+
+  const venueMut = useMutation({
+    mutationFn: (venue: BrokerVenue) => api.setBrokerVenue(venue),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["risk-kill-switch"] });
+      void qc.invalidateQueries({ queryKey: ["broker-venue"] });
+    },
+  });
+
+  const selfEvalQuery = useQuery({
+    queryKey: ["ops-self-eval", effectiveAccountId],
+    queryFn: () => api.getOpsSelfEval(effectiveAccountId!),
+    enabled: Boolean(effectiveAccountId),
+    staleTime: 60_000,
+  });
+
   const cash = summaryQuery.data?.data?.cash;
   const portfolio = portfolioQuery.data?.data;
   const board = boardQuery.data?.data;
@@ -65,6 +89,10 @@ export function MesaOperationalBar({
   const regimeHint = board ? deriveMesaRegimeHint(board) : null;
   const vetoed = board?.buckets?.vetoed ?? 0;
   const killOn = killQuery.data?.effective === true;
+  const brokerVenue: BrokerVenue =
+    killQuery.data?.brokerVenue ?? venueQuery.data?.brokerVenue ?? "paper";
+  const semiMark = selfEvalQuery.data?.lanes?.semi?.mark ?? null;
+  const autoMark = selfEvalQuery.data?.lanes?.auto?.mark ?? null;
 
   return (
     <div
@@ -115,6 +143,40 @@ export function MesaOperationalBar({
           {positionsCount}
         </span>
       </span>
+      <div
+        className="inline-flex items-center gap-0.5"
+        data-testid="mesa-broker-venue"
+        title="Venue de ejecución: Paper = simulación; Live = XTB bridge (sin URL → not_wired; submitted ≠ fill salvo filled)"
+      >
+        <span className="mr-1 text-muted-foreground">Venue</span>
+        {(["paper", "live"] as const).map((v) => {
+          const active = brokerVenue === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              disabled={venueMut.isPending}
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[10px] font-medium capitalize",
+                active
+                  ? "border-primary/50 bg-primary/10 text-foreground"
+                  : "border-border text-muted-foreground opacity-60",
+              )}
+              title={
+                v === "live"
+                  ? "Live = XTB bridge; sin URL → not_wired; submitted ≠ fill unless filled"
+                  : "Paper = PaperBroker (simulación ledger)"
+              }
+              onClick={() => {
+                if (!active) venueMut.mutate(v);
+              }}
+              data-testid={`mesa-broker-venue-${v}`}
+            >
+              {v === "paper" ? "Paper" : "Live"}
+            </button>
+          );
+        })}
+      </div>
       {pendingConfirm > 0 ? (
         <span
           className="rounded bg-sky-500/15 px-1.5 py-0.5 font-medium text-sky-900 dark:text-sky-100"
@@ -153,6 +215,16 @@ export function MesaOperationalBar({
       ) : (
         <span className="text-muted-foreground">Sin veto global</span>
       )}
+      <span
+        className="rounded border border-border px-1.5 py-0.5 font-medium text-foreground"
+        data-testid="mesa-ops-self-eval"
+        title="OE-1 Autoeval SEMI vs AUTO (read-only). Rojo ≠ permiso thaw. measure ≠ Accept."
+      >
+        Autoeval{" "}
+        <span className="text-muted-foreground">
+          SEMI {semiMark ?? "…"} · AUTO {autoMark ?? "…"}
+        </span>
+      </span>
     </div>
   );
 }

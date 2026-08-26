@@ -1,7 +1,8 @@
-"""HTTP paper trade con permiso pre-fill (Ciclo I1).
+"""HTTP paper trade con permiso pre-fill (Ciclo I1) + sync PositionState (OI-1).
 
 ``buy`` re-ejecuta ``allow_opening_fill`` (mismo SoT que Confirm/Fill).
 ``sell`` no abre cesta y no pasa el gate de apertura.
+Tras fill: ``post_fill_position_sync`` alinea ledger y Position persistida.
 """
 
 from __future__ import annotations
@@ -17,6 +18,12 @@ from bolsa_application.opening_permission import (
     LatestBarLookup,
     allow_opening_fill,
 )
+from bolsa_application.persist_position_from_exit import PersistPositionFromExit
+from bolsa_application.persist_position_from_fill import (
+    PersistPositionFromFill,
+    open_transaction_id_from_trade,
+)
+from bolsa_application.post_fill_position_sync import sync_position_after_ledger_fill
 
 
 class OpeningVetoedError(Exception):
@@ -36,6 +43,8 @@ class ExecuteGatedPortfolioTrade:
         accounts: AccountScopeLookup | None = None,
         ohlcv: LatestBarLookup | None = None,
         mandates: AccountMandateLookup | None = None,
+        position_from_fill: PersistPositionFromFill | None = None,
+        position_from_exit: PersistPositionFromExit | None = None,
     ) -> None:
         self._execute_trade = execute_trade
         self._portfolio_summary = portfolio_summary
@@ -44,6 +53,8 @@ class ExecuteGatedPortfolioTrade:
         self._accounts = accounts
         self._ohlcv = ohlcv
         self._mandates = mandates
+        self._position_from_fill = position_from_fill
+        self._position_from_exit = position_from_exit
 
     async def execute(
         self,
@@ -75,7 +86,7 @@ class ExecuteGatedPortfolioTrade:
             )
             if not allowed:
                 raise OpeningVetoedError("risk_veto")
-        return await self._execute_trade.execute(
+        trade = await self._execute_trade.execute(
             instrument_id=instrument_id,
             trade_type=side,
             quantity=quantity,
@@ -83,6 +94,22 @@ class ExecuteGatedPortfolioTrade:
             account_id=account_id,
             idempotency_key=idempotency_key,
         )
+        tx_id = open_transaction_id_from_trade(trade)
+        filled_at = getattr(getattr(trade, "transaction", None), "executed_at", None)
+        await sync_position_after_ledger_fill(
+            account_id=account_id or "",
+            instrument_id=instrument_id,
+            side=side,
+            fill_price=float(price),
+            fill_quantity=float(quantity),
+            trade=trade,
+            open_transaction_id=tx_id,
+            filled_at=str(filled_at) if filled_at else None,
+            position_from_fill=self._position_from_fill,
+            position_from_exit=self._position_from_exit,
+            trade_plan_snapshot=None,
+        )
+        return trade
 
     async def _resolve_symbol(self, instrument_id: str) -> str:
         if self._instruments is None or not instrument_id:

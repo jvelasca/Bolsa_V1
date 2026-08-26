@@ -84,7 +84,7 @@ async def fill_pending_order(
     account_id: Annotated[str | None, Depends(require_account_header_access)],
 ) -> FillPendingOrderResultDto:
     try:
-        result = await get_fill_pending_order_use_case(session).execute(
+        result = await (await get_fill_pending_order_use_case(session)).execute(
             order_id,
             account_id=account_id,
             idempotency_key=body.idempotency_key,

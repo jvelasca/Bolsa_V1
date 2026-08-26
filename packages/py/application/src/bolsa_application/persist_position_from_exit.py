@@ -1,6 +1,6 @@
-"""P3 — aplicar reduce/cierre a Position persistida tras fill SEMI (ADR-033 §4).
+"""P3 — aplicar reduce/cierre a Position persistida tras fill (ADR-033 §4; OI-1 Lab/HTTP/pending).
 
-No muta el ledger. Factory H2 intacta. Protect/BE fuera (sin acción SEMI protect).
+No muta el ledger. Factory H2 intacta. Protect vía ``PersistPositionFromProtect`` (OI-1).
 Bookkeeping ``_lastExitTransactionId`` no es campo F2.
 """
 
@@ -103,6 +103,7 @@ class PersistPositionFromExit:
             inp.fill_quantity,
             exit_price=inp.fill_price,
             at=inp.filled_at,
+            origin="reduce",
         )
         if updated is None:
             return None

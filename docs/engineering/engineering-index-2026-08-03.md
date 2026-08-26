@@ -26,11 +26,11 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-25** tag `v1.9-beta` · F1–F4 CERRADOS (modelo) · ADR-033 docs-only · next = v1.10 H1 honesty
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.11-beta` · ADR-034 OI-1…OE-1 CERRADOS · next = auditoría / thaw estricto (deuda)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 docs-only · Position persistida)**
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 · Position persistida)** · **ADR-034 (Operational Integrity v1.11 · OI-1…OE-1 CERRADOS)**
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -70,13 +70,17 @@ Engineering Index  (este doc)
 │   ├── traspaso-relevo-audit-ext-v181-cierre-apertura-v19-2026-08-25.md ← **HISTÓRICO** · v1.8.1 cerrada · apertura diseño v1.9
 │   ├── audit-ext-v19-ops-discontinuity-triage-2026-08-25.md ← **TRIAGE** auditoría discontinuidad decisión→posición · RATIFICADO · no consola
 │   ├── adr-032-ops-authority-gap-2026-08-25.md ← gap ADR-032 modelo vs autoridad v1.10 · docs-only
-│   ├── roadmap-v110-operational-authority-2026-08-25.md ← **FASE ABIERTA** v1.10 · **H1+H2+P1+P2+P3 CERRADOS** · next P4
+│   ├── roadmap-v110-operational-authority-2026-08-25.md ← **FASE CERRADA** v1.10 · H1→P4 · tag `v1.10-beta` → `047ddb6`
+│   ├── traspaso-relevo-tag-v1-10-beta-2026-08-25.md ← **HISTÓRICO** tag v1.10-beta
+│   ├── roadmap-v111-operational-integrity-2026-08-26.md ← **FASE CERRADA** v1.11 · OI-1…OE-1 · tag `v1.11-beta`
+│   ├── audit-pack-estado-global-2026-08-26-v111.md ← pack Operational Integrity · SHA al publicar
+│   ├── traspaso-relevo-tag-v1-11-beta-2026-08-26.md ← **RELEVO** tag v1.11-beta → auditoría
 │   ├── plan-h1-honesty-pending-2026-08-25.md ← **H1 CERRADO** pending ≠ stop
 │   ├── plan-h2-invariantes-factories-2026-08-25.md ← **H2 CERRADO** invariantes factories
 │   ├── plan-p1-position-durable-2026-08-25.md ← **P1 CERRADO** Position durable + wire fill
 │   ├── plan-p2-riesgo-al-firmar-2026-08-25.md ← **P2 CERRADO** firma de riesgo
 │   ├── plan-p3-cadena-salida-2026-08-25.md ← **P3 CERRADO** cadena ExitPlan → ExitPermission → SEMI
-│   ├── traspaso-relevo-p3-cadena-salida-2026-08-25.md ← **RELEVO ACTIVO** · P3 listo · apertura P4
+│   ├── traspaso-relevo-p3-cadena-salida-2026-08-25.md ← **HISTÓRICO** · P3 listo · apertura P4
 │   ├── traspaso-relevo-p2-riesgo-al-firmar-2026-08-25.md ← **HISTÓRICO** · P2 listo · apertura P3
 │   ├── traspaso-relevo-p1-position-durable-2026-08-25.md ← **HISTÓRICO** · P1 listo · apertura P2
 │   ├── traspaso-relevo-h2-invariantes-factories-2026-08-25.md ← **HISTÓRICO** · H2 listo · apertura P1
@@ -323,4 +327,5 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
     >                 └── **F5b-drift — traspaso de hilo:** [traspaso-f5b-drift-contrato-2026-08-12.md](./traspaso-f5b-drift-contrato-2026-08-12.md) — **COMPLETADO + MERGEADO 2026-08-12** · rama `stage/f5b-drift-contrato-2026-08-12` desde base `01cb72a` (tip P2.8) · **regen del `openapi.json`** contra FastAPI vivo (`contract:gen`, `PYTHONIOENCODING=utf-8`) para desbloquear `contract:check` (drift F5b heredado: `Deposit/Withdraw.amount → gt=0` faltaba `exclusiveMinimum: 0.0`) · diff mínimo = **2 inserciones** (`exclusiveMinimum: 0.0` en Deposit/Withdraw) · `schema.d.ts` **sin cambio** (cero impacto tipos FE) · batería: contract:check **VERDE** (antes ROJO) · web typecheck✓ lint 0 errores test **714✓** (141 f) ✓ · commits `9c3f643`+`aabc3f1` · **PR #37 MERGED** (fast-forward `01cb72a → aabc3f1`, mergeCommit `aabc3f1`) · base viva `stage/f1-*` ahora `aabc3f1` · tree limpio · deuda sin resolver: P2.6 duplicación TS↔Py/consolidación tipos web-only, F5a §6 fidelidad+openapi-fetch, P1.9 API thin, P1.3 auth full (D4), mypy por fases · ver §7
     >                 └── **P1.6 — plan/cierre:** [plan-p1.6-mypy-fases-2026-08-12.md](./plan-p1.6-mypy-fases-2026-08-12.md) + **CIERRE P1.6 (mypy por fases) COMPLETADO 2026-08-12** · objetivo: gate mypy **BLOQUEANTE** full-tree (antes `continue-on-error: true`) · ~448 preexistentes → **0 errores en 243 files** (domain/market/infrastructure/apps-api-python) · estrategia: 4 worktrees aislados (`wt-mypy-{domain,market,infrastructure,api-python}`) + 4 subagentes (evita colisión checkout compartido) · pattern fixes: `type-arg`/`arg-type` (guards `X | None`)/`no-untyped-def`/`Mapped` SQLAlchemy 2.0 · **PRs #45–#48 MERGED** (#48 → base `441c590`) · gate CI final `python-ci.yml` bloqueante full-tree (PR **#49**) + retirada de gate scoped F4+F5b · batería: ruff **0** · mypy **0/243** · pytest **451✓** · cierre ola: #42 docs + #43 fix auto-sync + #49 gate (#43 rebase p/ desbloquear quality I001) · base final `6a89f6c` · **0 PRs abiertos** · deuda: P1.9 API thin, P1.3 auth D4, F5a §6 openapi-fetch/DTOs, P2.6 web types · ver §9/§7
 19. **Auditoría externa post-tag v1.8.1-beta (2026-08-25):** [triage](./audit-ext-v181-triage-2026-08-25.md) · [roadmap v1.9](./roadmap-v19-operational-core-2026-08-25.md) · **F1–F4 + ExitPermission + INFRA CERRADOS** (modelo). Tag `v1.9-beta`.
-20. **Auditoría discontinuidad operativa (2026-08-25):** [triage](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · [gap autoridad](./adr-032-ops-authority-gap-2026-08-25.md) · [roadmap v1.10](./roadmap-v110-operational-authority-2026-08-25.md) · [ADR-033](../adr/033-operational-authority-position-persistence.md) · **H1 CERRADO** [plan](./plan-h1-honesty-pending-2026-08-25.md) · **H2 CERRADO** [plan](./plan-h2-invariantes-factories-2026-08-25.md) · **P1 CERRADO** [plan](./plan-p1-position-durable-2026-08-25.md) · **P2 CERRADO** [plan](./plan-p2-riesgo-al-firmar-2026-08-25.md) · **P3 CERRADO** [plan](./plan-p3-cadena-salida-2026-08-25.md) / [relevo](./traspaso-relevo-p3-cadena-salida-2026-08-25.md) · next = **P4** Consola de Mesa
+20. **Auditoría discontinuidad operativa (2026-08-25):** [triage](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · [roadmap v1.10](./roadmap-v110-operational-authority-2026-08-25.md) · [ADR-033](../adr/033-operational-authority-position-persistence.md) · **H1→P4 CERRADOS**. Tag `v1.10-beta` → `047ddb6`.
+21. **Operational Integrity v1.11 (2026-08-26):** [roadmap](./roadmap-v111-operational-integrity-2026-08-26.md) · [ADR-034](../adr/034-operational-integrity-continuity.md) · [pack](./audit-pack-estado-global-2026-08-26-v111.md) · [relevo tag](./traspaso-relevo-tag-v1-11-beta-2026-08-26.md) · **OI-1…OE-1 CERRADOS**. Tag `v1.11-beta` (SHA al publicar). Next = auditoría / thaw estricto (deuda).

@@ -26,7 +26,7 @@ export type RiskSignatureV1 = {
   overrideRequired: boolean;
   allowed: boolean;
   excess: RiskSignatureExcessV1;
-  blockReason: "override_missing" | null;
+  blockReason: "override_missing" | "no_tradeplan" | null;
 };
 
 function finite(n: unknown): n is number {
@@ -44,13 +44,15 @@ function asPlan(raw: TradePlanV1 | null | undefined): TradePlanV1 | null {
 
 /**
  * Evalúa qty/precio firmados contra el TradePlan.
- * Sin TRIGGERED + quantity>0 → `no_plan` (no inventa stop/R; allowed).
+ * Sin TRIGGERED + quantity>0 → `no_plan`.
+ * Con `requireTriggeredPlan` (SEMI apertura): `no_plan` → DENY `no_tradeplan`.
  */
 export function evaluateRiskSignature(input: {
   tradePlan: TradePlanV1 | null | undefined;
   signedQty: number;
   signedPrice: number;
   overrideReason?: string | null;
+  requireTriggeredPlan?: boolean;
 }): RiskSignatureV1 {
   const plan = asPlan(input.tradePlan);
   const qty = finite(input.signedQty) ? input.signedQty : NaN;
@@ -60,6 +62,7 @@ export function evaluateRiskSignature(input: {
       ? { reason: String(input.overrideReason) }
       : null,
   );
+  const requireTriggeredPlan = input.requireTriggeredPlan === true;
 
   const planQty =
     plan != null &&
@@ -79,9 +82,9 @@ export function evaluateRiskSignature(input: {
       signedLossAtStop: null,
       signedR: null,
       overrideRequired: false,
-      allowed: true,
+      allowed: !requireTriggeredPlan,
       excess: null,
-      blockReason: null,
+      blockReason: requireTriggeredPlan ? "no_tradeplan" : null,
     };
   }
 

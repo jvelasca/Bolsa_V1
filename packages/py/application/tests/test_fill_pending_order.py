@@ -118,6 +118,20 @@ async def test_fill_pending_buy_executes_when_gate_allows() -> None:
     assert result["status"] == "executed"
     assert len(fake_trade.calls) == 1
     assert repo.deleted == ["po-1"]
+    order = result["paperOrder"]
+    assert order["status"] == "FILLED"
+    assert order["orderId"] == "po-1"
+    assert order["venue"] == "PAPER"
+    assert order["transactionId"] == "tx-po"
+    assert order["status"] != "CREATED"
+    broker = result["paperBroker"]
+    assert broker["venue"] == "PAPER"
+    assert broker["adapter"] == "paper_broker"
+    assert broker["fillStatus"] == "executed"
+    adapter = result["brokerAdapter"]
+    assert adapter["venue"] == "PAPER"
+    assert adapter["adapter"] == "paper_broker"
+    assert adapter["fillStatus"] == "executed"
 
 
 @pytest.mark.asyncio
@@ -134,3 +148,144 @@ async def test_fill_pending_buy_risk_veto_no_trade() -> None:
     assert result["status"] == "rejected_by_gate"
     assert len(fake_trade.calls) == 0
     assert repo.deleted == []
+    assert "paperOrder" not in result
+    assert "paperBroker" not in result
+    assert "brokerAdapter" not in result
+
+
+@pytest.mark.asyncio
+async def test_fill_pending_execute_boom_unknown_keeps_order() -> None:
+    class _Boom:
+        async def execute(self, **kwargs: Any) -> Any:
+            raise RuntimeError("ledger timeout")
+
+    repo = _FakePendingRepo(_buy_order())
+    uc = FillPendingOrder(
+        repo,  # type: ignore[arg-type]
+        _FakeAccountRepo(),  # type: ignore[arg-type]
+        execute_trade=_Boom(),
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+    )
+    result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
+    assert result["status"] == "unknown"
+    assert result["paperOrder"]["status"] == "CREATED"
+    assert result["paperBroker"]["fillStatus"] == "unknown"
+    assert result["brokerAdapter"]["fillStatus"] == "unknown"
+    assert repo.deleted == []
+
+
+@pytest.mark.asyncio
+async def test_fill_pending_mock_live_does_not_fill() -> None:
+    from bolsa_application.broker_adapter import MockBrokerAdapter
+
+    fake_trade = _FakeExecuteTrade()
+    repo = _FakePendingRepo(_buy_order())
+    uc = FillPendingOrder(
+        repo,  # type: ignore[arg-type]
+        _FakeAccountRepo(),  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+        broker_adapter=MockBrokerAdapter(),
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+    )
+    result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
+    assert result["status"] == "skipped"
+    assert result["reason"] == "live_not_wired"
+    assert result["brokerAdapter"]["venue"] == "LIVE"
+    assert result["brokerAdapter"]["adapter"] == "mock"
+    assert result["brokerAdapter"]["fillStatus"] == "not_wired"
+    assert "paperOrder" not in result
+    assert len(fake_trade.calls) == 0
+    assert repo.deleted == []
+
+
+@pytest.mark.asyncio
+async def test_fill_pending_xtb_rejected_keeps_order() -> None:
+    from bolsa_application.broker_adapter import XtbBrokerAdapter
+    from bolsa_market.providers import XtbBridgeOrderResult
+
+    class _FakeXtb:
+        async def submit_order(self, **kwargs: object) -> XtbBridgeOrderResult:
+            _ = kwargs
+            return XtbBridgeOrderResult(status="rejected", reason="live_orders_disabled")
+
+    fake_trade = _FakeExecuteTrade()
+    repo = _FakePendingRepo(_buy_order())
+    uc = FillPendingOrder(
+        repo,  # type: ignore[arg-type]
+        _FakeAccountRepo(),  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+        broker_adapter=XtbBrokerAdapter(client=_FakeXtb()),
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+    )
+    result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
+    assert result["status"] == "skipped"
+    assert result["reason"] == "live_orders_disabled"
+    assert result["brokerAdapter"]["adapter"] == "xtb"
+    assert result["brokerAdapter"]["fillStatus"] == "rejected"
+    assert len(fake_trade.calls) == 0
+    assert repo.deleted == []
+
+
+@pytest.mark.asyncio
+async def test_fill_pending_xtb_submitted_keeps_order() -> None:
+    from bolsa_application.broker_adapter import XtbBrokerAdapter
+    from bolsa_market.providers import XtbBridgeOrderResult
+
+    class _FakeXtb:
+        async def submit_order(self, **kwargs: object) -> XtbBridgeOrderResult:
+            _ = kwargs
+            return XtbBridgeOrderResult(
+                status="submitted",
+                venue_order_id="xtb-sub-1",
+            )
+
+    fake_trade = _FakeExecuteTrade()
+    repo = _FakePendingRepo(_buy_order())
+    uc = FillPendingOrder(
+        repo,  # type: ignore[arg-type]
+        _FakeAccountRepo(),  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+        broker_adapter=XtbBrokerAdapter(client=_FakeXtb(), execute_trade=fake_trade),
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+    )
+    result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
+    assert result["status"] == "unknown"
+    assert result["reason"] == "live_submitted_no_fill"
+    assert result["venueOrderId"] == "xtb-sub-1"
+    assert result["brokerAdapter"]["fillStatus"] == "submitted"
+    assert len(fake_trade.calls) == 0
+    assert repo.deleted == []
+
+
+@pytest.mark.asyncio
+async def test_fill_pending_xtb_filled_executes_and_deletes() -> None:
+    from bolsa_application.broker_adapter import XtbBrokerAdapter
+    from bolsa_market.providers import XtbBridgeOrderResult
+
+    class _FakeXtb:
+        async def submit_order(self, **kwargs: object) -> XtbBridgeOrderResult:
+            _ = kwargs
+            return XtbBridgeOrderResult(
+                status="filled",
+                reason="live_filled",
+                venue_order_id="xtb-fill-po",
+            )
+
+    fake_trade = _FakeExecuteTrade()
+    repo = _FakePendingRepo(_buy_order())
+    uc = FillPendingOrder(
+        repo,  # type: ignore[arg-type]
+        _FakeAccountRepo(),  # type: ignore[arg-type]
+        execute_trade=fake_trade,
+        broker_adapter=XtbBrokerAdapter(client=_FakeXtb(), execute_trade=fake_trade),
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+    )
+    result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
+    assert result["status"] == "executed"
+    assert result["transactionId"] == "tx-po"
+    assert result["brokerAdapter"]["venue"] == "LIVE"
+    assert result["brokerAdapter"]["adapter"] == "xtb"
+    assert result["brokerAdapter"]["fillStatus"] == "executed"
+    assert len(fake_trade.calls) == 1
+    assert repo.deleted == ["po-1"]
+    assert "paperOrder" not in result

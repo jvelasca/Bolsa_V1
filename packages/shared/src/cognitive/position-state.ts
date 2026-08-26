@@ -5,6 +5,13 @@
 
 import { createRandomId } from "../create-id.js";
 import type { TradePlanDirectionV1, TradePlanV1 } from "./trade-plan.js";
+import {
+  buildPositionRevision,
+  revisionsFromUnknown,
+  stopOrStatusChanged,
+  type PositionRevisionOriginV1,
+  type PositionRevisionV1,
+} from "./position-revision.js";
 
 export type PositionStatusV1 = "OPEN" | "PARTIAL" | "PROTECTED" | "CLOSED";
 
@@ -47,6 +54,8 @@ export type PositionStateV1 = {
   exitStatus: PositionExitStatusV1;
   createdAt: string;
   updatedAt: string;
+  /** OI-5 — historia append-only de stop/status. */
+  revisions: PositionRevisionV1[];
 };
 
 export type PositionFillV1 = {
@@ -211,6 +220,39 @@ export function buildPositionStateFromFill(
     exitStatus: "none",
     createdAt: now,
     updatedAt: now,
+    revisions: [],
+  };
+}
+
+function withRevisionIfChanged(
+  previous: PositionStateV1,
+  next: PositionStateV1,
+  origin: PositionRevisionOriginV1,
+  reason: string | null | undefined,
+  at: string,
+): PositionStateV1 {
+  if (
+    !stopOrStatusChanged({
+      previousStop: previous.currentStop,
+      nextStop: next.currentStop,
+      previousStatus: previous.status,
+      nextStatus: next.status,
+    })
+  ) {
+    return next;
+  }
+  const revision = buildPositionRevision({
+    at,
+    previousStop: previous.currentStop,
+    nextStop: next.currentStop,
+    previousStatus: previous.status,
+    nextStatus: next.status,
+    origin,
+    reason: reason ?? null,
+  });
+  return {
+    ...next,
+    revisions: [...(previous.revisions ?? []), revision],
   };
 }
 
@@ -256,12 +298,15 @@ export function applyPositionMark(
 /**
  * F2.1 reduce → remaining / realizedR / PARTIAL|CLOSED.
  * CLOSED terminal; qty inválida → null.
+ * OI-5: append revisión si status cambia.
  */
 export function applyPositionReduce(
   position: PositionStateV1 | null | undefined,
   qty: number,
   exitPrice?: number | null,
   at?: string | null,
+  origin: PositionRevisionOriginV1 = "reduce",
+  reason?: string | null,
 ): PositionStateV1 | null {
   if (!position || position.status === "CLOSED") return null;
   if (!finite(qty) || qty <= 0) return null;
@@ -284,7 +329,7 @@ export function applyPositionReduce(
 
   const updatedAt = nowIso(at);
   if (remaining <= 0) {
-    return {
+    const next: PositionStateV1 = {
       ...position,
       remainingQuantity: 0,
       realizedR,
@@ -292,20 +337,26 @@ export function applyPositionReduce(
       exitStatus: "done",
       updatedAt,
     };
+    return withRevisionIfChanged(position, next, origin, reason, updatedAt);
   }
 
-  const next: PositionStateV1 = {
+  const mid: PositionStateV1 = {
     ...position,
     remainingQuantity: remaining,
     realizedR,
     updatedAt,
   };
-  return { ...next, status: derivePositionStatus(next) };
+  const next: PositionStateV1 = {
+    ...mid,
+    status: derivePositionStatus(mid),
+  };
+  return withRevisionIfChanged(position, next, origin, reason, updatedAt);
 }
 
 /**
  * F2.1 currentStop geométrico → posible PROTECTED (BE).
  * H2: no empeora el stop sin override auditado.
+ * OI-5: append revisión si stop o status cambian de verdad.
  * No lee thin. CLOSED / stop inválido / empeora → null.
  */
 export function applyPositionCurrentStop(
@@ -313,20 +364,47 @@ export function applyPositionCurrentStop(
   stop: number,
   at?: string | null,
   override?: FactoryOverrideV1 | null,
+  origin?: PositionRevisionOriginV1 | null,
+  reason?: string | null,
 ): PositionStateV1 | null {
   if (!position || position.status === "CLOSED") return null;
   if (!finite(stop) || stop <= 0) return null;
-  if (
-    stopWorsens(position.direction, position.currentStop, stop) &&
-    !isAuditedOverride(override)
-  ) {
+  const worsens = stopWorsens(position.direction, position.currentStop, stop);
+  if (worsens && !isAuditedOverride(override)) {
     return null;
   }
 
-  const next: PositionStateV1 = {
+  const updatedAt = nowIso(at);
+  const mid: PositionStateV1 = {
     ...position,
     currentStop: round4(stop),
-    updatedAt: nowIso(at),
+    updatedAt,
   };
-  return { ...next, status: derivePositionStatus(next) };
+  const next: PositionStateV1 = {
+    ...mid,
+    status: derivePositionStatus(mid),
+  };
+
+  const resolvedOrigin: PositionRevisionOriginV1 =
+    origin ?? (worsens ? "override" : "stop");
+  const resolvedReason =
+    reason ??
+    (typeof override?.reason === "string" && override.reason.trim()
+      ? override.reason.trim()
+      : null);
+
+  return withRevisionIfChanged(
+    position,
+    next,
+    resolvedOrigin,
+    resolvedReason,
+    updatedAt,
+  );
+}
+
+/** Rehidrata revisions desde snapshot JSON (OI-5). */
+export function positionStateRevisionsFromUnknown(
+  raw: unknown,
+): PositionRevisionV1[] {
+  return revisionsFromUnknown(raw);
 }

@@ -6,6 +6,15 @@ from bolsa_analytics.cognitive.bracket_plan import (
     build_bracket_plan_dict,
     map_bracket_plan,
 )
+from bolsa_analytics.cognitive.broker_adapter import (
+    BROKER_ADAPTER_KEY,
+    BROKER_ADAPTER_MOCK,
+    BROKER_ADAPTER_PAPER,
+    BROKER_ADAPTER_XTB,
+    BrokerAdapterReceipt,
+    broker_adapter_venue_copy,
+    build_broker_adapter_receipt,
+)
 from bolsa_analytics.cognitive.confidence_lifecycle import (
     ConfidenceEvent,
     ConfidenceState,
@@ -57,6 +66,12 @@ from bolsa_analytics.cognitive.execution_plan import (
     ExecutionPlan,
     build_execution_plan_from_exit_plan,
 )
+from bolsa_analytics.cognitive.execution_record import (
+    EXECUTION_RECORD_KEY,
+    ExecutionRecord,
+    build_execution_record,
+    execution_outcome_copy,
+)
 from bolsa_analytics.cognitive.exit_permission import (
     EXIT_PERMISSION_KEY,
     ExitPermission,
@@ -87,6 +102,15 @@ from bolsa_analytics.cognitive.investor_profile import (
     InvestorProfile,
     ObservedInvestorProfile,
 )
+from bolsa_analytics.cognitive.live_ledger_reconciliation import (
+    LIVE_LEDGER_RECONCILIATION_KEY,
+    LiveHoldingSnap,
+    LiveLedgerReconciliation,
+    LivePositionSnap,
+    LiveReconciliationCheck,
+    build_live_ledger_reconciliation,
+    live_ledger_reconciliation_status_copy,
+)
 from bolsa_analytics.cognitive.macro_facts import build_macro_fact_set
 from bolsa_analytics.cognitive.macro_inputs import MacroInputs
 from bolsa_analytics.cognitive.market_state import (
@@ -107,12 +131,40 @@ from bolsa_analytics.cognitive.observe_profile import (
     observe_investor_profile,
 )
 from bolsa_analytics.cognitive.order_intent import OrderIntent, intent_from_recommendation
+from bolsa_analytics.cognitive.paper_broker import (
+    PAPER_BROKER_ADAPTER,
+    PAPER_BROKER_KEY,
+    PaperBrokerReceipt,
+    build_paper_broker_receipt,
+    paper_broker_venue_copy,
+)
+from bolsa_analytics.cognitive.paper_order import (
+    PAPER_ORDER_KEY,
+    PaperOrder,
+    apply_paper_order_fill,
+    build_paper_order,
+    paper_order_status_copy,
+)
 from bolsa_analytics.cognitive.policy_gate import evaluate_policy_gate
 from bolsa_analytics.cognitive.portfolio_fit import (
     UNKNOWN_SECTOR,
     BasketPosition,
     PortfolioFitSignal,
     compute_portfolio_fit,
+)
+from bolsa_analytics.cognitive.portfolio_reconciliation import (
+    PORTFOLIO_RECONCILIATION_KEY,
+    HoldingSnap,
+    OpenPositionSnap,
+    PortfolioReconciliation,
+    ReconciliationCheck,
+    build_portfolio_reconciliation,
+    reconciliation_status_copy,
+)
+from bolsa_analytics.cognitive.position_revision import (
+    POSITION_REVISIONS_KEY,
+    PositionRevision,
+    build_position_revision,
 )
 from bolsa_analytics.cognitive.position_state import (
     POSITION_STATE_KEY,
@@ -230,10 +282,34 @@ __all__ = [
     "TradePlan",
     "PositionState",
     "POSITION_STATE_KEY",
+    "PositionRevision",
+    "POSITION_REVISIONS_KEY",
     "ExitPlan",
     "EXIT_PLAN_KEY",
     "ExecutionPlan",
     "EXECUTION_PLAN_KEY",
+    "ExecutionRecord",
+    "EXECUTION_RECORD_KEY",
+    "PaperOrder",
+    "PAPER_ORDER_KEY",
+    "PaperBrokerReceipt",
+    "PAPER_BROKER_KEY",
+    "PAPER_BROKER_ADAPTER",
+    "BrokerAdapterReceipt",
+    "BROKER_ADAPTER_KEY",
+    "BROKER_ADAPTER_PAPER",
+    "BROKER_ADAPTER_MOCK",
+    "BROKER_ADAPTER_XTB",
+    "PortfolioReconciliation",
+    "PORTFOLIO_RECONCILIATION_KEY",
+    "HoldingSnap",
+    "OpenPositionSnap",
+    "ReconciliationCheck",
+    "LiveLedgerReconciliation",
+    "LIVE_LEDGER_RECONCILIATION_KEY",
+    "LiveHoldingSnap",
+    "LivePositionSnap",
+    "LiveReconciliationCheck",
     "ExitPermission",
     "EXIT_PERMISSION_KEY",
     "TradingPolicy",
@@ -260,9 +336,23 @@ __all__ = [
     "build_trade_plan",
     "build_v0_trade_plan_dict",
     "build_position_state_from_fill",
+    "build_position_revision",
     "evaluate_risk_signature",
     "build_exit_plan_from_position",
     "build_execution_plan_from_exit_plan",
+    "build_execution_record",
+    "execution_outcome_copy",
+    "build_paper_order",
+    "apply_paper_order_fill",
+    "paper_order_status_copy",
+    "build_paper_broker_receipt",
+    "paper_broker_venue_copy",
+    "build_broker_adapter_receipt",
+    "broker_adapter_venue_copy",
+    "build_portfolio_reconciliation",
+    "reconciliation_status_copy",
+    "build_live_ledger_reconciliation",
+    "live_ledger_reconciliation_status_copy",
     "check_exit_permission",
     "build_thesis_health_dict",
     "build_protect_plan_dict",

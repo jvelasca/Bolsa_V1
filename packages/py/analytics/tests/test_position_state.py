@@ -64,7 +64,9 @@ def test_from_fill_open_geometry() -> None:
     assert pos.protection_state == {"status": "none"}
     assert pos.trailing == {"status": "none"}
     assert pos.exit_status == "none"
+    assert pos.revisions == ()
     d = pos.to_dict()
+    assert d["revisions"] == []
     assert d["tradePlanId"] == "dec-1"
     assert d["status"] == "OPEN"
 

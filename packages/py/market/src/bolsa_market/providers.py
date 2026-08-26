@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import Literal
 
 import httpx
 
 from bolsa_market.yahoo_chart import YahooMarketDataProvider
+
+XtbBridgeOrderStatus = Literal["submitted", "rejected", "filled"]
 
 
 def format_xtb_bridge_connect_error(base_url: str, exc: Exception) -> str:
@@ -34,6 +37,31 @@ class XtbBridgeQuote:
     ask: float
     last: float
     timestamp: str
+
+
+@dataclass(frozen=True, slots=True)
+class XtbBridgeOrderResult:
+    """Respuesta bridge POST /orders. submitted ≠ fill; filled→ledger (XL-2)."""
+
+    status: XtbBridgeOrderStatus
+    reason: str | None = None
+    venue_order_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class XtbBridgeAccountCash:
+    """Respuesta bridge GET /account/cash (LR-1 read-only)."""
+
+    cash: float
+    currency: str = "EUR"
+
+
+@dataclass(frozen=True, slots=True)
+class XtbBridgePosition:
+    """Posición live desde bridge GET /account/positions."""
+
+    instrument_id: str
+    quantity: float
 
 
 class XtbBridgeClient:
@@ -147,10 +175,115 @@ class XtbBridgeClient:
             await asyncio.gather(*[_one(symbol) for symbol in ordered])
         return out
 
+    async def fetch_cash(self) -> XtbBridgeAccountCash:
+        """GET /account/cash — read-only (LR-1). No trade."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{self._base_url}/account/cash")
+        except Exception as exc:
+            raise RuntimeError(format_xtb_bridge_connect_error(self._base_url, exc)) from exc
+        if not response.is_success:
+            body = response.json() if response.content else {}
+            raise RuntimeError(
+                body.get("error", f"XTB bridge cash error ({response.status_code})")
+            )
+        data = response.json()
+        return XtbBridgeAccountCash(
+            cash=float(data.get("cash", 0)),
+            currency=str(data.get("currency") or "EUR"),
+        )
+
+    async def fetch_positions(self) -> list[XtbBridgePosition]:
+        """GET /account/positions — read-only (LR-1). No trade."""
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(f"{self._base_url}/account/positions")
+        except Exception as exc:
+            raise RuntimeError(format_xtb_bridge_connect_error(self._base_url, exc)) from exc
+        if not response.is_success:
+            body = response.json() if response.content else {}
+            raise RuntimeError(
+                body.get("error", f"XTB bridge positions error ({response.status_code})")
+            )
+        data = response.json()
+        raw_positions = data.get("positions") if isinstance(data, dict) else None
+        if not isinstance(raw_positions, list):
+            return []
+        out: list[XtbBridgePosition] = []
+        for row in raw_positions:
+            if not isinstance(row, dict):
+                continue
+            iid = row.get("instrumentId") or row.get("instrument_id")
+            if not isinstance(iid, str) or not iid.strip():
+                continue
+            try:
+                qty = float(row.get("quantity", 0))
+            except (TypeError, ValueError):
+                continue
+            out.append(XtbBridgePosition(instrument_id=iid.strip(), quantity=qty))
+        return out
+
+    async def submit_order(
+        self,
+        *,
+        instrument_id: str,
+        side: str,
+        quantity: float,
+        price: float,
+        account_id: str,
+        idempotency_key: str,
+        order_id: str | None = None,
+        intent_id: str | None = None,
+    ) -> XtbBridgeOrderResult:
+        """POST /orders al bridge. Fail-closed: rejected si el mock no permite órdenes."""
+        payload = {
+            "instrumentId": instrument_id,
+            "side": side,
+            "quantity": quantity,
+            "price": price,
+            "accountId": account_id,
+            "idempotencyKey": idempotency_key,
+            "orderId": order_id,
+            "intentId": intent_id,
+        }
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.post(f"{self._base_url}/orders", json=payload)
+        except Exception as exc:
+            raise RuntimeError(format_xtb_bridge_connect_error(self._base_url, exc)) from exc
+        body = response.json() if response.content else {}
+        if not response.is_success:
+            return XtbBridgeOrderResult(
+                status="rejected",
+                reason=str(body.get("reason") or body.get("error") or f"http_{response.status_code}"),
+            )
+        status_raw = str(body.get("status") or "rejected").lower()
+        venue_order_id = body.get("venueOrderId") or body.get("orderId")
+        if status_raw == "submitted":
+            return XtbBridgeOrderResult(
+                status="submitted",
+                reason=body.get("reason"),
+                venue_order_id=venue_order_id,
+            )
+        if status_raw == "filled":
+            return XtbBridgeOrderResult(
+                status="filled",
+                reason=body.get("reason"),
+                venue_order_id=venue_order_id,
+            )
+        return XtbBridgeOrderResult(
+            status="rejected",
+            reason=str(body.get("reason") or "live_rejected"),
+            venue_order_id=venue_order_id,
+        )
+
 
 __all__ = [
+    "XtbBridgeAccountCash",
     "XtbBridgeClient",
     "XtbBridgeHealth",
+    "XtbBridgeOrderResult",
+    "XtbBridgePosition",
     "XtbBridgeQuote",
     "YahooMarketDataProvider",
     "format_xtb_bridge_connect_error",

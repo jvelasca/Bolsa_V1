@@ -153,6 +153,7 @@ export const api = {
       runtimeMemory: boolean;
       redis: boolean | null;
       paperDExecuteEnv: boolean;
+      brokerVenue?: "paper" | "live";
     }>(() => client.GET("/api/risk/kill-switch")),
 
   setRiskKillSwitch: (enabled: boolean) =>
@@ -162,8 +163,107 @@ export const api = {
       runtimeMemory: boolean;
       redis: boolean | null;
       paperDExecuteEnv: boolean;
+      brokerVenue?: "paper" | "live";
       updated?: { enabled: boolean; memory: boolean; redis: boolean };
     }>(() => client.POST("/api/risk/kill-switch", { body: { enabled } })),
+
+  getBrokerVenue: () =>
+    call<{
+      brokerVenue: "paper" | "live";
+      env: "paper" | "live";
+      runtimeMemory: "paper" | "live" | null;
+      redis: "paper" | "live" | null;
+    }>(() => client.GET("/api/risk/broker-venue")),
+
+  setBrokerVenue: (venue: "paper" | "live") =>
+    call<{
+      brokerVenue: "paper" | "live";
+      env: "paper" | "live";
+      runtimeMemory: "paper" | "live" | null;
+      redis: "paper" | "live" | null;
+    }>(() => client.POST("/api/risk/broker-venue", { body: { venue } })),
+
+  /** PA-1 — preferencia Paper|Live por cuenta (settings_json); ≠ override global mesa. */
+  getAccountBrokerVenue: (accountId: string) =>
+    call<{
+      accountId: string;
+      preference: "paper" | "live" | null;
+      effective: "paper" | "live";
+    }>(() =>
+      client.GET("/api/accounts/{account_id}/broker-venue", {
+        params: { path: { account_id: accountId } },
+      }),
+    ),
+
+  setAccountBrokerVenue: (accountId: string, venue: "paper" | "live") =>
+    call<{
+      accountId: string;
+      preference: "paper" | "live" | null;
+      effective: "paper" | "live";
+    }>(() =>
+      client.PATCH("/api/accounts/{account_id}/broker-venue", {
+        params: { path: { account_id: accountId } },
+        body: { venue },
+      }),
+    ),
+
+  /** OE-1 — scorecard SEMI + AUTO (read-only; measure ≠ Accept). */
+  getOpsSelfEval: (accountId?: string, lookbackDays = 120) =>
+    call<{
+      schemaVersion: string;
+      rule: string;
+      accountId: string;
+      lookbackDays: number;
+      lanes: {
+        semi: {
+          mark: string;
+          confirmSeed: number | null;
+          journalSeed: number | null;
+          buysSeed: number | null;
+          tradeLike: number | null;
+          pathAvailable?: boolean;
+        };
+        auto: {
+          mark: string;
+          paperDExecuteEnv: boolean;
+          executeOptIn: boolean;
+          strictAcceptReady: boolean;
+          p1: { daysWithOpinions: number | null; mark: string; need: number };
+          p2: { confirmSeed: number | null; mark: string; need: number };
+          p3: {
+            buyPrecision5d: number | null;
+            alarmaBuyCount: number | null;
+            matureBuySample: number | null;
+            mark: string;
+            need: number;
+          };
+          p4: { buyRecall5d: number | null; mark: string; need: number };
+          p5: {
+            tradeLike: number | null;
+            cashMaxDdFrac: number | null;
+            mark: string;
+            note: string | null;
+          };
+        };
+      };
+      runtime: {
+        killSwitchEffective: boolean;
+        brokerVenue: "paper" | "live";
+        accountVenuePreference: "paper" | "live" | null;
+        paperDExecuteEnv: boolean;
+        confirmPathHonesty: string;
+      };
+      portfolioReconciliation: Record<string, unknown>;
+    }>(() =>
+      client.GET("/api/risk/ops-self-eval", {
+        params: {
+          query: {
+            accountId: accountId ?? "default-account-seed",
+            lookbackDays,
+          },
+        },
+      }),
+    ),
 
   getAiStatus: () =>
     call<{
@@ -1362,6 +1462,11 @@ export const api = {
           reason?: string;
           transactionId?: string | null;
         } | null;
+        executionRecord?: import("@bolsa/shared").ExecutionRecordV1;
+        paperOrder?: import("@bolsa/shared").PaperOrderV1;
+        paperBroker?: import("@bolsa/shared").PaperBrokerReceiptV1;
+        brokerAdapter?: import("@bolsa/shared").BrokerAdapterReceiptV1;
+        positionPersist?: { status?: string; reason?: string };
         decisionSession?: import("@bolsa/shared").DecisionSessionV1 | null;
       };
     }>(() => client.POST("/api/ai/intents/confirm", { body: apiBody(body) })),

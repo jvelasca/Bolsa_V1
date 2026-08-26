@@ -73,4 +73,24 @@ describe("F3RiskSignatureBlock", () => {
       /supera el plan/i,
     );
   });
+
+  it("shows no_tradeplan block copy when SEMI opening lacks TRIGGERED", () => {
+    render(
+      <MemoryRouter>
+        <F3RiskSignatureBlock
+          signature={{
+            ...noPlan,
+            allowed: false,
+            blockReason: "no_tradeplan",
+          }}
+          currency="EUR"
+          overrideReason=""
+          onOverrideReasonChange={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+    const text = screen.getByTestId("f3-risk-signature").textContent ?? "";
+    expect(text).toMatch(/bloqueado/i);
+    expect(text).toMatch(/TRIGGERED/i);
+  });
 });

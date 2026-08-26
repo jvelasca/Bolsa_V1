@@ -1,6 +1,62 @@
 {
   "components": {
     "schemas": {
+      "AccountBrokerVenueBody": {
+        "description": "PA-1 — preferencia Paper|Live en settings_json.brokerVenue (≠ override global mesa).",
+        "properties": {
+          "venue": {
+            "description": "Preferencia por cuenta",
+            "enum": [
+              "paper",
+              "live"
+            ],
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venue"
+        ],
+        "title": "AccountBrokerVenueBody",
+        "type": "object"
+      },
+      "AccountBrokerVenueResponse": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "effective": {
+            "enum": [
+              "paper",
+              "live"
+            ],
+            "title": "Effective",
+            "type": "string"
+          },
+          "preference": {
+            "anyOf": [
+              {
+                "enum": [
+                  "paper",
+                  "live"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preference"
+          }
+        },
+        "required": [
+          "accountId",
+          "effective"
+        ],
+        "title": "AccountBrokerVenueResponse",
+        "type": "object"
+      },
       "AccountResponseDto": {
         "properties": {
           "data": {
@@ -1343,6 +1399,91 @@
           "file"
         ],
         "title": "Body_upload_instrument_filing_api_instruments__instrument_id__filings_post",
+        "type": "object"
+      },
+      "BrokerVenueBody": {
+        "properties": {
+          "venue": {
+            "enum": [
+              "paper",
+              "live"
+            ],
+            "title": "Venue",
+            "type": "string"
+          }
+        },
+        "required": [
+          "venue"
+        ],
+        "title": "BrokerVenueBody",
+        "type": "object"
+      },
+      "BrokerVenueResponse": {
+        "properties": {
+          "brokerVenue": {
+            "enum": [
+              "paper",
+              "live"
+            ],
+            "title": "Brokervenue",
+            "type": "string"
+          },
+          "env": {
+            "enum": [
+              "paper",
+              "live"
+            ],
+            "title": "Env",
+            "type": "string"
+          },
+          "redis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "paper",
+                  "live"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Redis"
+          },
+          "runtimeMemory": {
+            "anyOf": [
+              {
+                "enum": [
+                  "paper",
+                  "live"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtimememory"
+          },
+          "updated": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated"
+          }
+        },
+        "required": [
+          "brokerVenue",
+          "env"
+        ],
+        "title": "BrokerVenueResponse",
         "type": "object"
       },
       "CashMovementResponseDto": {
@@ -8970,6 +9111,15 @@
       "KillSwitchResponse": {
         "description": "Estado efectivo del kill switch + lectura de ``PAPER_D_EXECUTE`` (solo info).",
         "properties": {
+          "brokerVenue": {
+            "default": "paper",
+            "enum": [
+              "paper",
+              "live"
+            ],
+            "title": "Brokervenue",
+            "type": "string"
+          },
           "effective": {
             "title": "Effective",
             "type": "boolean"
@@ -17124,6 +17274,100 @@
         "summary": "Assign Active Profile",
         "tags": [
           "investor-profiles"
+        ]
+      }
+    },
+    "/api/accounts/{account_id}/broker-venue": {
+      "get": {
+        "description": "PA-1 — preferencia cuenta + venue efectivo (global override gana).",
+        "operationId": "get_account_broker_venue_api_accounts__account_id__broker_venue_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBrokerVenueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Account Broker Venue",
+        "tags": [
+          "accounts"
+        ]
+      },
+      "patch": {
+        "description": "PA-1 — escribe settings_json.brokerVenue vía merge (≠ POST /risk/broker-venue).",
+        "operationId": "patch_account_broker_venue_api_accounts__account_id__broker_venue_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountBrokerVenueBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBrokerVenueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Account Broker Venue",
+        "tags": [
+          "accounts"
         ]
       }
     },
@@ -26058,6 +26302,70 @@
         ]
       }
     },
+    "/api/risk/broker-venue": {
+      "get": {
+        "description": "Lee venue efectivo (memory ?? redis ?? env ``BROKER_VENUE``; default paper).",
+        "operationId": "get_broker_venue_api_risk_broker_venue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrokerVenueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Broker Venue",
+        "tags": [
+          "risk",
+          "risk"
+        ]
+      },
+      "post": {
+        "description": "Fija override Paper|Live (memoria + Redis best-effort).",
+        "operationId": "post_broker_venue_api_risk_broker_venue_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrokerVenueBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrokerVenueResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Broker Venue",
+        "tags": [
+          "risk",
+          "risk"
+        ]
+      }
+    },
     "/api/risk/kill-switch": {
       "get": {
         "description": "Lee kill switch efectivo (env ∨ memoria ∨ Redis) y si Paper D execute está on.",
@@ -26116,6 +26424,67 @@
           }
         },
         "summary": "Post Kill Switch",
+        "tags": [
+          "risk",
+          "risk"
+        ]
+      }
+    },
+    "/api/risk/ops-self-eval": {
+      "get": {
+        "description": "OE-1 — scorecard SEMI + AUTO (read-only). measure ≠ Accept · ≠ flip env.",
+        "operationId": "get_ops_self_eval_api_risk_ops_self_eval_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "accountId",
+            "required": false,
+            "schema": {
+              "default": "default-account-seed",
+              "maxLength": 128,
+              "minLength": 1,
+              "title": "Accountid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lookbackDays",
+            "required": false,
+            "schema": {
+              "default": 120,
+              "maximum": 366,
+              "minimum": 7,
+              "title": "Lookbackdays",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Ops Self Eval Api Risk Ops Self Eval Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Ops Self Eval",
         "tags": [
           "risk",
           "risk"

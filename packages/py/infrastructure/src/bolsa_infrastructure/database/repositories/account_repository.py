@@ -396,7 +396,7 @@ class SqlAlchemyAccountRepository:
         previous = dict(row.settings_json) if row.settings_json else {}
         merged = settings_to_dict(settings)
         # Preservar claves operativas no modeladas en AccountSettings
-        for key in ("equityMarks", "labEvidence"):
+        for key in ("equityMarks", "labEvidence", "brokerVenue"):
             if key in previous and key not in merged:
                 merged[key] = previous[key]
         row.settings_json = merged

@@ -1145,6 +1145,29 @@ class PositionStateRow(Base):
         JSONB,
         nullable=False,
     )
+    # JP-1 — hot scalars dual-written from position_state JSONB (nullable).
+    direction: Mapped[str | None] = mapped_column(String, nullable=True)
+    current_stop: Mapped[Decimal | None] = mapped_column(
+        "current_stop",
+        Numeric(18, 6),
+        nullable=True,
+    )
+    remaining_quantity: Mapped[Decimal | None] = mapped_column(
+        "remaining_quantity",
+        Numeric(18, 6),
+        nullable=True,
+    )
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True)
+    initial_stop: Mapped[Decimal | None] = mapped_column(
+        "initial_stop",
+        Numeric(18, 6),
+        nullable=True,
+    )
+    actual_entry: Mapped[Decimal | None] = mapped_column(
+        "actual_entry",
+        Numeric(18, 6),
+        nullable=True,
+    )
     birth_override_reason: Mapped[str | None] = mapped_column(
         "birth_override_reason",
         Text,

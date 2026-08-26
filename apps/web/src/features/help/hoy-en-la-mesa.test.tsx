@@ -11,8 +11,8 @@ import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
 afterEach(() => cleanup());
 
 describe("help C1 v1.8 sync", () => {
-  it("HELP_CONTENT_AS_OF is 2026-08-25", () => {
-    expect(HELP_CONTENT_AS_OF).toBe("2026-08-25");
+  it("HELP_CONTENT_AS_OF is 2026-08-26", () => {
+    expect(HELP_CONTENT_AS_OF).toBe("2026-08-26");
   });
 
   it("Hoy en la mesa states BUY only with TradePlan TRIGGERED", () => {
@@ -49,5 +49,24 @@ describe("help C1 v1.8 sync", () => {
     expect(text).toMatch(/filtros/i);
     expect(text).toMatch(/No operar hoy/i);
     expect(text).toMatch(/session_verdict/i);
+    expect(text).toMatch(/UNKNOWN ≠ ERROR/i);
+    expect(text).toMatch(/no asumir que no se ejecutó/i);
+    expect(text).toMatch(/CREATED ≠ FILLED/i);
+    expect(text).toMatch(/orden creada no es fill/i);
+    expect(text).toMatch(/PositionRevision/i);
+    expect(text).toMatch(/historia auditada/i);
+    expect(text).toMatch(/PortfolioReconciliation/i);
+    expect(text).toMatch(/no auto-heal/i);
+    expect(text).toMatch(/PaperBroker/i);
+    expect(text).toMatch(/venue PAPER/i);
+    expect(text).toMatch(/BrokerAdapter/i);
+    expect(text).toMatch(/mock live no envía/i);
+    expect(text).toMatch(/XTB/i);
+    expect(text).toMatch(/fill ledger/i);
+    expect(text).toMatch(/LiveLedgerReconciliation|live↔ledger|Paper\|Live/i);
+    expect(text).toMatch(/protect_applied/i);
+    expect(text).toMatch(/persist None/i);
+    expect(text).toMatch(/Autoeval/i);
+    expect(text).toMatch(/measure ≠ Accept/i);
   });
 });

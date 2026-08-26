@@ -1,9 +1,10 @@
-"""Repositorio P1 — PositionState persistida (ADR-033)."""
+"""Repositorio P1 — PositionState persistida (ADR-033). JP-1 dual-write hot columns."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from sqlalchemy import select
@@ -44,6 +45,48 @@ def _to_record(row: PositionStateRow) -> PositionStateRecord:
         created_at=row.created_at.isoformat(),
         updated_at=row.updated_at.isoformat(),
     )
+
+
+def _numeric_from_blob(raw: object) -> Decimal | None:
+    if raw is None or isinstance(raw, bool):
+        return None
+    if isinstance(raw, Decimal):
+        return raw
+    if isinstance(raw, (int, float)):
+        try:
+            return Decimal(str(raw))
+        except (InvalidOperation, ValueError):
+            return None
+    if isinstance(raw, str):
+        text = raw.strip()
+        if not text:
+            return None
+        try:
+            return Decimal(text)
+        except (InvalidOperation, ValueError):
+            return None
+    return None
+
+
+def hot_scalars_from_position_state(position_state: dict[str, Any]) -> dict[str, Any]:
+    """JP-1 — extract dual-write columns from PositionState.to_dict() camelCase blob."""
+    direction_raw = position_state.get("direction")
+    direction: str | None
+    if direction_raw is None:
+        direction = None
+    elif isinstance(direction_raw, str):
+        direction = direction_raw.strip() or None
+    else:
+        direction = str(direction_raw)
+
+    return {
+        "direction": direction,
+        "current_stop": _numeric_from_blob(position_state.get("currentStop")),
+        "remaining_quantity": _numeric_from_blob(position_state.get("remainingQuantity")),
+        "quantity": _numeric_from_blob(position_state.get("quantity")),
+        "initial_stop": _numeric_from_blob(position_state.get("initialStop")),
+        "actual_entry": _numeric_from_blob(position_state.get("actualEntry")),
+    }
 
 
 class SqlAlchemyPositionStateRepository:
@@ -100,6 +143,7 @@ class SqlAlchemyPositionStateRepository:
         position_id: str | None = None,
     ) -> PositionStateRecord:
         now = datetime.now(UTC)
+        hot = hot_scalars_from_position_state(position_state)
         row = PositionStateRow(
             id=position_id.strip() if isinstance(position_id, str) and position_id.strip() else new_id(),
             account_id=account_id,
@@ -113,6 +157,7 @@ class SqlAlchemyPositionStateRepository:
             birth_override_reason=birth_override_reason,
             created_at=now,
             updated_at=now,
+            **hot,
         )
         self._session.add(row)
         await self._session.flush()
@@ -125,7 +170,7 @@ class SqlAlchemyPositionStateRepository:
         status: str,
         position_state: dict[str, Any],
     ) -> PositionStateRecord | None:
-        """P3 — persiste reduce/cierre. No inserta natalicio."""
+        """P3 — persiste reduce/cierre. No inserta natalicio. JP-1 dual-write hot cols."""
         pid = position_id.strip() if position_id else ""
         if not pid:
             return None
@@ -133,8 +178,15 @@ class SqlAlchemyPositionStateRepository:
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         if row is None:
             return None
+        hot = hot_scalars_from_position_state(position_state)
         row.status = status
         row.position_state = position_state
+        row.direction = hot["direction"]
+        row.current_stop = hot["current_stop"]
+        row.remaining_quantity = hot["remaining_quantity"]
+        row.quantity = hot["quantity"]
+        row.initial_stop = hot["initial_stop"]
+        row.actual_entry = hot["actual_entry"]
         row.updated_at = datetime.now(UTC)
         await self._session.flush()
         return _to_record(row)

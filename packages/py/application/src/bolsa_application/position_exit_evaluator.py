@@ -12,6 +12,10 @@ from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.execution_router import ExecutionActionResult, ExecutionRouter
 from bolsa_application.get_ohlcv_bars import GetOhlcvBars
 from bolsa_application.paper_auto_http_gate import require_http_paper_auto_env
+from bolsa_application.persist_position_from_exit import (
+    PersistPositionFromExit,
+    PersistPositionFromExitInput,
+)
 from bolsa_application.position_policies import GetPositionPolicyForHolding
 from bolsa_domain.repositories.execution_policy_repository import ExecutionPolicyRepository
 from bolsa_domain.repositories.strategy_definition_repository import StrategyDefinitionRepository
@@ -81,6 +85,7 @@ class EvaluatePositionExits:
         execution_policy_repository: ExecutionPolicyRepository,
         get_ohlcv_bars: GetOhlcvBars,
         execution_router: ExecutionRouter | None = None,
+        position_from_exit: PersistPositionFromExit | None = None,
     ) -> None:
         self._portfolio = portfolio_summary
         self._policy_lookup = position_policy_lookup
@@ -88,6 +93,7 @@ class EvaluatePositionExits:
         self._execution_policies = execution_policy_repository
         self._ohlcv = get_ohlcv_bars
         self._router = execution_router
+        self._position_from_exit = position_from_exit
 
     async def _resolve_exit_definition(
         self,
@@ -262,6 +268,23 @@ class EvaluatePositionExits:
                     status: Literal["executed", "skipped", "error"] = (
                         "executed" if action and action.status == "trade_executed" else "skipped"
                     )
+                    if (
+                        status == "executed"
+                        and action is not None
+                        and action.transaction_id
+                        and self._position_from_exit is not None
+                    ):
+                        fill_price = float(signal.price) if signal.price else 0.0
+                        if fill_price > 0:
+                            await self._position_from_exit.persist(
+                                PersistPositionFromExitInput(
+                                    account_id=account_id,
+                                    instrument_id=position.instrument_id,
+                                    fill_quantity=float(position.quantity),
+                                    fill_price=fill_price,
+                                    exit_transaction_id=str(action.transaction_id),
+                                )
+                            )
                     results.append(
                         PositionExitEvalResult(
                             account_id=account_id,

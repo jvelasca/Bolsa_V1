@@ -20,7 +20,12 @@ import type {
   NewsAssessmentV1,
   TechnicalAssessmentV1,
 } from "@bolsa/shared";
-import { evaluateRiskSignature } from "@bolsa/shared";
+import {
+  brokerAdapterVenueCopy,
+  evaluateRiskSignature,
+  executionOutcomeCopy,
+  paperOrderStatusCopy,
+} from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -53,6 +58,10 @@ import {
   rankByOptimalThenGeo,
 } from "@/features/trading/demo-book-geo-rank";
 import { recordSemiConfirmMandate } from "@/features/trading/semi-confirm-mandate";
+import {
+  protectPersistNote,
+  protectStopNotApplied,
+} from "@/features/settings/protect-persist-honesty";
 import {
   conflictForActive,
   findHmConflicts,
@@ -393,12 +402,29 @@ export function SupervisedF3Panel() {
     onSuccess: (res) => {
       const intent = res.data.intent;
       const trade = res.data.trade;
+      const positionPersist = res.data.positionPersist as
+        | { status?: string; reason?: string }
+        | undefined;
+      const executionRecord = res.data.executionRecord as
+        | {
+            outcome?: "not_executed" | "executed" | "error" | "unknown";
+            reason?: string;
+          }
+        | undefined;
+      const paperOrder = res.data.paperOrder as
+        | { status?: "CREATED" | "FILLED" }
+        | undefined;
+      const brokerAdapter = res.data.brokerAdapter as
+        | { venue?: "PAPER" | "LIVE"; adapter?: string; fillStatus?: string }
+        | undefined;
       const sid = res.data.decisionSession?.sessionId;
+      const stopNotApplied = protectStopNotApplied(trade, positionPersist);
       let mandateNote = "";
       if (
         pending &&
         effectiveAccountId &&
-        (intent.status === "executed" || intent.status === "authorized")
+        (intent.status === "executed" || intent.status === "authorized") &&
+        !stopNotApplied
       ) {
         const m = recordSemiConfirmMandate({
           accountId: effectiveAccountId,
@@ -410,15 +436,36 @@ export function SupervisedF3Panel() {
           mandateNote = ` · mandato=${m.mandateTenureId.slice(0, 8)}${m.linked ? "+link" : ""}`;
         }
       }
+      const outcomeNote =
+        executionRecord?.outcome === "unknown"
+          ? ` · ${executionOutcomeCopy("unknown")}`
+          : executionRecord?.outcome === "error"
+            ? ` · ${executionOutcomeCopy("error")}`
+            : "";
+      const paperNote =
+        paperOrder?.status === "CREATED" || paperOrder?.status === "FILLED"
+          ? ` · ${paperOrderStatusCopy(paperOrder.status)}`
+          : "";
+      const adapterNote =
+        brokerAdapter?.venue === "PAPER" || brokerAdapter?.venue === "LIVE"
+          ? ` · ${brokerAdapterVenueCopy(brokerAdapter.venue)}`
+          : "";
       setLog(
         `Intent ${intent.intentId} · ${intent.status}` +
           (trade
             ? ` · trade=${trade.status}${trade.reason ? ` (${trade.reason})` : ""}`
             : "") +
+          outcomeNote +
+          paperNote +
+          adapterNote +
+          protectPersistNote(positionPersist) +
           (sid ? ` · session=${sid}` : "") +
           mandateNote,
       );
-      if (intent.status === "executed" || intent.status === "authorized") {
+      if (
+        (intent.status === "executed" || intent.status === "authorized") &&
+        !stopNotApplied
+      ) {
         if (activeId) {
           removeFromQueue(activeId);
           setSelectedIds((prev) => {
@@ -451,13 +498,20 @@ export function SupervisedF3Panel() {
           sessionId: item.payload.decisionSession?.sessionId,
         });
         const st = res.data.intent.status;
+        const trade = res.data.trade;
+        const positionPersist = res.data.positionPersist as
+          | { status?: string; reason?: string }
+          | undefined;
+        const stopNotApplied = protectStopNotApplied(trade, positionPersist);
         let tag = `${item.symbol ?? item.payload.instrumentId.slice(0, 6)}:${st}`;
-        if (st === "executed" || st === "authorized") {
+        if (stopNotApplied) {
+          tag += ":stop_no_aplicado";
+        } else if (st === "executed" || st === "authorized") {
           const m = recordSemiConfirmMandate({
             accountId: effectiveAccountId,
             payload: item.payload,
             intentStatus: st,
-            trade: res.data.trade,
+            trade,
           });
           if (m.mandateTenureId) tag += "+M";
           removeFromQueue(item.id);
@@ -528,6 +582,9 @@ export function SupervisedF3Panel() {
       signedQty: Number.isFinite(qty) ? qty : NaN,
       signedPrice: typeof px === "number" ? px : NaN,
       overrideReason: riskOverrideReason,
+      requireTriggeredPlan:
+        pending?.action === "recommend_long" ||
+        pending?.action === "recommend_short",
     });
   }, [
     pending?.tradePlan,
@@ -830,7 +887,7 @@ export function SupervisedF3Panel() {
             disabled={
               !pending ||
               confirm.isPending ||
-              pending.action === "wait" ||
+              (!protectMeta && pending.action === "wait") ||
               !canExecute ||
               executeBlockedByRisk ||
               executeBlockedByProtect
@@ -840,13 +897,15 @@ export function SupervisedF3Panel() {
                 ? "Stop empeora el actual: escribe un motivo de override"
                 : executeBlockedByRisk
                   ? "Supera el plan: escribe un motivo de override"
-                  : canExecute
-                    ? "Ejecutar en DEMO (SEMI)"
-                    : "Cambia a SEMI en Libro DEMO"
+                  : protectMeta
+                    ? "Persistir stop operativo (≠ orden broker)"
+                    : canExecute
+                      ? "Ejecutar en DEMO (SEMI)"
+                      : "Cambia a SEMI en Libro DEMO"
             }
             onClick={() => confirm.mutate(true)}
           >
-            Confirmar + ejecutar
+            {protectMeta ? "Confirmar protección" : "Confirmar + ejecutar"}
           </button>
         </div>
 

@@ -65,9 +65,15 @@ export function F3RiskSignatureBlock({
           <MesaTipButton tip="confirm-risk-signature" />
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Sin TradePlan TRIGGERED: no hay stop/R/máx del plan. El tamaño no
-          firma riesgo técnico (% caja puede prellenar).
+          {signature.blockReason === "no_tradeplan"
+            ? "Sin TradePlan TRIGGERED no se puede firmar una apertura SEMI. Usa manual HTTP solo con override explícito de mesa, o espera plan Propuesto."
+            : "Sin TradePlan TRIGGERED: no hay stop/R/máx del plan. El tamaño no firma riesgo técnico (% caja puede prellenar)."}
         </p>
+        {signature.blockReason === "no_tradeplan" ? (
+          <p className="text-[11px] text-amber-800 dark:text-amber-300">
+            Ejecutar apertura bloqueado hasta TRIGGERED.
+          </p>
+        ) : null}
       </div>
     );
   }
