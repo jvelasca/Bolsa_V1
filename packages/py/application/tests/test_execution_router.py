@@ -3,14 +3,14 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
-from bolsa_domain.platform_kernel import validate_execution_mode
 
 from bolsa_application.execution_router import ExecutionRouter, signal_kind_to_trade_type
 from bolsa_application.paper_auto_http_gate import (
     PAPER_AUTO_ENV_BLOCKED,
     PaperAutoEnvBlockedError,
 )
+from bolsa_domain.entities.execution_policy import ExecutionPolicyRecord
+from bolsa_domain.platform_kernel import validate_execution_mode
 
 
 class _FakePolicyRepo:

@@ -26,9 +26,10 @@ describe("mesa-tip-catalog", () => {
         "chart-f3-projection",
         "confirm-ticket-preview",
         "confirm-risk-signature",
+        "operational-console",
       ]),
     );
-    expect(MESA_TIP_IDS).toHaveLength(8);
+    expect(MESA_TIP_IDS).toHaveLength(9);
   });
 
   it("returns Spanish copy with optional links", () => {

@@ -6,12 +6,11 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
-from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
-
 from bolsa_application.decision_board import (
     extract_session_thesis_health,
     extract_session_trade_plan,
 )
+from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 NO_OPERATIONAL_PLAN_COPY = "No existe todavía un plan operativo."
 ARTIFACT_TYPE = "ART-DECISION-JOURNAL-STUDY"

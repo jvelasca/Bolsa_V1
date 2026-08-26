@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from bolsa_application.risk_engine import check_opening
-
 from bolsa_market.sanity import sanity_opening_veto_reason
 
 

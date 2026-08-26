@@ -3,11 +3,6 @@
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from bolsa_application.broker_venue_runtime import (
-    account_broker_venue_from_settings,
-    effective_broker_venue_async,
-    normalize_broker_venue,
-)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,10 +21,10 @@ from bolsa_api.api.dependencies import (
     get_deposit_cash_use_case,
     get_get_account_summary_use_case,
     get_get_account_use_case,
-    get_live_recon_lookup,
     get_list_account_summaries_use_case,
     get_list_accounts_use_case,
     get_list_ledger_use_case,
+    get_live_recon_lookup,
     get_operational_incident_store,
     get_portfolio_recon_lookup,
     get_record_session_verdict_use_case,
@@ -81,6 +76,11 @@ from bolsa_api.schemas.accounts import (
     WithdrawCashDto,
 )
 from bolsa_api.schemas.ai_governance import AiEffectivenessResponseDto
+from bolsa_application.broker_venue_runtime import (
+    account_broker_venue_from_settings,
+    effective_broker_venue_async,
+    normalize_broker_venue,
+)
 
 router = APIRouter()
 
