@@ -31,6 +31,10 @@ from bolsa_application.opening_permission import (
 from bolsa_application.persist_position_from_exit import PersistPositionFromExit
 from bolsa_application.persist_position_from_fill import PersistPositionFromFill
 from bolsa_application.post_fill_position_sync import sync_position_after_ledger_fill
+from bolsa_application.reconciliation_opening_gate import (
+    LiveReconLookup,
+    PortfolioReconLookup,
+)
 from bolsa_infrastructure.database.repositories.account_repository import (
     SqlAlchemyAccountRepository,
 )
@@ -72,6 +76,8 @@ class FillPendingOrder:
         accounts: AccountScopeLookup | None = None,
         ohlcv: LatestBarLookup | None = None,
         mandates: AccountMandateLookup | None = None,
+        portfolio_recon: PortfolioReconLookup | None = None,
+        live_recon: LiveReconLookup | None = None,
         position_from_fill: PersistPositionFromFill | None = None,
         position_from_exit: PersistPositionFromExit | None = None,
         broker_adapter: IBrokerAdapter | None = None,
@@ -86,8 +92,21 @@ class FillPendingOrder:
         self._accounts = accounts
         self._ohlcv = ohlcv
         self._mandates = mandates
+        self._portfolio_recon = portfolio_recon
+        self._live_recon = live_recon
         self._position_from_fill = position_from_fill
         self._position_from_exit = position_from_exit
+
+    async def _resolve_broker_venue_for_account(self, account_id: str) -> str:
+        account_venue: str | None = None
+        getter = getattr(self._account_repo, "get_settings_json", None)
+        if getter is not None:
+            try:
+                settings = await getter(account_id)
+                account_venue = account_broker_venue_from_settings(settings)
+            except Exception:  # noqa: BLE001
+                account_venue = None
+        return await effective_broker_venue_async(account_venue=account_venue)
 
     async def _resolve_broker_adapter_for_account(self, account_id: str) -> IBrokerAdapter:
         """PA-1: adapter inyectado (tests) o lazy resolve tras account_id."""
@@ -215,6 +234,7 @@ class FillPendingOrder:
     async def _risk_allows_opening(
         self, *, order: PendingOrderRecord, account_id: str
     ) -> bool:
+        venue = await self._resolve_broker_venue_for_account(account_id)
         return await allow_opening_fill(
             portfolio_summary=self._portfolio_summary,
             instruments=self._instruments,
@@ -222,6 +242,9 @@ class FillPendingOrder:
             accounts=self._accounts,
             ohlcv=self._ohlcv,
             mandates=self._mandates,
+            portfolio_recon=self._portfolio_recon,
+            live_recon=self._live_recon,
+            broker_venue=venue,
             account_id=account_id,
             instrument_id=order.instrument_id,
             symbol=str(order.symbol or order.instrument_id),

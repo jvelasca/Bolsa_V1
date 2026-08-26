@@ -4,6 +4,64 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.12-beta] — 2026-08-26
+
+Operational Reliability v1.12 (D0 + OR-1…OR-6). Producto sigue **BETA / no producción**. Tag anotado **`v1.12-beta`** (SHA al stamp; pin post Release tag CI GREEN). Partida: **`v1.11-beta` → `76d0f951`**. Spine **`pnpm test:decision-spine` = 433**. Pack: [`audit-pack-estado-global-2026-08-26-v112.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v112.md). Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**. LIVE **experimental**.
+
+### OR-6 — SEMI operational certification (v1.12)
+
+- Readiness discreto `PAPER_READY` / `PAPER_DEGRADED` / `LIVE_EXPERIMENTAL` / `LIVE_BLOCKED` (un FAIL crítico no se promedia; AUTO no entra).
+- CTA firma `Ejecutar en PAPER|LIVE` + badge LIVE; chip mesa aparte del Autoeval OE-1.
+- UI preferencia Paper|Live por cuenta (PA-1 API).
+- Spine **`pnpm test:decision-spine` = 433** (post-OR-5 = 418).
+- ADR-035 · plan [`plan-or6-semi-operational-certification-2026-08-26.md`](./docs/engineering/plan-or6-semi-operational-certification-2026-08-26.md) · relevo [`traspaso-relevo-or6-semi-operational-certification-2026-08-26.md`](./docs/engineering/traspaso-relevo-or6-semi-operational-certification-2026-08-26.md).
+- **No** thaw estricto · **no** AUTO on · **no** Alembic · **no** `contract:gen`.
+
+### OR-5 — Broker execution scenario suite (v1.12)
+
+- Certificación spine A–L + retry (OR-1) + crash (OR-2) en `test_or5_broker_execution_scenarios.py`.
+- Ancla en `pnpm test:decision-spine`. Paper/mock; sin live accepted; sin mass sim.
+- Spine **`pnpm test:decision-spine` = 418** (post-OR-4 = 403).
+- ADR-035 · plan [`plan-or5-broker-execution-scenario-suite-2026-08-26.md`](./docs/engineering/plan-or5-broker-execution-scenario-suite-2026-08-26.md) · relevo [`traspaso-relevo-or5-broker-execution-scenario-suite-2026-08-26.md`](./docs/engineering/traspaso-relevo-or5-broker-execution-scenario-suite-2026-08-26.md).
+- **No** CTA LIVE (OR-6) · **no** Alembic · **no** `contract:gen` · **no** simulación 1k–10k.
+
+### OR-4 — Reconciliation → opening veto (v1.12)
+
+- `check_opening`: OI-6 `drift` → DENY aperturas; LR-1 `drift`/`unavailable` → DENY solo venue **live**; exits (`exit`/`exit_hint`/`reduce`) ALLOW.
+- Confirm / Fill / HTTP gated / Router cablean puertos recon; fail-closed si lookup lanza. Sin auto-heal · sin UI resolución.
+- OE-1: OI-6 status honesto (`ok`/`drift`/`error`/`unavailable`; ya no `not_wired` fijo).
+- Spine **`pnpm test:decision-spine` = 403** (post-OR-3 = 387).
+- ADR-035 · plan [`plan-or4-recon-opening-veto-2026-08-26.md`](./docs/engineering/plan-or4-recon-opening-veto-2026-08-26.md) · relevo [`traspaso-relevo-or4-recon-opening-veto-2026-08-26.md`](./docs/engineering/traspaso-relevo-or4-recon-opening-veto-2026-08-26.md).
+- **No** suite A–L (OR-5) · **no** CTA LIVE (OR-6) · **no** Alembic · **no** `contract:gen`.
+
+### OR-3 — Full order state machine (v1.12)
+
+- `PaperOrderStatus`: `CREATED` | `SUBMITTED` | `ACK` | `PARTIAL` | `FILLED` | `REJECTED` | `CANCELLED` | `EXPIRED` | `UNKNOWN` + grafo `ALLOWED_TRANSITIONS` (PY/TS).
+- PaperBroker: `CREATED` → `SUBMITTED` pre-send → `FILLED` ok; boom → `UNKNOWN` (no deja CREATED «como si no enviada»).
+- Crash recovery OR-2: `paperOrder.status = UNKNOWN`. Campo opcional `filledQuantity` para PARTIAL.
+- Spine **`pnpm test:decision-spine` = 387** (post-OR-2 = 382).
+- ADR-035 · plan [`plan-or3-order-state-machine-2026-08-26.md`](./docs/engineering/plan-or3-order-state-machine-2026-08-26.md) · relevo [`traspaso-relevo-or3-order-state-machine-2026-08-26.md`](./docs/engineering/traspaso-relevo-or3-order-state-machine-2026-08-26.md).
+- **No** veto recon (OR-4) · **no** suite A–L (OR-5) · **no** OCO · **no** `contract:gen`.
+
+### OR-2 — Crash/restart recovery (v1.12)
+
+- Confirm: `DurableSubmitIntent` persistido **antes** de `adapter.submit` (fail-closed si `put` falla).
+- Sin fill local y con intento durable → `ExecutionRecord unknown` reconstruido (`crashRecovery`); **no** segundo `adapter.submit`.
+- Mapeo `intent_id` ↔ `venue_order_id` (retry live `submitted` = 1 send). Fill local (OR-1) sigue ganando.
+- Store = puerto + InMemory de proceso (sin Alembic). Tabla PG / Redis multi-worker parked.
+- Spine **`pnpm test:decision-spine` = 382** (post-OR-1 = 372).
+- ADR-035 · plan [`plan-or2-crash-restart-2026-08-26.md`](./docs/engineering/plan-or2-crash-restart-2026-08-26.md) · relevo [`traspaso-relevo-or2-crash-restart-2026-08-26.md`](./docs/engineering/traspaso-relevo-or2-crash-restart-2026-08-26.md).
+- **No** OR-3 state machine · **no** veto recon (OR-4) · **no** `contract:gen`.
+
+### OR-1 — End-to-end idempotency (v1.12)
+
+- Confirm paper: clave canónica = `decision_id` (sin fallback `confirm-{uuid}`); sin `decision_id` → `error` / `decision_id_required` pre-send.
+- `intent_id` / `PaperOrder.order_id` estables (`INT-{slug}` / `ORD-{slug}`) derivados de `decision_id`.
+- Short-circuit pre-`adapter.submit` si ya hay fill local (`ExecuteTrade.find_existing_by_idempotency`); replay sin segundo submit ni journal `executed` duplicado.
+- Spine **`pnpm test:decision-spine` = 372** (partida v1.11 = 367).
+- ADR-035 · plan [`plan-or1-e2e-idempotency-2026-08-26.md`](./docs/engineering/plan-or1-e2e-idempotency-2026-08-26.md) · relevo [`traspaso-relevo-or1-e2e-idempotency-2026-08-26.md`](./docs/engineering/traspaso-relevo-or1-e2e-idempotency-2026-08-26.md).
+- **No** Alembic · **no** `contract:gen` · **no** OR-2/OR-3/OR-4 en esta rebanada.
+
 ## [1.11-beta] — 2026-08-26
 
 Operational Integrity v1.11 (OI-1…OE-1). Producto sigue **BETA / no producción**. Tag anotado **`v1.11-beta` → `76d0f951`** (Release tag CI GREEN). Partida: **`v1.10-beta` → `047ddb6`**. Spine **`pnpm test:decision-spine` = 367**. Pack: [`audit-pack-estado-global-2026-08-26-v111.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v111.md). Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**.

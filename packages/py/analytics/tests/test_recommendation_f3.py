@@ -42,6 +42,9 @@ def test_recommendation_from_package_and_intent():
     assert intent.side == "buy"
     assert intent.source == "human_supervised"
     assert intent.status == "authorized"
+    from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
+
+    assert intent.intent_id == stable_intent_id_from_decision(package.decision_id)
 
 
 def test_recommendation_country_optional():

@@ -1,6 +1,6 @@
-"""PaperBroker — venue PAPER alrededor de execute_trade (ADR-034).
+"""PaperBroker — venue PAPER alrededor de execute_trade (ADR-034 · ADR-035 OR-3).
 
-CREATED → ledger fill → FILLED. Excepción → CREATED + unknown.
+CREATED → SUBMITTED → ledger fill → FILLED. Excepción post-send → UNKNOWN.
 PaperBroker = venue paper usado por PaperBrokerAdapter.
 ≠ IBrokerAdapter live · ≠ thaw PAPER_D_EXECUTE.
 """
@@ -20,6 +20,7 @@ from bolsa_analytics.cognitive.paper_order import (
     PaperOrderSide,
     apply_paper_order_fill,
     build_paper_order,
+    transition_paper_order,
 )
 from bolsa_application.persist_position_from_fill import open_transaction_id_from_trade
 
@@ -62,12 +63,15 @@ class PaperBroker:
         order_id: str | None = None,
         intent_id: str | None = None,
     ) -> PaperBrokerSubmitResult:
-        paper = build_paper_order(
-            instrument_id=instrument_id,
-            side=side,
-            quantity=quantity,
-            order_id=order_id,
-            intent_id=intent_id,
+        paper = transition_paper_order(
+            build_paper_order(
+                instrument_id=instrument_id,
+                side=side,
+                quantity=quantity,
+                order_id=order_id,
+                intent_id=intent_id,
+            ),
+            "SUBMITTED",
         )
         try:
             trade = await self._execute_trade.execute(
@@ -78,9 +82,9 @@ class PaperBroker:
                 account_id=account_id,
                 idempotency_key=idempotency_key,
             )
-        except Exception as exc:  # noqa: BLE001 — OI-3: UNKNOWN ≠ ERROR
+        except Exception as exc:  # noqa: BLE001 — OI-3/OR-3: UNKNOWN ≠ ERROR
             return PaperBrokerSubmitResult(
-                paper_order=paper,
+                paper_order=transition_paper_order(paper, "UNKNOWN"),
                 trade=None,
                 status="unknown",
                 reason=str(exc),

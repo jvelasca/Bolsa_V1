@@ -1,5 +1,5 @@
 import type { AccountSettings } from "@bolsa/shared";
-import { calculateTradeFees } from "@bolsa/shared";
+import { calculateTradeFees, executeCtaLabel } from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,7 @@ interface TradeConfirmPanelProps {
   details: TradeConfirmDetails;
   error?: string | null;
   isPending?: boolean;
+  venue?: "paper" | "live";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -30,6 +31,7 @@ export function TradeConfirmPanel({
   details,
   error,
   isPending = false,
+  venue = "paper",
   onConfirm,
   onCancel,
 }: TradeConfirmPanelProps) {
@@ -59,9 +61,20 @@ export function TradeConfirmPanel({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-primary">
-          Confirmar {orderLabel ?? sideLabel.toLowerCase()}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-primary">
+            Confirmar {orderLabel ?? sideLabel.toLowerCase()}
+          </p>
+          {venue === "live" ? (
+            <span
+              className="rounded border border-sky-500/40 bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100"
+              data-testid="manual-live-venue-badge"
+              title="LIVE experimental · submitted ≠ fill · trading not accepted"
+            >
+              LIVE
+            </span>
+          ) : null}
+        </div>
         <p className="mt-2 text-lg font-semibold">
           {sideLabel} {quantity} × {symbol}
         </p>
@@ -150,7 +163,7 @@ export function TradeConfirmPanel({
               : "bg-red-600 hover:bg-red-500",
           )}
         >
-          {isPending ? "Ejecutando…" : `Confirmar ${sideLabel.toLowerCase()}`}
+          {isPending ? "Ejecutando…" : executeCtaLabel(venue)}
         </button>
       </div>
     </div>

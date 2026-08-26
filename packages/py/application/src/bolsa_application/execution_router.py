@@ -28,6 +28,10 @@ from bolsa_application.events.payloads import signal_event_payload
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.journal_writer import append_journal_event
+from bolsa_application.reconciliation_opening_gate import (
+    LiveReconLookup,
+    PortfolioReconLookup,
+)
 from bolsa_application.risk_engine import RiskDecision, check_opening
 from bolsa_application.risk_runtime import (
     claim_auto_execute_idempotency,
@@ -188,6 +192,8 @@ class ExecutionRouter:
         cognitive_store: CognitiveStore | None = None,
         profile_store: InvestorProfileStore | None = None,
         mandates: AccountMandateLookup | None = None,
+        portfolio_recon: PortfolioReconLookup | None = None,
+        live_recon: LiveReconLookup | None = None,
         journal_writer: Any | None = None,
     ) -> None:
         self._policies = policy_repo
@@ -203,7 +209,49 @@ class ExecutionRouter:
         self._cognitive_store = cognitive_store
         self._profile_store = profile_store
         self._mandates = mandates
+        self._portfolio_recon = portfolio_recon
+        self._live_recon = live_recon
         self._journal_writer = journal_writer
+
+    async def _resolve_recon_kwargs(
+        self,
+        account_id: str,
+        *,
+        broker_venue: str = "paper",
+    ) -> dict[str, Any] | RiskDecision:
+        """OR-4 — statuses para check_opening, o DENY si lookup falla."""
+        portfolio_status = None
+        live_status = None
+        require = False
+        if self._portfolio_recon is not None:
+            require = True
+            try:
+                portfolio_status = await self._portfolio_recon.portfolio_recon_status(
+                    account_id
+                )
+            except Exception:  # noqa: BLE001
+                return RiskDecision(
+                    verdict="DENY",
+                    reasons=("reconciliation:portfolio_lookup_failed",),
+                    guard=None,
+                )
+        venue = (broker_venue or "paper").strip().lower()
+        if self._live_recon is not None and venue == "live":
+            require = True
+            try:
+                live_status = await self._live_recon.live_recon_status(account_id)
+            except Exception:  # noqa: BLE001
+                return RiskDecision(
+                    verdict="DENY",
+                    reasons=("reconciliation:live_unavailable",),
+                    guard=None,
+                )
+        return {
+            "portfolio_recon_status": portfolio_status,
+            "live_recon_status": live_status,
+            "broker_venue": venue,
+            "require_recon_veto": require,
+        }
 
     async def _resolve_account_mandate_for_opening(
         self,
@@ -601,34 +649,42 @@ class ExecutionRouter:
                 )
             else:
                 has_open_mandate, mandate_strategy_id, require_account_mandate = mandate_ctx
-                guard_decision = check_opening(
-                    profile=profile,
-                    instrument_id=signal.instrument_id,
-                    symbol=symbol,
-                    trade_type=trade_type,
-                    quantity=quantity,
-                    price=price,
-                    signal_kind=str(signal.kind),
-                    equity=equity,
-                    open_positions_count=len(summary.positions),
-                    event_calendar=self._event_calendar,
-                    auto_live=False,  # paper_auto ≠ live; D3 auto-live cuando mode=live_auto
-                    account_daily_drawdown_pct=dds.daily_pct,
-                    account_weekly_drawdown_pct=dds.weekly_pct,
-                    account_max_drawdown_pct=dds.max_pct,
-                    kill_switch=await effective_kill_switch(),
-                    book_max_open_positions=_book_max_open_positions(policy),
-                    portfolio_positions=_basket_positions_from_summary(summary),
-                    proposal_sector=(
-                        hit.get("sector") if isinstance(hit, dict) else None
-                    ),
-                    last_bar_timestamp=getattr(signal, "timestamp", None) or None,
-                    require_fresh_data=True,
-                    has_open_mandate=has_open_mandate,
-                    mandate_strategy_id=mandate_strategy_id,
-                    require_account_mandate=require_account_mandate,
-                    proposal_strategy_id=self._proposal_strategy_id(signal),
+                recon = await self._resolve_recon_kwargs(
+                    policy.account_id or "",
+                    broker_venue="paper",
                 )
+                if isinstance(recon, RiskDecision):
+                    guard_decision = recon
+                else:
+                    guard_decision = check_opening(
+                        profile=profile,
+                        instrument_id=signal.instrument_id,
+                        symbol=symbol,
+                        trade_type=trade_type,
+                        quantity=quantity,
+                        price=price,
+                        signal_kind=str(signal.kind),
+                        equity=equity,
+                        open_positions_count=len(summary.positions),
+                        event_calendar=self._event_calendar,
+                        auto_live=False,  # paper_auto ≠ live; D3 auto-live cuando mode=live_auto
+                        account_daily_drawdown_pct=dds.daily_pct,
+                        account_weekly_drawdown_pct=dds.weekly_pct,
+                        account_max_drawdown_pct=dds.max_pct,
+                        kill_switch=await effective_kill_switch(),
+                        book_max_open_positions=_book_max_open_positions(policy),
+                        portfolio_positions=_basket_positions_from_summary(summary),
+                        proposal_sector=(
+                            hit.get("sector") if isinstance(hit, dict) else None
+                        ),
+                        last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                        require_fresh_data=True,
+                        has_open_mandate=has_open_mandate,
+                        mandate_strategy_id=mandate_strategy_id,
+                        require_account_mandate=require_account_mandate,
+                        proposal_strategy_id=self._proposal_strategy_id(signal),
+                        **recon,
+                    )
             auto_decision_id = str(signal.id or idem_key)
             await append_journal_event(
                 self._journal_writer,
@@ -905,33 +961,41 @@ class ExecutionRouter:
             )
         else:
             has_open_mandate, mandate_strategy_id, require_account_mandate = mandate_ctx
-            guard_decision = check_opening(
-                profile=profile,
-                instrument_id=signal.instrument_id,
-                symbol=str(hit.get("symbol") or signal.instrument_id),
-                trade_type=trade_type,
-                quantity=max(quantity, 1e-9),
-                price=price,
-                signal_kind=str(signal.kind),
-                equity=equity,
-                open_positions_count=len(summary.positions),
-                event_calendar=self._event_calendar,
-                auto_live=True,
-                edge_report=edge_report,
-                account_daily_drawdown_pct=dds.daily_pct,
-                account_weekly_drawdown_pct=dds.weekly_pct,
-                account_max_drawdown_pct=dds.max_pct,
-                kill_switch=await effective_kill_switch(),
-                book_max_open_positions=_book_max_open_positions(policy),
-                portfolio_positions=_basket_positions_from_summary(summary),
-                proposal_sector=hit.get("sector"),
-                last_bar_timestamp=getattr(signal, "timestamp", None) or None,
-                require_fresh_data=True,
-                has_open_mandate=has_open_mandate,
-                mandate_strategy_id=mandate_strategy_id,
-                require_account_mandate=require_account_mandate,
-                proposal_strategy_id=self._proposal_strategy_id(signal),
+            recon = await self._resolve_recon_kwargs(
+                policy.account_id or "",
+                broker_venue="live",
             )
+            if isinstance(recon, RiskDecision):
+                guard_decision = recon
+            else:
+                guard_decision = check_opening(
+                    profile=profile,
+                    instrument_id=signal.instrument_id,
+                    symbol=str(hit.get("symbol") or signal.instrument_id),
+                    trade_type=trade_type,
+                    quantity=max(quantity, 1e-9),
+                    price=price,
+                    signal_kind=str(signal.kind),
+                    equity=equity,
+                    open_positions_count=len(summary.positions),
+                    event_calendar=self._event_calendar,
+                    auto_live=True,
+                    edge_report=edge_report,
+                    account_daily_drawdown_pct=dds.daily_pct,
+                    account_weekly_drawdown_pct=dds.weekly_pct,
+                    account_max_drawdown_pct=dds.max_pct,
+                    kill_switch=await effective_kill_switch(),
+                    book_max_open_positions=_book_max_open_positions(policy),
+                    portfolio_positions=_basket_positions_from_summary(summary),
+                    proposal_sector=hit.get("sector"),
+                    last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                    require_fresh_data=True,
+                    has_open_mandate=has_open_mandate,
+                    mandate_strategy_id=mandate_strategy_id,
+                    require_account_mandate=require_account_mandate,
+                    proposal_strategy_id=self._proposal_strategy_id(signal),
+                    **recon,
+                )
         guard = guard_decision.guard
         lineage_live = {
             "signalId": signal.id,

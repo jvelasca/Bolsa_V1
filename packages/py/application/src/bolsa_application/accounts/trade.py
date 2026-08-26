@@ -26,6 +26,26 @@ class ExecuteTrade:
         self._portfolio_repo = portfolio_repo
         self._ledger_repo = ledger_repo
 
+    async def find_existing_by_idempotency(
+        self,
+        *,
+        account_id: str | None = None,
+        portfolio_id: str | None = None,
+        idempotency_key: str,
+    ) -> TradeResult | None:
+        """OR-1 — peek de fill local sin enviar (short-circuit Confirm pre-submit)."""
+        if not idempotency_key:
+            return None
+        scope = await self._account_repo.resolve_scope(account_id, portfolio_id)
+        existing = await self._portfolio_repo.find_transaction_by_idempotency(
+            scope.legacy_portfolio_id,
+            idempotency_key,
+        )
+        if existing is None:
+            return None
+        summary = await self._portfolio_repo.get_summary(scope.legacy_portfolio_id)
+        return TradeResult(transaction=existing, summary=summary)
+
     async def execute(
         self,
         *,

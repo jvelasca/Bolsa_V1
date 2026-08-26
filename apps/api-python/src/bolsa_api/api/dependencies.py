@@ -463,6 +463,66 @@ def get_portfolio_summary_use_case(session: AsyncSession) -> GetPortfolioSummary
     return GetPortfolioSummary(get_account_repository(session), get_portfolio_repository(session))
 
 
+def get_reconcile_portfolio_integrity_use_case(session: AsyncSession) -> Any:
+    """OI-6 — detect/report paper layers (OR-4 opening veto + OE-1)."""
+    from bolsa_application.reconcile_portfolio_integrity import ReconcilePortfolioIntegrity
+    from bolsa_application.reconciliation_opening_gate import (
+        HoldingsFromSummary,
+        LedgerCashPort,
+        OpenPositionsFromRepo,
+        PortfolioCashFromSummary,
+    )
+    from bolsa_infrastructure.database.repositories.position_state_repository import (
+        SqlAlchemyPositionStateRepository,
+    )
+
+    summary = get_portfolio_summary_use_case(session)
+    return ReconcilePortfolioIntegrity(
+        cash=PortfolioCashFromSummary(summary),
+        ledger=LedgerCashPort(get_ledger_repository(session)),
+        holdings=HoldingsFromSummary(summary),
+        open_positions=OpenPositionsFromRepo(SqlAlchemyPositionStateRepository(session)),
+        transactions=None,
+    )
+
+
+def get_portfolio_recon_lookup(session: AsyncSession) -> Any:
+    """OR-4 — status OI-6 para check_opening."""
+    from bolsa_application.reconciliation_opening_gate import (
+        ReconcilePortfolioIntegrityLookup,
+    )
+
+    return ReconcilePortfolioIntegrityLookup(
+        get_reconcile_portfolio_integrity_use_case(session)
+    )
+
+
+def get_live_recon_lookup(session: AsyncSession) -> Any:
+    """OR-4 — status LR-1 (bridge opcional; sin client → unavailable)."""
+    from bolsa_application.reconcile_live_ledger import ReconcileLiveLedger
+    from bolsa_application.reconciliation_opening_gate import (
+        HoldingsFromSummary,
+        PortfolioCashFromSummary,
+        ReconcileLiveLedgerLookup,
+        XtbBridgeLiveVenueAdapter,
+    )
+    from bolsa_infrastructure.config import get_settings
+
+    summary = get_portfolio_summary_use_case(session)
+    live = None
+    url = get_settings().xtb_bridge_url
+    if url:
+        from bolsa_market.providers import XtbBridgeClient
+
+        live = XtbBridgeLiveVenueAdapter(XtbBridgeClient(url))
+    uc = ReconcileLiveLedger(
+        cash=PortfolioCashFromSummary(summary),
+        holdings=HoldingsFromSummary(summary),
+        live=live,
+    )
+    return ReconcileLiveLedgerLookup(uc)
+
+
 def get_list_transactions_use_case(session: AsyncSession) -> ListTransactions:
     return ListTransactions(get_account_repository(session), get_portfolio_repository(session))
 
@@ -540,6 +600,8 @@ def get_execute_gated_portfolio_trade_use_case(session: AsyncSession) -> Any:
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        portfolio_recon=get_portfolio_recon_lookup(session),
+        live_recon=get_live_recon_lookup(session),
         position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )
@@ -1205,6 +1267,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         PersistPositionFromProtect,
         PositionStateProtectStore,
     )
+    from bolsa_application.submit_intent_store import process_submit_intent_store
     from bolsa_infrastructure.database.repositories.position_state_repository import (
         SqlAlchemyPositionStateRepository,
     )
@@ -1221,10 +1284,13 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        portfolio_recon=get_portfolio_recon_lookup(session),
+        live_recon=get_live_recon_lookup(session),
         journal_writer=get_journal_writer(session),
         position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
         position_from_protect=PersistPositionFromProtect(cast(PositionStateProtectStore, repo)),
+        submit_intent_store=process_submit_intent_store(),
     )
 
 
@@ -1258,6 +1324,8 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         cognitive_store=get_cognitive_repository(session),
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        portfolio_recon=get_portfolio_recon_lookup(session),
+        live_recon=get_live_recon_lookup(session),
         journal_writer=get_journal_writer(session),
     )
 
@@ -1436,6 +1504,8 @@ async def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingO
         profile_store=get_investor_profile_repository(session),  # type: ignore[arg-type]
         ohlcv=get_ohlcv_repository(session),
         mandates=SqlAlchemyAccountMandateLookup(get_mandate_repository(session)),
+        portfolio_recon=get_portfolio_recon_lookup(session),
+        live_recon=get_live_recon_lookup(session),
         position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )

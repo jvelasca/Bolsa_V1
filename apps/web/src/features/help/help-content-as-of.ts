@@ -76,6 +76,10 @@
  * paper; Live sin URL → not_wired; ≠ thaw PAPER_D_EXECUTE.
  * **2026-08-26n** — OE-1: Autoeval SEMI·AUTO (barra + GET /risk/ops-self-eval);
  * measure ≠ Accept estricto · ≠ flip env.
+ * **2026-08-26o** — OR-4: recon drift / live unavailable → DENY aperturas;
+ * exits protectivos ALLOW; sin auto-heal.
+ * **2026-08-26p** — OR-6: readiness PAPER_READY / PAPER_DEGRADED /
+ * LIVE_EXPERIMENTAL / LIVE_BLOCKED (sin %); CTA Ejecutar en PAPER|LIVE.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *

@@ -36,7 +36,9 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · Confirm = firma · `PAPE
 
 ## 3. E1
 
-1. Auditar contra pack v111 + ADR-034 + tag + Actions GREEN.
+Auditoría 1 **triageada** (2026-08-26): [`audit-ext-v111-operational-reliability-triage-2026-08-26.md`](./audit-ext-v111-operational-reliability-triage-2026-08-26.md) · siguiente chat = OR-1 ([`traspaso-relevo-audit-ext-v111-cierre-apertura-v112-2026-08-26.md`](./traspaso-relevo-audit-ext-v111-cierre-apertura-v112-2026-08-26.md)).
+
+1. Auditar contra pack v111 + ADR-034 + tag + Actions GREEN (histórico).
 2. Usar OE-1 / SEMI checklists para profundidad operativa (measure ≠ thaw).
 3. No Accept estricto sin DoD §4 + palabra **thaw**.
 4. No módulos thin nuevos.

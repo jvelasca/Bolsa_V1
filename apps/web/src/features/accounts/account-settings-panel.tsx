@@ -15,6 +15,7 @@ import {
 } from "@bolsa/shared";
 import { FieldRow, inputClassName } from "@/components/ui/dialog";
 import { AccountInvestorProfileSelect } from "@/features/accounts/account-investor-profile-select";
+import { AccountVenuePreference } from "@/features/accounts/account-venue-preference";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,8 @@ export function AccountSettingsPanel({
         accountId={accountId}
         activeProfileId={activeProfileId}
       />
+
+      <AccountVenuePreference accountId={accountId} />
 
       <div className="flex gap-1 border-b border-border">
         {(

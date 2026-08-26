@@ -6,16 +6,22 @@ fusiona aquí (drawdown, book max, strategy mismatch).
 
 ``portfolio_summary=None`` conserva el wiring de test legado (no aplica cesta).
 OHLCV / mandates ausentes = gate DS-05 / DS-03 off (mismo patrón Confirm/Fill).
+OR-4: portfolio_recon / live_recon ausentes = gate recon off; inyectados →
+fail-closed + veto drift / live unavailable (venue live).
 """
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.investor_profiles import InvestorProfileStore
+from bolsa_application.reconciliation_opening_gate import (
+    LiveReconLookup,
+    PortfolioReconLookup,
+)
 from bolsa_application.risk_engine import check_opening
 from bolsa_application.risk_runtime import effective_kill_switch
 from bolsa_domain.entities.investor_profile import InvestorProfileRecord
@@ -124,11 +130,14 @@ async def allow_opening_fill(
     accounts: AccountScopeLookup | None = None,
     ohlcv: LatestBarLookup | None = None,
     mandates: AccountMandateLookup | None = None,
+    portfolio_recon: PortfolioReconLookup | None = None,
+    live_recon: LiveReconLookup | None = None,
+    broker_venue: Literal["paper", "live"] | str | None = None,
 ) -> bool:
     """True si ``check_opening`` permite el fill de una apertura.
 
     ``portfolio_summary=None`` → True (legado tests / sin cesta).
-    Summary o lookups OHLCV/mandate que lanzan → False (fail-closed).
+    Summary o lookups OHLCV/mandate/recon que lanzan → False (fail-closed).
     """
     if portfolio_summary is None:
         return True
@@ -160,6 +169,24 @@ async def allow_opening_fill(
             )
         except Exception:  # noqa: BLE001 — DS-03: indisponibilidad = veto
             return False
+    portfolio_recon_status: Literal["clean", "drift"] | None = None
+    live_recon_status: Literal["clean", "drift", "unavailable"] | None = None
+    require_recon_veto = False
+    if portfolio_recon is not None:
+        require_recon_veto = True
+        try:
+            portfolio_recon_status = await portfolio_recon.portfolio_recon_status(
+                account_id
+            )
+        except Exception:  # noqa: BLE001 — OR-4: indisponibilidad = veto
+            return False
+    venue = (broker_venue or "paper").strip().lower()
+    if live_recon is not None and venue == "live":
+        require_recon_veto = True
+        try:
+            live_recon_status = await live_recon.live_recon_status(account_id)
+        except Exception:  # noqa: BLE001 — OR-4 live: indisponibilidad = veto
+            return False
     decision = check_opening(
         profile=await resolve_opening_profile(
             profile_store=profile_store,
@@ -186,5 +213,9 @@ async def allow_opening_fill(
         has_open_mandate=has_open_mandate,
         mandate_strategy_id=mandate_strategy_id,
         require_account_mandate=require_account_mandate,
+        portfolio_recon_status=portfolio_recon_status,
+        live_recon_status=live_recon_status,
+        broker_venue=venue,
+        require_recon_veto=require_recon_veto,
     )
     return bool(decision.allowed)

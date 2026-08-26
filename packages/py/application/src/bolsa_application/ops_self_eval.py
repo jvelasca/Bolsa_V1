@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from bolsa_application.operational_readiness import derive_operational_readiness
+
 GateMark = Literal["PASS", "FAIL", "WARN", "UNAVAILABLE"]
 
 
@@ -41,7 +43,7 @@ def build_ops_self_eval_report(
     cash_max_dd_frac: float | None = None,
     portfolio_reconciliation: dict[str, Any] | None = None,
     portfolio_reconciliation_status: Literal[
-        "ok", "not_wired", "unavailable", "error"
+        "ok", "not_wired", "unavailable", "error", "drift"
     ] = "not_wired",
 ) -> dict[str, Any]:
     """Informe JSON-friendly: carriles SEMI y AUTO + honesty."""
@@ -97,8 +99,16 @@ def build_ops_self_eval_report(
     if portfolio_reconciliation_status != "ok":
         recon = {
             "status": portfolio_reconciliation_status,
-            "note": "OI-6 detect/report; no heal",
+            "note": "OI-6 detect/report; no heal · OR-4 opening veto if drift",
+            **(portfolio_reconciliation or {}),
         }
+
+    readiness = derive_operational_readiness(
+        broker_venue=broker_venue,
+        kill_switch_effective=kill_switch_effective,
+        portfolio_reconciliation_status=portfolio_reconciliation_status,
+        semi_path_mark=semi_lane,
+    )
 
     return {
         "schemaVersion": "ops_self_eval_v0",
@@ -153,4 +163,5 @@ def build_ops_self_eval_report(
             "confirmPathHonesty": "SEMI Confirm = única firma; AUTO execute solo opt-in env",
         },
         "portfolioReconciliation": recon,
+        "operationalReadiness": readiness,
     }

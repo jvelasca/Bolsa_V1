@@ -1440,6 +1440,67 @@ async def test_confirm_apertura_mandates_falla_fail_closed() -> None:
     assert result["trade"]["reason"] == "risk_veto"
 
 
+class _FakePortfolioReconDrift:
+    async def portfolio_recon_status(self, account_id: str) -> str:
+        return "drift"
+
+
+class _FakePortfolioReconClean:
+    async def portfolio_recon_status(self, account_id: str) -> str:
+        return "clean"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_portfolio_drift_risk_veto() -> None:
+    """OR-4 — portfolio recon drift → risk_veto; NO fill."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        portfolio_recon=_FakePortfolioReconDrift(),  # type: ignore[arg-type]
+    )
+
+    result = await use_case.execute(
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-OR4-DRIFT",
+            instrument_id="inst-1",
+            quantity=4.0,
+            price=1.0,
+        ),
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 0
+    assert result["trade"]["status"] == "rejected_by_gate"
+    assert result["trade"]["reason"] == "risk_veto"
+
+
+@pytest.mark.asyncio
+async def test_confirm_apertura_portfolio_clean_permite_fill() -> None:
+    """OR-4 — portfolio recon clean + cesta OK → fill."""
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        portfolio_summary=_risk_allow_summary(),  # type: ignore[arg-type]
+        portfolio_recon=_FakePortfolioReconClean(),  # type: ignore[arg-type]
+    )
+
+    result = await use_case.execute(
+        recommendation_raw=_opening_recommendation(
+            decision_id="DEC-OR4-CLEAN",
+            instrument_id="inst-new",
+            quantity=4.0,
+            price=1.0,
+        ),
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert len(fake_trade.calls) == 1
+    assert result["trade"]["status"] == "executed"
+
+
 @pytest.mark.asyncio
 async def test_confirm_expired_recommendation_no_fill() -> None:
     """ADR-031 TTL — expiresAt en el pasado → expired, sin ExecuteTrade."""
@@ -1563,4 +1624,162 @@ async def test_confirm_double_execute_concurrent_single_logical_fill() -> None:
     assert {r1["trade"]["status"], r2["trade"]["status"]} == {"executed"}
     assert "fill" in fake_trade.calls
     assert "replay" in fake_trade.calls
+
+
+class _IdempotentPeekExecuteTrade:
+    """OR-1 — fill + peek find_existing_by_idempotency (short-circuit Confirm)."""
+
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._by_key: dict[str, TradeResult] = {}
+        self.unique_fills = 0
+        self.execute_calls = 0
+        self.peek_calls = 0
+
+    async def find_existing_by_idempotency(
+        self,
+        *,
+        account_id: str | None = None,
+        portfolio_id: str | None = None,
+        idempotency_key: str,
+    ) -> TradeResult | None:
+        _ = account_id, portfolio_id
+        self.peek_calls += 1
+        return self._by_key.get(idempotency_key)
+
+    async def execute(self, **kwargs: object) -> TradeResult:
+        key = str(kwargs.get("idempotency_key") or "")
+        async with self._lock:
+            self.execute_calls += 1
+            existing = self._by_key.get(key)
+            if existing is not None:
+                return existing
+            self.unique_fills += 1
+            tx = Transaction(
+                id=f"tx-{self.unique_fills}",
+                type="buy",  # type: ignore[arg-type]
+                instrument_id="inst-1",
+                symbol="SYM",
+                quantity=1.0,
+                price=10.0,
+                total=10.0,
+                executed_at="2026-08-20T08:00:00Z",
+            )
+            result = TradeResult(transaction=tx, summary=_FakeSummary(0.0))
+            self._by_key[key] = result
+            return result
+
+
+class _CountingJournal:
+    def __init__(self) -> None:
+        self.events: list[str] = []
+
+    async def append(self, entry: Any) -> Any:
+        self.events.append(str(getattr(entry, "event_type", "") or ""))
+        return entry
+
+
+@pytest.mark.asyncio
+async def test_or1_confirm_retry_post_fill_short_circuits_without_submit() -> None:
+    """OR-1 — retry Confirm paper post-fill → 1 fill, mismos ids, sin segundo submit."""
+    from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
+    from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
+
+    fake_trade = _IdempotentPeekExecuteTrade()
+    journal = _CountingJournal()
+    decision_id = "DEC-OR1-RETRY"
+    use_case = ConfirmRecommendationIntent(
+        execute_trade=fake_trade,
+        journal_writer=journal,
+    )
+    raw = _opening_recommendation(
+        decision_id=decision_id,
+        instrument_id="inst-1",
+        quantity=5.0,
+        price=12.0,
+    )
+
+    first = await use_case.execute(
+        recommendation_raw=raw,
+        account_id="acc-1",
+        execute=True,
+    )
+    second = await use_case.execute(
+        recommendation_raw=raw,
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert fake_trade.unique_fills == 1
+    assert fake_trade.execute_calls == 1
+    assert first["trade"]["status"] == "executed"
+    assert second["trade"]["status"] == "executed"
+    assert second["trade"].get("idempotentReplay") is True
+    assert first["trade"]["transactionId"] == second["trade"]["transactionId"]
+    assert first["intent"]["intentId"] == second["intent"]["intentId"]
+    assert first["intent"]["intentId"] == stable_intent_id_from_decision(decision_id)
+    assert first["paperOrder"]["orderId"] == second["paperOrder"]["orderId"]
+    assert first["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert first["paperOrder"]["status"] == "FILLED"
+    assert second["paperOrder"]["status"] == "FILLED"
+    assert second["executionRecord"]["outcome"] == "executed"
+    assert journal.events.count("executed") == 1
+
+
+@pytest.mark.asyncio
+async def test_or1_confirm_missing_decision_id_fail_closed_pre_send() -> None:
+    """OR-1 D1 — sin decision_id → error pre-send; no adapter/execute."""
+    fake_trade = _IdempotentPeekExecuteTrade()
+    use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
+    raw = _opening_recommendation(
+        decision_id="DEC-TMP",
+        instrument_id="inst-1",
+        quantity=5.0,
+        price=12.0,
+    )
+    raw["decisionId"] = ""
+    raw["tradePlan"]["decisionId"] = ""
+
+    result = await use_case.execute(
+        recommendation_raw=raw,
+        account_id="acc-1",
+        execute=True,
+    )
+
+    assert fake_trade.execute_calls == 0
+    assert result["trade"]["status"] == "error"
+    assert result["trade"]["reason"] == "decision_id_required"
+    assert result["intent"]["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_or1_stable_intent_and_order_ids_from_decision() -> None:
+    """OR-1 D2/D3 — intent_id y order_id estables entre dos confirms."""
+    from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
+    from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
+
+    decision_id = "DEC-OR1-STABLE"
+    fake_trade = _FakeExecuteTrade()
+    use_case = ConfirmRecommendationIntent(execute_trade=fake_trade)
+    raw = _opening_recommendation(
+        decision_id=decision_id,
+        instrument_id="inst-1",
+        quantity=5.0,
+        price=12.0,
+    )
+    r1 = await use_case.execute(recommendation_raw=raw, account_id="acc-1", execute=True)
+    r2 = await use_case.execute(recommendation_raw=raw, account_id="acc-1", execute=True)
+    assert r1["intent"]["intentId"] == stable_intent_id_from_decision(decision_id)
+    assert r2["intent"]["intentId"] == r1["intent"]["intentId"]
+    assert r1["paperOrder"]["orderId"] == stable_order_id_from_decision(decision_id)
+    assert r2["paperOrder"]["orderId"] == r1["paperOrder"]["orderId"]
+
+
+def test_or1_stable_id_helpers_deterministic() -> None:
+    from bolsa_analytics.cognitive.order_intent import stable_intent_id_from_decision
+    from bolsa_analytics.cognitive.paper_order import stable_order_id_from_decision
+
+    assert stable_intent_id_from_decision("DEC-1") == "INT-DEC-1"
+    assert stable_order_id_from_decision("DEC-1") == "ORD-DEC-1"
+    assert stable_intent_id_from_decision("DEC-1") == stable_intent_id_from_decision("DEC-1")
 

@@ -2,7 +2,7 @@
  * U6 — preview de ticket SEMI en Confirm/drawer (margen / comisión).
  *
  * Solo lectura de datos ya disponibles (qty×precio, settings, summary).
- * No firma ni ejecuta; el camino Confirmar + ejecutar no cambia.
+ * No firma ni ejecuta; el camino Ejecutar en PAPER|LIVE no cambia.
  *
  * @see apps/web/src/features/trading/f3-ticket-preview-block.tsx
  * @see packages/shared/src/account-settings.ts (`calculateTradeFees`)

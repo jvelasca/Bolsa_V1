@@ -2,14 +2,15 @@
 
 Toda apertura automática (paper_auto / futuro AUTO Estudio) debe pasar por
 ``check_opening``. Reutiliza Policy Gate + long-only; añade kill switch,
-tope Libro DEMO (maxOpen) y **DS-05 Data Freshness Gate** y **DS-03 Account Mandate Gate**
-cuando se aportan.
+tope Libro DEMO (maxOpen), **DS-05 Data Freshness Gate**, **DS-03 Account Mandate Gate**
+y **OR-4 Reconciliation opening veto** cuando se aportan.
 
 Prohibido: Research/dictamen → Broker sin este check.
 
 @see docs/engineering/audit-ext-institutional-pre-auto-triage-2026-08-04.md §9.2
 @see docs/engineering/camino-d-auto-thaw-checklist-2026-08-04.md OR-RE
 @see docs/engineering/decision-spine-cadena-2026-08-24.md DS-05 · DS-03
+@see docs/adr/035-operational-reliability.md OR-4
 """
 
 from __future__ import annotations
@@ -22,6 +23,9 @@ from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_application.account_mandate_gate import account_mandate_veto_reason
+from bolsa_application.reconciliation_opening_gate import (
+    reconciliation_opening_veto_reason,
+)
 from bolsa_application.trading_policy_guard import (
     CognitiveGuardResult,
     enforce_cognitive_policy_for_opening,
@@ -127,13 +131,18 @@ def check_opening(
     mandate_strategy_id: str | None = None,
     require_account_mandate: bool = False,
     proposal_strategy_id: str | None = None,
+    portfolio_recon_status: Literal["clean", "drift"] | None = None,
+    live_recon_status: Literal["clean", "drift", "unavailable"] | None = None,
+    broker_venue: Literal["paper", "live"] | str | None = None,
+    require_recon_veto: bool = False,
 ) -> RiskDecision:
     """Evalúa una apertura. Exits siguen el bypass del Cognitive Guard.
 
     DS-05: si ``require_fresh_data`` o se aporta ``last_bar_timestamp``, VETO
     fail-closed cuando la barra/quote supera el umbral (o falta el timestamp).
     DS-03: si ``require_account_mandate``, VETO sin tenure abierto o mismatch
-    de estrategia (AUTO). No aplica a ``exit`` / ``exit_hint`` / ``reduce``.
+    de estrategia (AUTO). OR-4: drift paper o live unavailable/drift (venue live)
+    VETO aperturas; no auto-heal. No aplica a ``exit`` / ``exit_hint`` / ``reduce``.
     """
     if kill_switch:
         return RiskDecision(
@@ -175,6 +184,26 @@ def check_opening(
             return RiskDecision(
                 verdict="DENY",
                 reasons=(mandate_reason,),
+                guard=None,
+            )
+
+    if kind not in _EXIT_SIGNAL_KINDS and (
+        require_recon_veto
+        or portfolio_recon_status is not None
+        or live_recon_status is not None
+    ):
+        recon_reason = reconciliation_opening_veto_reason(
+            portfolio_recon_status=portfolio_recon_status,
+            live_recon_status=live_recon_status,
+            broker_venue=broker_venue,
+            require=require_recon_veto
+            or portfolio_recon_status is not None
+            or live_recon_status is not None,
+        )
+        if recon_reason is not None:
+            return RiskDecision(
+                verdict="DENY",
+                reasons=(recon_reason,),
                 guard=None,
             )
 

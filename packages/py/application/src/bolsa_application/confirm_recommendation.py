@@ -66,9 +66,15 @@ Decision Spine — rebanada confirm SEMI (D2 + Escalón 3/D1 + cierre de la deud
 - **OI-3 ExecutionRecord (ADR-034):** excepción de `execute_trade` →
   `trade.status=unknown` (nunca `error`, nunca `rejected_by_gate`). ERROR solo
   si el envío no se intentó. `executionRecord` adjunta el outcome honesto.
-- **OI-4 PaperOrder (ADR-034):** al enviar se crea `paperOrder` CREATED;
-  fill → FILLED. Excepción de envío → CREATED (fill no confirmado). Gate/skip
-  → no hay `paperOrder`. CREATED ≠ FILLED.
+- **OI-4 / OR-3 PaperOrder (ADR-034/035):** al enviar nace CREATED; PaperBroker
+  marca SUBMITTED pre-send → fill FILLED; boom/crash → UNKNOWN (≠ CREATED).
+  Gate/skip → no hay `paperOrder`. CREATED ≠ FILLED.
+- **OR-1 idempotencia E2E (ADR-035):** clave = `decision_id` (sin fallback
+  `confirm-{uuid}`). Sin `decision_id` → `error` pre-send. Fill local ya
+  existente → replay sin `adapter.submit`. `intent_id`/`order_id` estables.
+- **OR-2 crash/restart (ADR-035):** `DurableSubmitIntent` se persiste *antes*
+  de `adapter.submit`. Sin fill local y con intento durable → `unknown`
+  reconstruido (mapeo `intent` ↔ `venue_order_id`); no re-POST.
 - **BrokerAdapter (ADR-034 / XL-1):** Confirm envía vía `IBrokerAdapter` (default
   paper = PaperBroker). Adjunta `brokerAdapter` + `paperBroker` en paper.
   Mock LIVE → `live_not_wired`. XTB → rejected/submitted sin ledger
@@ -80,7 +86,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
 
 from bolsa_analytics.cognitive.decision_session import (
     attach_execution_to_payload,
@@ -88,6 +93,19 @@ from bolsa_analytics.cognitive.decision_session import (
 )
 from bolsa_analytics.cognitive.execution_record import build_execution_record
 from bolsa_analytics.cognitive.order_intent import intent_from_recommendation
+from bolsa_analytics.cognitive.paper_order import (
+    apply_paper_order_fill,
+    build_paper_order,
+    stable_order_id_from_decision,
+    transition_paper_order,
+)
+from bolsa_analytics.cognitive.submit_intent import (
+    bind_venue_order,
+    mark_submit_filled,
+    record_submit_intent,
+    reconstruct_unknown,
+    send_attempted_durable,
+)
 from bolsa_analytics.cognitive.recommendation import Recommendation
 from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
 from bolsa_analytics.cognitive.trade_plan import (
@@ -115,6 +133,10 @@ from bolsa_application.opening_permission import (
     LatestBarLookup,
     allow_opening_fill,
 )
+from bolsa_application.reconciliation_opening_gate import (
+    LiveReconLookup,
+    PortfolioReconLookup,
+)
 from bolsa_application.persist_position_from_exit import (
     PersistPositionFromExitInput,
     row_position_state,
@@ -122,6 +144,7 @@ from bolsa_application.persist_position_from_exit import (
 from bolsa_application.persist_position_from_fill import (
     PersistPositionFromFillInput,
     ledger_position_id_from_trade,
+    open_transaction_id_from_trade,
 )
 from bolsa_application.persist_position_from_protect import PersistPositionFromProtectInput
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
@@ -415,25 +438,42 @@ class ConfirmRecommendationIntent:
         accounts: AccountScopeLookup | None = None,
         ohlcv: LatestBarLookup | None = None,
         mandates: AccountMandateLookup | None = None,
+        portfolio_recon: PortfolioReconLookup | None = None,
+        live_recon: LiveReconLookup | None = None,
         journal_writer: Any | None = None,
         position_from_fill: Any | None = None,
         position_from_exit: Any | None = None,
         position_from_protect: Any | None = None,
         broker_adapter: IBrokerAdapter | None = None,
+        submit_intent_store: Any | None = None,
     ) -> None:
         self._store = cognitive_store
         self._execute_trade = execute_trade
         self._broker_adapter = broker_adapter
+        self._submit_intent_store = submit_intent_store
         self._portfolio_summary = portfolio_summary
         self._instruments = instruments
         self._profile_store = profile_store
         self._accounts = accounts
         self._ohlcv = ohlcv
         self._mandates = mandates
+        self._portfolio_recon = portfolio_recon
+        self._live_recon = live_recon
         self._journal_writer = journal_writer
         self._position_from_fill = position_from_fill
         self._position_from_exit = position_from_exit
         self._position_from_protect = position_from_protect
+
+    async def _resolve_broker_venue_for_account(self, account_id: str) -> str:
+        account_venue: str | None = None
+        getter = getattr(self._accounts, "get_settings_json", None) if self._accounts else None
+        if getter is not None:
+            try:
+                settings = await getter(account_id)
+                account_venue = account_broker_venue_from_settings(settings)
+            except Exception:  # noqa: BLE001
+                account_venue = None
+        return await effective_broker_venue_async(account_venue=account_venue)
 
     async def _resolve_broker_adapter_for_account(self, account_id: str) -> IBrokerAdapter:
         """PA-1: adapter inyectado (tests) o lazy resolve tras account_id."""
@@ -866,158 +906,216 @@ class ConfirmRecommendationIntent:
             elif self._broker_adapter is None and self._execute_trade is None:
                 result["trade"] = {"status": "skipped", "reason": "execute_trade no configurado"}
             else:
-                idem_key = rec.decision_id or session_id or f"confirm-{uuid4().hex}"
-                trade = None
-                try:
-                    if _is_opening_action(rec.action) and self._portfolio_summary is not None:
-                        await append_journal_event(
-                            self._journal_writer,
-                            event_type="gate_evaluated",
-                            decision_id=rec.decision_id,
-                            session_id=session_id,
-                            account_id=account_id,
-                            instrument_id=rec.instrument_id,
-                            actor="human",
-                            payload=attribution_setup_payload(
-                                trade_plan_dict,
-                                session_payload=session_payload,
-                                base={"allowed": True},
-                            ),
-                        )
-                except Exception as exc:  # noqa: BLE001 — pre-send; no se llamó execute
-                    result["trade"] = {"status": "error", "reason": str(exc)}
+                idem_key = (rec.decision_id or "").strip()
+                if not idem_key:
+                    # OR-1 D1 — sin decision_id no hay identidad de intento (fail-closed).
+                    result["trade"] = {
+                        "status": "error",
+                        "reason": "decision_id_required",
+                    }
                     result["intent"] = {
                         **intent.to_dict(),
                         "status": "error",
                         "contract": contract_status,
                     }
                 else:
-                    adapter = await self._resolve_broker_adapter_for_account(account_id)
-                    pb = await adapter.submit(
-                        instrument_id=intent.instrument_id,
-                        side=intent.side,
-                        quantity=float(intent.quantity),
-                        price=price,
+                    existing_fill = await self._find_existing_fill(
                         account_id=account_id,
                         idempotency_key=idem_key,
-                        intent_id=intent.intent_id,
                     )
-                    result["brokerAdapter"] = pb.receipt().to_dict()
-                    if pb.paper_order is not None:
-                        result["paperOrder"] = pb.paper_order.to_dict()
-                    if pb.paper_receipt is not None:
-                        result["paperBroker"] = pb.paper_receipt.to_dict()
-                    if pb.status == "not_wired":
-                        result["trade"] = {
-                            "status": "skipped",
-                            "reason": pb.reason or "live_not_wired",
-                        }
-                    elif pb.status == "rejected":
-                        result["trade"] = {
-                            "status": "skipped",
-                            "reason": pb.reason or "live_rejected",
-                        }
-                    elif pb.status == "submitted":
-                        # Venue aceptó; sin ledger en XL-1 → unknown (≠ executed).
-                        trade_payload: dict[str, Any] = {
-                            "status": "unknown",
-                            "reason": pb.reason or "live_submitted_no_fill",
-                        }
-                        if pb.venue_order_id:
-                            trade_payload["venueOrderId"] = pb.venue_order_id
-                        result["trade"] = trade_payload
-                        result["intent"] = {
-                            **intent.to_dict(),
-                            "status": "unknown",
-                            "contract": contract_status,
-                        }
-                    elif pb.status == "unknown":
-                        result["trade"] = {"status": "unknown", "reason": pb.reason}
-                        result["intent"] = {
-                            **intent.to_dict(),
-                            "status": "unknown",
-                            "contract": contract_status,
-                        }
+                    if existing_fill is not None:
+                        # OR-1 D4 — short-circuit: fill local → replay sin adapter.submit.
+                        await self._apply_idempotent_replay(
+                            result=result,
+                            intent=intent,
+                            contract_status=contract_status,
+                            trade=existing_fill,
+                            order_id=stable_order_id_from_decision(idem_key),
+                        )
+                    elif await self._try_recover_in_flight(
+                        result=result,
+                        intent=intent,
+                        contract_status=contract_status,
+                        decision_id=idem_key,
+                    ):
+                        pass
                     else:
-                        trade = pb.trade
-                        tx_id = pb.transaction_id
-                        result["trade"] = {
-                            "status": "executed",
-                            "transactionId": tx_id,
-                        }
-                        result["intent"] = {
-                            **intent.to_dict(),
-                            "status": "executed",
-                            "contract": contract_status,
-                        }
-                        position_persist = {"status": "applied"}
+                        trade = None
+                        durable = None
                         try:
-                            await append_journal_event(
-                                self._journal_writer,
-                                event_type="executed",
-                                decision_id=rec.decision_id,
-                                session_id=session_id,
-                                account_id=account_id,
-                                instrument_id=rec.instrument_id,
-                                actor="human",
-                                payload=attribution_setup_payload(
-                                    trade_plan_dict,
-                                    session_payload=session_payload,
-                                    base=await self._executed_journal_base(
-                                        rec=rec,
-                                        intent=intent,
-                                        price=price,
-                                        account_id=account_id,
-                                        transaction_id=tx_id,
+                            if _is_opening_action(rec.action) and self._portfolio_summary is not None:
+                                await append_journal_event(
+                                    self._journal_writer,
+                                    event_type="gate_evaluated",
+                                    decision_id=rec.decision_id,
+                                    session_id=session_id,
+                                    account_id=account_id,
+                                    instrument_id=rec.instrument_id,
+                                    actor="human",
+                                    payload=attribution_setup_payload(
+                                        trade_plan_dict,
+                                        session_payload=session_payload,
+                                        base={"allowed": True},
                                     ),
-                                ),
+                                )
+                        except Exception as exc:  # noqa: BLE001 — pre-send; no se llamó execute
+                            result["trade"] = {"status": "error", "reason": str(exc)}
+                            result["intent"] = {
+                                **intent.to_dict(),
+                                "status": "error",
+                                "contract": contract_status,
+                            }
+                        else:
+                            durable = await self._record_before_submit(
+                                result=result,
+                                intent=intent,
+                                contract_status=contract_status,
+                                decision_id=idem_key,
+                                account_id=account_id,
                             )
-                            if self._position_from_fill is not None and _is_opening_action(
-                                rec.action
-                            ):
-                                if isinstance(tx_id, str) and tx_id.strip():
-                                    filled_at = getattr(
-                                        getattr(trade, "transaction", None),
-                                        "executed_at",
-                                        None,
-                                    )
-                                    await self._position_from_fill.persist(
-                                        PersistPositionFromFillInput(
+                            if durable is None:
+                                pass
+                            else:
+                                adapter = await self._resolve_broker_adapter_for_account(account_id)
+                                pb = await adapter.submit(
+                                    instrument_id=intent.instrument_id,
+                                    side=intent.side,
+                                    quantity=float(intent.quantity),
+                                    price=price,
+                                    account_id=account_id,
+                                    idempotency_key=idem_key,
+                                    order_id=stable_order_id_from_decision(idem_key),
+                                    intent_id=intent.intent_id,
+                                )
+                                result["brokerAdapter"] = pb.receipt().to_dict()
+                                if pb.paper_order is not None:
+                                    result["paperOrder"] = pb.paper_order.to_dict()
+                                if pb.paper_receipt is not None:
+                                    result["paperBroker"] = pb.paper_receipt.to_dict()
+                                if pb.status == "not_wired":
+                                    result["trade"] = {
+                                        "status": "skipped",
+                                        "reason": pb.reason or "live_not_wired",
+                                    }
+                                elif pb.status == "rejected":
+                                    result["trade"] = {
+                                        "status": "skipped",
+                                        "reason": pb.reason or "live_rejected",
+                                    }
+                                elif pb.status == "submitted":
+                                    # Venue aceptó; sin ledger en XL-1 → unknown (≠ executed).
+                                    # OR-1/D6: sin fill local no hay short-circuit; mapeo
+                                    # durable intent↔venue = OR-2 (no re-POST ciego ahí).
+                                    trade_payload: dict[str, Any] = {
+                                        "status": "unknown",
+                                        "reason": pb.reason or "live_submitted_no_fill",
+                                    }
+                                    if pb.venue_order_id:
+                                        trade_payload["venueOrderId"] = pb.venue_order_id
+                                    result["trade"] = trade_payload
+                                    result["intent"] = {
+                                        **intent.to_dict(),
+                                        "status": "unknown",
+                                        "contract": contract_status,
+                                    }
+                                elif pb.status == "unknown":
+                                    unknown_payload: dict[str, Any] = {
+                                        "status": "unknown",
+                                        "reason": pb.reason,
+                                    }
+                                    if pb.venue_order_id:
+                                        unknown_payload["venueOrderId"] = pb.venue_order_id
+                                    result["trade"] = unknown_payload
+                                    result["intent"] = {
+                                        **intent.to_dict(),
+                                        "status": "unknown",
+                                        "contract": contract_status,
+                                    }
+                                else:
+                                    trade = pb.trade
+                                    tx_id = pb.transaction_id
+                                    result["trade"] = {
+                                        "status": "executed",
+                                        "transactionId": tx_id,
+                                    }
+                                    result["intent"] = {
+                                        **intent.to_dict(),
+                                        "status": "executed",
+                                        "contract": contract_status,
+                                    }
+                                    position_persist = {"status": "applied"}
+                                    try:
+                                        await append_journal_event(
+                                            self._journal_writer,
+                                            event_type="executed",
+                                            decision_id=rec.decision_id,
+                                            session_id=session_id,
                                             account_id=account_id,
-                                            trade_plan=trade_plan_dict
-                                            if isinstance(trade_plan_dict, dict)
-                                            else None,
-                                            fill_price=price,
-                                            fill_quantity=float(intent.quantity),
-                                            filled_at=str(filled_at) if filled_at else None,
-                                            open_transaction_id=tx_id,
-                                            ledger_position_id=ledger_position_id_from_trade(
-                                                trade, intent.instrument_id
+                                            instrument_id=rec.instrument_id,
+                                            actor="human",
+                                            payload=attribution_setup_payload(
+                                                trade_plan_dict,
+                                                session_payload=session_payload,
+                                                base=await self._executed_journal_base(
+                                                    rec=rec,
+                                                    intent=intent,
+                                                    price=price,
+                                                    account_id=account_id,
+                                                    transaction_id=tx_id,
+                                                ),
                                             ),
                                         )
-                                    )
-                            if self._position_from_exit is not None and _is_closing_action(
-                                rec.action
-                            ):
-                                if isinstance(tx_id, str) and tx_id.strip():
-                                    filled_at = getattr(
-                                        getattr(trade, "transaction", None),
-                                        "executed_at",
-                                        None,
-                                    )
-                                    await self._position_from_exit.persist(
-                                        PersistPositionFromExitInput(
-                                            account_id=account_id,
-                                            instrument_id=intent.instrument_id,
-                                            fill_quantity=float(intent.quantity),
-                                            fill_price=price,
-                                            exit_transaction_id=tx_id,
-                                            filled_at=str(filled_at) if filled_at else None,
-                                        )
-                                    )
-                        except Exception as exc:  # noqa: BLE001
-                            position_persist = {"status": "error", "reason": str(exc)}
-                        result["positionPersist"] = position_persist
+                                        if self._position_from_fill is not None and _is_opening_action(
+                                            rec.action
+                                        ):
+                                            if isinstance(tx_id, str) and tx_id.strip():
+                                                filled_at = getattr(
+                                                    getattr(trade, "transaction", None),
+                                                    "executed_at",
+                                                    None,
+                                                )
+                                                await self._position_from_fill.persist(
+                                                    PersistPositionFromFillInput(
+                                                        account_id=account_id,
+                                                        trade_plan=trade_plan_dict
+                                                        if isinstance(trade_plan_dict, dict)
+                                                        else None,
+                                                        fill_price=price,
+                                                        fill_quantity=float(intent.quantity),
+                                                        filled_at=str(filled_at) if filled_at else None,
+                                                        open_transaction_id=tx_id,
+                                                        ledger_position_id=ledger_position_id_from_trade(
+                                                            trade, intent.instrument_id
+                                                        ),
+                                                    )
+                                                )
+                                        if self._position_from_exit is not None and _is_closing_action(
+                                            rec.action
+                                        ):
+                                            if isinstance(tx_id, str) and tx_id.strip():
+                                                filled_at = getattr(
+                                                    getattr(trade, "transaction", None),
+                                                    "executed_at",
+                                                    None,
+                                                )
+                                                await self._position_from_exit.persist(
+                                                    PersistPositionFromExitInput(
+                                                        account_id=account_id,
+                                                        instrument_id=intent.instrument_id,
+                                                        fill_quantity=float(intent.quantity),
+                                                        fill_price=price,
+                                                        exit_transaction_id=tx_id,
+                                                        filled_at=str(filled_at) if filled_at else None,
+                                                    )
+                                                )
+                                    except Exception as exc:  # noqa: BLE001
+                                        position_persist = {"status": "error", "reason": str(exc)}
+                                    result["positionPersist"] = position_persist
+                                await self._persist_after_adapter(
+                                    durable=durable,
+                                    pb=pb,
+                                    result=result,
+                                )
 
         _attach_execution_record(result)
 
@@ -1040,6 +1138,185 @@ class ConfirmRecommendationIntent:
                 pass
 
         return result
+
+    async def _find_existing_fill(
+        self,
+        *,
+        account_id: str,
+        idempotency_key: str,
+    ) -> Any | None:
+        """OR-1 — peek de fill local vía ExecuteTrade (o duck-type de tests)."""
+        if not idempotency_key or self._execute_trade is None:
+            return None
+        finder = getattr(self._execute_trade, "find_existing_by_idempotency", None)
+        if finder is None:
+            return None
+        try:
+            trade = await finder(
+                account_id=account_id,
+                idempotency_key=idempotency_key,
+            )
+        except Exception:  # noqa: BLE001 — peek best-effort; fallo → primer envío
+            return None
+        if trade is None:
+            return None
+        tx_id = open_transaction_id_from_trade(trade)
+        if not isinstance(tx_id, str) or not tx_id.strip():
+            return None
+        return trade
+
+    async def _try_recover_in_flight(
+        self,
+        *,
+        result: dict[str, Any],
+        intent: Any,
+        contract_status: str,
+        decision_id: str,
+    ) -> bool:
+        """OR-2 — intento durable sin fill local → UNKNOWN, no adapter.submit."""
+        store = self._submit_intent_store
+        if store is None or not decision_id:
+            return False
+        getter = getattr(store, "get", None)
+        if getter is None:
+            return False
+        try:
+            durable = await getter(decision_id)
+        except Exception:  # noqa: BLE001 — peek fallido → primer envío
+            return False
+        if not send_attempted_durable(durable):
+            return False
+        rec = reconstruct_unknown(durable)
+        trade_payload: dict[str, Any] = {
+            "status": "unknown",
+            "reason": rec.reason or "crash_before_venue_ack",
+            "crashRecovery": True,
+        }
+        if durable.venue_order_id:
+            trade_payload["venueOrderId"] = durable.venue_order_id
+        result["trade"] = trade_payload
+        result["intent"] = {
+            **intent.to_dict(),
+            "status": "unknown",
+            "contract": contract_status,
+        }
+        result["submitIntent"] = durable.to_dict()
+        if durable.venue_order_id is None:
+            # OR-3 D6 — crash sin venue ack → UNKNOWN (no CREATED «como si no enviada»).
+            result["paperOrder"] = transition_paper_order(
+                build_paper_order(
+                    instrument_id=intent.instrument_id,
+                    side=intent.side,
+                    quantity=float(intent.quantity),
+                    order_id=durable.order_id,
+                    intent_id=durable.intent_id,
+                ),
+                "UNKNOWN",
+            ).to_dict()
+        return True
+
+    async def _record_before_submit(
+        self,
+        *,
+        result: dict[str, Any],
+        intent: Any,
+        contract_status: str,
+        decision_id: str,
+        account_id: str,
+    ) -> Any | None:
+        """OR-2 D2 — persist recorded *antes* de adapter.submit. put falla → error pre-send."""
+        durable = record_submit_intent(
+            decision_id=decision_id,
+            intent_id=intent.intent_id,
+            order_id=stable_order_id_from_decision(decision_id),
+            account_id=account_id,
+        )
+        store = self._submit_intent_store
+        if store is None:
+            return durable
+        try:
+            await store.put(durable)
+        except Exception as exc:  # noqa: BLE001 — no enviar si no hay rastro
+            result["trade"] = {"status": "error", "reason": str(exc) or "submit_intent_persist_failed"}
+            result["intent"] = {
+                **intent.to_dict(),
+                "status": "error",
+                "contract": contract_status,
+            }
+            return None
+        result["submitIntent"] = durable.to_dict()
+        return durable
+
+    async def _persist_after_adapter(
+        self,
+        *,
+        durable: Any,
+        pb: Any,
+        result: dict[str, Any],
+    ) -> None:
+        """OR-2 D4 — bind venue / mark filled / borrar si never-sent (not_wired|rejected)."""
+        store = self._submit_intent_store
+        if store is None or durable is None:
+            return
+        status = getattr(pb, "status", None)
+        try:
+            if status in {"not_wired", "rejected"}:
+                deleter = getattr(store, "delete", None)
+                if deleter is not None:
+                    await deleter(durable.decision_id)
+                result.pop("submitIntent", None)
+                return
+            if status == "executed":
+                updated = mark_submit_filled(
+                    bind_venue_order(
+                        durable,
+                        venue_order_id=getattr(pb, "venue_order_id", None),
+                    )
+                )
+            else:
+                updated = bind_venue_order(
+                    durable,
+                    venue_order_id=getattr(pb, "venue_order_id", None),
+                    reason=getattr(pb, "reason", None),
+                )
+            await store.put(updated)
+            result["submitIntent"] = updated.to_dict()
+        except Exception:  # noqa: BLE001 — post-send; no tumbar el fill/unknown
+            pass
+
+    async def _apply_idempotent_replay(
+        self,
+        *,
+        result: dict[str, Any],
+        intent: Any,
+        contract_status: str,
+        trade: Any,
+        order_id: str,
+    ) -> None:
+        """OR-1 D4 — mismo trade/ids sin adapter.submit ni journal executed duplicado."""
+        tx_id = open_transaction_id_from_trade(trade)
+        paper = apply_paper_order_fill(
+            build_paper_order(
+                instrument_id=intent.instrument_id,
+                side=intent.side,
+                quantity=float(intent.quantity),
+                order_id=order_id,
+                intent_id=intent.intent_id,
+            ),
+            transaction_id=tx_id,
+        )
+        result["trade"] = {
+            "status": "executed",
+            "transactionId": tx_id,
+            "idempotentReplay": True,
+        }
+        result["intent"] = {
+            **intent.to_dict(),
+            "status": "executed",
+            "contract": contract_status,
+        }
+        result["paperOrder"] = paper.to_dict()
+        result["positionPersist"] = {"status": "applied", "idempotentReplay": True}
 
     async def _effective_package_for_side(
         self,
@@ -1140,7 +1417,10 @@ class ConfirmRecommendationIntent:
         lookup que lanza → veto (fail-closed).
         DS-03: con `mandates` inyectado, tenure abierto + `require_account_mandate=True`;
         lookup que lanza → veto (fail-closed).
+        OR-4: con `portfolio_recon` / `live_recon` inyectados, drift / live unavailable
+        (venue live) → veto; lookup que lanza → veto (fail-closed).
         """
+        venue = await self._resolve_broker_venue_for_account(account_id)
         return await allow_opening_fill(
             portfolio_summary=self._portfolio_summary,
             instruments=self._instruments,
@@ -1148,6 +1428,9 @@ class ConfirmRecommendationIntent:
             accounts=self._accounts,
             ohlcv=self._ohlcv,
             mandates=self._mandates,
+            portfolio_recon=self._portfolio_recon,
+            live_recon=self._live_recon,
+            broker_venue=venue,
             account_id=account_id,
             instrument_id=intent.instrument_id,
             symbol=str(rec.symbol or intent.instrument_id),

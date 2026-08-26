@@ -82,7 +82,7 @@ async def test_paper_adapter_exception_unknown() -> None:
     )
     assert result.status == "unknown"
     assert result.paper_order is not None
-    assert result.paper_order.status == "CREATED"
+    assert result.paper_order.status == "UNKNOWN"
     assert result.receipt().fill_status == "unknown"
 
 

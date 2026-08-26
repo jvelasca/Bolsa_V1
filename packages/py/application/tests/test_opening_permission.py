@@ -111,3 +111,61 @@ async def test_allow_opening_fill_stale_bar_vetoes() -> None:
         **_kwargs(),
     )
     assert allowed is False
+
+
+class _FakePortfolioRecon:
+    def __init__(self, status: str) -> None:
+        self.status = status
+
+    async def portfolio_recon_status(self, account_id: str) -> str:
+        return self.status
+
+
+class _FakeLiveRecon:
+    def __init__(self, status: str) -> None:
+        self.status = status
+
+    async def live_recon_status(self, account_id: str) -> str:
+        return self.status
+
+
+@pytest.mark.asyncio
+async def test_allow_opening_fill_portfolio_drift_vetoes() -> None:
+    allowed = await allow_opening_fill(
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        portfolio_recon=_FakePortfolioRecon("drift"),  # type: ignore[arg-type]
+        **_kwargs(),
+    )
+    assert allowed is False
+
+
+@pytest.mark.asyncio
+async def test_allow_opening_fill_portfolio_clean_allows() -> None:
+    allowed = await allow_opening_fill(
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        portfolio_recon=_FakePortfolioRecon("clean"),  # type: ignore[arg-type]
+        **_kwargs(),
+    )
+    assert allowed is True
+
+
+@pytest.mark.asyncio
+async def test_allow_opening_fill_live_unavailable_vetoes_on_live() -> None:
+    allowed = await allow_opening_fill(
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        live_recon=_FakeLiveRecon("unavailable"),  # type: ignore[arg-type]
+        broker_venue="live",
+        **_kwargs(),
+    )
+    assert allowed is False
+
+
+@pytest.mark.asyncio
+async def test_allow_opening_fill_live_unavailable_ignored_on_paper() -> None:
+    allowed = await allow_opening_fill(
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        live_recon=_FakeLiveRecon("unavailable"),  # type: ignore[arg-type]
+        broker_venue="paper",
+        **_kwargs(),
+    )
+    assert allowed is True

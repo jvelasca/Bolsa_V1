@@ -242,6 +242,72 @@ def test_ds03_exit_skips_mandate_gate() -> None:
     assert d.verdict == "ALLOW"
 
 
+def test_or4_portfolio_drift_denies() -> None:
+    d = check_opening(
+        profile=None,
+        instrument_id="i1",
+        symbol="SAN",
+        trade_type="buy",
+        quantity=1,
+        price=10,
+        signal_kind="entry_long",
+        portfolio_recon_status="drift",
+        require_recon_veto=True,
+    )
+    assert d.verdict == "DENY"
+    assert d.reasons == ("reconciliation:portfolio_drift",)
+
+
+def test_or4_exit_allows_despite_portfolio_drift() -> None:
+    d = check_opening(
+        profile=None,
+        instrument_id="i1",
+        symbol="SAN",
+        trade_type="sell",
+        quantity=1,
+        price=10,
+        signal_kind="exit",
+        portfolio_recon_status="drift",
+        require_recon_veto=True,
+    )
+    assert d.verdict == "ALLOW"
+
+
+def test_or4_live_unavailable_denies_on_live_venue() -> None:
+    d = check_opening(
+        profile=None,
+        instrument_id="i1",
+        symbol="SAN",
+        trade_type="buy",
+        quantity=1,
+        price=10,
+        signal_kind="entry_long",
+        live_recon_status="unavailable",
+        broker_venue="live",
+        require_recon_veto=True,
+    )
+    assert d.verdict == "DENY"
+    assert d.reasons == ("reconciliation:live_unavailable",)
+
+
+def test_or4_live_unavailable_ignored_on_paper() -> None:
+    d = check_opening(
+        profile=None,
+        instrument_id="i1",
+        symbol="SAN",
+        trade_type="buy",
+        quantity=1,
+        price=10,
+        signal_kind="entry_long",
+        equity=10_000.0,
+        live_recon_status="unavailable",
+        broker_venue="paper",
+        require_recon_veto=True,
+    )
+    assert d.verdict == "ALLOW"
+    assert not any(r.startswith("reconciliation:") for r in d.reasons)
+
+
 def test_account_mandate_veto_reason_helper() -> None:
     assert account_mandate_veto_reason(has_open_tenure=False, require=False) is None
     assert (

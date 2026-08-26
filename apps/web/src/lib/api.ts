@@ -254,6 +254,17 @@ export const api = {
         confirmPathHonesty: string;
       };
       portfolioReconciliation: Record<string, unknown>;
+      operationalReadiness?: {
+        state:
+          | "PAPER_READY"
+          | "PAPER_DEGRADED"
+          | "LIVE_EXPERIMENTAL"
+          | "LIVE_BLOCKED";
+        venue: "paper" | "live";
+        reasons: string[];
+        notes: string[];
+        rule: string;
+      };
     }>(() =>
       client.GET("/api/risk/ops-self-eval", {
         params: {

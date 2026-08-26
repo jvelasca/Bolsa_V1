@@ -26,11 +26,11 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.11-beta` · ADR-034 OI-1…OE-1 CERRADOS · next = auditoría / thaw estricto (deuda)
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.12-beta` · ADR-034 OI-1…OE-1 CERRADOS · ADR-035 D0+OR-1…OR-6 CERRADOS · next = thaw estricto (deuda) / operar SEMI
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 · Position persistida)** · **ADR-034 (Operational Integrity v1.11 · OI-1…OE-1 CERRADOS)**
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 · Position persistida)** · **ADR-034 (Operational Integrity v1.11 · OI-1…OE-1 CERRADOS)** · **ADR-035 (Operational Reliability v1.12 · D0+OR-1…OR-6 CERRADOS)**
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -74,7 +74,24 @@ Engineering Index  (este doc)
 │   ├── traspaso-relevo-tag-v1-10-beta-2026-08-25.md ← **HISTÓRICO** tag v1.10-beta
 │   ├── roadmap-v111-operational-integrity-2026-08-26.md ← **FASE CERRADA** v1.11 · OI-1…OE-1 · tag `v1.11-beta`
 │   ├── audit-pack-estado-global-2026-08-26-v111.md ← pack Operational Integrity · tag `v1.11-beta` → `76d0f951`
-│   ├── traspaso-relevo-tag-v1-11-beta-2026-08-26.md ← **RELEVO** tag v1.11-beta → auditoría
+│   ├── traspaso-relevo-tag-v1-11-beta-2026-08-26.md ← **HISTÓRICO** tag v1.11-beta → auditoría
+│   ├── audit-ext-v111-operational-reliability-triage-2026-08-26.md ← **TRIAGE** auditoría 1 post-v1.11 · RATIFICADO · v1.12
+│   ├── roadmap-v112-operational-reliability-2026-08-26.md ← **FASE CERRADA** v1.12 · D0+OR-1…OR-6 · tag `v1.12-beta`
+│   ├── audit-pack-estado-global-2026-08-26-v112.md ← pack Operational Reliability · tag `v1.12-beta`
+│   ├── traspaso-relevo-tag-v1-12-beta-2026-08-26.md ← **PUBLICACIÓN** tag v1.12-beta → auditoría
+│   ├── plan-or1-e2e-idempotency-2026-08-26.md ← **OR-1 CERRADO** · retry Confirm paper · spine 372
+│   ├── traspaso-relevo-or1-e2e-idempotency-2026-08-26.md ← **HISTÓRICO** OR-1 → chat OR-2
+│   ├── plan-or2-crash-restart-2026-08-26.md ← **OR-2 CERRADO** · crash/restart UNKNOWN · spine 382
+│   ├── traspaso-relevo-or2-crash-restart-2026-08-26.md ← **HISTÓRICO** OR-2 → chat OR-3
+│   ├── plan-or3-order-state-machine-2026-08-26.md ← **OR-3 CERRADO** · PaperOrder state machine · spine 387
+│   ├── traspaso-relevo-or3-order-state-machine-2026-08-26.md ← **HISTÓRICO** OR-3 → chat OR-4
+│   ├── plan-or4-recon-opening-veto-2026-08-26.md ← **OR-4 CERRADO** · recon → opening veto · spine 403
+│   ├── traspaso-relevo-or4-recon-opening-veto-2026-08-26.md ← **HISTÓRICO** OR-4 → chat OR-5
+│   ├── plan-or5-broker-execution-scenario-suite-2026-08-26.md ← **OR-5 CERRADO** · suite A–L · spine 418
+│   ├── traspaso-relevo-or5-broker-execution-scenario-suite-2026-08-26.md ← **HISTÓRICO** OR-5 → chat OR-6
+│   ├── plan-or6-semi-operational-certification-2026-08-26.md ← **OR-6 CERRADO** · readiness 4 estados + CTA venue
+│   ├── traspaso-relevo-or6-semi-operational-certification-2026-08-26.md ← **HISTÓRICO** OR-6 → pack/tag v1.12-beta
+│   ├── traspaso-relevo-audit-ext-v111-cierre-apertura-v112-2026-08-26.md ← **HISTÓRICO** D0 v1.12 → chat OR-1
 │   ├── plan-h1-honesty-pending-2026-08-25.md ← **H1 CERRADO** pending ≠ stop
 │   ├── plan-h2-invariantes-factories-2026-08-25.md ← **H2 CERRADO** invariantes factories
 │   ├── plan-p1-position-durable-2026-08-25.md ← **P1 CERRADO** Position durable + wire fill
@@ -328,4 +345,5 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
     >                 └── **P1.6 — plan/cierre:** [plan-p1.6-mypy-fases-2026-08-12.md](./plan-p1.6-mypy-fases-2026-08-12.md) + **CIERRE P1.6 (mypy por fases) COMPLETADO 2026-08-12** · objetivo: gate mypy **BLOQUEANTE** full-tree (antes `continue-on-error: true`) · ~448 preexistentes → **0 errores en 243 files** (domain/market/infrastructure/apps-api-python) · estrategia: 4 worktrees aislados (`wt-mypy-{domain,market,infrastructure,api-python}`) + 4 subagentes (evita colisión checkout compartido) · pattern fixes: `type-arg`/`arg-type` (guards `X | None`)/`no-untyped-def`/`Mapped` SQLAlchemy 2.0 · **PRs #45–#48 MERGED** (#48 → base `441c590`) · gate CI final `python-ci.yml` bloqueante full-tree (PR **#49**) + retirada de gate scoped F4+F5b · batería: ruff **0** · mypy **0/243** · pytest **451✓** · cierre ola: #42 docs + #43 fix auto-sync + #49 gate (#43 rebase p/ desbloquear quality I001) · base final `6a89f6c` · **0 PRs abiertos** · deuda: P1.9 API thin, P1.3 auth D4, F5a §6 openapi-fetch/DTOs, P2.6 web types · ver §9/§7
 19. **Auditoría externa post-tag v1.8.1-beta (2026-08-25):** [triage](./audit-ext-v181-triage-2026-08-25.md) · [roadmap v1.9](./roadmap-v19-operational-core-2026-08-25.md) · **F1–F4 + ExitPermission + INFRA CERRADOS** (modelo). Tag `v1.9-beta`.
 20. **Auditoría discontinuidad operativa (2026-08-25):** [triage](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · [roadmap v1.10](./roadmap-v110-operational-authority-2026-08-25.md) · [ADR-033](../adr/033-operational-authority-position-persistence.md) · **H1→P4 CERRADOS**. Tag `v1.10-beta` → `047ddb6`.
-21. **Operational Integrity v1.11 (2026-08-26):** [roadmap](./roadmap-v111-operational-integrity-2026-08-26.md) · [ADR-034](../adr/034-operational-integrity-continuity.md) · [pack](./audit-pack-estado-global-2026-08-26-v111.md) · [relevo tag](./traspaso-relevo-tag-v1-11-beta-2026-08-26.md) · **OI-1…OE-1 CERRADOS**. Tag `v1.11-beta` → `76d0f951`. Next = auditoría / thaw estricto (deuda).
+21. **Operational Integrity v1.11 (2026-08-26):** [roadmap](./roadmap-v111-operational-integrity-2026-08-26.md) · [ADR-034](../adr/034-operational-integrity-continuity.md) · [pack](./audit-pack-estado-global-2026-08-26-v111.md) · [relevo tag](./traspaso-relevo-tag-v1-11-beta-2026-08-26.md) · **OI-1…OE-1 CERRADOS**. Tag `v1.11-beta` → `76d0f951`.
+22. **Operational Reliability v1.12 (2026-08-26):** [triage](./audit-ext-v111-operational-reliability-triage-2026-08-26.md) · [roadmap](./roadmap-v112-operational-reliability-2026-08-26.md) · [ADR-035](../adr/035-operational-reliability.md) · [pack](./audit-pack-estado-global-2026-08-26-v112.md) · [relevo tag](./traspaso-relevo-tag-v1-12-beta-2026-08-26.md) · **D0 + OR-1…OR-6 CERRADOS**. Tag `v1.12-beta`. Partida `v1.11-beta` → `76d0f951`. Spine **433**. Next = thaw estricto (deuda) / operar SEMI.

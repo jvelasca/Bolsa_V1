@@ -17,6 +17,7 @@ import {
   useActiveAccount,
   useActiveAccountSettings,
 } from "@/features/accounts/use-active-account";
+import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broker-venue";
 import { InstrumentStrategyTopPanel } from "@/features/backtests/instrument-strategy-top-panel";
 import { OhlcvChart } from "@/features/charts/ohlcv-chart";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
@@ -48,6 +49,7 @@ export function InstrumentDetailPage() {
     accountName,
   } = useActiveAccountSettings();
   const { effectiveAccountId } = useActiveAccount();
+  const brokerVenue = useEffectiveBrokerVenue();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
   const openChartInspector = useWorkspaceStore((s) => s.openChartInspector);
 
@@ -424,6 +426,7 @@ export function InstrumentDetailPage() {
             }}
             error={tradeError}
             isPending={tradeMutation.isPending}
+            venue={brokerVenue}
             onConfirm={() => tradeMutation.mutate(pendingSide)}
             onCancel={() => setPendingSide(null)}
           />

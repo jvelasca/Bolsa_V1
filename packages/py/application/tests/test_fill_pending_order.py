@@ -168,7 +168,7 @@ async def test_fill_pending_execute_boom_unknown_keeps_order() -> None:
     )
     result = await uc.execute("po-1", account_id="acc-1", idempotency_key="k" * 16)
     assert result["status"] == "unknown"
-    assert result["paperOrder"]["status"] == "CREATED"
+    assert result["paperOrder"]["status"] == "UNKNOWN"
     assert result["paperBroker"]["fillStatus"] == "unknown"
     assert result["brokerAdapter"]["fillStatus"] == "unknown"
     assert repo.deleted == []

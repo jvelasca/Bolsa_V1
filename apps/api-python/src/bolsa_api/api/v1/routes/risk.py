@@ -139,9 +139,9 @@ async def get_ops_self_eval(
 ) -> dict[str, Any]:
     """OE-1 — scorecard SEMI + AUTO (read-only). measure ≠ Accept · ≠ flip env."""
     st = await kill_switch_status()
-    venue = await effective_broker_venue_async()
 
     pref: Literal["paper", "live"] | None = None
+    pref_raw: str | None = None
     try:
         settings = await get_account_repository(session).get_settings_json(account_id)
         pref_raw = account_broker_venue_from_settings(settings)
@@ -149,6 +149,8 @@ async def get_ops_self_eval(
             pref = normalize_broker_venue(pref_raw)
     except ValueError:
         pref = None
+
+    venue = await effective_broker_venue_async(account_venue=pref_raw)
 
     days: int | None = None
     prec: float | None = None
@@ -182,6 +184,30 @@ async def get_ops_self_eval(
     except Exception:  # noqa: BLE001 — DB gap
         confirm_seed = None
 
+    recon_status: Literal["ok", "not_wired", "unavailable", "error", "drift"] = (
+        "unavailable"
+    )
+    recon_payload: dict[str, Any] | None = None
+    try:
+        from bolsa_api.api.dependencies import get_reconcile_portfolio_integrity_use_case
+        from bolsa_application.reconcile_portfolio_integrity import (
+            ReconcilePortfolioIntegrityInput,
+        )
+
+        report = await get_reconcile_portfolio_integrity_use_case(session).reconcile(
+            ReconcilePortfolioIntegrityInput(account_id=account_id)
+        )
+        if report is None:
+            recon_status = "unavailable"
+        elif report.status == "clean":
+            recon_status = "ok"
+            recon_payload = report.to_dict()
+        else:
+            recon_status = "drift"
+            recon_payload = report.to_dict()
+    except Exception:  # noqa: BLE001 — OI-6 gap
+        recon_status = "error"
+
     return build_ops_self_eval_report(
         account_id=account_id,
         lookback_days=lookback_days,
@@ -199,5 +225,6 @@ async def get_ops_self_eval(
         buys_seed=buys_seed,
         trade_like=trade_like,
         cash_max_dd_frac=cash_dd,
-        portfolio_reconciliation_status="not_wired",
+        portfolio_reconciliation=recon_payload,
+        portfolio_reconciliation_status=recon_status,
     )

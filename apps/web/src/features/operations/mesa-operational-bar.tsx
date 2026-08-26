@@ -64,6 +64,8 @@ export function MesaOperationalBar({
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["risk-kill-switch"] });
       void qc.invalidateQueries({ queryKey: ["broker-venue"] });
+      void qc.invalidateQueries({ queryKey: ["ops-self-eval"] });
+      void qc.invalidateQueries({ queryKey: ["account-broker-venue"] });
     },
   });
 
@@ -93,6 +95,10 @@ export function MesaOperationalBar({
     killQuery.data?.brokerVenue ?? venueQuery.data?.brokerVenue ?? "paper";
   const semiMark = selfEvalQuery.data?.lanes?.semi?.mark ?? null;
   const autoMark = selfEvalQuery.data?.lanes?.auto?.mark ?? null;
+  const readinessState =
+    selfEvalQuery.data?.operationalReadiness?.state ?? null;
+  const readinessReasons =
+    selfEvalQuery.data?.operationalReadiness?.reasons ?? [];
 
   return (
     <div
@@ -224,6 +230,26 @@ export function MesaOperationalBar({
         <span className="text-muted-foreground">
           SEMI {semiMark ?? "…"} · AUTO {autoMark ?? "…"}
         </span>
+      </span>
+      <span
+        className={cn(
+          "rounded border px-1.5 py-0.5 font-medium",
+          readinessState === "PAPER_READY"
+            ? "border-emerald-500/40 text-emerald-800 dark:text-emerald-200"
+            : readinessState === "LIVE_EXPERIMENTAL"
+              ? "border-sky-500/40 text-sky-900 dark:text-sky-100"
+              : readinessState === "LIVE_BLOCKED"
+                ? "border-rose-500/40 text-rose-800 dark:text-rose-200"
+                : "border-amber-500/40 text-amber-900 dark:text-amber-200",
+        )}
+        data-testid="mesa-operational-readiness"
+        title={
+          readinessReasons.length > 0
+            ? `OR-6 readiness (no se promedia). ${readinessReasons.join(" · ")}`
+            : "OR-6 SEMI certification. Un FAIL crítico no es un % listo. LIVE nunca accepted."
+        }
+      >
+        {readinessState ?? "Readiness …"}
       </span>
     </div>
   );

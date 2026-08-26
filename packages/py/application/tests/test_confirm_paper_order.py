@@ -69,7 +69,7 @@ async def test_fill_ok_paper_order_is_filled() -> None:
 
 
 @pytest.mark.asyncio
-async def test_execute_exception_paper_order_stays_created() -> None:
+async def test_execute_exception_paper_order_marks_unknown() -> None:
     uc = ConfirmRecommendationIntent(execute_trade=_BoomExecute())
     result = await uc.execute(
         recommendation_raw=_raw(plan=_triggered()),
@@ -78,7 +78,7 @@ async def test_execute_exception_paper_order_stays_created() -> None:
     )
     assert result["trade"]["status"] == "unknown"
     order = result["paperOrder"]
-    assert order["status"] == "CREATED"
+    assert order["status"] == "UNKNOWN"
     assert order["venue"] == "PAPER"
     assert order["transactionId"] is None
     assert order["status"] != "FILLED"

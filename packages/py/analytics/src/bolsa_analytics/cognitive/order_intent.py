@@ -1,7 +1,12 @@
-"""ART-ORDER-INTENT — voluntad autorizada (F3/F4)."""
+"""ART-ORDER-INTENT — voluntad autorizada (F3/F4).
+
+OR-1 (ADR-035): ``intent_id`` estable derivado de ``decision_id`` cuando existe
+(no ``uuid4`` por llamada). Sin ``decision_id`` → id efímero (solo paths no-execute).
+"""
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -18,6 +23,15 @@ OrderIntentStatus = Literal[
     "rejected_by_gate",
     "expired",
 ]
+
+
+def stable_intent_id_from_decision(decision_id: str) -> str:
+    """OR-1 — identidad de intento estable (retry Confirm = mismo INT-)."""
+    slug = "".join(c for c in decision_id.strip() if c.isalnum() or c in "-_")
+    if not slug:
+        digest = hashlib.sha256(decision_id.encode("utf-8")).hexdigest()[:12]
+        return f"INT-{digest}"
+    return f"INT-{slug[:48]}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,8 +94,14 @@ def intent_from_recommendation(
     elif recommendation.action in {"recommend_short", "exit_hint", "reduce"}:
         side = "sell"
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    decision_id = (recommendation.decision_id or "").strip()
+    intent_id = (
+        stable_intent_id_from_decision(decision_id)
+        if decision_id
+        else f"INT-{uuid4().hex[:12]}"
+    )
     return OrderIntent(
-        intent_id=f"INT-{uuid4().hex[:12]}",
+        intent_id=intent_id,
         account_id=account_id,
         instrument_id=recommendation.instrument_id,
         side=side,

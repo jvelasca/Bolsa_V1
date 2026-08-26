@@ -23,6 +23,7 @@ import type {
 import {
   brokerAdapterVenueCopy,
   evaluateRiskSignature,
+  executeCtaLabel,
   executionOutcomeCopy,
   paperOrderStatusCopy,
 } from "@bolsa/shared";
@@ -37,6 +38,7 @@ import {
   useActiveAccount,
   useActiveAccountSettings,
 } from "@/features/accounts/use-active-account";
+import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broker-venue";
 import { api } from "@/lib/api";
 import { formatNumber0 } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -207,6 +209,7 @@ export function SupervisedF3Panel() {
     ? resolveSupervisedQueueOrigin(activeItem)
     : null;
   const canExecute = demoBookAllowsExecute(bookMode);
+  const brokerVenue = useEffectiveBrokerVenue();
 
   const summaryQuery = useQuery({
     queryKey: ["account-summary", effectiveAccountId],
@@ -412,7 +415,18 @@ export function SupervisedF3Panel() {
           }
         | undefined;
       const paperOrder = res.data.paperOrder as
-        | { status?: "CREATED" | "FILLED" }
+        | {
+            status?:
+              | "CREATED"
+              | "SUBMITTED"
+              | "ACK"
+              | "PARTIAL"
+              | "FILLED"
+              | "REJECTED"
+              | "CANCELLED"
+              | "EXPIRED"
+              | "UNKNOWN";
+          }
         | undefined;
       const brokerAdapter = res.data.brokerAdapter as
         | { venue?: "PAPER" | "LIVE"; adapter?: string; fillStatus?: string }
@@ -443,7 +457,7 @@ export function SupervisedF3Panel() {
             ? ` · ${executionOutcomeCopy("error")}`
             : "";
       const paperNote =
-        paperOrder?.status === "CREATED" || paperOrder?.status === "FILLED"
+        paperOrder?.status != null
           ? ` · ${paperOrderStatusCopy(paperOrder.status)}`
           : "";
       const adapterNote =
@@ -715,14 +729,14 @@ export function SupervisedF3Panel() {
               }
               title={
                 canExecute
-                  ? "Ejecuta en DEMO las propuestas marcadas (SEMI)"
+                  ? executeCtaLabel(brokerVenue)
                   : "Pasa el libro a SEMI para ejecutar"
               }
               onClick={() => confirmSelected.mutate()}
             >
               {confirmSelected.isPending
                 ? "Ejecutando lote…"
-                : `Confirmar seleccionadas + ejecutar (${selectedCount})`}
+                : `${executeCtaLabel(brokerVenue)} (${selectedCount})`}
             </button>
           </div>
         ) : null}
@@ -758,7 +772,7 @@ export function SupervisedF3Panel() {
           <p className="rounded-md border border-primary/35 bg-primary/5 px-3 py-2 text-[11px] leading-snug text-foreground">
             <strong>H · Finalistas</strong> (Camino C / SEMI). Si el momento
             Radar discrepa, elige en Confirm (aceptar, ajustar qty o rechazar).
-            Siguiente: Confirmar + ejecutar.
+            Siguiente: {executeCtaLabel(brokerVenue)}.
           </p>
         ) : null}
         {activeOrigin === "alarm" && pending && !activeHm ? (
@@ -881,9 +895,19 @@ export function SupervisedF3Panel() {
           >
             Confirmar Intent
           </button>
+          {brokerVenue === "live" ? (
+            <span
+              className="inline-flex items-center rounded border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-900 dark:text-sky-100"
+              data-testid="confirm-live-venue-badge"
+              title="LIVE experimental · submitted ≠ fill · trading not accepted"
+            >
+              LIVE
+            </span>
+          ) : null}
           <button
             type="button"
             className="rounded-md border border-primary/40 px-3 py-1.5 text-primary hover:bg-accent disabled:opacity-50"
+            data-testid="confirm-execute-cta"
             disabled={
               !pending ||
               confirm.isPending ||
@@ -900,12 +924,14 @@ export function SupervisedF3Panel() {
                   : protectMeta
                     ? "Persistir stop operativo (≠ orden broker)"
                     : canExecute
-                      ? "Ejecutar en DEMO (SEMI)"
+                      ? executeCtaLabel(brokerVenue)
                       : "Cambia a SEMI en Libro DEMO"
             }
             onClick={() => confirm.mutate(true)}
           >
-            {protectMeta ? "Confirmar protección" : "Confirmar + ejecutar"}
+            {protectMeta
+              ? executeCtaLabel(brokerVenue, "protect")
+              : executeCtaLabel(brokerVenue)}
           </button>
         </div>
 

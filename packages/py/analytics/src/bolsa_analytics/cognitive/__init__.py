@@ -72,6 +72,15 @@ from bolsa_analytics.cognitive.execution_record import (
     build_execution_record,
     execution_outcome_copy,
 )
+from bolsa_analytics.cognitive.submit_intent import (
+    SUBMIT_INTENT_KEY,
+    DurableSubmitIntent,
+    bind_venue_order,
+    mark_submit_filled,
+    record_submit_intent,
+    reconstruct_unknown,
+    send_attempted_durable,
+)
 from bolsa_analytics.cognitive.exit_permission import (
     EXIT_PERMISSION_KEY,
     ExitPermission,
@@ -130,7 +139,11 @@ from bolsa_analytics.cognitive.observe_profile import (
     PolicyBehaviorLimits,
     observe_investor_profile,
 )
-from bolsa_analytics.cognitive.order_intent import OrderIntent, intent_from_recommendation
+from bolsa_analytics.cognitive.order_intent import (
+    OrderIntent,
+    intent_from_recommendation,
+    stable_intent_id_from_decision,
+)
 from bolsa_analytics.cognitive.paper_broker import (
     PAPER_BROKER_ADAPTER,
     PAPER_BROKER_KEY,
@@ -143,7 +156,10 @@ from bolsa_analytics.cognitive.paper_order import (
     PaperOrder,
     apply_paper_order_fill,
     build_paper_order,
+    can_transition_paper_order,
     paper_order_status_copy,
+    stable_order_id_from_decision,
+    transition_paper_order,
 )
 from bolsa_analytics.cognitive.policy_gate import evaluate_policy_gate
 from bolsa_analytics.cognitive.portfolio_fit import (
@@ -290,6 +306,8 @@ __all__ = [
     "EXECUTION_PLAN_KEY",
     "ExecutionRecord",
     "EXECUTION_RECORD_KEY",
+    "DurableSubmitIntent",
+    "SUBMIT_INTENT_KEY",
     "PaperOrder",
     "PAPER_ORDER_KEY",
     "PaperBrokerReceipt",
@@ -342,8 +360,17 @@ __all__ = [
     "build_execution_plan_from_exit_plan",
     "build_execution_record",
     "execution_outcome_copy",
+    "record_submit_intent",
+    "bind_venue_order",
+    "mark_submit_filled",
+    "reconstruct_unknown",
+    "send_attempted_durable",
     "build_paper_order",
+    "stable_intent_id_from_decision",
+    "stable_order_id_from_decision",
     "apply_paper_order_fill",
+    "transition_paper_order",
+    "can_transition_paper_order",
     "paper_order_status_copy",
     "build_paper_broker_receipt",
     "paper_broker_venue_copy",

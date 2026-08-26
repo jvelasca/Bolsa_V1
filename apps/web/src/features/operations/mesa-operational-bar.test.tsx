@@ -102,6 +102,13 @@ vi.mock("@/lib/api", () => ({
         confirmPathHonesty: "SEMI",
       },
       portfolioReconciliation: { status: "not_wired" },
+      operationalReadiness: {
+        state: "PAPER_DEGRADED",
+        venue: "paper",
+        reasons: ["recon_not_certified"],
+        notes: ["thin_semi_evidence"],
+        rule: "no averaging",
+      },
     })),
   },
 }));
@@ -150,5 +157,14 @@ describe("MesaOperationalBar P4.2", () => {
     expect(venue).toBeTruthy();
     expect(screen.getByTestId("mesa-broker-venue-paper")).toBeTruthy();
     expect(screen.getByTestId("mesa-broker-venue-live")).toBeTruthy();
+  });
+
+  it("shows OR-6 readiness state (not a percent)", async () => {
+    renderBar();
+    const chip = await screen.findByTestId("mesa-operational-readiness");
+    await waitFor(() => {
+      expect(chip.textContent ?? "").toMatch(/PAPER_DEGRADED/);
+    });
+    expect(chip.textContent ?? "").not.toMatch(/%/);
   });
 });

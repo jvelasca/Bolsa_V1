@@ -18,6 +18,10 @@ from bolsa_application.opening_permission import (
     LatestBarLookup,
     allow_opening_fill,
 )
+from bolsa_application.reconciliation_opening_gate import (
+    LiveReconLookup,
+    PortfolioReconLookup,
+)
 from bolsa_application.persist_position_from_exit import PersistPositionFromExit
 from bolsa_application.persist_position_from_fill import (
     PersistPositionFromFill,
@@ -43,6 +47,8 @@ class ExecuteGatedPortfolioTrade:
         accounts: AccountScopeLookup | None = None,
         ohlcv: LatestBarLookup | None = None,
         mandates: AccountMandateLookup | None = None,
+        portfolio_recon: PortfolioReconLookup | None = None,
+        live_recon: LiveReconLookup | None = None,
         position_from_fill: PersistPositionFromFill | None = None,
         position_from_exit: PersistPositionFromExit | None = None,
     ) -> None:
@@ -53,6 +59,8 @@ class ExecuteGatedPortfolioTrade:
         self._accounts = accounts
         self._ohlcv = ohlcv
         self._mandates = mandates
+        self._portfolio_recon = portfolio_recon
+        self._live_recon = live_recon
         self._position_from_fill = position_from_fill
         self._position_from_exit = position_from_exit
 
@@ -69,6 +77,7 @@ class ExecuteGatedPortfolioTrade:
         side = str(trade_type).lower()
         if side == "buy":
             symbol = await self._resolve_symbol(instrument_id)
+            venue = await self._resolve_broker_venue(account_id or "")
             allowed = await allow_opening_fill(
                 portfolio_summary=self._portfolio_summary,
                 account_id=account_id or "",
@@ -83,6 +92,9 @@ class ExecuteGatedPortfolioTrade:
                 accounts=self._accounts,
                 ohlcv=self._ohlcv,
                 mandates=self._mandates,
+                portfolio_recon=self._portfolio_recon,
+                live_recon=self._live_recon,
+                broker_venue=venue,
             )
             if not allowed:
                 raise OpeningVetoedError("risk_veto")
@@ -110,6 +122,22 @@ class ExecuteGatedPortfolioTrade:
             trade_plan_snapshot=None,
         )
         return trade
+
+    async def _resolve_broker_venue(self, account_id: str) -> str:
+        from bolsa_application.broker_venue_runtime import (
+            account_broker_venue_from_settings,
+            effective_broker_venue_async,
+        )
+
+        account_venue: str | None = None
+        getter = getattr(self._accounts, "get_settings_json", None) if self._accounts else None
+        if getter is not None and account_id:
+            try:
+                settings = await getter(account_id)
+                account_venue = account_broker_venue_from_settings(settings)
+            except Exception:  # noqa: BLE001
+                account_venue = None
+        return await effective_broker_venue_async(account_venue=account_venue)
 
     async def _resolve_symbol(self, instrument_id: str) -> str:
         if self._instruments is None or not instrument_id:

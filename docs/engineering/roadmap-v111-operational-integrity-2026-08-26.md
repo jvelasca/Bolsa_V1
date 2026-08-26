@@ -29,7 +29,7 @@
 | **PA-1**       | Per-account venue       | `settings_json.brokerVenue`; lazy Confirm/Fill; global override mesa    | **CERRADO** |
 | **OE-1**       | Ops Autoeval            | Scorecard SEMI+AUTO read-only (`/risk/ops-self-eval` + mesa chip)       | **CERRADO** |
 
-Después: pack + tag **`v1.11-beta`** · thaw **estricto** Accept (deuda; DoD + palabra) · remasure W+2 docs **cerrado** ([`traspaso-relevo-thaw-estricto-remeasure-2026-08-26.md`](./traspaso-relevo-thaw-estricto-remeasure-2026-08-26.md)) · UI preferencia cuenta (opcional).
+Después: pack + tag **`v1.11-beta`** (hecho) · **v1.12 Operational Reliability** ([`roadmap-v112-operational-reliability-2026-08-26.md`](./roadmap-v112-operational-reliability-2026-08-26.md) · OR-1) · thaw **estricto** Accept (deuda; DoD + palabra) · remasure W+2 docs **cerrado** ([`traspaso-relevo-thaw-estricto-remeasure-2026-08-26.md`](./traspaso-relevo-thaw-estricto-remeasure-2026-08-26.md)) · UI preferencia cuenta (OR-6).
 
 ---
 

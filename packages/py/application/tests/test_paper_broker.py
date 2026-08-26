@@ -1,4 +1,4 @@
-"""PaperBroker.submit — CREATED→FILLED; boom → CREATED + unknown."""
+"""PaperBroker.submit — CREATED→SUBMITTED→FILLED; boom → UNKNOWN."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ async def test_submit_ok_fills_paper_order() -> None:
 
 
 @pytest.mark.asyncio
-async def test_submit_exception_stays_created_unknown() -> None:
+async def test_submit_exception_marks_unknown() -> None:
     broker = PaperBroker(_BoomExecute())
     result = await broker.submit(
         instrument_id="inst-1",
@@ -55,7 +55,7 @@ async def test_submit_exception_stays_created_unknown() -> None:
     )
     assert result.status == "unknown"
     assert result.reason == "ledger timeout"
-    assert result.paper_order.status == "CREATED"
+    assert result.paper_order.status == "UNKNOWN"
     assert result.paper_order.transaction_id is None
     assert result.trade is None
     receipt = result.receipt()

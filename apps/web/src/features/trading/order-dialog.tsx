@@ -16,6 +16,7 @@ import {
   useActiveAccount,
   useActiveAccountSettings,
 } from "@/features/accounts/use-active-account";
+import { useEffectiveBrokerVenue } from "@/features/accounts/use-effective-broker-venue";
 import { TradeConfirmPanel } from "@/features/trading/trade-confirm-panel";
 import { TradeFeeBreakdown } from "@/features/trading/trade-fee-breakdown";
 import { useTradeNotional } from "@/features/trading/use-trade-notional";
@@ -46,6 +47,7 @@ export function OrderDialog() {
     accountName,
   } = useActiveAccountSettings();
   const { effectiveAccountId } = useActiveAccount();
+  const brokerVenue = useEffectiveBrokerVenue();
   const [mode, setMode] = useState<OrderMode>("market");
   const [sizeMode, setSizeMode] = useState<SizeMode>("volume");
   const [volume, setVolume] = useState("10");
@@ -233,6 +235,7 @@ export function OrderDialog() {
           }}
           error={error}
           isPending={busy}
+          venue={brokerVenue}
           onConfirm={confirmPendingAction}
           onCancel={() => setPendingConfirm(null)}
         />
