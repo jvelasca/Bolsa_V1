@@ -208,7 +208,10 @@ export function JournalEvolutionPanel({
                     Estudio {formatStudiedAt(selected.studiedAt)}
                   </p>
                 </div>
-                <JournalStudyCompareCard prev={previous} next={selected} />
+                <JournalStudyCompareCard
+                  prev={previous ?? null}
+                  next={selected}
+                />
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
