@@ -1,7 +1,7 @@
 # RELEVO — tag v1.15-beta (Mesa · Hoy) (2026-08-26)
 
 > **Padre:** [`traspaso-relevo-tag-v1-14-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-14-beta-2026-08-26.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.15-beta` pendiente pin SHA post-push.
+> **Estado:** **PUBLICACIÓN** — tag `v1.15-beta` → `fc2ed753`. **Release tag CI:** pendiente pin GREEN.
 > **Arranque chat nuevo / auditor:** `CURRENT_SYSTEM.md` + este relevo + ADR-037.
 
 ---
