@@ -1,7 +1,7 @@
 # RELEVO — tag v1.12-beta → auditoría (2026-08-26)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-26-v112.md`](./audit-pack-estado-global-2026-08-26-v112.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **PUBLICACIÓN.** Tag `v1.12-beta` → `369b5d1`. Push tag → Release tag CI.  
+> **Estado:** **PUBLICACIÓN.** Tag `v1.12-beta` → `369b5d1`. **Release tag CI GREEN.**  
 > **Arranque chat nuevo / auditor:** este fichero + pack v112 + ADR-035 + `CURRENT_SYSTEM.md` + roadmap v1.12.
 
 ---
