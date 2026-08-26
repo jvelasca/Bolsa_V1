@@ -37,7 +37,7 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · Confirm = firma · `PAPE
 
 ## 3. E1
 
-1. Auditar contra pack v113 + ADR-035 §8 + tag + Actions GREEN (tras publicar).
+1. Auditar contra pack v113 + ADR-035 §8 + tag + Actions GREEN. **Hecho** (2026-08-26) — A–K PASS · CI [32990245215](https://github.com/jvelasca/Bolsa_V1/actions/runs/32990245215) GREEN · spine 483 pre-tag.
 2. Opción operativa: SEMI TRIGGERED → Confirm → `Ejecutar en PAPER` · DEX-2/3/5 en spine.
 3. No Accept estricto sin DoD §4 + palabra **thaw**.
 4. No módulos thin nuevos · no reabrir OR-1/3/4/5/6 ni DEX-1…5 a ciegas.
