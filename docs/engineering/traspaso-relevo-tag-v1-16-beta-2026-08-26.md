@@ -1,14 +1,14 @@
 # RELEVO — tag v1.16-beta → auditoría (2026-08-26)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-26-v116.md`](./audit-pack-estado-global-2026-08-26-v116.md) · [`traspaso-relevo-tag-v1-15-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-15-beta-2026-08-26.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.16-beta` → `42469e7`. **Release tag CI:** pendiente pin GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.16-beta` → `953cfcb`. **Release tag CI:** pendiente pin GREEN.
 > **Arranque chat nuevo / auditor:** pack v116 + ADR-037 + `CURRENT_SYSTEM.md` + relevos MD-1…MD-5 + este relevo.
 
 ---
 
 ## 0. Confirmación
 
-- **MD-0 + MD-1…MD-5:** código + tests + relevos epic; feature **`11ee5ff`** + CI fix **`42469e7`** (tag).
+- **MD-0 + MD-1…MD-5:** código + tests + relevos epic; feature **`11ee5ff`** + CI fixes → tag **`953cfcb`**.
 - DEX-1…DEX-5 **intactos**. Confirm/DEX/SubmitIntent **sin cambios de contrato**.
 - Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. LIVE **experimental**. AUTO **off**.
 - Limitaciones P1/P2 **declaradas** (no ocultas): chip DS-05 · sanity E2E · what-if sin gates reales · Libro `showRoute`.
@@ -18,7 +18,7 @@
 
 | Pieza        | Valor                                                                                          |
 | ------------ | ---------------------------------------------------------------------------------------------- |
-| Tag          | `v1.16-beta` → `42469e7`                                                                       |
+| Tag          | `v1.16-beta` → `953cfcb`                                                                       |
 | Previo       | `v1.15-beta` → `fc2ed753`                                                                      |
 | Pack auditor | [`audit-pack-estado-global-2026-08-26-v116.md`](./audit-pack-estado-global-2026-08-26-v116.md) |
 | Spine        | `pnpm test:decision-spine` **485** (2026-08-26)                                                |
@@ -28,7 +28,7 @@
 ### Owner: publicado
 
 ```bash
-git tag v1.16-beta          # 42469e7
+git tag v1.16-beta          # 953cfcb
 git push origin main v1.16-beta  # Actions → GREEN → pin docs CI URL
 ```
 

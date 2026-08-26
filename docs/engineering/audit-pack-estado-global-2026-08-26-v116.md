@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.16 (Mesa desk)
 
-> **AsOf:** 2026-08-26 · **Tag:** **`v1.16-beta` → `42469e7`**. Partida **`v1.15-beta` → `fc2ed753`**.
+> **AsOf:** 2026-08-26 · **Tag:** **`v1.16-beta` → `953cfcb`**. Partida **`v1.15-beta` → `fc2ed753`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · roadmap [`roadmap-v116-mesa-desk-2026-08-26.md`](./roadmap-v116-mesa-desk-2026-08-26.md) · plan [`plan-mesa-desk-v116-v119-2026-08-26.md`](./plan-mesa-desk-v116-v119-2026-08-26.md) · ADR-037 · pack previo [`audit-pack-estado-global-2026-08-26-v113.md`](./audit-pack-estado-global-2026-08-26-v113.md).
 > **Para:** auditoría externa / GitHub Actions Release tag CI · cierre de fase V1.16 Mesa desk.
 
