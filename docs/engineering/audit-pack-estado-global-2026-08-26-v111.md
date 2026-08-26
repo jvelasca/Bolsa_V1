@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.11-beta (Operational Integrity)
 
-> **AsOf:** 2026-08-26 · **Tag:** `v1.11-beta` (SHA al publicar).
+> **AsOf:** 2026-08-26 · **Tag:** `v1.11-beta` → `76d0f951`.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · roadmap [`roadmap-v111-operational-integrity-2026-08-26.md`](./roadmap-v111-operational-integrity-2026-08-26.md) · ADR-034 · pack previo [`audit-pack-estado-global-2026-08-25-v110.md`](./audit-pack-estado-global-2026-08-25-v110.md).
 > **Partida:** `v1.10-beta` → `047ddb6`.
 > **Para:** auditoría externa / GitHub Actions Release tag CI.
@@ -103,7 +103,7 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · TradePlan ≠ permiso ·
 
 ## 7. Checklist auditor (E1)
 
-1. Checkout tag **`v1.11-beta`** (SHA del relevo de tag).
+1. Checkout tag **`v1.11-beta`** (`76d0f951`).
 2. Verificar GitHub Actions **`release-tag-ci.yml`** GREEN en el push del tag.
 3. Ejecutar `pnpm test:decision-spine` → esperar **367** passed.
 4. Contrastar ADR-034 (OI…OE-1) con código: Confirm honesty, venue coalesce, ops-self-eval.

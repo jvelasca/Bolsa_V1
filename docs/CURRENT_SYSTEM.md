@@ -3,7 +3,7 @@
 > **Padre:** [engineering-index](./engineering/engineering-index-2026-08-03.md) §1 (Architecture).
 > **Para quién:** el siguiente chat, un auditor, Cursor. No es el historial (`PROJECT_STATE.md`).
 > **AsOf:** 2026-08-26 · **ADR-031** tesis ≠ plan ≠ permiso · **ADR-032** Operational Core v1.9 **CERRADO (modelo)** · **ADR-033** Operational Authority v1.10 **CERRADA (H1→P4)** · **ADR-034** Operational Integrity **OI-1…PA-1 + OE-1 CERRADOS** · **F1–F4** · **ExitPermission** · **INFRA CI-by-tag** · **ADR-023 Accepted BETA-D** · **A3-wire** `d704263` · **C1–C6** consolidación v1.8.1 **CERRADA**. Alembic `012` en `bolsa_v1`.
-> **Tag:** **`v1.11-beta`** (stamp docs listo; SHA al publicar tag). Previo: **`v1.10-beta` → `047ddb6`**. **BETA / no producción.** Roadmap: [`roadmap-v111-operational-integrity-2026-08-26.md`](./engineering/roadmap-v111-operational-integrity-2026-08-26.md). Pack: [`audit-pack-estado-global-2026-08-26-v111.md`](./engineering/audit-pack-estado-global-2026-08-26-v111.md). OE-1: [`traspaso-relevo-oe1-ops-autoeval-2026-08-26.md`](./engineering/traspaso-relevo-oe1-ops-autoeval-2026-08-26.md).
+> **Tag:** **`v1.11-beta` → `76d0f951`**. Previo: **`v1.10-beta` → `047ddb6`**. **BETA / no producción.** Roadmap: [`roadmap-v111-operational-integrity-2026-08-26.md`](./engineering/roadmap-v111-operational-integrity-2026-08-26.md). Pack: [`audit-pack-estado-global-2026-08-26-v111.md`](./engineering/audit-pack-estado-global-2026-08-26-v111.md). OE-1: [`traspaso-relevo-oe1-ops-autoeval-2026-08-26.md`](./engineering/traspaso-relevo-oe1-ops-autoeval-2026-08-26.md).
 > **Auditoría:** pack v111 · triage origen [`audit-ext-v19-ops-discontinuity-triage-2026-08-25.md`](./engineering/audit-ext-v19-ops-discontinuity-triage-2026-08-25.md).
 
 ---

@@ -6,7 +6,7 @@ All notable releases of Bolsa V1.
 
 ## [1.11-beta] — 2026-08-26
 
-Operational Integrity v1.11 (OI-1…OE-1). Producto sigue **BETA / no producción**. Tag **`v1.11-beta`** (SHA al publicar). Partida: **`v1.10-beta` → `047ddb6`**. Spine **`pnpm test:decision-spine` = 367**. Pack: [`audit-pack-estado-global-2026-08-26-v111.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v111.md). Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**.
+Operational Integrity v1.11 (OI-1…OE-1). Producto sigue **BETA / no producción**. Tag anotado **`v1.11-beta` → `76d0f951`** (Release tag CI GREEN). Partida: **`v1.10-beta` → `047ddb6`**. Spine **`pnpm test:decision-spine` = 367**. Pack: [`audit-pack-estado-global-2026-08-26-v111.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v111.md). Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**.
 
 ### OI-1 — Continuidad operativa (v1.11)
 

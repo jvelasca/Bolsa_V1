@@ -1,7 +1,7 @@
 # RELEVO — tag v1.11-beta → auditoría (2026-08-26)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-26-v111.md`](./audit-pack-estado-global-2026-08-26-v111.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **LISTO PARA PUBLICACIÓN** (docs + batería local). Tag git + CI = paso owner.  
+> **Estado:** **PUBLICACIÓN.** Tag `v1.11-beta` → `76d0f951`. **Release tag CI GREEN.**  
 > **Arranque chat nuevo / auditor:** este fichero + pack v111 + ADR-034 + `CURRENT_SYSTEM.md` + roadmap v1.11 + OE-1 checklist.
 
 ---
@@ -16,20 +16,18 @@
 
 | Pieza        | Valor                                                                                          |
 | ------------ | ---------------------------------------------------------------------------------------------- |
-| Tag          | `v1.11-beta` → **SHA al `git tag`** (rellenar tras commit limpio)                              |
+| Tag          | `v1.11-beta` → `76d0f951`                                                                      |
 | Previo       | `v1.10-beta` → `047ddb6`                                                                       |
 | Pack auditor | [`audit-pack-estado-global-2026-08-26-v111.md`](./audit-pack-estado-global-2026-08-26-v111.md) |
 | Spine        | `pnpm test:decision-spine` **367** (2026-08-26)                                                |
 | OE-1         | `test_ops_self_eval.py` 3 · vitest mesa/HELP 5 · `scripts/ops_operativa_self_eval.mjs`         |
 | CI tag       | `release-tag-ci.yml` (sin path-filter)                                                         |
 
-### Owner: publicar
+### Owner: publicado
 
 ```bash
-# Tras commit limpio del cierre v1.11:
-git tag v1.11-beta
-git push origin v1.11-beta
-# Esperar Actions GREEN → anotar SHA aquí y en CURRENT_SYSTEM Tag line
+git tag v1.11-beta          # 76d0f951
+git push origin v1.11-beta  # Actions GREEN
 ```
 
 ## 2. Freeze
