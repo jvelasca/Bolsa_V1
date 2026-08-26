@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { ArrowRight, History } from "lucide-react";
+import { MESA_PATH } from "@/features/confirm/daily-nav";
 import {
   Card,
   CardContent,
@@ -126,7 +127,12 @@ export function OperationsPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Entradas</CardTitle>
-            <CardDescription>Proyección Decision Board</CardDescription>
+            <CardDescription>
+              Proyección Decision Board ·{" "}
+              <Link to={MESA_PATH} className="text-primary hover:underline">
+                Abrir Mesa · Oportunidades
+              </Link>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <MesaEntryQueuePanel entriesBlocked={entriesBlocked} />

@@ -4,6 +4,18 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.15-beta] — 2026-08-26
+
+Operational UX — **Mesa · Hoy** (ADR-037). Home diaria `/mesa` compone Decision Board, portfolio, studies e incidentes sin endpoints nuevos. Nav: Mesa · Hoy → Trading → … · Consola ops → Herramientas. Journal: vista tabla simplificada + status 3 dimensiones. **BETA / no producción.** Sin cambios en Confirm, TradePlan, SubmitIntent ni DEX.
+
+### Mesa · Hoy (V1.15 Operational UX)
+
+- Ruta `/mesa` · redirect `/` → `/mesa` · ADR [`037-mesa-hoy-operational-ux.md`](./docs/adr/037-mesa-hoy-operational-ux.md).
+- Compositor shared `mesa-hoy-model` · `mapMesaStatusDimensions` · tests.
+- Secciones: incidentes → sesión → KPIs → atención → posiciones → candidatos → salud ops.
+- Deep-links Journal ficha · Hoy strip adelgazado (top-3 + link Mesa).
+- Plan [`plan-mesa-hoy-v115-2026-08-26.md`](./docs/engineering/plan-mesa-hoy-v115-2026-08-26.md).
+
 ## [1.13-beta] — 2026-08-26
 
 Durable Execution v1.13 (D0 + DEX-1…DEX-5). Producto sigue **BETA / no producción**. Tag anotado **`v1.13-beta` → `c8d5800`** (Release tag CI GREEN). Partida: **`v1.12-beta` → `369b5d1`**. Spine **`pnpm test:decision-spine` = 483**. Pack: [`audit-pack-estado-global-2026-08-26-v113.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v113.md). OR-2 cerrado vía DEX-1+DEX-2. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**. LIVE **experimental**. AUTO **off**.

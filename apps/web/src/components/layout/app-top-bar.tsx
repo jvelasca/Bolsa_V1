@@ -29,6 +29,7 @@ import {
   FlaskConical,
   Gauge,
   LayoutDashboard,
+  LayoutGrid,
   LineChart,
   List,
   Microscope,
@@ -65,9 +66,12 @@ import {
   LABORATORIO_LABEL,
   LIBRO_LABEL,
   LIBRO_NAV,
+  MESA_LABEL,
+  MESA_PATH,
   SEÑALES_LABEL,
   SEÑALES_PATH,
   TRADING_NAV_LABEL,
+  OPERATIONAL_CONSOLE_PATH,
 } from "@/features/confirm/daily-nav";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
@@ -262,8 +266,9 @@ function DropdownMenu({
   );
 }
 
-/** Bucle diario (primer nivel). Señales, Confirmar y Libro se renderizan aparte. */
+/** Bucle diario (primer nivel). Mesa · Hoy primero (ADR-037). */
 const DAILY_NAV = [
+  { to: MESA_PATH, label: MESA_LABEL, icon: LayoutGrid, end: true },
   { to: "/trading", label: TRADING_NAV_LABEL, icon: LineChart, end: true },
 ] as const;
 
@@ -273,7 +278,7 @@ const HERRAMIENTAS_NAV = [
   { to: "/alerts", label: "Alertas", icon: Bell },
   { to: "/instruments", label: "Instrumentos", icon: BookOpen },
   { to: "/decision-board", label: "Decision Board", icon: Gauge },
-  { to: "/operational-console", label: "Consola ops", icon: ShieldCheck },
+  { to: OPERATIONAL_CONSOLE_PATH, label: "Consola ops", icon: ShieldCheck },
   { to: "/decision-journal", label: "Decision Journal", icon: BookMarked },
 ] as const;
 
@@ -323,7 +328,6 @@ export function AppTopBar() {
   const isResearchRoute = location.pathname.startsWith("/research");
   const isLibroRoute =
     location.pathname.startsWith("/operations") ||
-    location.pathname.startsWith("/operational-console") ||
     location.pathname.startsWith("/history");
   const trading = isTradingRoute(location.pathname);
   const historyNav = useSpaHistoryNav();

@@ -34,6 +34,7 @@ import { OperationsPage } from "@/features/operations/operations-page";
 import { OperationalConsolePage } from "@/features/operational-console/operational-console-page";
 import { DecisionBoardPage } from "@/features/decision-board/decision-board-page";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
+import { MesaHoyPage } from "@/features/mesa/mesa-hoy-page";
 import { ConfirmPage } from "@/features/confirm/confirm-page";
 import { AlertsPage } from "@/features/alerts/alerts-page";
 import { SettingsRedirectPage } from "@/features/settings/settings-redirect-page";
@@ -59,7 +60,9 @@ const router = createBrowserRouter([
     ),
 
     children: [
-      { index: true, element: <Navigate to="/trading" replace /> },
+      { index: true, element: <Navigate to="/mesa" replace /> },
+
+      { path: "mesa", element: <MesaHoyPage /> },
 
       { path: "trading", element: <ChartWorkspacePage /> },
 

@@ -18,7 +18,8 @@ import {
   LIBRO_HISTORIAL_PATH,
   LIBRO_LABEL,
   LIBRO_NAV,
-  OPERATIONAL_CONSOLE_HINT,
+  MESA_LABEL,
+  MESA_PATH,
   OPERATIONAL_CONSOLE_LABEL,
   OPERATIONAL_CONSOLE_PATH,
   LIBRO_OPERACIONES_HINT,
@@ -67,7 +68,7 @@ describe("daily-nav", () => {
     expect(CONFIRM_PATH).toBe("/confirm");
   });
 
-  it("exposes Libro dropdown to Operaciones and Historial without merging routes", () => {
+  it("exposes Libro dropdown to Operaciones and Historial without Consola ops", () => {
     expect(LIBRO_LABEL).toBe("Libro");
     expect(LIBRO_OPERACIONES_LABEL).toBe("Operaciones");
     expect(LIBRO_HISTORIAL_LABEL).toBe("Historial");
@@ -84,11 +85,6 @@ describe("daily-nav", () => {
         hint: LIBRO_OPERACIONES_HINT,
       },
       {
-        label: OPERATIONAL_CONSOLE_LABEL,
-        href: OPERATIONAL_CONSOLE_PATH,
-        hint: OPERATIONAL_CONSOLE_HINT,
-      },
-      {
         label: LIBRO_HISTORIAL_LABEL,
         href: LIBRO_HISTORIAL_PATH,
         hint: LIBRO_HISTORIAL_HINT,
@@ -96,13 +92,27 @@ describe("daily-nav", () => {
     ]);
   });
 
-  it("orders daily, tools, and lab/tesis groups", () => {
+  it("promotes Mesa · Hoy as first daily nav item", () => {
+    expect(MESA_LABEL).toBe("Mesa · Hoy");
+    expect(MESA_PATH).toBe("/mesa");
+    expect(DAILY_NAV_ORDER[0]).toBe(MESA_LABEL);
     expect(DAILY_NAV_ORDER).toEqual([
+      MESA_LABEL,
       TRADING_NAV_LABEL,
       SEÑALES_LABEL,
       CONFIRMAR_LABEL,
       LIBRO_LABEL,
     ]);
+  });
+
+  it("moves Consola ops to Herramientas", () => {
+    expect(HERRAMIENTAS_NAV_ORDER).toContain(OPERATIONAL_CONSOLE_LABEL);
+    expect(
+      LIBRO_NAV.items.some((i) => i.href === OPERATIONAL_CONSOLE_PATH),
+    ).toBe(false);
+  });
+
+  it("orders daily, tools, and lab/tesis groups", () => {
     expect(DAILY_NAV_ORDER.indexOf(LIBRO_LABEL)).toBeGreaterThan(
       DAILY_NAV_ORDER.indexOf(CONFIRMAR_LABEL),
     );
@@ -112,6 +122,7 @@ describe("daily-nav", () => {
       "Alertas",
       "Instrumentos",
       "Decision Board",
+      OPERATIONAL_CONSOLE_LABEL,
     ]);
     expect(LAB_TESIS_NAV_ORDER).toEqual([LABORATORIO_LABEL, ASESOR_LABEL]);
     expect(ASESOR_LABEL).toBe("Asesor");

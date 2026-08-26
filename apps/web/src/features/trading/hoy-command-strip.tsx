@@ -22,6 +22,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import { MESA_PATH } from "@/features/confirm/daily-nav";
 import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 
 const KIND_CLASS: Record<HoyQueueItemV1["kind"], string> = {
@@ -172,7 +173,7 @@ export function HoyCommandStrip() {
   });
 
   const items = useMemo(
-    () => (query.data ? mapDecisionBoardToHoyQueue(query.data) : []),
+    () => (query.data ? mapDecisionBoardToHoyQueue(query.data, 3) : []),
     [query.data],
   );
   const pending = query.data?.buckets.pendingConfirm ?? 0;
@@ -213,6 +214,13 @@ export function HoyCommandStrip() {
       <span className="ml-auto shrink-0 text-muted-foreground">
         Firma {pending}
       </span>
+      <Link
+        to={MESA_PATH}
+        className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] hover:bg-muted"
+        data-testid="hoy-link-mesa"
+      >
+        Mesa · Hoy
+      </Link>
       <button
         type="button"
         className="shrink-0 rounded border border-border px-1.5 py-0.5 hover:bg-muted"

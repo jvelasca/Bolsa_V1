@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import type { DecisionJournalStudyViewV1 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,15 @@ const STUDIES_PAGE_LIMIT = 200;
 
 export function DecisionJournalPage() {
   const { effectiveAccountId } = useActiveAccount();
+  const [searchParams] = useSearchParams();
   const isWide = useMediaQuery("(min-width: 1024px)");
   const splitPrefs = useMemo(() => loadJournalStudiesSplitPrefs(), []);
-  const [tab, setTab] = useState<JournalTab>("tesis");
+  const initialTab = searchParams.get("tab");
+  const [tab, setTab] = useState<JournalTab>(
+    initialTab === "evolucion" || initialTab === "historial"
+      ? initialTab
+      : "tesis",
+  );
   const [filters, setFilters] = useState<JournalStudyFilters>(
     DEFAULT_JOURNAL_STUDY_FILTERS,
   );
@@ -121,7 +128,10 @@ export function DecisionJournalPage() {
     refetchInterval: 60_000,
   });
 
-  const studies = studiesQuery.data?.data.studies ?? [];
+  const studies = useMemo(
+    () => studiesQuery.data?.data.studies ?? [],
+    [studiesQuery.data],
+  );
   const studiesTotal = studiesQuery.data?.data.total ?? studies.length;
   const journal = journalQuery.data?.data;
   const lists = useMemo(
@@ -134,6 +144,18 @@ export function DecisionJournalPage() {
   );
 
   const showFicha = Boolean(selected) && !fichaCollapsed;
+
+  useEffect(() => {
+    const instrumentParam = searchParams.get("instrument");
+    if (!instrumentParam || studies.length === 0) return;
+    const match = studies.find((s) => s.instrumentId === instrumentParam);
+    if (match) {
+      setSelected(match);
+      if (searchParams.get("ficha") === "1") {
+        setFichaCollapsed(false);
+      }
+    }
+  }, [searchParams, studies]);
 
   return (
     <div

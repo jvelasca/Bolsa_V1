@@ -59,6 +59,20 @@ export const DEFAULT_JOURNAL_STUDY_LAYOUT: JournalStudyColumnLayoutItem[] = [
   { id: "actions", width: 44, visible: true },
 ];
 
+/** Vista limpia usuario básico (ADR-037). */
+export const SIMPLE_JOURNAL_STUDY_LAYOUT: JournalStudyColumnLayoutItem[] = [
+  { id: "symbol", width: 108, visible: true },
+  { id: "status", width: 120, visible: true },
+  { id: "opinion", width: 80, visible: true },
+  { id: "targets", width: 96, visible: true },
+  { id: "strength", width: 88, visible: true },
+  { id: "updated", width: 104, visible: true },
+  { id: "period", width: 68, visible: false },
+  { id: "entry", width: 72, visible: false },
+  { id: "vigencia", width: 80, visible: false },
+  { id: "actions", width: 44, visible: false },
+];
+
 export const DEFAULT_JOURNAL_STUDY_FAVORITES: JournalStudyColumnId[] = [
   "symbol",
   "status",

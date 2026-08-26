@@ -9,6 +9,12 @@
  * @see docs/engineering/plan-r12-track-c-frontend-2026-08-21.md § C2 · § C4
  */
 
+/** Home operativa diaria — ¿qué debo hacer hoy? (ADR-037). */
+export const MESA_LABEL = "Mesa · Hoy" as const;
+export const MESA_PATH = "/mesa" as const;
+export const MESA_HINT =
+  "Briefing diario: incidentes, atención, posiciones y candidatos" as const;
+
 /** Hub diario de señales (ruta histórica `/screeners`; copy trader). */
 export const SEÑALES_LABEL = "Señales" as const;
 export const SEÑALES_PATH = "/screeners" as const;
@@ -24,7 +30,7 @@ export const LEDGER_ASESOR_LINK_LABEL = "Ledger Asesor →" as const;
 export const CONFIRMAR_LABEL = "Confirmar" as const;
 export const TRADING_NAV_LABEL = "Trading" as const;
 
-/** Dropdown Libro (R-12 C4): Operaciones + Historial; no fusiona rutas. */
+/** Dropdown Libro (R-12 C4): Operaciones + Historial; Consola ops → Herramientas (V1.15). */
 export const LIBRO_LABEL = "Libro" as const;
 export const LIBRO_OPERACIONES_LABEL = "Operaciones" as const;
 export const LIBRO_HISTORIAL_LABEL = "Historial" as const;
@@ -52,11 +58,6 @@ export const LIBRO_NAV = {
       hint: LIBRO_OPERACIONES_HINT,
     },
     {
-      label: OPERATIONAL_CONSOLE_LABEL,
-      href: OPERATIONAL_CONSOLE_PATH,
-      hint: OPERATIONAL_CONSOLE_HINT,
-    },
-    {
       label: LIBRO_HISTORIAL_LABEL,
       href: LIBRO_HISTORIAL_PATH,
       hint: LIBRO_HISTORIAL_HINT,
@@ -75,6 +76,7 @@ export const ASESOR_TESIS_HINT =
 export const UNIVERSO_EN_VIGILANCIA = "Universo en vigilancia" as const;
 
 export const DAILY_NAV_ORDER = [
+  MESA_LABEL,
   TRADING_NAV_LABEL,
   SEÑALES_LABEL,
   CONFIRMAR_LABEL,
@@ -87,6 +89,7 @@ export const HERRAMIENTAS_NAV_ORDER = [
   "Alertas",
   "Instrumentos",
   "Decision Board",
+  OPERATIONAL_CONSOLE_LABEL,
 ] as const;
 
 /**

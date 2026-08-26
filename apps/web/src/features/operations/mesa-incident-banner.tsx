@@ -129,13 +129,17 @@ export function MesaIncidentBanner({
 
   const showBannerUi = showBanner;
 
-  const primary = selected ?? incidents[0];
-  const statusCopy = operationalIncidentStatusCopy(primary.status);
+  const primaryIncident = selected ?? incidents[0];
+  if (!primaryIncident) {
+    return null;
+  }
+  const statusCopy = operationalIncidentStatusCopy(primaryIncident.status);
   const reconForClear = reconStatusForIncident(
-    primary.kind,
+    primaryIncident.kind,
     portfolioReconStatus,
   );
-  const clearAllowed = canClear(primary, reconForClear);
+  const clearAllowed = canClear(primaryIncident, reconForClear);
+  const activeIncidentId = primaryIncident.incidentId;
 
   function openPanel(incident: OperationalIncidentV1) {
     setSelectedId(incident.incidentId);
@@ -151,7 +155,7 @@ export function MesaIncidentBanner({
       return;
     }
     resolveMut.mutate({
-      incidentId: primary.incidentId,
+      incidentId: activeIncidentId,
       resolutionNote: trimmed,
     });
   }
@@ -172,8 +176,8 @@ export function MesaIncidentBanner({
               Incidente operacional — entradas bloqueadas ({incidents.length})
             </p>
             <p className="text-amber-900/80 dark:text-amber-200/80">
-              {INCIDENT_KIND_LABELS[primary.kind]} · {statusCopy} Salidas
-              protectivas permitidas. Sin auto-heal.
+              {INCIDENT_KIND_LABELS[primaryIncident.kind]} · {statusCopy}{" "}
+              Salidas protectivas permitidas. Sin auto-heal.
             </p>
           </div>
           <Button
@@ -181,7 +185,7 @@ export function MesaIncidentBanner({
             size="sm"
             variant="outline"
             className="border-amber-600/40"
-            onClick={() => openPanel(primary)}
+            onClick={() => openPanel(primaryIncident)}
             data-testid="mesa-incident-manage"
           >
             Gestionar
@@ -202,7 +206,7 @@ export function MesaIncidentBanner({
               Incidente
               <select
                 className="h-8 rounded-md border border-border bg-card px-2 text-xs text-foreground"
-                value={primary.incidentId}
+                value={primaryIncident.incidentId}
                 onChange={(e) => setSelectedId(e.target.value)}
                 data-testid="mesa-incident-select"
               >
@@ -216,10 +220,12 @@ export function MesaIncidentBanner({
           ) : null}
 
           <div className="rounded-md border border-border bg-muted/30 p-3 text-xs">
-            <p className="font-medium">{INCIDENT_KIND_LABELS[primary.kind]}</p>
+            <p className="font-medium">
+              {INCIDENT_KIND_LABELS[primaryIncident.kind]}
+            </p>
             <p className="mt-1 text-muted-foreground">{statusCopy}</p>
             <p className="mt-2 text-muted-foreground">
-              {reconLabel(primary.kind, portfolioReconStatus)}
+              {reconLabel(primaryIncident.kind, portfolioReconStatus)}
             </p>
             <p className="mt-2 text-muted-foreground">
               Veto aperturas:{" "}
@@ -253,8 +259,8 @@ export function MesaIncidentBanner({
               size="sm"
               disabled={
                 resolveMut.isPending ||
-                primary.status === "resolved" ||
-                primary.status === "cleared"
+                primaryIncident.status === "resolved" ||
+                primaryIncident.status === "cleared"
               }
               onClick={handleResolve}
               data-testid="mesa-incident-resolve"
@@ -271,7 +277,7 @@ export function MesaIncidentBanner({
                   ? "Clear con recon clean"
                   : "Clear requiere status resolved + recon clean"
               }
-              onClick={() => clearMut.mutate(primary.incidentId)}
+              onClick={() => clearMut.mutate(primaryIncident.incidentId)}
               data-testid="mesa-incident-clear"
             >
               Clear

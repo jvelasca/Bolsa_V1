@@ -23,6 +23,11 @@ export function HoyEnLaMesaBlock() {
       <h3 className="text-sm font-semibold text-foreground">Hoy en la mesa</h3>
       <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
         <li>
+          <strong className="text-foreground">Abrir la mesa</strong> en{" "}
+          <RouteLink to="/mesa">Mesa · Hoy</RouteLink> — briefing del día
+          (incidentes, atención, posiciones, candidatos).
+        </li>
+        <li>
           <strong className="text-foreground">Ver valor</strong> en{" "}
           <RouteLink to="/trading">Trading</RouteLink> (gráfico + Operativa).
         </li>

@@ -11,13 +11,7 @@ import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
-import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
-import {
-  buildPositionExitPayload,
-  positionShowsProtectHint,
-} from "@/features/operations/propose-position-exit";
-import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
-import type { PositionDto } from "@bolsa/shared";
+import { MesaPositionExitActions } from "@/features/mesa/mesa-position-row";
 
 type OperationsTab = "open" | "pending";
 
@@ -39,87 +33,6 @@ function formatR(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}R`;
-}
-
-function PositionExitActions({
-  position,
-  protectPlan,
-}: {
-  position: PositionDto;
-  protectPlan?: ProtectPlanV1 | null;
-}) {
-  const { effectiveAccountId } = useActiveAccount();
-  const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
-  const [error, setError] = useState<string | null>(null);
-  const hasPlan = Boolean(position.operational?.tradePlanId);
-  const showProtect = positionShowsProtectHint(position, protectPlan);
-
-  function enqueueExit(intent: "review" | "reduce" | "exit_hint" | "protect") {
-    setError(null);
-    if (!effectiveAccountId) {
-      setError("Sin cuenta activa");
-      return;
-    }
-    try {
-      const payload = buildPositionExitPayload({
-        position,
-        accountId: effectiveAccountId,
-        intent,
-        protectPlan,
-      });
-      enqueue(payload, { origin: "operativa", symbol: position.symbol });
-      openConfirmDrawer();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo encolar");
-    }
-  }
-
-  if (!hasPlan) {
-    return <span className="text-[10px] text-muted-foreground">sin plan</span>;
-  }
-
-  return (
-    <div className="flex flex-col items-end gap-0.5">
-      <div className="flex flex-wrap justify-end gap-1">
-        {showProtect ? (
-          <button
-            type="button"
-            className="rounded border border-emerald-500/40 px-1.5 py-0.5 text-[10px] text-emerald-900 hover:bg-emerald-500/10 dark:text-emerald-100"
-            onClick={() => enqueueExit("protect")}
-            data-testid={`protect-${position.symbol}`}
-          >
-            Proteger
-          </button>
-        ) : null}
-        <button
-          type="button"
-          className="rounded border border-border px-1.5 py-0.5 text-[10px] hover:bg-accent"
-          onClick={() => enqueueExit("review")}
-        >
-          Revisar
-        </button>
-        <button
-          type="button"
-          className="rounded border border-border px-1.5 py-0.5 text-[10px] hover:bg-accent"
-          onClick={() => enqueueExit("reduce")}
-        >
-          Reducir
-        </button>
-        <button
-          type="button"
-          className="rounded border border-amber-500/40 px-1.5 py-0.5 text-[10px] text-amber-900 hover:bg-amber-500/10 dark:text-amber-100"
-          onClick={() => enqueueExit("exit_hint")}
-        >
-          Salir
-        </button>
-      </div>
-      {error && (
-        <span className="max-w-[140px] text-right text-[9px] text-destructive">
-          {error}
-        </span>
-      )}
-    </div>
-  );
 }
 
 export function OperationsPanel() {
@@ -306,7 +219,7 @@ export function OperationsPanel() {
                       </td>
 
                       <td className="px-2 py-1">
-                        <PositionExitActions
+                        <MesaPositionExitActions
                           position={pos}
                           protectPlan={protectPlanByInstrument.get(
                             pos.instrumentId,

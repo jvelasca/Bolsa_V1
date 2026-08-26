@@ -14,6 +14,7 @@ import {
   JOURNAL_STUDY_STATUS_LABELS,
   JOURNAL_STUDY_VIGENCIA_LABELS,
   formatJournalStudyAge,
+  mapMesaStatusDimensions,
   type DecisionJournalStudyViewV1,
   type JournalStudyOpinion,
   type JournalStudyPeriod,
@@ -41,6 +42,7 @@ import {
   persistJournalStudyLayout,
   reorderJournalStudyColumns,
   resizeJournalStudyColumn,
+  SIMPLE_JOURNAL_STUDY_LAYOUT,
   toggleJournalStudyColumn,
   toggleJournalStudyFavorite,
   visibleJournalStudyColumns,
@@ -145,8 +147,9 @@ export function JournalStudiesTable({
   const navigate = useNavigate();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
   const stored = useMemo(() => loadJournalStudyLayout(), []);
+  const [advancedMode, setAdvancedMode] = useState(false);
   const [layout, setLayout] = useState<JournalStudyColumnLayoutItem[]>(
-    stored.layout,
+    SIMPLE_JOURNAL_STUDY_LAYOUT,
   );
   const [favorites, setFavorites] = useState<JournalStudyColumnId[]>(
     stored.favorites,
@@ -226,19 +229,23 @@ export function JournalStudiesTable({
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-1">
         <p className="text-[10px] text-muted-foreground">
-          {sorted.length} tesis · clic cabecera ordena · arrastra columnas ·
-          borde derecho ancho
+          {sorted.length} tesis
+          {advancedMode
+            ? " · clic cabecera ordena · arrastra columnas · borde derecho ancho"
+            : " · vista simplificada"}
         </p>
         <div className="flex items-center gap-2">
-          <label className="flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={autoFitColumns}
-              onChange={(event) => setAutoFitColumns(event.target.checked)}
-              data-testid="journal-columns-autofit"
-            />
-            Ajustar al contenido
-          </label>
+          {advancedMode ? (
+            <label className="flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={autoFitColumns}
+                onChange={(event) => setAutoFitColumns(event.target.checked)}
+                data-testid="journal-columns-autofit"
+              />
+              Ajustar al contenido
+            </label>
+          ) : null}
           <div className="relative" ref={menuRef}>
             <Button
               type="button"
@@ -247,54 +254,86 @@ export function JournalStudiesTable({
               className="h-7 px-2"
               onClick={() => setMenuOpen((v) => !v)}
               data-testid="journal-columns-menu"
-              aria-label="Columnas"
+              aria-label="Opciones de tabla"
             >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
             {menuOpen ? (
               <OpaqueMenuPanel className="min-w-[200px] p-2">
-                <OpaqueMenuLabel>Columnas visibles</OpaqueMenuLabel>
-                {layout
-                  .filter((column) => column.id !== "actions")
-                  .map((column) => (
-                    <label
-                      key={column.id}
-                      className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={column.visible}
-                        disabled={column.id === "symbol"}
-                        onChange={() =>
-                          persistLayout(
-                            toggleJournalStudyColumn(layout, column.id),
-                          )
-                        }
-                      />
-                      <span className="flex-1">
-                        {JOURNAL_STUDY_COLUMN_LABELS[column.id]}
-                      </span>
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-amber-500"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          setFavorites(
-                            toggleJournalStudyFavorite(favorites, column.id),
-                          );
-                        }}
-                        aria-label="Favorita"
-                      >
-                        <Star
-                          className={cn(
-                            "h-3 w-3",
-                            favorites.includes(column.id) &&
-                              "fill-amber-400 text-amber-400",
-                          )}
-                        />
-                      </button>
-                    </label>
-                  ))}
+                <OpaqueMenuLabel>Opciones</OpaqueMenuLabel>
+                <OpaqueMenuItem
+                  onClick={() => {
+                    setAdvancedMode((v) => !v);
+                    setLayout(
+                      advancedMode
+                        ? SIMPLE_JOURNAL_STUDY_LAYOUT
+                        : stored.layout,
+                    );
+                    setMenuOpen(false);
+                  }}
+                >
+                  {advancedMode
+                    ? "Vista simplificada"
+                    : "Configuración avanzada"}
+                </OpaqueMenuItem>
+                <OpaqueMenuItem
+                  onClick={() => {
+                    setLayout(SIMPLE_JOURNAL_STUDY_LAYOUT);
+                    setAdvancedMode(false);
+                    setMenuOpen(false);
+                  }}
+                >
+                  Restaurar diseño simple
+                </OpaqueMenuItem>
+                {advancedMode ? (
+                  <>
+                    <OpaqueMenuLabel>Columnas visibles</OpaqueMenuLabel>
+                    {layout
+                      .filter((column) => column.id !== "actions")
+                      .map((column) => (
+                        <label
+                          key={column.id}
+                          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={column.visible}
+                            disabled={column.id === "symbol"}
+                            onChange={() =>
+                              persistLayout(
+                                toggleJournalStudyColumn(layout, column.id),
+                              )
+                            }
+                          />
+                          <span className="flex-1">
+                            {JOURNAL_STUDY_COLUMN_LABELS[column.id]}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-muted-foreground hover:text-amber-500"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              setFavorites(
+                                toggleJournalStudyFavorite(
+                                  favorites,
+                                  column.id,
+                                ),
+                              );
+                            }}
+                            aria-label="Favorita"
+                          >
+                            <Star
+                              className={cn(
+                                "h-3 w-3",
+                                favorites.includes(column.id) &&
+                                  "fill-amber-400 text-amber-400",
+                              )}
+                            />
+                          </button>
+                        </label>
+                      ))}
+                  </>
+                ) : null}
               </OpaqueMenuPanel>
             ) : null}
           </div>
@@ -320,7 +359,7 @@ export function JournalStudiesTable({
                 <div
                   key={column.id}
                   className="relative box-border py-1"
-                  draggable={column.id !== "actions"}
+                  draggable={advancedMode && column.id !== "actions"}
                   onDragStart={() => {
                     dragFrom.current = column.id;
                   }}
@@ -352,7 +391,7 @@ export function JournalStudiesTable({
                       setSort(cycleJournalStudySort(sort, column.id));
                     }}
                   >
-                    {column.id !== "actions" ? (
+                    {advancedMode && column.id !== "actions" ? (
                       <GripVertical className="h-3 w-3 shrink-0 cursor-grab opacity-40" />
                     ) : null}
                     <span className="truncate">
@@ -370,7 +409,7 @@ export function JournalStudiesTable({
                       )
                     ) : null}
                   </div>
-                  {column.id !== "actions" ? (
+                  {advancedMode && column.id !== "actions" ? (
                     <ColumnResizeHandle
                       columnId={column.id}
                       width={column.width}
@@ -575,19 +614,30 @@ function renderCell(
           ) : null}
         </div>
       );
-    case "status":
+    case "status": {
+      const dims = mapMesaStatusDimensions({
+        study,
+        hasOpenPosition: false,
+        tradePlanStatus: study.tradePlanStatus,
+      });
       return (
-        <span
-          className={cn(
-            "inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold",
-            statusClass(study.status),
-          )}
-        >
-          {JOURNAL_STUDY_STATUS_LABELS[
-            study.status as JournalStudyUserStatus
-          ] ?? study.status}
-        </span>
+        <div className="space-y-0.5 text-[10px] leading-tight">
+          <span
+            className={cn(
+              "inline-flex rounded px-1 py-0.5 font-semibold",
+              statusClass(study.status),
+            )}
+          >
+            {JOURNAL_STUDY_STATUS_LABELS[
+              study.status as JournalStudyUserStatus
+            ] ?? study.status}
+          </span>
+          <p className="text-muted-foreground">
+            Op: {dims.operational} · Pos: {dims.position}
+          </p>
+        </div>
       );
+    }
     case "period":
       return dash(
         study.period
