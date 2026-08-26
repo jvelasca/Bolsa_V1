@@ -72,15 +72,6 @@ from bolsa_analytics.cognitive.execution_record import (
     build_execution_record,
     execution_outcome_copy,
 )
-from bolsa_analytics.cognitive.submit_intent import (
-    SUBMIT_INTENT_KEY,
-    DurableSubmitIntent,
-    bind_venue_order,
-    mark_submit_filled,
-    record_submit_intent,
-    reconstruct_unknown,
-    send_attempted_durable,
-)
 from bolsa_analytics.cognitive.exit_permission import (
     EXIT_PERMISSION_KEY,
     ExitPermission,
@@ -206,6 +197,15 @@ from bolsa_analytics.cognitive.score_macro import ScoreMacroResult, score_macro_
 from bolsa_analytics.cognitive.stats_suite import (
     monte_carlo_permutation_p_value,
     walk_forward_efficiency,
+)
+from bolsa_analytics.cognitive.submit_intent import (
+    SUBMIT_INTENT_KEY,
+    DurableSubmitIntent,
+    bind_venue_order,
+    mark_submit_filled,
+    reconstruct_unknown,
+    record_submit_intent,
+    send_attempted_durable,
 )
 from bolsa_analytics.cognitive.suggest_policy import suggest_policy_template_from_declared
 from bolsa_analytics.cognitive.thesis_health import (

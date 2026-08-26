@@ -18,16 +18,16 @@ from bolsa_application.opening_permission import (
     LatestBarLookup,
     allow_opening_fill,
 )
-from bolsa_application.reconciliation_opening_gate import (
-    LiveReconLookup,
-    PortfolioReconLookup,
-)
 from bolsa_application.persist_position_from_exit import PersistPositionFromExit
 from bolsa_application.persist_position_from_fill import (
     PersistPositionFromFill,
     open_transaction_id_from_trade,
 )
 from bolsa_application.post_fill_position_sync import sync_position_after_ledger_fill
+from bolsa_application.reconciliation_opening_gate import (
+    LiveReconLookup,
+    PortfolioReconLookup,
+)
 
 
 class OpeningVetoedError(Exception):

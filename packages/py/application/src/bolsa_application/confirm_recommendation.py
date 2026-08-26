@@ -99,15 +99,15 @@ from bolsa_analytics.cognitive.paper_order import (
     stable_order_id_from_decision,
     transition_paper_order,
 )
+from bolsa_analytics.cognitive.recommendation import Recommendation
+from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
 from bolsa_analytics.cognitive.submit_intent import (
     bind_venue_order,
     mark_submit_filled,
-    record_submit_intent,
     reconstruct_unknown,
+    record_submit_intent,
     send_attempted_durable,
 )
-from bolsa_analytics.cognitive.recommendation import Recommendation
-from bolsa_analytics.cognitive.risk_signature import evaluate_risk_signature
 from bolsa_analytics.cognitive.trade_plan import (
     WYCKOFF_SPRING_ANCHOR_KEY,
     build_v0_trade_plan_dict,
@@ -133,10 +133,6 @@ from bolsa_application.opening_permission import (
     LatestBarLookup,
     allow_opening_fill,
 )
-from bolsa_application.reconciliation_opening_gate import (
-    LiveReconLookup,
-    PortfolioReconLookup,
-)
 from bolsa_application.persist_position_from_exit import (
     PersistPositionFromExitInput,
     row_position_state,
@@ -147,6 +143,10 @@ from bolsa_application.persist_position_from_fill import (
     open_transaction_id_from_trade,
 )
 from bolsa_application.persist_position_from_protect import PersistPositionFromProtectInput
+from bolsa_application.reconciliation_opening_gate import (
+    LiveReconLookup,
+    PortfolioReconLookup,
+)
 from bolsa_domain.entities.cognitive_artifacts import DecisionSessionRecord
 
 _OPENING_ACTIONS = {"recommend_long", "recommend_short"}
