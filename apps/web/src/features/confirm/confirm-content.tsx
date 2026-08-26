@@ -10,6 +10,7 @@ import {
   CONFIRM_FULL_PAGE_LINK_LABEL,
   confirmFullPagePath,
 } from "@/features/confirm/confirm-drawer";
+import { FeatureErrorBoundary } from "@/components/layout/feature-error-boundary";
 import { SupervisedF3Panel } from "@/features/settings/supervised-f3-panel";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +63,9 @@ export function ConfirmContent({
           </Link>
         ) : null}
       </div>
-      <SupervisedF3Panel />
+      <FeatureErrorBoundary featureName="Panel F3">
+        <SupervisedF3Panel />
+      </FeatureErrorBoundary>
     </div>
   );
 }

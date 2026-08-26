@@ -65,6 +65,7 @@ export function mesaEntriesBlocked(input: {
 export function filterMesaAttentionItems(
   queue: HoyQueueItemV1[],
   limit = 5,
+  extra?: Array<{ symbol: string; reason: string; recommendedAction: string }>,
 ): MesaAttentionItemV1[] {
   const items: MesaAttentionItemV1[] = [];
   for (const item of queue) {
@@ -88,6 +89,20 @@ export function filterMesaAttentionItems(
     if (!reason || !recommendedAction) continue;
     items.push({ ...item, reason, recommendedAction });
     if (items.length >= limit) break;
+  }
+  for (const ex of extra ?? []) {
+    if (items.length >= limit) break;
+    items.push({
+      id: `discrepancy-${ex.symbol}`,
+      symbol: ex.symbol,
+      kind: "REVIEW",
+      status: "WATCH",
+      whyNot: [],
+      gate: "PASS",
+      planSource: "projection",
+      reason: ex.reason,
+      recommendedAction: ex.recommendedAction,
+    });
   }
   return items;
 }
@@ -193,13 +208,21 @@ export function buildMesaSessionState(
   }
 
   const actionable = candidateCounts.ready + candidateCounts.prepared;
+  const noOperationsToday = actionable === 0 && candidateCounts.ready === 0;
   return {
     tone: "operational",
-    headline: actionable > 0 ? "Sesión operativa" : "Sin entradas urgentes",
+    headline:
+      noOperationsToday && pendingConfirm === 0
+        ? "Hoy no hay operaciones recomendadas"
+        : actionable > 0
+          ? "Sesión operativa"
+          : "Sin entradas urgentes",
     detail:
-      actionable > 0
-        ? `${actionable} candidato(s) preparados · ${pendingConfirm} en cola Confirm`
-        : `${candidateCounts.watch} en vigilancia · puede ser una buena decisión no operar`,
+      noOperationsToday && pendingConfirm === 0
+        ? `${candidateCounts.watch} en vigilancia · ${candidateCounts.blocked} bloqueados · la decisión correcta puede ser no operar`
+        : actionable > 0
+          ? `${actionable} candidato(s) preparados · ${pendingConfirm} en cola Confirm`
+          : `${candidateCounts.watch} en vigilancia · puede ser una buena decisión no operar`,
     regimeHint,
     pendingConfirm,
     vetoed,

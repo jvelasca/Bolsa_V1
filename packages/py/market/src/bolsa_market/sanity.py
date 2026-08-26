@@ -64,3 +64,12 @@ def run_sanity_checks(
         errors=tuple(errors),
         warnings=tuple(warnings),
     )
+
+
+def sanity_opening_veto_reason(warnings: tuple[str, ...] | list[str]) -> str | None:
+    """Propaga anomalías de calidad (p. ej. split sin ajustar) al gate DS-05."""
+    for warning in warnings:
+        w = str(warning).lower()
+        if "split/dividendo" in w or ("movimiento" in w and "%" in w):
+            return f"data_freshness:sanity_anomaly:{warning[:120]}"
+    return None

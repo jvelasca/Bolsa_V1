@@ -60,6 +60,14 @@ class BacktestCostModel:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestRiskPolicy:
+    """Alineación opcional con TradingPolicy live (sizing por riesgo + stop)."""
+
+    max_risk_per_trade_pct: float = 1.0
+    stop_loss_pct: float = 5.0
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestTradeResult:
     """Fill simulado (buy/sell) con equity tras la operación."""
 
@@ -251,6 +259,7 @@ def run_backtest(
     cost_v2: CostModelV2Config | None = None,
     strategy_definition: dict[str, Any] | None = None,
     execution_model: Literal["next_open"] = "next_open",
+    risk_policy: BacktestRiskPolicy | None = None,
 ) -> BacktestEngineResult:
     """Ejecuta un backtest H0 sobre ``bars`` con preset o ``strategy_definition``.
 
@@ -315,6 +324,7 @@ def run_backtest(
     exit_proceeds: list[float] = []
     open_entry_cost: float | None = None
     total_commission = 0.0
+    structural_stop: float | None = None
 
     for i, bar in enumerate(bars):
         kind = signal_by_index.get(i - 1)
@@ -342,6 +352,7 @@ def run_backtest(
 
         fill_price = float(bar.open if bar.open is not None else bar.close)
         close_price = float(bar.close)
+        bar_low = float(bar.low if bar.low is not None else bar.close)
         bar_costs = _bar_costs(
             resolved_costs,
             cost_v2=cost_v2,
@@ -349,10 +360,26 @@ def run_backtest(
             median_vol=median_vol,
         )
 
+        if (
+            shares > 0
+            and structural_stop is not None
+            and risk_policy is not None
+            and bar_low <= structural_stop
+        ):
+            signal = "sell"
+            reason = {"stop_loss": structural_stop}
+
         if signal == "buy" and shares == 0:
             fill = _buy_fill_price(fill_price, bar_costs)
             cost_per_share = fill * (1.0 + _bps_frac(bar_costs.commission_bps))
-            quantity = int(cash // cost_per_share) if cost_per_share > 0 else 0
+            if risk_policy is not None and risk_policy.stop_loss_pct > 0:
+                risk_budget = cash * (risk_policy.max_risk_per_trade_pct / 100.0)
+                risk_per_share = fill * (risk_policy.stop_loss_pct / 100.0)
+                quantity = int(risk_budget / risk_per_share) if risk_per_share > 0 else 0
+                structural_stop = fill * (1.0 - risk_policy.stop_loss_pct / 100.0)
+            else:
+                quantity = int(cash // cost_per_share) if cost_per_share > 0 else 0
+                structural_stop = None
             if quantity > 0:
                 notional = quantity * fill
                 commission = _commission(notional, bar_costs)
@@ -379,6 +406,7 @@ def run_backtest(
             cash += notional - commission
             quantity = shares
             shares = 0.0
+            structural_stop = None
             total_commission += commission
             if open_entry_cost is not None:
                 entry_costs.append(open_entry_cost)

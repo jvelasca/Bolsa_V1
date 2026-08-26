@@ -1,6 +1,6 @@
 import {
   JOURNAL_STUDY_DELTA_BUCKET_LABELS,
-  mapJournalStudyDelta,
+  buildRelevantJournalDelta,
   type DecisionJournalStudyViewV1,
   type JournalStudyDeltaBucket,
 } from "@bolsa/shared";
@@ -26,7 +26,7 @@ export function JournalStudyCompareCard({
   prev: DecisionJournalStudyViewV1 | null;
   next: DecisionJournalStudyViewV1;
 }) {
-  const delta = mapJournalStudyDelta(prev, next);
+  const delta = buildRelevantJournalDelta(next, prev);
 
   return (
     <div
@@ -34,12 +34,14 @@ export function JournalStudyCompareCard({
       data-testid="journal-study-compare"
     >
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Cambios respecto a la versión anterior
+        ¿Por qué cambió?
       </p>
-      <p className="mt-1 text-xs text-foreground/90">{delta.summary}</p>
-      {delta.fields.length === 0 ? null : (
+      <p className="mt-1 text-xs font-medium text-foreground/90">
+        {delta.conclusion}
+      </p>
+      {!delta.hasRelevantChange ? null : (
         <ul className="mt-2 space-y-1.5">
-          {delta.fields.map((field) => (
+          {delta.relevantFields.map((field) => (
             <li
               key={`${field.bucket}-${field.label}`}
               className={cn(

@@ -51,35 +51,38 @@ def compute_credibility(
 ) -> tuple[float, float, EdgeBand]:
     """Return (credibility, edge_score, band). DSR ignored if trials_n < 1."""
     if suite.monte_carlo_p_value is None:
-        mc = 0.0
+        mc = None
     else:
         mc = _clamp01(1.0 - suite.monte_carlo_p_value / 0.05) * (
             1.0 if suite.monte_carlo_p_value <= 0.05 else 0.3
         )
 
-    wfe = 0.0 if suite.walk_forward_efficiency is None else _clamp01(suite.walk_forward_efficiency)
-    dsr = 0.0 if suite.trials_n < 1 or suite.dsr is None else _clamp01(suite.dsr)
+    wfe = None if suite.walk_forward_efficiency is None else _clamp01(suite.walk_forward_efficiency)
+    dsr = None if suite.trials_n < 1 or suite.dsr is None else _clamp01(suite.dsr)
 
-    bootstrap = 0.0
+    bootstrap: float | None = None
     if suite.bootstrap_alpha_ci_lower is not None and suite.bootstrap_alpha_ci_upper is not None:
         bootstrap = 1.0 if suite.bootstrap_alpha_ci_lower > 0 else 0.35
 
-    stress = 0.0 if suite.stress_survival_rate is None else _clamp01(suite.stress_survival_rate)
+    stress = None if suite.stress_survival_rate is None else _clamp01(suite.stress_survival_rate)
 
-    sum_w = (
-        weights.w_monte_carlo
-        + weights.w_wfe
-        + weights.w_dsr
-        + weights.w_bootstrap
-        + weights.w_stress
-    )
-    score01 = (
-        weights.w_monte_carlo * mc
-        + weights.w_wfe * wfe
-        + weights.w_dsr * dsr
-        + weights.w_bootstrap * bootstrap
-        + weights.w_stress * stress
-    ) / sum_w
+    weighted: list[tuple[float, float]] = []
+    if mc is not None:
+        weighted.append((weights.w_monte_carlo, mc))
+    if wfe is not None:
+        weighted.append((weights.w_wfe, wfe))
+    if dsr is not None:
+        weighted.append((weights.w_dsr, dsr))
+    if bootstrap is not None:
+        weighted.append((weights.w_bootstrap, bootstrap))
+    if stress is not None:
+        weighted.append((weights.w_stress, stress))
+
+    sum_w = sum(w for w, _ in weighted)
+    if sum_w <= 0:
+        score01 = 0.0
+    else:
+        score01 = sum(w * v for w, v in weighted) / sum_w
 
     credibility = round(score01 * 1000) / 10
     edge_score = credibility

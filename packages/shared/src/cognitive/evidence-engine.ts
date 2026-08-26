@@ -3,19 +3,19 @@
  * Responde: ¿cuánto puedo creerme esta señal? (Credibility), no solo “¿funciona?”.
  */
 
-export type EvidenceDirection = 'supports' | 'contradicts' | 'neutral';
+export type EvidenceDirection = "supports" | "contradicts" | "neutral";
 
 export type EvidenceKind =
-  | 'data_quality'
-  | 'market_regime'
-  | 'technical'
-  | 'fundamental'
-  | 'opportunity'
-  | 'news_event'
-  | 'macro'
-  | 'risk'
-  | 'policy'
-  | 'statistical';
+  | "data_quality"
+  | "market_regime"
+  | "technical"
+  | "fundamental"
+  | "opportunity"
+  | "news_event"
+  | "macro"
+  | "risk"
+  | "policy"
+  | "statistical";
 
 export interface EvidenceV1 {
   evidenceId: string;
@@ -32,17 +32,17 @@ export interface EvidenceV1 {
 }
 
 export interface EvidenceBundleV1 {
-  artifactType: 'ART-EVIDENCE-BUNDLE';
-  schemaVersion: '1.0.0';
+  artifactType: "ART-EVIDENCE-BUNDLE";
+  schemaVersion: "1.0.0";
   bundleId: string;
   instrumentId: string;
   timestamp: string;
   evidences: EvidenceV1[];
 }
 
-export type EdgeBand = 'skill' | 'uncertain' | 'luck';
+export type EdgeBand = "skill" | "uncertain" | "luck";
 
-export type WfeSource = 'lab_score' | 'sharpe';
+export type WfeSource = "lab_score" | "sharpe";
 
 export interface StatisticalSuiteResult {
   /** Walk-Forward Efficiency — Sharpe ratio or lab score ratio (see wfeSource). */
@@ -64,8 +64,8 @@ export interface StatisticalSuiteResult {
 }
 
 export interface EdgeReportV1 {
-  artifactType: 'ART-EDGE-REPORT';
-  schemaVersion: '1.0.0';
+  artifactType: "ART-EDGE-REPORT";
+  schemaVersion: "1.0.0";
   edgeReportId: string;
   version: string;
   strategyOrSignalRef: string;
@@ -109,18 +109,19 @@ export function computeCredibility(
 ): { credibility: number; edgeScore: number; band: EdgeBand } {
   const mc =
     suite.monteCarloPValue == null
-      ? 0
-      : clamp01(1 - suite.monteCarloPValue / 0.05) * (suite.monteCarloPValue <= 0.05 ? 1 : 0.3);
+      ? null
+      : clamp01(1 - suite.monteCarloPValue / 0.05) *
+        (suite.monteCarloPValue <= 0.05 ? 1 : 0.3);
 
   const wfe =
     suite.walkForwardEfficiency == null
-      ? 0
+      ? null
       : clamp01(suite.walkForwardEfficiency);
 
   const dsr =
-    suite.trialsN < 1 || suite.dsr == null ? 0 : clamp01(suite.dsr);
+    suite.trialsN < 1 || suite.dsr == null ? null : clamp01(suite.dsr);
 
-  let bootstrap = 0;
+  let bootstrap: number | null = null;
   if (
     suite.bootstrapAlphaCiLower != null &&
     suite.bootstrapAlphaCiUpper != null
@@ -129,27 +130,23 @@ export function computeCredibility(
   }
 
   const stress =
-    suite.stressSurvivalRate == null ? 0 : clamp01(suite.stressSurvivalRate);
+    suite.stressSurvivalRate == null ? null : clamp01(suite.stressSurvivalRate);
 
-  const sumW =
-    weights.wMonteCarlo +
-    weights.wWfe +
-    weights.wDsr +
-    weights.wBootstrap +
-    weights.wStress;
+  const weighted: Array<[number, number]> = [];
+  if (mc != null) weighted.push([weights.wMonteCarlo, mc]);
+  if (wfe != null) weighted.push([weights.wWfe, wfe]);
+  if (dsr != null) weighted.push([weights.wDsr, dsr]);
+  if (bootstrap != null) weighted.push([weights.wBootstrap, bootstrap]);
+  if (stress != null) weighted.push([weights.wStress, stress]);
 
+  const sumW = weighted.reduce((s, [w]) => s + w, 0);
   const score01 =
-    (weights.wMonteCarlo * mc +
-      weights.wWfe * wfe +
-      weights.wDsr * dsr +
-      weights.wBootstrap * bootstrap +
-      weights.wStress * stress) /
-    sumW;
+    sumW <= 0 ? 0 : weighted.reduce((s, [w, v]) => s + w * v, 0) / sumW;
 
   const credibility = Math.round(score01 * 1000) / 10;
   const edgeScore = credibility;
   const band: EdgeBand =
-    credibility >= 85 ? 'skill' : credibility >= 65 ? 'uncertain' : 'luck';
+    credibility >= 85 ? "skill" : credibility >= 65 ? "uncertain" : "luck";
 
   return { credibility, edgeScore, band };
 }
@@ -181,8 +178,14 @@ export interface AutoLiveCheckV1 {
 
 /** Suite D3 — implementación numérica en Python (`bolsa_analytics.cognitive`). */
 export interface EvidenceEngineSuiteApi {
-  monteCarloPermutationPValue(tradeReturns: number[], permutations?: number): number;
-  walkForwardEfficiency(inSampleSharpe: number, outOfSampleSharpe: number): number;
+  monteCarloPermutationPValue(
+    tradeReturns: number[],
+    permutations?: number,
+  ): number;
+  walkForwardEfficiency(
+    inSampleSharpe: number,
+    outOfSampleSharpe: number,
+  ): number;
   /** Requiere trialsN > 0 para DSR válido */
   buildEdgeReport(input: {
     strategyOrSignalRef: string;

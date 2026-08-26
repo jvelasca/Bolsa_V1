@@ -69,8 +69,14 @@ import {
   findHmConflicts,
 } from "@/features/trading/semi-hm-conflict";
 import { F3TicketPreviewBlock } from "@/features/trading/f3-ticket-preview-block";
+import { F3TradePlanRiskFirstBlock } from "@/features/trading/f3-trade-plan-risk-first-block";
 import { F3RiskSignatureBlock } from "@/features/trading/f3-risk-signature-block";
 import { F3ProtectStopBlock } from "@/features/trading/f3-protect-stop-block";
+import {
+  f3TicketInputsStale,
+  resolveF3PlanBaseline,
+  resolveF3SignedPrice,
+} from "@/features/trading/f3-risk-input-baseline";
 import { resolveF3TicketPreview } from "@/features/trading/f3-ticket-preview";
 import { asOperativaProtectMeta } from "@/features/operations/propose-position-exit";
 import { PAPER_PATH_SUPERVISED } from "@/features/settings/paper-paths-copy";
@@ -237,7 +243,7 @@ export function SupervisedF3Panel() {
 
   useEffect(() => {
     setRiskOverrideReason("");
-  }, [activeId]);
+  }, [activeId, quantity, price]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -584,17 +590,46 @@ export function SupervisedF3Panel() {
     summary?.freeMargin,
   ]);
 
+  const planBaseline = useMemo(
+    () =>
+      resolveF3PlanBaseline({
+        tradePlan: pending?.tradePlan,
+        suggestedPrice: pending?.suggestedPrice,
+        lastClose: pending?.lastClose,
+      }),
+    [pending?.tradePlan, pending?.suggestedPrice, pending?.lastClose],
+  );
+
+  const ticketInputsStale = useMemo(
+    () =>
+      f3TicketInputsStale({
+        quantity,
+        priceField: price,
+        baseline: planBaseline,
+        suggestedPrice: pending?.suggestedPrice,
+        lastClose: pending?.lastClose,
+      }),
+    [
+      quantity,
+      price,
+      planBaseline,
+      pending?.suggestedPrice,
+      pending?.lastClose,
+    ],
+  );
+
   const riskSignature = useMemo(() => {
     const qty = Number(quantity);
-    const parsedPrice = price.trim() ? Number(price) : null;
-    const px =
-      parsedPrice != null && Number.isFinite(parsedPrice)
-        ? parsedPrice
-        : (pending?.suggestedPrice ?? pending?.lastClose ?? NaN);
+    const px = resolveF3SignedPrice({
+      priceField: price,
+      baselinePrice: planBaseline.price,
+      suggestedPrice: pending?.suggestedPrice,
+      lastClose: pending?.lastClose,
+    });
     return evaluateRiskSignature({
       tradePlan: pending?.tradePlan,
       signedQty: Number.isFinite(qty) ? qty : NaN,
-      signedPrice: typeof px === "number" ? px : NaN,
+      signedPrice: px ?? NaN,
       overrideReason: riskOverrideReason,
       requireTriggeredPlan:
         pending?.action === "recommend_long" ||
@@ -602,8 +637,10 @@ export function SupervisedF3Panel() {
     });
   }, [
     pending?.tradePlan,
+    pending?.action,
     quantity,
     price,
+    planBaseline.price,
     pending?.suggestedPrice,
     pending?.lastClose,
     riskOverrideReason,
@@ -860,7 +897,20 @@ export function SupervisedF3Panel() {
             </label>
           </div>
         </div>
-        {ticketPreview ? <F3TicketPreviewBlock ticket={ticketPreview} /> : null}
+        {ticketPreview ? (
+          <>
+            <F3TradePlanRiskFirstBlock
+              ticket={ticketPreview}
+              stop={
+                protectMeta?.suggestedStop ?? protectMeta?.currentStop ?? null
+              }
+              target1={null}
+              riskPct={null}
+              inputsStale={ticketInputsStale}
+            />
+            <F3TicketPreviewBlock ticket={ticketPreview} />
+          </>
+        ) : null}
         {pending ? (
           <F3RiskSignatureBlock
             signature={riskSignature}

@@ -176,6 +176,12 @@ def train_direction_model(
 def _load_binary(model: ModelArtifact) -> Any:
     if model.binary is None:
         raise ValueError("Modelo sin binary")
+    import hashlib
+
+    if model.model_checksum:
+        digest = hashlib.sha256(model.binary).hexdigest()
+        if digest != model.model_checksum:
+            raise ValueError("Model checksum mismatch")
     return pickle.loads(model.binary)
 
 

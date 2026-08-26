@@ -165,7 +165,7 @@ async def test_execute_blocked_without_env(monkeypatch):
 @pytest.mark.asyncio
 async def test_execute_calls_router(monkeypatch):
     monkeypatch.setenv("PAPER_D_EXECUTE", "1")
-    monkeypatch.delenv("PAPER_D_ACCOUNT_ID", raising=False)
+    monkeypatch.setenv("PAPER_D_ACCOUNT_ID", "acc-1")
     monkeypatch.setattr(
         "bolsa_application.scan_universe.validate_scan_universe_size",
         lambda *_a, **_k: None,

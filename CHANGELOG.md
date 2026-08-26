@@ -4,6 +4,46 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.16-beta] — 2026-08-26
+
+Mesa desk V1.16–V1.19 (ADR-037 extensiones) + backend paralelo auditoría V1.15. Producto sigue **BETA / no producción**. Tag objetivo **`v1.16-beta` → SHA TBD** (pendiente commit + gate owner). Partida: **`v1.15-beta` → `fc2ed753`**. Spine **`pnpm test:decision-spine` = 485**. Pack: [`audit-pack-estado-global-2026-08-26-v116.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v116.md). Confirm/DEX/SubmitIntent **intactos**. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. AUTO **off**.
+
+### Docs — Pack auditor v116 Mesa desk (2026-08-26)
+
+- Pack [`audit-pack-estado-global-2026-08-26-v116.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v116.md): stamp global · scorecard MD-1…5 · limitaciones P1/P2.
+- Relevo tag [`traspaso-relevo-tag-v1-16-beta-2026-08-26.md`](./docs/engineering/traspaso-relevo-tag-v1-16-beta-2026-08-26.md) — SHA TBD hasta commit owner.
+- Spine verificado **485**. Limitaciones: chip DS-05 P1 · sanity E2E P1 · what-if sin gates · Libro showRoute post-tag.
+
+### MD-1 — V1.16 Mesa desk cierre (Operational UX II)
+
+- Cabecera operativa · matriz semántica 10 estados · FeatureErrorBoundary Mesa/Confirm/F3.
+- Tests shared + web GREEN · smoke browser 5/5 documentado.
+- Pendiente P1: chip DS-05 honesto (F1-H).
+- Relevo [`traspaso-relevo-mesa-desk-v116-2026-08-26.md`](./docs/engineering/traspaso-relevo-mesa-desk-v116-2026-08-26.md).
+
+### MD-2 — V1.17 Posición + ticket Confirm
+
+- `showRoute` cableado en `/mesa` · invalidación qty/precio F3 · ticket riesgo primero.
+- Libro (`/operaciones`) fuera scope — post-tag.
+- Relevo [`traspaso-relevo-mesa-desk-v117-2026-08-26.md`](./docs/engineering/traspaso-relevo-mesa-desk-v117-2026-08-26.md).
+
+### MD-3 — V1.18 Evolución + alertas
+
+- Deltas Journal relevantes · panel alertas decisión · orden ADR-037 en `/mesa`.
+- Relevo [`traspaso-relevo-mesa-desk-v118-2026-08-26.md`](./docs/engineering/traspaso-relevo-mesa-desk-v118-2026-08-26.md).
+
+### MD-4 — V1.19 What-if + ranking operable
+
+- `sortMesaCandidatesOperable` · `projectMesaWhatIf` read-only · tests ranking.
+- Gates reales what-if **fuera** tag (documentado).
+- Relevo [`traspaso-relevo-mesa-desk-v119-2026-08-26.md`](./docs/engineering/traspaso-relevo-mesa-desk-v119-2026-08-26.md).
+
+### MD-5 — Backend paralelo (auditoría V1.15)
+
+- Pickle SHA256 · prod allowlist · `PAPER_D_EXECUTE` Router gate · sanity→DS-05 API · EdgeReport · `require_role` doc.
+- pytest **72** passed. `sanity_warnings` E2E runtime **P1 post-tag**.
+- Relevo [`traspaso-relevo-mesa-desk-backend-2026-08-26.md`](./docs/engineering/traspaso-relevo-mesa-desk-backend-2026-08-26.md).
+
 ## [1.15-beta] — 2026-08-26
 
 Operational UX — **Mesa · Hoy** (ADR-037). Home diaria `/mesa` compone Decision Board, portfolio, studies e incidentes sin endpoints nuevos. Nav: Mesa · Hoy → Trading → … · Consola ops → Herramientas. Journal: vista tabla simplificada + status 3 dimensiones. **BETA / no producción.** Sin cambios en Confirm, TradePlan, SubmitIntent ni DEX.

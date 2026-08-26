@@ -69,6 +69,54 @@ describe("mesa-hoy-model", () => {
     expect(state.detail).toMatch(/BLOQUEADAS/);
   });
 
+  it("kill switch session blocks entries", () => {
+    const state = buildMesaSessionState(emptyBoard, {
+      entriesBlocked: true,
+      killSwitchEffective: true,
+    });
+    expect(state.tone).toBe("blocked");
+    expect(state.headline).toMatch(/kill switch/i);
+    expect(state.detail).toMatch(/bloqueadas/i);
+  });
+
+  it("NO TRADE session when zero ready and no pending confirm", () => {
+    const board: DecisionBoardV1 = {
+      ...emptyBoard,
+      buckets: {
+        pendingConfirm: 0,
+        vetoed: 0,
+        deferred: 0,
+        autoWaiting: 0,
+        total: 0,
+      },
+      decisionSessions: [
+        {
+          sessionId: "s-watch",
+          kind: "propose",
+          status: "open",
+          instrumentId: "i1",
+          symbol: "WATCH1",
+          createdAt: "2026-08-26T10:00:00Z",
+          gate: "PASS",
+          tradePlan: {
+            artifactType: "ART-TRADE-PLAN",
+            schemaVersion: "1.0.0",
+            decisionId: "d1",
+            instrumentId: "i1",
+            direction: "long",
+            status: "WATCH",
+            entryReady: false,
+            structuralStop: 9,
+            entry: 10,
+          },
+        },
+      ],
+    };
+    const state = buildMesaSessionState(board, { entriesBlocked: false });
+    expect(state.headline).toBe("Hoy no hay operaciones recomendadas");
+    expect(state.candidateCounts.ready).toBe(0);
+  });
+
   it("filters attention items for REVIEW and protect hints", () => {
     const queue: HoyQueueItemV1[] = [
       baseItem({ kind: "WATCH" }),
@@ -96,5 +144,18 @@ describe("mesa-hoy-model", () => {
     expect(attention).toHaveLength(2);
     expect(attention[0]?.recommendedAction).toBe("REVISAR");
     expect(attention[1]?.recommendedAction).toBe("REVISAR PROTECCIÓN");
+  });
+
+  it("persist skipped discrepancy appears in attention queue", () => {
+    const attention = filterMesaAttentionItems([], 5, [
+      {
+        symbol: "MSFT",
+        reason: "Discrepancia de protección — persist omitido",
+        recommendedAction: "REVISAR PROTECCIÓN",
+      },
+    ]);
+    expect(attention).toHaveLength(1);
+    expect(attention[0]?.symbol).toBe("MSFT");
+    expect(attention[0]?.recommendedAction).toBe("REVISAR PROTECCIÓN");
   });
 });

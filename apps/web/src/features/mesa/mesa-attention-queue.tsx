@@ -1,9 +1,10 @@
 /**
- * Cola de atención urgente (NIVEL 3).
+ * Cola de atención urgente (NIVEL 3 + V1.16 una CTA).
  */
 
 import { Link } from "react-router-dom";
 import type { MesaAttentionItemV1 } from "@bolsa/shared";
+import { mapMesaNextAction } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,6 +19,56 @@ import { buildInstrumentIdBySymbol } from "@bolsa/shared";
 import type { DecisionBoardV1 } from "@bolsa/shared";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 
+function primaryCtaForAttention(item: MesaAttentionItemV1) {
+  const next = mapMesaNextAction({
+    attentionKind: item.kind,
+    protectPlan: item.protectPlan,
+    exitSuggestedAction:
+      item.exitRadar?.status === "exit_hint" ? "full_exit" : null,
+  });
+
+  const instrumentId = item.symbol;
+
+  if (next.kind === "protect" || next.kind === "review") {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => openConfirmDrawer()}
+        data-testid={`mesa-attention-cta-${instrumentId}`}
+      >
+        {next.label}
+      </Button>
+    );
+  }
+  if (next.kind === "review_proposal") {
+    return (
+      <Link
+        to={CONFIRM_PATH}
+        className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+        data-testid={`mesa-attention-cta-${instrumentId}`}
+      >
+        {next.label}
+      </Link>
+    );
+  }
+  if (next.kind === "review_filter") {
+    return <span className="text-xs text-muted-foreground">{next.label}</span>;
+  }
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      onClick={() => openConfirmDrawer()}
+      data-testid={`mesa-attention-cta-${instrumentId}`}
+    >
+      Revisar
+    </Button>
+  );
+}
+
 export function MesaAttentionQueue({
   items,
   board,
@@ -30,7 +81,7 @@ export function MesaAttentionQueue({
   const bySymbol = buildInstrumentIdBySymbol(board);
 
   return (
-    <Card data-testid="mesa-attention-queue">
+    <Card data-testid="mesa-attention-queue" role="alert" aria-live="assertive">
       <CardHeader className="pb-2">
         <CardTitle className="text-base text-rose-700 dark:text-rose-300">
           Requiere atención
@@ -53,39 +104,15 @@ export function MesaAttentionQueue({
                 <div>
                   <p className="font-medium">{item.symbol}</p>
                   <p className="text-sm text-muted-foreground">{item.reason}</p>
-                  <p className="mt-1 text-xs">
-                    Acción recomendada:{" "}
-                    <span className="font-medium">
-                      {item.recommendedAction}
-                    </span>
-                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {item.recommendedAction.includes("PROTECCIÓN") ||
-                  item.kind === "REVIEW" ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openConfirmDrawer()}
-                    >
-                      Revisar
-                    </Button>
-                  ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  {primaryCtaForAttention(item)}
                   {instrumentId ? (
                     <Link
                       to={mesaJournalTesisHref(instrumentId, { ficha: true })}
-                      className="inline-flex h-8 items-center rounded-md px-3 text-xs font-medium hover:bg-accent"
+                      className="text-[10px] text-primary hover:underline"
                     >
-                      Abrir tesis
-                    </Link>
-                  ) : null}
-                  {item.kind === "BUY" || item.status === "TRIGGERED" ? (
-                    <Link
-                      to={CONFIRM_PATH}
-                      className="inline-flex h-8 items-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-                    >
-                      Confirmar
+                      Ver tesis
                     </Link>
                   ) : null}
                 </div>

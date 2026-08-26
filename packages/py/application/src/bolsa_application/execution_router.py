@@ -422,6 +422,10 @@ class ExecutionRouter:
         if not policy.enabled:
             raise ValueError("Política de ejecución deshabilitada")
 
+        from bolsa_application.paper_auto_http_gate import require_http_paper_auto_env
+
+        require_http_paper_auto_env(policy.mode)
+
         definition = policy.definition
         allowed_kinds = set(definition.get("signalKinds") or [])
         actions: list[ExecutionActionResult] = []
@@ -549,6 +553,22 @@ class ExecutionRouter:
             summary = await self._portfolio_summary.execute(account_id=policy.account_id)
             return max(summary.total_equity * value / 100.0, 0.0)
         return max(value, 0.0)
+
+    async def _resolve_edge_report(self, policy: ExecutionPolicyRecord):
+        if self._cognitive_store is None or not policy.strategy_definition_id:
+            return None
+        try:
+            from bolsa_application.cognitive_persistence import record_to_edge_report
+
+            edge_rec = await self._cognitive_store.latest_edge_report(
+                strategy_or_signal_ref=policy.strategy_definition_id,
+                account_id=policy.account_id,
+            )
+            if edge_rec is not None:
+                return record_to_edge_report(edge_rec)
+        except Exception:  # noqa: BLE001
+            return None
+        return None
 
     async def _execute_paper_trade(
         self,
@@ -679,6 +699,7 @@ class ExecutionRouter:
                     policy.account_id or "",
                     broker_venue="paper",
                 )
+                edge_report = await self._resolve_edge_report(policy)
                 if isinstance(recon, RiskDecision):
                     guard_decision = recon
                 else:
@@ -694,6 +715,7 @@ class ExecutionRouter:
                         open_positions_count=len(summary.positions),
                         event_calendar=self._event_calendar,
                         auto_live=False,  # paper_auto ≠ live; D3 auto-live cuando mode=live_auto
+                        edge_report=edge_report,
                         account_daily_drawdown_pct=dds.daily_pct,
                         account_weekly_drawdown_pct=dds.weekly_pct,
                         account_max_drawdown_pct=dds.max_pct,

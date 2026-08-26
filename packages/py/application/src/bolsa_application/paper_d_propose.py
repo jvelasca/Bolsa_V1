@@ -285,7 +285,11 @@ class ProposePaperDPlan:
                 raise ValueError("Paper D execute requiere mode=paper_auto")
             allowed_acct = paper_d_allowed_account_id()
             policy_acct = getattr(policy, "account_id", None)
-            if allowed_acct and policy_acct and str(policy_acct) != allowed_acct:
+            if not allowed_acct:
+                raise ValueError(
+                    "PAPER_D_ACCOUNT_ID requerido para execute=true (fail-closed A5)"
+                )
+            if policy_acct and str(policy_acct) != allowed_acct:
                 raise ValueError(
                     f"A5 opt-in: PAPER_D_ACCOUNT_ID={allowed_acct} "
                     f"no coincide con policy.accountId={policy_acct}"

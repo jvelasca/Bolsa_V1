@@ -254,6 +254,9 @@ def test_cookie_secure_only_in_production() -> None:
             self.environment = environment
 
     assert cookie_secure(FakeSettings("development")) is False
+    assert cookie_secure(FakeSettings("local")) is False
+    assert cookie_secure(FakeSettings("staging")) is False
+    assert cookie_secure(FakeSettings("test")) is False
     assert cookie_secure(FakeSettings("prod")) is True
     assert cookie_secure(FakeSettings("production")) is True
 

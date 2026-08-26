@@ -3,6 +3,15 @@ from functools import lru_cache
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Entornos no productivos (allowlist). Cualquier otro nombre exige fail-closed prod.
+NON_PRODUCTION_ENVIRONMENTS = frozenset(
+    {"dev", "development", "test", "testing", "local", "staging"}
+)
+
+
+def is_production_environment(environment: str) -> bool:
+    return environment.strip().lower() not in NON_PRODUCTION_ENVIRONMENTS
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -196,7 +205,7 @@ class Settings(BaseSettings):
         # producción: NO debe arrancar con autenticación desactivada ni con secretos
         # de desarrollo conocidos. Esto convierte el antiguo aviso "degraded" de
         # /health en un bloqueo real de arranque.
-        if self.environment.strip().lower() in {"prod", "production"}:
+        if is_production_environment(self.environment):
             if not self.app_password:
                 raise ValueError(
                     "ENVIRONMENT=production exige APP_PASSWORD (autenticación no puede desactivarse en producción)"

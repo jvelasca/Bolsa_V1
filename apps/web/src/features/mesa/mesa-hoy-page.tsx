@@ -1,6 +1,5 @@
 /**
- * Mesa · Hoy — home operativa diaria (ADR-037).
- * Orden invariante: incidentes → sesión → KPIs → atención → posiciones → candidatos → salud.
+ * Mesa · Hoy — home operativa diaria (ADR-037 + V1.16 desk).
  */
 
 import { useMemo } from "react";
@@ -11,12 +10,17 @@ import type { ProtectPlanV1 } from "@bolsa/shared";
 import {
   buildMesaActionQueue,
   buildMesaCandidateGroups,
+  buildMesaOperationalHeader,
+  buildMesaProtectionState,
+  buildMesaDecisionAlerts,
   buildMesaSessionState,
   filterMesaAttentionItems,
   mesaEntriesBlocked,
   studiesByInstrumentMap,
+  sumPortfolioUnrealizedR,
 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
+import { FeatureErrorBoundary } from "@/components/layout/feature-error-boundary";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { MesaIncidentBanner } from "@/features/operations/mesa-incident-banner";
 import {
@@ -24,15 +28,18 @@ import {
   useOpsSelfEval,
 } from "@/features/operational-console/use-ops-self-eval";
 import { MesaDailyHeader } from "@/features/mesa/mesa-daily-header";
+import { MesaOperationalHeaderStrip } from "@/features/mesa/mesa-operational-header";
 import { MesaSessionStateCard } from "@/features/mesa/mesa-session-state-card";
 import { MesaAttentionQueue } from "@/features/mesa/mesa-attention-queue";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
 import { MesaCandidatesPanel } from "@/features/mesa/mesa-candidates-panel";
+import { MesaDecisionAlertsPanel } from "@/features/mesa/mesa-decision-alerts-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 
 const STUDIES_LIMIT = 200;
+const MESA_REFETCH_MS = 60_000;
 
 export function MesaHoyPage() {
   const accountScope = useActiveAccountQueryKey();
@@ -47,13 +54,14 @@ export function MesaHoyPage() {
     queryFn: () => api.getDecisionBoard(accountScope!),
     enabled: Boolean(accountScope),
     staleTime: 15_000,
-    refetchInterval: 60_000,
+    refetchInterval: MESA_REFETCH_MS,
   });
 
   const portfolioQuery = useQuery({
     queryKey: ["portfolio", accountScope],
     queryFn: api.getPortfolio,
     staleTime: 15_000,
+    refetchInterval: MESA_REFETCH_MS,
   });
 
   const summaryQuery = useQuery({
@@ -61,12 +69,14 @@ export function MesaHoyPage() {
     queryFn: () => api.getAccountSummary(effectiveAccountId!),
     enabled: Boolean(effectiveAccountId),
     staleTime: 15_000,
+    refetchInterval: MESA_REFETCH_MS,
   });
 
   const killQuery = useQuery({
     queryKey: ["risk-kill-switch"],
     queryFn: () => api.getRiskKillSwitch(),
     staleTime: 15_000,
+    refetchInterval: MESA_REFETCH_MS,
   });
 
   const studiesQuery = useQuery({
@@ -75,6 +85,15 @@ export function MesaHoyPage() {
       api.getDecisionStudies(effectiveAccountId!, { limit: STUDIES_LIMIT }),
     enabled: Boolean(effectiveAccountId),
     staleTime: 30_000,
+    refetchInterval: MESA_REFETCH_MS,
+  });
+
+  const incidentsQuery = useQuery({
+    queryKey: ["operational-incidents-active", effectiveAccountId],
+    queryFn: () => api.getActiveOperationalIncidents(effectiveAccountId!),
+    enabled: Boolean(effectiveAccountId),
+    staleTime: 15_000,
+    refetchInterval: MESA_REFETCH_MS,
   });
 
   const board = boardQuery.data?.data;
@@ -87,34 +106,73 @@ export function MesaHoyPage() {
 
   const killOn = killQuery.data?.effective === true;
   const vetoed = board?.buckets?.vetoed ?? 0;
-  const incidentsQuery = useQuery({
-    queryKey: ["operational-incidents-active", effectiveAccountId],
-    queryFn: () => api.getActiveOperationalIncidents(effectiveAccountId!),
-    enabled: Boolean(effectiveAccountId),
-    staleTime: 15_000,
-  });
-  const incidentCount = incidentsQuery.data?.data?.incidents?.length ?? 0;
+  const incidentsFailed = incidentsQuery.isError;
+  const incidentCount = incidentsFailed
+    ? -1
+    : (incidentsQuery.data?.data?.incidents?.length ?? 0);
+  const incidents = incidentsFailed
+    ? []
+    : (incidentsQuery.data?.data?.incidents ?? []);
 
-  const entriesBlocked = mesaEntriesBlocked({
-    killSwitchEffective: killOn,
-    incidents: incidentsQuery.data?.data?.incidents,
-    vetoed,
-  });
+  const entriesBlocked =
+    incidentsFailed ||
+    mesaEntriesBlocked({
+      killSwitchEffective: killOn,
+      incidents,
+      vetoed,
+    });
 
   const sessionState = useMemo(
     () =>
       buildMesaSessionState(board, {
         entriesBlocked,
         killSwitchEffective: killOn,
-        incidentCount,
+        incidentCount: Math.max(0, incidentCount),
       }),
     [board, entriesBlocked, killOn, incidentCount],
   );
 
+  const positions = portfolio?.positions ?? [];
+
+  const protectionDiscrepancies = useMemo(() => {
+    const out: Array<{
+      symbol: string;
+      reason: string;
+      recommendedAction: string;
+    }> = [];
+    for (const position of positions) {
+      const study = studiesMap.get(position.instrumentId) ?? null;
+      const protectPlan = (() => {
+        for (const session of board?.decisionSessions ?? []) {
+          if (session.instrumentId === position.instrumentId) {
+            const plan = session.protectPlan as ProtectPlanV1 | undefined;
+            if (plan?.status === "protect_hint") return plan;
+          }
+        }
+        return null;
+      })();
+      const protection = buildMesaProtectionState({
+        study,
+        exitSuggestedStop:
+          position.operational?.exitPlan?.suggestedStop ?? null,
+        currentStop: position.operational?.currentStop ?? null,
+        protectPlan,
+      });
+      if (protection.discrepancy) {
+        out.push({
+          symbol: position.symbol,
+          reason: "Discrepancia de protección — stop no confirmado",
+          recommendedAction: "REVISAR PROTECCIÓN",
+        });
+      }
+    }
+    return out;
+  }, [positions, studiesMap, board]);
+
   const attentionItems = useMemo(() => {
     const queue = buildMesaActionQueue(board);
-    return filterMesaAttentionItems(queue);
-  }, [board]);
+    return filterMesaAttentionItems(queue, 5, protectionDiscrepancies);
+  }, [board, protectionDiscrepancies]);
 
   const candidateGroups = useMemo(
     () => buildMesaCandidateGroups(board, studiesMap, entriesBlocked),
@@ -132,104 +190,191 @@ export function MesaHoyPage() {
     return map;
   }, [board]);
 
-  const positions = portfolio?.positions ?? [];
+  const operationalHeader = useMemo(
+    () =>
+      buildMesaOperationalHeader({
+        regimeHint: sessionState.regimeHint,
+        positions,
+        cash: summaryQuery.data?.data?.cash ?? null,
+        equity: portfolio?.totalEquity ?? null,
+        killSwitchEffective: killOn,
+        incidentCount: Math.max(0, incidentCount),
+        entriesBlocked,
+        vetoed,
+        boardQueryFailed: boardQuery.isError,
+        incidentsQueryFailed: incidentsFailed,
+        brokerVenue: killQuery.data?.brokerVenue ?? null,
+        paperDExecuteEnv: killQuery.data?.paperDExecuteEnv === true,
+        readinessState: selfEvalQuery.data?.operationalReadiness?.state ?? null,
+      }),
+    [
+      sessionState.regimeHint,
+      positions,
+      summaryQuery.data,
+      portfolio,
+      killOn,
+      incidentCount,
+      entriesBlocked,
+      vetoed,
+      boardQuery.isError,
+      incidentsFailed,
+      killQuery.data,
+      selfEvalQuery.data,
+    ],
+  );
+
+  const portfolioRiskR = sumPortfolioUnrealizedR(positions);
+
+  const decisionAlerts = useMemo(
+    () =>
+      buildMesaDecisionAlerts({
+        positions,
+        studies,
+        dataStale: operationalHeader.dataFreshness.state === "stale",
+        incidentCount: Math.max(0, incidentCount),
+        protectionDiscrepancies: protectionDiscrepancies.map((d) => ({
+          symbol: d.symbol,
+        })),
+      }),
+    [
+      positions,
+      studies,
+      operationalHeader.dataFreshness.state,
+      incidentCount,
+      protectionDiscrepancies,
+    ],
+  );
+
   const alertCount =
     attentionItems.length + (board?.buckets?.pendingConfirm ?? 0);
 
   const isRefreshing =
     boardQuery.isFetching ||
     portfolioQuery.isFetching ||
-    studiesQuery.isFetching;
+    studiesQuery.isFetching ||
+    incidentsQuery.isFetching;
 
   function refreshAll() {
     void boardQuery.refetch();
     void portfolioQuery.refetch();
+    void summaryQuery.refetch();
     void studiesQuery.refetch();
+    void killQuery.refetch();
+    void incidentsQuery.refetch();
     void selfEvalQuery.refetch();
   }
 
   return (
-    <div
-      className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6"
-      data-testid="mesa-hoy-page"
+    <FeatureErrorBoundary
+      featureName="Mesa · Hoy"
+      fallbackMessage="No se pudo mostrar la mesa. Tus posiciones siguen intactas en el libro."
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight">
-            Mesa · Hoy
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            ¿Qué debo hacer hoy? — briefing operativo
-            {account ? ` · ${account.name}` : ""}
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={refreshAll}
-          disabled={isRefreshing}
-        >
-          <RefreshCw
-            className={`mr-1.5 h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-          />
-          Actualizar
-        </Button>
-      </div>
-
-      {effectiveAccountId && incidentCount > 0 ? (
-        <div data-testid="mesa-incident-section">
-          <MesaIncidentBanner
-            accountId={effectiveAccountId}
-            portfolioReconStatus={portfolioReconStatus}
-            className="border-rose-500/50 bg-rose-500/10"
-          />
-          <p className="mt-2 text-xs font-medium text-rose-700 dark:text-rose-300">
-            Nuevas entradas: BLOQUEADAS · Automatismos: BLOQUEADOS · Desriesgo
-            humano: DISPONIBLE
-          </p>
-        </div>
-      ) : null}
-
-      <MesaSessionStateCard session={sessionState} />
-
-      <MesaDailyHeader
-        cash={summaryQuery.data?.data?.cash ?? null}
-        equity={portfolio?.totalEquity ?? null}
-        unrealizedPnl={portfolio?.totalUnrealizedPnl ?? null}
-        positionsCount={positions.length}
-        alertCount={alertCount}
-        criticalAlerts={incidentCount}
-      />
-
-      <MesaAttentionQueue items={attentionItems} board={board} />
-
-      <MesaPositionsSummary
-        positions={positions}
-        protectPlanByInstrument={protectPlanByInstrument}
-        studiesByInstrument={studiesMap}
-      />
-
-      <MesaCandidatesPanel
-        groups={candidateGroups}
-        entriesBlocked={entriesBlocked}
-      />
-
       <div
-        className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
-        data-testid="mesa-system-health-link"
+        className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6"
+        data-testid="mesa-hoy-page"
       >
-        <p className="font-medium">Salud del sistema</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          OE-1, readiness, recon e incidentes históricos — auditoría read-only.
-        </p>
-        <Link
-          to={mesaOperationalConsoleHref()}
-          className="mt-2 inline-block text-xs text-primary hover:underline"
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-2xl font-semibold tracking-tight">
+              Mesa · Hoy
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              ¿Qué debo hacer hoy? — briefing operativo
+              {account ? ` · ${account.name}` : ""}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={refreshAll}
+            disabled={isRefreshing}
+          >
+            <RefreshCw
+              className={`mr-1.5 h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+            />
+            Actualizar
+          </Button>
+        </div>
+
+        {incidentsFailed ? (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="rounded-md border border-amber-500/50 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100"
+            data-testid="mesa-incidents-query-error"
+          >
+            No se pudo consultar incidentes operativos. Se trata como bloqueo
+            preventivo hasta confirmar el estado del sistema.
+          </div>
+        ) : null}
+
+        {effectiveAccountId && incidentCount > 0 ? (
+          <div data-testid="mesa-incident-section">
+            <MesaIncidentBanner
+              accountId={effectiveAccountId}
+              portfolioReconStatus={portfolioReconStatus}
+              className="border-rose-500/50 bg-rose-500/10"
+            />
+            <p
+              className="mt-2 text-xs font-medium text-rose-700 dark:text-rose-300"
+              role="alert"
+              aria-live="assertive"
+            >
+              Nuevas entradas: BLOQUEADAS · Automatismos: BLOQUEADOS ·
+              Posiciones: VISIBLES · Desriesgo humano: DISPONIBLE
+            </p>
+          </div>
+        ) : null}
+
+        <MesaOperationalHeaderStrip header={operationalHeader} />
+
+        <MesaSessionStateCard session={sessionState} />
+
+        <MesaDailyHeader
+          cash={summaryQuery.data?.data?.cash ?? null}
+          equity={portfolio?.totalEquity ?? null}
+          unrealizedPnl={portfolio?.totalUnrealizedPnl ?? null}
+          positionsCount={positions.length}
+          alertCount={alertCount}
+          criticalAlerts={Math.max(0, incidentCount)}
+        />
+
+        <MesaDecisionAlertsPanel alerts={decisionAlerts} />
+
+        <MesaAttentionQueue items={attentionItems} board={board} />
+
+        <MesaPositionsSummary
+          positions={positions}
+          protectPlanByInstrument={protectPlanByInstrument}
+          studiesByInstrument={studiesMap}
+        />
+
+        <MesaCandidatesPanel
+          groups={candidateGroups}
+          entriesBlocked={entriesBlocked}
+          portfolioRiskR={portfolioRiskR}
+          equity={portfolio?.totalEquity ?? null}
+          cash={summaryQuery.data?.data?.cash ?? null}
+        />
+
+        <div
+          className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
+          data-testid="mesa-system-health-link"
         >
-          Abrir Consola operacional →
-        </Link>
+          <p className="font-medium">Salud del sistema</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            OE-1, readiness, recon e incidentes históricos — auditoría
+            read-only.
+          </p>
+          <Link
+            to={mesaOperationalConsoleHref()}
+            className="mt-2 inline-block text-xs text-primary hover:underline"
+          >
+            Abrir Consola operacional →
+          </Link>
+        </div>
       </div>
-    </div>
+    </FeatureErrorBoundary>
   );
 }

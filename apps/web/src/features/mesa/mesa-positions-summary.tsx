@@ -12,7 +12,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { MesaPositionRow } from "@/features/mesa/mesa-position-row";
+import {
+  MesaPositionRow,
+  mesaPositionShowsRoute,
+} from "@/features/mesa/mesa-position-row";
 import { mesaOperationsHref } from "@/features/mesa/mesa-nav-links";
 
 export function MesaPositionsSummary({
@@ -30,7 +33,7 @@ export function MesaPositionsSummary({
         <div>
           <CardTitle className="text-base">Posiciones</CardTitle>
           <CardDescription>
-            HOLD / PROTECT / REDUCE / EXIT — CTAs encolan Confirm
+            Una acción principal por posición — Confirm es la firma
           </CardDescription>
         </div>
         <Link
@@ -52,6 +55,10 @@ export function MesaPositionsSummary({
               position={position}
               protectPlan={protectPlanByInstrument.get(position.instrumentId)}
               study={studiesByInstrument.get(position.instrumentId) ?? null}
+              showRoute={mesaPositionShowsRoute(
+                position,
+                studiesByInstrument.get(position.instrumentId),
+              )}
             />
           ))
         )}

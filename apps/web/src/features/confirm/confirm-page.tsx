@@ -8,12 +8,18 @@
  * @see docs/engineering/plan-r12-track-c-frontend-2026-08-21.md § C1
  */
 
+import { FeatureErrorBoundary } from "@/components/layout/feature-error-boundary";
 import { ConfirmContent } from "@/features/confirm/confirm-content";
 
 export function ConfirmPage() {
   return (
-    <div className="mx-auto max-w-5xl">
-      <ConfirmContent />
-    </div>
+    <FeatureErrorBoundary
+      featureName="Confirmar"
+      fallbackMessage="No se pudo mostrar Confirm. Tus posiciones siguen intactas; reintenta o usa el libro."
+    >
+      <div className="mx-auto max-w-5xl">
+        <ConfirmContent />
+      </div>
+    </FeatureErrorBoundary>
   );
 }

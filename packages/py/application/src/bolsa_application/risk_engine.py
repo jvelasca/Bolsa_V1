@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from bolsa_market.sanity import sanity_opening_veto_reason
 from bolsa_analytics.cognitive.edge_report import EdgeReport
 from bolsa_analytics.cognitive.operational_incident import (
     IncidentOpeningStatus,
@@ -141,6 +142,7 @@ def check_opening(
     require_recon_veto: bool = False,
     incident_status: IncidentOpeningStatus | None = None,
     require_incident_veto: bool = False,
+    sanity_warnings: tuple[str, ...] | list[str] | None = None,
 ) -> RiskDecision:
     """Evalúa una apertura. Exits siguen el bypass del Cognitive Guard.
 
@@ -179,6 +181,14 @@ def check_opening(
                 reasons=(freshness_reason,),
                 guard=None,
             )
+        if sanity_warnings:
+            sanity_reason = sanity_opening_veto_reason(sanity_warnings)
+            if sanity_reason is not None:
+                return RiskDecision(
+                    verdict="DENY",
+                    reasons=(sanity_reason,),
+                    guard=None,
+                )
 
     if kind not in _EXIT_SIGNAL_KINDS and require_account_mandate:
         mandate_reason = account_mandate_veto_reason(
