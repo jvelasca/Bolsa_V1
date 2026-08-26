@@ -4,7 +4,7 @@
 > **AsOf:** 2026-08-26.  
 > **Partida:** **`v1.15-beta` → `fc2ed753`**.  
 > **Plan:** [`plan-mesa-desk-v116-v119-2026-08-26.md`](./plan-mesa-desk-v116-v119-2026-08-26.md).  
-> **Tag objetivo:** **`v1.16-beta`** (pendiente gate owner).
+> **Tag objetivo:** **`v1.16-beta` → `11ee5ff`** (publicado).
 
 ---
 
@@ -27,7 +27,7 @@ V1.16–V1.19 **no** son tags separados en este roadmap: se agrupan en **un tag 
 | **MD-4** | V1.19 What-if + operable  | **CERRADO** (gates reales fuera tag)                   | [`traspaso-relevo-mesa-desk-v119-2026-08-26.md`](./traspaso-relevo-mesa-desk-v119-2026-08-26.md)                   |
 | **MD-5** | Backend paralelo          | **CERRADO** (sanity E2E = P1 post-tag)                 | [`traspaso-relevo-mesa-desk-backend-2026-08-26.md`](./traspaso-relevo-mesa-desk-backend-2026-08-26.md)             |
 | **MD-6** | Verificación + pack v116  | **DOCS LISTOS** — spine 485                            | [`audit-pack-estado-global-2026-08-26-v116.md`](./audit-pack-estado-global-2026-08-26-v116.md)                     |
-| **MD-7** | Tag `v1.16-beta`          | **PRE-TAG** — SHA TBD · gate owner                     | [`traspaso-relevo-tag-v1-16-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-16-beta-2026-08-26.md)                   |
+| **MD-7** | Tag `v1.16-beta`          | **PUBLICADO** → `11ee5ff`                              | [`traspaso-relevo-tag-v1-16-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-16-beta-2026-08-26.md)                   |
 
 ---
 
