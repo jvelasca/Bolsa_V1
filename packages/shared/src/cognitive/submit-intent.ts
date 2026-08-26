@@ -1,7 +1,10 @@
 /**
- * DurableSubmitIntent — intento de envío durable (ADR-035 OR-2).
- * Crash/restart: recorded antes de adapter.submit → UNKNOWN reconstruible.
+ * DurableSubmitIntent — intento de envío durable (ADR-035 OR-2 · DEX-1).
+ * Crash/restart: recorded → send_attempted → adapter.submit → UNKNOWN reconstruible.
  * Mapeo intent ↔ venueOrderId. ≠ PaperOrder status machine (OR-3).
+ *
+ * DEX-1: sendAttemptedDurable = fase/timestamp de envío (no «cualquier fila»).
+ * Fila durable existente ⇒ no re-POST en Confirm aunque phase sea solo recorded.
  */
 
 import {
@@ -9,7 +12,11 @@ import {
   type ExecutionRecordV1,
 } from "./execution-record.js";
 
-export type SubmitIntentPhaseV1 = "recorded" | "venue_bound" | "filled";
+export type SubmitIntentPhaseV1 =
+  | "recorded"
+  | "send_attempted"
+  | "venue_bound"
+  | "filled";
 
 export type DurableSubmitIntentV1 = {
   decisionId: string;
@@ -19,9 +26,17 @@ export type DurableSubmitIntentV1 = {
   phase: SubmitIntentPhaseV1;
   venueOrderId: string | null;
   reason: string | null;
+  venue: string;
+  sendAttemptedAt: string | null;
 };
 
 export const SUBMIT_INTENT_KEY = "submitIntent";
+
+const SEND_PHASES: ReadonlySet<SubmitIntentPhaseV1> = new Set([
+  "send_attempted",
+  "venue_bound",
+  "filled",
+]);
 
 function nonEmpty(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
@@ -29,12 +44,13 @@ function nonEmpty(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-/** Antes de adapter.submit. Fase recorded, sin venue. */
+/** Antes de adapter.submit. Fase recorded, sin venue ack ni send mark. */
 export function recordSubmitIntent(input: {
   decisionId: string;
   intentId: string;
   orderId: string;
   accountId: string;
+  venue?: string;
 }): DurableSubmitIntentV1 {
   return {
     decisionId: input.decisionId.trim(),
@@ -44,6 +60,28 @@ export function recordSubmitIntent(input: {
     phase: "recorded",
     venueOrderId: null,
     reason: "crash_before_venue_ack",
+    venue: nonEmpty(input.venue) ?? "paper",
+    sendAttemptedAt: null,
+  };
+}
+
+/** Tras commit de recorded, antes de adapter.submit. */
+export function markSendAttempted(
+  intent: DurableSubmitIntentV1,
+  at?: string | null,
+): DurableSubmitIntentV1 {
+  if (SEND_PHASES.has(intent.phase) && intent.phase !== "send_attempted") {
+    return intent;
+  }
+  if (intent.phase === "send_attempted" && intent.sendAttemptedAt != null) {
+    return intent;
+  }
+  const stamp = nonEmpty(at) ?? new Date().toISOString();
+  return {
+    ...intent,
+    phase: "send_attempted",
+    reason: intent.reason ?? "crash_before_venue_ack",
+    sendAttemptedAt: intent.sendAttemptedAt ?? stamp,
   };
 }
 
@@ -79,11 +117,16 @@ export function markSubmitFilled(
   };
 }
 
-/** Cualquier fila durable = ya se intentó enviar (no re-POST). */
+/**
+ * True si ya se marcó envío (fase o timestamp). Pure recorded = false.
+ * Confirm no re-POST si hay fila durable; esa política no vive aquí.
+ */
 export function sendAttemptedDurable(
   intent: DurableSubmitIntentV1 | null | undefined,
 ): boolean {
-  return intent != null;
+  if (intent == null) return false;
+  if (SEND_PHASES.has(intent.phase)) return true;
+  return intent.sendAttemptedAt != null;
 }
 
 /** OR-2 — UNKNOWN reconstruible. Nunca error ni not_executed. */
@@ -91,7 +134,7 @@ export function reconstructUnknown(
   intent: DurableSubmitIntentV1,
 ): ExecutionRecordV1 {
   let reason: string;
-  if (intent.phase === "recorded") {
+  if (intent.phase === "recorded" || intent.phase === "send_attempted") {
     reason = intent.reason ?? "crash_before_venue_ack";
   } else if (intent.phase === "filled") {
     reason = intent.reason ?? "crash_after_fill_unconfirmed";

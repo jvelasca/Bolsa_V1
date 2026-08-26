@@ -308,6 +308,39 @@ def test_or4_live_unavailable_ignored_on_paper() -> None:
     assert not any(r.startswith("reconciliation:") for r in d.reasons)
 
 
+def test_dex3_unresolved_incident_denies() -> None:
+    d = check_opening(
+        profile=None,
+        instrument_id="i1",
+        symbol="SAN",
+        trade_type="buy",
+        quantity=1,
+        price=10,
+        signal_kind="entry_long",
+        incident_status="unresolved",
+        require_incident_veto=True,
+        equity=10_000.0,
+    )
+    assert d.verdict == "DENY"
+    assert d.reasons == ("incident:unresolved",)
+
+
+def test_dex3_exit_allows_unresolved_incident() -> None:
+    d = check_opening(
+        profile=None,
+        instrument_id="i1",
+        symbol="SAN",
+        trade_type="sell",
+        quantity=1,
+        price=10,
+        signal_kind="exit",
+        incident_status="unresolved",
+        require_incident_veto=True,
+        equity=10_000.0,
+    )
+    assert d.verdict == "ALLOW"
+
+
 def test_account_mandate_veto_reason_helper() -> None:
     assert account_mandate_veto_reason(has_open_tenure=False, require=False) is None
     assert (

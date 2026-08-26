@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from bolsa_application.opening_permission import allow_opening_fill
+from bolsa_application.operational_incident_store import InMemoryOperationalIncidentStore
 from bolsa_application.risk_engine import DATA_FRESHNESS_MAX_AGE_SECONDS
 
 
@@ -169,3 +170,16 @@ async def test_allow_opening_fill_live_unavailable_ignored_on_paper() -> None:
         **_kwargs(),
     )
     assert allowed is True
+
+
+@pytest.mark.asyncio
+async def test_allow_opening_fill_unresolved_incident_vetoes() -> None:
+    store = InMemoryOperationalIncidentStore()
+    allowed = await allow_opening_fill(
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        portfolio_recon=_FakePortfolioRecon("drift"),  # type: ignore[arg-type]
+        incident_store=store,
+        **_kwargs(),
+    )
+    assert allowed is False
+    assert len(await store.list_active("acc-1")) == 1

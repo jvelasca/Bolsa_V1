@@ -128,7 +128,13 @@ def build_paper_order(
     order_id: str | None = None,
     intent_id: str | None = None,
 ) -> PaperOrder:
-    """Nacimiento: siempre CREATED, venue PAPER, sin fill."""
+    """Nacimiento: siempre CREATED, venue PAPER, sin fill.
+
+    DEX-5: ``quantity <= 0`` → fail-closed (qty ≥ 0 estricto en operativa).
+    """
+    qty = float(quantity)
+    if qty <= 0 or qty != qty:
+        raise ValueError("paper_order_qty_not_positive")
     oid = _non_empty(order_id) or f"ORD-{uuid4().hex[:12]}"
     return PaperOrder(
         order_id=oid,
@@ -136,7 +142,7 @@ def build_paper_order(
         venue="PAPER",
         instrument_id=instrument_id.strip() if isinstance(instrument_id, str) else "",
         side=side,
-        quantity=float(quantity),
+        quantity=qty,
         transaction_id=None,
         intent_id=_non_empty(intent_id),
         filled_quantity=None,
@@ -182,6 +188,9 @@ def transition_paper_order(
             if filled_quantity is not None
             else float(order.quantity)
         )
+        # DEX-5: filled ≤ ordered · filled ≥ 0
+        if next_filled != next_filled or next_filled < 0 or next_filled > float(order.quantity):
+            raise ValueError("paper_order_filled_gt_ordered")
     elif transaction_id is not None:
         next_tx = _non_empty(transaction_id)
 

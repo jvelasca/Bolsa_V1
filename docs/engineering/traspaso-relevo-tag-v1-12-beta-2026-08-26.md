@@ -1,8 +1,8 @@
 # RELEVO — tag v1.12-beta → auditoría (2026-08-26)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-26-v112.md`](./audit-pack-estado-global-2026-08-26-v112.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).  
-> **Estado:** **PUBLICACIÓN.** Tag `v1.12-beta` → `369b5d1`. **Release tag CI GREEN.**  
-> **Arranque chat nuevo / auditor:** este fichero + pack v112 + ADR-035 + `CURRENT_SYSTEM.md` + roadmap v1.12.
+> **Estado:** **PUBLICACIÓN.** Tag `v1.12-beta` → `369b5d1`. **Release tag CI GREEN.** Auditoría externa recibida → OR-2 **PARTIAL** · apertura V1.13: [`traspaso-relevo-audit-ext-v112-apertura-v113-2026-08-26.md`](./traspaso-relevo-audit-ext-v112-apertura-v113-2026-08-26.md).
+> **Arranque chat nuevo / auditor:** pack v112 + ADR-035 + `CURRENT_SYSTEM.md` + triage [`audit-ext-v112-durable-execution-triage-2026-08-26.md`](./audit-ext-v112-durable-execution-triage-2026-08-26.md).
 
 ---
 
@@ -36,7 +36,7 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · Confirm = firma · `PAPE
 
 ## 3. E1
 
-1. Auditar contra pack v112 + ADR-035 + tag + Actions GREEN.
+1. Auditar contra pack v112 + ADR-035 + tag + Actions GREEN. **Hecho** — triage [`audit-ext-v112-durable-execution-triage-2026-08-26.md`](./audit-ext-v112-durable-execution-triage-2026-08-26.md).
 2. Opción operativa: SEMI TRIGGERED → Confirm → `Ejecutar en PAPER` · suite A–L · readiness en barra.
 3. No Accept estricto sin DoD §4 + palabra **thaw**.
-4. No módulos thin nuevos · no reabrir OR-1…OR-6.
+4. No módulos thin nuevos · no reabrir OR-1/3/4/5/6. OR-2 físico = **DEX-1** (V1.13), no reabrir OR-2 como fase v1.12.

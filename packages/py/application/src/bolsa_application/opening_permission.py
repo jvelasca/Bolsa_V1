@@ -8,6 +8,8 @@ fusiona aquí (drawdown, book max, strategy mismatch).
 OHLCV / mandates ausentes = gate DS-05 / DS-03 off (mismo patrón Confirm/Fill).
 OR-4: portfolio_recon / live_recon ausentes = gate recon off; inyectados →
 fail-closed + veto drift / live unavailable (venue live).
+DEX-3: incident_store ausente = gate incident off; inyectado → abre INC
+en drift y veta ``incident:unresolved`` mientras haya incidente activo.
 """
 
 from __future__ import annotations
@@ -18,6 +20,10 @@ from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_application.account_mandate_gate import AccountMandateLookup
 from bolsa_application.accounts import GetPortfolioSummary
 from bolsa_application.investor_profiles import InvestorProfileStore
+from bolsa_application.operational_incident_store import (
+    OperationalIncidentStore,
+    sync_opening_incidents,
+)
 from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
@@ -133,6 +139,7 @@ async def allow_opening_fill(
     portfolio_recon: PortfolioReconLookup | None = None,
     live_recon: LiveReconLookup | None = None,
     broker_venue: Literal["paper", "live"] | str | None = None,
+    incident_store: OperationalIncidentStore | None = None,
 ) -> bool:
     """True si ``check_opening`` permite el fill de una apertura.
 
@@ -187,6 +194,20 @@ async def allow_opening_fill(
             live_recon_status = await live_recon.live_recon_status(account_id)
         except Exception:  # noqa: BLE001 — OR-4 live: indisponibilidad = veto
             return False
+    incident_status: Literal["clear", "unresolved"] | None = None
+    require_incident_veto = False
+    if incident_store is not None:
+        require_incident_veto = True
+        try:
+            incident_status = await sync_opening_incidents(
+                incident_store,
+                account_id=account_id,
+                portfolio_recon_status=portfolio_recon_status,
+                live_recon_status=live_recon_status,
+                broker_venue=venue,
+            )
+        except Exception:  # noqa: BLE001 — DEX-3: indisponibilidad = veto
+            return False
     decision = check_opening(
         profile=await resolve_opening_profile(
             profile_store=profile_store,
@@ -217,5 +238,7 @@ async def allow_opening_fill(
         live_recon_status=live_recon_status,
         broker_venue=venue,
         require_recon_veto=require_recon_veto,
+        incident_status=incident_status,
+        require_incident_veto=require_incident_veto,
     )
     return bool(decision.allowed)

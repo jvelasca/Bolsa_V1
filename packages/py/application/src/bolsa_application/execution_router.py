@@ -28,6 +28,10 @@ from bolsa_application.events.payloads import signal_event_payload
 from bolsa_application.events.platform_event_bus import PlatformEventBus
 from bolsa_application.investor_profiles import InvestorProfileStore
 from bolsa_application.journal_writer import append_journal_event
+from bolsa_application.operational_incident_store import (
+    OperationalIncidentStore,
+    sync_opening_incidents,
+)
 from bolsa_application.reconciliation_opening_gate import (
     LiveReconLookup,
     PortfolioReconLookup,
@@ -194,6 +198,7 @@ class ExecutionRouter:
         mandates: AccountMandateLookup | None = None,
         portfolio_recon: PortfolioReconLookup | None = None,
         live_recon: LiveReconLookup | None = None,
+        incident_store: OperationalIncidentStore | None = None,
         journal_writer: Any | None = None,
     ) -> None:
         self._policies = policy_repo
@@ -211,6 +216,7 @@ class ExecutionRouter:
         self._mandates = mandates
         self._portfolio_recon = portfolio_recon
         self._live_recon = live_recon
+        self._incident_store = incident_store
         self._journal_writer = journal_writer
 
     async def _resolve_recon_kwargs(
@@ -246,11 +252,31 @@ class ExecutionRouter:
                     reasons=("reconciliation:live_unavailable",),
                     guard=None,
                 )
+        incident_status = None
+        require_incident = False
+        if self._incident_store is not None:
+            require_incident = True
+            try:
+                incident_status = await sync_opening_incidents(
+                    self._incident_store,
+                    account_id=account_id,
+                    portfolio_recon_status=portfolio_status,
+                    live_recon_status=live_status,
+                    broker_venue=venue,
+                )
+            except Exception:  # noqa: BLE001
+                return RiskDecision(
+                    verdict="DENY",
+                    reasons=("incident:lookup_failed",),
+                    guard=None,
+                )
         return {
             "portfolio_recon_status": portfolio_status,
             "live_recon_status": live_status,
             "broker_venue": venue,
             "require_recon_veto": require,
+            "incident_status": incident_status,
+            "require_incident_veto": require_incident,
         }
 
     async def _resolve_account_mandate_for_opening(

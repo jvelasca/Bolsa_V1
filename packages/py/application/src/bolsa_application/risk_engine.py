@@ -2,8 +2,8 @@
 
 Toda apertura automática (paper_auto / futuro AUTO Estudio) debe pasar por
 ``check_opening``. Reutiliza Policy Gate + long-only; añade kill switch,
-tope Libro DEMO (maxOpen), **DS-05 Data Freshness Gate**, **DS-03 Account Mandate Gate**
-y **OR-4 Reconciliation opening veto** cuando se aportan.
+tope Libro DEMO (maxOpen), **DS-05 Data Freshness Gate**, **DS-03 Account Mandate Gate**,
+**OR-4 Reconciliation opening veto** y **DEX-3 OperationalIncident** cuando se aportan.
 
 Prohibido: Research/dictamen → Broker sin este check.
 
@@ -20,6 +20,10 @@ from datetime import UTC, datetime
 from typing import Any, Literal
 
 from bolsa_analytics.cognitive.edge_report import EdgeReport
+from bolsa_analytics.cognitive.operational_incident import (
+    IncidentOpeningStatus,
+    incident_opening_veto_reason,
+)
 from bolsa_analytics.cognitive.portfolio_fit import BasketPosition
 from bolsa_analytics.knowledge.models import TechnicalInputs
 from bolsa_application.account_mandate_gate import account_mandate_veto_reason
@@ -135,6 +139,8 @@ def check_opening(
     live_recon_status: Literal["clean", "drift", "unavailable"] | None = None,
     broker_venue: Literal["paper", "live"] | str | None = None,
     require_recon_veto: bool = False,
+    incident_status: IncidentOpeningStatus | None = None,
+    require_incident_veto: bool = False,
 ) -> RiskDecision:
     """Evalúa una apertura. Exits siguen el bypass del Cognitive Guard.
 
@@ -142,7 +148,8 @@ def check_opening(
     fail-closed cuando la barra/quote supera el umbral (o falta el timestamp).
     DS-03: si ``require_account_mandate``, VETO sin tenure abierto o mismatch
     de estrategia (AUTO). OR-4: drift paper o live unavailable/drift (venue live)
-    VETO aperturas; no auto-heal. No aplica a ``exit`` / ``exit_hint`` / ``reduce``.
+    VETO aperturas. DEX-3: incidente activo → ``incident:unresolved``. Sin auto-heal.
+    No aplica a ``exit`` / ``exit_hint`` / ``reduce``.
     """
     if kill_switch:
         return RiskDecision(
@@ -204,6 +211,20 @@ def check_opening(
             return RiskDecision(
                 verdict="DENY",
                 reasons=(recon_reason,),
+                guard=None,
+            )
+
+    if kind not in _EXIT_SIGNAL_KINDS and (
+        require_incident_veto or incident_status is not None
+    ):
+        incident_reason = incident_opening_veto_reason(
+            incident_status=incident_status,
+            require=require_incident_veto or incident_status is not None,
+        )
+        if incident_reason is not None:
+            return RiskDecision(
+                verdict="DENY",
+                reasons=(incident_reason,),
                 guard=None,
             )
 

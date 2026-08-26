@@ -1,10 +1,11 @@
 /**
- * DurableSubmitIntent OR-2 — crash/restart UNKNOWN reconstruible (ADR-035).
+ * DurableSubmitIntent OR-2 / DEX-1 — crash/restart UNKNOWN reconstruible (ADR-035).
  */
 
 import { describe, expect, it } from "vitest";
 import {
   bindVenueOrder,
+  markSendAttempted,
   markSubmitFilled,
   recordSubmitIntent,
   reconstructUnknown,
@@ -20,14 +21,23 @@ function recorded() {
   });
 }
 
-describe("OR-2 DurableSubmitIntent", () => {
-  it("record → recorded without venue", () => {
+describe("OR-2 / DEX-1 DurableSubmitIntent", () => {
+  it("record → recorded without venue; sendAttemptedDurable false", () => {
     const intent = recorded();
     expect(intent.phase).toBe("recorded");
     expect(intent.venueOrderId).toBeNull();
     expect(intent.reason).toBe("crash_before_venue_ack");
-    expect(sendAttemptedDurable(intent)).toBe(true);
+    expect(intent.venue).toBe("paper");
+    expect(intent.sendAttemptedAt).toBeNull();
+    expect(sendAttemptedDurable(intent)).toBe(false);
     expect(sendAttemptedDurable(null)).toBe(false);
+  });
+
+  it("markSendAttempted sets phase + timestamp", () => {
+    const stamped = markSendAttempted(recorded(), "2026-08-26T12:00:00.000Z");
+    expect(stamped.phase).toBe("send_attempted");
+    expect(stamped.sendAttemptedAt).toBe("2026-08-26T12:00:00.000Z");
+    expect(sendAttemptedDurable(stamped)).toBe(true);
   });
 
   it("bind venue keeps ids and is not fill; first venue id wins", () => {
@@ -35,6 +45,7 @@ describe("OR-2 DurableSubmitIntent", () => {
     expect(bound.phase).toBe("venue_bound");
     expect(bound.venueOrderId).toBe("xtb-1");
     expect(bound.intentId).toBe("INT-DEC-1");
+    expect(sendAttemptedDurable(bound)).toBe(true);
     expect(bindVenueOrder(bound, "xtb-other").venueOrderId).toBe("xtb-1");
   });
 

@@ -4,6 +4,63 @@ All notable releases of Bolsa V1.
 
 ## [Unreleased]
 
+## [1.13-beta] — 2026-08-26
+
+Durable Execution v1.13 (D0 + DEX-1…DEX-5). Producto sigue **BETA / no producción**. Tag anotado **`v1.13-beta`** (SHA al stamp; pin post Release tag CI GREEN). Partida: **`v1.12-beta` → `369b5d1`**. Spine **`pnpm test:decision-spine` = 483**. Pack: [`audit-pack-estado-global-2026-08-26-v113.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v113.md). OR-2 cerrado vía DEX-1+DEX-2. Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**. LIVE **experimental**. AUTO **off**.
+
+### Docs — Pack auditor v113 Durable Execution (2026-08-26)
+
+- Pack [`audit-pack-estado-global-2026-08-26-v113.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v113.md): stamp global · scorecard DEX-1…5 · candidatas post-v1.13.
+- Relevo tag [`traspaso-relevo-tag-v1-13-beta-2026-08-26.md`](./docs/engineering/traspaso-relevo-tag-v1-13-beta-2026-08-26.md) — tag `v1.13-beta` al stamp.
+- Spine verificado **483**. Cero thaw · cero UI Mesa · cero AUTO · cero broker.
+
+### DEX-5 — Operational invariants (V1.13 Durable Execution)
+
+- Kernel `paper_order`: qty > 0 en build · FILLED rechaza filled < 0 o filled > ordered.
+- Predicados `operational_invariants.py` (qty · filled≤ordered · terminal · adverse_exposure).
+- Property suite spine `test_dex5_operational_invariants.py` (6 invariantes; sin `hypothesis`).
+- Spine **`pnpm test:decision-spine` = 483** (465 → 483).
+- Pack v113 stampado en Unreleased Docs · sin UI Mesa incidente · sin thaw.
+- Plan [`plan-dex5-operational-invariants-2026-08-26.md`](./docs/engineering/plan-dex5-operational-invariants-2026-08-26.md) · relevo [`traspaso-relevo-dex5-operational-invariants-2026-08-26.md`](./docs/engineering/traspaso-relevo-dex5-operational-invariants-2026-08-26.md).
+
+### DEX-4 — Confirm = orquestador (V1.13 Durable Execution)
+
+- Paquete `bolsa_application/confirm/`: Identity · RiskGate · OpeningGate · ExitGate · Execution · SubmitIntent · PositionSync.
+- `ConfirmRecommendationIntent` = orquestador fino (~922 líneas; pre ~1531). API pública y semántica OR-1…OR-4 / DEX-1…3 intactas.
+- Tests spine `test_dex4_confirm_orchestrator.py` (2). Spine **`pnpm test:decision-spine` = 465**.
+- Sin property suite (DEX-5) · sin pack v113 · sin UI Mesa incidente · sin thaw.
+- Plan [`plan-dex4-confirm-orchestrator-2026-08-26.md`](./docs/engineering/plan-dex4-confirm-orchestrator-2026-08-26.md) · relevo [`traspaso-relevo-dex4-confirm-orchestrator-2026-08-26.md`](./docs/engineering/traspaso-relevo-dex4-confirm-orchestrator-2026-08-26.md).
+
+### DEX-3 — OperationalIncident / resolución recon (V1.13 Durable Execution)
+
+- Kernel `OperationalIncident`: open → in_review → resolved → cleared. Resolve exige nota; clear solo si recon `clean`. Sin auto-heal.
+- Alembic `014_operational_incidents` + `PostgresOperationalIncidentStore`. Un activo por `(account, kind)`.
+- Opening veto `incident:unresolved` (incluso si el drift ya se fue). Exits ALLOW. Confirm / Fill / HTTP / Router cableados.
+- Tests spine `test_dex3_operational_incident.py` + kernel analytics. Spine **`pnpm test:decision-spine` = 463**.
+- Sin Confirm split · sin UI Mesa · sin pack v113.
+- Plan [`plan-dex3-operational-incident-2026-08-26.md`](./docs/engineering/plan-dex3-operational-incident-2026-08-26.md) · relevo [`traspaso-relevo-dex3-operational-incident-2026-08-26.md`](./docs/engineering/traspaso-relevo-dex3-operational-incident-2026-08-26.md).
+
+### DEX-2 — Crash/restart cross-PID (V1.13 Durable Execution)
+
+- Certificación: store/sesión A persiste → kill → store B fresco → Confirm `UNKNOWN` · 0 re-POST · mismos ids / mapeo venue.
+- Tests spine `test_dex2_crash_restart_cross_pid.py` (5). Spine **`pnpm test:decision-spine` = 440**.
+- Sin Incident UI · sin Confirm split · sin pack v113.
+- Plan [`plan-dex2-crash-restart-cross-pid-2026-08-26.md`](./docs/engineering/plan-dex2-crash-restart-cross-pid-2026-08-26.md) · relevo [`traspaso-relevo-dex2-crash-restart-cross-pid-2026-08-26.md`](./docs/engineering/traspaso-relevo-dex2-crash-restart-cross-pid-2026-08-26.md).
+
+### DEX-1 — PostgreSQL SubmitIntent (V1.13 Durable Execution)
+
+- Alembic `013_submit_intents` + `SubmitIntentRow` + `PostgresSubmitIntentStore` (commit en put/delete).
+- Fases `recorded` → `send_attempted` → `venue_bound`/`filled` + `send_attempted_at`; espejo TS.
+- Confirm: put recorded → mark send_attempted → `adapter.submit`; fila durable ⇒ no re-POST.
+- DI Confirm → store PG; InMemory en unit tests. Sin DEX-2 kill · sin Incident · sin Confirm split.
+- Plan [`plan-dex1-pg-submit-intents-2026-08-26.md`](./docs/engineering/plan-dex1-pg-submit-intents-2026-08-26.md) · relevo [`traspaso-relevo-dex1-pg-submit-intents-2026-08-26.md`](./docs/engineering/traspaso-relevo-dex1-pg-submit-intents-2026-08-26.md).
+
+### Docs — Auditoría v1.12 → V1.13 Durable Execution (2026-08-26)
+
+- Triage externo post-`v1.12-beta`: OR-2 **PARTIAL** (InMemory ≠ cross-PID). Tag `v1.12-beta` intacto.
+- Roadmap V1.13 DEX-1…DEX-5 · plan DEX-1 PG `submit_intents` · relevo apertura.
+- ADR-035 §8 post-audit · `CURRENT_SYSTEM` next = DEX-1 (cerrado en Unreleased DEX-1; DEX-2 cerrado → next DEX-3).
+
 ## [1.12-beta] — 2026-08-26
 
 Operational Reliability v1.12 (D0 + OR-1…OR-6). Producto sigue **BETA / no producción**. Tag anotado **`v1.12-beta` → `369b5d1`** (Release tag CI GREEN). Partida: **`v1.11-beta` → `76d0f951`**. Spine **`pnpm test:decision-spine` = 433**. Pack: [`audit-pack-estado-global-2026-08-26-v112.md`](./docs/engineering/audit-pack-estado-global-2026-08-26-v112.md). Accept estricto **NO**. `PAPER_D_EXECUTE` default **OFF**. Confirm = única firma. Mesa default **paper**. LIVE **experimental**.
@@ -48,7 +105,8 @@ Operational Reliability v1.12 (D0 + OR-1…OR-6). Producto sigue **BETA / no pro
 - Confirm: `DurableSubmitIntent` persistido **antes** de `adapter.submit` (fail-closed si `put` falla).
 - Sin fill local y con intento durable → `ExecutionRecord unknown` reconstruido (`crashRecovery`); **no** segundo `adapter.submit`.
 - Mapeo `intent_id` ↔ `venue_order_id` (retry live `submitted` = 1 send). Fill local (OR-1) sigue ganando.
-- Store = puerto + InMemory de proceso (sin Alembic). Tabla PG / Redis multi-worker parked.
+- Store = puerto + InMemory de proceso (sin Alembic). Tabla PG / Redis multi-worker parked en v1.12.
+- **Post-audit `v1.12-beta`:** estado **PARTIAL** — no sobrevive al PID; PG = DEX-1 (V1.13).
 - Spine **`pnpm test:decision-spine` = 382** (post-OR-1 = 372).
 - ADR-035 · plan [`plan-or2-crash-restart-2026-08-26.md`](./docs/engineering/plan-or2-crash-restart-2026-08-26.md) · relevo [`traspaso-relevo-or2-crash-restart-2026-08-26.md`](./docs/engineering/traspaso-relevo-or2-crash-restart-2026-08-26.md).
 - **No** OR-3 state machine · **no** veto recon (OR-4) · **no** `contract:gen`.

@@ -1,10 +1,10 @@
 # ADR-035: Operational Reliability — validar el sistema (contrato v1.12)
 
-**Estado:** Accepted — **D0 docs CERRADO.** **OR-1…OR-6 CERRADOS** (código). Fase v1.12 **cerrada en pack + tag** (`v1.12-beta`).  
+**Estado:** Accepted — **D0 docs CERRADO.** **OR-1/3/4/5/6 CERRADOS** (código). **OR-2 cerrado vía DEX-1+DEX-2** (PG + cert cross-PID). Fase v1.12 **cerrada en pack + tag** (`v1.12-beta`). Post-audit: V1.13 Durable Execution (**DEX-1…DEX-5 CERRADOS**; pack v113 stampado; tag `v1.13-beta` pendiente owner).  
 **Fecha:** 2026-08-26  
-**Contexto:** Auditoría externa post-`v1.11-beta` (`76d0f951`). Operational Integrity (ADR-034) **cerrada**. El modelo sobrevive al fill; falta demostrar que sobrevive a timeout, retry, crash, drift y estado de broker desconocido.
+**Contexto:** Auditoría externa post-`v1.11-beta` (`76d0f951`). Operational Integrity (ADR-034) **cerrada**. El modelo sobrevive al fill; falta demostrar que sobrevive a timeout, retry, crash, drift y estado de broker desconocido. Auditoría post-`v1.12-beta` (`369b5d1`): concepto DurableSubmitIntent OK; durabilidad física = DEX-1; cert cross-PID = DEX-2.
 
-**Depende de:** [ADR-034](./034-operational-integrity-continuity.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · triage [`audit-ext-v111-operational-reliability-triage-2026-08-26.md`](../engineering/audit-ext-v111-operational-reliability-triage-2026-08-26.md) · roadmap [`roadmap-v112-operational-reliability-2026-08-26.md`](../engineering/roadmap-v112-operational-reliability-2026-08-26.md).
+**Depende de:** [ADR-034](./034-operational-integrity-continuity.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · triage [`audit-ext-v111-operational-reliability-triage-2026-08-26.md`](../engineering/audit-ext-v111-operational-reliability-triage-2026-08-26.md) · roadmap [`roadmap-v112-operational-reliability-2026-08-26.md`](../engineering/roadmap-v112-operational-reliability-2026-08-26.md) · triage post-v1.12 [`audit-ext-v112-durable-execution-triage-2026-08-26.md`](../engineering/audit-ext-v112-durable-execution-triage-2026-08-26.md) · roadmap [`roadmap-v113-durable-execution-2026-08-26.md`](../engineering/roadmap-v113-durable-execution-2026-08-26.md).
 
 ---
 
@@ -38,14 +38,14 @@ Ambos terminan en `PositionState` (OI-1). `ManualTradeRiskGate` nombra la polít
 
 ## 3. Seis objetivos (OR-1…OR-6)
 
-| ID   | Contrato                                                                              | Fuera de este ID                    |
-| ---- | ------------------------------------------------------------------------------------- | ----------------------------------- |
-| OR-1 | Retry Confirm paper = 1 fill / 1 posición / misma identidad · **CERRADO**             | Alembic · live e2e                  |
-| OR-2 | Crash tras submit → `UNKNOWN` reconstruible; mapeo intent ↔ venue order · **CERRADO** | Heal · Alembic · Redis multi-worker |
-| OR-3 | State machine de orden más allá de `CREATED`/`FILLED` · **CERRADO**                   | Broker producción · OCO             |
-| OR-4 | Recon `drift` / live `unavailable` = veto **global de apertura** · **CERRADO**        | Auto-heal · UI de resolución        |
-| OR-5 | Suite de escenarios A–L + retry + crash en el Decision Spine · **CERRADO**            | Simulación masiva post-v1.12        |
-| OR-6 | Readiness 4 estados + CTA `EJECUTAR EN PAPER\|LIVE` · **CERRADO**                     | Thaw estricto · AUTO on             |
+| ID   | Contrato                                                                                            | Fuera de este ID                                           |
+| ---- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| OR-1 | Retry Confirm paper = 1 fill / 1 posición / misma identidad · **CERRADO**                           | Alembic · live e2e                                         |
+| OR-2 | Crash tras submit → `UNKNOWN` reconstruible; mapeo intent ↔ venue order · **CERRADO** (DEX-1+DEX-2) | Heal · Redis multi-worker                                  |
+| OR-3 | State machine de orden más allá de `CREATED`/`FILLED` · **CERRADO**                                 | Broker producción · OCO                                    |
+| OR-4 | Recon `drift` / live `unavailable` = veto **global de apertura** · **CERRADO**                      | Auto-heal · UI Mesa resolución (backend DEX-3 **CERRADO**) |
+| OR-5 | Suite de escenarios A–L + retry + crash en el Decision Spine · **CERRADO**                          | Simulación masiva post-v1.12                               |
+| OR-6 | Readiness 4 estados + CTA `EJECUTAR EN PAPER\|LIVE` · **CERRADO**                                   | Thaw estricto · AUTO on                                    |
 
 **OR-4 (veto):** `DRIFT` → no new entries · Allow protective / manual de-risk · Require human resolution. Detect → Explain → Require resolution. **Nunca** auto-heal.
 
@@ -66,22 +66,47 @@ Ambos terminan en `PositionState` (OI-1). `ManualTradeRiskGate` nombra la polít
 
 - Tabla `position_revisions` (hoy JSON en snapshot).
 - JSONB `position_state` como SoT → columnas (JP-1 dual-write se conserva).
-- ExecutionRecord como entidad fuerte (OR-1 no la crea; OR-2 si la identidad durable lo exige).
+- ExecutionRecord como entidad fuerte (OR-1 no la crea; identidad durable PG = DEX-1).
+- Tabla PG `submit_intents` / Redis multi-worker (OR-2 físico) → **DEX-1 + DEX-2 CERRADOS** (tabla + store PG + cert store fresco); Redis multi-worker sigue parked.
 - Más brokers (IBKR, etc.).
 - AUTO on · thaw estricto · Accept P1–P5.
-- Simulación 1.000–10.000 sesiones (después de cerrar OR-1…OR-6).
+- Simulación 1.000–10.000 sesiones (después de cerrar OR-1…OR-6 / DEX).
 
 ---
 
 ## 6. Freeze
 
-ADR-034 intacto · Confirm = única firma · Lab ≠ mesa · thin 5.x/8.x congelados · I1–I3 + RX1 · `PAPER_D_EXECUTE` off · mesa default paper · no `contract:gen` en OR-1…OR-3 · no Alembic en OR-1…OR-3.
+ADR-034 intacto · Confirm = única firma · Lab ≠ mesa · thin 5.x/8.x congelados · I1–I3 + RX1 · `PAPER_D_EXECUTE` off · mesa default paper · no `contract:gen` en OR-1…OR-3 · no Alembic en OR-1…OR-3 (Alembic `submit_intents` = **DEX-1**).
 
 ---
 
 ## 7. Consecuencias
 
-- Docs: triage v111 reliability · roadmap v1.12 · plan OR-1 · plan OR-2 · plan OR-3 · plan OR-4 · plan OR-5 · plan OR-6 · relevo OR-6.
-- Código: **OR-1 CERRADO** — short-circuit Confirm · ids estables · fail-closed sin `decision_id`. **OR-2 CERRADO** — `DurableSubmitIntent` pre-submit · recovery `UNKNOWN` sin re-POST · mapeo `venue_order_id`. **OR-3 CERRADO** — `PaperOrder` Literal + grafo · PaperBroker `SUBMITTED`→`FILLED`/`UNKNOWN` · crash recovery `paperOrder.status=UNKNOWN`. **OR-4 CERRADO** — recon → opening veto (`drift` / live `unavailable`); exits ALLOW; OE-1 OI-6 honesto; sin auto-heal. **OR-5 CERRADO** — suite A–L + retry + crash anclada a spine (15 tests certificación). **OR-6 CERRADO** — 4 estados de readiness (sin promedio) + CTA `Ejecutar en PAPER|LIVE` + UI preferencia cuenta.
-- Spine: `pnpm test:decision-spine` **433** (partida v1.11 = 367 · post-OR-1 = 372 · post-OR-2 = 382 · post-OR-3 = 387 · post-OR-4 = 403 · post-OR-5 = 418 · post-OR-6 = 433).
-- Siguiente: thaw estricto (deuda) · operar SEMI. Pack [`audit-pack-estado-global-2026-08-26-v112.md`](../engineering/audit-pack-estado-global-2026-08-26-v112.md) · relevo tag [`traspaso-relevo-tag-v1-12-beta-2026-08-26.md`](../engineering/traspaso-relevo-tag-v1-12-beta-2026-08-26.md).
+- Docs: triage v111 reliability · roadmap v1.12 · plan OR-1 · plan OR-2 · plan OR-3 · plan OR-4 · plan OR-5 · plan OR-6 · relevo OR-6 · pack + tag `v1.12-beta`.
+- Código: **OR-1 CERRADO** — short-circuit Confirm · ids estables · fail-closed sin `decision_id`. **OR-2 CERRADO vía DEX-1+DEX-2** — `DurableSubmitIntent` pre-submit · recovery `UNKNOWN` sin re-POST · mapeo `venue_order_id` · PG `submit_intents` · cert store/cliente fresco cross-PID. **OR-3 CERRADO** — `PaperOrder` Literal + grafo · PaperBroker `SUBMITTED`→`FILLED`/`UNKNOWN` · crash recovery `paperOrder.status=UNKNOWN`. **OR-4 CERRADO** — recon → opening veto (`drift` / live `unavailable`); exits ALLOW; OE-1 OI-6 honesto; sin auto-heal. **OR-5 CERRADO** — suite A–L + retry + crash anclada a spine (15 tests certificación). **OR-6 CERRADO** — 4 estados de readiness (sin promedio) + CTA `Ejecutar en PAPER|LIVE` + UI preferencia cuenta.
+- Spine: `pnpm test:decision-spine` **483** (partida v1.12 = 433 · post-DEX-2 = 440 · post-DEX-3 = 463 · post-DEX-4 = 465 · post-DEX-5 = 483).
+- Pack [`audit-pack-estado-global-2026-08-26-v112.md`](../engineering/audit-pack-estado-global-2026-08-26-v112.md) · tag [`traspaso-relevo-tag-v1-12-beta-2026-08-26.md`](../engineering/traspaso-relevo-tag-v1-12-beta-2026-08-26.md).
+
+---
+
+## 8. Post-v1.12 audit (2026-08-26) — Durable Execution
+
+Auditoría externa contra código `369b5d1`: OR-2 **PARTIAL / CONDITIONALLY CLOSED** en tag v1.12. Tag `v1.12-beta` **válido**. **DEX-1 + DEX-2 (2026-08-26)** cierran persistencia PG + cert store/cliente fresco → `UNKNOWN` · 0 re-POST.
+
+| Cerrado (v1.12 lógico)                                                          | Cerrado (V1.13 físico)                                                                                                                                                                                                                 | Sigue parked                                    |
+| ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| UNKNOWN · identity · venue map · no blind re-POST · reconstruction mismo worker | PG `submit_intents` · `PostgresSubmitIntentStore` · fases `send_attempted` · tests cross-PID (store fresco) · `OperationalIncident` resolve/clear (mínimo backend) · Confirm = orquestador (DEX-4) · invariantes operacionales (DEX-5) | Redis multi-worker · Incident UI Mesa · 10k sim |
+
+**Siguiente fase:** pack auditor v113 (cierre) — [`roadmap-v113-durable-execution-2026-08-26.md`](../engineering/roadmap-v113-durable-execution-2026-08-26.md) · triage [`audit-ext-v112-durable-execution-triage-2026-08-26.md`](../engineering/audit-ext-v112-durable-execution-triage-2026-08-26.md).
+
+DEX-1…DEX-5: PG `submit_intents` (**DEX-1 CERRADO**) → crash tests cross-PID (**DEX-2 CERRADO**) → Incident resolution (**DEX-3 CERRADO**) → Confirm decomposition (**DEX-4 CERRADO**) → operational invariants (**DEX-5 CERRADO**). Pack auditor [`audit-pack-estado-global-2026-08-26-v113.md`](../engineering/audit-pack-estado-global-2026-08-26-v113.md). Tag `v1.13-beta` = owner. **No** ADR-036 (esta sección extiende el contrato).
+
+**DEX-1 (2026-08-26):** Alembic `013` · `PostgresSubmitIntentStore` · fases `send_attempted` + `send_attempted_at` · Confirm DI PG. Relevo [`traspaso-relevo-dex1-pg-submit-intents-2026-08-26.md`](../engineering/traspaso-relevo-dex1-pg-submit-intents-2026-08-26.md).
+
+**DEX-2 (2026-08-26):** Cert store/sesión A → kill → store B fresco → Confirm `UNKNOWN` · 0 re-POST. Spine **440**. Plan [`plan-dex2-crash-restart-cross-pid-2026-08-26.md`](../engineering/plan-dex2-crash-restart-cross-pid-2026-08-26.md) · relevo [`traspaso-relevo-dex2-crash-restart-cross-pid-2026-08-26.md`](../engineering/traspaso-relevo-dex2-crash-restart-cross-pid-2026-08-26.md).
+
+**DEX-3 (2026-08-26):** `OperationalIncident` + Alembic `014` + store PG · drift → OPEN → review → resolve (nota; sin auto-heal) → clear solo si recon `clean` · veto `incident:unresolved`. Spine **463**. Plan [`plan-dex3-operational-incident-2026-08-26.md`](../engineering/plan-dex3-operational-incident-2026-08-26.md) · relevo [`traspaso-relevo-dex3-operational-incident-2026-08-26.md`](../engineering/traspaso-relevo-dex3-operational-incident-2026-08-26.md).
+
+**DEX-4 (2026-08-26):** Confirm = orquestador · `bolsa_application/confirm/` (Identity / RiskGate / OpeningGate / ExitGate / Execution / SubmitIntent / PositionSync). Semántica intacta. Spine **465**. Plan [`plan-dex4-confirm-orchestrator-2026-08-26.md`](../engineering/plan-dex4-confirm-orchestrator-2026-08-26.md) · relevo [`traspaso-relevo-dex4-confirm-orchestrator-2026-08-26.md`](../engineering/traspaso-relevo-dex4-confirm-orchestrator-2026-08-26.md).
+
+**DEX-5 (2026-08-26):** Invariantes operacionales (property suite): qty ≥ 0 · filled ≤ ordered · terminal no re-ejecuta · 1 decision ≤1 order · drift blocks opening · protect no ↑ exposición. Spine **483**. Plan [`plan-dex5-operational-invariants-2026-08-26.md`](../engineering/plan-dex5-operational-invariants-2026-08-26.md) · relevo [`traspaso-relevo-dex5-operational-invariants-2026-08-26.md`](../engineering/traspaso-relevo-dex5-operational-invariants-2026-08-26.md).

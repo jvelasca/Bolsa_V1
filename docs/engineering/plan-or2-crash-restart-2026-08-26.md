@@ -2,7 +2,7 @@
 
 > **Padre:** [`roadmap-v112-operational-reliability-2026-08-26.md`](./roadmap-v112-operational-reliability-2026-08-26.md) · ADR-035.
 > **AsOf:** 2026-08-26.
-> **Estado:** **CERRADO** (código + tests + docs). Spine **382**.
+> **Estado:** **CERRADO lógico** (código + tests + docs). Spine **382**. Post-audit v1.12: **PARTIAL físico** → [`plan-dex1-pg-submit-intents-2026-08-26.md`](./plan-dex1-pg-submit-intents-2026-08-26.md).
 > **Relevo:** [`traspaso-relevo-or2-crash-restart-2026-08-26.md`](./traspaso-relevo-or2-crash-restart-2026-08-26.md).
 
 ---
@@ -24,15 +24,15 @@ OR-1 cierra retry **post-fill**. OR-2 cierra retry **sin fill local**: el intent
 
 ## Decisiones
 
-| ID  | Decisión                                                                                                                                                                                                                      |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | Identidad = `decision_id` (OR-1). Objeto `DurableSubmitIntent` (fase `recorded` \| `venue_bound` \| `filled`). **No** es la state machine OR-3 (`SUBMITTED`/`ACK`/…). PaperOrder sigue `CREATED`\|`FILLED`.                   |
-| D2  | Puerto `SubmitIntentStore` (get/put). Confirm **persiste `recorded` antes** de `adapter.submit`. Si `put` falla → `error` pre-send (no se envía).                                                                             |
-| D3  | Store con fila para ese `decision_id` y **sin** fill local → reconstruir `UNKNOWN`, **no** `adapter.submit`. Fill local sigue ganando (OR-1).                                                                                 |
-| D4  | Tras el adapter: `venue_order_id` → `venue_bound` (mapeo durable); fill → `filled`. Recovery adjunta `venueOrderId` si existe.                                                                                                |
-| D5  | **Sin Alembic.** El store es el límite de durabilidad. Tests = store compartido entre «procesos». Producción = singleton de proceso (retry mismo worker). Tabla PG / Redis multi-worker = parked (plan explícito si se abre). |
-| D6  | Tests spine: crash post-record; crash post-mapeo venue; retry live `submitted` = 1 submit; fill local sigue short-circuit. Sin `contract:gen`.                                                                                |
-| D7  | **No** OR-3 machine · **no** veto recon (OR-4) · **no** auto-heal · **no** CTA LIVE · **no** FillPending en esta rebanada.                                                                                                    |
+| ID  | Decisión                                                                                                                                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | Identidad = `decision_id` (OR-1). Objeto `DurableSubmitIntent` (fase `recorded` \| `venue_bound` \| `filled`). **No** es la state machine OR-3 (`SUBMITTED`/`ACK`/…). PaperOrder sigue `CREATED`\|`FILLED`.                                  |
+| D2  | Puerto `SubmitIntentStore` (get/put). Confirm **persiste `recorded` antes** de `adapter.submit`. Si `put` falla → `error` pre-send (no se envía).                                                                                            |
+| D3  | Store con fila para ese `decision_id` y **sin** fill local → reconstruir `UNKNOWN`, **no** `adapter.submit`. Fill local sigue ganando (OR-1).                                                                                                |
+| D4  | Tras el adapter: `venue_order_id` → `venue_bound` (mapeo durable); fill → `filled`. Recovery adjunta `venueOrderId` si existe.                                                                                                               |
+| D5  | **Sin Alembic en OR-2.** El store es el límite de durabilidad. Tests = store compartido entre «procesos». Producción = singleton de proceso (retry mismo worker). Tabla PG / Redis multi-worker = parked → **DEX-1** (auditoría post-v1.12). |
+| D6  | Tests spine: crash post-record; crash post-mapeo venue; retry live `submitted` = 1 submit; fill local sigue short-circuit. Sin `contract:gen`.                                                                                               |
+| D7  | **No** OR-3 machine · **no** veto recon (OR-4) · **no** auto-heal · **no** CTA LIVE · **no** FillPending en esta rebanada.                                                                                                                   |
 
 ## Kernel
 

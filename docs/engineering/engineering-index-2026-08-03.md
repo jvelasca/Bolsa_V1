@@ -26,11 +26,11 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.12-beta` → `369b5d1` · ADR-034 OI-1…OE-1 CERRADOS · ADR-035 D0+OR-1…OR-6 CERRADOS · next = thaw estricto (deuda) / operar SEMI
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.12-beta` → `369b5d1` · ADR-034 OI-1…OE-1 CERRADOS · ADR-035 OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL · next = V1.13 DEX-1
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
-│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 · Position persistida)** · **ADR-034 (Operational Integrity v1.11 · OI-1…OE-1 CERRADOS)** · **ADR-035 (Operational Reliability v1.12 · D0+OR-1…OR-6 CERRADOS)**
+│   ├── adr/*  (decisiones)  — incl. ADR-001 (Prisma) · ADR-003 (Python backend) · ADR-025 (fuente verdad modelo, M4) · **ADR-026 (custodia Opción B, obligación pendiente, R-10 F4a)** · **ADR-027 (auth multi-user JWT híbrido Opción C, R12-AUTH, Aceptado)** · **ADR-031 (tesis ≠ plan ≠ permiso / TradePlan v0)** · **ADR-032 (Operational Core v1.9 · F1–F4 modelo CERRADO)** · **ADR-033 (Operational Authority v1.10 · Position persistida)** · **ADR-034 (Operational Integrity v1.11 · OI-1…OE-1 CERRADOS)** · **ADR-035 (Operational Reliability v1.12 · OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL · V1.13 DEX)**
 │   ├── rfc/*  (constitución)
 │   └── bounded-contexts-2026-08-03.md
 ├── Research
@@ -75,14 +75,29 @@ Engineering Index  (este doc)
 │   ├── roadmap-v111-operational-integrity-2026-08-26.md ← **FASE CERRADA** v1.11 · OI-1…OE-1 · tag `v1.11-beta`
 │   ├── audit-pack-estado-global-2026-08-26-v111.md ← pack Operational Integrity · tag `v1.11-beta` → `76d0f951`
 │   ├── traspaso-relevo-tag-v1-11-beta-2026-08-26.md ← **HISTÓRICO** tag v1.11-beta → auditoría
-│   ├── audit-ext-v111-operational-reliability-triage-2026-08-26.md ← **TRIAGE** auditoría 1 post-v1.11 · RATIFICADO · v1.12
-│   ├── roadmap-v112-operational-reliability-2026-08-26.md ← **FASE CERRADA** v1.12 · D0+OR-1…OR-6 · tag `v1.12-beta`
+│   ├── audit-ext-v111-operational-reliability-triage-2026-08-26.md ← **TRIAGE** auditoría 1 post-v1.11 · RATIFICADO · v1.12 · OR-2 PARTIAL post-audit
+│   ├── roadmap-v112-operational-reliability-2026-08-26.md ← **FASE CERRADA** v1.12 · D0+OR-1…OR-6 · OR-2 PARTIAL · tag `v1.12-beta`
 │   ├── audit-pack-estado-global-2026-08-26-v112.md ← pack Operational Reliability · tag `v1.12-beta` → `369b5d1`
-│   ├── traspaso-relevo-tag-v1-12-beta-2026-08-26.md ← **PUBLICACIÓN** tag v1.12-beta → auditoría
+│   ├── traspaso-relevo-tag-v1-12-beta-2026-08-26.md ← **HISTÓRICO** tag v1.12-beta → auditoría recibida
+│   ├── audit-ext-v112-durable-execution-triage-2026-08-26.md ← **TRIAGE** auditoría post-v1.12 · RATIFICADO · V1.13
+│   ├── roadmap-v113-durable-execution-2026-08-26.md ← **FASE CERRADA** v1.13 · D0+DEX-1…DEX-5 · pack v113 · tag `v1.13-beta` pendiente owner
+│   ├── audit-pack-estado-global-2026-08-26-v113.md ← pack Durable Execution · spine 483 · tag `v1.13-beta` pendiente
+│   ├── traspaso-relevo-tag-v1-13-beta-2026-08-26.md ← **RELEVO** tag v1.13-beta → auditoría (owner publica)
+│   ├── plan-dex1-pg-submit-intents-2026-08-26.md ← **DEX-1 CERRADO** · PG submit_intents
+│   ├── traspaso-relevo-dex1-pg-submit-intents-2026-08-26.md ← **HISTÓRICO** DEX-1 → DEX-2
+│   ├── plan-dex2-crash-restart-cross-pid-2026-08-26.md ← **DEX-2 CERRADO** · cert cross-PID
+│   ├── traspaso-relevo-dex2-crash-restart-cross-pid-2026-08-26.md ← **HISTÓRICO** DEX-2 → DEX-3
+│   ├── plan-dex3-operational-incident-2026-08-26.md ← **DEX-3 CERRADO** · OperationalIncident resolve/clear
+│   ├── traspaso-relevo-dex3-operational-incident-2026-08-26.md ← **HISTÓRICO** DEX-3 → DEX-4
+│   ├── plan-dex4-confirm-orchestrator-2026-08-26.md ← **DEX-4 CERRADO** · Confirm = orquestador
+│   ├── traspaso-relevo-dex4-confirm-orchestrator-2026-08-26.md ← **HISTÓRICO** DEX-4 → DEX-5
+│   ├── plan-dex5-operational-invariants-2026-08-26.md ← **DEX-5 CERRADO** · invariantes / property suite
+│   ├── traspaso-relevo-dex5-operational-invariants-2026-08-26.md ← **HISTÓRICO** DEX-5 → pack v113
+│   ├── traspaso-relevo-audit-ext-v112-apertura-v113-2026-08-26.md ← **HISTÓRICO** D0 v1.13 → chat DEX-1
 │   ├── plan-or1-e2e-idempotency-2026-08-26.md ← **OR-1 CERRADO** · retry Confirm paper · spine 372
 │   ├── traspaso-relevo-or1-e2e-idempotency-2026-08-26.md ← **HISTÓRICO** OR-1 → chat OR-2
-│   ├── plan-or2-crash-restart-2026-08-26.md ← **OR-2 CERRADO** · crash/restart UNKNOWN · spine 382
-│   ├── traspaso-relevo-or2-crash-restart-2026-08-26.md ← **HISTÓRICO** OR-2 → chat OR-3
+│   ├── plan-or2-crash-restart-2026-08-26.md ← **OR-2 PARTIAL** · lógico CERRADO · físico → DEX-1 · spine 382
+│   ├── traspaso-relevo-or2-crash-restart-2026-08-26.md ← **HISTÓRICO** OR-2 → chat OR-3 · nota PARTIAL
 │   ├── plan-or3-order-state-machine-2026-08-26.md ← **OR-3 CERRADO** · PaperOrder state machine · spine 387
 │   ├── traspaso-relevo-or3-order-state-machine-2026-08-26.md ← **HISTÓRICO** OR-3 → chat OR-4
 │   ├── plan-or4-recon-opening-veto-2026-08-26.md ← **OR-4 CERRADO** · recon → opening veto · spine 403
@@ -346,4 +361,5 @@ Ver [bounded-contexts-2026-08-03.md](./bounded-contexts-2026-08-03.md).
 19. **Auditoría externa post-tag v1.8.1-beta (2026-08-25):** [triage](./audit-ext-v181-triage-2026-08-25.md) · [roadmap v1.9](./roadmap-v19-operational-core-2026-08-25.md) · **F1–F4 + ExitPermission + INFRA CERRADOS** (modelo). Tag `v1.9-beta`.
 20. **Auditoría discontinuidad operativa (2026-08-25):** [triage](./audit-ext-v19-ops-discontinuity-triage-2026-08-25.md) · [roadmap v1.10](./roadmap-v110-operational-authority-2026-08-25.md) · [ADR-033](../adr/033-operational-authority-position-persistence.md) · **H1→P4 CERRADOS**. Tag `v1.10-beta` → `047ddb6`.
 21. **Operational Integrity v1.11 (2026-08-26):** [roadmap](./roadmap-v111-operational-integrity-2026-08-26.md) · [ADR-034](../adr/034-operational-integrity-continuity.md) · [pack](./audit-pack-estado-global-2026-08-26-v111.md) · [relevo tag](./traspaso-relevo-tag-v1-11-beta-2026-08-26.md) · **OI-1…OE-1 CERRADOS**. Tag `v1.11-beta` → `76d0f951`.
-22. **Operational Reliability v1.12 (2026-08-26):** [triage](./audit-ext-v111-operational-reliability-triage-2026-08-26.md) · [roadmap](./roadmap-v112-operational-reliability-2026-08-26.md) · [ADR-035](../adr/035-operational-reliability.md) · [pack](./audit-pack-estado-global-2026-08-26-v112.md) · [relevo tag](./traspaso-relevo-tag-v1-12-beta-2026-08-26.md) · **D0 + OR-1…OR-6 CERRADOS**. Tag `v1.12-beta` → `369b5d1`. Partida `v1.11-beta` → `76d0f951`. Spine **433**. Next = thaw estricto (deuda) / operar SEMI.
+22. **Operational Reliability v1.12 (2026-08-26):** [triage](./audit-ext-v111-operational-reliability-triage-2026-08-26.md) · [roadmap](./roadmap-v112-operational-reliability-2026-08-26.md) · [ADR-035](../adr/035-operational-reliability.md) · [pack](./audit-pack-estado-global-2026-08-26-v112.md) · [relevo tag](./traspaso-relevo-tag-v1-12-beta-2026-08-26.md) · **D0 + OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL**. Tag `v1.12-beta` → `369b5d1`. Partida `v1.11-beta` → `76d0f951`. Spine **433**.
+23. **Durable Execution v1.13 (2026-08-26):** [triage](./audit-ext-v112-durable-execution-triage-2026-08-26.md) · [roadmap](./roadmap-v113-durable-execution-2026-08-26.md) · [pack](./audit-pack-estado-global-2026-08-26-v113.md) · [relevo tag](./traspaso-relevo-tag-v1-13-beta-2026-08-26.md) · [plan DEX-1](./plan-dex1-pg-submit-intents-2026-08-26.md) · [plan DEX-2](./plan-dex2-crash-restart-cross-pid-2026-08-26.md) · [plan DEX-3](./plan-dex3-operational-incident-2026-08-26.md) · [plan DEX-4](./plan-dex4-confirm-orchestrator-2026-08-26.md) · [plan DEX-5](./plan-dex5-operational-invariants-2026-08-26.md) · **D0 + DEX-1…DEX-5 CERRADOS · pack v113 stampado**. Tag `v1.13-beta` pendiente owner. ADR-035 §8. Spine **483**. Partida `v1.12-beta` → `369b5d1`.

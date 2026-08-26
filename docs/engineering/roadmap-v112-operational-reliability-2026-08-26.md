@@ -2,7 +2,7 @@
 
 > **Padre:** [`audit-ext-v111-operational-reliability-triage-2026-08-26.md`](./audit-ext-v111-operational-reliability-triage-2026-08-26.md) · ADR-035.
 > **AsOf:** 2026-08-26.
-> **Estado:** **FASE CERRADA — D0 + OR-1…OR-6 CERRADOS · pack + tag `v1.12-beta`.** Partida **`v1.11-beta` → `76d0f951`**. Spine **433**. ≠ notas históricas CORE-R «v1.12».
+> **Estado:** **FASE CERRADA — D0 + OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL · pack + tag `v1.12-beta`.** Partida **`v1.11-beta` → `76d0f951`**. Spine **433**. ≠ notas históricas CORE-R «v1.12». Post-audit → [`roadmap-v113-durable-execution-2026-08-26.md`](./roadmap-v113-durable-execution-2026-08-26.md).
 > **Método:** **validar** el sistema bajo timeout, retry, crash y drift. No más arquitectura general. No thaw. No broker producción. No LLM.
 
 ---
@@ -46,7 +46,7 @@ ADR-034 sigue siendo el contrato de **integridad** v1.11. No se reabre.
 | -------- | ------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------- | ----------- |
 | **D0**   | Diseño / triage + ADR-035       | Congelar fiabilidad operativa · **no código**                                                       | Pack v112 (al tag)                  | **CERRADO** |
 | **OR-1** | End-to-end idempotency          | Timeout + retry Confirm paper → 1 fill / 1 posición / misma identidad de intento                    | Tabla `execution_records` · XTB e2e | **CERRADO** |
-| **OR-2** | Crash/restart recovery          | Submit intent durable; al reiniciar reconstruye `UNKNOWN` + recon                                   | Auto-heal                           | **CERRADO** |
+| **OR-2** | Crash/restart recovery          | Submit intent durable (lógico); al reiniciar reconstruye `UNKNOWN` + recon                          | Auto-heal · **PG = DEX-1**          | **PARTIAL** |
 | **OR-3** | Full order state machine        | Ampliar `CREATED→FILLED` hacia SUBMITTED / ACK / PARTIAL / REJECTED / CANCELLED / EXPIRED / UNKNOWN | Broker real · OCO                   | **CERRADO** |
 | **OR-4** | Reconciliation → opening veto   | `drift` / live `unavailable` → DENY aperturas; exits protectivos ALLOW; sin heal                    | Resolución humana UI plena          | **CERRADO** |
 | **OR-5** | Broker execution scenario suite | Batería A–L + retry + crash del auditor, anclada a `pnpm test:decision-spine`                       | 1.000–10.000 sesiones (post-v1.12)  | **CERRADO** |
@@ -62,11 +62,11 @@ Ver [`plan-or1-e2e-idempotency-2026-08-26.md`](./plan-or1-e2e-idempotency-2026-0
 
 Paper: Confirm → timeout → retry → **1 order identity + 1 execution**. Live: short-circuit solo con fill local; mapeo durable = OR-2 (**cerrado**).
 
-## 2b. OR-2 (CERRADO)
+## 2b. OR-2 (PARTIAL — post-audit v1.12)
 
 Ver [`plan-or2-crash-restart-2026-08-26.md`](./plan-or2-crash-restart-2026-08-26.md) · relevo [`traspaso-relevo-or2-crash-restart-2026-08-26.md`](./traspaso-relevo-or2-crash-restart-2026-08-26.md).
 
-Confirm persiste `DurableSubmitIntent` antes de `adapter.submit`. Crash/retry sin fill local → `UNKNOWN` reconstruido + mapeo `venue_order_id`; **no** re-POST. Store InMemory de proceso. Sin Alembic.
+Confirm persiste `DurableSubmitIntent` antes de `adapter.submit`. Crash/retry sin fill local → `UNKNOWN` reconstruido + mapeo `venue_order_id`; **no** re-POST. Store InMemory de proceso (no sobrevive al PID). Sin Alembic en v1.12. **Auditoría post-tag:** lógico **CERRADO** · físico **PARTIAL** → PG = [`roadmap-v113-durable-execution-2026-08-26.md`](./roadmap-v113-durable-execution-2026-08-26.md) **DEX-1**.
 
 ## 2c. OR-3 (CERRADO)
 

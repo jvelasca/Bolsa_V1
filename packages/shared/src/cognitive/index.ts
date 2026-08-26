@@ -23,6 +23,7 @@ export * from "./broker-adapter.js";
 export * from "./portfolio-reconciliation.js";
 export * from "./live-ledger-reconciliation.js";
 export * from "./reconciliation-opening-veto.js";
+export * from "./operational-incident.js";
 export * from "./operational-readiness.js";
 export * from "./exit-permission.js";
 export * from "./hoy-queue.js";

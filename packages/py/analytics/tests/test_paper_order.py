@@ -155,3 +155,19 @@ def test_or3_illegal_partial_qty() -> None:
         transition_paper_order(ack, "PARTIAL", filled_quantity=10.0)
     with pytest.raises(ValueError, match="partial_requires_qty"):
         transition_paper_order(ack, "PARTIAL", filled_quantity=0.0)
+
+
+def test_dex5_build_rejects_non_positive_qty() -> None:
+    with pytest.raises(ValueError, match="qty_not_positive"):
+        build_paper_order(instrument_id="i", side="buy", quantity=-5.0)
+    with pytest.raises(ValueError, match="qty_not_positive"):
+        build_paper_order(instrument_id="i", side="buy", quantity=0.0)
+
+
+def test_dex5_filled_rejects_overfill() -> None:
+    ack = transition_paper_order(
+        build_paper_order(order_id="ORD-1", instrument_id="i", side="buy", quantity=10.0),
+        "ACK",
+    )
+    with pytest.raises(ValueError, match="filled_gt_ordered"):
+        transition_paper_order(ack, "FILLED", filled_quantity=11.0)

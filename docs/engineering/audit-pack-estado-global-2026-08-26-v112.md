@@ -9,19 +9,19 @@
 
 ## 0. Veredicto interno
 
-Operational Reliability v1.12 **CERRADA (D0 + OR-1…OR-6)**: idempotencia E2E Confirm paper, crash/restart con `DurableSubmitIntent` → `UNKNOWN`, state machine PaperOrder, veto de apertura por recon drift / live unavailable, suite de escenarios A–L (+ retry + crash) en Decision Spine, y certificación SEMI con readiness de 4 estados + CTA `Ejecutar en PAPER|LIVE` + UI preferencia venue por cuenta. Producto sigue **BETA / no producción**. Confirm = **única** firma transaccional. Accept estricto **NO**. `PAPER_D_EXECUTE` repo **OFF**. LIVE **experimental** (nunca `PAPER_READY` / nunca trading accepted).
+Operational Reliability v1.12 **CERRADA (D0 + OR-1…OR-6)**: idempotencia E2E Confirm paper, crash/restart **lógico** con `DurableSubmitIntent` → `UNKNOWN` (store InMemory de proceso; **OR-2 PARTIAL** físico — PG = V1.13 DEX-1), state machine PaperOrder, veto de apertura por recon drift / live unavailable, suite de escenarios A–L (+ retry + crash) en Decision Spine, y certificación SEMI con readiness de 4 estados + CTA `Ejecutar en PAPER|LIVE` + UI preferencia venue por cuenta. Producto sigue **BETA / no producción**. Confirm = **única** firma transaccional. Accept estricto **NO**. `PAPER_D_EXECUTE` repo **OFF**. LIVE **experimental** (nunca `PAPER_READY` / nunca trading accepted).
 
 | Slice | Nombre                          | Estado  |
 | ----- | ------------------------------- | ------- |
 | D0    | Diseño / triage + ADR-035       | CERRADO |
 | OR-1  | End-to-end idempotency          | CERRADO |
-| OR-2  | Crash/restart recovery          | CERRADO |
+| OR-2  | Crash/restart recovery          | PARTIAL |
 | OR-3  | Full order state machine        | CERRADO |
 | OR-4  | Reconciliation → opening veto   | CERRADO |
 | OR-5  | Broker execution scenario suite | CERRADO |
 | OR-6  | SEMI operational certification  | CERRADO |
 
-**Mensaje clave:** v1.11 **integró** post-fill; v1.12 **valida** timeout, retry, crash, drift y readiness operativa. **No** Accept estricto. **No** default-on execute. **No** AUTO on. **No** broker producción.
+**Mensaje clave:** v1.11 **integró** post-fill; v1.12 **valida** timeout, retry, crash, drift y readiness operativa. Tag válido; OR-2 físico incompleto → V1.13. **No** Accept estricto. **No** default-on execute. **No** AUTO on. **No** broker producción.
 
 ---
 
@@ -57,7 +57,7 @@ Spine progression: **367** (v1.11) → **372** (OR-1) → **382** (OR-2) → **3
 ## 2. Qué entra en el tag
 
 - **OR-1:** `decision_id` canónico · `INT-`/`ORD-` estables · short-circuit pre-`adapter.submit`.
-- **OR-2:** `DurableSubmitIntent` pre-submit · recovery `UNKNOWN` sin re-POST · store InMemory de proceso.
+- **OR-2:** `DurableSubmitIntent` pre-submit · recovery `UNKNOWN` sin re-POST · store InMemory de proceso (**PARTIAL** — no cross-PID; PG = DEX-1).
 - **OR-3:** PaperOrder `CREATED…FILLED` + `REJECTED`/`CANCELLED`/`EXPIRED`/`UNKNOWN` · PaperBroker boom → `UNKNOWN`.
 - **OR-4:** OI-6 `drift` / LR-1 live `drift|unavailable` → DENY aperturas; exits ALLOW; sin auto-heal.
 - **OR-5:** `test_or5_broker_execution_scenarios.py` A–L + retry + crash anclado a spine.
@@ -68,17 +68,17 @@ Spine progression: **367** (v1.11) → **372** (OR-1) → **382** (OR-2) → **3
 
 ## 3. Qué no entra / parked
 
-| Excluido                            | Notas                                          |
-| ----------------------------------- | ---------------------------------------------- |
-| Accept estricto P1–P5               | Deuda; DoD runbook §4 + palabra **thaw**       |
-| `PAPER_D_EXECUTE` default on        | Opt-in local; repo **off**                     |
-| AUTO on / AUTO como modalidad       | Confirm = firma                                |
-| Alembic DurableSubmitIntent         | Store proceso; Redis multi-worker parked       |
-| UI resolución recon / auto-heal     | Detect → Explain → Require resolution (futuro) |
-| Live trading accepted / XTB capital | LIVE experimental only                         |
-| Simulación 1k–10k sesiones          | Post-v1.12                                     |
-| `contract:gen` por campo OE-1       | Campo aditivo sin regen obligatorio            |
-| Thin 5.x/8.x / brokers nuevos       | Congelados                                     |
+| Excluido                            | Notas                                             |
+| ----------------------------------- | ------------------------------------------------- |
+| Accept estricto P1–P5               | Deuda; DoD runbook §4 + palabra **thaw**          |
+| `PAPER_D_EXECUTE` default on        | Opt-in local; repo **off**                        |
+| AUTO on / AUTO como modalidad       | Confirm = firma                                   |
+| Alembic DurableSubmitIntent         | Store proceso en v1.12; PG = **DEX-1** V1.13      |
+| UI resolución recon / auto-heal     | Detect → Explain → Require resolution (**DEX-3**) |
+| Live trading accepted / XTB capital | LIVE experimental only                            |
+| Simulación 1k–10k sesiones          | Post-v1.12                                        |
+| `contract:gen` por campo OE-1       | Campo aditivo sin regen obligatorio               |
+| Thin 5.x/8.x / brokers nuevos       | Congelados                                        |
 
 ---
 
@@ -123,9 +123,9 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · TradePlan ≠ permiso ·
 1. Checkout tag **`v1.12-beta`** (`369b5d1`).
 2. Verificar GitHub Actions **`release-tag-ci.yml`** GREEN en el push del tag.
 3. Ejecutar `pnpm test:decision-spine` → esperar **433** passed.
-4. Contrastar ADR-035 (OR-1…OR-6) con código: idempotencia, DurableSubmitIntent, state machine, opening veto, suite A–L, readiness + CTA.
+4. Contrastar ADR-035 (OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL) con código: idempotencia, DurableSubmitIntent InMemory, state machine, opening veto, suite A–L, readiness + CTA.
 5. Confirmar freeze §5: sin Accept estricto, sin default-on, sin AUTO on, mesa paper, Confirm = firma, LIVE experimental.
 6. Opcional SEMI UI: TRIGGERED → Confirm → CTA `Ejecutar en PAPER` · chip readiness ≠ Autoeval.
-7. Emitir triage/findings si aplica (`audit-ext-*-triage-*.md`).
+7. Emitir triage/findings si aplica — **hecho:** [`audit-ext-v112-durable-execution-triage-2026-08-26.md`](./audit-ext-v112-durable-execution-triage-2026-08-26.md).
 
-**Preguntas que este pack no resuelve:** Accept estricto · default-on · AUTO on · Alembic intent durable · UI resolución recon · broker producción · mass sim.
+**Preguntas que este pack no resuelve:** Accept estricto · default-on · AUTO on · Alembic intent durable (**DEX-1**) · UI resolución recon (**DEX-3**) · broker producción · mass sim.

@@ -1177,6 +1177,102 @@ class PositionStateRow(Base):
     updated_at: Mapped[datetime] = mapped_column("updated_at", DateTime(timezone=True), nullable=False)
 
 
+class SubmitIntentRow(Base):
+    """DEX-1 — DurableSubmitIntent en PostgreSQL (ADR-035 OR-2 físico)."""
+
+    __tablename__ = "submit_intents"
+    __table_args__ = (
+        UniqueConstraint("decision_id", name="submit_intents_decision_id_key"),
+        UniqueConstraint("intent_id", name="submit_intents_intent_id_key"),
+        UniqueConstraint("order_id", name="submit_intents_order_id_key"),
+        Index("submit_intents_account_id_idx", "account_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    decision_id: Mapped[str] = mapped_column("decision_id", String, nullable=False)
+    intent_id: Mapped[str] = mapped_column("intent_id", String, nullable=False)
+    order_id: Mapped[str] = mapped_column("order_id", String, nullable=False)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    venue: Mapped[str] = mapped_column(String, nullable=False)
+    phase: Mapped[str] = mapped_column(String, nullable=False)
+    venue_order_id: Mapped[str | None] = mapped_column(
+        "venue_order_id",
+        String,
+        nullable=True,
+    )
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    send_attempted_at: Mapped[datetime | None] = mapped_column(
+        "send_attempted_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
+class OperationalIncidentRow(Base):
+    """DEX-3 — OperationalIncident en PostgreSQL (ADR-035 resolución recon)."""
+
+    __tablename__ = "operational_incidents"
+    __table_args__ = (
+        Index("operational_incidents_account_id_idx", "account_id"),
+        Index(
+            "operational_incidents_active_account_kind_idx",
+            "account_id",
+            "kind",
+            unique=True,
+            postgresql_where=text("status IN ('open', 'in_review', 'resolved')"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    account_id: Mapped[str] = mapped_column("account_id", String, nullable=False)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(
+        "opened_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        "reviewed_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        "resolved_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    resolved_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cleared_at: Mapped[datetime | None] = mapped_column(
+        "cleared_at",
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
 class InvestorProfileRow(Base):
     """ART-PROFILE — catálogo (RFC-008)."""
 

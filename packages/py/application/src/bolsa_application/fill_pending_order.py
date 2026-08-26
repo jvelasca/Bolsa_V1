@@ -78,6 +78,7 @@ class FillPendingOrder:
         mandates: AccountMandateLookup | None = None,
         portfolio_recon: PortfolioReconLookup | None = None,
         live_recon: LiveReconLookup | None = None,
+        incident_store: Any | None = None,
         position_from_fill: PersistPositionFromFill | None = None,
         position_from_exit: PersistPositionFromExit | None = None,
         broker_adapter: IBrokerAdapter | None = None,
@@ -94,6 +95,7 @@ class FillPendingOrder:
         self._mandates = mandates
         self._portfolio_recon = portfolio_recon
         self._live_recon = live_recon
+        self._incident_store = incident_store
         self._position_from_fill = position_from_fill
         self._position_from_exit = position_from_exit
 
@@ -244,6 +246,7 @@ class FillPendingOrder:
             mandates=self._mandates,
             portfolio_recon=self._portfolio_recon,
             live_recon=self._live_recon,
+            incident_store=self._incident_store,
             broker_venue=venue,
             account_id=account_id,
             instrument_id=order.instrument_id,

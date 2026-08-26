@@ -3,8 +3,8 @@
 > **Padre:** [`plan-or2-crash-restart-2026-08-26.md`](./plan-or2-crash-restart-2026-08-26.md) · ADR-035.
 > **AsOf:** 2026-08-26.
 > **Partida:** tag **`v1.11-beta` → `76d0f951`**. Spine **372 → 382**.
-> **Estado:** **CERRADO (código + tests + docs).** Cambiar de chat recomendado para OR-3.
-> **Arranque chat nuevo:** este fichero + ADR-035 + roadmap v1.12 + `CURRENT_SYSTEM.md`.
+> **Estado:** **CERRADO lógico (código + tests + docs).** Post-audit v1.12: **PARTIAL físico** (InMemory ≠ cross-PID) → V1.13 DEX-1. Histórico: chat OR-3 ya hecho.
+> **Arranque chat nuevo (histórico OR-3):** este fichero + ADR-035 + roadmap v1.12. **Apertura DEX:** [`traspaso-relevo-audit-ext-v112-apertura-v113-2026-08-26.md`](./traspaso-relevo-audit-ext-v112-apertura-v113-2026-08-26.md).
 
 ---
 
@@ -14,15 +14,16 @@ OR-2 cierra crash/restart Confirm: intento durable **antes** de `adapter.submit`
 
 ## 1. Qué quedó hecho
 
-| Pieza                                                 | Estado                                      |
-| ----------------------------------------------------- | ------------------------------------------- |
-| `DurableSubmitIntent` recorded / venue_bound / filled | **Hecho** — ≠ OR-3 SUBMITTED/ACK/…          |
-| Persist **antes** de `adapter.submit`                 | **Hecho** — fail-closed si `put` falla      |
-| Recovery sin fill → `UNKNOWN` · 0 re-POST             | **Hecho** — `crashRecovery`                 |
-| Mapeo `intent` ↔ `venue_order_id`                     | **Hecho** — live `submitted` retry = 1 send |
-| Store sin Alembic                                     | **Hecho** — puerto + InMemory proceso       |
-| Spine                                                 | **382**                                     |
-| Alembic / Redis multi-worker / OR-3…OR-6              | **No**                                      |
+| Pieza                                                 | Estado                                                      |
+| ----------------------------------------------------- | ----------------------------------------------------------- |
+| `DurableSubmitIntent` recorded / venue_bound / filled | **Hecho** — ≠ OR-3 SUBMITTED/ACK/…                          |
+| Persist **antes** de `adapter.submit`                 | **Hecho** — fail-closed si `put` falla                      |
+| Recovery sin fill → `UNKNOWN` · 0 re-POST             | **Hecho** — `crashRecovery`                                 |
+| Mapeo `intent` ↔ `venue_order_id`                     | **Hecho** — live `submitted` retry = 1 send                 |
+| Store sin Alembic                                     | **Hecho** — puerto + InMemory proceso                       |
+| Spine                                                 | **382**                                                     |
+| Alembic / Redis multi-worker / OR-3…OR-6              | **No** (en OR-2) — OR-3…OR-6 hechos después; PG = **DEX-1** |
+| Nota auditoría post-`v1.12-beta`                      | **PARTIAL** — store no sobrevive al PID                     |
 
 ## 2. Freeze / flags
 
