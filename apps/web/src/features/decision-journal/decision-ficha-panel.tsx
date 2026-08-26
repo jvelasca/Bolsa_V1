@@ -353,3 +353,67 @@ export function DecisionFichaPanel({
     </aside>
   );
 }
+
+/** Rail estrecho cuando la ficha está colapsada pero hay tesis seleccionada. */
+export function JournalStudyDetailCollapsedRail({
+  symbol,
+  isWide,
+  onExpand,
+  onClose,
+}: {
+  symbol: string;
+  isWide: boolean;
+  onExpand: () => void;
+  onClose: () => void;
+}) {
+  if (!isWide) {
+    return (
+      <div className="flex h-full min-h-0 w-full items-center gap-2 bg-muted/30 px-2">
+        <IconButton icon={X} title="Quitar selección" onClick={onClose} />
+        <button
+          type="button"
+          className="min-w-0 flex-1 truncate text-left text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+          title={`Mostrar ficha · ${symbol}`}
+          onClick={onExpand}
+        >
+          Ficha · {symbol}
+        </button>
+        <button
+          type="button"
+          className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+          title="Desplegar ficha"
+          onClick={onExpand}
+        >
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col items-center gap-2 border-l border-border/60 bg-muted/30 py-2">
+      <IconButton icon={X} title="Quitar selección" onClick={onClose} />
+      <button
+        type="button"
+        className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-1 text-[10px] font-semibold text-muted-foreground hover:text-foreground"
+        title={`Mostrar ficha · ${symbol}`}
+        onClick={onExpand}
+      >
+        <span
+          className="max-h-[min(12rem,50vh)] truncate [writing-mode:vertical-rl]"
+          style={{ textOrientation: "mixed" }}
+        >
+          {symbol}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+        title="Desplegar ficha"
+        onClick={onExpand}
+      >
+        <PanelRightClose className="h-3.5 w-3.5 rotate-180" />
+      </button>
+    </div>
+  );
+}

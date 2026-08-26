@@ -270,6 +270,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/accounts/{account_id}/decision-studies/{instrument_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Decision Study History
+         * @description ADR-036 Evolución — historial propose por instrumento (solo lectura).
+         */
+        get: operations["get_decision_study_history_api_accounts__account_id__decision_studies__instrument_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts/{account_id}/deposits": {
         parameters: {
             query?: never;
@@ -336,6 +356,86 @@ export interface paths {
          */
         put: operations["sync_account_mandates_api_accounts__account_id__mandates_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/operational-incidents/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Active Operational Incidents
+         * @description DEX-3 — incidentes activos (open/in_review/resolved). Solo lectura.
+         */
+        get: operations["list_active_operational_incidents_api_accounts__account_id__operational_incidents_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/operational-incidents/{incident_id}/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear Operational Incident
+         * @description DEX-3 — clear solo si resolved + recon clean. Server lookup recon.
+         */
+        post: operations["clear_operational_incident_api_accounts__account_id__operational_incidents__incident_id__clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/operational-incidents/{incident_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Operational Incident
+         * @description DEX-3 — resolución humana con nota obligatoria. Sin auto-heal.
+         */
+        post: operations["resolve_operational_incident_api_accounts__account_id__operational_incidents__incident_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{account_id}/operational-incidents/{incident_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Operational Incident
+         * @description DEX-3 — marca incidente en revisión (opcional).
+         */
+        post: operations["review_operational_incident_api_accounts__account_id__operational_incidents__incident_id__review_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4849,6 +4949,29 @@ export interface components {
             /** Vigencia */
             vigencia?: string | null;
         };
+        /** DecisionJournalStudyHistoryDto */
+        DecisionJournalStudyHistoryDto: {
+            /** Accountid */
+            accountId: string;
+            /** Instrumentid */
+            instrumentId: string;
+            /** Limit */
+            limit: number;
+            /** Name */
+            name?: string | null;
+            /** Offset */
+            offset: number;
+            /** Studies */
+            studies: components["schemas"]["DecisionJournalStudyDto"][];
+            /** Symbol */
+            symbol?: string | null;
+            /** Total */
+            total: number;
+        };
+        /** DecisionJournalStudyHistoryResponseDto */
+        DecisionJournalStudyHistoryResponseDto: {
+            data: components["schemas"]["DecisionJournalStudyHistoryDto"];
+        };
         /** DecisionJournalStudyListDto */
         DecisionJournalStudyListDto: {
             /** Accountid */
@@ -7196,6 +7319,59 @@ export interface components {
             suggestedAction: string;
         };
         /**
+         * OperationalIncidentDto
+         * @description DEX-3 — OperationalIncident wire (ADR-035).
+         */
+        OperationalIncidentDto: {
+            /** Accountid */
+            accountId: string;
+            /** Clearedat */
+            clearedAt?: string | null;
+            /** Incidentid */
+            incidentId: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "portfolio_drift" | "live_drift" | "live_unavailable";
+            /** Openedat */
+            openedAt: string;
+            /** Resolutionnote */
+            resolutionNote?: string | null;
+            /** Resolvedat */
+            resolvedAt?: string | null;
+            /** Resolvedby */
+            resolvedBy?: string | null;
+            /** Reviewedat */
+            reviewedAt?: string | null;
+            /** Reviewedby */
+            reviewedBy?: string | null;
+            /** Snapshot */
+            snapshot?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "in_review" | "resolved" | "cleared";
+        };
+        /** OperationalIncidentResponseDto */
+        OperationalIncidentResponseDto: {
+            data: components["schemas"]["OperationalIncidentDto"];
+        };
+        /** OperationalIncidentsListDto */
+        OperationalIncidentsListDto: {
+            /** Accountid */
+            accountId: string;
+            /** Incidents */
+            incidents: components["schemas"]["OperationalIncidentDto"][];
+            /** Total */
+            total: number;
+        };
+        /** OperationalIncidentsListResponseDto */
+        OperationalIncidentsListResponseDto: {
+            data: components["schemas"]["OperationalIncidentsListDto"];
+        };
+        /**
          * OperationalPositionDto
          * @description P1 — snapshot de autoridad post-fill (no es el holding ledger).
          */
@@ -8086,6 +8262,18 @@ export interface components {
             offset: number;
             /** Total */
             total: number;
+        };
+        /** ResolveOperationalIncidentBodyDto */
+        ResolveOperationalIncidentBodyDto: {
+            /** Resolutionnote */
+            resolutionNote: string;
+            /** Resolvedby */
+            resolvedBy?: string | null;
+        };
+        /** ReviewOperationalIncidentBodyDto */
+        ReviewOperationalIncidentBodyDto: {
+            /** Reviewedby */
+            reviewedBy?: string | null;
         };
         /** RouteSignalsRequestDto */
         RouteSignalsRequestDto: {
@@ -9878,6 +10066,41 @@ export interface operations {
             };
         };
     };
+    get_decision_study_history_api_accounts__account_id__decision_studies__instrument_id__history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                instrument_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionJournalStudyHistoryResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     deposit_cash_api_accounts__account_id__deposits_post: {
         parameters: {
             query?: never;
@@ -10044,6 +10267,141 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MandateBundleResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_active_operational_incidents_api_accounts__account_id__operational_incidents_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationalIncidentsListResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_operational_incident_api_accounts__account_id__operational_incidents__incident_id__clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationalIncidentResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_operational_incident_api_accounts__account_id__operational_incidents__incident_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveOperationalIncidentBodyDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationalIncidentResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_operational_incident_api_accounts__account_id__operational_incidents__incident_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                incident_id: string;
+                account_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewOperationalIncidentBodyDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationalIncidentResponseDto"];
                 };
             };
             /** @description Validation Error */

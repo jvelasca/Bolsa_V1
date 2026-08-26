@@ -56,12 +56,18 @@ export function HoyEnLaMesaBlock() {
         tienen historia auditada (PositionRevision); Proteger deja huella en el
         snapshot. PortfolioReconciliation detecta deriva paper
         (cash/holdings/posición) — informe, no auto-heal (≠ broker); con drift
-        las aperturas se vetan (exits protectivos siguen ALLOW). El envío paper
-        pasa por PaperBroker (venue PAPER ≠ broker live). Confirm envía por
-        BrokerAdapter (paper | live mock | XTB); el mock live no envía; XTB
-        rejected/submitted no es fill ledger; filled sí escribe ledger.
-        Live↔ledger se reporta (LiveLedgerReconciliation) sin auto-heal; en
-        venue live, drift/unavailable también veta aperturas. Mesa elige
+        las aperturas se vetan (exits protectivos siguen ALLOW).{" "}
+        <strong className="text-foreground">OperationalIncident (DEX-3)</strong>
+        : si hay drift persistente, la mesa abre un incidente — entradas
+        bloqueadas hasta resolve (nota humana) + clear (solo recon clean). Sin
+        auto-heal; distinto de{" "}
+        <code className="text-[10px]">reconciliation:*</code> y de{" "}
+        <code className="text-[10px]">incident:unresolved</code> en el banner.
+        El envío paper pasa por PaperBroker (venue PAPER ≠ broker live). Confirm
+        envía por BrokerAdapter (paper | live mock | XTB); el mock live no
+        envía; XTB rejected/submitted no es fill ledger; filled sí escribe
+        ledger. Live↔ledger se reporta (LiveLedgerReconciliation) sin auto-heal;
+        en venue live, drift/unavailable también veta aperturas. Mesa elige
         Paper|Live (default paper; Live sin bridge → not_wired). Proteger: si H2
         no persiste el stop (persist None), Confirm no dice protect_applied — el
         stop no cambió. Cadena de salida: ExitPlan propone, ExitPermission

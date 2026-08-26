@@ -903,10 +903,122 @@ class GetDecisionJournalStudies:
         return set()
 
 
+@dataclass(frozen=True, slots=True)
+class DecisionJournalStudyHistoryResult:
+    account_id: str
+    instrument_id: str
+    symbol: str | None
+    name: str | None
+    studies: list[DecisionJournalStudyView]
+    total: int
+    limit: int
+    offset: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "accountId": self.account_id,
+            "instrumentId": self.instrument_id,
+            "symbol": self.symbol,
+            "name": self.name,
+            "studies": [s.to_dict() for s in self.studies],
+            "total": self.total,
+            "limit": self.limit,
+            "offset": self.offset,
+        }
+
+
+class GetDecisionJournalStudyHistory:
+    """Historial propose por instrumento (solo lectura, ADR-036 Evolución)."""
+
+    def __init__(
+        self,
+        session_reader: SessionReader,
+        *,
+        instruments: InstrumentQuoteReader | None = None,
+        positions: PositionReader | None = None,
+        default_limit: int = 20,
+        max_limit: int = 100,
+    ) -> None:
+        self._sessions = session_reader
+        self._instruments = instruments
+        self._positions = positions
+        self._default_limit = default_limit
+        self._max_limit = max_limit
+
+    async def execute(
+        self,
+        account_id: str,
+        instrument_id: str,
+        *,
+        limit: int | None = None,
+        offset: int = 0,
+        now: datetime | None = None,
+    ) -> DecisionJournalStudyHistoryResult:
+        effective_limit = limit if limit is not None else self._default_limit
+        effective_limit = min(max(1, effective_limit), self._max_limit)
+        effective_offset = max(0, offset)
+        clock = now or datetime.now(UTC)
+
+        rows = await self._sessions.list_decision_sessions(
+            account_id=account_id,
+            instrument_id=instrument_id,
+            limit=STUDY_SESSION_LIMIT,
+        )
+        propose = [r for r in rows if r.kind == "propose"]
+        propose.sort(key=lambda r: r.created_at, reverse=True)
+
+        name: str | None = None
+        symbol: str | None = propose[0].symbol if propose else None
+        if self._instruments is not None and instrument_id:
+            quotes = await self._instruments.get_quotes_by_ids([instrument_id])
+            if quotes:
+                name = getattr(quotes[0], "name", None)
+                if name is not None:
+                    name = str(name)
+
+        pos = None
+        if self._positions is not None:
+            for rec in await self._positions.list_open_for_account(account_id):
+                if str(getattr(rec, "instrument_id", "")) == instrument_id:
+                    pos = rec
+                    break
+        pos_status = getattr(pos, "status", None) if pos is not None else None
+        exit_reason = _exit_reason_from_position(pos) if pos is not None else None
+        has_open = pos is not None
+
+        views: list[DecisionJournalStudyView] = []
+        for row in propose:
+            views.append(
+                build_study_view(
+                    session=row,
+                    name=name,
+                    position_status=str(pos_status) if pos_status else None,
+                    has_open_position=has_open,
+                    exit_primary_reason=exit_reason,
+                    now=clock,
+                )
+            )
+
+        total = len(views)
+        page = views[effective_offset : effective_offset + effective_limit]
+        return DecisionJournalStudyHistoryResult(
+            account_id=account_id,
+            instrument_id=instrument_id,
+            symbol=symbol,
+            name=name,
+            studies=page,
+            total=total,
+            limit=effective_limit,
+            offset=effective_offset,
+        )
+
+
 __all__ = [
+    "DecisionJournalStudyHistoryResult",
     "DecisionJournalStudyListResult",
     "DecisionJournalStudyView",
     "GetDecisionJournalStudies",
+    "GetDecisionJournalStudyHistory",
     "NO_OPERATIONAL_PLAN_COPY",
     "build_study_view",
     "journal_study_geometry",

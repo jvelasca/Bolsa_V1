@@ -3,7 +3,7 @@
 > **Padre:** [ADR-036](../adr/036-decision-journal-study-view.md) · [plan](./plan-journal-20-tesis-ficha-2026-08-26.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
 > **AsOf:** 2026-08-26.
 > **Estado:** **J0–J4 CERRADOS** (código + tests). DEX-1…DEX-5 **no reabiertos**.
-> **Arranque chat nuevo:** ADR-036 + este relevo + `CURRENT_SYSTEM.md`. Next = P1 posteriores (UI incidente Mesa, Evolución de tesis, Operational Console) — **no** mezclar aquí.
+> **Arranque chat nuevo:** ADR-036 + [relevo Evolución](./traspaso-relevo-journal-evolucion-2026-08-26.md) + `CURRENT_SYSTEM.md`. Next = P1 posteriores (UI incidente Mesa, Operational Console) — **no** mezclar aquí.
 
 ---
 

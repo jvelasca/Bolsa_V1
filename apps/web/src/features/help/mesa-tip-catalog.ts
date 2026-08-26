@@ -11,7 +11,8 @@ export type MesaTipId =
   | "operativa-fit-chip"
   | "chart-f3-projection"
   | "confirm-ticket-preview"
-  | "confirm-risk-signature";
+  | "confirm-risk-signature"
+  | "operational-console";
 
 export type MesaTip = {
   id: MesaTipId;
@@ -79,6 +80,13 @@ export const MESA_TIPS: Record<MesaTipId, MesaTip> = {
     body: "Con TradePlan TRIGGERED, el tamaño es el riesgo del plan (qty / stop / pérdida €), no un % de caja. Superar el plan exige un motivo. Sin plan, el ticket no inventa stop ni R.",
     linkTo: "/confirm",
     linkLabel: "Abrir Confirmar",
+  },
+  "operational-console": {
+    id: "operational-console",
+    title: "Consola operacional",
+    body: "Panel read-only de salud ops: OE-1 Autoeval, readiness OR-6, recon OI-6 y incidentes DEX-3. PASS ≠ permiso operar. No firma ni ejecuta — Confirm sigue siendo la única firma. Posiciones en Libro · Operaciones.",
+    linkTo: "/operational-console",
+    linkLabel: "Abrir Consola ops",
   },
 };
 

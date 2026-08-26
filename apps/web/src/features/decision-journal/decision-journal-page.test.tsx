@@ -34,6 +34,7 @@ vi.mock("@/lib/api", () => ({
   api: {
     getDecisionJournal: vi.fn(),
     getDecisionStudies: vi.fn(),
+    getDecisionStudyHistory: vi.fn(),
     getLists: vi.fn(),
     getOhlcv: vi.fn(),
   },
@@ -155,10 +156,33 @@ describe("DecisionJournalPage", () => {
         unobserve() {}
       },
     );
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes("min-width"),
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    );
     vi.clearAllMocks();
     vi.mocked(api.getLists).mockResolvedValue({ data: [] } as never);
     vi.mocked(api.getDecisionStudies).mockResolvedValue({
       data: { accountId: "acc1", studies: [], total: 0, limit: 50, offset: 0 },
+    } as never);
+    vi.mocked(api.getDecisionStudyHistory).mockResolvedValue({
+      data: {
+        accountId: "acc1",
+        instrumentId: "inst-1",
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        studies: [],
+        total: 0,
+        limit: 20,
+        offset: 0,
+      },
     } as never);
     vi.mocked(api.getDecisionJournal).mockResolvedValue(
       makeJournalResponse() as never,
@@ -277,6 +301,68 @@ describe("DecisionJournalPage", () => {
     await waitFor(() =>
       expect(screen.getByTestId("journal-error")).toBeTruthy(),
     );
+  });
+
+  it("muestra pestaña Evolución y estado vacío", async () => {
+    vi.mocked(api.getDecisionStudies).mockResolvedValue({
+      data: {
+        accountId: "acc1",
+        studies: [makeStudy()],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      },
+    } as never);
+    renderPage();
+    fireEvent.click(screen.getByTestId("tab-evolucion"));
+    await waitFor(() =>
+      expect(screen.getByTestId("evolution-panel")).toBeTruthy(),
+    );
+    expect(screen.getByText(/Evolución de análisis IA/i)).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByTestId("evolution-empty")).toBeTruthy(),
+    );
+  });
+
+  it("Evolución carga historial y compare card", async () => {
+    vi.mocked(api.getDecisionStudies).mockResolvedValue({
+      data: {
+        accountId: "acc1",
+        studies: [makeStudy()],
+        total: 1,
+        limit: 50,
+        offset: 0,
+      },
+    } as never);
+    vi.mocked(api.getDecisionStudyHistory).mockResolvedValue({
+      data: {
+        accountId: "acc1",
+        instrumentId: "inst-1",
+        symbol: "AAPL",
+        name: "Apple Inc.",
+        studies: [
+          makeStudy({
+            sessionId: "s-new",
+            studiedAt: "2026-08-26T09:32:00Z",
+            opinion: "bullish",
+          }),
+          makeStudy({
+            sessionId: "s-old",
+            studiedAt: "2026-08-20T09:00:00Z",
+            opinion: "neutral",
+          }),
+        ],
+        total: 2,
+        limit: 20,
+        offset: 0,
+      },
+    } as never);
+    renderPage();
+    fireEvent.click(screen.getByTestId("tab-evolucion"));
+    await waitFor(() =>
+      expect(screen.getByTestId("journal-study-compare")).toBeTruthy(),
+    );
+    expect(screen.getAllByTestId("evolution-version-row").length).toBe(2);
   });
 
   it("muestra meta con total de entradas en historial", async () => {

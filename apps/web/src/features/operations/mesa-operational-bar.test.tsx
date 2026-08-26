@@ -58,6 +58,9 @@ vi.mock("@/lib/api", () => ({
       runtimeMemory: venue,
       redis: venue,
     })),
+    getActiveOperationalIncidents: vi.fn(async () => ({
+      data: { accountId: "acc-1", incidents: [], total: 0 },
+    })),
     getOpsSelfEval: vi.fn(async () => ({
       schemaVersion: "ops_self_eval_v0",
       rule: "measure ≠ Accept",

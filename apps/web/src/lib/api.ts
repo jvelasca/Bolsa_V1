@@ -1525,6 +1525,49 @@ export const api = {
       }),
     ),
 
+  /** DEX-3 — incidentes operacionales activos (open/in_review/resolved). */
+  getActiveOperationalIncidents: (accountId: string) =>
+    call<{
+      data: {
+        accountId: string;
+        incidents: import("@bolsa/shared").OperationalIncidentV1[];
+        total: number;
+      };
+    }>(() =>
+      client.GET("/api/accounts/{account_id}/operational-incidents/active", {
+        params: { path: { account_id: accountId } },
+      }),
+    ),
+
+  resolveOperationalIncident: (
+    accountId: string,
+    incidentId: string,
+    body: { resolutionNote: string; resolvedBy?: string },
+  ) =>
+    call<{ data: import("@bolsa/shared").OperationalIncidentV1 }>(() =>
+      client.POST(
+        "/api/accounts/{account_id}/operational-incidents/{incident_id}/resolve",
+        {
+          params: {
+            path: { account_id: accountId, incident_id: incidentId },
+          },
+          body,
+        },
+      ),
+    ),
+
+  clearOperationalIncident: (accountId: string, incidentId: string) =>
+    call<{ data: import("@bolsa/shared").OperationalIncidentV1 }>(() =>
+      client.POST(
+        "/api/accounts/{account_id}/operational-incidents/{incident_id}/clear",
+        {
+          params: {
+            path: { account_id: accountId, incident_id: incidentId },
+          },
+        },
+      ),
+    ),
+
   /** F3 — Decision Journal (solo lectura): audit trail append-only del spine. */
   getDecisionJournal: (
     accountId: string,
@@ -1576,6 +1619,24 @@ export const api = {
           query: opts,
         },
       }),
+    ),
+
+  /** ADR-036 Evolución — historial propose por instrumento (solo lectura). */
+  getDecisionStudyHistory: (
+    accountId: string,
+    instrumentId: string,
+    opts?: { limit?: number; offset?: number },
+  ) =>
+    call<import("@bolsa/shared").DecisionJournalStudyHistoryResponseV1>(() =>
+      client.GET(
+        "/api/accounts/{account_id}/decision-studies/{instrument_id}/history",
+        {
+          params: {
+            path: { account_id: accountId, instrument_id: instrumentId },
+            query: opts,
+          },
+        },
+      ),
     ),
 
   recordSessionVerdict: (

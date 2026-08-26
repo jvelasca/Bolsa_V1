@@ -48,6 +48,7 @@ export * from "./order-intent.js";
 export * from "./order-proposal.js";
 export * from "./decision-journal.js";
 export * from "./decision-journal-study.js";
+export * from "./decision-journal-study-delta.js";
 export * from "./order-proposal-mapper.js";
 export * from "./decision-session.js";
 export * from "./assessment.js";

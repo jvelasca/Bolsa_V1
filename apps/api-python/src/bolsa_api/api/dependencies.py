@@ -464,6 +464,17 @@ def get_decision_journal_studies_use_case(session: AsyncSession) -> Any:
     )
 
 
+def get_decision_journal_study_history_use_case(session: AsyncSession) -> Any:
+    """ADR-036 Evolución — historial propose por instrumento (solo lectura)."""
+    from bolsa_application.decision_journal_studies import GetDecisionJournalStudyHistory
+
+    return GetDecisionJournalStudyHistory(
+        get_cognitive_repository(session),
+        instruments=get_instrument_repository(session),
+        positions=get_position_state_repository(session),
+    )
+
+
 def get_record_session_verdict_use_case(session: AsyncSession) -> Any:
     """P4 — veredicto de sesión append-only."""
     from bolsa_application.record_session_verdict import RecordSessionVerdict

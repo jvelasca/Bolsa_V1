@@ -10,12 +10,13 @@
 
 ## 1. Decisión
 
-El Decision Journal en `/decision-journal` tiene **dos pestañas**:
+El Decision Journal en `/decision-journal` tiene **tres pestañas**:
 
-| Pestaña               | Qué es                                                      | SoT                                                                                     |
-| --------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| **Tesis**             | Lista + ficha de la última sesión `propose` por instrumento | Proyección de `decision_sessions` + `DecisionPackage` + `TradePlan` + Position/ExitPlan |
-| **Historial técnico** | Timeline ADR-029                                            | `decision_journal_entries` append-only                                                  |
+| Pestaña               | Qué es                                                                 | SoT                                                                                     |
+| --------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Tesis**             | Lista + ficha de la última sesión `propose` por instrumento            | Proyección de `decision_sessions` + `DecisionPackage` + `TradePlan` + Position/ExitPlan |
+| **Evolución**         | Serie read-only de snapshots `propose` por instrumento + diff N vs N-1 | Misma proyección que Tesis, **time series** (sin nueva tabla)                           |
+| **Historial técnico** | Timeline ADR-029                                                       | `decision_journal_entries` append-only                                                  |
 
 `DecisionJournalStudyViewV1` es un **ViewModel**. No hay tabla Alembic nueva. No se copian SL/TP/tesis al journal.
 
@@ -42,5 +43,33 @@ Precedencia documentada en `mapJournalStudyStatus` (`decision-journal-study.ts`)
 ## 4. Consecuencias
 
 - Confirm, SubmitIntent, OperationalIncident y DEX-1…DEX-5 **no se tocan**.
-- Journal Writer sigue siendo append-only; Tesis es solo lectura.
-- Pestaña Evolución / Operational Console / UI de incidentes: fuera de este ADR.
+- Journal Writer sigue siendo append-only; Tesis y Evolución son solo lectura.
+- Operational Console / UI de incidentes Mesa: fuera de este ADR.
+
+---
+
+## 5. Addendum — Evolución de tesis (E0–E4, 2026-08-26)
+
+**Estado:** Accepted (implementación E0–E4).
+
+La pestaña **Evolución** responde «**por qué cambió**» entre snapshots `propose` consecutivos del mismo instrumento. **No** es una nueva SoT ni sustituye el dictamen diario (ADR-022) ni la «Evolución» de Instruments.
+
+### Contrato
+
+- `DecisionJournalStudyHistoryV1` — `{ instrumentId, studies: DecisionJournalStudyViewV1[], total }`
+- `JournalStudyDeltaV1` + `mapJournalStudyDelta(prev, next)` — diff honesto, null-safe, buckets `motor` | `plan` | `health`
+- Copy: primera sesión → «Primera tesis registrada»; diff vacío → «Sin cambios materializados en el snapshot»
+
+### API
+
+`GET /api/accounts/{accountId}/decision-studies/{instrumentId}/history?limit&offset` — lista **todas** las sesiones `kind=propose` del instrumento (`created_at` desc), `build_study_view` por cada una.
+
+### Honestidad Evolución
+
+- WATCH / sin plan válido → **no** fabricar diff de SL/TP/entrada
+- Motor/plan solo desde payloads de sesión; journal events **no** se mezclan como estudios
+- Copy UI: «Evolución de análisis IA» (≠ dictamen diario Instruments)
+
+### Fuera de alcance
+
+Alembic · `userThesis` · causas inventadas · reabrir DEX/Confirm.

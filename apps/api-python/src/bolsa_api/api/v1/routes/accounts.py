@@ -20,14 +20,18 @@ from bolsa_api.api.dependencies import (
     get_db_session,
     get_decision_board_use_case,
     get_decision_journal_studies_use_case,
+    get_decision_journal_study_history_use_case,
     get_decision_journal_use_case,
     get_delete_account_use_case,
     get_deposit_cash_use_case,
     get_get_account_summary_use_case,
     get_get_account_use_case,
+    get_live_recon_lookup,
     get_list_account_summaries_use_case,
     get_list_accounts_use_case,
     get_list_ledger_use_case,
+    get_operational_incident_store,
+    get_portfolio_recon_lookup,
     get_record_session_verdict_use_case,
     get_set_default_account_use_case,
     get_tax_report_use_case,
@@ -58,9 +62,16 @@ from bolsa_api.schemas.accounts import (
     DailyOpsDigestNotifyResponseDto,
     DecisionBoardResponseDto,
     DecisionJournalListResponseDto,
+    DecisionJournalStudyHistoryResponseDto,
     DecisionJournalStudyListResponseDto,
     DepositCashDto,
     LedgerResponseDto,
+    OperationalIncidentDto,
+    OperationalIncidentResponseDto,
+    OperationalIncidentsListDto,
+    OperationalIncidentsListResponseDto,
+    ResolveOperationalIncidentBodyDto,
+    ReviewOperationalIncidentBodyDto,
     SendDailyOpsDigestDto,
     SessionVerdictBodyDto,
     SessionVerdictResponseDto,
@@ -456,6 +467,171 @@ async def get_decision_studies(
         offset=offset,
     )
     return DecisionJournalStudyListResponseDto(data=result.to_dict())
+
+
+@router.get(
+    "/accounts/{account_id}/decision-studies/{instrument_id}/history",
+    response_model=DecisionJournalStudyHistoryResponseDto,
+)
+async def get_decision_study_history(
+    account_id: Annotated[str, Depends(require_account_access)],
+    instrument_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> DecisionJournalStudyHistoryResponseDto:
+    """ADR-036 Evolución — historial propose por instrumento (solo lectura)."""
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    if not instrument_id or not instrument_id.strip():
+        raise HTTPException(status_code=422, detail="instrument_id no puede estar vacío")
+    result = await get_decision_journal_study_history_use_case(session).execute(
+        account_id,
+        instrument_id,
+        limit=limit,
+        offset=offset,
+    )
+    return DecisionJournalStudyHistoryResponseDto(data=result.to_dict())
+
+
+def _incident_http_error(exc: ValueError) -> HTTPException:
+    msg = str(exc)
+    if msg == "incident:not_found":
+        return HTTPException(status_code=404, detail=msg)
+    if msg in {"incident:resolution_note_required", "incident:identity_required"}:
+        return HTTPException(status_code=422, detail=msg)
+    if msg in {
+        "incident:recon_not_clean",
+        "incident:not_resolved",
+        "incident:invalid_transition",
+        "incident:already_cleared",
+    }:
+        return HTTPException(status_code=409, detail=msg)
+    return HTTPException(status_code=400, detail=msg)
+
+
+def _to_incident_dto(incident: object) -> OperationalIncidentDto:
+    payload = incident.to_dict()  # type: ignore[attr-defined]
+    return OperationalIncidentDto.model_validate(payload)
+
+
+@router.get(
+    "/accounts/{account_id}/operational-incidents/active",
+    response_model=OperationalIncidentsListResponseDto,
+)
+async def list_active_operational_incidents(
+    account_id: Annotated[str, Depends(require_account_access)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> OperationalIncidentsListResponseDto:
+    """DEX-3 — incidentes activos (open/in_review/resolved). Solo lectura."""
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    store = get_operational_incident_store(session)
+    active = await store.list_active(account_id)
+    incidents = [_to_incident_dto(inc) for inc in active]
+    return OperationalIncidentsListResponseDto(
+        data=OperationalIncidentsListDto(
+            account_id=account_id,
+            incidents=incidents,
+            total=len(incidents),
+        )
+    )
+
+
+@router.post(
+    "/accounts/{account_id}/operational-incidents/{incident_id}/review",
+    response_model=OperationalIncidentResponseDto,
+)
+async def review_operational_incident(
+    account_id: Annotated[str, Depends(require_account_access)],
+    incident_id: str,
+    body: ReviewOperationalIncidentBodyDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> OperationalIncidentResponseDto:
+    """DEX-3 — marca incidente en revisión (opcional)."""
+    from bolsa_application.operational_incident_store import mark_in_review_and_store
+
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    store = get_operational_incident_store(session)
+    try:
+        updated = await mark_in_review_and_store(
+            store,
+            incident_id=incident_id,
+            reviewed_by=body.reviewed_by,
+        )
+    except ValueError as exc:
+        raise _incident_http_error(exc) from exc
+    if updated.account_id != account_id:
+        raise HTTPException(status_code=404, detail="incident:not_found")
+    return OperationalIncidentResponseDto(data=_to_incident_dto(updated))
+
+
+@router.post(
+    "/accounts/{account_id}/operational-incidents/{incident_id}/resolve",
+    response_model=OperationalIncidentResponseDto,
+)
+async def resolve_operational_incident(
+    account_id: Annotated[str, Depends(require_account_access)],
+    incident_id: str,
+    body: ResolveOperationalIncidentBodyDto,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> OperationalIncidentResponseDto:
+    """DEX-3 — resolución humana con nota obligatoria. Sin auto-heal."""
+    from bolsa_application.operational_incident_store import resolve_and_store
+
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    store = get_operational_incident_store(session)
+    try:
+        updated = await resolve_and_store(
+            store,
+            incident_id=incident_id,
+            resolution_note=body.resolution_note,
+            resolved_by=body.resolved_by,
+        )
+    except ValueError as exc:
+        raise _incident_http_error(exc) from exc
+    if updated.account_id != account_id:
+        raise HTTPException(status_code=404, detail="incident:not_found")
+    return OperationalIncidentResponseDto(data=_to_incident_dto(updated))
+
+
+@router.post(
+    "/accounts/{account_id}/operational-incidents/{incident_id}/clear",
+    response_model=OperationalIncidentResponseDto,
+)
+async def clear_operational_incident(
+    account_id: Annotated[str, Depends(require_account_access)],
+    incident_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> OperationalIncidentResponseDto:
+    """DEX-3 — clear solo si resolved + recon clean. Server lookup recon."""
+    from bolsa_application.operational_incident_store import (
+        clear_and_store,
+        recon_status_for_incident_clear,
+    )
+
+    if not account_id or not account_id.strip():
+        raise HTTPException(status_code=422, detail="account_id no puede estar vacío")
+    store = get_operational_incident_store(session)
+    inc = await store.get(incident_id)
+    if inc is None or inc.account_id != account_id:
+        raise HTTPException(status_code=404, detail="incident:not_found")
+    recon_status = await recon_status_for_incident_clear(
+        inc,
+        portfolio_recon=get_portfolio_recon_lookup(session),
+        live_recon=get_live_recon_lookup(session),
+    )
+    try:
+        updated = await clear_and_store(
+            store,
+            incident_id=incident_id,
+            recon_status=recon_status,
+        )
+    except ValueError as exc:
+        raise _incident_http_error(exc) from exc
+    return OperationalIncidentResponseDto(data=_to_incident_dto(updated))
 
 
 @router.post(

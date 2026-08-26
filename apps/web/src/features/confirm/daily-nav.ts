@@ -29,6 +29,10 @@ export const LIBRO_LABEL = "Libro" as const;
 export const LIBRO_OPERACIONES_LABEL = "Operaciones" as const;
 export const LIBRO_HISTORIAL_LABEL = "Historial" as const;
 export const LIBRO_OPERACIONES_PATH = "/operations" as const;
+export const OPERATIONAL_CONSOLE_PATH = "/operational-console" as const;
+export const OPERATIONAL_CONSOLE_LABEL = "Consola ops" as const;
+export const OPERATIONAL_CONSOLE_HINT =
+  "Salud operativa read-only (OE-1, recon, incidentes)" as const;
 export const LIBRO_HISTORIAL_PATH = "/history" as const;
 /** Hint DropdownMenu: posiciones abiertas / órdenes. */
 export const LIBRO_OPERACIONES_HINT = "Posiciones y órdenes" as const;
@@ -46,6 +50,11 @@ export const LIBRO_NAV = {
       label: LIBRO_OPERACIONES_LABEL,
       href: LIBRO_OPERACIONES_PATH,
       hint: LIBRO_OPERACIONES_HINT,
+    },
+    {
+      label: OPERATIONAL_CONSOLE_LABEL,
+      href: OPERATIONAL_CONSOLE_PATH,
+      hint: OPERATIONAL_CONSOLE_HINT,
     },
     {
       label: LIBRO_HISTORIAL_LABEL,

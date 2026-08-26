@@ -9,9 +9,9 @@ import { RefreshCw } from "lucide-react";
 import type { DecisionJournalStudyViewV1 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PanelResizeHandle } from "@/components/layout/panel-resize-handle";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { JournalTimeline } from "@/features/decision-journal/journal-timeline";
 import {
@@ -20,12 +20,25 @@ import {
   type JournalStudyFilters,
 } from "@/features/decision-journal/journal-studies-filters";
 import { JournalStudiesTable } from "@/features/decision-journal/journal-studies-table";
-import { DecisionFichaPanel } from "@/features/decision-journal/decision-ficha-panel";
+import {
+  DecisionFichaPanel,
+  JournalStudyDetailCollapsedRail,
+} from "@/features/decision-journal/decision-ficha-panel";
+import { JournalEvolutionPanel } from "@/features/decision-journal/journal-evolution-panel";
+import {
+  JournalStudiesSplitLayout,
+  loadJournalStudiesSplitPrefs,
+  persistJournalStudiesSplitPrefs,
+} from "@/features/decision-journal/journal-studies-split-layout";
 
-type JournalTab = "tesis" | "historial";
+type JournalTab = "tesis" | "evolucion" | "historial";
+
+const STUDIES_PAGE_LIMIT = 200;
 
 export function DecisionJournalPage() {
   const { effectiveAccountId } = useActiveAccount();
+  const isWide = useMediaQuery("(min-width: 1024px)");
+  const splitPrefs = useMemo(() => loadJournalStudiesSplitPrefs(), []);
   const [tab, setTab] = useState<JournalTab>("tesis");
   const [filters, setFilters] = useState<JournalStudyFilters>(
     DEFAULT_JOURNAL_STUDY_FILTERS,
@@ -35,7 +48,20 @@ export function DecisionJournalPage() {
     null,
   );
   const [fichaCollapsed, setFichaCollapsed] = useState(false);
-  const [listPct, setListPct] = useState(62);
+  const [listWidthPct, setListWidthPct] = useState(splitPrefs.listWidthPct);
+  const [stackHeightPct, setStackHeightPct] = useState(
+    splitPrefs.stackHeightPct,
+  );
+  const [historialInstrumentFilter, setHistorialInstrumentFilter] = useState<
+    string | null
+  >(null);
+  const [evolutionInstrumentId, setEvolutionInstrumentId] = useState<
+    string | null
+  >(null);
+
+  useEffect(() => {
+    persistJournalStudiesSplitPrefs({ listWidthPct, stackHeightPct });
+  }, [listWidthPct, stackHeightPct]);
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedQ(filters.q), 250);
@@ -59,8 +85,10 @@ export function DecisionJournalPage() {
       filters.strengthBand,
       filters.dateFrom,
       filters.dateTo,
+      STUDIES_PAGE_LIMIT,
     ],
-    enabled: Boolean(effectiveAccountId) && tab === "tesis",
+    enabled:
+      Boolean(effectiveAccountId) && (tab === "tesis" || tab === "evolucion"),
     queryFn: () =>
       api.getDecisionStudies(effectiveAccountId!, {
         listId: filters.listId === "todas" ? undefined : filters.listId,
@@ -74,18 +102,27 @@ export function DecisionJournalPage() {
           ? `${filters.dateFrom}T00:00:00.000Z`
           : undefined,
         to: filters.dateTo ? `${filters.dateTo}T23:59:59.000Z` : undefined,
+        limit: STUDIES_PAGE_LIMIT,
       }),
     refetchInterval: 60_000,
   });
 
   const journalQuery = useQuery({
-    queryKey: ["decision-journal", effectiveAccountId],
+    queryKey: [
+      "decision-journal",
+      effectiveAccountId,
+      historialInstrumentFilter,
+    ],
     enabled: Boolean(effectiveAccountId) && tab === "historial",
-    queryFn: () => api.getDecisionJournal(effectiveAccountId!),
+    queryFn: () =>
+      api.getDecisionJournal(effectiveAccountId!, {
+        instrumentId: historialInstrumentFilter ?? undefined,
+      }),
     refetchInterval: 60_000,
   });
 
   const studies = studiesQuery.data?.data.studies ?? [];
+  const studiesTotal = studiesQuery.data?.data.total ?? studies.length;
   const journal = journalQuery.data?.data;
   const lists = useMemo(
     () =>
@@ -100,10 +137,10 @@ export function DecisionJournalPage() {
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col space-y-3 p-4 sm:p-6"
+      className="flex h-[calc(100dvh-3.5rem)] min-h-[480px] flex-col gap-3 overflow-hidden p-4 md:p-6"
       data-testid="decision-journal"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
+      <div className="flex shrink-0 flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-serif text-2xl font-semibold text-foreground sm:text-3xl">
             Decision Journal
@@ -112,21 +149,30 @@ export function DecisionJournalPage() {
             Seguimiento de análisis y tesis
           </p>
         </div>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => {
-            void studiesQuery.refetch();
-            void journalQuery.refetch();
-          }}
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-3">
+          {studiesQuery.isSuccess && tab === "tesis" ? (
+            <p className="text-[11px] tabular-nums text-muted-foreground">
+              {studies.length === studiesTotal
+                ? `${studiesTotal} tesis`
+                : `${studies.length} / ${studiesTotal}`}
+            </p>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              void studiesQuery.refetch();
+              void journalQuery.refetch();
+            }}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Actualizar
+          </Button>
+        </div>
       </div>
 
-      <div className="flex gap-1 rounded-lg border border-border bg-muted/30 p-0.5">
+      <div className="flex shrink-0 gap-1 rounded-lg border border-border bg-muted/30 p-0.5">
         <button
           type="button"
           data-testid="tab-tesis"
@@ -139,6 +185,19 @@ export function DecisionJournalPage() {
           onClick={() => setTab("tesis")}
         >
           Tesis
+        </button>
+        <button
+          type="button"
+          data-testid="tab-evolucion"
+          className={cn(
+            "rounded-md px-3 py-1.5 text-xs font-medium",
+            tab === "evolucion"
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground",
+          )}
+          onClick={() => setTab("evolucion")}
+        >
+          Evolución
         </button>
         <button
           type="button"
@@ -156,7 +215,7 @@ export function DecisionJournalPage() {
       </div>
 
       {tab === "tesis" ? (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
           <JournalStudiesFilters
             value={filters}
             onChange={setFilters}
@@ -178,57 +237,64 @@ export function DecisionJournalPage() {
             </Card>
           ) : null}
 
-          <div className="flex min-h-[28rem] flex-1 overflow-hidden rounded-xl border border-border">
-            <div
-              className="min-w-0 overflow-auto"
-              style={{ width: showFicha ? `${listPct}%` : "100%" }}
-            >
-              <JournalStudiesTable
-                studies={studies}
-                selectedSessionId={selected?.sessionId ?? null}
-                onSelect={(study) => {
-                  setSelected(study);
-                  setFichaCollapsed(false);
-                }}
-              />
-            </div>
-            {selected && fichaCollapsed ? (
-              <button
-                type="button"
-                className="w-8 border-l border-border bg-muted/30 text-[10px] text-muted-foreground"
-                onClick={() => setFichaCollapsed(false)}
-                aria-label="Mostrar ficha"
-              >
-                Ficha
-              </button>
-            ) : null}
-            {showFicha && selected ? (
-              <>
-                <PanelResizeHandle
-                  label="Redimensionar ficha"
-                  onDrag={(delta) => {
-                    const root = 900;
-                    setListPct((pct) =>
-                      Math.min(78, Math.max(36, pct + (delta / root) * 100)),
-                    );
+          {studiesQuery.isSuccess ? (
+            <JournalStudiesSplitLayout
+              className="min-h-0 flex-1"
+              isWide={isWide}
+              showDetail={Boolean(selected)}
+              detailCollapsed={Boolean(selected) && fichaCollapsed}
+              listWidthPct={listWidthPct}
+              stackHeightPct={stackHeightPct}
+              onListWidthPctChange={setListWidthPct}
+              onStackHeightPctChange={setStackHeightPct}
+              list={
+                <JournalStudiesTable
+                  studies={studies}
+                  selectedSessionId={selected?.sessionId ?? null}
+                  onSelect={(study) => {
+                    setSelected(study);
+                    setFichaCollapsed(false);
+                    setEvolutionInstrumentId(study.instrumentId);
                   }}
                 />
-                <div
-                  className="min-h-0 min-w-0"
-                  style={{ width: `${100 - listPct}%` }}
-                >
-                  <DecisionFichaPanel
-                    study={selected}
-                    onClose={() => setSelected(null)}
-                    onCollapse={() => setFichaCollapsed(true)}
-                  />
-                </div>
-              </>
-            ) : null}
-          </div>
+              }
+              detail={
+                selected ? (
+                  showFicha ? (
+                    <DecisionFichaPanel
+                      study={selected}
+                      onClose={() => setSelected(null)}
+                      onCollapse={() => setFichaCollapsed(true)}
+                    />
+                  ) : (
+                    <JournalStudyDetailCollapsedRail
+                      symbol={selected.symbol ?? selected.instrumentId}
+                      isWide={isWide}
+                      onExpand={() => setFichaCollapsed(false)}
+                      onClose={() => setSelected(null)}
+                    />
+                  )
+                ) : (
+                  <div className="flex h-full items-center justify-center p-4 text-[11px] text-muted-foreground">
+                    Selecciona una tesis en la lista
+                  </div>
+                )
+              }
+            />
+          ) : null}
         </div>
+      ) : tab === "evolucion" ? (
+        <JournalEvolutionPanel
+          accountId={effectiveAccountId!}
+          studiesCatalog={studies}
+          initialInstrumentId={evolutionInstrumentId ?? selected?.instrumentId}
+          onOpenHistorial={(instrumentId) => {
+            setHistorialInstrumentFilter(instrumentId);
+            setTab("historial");
+          }}
+        />
       ) : (
-        <>
+        <div className="min-h-0 flex-1 overflow-auto space-y-3">
           {journalQuery.isLoading && !journal ? (
             <p className="text-sm text-muted-foreground">Cargando…</p>
           ) : null}
@@ -256,12 +322,27 @@ export function DecisionJournalPage() {
                   {journal.total > journal.entries.length
                     ? ` (mostrando ${journal.entries.length})`
                     : null}
+                  {historialInstrumentFilter ? (
+                    <>
+                      {" · filtro activo "}
+                      <code className="text-[10px]">
+                        {historialInstrumentFilter}
+                      </code>
+                      <button
+                        type="button"
+                        className="ml-2 text-primary underline-offset-2 hover:underline"
+                        onClick={() => setHistorialInstrumentFilter(null)}
+                      >
+                        Quitar filtro
+                      </button>
+                    </>
+                  ) : null}
                 </p>
               </Card>
               <JournalTimeline entries={journal.entries} />
             </>
           ) : null}
-        </>
+        </div>
       )}
     </div>
   );

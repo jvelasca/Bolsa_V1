@@ -273,3 +273,32 @@ async def clear_and_store(
     updated = clear_incident(inc, recon_status=recon_status)
     await store.put(updated)
     return updated
+
+
+async def mark_in_review_and_store(
+    store: OperationalIncidentStore,
+    *,
+    incident_id: str,
+    reviewed_by: str | None = None,
+) -> OperationalIncident:
+    from bolsa_analytics.cognitive.operational_incident import mark_in_review
+
+    inc = await store.get(incident_id)
+    if inc is None:
+        raise ValueError("incident:not_found")
+    updated = mark_in_review(inc, reviewed_by=reviewed_by)
+    await store.put(updated)
+    return updated
+
+
+async def recon_status_for_incident_clear(
+    incident: OperationalIncident,
+    *,
+    portfolio_recon: object,
+    live_recon: object,
+) -> str:
+    """Status recon relevante para clear según kind del incidente."""
+    aid = incident.account_id
+    if incident.kind == "portfolio_drift":
+        return await portfolio_recon.portfolio_recon_status(aid)  # type: ignore[attr-defined]
+    return await live_recon.live_recon_status(aid)  # type: ignore[attr-defined]

@@ -4026,6 +4026,81 @@
         "title": "DecisionJournalStudyDto",
         "type": "object"
       },
+      "DecisionJournalStudyHistoryDto": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "studies": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionJournalStudyDto"
+            },
+            "title": "Studies",
+            "type": "array"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountId",
+          "instrumentId",
+          "studies",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DecisionJournalStudyHistoryDto",
+        "type": "object"
+      },
+      "DecisionJournalStudyHistoryResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/DecisionJournalStudyHistoryDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "DecisionJournalStudyHistoryResponseDto",
+        "type": "object"
+      },
       "DecisionJournalStudyListDto": {
         "properties": {
           "accountId": {
@@ -11000,6 +11075,178 @@
         "title": "OperationalExitPlanDto",
         "type": "object"
       },
+      "OperationalIncidentDto": {
+        "description": "DEX-3 — OperationalIncident wire (ADR-035).",
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "clearedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clearedat"
+          },
+          "incidentId": {
+            "title": "Incidentid",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "portfolio_drift",
+              "live_drift",
+              "live_unavailable"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "openedAt": {
+            "title": "Openedat",
+            "type": "string"
+          },
+          "resolutionNote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolutionnote"
+          },
+          "resolvedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolvedat"
+          },
+          "resolvedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolvedby"
+          },
+          "reviewedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewedat"
+          },
+          "reviewedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewedby"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_review",
+              "resolved",
+              "cleared"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "incidentId",
+          "accountId",
+          "kind",
+          "status",
+          "openedAt"
+        ],
+        "title": "OperationalIncidentDto",
+        "type": "object"
+      },
+      "OperationalIncidentResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OperationalIncidentDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "OperationalIncidentResponseDto",
+        "type": "object"
+      },
+      "OperationalIncidentsListDto": {
+        "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
+          "incidents": {
+            "items": {
+              "$ref": "#/components/schemas/OperationalIncidentDto"
+            },
+            "title": "Incidents",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "accountId",
+          "incidents",
+          "total"
+        ],
+        "title": "OperationalIncidentsListDto",
+        "type": "object"
+      },
+      "OperationalIncidentsListResponseDto": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/OperationalIncidentsListDto"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "OperationalIncidentsListResponseDto",
+        "type": "object"
+      },
       "OperationalPositionDto": {
         "description": "P1 — snapshot de autoridad post-fill (no es el holding ledger).",
         "properties": {
@@ -13716,6 +13963,48 @@
           "offset"
         ],
         "title": "ResearchTrialsListResponseDto",
+        "type": "object"
+      },
+      "ResolveOperationalIncidentBodyDto": {
+        "properties": {
+          "resolutionNote": {
+            "minLength": 1,
+            "title": "Resolutionnote",
+            "type": "string"
+          },
+          "resolvedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolvedby"
+          }
+        },
+        "required": [
+          "resolutionNote"
+        ],
+        "title": "ResolveOperationalIncidentBodyDto",
+        "type": "object"
+      },
+      "ReviewOperationalIncidentBodyDto": {
+        "properties": {
+          "reviewedBy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewedby"
+          }
+        },
+        "title": "ReviewOperationalIncidentBodyDto",
         "type": "object"
       },
       "RouteSignalsRequestDto": {
@@ -18421,6 +18710,81 @@
         ]
       }
     },
+    "/api/accounts/{account_id}/decision-studies/{instrument_id}/history": {
+      "get": {
+        "description": "ADR-036 Evolución — historial propose por instrumento (solo lectura).",
+        "operationId": "get_decision_study_history_api_accounts__account_id__decision_studies__instrument_id__history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instrument_id",
+            "required": true,
+            "schema": {
+              "title": "Instrument Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionJournalStudyHistoryResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Decision Study History",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
     "/api/accounts/{account_id}/deposits": {
       "post": {
         "operationId": "deposit_cash_api_accounts__account_id__deposits_post",
@@ -18704,6 +19068,225 @@
         "summary": "Sync Account Mandates",
         "tags": [
           "mandates"
+        ]
+      }
+    },
+    "/api/accounts/{account_id}/operational-incidents/active": {
+      "get": {
+        "description": "DEX-3 — incidentes activos (open/in_review/resolved). Solo lectura.",
+        "operationId": "list_active_operational_incidents_api_accounts__account_id__operational_incidents_active_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalIncidentsListResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Active Operational Incidents",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/api/accounts/{account_id}/operational-incidents/{incident_id}/clear": {
+      "post": {
+        "description": "DEX-3 — clear solo si resolved + recon clean. Server lookup recon.",
+        "operationId": "clear_operational_incident_api_accounts__account_id__operational_incidents__incident_id__clear_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalIncidentResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clear Operational Incident",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/api/accounts/{account_id}/operational-incidents/{incident_id}/resolve": {
+      "post": {
+        "description": "DEX-3 — resolución humana con nota obligatoria. Sin auto-heal.",
+        "operationId": "resolve_operational_incident_api_accounts__account_id__operational_incidents__incident_id__resolve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveOperationalIncidentBodyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalIncidentResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Operational Incident",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/api/accounts/{account_id}/operational-incidents/{incident_id}/review": {
+      "post": {
+        "description": "DEX-3 — marca incidente en revisión (opcional).",
+        "operationId": "review_operational_incident_api_accounts__account_id__operational_incidents__incident_id__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "incident_id",
+            "required": true,
+            "schema": {
+              "title": "Incident Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "title": "Account Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewOperationalIncidentBodyDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalIncidentResponseDto"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Operational Incident",
+        "tags": [
+          "accounts"
         ]
       }
     },

@@ -47,16 +47,16 @@ export function clampJournalStudyColumnWidth(width: number): number {
 }
 
 export const DEFAULT_JOURNAL_STUDY_LAYOUT: JournalStudyColumnLayoutItem[] = [
-  { id: "symbol", width: 120, visible: true },
-  { id: "status", width: 132, visible: true },
-  { id: "period", width: 88, visible: true },
-  { id: "opinion", width: 88, visible: true },
-  { id: "targets", width: 108, visible: true },
-  { id: "strength", width: 112, visible: true },
-  { id: "updated", width: 128, visible: true },
-  { id: "entry", width: 88, visible: false },
-  { id: "vigencia", width: 120, visible: false },
-  { id: "actions", width: 132, visible: true },
+  { id: "symbol", width: 108, visible: true },
+  { id: "status", width: 92, visible: true },
+  { id: "period", width: 68, visible: true },
+  { id: "opinion", width: 72, visible: true },
+  { id: "targets", width: 84, visible: true },
+  { id: "strength", width: 88, visible: true },
+  { id: "updated", width: 104, visible: true },
+  { id: "entry", width: 72, visible: false },
+  { id: "vigencia", width: 80, visible: false },
+  { id: "actions", width: 44, visible: true },
 ];
 
 export const DEFAULT_JOURNAL_STUDY_FAVORITES: JournalStudyColumnId[] = [
@@ -76,16 +76,54 @@ export function buildJournalStudyGridTemplate(
   visibleColumns: JournalStudyColumnLayoutItem[],
 ): string {
   if (visibleColumns.length === 0) return "minmax(0, 1fr)";
-  const flexId = visibleColumns.some((column) => column.id === "symbol")
-    ? "symbol"
-    : visibleColumns.at(-1)?.id;
-  return visibleColumns
-    .map((column) =>
-      column.id === flexId
-        ? `minmax(${column.width}px, 1fr)`
-        : `minmax(0, ${column.width}px)`,
-    )
-    .join(" ");
+  return visibleColumns.map((column) => `${column.width}px`).join(" ");
+}
+
+export function journalStudyGridMinWidth(
+  visibleColumns: JournalStudyColumnLayoutItem[],
+): number {
+  return visibleColumns.reduce((sum, column) => sum + column.width, 0);
+}
+
+export function journalStudyColumnAlign(
+  columnId: JournalStudyColumnId,
+): "left" | "right" | "center" {
+  if (
+    columnId === "symbol" ||
+    columnId === "status" ||
+    columnId === "period" ||
+    columnId === "opinion" ||
+    columnId === "vigencia"
+  ) {
+    return "left";
+  }
+  if (columnId === "actions") return "center";
+  return "right";
+}
+
+export function fitJournalStudyColumnsToContent(
+  layout: JournalStudyColumnLayoutItem[],
+  contentSamples: Partial<Record<JournalStudyColumnId, string[]>>,
+): JournalStudyColumnLayoutItem[] {
+  const charPx = 6.5;
+  const pad = 16;
+  return layout.map((column) => {
+    const header = JOURNAL_STUDY_COLUMN_LABELS[column.id];
+    const headerW = header.length * charPx + pad + 12;
+    const samples = contentSamples[column.id] ?? [];
+    let contentW = 0;
+    for (const sample of samples) {
+      if (!sample) continue;
+      contentW = Math.max(contentW, sample.length * charPx + pad);
+    }
+    contentW = Math.max(contentW, header.length * charPx + pad);
+    const floor =
+      column.id === "actions" ? 40 : column.id === "strength" ? 80 : MIN_WIDTH;
+    const width = clampJournalStudyColumnWidth(
+      Math.max(floor, headerW, contentW),
+    );
+    return { ...column, width };
+  });
 }
 
 export function resizeJournalStudyColumn(
@@ -175,7 +213,7 @@ export function journalStudyStatusRank(status: string): number {
   return STATUS_ORDER[status as JournalStudyUserStatus] ?? 99;
 }
 
-const STORAGE_KEY = "bolsa.journal-study-columns.v1";
+const STORAGE_KEY = "bolsa.journal-study-columns.v2";
 
 export function loadJournalStudyLayout(): {
   layout: JournalStudyColumnLayoutItem[];

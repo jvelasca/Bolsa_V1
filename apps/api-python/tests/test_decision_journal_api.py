@@ -113,3 +113,42 @@ def test_decision_study_list_dto_maps_without_error() -> None:
     resp = DecisionJournalStudyListResponseDto(data=payload)
     dumped = resp.model_dump(by_alias=True)
     assert dumped["data"]["studies"][0]["sessionId"] == "s1"
+
+
+def test_decision_study_history_dto_maps_without_error() -> None:
+    from bolsa_api.schemas.accounts import (
+        DecisionJournalStudyHistoryDto,
+        DecisionJournalStudyHistoryResponseDto,
+    )
+
+    payload = {
+        "accountId": "acc-1",
+        "instrumentId": "inst-1",
+        "symbol": "AAPL",
+        "name": "Apple",
+        "studies": [
+            {
+                "artifactType": "ART-DECISION-JOURNAL-STUDY",
+                "schemaVersion": "1.0.0",
+                "sessionId": "s-new",
+                "instrumentId": "inst-1",
+                "studiedAt": "2026-08-26T09:32:00Z",
+                "status": "neutral",
+                "hasOperationalPlan": False,
+                "userThesis": None,
+                "analysisNotes": [],
+                "trends": [],
+                "consensus": {"bullish": 0, "bearish": 0, "neutral": 1, "total": 1},
+                "indicators": {"primary": None, "confirmation": None},
+                "invalidation": [],
+            }
+        ],
+        "total": 1,
+        "limit": 20,
+        "offset": 0,
+    }
+    dto = DecisionJournalStudyHistoryDto.model_validate(payload)
+    assert dto.instrument_id == "inst-1"
+    resp = DecisionJournalStudyHistoryResponseDto(data=payload)
+    dumped = resp.model_dump(by_alias=True)
+    assert dumped["data"]["instrumentId"] == "inst-1"

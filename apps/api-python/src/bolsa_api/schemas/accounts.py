@@ -1,6 +1,6 @@
 """DTOs HTTP de cuentas de trading/DEMO."""
 
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -505,6 +505,23 @@ class DecisionJournalStudyListResponseDto(BaseModel):
     data: DecisionJournalStudyListDto
 
 
+class DecisionJournalStudyHistoryDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    account_id: str = Field(alias="accountId")
+    instrument_id: str = Field(alias="instrumentId")
+    symbol: str | None = None
+    name: str | None = None
+    studies: list[DecisionJournalStudyDto]
+    total: int
+    limit: int
+    offset: int
+
+
+class DecisionJournalStudyHistoryResponseDto(BaseModel):
+    data: DecisionJournalStudyHistoryDto
+
+
 class SessionVerdictBodyDto(BaseModel):
     """P4 — veredicto explícito de sesión (sin fill)."""
 
@@ -524,3 +541,51 @@ class SessionVerdictResultDto(BaseModel):
 
 class SessionVerdictResponseDto(BaseModel):
     data: SessionVerdictResultDto
+
+
+class OperationalIncidentDto(BaseModel):
+    """DEX-3 — OperationalIncident wire (ADR-035)."""
+
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    incident_id: str = Field(alias="incidentId")
+    account_id: str = Field(alias="accountId")
+    kind: Literal["portfolio_drift", "live_drift", "live_unavailable"]
+    status: Literal["open", "in_review", "resolved", "cleared"]
+    snapshot: str | None = None
+    opened_at: str = Field(alias="openedAt")
+    reviewed_at: str | None = Field(default=None, alias="reviewedAt")
+    reviewed_by: str | None = Field(default=None, alias="reviewedBy")
+    resolved_at: str | None = Field(default=None, alias="resolvedAt")
+    resolved_by: str | None = Field(default=None, alias="resolvedBy")
+    resolution_note: str | None = Field(default=None, alias="resolutionNote")
+    cleared_at: str | None = Field(default=None, alias="clearedAt")
+
+
+class OperationalIncidentsListDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    account_id: str = Field(alias="accountId")
+    incidents: list[OperationalIncidentDto]
+    total: int
+
+
+class OperationalIncidentsListResponseDto(BaseModel):
+    data: OperationalIncidentsListDto
+
+
+class OperationalIncidentResponseDto(BaseModel):
+    data: OperationalIncidentDto
+
+
+class ResolveOperationalIncidentBodyDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    resolution_note: str = Field(alias="resolutionNote", min_length=1)
+    resolved_by: str | None = Field(default=None, alias="resolvedBy")
+
+
+class ReviewOperationalIncidentBodyDto(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, ser_json_by_alias=True)  # type: ignore[typeddict-unknown-key]
+
+    reviewed_by: str | None = Field(default=None, alias="reviewedBy")

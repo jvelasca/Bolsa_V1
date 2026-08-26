@@ -45,8 +45,12 @@ LAB ≠ TRADING · LLM no ejecuta · Ranking ≠ BUY · Confirm = firma · `PAPE
 
 ## 4. Post-tag cerrado (no mezclar con DEX)
 
-| Epic                                     | Estado                   | Relevo                                                                                               |
-| ---------------------------------------- | ------------------------ | ---------------------------------------------------------------------------------------------------- |
-| **Decision Journal 2.0 Tesis** (ADR-036) | **CERRADO** (2026-08-26) | [`traspaso-relevo-journal-20-tesis-2026-08-26.md`](./traspaso-relevo-journal-20-tesis-2026-08-26.md) |
+| Epic                                      | Estado                   | Relevo                                                                                                                                                                          |
+| ----------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Decision Journal 2.0 Tesis** (ADR-036)  | **CERRADO** (2026-08-26) | [`traspaso-relevo-journal-20-tesis-2026-08-26.md`](./traspaso-relevo-journal-20-tesis-2026-08-26.md)                                                                            |
+| **Journal Evolución** (ADR-036 §5)        | **CERRADO** (2026-08-26) | [`traspaso-relevo-journal-evolucion-2026-08-26.md`](./traspaso-relevo-journal-evolucion-2026-08-26.md)                                                                          |
+| **Mesa incident UI** (DEX-3)              | **CERRADO** (2026-08-26) | [`traspaso-relevo-mesa-incident-ui-2026-08-26.md`](./traspaso-relevo-mesa-incident-ui-2026-08-26.md)                                                                            |
+| **Operational Console**                   | **CERRADO** (2026-08-26) | [`traspaso-relevo-operational-console-2026-08-26.md`](./traspaso-relevo-operational-console-2026-08-26.md)                                                                      |
+| **Journal hub UI** (Tesis ≈ Instrumentos) | **CERRADO** (2026-08-26) | [`traspaso-relevo-journal-hub-ui-2026-08-26.md`](./traspaso-relevo-journal-hub-ui-2026-08-26.md) · candidato tag [`v1.14-beta`](./traspaso-relevo-tag-v1-14-beta-2026-08-26.md) |
 
 Solo lectura · sin Alembic · spine **483** tras J4 · DEX-1…5 **no reabiertos**.

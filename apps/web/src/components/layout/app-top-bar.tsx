@@ -38,6 +38,7 @@ import {
   Radar,
   RotateCcw,
   Settings,
+  ShieldCheck,
   SquareArrowOutUpRight,
   User,
   Wallet,
@@ -272,6 +273,7 @@ const HERRAMIENTAS_NAV = [
   { to: "/alerts", label: "Alertas", icon: Bell },
   { to: "/instruments", label: "Instrumentos", icon: BookOpen },
   { to: "/decision-board", label: "Decision Board", icon: Gauge },
+  { to: "/operational-console", label: "Consola ops", icon: ShieldCheck },
   { to: "/decision-journal", label: "Decision Journal", icon: BookMarked },
 ] as const;
 
@@ -321,6 +323,7 @@ export function AppTopBar() {
   const isResearchRoute = location.pathname.startsWith("/research");
   const isLibroRoute =
     location.pathname.startsWith("/operations") ||
+    location.pathname.startsWith("/operational-console") ||
     location.pathname.startsWith("/history");
   const trading = isTradingRoute(location.pathname);
   const historyNav = useSpaHistoryNav();

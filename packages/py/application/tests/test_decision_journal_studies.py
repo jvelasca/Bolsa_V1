@@ -200,3 +200,43 @@ async def test_filters_opinion_and_search() -> None:
     assert by_q.total == 1
     by_aapl = await uc.execute("acc-1", q="aapl")
     assert by_aapl.total == 1
+
+
+@pytest.mark.asyncio
+async def test_study_history_returns_all_propose_for_instrument() -> None:
+    from bolsa_application.decision_journal_studies import GetDecisionJournalStudyHistory
+
+    older = _session(session_id="s-old", created_at="2026-08-20T09:00:00Z")
+    newer = _session(session_id="s-new", created_at="2026-08-26T09:32:00Z")
+    confirm = _session(session_id="s-c", kind="confirm")
+    msft = _session(session_id="s-msft", instrument_id="inst-2", symbol="MSFT")
+
+    class _FilteredSessions(_FakeSessions):
+        async def list_decision_sessions(
+            self,
+            *,
+            limit: int = 50,
+            account_id: str | None = None,
+            instrument_id: str | None = None,
+        ) -> list[DecisionSessionRecord]:
+            rows = await super().list_decision_sessions(
+                limit=limit, account_id=account_id, instrument_id=instrument_id
+            )
+            if instrument_id:
+                return [r for r in rows if r.instrument_id == instrument_id]
+            return rows
+
+    uc = GetDecisionJournalStudyHistory(
+        _FilteredSessions([newer, confirm, older, msft]),
+        instruments=_FakeInstruments(),
+    )
+    result = await uc.execute(
+        "acc-1",
+        "inst-1",
+        now=datetime(2026, 8, 26, 11, 32, tzinfo=UTC),
+    )
+    assert result.total == 2
+    assert result.instrument_id == "inst-1"
+    assert result.studies[0].session_id == "s-new"
+    assert result.studies[1].session_id == "s-old"
+    assert all(s.instrument_id == "inst-1" for s in result.studies)
