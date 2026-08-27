@@ -3,7 +3,7 @@
  * Proyección de TradePlan / PositionState; no entidad nueva.
  */
 
-import type { OperationalPlanViewV1 } from "@bolsa/shared";
+import { targetProgressHint, type OperationalPlanViewV1 } from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
 
@@ -107,13 +107,13 @@ export function OperationalPlanView({
         <Row
           label="T1"
           value={plan.target1 != null ? formatPrice(plan.target1) : "—"}
-          hint={plan.target1Reached ? "✓ alcanzado" : null}
+          hint={targetProgressHint(plan.target1Touched, plan.target1Managed)}
           tone="target"
         />
         <Row
           label="T2"
           value={plan.target2 != null ? formatPrice(plan.target2) : "—"}
-          hint={plan.target2Reached ? "✓ alcanzado" : "→"}
+          hint={targetProgressHint(plan.target2Touched, plan.target2Managed)}
           tone="target"
         />
         {plan.expectedRR != null ? (
@@ -135,7 +135,7 @@ export function OperationalPlanView({
           data-testid={`${testId}-trailing`}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
-            Trailing activo
+            Trailing (propuesta)
           </p>
           <dl className="mt-1 space-y-0.5">
             {plan.trailingPeakPrice != null ? (
@@ -155,7 +155,7 @@ export function OperationalPlanView({
               />
             ) : null}
             <Row
-              label="Stop dinámico"
+              label="Stop sugerido"
               value={
                 plan.trailingStopHint != null
                   ? formatPrice(plan.trailingStopHint)

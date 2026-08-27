@@ -1,6 +1,7 @@
 """R1 — Resumen operativo diario (cuenta + ledger + semana + F3 + canales).
 
 @see docs/engineering/daily-ops-report-brief-2026-08-04.md
+@see ADR-041 V1.22 H1 — universo = Estudio; filtro nunca amplía.
 """
 
 from __future__ import annotations
@@ -8,9 +9,8 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, Protocol
 
-from bolsa_application.accounts import GetAccountSummary, ListLedgerEntries
 from bolsa_domain.entities.account import AccountSummary, LedgerEntry
 from bolsa_infrastructure.alerts.estudio_opinion_email import map_opinion_to_channel
 from bolsa_infrastructure.database.repositories.instrument_daily_opinion_repository import (
@@ -20,8 +20,31 @@ from bolsa_infrastructure.database.repositories.supervised_f3_repository import 
     SqlAlchemySupervisedF3Repository,
 )
 
+from bolsa_application.accounts import GetAccountSummary, ListLedgerEntries
+from bolsa_application.opportunity_daily_discovery import DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
+
 DAILY_OPS_REPORT_SCHEMA = "daily_ops_report_v1"
 WEEK_DAYS = 7
+ESTUDIO_LIST_ID = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
+
+
+class EstudioListPort(Protocol):
+    """GetInstrumentList.execute(list_id) → detail con instrument_ids."""
+
+    async def execute(self, list_id: str) -> Any: ...
+
+
+def intersect_daily_ops_universe(
+    estudio_ids: list[str] | None,
+    instrument_ids: list[str] | None,
+) -> list[str]:
+    """DAILY_OPS_UNIVERSE = Estudio. Filtro = Estudio ∩ ids. Nunca amplía."""
+    estudio = [i for i in (estudio_ids or []) if i]
+    requested = [i for i in (instrument_ids or []) if i]
+    if not requested:
+        return estudio
+    wanted = set(requested)
+    return [i for i in estudio if i in wanted]
 
 
 def _day_key(iso: str) -> str | None:
@@ -57,11 +80,22 @@ class GetDailyOpsReport:
         list_ledger: ListLedgerEntries,
         f3_repo: SqlAlchemySupervisedF3Repository,
         opinion_repo: SqlAlchemyInstrumentDailyOpinionRepository | None = None,
+        get_estudio: EstudioListPort | None = None,
     ) -> None:
         self._get_summary = get_summary
         self._list_ledger = list_ledger
         self._f3_repo = f3_repo
         self._opinion_repo = opinion_repo
+        self._get_estudio = get_estudio
+
+    async def _estudio_instrument_ids(self) -> list[str]:
+        if self._get_estudio is None:
+            return []
+        detail = await self._get_estudio.execute(ESTUDIO_LIST_ID)
+        raw = getattr(detail, "instrument_ids", None) if detail is not None else None
+        if isinstance(raw, list):
+            return [str(i) for i in raw if i]
+        return []
 
     async def execute(
         self,
@@ -119,7 +153,11 @@ class GetDailyOpsReport:
         channels = {"alarma": 0, "aviso": 0, "none": 0}
         opinion_rows: list[dict[str, Any]] = []
         notes: list[str] = ["R1–R4: preview web + digest HTML/PDF (flag/prefs)."]
-        ids = [i for i in (instrument_ids or []) if i]
+        estudio_ids = await self._estudio_instrument_ids()
+        ids = intersect_daily_ops_universe(estudio_ids, instrument_ids)
+        requested = [i for i in (instrument_ids or []) if i]
+        if requested and set(requested) - set(ids):
+            notes.append("Filtro recortado a Estudio (ids fuera del universo descartados).")
         if ids and self._opinion_repo is not None:
             op_recs = await self._opinion_repo.list_for_instruments(ids, day, source="on_demand")
             if not op_recs:
@@ -150,7 +188,12 @@ class GetDailyOpsReport:
                     "Sin dictámenes cacheados para el Estudio en asOf (calcula en Opiniones)."
                 )
         elif not ids:
-            notes.append("Pasa instrumentIds del Estudio para Alarmas/Avisos del día.")
+            if self._get_estudio is None:
+                notes.append(
+                    "Sin membresía Estudio resuelta; no se consultan opiniones de un universo libre."
+                )
+            else:
+                notes.append("Estudio vacío o filtro sin intersección; sin Alarmas/Avisos del día.")
 
         return DailyOpsReportBundle(
             as_of=day,

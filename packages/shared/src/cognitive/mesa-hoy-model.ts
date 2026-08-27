@@ -38,6 +38,8 @@ export type MesaSessionStateV1 = {
   pendingConfirm: number;
   vetoed: number;
   deferred: number;
+  /** Tamaño del universo Estudio (supervisión), no = WATCH del board. */
+  estudioUniverseCount: number | null;
   candidateCounts: {
     ready: number;
     prepared: number;
@@ -246,6 +248,8 @@ export function buildMesaSessionState(
     entriesBlocked: boolean;
     killSwitchEffective?: boolean;
     incidentCount?: number;
+    /** Instrumentos en lista Estudio (universo supervisable). */
+    estudioUniverseCount?: number | null;
   },
 ): MesaSessionStateV1 {
   const buckets = board?.buckets;
@@ -263,6 +267,17 @@ export function buildMesaSessionState(
     blocked: countByStatus("BLOCKED"),
   };
 
+  const estudioUniverseCount =
+    typeof input.estudioUniverseCount === "number" &&
+    Number.isFinite(input.estudioUniverseCount)
+      ? Math.max(0, Math.floor(input.estudioUniverseCount))
+      : null;
+
+  const estudioPrefix =
+    estudioUniverseCount != null
+      ? `Estudio ${estudioUniverseCount} en supervisión`
+      : null;
+
   const regimeHint = board ? deriveMesaRegimeHint(board) : null;
 
   if (input.incidentCount && input.incidentCount > 0) {
@@ -275,6 +290,7 @@ export function buildMesaSessionState(
       pendingConfirm,
       vetoed,
       deferred,
+      estudioUniverseCount,
       candidateCounts,
     };
   }
@@ -288,6 +304,7 @@ export function buildMesaSessionState(
       pendingConfirm,
       vetoed,
       deferred,
+      estudioUniverseCount,
       candidateCounts,
     };
   }
@@ -296,17 +313,28 @@ export function buildMesaSessionState(
     return {
       tone: "selective",
       headline: "Condiciones selectivas",
-      detail: `${candidateCounts.ready} listos · ${candidateCounts.blocked} bloqueados · ${pendingConfirm} pendiente(s) de confirmación`,
+      detail: [
+        estudioPrefix,
+        `${candidateCounts.ready} listos · ${candidateCounts.blocked} bloqueados · ${pendingConfirm} pendiente(s) de confirmación`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       regimeHint,
       pendingConfirm,
       vetoed,
       deferred,
+      estudioUniverseCount,
       candidateCounts,
     };
   }
 
   const actionable = candidateCounts.ready + candidateCounts.prepared;
   const noOperationsToday = actionable === 0 && candidateCounts.ready === 0;
+  const boardWatchHint =
+    candidateCounts.watch > 0
+      ? `${candidateCounts.watch} WATCH en board (≠ tamaño Estudio)`
+      : "0 WATCH en board";
+
   return {
     tone: "operational",
     headline:
@@ -317,14 +345,33 @@ export function buildMesaSessionState(
           : "Sin entradas urgentes",
     detail:
       noOperationsToday && pendingConfirm === 0
-        ? `${candidateCounts.watch} en vigilancia · ${candidateCounts.blocked} bloqueados · la decisión correcta puede ser no operar`
+        ? [
+            estudioPrefix,
+            boardWatchHint,
+            `${candidateCounts.blocked} bloqueados`,
+            "la decisión correcta puede ser no operar",
+          ]
+            .filter(Boolean)
+            .join(" · ")
         : actionable > 0
-          ? `${actionable} candidato(s) preparados · ${pendingConfirm} en cola Confirm`
-          : `${candidateCounts.watch} en vigilancia · puede ser una buena decisión no operar`,
+          ? [
+              estudioPrefix,
+              `${actionable} candidato(s) preparados · ${pendingConfirm} en cola Confirm`,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : [
+              estudioPrefix,
+              boardWatchHint,
+              "puede ser una buena decisión no operar",
+            ]
+              .filter(Boolean)
+              .join(" · "),
     regimeHint,
     pendingConfirm,
     vetoed,
     deferred,
+    estudioUniverseCount,
     candidateCounts,
   };
 }

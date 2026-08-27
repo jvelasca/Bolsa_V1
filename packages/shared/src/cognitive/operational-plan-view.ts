@@ -32,8 +32,20 @@ export type OperationalPlanViewV1 = {
   stopInicial: number | null;
   target1: number | null;
   target2: number | null;
+  /**
+   * @deprecated Compat: touched **o** managed. No usar como «ya reducido».
+   * Preferir target1Touched / target1Managed.
+   */
   target1Reached: boolean;
+  /** @deprecated Igual que target1Reached para T2. */
   target2Reached: boolean;
+  /** Precio cruzó T1. ≠ reducción ejecutada. */
+  target1Touched: boolean;
+  /** Existe `target1AchievedAt` (reduce T1 firmado). */
+  target1Managed: boolean;
+  target2Touched: boolean;
+  /** Siempre false hasta que exista sello T2. */
+  target2Managed: boolean;
   expectedRR: number | null;
   riskR: number | null;
   currentPrice: number | null;
@@ -61,6 +73,22 @@ const EMPTY_TRAIL = {
 
 function finite(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n);
+}
+
+function targetTouchedByPrice(
+  isShort: boolean,
+  price: number | null,
+  target: number | null,
+): boolean {
+  if (price == null || target == null) return false;
+  return isShort ? price <= target : price >= target;
+}
+
+/** Copy honesto: pendiente / alcanzado (tocado) / gestionado. */
+export function targetProgressHint(touched: boolean, managed: boolean): string {
+  if (managed) return "✓ gestionado";
+  if (touched) return "● alcanzado";
+  return "○ pendiente";
 }
 
 function phaseFromTradePlanStatus(
@@ -177,6 +205,10 @@ export function buildOperationalPlanFromStudy(
     target2: t2,
     target1Reached: false,
     target2Reached: false,
+    target1Touched: false,
+    target1Managed: false,
+    target2Touched: false,
+    target2Managed: false,
     expectedRR:
       (finite(tradePlan?.expectedRR) ? tradePlan!.expectedRR! : null) ??
       (finite(study?.expectedRR) ? study!.expectedRR! : null),
@@ -227,11 +259,12 @@ export function buildOperationalPlanFromPosition(input: {
       ? "short"
       : "long";
   const isShort = direction === "short";
-  const t1Reached =
-    Boolean(ps?.target1AchievedAt) ||
-    (price != null && t1 != null && (isShort ? price <= t1 : price >= t1));
-  const t2Reached =
-    price != null && t2 != null && (isShort ? price <= t2 : price >= t2);
+  const t1Touched = targetTouchedByPrice(isShort, price, t1);
+  const t1Managed = Boolean(ps?.target1AchievedAt);
+  const t2Touched = targetTouchedByPrice(isShort, price, t2);
+  const t2Managed = false;
+  const t1Reached = t1Touched || t1Managed;
+  const t2Reached = t2Touched || t2Managed;
   const closed = ps?.status === "CLOSED";
   const hasPlan = entry != null || stopVigente != null;
   const phase: OperationalPlanPhaseV1 = closed
@@ -265,6 +298,10 @@ export function buildOperationalPlanFromPosition(input: {
     target2: t2,
     target1Reached: t1Reached,
     target2Reached: t2Reached,
+    target1Touched: t1Touched,
+    target1Managed: t1Managed,
+    target2Touched: t2Touched,
+    target2Managed: t2Managed,
     expectedRR: null,
     riskR: finite(ps?.initialRisk) ? ps!.initialRisk! : null,
     currentPrice: price,

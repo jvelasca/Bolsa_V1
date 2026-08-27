@@ -27,6 +27,14 @@ def is_opportunity_discovery_payload(payload: dict[str, Any] | None) -> bool:
     return bool(payload.get(OPPORTUNITY_DISCOVERY_PAYLOAD_KEY))
 
 
+def clamp_daily_ops_list_id(list_id: str | None) -> str:
+    """Daily Ops no puede usar un catálogo (IBEX, etc.) como universo."""
+    raw = (list_id or "").strip()
+    if raw == DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID:
+        return raw
+    return DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
+
+
 def build_opportunity_scan_payload(
     *,
     list_id: str = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
@@ -39,7 +47,7 @@ def build_opportunity_scan_payload(
     """Payload para EnqueueScanJob / ProcessScanJob (solo lectura + propose)."""
     cap = max(0, min(int(propose_cap), DEFAULT_OPPORTUNITY_PROPOSE_CAP))
     payload: dict[str, Any] = {
-        "universe": {"listId": list_id},
+        "universe": {"listId": clamp_daily_ops_list_id(list_id)},
         "timeframe": timeframe,
         "presetKey": preset_key,
         "maxResults": max_results,
@@ -112,11 +120,10 @@ def resolve_universe_list_id(
     *,
     default: str = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
 ) -> str:
-    if isinstance(settings_json, dict):
-        raw = settings_json.get(SETTINGS_UNIVERSE_LIST_ID)
-        if isinstance(raw, str) and raw.strip():
-            return raw.strip()
-    return default
+    """V1.22 H1 — Daily Ops siempre Estudio. Settings/env no amplían el universo."""
+    _ = settings_json
+    _ = default
+    return DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
 
 
 class _EnqueuePort(Protocol):
@@ -146,7 +153,7 @@ class EnqueueOpportunityDailyScan:
         propose_cap: int = DEFAULT_OPPORTUNITY_PROPOSE_CAP,
     ) -> Any:
         payload = build_opportunity_scan_payload(
-            list_id=list_id,
+            list_id=clamp_daily_ops_list_id(list_id),
             account_id=account_id,
             propose_cap=propose_cap,
         )

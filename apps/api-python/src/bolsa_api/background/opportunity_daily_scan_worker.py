@@ -1,7 +1,8 @@
 """Worker — Opportunity daily scan opt-in (V1.19).
 
 Off-by-default: ``OPPORTUNITY_DAILY_SCAN_ENABLED=false``.
-Encola scan contra universo configurado (default ibex35).
+Encola scan contra universo **Estudio** (ADR-041 / V1.22 H1).
+``OPPORTUNITY_DAILY_UNIVERSE_LIST_ID`` distinto de estudio se ignora.
 Propose acotado solo si hay ``OPPORTUNITY_DAILY_ACCOUNT_ID`` o cuenta con
 ``settings_json.opportunityDailyScanEnabled``.
 Nunca execute / AUTO / Router.
@@ -14,16 +15,17 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-from bolsa_api.api.dependencies import get_enqueue_scan_job_use_case
 from bolsa_application.opportunity_daily_discovery import (
     DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
     EnqueueOpportunityDailyScan,
     account_wants_daily_scan,
+    clamp_daily_ops_list_id,
     resolve_universe_list_id,
 )
 from bolsa_infrastructure.config import get_settings
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from bolsa_api.api.dependencies import get_enqueue_scan_job_use_case
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +40,14 @@ async def _resolve_targets(session: AsyncSession) -> list[dict[str, Any]]:
     """Cuentas a enriquecer con propose; scan siempre se encola al menos una vez."""
     settings = get_settings()
     env_account = (settings.opportunity_daily_account_id or "").strip() or None
-    list_id = (
-        (settings.opportunity_daily_universe_list_id or "").strip()
-        or DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
-    )
+    raw_list = (settings.opportunity_daily_universe_list_id or "").strip()
+    list_id = clamp_daily_ops_list_id(raw_list or DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID)
+    if raw_list and raw_list != list_id:
+        logger.warning(
+            "OPPORTUNITY_DAILY_UNIVERSE_LIST_ID=%s ignored; Daily Ops universe is %s",
+            raw_list,
+            list_id,
+        )
     propose_cap = int(settings.opportunity_daily_propose_cap)
 
     targets: list[dict[str, Any]] = []
@@ -139,7 +145,7 @@ async def opportunity_daily_scan_worker_loop(
     logger.info(
         "Worker OPPORTUNITY_DAILY_SCAN iniciado — intervalo %ds · list=%s",
         interval,
-        settings.opportunity_daily_universe_list_id,
+        clamp_daily_ops_list_id(settings.opportunity_daily_universe_list_id),
     )
     while True:
         await asyncio.sleep(interval)

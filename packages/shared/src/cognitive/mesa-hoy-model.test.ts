@@ -120,9 +120,16 @@ describe("mesa-hoy-model", () => {
         },
       ],
     };
-    const state = buildMesaSessionState(board, { entriesBlocked: false });
+    const state = buildMesaSessionState(board, {
+      entriesBlocked: false,
+      estudioUniverseCount: 180,
+    });
     expect(state.headline).toBe("Hoy no hay operaciones recomendadas");
     expect(state.candidateCounts.ready).toBe(0);
+    expect(state.estudioUniverseCount).toBe(180);
+    expect(state.detail).toMatch(/Estudio 180 en supervisión/);
+    expect(state.detail).toMatch(/WATCH en board/);
+    expect(state.detail).not.toMatch(/^\d+ en vigilancia/);
   });
 
   it("filters attention items for REVIEW and protect hints", () => {

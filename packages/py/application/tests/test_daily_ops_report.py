@@ -7,9 +7,13 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
-from bolsa_application.daily_ops_report import GetDailyOpsReport, _day_key
 from bolsa_domain.entities.account import LedgerEntry
+
+from bolsa_application.daily_ops_report import (
+    GetDailyOpsReport,
+    _day_key,
+    intersect_daily_ops_universe,
+)
 
 
 def _ledger(
@@ -133,3 +137,94 @@ async def test_week_trade_counts_and_f3() -> None:
     assert aug2["tradeCount"] == 1
     # Outside week window ignored
     assert sum(d["tradeCount"] for d in bundle.week) == 3
+
+
+def test_intersect_daily_ops_universe_never_widens() -> None:
+    estudio = ["a", "b", "c"]
+    assert intersect_daily_ops_universe(estudio, None) == ["a", "b", "c"]
+    assert intersect_daily_ops_universe(estudio, ["b", "ibex-all"]) == ["b"]
+    assert intersect_daily_ops_universe(estudio, ["ibex-all"]) == []
+    assert intersect_daily_ops_universe([], ["a"]) == []
+
+
+class _FakeEstudio:
+    def __init__(self, ids: list[str]) -> None:
+        self._ids = ids
+
+    async def execute(self, list_id: str) -> Any:
+        assert list_id == "estudio"
+        return SimpleNamespace(instrument_ids=self._ids)
+
+
+class _FakeOpinions:
+    def __init__(self) -> None:
+        self.called_with: list[list[str]] = []
+
+    async def list_for_instruments(
+        self, instrument_ids: list[str], as_of: date, source: str = "on_demand"
+    ) -> list[Any]:
+        self.called_with.append(list(instrument_ids))
+        return [
+            SimpleNamespace(
+                instrument_id=iid,
+                stance="watch",
+                dictamen_stars=3,
+                reasons=["r"],
+            )
+            for iid in instrument_ids
+        ]
+
+
+@pytest.mark.asyncio
+async def test_h1_caller_ids_outside_estudio_are_dropped() -> None:
+    opinions = _FakeOpinions()
+    uc = GetDailyOpsReport(
+        _FakeSummary(),  # type: ignore[arg-type]
+        _FakeLedger([]),  # type: ignore[arg-type]
+        _FakeF3([]),  # type: ignore[arg-type]
+        opinion_repo=opinions,  # type: ignore[arg-type]
+        get_estudio=_FakeEstudio(["nvda", "msft"]),
+    )
+    bundle = await uc.execute(
+        "acc-1",
+        as_of=date(2026, 8, 27),
+        instrument_ids=["ibex-all", "nvda", "tef"],
+    )
+    assert opinions.called_with[0] == ["nvda"]
+    assert [row["instrumentId"] for row in bundle.opinions] == ["nvda"]
+    assert any("Filtro recortado" in n for n in bundle.notes)
+
+
+@pytest.mark.asyncio
+async def test_h1_no_filter_uses_full_estudio() -> None:
+    opinions = _FakeOpinions()
+    uc = GetDailyOpsReport(
+        _FakeSummary(),  # type: ignore[arg-type]
+        _FakeLedger([]),  # type: ignore[arg-type]
+        _FakeF3([]),  # type: ignore[arg-type]
+        opinion_repo=opinions,  # type: ignore[arg-type]
+        get_estudio=_FakeEstudio(["a", "b"]),
+    )
+    bundle = await uc.execute("acc-1", as_of=date(2026, 8, 27))
+    assert opinions.called_with[0] == ["a", "b"]
+    assert len(bundle.opinions) == 2
+
+
+@pytest.mark.asyncio
+async def test_h1_filter_subset_intersects() -> None:
+    opinions = _FakeOpinions()
+    uc = GetDailyOpsReport(
+        _FakeSummary(),  # type: ignore[arg-type]
+        _FakeLedger([]),  # type: ignore[arg-type]
+        _FakeF3([]),  # type: ignore[arg-type]
+        opinion_repo=opinions,  # type: ignore[arg-type]
+        get_estudio=_FakeEstudio(["a", "b", "c"]),
+    )
+    bundle = await uc.execute(
+        "acc-1",
+        as_of=date(2026, 8, 27),
+        instrument_ids=["c", "a"],
+    )
+    assert opinions.called_with[0] == ["a", "c"]
+    assert [row["instrumentId"] for row in bundle.opinions] == ["a", "c"]
+

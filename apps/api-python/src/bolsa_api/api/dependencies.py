@@ -410,14 +410,16 @@ def get_list_ledger_use_case(session: AsyncSession) -> ListLedgerEntries:
 
 
 def get_daily_ops_report_use_case(session: AsyncSession) -> GetDailyOpsReport:
-    """R1 — resumen operativo diario."""
+    """R1 — resumen operativo diario. Universo = Estudio (V1.22 H1)."""
     from bolsa_application.daily_ops_report import GetDailyOpsReport
+    from bolsa_application.lists import GetInstrumentList
 
     return GetDailyOpsReport(
         get_get_account_summary_use_case(session),
         get_list_ledger_use_case(session),
         SqlAlchemySupervisedF3Repository(session),
         SqlAlchemyInstrumentDailyOpinionRepository(session),
+        GetInstrumentList(get_list_repository(session)),
     )
 
 

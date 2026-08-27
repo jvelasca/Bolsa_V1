@@ -11,6 +11,7 @@ from bolsa_application.opportunity_daily_discovery import (
     ProposeOpportunityHits,
     account_wants_daily_scan,
     build_opportunity_scan_payload,
+    clamp_daily_ops_list_id,
     is_opportunity_discovery_payload,
     resolve_universe_list_id,
     select_hits_for_propose,
@@ -45,9 +46,13 @@ def test_account_opt_in_default_off() -> None:
     assert account_wants_daily_scan({}) is False
     assert account_wants_daily_scan({"opportunityDailyScanEnabled": True}) is True
     assert (
-        resolve_universe_list_id({"opportunityUniverseListId": "my-list"}) == "my-list"
+        resolve_universe_list_id({"opportunityUniverseListId": "my-list"})
+        == DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
     )
     assert resolve_universe_list_id(None) == DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
+    assert clamp_daily_ops_list_id("ibex35") == "estudio"
+    assert clamp_daily_ops_list_id("estudio") == "estudio"
+    assert build_opportunity_scan_payload(list_id="ibex35")["universe"]["listId"] == "estudio"
 
 
 @pytest.mark.asyncio
