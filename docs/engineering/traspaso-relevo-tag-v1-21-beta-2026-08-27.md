@@ -1,7 +1,7 @@
 # RELEVO — tag v1.21-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v121.md`](./audit-pack-estado-global-2026-08-27-v121.md) · [`traspaso-relevo-v1-21-coherence-2026-08-27.md`](./traspaso-relevo-v1-21-coherence-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.21-beta` → tip `dad8f51c`. **Release tag CI:** pendiente de pin tras Actions GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.21-beta` → tip `dad8f51c`. **Release tag CI:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33095441423).
 > **Arranque chat nuevo / auditor:** pack v121 + ADR-041 + ADR-040 §7 + `CURRENT_SYSTEM.md` + este relevo.
 
 ---
@@ -24,7 +24,7 @@
 | Daily ops    | `pnpm test:daily-ops:offline` **1159** (6 fases)                                                           |
 | Spine        | `pnpm test:decision-spine` **497**                                                                         |
 | ADR          | [ADR-041](../adr/041-operational-coherence.md) · [ADR-040](../adr/040-user-information-architecture.md) §7 |
-| CI tag       | pendiente pin                                                                                              |
+| CI tag       | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33095441423)                                     |
 
 ### Owner: publicar
 
