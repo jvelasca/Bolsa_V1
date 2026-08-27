@@ -39,7 +39,7 @@ export function HoyEnLaMesaBlock() {
         </li>
       </ol>
       <p className="mt-2 text-xs text-muted-foreground">
-        Prioridad N/100 ≠ BUY. Confirm es la única firma. Trail = propuesta, no
+        Calidad N/100 ≠ BUY. Confirm es la única firma. Trail = propuesta, no
         stop vigente. T1 alcanzado ≠ gestionado. Estudio empty ≠ unavailable.
         Asesor explica; no ejecuta.{" "}
         <RouteLink to="/mesa?view=posiciones">Cartera · Posiciones</RouteLink> y

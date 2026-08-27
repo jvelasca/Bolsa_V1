@@ -175,11 +175,20 @@ export function MesaHoyPage() {
   });
 
   const estudioMembers = useEstudioMembershipStore((s) => s.members);
+  const estudioUniverseUnavailable = universeListQuery.isError;
   const estudioInstrumentIds = useMemo(() => {
+    // Fail-closed: API error ≠ empty universe (no inventar 0 candidatos).
+    if (estudioUniverseUnavailable) return [] as string[];
     const fromApi = universeListQuery.data?.data?.instrumentIds;
     if (fromApi) return fromApi;
     return estudioMembers.map((m) => m.instrumentId);
-  }, [universeListQuery.data, estudioMembers]);
+  }, [estudioUniverseUnavailable, universeListQuery.data, estudioMembers]);
+
+  const estudioStatus = estudioUniverseUnavailable
+    ? ("unavailable" as const)
+    : estudioInstrumentIds.length === 0
+      ? ("empty" as const)
+      : ("ok" as const);
 
   const board = boardQuery.data?.data;
   const portfolio = portfolioQuery.data?.data;
@@ -373,6 +382,7 @@ export function MesaHoyPage() {
         latestCompletedScan?.completedAt ??
         latestCompletedScan?.updatedAt ??
         null,
+      marketDataAsOf: mesaLastBarDate,
       board: board ?? null,
       estudioInstrumentIds,
       priorityCtx: {
@@ -394,6 +404,7 @@ export function MesaHoyPage() {
     portfolioRisk,
     sectorExposurePct,
     sectorByInstrumentId,
+    mesaLastBarDate,
   ]);
 
   const protectPlanByInstrument = useMemo(() => {
@@ -725,7 +736,7 @@ export function MesaHoyPage() {
 
             <MesaInboxBlock
               title="Oportunidades"
-              description="Prioridad del ranking — no es una orden. Confirm firma."
+              description="Calidad del ranking — no es una orden. Confirm firma."
               count={opportunityRanking.top.length}
               emptyLabel="Sin oportunidades TOP"
               testId="mesa-inbox-oportunidades"
@@ -760,8 +771,17 @@ export function MesaHoyPage() {
               }
             >
               <MesaCoberturaKpi
-                frescos={opportunityRanking.funnel.analyzedCount}
-                universeCount={opportunityRanking.funnel.universeCount}
+                frescos={
+                  estudioStatus === "unavailable"
+                    ? 0
+                    : opportunityRanking.funnel.analyzedCount
+                }
+                universeCount={
+                  estudioStatus === "unavailable"
+                    ? 0
+                    : opportunityRanking.funnel.universeCount
+                }
+                estudioStatus={estudioStatus}
               />
               <div
                 className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"

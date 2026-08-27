@@ -1,15 +1,17 @@
 /**
- * Chip de frescura de datos (Hoy / Mercado encabezado).
+ * Chip de frescura del barrido Estudio (Hoy / Mercado encabezado).
  * Umbral alineado con OPPORTUNITY_SCAN_STALE_HOURS (48h).
+ * Prefijo «Barrido» — no «Datos» (reservado a OHLCV/DS-05).
  */
 
 import { OPPORTUNITY_SCAN_STALE_HOURS } from "./opportunity-ranking.js";
+import { SCAN_FRESHNESS_PREFIX } from "./product-vocabulary.js";
 
 export type ScanFreshnessChipToneV1 = "fresh" | "stale" | "missing";
 
 export type ScanFreshnessChipV1 = {
   tone: ScanFreshnessChipToneV1;
-  /** Texto corto para el chip (Datos · …). */
+  /** Texto corto para el chip (Barrido · …). */
   label: string;
   ageHours: number | null;
   asOf: string | null;
@@ -37,7 +39,7 @@ function formatShortAsOf(iso: string): string {
 }
 
 /**
- * Chip Datos para encabezados.
+ * Chip Barrido para encabezados.
  * fresh: as-of reciente; stale: >48h; missing: sin scan.
  */
 export function buildScanFreshnessChip(input: {
@@ -49,11 +51,12 @@ export function buildScanFreshnessChip(input: {
   const staleHours = input.staleHours ?? OPPORTUNITY_SCAN_STALE_HOURS;
   const asOf = input.scanUpdatedAt ?? null;
   const age = hoursAgo(asOf, now);
+  const prefix = SCAN_FRESHNESS_PREFIX;
 
   if (asOf == null || age == null) {
     return {
       tone: "missing",
-      label: "Datos · No actualizado",
+      label: `${prefix} · No actualizado`,
       ageHours: null,
       asOf: null,
     };
@@ -62,14 +65,14 @@ export function buildScanFreshnessChip(input: {
     const hours = Math.round(age);
     return {
       tone: "stale",
-      label: `Datos · Último análisis hace ${hours} h`,
+      label: `${prefix} · Último análisis hace ${hours} h`,
       ageHours: age,
       asOf,
     };
   }
   return {
     tone: "fresh",
-    label: `Datos · ${formatShortAsOf(asOf)}`,
+    label: `${prefix} · ${formatShortAsOf(asOf)}`,
     ageHours: age,
     asOf,
   };

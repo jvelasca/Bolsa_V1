@@ -3,7 +3,11 @@ import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import type { ProtectPlanV1 } from "@bolsa/shared";
-import { studiesByInstrumentMap } from "@bolsa/shared";
+import {
+  buildInvestmentPositionAggregate,
+  buildOperationalPlanFromPosition,
+  studiesByInstrumentMap,
+} from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 
 import { api } from "@/lib/api";
@@ -92,7 +96,7 @@ export function OperationsPanel({
   });
 
   const studiesQuery = useQuery({
-    queryKey: ["decision-studies", effectiveAccountId, "libro"],
+    queryKey: ["decision-studies", effectiveAccountId, "mesa"],
     queryFn: () => api.getDecisionStudies(effectiveAccountId!, { limit: 200 }),
     enabled: Boolean(effectiveAccountId),
     staleTime: 30_000,
@@ -235,6 +239,14 @@ export function OperationsPanel({
                   const operational = pos.operational ?? null;
                   const study = studiesMap.get(pos.instrumentId) ?? null;
                   const showRoute = mesaPositionShowsRoute(pos, study);
+                  const aggregate = buildInvestmentPositionAggregate({
+                    position: pos,
+                    study,
+                  });
+                  const plan = buildOperationalPlanFromPosition({
+                    aggregate,
+                    markPrice: pos.lastPrice ?? null,
+                  });
 
                   return (
                     <Fragment key={pos.id}>
@@ -254,24 +266,26 @@ export function OperationsPanel({
                         </td>
 
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                          {formatR(operational?.unrealizedR)}
+                          {formatR(
+                            plan.unrealizedR ?? operational?.unrealizedR,
+                          )}
                         </td>
 
                         <td className="px-2 py-1 text-right tabular-nums">
-                          {operational?.currentStop != null
-                            ? formatPrice(operational.currentStop)
+                          {plan.stopVigente != null
+                            ? formatPrice(plan.stopVigente)
                             : "—"}
                         </td>
 
                         <td className="px-2 py-1 text-right tabular-nums">
-                          {operational?.target1 != null
-                            ? formatPrice(operational.target1)
+                          {plan.target1 != null
+                            ? formatPrice(plan.target1)
                             : "—"}
                         </td>
 
                         <td className="px-2 py-1 text-right tabular-nums">
-                          {operational?.target2 != null
-                            ? formatPrice(operational.target2)
+                          {plan.target2 != null
+                            ? formatPrice(plan.target2)
                             : "—"}
                         </td>
 

@@ -1,6 +1,7 @@
 /**
  * PositionRoutePanel — envuelve OperationalPlanView (continuidad V1.21)
  * + ruta de niveles para detalle.
+ * V1.24 — T1 tocado ≠ gestionado (mismo hint que OperationalPlanView).
  */
 
 import type { DecisionJournalStudyViewV1, PositionDto } from "@bolsa/shared";
@@ -8,6 +9,7 @@ import {
   buildInvestmentPositionAggregate,
   buildOperationalPlanFromPosition,
   buildPositionRouteLevels,
+  targetProgressHint,
 } from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
@@ -72,7 +74,14 @@ export function PositionRoutePanel({
                   {level.distanceR.toFixed(1)}R
                 </span>
               ) : null}
-              {level.reached ? (
+              {level.kind === "target" ? (
+                <span className="ml-1 text-[10px] text-muted-foreground">
+                  {targetProgressHint(
+                    level.touched === true,
+                    level.managed === true,
+                  )}
+                </span>
+              ) : level.kind === "entry" && level.reached ? (
                 <span className="ml-1 text-emerald-600">✓</span>
               ) : null}
             </div>

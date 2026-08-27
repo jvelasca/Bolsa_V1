@@ -331,7 +331,15 @@ export type PositionRouteLevelV1 = {
   kind: "target" | "entry" | "stop" | "price";
   distancePct: number | null;
   distanceR: number | null;
+  /**
+   * @deprecated For targets prefer touched/managed (H2: touch ≠ managed).
+   * Still true for entry (fill).
+   */
   reached: boolean;
+  /** Precio cruzó el nivel (targets). */
+  touched?: boolean;
+  /** Reduce/gestión firmada (targets; T2 always false until sello). */
+  managed?: boolean;
 };
 
 export function buildPositionRouteLevels(
@@ -344,6 +352,7 @@ export function buildPositionRouteLevels(
   const t2 = aggregate.targets.target2;
   const riskAmount = aggregate.thesisSnapshot?.riskAmount;
   const isShort = aggregate.thesisSnapshot?.direction === "short";
+  const t1Managed = Boolean(aggregate.targets.target1AchievedAt);
 
   function distancePct(from: number, to: number): number | null {
     if (!Number.isFinite(from) || from === 0) return null;
@@ -368,23 +377,30 @@ export function buildPositionRouteLevels(
   const levels: PositionRouteLevelV1[] = [];
 
   if (t2 != null) {
+    const t2Touched = price != null && (isShort ? price <= t2 : price >= t2);
     levels.push({
       label: "TP2",
       value: t2,
       kind: "target",
       distancePct: price != null ? distancePct(price, t2) : null,
       distanceR: distanceR(t2),
-      reached: price != null && (isShort ? price <= t2 : price >= t2),
+      reached: t2Touched,
+      touched: t2Touched,
+      managed: false,
     });
   }
   if (t1 != null) {
+    const t1Touched = price != null && (isShort ? price <= t1 : price >= t1);
     levels.push({
       label: "TP1",
       value: t1,
       kind: "target",
       distancePct: price != null ? distancePct(price, t1) : null,
       distanceR: distanceR(t1),
-      reached: price != null && (isShort ? price <= t1 : price >= t1),
+      // reached kept for compat; UI must use touched/managed (H2).
+      reached: t1Touched || t1Managed,
+      touched: t1Touched,
+      managed: t1Managed,
     });
   }
   if (price != null) {

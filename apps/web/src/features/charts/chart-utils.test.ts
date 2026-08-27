@@ -63,7 +63,9 @@ describe("chart-utils", () => {
   });
 
   it("formatea precio y porcentaje", () => {
-    expect(formatPrice(10.5)).toBe("10.50 €");
+    expect(formatPrice(10.5)).toBe("10.50");
+    expect(formatPrice(10.5, "EUR")).toBe("10.50 €");
+    expect(formatPrice(10.5, "USD")).toBe("$10.50");
     expect(formatChartBarPrice(40.1256)).toBe("40.126");
     expect(formatPct(1.25)).toBe("+1.25%");
     expect(formatPct(-2)).toBe("-2.00%");

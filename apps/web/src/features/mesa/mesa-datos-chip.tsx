@@ -1,6 +1,7 @@
 /**
- * Chip «Datos» del encabezado de Hoy (V1.23 Fase 4).
+ * Chip «Barrido» del encabezado de Hoy (V1.24).
  * Mismo builder que Mercado — sin scan no se inventa frescura.
+ * Prefijo Barrido ≠ chip OHLCV «Datos».
  */
 
 import { buildScanFreshnessChip } from "@bolsa/shared";
@@ -29,7 +30,7 @@ export function MesaDatosChip({
       )}
       data-testid="mesa-datos-chip"
       data-tone={chip.tone}
-      title="Frescura del último barrido del universo Estudio"
+      title="Frescura del último barrido del universo Estudio (≠ barras OHLCV)"
     >
       {chip.label}
     </span>

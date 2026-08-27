@@ -1,9 +1,14 @@
 /**
  * Plan operativo unificado (V1.21) — misma tarjeta pre/post entrada.
  * Proyección de TradePlan / PositionState; no entidad nueva.
+ * V1.24 — trailing «No aplicado» solo cuando el stop vigente no recoge el hint.
  */
 
-import { targetProgressHint, type OperationalPlanViewV1 } from "@bolsa/shared";
+import {
+  isTrailingStopApplied,
+  targetProgressHint,
+  type OperationalPlanViewV1,
+} from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
 
@@ -69,7 +74,17 @@ export function OperationalPlanView({
     plan.stopVigente != null &&
     plan.stopInicial !== plan.stopVigente
       ? `inicial ${formatPrice(plan.stopInicial)}`
-      : null;
+      : plan.stopInicial == null && plan.stopVigente != null
+        ? "inicial —"
+        : null;
+
+  const trailingApplied =
+    plan.trailingActive &&
+    isTrailingStopApplied({
+      direction: plan.direction,
+      stopVigente: plan.stopVigente,
+      trailingStopHint: plan.trailingStopHint,
+    });
 
   return (
     <div
@@ -133,6 +148,7 @@ export function OperationalPlanView({
         <div
           className="rounded border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5"
           data-testid={`${testId}-trailing`}
+          data-trailing-applied={trailingApplied ? "true" : "false"}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
             ↗ Trailing sugerido
@@ -178,9 +194,15 @@ export function OperationalPlanView({
               />
             ) : null}
           </dl>
-          <p className="mt-1 text-[10px] font-medium text-amber-800 dark:text-amber-200">
-            ⚠ No aplicado
-          </p>
+          {trailingApplied ? (
+            <p className="mt-1 text-[10px] font-medium text-emerald-800 dark:text-emerald-200">
+              Recogido en el stop vigente
+            </p>
+          ) : (
+            <p className="mt-1 text-[10px] font-medium text-amber-800 dark:text-amber-200">
+              ⚠ No aplicado
+            </p>
+          )}
           <p className="mt-0.5 text-[10px] text-muted-foreground">
             Propuesta thin · SEMI firma · no empeora el stop vigente
           </p>

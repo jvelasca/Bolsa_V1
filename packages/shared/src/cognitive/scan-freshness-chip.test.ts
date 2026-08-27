@@ -20,7 +20,7 @@ describe("buildScanFreshnessChip", () => {
       now,
     });
     expect(chip.tone).toBe("fresh");
-    expect(chip.label.startsWith("Datos ·")).toBe(true);
+    expect(chip.label.startsWith("Barrido ·")).toBe(true);
   });
 
   it("stale after 48h", () => {

@@ -270,9 +270,19 @@ export function summarizeBars(bars: OhlcvBarDto[]) {
   };
 }
 
-export function formatPrice(value: number | null | undefined): string {
+export function formatPrice(
+  value: number | null | undefined,
+  currency?: string | null,
+): string {
   if (value == null || Number.isNaN(value)) return "—";
-  return `${value.toFixed(2)} €`;
+  const amount = value.toFixed(2);
+  // Sin símbolo universal €: universos mixtos (USD/GBP). Pasa currency si se conoce.
+  if (currency == null || currency === "") return amount;
+  const c = currency.trim().toUpperCase();
+  if (c === "EUR" || c === "€") return `${amount} €`;
+  if (c === "USD" || c === "$") return `$${amount}`;
+  if (c === "GBP" || c === "£") return `£${amount}`;
+  return `${amount} ${c}`;
 }
 
 /** Precio OHLC en la barra del gráfico (3 decimales, sin símbolo €). */

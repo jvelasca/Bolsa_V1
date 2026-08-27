@@ -163,6 +163,7 @@ export function useInstrumentOperationalContext(
     stopVigente: plan.stopVigente,
     trailingActive: plan.trailingActive,
     trailingStopHint: plan.trailingStopHint,
+    direction: plan.direction === "short" ? "short" : "long",
   });
 
   return {

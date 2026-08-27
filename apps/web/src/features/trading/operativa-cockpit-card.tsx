@@ -9,7 +9,6 @@
  */
 
 import { useState } from "react";
-import { formatPrice } from "@/features/charts/chart-utils";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import type { InstrumentDailyOpinionV1 } from "@bolsa/shared";
 import {
@@ -50,6 +49,10 @@ function phaseTone(phase: MercadoCockpitPhase): string {
       return "border-amber-600/40 bg-amber-500/5";
     case "preparada":
       return "border-sky-600/40 bg-sky-500/5";
+    case "bloqueada":
+      return "border-rose-600/40 bg-rose-500/5";
+    case "caducada":
+      return "border-amber-700/35 bg-amber-500/5";
     case "descubierto":
       return "border-violet-600/30 bg-violet-500/5";
     default:
@@ -73,7 +76,7 @@ export function OperativaCockpitCard({
   const operationsOpen = useTradingLayoutStore((s) => s.operationsOpen);
   const toggleOperations = useTradingLayoutStore((s) => s.toggleOperations);
 
-  const { phase, plan, study, position, trailing } = context;
+  const { phase, plan, study, position } = context;
   const primaryLabel = mercadoCockpitPrimaryCta(phase);
   const noLevelsCopy = mercadoCockpitNoLevelsCopy(phase);
 
@@ -136,35 +139,6 @@ export function OperativaCockpitCard({
         </p>
       )}
 
-      {trailing.show ? (
-        <p
-          className="text-[10px] leading-snug text-muted-foreground"
-          data-testid="operativa-cockpit-trailing"
-          data-trailing-status={trailing.statusLabel ?? "recogido"}
-        >
-          <span className="font-medium text-foreground">
-            {trailing.stopVigenteLabel}
-          </span>
-          {trailing.stopVigente != null
-            ? ` ${formatPrice(trailing.stopVigente)}`
-            : " —"}
-          {trailing.stopSugerido != null ? (
-            <>
-              {" · "}
-              <span className="font-medium text-foreground/90">
-                {trailing.stopSugeridoLabel}
-              </span>
-              {` ${formatPrice(trailing.stopSugerido)}`}
-            </>
-          ) : null}
-          {trailing.statusLabel === "Revisar"
-            ? " · Revisar — trail activo sin stop sugerido resoluble."
-            : trailing.statusLabel === "No aplicado"
-              ? " · No aplicado — propuesta; Confirm firma."
-              : " · recogido en el stop vigente."}
-        </p>
-      ) : null}
-
       <div className="flex flex-col gap-1">
         {phase === "descubierto" && onAddToEstudio ? (
           <button
@@ -220,13 +194,25 @@ export function OperativaCockpitCard({
           <PositionExitDrawerActions position={position} showMaintain />
         ) : null}
 
-        {phase === "vigilar" ? (
+        {phase === "vigilar" ||
+        phase === "bloqueada" ||
+        phase === "caducada" ? (
           <button
             type="button"
             className="w-fit rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
             onClick={() => setWhyOpen(true)}
-            data-testid="operativa-cockpit-cta-vigilar"
-            title="Ya está en Estudio: sin disparador todavía — mira el análisis"
+            data-testid={
+              phase === "vigilar"
+                ? "operativa-cockpit-cta-vigilar"
+                : `operativa-cockpit-cta-${phase}`
+            }
+            title={
+              phase === "bloqueada"
+                ? "Plan bloqueado — mira el motivo en ¿Por qué?"
+                : phase === "caducada"
+                  ? "Plan caducado — niveles residuales no autorizan"
+                  : "Ya está en Estudio: sin disparador todavía — mira el análisis"
+            }
           >
             {primaryLabel}
           </button>

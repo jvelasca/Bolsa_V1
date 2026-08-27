@@ -105,9 +105,9 @@ export function ListItemAccordion({
 
   const lastClose = item.meta.lastClose;
 
-  const changePct = item.meta.changePct ?? 0;
+  const changePct = item.meta.changePct;
 
-  const isUp = changePct >= 0;
+  const isUp = changePct != null ? changePct >= 0 : null;
 
   const live = liveQuery.quote;
 
@@ -394,7 +394,7 @@ function ListItemExpandedDetail({
   dayHigh: number | null;
   dayLow: number | null;
   changePct: number | null;
-  isUp: boolean;
+  isUp: boolean | null;
   spreadPct: number | null;
   onOrder: () => void;
 }) {
@@ -460,7 +460,11 @@ function ListItemExpandedDetail({
           <div
             className={cn(
               "truncate font-medium",
-              isUp ? "text-emerald-500" : "text-red-500",
+              changePct == null
+                ? "text-muted-foreground"
+                : isUp
+                  ? "text-emerald-500"
+                  : "text-red-500",
             )}
           >
             {changePct != null ? formatPct(changePct) : "—"}

@@ -1,7 +1,7 @@
 /**
  * Línea mínima de salud operativa en el terminal Mercado (ADR-040).
  * Sin candidatos, sin cola F3, sin «Hoy», sin venue toggle.
- * V1.23 — chip Datos = frescura del último scan Estudio (48h).
+ * V1.24 — chip Barrido = frescura del último scan Estudio (48h).
  */
 
 import { useMemo } from "react";

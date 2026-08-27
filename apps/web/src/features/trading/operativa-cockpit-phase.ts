@@ -1,7 +1,7 @@
 /**
  * Fase de producto Mercado 2.0 (cockpit) — lenguaje UI, no Decision Spine.
  * Ranking ≠ BUY. Confirm = firma.
- * V1.23 — InstrumentOperationalContext: un resolver, panel contextual.
+ * V1.24 — allowlist: BLOCKED / EXPIRED / CANCELLED nunca «Preparada».
  *
  * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md
  */
@@ -11,6 +11,8 @@ export const MERCADO_COCKPIT_PHASES = [
   "descubierto",
   "vigilar",
   "preparada",
+  "bloqueada",
+  "caducada",
   "disparada",
   "propuesta",
   "confirmada",
@@ -25,11 +27,16 @@ export const MERCADO_COCKPIT_PHASE_LABEL: Record<MercadoCockpitPhase, string> =
     descubierto: "Descubierto",
     vigilar: "En estudio",
     preparada: "Preparada",
+    bloqueada: "Bloqueada",
+    caducada: "Caducada",
     disparada: "Disparada",
     propuesta: "Propuesta",
     confirmada: "Confirmada",
     posicion: "Posición",
   };
+
+/** Statuses that may show as Preparada when hasOperationalPlan (allowlist). */
+const PREPARADA_PLAN_STATUSES = new Set(["ARMED", "WATCH", ""]);
 
 export type MercadoCockpitPhaseInput = {
   instrumentId: string | null | undefined;
@@ -44,7 +51,8 @@ export type MercadoCockpitPhaseInput = {
 };
 
 /**
- * Prioridad: posición → confirmada → cola Confirm → TRIGGERED → plan → Estudio → descubierto.
+ * Prioridad: posición → confirmada → cola Confirm → TRIGGERED →
+ * BLOCKED/EXPIRED → plan allowlist → Estudio → descubierto.
  */
 export function resolveMercadoCockpitPhase(
   input: MercadoCockpitPhaseInput,
@@ -56,21 +64,19 @@ export function resolveMercadoCockpitPhase(
   if (input.inConfirmQueue) return "propuesta";
   const status = (input.tradePlanStatus ?? "").toUpperCase();
   if (status === "TRIGGERED") return "disparada";
+  if (status === "BLOCKED") return "bloqueada";
+  if (status === "EXPIRED" || status === "CANCELLED") return "caducada";
   if (
     status === "ARMED" ||
-    (input.hasOperationalPlan === true &&
-      (status === "WATCH" || status === "" || status === "ARMED"))
+    (input.hasOperationalPlan === true && PREPARADA_PLAN_STATUSES.has(status))
   ) {
-    return "preparada";
-  }
-  if (input.hasOperationalPlan === true && status !== "TRIGGERED") {
     return "preparada";
   }
   if (input.inEstudio) return "vigilar";
   return "descubierto";
 }
 
-/** Anti-ruido: no mostrar Entrada/Stop/T1/T2 en estudio puro. */
+/** Anti-ruido: no mostrar Entrada/Stop/T1/T2 en estudio puro ni planes muertos. */
 export function mercadoCockpitShowsPlanLevels(
   phase: MercadoCockpitPhase,
 ): boolean {
@@ -82,6 +88,7 @@ export function mercadoCockpitShowsPlanLevels(
     case "posicion":
       return true;
     default:
+      // bloqueada / caducada: fail-closed — no niveles ni CTA de «Revisar operación».
       return false;
   }
 }
@@ -96,6 +103,10 @@ export function mercadoCockpitPrimaryCta(
       return "Ver análisis";
     case "preparada":
       return "Revisar operación";
+    case "bloqueada":
+      return "Ver motivo del bloqueo";
+    case "caducada":
+      return "Ver análisis";
     case "disparada":
       return "Confirmar";
     case "propuesta":
@@ -109,7 +120,7 @@ export function mercadoCockpitPrimaryCta(
   }
 }
 
-/** Copy corto de por qué no hay niveles (VIGILAR / DESCUBIERTO / sin valor). */
+/** Copy corto de por qué no hay niveles / plan no operable. */
 export function mercadoCockpitNoLevelsCopy(
   phase: MercadoCockpitPhase,
 ): string | null {
@@ -120,6 +131,10 @@ export function mercadoCockpitNoLevelsCopy(
       return "Fuera de Estudio. Sin plan diario — añádelo a Estudio para supervisarlo.";
     case "sin_contexto":
       return "Selecciona un valor en listas o gráfico.";
+    case "bloqueada":
+      return "Plan bloqueado por gate de riesgo o mandato — no es Preparada. Ranking ≠ BUY.";
+    case "caducada":
+      return "Plan caducado o cancelado — niveles residuales no autorizan entrada.";
     default:
       return null;
   }

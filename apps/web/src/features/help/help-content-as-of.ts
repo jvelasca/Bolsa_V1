@@ -87,6 +87,8 @@
  * cockpit slice 1; Hoy Resumen KPI Cobertura.
  * **2026-08-27c** — V1.23 UX Consolidation: Hoy inbox 4 niveles; Mercado
  * overlays + contexto operativo; Prioridad ≠ orden; Estudio empty≠unavailable.
+ * **2026-08-28** — V1.24 Honestidad: fases BLOCKED≠Preparada; Calidad N/100;
+ * Barrido≠Datos; Encaja≠Preparada; sameOperationalPlanAcrossSurfaces.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -127,4 +129,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-27c" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-28" as const;

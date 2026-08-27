@@ -1,44 +1,60 @@
 /**
- * Lenguaje de producto del ranking (V1.23 Fase 4).
+ * Lenguaje de producto del ranking (V1.23 Fase 4 · V1.24 honesty).
  *
- * El ranking prioriza; nunca autoriza. Por eso el score se llama Prioridad y
- * el resultado se nombra PREPARADA / VIGILAR / BLOQUEADA — nunca BUY.
+ * El ranking prioriza; nunca autoriza. El eje quality se llama «Calidad»
+ * (no «Prioridad» compuesta). El resultado Encaja / Vigilable / Bloqueada
+ * no reutiliza «Preparada» (reservada al cockpit Mercado).
  */
 
 import type { OpportunityFunnelV1, OpportunityRankRowV1 } from "@bolsa/shared";
+import {
+  QUALITY_SCORE_PREFIX,
+  RANKING_RESULT_BLOQUEADA,
+  RANKING_RESULT_ENCAJA,
+  RANKING_RESULT_VIGILABLE,
+} from "@bolsa/shared";
 
-export const PRIORITY_SCORE_PREFIX = "Prioridad" as const;
+export const PRIORITY_SCORE_PREFIX = QUALITY_SCORE_PREFIX;
 export const PRIORITY_NOT_AN_ORDER = "NO ES UNA ORDEN" as const;
 
+/** @deprecated Alias — prefer formatQualityScore. */
 export function formatPriorityScore(quality: number): string {
-  return `${PRIORITY_SCORE_PREFIX} ${quality}/100`;
+  return formatQualityScore(quality);
+}
+
+export function formatQualityScore(quality: number): string {
+  return `${QUALITY_SCORE_PREFIX} ${quality}/100`;
 }
 
 export const OPPORTUNITY_RESULT_LABELS = [
-  "PREPARADA",
-  "VIGILAR",
-  "BLOQUEADA",
+  RANKING_RESULT_ENCAJA,
+  RANKING_RESULT_VIGILABLE,
+  RANKING_RESULT_BLOQUEADA,
 ] as const;
 export type OpportunityResultLabel = (typeof OPPORTUNITY_RESULT_LABELS)[number];
 
 /**
  * Resultado de producto de una fila del ranking.
- * PREPARADA ≠ permiso de compra: sigue exigiendo firma en Confirmar.
+ * Encaja ≠ permiso de compra: sigue exigiendo firma en Confirmar.
+ * ≠ fase cockpit «Preparada» (resolveMercadoCockpitPhase).
  */
 export function opportunityResultLabel(
   rankRow: Pick<OpportunityRankRowV1, "category" | "operationalPriority">,
   entriesBlocked = false,
 ): OpportunityResultLabel {
-  if (entriesBlocked) return "BLOQUEADA";
-  if (rankRow.category === "BLOCKED") return "BLOQUEADA";
-  if (!rankRow.operationalPriority.operability.operable) return "BLOQUEADA";
-  if (rankRow.category === "TOP") return "PREPARADA";
-  return "VIGILAR";
+  if (entriesBlocked) return RANKING_RESULT_BLOQUEADA;
+  if (rankRow.category === "BLOCKED") return RANKING_RESULT_BLOQUEADA;
+  if (!rankRow.operationalPriority.operability.operable)
+    return RANKING_RESULT_BLOQUEADA;
+  if (rankRow.category === "TOP") return RANKING_RESULT_ENCAJA;
+  return RANKING_RESULT_VIGILABLE;
 }
 
 export function opportunityResultTone(label: OpportunityResultLabel): string {
-  if (label === "PREPARADA") return "text-emerald-700 dark:text-emerald-300";
-  if (label === "BLOQUEADA") return "text-rose-700 dark:text-rose-300";
+  if (label === RANKING_RESULT_ENCAJA)
+    return "text-emerald-700 dark:text-emerald-300";
+  if (label === RANKING_RESULT_BLOQUEADA)
+    return "text-rose-700 dark:text-rose-300";
   return "text-amber-800 dark:text-amber-200";
 }
 

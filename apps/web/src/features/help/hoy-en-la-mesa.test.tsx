@@ -11,8 +11,8 @@ import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
 afterEach(() => cleanup());
 
 describe("help Hoy V1.23", () => {
-  it("HELP_CONTENT_AS_OF is 2026-08-27c", () => {
-    expect(HELP_CONTENT_AS_OF).toBe("2026-08-27c");
+  it("HELP_CONTENT_AS_OF is 2026-08-28", () => {
+    expect(HELP_CONTENT_AS_OF).toBe("2026-08-28");
   });
 
   it("Hoy en la mesa describes inbox → Mercado → Confirm", () => {
@@ -28,7 +28,7 @@ describe("help Hoy V1.23", () => {
     expect(text).toMatch(/Mercado/i);
     expect(text).toMatch(/Ranking ≠ orden/i);
     expect(text).toMatch(/Confirm/i);
-    expect(text).toMatch(/Prioridad N\/100 ≠ BUY/i);
+    expect(text).toMatch(/Calidad N\/100 ≠ BUY/i);
     expect(text).toMatch(/Trail = propuesta/i);
     expect(text).toMatch(/T1 alcanzado ≠ gestionado/i);
     expect(text).toMatch(/Estudio empty ≠ unavailable/i);

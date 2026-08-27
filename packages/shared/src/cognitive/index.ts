@@ -40,6 +40,7 @@ export * from "./opportunity-evidence.js";
 export * from "./opportunity-ranking.js";
 export * from "./scan-freshness-chip.js";
 export * from "./operational-plan-view.js";
+export * from "./product-vocabulary.js";
 export * from "./portfolio-scenario.js";
 export * from "./unified-alerts.js";
 export * from "./mesa-next-action.js";

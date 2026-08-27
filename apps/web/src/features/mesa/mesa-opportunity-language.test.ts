@@ -1,6 +1,6 @@
 /**
- * Tests — lenguaje de producto del ranking (V1.23 Fase 4).
- * Prioridad ≠ BUY; el embudo habla castellano básico; sin scan → «—».
+ * Tests — lenguaje de producto del ranking (V1.24 honesty).
+ * Calidad ≠ Prioridad compuesta; Encaja ≠ Preparada cockpit; sin scan → «—».
  */
 
 import { describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ import {
   formatFunnelClock,
   formatFunnelTitle,
   formatPriorityScore,
+  formatQualityScore,
   opportunityResultLabel,
 } from "@/features/mesa/mesa-opportunity-language";
 
@@ -33,9 +34,11 @@ function rankRow(
 }
 
 describe("ranking score language", () => {
-  it("says Prioridad, never Opportunity nor BUY", () => {
-    const label = formatPriorityScore(91);
-    expect(label).toBe("Prioridad 91/100");
+  it("says Calidad, never Prioridad composite nor BUY", () => {
+    const label = formatQualityScore(91);
+    expect(label).toBe("Calidad 91/100");
+    expect(formatPriorityScore(91)).toBe(label);
+    expect(label).not.toMatch(/prioridad/i);
     expect(label).not.toMatch(/opportunity/i);
     expect(label).not.toMatch(/\bbuy\b/i);
     expect(PRIORITY_NOT_AN_ORDER).toBe("NO ES UNA ORDEN");
@@ -57,31 +60,29 @@ describe("ranking score language", () => {
 });
 
 describe("opportunityResultLabel", () => {
-  it("TOP + operable → PREPARADA", () => {
-    expect(opportunityResultLabel(rankRow({ category: "TOP" }))).toBe(
-      "PREPARADA",
-    );
+  it("TOP + operable → Encaja (≠ Preparada cockpit)", () => {
+    expect(opportunityResultLabel(rankRow({ category: "TOP" }))).toBe("Encaja");
   });
 
-  it("WATCH / STALE / NOT_FOR_PORTFOLIO → VIGILAR", () => {
+  it("WATCH / STALE / NOT_FOR_PORTFOLIO → Vigilable", () => {
     for (const category of ["WATCH", "STALE", "NOT_FOR_PORTFOLIO"] as const) {
-      expect(opportunityResultLabel(rankRow({ category }))).toBe("VIGILAR");
+      expect(opportunityResultLabel(rankRow({ category }))).toBe("Vigilable");
     }
   });
 
-  it("BLOCKED category, non-operable or blocked entries → BLOQUEADA", () => {
+  it("BLOCKED category, non-operable or blocked entries → Bloqueada", () => {
     expect(opportunityResultLabel(rankRow({ category: "BLOCKED" }))).toBe(
-      "BLOQUEADA",
+      "Bloqueada",
     );
     expect(opportunityResultLabel(rankRow({ operable: false }))).toBe(
-      "BLOQUEADA",
+      "Bloqueada",
     );
     expect(opportunityResultLabel(rankRow({ category: "TOP" }), true)).toBe(
-      "BLOQUEADA",
+      "Bloqueada",
     );
   });
 
-  it("never labels a row as BUY", () => {
+  it("never labels a row as BUY or PREPARADA", () => {
     for (const category of [
       "TOP",
       "WATCH",
@@ -89,9 +90,8 @@ describe("opportunityResultLabel", () => {
       "NOT_FOR_PORTFOLIO",
       "BLOCKED",
     ] as const) {
-      expect(opportunityResultLabel(rankRow({ category }))).not.toMatch(
-        /buy|comprar/i,
-      );
+      const label = opportunityResultLabel(rankRow({ category }));
+      expect(label).not.toMatch(/buy|comprar|preparada/i);
     }
   });
 });

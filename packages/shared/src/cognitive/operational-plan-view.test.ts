@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOperationalPlanFromPosition,
   buildOperationalPlanFromStudy,
+  isTrailingStopApplied,
   targetProgressHint,
 } from "./operational-plan-view.js";
 import {
@@ -175,5 +176,50 @@ describe("operational-plan-view", () => {
     });
     expect(plan.target1Managed).toBe(true);
     expect(plan.target1Touched).toBe(false);
+  });
+
+  it("stopInicial missing → null (no silent fallback to vigente)", () => {
+    const ps = {
+      status: "OPEN",
+      direction: "long",
+      actualEntry: 100,
+      plannedEntry: 100,
+      initialStop: null,
+      currentStop: 108,
+      target1: 112,
+      target2: 124,
+      unrealizedR: 1,
+      initialRisk: 6,
+    } as PositionStateV1;
+    const plan = buildOperationalPlanFromPosition({
+      positionState: ps,
+      markPrice: 110,
+    });
+    expect(plan.stopVigente).toBe(108);
+    expect(plan.stopInicial).toBeNull();
+  });
+
+  it("isTrailingStopApplied respects long/short", () => {
+    expect(
+      isTrailingStopApplied({
+        direction: "long",
+        stopVigente: 103,
+        trailingStopHint: 101,
+      }),
+    ).toBe(true);
+    expect(
+      isTrailingStopApplied({
+        direction: "short",
+        stopVigente: 104,
+        trailingStopHint: 106,
+      }),
+    ).toBe(true);
+    expect(
+      isTrailingStopApplied({
+        direction: "short",
+        stopVigente: 108,
+        trailingStopHint: 106,
+      }),
+    ).toBe(false);
   });
 });

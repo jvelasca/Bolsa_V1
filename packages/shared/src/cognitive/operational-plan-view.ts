@@ -25,10 +25,12 @@ export type OperationalPlanViewV1 = {
   phase: OperationalPlanPhaseV1;
   /** Copy corto del estado (Preparada / Posición activa / …). */
   phaseLabel: string;
+  /** Dirección del plan / posición (para trail applied). */
+  direction: TradePlanDirectionV1;
   entry: number | null;
   /** Stop vigente (post-fill = currentStop; pre-fill = plan stop). */
   stopVigente: number | null;
-  /** Stop inicial / planificado (traza). */
+  /** Stop inicial / planificado (traza). Sin fallback silencioso a vigente. */
   stopInicial: number | null;
   target1: number | null;
   target2: number | null;
@@ -89,6 +91,21 @@ export function targetProgressHint(touched: boolean, managed: boolean): string {
   if (managed) return "✓ gestionado";
   if (touched) return "● alcanzado · ○ pendiente de gestión";
   return "○ pendiente";
+}
+
+/**
+ * ¿El stop vigente ya recoge el trailing sugerido?
+ * Trail es advisory: applied ≠ autoridad (currentStop sigue siendo el soberano).
+ */
+export function isTrailingStopApplied(input: {
+  direction?: TradePlanDirectionV1 | "long" | "short" | null;
+  stopVigente: number | null;
+  trailingStopHint: number | null;
+}): boolean {
+  const current = input.stopVigente;
+  const hint = input.trailingStopHint;
+  if (!finite(current) || !finite(hint)) return false;
+  return input.direction === "short" ? current <= hint : current >= hint;
 }
 
 function phaseFromTradePlanStatus(
@@ -177,6 +194,10 @@ export function buildOperationalPlanFromStudy(
     study?.hasOperationalPlan === true ||
     (tradePlan != null &&
       (tradePlan.status === "ARMED" || tradePlan.status === "TRIGGERED"));
+  const direction: TradePlanDirectionV1 =
+    tradePlan?.direction === "short" || study?.direction === "short"
+      ? "short"
+      : "long";
   const entry =
     (finite(tradePlan?.entry) ? tradePlan!.entry! : null) ??
     (finite(study?.entry) ? study!.entry! : null);
@@ -198,6 +219,7 @@ export function buildOperationalPlanFromStudy(
   return {
     phase,
     phaseLabel: phaseLabel(phase),
+    direction,
     entry,
     stopVigente: stop,
     stopInicial: stop,
@@ -241,10 +263,10 @@ export function buildOperationalPlanFromPosition(input: {
   const stopVigente =
     (finite(ps?.currentStop) ? ps!.currentStop! : null) ??
     (finite(agg?.protection.currentStop) ? agg!.protection.currentStop! : null);
+  // Sin fallback a vigente: si falta initialStop, la traza de riesgo aceptado es «—».
   const stopInicial =
     (finite(ps?.initialStop) ? ps!.initialStop! : null) ??
-    (finite(agg?.originalPlan?.stop) ? agg!.originalPlan!.stop! : null) ??
-    stopVigente;
+    (finite(agg?.originalPlan?.stop) ? agg!.originalPlan!.stop! : null);
   const t1 =
     (finite(ps?.target1) ? ps!.target1! : null) ??
     (finite(agg?.targets.target1) ? agg!.targets.target1! : null);
@@ -295,6 +317,7 @@ export function buildOperationalPlanFromPosition(input: {
   return {
     phase,
     phaseLabel: phaseLabel(phase),
+    direction,
     entry,
     stopVigente,
     stopInicial,

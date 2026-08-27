@@ -85,11 +85,12 @@ export function getListCellDisplay(
       return {
         text:
           item.meta.changePct != null ? formatPct(item.meta.changePct) : "—",
-        className: `text-right tabular-nums ${
-          item.meta.changePct != null && item.meta.changePct >= 0
-            ? "text-success"
-            : "text-destructive"
-        }`,
+        className:
+          item.meta.changePct == null
+            ? "text-right tabular-nums text-muted-foreground"
+            : `text-right tabular-nums ${
+                item.meta.changePct >= 0 ? "text-success" : "text-destructive"
+              }`,
       };
     case "isin":
       return {

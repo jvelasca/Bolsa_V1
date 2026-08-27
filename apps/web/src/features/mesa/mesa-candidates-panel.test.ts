@@ -55,8 +55,8 @@ describe("mesa opportunity discovery UI helpers", () => {
   });
 });
 
-describe("V1.23 Fase 4 — ranking language in the panel and drawer", () => {
-  it("panel says Prioridad and NO ES UNA ORDEN, never Opportunity NN/100", () => {
+describe("V1.24 — ranking language in the panel and drawer", () => {
+  it("panel says Calidad and NO ES UNA ORDEN, never Opportunity NN/100", () => {
     const src = readSource("mesa-candidates-panel.tsx");
     expect(src).toMatch(/formatPriorityScore\(rankRow\.quality\)/);
     expect(src).toMatch(/PRIORITY_NOT_AN_ORDER/);
@@ -86,7 +86,7 @@ describe("V1.23 Fase 4 — ranking language in the panel and drawer", () => {
     expect(src).not.toMatch(/¿Por qué no aparecen más\?/);
   });
 
-  it("drawer titles with Prioridad and shows the result label", () => {
+  it("drawer titles with Calidad and shows the result label", () => {
     const src = readSource("opportunity-drawer.tsx");
     expect(src).toMatch(/formatPriorityScore\(rankRow\.quality\)/);
     expect(src).toMatch(/PRIORITY_NOT_AN_ORDER/);
