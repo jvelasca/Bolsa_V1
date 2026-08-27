@@ -33,7 +33,7 @@ describe("v120 mesa zone1 redirects and deep-links", () => {
     expect(hoyViewHref(HOY_VIEW.decisiones)).toBe("/mesa?view=decisiones");
   });
 
-  it("Screeners CTA deep-links ibex35 listId", () => {
-    expect(mesaScreenersUniverseHref()).toBe("/screeners?listId=ibex35");
+  it("Screeners CTA deep-links Estudio listId by default", () => {
+    expect(mesaScreenersUniverseHref()).toBe("/screeners?listId=estudio");
   });
 });

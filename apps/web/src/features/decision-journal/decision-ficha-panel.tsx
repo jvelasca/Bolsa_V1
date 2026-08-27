@@ -4,6 +4,7 @@ import {
   JOURNAL_STUDY_OPINION_LABELS,
   JOURNAL_STUDY_PERIOD_LABELS,
   JOURNAL_STUDY_STATUS_LABELS,
+  buildOperationalPlanFromStudy,
   journalStudyConsensusPercents,
   type DecisionJournalStudyViewV1,
   type JournalStudyOpinion,
@@ -14,6 +15,7 @@ import { IconButton } from "@/components/ui/icon-button";
 import { DecisionStudyChart } from "@/features/decision-journal/decision-study-chart";
 import { openDecisionReplay } from "@/features/decision-journal/decision-journal-helpers";
 import { formatPrice } from "@/features/charts/chart-utils";
+import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import { cn } from "@/lib/utils";
 
 function opinionTone(opinion: string | null): string {
@@ -307,6 +309,13 @@ export function DecisionFichaPanel({
             </p>
             <p className="text-xs">{study.nextReviewAt}</p>
           </section>
+        ) : null}
+
+        {study.hasOperationalPlan ? (
+          <OperationalPlanView
+            plan={buildOperationalPlanFromStudy(study)}
+            testId={`operational-plan-ficha-${study.symbol ?? study.sessionId}`}
+          />
         ) : null}
 
         {study.hasOperationalPlan && study.riskAmount != null ? (

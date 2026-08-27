@@ -12,7 +12,7 @@ from __future__ import annotations
 from typing import Any, Protocol
 
 OPPORTUNITY_DISCOVERY_PAYLOAD_KEY = "opportunityDiscovery"
-DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID = "ibex35"
+DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID = "estudio"
 DEFAULT_OPPORTUNITY_PROPOSE_CAP = 15
 DEFAULT_OPPORTUNITY_PRESET_KEY = "sma_crossover"
 
@@ -133,7 +133,7 @@ class _ProposePort(Protocol):
 
 
 class EnqueueOpportunityDailyScan:
-    """Encola scan de discovery (sin execute). Default list = ibex35."""
+    """Encola scan de discovery (sin execute). Default list = Estudio."""
 
     def __init__(self, enqueue: _EnqueuePort) -> None:
         self._enqueue = enqueue

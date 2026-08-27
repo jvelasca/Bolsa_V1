@@ -26,22 +26,23 @@ Nombres internos **no** aparecen en la navegación diaria: Decision Spine, Decis
 
 ## 2. Mapa módulo → puerta
 
-| Módulo interno                            | Puerta de usuario                                                                    |
-| ----------------------------------------- | ------------------------------------------------------------------------------------ |
-| MesaHoyPage / mesa-hoy-model              | Hoy (vistas Resumen / Posiciones / Oportunidades / Decisiones / Journal / Confirmar) |
-| DecisionSpineDetailPanel / decision-board | Hoy → Decisiones                                                                     |
-| DecisionJournalPage                       | Hoy → Journal                                                                        |
-| OperationalConsolePage                    | Hoy → estado operativo → Detalles; Config → Avanzado                                 |
-| MesaLibroPanel / OperationsPanel          | Cartera → Posiciones / Órdenes                                                       |
-| HistoryPage                               | Cartera → Historial                                                                  |
-| TradingLayout / ChartWorkspace            | Mercado (terminal)                                                                   |
-| ScreenersPage                             | Mercado → Señales                                                                    |
-| InstrumentsPage                           | Mercado → Instrumentos                                                               |
-| AlertsPage                                | 🔔 / Mercado → Alertas                                                               |
-| ConfirmPage                               | Hoy → Confirmar (+ ruta `/confirm` intacta)                                          |
-| ResearchPage                              | Asesor                                                                               |
-| BacktestsPage                             | Laboratorio                                                                          |
-| Overview / Accounts / Fiscal              | ⚙ Configuración                                                                      |
+| Módulo interno                                                                                      | Puerta de usuario                                                                    |
+| --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| MesaHoyPage / mesa-hoy-model                                                                        | Hoy (vistas Resumen / Posiciones / Oportunidades / Decisiones / Journal / Confirmar) |
+| DecisionSpineDetailPanel / decision-board                                                           | Hoy → Decisiones                                                                     |
+| DecisionJournalPage                                                                                 | Hoy → Journal                                                                        |
+| OperationalConsolePage                                                                              | AdminRail → Consola avanzada; Hoy → estado operativo → Detalles                      |
+| MesaLibroPanel / OperationsPanel                                                                    | Cartera → Posiciones / Órdenes                                                       |
+| HistoryPage                                                                                         | Cartera → Historial                                                                  |
+| TradingLayout / ChartWorkspace                                                                      | Mercado (terminal)                                                                   |
+| ScreenersPage                                                                                       | Mercado → Señales                                                                    |
+| InstrumentsPage                                                                                     | Mercado → Instrumentos                                                               |
+| AlertsPage                                                                                          | 🔔 / Mercado → Alertas                                                               |
+| ConfirmPage                                                                                         | Hoy → Confirmar (+ ruta `/confirm` intacta)                                          |
+| ResearchPage                                                                                        | Asesor                                                                               |
+| BacktestsPage                                                                                       | Laboratorio                                                                          |
+| Overview / Accounts / Fiscal / Consola avanzada                                                     | **AdminRail** (barra admin colapsable; ≠ L1 diario; ≠ ⚙)                             |
+| Preferencias / Interfaz / Datos / Notificaciones / Trading / Riesgo / IA / Integraciones / Avanzado | ⚙ Configuración (`PlatformConfigDialog`)                                             |
 
 ## 3. Contrato UX (DoD)
 
@@ -74,3 +75,13 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 - Label producto de `/mesa` = **Hoy**; «Mesa» queda interno.
 - Rutas HTTP históricas se mantienen con redirect (`/decision-board`, `/operations`, …).
 - Enmienda ADR-037 §5: strip Hoy sale de Trading; nav diaria deja de ser Mesa→Trading→Señales→Confirmar→Libro.
+
+## 7. Enmienda V1.21 — AdminRail vs Configuración
+
+**Fecha:** 2026-08-27
+
+- Overview · Cuentas · Fiscal · Consola avanzada **salen** del menú ⚙.
+- Pasan a **AdminRail** (columna izquierda colapsable bajo el logo Bolsa). No es navegación de producto diaria.
+- ⚙ abre solo preferencias / configuración de plataforma.
+- Cuenta activa visible en el header como **contexto** (selector compacto), no como página de administración.
+- Ver [ADR-041](./041-operational-coherence.md).

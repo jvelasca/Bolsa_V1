@@ -168,7 +168,7 @@ class Settings(BaseSettings):
         validation_alias="OPPORTUNITY_DAILY_SCAN_INTERVAL_SECONDS",
     )
     opportunity_daily_universe_list_id: str = Field(
-        default="ibex35",
+        default="estudio",
         validation_alias="OPPORTUNITY_DAILY_UNIVERSE_LIST_ID",
     )
     opportunity_daily_propose_cap: int = Field(

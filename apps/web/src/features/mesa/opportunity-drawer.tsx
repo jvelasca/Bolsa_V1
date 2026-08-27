@@ -15,11 +15,12 @@ import {
   JOURNAL_STUDY_VIGENCIA_LABELS,
   NO_OPERATIONAL_PLAN_COPY,
   OPPORTUNITY_CATEGORY_LABEL,
+  buildOperationalPlanFromStudy,
 } from "@bolsa/shared";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { formatPrice } from "@/features/charts/chart-utils";
 import { MesaWhatIfPanel } from "@/features/mesa/mesa-what-if-panel";
+import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -115,40 +116,12 @@ export function OpportunityDrawer({
             value={`${rankRow.suitability} / Operability ${rankRow.operability}`}
           />
           {study?.hasOperationalPlan ? (
-            <>
-              <Field
-                label="Entrada"
-                value={study.entry != null ? formatPrice(study.entry) : "—"}
+            <div className="sm:col-span-2">
+              <OperationalPlanView
+                plan={buildOperationalPlanFromStudy(study)}
+                testId={`operational-plan-drawer-${row.symbol}`}
               />
-              <Field
-                label="Stop"
-                value={study.stop != null ? formatPrice(study.stop) : "—"}
-              />
-              <Field
-                label="T1"
-                value={study.target1 != null ? formatPrice(study.target1) : "—"}
-              />
-              <Field
-                label="T2"
-                value={study.target2 != null ? formatPrice(study.target2) : "—"}
-              />
-              <Field
-                label="R/R"
-                value={
-                  study.expectedRR != null
-                    ? `1:${study.expectedRR.toFixed(2)}`
-                    : "—"
-                }
-              />
-              <Field
-                label="Riesgo plan"
-                value={
-                  study.initialRiskR != null
-                    ? `${study.initialRiskR.toFixed(2)}R`
-                    : "—"
-                }
-              />
-            </>
+            </div>
           ) : (
             <div className="sm:col-span-2 text-sm text-muted-foreground">
               {NO_OPERATIONAL_PLAN_COPY}

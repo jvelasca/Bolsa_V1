@@ -1,11 +1,12 @@
 /**
  * Opportunity Discovery V1 — funnel + ranking (≠ Action Queue).
  *
- * Fuente: universo configurado + último scan + decision studies.
+ * Fuente: lista Estudio (universo supervisable TRADING) + último scan + studies.
  * Decision Board solo aporta overlay de gate/status (operability).
  * Ranking ≠ BUY ≠ Permission. Provisional.
+ * Instrumentos fuera de Estudio → `discovered` (nunca TOP operable / BUY diario).
  *
- * @see ADR-039 · RFC-008 Opportunity≠Permission · plan V1.19
+ * @see ADR-024 · ADR-039 · ADR-041 · RFC-008 Opportunity≠Permission
  */
 
 import type { DecisionBoardV1 } from "../decision-board.js";
@@ -86,12 +87,27 @@ export type OpportunityRankingV1 = {
   all: OpportunityRankRowV1[];
   /** Superficie principal — hasta TOP_N de categoría TOP (o mejores si no hay TOP). */
   top: OpportunityRankRowV1[];
+  /**
+   * Fuera de Estudio — descubrimiento, nunca BUY diario.
+   * CTA típico: Analizar / Añadir a Estudio.
+   */
+  discovered: OpportunityRankRowV1[];
   maxQuality: number;
   highQualityThreshold: number;
   /** Semántica explícita: ranking informativo ≠ ejecutable. */
   impliesOperable: false;
   provisional: true;
 };
+
+/** True si instrumentId pertenece al set de Estudio (o no hay filtro). */
+export function isInEstudioUniverse(
+  instrumentId: string | null | undefined,
+  estudioIds: ReadonlySet<string> | null | undefined,
+): boolean {
+  if (!estudioIds) return true;
+  if (!instrumentId) return false;
+  return estudioIds.has(instrumentId);
+}
 
 export type OpportunityScanHitInputV1 = {
   instrumentId: string;
@@ -105,7 +121,7 @@ export type OpportunityDiscoveryInputV1 = {
   /** Instrumentos evaluados en el último scan (0 si no hay scan). */
   screenedCount?: number;
   hitCount?: number;
-  /** Tamaño del universo configurado (lista). */
+  /** Tamaño del universo configurado (lista Estudio). */
   universeCount?: number;
   universeListId?: string | null;
   scanUpdatedAt?: string | null;
@@ -116,6 +132,12 @@ export type OpportunityDiscoveryInputV1 = {
   scanStaleHours?: number;
   topN?: number;
   highQualityThreshold?: number;
+  /**
+   * Membresía Estudio (ADR-024). Si se pasa (incluso vacío), solo esos
+   * instrumentIds entran en ranking operable; el resto → `discovered`.
+   * Si se omite, no se filtra (compat tests legacy).
+   */
+  estudioInstrumentIds?: ReadonlyArray<string> | null;
 };
 
 type BoardOverlay = {
@@ -287,6 +309,7 @@ function categorize(
 /**
  * Construye funnel + ranking de oportunidades.
  * No usa buildActionQueue — Discovery ≠ atención operativa.
+ * Con `estudioInstrumentIds`, solo membresía Estudio entra en `all`/`top`.
  */
 export function buildOpportunityRanking(
   input: OpportunityDiscoveryInputV1,
@@ -299,6 +322,10 @@ export function buildOpportunityRanking(
     input.highQualityThreshold ?? OPPORTUNITY_HIGH_QUALITY_THRESHOLD;
   const priorityCtx = input.priorityCtx ?? {};
   const overlay = boardOverlayBySymbol(input.board);
+  const estudioFilter =
+    input.estudioInstrumentIds != null
+      ? new Set(input.estudioInstrumentIds)
+      : null;
 
   const byKey = new Map<string, MesaCandidateRowV1>();
 
@@ -334,8 +361,19 @@ export function buildOpportunityRanking(
     byKey.set(key, buildCandidateFromHit(hit, overlay.get(symbol)));
   }
 
-  const candidates = [...byKey.values()];
-  const ranked: OpportunityRankRowV1[] = candidates.map((candidate) => {
+  const inUniverse: MesaCandidateRowV1[] = [];
+  const outsideUniverse: MesaCandidateRowV1[] = [];
+  for (const candidate of byKey.values()) {
+    if (isInEstudioUniverse(candidate.instrumentId, estudioFilter)) {
+      inUniverse.push(candidate);
+    } else {
+      outsideUniverse.push(candidate);
+    }
+  }
+
+  const rankCandidate = (
+    candidate: MesaCandidateRowV1,
+  ): OpportunityRankRowV1 => {
     const priority = computeOperationalPriority(candidate, {
       ...priorityCtx,
       candidateSector:
@@ -366,7 +404,15 @@ export function buildOpportunityRanking(
       candidate,
       operationalPriority: priority,
     };
-  });
+  };
+
+  const ranked: OpportunityRankRowV1[] = inUniverse.map(rankCandidate);
+  const discovered: OpportunityRankRowV1[] = outsideUniverse.map((c) => ({
+    ...rankCandidate(c),
+    category: "WATCH",
+    categoryReason: "Descubierto fuera de Estudio — no operable diario",
+    rank: null,
+  }));
 
   ranked.sort((a, b) => {
     const catOrder: Record<OpportunityCategoryV1, number> = {
@@ -392,8 +438,10 @@ export function buildOpportunityRanking(
     rank: i + 1,
   }));
 
-  const analyzed = input.studies.filter((s) =>
-    isStudyFresh(s, now, freshHours),
+  const analyzed = input.studies.filter(
+    (s) =>
+      isStudyFresh(s, now, freshHours) &&
+      isInEstudioUniverse(s.instrumentId, estudioFilter),
   );
   const withSetup = analyzed.filter((s) => hasSetup(s));
 
@@ -436,6 +484,7 @@ export function buildOpportunityRanking(
     funnel,
     all: ranked,
     top,
+    discovered,
     maxQuality,
     highQualityThreshold,
     impliesOperable: false,

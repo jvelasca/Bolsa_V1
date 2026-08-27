@@ -40,6 +40,11 @@ export type PositionStateV1 = {
   currentStop: number | null;
   target1: number | null;
   target2: number | null;
+  /**
+   * V1.21 — T1 ya consumido (idempotencia). Si set, ExitPlan no re-emite TARGET_1.
+   * Ausente en snapshots legacy = no alcanzado.
+   */
+  target1AchievedAt?: string | null;
   quantity: number;
   remainingQuantity: number;
   initialRisk: number | null;
@@ -208,6 +213,7 @@ export function buildPositionStateFromFill(
     currentStop: initialStop,
     target1: finite(tradePlan.target1) ? tradePlan.target1 : null,
     target2: finite(tradePlan.target2) ? tradePlan.target2 : null,
+    target1AchievedAt: null,
     quantity: qty,
     remainingQuantity: qty,
     initialRisk: initialRisk != null && initialRisk > 0 ? initialRisk : null,
@@ -299,6 +305,7 @@ export function applyPositionMark(
  * F2.1 reduce → remaining / realizedR / PARTIAL|CLOSED.
  * CLOSED terminal; qty inválida → null.
  * OI-5: append revisión si status cambia.
+ * V1.21: `markTarget1Achieved` fija target1AchievedAt (idempotencia T1).
  */
 export function applyPositionReduce(
   position: PositionStateV1 | null | undefined,
@@ -307,6 +314,7 @@ export function applyPositionReduce(
   at?: string | null,
   origin: PositionRevisionOriginV1 = "reduce",
   reason?: string | null,
+  options?: { markTarget1Achieved?: boolean } | null,
 ): PositionStateV1 | null {
   if (!position || position.status === "CLOSED") return null;
   if (!finite(qty) || qty <= 0) return null;
@@ -328,6 +336,11 @@ export function applyPositionReduce(
   }
 
   const updatedAt = nowIso(at);
+  const target1AchievedAt =
+    options?.markTarget1Achieved === true
+      ? (position.target1AchievedAt ?? updatedAt)
+      : (position.target1AchievedAt ?? null);
+
   if (remaining <= 0) {
     const next: PositionStateV1 = {
       ...position,
@@ -335,6 +348,7 @@ export function applyPositionReduce(
       realizedR,
       status: "CLOSED",
       exitStatus: "done",
+      target1AchievedAt,
       updatedAt,
     };
     return withRevisionIfChanged(position, next, origin, reason, updatedAt);
@@ -344,6 +358,7 @@ export function applyPositionReduce(
     ...position,
     remainingQuantity: remaining,
     realizedR,
+    target1AchievedAt,
     updatedAt,
   };
   const next: PositionStateV1 = {

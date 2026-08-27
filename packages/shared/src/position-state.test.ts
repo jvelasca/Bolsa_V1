@@ -263,11 +263,12 @@ describe("H2 invariantes from_fill / stop", () => {
     ).toBe(106);
   });
 
-  it("OI-5 applyCurrentStop appends revision on real stop change", () => {
-    const nxt = applyPositionCurrentStop(openLong(), 97, "t-rev");
-    expect(nxt?.revisions).toHaveLength(1);
-    expect(nxt?.revisions[0]?.previousStop).toBe(95);
-    expect(nxt?.revisions[0]?.nextStop).toBe(97);
-    expect(nxt?.revisions[0]?.origin).toBe("stop");
+  it("OP-05 — trailing/stop ratchet never worsens without override", () => {
+    const open = openLong();
+    const up1 = applyPositionCurrentStop(open, 97);
+    expect(up1?.currentStop).toBe(97);
+    const up2 = applyPositionCurrentStop(up1!, 100);
+    expect(up2?.currentStop).toBe(100);
+    expect(applyPositionCurrentStop(up2!, 98)).toBeNull();
   });
 });

@@ -6,11 +6,13 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
+  ESTUDIO_LIST_ID,
   JOURNAL_STUDY_OPINION_LABELS,
   JOURNAL_STUDY_VIGENCIA_LABELS,
   NO_OPERATIONAL_PLAN_COPY,
   OPPORTUNITY_CATEGORY_LABEL,
   OPPORTUNITY_HIGH_QUALITY_THRESHOLD,
+  buildOperationalPlanFromStudy,
   mapCandidateNextAction,
   opportunityQualityBandCounts,
   type MesaCandidateRowV1,
@@ -29,15 +31,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
 import { OpportunityDrawer } from "@/features/mesa/opportunity-drawer";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { SEÑALES_PATH } from "@/features/confirm/daily-nav";
 import { MesaWhatIfPanel } from "@/features/mesa/mesa-what-if-panel";
+import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
 
-export const DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID = "ibex35";
+/** Universo diario de Opportunity Discovery = Estudio (ADR-024 / V1.21). */
+export const DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID = ESTUDIO_LIST_ID;
 
 export function mesaScreenersUniverseHref(
   listId = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
@@ -202,32 +205,12 @@ function OpportunityCard({
           </dd>
         </div>
         {study?.hasOperationalPlan ? (
-          <>
-            <div>
-              <dt className="text-muted-foreground">Entrada</dt>
-              <dd>{study.entry != null ? formatPrice(study.entry) : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Stop</dt>
-              <dd>{study.stop != null ? formatPrice(study.stop) : "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">R/R</dt>
-              <dd>
-                {study.expectedRR != null
-                  ? `1:${study.expectedRR.toFixed(2)}`
-                  : "—"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">R plan</dt>
-              <dd>
-                {study.initialRiskR != null
-                  ? `${study.initialRiskR.toFixed(2)}R`
-                  : "—"}
-              </dd>
-            </div>
-          </>
+          <div className="mt-2 sm:col-span-2">
+            <OperationalPlanView
+              plan={buildOperationalPlanFromStudy(study)}
+              testId={`operational-plan-candidate-${row.symbol}`}
+            />
+          </div>
         ) : (
           <div className="sm:col-span-2">
             <p className="text-muted-foreground">{NO_OPERATIONAL_PLAN_COPY}</p>
@@ -286,6 +269,10 @@ function FunnelStrip({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const universeLabel =
+    funnel.universeListId === "estudio" || !funnel.universeListId
+      ? "Estudio"
+      : funnel.universeListId;
   return (
     <div
       className="rounded-md border border-border/50 bg-background/40 px-3 py-2 text-[11px]"
@@ -293,10 +280,10 @@ function FunnelStrip({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-muted-foreground">
-          Universo {funnel.universeCount} → Screening {funnel.screenedCount} →
-          Hits {funnel.hitCount} → Analizadas {funnel.analyzedCount} → Setup{" "}
-          {funnel.setupCount} → Encaje {funnel.portfolioFitCount} → Operables{" "}
-          {funnel.operableCount}
+          {universeLabel} {funnel.universeCount} → Screening{" "}
+          {funnel.screenedCount} → Hits {funnel.hitCount} → Analizadas{" "}
+          {funnel.analyzedCount} → Setup {funnel.setupCount} → Encaje{" "}
+          {funnel.portfolioFitCount} → Operables {funnel.operableCount}
         </p>
         <button
           type="button"
@@ -377,6 +364,7 @@ export function MesaCandidatesPanel({
   const funnel = ranking?.funnel;
   const top = ranking?.top ?? [];
   const all = ranking?.all ?? [];
+  const discovered = ranking?.discovered ?? [];
   const maxQuality = ranking?.maxQuality ?? 0;
   const threshold =
     ranking?.highQualityThreshold ?? OPPORTUNITY_HIGH_QUALITY_THRESHOLD;
@@ -445,8 +433,8 @@ export function MesaCandidatesPanel({
                 : "No hay un scan reciente del universo"}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Amplíalo a IBEX35 (o tu lista) y ejecuta un scan en Señales para
-              alimentar oportunidades. Esto no ejecuta órdenes.
+              Añade valores a Estudio y ejecuta Actualizar / un scan sobre
+              Estudio para alimentar oportunidades. Esto no ejecuta órdenes.
             </p>
             <Link
               to={mesaScreenersUniverseHref(universeListId)}
@@ -483,8 +471,8 @@ export function MesaCandidatesPanel({
           >
             <p className="font-medium">Hoy no hay operaciones recomendadas</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              La decisión correcta puede ser no operar. Corre un scan o amplía
-              el universo.
+              La decisión correcta puede ser no operar. Añade valores a Estudio
+              o corre Actualizar / scan sobre Estudio.
             </p>
             <Link
               to={mesaScreenersUniverseHref(universeListId)}
@@ -540,6 +528,32 @@ export function MesaCandidatesPanel({
             ) : null}
           </>
         )}
+
+        {discovered.length > 0 ? (
+          <section
+            className="rounded-md border border-dashed border-border/60 px-3 py-2"
+            data-testid="mesa-discovered-outside-estudio"
+          >
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Descubierto fuera de Estudio ({discovered.length})
+            </h3>
+            <p className="mb-2 text-[11px] text-muted-foreground">
+              Interesante, pero no operable en el ciclo diario hasta añadirlo a
+              Estudio. Ranking ≠ BUY.
+            </p>
+            <ul className="flex flex-wrap gap-2 text-xs">
+              {discovered.slice(0, 8).map((row) => (
+                <li
+                  key={`disc-${row.instrumentId ?? row.symbol}`}
+                  className="rounded border border-border/50 bg-muted/30 px-2 py-1"
+                >
+                  {row.symbol}
+                  {row.quality > 0 ? ` · ${row.quality}` : ""}
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </CardContent>
       <OpportunityDrawer
         open={drawerRow != null}

@@ -270,4 +270,93 @@ describe("opportunity-ranking", () => {
       ),
     ).toBe(false);
   });
+
+  it("DAILY-OPS-UNIVERSE-001 — only Estudio members enter operable ranking", () => {
+    const ranking = buildOpportunityRanking({
+      studies: [
+        study({
+          symbol: "AAPL",
+          instrumentId: "i-aapl",
+          sessionId: "s-a",
+          strength: 9,
+          expectedRR: 3,
+        }),
+        study({
+          symbol: "MSFT",
+          instrumentId: "i-msft",
+          sessionId: "s-m",
+          strength: 8,
+          expectedRR: 2,
+        }),
+        study({
+          symbol: "OUT",
+          instrumentId: "i-out",
+          sessionId: "s-o",
+          strength: 9.5,
+          expectedRR: 4,
+        }),
+      ],
+      scanHits: [
+        { instrumentId: "i-aapl", symbol: "AAPL" },
+        { instrumentId: "i-out", symbol: "OUT" },
+        { instrumentId: "i-disc", symbol: "DISC" },
+      ],
+      screenedCount: 3,
+      hitCount: 3,
+      universeCount: 2,
+      universeListId: "estudio",
+      estudioInstrumentIds: ["i-aapl", "i-msft"],
+      scanUpdatedAt: "2026-08-27T09:00:00Z",
+      now: new Date("2026-08-27T12:00:00Z"),
+      priorityCtx: { entriesBlocked: false },
+    });
+
+    expect(
+      ranking.all.every(
+        (r) => r.instrumentId === "i-aapl" || r.instrumentId === "i-msft",
+      ),
+    ).toBe(true);
+    expect(ranking.all.some((r) => r.symbol === "OUT")).toBe(false);
+    expect(
+      ranking.top.every(
+        (r) => r.instrumentId === "i-aapl" || r.instrumentId === "i-msft",
+      ),
+    ).toBe(true);
+    expect(ranking.funnel.universeListId).toBe("estudio");
+    expect(ranking.funnel.universeCount).toBe(2);
+    expect(ranking.discovered.some((r) => r.symbol === "OUT")).toBe(true);
+  });
+
+  it("DAILY-OPS-UNIVERSE-002 / OP-07 — outside Estudio → discovered, never TOP BUY", () => {
+    const ranking = buildOpportunityRanking({
+      studies: [
+        study({
+          symbol: "OUT",
+          instrumentId: "i-out",
+          strength: 9.9,
+          expectedRR: 5,
+          hasOperationalPlan: true,
+          tradePlanStatus: "TRIGGERED",
+        }),
+      ],
+      scanHits: [{ instrumentId: "i-disc", symbol: "DISC" }],
+      screenedCount: 10,
+      universeCount: 0,
+      universeListId: "estudio",
+      estudioInstrumentIds: [],
+      scanUpdatedAt: "2026-08-27T09:00:00Z",
+      now: new Date("2026-08-27T12:00:00Z"),
+      priorityCtx: { entriesBlocked: false },
+    });
+
+    expect(ranking.all).toHaveLength(0);
+    expect(ranking.top).toHaveLength(0);
+    expect(ranking.discovered.length).toBeGreaterThanOrEqual(1);
+    expect(
+      ranking.discovered.every((r) =>
+        Boolean(r.categoryReason?.includes("fuera de Estudio")),
+      ),
+    ).toBe(true);
+    expect(ranking.impliesOperable).toBe(false);
+  });
 });

@@ -1,7 +1,11 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InvestmentAccountDto } from "@bolsa/shared";
-import { defaultAccountSettings } from "@bolsa/shared";
+import {
+  DEFAULT_ACCOUNT_SEED_ID,
+  defaultAccountSettings,
+  isDailyTradingAccount,
+} from "@bolsa/shared";
 import { api } from "@/lib/api";
 import { useActiveAccountStore } from "@/stores/active-account-store";
 
@@ -23,8 +27,15 @@ function pickFallbackAccountId(
 ): string | null {
   const open = accounts.filter((a) => a.status === "active");
   if (open.length === 0) return null;
-  // Prefer last-used mirrored on server (isDefault), else first open account.
-  return open.find((a) => a.isDefault)?.id ?? open[0]?.id ?? null;
+  const daily = open.filter(isDailyTradingAccount);
+  const pool = daily.length > 0 ? daily : open;
+  // Prefer last-used mirrored on server (isDefault), else seed, else first.
+  return (
+    pool.find((a) => a.isDefault)?.id ??
+    pool.find((a) => a.id === DEFAULT_ACCOUNT_SEED_ID)?.id ??
+    pool[0]?.id ??
+    null
+  );
 }
 
 /**

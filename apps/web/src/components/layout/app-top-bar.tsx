@@ -1,11 +1,13 @@
 /**
  * Barra superior de la plataforma (nav + cluster derecha).
  *
- * Izquierda: marca · historial ←→ · separador · nav L1 (Hoy · Mercado · Cartera · Asesor · Laboratorio)
+ * Izquierda: historial ←→ · separador · nav L1 (Hoy · Mercado · Cartera · Asesor · Laboratorio)
  *   · paneles Mercado (cuando aplica).
- * Derecha (L→R): 🔔 · chip universo · espacio · Ayuda · Config · menú sesión.
+ * Derecha (L→R): 🔔 · chip universo · cuenta activa · espacio · Ayuda · Config · menú sesión.
+ * Logo / Overview / Cuentas / Fiscal / Consola → AdminRail (no ⚙).
  *
  * @see docs/adr/040-user-information-architecture.md
+ * @see docs/adr/041-operational-coherence.md
  * @see docs/WORKSPACE_PERSISTENCE.md §0
  * @see docs/UI_PLATFORM.md — Barra superior / espacios
  */
@@ -19,7 +21,6 @@ import {
   useNavigationType,
 } from "react-router-dom";
 import {
-  BarChart3,
   Bell,
   Briefcase,
   ChevronDown,
@@ -39,6 +40,7 @@ import {
 } from "lucide-react";
 import { AppHelpMenu } from "@/features/help/app-help-menu";
 import { UniverseChip } from "@/features/platform/universe-chip";
+import { AccountScopeSelector } from "@/features/accounts/account-scope-selector";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUiStore } from "@/stores/ui-store";
@@ -60,8 +62,6 @@ import {
   MERCADO_NAV,
   MESA_LABEL,
   MESA_PATH,
-  OPERATIONAL_CONSOLE_LABEL,
-  OPERATIONAL_CONSOLE_PATH,
 } from "@/features/confirm/daily-nav";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
 import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
@@ -275,19 +275,6 @@ const CARTERA_MENU: MenuItem[] = CARTERA_NAV.items.map((item) => ({
   hint: item.hint,
 }));
 
-/** Configuración / Avanzado (⚙) — no L1 diario. */
-const CONFIG_AVANZADO_MENU: MenuItem[] = [
-  { label: "Overview", href: "/overview", hint: "Resumen de cuenta y atajos" },
-  { label: "Cuentas", href: "/accounts", hint: "Hub de cuentas e operativa" },
-  { label: "Fiscal", href: "/fiscal", hint: "Plusvalías y ejercicio" },
-  { separator: true, label: "sep-adv" },
-  {
-    label: OPERATIONAL_CONSOLE_LABEL,
-    href: OPERATIONAL_CONSOLE_PATH,
-    hint: "Diagnóstico operativo (OE-1, recon, incidentes)",
-  },
-];
-
 const BACKTESTING_MENU: MenuItem[] = [
   {
     label: "Probar estrategia",
@@ -368,23 +355,36 @@ export function AppTopBar() {
   ];
 
   const configMenu: MenuItem[] = [
-    ...CONFIG_AVANZADO_MENU,
-    { separator: true, label: "sep-cfg" },
     {
       label: "Preferencias…",
       action: () => openPlatformConfig("general"),
+      hint: "Interfaz, notificaciones, datos, trading",
+    },
+    {
+      label: "Perfil inversor…",
+      action: () => openPlatformConfig("investor-profile"),
+    },
+    {
+      label: "Notificaciones…",
+      action: () => openPlatformConfig("notifications"),
+    },
+    {
+      label: "Confirmaciones…",
+      action: () => openPlatformConfig("confirmations"),
+    },
+    { separator: true, label: "sep-cfg-adv" },
+    {
+      label: "Datos / BD…",
+      action: () => openPlatformConfig("bd"),
+    },
+    {
+      label: "Sync / proveedores…",
+      action: () => openPlatformConfig("other"),
     },
   ];
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2">
-      <div className="mr-1 flex items-center gap-2 pr-1 sm:mr-2 sm:pr-2">
-        <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
-        <span className="hidden font-semibold tracking-tight sm:inline">
-          Bolsa
-        </span>
-      </div>
-
       <div
         className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background/40 p-0.5"
         role="group"
@@ -604,6 +604,7 @@ export function AppTopBar() {
           <Bell className="h-4 w-4" />
         </NavLink>
         <UniverseChip density="icon" />
+        <AccountScopeSelector compact hideLabel className="hidden sm:flex" />
         <button
           type="button"
           onClick={openWorkspacePicker}

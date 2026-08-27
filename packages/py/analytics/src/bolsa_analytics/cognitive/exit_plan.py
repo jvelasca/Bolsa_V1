@@ -152,8 +152,10 @@ def _collect_reasons(
         if position.current_stop is not None and position.current_stop > 0:
             if _stop_touched(position.direction, mark_price, position.current_stop):
                 fired.add("STRUCTURAL_STOP")
-        if position.target1 is not None and _target_touched(
-            position.direction, mark_price, position.target1
+        if (
+            position.target1 is not None
+            and not position.target1_achieved_at
+            and _target_touched(position.direction, mark_price, position.target1)
         ):
             fired.add("TARGET_1")
         if position.target2 is not None and _target_touched(

@@ -130,6 +130,7 @@ function collectReasons(
     }
     if (
       finite(position.target1) &&
+      !position.target1AchievedAt &&
       targetTouched(position.direction, mark, position.target1)
     ) {
       fired.add("TARGET_1");

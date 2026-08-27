@@ -24,11 +24,13 @@ import {
   pickPositionStudies,
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
+  ESTUDIO_LIST_ID,
 } from "@bolsa/shared";
 import {
   DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
   MesaCandidatesPanel,
 } from "@/features/mesa/mesa-candidates-panel";
+import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { Button } from "@/components/ui/button";
 import { FeatureErrorBoundary } from "@/components/layout/feature-error-boundary";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -162,6 +164,13 @@ export function MesaHoyPage() {
     queryFn: () => api.getList(universeListId),
     staleTime: 5 * 60_000,
   });
+
+  const estudioMembers = useEstudioMembershipStore((s) => s.members);
+  const estudioInstrumentIds = useMemo(() => {
+    const fromApi = universeListQuery.data?.data?.instrumentIds;
+    if (fromApi) return fromApi;
+    return estudioMembers.map((m) => m.instrumentId);
+  }, [universeListQuery.data, estudioMembers]);
 
   const board = boardQuery.data?.data;
   const portfolio = portfolioQuery.data?.data;
@@ -311,19 +320,26 @@ export function MesaHoyPage() {
   const latestCompletedScan = useMemo(() => {
     const jobs = scanJobsQuery.data?.data ?? [];
     const completed = jobs
-      .filter((j) => j.status === "completed" && j.result)
+      .filter((j) => {
+        if (j.status !== "completed" || !j.result) return false;
+        const listId = j.payload?.universe?.listId ?? null;
+        // Prefer Estudio (or discovery jobs tagged for Estudio). Never take
+        // an arbitrary IBEX/Lab scan as the daily TRADING universe.
+        return listId === ESTUDIO_LIST_ID || listId === universeListId;
+      })
       .sort(
         (a, b) =>
           new Date(b.completedAt ?? b.updatedAt).getTime() -
           new Date(a.completedAt ?? a.updatedAt).getTime(),
       );
     return completed[0] ?? null;
-  }, [scanJobsQuery.data]);
+  }, [scanJobsQuery.data, universeListId]);
 
   const opportunityRanking = useMemo(() => {
     const scanResult = latestCompletedScan?.result ?? null;
     const universeCount =
-      universeListQuery.data?.data?.instrumentIds?.length ?? 0;
+      universeListQuery.data?.data?.instrumentIds?.length ??
+      estudioInstrumentIds.length;
     return buildOpportunityRanking({
       studies,
       scanHits: (scanResult?.hits ?? []).map((h) => ({
@@ -339,6 +355,7 @@ export function MesaHoyPage() {
         latestCompletedScan?.updatedAt ??
         null,
       board: board ?? null,
+      estudioInstrumentIds,
       priorityCtx: {
         entriesBlocked,
         portfolioRisk,
@@ -352,6 +369,7 @@ export function MesaHoyPage() {
     latestCompletedScan,
     universeListQuery.data,
     universeListId,
+    estudioInstrumentIds,
     board,
     entriesBlocked,
     portfolioRisk,
@@ -630,6 +648,20 @@ export function MesaHoyPage() {
                 >
                   Ver oportunidades →
                 </Link>
+              </p>
+              <p
+                className="text-[11px] text-muted-foreground"
+                data-testid="mesa-estudio-daily-trace"
+              >
+                Análisis diario · Estudio{" "}
+                {opportunityRanking.funnel.universeCount} →{" "}
+                {opportunityRanking.funnel.analyzedCount} evaluados →{" "}
+                {opportunityRanking.funnel.setupCount} con setup →{" "}
+                {opportunityRanking.funnel.portfolioFitCount} compatibles →{" "}
+                {opportunityRanking.funnel.operableCount} operables hoy
+                {opportunityRanking.discovered.length > 0
+                  ? ` · ${opportunityRanking.discovered.length} descubiertos fuera de Estudio`
+                  : ""}
               </p>
             </MesaLevelSection>
 

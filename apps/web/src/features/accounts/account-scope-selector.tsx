@@ -1,5 +1,10 @@
 import { cn } from "@/lib/utils";
 import {
+  ACCOUNT_ORIGIN_LABEL,
+  accountOriginKind,
+  isDailyTradingAccount,
+} from "@bolsa/shared";
+import {
   accountTypeShortLabel,
   useActivateAccount,
   useActiveAccount,
@@ -21,11 +26,12 @@ export function AccountScopeSelector({
   const { account, effectiveAccountId, accounts } = useActiveAccount();
   const activate = useActivateAccount();
 
-  const openAccounts = accounts.filter((a) => a.status === "active");
+  // V1.21 — selector diario = demos operativas; Lab paper vive en Admin → Cuentas.
+  const openAccounts = accounts.filter(isDailyTradingAccount);
   if (openAccounts.length === 0) return null;
 
   const selectClass = compact
-    ? "max-w-[7.5rem] truncate rounded border border-border bg-background px-1 py-0 text-[10px] text-foreground"
+    ? "max-w-[9rem] truncate rounded border border-border bg-background px-1 py-0 text-[10px] text-foreground"
     : "rounded-md border border-border bg-background px-2 py-1.5 text-sm";
 
   return (
@@ -42,7 +48,12 @@ export function AccountScopeSelector({
         </span>
       )}
       <select
-        value={effectiveAccountId ?? ""}
+        value={
+          effectiveAccountId &&
+          openAccounts.some((a) => a.id === effectiveAccountId)
+            ? effectiveAccountId
+            : (openAccounts[0]?.id ?? "")
+        }
         disabled={activate.isPending}
         onChange={(e) => {
           const id = e.target.value;
@@ -50,17 +61,24 @@ export function AccountScopeSelector({
         }}
         className={selectClass}
         aria-label="Cambiar cuenta activa"
+        data-testid="account-scope-selector"
         title={
           account
             ? `Cambiar cuenta (ahora: «${account.name}»)`
             : "Cambiar cuenta activa"
         }
       >
-        {openAccounts.map((item) => (
-          <option key={item.id} value={item.id}>
-            {accountTypeShortLabel(item.type)} · {item.name}
-          </option>
-        ))}
+        {openAccounts.map((item) => {
+          const origin = accountOriginKind(item);
+          const originTag =
+            origin === "seed" ? ` · ${ACCOUNT_ORIGIN_LABEL.seed}` : "";
+          return (
+            <option key={item.id} value={item.id}>
+              {accountTypeShortLabel(item.type)} · {item.name}
+              {originTag}
+            </option>
+          );
+        })}
       </select>
     </label>
   );

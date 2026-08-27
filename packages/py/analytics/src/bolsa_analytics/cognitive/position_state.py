@@ -143,6 +143,7 @@ class PositionState:
     exit_status: PositionExitStatus
     created_at: str
     updated_at: str
+    target1_achieved_at: str | None = None
     revisions: tuple[PositionRevision, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
@@ -158,6 +159,7 @@ class PositionState:
             "currentStop": self.current_stop,
             "target1": self.target1,
             "target2": self.target2,
+            "target1AchievedAt": self.target1_achieved_at,
             "quantity": self.quantity,
             "remainingQuantity": self.remaining_quantity,
             "initialRisk": self.initial_risk,
@@ -245,6 +247,12 @@ def position_state_from_dict(raw: dict[str, object] | None) -> PositionState | N
         exit_status=exit_status,  # type: ignore[arg-type]
         created_at=created.strip(),
         updated_at=updated.strip() if isinstance(updated, str) else created.strip(),
+        target1_achieved_at=(
+            raw.get("target1AchievedAt").strip()
+            if isinstance(raw.get("target1AchievedAt"), str)
+            and str(raw.get("target1AchievedAt")).strip()
+            else None
+        ),
         revisions=revisions_from_raw(raw.get("revisions")),
     )
 
@@ -412,10 +420,12 @@ def apply_position_reduce(
     at: str | None = None,
     origin: PositionRevisionOrigin = "reduce",
     reason: str | None = None,
+    mark_target1_achieved: bool = False,
 ) -> PositionState | None:
     """F2.1 reduce → remaining / realized_r / PARTIAL|CLOSED.
 
     OI-5: append revisión si status cambia.
+    V1.21: ``mark_target1_achieved`` fija ``target1_achieved_at`` (idempotencia T1).
     """
     if position is None or position.status == "CLOSED":
         return None
@@ -440,6 +450,11 @@ def apply_position_reduce(
             realized = _round4(realized + slice_r * (cut / position.quantity))
 
     updated = _now_iso(at)
+    t1_at = (
+        position.target1_achieved_at or updated
+        if mark_target1_achieved
+        else position.target1_achieved_at
+    )
     if remaining <= 0:
         next_pos = replace(
             position,
@@ -447,6 +462,7 @@ def apply_position_reduce(
             realized_r=realized,
             status="CLOSED",
             exit_status="done",
+            target1_achieved_at=t1_at,
             updated_at=updated,
         )
         return _with_revision_if_changed(
@@ -461,6 +477,7 @@ def apply_position_reduce(
         position,
         remaining_quantity=remaining,
         realized_r=realized,
+        target1_achieved_at=t1_at,
         updated_at=updated,
     )
     next_pos = replace(mid, status=derive_position_status(mid))

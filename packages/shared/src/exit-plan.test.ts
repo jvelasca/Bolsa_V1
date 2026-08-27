@@ -191,4 +191,42 @@ describe("F3 buildExitPlanFromPosition", () => {
     expect(plan?.reasons).toEqual([]);
     expect(plan?.status).toBe("IDLE");
   });
+
+  it("OP-03 — T1 reduce once; after markTarget1Achieved no re-emit TARGET_1", () => {
+    const open = openLong();
+    const first = buildExitPlanFromPosition(open, { markPrice: 105 });
+    expect(first?.primaryReason).toBe("TARGET_1");
+    expect(first?.suggestedAction).toBe("reduce");
+    expect(first?.suggestedQty).toBe(5);
+
+    const reduced = applyPositionReduce(
+      open,
+      5,
+      105,
+      "2026-08-25T16:00:00Z",
+      "reduce",
+      "T1",
+      {
+        markTarget1Achieved: true,
+      },
+    );
+    expect(reduced?.target1AchievedAt).toBe("2026-08-25T16:00:00Z");
+    expect(reduced?.remainingQuantity).toBe(5);
+
+    const again = buildExitPlanFromPosition(reduced!, { markPrice: 106 });
+    expect(again?.reasons).not.toContain("TARGET_1");
+    expect(again?.primaryReason).not.toBe("TARGET_1");
+  });
+
+  it("OP-04 — T2 does not re-fire T1 after T1 achieved", () => {
+    const open = openLong();
+    const afterT1 = applyPositionReduce(open, 5, 105, null, "reduce", "T1", {
+      markTarget1Achieved: true,
+    })!;
+    const plan = buildExitPlanFromPosition(afterT1, { markPrice: 110 });
+    expect(plan?.primaryReason).toBe("TARGET_2");
+    expect(plan?.reasons).not.toContain("TARGET_1");
+    expect(plan?.suggestedAction).toBe("full_exit");
+    expect(plan?.suggestedQty).toBe(5);
+  });
 });

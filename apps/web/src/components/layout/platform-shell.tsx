@@ -4,6 +4,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { TradingLayout } from "@/components/layout/trading-layout";
 
 import { AppTopBar } from "@/components/layout/app-top-bar";
+import { AdminRail } from "@/components/layout/admin-rail";
 
 import { VisualizationLogDialog } from "@/features/trading/lists-tab/visualization-log-dialog";
 
@@ -104,59 +105,60 @@ export function PlatformShell() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <AppTopBar />
-      <WorkspaceBootstrap />
-      <WorkspaceUiBridgeRegister />
-      <WorkspaceAutoSave />
-      <VisualizationWorkspaceSync />
-      <EstudioApiSync />
-      <WorkspaceRemoteSync />
-      <CoreRSchedulerHost />
-      <EstudioSupervisionHost />
-      <EstudioProcessRunningWire />
-      <SupervisedF3QueueHost />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <AdminRail />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <AppTopBar />
+          <WorkspaceBootstrap />
+          <WorkspaceUiBridgeRegister />
+          <WorkspaceAutoSave />
+          <VisualizationWorkspaceSync />
+          <EstudioApiSync />
+          <WorkspaceRemoteSync />
+          <CoreRSchedulerHost />
+          <EstudioSupervisionHost />
+          <EstudioProcessRunningWire />
+          <SupervisedF3QueueHost />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {trading ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <TradingLayout>
-              <Outlet />
-            </TradingLayout>
-            <TradingStatusBar />
-          </div>
-        ) : !onBacktests ? (
-          <main
-            className={cn(
-              "min-h-0 flex-1 p-3 md:p-4",
-              fillHub
-                ? "flex flex-col overflow-hidden"
-                : "overflow-auto md:p-6",
-            )}
-          >
-            <Outlet />
-          </main>
-        ) : null}
+            {trading ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <TradingLayout>
+                  <Outlet />
+                </TradingLayout>
+                <TradingStatusBar />
+              </div>
+            ) : !onBacktests ? (
+              <main
+                className={cn(
+                  "min-h-0 flex-1 p-3 md:p-4",
+                  fillHub
+                    ? "flex flex-col overflow-hidden"
+                    : "overflow-auto md:p-6",
+                )}
+              >
+                <Outlet />
+              </main>
+            ) : null}
 
-        {/*
-          Keep-alive Lista AUTO: misma instancia de BacktestsPage al salir a Trading/otros hubs.
-          Visible solo en /backtests; si la campaña sigue, queda montada fuera de flujo.
-        */}
-        {mountBacktests ? (
-          <main
-            className={cn(
-              onBacktests
-                ? "flex min-h-0 flex-1 flex-col overflow-hidden p-3 md:p-4"
-                : "pointer-events-none fixed left-0 top-0 h-px w-px overflow-hidden opacity-0",
-            )}
-            aria-hidden={!onBacktests}
-            data-testid="backtests-keepalive-host"
-            data-list-auto-keepalive={
-              listAutoActive && !onBacktests ? "1" : "0"
-            }
-          >
-            <BacktestsPage />
-          </main>
-        ) : null}
+            {mountBacktests ? (
+              <main
+                className={cn(
+                  onBacktests
+                    ? "flex min-h-0 flex-1 flex-col overflow-hidden p-3 md:p-4"
+                    : "pointer-events-none fixed left-0 top-0 h-px w-px overflow-hidden opacity-0",
+                )}
+                aria-hidden={!onBacktests}
+                data-testid="backtests-keepalive-host"
+                data-list-auto-keepalive={
+                  listAutoActive && !onBacktests ? "1" : "0"
+                }
+              >
+                <BacktestsPage />
+              </main>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       <ChartGlobalBarSettingsDialog />

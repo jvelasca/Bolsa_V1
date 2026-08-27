@@ -17,10 +17,11 @@ from bolsa_application.opportunity_daily_discovery import (
 )
 
 
-def test_payload_marks_discovery_and_default_ibex() -> None:
+def test_payload_marks_discovery_and_default_estudio() -> None:
     payload = build_opportunity_scan_payload(account_id="acc-1")
     assert payload[OPPORTUNITY_DISCOVERY_PAYLOAD_KEY] is True
     assert payload["universe"]["listId"] == DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
+    assert payload["universe"]["listId"] == "estudio"
     assert payload["opportunityAccountId"] == "acc-1"
     assert payload["opportunityProposeCap"] == DEFAULT_OPPORTUNITY_PROPOSE_CAP
     assert is_opportunity_discovery_payload(payload)
@@ -82,4 +83,4 @@ def test_worker_start_respects_env_off(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OPPORTUNITY_DAILY_SCAN_ENABLED", "true")
     settings_on = Settings()
     assert settings_on.opportunity_daily_scan_enabled is True
-    assert settings_on.opportunity_daily_universe_list_id == "ibex35"
+    assert settings_on.opportunity_daily_universe_list_id == "estudio"

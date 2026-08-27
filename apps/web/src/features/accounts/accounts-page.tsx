@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -6,6 +6,11 @@ import type {
   InvestmentAccountDto,
   InvestmentAccountType,
   PaperLabEvidenceSnapshot,
+} from "@bolsa/shared";
+import {
+  ACCOUNT_ORIGIN_LABEL,
+  accountOriginKind,
+  listCloseableDevExtraAccounts,
 } from "@bolsa/shared";
 import { AccountDetailPanel } from "@/features/accounts/account-detail-panel";
 import { formatPaperLabEvidence } from "@/features/accounts/paper-lab-evidence";
@@ -35,6 +40,7 @@ function AccountListItem({
   isWorking?: boolean;
   totalEquity?: number;
 }) {
+  const origin = accountOriginKind(account);
   return (
     <button
       type="button"
@@ -46,6 +52,7 @@ function AccountListItem({
           : "border-border hover:bg-accent/40",
         account.status === "closed" && "opacity-70",
       )}
+      data-testid={`account-list-item-${account.id}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -53,6 +60,15 @@ function AccountListItem({
           <p className="text-xs text-muted-foreground">
             {account.currency} · {accountTypeLabel(account.type)}
             {account.status === "closed" ? " · cerrada" : ""}
+            {" · "}
+            <span
+              className={cn(
+                origin === "seed" && "text-sky-700 dark:text-sky-300",
+                origin === "lab_paper" && "text-amber-700 dark:text-amber-300",
+              )}
+            >
+              {ACCOUNT_ORIGIN_LABEL[origin]}
+            </span>
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
@@ -78,6 +94,7 @@ function AccountListItem({
 type HubFilter = "demo" | "paper" | "all";
 
 export function AccountsPage() {
+  const queryClient = useQueryClient();
   const activeAccountId = useActiveAccountStore((s) => s.activeAccountId);
   const activateAccount = useActivateAccount();
   const openWizard = useUiStore((s) => s.openCreateAccountWizard);
@@ -88,6 +105,9 @@ export function AccountsPage() {
     paperDeployNote?: string;
   } | null;
   const [showClosed, setShowClosed] = useState(false);
+  const [closeExtrasResult, setCloseExtrasResult] = useState<string | null>(
+    null,
+  );
   const [deployBanner, setDeployBanner] = useState<string | null>(
     deployState?.paperDeployNote
       ? `${deployState.paperDeployNote} ${formatPaperLabEvidence(deployState.paperLabEvidence)}`
@@ -129,6 +149,47 @@ export function AccountsPage() {
     }
     return map;
   }, [summariesQuery.data]);
+
+  const positionsCountById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const summary of summariesQuery.data ?? []) {
+      map.set(summary.account.id, summary.positionsCount ?? 0);
+    }
+    return map;
+  }, [summariesQuery.data]);
+
+  const closeableDevExtras = useMemo(
+    () => listCloseableDevExtraAccounts(accounts, positionsCountById),
+    [accounts, positionsCountById],
+  );
+
+  const closeDevExtrasMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const closed: string[] = [];
+      const failed: string[] = [];
+      for (const id of ids) {
+        try {
+          await api.closeAccount(id);
+          closed.push(id);
+        } catch {
+          failed.push(id);
+        }
+      }
+      return { closed, failed };
+    },
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      await queryClient.invalidateQueries({ queryKey: ["account-summaries"] });
+      const parts = [
+        result.closed.length > 0
+          ? `Cerradas ${result.closed.length} demos de desarrollo.`
+          : null,
+        result.failed.length > 0 ? `Fallaron ${result.failed.length}.` : null,
+        "Purga física de cerradas: ⚙ → BD.",
+      ].filter(Boolean);
+      setCloseExtrasResult(parts.join(" "));
+    },
+  });
 
   const filteredAccounts = useMemo(() => {
     if (hubFilter === "paper")
@@ -208,6 +269,49 @@ export function AccountsPage() {
             cuentas <span className="text-foreground">DEMO</span>. Paper =
             broker real futuro (no crear aún).
           </p>
+          <p
+            className="text-[11px] text-muted-foreground"
+            data-testid="accounts-hygiene-hint"
+          >
+            Si ves demos o Paper · Lab de más (desarrollo), ciérralas aquí y
+            luego purga cerradas en ⚙ → BD. No borres la{" "}
+            <span className="text-foreground">Demo canónica</span> salvo reset
+            intencional.
+          </p>
+          {closeableDevExtras.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button
+                type="button"
+                data-testid="accounts-close-dev-extras"
+                disabled={closeDevExtrasMutation.isPending}
+                className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-900 hover:bg-amber-500/20 disabled:opacity-50 dark:text-amber-100"
+                onClick={() => {
+                  const n = closeableDevExtras.length;
+                  const ok = window.confirm(
+                    `¿Cerrar ${n} cuenta(s) demo de desarrollo sin posiciones abiertas?\n\n` +
+                      "No incluye la Demo canónica ni Paper. " +
+                      "Después puedes purgar cerradas en ⚙ → BD.",
+                  );
+                  if (!ok) return;
+                  closeDevExtrasMutation.mutate(
+                    closeableDevExtras.map((a) => a.id),
+                  );
+                }}
+              >
+                {closeDevExtrasMutation.isPending
+                  ? "Cerrando…"
+                  : `Cerrar extras de desarrollo (${closeableDevExtras.length})`}
+              </button>
+              {closeExtrasResult ? (
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  data-testid="accounts-close-dev-extras-result"
+                >
+                  {closeExtrasResult}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-lg border border-border p-0.5">

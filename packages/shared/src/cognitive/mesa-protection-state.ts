@@ -94,9 +94,9 @@ export function buildMesaProtectionState(
   }
 
   return {
-    plan: line("plan", "Plan", planStop),
+    plan: line("plan", "Plan (inicial)", planStop),
     proposal: line("proposal", "Propuesta", proposalStop),
-    executed: line("executed", "Ejecutado", executedStop),
+    executed: line("executed", "Stop vigente", executedStop),
     discrepancy,
     summaryLabel,
   };
