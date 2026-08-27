@@ -1,7 +1,8 @@
 # RELEVO — V1.23 UX Consolidation & Operational Cockpit (2026-08-27)
 
-> **AsOf:** 2026-08-28 · **Estado:** **LISTO PARA TAG** — consolidación UX sin motores nuevos; §4 local GREEN.
+> **AsOf:** 2026-08-28 · **Estado:** **PUBLICACIÓN** — tag `v1.23-beta` → `4bc7426c`. **Release tag CI:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33122128224).
 > **Padre:** [`traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md`](./traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md) · [ADR-040](../adr/040-user-information-architecture.md) §9 · [diseño Mercado 2.0](./diseno-mercado-2-0-cockpit-2026-08-27.md).
+> **Tag relevo:** [`traspaso-relevo-tag-v1-23-beta-2026-08-28.md`](./traspaso-relevo-tag-v1-23-beta-2026-08-28.md).
 
 ---
 
@@ -26,7 +27,7 @@ Confirm = firma · `PAPER_D_EXECUTE` off · AUTO off · Ranking ≠ BUY · trail
 
 **Backend**
 
-- [x] Tests H1 empty vs unavailable verdes (offline + pytest 8)
+- [x] Tests H1 empty vs unavailable verdes (offline + CI)
 - [x] Ninguna ruta Daily Ops amplía Estudio
 - [x] Un stop vigente (`currentStop`)
 - [x] T1 tocado ≠ gestionado visible en Mercado
@@ -44,7 +45,7 @@ Confirm = firma · `PAPER_D_EXECUTE` off · AUTO off · Ranking ≠ BUY · trail
 
 OpportunityScore · VaR · correlación · batch propose · promover trail · grid Cobertura 180 · thaw/AUTO.
 
-## 4. Verificación (2026-08-28 local)
+## 4. Verificación (2026-08-28)
 
 ```bash
 pnpm --filter @bolsa/shared build          # PASS
@@ -55,6 +56,8 @@ pnpm test:decision-spine                   # PASS (497)
 
 H1: `test_daily_ops_report.py` en `pyOperativaTests` (offline). Digest email/pdf siguen `--with-report`.
 
+**CI tag:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33122128224) · tip `4bc7426c`.
+
 ## 5. Next
 
-Tag `v1.23-beta` → push `main` + tag → pin CI GREEN. No mezclar con OpportunityScore / thaw.
+Post-auditoría: un epic. No mezclar OpportunityScore / thaw.
