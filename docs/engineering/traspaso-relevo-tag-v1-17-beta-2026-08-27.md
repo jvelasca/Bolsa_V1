@@ -1,7 +1,7 @@
 # RELEVO — tag v1.17-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v117.md`](./audit-pack-estado-global-2026-08-27-v117.md) · [`traspaso-relevo-tag-v1-16-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-16-beta-2026-08-26.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.17-beta` sobre stamp docs (feature `62ebc4f`). **Release tag CI:** pendiente pin GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.17-beta` sobre stamp docs (feature `62ebc4f`). **Release tag CI:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33047657139).
 > **Arranque chat nuevo / auditor:** pack v117 + ADR-037 §7 + ADR-038/039 + `CURRENT_SYSTEM.md` + relevos P0/F1–F4 + este relevo.
 
 ---

@@ -2,7 +2,7 @@
 
 > **AsOf:** 2026-08-27 · **Baseline:** `main` post `v1.16-beta` (`f16119b`).
 > **Padre:** ADR-037 · ADR-038 · ADR-039 · [CURRENT_SYSTEM.md](../CURRENT_SYSTEM.md).
-> **Estado:** **CERRADO — tag `v1.17-beta`** (sesión operativa diaria). Pendiente CI GREEN + triage auditor externo.
+> **Estado:** **CERRADO — tag `v1.17-beta`** (sesión operativa diaria). CI GREEN · triage auditor externo.
 > **Producto:** BETA · Confirm = única firma · AUTO off · `PAPER_D_EXECUTE` off.
 
 ## Horizonte (qué manda)
