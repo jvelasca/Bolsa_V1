@@ -21,4 +21,9 @@ describe("parseHoyView", () => {
   it("prefers view over focus", () => {
     expect(parseHoyView("oportunidades", "spine")).toBe(HOY_VIEW.oportunidades);
   });
+
+  it("does not open a cobertura door (epic posterior)", () => {
+    expect(parseHoyView("cobertura", null)).toBe(HOY_VIEW.resumen);
+    expect(Object.values(HOY_VIEW)).not.toContain("cobertura");
+  });
 });

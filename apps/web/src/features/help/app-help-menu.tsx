@@ -126,8 +126,8 @@ function GuideContent() {
             órdenes, <RouteLink to="/history">Historial</RouteLink>, riesgo.
           </li>
           <li>
-            <RouteLink to="/research">Asesor</RouteLink> — Tesis / diario /
-            opiniones (pensar, no el bucle diario de firma).
+            <RouteLink to="/research">Asesor</RouteLink> — Dictamen / diario /
+            ledger (explica, no firma).
           </li>
           <li>
             <RouteLink to="/backtests">Laboratorio</RouteLink> — Simulaciones y
@@ -437,10 +437,11 @@ function TradingContent() {
         <ul className="list-disc space-y-1 pl-5">
           <li>
             <strong className="text-foreground">SEMI</strong> — camino operativo
-            diario: Alarma / Proponer F3 →{" "}
+            diario: Mercado / Hoy · Proponer →{" "}
             <RouteLink to="/confirm">Confirmar</RouteLink> (firma humana) → fill
-            DEMO. Frase de mesa: «La app propone operaciones sobre tu Universo.
-            Tú las firmas aquí. Nunca se envían solas.»
+            DEMO. Asesor explica dictámenes; no encola firma. Frase de mesa: «La
+            app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca
+            se envían solas.»
           </li>
           <li>
             <strong className="text-foreground">AUTO</strong> — BETA-D: pill
@@ -450,14 +451,14 @@ function TradingContent() {
           </li>
           <li>
             <strong className="text-foreground">Asesor → Diario</strong> —
-            resumen operativo del día (cuenta · trades · F3 · Alarmas/Avisos ·
-            semana). Preview en app; email HTML (+ PDF opt-in R4) o descarga
-            PDF.
+            explica el día (cuenta · trades · Alarmas/Avisos · semana). Preview
+            en app; email HTML (+ PDF opt-in) o descarga PDF. No es un segundo
+            Hoy.
           </li>
           <li>
             <strong className="text-foreground">Asesor → Opiniones</strong> —
-            telemetría A0 (días / precisión / recall proxy) para medir P1–P4
-            antes de thaw.
+            dictamen + telemetría A0 (días / precisión / recall). Actuar en
+            Mercado / Confirm — Asesor no propone F3.
           </li>
         </ul>
         <h4 className="mb-1 mt-3 font-semibold text-foreground">

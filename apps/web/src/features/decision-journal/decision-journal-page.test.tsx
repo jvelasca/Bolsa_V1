@@ -204,9 +204,12 @@ describe("DecisionJournalPage", () => {
     await waitFor(() =>
       expect(screen.getByTestId("decision-journal")).toBeTruthy(),
     );
-    expect(screen.getByText(/Seguimiento de análisis y tesis/i)).toBeTruthy();
+    expect(screen.getByText(/Estudios con análisis \(propose\)/i)).toBeTruthy();
     expect(screen.getByTestId("tab-tesis")).toBeTruthy();
     expect(screen.getByTestId("journal-study-filters")).toBeTruthy();
+    expect((screen.getByTestId("filter-list") as HTMLSelectElement).value).toBe(
+      "estudio",
+    );
   });
 
   it("WATCH no pinta objetivos operativos", async () => {

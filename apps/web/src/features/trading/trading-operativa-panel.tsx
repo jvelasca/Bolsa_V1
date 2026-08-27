@@ -1,10 +1,11 @@
 /**
- * Panel Operativa (Trading) — Recomendación (Pulso+TOP) / Info (por activo).
+ * Panel Operativa (Trading) — cockpit (plan + acción) + Recomendación / Info.
  *
  * Manual/SEMI/AUTO = cuenta entera → barra de estado / Cuentas (no aquí).
  * Supervisión Lab lista Estudio = banner Estudio.
  *
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
+ * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md
  */
 
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -35,6 +36,7 @@ import {
 import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { MesaTipButton } from "@/features/help/mesa-tip-button";
 import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
+import { OperativaCockpitCard } from "@/features/trading/operativa-cockpit-card";
 import { TradingOperativaSection } from "@/features/trading/trading-operativa-section";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import {
@@ -52,6 +54,7 @@ import {
 import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
 import { getDiaDExperimentTop1 } from "@/features/backtests/dia-d-experiment-top";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
+import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import {
   effectiveDiaD,
   isDiaDInPast,
@@ -92,6 +95,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const symbol = active?.label ?? "—";
   const timeframe = (active?.timeframe as string) || "1d";
   const { effectiveAccountId } = useActiveAccount();
+  const accountScope = useActiveAccountQueryKey();
   const bookPrefs = useDemoBookPrefs();
   const pushToast = useAlertsStore((s) => s.pushToast);
   const enqueueSupervised = useSupervisedF3QueueStore((s) => s.enqueue);
@@ -117,9 +121,9 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
   const canEnqueueConfirm = demoBookAllowsEnqueueConfirm(bookPrefs.mode);
 
   const portfolioQuery = useQuery({
-    queryKey: ["portfolio", "operativa"],
+    queryKey: ["portfolio", accountScope],
     queryFn: api.getPortfolio,
-    staleTime: 30_000,
+    staleTime: 15_000,
   });
   const positionOpen = useMemo(() => {
     if (!instrumentId) return false;
@@ -128,6 +132,18 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
       (p) =>
         p.instrumentId === instrumentId &&
         Math.abs(Number(p.quantity ?? 0)) > 0,
+    );
+  }, [instrumentId, portfolioQuery.data]);
+
+  const activePosition = useMemo(() => {
+    if (!instrumentId) return null;
+    const positions = portfolioQuery.data?.data.positions ?? [];
+    return (
+      positions.find(
+        (p) =>
+          p.instrumentId === instrumentId &&
+          Math.abs(Number(p.quantity ?? 0)) > 0,
+      ) ?? null
     );
   }, [instrumentId, portfolioQuery.data]);
 
@@ -321,6 +337,56 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         {symbol} · {timeframe}
         {positionOpen ? " · en cartera" : ""}
       </p>
+
+      <div className="min-h-0 shrink-0 overflow-y-auto">
+        <OperativaCockpitCard
+          instrumentId={instrumentId}
+          symbol={symbol}
+          accountId={effectiveAccountId}
+          inEstudio={inEstudio}
+          position={activePosition}
+          opinion={activeOpinion ?? null}
+          opinionLoading={opinionsQuery.isLoading || scoresLoading}
+          canPropose={
+            Boolean(effectiveAccountId) &&
+            canEnqueueConfirm &&
+            !(requiresEstudio && !inEstudio)
+          }
+          proposePending={proposeMutation.isPending}
+          onPropose={() => proposeMutation.mutate()}
+          onAddToEstudio={() => {
+            if (!instrumentId) return;
+            void (async () => {
+              const { addToEstudioMembership } =
+                await import("@/features/trading/estudio-membership");
+              const { added, ids } = await addToEstudioMembership([
+                {
+                  id: instrumentId,
+                  symbol,
+                  yahooSymbol: symbol,
+                  name: symbol,
+                  exchange: "—",
+                  country: "—",
+                  currency: "EUR",
+                  assetClass: "equity",
+                },
+              ]);
+              if (added <= 0) return;
+              upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
+              pushToast(`${symbol} → Estudio · actualizando…`);
+              const { runEstudioInstrumentsUpdate } =
+                await import("@/features/trading/estudio-instruments-update");
+              await runEstudioInstrumentsUpdate({
+                instrumentIds: ids,
+                rediscover: false,
+                phaseLabel: "Alta Estudio",
+                symbolOf: () => symbol,
+              });
+              pushToast(`${symbol} → Estudio · datos al día`);
+            })();
+          }}
+        />
+      </div>
 
       {requiresEstudio && !inEstudio ? (
         <div

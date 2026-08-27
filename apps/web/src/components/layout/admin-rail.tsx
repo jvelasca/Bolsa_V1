@@ -1,5 +1,6 @@
 /**
- * AdminRail — barra administrativa colapsable (V1.21).
+ * AdminRail — barra administrativa icon-first (V1.21+).
+ * Por defecto solo iconos (mínimo ancho); al hover se descolapsa el texto.
  * No es navegación diaria de producto. Overview / Cuentas / Fiscal / Consola.
  *
  * @see docs/adr/040-user-information-architecture.md (enmienda V1.21)
@@ -11,9 +12,9 @@ import { NavLink } from "react-router-dom";
 import {
   BarChart3,
   Briefcase,
-  ChevronLeft,
-  ChevronRight,
   LayoutDashboard,
+  Pin,
+  PinOff,
   Receipt,
   Wrench,
 } from "lucide-react";
@@ -23,7 +24,7 @@ import {
 } from "@/features/confirm/daily-nav";
 import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "bolsa-admin-rail-collapsed";
+const STORAGE_KEY = "bolsa-admin-rail-pinned";
 
 const ADMIN_ITEMS = [
   {
@@ -52,43 +53,65 @@ const ADMIN_ITEMS = [
   },
 ] as const;
 
-function loadCollapsed(): boolean {
+function loadPinned(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 
 export function AdminRail() {
-  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [pinned, setPinned] = useState(loadPinned);
+  const [hovered, setHovered] = useState(false);
+  const expanded = pinned || hovered;
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
+      localStorage.setItem(STORAGE_KEY, pinned ? "1" : "0");
     } catch {
       /* ignore */
     }
-  }, [collapsed]);
+  }, [pinned]);
+
+  // Migrate legacy collapsed key once (default was collapsed=true → unpinned).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("bolsa-admin-rail-collapsed") != null) {
+        localStorage.removeItem("bolsa-admin-rail-collapsed");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   return (
     <aside
       className={cn(
-        "flex shrink-0 flex-col border-r border-border bg-card/80",
-        collapsed ? "w-12" : "w-44",
+        "group relative z-30 flex shrink-0 flex-col border-r border-border bg-card/95 transition-[width] duration-150 ease-out",
+        expanded ? "w-44" : "w-12",
       )}
       aria-label="Administración"
       data-testid="admin-rail"
-      data-collapsed={collapsed ? "1" : "0"}
+      data-collapsed={expanded ? "0" : "1"}
+      data-pinned={pinned ? "1" : "0"}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocusCapture={() => setHovered(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setHovered(false);
+        }
+      }}
     >
       <div
         className={cn(
           "flex h-12 items-center border-b border-border px-2",
-          collapsed ? "justify-center" : "gap-2",
+          expanded ? "gap-2" : "justify-center",
         )}
       >
         <BarChart3 className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-        {!collapsed ? (
+        {expanded ? (
           <span className="truncate text-sm font-semibold tracking-tight">
             Bolsa
           </span>
@@ -107,36 +130,42 @@ export function AdminRail() {
             className={({ isActive }) =>
               cn(
                 "flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground",
-                collapsed && "justify-center px-1.5",
+                !expanded && "justify-center px-1.5",
                 isActive && "bg-accent text-primary",
               )
             }
             data-testid={`admin-rail-${item.href.replace(/^\//, "")}`}
           >
             <item.icon className="h-4 w-4 shrink-0" />
-            {!collapsed ? <span className="truncate">{item.label}</span> : null}
+            {expanded ? <span className="truncate">{item.label}</span> : null}
           </NavLink>
         ))}
       </nav>
 
       <button
         type="button"
-        className="m-1.5 flex items-center justify-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-accent"
-        onClick={() => setCollapsed((v) => !v)}
-        aria-expanded={!collapsed}
+        className={cn(
+          "m-1.5 flex items-center justify-center gap-1 rounded-md border border-border/60 px-2 py-1.5 text-[10px] text-muted-foreground hover:bg-accent",
+          expanded && "justify-start",
+        )}
+        onClick={() => setPinned((v) => !v)}
+        aria-pressed={pinned}
         aria-label={
-          collapsed ? "Expandir administración" : "Colapsar administración"
+          pinned
+            ? "Desanclar administración (solo iconos)"
+            : "Anclar administración expandida"
         }
+        title={pinned ? "Desanclar" : "Anclar expandido"}
         data-testid="admin-rail-toggle"
       >
-        {collapsed ? (
-          <ChevronRight className="h-3.5 w-3.5" />
+        {pinned ? (
+          <PinOff className="h-3.5 w-3.5 shrink-0" />
         ) : (
-          <>
-            <ChevronLeft className="h-3.5 w-3.5" />
-            <span>Admin</span>
-          </>
+          <Pin className="h-3.5 w-3.5 shrink-0" />
         )}
+        {expanded ? (
+          <span className="truncate">{pinned ? "Anclado" : "Anclar"}</span>
+        ) : null}
       </button>
     </aside>
   );

@@ -138,7 +138,8 @@ describe("daily-nav", () => {
     ]);
     expect(LAB_TESIS_NAV_ORDER).toEqual([LABORATORIO_LABEL, ASESOR_LABEL]);
     expect(ASESOR_LABEL).toBe("Asesor");
-    expect(ASESOR_TESIS_HINT.toLowerCase()).toMatch(/tesis/);
+    expect(ASESOR_TESIS_HINT.toLowerCase()).toMatch(/explica/);
+    expect(ASESOR_TESIS_HINT.toLowerCase()).toMatch(/no opera/);
   });
 
   it("answers UX-01…05 without internal module names", () => {

@@ -25,7 +25,7 @@ export type JournalStudyFilters = {
 };
 
 export const DEFAULT_JOURNAL_STUDY_FILTERS: JournalStudyFilters = {
-  listId: "todas",
+  listId: ESTUDIO_LIST_ID,
   q: "",
   period: "all",
   opinion: "all",

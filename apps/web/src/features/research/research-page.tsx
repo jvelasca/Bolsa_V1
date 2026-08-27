@@ -173,13 +173,16 @@ export function ResearchPage() {
           Asesor
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Observatorio del laboratorio y dictámenes del Estudio. Para señales
-          operativas del día, usa{" "}
+          Explica dictámenes, diario y ledger del laboratorio. No ejecuta ni
+          firma — actuar en{" "}
+          <Link to="/trading" className="text-primary hover:underline">
+            Mercado
+          </Link>{" "}
+          o{" "}
           <Link to={SEÑALES_PATH} className="text-primary hover:underline">
             {SEÑALES_LABEL}
           </Link>
           . Ruta <code className="text-xs">/research</code> (API sin cambios).
-          Sin Belief ni Discovery Score.
         </p>
       </div>
 

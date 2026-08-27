@@ -210,7 +210,7 @@ export function AsesorDailyOpsPanel() {
           <div className="flex flex-wrap items-start justify-between gap-2">
             <div>
               <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-teal-200/80">
-                Resumen operativo
+                Explica el día · no firma
               </p>
               <h2 className="font-serif text-2xl text-white sm:text-3xl">
                 {account?.name ?? "Cuenta DEMO"}
@@ -225,10 +225,10 @@ export function AsesorDailyOpsPanel() {
                 to="/trading"
                 className={cn(
                   buttonVariants({ variant: "outline", size: "sm" }),
-                  "h-7 text-[11px]",
+                  "h-7 border-white/30 bg-transparent text-[11px] text-white hover:bg-white/10",
                 )}
               >
-                Abrir Operativa
+                Ver en Mercado
               </Link>
               <Link
                 to="/research?tab=opiniones"
@@ -279,7 +279,7 @@ export function AsesorDailyOpsPanel() {
           {/* Hoy */}
           <section className="space-y-3 rounded-xl border border-border bg-card p-4">
             <h3 className="text-sm font-semibold text-foreground">
-              Hoy · operaciones
+              Actividad del día (lectura)
             </h3>
             <div className="flex flex-wrap gap-3 text-[11px]">
               <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-sky-800 dark:text-sky-200">

@@ -83,6 +83,8 @@
  * **2026-08-27** — V1.20 ADR-040: nav L1 Hoy·Mercado·Cartera·Asesor·Laboratorio;
  * strip Hoy y MesaOperationalBar fuera del terminal Mercado; Spine/Consola/
  * Journal/Libro no son puertas L1; OpportunityScore aparcado.
+ * **2026-08-27b** — V1.22: Asesor explica (Opiniones sin Proponer F3); Mercado
+ * cockpit slice 1; Hoy Resumen KPI Cobertura.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -123,4 +125,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-27" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-27b" as const;

@@ -179,7 +179,7 @@ export const MERCADO_NAV = {
  * Tesis / FA — no es el bucle diario de señales.
  */
 export const ASESOR_TESIS_HINT =
-  "Tesis y fundamental — no es el bucle diario de señales" as const;
+  "Dictamen y ledger · explica, no opera" as const;
 
 /** Copy de mesa para Estudio (API list id `estudio` / ADR-024 no cambia). */
 export const UNIVERSO_EN_VIGILANCIA = "Universo en vigilancia" as const;

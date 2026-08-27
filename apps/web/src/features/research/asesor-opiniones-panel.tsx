@@ -1,10 +1,12 @@
 /**
  * Bandeja Opiniones de hoy — Estudio → Asesor.
- * Canales AVISO | ALARMA (§5.2) derivados del dictamen; SEMI propone desde Alarma.
+ * Explica dictamen (AVISO | ALARMA). No propone ni firma — eso es Mercado / Confirm.
+ *
+ * @see docs/engineering/traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md
  */
 
 import { useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import {
   INSTRUMENT_DAILY_OPINION_STANCE_LABELS,
@@ -13,7 +15,6 @@ import {
   buildOpinionChannelItems,
   mapOpinionToChannel,
   type InstrumentDailyOpinionHintV1,
-  type OpinionChannelItemV1,
 } from "@bolsa/shared";
 import { api } from "@/lib/api";
 import {
@@ -22,17 +23,15 @@ import {
 } from "@/features/trading/use-instrument-daily-opinions";
 import { useInstrumentsHubScores } from "@/features/instruments/use-instruments-hub-scores";
 import { resolveIndiceOperativo } from "@/features/trading/operativa-index";
-import { proposeInstrumentSupervised } from "@/features/trading/propose-instrument-supervised";
-import { demoBookAllowsEnqueueConfirm } from "@/features/trading/demo-book-prefs";
-import { useDemoBookPrefs } from "@/features/trading/use-demo-book-prefs";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { useNotificationPrefsStore } from "@/stores/notification-prefs-store";
 import {
-  openHelpAiPlatform,
-  useSupervisedF3QueueStore,
-} from "@/stores/supervised-f3-queue-store";
+  hoyViewHref,
+  HOY_VIEW,
+  MERCADO_PATH,
+} from "@/features/confirm/daily-nav";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -53,8 +52,7 @@ type ChannelFilter = "todas" | "alarma" | "aviso";
 export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const [filter, setFilter] = useState<ChannelFilter>("todas");
   const [showMap, setShowMap] = useState(false);
-  const bookPrefs = useDemoBookPrefs();
-  const canEnqueue = demoBookAllowsEnqueueConfirm(bookPrefs.mode);
+  const [showEodOps, setShowEodOps] = useState(false);
   const { effectiveAccountId } = useActiveAccount();
   const pushToast = useAlertsStore((s) => s.pushToast);
   const notifyEmail = useNotificationPrefsStore((s) => s.alarmaEmail);
@@ -67,8 +65,6 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const dailyDigestPdfEnabled = useNotificationPrefsStore(
     (s) => s.dailyDigestPdfEnabled,
   );
-  const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
-  const setActive = useSupervisedF3QueueStore((s) => s.setActive);
 
   const studyEntries = useEstudioMembershipStore((s) => s.members);
   const studyIds = useMemo(
@@ -170,39 +166,14 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
   const alarmaCount = channelItems.filter((i) => i.level === "alarma").length;
   const avisoCount = channelItems.filter((i) => i.level === "aviso").length;
 
-  const proposeMutation = useMutation({
-    mutationFn: async (item: OpinionChannelItemV1) => {
-      if (!effectiveAccountId) throw new Error("Sin cuenta DEMO activa");
-      return proposeInstrumentSupervised({
-        instrumentId: item.instrumentId,
-        symbol: item.symbol,
-        accountId: effectiveAccountId,
-        source: "asesor_alarma",
-      });
-    },
-    onSuccess: (payload, item) => {
-      const id = enqueue(payload, {
-        symbol: payload.symbol ?? item.symbol,
-        origin: "asesor",
-      });
-      setActive(id);
-      pushToast(`Alarma · ${item.symbol}: ${payload.action} → Confirm`);
-      openHelpAiPlatform({ panel: "supervised-f3" });
-    },
-    onError: (e: Error) => {
-      pushToast(`Alarma · ${e.message}`);
-    },
-  });
-
   return (
     <div className={cn("space-y-4", className)} data-testid="asesor-opiniones">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Opiniones de hoy</CardTitle>
           <CardDescription>
-            Dictamen Estudio → canal AVISO (info) / ALARMA (accionable en SEMI).
-            ★ dictamen ≠ ★ TOP. Toast alarma en app · email tras EOD solo si
-            flag SMTP.
+            Dictamen Estudio → AVISO (info) / ALARMA (atención). Explica; no
+            encola firma. Actuar en Mercado · Confirm. ★ dictamen ≠ ★ TOP.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -320,16 +291,16 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
           {studyIds.length === 0 ? (
             <div className="space-y-2 text-sm text-muted-foreground">
               <p>
-                Estudio vacío. Añade valores desde Trading (Listas → Pasar a
+                Estudio vacío. Añade valores en Mercado (Listas → Pasar a
                 Estudio).
               </p>
               <Link
-                to="/"
+                to={MERCADO_PATH}
                 className={cn(
                   buttonVariants({ variant: "outline", size: "sm" }),
                 )}
               >
-                Ir a Trading
+                Ir a Mercado
               </Link>
             </div>
           ) : opinionsQuery.isLoading || scoresLoading ? (
@@ -357,9 +328,9 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link
-                        to="/"
+                        to={MERCADO_PATH}
                         className="font-medium text-foreground hover:underline"
-                        title="Abrir Trading"
+                        title="Ver en Mercado"
                       >
                         {item.symbol}
                       </Link>
@@ -397,26 +368,17 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                       </span>
                     ) : null}
                     {item.actionable ? (
-                      <button
-                        type="button"
+                      <Link
+                        to={hoyViewHref(HOY_VIEW.confirmar)}
                         className={cn(
                           buttonVariants({ variant: "outline", size: "sm" }),
                           "h-7 text-[10px]",
                         )}
-                        disabled={
-                          proposeMutation.isPending ||
-                          !canEnqueue ||
-                          !effectiveAccountId
-                        }
-                        title={
-                          !canEnqueue
-                            ? "Pasa a SEMI en Operativa → Configuración"
-                            : "Proponer F3 → Confirm"
-                        }
-                        onClick={() => proposeMutation.mutate(item)}
+                        title="Asesor explica · firmar en Confirm / preparar en Mercado"
+                        data-testid="asesor-opinion-act-elsewhere"
                       >
-                        {!canEnqueue ? "SEMI para actuar" : "Proponer F3"}
-                      </button>
+                        Actuar en Hoy
+                      </Link>
                     ) : null}
                   </div>
                 </li>
@@ -432,56 +394,70 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
               : ""}
           </p>
           {studyIds.length > 0 ? (
-            <button
-              type="button"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "h-7 text-[10px]",
-              )}
-              disabled={opinionsQuery.isFetching}
-              title="POST eod-batch con force=true (flag ESTUDIO_EOD_OPINION_ENABLED sigue off)"
-              onClick={() => {
-                void api
-                  .runInstrumentDailyOpinionEodBatch({
-                    instrumentIds: studyIds,
-                    force: true,
-                    accountId: effectiveAccountId,
-                    notifyEmail: notifyEmail.trim() || null,
-                    notifyEmailEnabled,
-                    notifyDigestEnabled: dailyDigestEnabled,
-                    attachPdf: dailyDigestEnabled
-                      ? dailyDigestPdfEnabled
-                      : false,
-                  })
-                  .then((res) => {
-                    void opinionsQuery.refetch();
-                    const n = res.count ?? 0;
-                    const email = res.emailNotify;
-                    const digest = res.digestNotify;
-                    let msg = `EOD batch · ${n} dictamen${n === 1 ? "" : "es"}`;
-                    if (email) {
-                      if (email.sent) {
-                        msg += ` · email ${email.alarmaCount} alarma(s)`;
-                      } else if (email.skippedReason) {
-                        msg += ` · email skip (${email.skippedReason})`;
-                      }
-                    }
-                    if (digest) {
-                      if (digest.sent) {
-                        msg += digest.pdfAttached
-                          ? " · digest+PDF enviado"
-                          : " · digest enviado";
-                      } else if (digest.skippedReason) {
-                        msg += ` · digest skip (${digest.skippedReason})`;
-                      }
-                    }
-                    pushToast(msg);
-                  })
-                  .catch((e: Error) => pushToast(`EOD batch · ${e.message}`));
-              }}
-            >
-              Recalcular EOD (manual / force)
-            </button>
+            <div className="space-y-1">
+              <button
+                type="button"
+                className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+                onClick={() => setShowEodOps((v) => !v)}
+                data-testid="asesor-eod-ops-toggle"
+              >
+                {showEodOps ? "Ocultar ops EOD" : "Ops EOD (avanzado)"}
+              </button>
+              {showEodOps ? (
+                <button
+                  type="button"
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "sm" }),
+                    "h-7 text-[10px]",
+                  )}
+                  disabled={opinionsQuery.isFetching}
+                  title="POST eod-batch con force=true (flag ESTUDIO_EOD_OPINION_ENABLED sigue off)"
+                  onClick={() => {
+                    void api
+                      .runInstrumentDailyOpinionEodBatch({
+                        instrumentIds: studyIds,
+                        force: true,
+                        accountId: effectiveAccountId,
+                        notifyEmail: notifyEmail.trim() || null,
+                        notifyEmailEnabled,
+                        notifyDigestEnabled: dailyDigestEnabled,
+                        attachPdf: dailyDigestEnabled
+                          ? dailyDigestPdfEnabled
+                          : false,
+                      })
+                      .then((res) => {
+                        void opinionsQuery.refetch();
+                        const n = res.count ?? 0;
+                        const email = res.emailNotify;
+                        const digest = res.digestNotify;
+                        let msg = `EOD batch · ${n} dictamen${n === 1 ? "" : "es"}`;
+                        if (email) {
+                          if (email.sent) {
+                            msg += ` · email ${email.alarmaCount} alarma(s)`;
+                          } else if (email.skippedReason) {
+                            msg += ` · email skip (${email.skippedReason})`;
+                          }
+                        }
+                        if (digest) {
+                          if (digest.sent) {
+                            msg += digest.pdfAttached
+                              ? " · digest+PDF enviado"
+                              : " · digest enviado";
+                          } else if (digest.skippedReason) {
+                            msg += ` · digest skip (${digest.skippedReason})`;
+                          }
+                        }
+                        pushToast(msg);
+                      })
+                      .catch((e: Error) =>
+                        pushToast(`EOD batch · ${e.message}`),
+                      );
+                  }}
+                >
+                  Recalcular EOD (manual / force)
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </CardContent>
       </Card>

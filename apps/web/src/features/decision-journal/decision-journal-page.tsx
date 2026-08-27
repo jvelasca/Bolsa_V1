@@ -168,14 +168,19 @@ export function DecisionJournalPage() {
             Decision Journal
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Seguimiento de análisis y tesis
+            Estudios con análisis (propose) — no es el listado de membresía de
+            Estudio. Sin propose reciente = no aparece aquí.
           </p>
         </div>
         <div className="flex items-center gap-3">
           {studiesQuery.isSuccess && tab === "tesis" ? (
-            <p className="text-[11px] tabular-nums text-muted-foreground">
+            <p
+              className="text-[11px] tabular-nums text-muted-foreground"
+              data-testid="journal-studies-count"
+              title="Filas = Decision Studies existentes, no el tamaño de la lista Estudio"
+            >
               {studies.length === studiesTotal
-                ? `${studiesTotal} tesis`
+                ? `${studiesTotal} estudio${studiesTotal === 1 ? "" : "s"}`
                 : `${studies.length} / ${studiesTotal}`}
             </p>
           ) : null}

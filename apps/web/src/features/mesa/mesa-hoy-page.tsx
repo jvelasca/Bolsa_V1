@@ -1,6 +1,7 @@
 /**
- * Hoy — home operativa diaria (ADR-037 + ADR-040).
- * Vistas: Resumen · Posiciones · Oportunidades · Decisiones · Confirmar · Journal.
+ * Hoy — command center diario (ADR-037 + ADR-040 · V1.22).
+ * Jobs: Actuar · Priorizar · Cobertura KPI. Journal = propose.
+ * Vista ?view=cobertura = epic posterior.
  */
 
 import { useMemo, useRef } from "react";
@@ -41,6 +42,7 @@ import {
 } from "@/features/operational-console/use-ops-self-eval";
 import { MesaOperationalHeaderStrip } from "@/features/mesa/mesa-operational-header";
 import { MesaSessionStateCard } from "@/features/mesa/mesa-session-state-card";
+import { MesaCoberturaKpi } from "@/features/mesa/mesa-cobertura-kpi";
 import { MesaLevelSection } from "@/features/mesa/mesa-level-section";
 import { MesaAttentionQueue } from "@/features/mesa/mesa-attention-queue";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
@@ -216,8 +218,18 @@ export function MesaHoyPage() {
         entriesBlocked,
         killSwitchEffective: killOn,
         incidentCount: Math.max(0, incidentCount),
+        estudioUniverseCount:
+          universeListQuery.data?.data?.instrumentIds?.length ??
+          estudioInstrumentIds.length,
       }),
-    [board, entriesBlocked, killOn, incidentCount],
+    [
+      board,
+      entriesBlocked,
+      killOn,
+      incidentCount,
+      universeListQuery.data,
+      estudioInstrumentIds.length,
+    ],
   );
 
   const positions = portfolio?.positions ?? [];
@@ -620,6 +632,10 @@ export function MesaHoyPage() {
             >
               <MesaOperationalHeaderStrip header={operationalHeader} />
               <MesaSessionStateCard session={sessionState} />
+              <MesaCoberturaKpi
+                frescos={opportunityRanking.funnel.analyzedCount}
+                universeCount={opportunityRanking.funnel.universeCount}
+              />
               <MesaDecisionAlertsPanel
                 alerts={decisionAlerts}
                 unifiedAlerts={unifiedAlerts}
@@ -629,7 +645,7 @@ export function MesaHoyPage() {
             <MesaLevelSection
               level={2}
               title="Qué debo hacer"
-              description="Atención y posiciones — una acción principal, Confirm es la firma."
+              description="Actuar — atención y posiciones. Confirm es la firma."
               testId="mesa-level-do"
             >
               <MesaAttentionQueue items={attentionItems} board={board} />
@@ -641,47 +657,36 @@ export function MesaHoyPage() {
               />
               <p className="text-xs text-muted-foreground">
                 {attentionItems.length} en atención · {positions.length}{" "}
-                posiciones · {opportunityRanking.top.length} oportunidades TOP —{" "}
-                <Link
-                  to={hoyViewHref(HOY_VIEW.oportunidades)}
-                  className="text-primary hover:underline"
-                >
-                  Ver oportunidades →
-                </Link>
-              </p>
-              <p
-                className="text-[11px] text-muted-foreground"
-                data-testid="mesa-estudio-daily-trace"
-              >
-                Análisis diario · Estudio{" "}
-                {opportunityRanking.funnel.universeCount} →{" "}
-                {opportunityRanking.funnel.analyzedCount} evaluados →{" "}
-                {opportunityRanking.funnel.setupCount} con setup →{" "}
-                {opportunityRanking.funnel.portfolioFitCount} compatibles →{" "}
-                {opportunityRanking.funnel.operableCount} operables hoy
-                {opportunityRanking.discovered.length > 0
-                  ? ` · ${opportunityRanking.discovered.length} descubiertos fuera de Estudio`
-                  : ""}
+                posiciones
               </p>
             </MesaLevelSection>
 
             <MesaLevelSection
               level={3}
               title="Qué podría hacer"
-              description="Mejores oportunidades para ESTA cartera — discovery ≠ Action Queue ≠ permiso."
+              description="Priorizar — TOP oportunidades (ranking ≠ BUY). Detalle en Oportunidades."
               testId="mesa-level-could"
             >
-              <MesaCandidatesPanel
-                ranking={opportunityRanking}
-                entriesBlocked={entriesBlocked}
-                portfolioRisk={portfolioRisk}
-                sectorExposurePct={sectorExposurePct}
-                sectorByInstrumentId={sectorByInstrumentId}
-                positions={riskPositions}
-                equity={portfolio?.totalEquity ?? null}
-                cash={summaryQuery.data?.data?.cash ?? null}
-                universeListId={universeListId}
-              />
+              <div
+                className="rounded-md border border-border/60 bg-muted/10 px-4 py-3 text-sm"
+                data-testid="mesa-resumen-priorizar"
+              >
+                <p className="font-medium">
+                  {opportunityRanking.top.length} oportunidades TOP
+                  {opportunityRanking.funnel.operableCount > 0
+                    ? ` · ${opportunityRanking.funnel.operableCount} operables`
+                    : ""}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  El ranking prioriza; no autoriza. Confirm firma.
+                </p>
+                <Link
+                  to={hoyViewHref(HOY_VIEW.oportunidades)}
+                  className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
+                >
+                  Ver oportunidades →
+                </Link>
+              </div>
             </MesaLevelSection>
 
             <div
