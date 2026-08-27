@@ -1,6 +1,6 @@
 # RELEVO — V1.24 Honestidad semántica (2026-08-28)
 
-> **AsOf:** 2026-08-28 · **Estado:** **CÓDIGO LISTO → PUBLICACIÓN** — tag `v1.24-beta` (tras commit).
+> **AsOf:** 2026-08-28 · **Estado:** **PUBLICACIÓN** — tag `v1.24-beta` → `c75b26a6`.
 > **Padre:** [`traspaso-relevo-tag-v1-23-beta-2026-08-28.md`](./traspaso-relevo-tag-v1-23-beta-2026-08-28.md) · auditoría 10/10 · plan V1.24 Honesty Audit.
 > **Tag relevo:** [`traspaso-relevo-tag-v1-24-beta-2026-08-28.md`](./traspaso-relevo-tag-v1-24-beta-2026-08-28.md).
 

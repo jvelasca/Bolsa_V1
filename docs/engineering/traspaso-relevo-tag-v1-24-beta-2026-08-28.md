@@ -1,7 +1,7 @@
 # RELEVO — tag v1.24-beta → auditoría / mañana (2026-08-28)
 
 > **Padre:** [`traspaso-relevo-v1-24-honesty-2026-08-28.md`](./traspaso-relevo-v1-24-honesty-2026-08-28.md) · [ADR-041](../adr/041-operational-coherence.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.24-beta` (tip tras push). **Release tag CI:** pin URL tras Actions GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.24-beta` → tip `c75b26a6`. **Release tag CI:** pin URL tras Actions GREEN.
 > **Arranque chat nuevo:** este relevo + V1.24 honesty + freeze SEMI.
 
 ---
@@ -18,11 +18,11 @@
 
 | Pieza     | Valor                                                                                          |
 | --------- | ---------------------------------------------------------------------------------------------- |
-| Tag       | `v1.24-beta`                                                                                   |
+| Tag       | `v1.24-beta` → `c75b26a6`                                                                      |
 | Previo    | `v1.23-beta` → `4bc7426c` (tip docs `76c09388`)                                                |
 | Relevo    | [`traspaso-relevo-v1-24-honesty-2026-08-28.md`](./traspaso-relevo-v1-24-honesty-2026-08-28.md) |
-| Daily ops | `pnpm test:daily-ops:offline`                                                                  |
-| Spine     | `pnpm test:decision-spine`                                                                     |
+| Daily ops | `pnpm test:daily-ops:offline` PASS (6/6; spine 497 en fase 5)                                  |
+| Spine     | subset daily-ops **497**                                                                       |
 | ADR       | [ADR-041](../adr/041-operational-coherence.md) · product-vocabulary                            |
 
 ### Owner: publicar
