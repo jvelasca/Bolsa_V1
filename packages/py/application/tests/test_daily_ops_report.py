@@ -7,13 +7,13 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from bolsa_domain.entities.account import LedgerEntry
 
 from bolsa_application.daily_ops_report import (
     GetDailyOpsReport,
     _day_key,
     intersect_daily_ops_universe,
 )
+from bolsa_domain.entities.account import LedgerEntry
 
 
 def _ledger(

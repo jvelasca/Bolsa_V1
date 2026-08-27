@@ -15,6 +15,9 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from bolsa_api.api.dependencies import get_enqueue_scan_job_use_case
 from bolsa_application.opportunity_daily_discovery import (
     DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
     EnqueueOpportunityDailyScan,
@@ -23,9 +26,6 @@ from bolsa_application.opportunity_daily_discovery import (
     resolve_universe_list_id,
 )
 from bolsa_infrastructure.config import get_settings
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-from bolsa_api.api.dependencies import get_enqueue_scan_job_use_case
 
 logger = logging.getLogger(__name__)
 
