@@ -171,6 +171,7 @@ class ConfirmRecommendationIntent:
         portfolio_recon: PortfolioReconLookup | None = None,
         live_recon: LiveReconLookup | None = None,
         incident_store: Any | None = None,
+        instrument_data_status: Any | None = None,
         journal_writer: Any | None = None,
         position_from_fill: Any | None = None,
         position_from_exit: Any | None = None,
@@ -191,6 +192,7 @@ class ConfirmRecommendationIntent:
         self._portfolio_recon = portfolio_recon
         self._live_recon = live_recon
         self._incident_store = incident_store
+        self._instrument_data_status = instrument_data_status
         self._journal_writer = journal_writer
         self._position_from_fill = position_from_fill
         self._position_from_exit = position_from_exit
@@ -211,6 +213,7 @@ class ConfirmRecommendationIntent:
             portfolio_recon=portfolio_recon,
             live_recon=live_recon,
             incident_store=incident_store,
+            instrument_data_status=instrument_data_status,
             resolve_broker_venue=self._resolve_broker_venue_for_account,
         )
         self._risk = RiskGateCoordinator()

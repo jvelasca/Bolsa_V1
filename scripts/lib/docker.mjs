@@ -142,16 +142,53 @@ export function checkPort(host, port, timeoutMs = 2000) {
   });
 }
 
+/**
+ * ¿Postgres acepta queries? TCP abierto ≠ listo: tras cold start de Docker
+ * el puerto 5432 responde mientras el motor aún dice «starting up» y el seed
+ * Prisma falla (primer F5 aborta; el segundo pasa). Preferimos `pg_isready`.
+ */
+export function isPostgresReady(docker = findDockerExe(), options = {}) {
+  const container = options.container ?? 'bolsa-postgres';
+  const user = options.user ?? 'bolsa';
+  const db = options.db ?? 'bolsa_v1';
+  if (!docker) return false;
+  const result = spawnSync(
+    docker,
+    ['exec', container, 'pg_isready', '-U', user, '-d', db],
+    {
+      shell: true,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  return result.status === 0;
+}
+
 export async function waitForPostgres(options = {}) {
   const host = options.host ?? '127.0.0.1';
   const port = options.port ?? 5432;
-  const maxAttempts = options.maxAttempts ?? 20;
+  const maxAttempts = options.maxAttempts ?? 40;
   const intervalMs = options.intervalMs ?? 1500;
+  const docker = options.docker ?? findDockerExe();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    if (await checkPort(host, port)) {
-      logInfo('docker', `PostgreSQL responde en ${host}:${port}`);
+    if (docker && isPostgresReady(docker, options)) {
+      logInfo(
+        'docker',
+        `PostgreSQL listo (pg_isready, intento ${attempt}) en ${host}:${port}`,
+      );
       return true;
+    }
+    // Fallback sin CLI docker: TCP (más débil; no distingue «starting up»).
+    if (!docker && (await checkPort(host, port))) {
+      logInfo('docker', `PostgreSQL responde en ${host}:${port} (TCP)`);
+      return true;
+    }
+    if (attempt === 1) {
+      logInfo(
+        'docker',
+        'Esperando a que PostgreSQL acepte conexiones (pg_isready)...',
+      );
     }
     await sleep(intervalMs);
   }
@@ -182,39 +219,49 @@ export async function ensureProjectDatabase(options = {}) {
   }
 
   const docker = dockerResult.docker;
-  const postgresAlreadyUp = await checkPort('127.0.0.1', 5432);
+  const alreadyAccepting = isPostgresReady(docker);
 
-  if (!postgresAlreadyUp) {
-    const started = startPostgresContainer(docker);
-    if (!started) {
-      return {
-        ok: false,
-        step: 'postgres',
-        docker,
-        error: 'COMPOSE_FAILED',
-        message: 'No se pudo levantar el contenedor bolsa-postgres',
-      };
+  if (!alreadyAccepting) {
+    const tcpOpen = await checkPort('127.0.0.1', 5432);
+    if (!tcpOpen) {
+      const started = startPostgresContainer(docker);
+      if (!started) {
+        return {
+          ok: false,
+          step: 'postgres',
+          docker,
+          error: 'COMPOSE_FAILED',
+          message: 'No se pudo levantar el contenedor bolsa-postgres',
+        };
+      }
+    } else {
+      // Puerto abierto pero motor aún en recovery tras cold start de Docker.
+      logInfo(
+        'docker',
+        'Puerto 5432 abierto — esperando pg_isready (evita fallo seed en 1.er F5)',
+      );
     }
 
-    const ready = await waitForPostgres(options);
+    const ready = await waitForPostgres({ ...options, docker });
     if (!ready) {
       return {
         ok: false,
         step: 'postgres',
         docker,
         error: 'POSTGRES_TIMEOUT',
-        message: 'PostgreSQL no respondió en localhost:5432',
+        message:
+          'PostgreSQL no aceptó conexiones a tiempo (pg_isready). Reintenta F5 o: docker compose up -d',
       };
     }
   } else {
-    logInfo('docker', 'PostgreSQL ya responde en localhost:5432');
+    logInfo('docker', 'PostgreSQL ya listo (pg_isready)');
   }
 
   return {
     ok: true,
     docker,
     dockerStarted: dockerResult.started,
-    postgresStarted: !postgresAlreadyUp,
+    postgresStarted: !alreadyAccepting,
     message: 'Docker y PostgreSQL listos',
   };
 }

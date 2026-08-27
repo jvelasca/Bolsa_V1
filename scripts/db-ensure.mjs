@@ -1,4 +1,4 @@
-import { ensureProjectDatabase, printDockerInstallHelp, checkPort } from './lib/docker.mjs';
+import { ensureProjectDatabase, printDockerInstallHelp, checkPort, findDockerExe, isPostgresReady } from './lib/docker.mjs';
 import { runDbMigrateDeploy, runDbSeed } from './lib/db.mjs';
 import { logError, logInfo, writeAgentLog } from './lib/logger.mjs';
 import {
@@ -11,8 +11,13 @@ const withMigrate = process.argv.includes('--migrate');
 const forceMigrate = process.argv.includes('--force-migrate');
 
 async function ensurePing() {
+  const docker = findDockerExe();
+  if (docker && isPostgresReady(docker)) {
+    return { ok: true, message: 'PostgreSQL listo (pg_isready)' };
+  }
+  // Sin CLI docker: TCP como señal débil.
   const postgresUp = await checkPort('127.0.0.1', 5432);
-  if (postgresUp) {
+  if (postgresUp && !docker) {
     return { ok: true, message: 'PostgreSQL responde en localhost:5432' };
   }
   return {
@@ -20,7 +25,7 @@ async function ensurePing() {
     step: 'postgres',
     error: 'POSTGRES_DOWN',
     message:
-      'PostgreSQL no responde en localhost:5432. Abre Docker Desktop y ejecuta: node scripts/db-ensure.mjs',
+      'PostgreSQL no está listo en localhost:5432. Abre Docker Desktop y ejecuta: node scripts/db-ensure.mjs',
   };
 }
 

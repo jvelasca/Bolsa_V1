@@ -160,4 +160,15 @@ describe("mesa-hoy-page invariants", () => {
     expect(header.dataFreshness.state).toBe("error");
     expect(header.operationalStatusLabel).not.toBe("Normal");
   });
+
+  it("attention extra items have a stable id per symbol", () => {
+    const items = filterMesaAttentionItems([], 5, [
+      {
+        symbol: "NVDA",
+        reason: "Discrepancia de protección",
+        recommendedAction: "REVISAR PROTECCIÓN",
+      },
+    ]);
+    expect(items[0]?.id).toBe("discrepancy-NVDA");
+  });
 });

@@ -14,10 +14,13 @@ import {
   buildMesaProtectionState,
   buildMesaDecisionAlerts,
   buildMesaSessionState,
+  buildPortfolioRiskSnapshot,
+  buildUnifiedAlertInbox,
+  buildInvestmentPositionAggregate,
+  computeSectorExposurePct,
   filterMesaAttentionItems,
   mesaEntriesBlocked,
   studiesByInstrumentMap,
-  sumPortfolioUnrealizedR,
 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { FeatureErrorBoundary } from "@/components/layout/feature-error-boundary";
@@ -27,9 +30,9 @@ import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
 } from "@/features/operational-console/use-ops-self-eval";
-import { MesaDailyHeader } from "@/features/mesa/mesa-daily-header";
 import { MesaOperationalHeaderStrip } from "@/features/mesa/mesa-operational-header";
 import { MesaSessionStateCard } from "@/features/mesa/mesa-session-state-card";
+import { MesaLevelSection } from "@/features/mesa/mesa-level-section";
 import { MesaAttentionQueue } from "@/features/mesa/mesa-attention-queue";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
 import { MesaCandidatesPanel } from "@/features/mesa/mesa-candidates-panel";
@@ -88,6 +91,12 @@ export function MesaHoyPage() {
     refetchInterval: MESA_REFETCH_MS,
   });
 
+  const instrumentsQuery = useQuery({
+    queryKey: ["instruments", "mesa-sector"],
+    queryFn: api.getInstruments,
+    staleTime: 5 * 60_000,
+  });
+
   const incidentsQuery = useQuery({
     queryKey: ["operational-incidents-active", effectiveAccountId],
     queryFn: () => api.getActiveOperationalIncidents(effectiveAccountId!),
@@ -103,6 +112,14 @@ export function MesaHoyPage() {
     [studiesQuery.data],
   );
   const studiesMap = useMemo(() => studiesByInstrumentMap(studies), [studies]);
+
+  const sectorByInstrumentId = useMemo(() => {
+    const out: Record<string, string | null | undefined> = {};
+    for (const inst of instrumentsQuery.data?.data ?? []) {
+      if (inst.id) out[inst.id] = inst.sector;
+    }
+    return out;
+  }, [instrumentsQuery.data]);
 
   const killOn = killQuery.data?.effective === true;
   const vetoed = board?.buckets?.vetoed ?? 0;
@@ -133,6 +150,60 @@ export function MesaHoyPage() {
   );
 
   const positions = portfolio?.positions ?? [];
+
+  const mesaFreshnessInstrumentId = positions[0]?.instrumentId ?? null;
+  const mesaDataStatusQuery = useQuery({
+    queryKey: ["mesa-data-freshness", mesaFreshnessInstrumentId],
+    queryFn: () => api.getDataStatus(mesaFreshnessInstrumentId!),
+    enabled: Boolean(mesaFreshnessInstrumentId),
+    staleTime: 60_000,
+  });
+  const mesaLastBarDate = mesaDataStatusQuery.data?.data?.lastBarDate ?? null;
+
+  const portfolioRisk = useMemo(
+    () =>
+      buildPortfolioRiskSnapshot({
+        positions: positions.map((p) => {
+          const study = studiesMap.get(p.instrumentId) ?? null;
+          return {
+            avgCost: p.avgCost,
+            quantity: p.quantity,
+            lastPrice: p.lastPrice,
+            marketValue: p.marketValue,
+            sector: sectorByInstrumentId[p.instrumentId] ?? null,
+            operational: p.operational,
+            study,
+          };
+        }),
+      }),
+    [positions, studiesMap, sectorByInstrumentId],
+  );
+
+  const sectorExposurePct = useMemo(
+    () =>
+      computeSectorExposurePct(
+        positions.map((p) => ({
+          marketValue: p.marketValue,
+          sector: sectorByInstrumentId[p.instrumentId] ?? null,
+        })),
+        portfolio?.totalEquity ?? null,
+      ),
+    [positions, sectorByInstrumentId, portfolio?.totalEquity],
+  );
+
+  const riskPositions = useMemo(
+    () =>
+      positions.map((p) => ({
+        avgCost: p.avgCost,
+        quantity: p.quantity,
+        lastPrice: p.lastPrice,
+        marketValue: p.marketValue,
+        sector: sectorByInstrumentId[p.instrumentId] ?? null,
+        operational: p.operational,
+        study: studiesMap.get(p.instrumentId) ?? null,
+      })),
+    [positions, sectorByInstrumentId, studiesMap],
+  );
 
   const protectionDiscrepancies = useMemo(() => {
     const out: Array<{
@@ -194,13 +265,21 @@ export function MesaHoyPage() {
     () =>
       buildMesaOperationalHeader({
         regimeHint: sessionState.regimeHint,
-        positions,
+        positions: positions.map((p) => ({
+          avgCost: p.avgCost,
+          quantity: p.quantity,
+          lastPrice: p.lastPrice,
+          marketValue: p.marketValue,
+          operational: p.operational,
+          study: studiesMap.get(p.instrumentId) ?? null,
+        })),
         cash: summaryQuery.data?.data?.cash ?? null,
         equity: portfolio?.totalEquity ?? null,
         killSwitchEffective: killOn,
         incidentCount: Math.max(0, incidentCount),
         entriesBlocked,
         vetoed,
+        lastBarDate: mesaLastBarDate,
         boardQueryFailed: boardQuery.isError,
         incidentsQueryFailed: incidentsFailed,
         brokerVenue: killQuery.data?.brokerVenue ?? null,
@@ -210,20 +289,20 @@ export function MesaHoyPage() {
     [
       sessionState.regimeHint,
       positions,
+      studiesMap,
       summaryQuery.data,
       portfolio,
       killOn,
       incidentCount,
       entriesBlocked,
       vetoed,
+      mesaLastBarDate,
       boardQuery.isError,
       incidentsFailed,
       killQuery.data,
       selfEvalQuery.data,
     ],
   );
-
-  const portfolioRiskR = sumPortfolioUnrealizedR(positions);
 
   const decisionAlerts = useMemo(
     () =>
@@ -245,8 +324,35 @@ export function MesaHoyPage() {
     ],
   );
 
-  const alertCount =
-    attentionItems.length + (board?.buckets?.pendingConfirm ?? 0);
+  const positionAggregates = useMemo(
+    () =>
+      positions.map((position) => {
+        const study = studiesMap.get(position.instrumentId) ?? null;
+        const protectPlan = protectPlanByInstrument.get(position.instrumentId);
+        return buildInvestmentPositionAggregate({
+          position,
+          study,
+          protectPlan,
+        });
+      }),
+    [positions, studiesMap, protectPlanByInstrument],
+  );
+
+  const unifiedAlerts = useMemo(
+    () =>
+      buildUnifiedAlertInbox({
+        decisionAlerts,
+        positionAggregates,
+        portfolioRiskWarnings:
+          portfolioRisk.portfolioOpenRiskR != null &&
+          portfolioRisk.portfolioOpenRiskR > portfolioRisk.portfolioRiskLimitR
+            ? [
+                `Riesgo abierto ${portfolioRisk.portfolioOpenRiskR}R supera límite ${portfolioRisk.portfolioRiskLimitR}R`,
+              ]
+            : [],
+      }),
+    [decisionAlerts, positionAggregates, portfolioRisk],
+  );
 
   const isRefreshing =
     boardQuery.isFetching ||
@@ -270,7 +376,7 @@ export function MesaHoyPage() {
       fallbackMessage="No se pudo mostrar la mesa. Tus posiciones siguen intactas en el libro."
     >
       <div
-        className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6"
+        className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6"
         data-testid="mesa-hoy-page"
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -327,36 +433,51 @@ export function MesaHoyPage() {
           </div>
         ) : null}
 
-        <MesaOperationalHeaderStrip header={operationalHeader} />
+        <MesaLevelSection
+          level={1}
+          title="Qué ocurre"
+          description="Mercado, riesgo, datos y sistema — sin ejecutar."
+          testId="mesa-level-occurs"
+        >
+          <MesaOperationalHeaderStrip header={operationalHeader} />
+          <MesaSessionStateCard session={sessionState} />
+          <MesaDecisionAlertsPanel
+            alerts={decisionAlerts}
+            unifiedAlerts={unifiedAlerts}
+          />
+        </MesaLevelSection>
 
-        <MesaSessionStateCard session={sessionState} />
+        <MesaLevelSection
+          level={2}
+          title="Qué debo hacer"
+          description="Atención y posiciones — una acción principal, Confirm es la firma."
+          testId="mesa-level-do"
+        >
+          <MesaAttentionQueue items={attentionItems} board={board} />
+          <MesaPositionsSummary
+            positions={positions}
+            protectPlanByInstrument={protectPlanByInstrument}
+            studiesByInstrument={studiesMap}
+          />
+        </MesaLevelSection>
 
-        <MesaDailyHeader
-          cash={summaryQuery.data?.data?.cash ?? null}
-          equity={portfolio?.totalEquity ?? null}
-          unrealizedPnl={portfolio?.totalUnrealizedPnl ?? null}
-          positionsCount={positions.length}
-          alertCount={alertCount}
-          criticalAlerts={Math.max(0, incidentCount)}
-        />
-
-        <MesaDecisionAlertsPanel alerts={decisionAlerts} />
-
-        <MesaAttentionQueue items={attentionItems} board={board} />
-
-        <MesaPositionsSummary
-          positions={positions}
-          protectPlanByInstrument={protectPlanByInstrument}
-          studiesByInstrument={studiesMap}
-        />
-
-        <MesaCandidatesPanel
-          groups={candidateGroups}
-          entriesBlocked={entriesBlocked}
-          portfolioRiskR={portfolioRiskR}
-          equity={portfolio?.totalEquity ?? null}
-          cash={summaryQuery.data?.data?.cash ?? null}
-        />
+        <MesaLevelSection
+          level={3}
+          title="Qué podría hacer"
+          description="Oportunidades para ESTA cartera — no es un ranking del universo."
+          testId="mesa-level-could"
+        >
+          <MesaCandidatesPanel
+            groups={candidateGroups}
+            entriesBlocked={entriesBlocked}
+            portfolioRisk={portfolioRisk}
+            sectorExposurePct={sectorExposurePct}
+            sectorByInstrumentId={sectorByInstrumentId}
+            positions={riskPositions}
+            equity={portfolio?.totalEquity ?? null}
+            cash={summaryQuery.data?.data?.cash ?? null}
+          />
+        </MesaLevelSection>
 
         <div
           className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"

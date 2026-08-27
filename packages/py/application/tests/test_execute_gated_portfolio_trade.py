@@ -163,3 +163,75 @@ async def test_gated_http_buy_persists_manual_position() -> None:
     )
     assert len(fill_store.inserts) == 1
     assert fill_store.inserts[0]["birth_override_reason"] == "human_manual"
+
+
+class _FakeOhlcv:
+    def __init__(self, last_bar: str) -> None:
+        self._last_bar = last_bar
+
+    async def get_latest_bar_date(
+        self, instrument_id: str, *, timeframe: object = None
+    ) -> str | None:
+        return self._last_bar
+
+
+class _FakeMandatesOpen:
+    async def get_open_mandate_for_instrument(
+        self, account_id: str, instrument_id: str
+    ) -> tuple[bool, str | None]:
+        return True, "st-mandate-1"
+
+
+class _FakeInstrumentDataStatus:
+    def __init__(self, warnings: tuple[str, ...]) -> None:
+        self._warnings = warnings
+
+    async def execute(self, instrument_id: str, *, timeframe: object = None) -> Any:
+        return type("Status", (), {"sanity_warnings": self._warnings})()
+
+
+def _uc_with_sanity(*, warnings: tuple[str, ...], trade: _FakeExecuteTrade) -> ExecuteGatedPortfolioTrade:
+    from datetime import UTC, datetime
+
+    return ExecuteGatedPortfolioTrade(
+        trade,  # type: ignore[arg-type]
+        portfolio_summary=_AllowSummary(),
+        ohlcv=_FakeOhlcv(datetime.now(UTC).isoformat()),  # type: ignore[arg-type]
+        mandates=_FakeMandatesOpen(),  # type: ignore[arg-type]
+        instrument_data_status=_FakeInstrumentDataStatus(warnings),
+    )
+
+
+@pytest.mark.asyncio
+async def test_gated_http_buy_sanity_split_vetoes() -> None:
+    trade = _FakeExecuteTrade()
+    uc = _uc_with_sanity(
+        warnings=("movimiento 55.00% en 2024-01-01 — revisar split/dividendo",),
+        trade=trade,
+    )
+    with pytest.raises(OpeningVetoedError, match="risk_veto"):
+        await uc.execute(
+            instrument_id="inst-1",
+            trade_type="buy",
+            quantity=2.0,
+            price=10.0,
+            account_id="acc-1",
+            idempotency_key="k" * 16,
+        )
+    assert trade.calls == []
+
+
+@pytest.mark.asyncio
+async def test_gated_http_buy_sanity_gap_only_allows() -> None:
+    trade = _FakeExecuteTrade()
+    uc = _uc_with_sanity(warnings=("gap de 2 días",), trade=trade)
+    result = await uc.execute(
+        instrument_id="inst-1",
+        trade_type="buy",
+        quantity=2.0,
+        price=10.0,
+        account_id="acc-1",
+        idempotency_key="k" * 16,
+    )
+    assert result.transaction.id == "tx-http"
+    assert len(trade.calls) == 1

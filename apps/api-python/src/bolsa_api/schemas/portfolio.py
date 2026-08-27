@@ -50,6 +50,7 @@ class PositionDto(BaseModel):
     market_value: float | None = Field(alias="marketValue")
     unrealized_pnl: float | None = Field(alias="unrealizedPnl")
     unrealized_pnl_pct: float | None = Field(alias="unrealizedPnlPct")
+    sector: str | None = None
     operational: OperationalPositionDto | None = None
 
 

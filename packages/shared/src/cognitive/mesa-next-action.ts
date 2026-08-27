@@ -8,6 +8,20 @@ import type { ExitSuggestedActionV1 } from "./exit-plan.js";
 import type { ProtectPlanV1 } from "./protect-plan.js";
 import type { TradePlanStatusV1 } from "./trade-plan.js";
 import type { HoyActionKindV1 } from "./hoy-queue.js";
+import {
+  buildDataFreshness,
+  mesaDataFreshnessFromContract,
+  type DataFreshnessV1,
+} from "./data-freshness.js";
+import {
+  buildPortfolioRiskSnapshot,
+  sumPortfolioUnrealizedR,
+  type PortfolioPositionRiskInput,
+} from "./portfolio-risk-metrics.js";
+import { buildMesaOperationalStatusDetail } from "./mesa-operational-health.js";
+
+export { sumPortfolioUnrealizedR };
+export type { DataFreshnessV1, PortfolioPositionRiskInput };
 
 export type MesaNextActionKindV1 =
   | "none"
@@ -155,22 +169,13 @@ export function mapMesaNextAction(
   };
 }
 
-/** Suma R de posiciones abiertas cuando el dato existe. */
-export function sumPortfolioUnrealizedR(
+/** @deprecated Usar sumPortfolioUnrealizedR — P&L no realizado en R. */
+export function sumPortfolioPnLR(
   positions: ReadonlyArray<{
     operational?: { unrealizedR?: number | null } | null;
   }>,
 ): number | null {
-  let sum = 0;
-  let any = false;
-  for (const p of positions) {
-    const r = p.operational?.unrealizedR;
-    if (r != null && Number.isFinite(r)) {
-      sum += r;
-      any = true;
-    }
-  }
-  return any ? Math.round(sum * 100) / 100 : null;
+  return sumPortfolioUnrealizedR(positions);
 }
 
 export type MesaOperationalStatusV1 = "normal" | "attention" | "blocked";
@@ -181,12 +186,10 @@ export function deriveMesaOperationalStatus(input: {
   entriesBlocked?: boolean;
   vetoed?: number;
   queryFailed?: boolean;
+  dataFreshnessStatus?: import("./data-freshness.js").DataFreshnessStatusV1;
+  readinessState?: string | null;
 }): MesaOperationalStatusV1 {
-  if (input.queryFailed) return "attention";
-  if (input.killSwitchEffective) return "blocked";
-  if ((input.incidentCount ?? 0) > 0) return "blocked";
-  if (input.entriesBlocked || (input.vetoed ?? 0) > 0) return "attention";
-  return "normal";
+  return buildMesaOperationalStatusDetail(input).status;
 }
 
 export type MesaDataFreshnessV1 =
@@ -201,55 +204,35 @@ export function deriveMesaDataFreshness(input: {
   now?: Date;
   maxAgeMinutes?: number;
 }): MesaDataFreshnessV1 {
-  if (input.queryFailed) {
-    return { state: "error", label: "No consultado" };
-  }
-  const raw = input.lastBarDate?.trim();
-  if (!raw) {
-    return { state: "unknown", label: "—" };
-  }
-  const ts = new Date(raw);
-  if (Number.isNaN(ts.getTime())) {
-    return { state: "unknown", label: "—" };
-  }
-  const now = input.now ?? new Date();
-  const ageMinutes = Math.max(
-    0,
-    Math.floor((now.getTime() - ts.getTime()) / 60_000),
+  return mesaDataFreshnessFromContract(
+    buildDataFreshness({
+      lastBarDate: input.lastBarDate,
+      queryFailed: input.queryFailed,
+      now: input.now,
+      thresholdMinutes: input.maxAgeMinutes,
+    }),
   );
-  const max = input.maxAgeMinutes ?? 5 * 24 * 60;
-  if (ageMinutes > max) {
-    return {
-      state: "stale",
-      label: `Retrasados · ${formatAge(ageMinutes)}`,
-      ageMinutes,
-    };
-  }
-  return {
-    state: "fresh",
-    label: `Actualizados · ${formatAge(ageMinutes)}`,
-    ageMinutes,
-  };
-}
-
-function formatAge(minutes: number): string {
-  if (minutes < 60) return `${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h < 48) return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  const d = Math.floor(h / 24);
-  return `${d}d`;
 }
 
 export type MesaOperationalHeaderV1 = {
   regimeHint: string | null;
+  /** P&L no realizado agregado en R. */
+  portfolioPnLR: number | null;
+  /** R en riesgo si stops actuales se ejecutan. */
+  portfolioOpenRiskR: number | null;
+  /** Stub stress risk — pendiente dominio correlación. */
+  portfolioStressRiskR: number | null;
+  /** @deprecated Usar portfolioPnLR */
   totalRiskR: number | null;
+  portfolioRiskLimitR: number;
   cash: number | null;
   equity: number | null;
   investedPct: number | null;
   operationalStatus: MesaOperationalStatusV1;
   operationalStatusLabel: string;
+  operationalPrimaryReason: string | null;
   dataFreshness: MesaDataFreshnessV1;
+  dataFreshnessContract: DataFreshnessV1;
   modeLabel: string;
   modeDetail: string;
   brokerVenue: "paper" | "live" | null;
@@ -257,18 +240,13 @@ export type MesaOperationalHeaderV1 = {
   readinessState: string | null;
 };
 
-const OPERATIONAL_STATUS_LABEL: Record<MesaOperationalStatusV1, string> = {
-  normal: "Normal",
-  attention: "Atención",
-  blocked: "Bloqueado",
-};
-
 export function buildMesaOperationalHeader(input: {
   regimeHint?: string | null;
-  positions?: ReadonlyArray<{
-    marketValue?: number | null;
-    operational?: { unrealizedR?: number | null } | null;
-  }>;
+  positions?: ReadonlyArray<
+    PortfolioPositionRiskInput & {
+      marketValue?: number | null;
+    }
+  >;
   cash?: number | null;
   equity?: number | null;
   killSwitchEffective?: boolean;
@@ -281,6 +259,8 @@ export function buildMesaOperationalHeader(input: {
   brokerVenue?: "paper" | "live" | null;
   paperDExecuteEnv?: boolean;
   readinessState?: string | null;
+  riskTolerance?: string | null;
+  maxAcceptableLossPct?: number | null;
 }): MesaOperationalHeaderV1 {
   const equity = input.equity ?? null;
   const cash = input.cash ?? null;
@@ -292,26 +272,42 @@ export function buildMesaOperationalHeader(input: {
   const queryFailed = Boolean(
     input.boardQueryFailed || input.incidentsQueryFailed,
   );
-  const operationalStatus = deriveMesaOperationalStatus({
+  const dataFreshnessContract = buildDataFreshness({
+    lastBarDate: input.lastBarDate,
+    queryFailed,
+  });
+  const statusDetail = buildMesaOperationalStatusDetail({
     killSwitchEffective: input.killSwitchEffective,
     incidentCount: input.incidentCount,
     entriesBlocked: input.entriesBlocked,
     vetoed: input.vetoed,
     queryFailed,
+    dataFreshnessStatus: dataFreshnessContract.status,
+    readinessState: input.readinessState,
+    brokerVenue: input.brokerVenue,
+  });
+
+  const riskSnapshot = buildPortfolioRiskSnapshot({
+    positions: input.positions ?? [],
+    riskTolerance: input.riskTolerance,
+    maxAcceptableLossPct: input.maxAcceptableLossPct,
   });
 
   return {
     regimeHint: input.regimeHint ?? null,
-    totalRiskR: sumPortfolioUnrealizedR(input.positions ?? []),
+    portfolioPnLR: riskSnapshot.portfolioPnLR,
+    portfolioOpenRiskR: riskSnapshot.portfolioOpenRiskR,
+    portfolioStressRiskR: riskSnapshot.portfolioStressRiskR,
+    totalRiskR: riskSnapshot.portfolioPnLR,
+    portfolioRiskLimitR: riskSnapshot.portfolioRiskLimitR,
     cash,
     equity,
     investedPct,
-    operationalStatus,
-    operationalStatusLabel: OPERATIONAL_STATUS_LABEL[operationalStatus],
-    dataFreshness: deriveMesaDataFreshness({
-      lastBarDate: input.lastBarDate,
-      queryFailed,
-    }),
+    operationalStatus: statusDetail.status,
+    operationalStatusLabel: statusDetail.statusLabel,
+    operationalPrimaryReason: statusDetail.primaryReason,
+    dataFreshness: mesaDataFreshnessFromContract(dataFreshnessContract),
+    dataFreshnessContract,
     modeLabel: "SEMI",
     modeDetail: "IA propone · humano firma · AUTO off",
     brokerVenue: input.brokerVenue ?? null,

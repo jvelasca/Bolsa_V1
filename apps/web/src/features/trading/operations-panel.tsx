@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import { useQuery } from "@tanstack/react-query";
 
 import type { ProtectPlanV1 } from "@bolsa/shared";
+import { studiesByInstrumentMap } from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 
 import { api } from "@/lib/api";
@@ -11,7 +12,11 @@ import { useActiveAccountQueryKey } from "@/stores/active-account-store";
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
-import { MesaPositionExitActions } from "@/features/mesa/mesa-position-row";
+import {
+  MesaPositionExitActions,
+  mesaPositionShowsRoute,
+} from "@/features/mesa/mesa-position-row";
+import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
 
 type OperationsTab = "open" | "pending";
 
@@ -57,6 +62,18 @@ export function OperationsPanel() {
     enabled: Boolean(effectiveAccountId),
     staleTime: 15_000,
   });
+
+  const studiesQuery = useQuery({
+    queryKey: ["decision-studies", effectiveAccountId, "libro"],
+    queryFn: () => api.getDecisionStudies(effectiveAccountId!, { limit: 200 }),
+    enabled: Boolean(effectiveAccountId),
+    staleTime: 30_000,
+  });
+
+  const studiesMap = useMemo(
+    () => studiesByInstrumentMap(studiesQuery.data?.data?.studies ?? []),
+    [studiesQuery.data],
+  );
 
   const protectPlanByInstrument = useMemo(() => {
     const map = new Map<string, ProtectPlanV1>();
@@ -154,79 +171,88 @@ export function OperationsPanel() {
                 {positions.map((pos) => {
                   const pnlUp = (pos.unrealizedPnl ?? 0) >= 0;
                   const operational = pos.operational ?? null;
+                  const study = studiesMap.get(pos.instrumentId) ?? null;
+                  const showRoute = mesaPositionShowsRoute(pos, study);
 
                   return (
-                    <tr
-                      key={pos.id}
-                      className="border-b border-border/50 hover:bg-accent/30"
-                    >
-                      <td className="px-2 py-1">
-                        <div className="font-medium">{pos.symbol}</div>
+                    <Fragment key={pos.id}>
+                      <tr className="border-b border-border/50 hover:bg-accent/30">
+                        <td className="px-2 py-1">
+                          <div className="font-medium">{pos.symbol}</div>
 
-                        <div className="truncate text-[10px] text-muted-foreground">
-                          {operational
-                            ? operational.status
-                            : "sin plan persistido"}
-                        </div>
-                      </td>
+                          <div className="truncate text-[10px] text-muted-foreground">
+                            {operational
+                              ? operational.status
+                              : "sin plan persistido"}
+                          </div>
+                        </td>
 
-                      <td className="px-2 py-1 text-right tabular-nums">
-                        {pos.quantity}
-                      </td>
+                        <td className="px-2 py-1 text-right tabular-nums">
+                          {pos.quantity}
+                        </td>
 
-                      <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                        {formatR(operational?.unrealizedR)}
-                      </td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
+                          {formatR(operational?.unrealizedR)}
+                        </td>
 
-                      <td className="px-2 py-1 text-right tabular-nums">
-                        {operational?.currentStop != null
-                          ? formatPrice(operational.currentStop)
-                          : "—"}
-                      </td>
+                        <td className="px-2 py-1 text-right tabular-nums">
+                          {operational?.currentStop != null
+                            ? formatPrice(operational.currentStop)
+                            : "—"}
+                        </td>
 
-                      <td className="px-2 py-1 text-right tabular-nums">
-                        {operational?.target1 != null
-                          ? formatPrice(operational.target1)
-                          : "—"}
-                      </td>
+                        <td className="px-2 py-1 text-right tabular-nums">
+                          {operational?.target1 != null
+                            ? formatPrice(operational.target1)
+                            : "—"}
+                        </td>
 
-                      <td className="px-2 py-1 text-right tabular-nums">
-                        {operational?.target2 != null
-                          ? formatPrice(operational.target2)
-                          : "—"}
-                      </td>
+                        <td className="px-2 py-1 text-right tabular-nums">
+                          {operational?.target2 != null
+                            ? formatPrice(operational.target2)
+                            : "—"}
+                        </td>
 
-                      <td className="px-2 py-1 text-right text-muted-foreground">
-                        {exitPlanLabel(operational)}
-                      </td>
+                        <td className="px-2 py-1 text-right text-muted-foreground">
+                          {exitPlanLabel(operational)}
+                        </td>
 
-                      <td
-                        className={cn(
-                          "px-2 py-1 text-right tabular-nums",
+                        <td
+                          className={cn(
+                            "px-2 py-1 text-right tabular-nums",
 
-                          pnlUp ? "text-emerald-400" : "text-red-400",
-                        )}
-                      >
-                        {pos.unrealizedPnl != null
-                          ? formatPrice(pos.unrealizedPnl)
-                          : "—"}
-
-                        {pos.unrealizedPnlPct != null && (
-                          <span className="ml-1 text-[10px] opacity-80">
-                            ({formatPct(pos.unrealizedPnlPct)})
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-2 py-1">
-                        <MesaPositionExitActions
-                          position={pos}
-                          protectPlan={protectPlanByInstrument.get(
-                            pos.instrumentId,
+                            pnlUp ? "text-emerald-400" : "text-red-400",
                           )}
-                        />
-                      </td>
-                    </tr>
+                        >
+                          {pos.unrealizedPnl != null
+                            ? formatPrice(pos.unrealizedPnl)
+                            : "—"}
+
+                          {pos.unrealizedPnlPct != null && (
+                            <span className="ml-1 text-[10px] opacity-80">
+                              ({formatPct(pos.unrealizedPnlPct)})
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-2 py-1">
+                          <MesaPositionExitActions
+                            position={pos}
+                            study={study}
+                            protectPlan={protectPlanByInstrument.get(
+                              pos.instrumentId,
+                            )}
+                          />
+                        </td>
+                      </tr>
+                      {showRoute ? (
+                        <tr className="border-b border-border/50 bg-muted/10">
+                          <td colSpan={9} className="px-2 py-2">
+                            <PositionRoutePanel position={pos} study={study} />
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
                   );
                 })}
               </tbody>

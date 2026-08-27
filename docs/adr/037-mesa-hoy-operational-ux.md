@@ -59,3 +59,21 @@ Tesis / Operativa / Posición — **no amplía** `JournalStudyUserStatus`.
 - Refactor `decision_journal_studies.py`
 - Paginación UI studies/history
 - Evolución opinión+fuerza (V1.16)
+
+---
+
+## 7. Amendment 2026-08-27 — tres niveles = proyección visual
+
+**No cambia el orden canónico** del §2. El incidente activo sigue primero (entradas BLOQUEADAS).
+
+La home diaria agrupa el resto en **tres niveles de producto** (sesión ~20 s):
+
+| Nivel | Pregunta           | Superficie                                                  |
+| ----- | ------------------ | ----------------------------------------------------------- |
+| 1     | ¿Qué ocurre?       | Header operativo + estado de sesión + alertas unificadas    |
+| 2     | ¿Qué debo hacer?   | Atención + posiciones (Next Action del agregado, ruta viva) |
+| 3     | ¿Qué podría hacer? | Candidatos por OperationalPriority + scenario al expandir   |
+
+`MesaDailyHeader` (capital/cash duplicado) queda fuera de `/mesa`. `aria-live="assertive"` solo en incidente nuevo / query fail; cola de atención = `polite` + key estable por símbolo.
+
+Suitability, scenario y ruta en Libro son profundidad de sesión (ADR-038 / ADR-039), no un HTTP Mesa nuevo ni un cambio de Confirm.

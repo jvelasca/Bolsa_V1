@@ -1,5 +1,5 @@
 /**
- * Cabecera operativa Mesa · Hoy (V1.16) — 5+1 chips read-only.
+ * Cabecera operativa Mesa · Hoy (V1.16+) — chips read-only con métricas separadas.
  */
 
 import { useState } from "react";
@@ -60,16 +60,17 @@ function freshnessTone(
   return "neutral";
 }
 
+function formatR(value: number | null): string {
+  if (value == null) return "—";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)} R`;
+}
+
 export function MesaOperationalHeaderStrip({
   header,
 }: MesaOperationalHeaderProps) {
   const [expanded, setExpanded] = useState(false);
 
   const regime = header.regimeHint ?? "—";
-  const risk =
-    header.totalRiskR != null
-      ? `${header.totalRiskR >= 0 ? "+" : ""}${header.totalRiskR.toFixed(2)} R`
-      : "—";
   const capital =
     header.equity != null
       ? header.investedPct != null
@@ -89,7 +90,16 @@ export function MesaOperationalHeaderStrip({
           value={regime}
           tone={regime === "—" ? "neutral" : "ok"}
         />
-        <Chip label="Riesgo cartera" value={risk} />
+        <Chip
+          label="P&L cartera"
+          value={formatR(header.portfolioPnLR)}
+          title="P&L no realizado agregado en R"
+        />
+        <Chip
+          label="Riesgo abierto"
+          value={formatR(header.portfolioOpenRiskR)}
+          title={`R si stops actuales se ejecutan · límite ${header.portfolioRiskLimitR}R`}
+        />
         <Chip label="Capital" value={capital} />
         <Chip
           label="Datos"
@@ -107,7 +117,7 @@ export function MesaOperationalHeaderStrip({
             label="Estado operativo"
             value={header.operationalStatusLabel}
             tone={statusTone(header.operationalStatus)}
-            title="Click para detalle"
+            title={header.operationalPrimaryReason ?? "Click para detalle"}
           />
         </button>
         <Chip
@@ -135,6 +145,17 @@ export function MesaOperationalHeaderStrip({
               </dd>
             </div>
             <div>
+              <dt className="text-muted-foreground">P&L / Open Risk</dt>
+              <dd>
+                {formatR(header.portfolioPnLR)} /{" "}
+                {formatR(header.portfolioOpenRiskR)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Límite riesgo</dt>
+              <dd>{header.portfolioRiskLimitR}R</dd>
+            </div>
+            <div>
               <dt className="text-muted-foreground">Broker</dt>
               <dd>{header.brokerVenue ?? "—"}</dd>
             </div>
@@ -149,8 +170,8 @@ export function MesaOperationalHeaderStrip({
               <dd>{header.readinessState ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Modo</dt>
-              <dd>{header.modeDetail}</dd>
+              <dt className="text-muted-foreground">Motivo</dt>
+              <dd>{header.operationalPrimaryReason ?? "—"}</dd>
             </div>
           </dl>
           <Link

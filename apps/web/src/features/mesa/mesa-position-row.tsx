@@ -11,9 +11,9 @@ import type {
 } from "@bolsa/shared";
 import {
   JOURNAL_STUDY_OPINION_LABELS,
+  buildInvestmentPositionAggregate,
   buildMesaProtectionState,
   mapMesaStatusDimensions,
-  mapPositionNextAction,
   stopDistancePct,
   type MesaNextActionKindV1,
 } from "@bolsa/shared";
@@ -59,19 +59,11 @@ export function MesaPositionNextActionButton({
   const { effectiveAccountId } = useActiveAccount();
   const enqueue = useSupervisedF3QueueStore((s) => s.enqueue);
   const [error, setError] = useState<string | null>(null);
-  const operational = position.operational;
-  const protection = buildMesaProtectionState({
-    study,
-    exitSuggestedStop: operational?.exitPlan?.suggestedStop ?? null,
-    currentStop: operational?.currentStop ?? null,
-    protectPlan,
-  });
-  const nextAction = mapPositionNextAction({
+  const nextAction = buildInvestmentPositionAggregate({
     position,
-    protectPlan,
     study,
-    protectionDiscrepancy: protection.discrepancy,
-  });
+    protectPlan,
+  }).nextAction;
 
   function enqueueExit(intent: "review" | "reduce" | "exit_hint" | "protect") {
     setError(null);

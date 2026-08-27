@@ -1,10 +1,13 @@
 /**
- * V1.17 — ruta visual de posición: entrada → stop → T1/T2.
+ * V1.17 — ruta visual viva: precio actual entre niveles con distancia/R.
  */
 
-import type { DecisionJournalStudyViewV1 } from "@bolsa/shared";
-import type { PositionDto } from "@bolsa/shared";
-import { NO_OPERATIONAL_PLAN_COPY } from "@bolsa/shared";
+import type { DecisionJournalStudyViewV1, PositionDto } from "@bolsa/shared";
+import {
+  NO_OPERATIONAL_PLAN_COPY,
+  buildInvestmentPositionAggregate,
+  buildPositionRouteLevels,
+} from "@bolsa/shared";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
 
@@ -19,12 +22,11 @@ export function PositionRoutePanel({
   study,
   className,
 }: PositionRoutePanelProps) {
+  const aggregate = buildInvestmentPositionAggregate({ position, study });
   const op = position.operational;
   const hasPlan = study?.hasOperationalPlan === true;
-  const entry = (study?.entry ?? op?.direction) ? position.avgCost : null;
   const stop = op?.currentStop ?? (hasPlan ? study?.stop : null);
   const t1 = op?.target1 ?? (hasPlan ? study?.target1 : null);
-  const t2 = op?.target2 ?? (hasPlan ? study?.target2 : null);
 
   if (!hasPlan && stop == null && t1 == null) {
     return (
@@ -34,12 +36,7 @@ export function PositionRoutePanel({
     );
   }
 
-  const levels = [
-    { label: "TP2", value: t2, kind: "target" as const },
-    { label: "TP1", value: t1, kind: "target" as const },
-    { label: "ENTRADA", value: entry, kind: "entry" as const },
-    { label: "STOP", value: stop, kind: "stop" as const },
-  ].filter((l) => l.value != null);
+  const levels = buildPositionRouteLevels(aggregate);
 
   return (
     <div
@@ -57,13 +54,23 @@ export function PositionRoutePanel({
                 "absolute -left-[13px] top-2 h-2 w-2 rounded-full border",
                 level.kind === "stop" && "border-rose-500 bg-rose-500/30",
                 level.kind === "entry" && "border-sky-500 bg-sky-500/30",
+                level.kind === "price" && "border-amber-500 bg-amber-500/30",
                 level.kind === "target" &&
                   "border-emerald-500 bg-emerald-500/30",
               )}
             />
             <span className="font-medium">{level.label}</span>
             {" · "}
-            <span className="tabular-nums">{formatPrice(level.value!)}</span>
+            <span className="tabular-nums">{formatPrice(level.value)}</span>
+            {level.distanceR != null ? (
+              <span className="ml-1 text-muted-foreground tabular-nums">
+                {level.distanceR >= 0 ? "+" : ""}
+                {level.distanceR.toFixed(1)}R
+              </span>
+            ) : null}
+            {level.reached ? (
+              <span className="ml-1 text-emerald-600">✓</span>
+            ) : null}
           </div>
         ))}
       </div>

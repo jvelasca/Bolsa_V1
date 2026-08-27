@@ -140,6 +140,7 @@ async def allow_opening_fill(
     live_recon: LiveReconLookup | None = None,
     broker_venue: Literal["paper", "live"] | str | None = None,
     incident_store: OperationalIncidentStore | None = None,
+    instrument_data_status: Any | None = None,
 ) -> bool:
     """True si ``check_opening`` permite el fill de una apertura.
 
@@ -208,6 +209,14 @@ async def allow_opening_fill(
             )
         except Exception:  # noqa: BLE001 — DEX-3: indisponibilidad = veto
             return False
+    sanity_warnings: tuple[str, ...] = ()
+    if instrument_data_status is not None and require_fresh_data:
+        try:
+            status = await instrument_data_status.execute(instrument_id)
+            if status is not None:
+                sanity_warnings = tuple(getattr(status, "sanity_warnings", ()) or ())
+        except Exception:  # noqa: BLE001 — sanity E2E: indisponibilidad = veto
+            return False
     decision = check_opening(
         profile=await resolve_opening_profile(
             profile_store=profile_store,
@@ -240,5 +249,6 @@ async def allow_opening_fill(
         require_recon_veto=require_recon_veto,
         incident_status=incident_status,
         require_incident_veto=require_incident_veto,
+        sanity_warnings=sanity_warnings,
     )
     return bool(decision.allowed)

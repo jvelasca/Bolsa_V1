@@ -7,17 +7,18 @@ Guía única para Cursor/VS Code y terminal. **Un solo flujo recomendado.**
 1. **Tras reiniciar el PC** (una vez): Docker Desktop en verde + `pnpm db:ensure`
 2. **F5** con launch config: **`Bolsa: F5 Dev (recomendado)`**
 
+Si Docker estaba parado, el **primer** F5 también debe bastar: `run-dev` abre Docker Desktop, levanta `bolsa-postgres` y espera **`pg_isready`** (no solo el puerto TCP). Antes, el puerto 5432 abría mientras Postgres aún decía «starting up» y el seed IBEX abortaba el arranque — hacía falta un segundo F5.
 Eso arranca en **un solo proceso** (Node `run-dev.mjs`):
 
-| Paso | Qué hace |
-|------|----------|
-| 1 | Ping PostgreSQL; si no hay BD → setup completo |
-| 2 | Migraciones Prisma (rápido, no interactivo) |
-| 3 | Libera puertos 8000 / 5173 / 3002 si quedaron colgados |
-| 4 | Compila `@bolsa/shared` (skip si `dist` ≥ `src`) |
-| 5 | Arranca **API** Python (:8000) y **espera** `/api/health` |
-| 6 | Arranca **Web** Vite (:5173) — sin `ECONNREFUSED` |
-| 7 | Opcional: bridge XTB mock (:3002) |
+| Paso | Qué hace                                                  |
+| ---- | --------------------------------------------------------- |
+| 1    | Ping PostgreSQL; si no hay BD → setup completo            |
+| 2    | Migraciones Prisma (rápido, no interactivo)               |
+| 3    | Libera puertos 8000 / 5173 / 3002 si quedaron colgados    |
+| 4    | Compila `@bolsa/shared` (skip si `dist` ≥ `src`)          |
+| 5    | Arranca **API** Python (:8000) y **espera** `/api/health` |
+| 6    | Arranca **Web** Vite (:5173) — sin `ECONNREFUSED`         |
+| 7    | Opcional: bridge XTB mock (:3002)                         |
 
 **API reload:** por defecto **sin** `--reload` (arranque ~2× más rápido). Para autoreload al editar Python:
 
@@ -29,28 +30,28 @@ En Windows, sin reload uvicorn usaría `ProactorEventLoop` (incompatible con psy
 
 **URLs:** Web http://localhost:5173 · API http://localhost:8000/api/health
 
-Cursor abre el navegador al ver `Web lista -> http://localhost:5173` (`serverReadyAction` en `.vscode/launch.json`). Si aparece *Failed to open… (0x2)*, es un fallo al lanzar el navegador por defecto (no de la app); el stack sigue OK. Revisa el navegador predeterminado de Windows o abre la URL a mano.
+Cursor abre el navegador al ver `Web lista -> http://localhost:5173` (`serverReadyAction` en `.vscode/launch.json`). Si aparece _Failed to open… (0x2)_, es un fallo al lanzar el navegador por defecto (no de la app); el stack sigue OK. Revisa el navegador predeterminado de Windows o abre la URL a mano.
 
 ### Arranque rápido (warm F5)
 
-| Fase | Antes (típ.) | Ahora |
-|------|--------------|-------|
-| PostgreSQL ping+migrate | ~0.1–0.2 s | igual (cache fingerprint) |
-| Liberar puertos Windows | ~3 s (PowerShell) | ~0.1–0.3 s (`netstat`) |
-| Import API + health | ~3 s | igual (sin `--reload`) |
-| UI listas tras paint | N× `GET /lists/{id}` + N× strategy-top | `GET /lists/memberships` + batch tops |
-| CORE-R shell al abrir | tick inmediato | diferido idle / ~4 s (cadencia sigue en minutos) |
+| Fase                    | Antes (típ.)                           | Ahora                                            |
+| ----------------------- | -------------------------------------- | ------------------------------------------------ |
+| PostgreSQL ping+migrate | ~0.1–0.2 s                             | igual (cache fingerprint)                        |
+| Liberar puertos Windows | ~3 s (PowerShell)                      | ~0.1–0.3 s (`netstat`)                           |
+| Import API + health     | ~3 s                                   | igual (sin `--reload`)                           |
+| UI listas tras paint    | N× `GET /lists/{id}` + N× strategy-top | `GET /lists/memberships` + batch tops            |
+| CORE-R shell al abrir   | tick inmediato                         | diferido idle / ~4 s (cadencia sigue en minutos) |
 
 Informe: `pnpm startup:report` · `logs/agent/startup.json`.
 
 ## No uses (obsoleto / confuso)
 
-| Antes | Problema |
-|-------|----------|
-| Compound «API Python + Web» | 2 debuggers Node, race conditions, tasks colgadas |
-| Solo «Bolsa: Web» | API no arranca → proxy ECONNREFUSED |
-| Task «Docker + PostgreSQL» en cada F5 | Lento (1-2 min Docker); solo tras reinicio PC |
-| `db push` interactivo | Prompt Prisma colgaba la task |
+| Antes                                 | Problema                                          |
+| ------------------------------------- | ------------------------------------------------- |
+| Compound «API Python + Web»           | 2 debuggers Node, race conditions, tasks colgadas |
+| Solo «Bolsa: Web»                     | API no arranca → proxy ECONNREFUSED               |
+| Task «Docker + PostgreSQL» en cada F5 | Lento (1-2 min Docker); solo tras reinicio PC     |
+| `db push` interactivo                 | Prompt Prisma colgaba la task                     |
 
 ## Comandos útiles
 
@@ -90,17 +91,17 @@ El agente puede leer esos JSON para comparar arranques tras reinicios o cambios 
 
 ## Launch configs (avanzado)
 
-| Config | Cuándo |
-|--------|--------|
-| **F5 Dev (recomendado)** | Uso diario |
-| Solo API | Depurar backend sin Vite |
-| Solo Web | Solo si API ya corre en :8000 |
+| Config                   | Cuándo                        |
+| ------------------------ | ----------------------------- |
+| **F5 Dev (recomendado)** | Uso diario                    |
+| Solo API                 | Depurar backend sin Vite      |
+| Solo Web                 | Solo si API ya corre en :8000 |
 
 ## Puertos
 
-| Puerto | Servicio |
-|--------|----------|
-| 5432 | PostgreSQL (Docker `bolsa-postgres`) |
-| 8000 | API FastAPI |
-| 5173 | Vite dev server |
-| 3002 | XTB bridge mock |
+| Puerto | Servicio                             |
+| ------ | ------------------------------------ |
+| 5432   | PostgreSQL (Docker `bolsa-postgres`) |
+| 8000   | API FastAPI                          |
+| 5173   | Vite dev server                      |
+| 3002   | XTB bridge mock                      |

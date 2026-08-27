@@ -102,6 +102,7 @@ def to_portfolio_summary_dto(summary: PortfolioSummary) -> PortfolioSummaryDto:
                 market_value=position.market_value,
                 unrealized_pnl=position.unrealized_pnl,
                 unrealized_pnl_pct=position.unrealized_pnl_pct,
+                sector=getattr(position, "sector", None),
             )
             for position in summary.positions
         ],

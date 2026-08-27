@@ -635,6 +635,7 @@ def get_execute_gated_portfolio_trade_use_case(session: AsyncSession) -> Any:
         portfolio_recon=get_portfolio_recon_lookup(session),
         live_recon=get_live_recon_lookup(session),
         incident_store=get_operational_incident_store(session),
+        instrument_data_status=get_instrument_data_status_use_case(session),
         position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )
@@ -1325,6 +1326,7 @@ async def get_confirm_intent_use_case(session: AsyncSession) -> Any:
         position_from_protect=PersistPositionFromProtect(cast(PositionStateProtectStore, repo)),
         submit_intent_store=PostgresSubmitIntentStore(session),
         incident_store=get_operational_incident_store(session),
+        instrument_data_status=get_instrument_data_status_use_case(session),
     )
 
 
@@ -1542,6 +1544,7 @@ async def get_fill_pending_order_use_case(session: AsyncSession) -> FillPendingO
         portfolio_recon=get_portfolio_recon_lookup(session),
         live_recon=get_live_recon_lookup(session),
         incident_store=get_operational_incident_store(session),
+        instrument_data_status=get_instrument_data_status_use_case(session),
         position_from_fill=PersistPositionFromFill(cast(PositionStateStore, repo)),
         position_from_exit=PersistPositionFromExit(cast(PositionStateExitStore, repo)),
     )

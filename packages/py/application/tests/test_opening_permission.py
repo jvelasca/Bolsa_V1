@@ -183,3 +183,39 @@ async def test_allow_opening_fill_unresolved_incident_vetoes() -> None:
     )
     assert allowed is False
     assert len(await store.list_active("acc-1")) == 1
+
+
+class _FakeInstrumentDataStatus:
+    def __init__(self, warnings: tuple[str, ...]) -> None:
+        self._warnings = warnings
+
+    async def execute(self, instrument_id: str, *, timeframe: object = None) -> Any:
+        return type("Status", (), {"sanity_warnings": self._warnings})()
+
+
+@pytest.mark.asyncio
+async def test_allow_opening_fill_sanity_split_vetoes() -> None:
+    fresh = datetime.now(UTC).isoformat()
+    allowed = await allow_opening_fill(
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        ohlcv=_FakeOhlcv(fresh),  # type: ignore[arg-type]
+        mandates=_FakeMandatesOpen(),  # type: ignore[arg-type]
+        instrument_data_status=_FakeInstrumentDataStatus(
+            ("movimiento 55.00% en 2024-01-01 — revisar split/dividendo",)
+        ),
+        **_kwargs(),
+    )
+    assert allowed is False
+
+
+@pytest.mark.asyncio
+async def test_allow_opening_fill_sanity_clean_allows() -> None:
+    fresh = datetime.now(UTC).isoformat()
+    allowed = await allow_opening_fill(
+        portfolio_summary=_AllowSummary(),  # type: ignore[arg-type]
+        ohlcv=_FakeOhlcv(fresh),  # type: ignore[arg-type]
+        mandates=_FakeMandatesOpen(),  # type: ignore[arg-type]
+        instrument_data_status=_FakeInstrumentDataStatus(("gap de 2 días",)),
+        **_kwargs(),
+    )
+    assert allowed is True

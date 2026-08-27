@@ -1,48 +1,61 @@
 /**
- * V1.19 — panel what-if read-only para candidatos Mesa.
+ * Portfolio Scenario — estimación de cartera, no permiso (Confirm = firma).
  */
 
 import { useState } from "react";
-import type { MesaCandidateRowV1 } from "@bolsa/shared";
-import { projectMesaWhatIf } from "@bolsa/shared";
+import type {
+  MesaCandidateRowV1,
+  PortfolioPositionRiskInput,
+  PortfolioRiskSnapshotV1,
+} from "@bolsa/shared";
+import { buildPortfolioScenario } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type MesaWhatIfPanelProps = {
   row: MesaCandidateRowV1;
-  portfolioRiskR: number | null;
+  portfolioRisk: PortfolioRiskSnapshotV1 | null;
+  positions?: ReadonlyArray<PortfolioPositionRiskInput>;
+  candidateSector?: string | null;
   equity: number | null;
   cash: number | null;
   className?: string;
 };
 
+function cell(value: string | number | null | undefined, suffix = ""): string {
+  if (value == null || value === "") return "—";
+  return `${value}${suffix}`;
+}
+
 export function MesaWhatIfPanel({
   row,
-  portfolioRiskR,
+  portfolioRisk,
+  positions = [],
+  candidateSector = null,
   equity,
   cash,
   className,
 }: MesaWhatIfPanelProps) {
   const [open, setOpen] = useState(false);
-  const study = row.study;
-  const notional =
-    study?.entry != null && study?.riskAmount != null
-      ? study.riskAmount * 10
-      : null;
 
-  const projection = projectMesaWhatIf({
-    symbol: row.symbol,
-    candidateRiskR:
-      study?.riskAmount != null && study?.entry != null && study?.stop != null
-        ? Math.abs(study.entry - study.stop) > 0
-          ? (study.riskAmount / Math.abs(study.entry - study.stop)) * 0.01
-          : null
-        : null,
-    portfolioRiskR,
+  const scenario = buildPortfolioScenario({
+    candidate: row,
+    positions,
     equity,
     cash,
-    candidateNotional: notional,
+    candidateSector,
+    riskTolerance: null,
+    maxSectorExposurePct: 40,
+    portfolioRiskLimitR: portfolioRisk?.portfolioRiskLimitR ?? null,
   });
+
+  const limit = portfolioRisk?.portfolioRiskLimitR ?? scenario.riskLimitR;
+  const topSectorAfter = Object.entries(scenario.after.sectorExposurePct).sort(
+    (a, b) => b[1] - a[1],
+  )[0];
+  const topSectorCurrent = Object.entries(
+    scenario.current.sectorExposurePct,
+  ).sort((a, b) => b[1] - a[1])[0];
 
   if (!open) {
     return (
@@ -67,39 +80,78 @@ export function MesaWhatIfPanel({
       )}
       data-testid={`mesa-whatif-${row.symbol}`}
     >
-      <p className="font-semibold">What-if (solo lectura)</p>
-      <dl className="mt-1 grid gap-0.5">
-        <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">Riesgo actual</dt>
-          <dd className="tabular-nums">
-            {projection.currentRiskR != null
-              ? `${projection.currentRiskR.toFixed(2)} R`
-              : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">+ {row.symbol}</dt>
-          <dd className="tabular-nums">
-            {projection.projectedRiskR != null
-              ? `${projection.projectedRiskR.toFixed(2)} R`
-              : "—"}
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="text-muted-foreground">Exposición</dt>
-          <dd className="tabular-nums">
-            {projection.currentExposurePct != null
-              ? `${projection.currentExposurePct}%`
-              : "—"}
-            {projection.projectedExposurePct != null
-              ? ` → ${projection.projectedExposurePct}%`
-              : ""}
-          </dd>
-        </div>
+      <p className="font-semibold">¿Qué pasa si añado {row.symbol}?</p>
+      <p className="text-muted-foreground">
+        Estimación de cartera, no permiso. Confirm es la firma.
+      </p>
+      <div className="mt-1 grid grid-cols-3 gap-1 text-[9px] font-semibold uppercase text-muted-foreground">
+        <span />
+        <span>Actual</span>
+        <span>Después</span>
+      </div>
+      <dl className="mt-0.5 grid grid-cols-3 gap-0.5">
+        <dt className="text-muted-foreground">Capital</dt>
+        <dd className="tabular-nums text-right">
+          {cell(scenario.current.capital)}
+        </dd>
+        <dd className="tabular-nums text-right">
+          {cell(scenario.after.capital)}
+        </dd>
+        <dt className="text-muted-foreground">Invertido</dt>
+        <dd className="tabular-nums text-right">
+          {cell(scenario.current.investedPct, "%")}
+        </dd>
+        <dd className="tabular-nums text-right">
+          {cell(scenario.after.investedPct, "%")}
+        </dd>
+        <dt className="text-muted-foreground">Cash</dt>
+        <dd className="tabular-nums text-right">
+          {cell(scenario.current.cashPct, "%")}
+        </dd>
+        <dd className="tabular-nums text-right">
+          {cell(scenario.after.cashPct, "%")}
+        </dd>
+        <dt className="text-muted-foreground">Open Risk</dt>
+        <dd className="tabular-nums text-right">
+          {scenario.current.openRiskR != null
+            ? `${scenario.current.openRiskR.toFixed(2)}R`
+            : "—"}
+        </dd>
+        <dd className="tabular-nums text-right">
+          {scenario.after.openRiskR != null
+            ? `${scenario.after.openRiskR.toFixed(2)}R`
+            : "—"}
+        </dd>
+        <dt className="text-muted-foreground">Sector</dt>
+        <dd className="text-right tabular-nums">
+          {topSectorCurrent
+            ? `${topSectorCurrent[0]} ${topSectorCurrent[1]}%`
+            : "—"}
+        </dd>
+        <dd className="text-right tabular-nums">
+          {topSectorAfter ? `${topSectorAfter[0]} ${topSectorAfter[1]}%` : "—"}
+        </dd>
+        <dt className="text-muted-foreground">Fit</dt>
+        <dd className="text-right">{scenario.current.portfolioFit}</dd>
+        <dd className="text-right">{scenario.after.portfolioFit}</dd>
       </dl>
-      {projection.warnings.length > 0 ? (
+      <p className="mt-1">
+        Veredicto:{" "}
+        <span
+          className={cn(
+            "font-medium",
+            scenario.verdict === "COMPATIBLE" && "text-emerald-700",
+            scenario.verdict === "NO_RECOMENDADA" && "text-rose-700",
+          )}
+        >
+          {scenario.verdict}
+        </span>
+        {scenario.verdictReason ? ` — ${scenario.verdictReason}` : ""}
+      </p>
+      <p className="text-muted-foreground">Límite mandato: {limit}R</p>
+      {scenario.warnings.length > 0 ? (
         <ul className="mt-1 list-disc pl-4 text-amber-700 dark:text-amber-300">
-          {projection.warnings.map((w) => (
+          {scenario.warnings.map((w) => (
             <li key={w}>{w}</li>
           ))}
         </ul>

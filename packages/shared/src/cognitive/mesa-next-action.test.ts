@@ -166,12 +166,29 @@ describe("buildMesaOperationalHeader", () => {
   });
 
   it("sums portfolio R when available", () => {
-    expect(
-      sumPortfolioUnrealizedR([
-        { operational: { unrealizedR: 1.2 } },
-        { operational: { unrealizedR: -0.3 } },
-      ]),
-    ).toBe(0.9);
+    const h = buildMesaOperationalHeader({
+      positions: [
+        {
+          avgCost: 100,
+          quantity: 1,
+          operational: { unrealizedR: 1.2, currentStop: 95, direction: "long" },
+          study: { stop: 95, riskAmount: 100 },
+        },
+        {
+          avgCost: 50,
+          quantity: 1,
+          operational: {
+            unrealizedR: -0.3,
+            currentStop: 48,
+            direction: "long",
+          },
+          study: { stop: 48, riskAmount: 50 },
+        },
+      ],
+    });
+    expect(h.portfolioPnLR).toBe(0.9);
+    expect(h.portfolioOpenRiskR).not.toBeNull();
+    expect(h.totalRiskR).toBe(h.portfolioPnLR);
   });
 });
 
@@ -185,6 +202,14 @@ describe("deriveMesaDataFreshness", () => {
     const last = new Date("2026-08-26T11:30:00Z").toISOString();
     expect(deriveMesaDataFreshness({ lastBarDate: last, now }).state).toBe(
       "fresh",
+    );
+  });
+
+  it("stale when beyond 5d threshold", () => {
+    const now = new Date("2026-08-26T12:00:00Z");
+    const last = new Date("2026-08-01T12:00:00Z").toISOString();
+    expect(deriveMesaDataFreshness({ lastBarDate: last, now }).state).toBe(
+      "stale",
     );
   });
 });

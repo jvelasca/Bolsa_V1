@@ -81,7 +81,7 @@ export function MesaAttentionQueue({
   const bySymbol = buildInstrumentIdBySymbol(board);
 
   return (
-    <Card data-testid="mesa-attention-queue" role="alert" aria-live="assertive">
+    <Card data-testid="mesa-attention-queue" role="status" aria-live="polite">
       <CardHeader className="pb-2">
         <CardTitle className="text-base text-rose-700 dark:text-rose-300">
           Requiere atención
@@ -96,7 +96,7 @@ export function MesaAttentionQueue({
           const instrumentId = bySymbol.get(item.symbol.toUpperCase()) ?? null;
           return (
             <div
-              key={item.id}
+              key={item.id ?? `${item.symbol}-${item.kind ?? "attn"}`}
               className="border-t border-border px-4 pt-3 first:border-t-0 first:pt-0"
               data-testid={`mesa-attention-${item.symbol}`}
             >

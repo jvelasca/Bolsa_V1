@@ -1,5 +1,5 @@
 /**
- * Candidatos agrupados + ranking operable + what-if (V1.16–V1.19).
+ * Candidatos agrupados + Operational Priority + Portfolio Scenario.
  */
 
 import { Link } from "react-router-dom";
@@ -8,8 +8,10 @@ import {
   JOURNAL_STUDY_VIGENCIA_LABELS,
   NO_OPERATIONAL_PLAN_COPY,
   mapCandidateNextAction,
-  sortMesaCandidatesOperable,
+  sortByOperationalPriority,
   type MesaCandidateRowV1,
+  type PortfolioRiskSnapshotV1,
+  type PortfolioPositionRiskInput,
 } from "@bolsa/shared";
 import {
   Card,
@@ -88,23 +90,34 @@ function CandidateNextAction({
 function CandidateCard({
   row,
   entriesBlocked,
-  portfolioRiskR,
+  portfolioRisk,
+  positions = [],
   equity,
   cash,
   operableRank,
+  sectorExposurePct,
+  sectorByInstrumentId,
 }: {
   row: MesaCandidateRowV1;
   entriesBlocked: boolean;
-  portfolioRiskR: number | null;
+  portfolioRisk: PortfolioRiskSnapshotV1 | null;
+  positions?: ReadonlyArray<PortfolioPositionRiskInput>;
   equity: number | null;
   cash: number | null;
   operableRank?: number;
+  sectorExposurePct?: Record<string, number>;
+  sectorByInstrumentId?: Record<string, string | null | undefined>;
 }) {
   const study = row.study;
   const opinion =
     study?.opinion != null ? JOURNAL_STUDY_OPINION_LABELS[study.opinion] : "—";
-  const score = sortMesaCandidatesOperable([row], entriesBlocked)[0]
-    ?.operableScore;
+  const priority = sortByOperationalPriority([row], {
+    entriesBlocked,
+    portfolioRisk,
+    sectorExposurePct,
+    sectorByInstrumentId,
+    maxSectorExposurePct: 40,
+  })[0]?.operationalPriority;
 
   return (
     <div
@@ -127,13 +140,30 @@ function CandidateCard({
               {study.strength.toFixed(1)}
             </span>
           ) : null}
-          {score?.operable ? (
+          {priority?.verdict === "OPERABLE" ? (
             <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
               OPERABLE
+            </p>
+          ) : priority?.verdict === "NO_OPERAR" ? (
+            <p
+              className="text-[10px] font-medium text-rose-700 dark:text-rose-300"
+              data-testid={`mesa-candidate-no-operar-${row.symbol}`}
+            >
+              NO OPERAR
+              {priority.suitability.value < 50 && priority.quality.value >= 70
+                ? " · no encaja"
+                : ""}
             </p>
           ) : null}
         </div>
       </div>
+      {priority ? (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Q {priority.quality.value} · Encaje {priority.suitability.value} · Op{" "}
+          {priority.operability.value}
+          <span className="ml-1 italic">(orden provisional)</span>
+        </p>
+      ) : null}
       <dl className="mt-2 grid gap-1 text-[11px] sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">Opinión</dt>
@@ -178,16 +208,23 @@ function CandidateCard({
           </div>
         )}
       </dl>
-      {!score?.operable && (score?.blockReasons.length ?? 0) > 0 ? (
+      {!priority?.operability.operable &&
+      (priority?.operability.blockReasons.length ?? 0) > 0 ? (
         <p className="mt-1 text-[10px] text-amber-800 dark:text-amber-200">
-          No operable: {score?.blockReasons.join(" · ")}
+          No operable: {priority?.operability.blockReasons.join(" · ")}
         </p>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <CandidateNextAction row={row} entriesBlocked={entriesBlocked} />
         <MesaWhatIfPanel
           row={row}
-          portfolioRiskR={portfolioRiskR}
+          portfolioRisk={portfolioRisk}
+          positions={positions}
+          candidateSector={
+            row.instrumentId
+              ? (sectorByInstrumentId?.[row.instrumentId] ?? null)
+              : null
+          }
           equity={equity}
           cash={cash}
         />
@@ -199,26 +236,42 @@ function CandidateCard({
 export function MesaCandidatesPanel({
   groups,
   entriesBlocked,
-  portfolioRiskR = null,
+  portfolioRisk = null,
+  positions = [],
   equity = null,
   cash = null,
   useOperableRanking = true,
+  sectorExposurePct,
+  sectorByInstrumentId,
 }: {
   groups: CandidateGroup[];
   entriesBlocked: boolean;
+  portfolioRisk?: PortfolioRiskSnapshotV1 | null;
+  /** @deprecated Usar portfolioRisk */
   portfolioRiskR?: number | null;
+  positions?: ReadonlyArray<PortfolioPositionRiskInput>;
   equity?: number | null;
   cash?: number | null;
   useOperableRanking?: boolean;
+  sectorExposurePct?: Record<string, number>;
+  sectorByInstrumentId?: Record<string, string | null | undefined>;
 }) {
   const total = groups.reduce((sum, g) => sum + g.items.length, 0);
   const allRows = groups.flatMap((g) => g.items);
   const operableOrder = useOperableRanking
-    ? sortMesaCandidatesOperable(allRows, entriesBlocked)
+    ? sortByOperationalPriority(allRows, {
+        entriesBlocked,
+        portfolioRisk,
+        sectorExposurePct,
+        sectorByInstrumentId,
+        maxSectorExposurePct: 40,
+      })
     : null;
   const rankBySymbol = new Map<string, number>();
   operableOrder?.forEach((row, i) => {
-    if (row.operableScore.operable) rankBySymbol.set(row.symbol, i + 1);
+    if (row.operationalPriority.verdict === "OPERABLE") {
+      rankBySymbol.set(row.symbol, i + 1);
+    }
   });
 
   const readyCount =
@@ -238,6 +291,10 @@ export function MesaCandidatesPanel({
           ) : (
             `${total} candidato${total === 1 ? "" : "s"} en cola`
           )}
+          {" · "}
+          <span className="text-muted-foreground">
+            Prioridad operativa (provisional)
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -275,10 +332,13 @@ export function MesaCandidatesPanel({
                     key={`${row.symbol}-${row.status}`}
                     row={row}
                     entriesBlocked={entriesBlocked}
-                    portfolioRiskR={portfolioRiskR}
+                    portfolioRisk={portfolioRisk}
+                    positions={positions}
                     equity={equity}
                     cash={cash}
                     operableRank={rankBySymbol.get(row.symbol)}
+                    sectorExposurePct={sectorExposurePct}
+                    sectorByInstrumentId={sectorByInstrumentId}
                   />
                 ))}
               </div>
