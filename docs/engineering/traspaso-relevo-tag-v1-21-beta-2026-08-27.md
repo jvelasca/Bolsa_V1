@@ -1,7 +1,7 @@
 # RELEVO — tag v1.21-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v121.md`](./audit-pack-estado-global-2026-08-27-v121.md) · [`traspaso-relevo-v1-21-coherence-2026-08-27.md`](./traspaso-relevo-v1-21-coherence-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.21-beta` (tip SHA pin post-commit). **Release tag CI:** pendiente de pin tras Actions GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.21-beta` → tip `dad8f51c`. **Release tag CI:** pendiente de pin tras Actions GREEN.
 > **Arranque chat nuevo / auditor:** pack v121 + ADR-041 + ADR-040 §7 + `CURRENT_SYSTEM.md` + este relevo.
 
 ---
@@ -18,7 +18,7 @@
 
 | Pieza        | Valor                                                                                                      |
 | ------------ | ---------------------------------------------------------------------------------------------------------- |
-| Tag          | `v1.21-beta` → tip (pin SHA abajo tras commit)                                                             |
+| Tag          | `v1.21-beta` → `dad8f51c`                                                                                  |
 | Previo       | `v1.20-beta` → `4c0bfe7b`                                                                                  |
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v121.md`](./audit-pack-estado-global-2026-08-27-v121.md)             |
 | Daily ops    | `pnpm test:daily-ops:offline` **1159** (6 fases)                                                           |

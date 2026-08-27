@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.21 (Operational Coherence & UX Hardening)
 
-> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.21-beta` → tip pendiente de pin post-commit** (ver relevo tag). Partida **`v1.20-beta` → `4c0bfe7b`**.
+> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.21-beta` → `dad8f51c`**. Partida **`v1.20-beta` → `4c0bfe7b`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-041](../adr/041-operational-coherence.md) · [ADR-040](../adr/040-user-information-architecture.md) §7 · pack previo [`audit-pack-estado-global-2026-08-27-v120.md`](./audit-pack-estado-global-2026-08-27-v120.md).
 > **Para:** auditoría cruzada post-v1.21 · Release tag CI pendiente de pin tras `git push origin v1.21-beta`.
 
