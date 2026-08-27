@@ -7731,6 +7731,8 @@ export interface components {
             operational?: components["schemas"]["OperationalPositionDto"] | null;
             /** Quantity */
             quantity: number;
+            /** Sector */
+            sector?: string | null;
             /** Symbol */
             symbol: string;
             /** Unrealizedpnl */
