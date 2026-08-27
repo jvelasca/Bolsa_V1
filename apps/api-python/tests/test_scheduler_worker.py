@@ -28,6 +28,9 @@ from bolsa_api.background.fa_weekly_worker import (  # type: ignore[import-untyp
 from bolsa_api.background.index_subscribe_worker import (  # type: ignore[import-untyped]
     start_index_subscribe_worker,
 )
+from bolsa_api.background.opportunity_daily_scan_worker import (  # type: ignore[import-untyped]
+    start_opportunity_daily_scan_worker,
+)
 from bolsa_api.background.optimization_worker import (  # type: ignore[import-untyped]
     start_optimization_worker,
 )
@@ -55,6 +58,7 @@ def test_event_loop_starters_reunen_todos_los_workers_periodicos() -> None:
         start_auto_sync_worker,
         start_index_subscribe_worker,
         start_custody_job_worker,
+        start_opportunity_daily_scan_worker,
     }
     assert set(starters) == expected
 
