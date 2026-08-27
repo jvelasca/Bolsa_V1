@@ -1,7 +1,8 @@
 # Ayuda en la app — coordinación con trackers y docs
 
-> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-25** (v1.8 Decision Spine · AUTO BETA-D · Hoy honesty · H1 pending ≠ stop · H2 kill switch asimétrico · P1 posición persistida · P2 firma de riesgo · P3 cadena de salida)  
-> Mesa diaria: **Trading** · **Señales** (`/screeners`) · **Confirmar** (`/confirm`) · **Libro** (`/operations` + `/history`). Menús: **Laboratorio** (`/backtests`, alias Backtesting) · **Asesor**. Confirm es primer nivel (no solo Ayuda → Plataforma IA). **AUTO cuenta** = UI BETA-D: armar con frase `ACTIVAR AUTO` en Cuentas → Operativa; execute solo con `PAPER_D_EXECUTE=1` (default off). Distinto de Lista AUTO Lab. SEMI: _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se envían solas._ En Ayuda (Guía y **Flujo y módulos**) aparece el bloque **«Hoy en la mesa»** (3 pasos: Trading → Proponer F3 → Confirmar). Tira **Hoy** = proyección del Decision Board (sin TradePlan vivo → WATCH, nunca BUY). Tips «?» de mesa en Operativa / Confirmar. Desde **Operativa** / chip **F3** de la barra Trading se abre Confirmar en **panel lateral** (mismo flujo SEMI; la página `/confirm` sigue en el menú). Ayuda sigue con Datos de mercado · Watchlist · Análisis del valor · Laboratorio (Play · Lista AUTO · Finalistas · Monitor · DÍA D) · Trading (Operativa · Estudio ADR-024) · Plataforma IA (docs/tracker; firma en `/confirm`).  
+> **Sync:** `HELP_CONTENT_AS_OF` = **2026-08-27** (V1.20 ADR-040: nav Hoy·Mercado·Cartera·Asesor·Laboratorio · strip Hoy fuera de Trading)  
+> Nav L1: **Hoy** · **Mercado** (terminal) · **Cartera** · **Asesor** · **Laboratorio**. Firma en Hoy → Confirmar (`/confirm`). Señales bajo Mercado. Consola / Decisiones / Journal no son puertas L1.  
+> Mesa diaria (legado): **Trading** · **Señales** (`/screeners`) · **Confirmar** (`/confirm`) · **Libro** (`/operations` + `/history`). Menús: **Laboratorio** (`/backtests`, alias Backtesting) · **Asesor**. Confirm es primer nivel (no solo Ayuda → Plataforma IA). **AUTO cuenta** = UI BETA-D: armar con frase `ACTIVAR AUTO` en Cuentas → Operativa; execute solo con `PAPER_D_EXECUTE=1` (default off). Distinto de Lista AUTO Lab. SEMI: _La app propone operaciones sobre tu Universo. Tú las firmas aquí. Nunca se envían solas._ En Ayuda (Guía y **Flujo y módulos**) aparece el bloque **«Hoy»** (Hoy → Mercado → Firmar). Tips «?» de mesa en Operativa / Confirmar. Desde **Operativa** / chip **F3** se abre Confirmar en **panel lateral**. Ayuda sigue con Datos de mercado · Watchlist · Análisis del valor · Laboratorio · Mercado (Operativa · Estudio ADR-024) · Plataforma IA.  
 > **Cierre etapa (auditoría):** [engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md](./engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md).  
 > **Roadmap post-auditorías:** [engineering/improvement-roadmap-post-audits-2026-08-02.md](./engineering/improvement-roadmap-post-audits-2026-08-02.md) — Q0–Q3 hecho.  
 > **Decisión freeze:** [engineering/post-audit-decision-freeze-2026-08-03.md](./engineering/post-audit-decision-freeze-2026-08-03.md) — C4 no · Belief congelado · `CORE_R_CRON` / `COST_MODEL_V2` off · **Camino D execute off** (prep A0–A5).  
@@ -32,17 +33,18 @@ La UI **Ayuda (?)** muestra guías y tableros de seguimiento.
 
 ## Nomenclatura de producto
 
-| En la app (español) | Código / URL (interno)                                       |
-| ------------------- | ------------------------------------------------------------ |
-| Análisis del valor  | value-analysis / FA                                          |
-| Confirmar           | `/confirm`                                                   |
-| Señales             | `/screeners` (hub; rastreadores guardados siguen existiendo) |
-| Libro               | `/operations` + `/history`                                   |
-| Laboratorio         | `/backtests` (alias histórico: Backtesting)                  |
-| Backtesting         | alias de Laboratorio (`/backtests`)                          |
-| Plataforma IA       | ai / docs tracker; firma viva en Confirmar                   |
-| Datos de mercado    | data capture                                                 |
-| Espacio de trabajo  | workspace                                                    |
+| En la app (español) | Código / URL (interno)                      |
+| ------------------- | ------------------------------------------- |
+| Hoy                 | `/mesa` (label producto; interno Mesa)      |
+| Mercado             | `/trading` (terminal)                       |
+| Cartera             | Posiciones / Órdenes / Historial            |
+| Confirmar           | `/confirm` (también Hoy → Confirmar)        |
+| Señales             | `/screeners` (bajo Mercado)                 |
+| Laboratorio         | `/backtests` (alias histórico: Backtesting) |
+| Backtesting         | alias de Laboratorio (`/backtests`)         |
+| Plataforma IA       | ai / docs tracker; firma viva en Confirmar  |
+| Datos de mercado    | data capture                                |
+| Espacio de trabajo  | workspace                                   |
 
 ## Mapa sección → tracker → docs
 

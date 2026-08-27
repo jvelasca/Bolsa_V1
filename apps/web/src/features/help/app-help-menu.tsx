@@ -109,42 +109,33 @@ function GuideContent() {
         <h3 className="mb-2 font-semibold">Navegación principal</h3>
         <ul className="space-y-2 text-muted-foreground">
           <li>
-            <RouteLink to="/overview">Overview</RouteLink> — Cuenta activa,
-            patrimonio y atajos a Trading, Laboratorio (Play / Lista AUTO /
-            Finalistas) y análisis fundamental (Tarjeta Valor · Screeners FA ·
-            Paper D).
+            <strong>← →</strong> — historial de navegación SPA.
           </li>
           <li>
-            <strong>← →</strong> (inicio de la barra, antes de Overview) —
-            historial de navegación SPA (atrás / adelante entre rutas y
-            queries).
+            <RouteLink to="/mesa">Hoy</RouteLink> — ¿Qué debo hacer hoy?
+            (resumen, posiciones, oportunidades, decisiones, confirmar,
+            journal).
           </li>
           <li>
-            <RouteLink to="/trading">Trading</RouteLink> — Workspace de
-            gráficos, watchlist, indicadores y panel de operaciones (Universo en
-            vigilancia).
+            <RouteLink to="/trading">Mercado</RouteLink> — Terminal (watchlist,
+            gráfico, operaciones, operativa). Menú: Señales, Instrumentos,
+            Alertas.
           </li>
           <li>
-            <RouteLink to="/screeners">Señales</RouteLink> — Hub de señales
-            (ruta <code className="text-[10px]">/screeners</code>; rastreadores
-            guardados siguen existiendo).
+            <strong className="text-foreground">Cartera</strong> — Posiciones,
+            órdenes, <RouteLink to="/history">Historial</RouteLink>, riesgo.
           </li>
           <li>
-            <RouteLink to="/confirm">Confirmar</RouteLink> — Firma humana de la
-            cola F3 (SEMI). Primer nivel de nav.
+            <RouteLink to="/research">Asesor</RouteLink> — Tesis / diario /
+            opiniones (pensar, no el bucle diario de firma).
           </li>
           <li>
-            <strong className="text-foreground">Libro</strong> —{" "}
-            <RouteLink to="/operations">Operaciones</RouteLink> (posiciones /
-            órdenes) · <RouteLink to="/history">Historial</RouteLink> (ledger).
+            <RouteLink to="/backtests">Laboratorio</RouteLink> — Simulaciones y
+            estudios.
           </li>
           <li>
-            <RouteLink to="/accounts">Cuentas</RouteLink> — Hub de cuentas:
-            resumen, posiciones, movimientos de efectivo y configuración.
-          </li>
-          <li>
-            <RouteLink to="/alerts">Alertas</RouteLink> — Alertas de precio
-            sobre instrumentos del catálogo.
+            🔔 Alertas · ? Ayuda · ⚙ Configuración (Cuentas, Overview, Fiscal,
+            Consola avanzada).
           </li>
         </ul>
       </section>
@@ -217,9 +208,8 @@ function GuideContent() {
         <h3 className="mb-2 font-semibold">Barra superior</h3>
         <ul className="space-y-1 text-muted-foreground">
           <li>
-            <strong>Nav</strong> — Mesa diaria: Trading · Señales · Confirmar ·
-            Libro. Herramientas: Cuentas · Alertas · Instrumentos. Menús:
-            Laboratorio · Asesor.
+            <strong>Nav</strong> — Hoy · Mercado · Cartera · Asesor ·
+            Laboratorio. Derecha: 🔔 · ? · ⚙.
           </li>
           <li>
             <strong>Grupo tras separador</strong> — Flechas ← → (historial). En

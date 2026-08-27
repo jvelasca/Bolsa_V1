@@ -1,8 +1,9 @@
 /**
- * Mesa · Hoy — home operativa diaria (ADR-037 + V1.16 desk).
+ * Hoy — home operativa diaria (ADR-037 + ADR-040).
+ * Vistas: Resumen · Posiciones · Oportunidades · Decisiones · Confirmar · Journal.
  */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
@@ -45,27 +46,49 @@ import { MesaDecisionAlertsPanel } from "@/features/mesa/mesa-decision-alerts-pa
 import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
 import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
+import { HOY_VIEW_TABS, parseHoyView } from "@/features/mesa/mesa-hoy-view";
+import {
+  HOY_VIEW,
+  hoyViewHref,
+  type HoyView,
+} from "@/features/confirm/daily-nav";
+import { ConfirmPage } from "@/features/confirm/confirm-page";
+import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
+import { cn } from "@/lib/utils";
 
 const STUDIES_LIMIT = 200;
 const MESA_REFETCH_MS = 60_000;
 
+function formatHoyDate(d = new Date()): string {
+  return d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export function MesaHoyPage() {
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId, account } = useActiveAccount();
-  const [searchParams] = useSearchParams();
-  const focus = searchParams.get("focus");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = parseHoyView(
+    searchParams.get("view"),
+    searchParams.get("focus"),
+  );
   const libroRef = useRef<HTMLDivElement | null>(null);
-  const spineRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (focus === "libro") {
-      libroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else if (focus === "spine") {
-      spineRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  function setView(next: HoyView) {
+    const params = new URLSearchParams(searchParams);
+    params.delete("focus");
+    if (next === HOY_VIEW.resumen) {
+      params.delete("view");
+    } else {
+      params.set("view", next);
     }
-  }, [focus]);
+    setSearchParams(params, { replace: true });
+  }
 
   const selfEvalQuery = useOpsSelfEval(effectiveAccountId);
   const portfolioReconStatus = portfolioReconStatusFromReport(
@@ -478,8 +501,8 @@ export function MesaHoyPage() {
 
   return (
     <FeatureErrorBoundary
-      featureName="Mesa · Hoy"
-      fallbackMessage="No se pudo mostrar la mesa. Tus posiciones siguen intactas en el libro."
+      featureName="Hoy"
+      fallbackMessage="No se pudo mostrar Hoy. Tus posiciones siguen intactas en Cartera."
     >
       <div
         className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6"
@@ -488,11 +511,11 @@ export function MesaHoyPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="font-serif text-2xl font-semibold tracking-tight">
-              Mesa · Hoy
+              Hoy
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              ¿Qué debo hacer hoy? — briefing operativo
-              {account ? ` · ${account.name}` : ""}
+              {formatHoyDate()}
+              {account ? ` · ${account.name}` : ""} — ¿qué debo hacer?
             </p>
           </div>
           <Button
@@ -508,6 +531,30 @@ export function MesaHoyPage() {
             Actualizar
           </Button>
         </div>
+
+        <nav
+          className="flex flex-wrap gap-1 border-b border-border pb-2"
+          aria-label="Vistas de Hoy"
+          data-testid="hoy-view-tabs"
+        >
+          {HOY_VIEW_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setView(tab.id)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                view === tab.id
+                  ? "bg-accent text-primary"
+                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+              )}
+              data-testid={`hoy-tab-${tab.id}`}
+              aria-current={view === tab.id ? "page" : undefined}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
 
         {incidentsFailed ? (
           <div
@@ -536,117 +583,147 @@ export function MesaHoyPage() {
               Nuevas entradas: BLOQUEADAS · Automatismos: BLOQUEADOS ·
               Posiciones: VISIBLES · Desriesgo humano: DISPONIBLE
             </p>
+            <Link
+              to={mesaOperationalConsoleHref()}
+              className="mt-2 inline-block text-xs text-primary hover:underline"
+            >
+              Detalles operativos →
+            </Link>
           </div>
         ) : null}
 
-        <MesaLevelSection
-          level={1}
-          title="Qué ocurre"
-          description="Mercado, riesgo, datos y sistema — sin ejecutar."
-          testId="mesa-level-occurs"
-        >
-          <MesaOperationalHeaderStrip header={operationalHeader} />
-          <MesaSessionStateCard session={sessionState} />
-          <MesaDecisionAlertsPanel
-            alerts={decisionAlerts}
-            unifiedAlerts={unifiedAlerts}
-          />
-        </MesaLevelSection>
+        {view === HOY_VIEW.resumen ? (
+          <>
+            <MesaLevelSection
+              level={1}
+              title="Qué ocurre"
+              description="Mercado, riesgo, datos y sistema — sin ejecutar."
+              testId="mesa-level-occurs"
+            >
+              <MesaOperationalHeaderStrip header={operationalHeader} />
+              <MesaSessionStateCard session={sessionState} />
+              <MesaDecisionAlertsPanel
+                alerts={decisionAlerts}
+                unifiedAlerts={unifiedAlerts}
+              />
+            </MesaLevelSection>
 
-        <MesaLevelSection
-          level={2}
-          title="Qué debo hacer"
-          description="Atención y posiciones — una acción principal, Confirm es la firma."
-          testId="mesa-level-do"
-        >
-          <MesaAttentionQueue items={attentionItems} board={board} />
-          <MesaPositionsSummary
-            positions={positions}
-            protectPlanByInstrument={protectPlanByInstrument}
-            studiesByInstrument={studiesMap}
-            studiesByDecisionId={studiesByDecision}
-          />
-          <div ref={libroRef} className="scroll-mt-4">
-            {focus === "libro" ? (
-              <MesaLibroPanel summary={portfolio} accountName={account?.name} />
-            ) : (
+            <MesaLevelSection
+              level={2}
+              title="Qué debo hacer"
+              description="Atención y posiciones — una acción principal, Confirm es la firma."
+              testId="mesa-level-do"
+            >
+              <MesaAttentionQueue items={attentionItems} board={board} />
+              <MesaPositionsSummary
+                positions={positions}
+                protectPlanByInstrument={protectPlanByInstrument}
+                studiesByInstrument={studiesMap}
+                studiesByDecisionId={studiesByDecision}
+              />
               <p className="text-xs text-muted-foreground">
-                Libro completo (pendientes + KPIs):{" "}
+                {attentionItems.length} en atención · {positions.length}{" "}
+                posiciones · {opportunityRanking.top.length} oportunidades TOP —{" "}
                 <Link
-                  to="/mesa?focus=libro"
+                  to={hoyViewHref(HOY_VIEW.oportunidades)}
                   className="text-primary hover:underline"
                 >
-                  Abrir Libro en Mesa →
+                  Ver oportunidades →
                 </Link>
               </p>
-            )}
+            </MesaLevelSection>
+
+            <MesaLevelSection
+              level={3}
+              title="Qué podría hacer"
+              description="Mejores oportunidades para ESTA cartera — discovery ≠ Action Queue ≠ permiso."
+              testId="mesa-level-could"
+            >
+              <MesaCandidatesPanel
+                ranking={opportunityRanking}
+                entriesBlocked={entriesBlocked}
+                portfolioRisk={portfolioRisk}
+                sectorExposurePct={sectorExposurePct}
+                sectorByInstrumentId={sectorByInstrumentId}
+                positions={riskPositions}
+                equity={portfolio?.totalEquity ?? null}
+                cash={summaryQuery.data?.data?.cash ?? null}
+                universeListId={universeListId}
+              />
+            </MesaLevelSection>
+
+            <div
+              className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
+              data-testid="mesa-system-health-link"
+            >
+              <p className="font-medium">Estado operativo</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Salud del sistema, recon e incidentes — solo si hace falta.
+              </p>
+              <Link
+                to={mesaOperationalConsoleHref()}
+                className="mt-2 inline-block text-xs text-primary hover:underline"
+              >
+                Detalles operativos →
+              </Link>
+            </div>
+          </>
+        ) : null}
+
+        {view === HOY_VIEW.posiciones ? (
+          <div
+            ref={libroRef}
+            className="space-y-4"
+            data-testid="hoy-view-posiciones"
+          >
+            <MesaPositionsSummary
+              positions={positions}
+              protectPlanByInstrument={protectPlanByInstrument}
+              studiesByInstrument={studiesMap}
+              studiesByDecisionId={studiesByDecision}
+            />
+            <MesaLibroPanel summary={portfolio} accountName={account?.name} />
           </div>
-        </MesaLevelSection>
+        ) : null}
 
-        <MesaLevelSection
-          level={3}
-          title="Qué podría hacer"
-          description="Mejores oportunidades para ESTA cartera — discovery ≠ Action Queue ≠ permiso."
-          testId="mesa-level-could"
-        >
-          <MesaCandidatesPanel
-            ranking={opportunityRanking}
-            entriesBlocked={entriesBlocked}
-            portfolioRisk={portfolioRisk}
-            sectorExposurePct={sectorExposurePct}
-            sectorByInstrumentId={sectorByInstrumentId}
-            positions={riskPositions}
-            equity={portfolio?.totalEquity ?? null}
-            cash={summaryQuery.data?.data?.cash ?? null}
-            universeListId={universeListId}
-          />
-        </MesaLevelSection>
+        {view === HOY_VIEW.oportunidades ? (
+          <div data-testid="hoy-view-oportunidades">
+            <MesaCandidatesPanel
+              ranking={opportunityRanking}
+              entriesBlocked={entriesBlocked}
+              portfolioRisk={portfolioRisk}
+              sectorExposurePct={sectorExposurePct}
+              sectorByInstrumentId={sectorByInstrumentId}
+              positions={riskPositions}
+              equity={portfolio?.totalEquity ?? null}
+              cash={summaryQuery.data?.data?.cash ?? null}
+              universeListId={universeListId}
+            />
+          </div>
+        ) : null}
 
-        <div
-          ref={spineRef}
-          className="scroll-mt-4 rounded-md border border-border/60 bg-muted/10 px-4 py-3"
-          data-testid="mesa-spine-section"
-          id="mesa-focus-spine"
-        >
-          {focus === "spine" ? (
+        {view === HOY_VIEW.decisiones ? (
+          <div data-testid="hoy-view-decisiones">
             <DecisionSpineDetailPanel
               board={board}
               entriesBlocked={entriesBlocked}
               isLoading={boardQuery.isLoading}
               isError={boardQuery.isError}
             />
-          ) : (
-            <>
-              <p className="font-medium text-sm">Detalle del Decision Spine</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Buckets, SEMI_F3 y sesiones — auditoría de atención (≠ ranking).
-              </p>
-              <Link
-                to="/mesa?focus=spine"
-                className="mt-2 inline-block text-xs text-primary hover:underline"
-              >
-                Ver detalle técnico →
-              </Link>
-            </>
-          )}
-        </div>
+          </div>
+        ) : null}
 
-        <div
-          className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
-          data-testid="mesa-system-health-link"
-        >
-          <p className="font-medium">Salud del sistema</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            OE-1, readiness, recon e incidentes históricos — auditoría
-            read-only.
-          </p>
-          <Link
-            to={mesaOperationalConsoleHref()}
-            className="mt-2 inline-block text-xs text-primary hover:underline"
-          >
-            Abrir Consola operacional →
-          </Link>
-        </div>
+        {view === HOY_VIEW.confirmar ? (
+          <div data-testid="hoy-view-confirmar" className="-mx-4 sm:-mx-6">
+            <ConfirmPage />
+          </div>
+        ) : null}
+
+        {view === HOY_VIEW.journal ? (
+          <div data-testid="hoy-view-journal" className="-mx-4 sm:-mx-6">
+            <DecisionJournalPage />
+          </div>
+        ) : null}
       </div>
     </FeatureErrorBoundary>
   );

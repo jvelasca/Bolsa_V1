@@ -219,7 +219,7 @@ export function HoyCommandStrip() {
         className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] hover:bg-muted"
         data-testid="hoy-link-mesa"
       >
-        Mesa · Hoy
+        Hoy
       </Link>
       <button
         type="button"

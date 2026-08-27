@@ -1,13 +1,13 @@
 /**
  * Barra superior de la plataforma (nav + cluster derecha).
  *
- * Izquierda: marca · historial ←→ · separador · nav (diario · herramientas · lab) · paneles Trading.
- * Derecha (L→R): chip universo (compacto) · espacio · Ayuda · Config · menú sesión.
- * Tras Restablecer paneles (o solo en otras rutas): icono «abrir en otra pestaña».
+ * Izquierda: marca · historial ←→ · separador · nav L1 (Hoy · Mercado · Cartera · Asesor · Laboratorio)
+ *   · paneles Mercado (cuando aplica).
+ * Derecha (L→R): 🔔 · chip universo · espacio · Ayuda · Config · menú sesión.
  *
+ * @see docs/adr/040-user-information-architecture.md
  * @see docs/WORKSPACE_PERSISTENCE.md §0
  * @see docs/UI_PLATFORM.md — Barra superior / espacios
- * @see docs/engineering/lists-universes-design-2026-07-30.md — Listas / índices
  */
 import type { ComponentType } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -21,28 +21,21 @@ import {
 import {
   BarChart3,
   Bell,
-  BookMarked,
-  BookOpen,
+  Briefcase,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   FlaskConical,
-  Gauge,
-  LayoutDashboard,
   LayoutGrid,
   LineChart,
   List,
   Microscope,
   PanelBottom,
   PanelRight,
-  PenLine,
-  Radar,
   RotateCcw,
   Settings,
-  ShieldCheck,
   SquareArrowOutUpRight,
   User,
-  Wallet,
 } from "lucide-react";
 import { AppHelpMenu } from "@/features/help/app-help-menu";
 import { UniverseChip } from "@/features/platform/universe-chip";
@@ -51,10 +44,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useUiStore } from "@/stores/ui-store";
 import { useTradingLayoutStore } from "@/stores/trading-layout-store";
 import { useWorkspaceStore } from "@/stores/workspace-store";
-import { useScreenerNavBadge } from "@/features/screeners/use-screener-nav-badge";
 import { useAsesorAlarmaBadge } from "@/features/research/use-asesor-alarma-badge";
 import {
-  CONFIRM_PATH,
   confirmNavAriaLabel,
   formatConfirmNavBadge,
 } from "@/features/confirm/confirm-nav";
@@ -62,17 +53,14 @@ import {
   ASESOR_LABEL,
   ASESOR_PATH,
   ASESOR_TESIS_HINT,
-  CONFIRMAR_LABEL,
-  DECISION_SPINE_LABEL,
-  DECISION_SPINE_PATH,
+  CARTERA_LABEL,
+  CARTERA_NAV,
   LABORATORIO_LABEL,
-  LIBRO_LABEL,
-  LIBRO_NAV,
+  MERCADO_LABEL,
+  MERCADO_NAV,
   MESA_LABEL,
   MESA_PATH,
-  SEÑALES_LABEL,
-  SEÑALES_PATH,
-  TRADING_NAV_LABEL,
+  OPERATIONAL_CONSOLE_LABEL,
   OPERATIONAL_CONSOLE_PATH,
 } from "@/features/confirm/daily-nav";
 import { useListAutoActivityStore } from "@/stores/list-auto-activity-store";
@@ -268,27 +256,37 @@ function DropdownMenu({
   );
 }
 
-/** Bucle diario (primer nivel). Mesa · Hoy primero (ADR-037). */
-const DAILY_NAV = [
-  { to: MESA_PATH, label: MESA_LABEL, icon: LayoutGrid, end: true },
-  { to: "/trading", label: TRADING_NAV_LABEL, icon: LineChart, end: true },
-] as const;
+/** L1 — cinco conceptos de usuario (ADR-040). */
+const HOY_NAV = {
+  to: MESA_PATH,
+  label: MESA_LABEL,
+  icon: LayoutGrid,
+} as const;
 
-const HERRAMIENTAS_NAV = [
-  { to: "/overview", label: "Overview", icon: LayoutDashboard },
-  { to: "/accounts", label: "Cuentas", icon: Wallet },
-  { to: "/alerts", label: "Alertas", icon: Bell },
-  { to: "/instruments", label: "Instrumentos", icon: BookOpen },
-  { to: DECISION_SPINE_PATH, label: DECISION_SPINE_LABEL, icon: Gauge },
-  { to: OPERATIONAL_CONSOLE_PATH, label: "Consola ops", icon: ShieldCheck },
-  { to: "/decision-journal", label: "Decision Journal", icon: BookMarked },
-] as const;
-
-const LIBRO_MENU: MenuItem[] = LIBRO_NAV.items.map((item) => ({
+const MERCADO_MENU: MenuItem[] = MERCADO_NAV.items.map((item) => ({
   label: item.label,
   href: item.href,
   hint: item.hint,
 }));
+
+const CARTERA_MENU: MenuItem[] = CARTERA_NAV.items.map((item) => ({
+  label: item.label,
+  href: item.href,
+  hint: item.hint,
+}));
+
+/** Configuración / Avanzado (⚙) — no L1 diario. */
+const CONFIG_AVANZADO_MENU: MenuItem[] = [
+  { label: "Overview", href: "/overview", hint: "Resumen de cuenta y atajos" },
+  { label: "Cuentas", href: "/accounts", hint: "Hub de cuentas e operativa" },
+  { label: "Fiscal", href: "/fiscal", hint: "Plusvalías y ejercicio" },
+  { separator: true, label: "sep-adv" },
+  {
+    label: OPERATIONAL_CONSOLE_LABEL,
+    href: OPERATIONAL_CONSOLE_PATH,
+    hint: "Diagnóstico operativo (OE-1, recon, incidentes)",
+  },
+];
 
 const BACKTESTING_MENU: MenuItem[] = [
   {
@@ -328,10 +326,18 @@ export function AppTopBar() {
   const location = useLocation();
   const isBacktestsRoute = location.pathname.startsWith("/backtests");
   const isResearchRoute = location.pathname.startsWith("/research");
-  const isLibroRoute =
+  const isHoyRoute = location.pathname.startsWith("/mesa");
+  const searchParams = new URLSearchParams(location.search);
+  const isCarteraRoute =
     location.pathname.startsWith("/history") ||
-    (location.pathname.startsWith("/mesa") &&
-      new URLSearchParams(location.search).get("focus") === "libro");
+    (isHoyRoute &&
+      (searchParams.get("view") === "posiciones" ||
+        searchParams.get("focus") === "libro"));
+  const isMercadoRoute =
+    isTradingRoute(location.pathname) ||
+    location.pathname.startsWith("/screeners") ||
+    location.pathname.startsWith("/instruments") ||
+    location.pathname.startsWith("/alerts");
   const trading = isTradingRoute(location.pathname);
   const historyNav = useSpaHistoryNav();
 
@@ -343,7 +349,6 @@ export function AppTopBar() {
   const isSaving = useWorkspaceStore((s) => s.isSaving);
 
   const layout = useTradingLayoutStore();
-  const screenerNavBadge = useScreenerNavBadge();
   const asesorAlarmaBadge = useAsesorAlarmaBadge();
   const confirmQueueCount = useSupervisedF3QueueStore((s) => s.items.length);
   const confirmBadge = formatConfirmNavBadge(confirmQueueCount);
@@ -362,6 +367,15 @@ export function AppTopBar() {
     { label: "Cerrar sesión", action: clearSession },
   ];
 
+  const configMenu: MenuItem[] = [
+    ...CONFIG_AVANZADO_MENU,
+    { separator: true, label: "sep-cfg" },
+    {
+      label: "Preferencias…",
+      action: () => openPlatformConfig("general"),
+    },
+  ];
+
   return (
     <header className="flex h-12 shrink-0 items-center gap-1 border-b border-border bg-card/90 px-2">
       <div className="mr-1 flex items-center gap-2 pr-1 sm:mr-2 sm:pr-2">
@@ -371,7 +385,6 @@ export function AppTopBar() {
         </span>
       </div>
 
-      {/* Historial SPA al inicio, antes del grupo diario */}
       <div
         className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background/40 p-0.5"
         role="group"
@@ -414,63 +427,23 @@ export function AppTopBar() {
       <div className="mx-1.5 h-5 w-px shrink-0 bg-border sm:mx-2" aria-hidden />
 
       <nav className="flex items-center gap-0.5" aria-label="Principal">
-        {DAILY_NAV.map(({ to, label, icon: Icon, ...rest }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={"end" in rest ? rest.end : false}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
-                isActive && "bg-accent text-primary",
-              )
-            }
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            <span className="hidden lg:inline">{label}</span>
-          </NavLink>
-        ))}
         <NavLink
-          to={SEÑALES_PATH}
+          to={HOY_NAV.to}
+          end
           className={({ isActive }) =>
             cn(
               "relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
-              isActive && "bg-accent text-primary",
-            )
-          }
-          title={
-            screenerNavBadge > 0
-              ? `${screenerNavBadge} rastreo${screenerNavBadge === 1 ? "" : "s"} en curso`
-              : SEÑALES_LABEL
-          }
-        >
-          <Radar className="h-4 w-4 shrink-0" />
-          <span className="hidden lg:inline">{SEÑALES_LABEL}</span>
-          {screenerNavBadge > 0 && (
-            <span
-              className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
-              aria-label={`${screenerNavBadge} rastreos en curso`}
-            >
-              {screenerNavBadge > 9 ? "9+" : screenerNavBadge}
-            </span>
-          )}
-        </NavLink>
-        <NavLink
-          to={CONFIRM_PATH}
-          className={({ isActive }) =>
-            cn(
-              "relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
-              isActive && "bg-accent text-primary",
+              (isActive || isHoyRoute) && "bg-accent text-primary",
             )
           }
           title={
             confirmQueueCount > 0
               ? `${confirmQueueCount} pendientes de firma`
-              : CONFIRMAR_LABEL
+              : "¿Qué debo hacer hoy?"
           }
         >
-          <PenLine className="h-4 w-4 shrink-0" />
-          <span className="hidden lg:inline">{CONFIRMAR_LABEL}</span>
+          <HOY_NAV.icon className="h-4 w-4 shrink-0" />
+          <span className="hidden lg:inline">{HOY_NAV.label}</span>
           {confirmBadge ? (
             <span
               className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground"
@@ -480,50 +453,25 @@ export function AppTopBar() {
             </span>
           ) : null}
         </NavLink>
+
         <DropdownMenu
-          label={LIBRO_LABEL}
-          icon={BookMarked}
-          items={LIBRO_MENU}
+          label={MERCADO_LABEL}
+          icon={LineChart}
+          items={MERCADO_MENU}
           align="left"
           navStyle
-          active={isLibroRoute}
+          active={isMercadoRoute && !isHoyRoute}
         />
-        <div className="mx-0.5 hidden h-5 w-px bg-border md:block" />
-        {HERRAMIENTAS_NAV.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:bg-accent",
-                isActive && "bg-accent text-primary",
-              )
-            }
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            <span className="hidden lg:inline">{label}</span>
-          </NavLink>
-        ))}
-        <div className="mx-0.5 hidden h-5 w-px bg-border md:block" />
-        <div className="relative">
-          <DropdownMenu
-            label={LABORATORIO_LABEL}
-            icon={FlaskConical}
-            items={BACKTESTING_MENU}
-            align="left"
-            navStyle
-            active={isBacktestsRoute}
-          />
-          {listAutoActive ? (
-            <span
-              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-semibold leading-none text-white"
-              title={listAutoSummary ?? "Lista AUTO en curso"}
-              aria-label={listAutoSummary ?? "Lista AUTO en curso"}
-            >
-              …
-            </span>
-          ) : null}
-        </div>
+
+        <DropdownMenu
+          label={CARTERA_LABEL}
+          icon={Briefcase}
+          items={CARTERA_MENU}
+          align="left"
+          navStyle
+          active={isCarteraRoute}
+        />
+
         <div className="relative">
           <DropdownMenu
             label={ASESOR_LABEL}
@@ -543,6 +491,26 @@ export function AppTopBar() {
             </span>
           ) : null}
         </div>
+
+        <div className="relative">
+          <DropdownMenu
+            label={LABORATORIO_LABEL}
+            icon={FlaskConical}
+            items={BACKTESTING_MENU}
+            align="left"
+            navStyle
+            active={isBacktestsRoute}
+          />
+          {listAutoActive ? (
+            <span
+              className="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-semibold leading-none text-white"
+              title={listAutoSummary ?? "Lista AUTO en curso"}
+              aria-label={listAutoSummary ?? "Lista AUTO en curso"}
+            >
+              …
+            </span>
+          ) : null}
+        </div>
       </nav>
 
       {trading ? (
@@ -554,7 +522,7 @@ export function AppTopBar() {
           <div
             className="flex items-center gap-0.5 rounded-md border border-border/70 bg-background/40 p-0.5"
             role="group"
-            aria-label="Paneles Trading"
+            aria-label="Paneles Mercado"
           >
             <button
               type="button"
@@ -622,6 +590,19 @@ export function AppTopBar() {
       )}
 
       <div className="ml-auto flex items-center gap-1">
+        <NavLink
+          to="/alerts"
+          className={({ isActive }) =>
+            cn(
+              "rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground",
+              isActive && "bg-accent text-primary",
+            )
+          }
+          title="Alertas"
+          aria-label="Alertas"
+        >
+          <Bell className="h-4 w-4" />
+        </NavLink>
         <UniverseChip density="icon" />
         <button
           type="button"
@@ -650,14 +631,12 @@ export function AppTopBar() {
           <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
         </button>
         <AppHelpMenu />
-        <button
-          type="button"
-          onClick={() => openPlatformConfig("general")}
-          className="rounded-md p-1.5 hover:bg-accent"
-          title="Configuración"
-        >
-          <Settings className="h-4 w-4" />
-        </button>
+        <DropdownMenu
+          label="Configuración"
+          icon={Settings}
+          items={configMenu}
+          iconOnly
+        />
         <DropdownMenu label="Sesión" icon={User} items={sessionMenu} iconOnly />
       </div>
     </header>

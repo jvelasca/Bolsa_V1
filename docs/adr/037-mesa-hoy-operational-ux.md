@@ -77,3 +77,18 @@ La home diaria agrupa el resto en **tres niveles de producto** (sesión ~20 s):
 `MesaDailyHeader` (capital/cash duplicado) queda fuera de `/mesa`. `aria-live="assertive"` solo en incidente nuevo / query fail; cola de atención = `polite` + key estable por símbolo.
 
 Suitability, scenario y ruta en Libro son profundidad de sesión (ADR-038 / ADR-039), no un HTTP Mesa nuevo ni un cambio de Confirm.
+
+---
+
+## 8. Amendment 2026-08-27 — V1.20 arquitectura de usuario (ADR-040)
+
+**Supersede parcialmente §5** (nav y strip). El núcleo de §1–§4 y §7 (fuentes, orden canónico, tres niveles) sigue válido; cambia la **presentación**.
+
+- Label de producto de `/mesa` = **Hoy** («Mesa» = nombre interno).
+- Nav L1: **Hoy · Mercado · Cartera · Asesor · Laboratorio** (no Mesa→Trading→Señales→Confirmar→Libro).
+- El strip **Hoy** (`HoyCommandStrip`) **sale** de Trading. Candidatos / atención viven solo en Hoy.
+- `MesaOperationalBar` **no** se monta en el terminal Trading.
+- Decision Spine / Consola ops / Decision Journal / Libro **no** son puertas L1; se alcanzan desde Hoy / Cartera / Config → Avanzado.
+- Vistas Hoy vía `?view=` (resumen · posiciones · oportunidades · decisiones · journal · confirmar). Compat: `?focus=spine` → decisiones; `?focus=libro` → posiciones.
+
+Detalle: [ADR-040](./040-user-information-architecture.md).

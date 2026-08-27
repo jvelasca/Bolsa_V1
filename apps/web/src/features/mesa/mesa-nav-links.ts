@@ -1,6 +1,8 @@
 /**
- * Deep-links Mesa → Journal / Confirm (ADR-037 P4).
+ * Deep-links Hoy → Journal / Confirm / Decisiones / Cartera (ADR-037 + ADR-040).
  */
+
+import { hoyViewHref, HOY_VIEW } from "@/features/confirm/daily-nav";
 
 export function mesaJournalTesisHref(
   instrumentId: string,
@@ -23,13 +25,25 @@ export function mesaJournalEvolutionHref(instrumentId: string): string {
 }
 
 export function mesaOperationsHref(): string {
-  return "/mesa?focus=libro";
+  return hoyViewHref(HOY_VIEW.posiciones);
 }
 
 export function mesaSpineHref(): string {
-  return "/mesa?focus=spine";
+  return hoyViewHref(HOY_VIEW.decisiones);
 }
 
 export function mesaOperationalConsoleHref(): string {
   return "/operational-console";
+}
+
+export function mesaOportunidadesHref(): string {
+  return hoyViewHref(HOY_VIEW.oportunidades);
+}
+
+export function mesaConfirmarHref(): string {
+  return hoyViewHref(HOY_VIEW.confirmar);
+}
+
+export function mesaJournalHref(): string {
+  return hoyViewHref(HOY_VIEW.journal);
 }

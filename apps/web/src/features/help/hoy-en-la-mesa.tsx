@@ -20,16 +20,17 @@ export function HoyEnLaMesaBlock() {
       className="rounded-md border border-border bg-muted/25 px-3 py-2.5"
       data-testid="hoy-en-la-mesa"
     >
-      <h3 className="text-sm font-semibold text-foreground">Hoy en la mesa</h3>
+      <h3 className="text-sm font-semibold text-foreground">Hoy</h3>
       <ol className="mt-1.5 list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
         <li>
-          <strong className="text-foreground">Abrir la mesa</strong> en{" "}
-          <RouteLink to="/mesa">Mesa · Hoy</RouteLink> — briefing del día
-          (incidentes, atención, posiciones, candidatos).
+          <strong className="text-foreground">Abrir Hoy</strong> (
+          <RouteLink to="/mesa">Hoy</RouteLink>) — qué ocurre, qué debo hacer,
+          oportunidades.
         </li>
         <li>
           <strong className="text-foreground">Ver valor</strong> en{" "}
-          <RouteLink to="/trading">Trading</RouteLink> (gráfico + Operativa).
+          <RouteLink to="/trading">Mercado</RouteLink> (terminal: gráfico +
+          Operativa).
         </li>
         <li>
           <strong className="text-foreground">Leer recomendación</strong> /{" "}
@@ -37,8 +38,9 @@ export function HoyEnLaMesaBlock() {
         </li>
         <li>
           <strong className="text-foreground">Firmar</strong> en{" "}
-          <RouteLink to="/confirm">Confirmar</RouteLink> (página o panel desde
-          Trading) — SEMI: la app propone, tú firmas; nunca sola.
+          <RouteLink to="/mesa?view=confirmar">Hoy → Confirmar</RouteLink> o{" "}
+          <RouteLink to="/confirm">/confirm</RouteLink> — SEMI: la app propone,
+          tú firmas; nunca sola.
         </li>
       </ol>
       <p className="mt-2 text-xs text-muted-foreground">
@@ -79,9 +81,9 @@ export function HoyEnLaMesaBlock() {
         valida, tú firmas en SEMI (no es auto-exit; thin «Salida» y Lab Señales
         no son este puerto). Tras un cierre firmado, el plan se reduce o cierra.{" "}
         <strong className="text-foreground">Operaciones</strong> (
-        <RouteLink to="/operations">Libro · Operaciones</RouteLink>) abre por
-        posiciones: R/stop/T1/T2, advisory Salida, CTAs Revisar/Reducir/Salir
-        encolan Confirm (no ejecutan).{" "}
+        <RouteLink to="/mesa?view=posiciones">Cartera · Posiciones</RouteLink>)
+        abre por posiciones: R/stop/T1/T2, advisory Salida, CTAs
+        Revisar/Reducir/Salir encolan Confirm (no ejecutan).{" "}
         <strong className="text-foreground">Proteger</strong> encola stop amend
         advisory cuando ExitPlan o protectPlan lo sugieren. Barra operativa
         global (Trading + Operaciones): patrimonio, P&amp;L, cola Confirm,

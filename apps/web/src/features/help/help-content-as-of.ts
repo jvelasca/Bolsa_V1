@@ -80,6 +80,9 @@
  * exits protectivos ALLOW; sin auto-heal.
  * **2026-08-26p** — OR-6: readiness PAPER_READY / PAPER_DEGRADED /
  * LIVE_EXPERIMENTAL / LIVE_BLOCKED (sin %); CTA Ejecutar en PAPER|LIVE.
+ * **2026-08-27** — V1.20 ADR-040: nav L1 Hoy·Mercado·Cartera·Asesor·Laboratorio;
+ * strip Hoy y MesaOperationalBar fuera del terminal Mercado; Spine/Consola/
+ * Journal/Libro no son puertas L1; OpportunityScore aparcado.
  *
  * Auditoría cierre: `docs/engineering/stage-audit-lab-dia-d-mandate-2026-08-02.md`
  *
@@ -120,4 +123,4 @@
  * @see docs/engineering/session-handoff-2026-08-04-operativa.md
  * @see docs/engineering/lists-universes-design-2026-07-30.md
  */
-export const HELP_CONTENT_AS_OF = "2026-08-26" as const;
+export const HELP_CONTENT_AS_OF = "2026-08-27" as const;

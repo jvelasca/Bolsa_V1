@@ -28,9 +28,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/features/charts/chart-utils";
 import { cn } from "@/lib/utils";
 import { mesaJournalTesisHref } from "@/features/mesa/mesa-nav-links";
+import { OpportunityDrawer } from "@/features/mesa/opportunity-drawer";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { SEÑALES_PATH } from "@/features/confirm/daily-nav";
 import { MesaWhatIfPanel } from "@/features/mesa/mesa-what-if-panel";
@@ -130,6 +132,7 @@ function OpportunityCard({
   equity,
   cash,
   sectorByInstrumentId,
+  onOpenDrawer,
 }: {
   rankRow: OpportunityRankRowV1;
   entriesBlocked: boolean;
@@ -138,6 +141,7 @@ function OpportunityCard({
   equity: number | null;
   cash: number | null;
   sectorByInstrumentId?: Record<string, string | null | undefined>;
+  onOpenDrawer: (row: OpportunityRankRowV1) => void;
 }) {
   const row = rankRow.candidate;
   const study = row.study;
@@ -245,6 +249,16 @@ function OpportunityCard({
         </p>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 text-[11px]"
+          onClick={() => onOpenDrawer(rankRow)}
+          data-testid={`mesa-candidate-view-${row.symbol}`}
+        >
+          Ver oportunidad
+        </Button>
         <CandidateNextAction row={row} entriesBlocked={entriesBlocked} />
         <MesaWhatIfPanel
           row={row}
@@ -358,6 +372,7 @@ export function MesaCandidatesPanel({
 }) {
   const [funnelOpen, setFunnelOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [drawerRow, setDrawerRow] = useState<OpportunityRankRowV1 | null>(null);
 
   const funnel = ranking?.funnel;
   const top = ranking?.top ?? [];
@@ -505,6 +520,7 @@ export function MesaCandidatesPanel({
                       equity={equity}
                       cash={cash}
                       sectorByInstrumentId={sectorByInstrumentId}
+                      onOpenDrawer={setDrawerRow}
                     />
                   ))}
                 </div>
@@ -525,6 +541,16 @@ export function MesaCandidatesPanel({
           </>
         )}
       </CardContent>
+      <OpportunityDrawer
+        open={drawerRow != null}
+        onClose={() => setDrawerRow(null)}
+        rankRow={drawerRow}
+        portfolioRisk={portfolioRisk}
+        positions={positions}
+        equity={equity}
+        cash={cash}
+        sectorByInstrumentId={sectorByInstrumentId}
+      />
     </Card>
   );
 }

@@ -15,8 +15,7 @@ import { WatchlistPanel } from "@/features/trading/lists-tab/watchlist-panel";
 import { ChartsZone } from "@/features/trading/charts-zone";
 import { OperationsPanel } from "@/features/trading/operations-panel";
 import { TradingOperativaPanel } from "@/features/trading/trading-operativa-panel";
-import { HoyCommandStrip } from "@/features/trading/hoy-command-strip";
-import { MesaOperationalBar } from "@/features/operations/mesa-operational-bar";
+import { TradingHealthStrip } from "@/features/trading/trading-health-strip";
 import { useChartListMembershipSync } from "@/features/trading/lists-tab/use-chart-list-membership-sync";
 import { useChartVisualizationSync } from "@/features/trading/lists-tab/use-chart-visualization-sync";
 
@@ -29,11 +28,12 @@ function pxToPct(px: number, total: number) {
 }
 
 /**
- * Mesa TRADING (ADR-019):
+ * Terminal Mercado / TRADING (ADR-019 + ADR-040):
  * columna izq. = Watchlist | Gráfico + Operaciones;
  * columna der. = Operativa a altura completa (hasta TradingStatusBar).
- * Verificar D→hoy vive en LAB / Backtesting.
+ * Sin HoyCommandStrip ni MesaOperationalBar — candidatos viven en Hoy.
  *
+ * @see docs/adr/040-user-information-architecture.md
  * @see docs/engineering/trading-operativa-panel-2026-08-04.md
  */
 export function TradingLayout({ children }: { children: ReactNode }) {
@@ -159,8 +159,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
       ref={containerRef}
       className="flex min-h-0 flex-1 flex-col overflow-hidden"
     >
-      <HoyCommandStrip />
-      <MesaOperationalBar className="mx-2 mb-1 shrink-0" />
+      <TradingHealthStrip />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
           ref={leftColumnRef}

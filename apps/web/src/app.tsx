@@ -88,15 +88,17 @@ const router = createBrowserRouter([
 
       {
         path: "operations",
-        element: <Navigate to="/mesa?focus=libro" replace />,
+        element: <Navigate to="/mesa?view=posiciones" replace />,
       },
 
       { path: "operational-console", element: <OperationalConsolePage /> },
 
       {
         path: "decision-board",
-        element: <Navigate to="/mesa?focus=spine" replace />,
+        element: <Navigate to="/mesa?view=decisiones" replace />,
       },
+
+      { path: "hoy", element: <Navigate to="/mesa" replace /> },
 
       { path: "decision-journal", element: <DecisionJournalPage /> },
 

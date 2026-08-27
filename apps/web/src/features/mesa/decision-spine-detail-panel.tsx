@@ -1,6 +1,6 @@
 /**
- * Detalle read-only del Decision Spine (buckets + SEMI_F3 + sessions).
- * Extraído de Decision Board para absorber en Mesa (V1.19).
+ * Detalle read-only de Decisiones (buckets + SEMI_F3 + sessions).
+ * Internamente = Decision Spine; label de usuario = Decisiones (ADR-040).
  */
 
 import {
@@ -195,7 +195,7 @@ export function DecisionSpineDetailPanel({
   return (
     <div className="space-y-4" data-testid="decision-spine-detail">
       <div>
-        <h2 className="text-base font-semibold">Detalle del Decision Spine</h2>
+        <h2 className="text-base font-semibold">Decisiones</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">
           Solo lectura — buckets, SEMI_F3 y sesiones. Confirm sigue siendo la
           firma.

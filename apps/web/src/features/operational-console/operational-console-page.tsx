@@ -71,7 +71,7 @@ export function OperationalConsolePage() {
           <p className="mt-1 text-xs text-muted-foreground">
             Posiciones y CTAs de desriesgo siguen en{" "}
             <Link
-              to="/mesa?focus=libro"
+              to="/mesa?view=posiciones"
               className="text-primary hover:underline"
             >
               Libro · Operaciones

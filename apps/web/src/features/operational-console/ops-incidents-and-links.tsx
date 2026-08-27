@@ -67,10 +67,10 @@ export function OpsIncidentsSection({
                     Resolver
                   </Button>
                   <Link
-                    to="/mesa?focus=libro"
+                    to="/mesa?view=posiciones"
                     className="inline-flex items-center text-xs text-primary hover:underline"
                   >
-                    Ir a Libro (Mesa)
+                    Ir a Cartera · Posiciones
                   </Link>
                 </div>
               </li>
@@ -89,26 +89,26 @@ export function OpsQuickLinksSection({
 }) {
   const tiles = [
     {
-      to: "/mesa?focus=spine",
-      label: "Decision Spine",
+      to: "/mesa?view=decisiones",
+      label: "Decisiones",
       hint: "Oportunidades y gates (solo lectura)",
       testId: "ops-link-board",
     },
     {
-      to: "/decision-journal",
-      label: "Decision Journal",
+      to: "/mesa?view=journal",
+      label: "Journal",
       hint: "Tesis · Evolución · Historial técnico",
       testId: "ops-link-journal",
     },
     {
-      to: "/confirm",
+      to: "/mesa?view=confirmar",
       label: "Confirmar",
       hint: `Cola SEMI (${pendingConfirm} pendientes)`,
       testId: "ops-link-confirm",
     },
     {
-      to: "/mesa?focus=libro",
-      label: "Libro · Operaciones",
+      to: "/mesa?view=posiciones",
+      label: "Cartera · Posiciones",
       hint: "Posiciones y CTAs de desriesgo",
       testId: "ops-link-operations",
     },

@@ -217,7 +217,7 @@ export function OpsReconSection({
           Live recon (LR-1) se evalúa en venue Live; consola no inventa estado.
         </p>
         <Link
-          to="/mesa?focus=libro"
+          to="/mesa?view=posiciones"
           className="text-xs font-medium text-primary hover:underline"
         >
           Libro · Operaciones (posiciones)
