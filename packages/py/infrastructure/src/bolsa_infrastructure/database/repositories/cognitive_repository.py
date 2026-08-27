@@ -100,6 +100,44 @@ class SqlAlchemyCognitiveRepository:
             payload=dict(row.payload) if row.payload else None,
         )
 
+    async def get_decision_session_by_decision_id(
+        self,
+        decision_id: str,
+        *,
+        account_id: str | None = None,
+        kind: str | None = "propose",
+    ) -> DecisionSessionRecord | None:
+        """V1.18 L2a — sesión de origen por decisionId (más reciente)."""
+        did = decision_id.strip() if decision_id else ""
+        if not did:
+            return None
+        stmt = (
+            select(DecisionSessionRow)
+            .where(DecisionSessionRow.decision_id == did)
+            .order_by(DecisionSessionRow.created_at.desc())
+            .limit(1)
+        )
+        if account_id:
+            stmt = stmt.where(DecisionSessionRow.account_id == account_id)
+        if kind:
+            stmt = stmt.where(DecisionSessionRow.kind == kind)
+        result = await self._session.execute(stmt)
+        row = result.scalars().first()
+        if row is None:
+            return None
+        return DecisionSessionRecord(
+            id=row.id,
+            kind=row.kind,
+            status=row.status,
+            instrument_id=row.instrument_id,
+            created_at=_iso(row.created_at),
+            account_id=row.account_id,
+            symbol=row.symbol,
+            recommendation_id=row.recommendation_id,
+            decision_id=row.decision_id,
+            payload=dict(row.payload) if row.payload else None,
+        )
+
     async def list_decision_sessions(
         self,
         *,

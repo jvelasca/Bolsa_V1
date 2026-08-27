@@ -13,6 +13,7 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_current_stop,
     position_state_from_dict,
 )
+from bolsa_application.origin_decision_package import preserve_origin_decision_package
 from bolsa_application.persist_position_from_exit import (
     row_position_id,
     row_position_state,
@@ -87,8 +88,9 @@ class PersistPositionFromProtect:
         if updated is None:
             return None
 
+        next_blob = preserve_origin_decision_package(blob, dict(updated.to_dict()))
         return await self._store.update_state(
             position_id=pid,
             status=updated.status,
-            position_state=updated.to_dict(),
+            position_state=next_blob,
         )

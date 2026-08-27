@@ -84,6 +84,83 @@ async def test_persist_triggered_inserts_row() -> None:
     assert store.inserts[0]["open_transaction_id"] == "tx-1"
     assert store.inserts[0]["status"] == "OPEN"
     assert store.inserts[0]["position_state"]["currentStop"] == 95.0
+    assert "originDecisionPackage" not in store.inserts[0]["position_state"]
+
+
+class _FakeSessions:
+    def __init__(self, payload: dict[str, Any] | None) -> None:
+        self.payload = payload
+        self.calls: list[str] = []
+
+    async def get_decision_session_by_decision_id(
+        self,
+        decision_id: str,
+        *,
+        account_id: str | None = None,
+        kind: str | None = "propose",
+    ) -> Any | None:
+        self.calls.append(decision_id)
+        if self.payload is None:
+            return None
+        return type("S", (), {"payload": self.payload})()
+
+
+@pytest.mark.asyncio
+async def test_persist_freezes_origin_package_when_session_matches() -> None:
+    store = _FakeStore()
+    sessions = _FakeSessions(
+        {
+            "runtime": {
+                "decisionPackage": {
+                    "instrumentId": "inst-1",
+                    "action": "recommend_long",
+                    "overallConfidence": 8.0,
+                }
+            }
+        }
+    )
+    uc = PersistPositionFromFill(store, sessions=sessions)
+    row = await uc.persist(
+        PersistPositionFromFillInput(
+            account_id="acc-1",
+            trade_plan=_triggered_plan(),
+            fill_price=100.0,
+            fill_quantity=10.0,
+            filled_at="2026-08-25T15:00:00Z",
+            open_transaction_id="tx-origin",
+            ledger_position_id="led-1",
+        )
+    )
+    assert row is not None
+    origin = store.inserts[0]["position_state"]["originDecisionPackage"]
+    assert origin["decisionId"] == "dec-1"
+    assert origin["entry"] == 100.0
+    assert origin["strength"] == 8.0
+    assert sessions.calls == ["dec-1"]
+
+
+@pytest.mark.asyncio
+async def test_persist_manual_never_looks_up_package() -> None:
+    store = _FakeStore()
+    sessions = _FakeSessions(
+        {"runtime": {"decisionPackage": {"instrumentId": "inst-1", "action": "recommend_long"}}}
+    )
+    uc = PersistPositionFromFill(store, sessions=sessions)
+    row = await uc.persist(
+        PersistPositionFromFillInput(
+            account_id="acc-1",
+            trade_plan=_triggered_plan(decisionId="manual-tx-1", status="HUMAN_MANUAL"),
+            fill_price=100.0,
+            fill_quantity=10.0,
+            filled_at=None,
+            open_transaction_id="tx-manual",
+            ledger_position_id=None,
+            override_reason="human_manual",
+        )
+    )
+    assert row is not None
+    assert "originDecisionPackage" not in store.inserts[0]["position_state"]
+    assert sessions.calls == []
 
 
 @pytest.mark.asyncio

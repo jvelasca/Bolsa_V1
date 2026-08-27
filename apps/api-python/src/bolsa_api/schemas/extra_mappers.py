@@ -119,6 +119,7 @@ def attach_operational_positions(
 ) -> PortfolioSummaryDto:
     """P1 — adjunta snapshot de autoridad al holding, por instrumento."""
     from bolsa_application.evaluate_exit_plan import advisory_exit_plan
+    from bolsa_application.origin_decision_package import origin_thesis_from_position_state
 
     by_instrument: dict[str, Any] = {}
     for rec in records:
@@ -130,7 +131,8 @@ def attach_operational_positions(
         if rec is None:
             continue
         state = getattr(rec, "position_state", None) or {}
-        adv = advisory_exit_plan(state if isinstance(state, dict) else None, mark_price=pos.last_price)
+        state_dict = state if isinstance(state, dict) else {}
+        adv = advisory_exit_plan(state_dict or None, mark_price=pos.last_price)
         exit_plan = None
         if isinstance(adv, dict):
             exit_plan = OperationalExitPlanDto(
@@ -141,19 +143,20 @@ def attach_operational_positions(
                 else None,
             )
         pos.operational = OperationalPositionDto(
-            status=str(state.get("status") or getattr(rec, "status", "") or ""),
-            direction=str(state.get("direction") or ""),
-            current_stop=_finite_or_none(state.get("currentStop")),
-            target1=_finite_or_none(state.get("target1")),
-            target2=_finite_or_none(state.get("target2")),
+            status=str(state_dict.get("status") or getattr(rec, "status", "") or ""),
+            direction=str(state_dict.get("direction") or ""),
+            current_stop=_finite_or_none(state_dict.get("currentStop")),
+            target1=_finite_or_none(state_dict.get("target1")),
+            target2=_finite_or_none(state_dict.get("target2")),
             trade_plan_id=str(
-                state.get("tradePlanId") or getattr(rec, "trade_plan_id", "") or ""
+                state_dict.get("tradePlanId") or getattr(rec, "trade_plan_id", "") or ""
             ),
-            unrealized_r=_finite_or_none(state.get("unrealizedR")),
-            planned_entry=_finite_or_none(state.get("plannedEntry")),
-            actual_entry=_finite_or_none(state.get("actualEntry")),
-            initial_stop=_finite_or_none(state.get("initialStop")),
+            unrealized_r=_finite_or_none(state_dict.get("unrealizedR")),
+            planned_entry=_finite_or_none(state_dict.get("plannedEntry")),
+            actual_entry=_finite_or_none(state_dict.get("actualEntry")),
+            initial_stop=_finite_or_none(state_dict.get("initialStop")),
             exit_plan=exit_plan,
+            origin_thesis=origin_thesis_from_position_state(state_dict),
         )
     return dto
 

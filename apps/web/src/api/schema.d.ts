@@ -7397,6 +7397,13 @@ export interface components {
             actualEntry?: number | null;
             /** Initialstop */
             initialStop?: number | null;
+            /**
+             * Originthesis
+             * @description V1.18 L2a — tesis de nacimiento congelada al fill.
+             */
+            originThesis?: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * OpinionTelemetryDto

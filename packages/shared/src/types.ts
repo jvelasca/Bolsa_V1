@@ -253,6 +253,24 @@ export interface OperationalExitPlanDto {
   suggestedStop?: number | null;
 }
 
+/** V1.18 L2a — tesis de nacimiento congelada al fill. */
+export interface OriginThesisSnapshotDto {
+  decisionId: string;
+  instrumentId?: string | null;
+  status?: string | null;
+  opinion?: string | null;
+  tradePlanStatus?: string | null;
+  hasOperationalPlan?: boolean;
+  strength?: number | null;
+  entry?: number | null;
+  stop?: number | null;
+  target1?: number | null;
+  target2?: number | null;
+  expectedRR?: number | null;
+  riskAmount?: number | null;
+  direction?: "long" | "short" | string | null;
+}
+
 export interface OperationalPositionDto {
   status: string;
   direction: string;
@@ -265,6 +283,7 @@ export interface OperationalPositionDto {
   actualEntry?: number | null;
   initialStop?: number | null;
   exitPlan?: OperationalExitPlanDto | null;
+  originThesis?: OriginThesisSnapshotDto | null;
 }
 
 export interface PositionDto {

@@ -208,4 +208,36 @@ describe("investment-position-aggregate", () => {
     expect(agg.thesisSnapshot?.entry).toBe(180);
     expect(agg.currentPlan.target1).toBe(220);
   });
+
+  it("uses operational.originThesis snapshot when studies disagree", () => {
+    const wrong = study({ decisionId: "D-LATER", entry: 999 });
+    const agg = buildInvestmentPositionAggregate({
+      position: {
+        symbol: "AAPL",
+        instrumentId: "i1",
+        quantity: 10,
+        avgCost: 182,
+        lastPrice: 194,
+        operational: {
+          tradePlanId: "D1",
+          direction: "long",
+          currentStop: 178,
+          originThesis: {
+            decisionId: "D1",
+            instrumentId: "i1",
+            entry: 180,
+            stop: 170,
+            riskAmount: 1000,
+            strength: 7,
+            hasOperationalPlan: true,
+            direction: "long",
+          },
+        },
+      },
+      study: wrong,
+    });
+    expect(agg.lineage.packageAvailable).toBe(true);
+    expect(agg.thesisSnapshot?.entry).toBe(180);
+    expect(agg.thesisSnapshot?.strength).toBe(7);
+  });
 });

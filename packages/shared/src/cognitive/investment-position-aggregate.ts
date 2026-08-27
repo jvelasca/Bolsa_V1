@@ -104,6 +104,23 @@ export type BuildInvestmentPositionAggregateInput = {
       exitPlan?: {
         suggestedAction?: ExitSuggestedActionV1 | string | null;
       } | null;
+      /** V1.18 L2a — snapshot write-once al fill. */
+      originThesis?: {
+        decisionId?: string | null;
+        instrumentId?: string | null;
+        status?: string | null;
+        opinion?: string | null;
+        tradePlanStatus?: string | null;
+        hasOperationalPlan?: boolean | null;
+        strength?: number | null;
+        entry?: number | null;
+        stop?: number | null;
+        target1?: number | null;
+        target2?: number | null;
+        expectedRR?: number | null;
+        riskAmount?: number | null;
+        direction?: TradePlanDirectionV1 | string | null;
+      } | null;
     } | null;
   };
   /**
@@ -134,7 +151,36 @@ export function buildInvestmentPositionAggregate(
 ): InvestmentPositionAggregateV1 {
   const { position, study, protectPlan } = input;
   const op = position.operational;
-  const originStudyCandidate = input.originStudy ?? study ?? null;
+  const snapshotThesis = op?.originThesis ?? null;
+  const originStudyCandidate =
+    input.originStudy ??
+    (snapshotThesis?.decisionId
+      ? ({
+          decisionId: snapshotThesis.decisionId,
+          instrumentId: snapshotThesis.instrumentId ?? position.instrumentId,
+          status:
+            (snapshotThesis.status as DecisionJournalStudyViewV1["status"]) ??
+            "active",
+          opinion:
+            (snapshotThesis.opinion as DecisionJournalStudyViewV1["opinion"]) ??
+            null,
+          tradePlanStatus:
+            (snapshotThesis.tradePlanStatus as DecisionJournalStudyViewV1["tradePlanStatus"]) ??
+            null,
+          hasOperationalPlan: snapshotThesis.hasOperationalPlan ?? true,
+          strength: snapshotThesis.strength ?? null,
+          entry: snapshotThesis.entry ?? null,
+          stop: snapshotThesis.stop ?? null,
+          target1: snapshotThesis.target1 ?? null,
+          target2: snapshotThesis.target2 ?? null,
+          expectedRR: snapshotThesis.expectedRR ?? null,
+          riskAmount: snapshotThesis.riskAmount ?? null,
+          direction:
+            (snapshotThesis.direction as TradePlanDirectionV1 | null) ?? null,
+        } as DecisionJournalStudyViewV1)
+      : null) ??
+    study ??
+    null;
 
   const lineage = resolvePositionOriginLineage({
     originDecisionId: input.originDecisionId,

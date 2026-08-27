@@ -38,6 +38,8 @@ class OperationalPositionDto(BaseModel):
     actual_entry: float | None = Field(default=None, alias="actualEntry")
     initial_stop: float | None = Field(default=None, alias="initialStop")
     exit_plan: OperationalExitPlanDto | None = Field(default=None, alias="exitPlan")
+    # V1.18 L2a — tesis de nacimiento congelada al fill (≠ study evolución).
+    origin_thesis: dict[str, Any] | None = Field(default=None, alias="originThesis")
 
 
 class PositionDto(BaseModel):

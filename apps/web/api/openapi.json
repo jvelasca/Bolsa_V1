@@ -11250,6 +11250,17 @@
       "OperationalPositionDto": {
         "description": "P1 — snapshot de autoridad post-fill (no es el holding ledger).",
         "properties": {
+          "actualEntry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualentry"
+          },
           "currentStop": {
             "anyOf": [
               {
@@ -11274,6 +11285,41 @@
                 "type": "null"
               }
             ]
+          },
+          "initialStop": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initialstop"
+          },
+          "originThesis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "V1.18 L2a — tesis de nacimiento congelada al fill.",
+            "title": "Originthesis"
+          },
+          "plannedEntry": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plannedentry"
           },
           "status": {
             "title": "Status",

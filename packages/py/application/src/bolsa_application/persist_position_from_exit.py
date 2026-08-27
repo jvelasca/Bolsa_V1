@@ -13,6 +13,7 @@ from bolsa_analytics.cognitive.position_state import (
     apply_position_reduce,
     position_state_from_dict,
 )
+from bolsa_application.origin_decision_package import preserve_origin_decision_package
 
 LAST_EXIT_TRANSACTION_KEY = "_lastExitTransactionId"
 
@@ -109,6 +110,7 @@ class PersistPositionFromExit:
             return None
         next_blob = dict(updated.to_dict())
         next_blob[LAST_EXIT_TRANSACTION_KEY] = tx_id
+        next_blob = preserve_origin_decision_package(blob, next_blob)
         return await self._store.update_state(
             position_id=pid,
             status=updated.status,
