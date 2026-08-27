@@ -42,12 +42,13 @@ Ciclo **V1.17.1 Hardening de honestidad** **CERRADO** (+ refinamiento Mesa corto
 
 ## 2. Batería (local, 2026-08-27)
 
-| Gate                       | Resultado               |
-| -------------------------- | ----------------------- |
-| `pnpm test:decision-spine` | **495** passed          |
-| Shared DoD refine          | **49** passed (5 files) |
-| Web `mesa-hoy`             | **13** passed           |
-| Pytest H4/H5 dirigido      | **36+** passed          |
+| Gate                       | Resultado                                                              |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `pnpm test:decision-spine` | **495** passed                                                         |
+| Shared DoD refine          | **49** passed (5 files)                                                |
+| Web `mesa-hoy`             | **13** passed                                                          |
+| Pytest H4/H5 dirigido      | **36+** passed                                                         |
+| Release tag CI             | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33056937491) |
 
 ```bash
 pnpm --filter @bolsa/shared build

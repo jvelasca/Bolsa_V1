@@ -1,7 +1,7 @@
 # RELEVO — tag v1.17.1-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v1171.md`](./audit-pack-estado-global-2026-08-27-v1171.md) · [`traspaso-relevo-tag-v1-17-beta-2026-08-27.md`](./traspaso-relevo-tag-v1-17-beta-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.17.1-beta` → `e0ae633` (hardening + refino Mesa).
+> **Estado:** **PUBLICACIÓN** — tag `v1.17.1-beta` → feature `e0ae633` + CI fix `9c98fb8`. **Release tag CI:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33056937491).
 > **Arranque chat nuevo / auditor:** pack v1171 + plan-v1171 + ADR-038/039 + `CURRENT_SYSTEM.md` + este relevo.
 
 ---
@@ -23,7 +23,7 @@
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v1171.md`](./audit-pack-estado-global-2026-08-27-v1171.md) |
 | Spine        | `pnpm test:decision-spine` **495**                                                               |
 | Plan         | [`plan-v1171-hardening-2026-08-27.md`](./plan-v1171-hardening-2026-08-27.md)                     |
-| CI tag       | `release-tag-ci.yml` (sin path-filter)                                                           |
+| CI tag       | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33056937491)                           |
 
 ### Owner: publicar
 
