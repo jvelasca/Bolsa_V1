@@ -1,7 +1,7 @@
 # RELEVO — tag v1.20-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v120.md`](./audit-pack-estado-global-2026-08-27-v120.md) · [`traspaso-relevo-tag-v1-19-beta-2026-08-27.md`](./traspaso-relevo-tag-v1-19-beta-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.20-beta` → tip stamp (feature `a28e4a93`). **Release tag CI:** pin URL tras GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.20-beta` → tip `cb849514` (feature `a28e4a93`). **Release tag CI:** pin URL tras GREEN.
 > **Arranque chat nuevo / auditor:** pack v120 + ADR-040 + ADR-037 §8 + `CURRENT_SYSTEM.md` + este relevo.
 
 ---
@@ -18,7 +18,7 @@
 
 | Pieza        | Valor                                                                                          |
 | ------------ | ---------------------------------------------------------------------------------------------- |
-| Tag          | `v1.20-beta` → tip stamp (feature `a28e4a93`)                                                  |
+| Tag          | `v1.20-beta` → `cb849514` (feature `a28e4a93`)                                                 |
 | Previo       | `v1.19-beta` → `dc9327d`                                                                       |
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v120.md`](./audit-pack-estado-global-2026-08-27-v120.md) |
 | Spine        | `pnpm test:decision-spine` **497**                                                             |

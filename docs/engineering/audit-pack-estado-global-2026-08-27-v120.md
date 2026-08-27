@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.20 (Arquitectura de usuario / consolidación UX)
 
-> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.20-beta` → tip stamp** (feature `a28e4a93`). Partida **`v1.19-beta` → `dc9327d`**.
+> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.20-beta` → `cb849514`** (feature `a28e4a93`). Partida **`v1.19-beta` → `dc9327d`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-040](../adr/040-user-information-architecture.md) · ADR-037 §8 · pack previo [`audit-pack-estado-global-2026-08-27-v119.md`](./audit-pack-estado-global-2026-08-27-v119.md).
 > **Para:** auditoría cruzada post-v1.20 · Release tag CI (pin tras GREEN).
 
