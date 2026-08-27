@@ -18,7 +18,7 @@
 
 | Pieza        | Valor                                                                                              |
 | ------------ | -------------------------------------------------------------------------------------------------- |
-| Tag          | `v1.19-beta` → _(tip feature al commit)_                                                           |
+| Tag          | `v1.19-beta` → `c30594e`                                                                           |
 | Previo       | `v1.18-beta` → `4d1b2e6`                                                                           |
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v119.md`](./audit-pack-estado-global-2026-08-27-v119.md)     |
 | Spine        | `pnpm test:decision-spine` **497**                                                                 |
