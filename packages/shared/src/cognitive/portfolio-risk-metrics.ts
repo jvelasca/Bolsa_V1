@@ -88,11 +88,31 @@ export function sumPortfolioOpenRiskR(
   return any ? round2(sum) : null;
 }
 
-/** Stub — stress risk (correlación / escenario) pendiente de dominio completo. */
+/**
+ * Kind honesto de `portfolioStressRiskR` (MVP).
+ * No es VaR, ni stress correlacionado, ni permiso de ejecución.
+ */
+export const PORTFOLIO_STRESS_RISK_KIND = "concurrent_stops_v0" as const;
+
+/**
+ * Cota concurrente de stops (`concurrent_stops_v0`): suma de
+ * `computePositionOpenRiskR` solo con cobertura completa (toda posición
+ * con qty>0 tiene openRiskR no null). Vacío → 0; cobertura parcial → null.
+ * No inventa correlación ni VaR.
+ */
 export function sumPortfolioStressRiskR(
-  _positions: ReadonlyArray<PortfolioPositionRiskInput>,
+  positions: ReadonlyArray<PortfolioPositionRiskInput>,
 ): number | null {
-  return null;
+  const open = positions.filter((p) => p.quantity > 0);
+  if (open.length === 0) return 0;
+
+  let sum = 0;
+  for (const p of open) {
+    const r = computePositionOpenRiskR(p);
+    if (r == null) return null;
+    sum += r;
+  }
+  return round2(sum);
 }
 
 /** Límite de riesgo cartera en R — desde perfil/mandato, no hardcoded en UI. */

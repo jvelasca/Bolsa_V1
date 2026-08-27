@@ -12,7 +12,7 @@ V1.19 entregó ranking heurístico y what-if aditivo. AUDITORIA 1 exige separar 
 
 - `portfolioPnLR` — P&L no realizado en R (suma `unrealizedR`).
 - `portfolioOpenRiskR` — R en riesgo si stops actuales se ejecutan.
-- `portfolioStressRiskR` — stub (correlación/stress futuro).
+- `portfolioStressRiskR` — cota concurrente stops (`concurrent_stops_v0`); stub de correlación/VaR retirado.
 - `portfolioRiskLimitR` — desde perfil/mandato, no hardcoded en UI.
 
 ### Operational Priority (Fase B)
@@ -47,6 +47,6 @@ Inbox único: `MARKET | DECISION | POSITION | RISK | SYSTEM` sobre alertas exist
 
 ## Pending
 
-- Correlación/stress en fase separada vs stub (`portfolioStressRiskR`)
+- Correlación / VaR / stress de régimen (fase posterior) — MVP actual = `concurrent_stops_v0` (suma openRiskR con cobertura completa; ≠ VaR, ≠ correlación). Stress **no** gatea scenario verdict, Priority, Confirm ni AUTO.
 - Endpoint read-only backend para scenario (opcional)
 - Opportunity Engine / best next R

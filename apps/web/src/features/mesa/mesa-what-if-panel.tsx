@@ -126,6 +126,26 @@ export function MesaWhatIfPanel({
             ? `${scenario.after.openRiskR.toFixed(2)}R`
             : "—"}
         </dd>
+        <dt
+          className="text-muted-foreground"
+          title="cota concurrente stops; sin correlación"
+        >
+          Stress
+        </dt>
+        <dd
+          className="tabular-nums text-right"
+          title="cota concurrente stops; sin correlación"
+        >
+          {portfolioRisk?.portfolioStressRiskR != null
+            ? `${portfolioRisk.portfolioStressRiskR.toFixed(2)}R`
+            : "—"}
+        </dd>
+        <dd
+          className="tabular-nums text-right text-muted-foreground"
+          title="cota concurrente stops; sin correlación · no proyectado en scenario"
+        >
+          —
+        </dd>
         <dt className="text-muted-foreground">Sector</dt>
         <dd className="text-right tabular-nums">
           {topSectorCurrent

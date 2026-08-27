@@ -100,6 +100,11 @@ export function MesaOperationalHeaderStrip({
           value={formatR(header.portfolioOpenRiskR)}
           title={`R si stops actuales se ejecutan · límite ${header.portfolioRiskLimitR}R`}
         />
+        <Chip
+          label="Stress"
+          value={formatR(header.portfolioStressRiskR)}
+          title="cota concurrente stops; sin correlación"
+        />
         <Chip label="Capital" value={capital} />
         <Chip
           label="Datos"
@@ -145,10 +150,11 @@ export function MesaOperationalHeaderStrip({
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">P&L / Open Risk</dt>
+              <dt className="text-muted-foreground">P&L / Open / Stress</dt>
               <dd>
                 {formatR(header.portfolioPnLR)} /{" "}
-                {formatR(header.portfolioOpenRiskR)}
+                {formatR(header.portfolioOpenRiskR)} /{" "}
+                {formatR(header.portfolioStressRiskR)}
               </dd>
             </div>
             <div>
