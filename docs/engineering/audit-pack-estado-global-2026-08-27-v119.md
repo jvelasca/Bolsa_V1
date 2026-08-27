@@ -1,8 +1,8 @@
 # Audit pack — estado global v1.19 (Opportunity Discovery + Mesa Zona 1)
 
-> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.19-beta` → `c30594e`**. Partida **`v1.18-beta` → `4d1b2e6`**.
+> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.19-beta` → `dc9327d`** (feature `c30594e`). Partida **`v1.18-beta` → `4d1b2e6`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · ADR-037 · ADR-039 · plan [`plan-v119-opportunity-discovery-2026-08-27.md`](./plan-v119-opportunity-discovery-2026-08-27.md) · pack previo [`audit-pack-estado-global-2026-08-27-v118.md`](./audit-pack-estado-global-2026-08-27-v118.md).
-> **Para:** auditoría cruzada post-v1.19 · Release tag CI.
+> **Para:** auditoría cruzada post-v1.19 · Release tag CI [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33072651425).
 
 ---
 

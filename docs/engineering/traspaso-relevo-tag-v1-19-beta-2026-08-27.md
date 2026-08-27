@@ -1,7 +1,7 @@
 # RELEVO — tag v1.19-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v119.md`](./audit-pack-estado-global-2026-08-27-v119.md) · [`traspaso-relevo-tag-v1-18-beta-2026-08-27.md`](./traspaso-relevo-tag-v1-18-beta-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.19-beta` → tip feature `c30594e`. **Release tag CI:** pendiente pin tras Actions GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.19-beta` → feature `c30594e` + CI fix `dc9327d`. **Release tag CI:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33072651425).
 > **Arranque chat nuevo / auditor:** pack v119 + ADR-037/039 + `CURRENT_SYSTEM.md` + este relevo · plan [`plan-v119-opportunity-discovery-2026-08-27.md`](./plan-v119-opportunity-discovery-2026-08-27.md).
 
 ---
@@ -18,12 +18,12 @@
 
 | Pieza        | Valor                                                                                              |
 | ------------ | -------------------------------------------------------------------------------------------------- |
-| Tag          | `v1.19-beta` → `c30594e`                                                                           |
+| Tag          | `v1.19-beta` → `dc9327d` (feature `c30594e`)                                                       |
 | Previo       | `v1.18-beta` → `4d1b2e6`                                                                           |
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v119.md`](./audit-pack-estado-global-2026-08-27-v119.md)     |
 | Spine        | `pnpm test:decision-spine` **497**                                                                 |
 | Plan         | [`plan-v119-opportunity-discovery-2026-08-27.md`](./plan-v119-opportunity-discovery-2026-08-27.md) |
-| CI tag       | pendiente (pin URL tras GREEN)                                                                     |
+| CI tag       | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33072651425)                             |
 
 ### Owner: publicar
 
