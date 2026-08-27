@@ -25,6 +25,11 @@ export function buildDataFreshness(input: {
   lastBarDate?: string | null;
   queryFailed?: boolean;
   noFreshnessProbe?: boolean;
+  /**
+   * Probe parcial de cartera (p. ej. solo 1 de N posiciones).
+   * Nunca afirmar «fresh» global a partir de una sola muestra.
+   */
+  partialSample?: { probed: number; total: number } | null;
   now?: Date;
   thresholdMinutes?: number;
   source?: string;
@@ -33,8 +38,10 @@ export function buildDataFreshness(input: {
     input.thresholdMinutes ?? DATA_FRESHNESS_THRESHOLD_MINUTES;
   const source = input.source ?? "ohlcv";
 
+  let result: DataFreshnessV1;
+
   if (input.queryFailed) {
-    return {
+    result = {
       asOf: null,
       source,
       ageMinutes: null,
@@ -42,10 +49,8 @@ export function buildDataFreshness(input: {
       thresholdMinutes,
       label: "No consultado",
     };
-  }
-
-  if (input.noFreshnessProbe) {
-    return {
+  } else if (input.noFreshnessProbe) {
+    result = {
       asOf: null,
       source,
       ageMinutes: null,
@@ -53,58 +58,83 @@ export function buildDataFreshness(input: {
       thresholdMinutes,
       label: "Sin referencia (sin posiciones)",
     };
+  } else {
+    const raw = input.lastBarDate?.trim();
+    if (!raw) {
+      result = {
+        asOf: null,
+        source,
+        ageMinutes: null,
+        status: "unknown",
+        thresholdMinutes,
+        label: "—",
+      };
+    } else {
+      const ts = new Date(raw);
+      if (Number.isNaN(ts.getTime())) {
+        result = {
+          asOf: raw,
+          source,
+          ageMinutes: null,
+          status: "invalid",
+          thresholdMinutes,
+          label: "—",
+        };
+      } else {
+        const now = input.now ?? new Date();
+        const ageMinutes = Math.max(
+          0,
+          Math.floor((now.getTime() - ts.getTime()) / 60_000),
+        );
+        const asOf = ts.toISOString();
+
+        if (ageMinutes > thresholdMinutes) {
+          result = {
+            asOf,
+            source,
+            ageMinutes,
+            status: "stale",
+            thresholdMinutes,
+            label: `Retrasados · ${formatAgeMinutes(ageMinutes)}`,
+          };
+        } else {
+          result = {
+            asOf,
+            source,
+            ageMinutes,
+            status: "fresh",
+            thresholdMinutes,
+            label: `Actualizados · ${formatAgeMinutes(ageMinutes)}`,
+          };
+        }
+      }
+    }
   }
 
-  const raw = input.lastBarDate?.trim();
-  if (!raw) {
-    return {
-      asOf: null,
-      source,
-      ageMinutes: null,
-      status: "unknown",
-      thresholdMinutes,
-      label: "—",
-    };
+  return applyPartialSampleLabel(result, input.partialSample);
+}
+
+function applyPartialSampleLabel(
+  freshness: DataFreshnessV1,
+  partialSample?: { probed: number; total: number } | null,
+): DataFreshnessV1 {
+  if (
+    !partialSample ||
+    partialSample.total <= 1 ||
+    partialSample.probed >= partialSample.total ||
+    partialSample.probed < 1
+  ) {
+    return freshness;
   }
-
-  const ts = new Date(raw);
-  if (Number.isNaN(ts.getTime())) {
-    return {
-      asOf: raw,
-      source,
-      ageMinutes: null,
-      status: "invalid",
-      thresholdMinutes,
-      label: "—",
-    };
-  }
-
-  const now = input.now ?? new Date();
-  const ageMinutes = Math.max(
-    0,
-    Math.floor((now.getTime() - ts.getTime()) / 60_000),
-  );
-  const asOf = ts.toISOString();
-
-  if (ageMinutes > thresholdMinutes) {
-    return {
-      asOf,
-      source,
-      ageMinutes,
-      status: "stale",
-      thresholdMinutes,
-      label: `Retrasados · ${formatAgeMinutes(ageMinutes)}`,
-    };
-  }
-
-  return {
-    asOf,
-    source,
-    ageMinutes,
-    status: "fresh",
-    thresholdMinutes,
-    label: `Actualizados · ${formatAgeMinutes(ageMinutes)}`,
-  };
+  const tag = `muestra parcial (${partialSample.probed}/${partialSample.total})`;
+  const label =
+    !freshness.label || freshness.label === "—"
+      ? tag
+      : `${freshness.label} · ${tag}`;
+  // Una sola muestra fresca ≠ cartera fresca — no verde por omisión.
+  const status =
+    freshness.status === "fresh" ? ("stale" as const) : freshness.status;
+  return { ...freshness, label, status };
 }
 
 function formatAgeMinutes(minutes: number): string {

@@ -41,15 +41,16 @@ function CandidateNextAction({
   entriesBlocked: boolean;
 }) {
   const next = mapCandidateNextAction(row, entriesBlocked);
+  const label = `Acción: ${next.label}`;
 
   if (next.kind === "review_proposal") {
     return (
       <Link
         to={CONFIRM_PATH}
-        className="text-[11px] font-medium text-primary hover:underline"
-        data-testid={`mesa-candidate-cta-${row.symbol}`}
+        className="rounded border border-primary/40 bg-primary/5 px-1.5 py-0.5 text-[11px] font-medium text-primary hover:underline"
+        data-testid={`mesa-candidate-action-${row.symbol}`}
       >
-        {next.label}
+        {label}
       </Link>
     );
   }
@@ -57,20 +58,20 @@ function CandidateNextAction({
     return (
       <Link
         to={mesaJournalTesisHref(row.instrumentId, { ficha: true })}
-        className="text-[11px] font-medium text-primary hover:underline"
-        data-testid={`mesa-candidate-cta-${row.symbol}`}
+        className="rounded border border-primary/40 bg-primary/5 px-1.5 py-0.5 text-[11px] font-medium text-primary hover:underline"
+        data-testid={`mesa-candidate-action-${row.symbol}`}
       >
-        {next.label}
+        {label}
       </Link>
     );
   }
   if (next.kind === "watch") {
     return (
       <span
-        className="text-[11px] text-muted-foreground"
-        data-testid={`mesa-candidate-cta-${row.symbol}`}
+        className="rounded border border-border/50 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+        data-testid={`mesa-candidate-action-${row.symbol}`}
       >
-        {next.label}
+        {label}
       </span>
     );
   }
@@ -78,13 +79,21 @@ function CandidateNextAction({
     return (
       <Link
         to={mesaJournalTesisHref(row.instrumentId, { ficha: true })}
-        className="text-[11px] text-primary hover:underline"
+        className="rounded border border-primary/40 bg-primary/5 px-1.5 py-0.5 text-[11px] text-primary hover:underline"
+        data-testid={`mesa-candidate-action-${row.symbol}`}
       >
-        Ver tesis
+        Acción: Ver tesis
       </Link>
     );
   }
-  return null;
+  return (
+    <span
+      className="rounded border border-border/50 px-1.5 py-0.5 text-[11px] text-muted-foreground"
+      data-testid={`mesa-candidate-action-${row.symbol}`}
+    >
+      {label}
+    </span>
+  );
 }
 
 function CandidateCard({
@@ -239,12 +248,6 @@ function CandidateCard({
         </p>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <span
-          className="rounded border border-border/50 px-1.5 py-0.5 text-[10px] text-muted-foreground"
-          data-testid={`mesa-candidate-action-${row.symbol}`}
-        >
-          Acción: {mapCandidateNextAction(row, entriesBlocked).label}
-        </span>
         <CandidateNextAction row={row} entriesBlocked={entriesBlocked} />
         <MesaWhatIfPanel
           row={row}
@@ -310,7 +313,7 @@ export function MesaCandidatesPanel({
   return (
     <Card data-testid="mesa-candidates-panel">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Oportunidades operables</CardTitle>
+        <CardTitle className="text-base">Candidatos de la mesa</CardTitle>
         <CardDescription>
           {entriesBlocked ? (
             <span className="text-rose-600 dark:text-rose-400">

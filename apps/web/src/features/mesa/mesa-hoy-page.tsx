@@ -288,6 +288,10 @@ export function MesaHoyPage() {
         vetoed,
         lastBarDate: mesaLastBarDate,
         noFreshnessProbe: positions.length === 0,
+        freshnessPartialSample:
+          positions.length > 1 && mesaFreshnessInstrumentId
+            ? { probed: 1, total: positions.length }
+            : null,
         boardQueryFailed: boardQuery.isError,
         incidentsQueryFailed: incidentsFailed,
         portfolioQueryFailed: portfolioQuery.isError,

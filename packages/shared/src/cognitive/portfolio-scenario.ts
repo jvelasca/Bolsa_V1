@@ -38,6 +38,10 @@ export type PortfolioScenarioV1 = {
   riskLimitR: number;
 };
 
+/** Honesty — scenario ≠ permiso; no re-evalúa gates de firma. */
+export const PORTFOLIO_SCENARIO_GATES_NOT_EVALUATED_WARNING =
+  "No evalúa check_opening / DS-05 / Fit de firma — Confirm es la firma";
+
 export type BuildPortfolioScenarioInput = {
   candidate: MesaCandidateRowV1;
   positions: ReadonlyArray<
@@ -128,7 +132,7 @@ function candidateNotional(candidate: MesaCandidateRowV1): number | null {
 export function buildPortfolioScenario(
   input: BuildPortfolioScenarioInput,
 ): PortfolioScenarioV1 {
-  const warnings: string[] = [];
+  const warnings: string[] = [PORTFOLIO_SCENARIO_GATES_NOT_EVALUATED_WARNING];
   const equity = input.equity ?? null;
   const cash = input.cash ?? null;
   const riskLimitR =

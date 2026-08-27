@@ -86,7 +86,8 @@ export function MesaWhatIfPanel({
     >
       <p className="font-semibold">¿Qué pasa si añado {row.symbol}?</p>
       <p className="text-muted-foreground">
-        Estimación de cartera, no permiso. Confirm es la firma.
+        Estimación de cartera, no permiso. Confirm es la firma. No evalúa
+        check_opening, DS-05 ni Fit de firma.
       </p>
       <div className="mt-1 grid grid-cols-3 gap-1 text-[9px] font-semibold uppercase text-muted-foreground">
         <span />

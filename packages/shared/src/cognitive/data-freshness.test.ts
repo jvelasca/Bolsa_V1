@@ -26,4 +26,28 @@ describe("data-freshness", () => {
   it("error on query failed", () => {
     expect(buildDataFreshness({ queryFailed: true }).status).toBe("error");
   });
+
+  it("partial sample never claims portfolio-wide fresh", () => {
+    const now = new Date("2026-08-26T12:00:00Z");
+    const last = new Date("2026-08-26T11:30:00Z").toISOString();
+    const f = buildDataFreshness({
+      lastBarDate: last,
+      now,
+      partialSample: { probed: 1, total: 3 },
+    });
+    expect(f.status).not.toBe("fresh");
+    expect(f.label).toMatch(/muestra parcial \(1\/3\)/i);
+  });
+
+  it("single-position probe can stay fresh", () => {
+    const now = new Date("2026-08-26T12:00:00Z");
+    const last = new Date("2026-08-26T11:30:00Z").toISOString();
+    expect(
+      buildDataFreshness({
+        lastBarDate: last,
+        now,
+        partialSample: { probed: 1, total: 1 },
+      }).status,
+    ).toBe("fresh");
+  });
 });
