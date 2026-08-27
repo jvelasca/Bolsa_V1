@@ -37,10 +37,12 @@ git push origin v1.20-beta  # Actions → GREEN → pin docs CI URL
 
 ```bash
 pnpm --filter @bolsa/web exec tsc --noEmit
-pnpm --filter @bolsa/web test -- daily-nav mesa-zone1 mesa-hoy-view mesa-candidates mesa-hoy
+pnpm test:daily-ops:offline
 pnpm test:decision-spine
-# expect: 497 passed
+# expect: daily-ops 6 fases OK · spine 497 passed
 ```
+
+Fases `test:daily-ops:offline`: shared domain · web Mesa/Confirm · web Trading desk · web CORE-R · py spine · py operativa. Manifest: `scripts/research/daily-ops-manifest.mjs`.
 
 ## 3. Freeze
 

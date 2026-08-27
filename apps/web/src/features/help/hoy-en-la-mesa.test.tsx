@@ -11,8 +11,8 @@ import { HoyEnLaMesaBlock } from "@/features/help/hoy-en-la-mesa";
 afterEach(() => cleanup());
 
 describe("help C1 v1.8 sync", () => {
-  it("HELP_CONTENT_AS_OF is 2026-08-26", () => {
-    expect(HELP_CONTENT_AS_OF).toBe("2026-08-26");
+  it("HELP_CONTENT_AS_OF is 2026-08-27", () => {
+    expect(HELP_CONTENT_AS_OF).toBe("2026-08-27");
   });
 
   it("Hoy en la mesa states BUY only with TradePlan TRIGGERED", () => {

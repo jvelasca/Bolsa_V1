@@ -51,6 +51,10 @@
     "test:semi": "node scripts/research/verify_semi_demo_battery.mjs",
     "test:semi:smoke": "python scripts/research/verify_semi_demo_api_smoke.py",
     "test:decision-spine": "node scripts/research/verify_decision_spine_battery.mjs",
+    "test:daily-ops": "node scripts/research/verify_daily_ops_battery.mjs",
+    "test:daily-ops:offline": "node scripts/research/verify_daily_ops_battery.mjs --offline",
+    "test:daily-ops:smoke": "node scripts/research/verify_daily_ops_battery.mjs --smoke",
+    "ops:self-eval": "node scripts/ops_operativa_self_eval.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md}\"",
     "prepare": "husky"
