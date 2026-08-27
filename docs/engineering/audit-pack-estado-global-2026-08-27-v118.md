@@ -36,14 +36,14 @@ Ciclo **V1.18** **CERRADO** (L1+L2a + MR-1 + Stress MVP + OpportunityEvidence co
 
 ## 2. Batería (local, 2026-08-27)
 
-| Gate                                | Resultado            |
-| ----------------------------------- | -------------------- |
-| `pnpm --filter @bolsa/shared` build | OK                   |
-| Shared DoD (9 files)                | **78** passed        |
-| Web `mesa-hoy` + `mesa-position`    | **19** passed        |
-| Pytest L2a dirigido                 | **19** passed        |
-| `pnpm test:decision-spine`          | **497** passed       |
-| Release tag CI                      | _pendiente push tag_ |
+| Gate                                | Resultado                                                              |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm --filter @bolsa/shared` build | OK                                                                     |
+| Shared DoD (9 files)                | **78** passed                                                          |
+| Web `mesa-hoy` + `mesa-position`    | **19** passed                                                          |
+| Pytest L2a dirigido                 | **19** passed                                                          |
+| `pnpm test:decision-spine`          | **497** passed                                                         |
+| Release tag CI                      | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33067393463) |
 
 ```bash
 pnpm --filter @bolsa/shared build

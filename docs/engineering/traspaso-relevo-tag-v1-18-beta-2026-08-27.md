@@ -1,7 +1,7 @@
 # RELEVO — tag v1.18-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v118.md`](./audit-pack-estado-global-2026-08-27-v118.md) · [`traspaso-relevo-tag-v1-17-1-beta-2026-08-27.md`](./traspaso-relevo-tag-v1-17-1-beta-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **STAMP / PUBLICACIÓN** — tag `v1.18-beta` → tip feature `4d1b2e6` (L1+L2a + MR-1 + Stress MVP + OpportunityEvidence). **Release tag CI:** _pendiente push_.
+> **Estado:** **PUBLICACIÓN** — tag `v1.18-beta` → tip feature `4d1b2e6` + stamp `a4a95c5`. **Release tag CI:** [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33067393463).
 > **Arranque chat nuevo / auditor:** pack v118 + ADR-038/039 + `CURRENT_SYSTEM.md` + este relevo.
 
 ---
@@ -23,7 +23,7 @@
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v118.md`](./audit-pack-estado-global-2026-08-27-v118.md) |
 | Spine        | `pnpm test:decision-spine` **497**                                                             |
 | Planes       | L1 · L2a · MR-1 · Stress MVP · OpportunityEvidence                                             |
-| CI tag       | _pin URL tras GREEN_                                                                           |
+| CI tag       | [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33067393463)                         |
 
 ### Owner: publicar
 
