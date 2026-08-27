@@ -1,7 +1,7 @@
 # RELEVO — tag v1.19-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v119.md`](./audit-pack-estado-global-2026-08-27-v119.md) · [`traspaso-relevo-tag-v1-18-beta-2026-08-27.md`](./traspaso-relevo-tag-v1-18-beta-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.19-beta` (tip al publicar). **Release tag CI:** pendiente pin tras Actions GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.19-beta` → tip feature `c30594e`. **Release tag CI:** pendiente pin tras Actions GREEN.
 > **Arranque chat nuevo / auditor:** pack v119 + ADR-037/039 + `CURRENT_SYSTEM.md` + este relevo · plan [`plan-v119-opportunity-discovery-2026-08-27.md`](./plan-v119-opportunity-discovery-2026-08-27.md).
 
 ---
