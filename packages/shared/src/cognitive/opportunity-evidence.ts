@@ -7,12 +7,20 @@
  *
  * Freeze: Ranking≠BUY · Confirm=firma · Opportunity≠Permission ·
  * PAPER_D_EXECUTE off · AUTO off · provisional.
+ *
+ * V1.19: Quality 0–100 = strength (máx 60) + R/R (máx 40). Sin TRIGGERED/hasPlan.
  */
 
 import type { MesaCandidateRowV1 } from "./mesa-hoy-model.js";
-import type { QualityScoreV1 } from "./operational-priority.js";
 import type { PortfolioRiskSnapshotV1 } from "./portfolio-risk-metrics.js";
 import type { TradePlanV1 } from "./trade-plan.js";
+
+/** Shape compatible con QualityScoreV1 — evita ciclo con operational-priority. */
+export type OpportunityQualityScoreV1 = {
+  value: number;
+  label: string;
+  factors: string[];
+};
 
 /** Evidencia de oportunidad — solo tesis/setup; sin action/BUY/permission. */
 export type OpportunityEvidenceV1 = {
@@ -23,7 +31,7 @@ export type OpportunityEvidenceV1 = {
   expectedRR: number | null;
   /** Factores de Quality pura (strength + R/R). Sin TRIGGERED/hasPlan. */
   factors: string[];
-  /** Etiqueta provisional de calidad (Alta / Media / Baja). */
+  /** Etiqueta provisional de calidad (Excelente…No atractiva). */
   label: string;
   /** Composite 0–100 solo strength+RR; no es score definitivo. */
   qualityValue: number;
@@ -74,9 +82,19 @@ function finitePositive(n: unknown): n is number {
   return typeof n === "number" && Number.isFinite(n) && n > 0;
 }
 
+/** Bandas honestas 0–100 (solo strength + R/R). */
+export function opportunityQualityLabel(qualityValue: number): string {
+  if (qualityValue >= 90) return "Excelente";
+  if (qualityValue >= 80) return "Alta";
+  if (qualityValue >= 70) return "Buena";
+  if (qualityValue >= 60) return "Débil";
+  return "No atractiva";
+}
+
 /**
- * Quality pura: strength + expectedRR únicamente.
+ * Quality pura: strength (máx 60) + expectedRR (máx 40).
  * NO usa TRIGGERED / hasOperationalPlan (eso es Operability).
+ * Escala 0–100 para que las bandas Excelente/Alta sean alcanzables.
  */
 export function projectOpportunityEvidence(
   row: MesaCandidateRowV1,
@@ -90,21 +108,18 @@ export function projectOpportunityEvidence(
   const factors: string[] = [];
   let qualityValue = 0;
 
-  qualityValue += Math.min(strength * 10, 50);
+  // strength 0–10 → hasta 60
+  qualityValue += Math.min(strength * 6, 60);
   if (strength > 0) factors.push(`Strength ${strength.toFixed(1)}`);
 
+  // R/R → hasta 40 (R/R 4.0 = techo)
   if (expectedRR != null) {
-    qualityValue += Math.min(expectedRR * 8, 24);
+    qualityValue += Math.min(expectedRR * 10, 40);
     factors.push(`R/R 1:${expectedRR.toFixed(1)}`);
   }
 
-  // Cap intentional: without plan/status bonuses, pure max ≈ 74.
-  // Leave headroom so Priority Operability remains a separate axis.
   qualityValue = Math.min(100, Math.round(qualityValue));
-
-  let label = "Media";
-  if (qualityValue >= 70) label = "Alta";
-  else if (qualityValue < 40) label = "Baja";
+  const label = opportunityQualityLabel(qualityValue);
 
   return {
     symbol: row.symbol,
@@ -118,12 +133,12 @@ export function projectOpportunityEvidence(
 }
 
 /**
- * Thin adapter: QualityScoreV1 puede leer OpportunityEvidence más adelante.
- * No cablea aún pesos 35/35/30 ni sustituye scoreQuality legacy.
+ * Thin adapter: QualityScoreV1 lee OpportunityEvidence.
+ * Pesos Priority 35/35/30 intactos; Operability sigue aparte.
  */
 export function qualityScoreFromOpportunityEvidence(
   evidence: OpportunityEvidenceV1,
-): QualityScoreV1 {
+): OpportunityQualityScoreV1 {
   return {
     value: evidence.qualityValue,
     label: evidence.label,

@@ -23,7 +23,11 @@ export function mesaJournalEvolutionHref(instrumentId: string): string {
 }
 
 export function mesaOperationsHref(): string {
-  return "/operations";
+  return "/mesa?focus=libro";
+}
+
+export function mesaSpineHref(): string {
+  return "/mesa?focus=spine";
 }
 
 export function mesaOperationalConsoleHref(): string {

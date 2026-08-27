@@ -70,7 +70,10 @@ export function OperationalConsolePage() {
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Posiciones y CTAs de desriesgo siguen en{" "}
-            <Link to="/operations" className="text-primary hover:underline">
+            <Link
+              to="/mesa?focus=libro"
+              className="text-primary hover:underline"
+            >
               Libro · Operaciones
             </Link>
             . Confirm = única firma.

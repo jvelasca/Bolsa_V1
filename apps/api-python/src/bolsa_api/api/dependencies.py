@@ -1042,6 +1042,7 @@ def get_process_scan_job_use_case(session: AsyncSession) -> ProcessScanJob:
         tracker_repository=get_tracker_definition_repository(session),
         policy_repository=get_execution_policy_repository(session),
         execution_router=get_execution_router_use_case(session),
+        opportunity_propose=get_propose_recommendation_use_case(session),
     )
 
 

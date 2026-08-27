@@ -159,6 +159,24 @@ class Settings(BaseSettings):
     estudio_eod_opinion_interval_seconds: float = Field(
         default=3600.0, validation_alias="ESTUDIO_EOD_OPINION_INTERVAL_SECONDS"
     )
+    # V1.19 — Opportunity daily scan (opt-in). Off-by-default; never execute.
+    opportunity_daily_scan_enabled: bool = Field(
+        default=False, validation_alias="OPPORTUNITY_DAILY_SCAN_ENABLED"
+    )
+    opportunity_daily_scan_interval_seconds: float = Field(
+        default=86400.0,
+        validation_alias="OPPORTUNITY_DAILY_SCAN_INTERVAL_SECONDS",
+    )
+    opportunity_daily_universe_list_id: str = Field(
+        default="ibex35",
+        validation_alias="OPPORTUNITY_DAILY_UNIVERSE_LIST_ID",
+    )
+    opportunity_daily_propose_cap: int = Field(
+        default=15, validation_alias="OPPORTUNITY_DAILY_PROPOSE_CAP"
+    )
+    opportunity_daily_account_id: str | None = Field(
+        default=None, validation_alias="OPPORTUNITY_DAILY_ACCOUNT_ID"
+    )
     # D2 — email Alarmas Estudio (off-by-default; requiere SMTP_* + EMAIL_TO).
     estudio_opinion_email_enabled: bool = Field(
         default=False, validation_alias="ESTUDIO_OPINION_EMAIL_ENABLED"

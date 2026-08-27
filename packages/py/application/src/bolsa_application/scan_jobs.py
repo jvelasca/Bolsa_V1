@@ -11,6 +11,10 @@ from bolsa_application.context.principal import (
     set_current_principal,
 )
 from bolsa_application.execution_router import ExecutionRouter
+from bolsa_application.opportunity_daily_discovery import (
+    ProposeOpportunityHits,
+    is_opportunity_discovery_payload,
+)
 from bolsa_application.scan_chunking import (
     JOB_KIND_CHUNK,
     JOB_KIND_PARENT,
@@ -183,6 +187,7 @@ class ProcessScanJob:
         tracker_repository: TrackerDefinitionRepository | None = None,
         policy_repository: ExecutionPolicyRepository | None = None,
         execution_router: ExecutionRouter | None = None,
+        opportunity_propose: Any | None = None,
     ) -> None:
         self._jobs = job_repo
         self._run_scan = run_scan
@@ -191,6 +196,7 @@ class ProcessScanJob:
         self._trackers = tracker_repository
         self._policies = policy_repository
         self._router = execution_router
+        self._opportunity_propose = opportunity_propose
 
     async def execute(self, job_id: str | None = None) -> ProcessScanJobResult:
         """Procesa un job. Restaura ``ownerUserId`` del payload como principal para ``scan.completed``."""
@@ -246,6 +252,7 @@ class ProcessScanJob:
             cache_hits=cache_hits,
             cache_misses=cache_misses,
         )
+        await self._maybe_propose_opportunity_hits(job, result.hits)
         if self._persist_manifest is not None and job.payload.get("parentJobId") is None:
             try:
                 await self._persist_manifest.execute(
@@ -279,6 +286,49 @@ class ProcessScanJob:
             router=self._router,
         )
         return execution_route_to_dict(route) if route is not None else None
+
+    async def _maybe_propose_opportunity_hits(
+        self, job: ScanJobRecord, hits: list[ScanHit]
+    ) -> None:
+        """V1.19 — propose acotado post-discovery scan. Cero execute / AUTO."""
+        payload = job.payload or {}
+        if not is_opportunity_discovery_payload(payload):
+            return
+        if payload.get("jobKind") == JOB_KIND_CHUNK:
+            return
+        if self._opportunity_propose is None:
+            logger.info(
+                "Opportunity discovery job %s completed without propose port — skip propose",
+                job.id,
+            )
+            return
+        account_id = payload.get("opportunityAccountId")
+        if not isinstance(account_id, str) or not account_id.strip():
+            logger.info(
+                "Opportunity discovery job %s — no accountId; scan only (funnel)",
+                job.id,
+            )
+            return
+        cap_raw = payload.get("opportunityProposeCap")
+        cap = int(cap_raw) if isinstance(cap_raw, (int, float)) else 15
+        try:
+            result = await ProposeOpportunityHits(self._opportunity_propose).execute(
+                hits,
+                account_id=account_id.strip(),
+                cap=cap,
+            )
+            logger.info(
+                "Opportunity discovery propose job=%s account=%s proposed=%s selected=%s",
+                job.id,
+                account_id,
+                result.get("proposed"),
+                result.get("selected"),
+            )
+        except Exception:
+            logger.exception(
+                "Opportunity discovery propose failed for job %s (scan intact)",
+                job.id,
+            )
 
     async def _run_scan_from_payload(self, payload: dict[str, Any]) -> ScanRunResult:
         universe = payload.get("universe") or {}

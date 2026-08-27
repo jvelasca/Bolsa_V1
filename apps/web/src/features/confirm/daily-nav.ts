@@ -34,16 +34,21 @@ export const TRADING_NAV_LABEL = "Trading" as const;
 export const LIBRO_LABEL = "Libro" as const;
 export const LIBRO_OPERACIONES_LABEL = "Operaciones" as const;
 export const LIBRO_HISTORIAL_LABEL = "Historial" as const;
-export const LIBRO_OPERACIONES_PATH = "/operations" as const;
+/** V1.19 — Libro absorbido en Mesa (?focus=libro). */
+export const LIBRO_OPERACIONES_PATH = "/mesa?focus=libro" as const;
 export const OPERATIONAL_CONSOLE_PATH = "/operational-console" as const;
 export const OPERATIONAL_CONSOLE_LABEL = "Consola ops" as const;
 export const OPERATIONAL_CONSOLE_HINT =
   "Salud operativa read-only (OE-1, recon, incidentes)" as const;
 export const LIBRO_HISTORIAL_PATH = "/history" as const;
 /** Hint DropdownMenu: posiciones abiertas / órdenes. */
-export const LIBRO_OPERACIONES_HINT = "Posiciones y órdenes" as const;
+export const LIBRO_OPERACIONES_HINT = "Posiciones y órdenes (en Mesa)" as const;
 /** Hint DropdownMenu: ledger contable + fills. */
 export const LIBRO_HISTORIAL_HINT = "Ledger y fills" as const;
+
+/** V1.19 — Decision Board absorbido en Mesa (?focus=spine). */
+export const DECISION_SPINE_PATH = "/mesa?focus=spine" as const;
+export const DECISION_SPINE_LABEL = "Decision Spine" as const;
 
 /**
  * Piezas del menú Libro (testable; misma forma que items de DropdownMenu).

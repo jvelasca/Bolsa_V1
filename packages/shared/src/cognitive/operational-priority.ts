@@ -10,6 +10,10 @@ import {
   type OperationalPriorityProjectionV1,
 } from "./mesa-operable-ranking.js";
 import type { PortfolioRiskSnapshotV1 } from "./portfolio-risk-metrics.js";
+import {
+  projectOpportunityEvidence,
+  qualityScoreFromOpportunityEvidence,
+} from "./opportunity-evidence.js";
 
 export type QualityScoreV1 = {
   value: number;
@@ -58,36 +62,9 @@ const STATUS_OPERABILITY: Record<TradePlanStatusV1, number> = {
   EXPIRED: 0,
 };
 
+/** Quality pura vía OpportunityEvidence — sin TRIGGERED/hasPlan (eso es Operability). */
 function scoreQuality(row: MesaCandidateRowV1): QualityScoreV1 {
-  const study = row.study;
-  const factors: string[] = [];
-  let value = 0;
-
-  const strength = study?.strength ?? 0;
-  value += Math.min(strength * 10, 50);
-  if (strength > 0) factors.push(`Strength ${strength.toFixed(1)}`);
-
-  const rr = study?.expectedRR ?? 0;
-  value += Math.min(rr * 8, 24);
-  if (rr > 0) factors.push(`R/R 1:${rr.toFixed(1)}`);
-
-  if (study?.hasOperationalPlan) {
-    value += 15;
-    factors.push("Plan operativo");
-  }
-
-  if (row.status === "TRIGGERED") {
-    value += 10;
-    factors.push("Trigger alcanzado");
-  }
-
-  value = Math.min(100, Math.round(value));
-
-  let label = "Media";
-  if (value >= 75) label = "Alta";
-  else if (value < 45) label = "Baja";
-
-  return { value, label, factors };
+  return qualityScoreFromOpportunityEvidence(projectOpportunityEvidence(row));
 }
 
 function scoreSuitability(

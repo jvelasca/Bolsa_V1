@@ -67,10 +67,10 @@ export function OpsIncidentsSection({
                     Resolver
                   </Button>
                   <Link
-                    to="/operations"
+                    to="/mesa?focus=libro"
                     className="inline-flex items-center text-xs text-primary hover:underline"
                   >
-                    Ir a Operaciones
+                    Ir a Libro (Mesa)
                   </Link>
                 </div>
               </li>
@@ -89,8 +89,8 @@ export function OpsQuickLinksSection({
 }) {
   const tiles = [
     {
-      to: "/decision-board",
-      label: "Decision Board",
+      to: "/mesa?focus=spine",
+      label: "Decision Spine",
       hint: "Oportunidades y gates (solo lectura)",
       testId: "ops-link-board",
     },
@@ -107,7 +107,7 @@ export function OpsQuickLinksSection({
       testId: "ops-link-confirm",
     },
     {
-      to: "/operations",
+      to: "/mesa?focus=libro",
       label: "Libro · Operaciones",
       hint: "Posiciones y CTAs de desriesgo",
       testId: "ops-link-operations",

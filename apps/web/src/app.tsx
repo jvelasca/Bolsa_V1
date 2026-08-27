@@ -30,9 +30,7 @@ import { ScreenersPage } from "@/features/screeners/screeners-page";
 import { AccountsPage } from "@/features/accounts/accounts-page";
 import { HistoryPage } from "@/features/history/history-page";
 import { TaxReportPage } from "@/features/fiscal/tax-report-page";
-import { OperationsPage } from "@/features/operations/operations-page";
 import { OperationalConsolePage } from "@/features/operational-console/operational-console-page";
-import { DecisionBoardPage } from "@/features/decision-board/decision-board-page";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
 import { MesaHoyPage } from "@/features/mesa/mesa-hoy-page";
 import { ConfirmPage } from "@/features/confirm/confirm-page";
@@ -88,11 +86,17 @@ const router = createBrowserRouter([
 
       { path: "accounts", element: <AccountsPage /> },
 
-      { path: "operations", element: <OperationsPage /> },
+      {
+        path: "operations",
+        element: <Navigate to="/mesa?focus=libro" replace />,
+      },
 
       { path: "operational-console", element: <OperationalConsolePage /> },
 
-      { path: "decision-board", element: <DecisionBoardPage /> },
+      {
+        path: "decision-board",
+        element: <Navigate to="/mesa?focus=spine" replace />,
+      },
 
       { path: "decision-journal", element: <DecisionJournalPage /> },
 

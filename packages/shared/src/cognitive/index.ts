@@ -37,6 +37,7 @@ export * from "./position-lineage.js";
 export * from "./mesa-operational-health.js";
 export * from "./operational-priority.js";
 export * from "./opportunity-evidence.js";
+export * from "./opportunity-ranking.js";
 export * from "./portfolio-scenario.js";
 export * from "./unified-alerts.js";
 export * from "./mesa-next-action.js";

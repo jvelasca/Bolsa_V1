@@ -72,7 +72,7 @@ describe("daily-nav", () => {
     expect(LIBRO_LABEL).toBe("Libro");
     expect(LIBRO_OPERACIONES_LABEL).toBe("Operaciones");
     expect(LIBRO_HISTORIAL_LABEL).toBe("Historial");
-    expect(LIBRO_OPERACIONES_PATH).toBe("/operations");
+    expect(LIBRO_OPERACIONES_PATH).toBe("/mesa?focus=libro");
     expect(LIBRO_HISTORIAL_PATH).toBe("/history");
     expect(LIBRO_OPERACIONES_PATH).not.toBe(LIBRO_HISTORIAL_PATH);
     expect(LIBRO_OPERACIONES_HINT.toLowerCase()).toMatch(/posicion/);

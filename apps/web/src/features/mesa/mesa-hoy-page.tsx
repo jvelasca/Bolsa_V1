@@ -2,18 +2,18 @@
  * Mesa · Hoy — home operativa diaria (ADR-037 + V1.16 desk).
  */
 
-import { useMemo } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import type { ProtectPlanV1 } from "@bolsa/shared";
 import {
   buildMesaActionQueue,
-  buildMesaCandidateGroups,
   buildMesaOperationalHeader,
   buildMesaProtectionState,
   buildMesaDecisionAlerts,
   buildMesaSessionState,
+  buildOpportunityRanking,
   buildPortfolioRiskSnapshot,
   buildUnifiedAlertInbox,
   buildInvestmentPositionAggregate,
@@ -24,6 +24,10 @@ import {
   studiesByDecisionIdMap,
   studiesByInstrumentMap,
 } from "@bolsa/shared";
+import {
+  DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID,
+  MesaCandidatesPanel,
+} from "@/features/mesa/mesa-candidates-panel";
 import { Button } from "@/components/ui/button";
 import { FeatureErrorBoundary } from "@/components/layout/feature-error-boundary";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -37,8 +41,9 @@ import { MesaSessionStateCard } from "@/features/mesa/mesa-session-state-card";
 import { MesaLevelSection } from "@/features/mesa/mesa-level-section";
 import { MesaAttentionQueue } from "@/features/mesa/mesa-attention-queue";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
-import { MesaCandidatesPanel } from "@/features/mesa/mesa-candidates-panel";
 import { MesaDecisionAlertsPanel } from "@/features/mesa/mesa-decision-alerts-panel";
+import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
+import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
@@ -49,6 +54,19 @@ const MESA_REFETCH_MS = 60_000;
 export function MesaHoyPage() {
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId, account } = useActiveAccount();
+  const [searchParams] = useSearchParams();
+  const focus = searchParams.get("focus");
+  const libroRef = useRef<HTMLDivElement | null>(null);
+  const spineRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (focus === "libro") {
+      libroRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (focus === "spine") {
+      spineRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [focus]);
+
   const selfEvalQuery = useOpsSelfEval(effectiveAccountId);
   const portfolioReconStatus = portfolioReconStatusFromReport(
     selfEvalQuery.data,
@@ -105,6 +123,21 @@ export function MesaHoyPage() {
     enabled: Boolean(effectiveAccountId),
     staleTime: 15_000,
     refetchInterval: MESA_REFETCH_MS,
+  });
+
+  const scanJobsQuery = useQuery({
+    queryKey: ["scan-jobs", "mesa-opportunity"],
+    queryFn: api.getScanJobs,
+    staleTime: 30_000,
+    refetchInterval: MESA_REFETCH_MS,
+  });
+
+  const universeListId = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID;
+
+  const universeListQuery = useQuery({
+    queryKey: ["lists", universeListId, "mesa-opportunity"],
+    queryFn: () => api.getList(universeListId),
+    staleTime: 5 * 60_000,
   });
 
   const board = boardQuery.data?.data;
@@ -252,10 +285,56 @@ export function MesaHoyPage() {
     return filterMesaAttentionItems(queue, 5, protectionDiscrepancies);
   }, [board, protectionDiscrepancies]);
 
-  const candidateGroups = useMemo(
-    () => buildMesaCandidateGroups(board, studiesMap, entriesBlocked),
-    [board, studiesMap, entriesBlocked],
-  );
+  const latestCompletedScan = useMemo(() => {
+    const jobs = scanJobsQuery.data?.data ?? [];
+    const completed = jobs
+      .filter((j) => j.status === "completed" && j.result)
+      .sort(
+        (a, b) =>
+          new Date(b.completedAt ?? b.updatedAt).getTime() -
+          new Date(a.completedAt ?? a.updatedAt).getTime(),
+      );
+    return completed[0] ?? null;
+  }, [scanJobsQuery.data]);
+
+  const opportunityRanking = useMemo(() => {
+    const scanResult = latestCompletedScan?.result ?? null;
+    const universeCount =
+      universeListQuery.data?.data?.instrumentIds?.length ?? 0;
+    return buildOpportunityRanking({
+      studies,
+      scanHits: (scanResult?.hits ?? []).map((h) => ({
+        instrumentId: h.instrumentId,
+        symbol: h.symbol,
+      })),
+      screenedCount: scanResult?.scannedCount ?? 0,
+      hitCount: scanResult?.hitCount ?? scanResult?.hits?.length ?? 0,
+      universeCount,
+      universeListId,
+      scanUpdatedAt:
+        latestCompletedScan?.completedAt ??
+        latestCompletedScan?.updatedAt ??
+        null,
+      board: board ?? null,
+      priorityCtx: {
+        entriesBlocked,
+        portfolioRisk,
+        sectorExposurePct,
+        sectorByInstrumentId,
+        maxSectorExposurePct: 40,
+      },
+    });
+  }, [
+    studies,
+    latestCompletedScan,
+    universeListQuery.data,
+    universeListId,
+    board,
+    entriesBlocked,
+    portfolioRisk,
+    sectorExposurePct,
+    sectorByInstrumentId,
+  ]);
 
   const protectPlanByInstrument = useMemo(() => {
     const map = new Map<string, ProtectPlanV1>();
@@ -487,16 +566,31 @@ export function MesaHoyPage() {
             studiesByInstrument={studiesMap}
             studiesByDecisionId={studiesByDecision}
           />
+          <div ref={libroRef} className="scroll-mt-4">
+            {focus === "libro" ? (
+              <MesaLibroPanel summary={portfolio} accountName={account?.name} />
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Libro completo (pendientes + KPIs):{" "}
+                <Link
+                  to="/mesa?focus=libro"
+                  className="text-primary hover:underline"
+                >
+                  Abrir Libro en Mesa →
+                </Link>
+              </p>
+            )}
+          </div>
         </MesaLevelSection>
 
         <MesaLevelSection
           level={3}
           title="Qué podría hacer"
-          description="Oportunidades para ESTA cartera — no es un ranking del universo."
+          description="Mejores oportunidades para ESTA cartera — discovery ≠ Action Queue ≠ permiso."
           testId="mesa-level-could"
         >
           <MesaCandidatesPanel
-            groups={candidateGroups}
+            ranking={opportunityRanking}
             entriesBlocked={entriesBlocked}
             portfolioRisk={portfolioRisk}
             sectorExposurePct={sectorExposurePct}
@@ -504,8 +598,38 @@ export function MesaHoyPage() {
             positions={riskPositions}
             equity={portfolio?.totalEquity ?? null}
             cash={summaryQuery.data?.data?.cash ?? null}
+            universeListId={universeListId}
           />
         </MesaLevelSection>
+
+        <div
+          ref={spineRef}
+          className="scroll-mt-4 rounded-md border border-border/60 bg-muted/10 px-4 py-3"
+          data-testid="mesa-spine-section"
+          id="mesa-focus-spine"
+        >
+          {focus === "spine" ? (
+            <DecisionSpineDetailPanel
+              board={board}
+              entriesBlocked={entriesBlocked}
+              isLoading={boardQuery.isLoading}
+              isError={boardQuery.isError}
+            />
+          ) : (
+            <>
+              <p className="font-medium text-sm">Detalle del Decision Spine</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Buckets, SEMI_F3 y sesiones — auditoría de atención (≠ ranking).
+              </p>
+              <Link
+                to="/mesa?focus=spine"
+                className="mt-2 inline-block text-xs text-primary hover:underline"
+              >
+                Ver detalle técnico →
+              </Link>
+            </>
+          )}
+        </div>
 
         <div
           className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"

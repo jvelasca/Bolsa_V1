@@ -63,6 +63,8 @@ import {
   ASESOR_PATH,
   ASESOR_TESIS_HINT,
   CONFIRMAR_LABEL,
+  DECISION_SPINE_LABEL,
+  DECISION_SPINE_PATH,
   LABORATORIO_LABEL,
   LIBRO_LABEL,
   LIBRO_NAV,
@@ -277,7 +279,7 @@ const HERRAMIENTAS_NAV = [
   { to: "/accounts", label: "Cuentas", icon: Wallet },
   { to: "/alerts", label: "Alertas", icon: Bell },
   { to: "/instruments", label: "Instrumentos", icon: BookOpen },
-  { to: "/decision-board", label: "Decision Board", icon: Gauge },
+  { to: DECISION_SPINE_PATH, label: DECISION_SPINE_LABEL, icon: Gauge },
   { to: OPERATIONAL_CONSOLE_PATH, label: "Consola ops", icon: ShieldCheck },
   { to: "/decision-journal", label: "Decision Journal", icon: BookMarked },
 ] as const;
@@ -327,8 +329,9 @@ export function AppTopBar() {
   const isBacktestsRoute = location.pathname.startsWith("/backtests");
   const isResearchRoute = location.pathname.startsWith("/research");
   const isLibroRoute =
-    location.pathname.startsWith("/operations") ||
-    location.pathname.startsWith("/history");
+    location.pathname.startsWith("/history") ||
+    (location.pathname.startsWith("/mesa") &&
+      new URLSearchParams(location.search).get("focus") === "libro");
   const trading = isTradingRoute(location.pathname);
   const historyNav = useSpaHistoryNav();
 
