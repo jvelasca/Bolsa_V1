@@ -66,8 +66,12 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+/**
+ * `recommendation` arranca colapsada: en Mercado 2.0 el idioma principal es la
+ * tarjeta de fase del valor; Pulso / dictamen / Lab son «¿Por qué?».
+ */
 const DEFAULT_OPERATIVA_SECTIONS: Record<OperativaSectionId, boolean> = {
-  recommendation: true,
+  recommendation: false,
   info: true,
   config: true,
 };

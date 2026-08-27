@@ -27,6 +27,12 @@ DAILY_OPS_REPORT_SCHEMA = "daily_ops_report_v1"
 WEEK_DAYS = 7
 ESTUDIO_LIST_ID = DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID
 
+# ok = membresía resuelta con ≥1 id; empty = lista canónica vacía;
+# unavailable = no se pudo determinar el universo (infra / port / shape).
+ESTUDIO_STATUS_OK = "ok"
+ESTUDIO_STATUS_EMPTY = "empty"
+ESTUDIO_STATUS_UNAVAILABLE = "unavailable"
+
 
 class EstudioListPort(Protocol):
     """GetInstrumentList.execute(list_id) → detail con instrument_ids."""
@@ -45,6 +51,14 @@ def intersect_daily_ops_universe(
         return estudio
     wanted = set(requested)
     return [i for i in estudio if i in wanted]
+
+
+@dataclass(frozen=True)
+class EstudioUniverseResolution:
+    """Resolución honesta del universo Estudio (≠ 0 candidatos por fallo)."""
+
+    status: str
+    instrument_ids: list[str] = field(default_factory=list)
 
 
 def _day_key(iso: str) -> str | None:
@@ -69,6 +83,8 @@ class DailyOpsReportBundle:
     channels: dict[str, int]
     opinions: list[dict[str, Any]]
     notes: list[str] = field(default_factory=list)
+    estudio_status: str = ESTUDIO_STATUS_OK
+    estudio_count: int = 0
 
 
 class GetDailyOpsReport:
@@ -88,14 +104,23 @@ class GetDailyOpsReport:
         self._opinion_repo = opinion_repo
         self._get_estudio = get_estudio
 
-    async def _estudio_instrument_ids(self) -> list[str]:
+    async def _resolve_estudio_universe(self) -> EstudioUniverseResolution:
+        """Distingue empty (0 valores) de unavailable (no se pudo resolver)."""
         if self._get_estudio is None:
-            return []
-        detail = await self._get_estudio.execute(ESTUDIO_LIST_ID)
-        raw = getattr(detail, "instrument_ids", None) if detail is not None else None
-        if isinstance(raw, list):
-            return [str(i) for i in raw if i]
-        return []
+            return EstudioUniverseResolution(status=ESTUDIO_STATUS_UNAVAILABLE)
+        try:
+            detail = await self._get_estudio.execute(ESTUDIO_LIST_ID)
+        except Exception:
+            return EstudioUniverseResolution(status=ESTUDIO_STATUS_UNAVAILABLE)
+        if detail is None:
+            return EstudioUniverseResolution(status=ESTUDIO_STATUS_UNAVAILABLE)
+        raw = getattr(detail, "instrument_ids", None)
+        if not isinstance(raw, list):
+            return EstudioUniverseResolution(status=ESTUDIO_STATUS_UNAVAILABLE)
+        ids = [str(i) for i in raw if i]
+        if not ids:
+            return EstudioUniverseResolution(status=ESTUDIO_STATUS_EMPTY)
+        return EstudioUniverseResolution(status=ESTUDIO_STATUS_OK, instrument_ids=ids)
 
     async def execute(
         self,
@@ -153,11 +178,21 @@ class GetDailyOpsReport:
         channels = {"alarma": 0, "aviso": 0, "none": 0}
         opinion_rows: list[dict[str, Any]] = []
         notes: list[str] = ["R1–R4: preview web + digest HTML/PDF (flag/prefs)."]
-        estudio_ids = await self._estudio_instrument_ids()
+        resolved = await self._resolve_estudio_universe()
+        estudio_status = resolved.status
+        estudio_ids = resolved.instrument_ids
         ids = intersect_daily_ops_universe(estudio_ids, instrument_ids)
         requested = [i for i in (instrument_ids or []) if i]
         if requested and set(requested) - set(ids):
             notes.append("Filtro recortado a Estudio (ids fuera del universo descartados).")
+        if estudio_status == ESTUDIO_STATUS_UNAVAILABLE:
+            notes.append(
+                "Estudio no disponible — no se puede generar Daily Ops del universo."
+            )
+        elif estudio_status == ESTUDIO_STATUS_EMPTY:
+            notes.append("Estudio vacío — 0 valores en el universo supervisado.")
+        elif not ids and requested:
+            notes.append("Filtro sin intersección con Estudio; sin Alarmas/Avisos del día.")
         if ids and self._opinion_repo is not None:
             op_recs = await self._opinion_repo.list_for_instruments(ids, day, source="on_demand")
             if not op_recs:
@@ -187,13 +222,6 @@ class GetDailyOpsReport:
                 notes.append(
                     "Sin dictámenes cacheados para el Estudio en asOf (calcula en Opiniones)."
                 )
-        elif not ids:
-            if self._get_estudio is None:
-                notes.append(
-                    "Sin membresía Estudio resuelta; no se consultan opiniones de un universo libre."
-                )
-            else:
-                notes.append("Estudio vacío o filtro sin intersección; sin Alarmas/Avisos del día.")
 
         return DailyOpsReportBundle(
             as_of=day,
@@ -207,4 +235,6 @@ class GetDailyOpsReport:
             channels=channels,
             opinions=opinion_rows,
             notes=notes,
+            estudio_status=estudio_status,
+            estudio_count=len(estudio_ids),
         )

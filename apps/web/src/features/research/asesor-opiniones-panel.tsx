@@ -27,11 +27,8 @@ import { useActiveAccount } from "@/features/accounts/use-active-account";
 import { useEstudioMembershipStore } from "@/stores/estudio-membership-store";
 import { useAlertsStore } from "@/stores/alerts-store";
 import { useNotificationPrefsStore } from "@/stores/notification-prefs-store";
-import {
-  hoyViewHref,
-  HOY_VIEW,
-  MERCADO_PATH,
-} from "@/features/confirm/daily-nav";
+import { MERCADO_PATH } from "@/features/confirm/daily-nav";
+import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import {
@@ -369,7 +366,7 @@ export function AsesorOpinionesPanel({ className }: { className?: string }) {
                     ) : null}
                     {item.actionable ? (
                       <Link
-                        to={hoyViewHref(HOY_VIEW.confirmar)}
+                        to={CONFIRM_PATH}
                         className={cn(
                           buttonVariants({ variant: "outline", size: "sm" }),
                           "h-7 text-[10px]",

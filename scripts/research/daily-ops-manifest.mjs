@@ -179,7 +179,7 @@ export const pyDecisionSpineTests = [
   'packages/py/analytics/tests/test_risk_signature.py',
 ];
 
-/** @type {string[]} Python — DÍA D + CORE-R evidence */
+/** @type {string[]} Python — DÍA D + CORE-R evidence + daily ops report (H1 offline) */
 export const pyOperativaTests = [
   'packages/py/analytics/tests/test_as_of_cut.py',
   'packages/py/market/tests/test_fundamentals_as_of.py',
@@ -187,14 +187,14 @@ export const pyOperativaTests = [
   'packages/py/analytics/tests/test_core_r_review_evidence.py',
   'packages/py/application/tests/test_explain_core_r_review.py',
   'packages/py/application/tests/test_research_evidence.py',
+  'packages/py/application/tests/test_daily_ops_report.py',
 ];
 
 /** @type {string[]} Python — SEMI F3 contract */
 export const pySemiTests = ['packages/py/analytics/tests/test_recommendation_f3.py'];
 
-/** @type {string[]} Python — daily ops report (R1–R4 + digest infra) */
+/** @type {string[]} Python — daily ops digest infra (--with-report only; report unit tests are offline in pyOperativaTests) */
 export const pyDailyOpsReportTests = [
-  'packages/py/application/tests/test_daily_ops_report.py',
   'packages/py/infrastructure/tests/test_daily_ops_digest_email.py',
   'packages/py/infrastructure/tests/test_daily_ops_digest_pdf.py',
 ];
@@ -255,7 +255,7 @@ export const DAILY_OPS_PHASES = [
   },
   {
     id: 'py-operativa',
-    label: 'Python DÍA D + CORE-R evidence',
+    label: 'Python DÍA D + CORE-R + daily ops report',
     kind: 'py',
     files: pyOperativaTests,
   },

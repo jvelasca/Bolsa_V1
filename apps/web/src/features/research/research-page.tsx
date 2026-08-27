@@ -17,14 +17,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { SEÑALES_LABEL, SEÑALES_PATH } from "@/features/confirm/daily-nav";
 
-type HubTab = "dashboard" | "diario" | "history" | "opiniones";
+type HubTab = "dashboard" | "diario" | "history" | "opiniones" | "journal";
 
 function parseTab(raw: string | null): HubTab {
   if (raw === "history") return "history";
   if (raw === "opiniones") return "opiniones";
   if (raw === "diario") return "diario";
+  if (raw === "journal") return "journal";
   return "dashboard";
 }
 
@@ -173,25 +173,34 @@ export function ResearchPage() {
           Asesor
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Explica dictámenes, diario y ledger del laboratorio. No ejecuta ni
-          firma — actuar en{" "}
+          Análisis, tesis, journal e investigación. Explica el porqué — no
+          ejecuta ni firma. Actuar en{" "}
           <Link to="/trading" className="text-primary hover:underline">
             Mercado
           </Link>{" "}
-          o{" "}
-          <Link to={SEÑALES_PATH} className="text-primary hover:underline">
-            {SEÑALES_LABEL}
-          </Link>
-          . Ruta <code className="text-xs">/research</code> (API sin cambios).
+          · firmar en Confirm. Ruta <code className="text-xs">/research</code>{" "}
+          (API sin cambios).
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         <HubTabButton
+          active={tab === "opiniones"}
+          onClick={() => setTab("opiniones")}
+        >
+          Análisis
+        </HubTabButton>
+        <HubTabButton
           active={tab === "dashboard"}
           onClick={() => setTab("dashboard")}
         >
-          Resumen
+          Tesis
+        </HubTabButton>
+        <HubTabButton
+          active={tab === "journal"}
+          onClick={() => setTab("journal")}
+        >
+          Journal
         </HubTabButton>
         <HubTabButton
           active={tab === "diario"}
@@ -203,19 +212,33 @@ export function ResearchPage() {
           active={tab === "history"}
           onClick={() => setTab("history")}
         >
-          Historial
-        </HubTabButton>
-        <HubTabButton
-          active={tab === "opiniones"}
-          onClick={() => setTab("opiniones")}
-        >
-          Opiniones
+          Investigación
         </HubTabButton>
       </div>
 
       {tab === "diario" && <AsesorDailyOpsPanel />}
 
       {tab === "opiniones" && <AsesorOpinionesPanel />}
+
+      {tab === "journal" && (
+        <Card data-testid="asesor-journal-bridge">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Journal de decisiones</CardTitle>
+            <CardDescription>
+              ¿Qué decidimos, por qué, qué ocurrió? No es la mesa operativa —
+              firmar sigue en Confirm.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              to="/decision-journal"
+              className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+            >
+              Abrir Journal
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {tab === "dashboard" && (
         <div className="space-y-4">

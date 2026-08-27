@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildMesaOperationalHeader,
@@ -203,5 +205,49 @@ describe("mesa-hoy-page invariants", () => {
       },
     ]);
     expect(items[0]?.id).toBe("discrepancy-NVDA");
+  });
+});
+
+describe("Hoy inbox chrome (V1.23 Fase 4)", () => {
+  const src = readFileSync(resolve(__dirname, "mesa-hoy-page.tsx"), "utf8");
+
+  it("renders the four inbox blocks in order", () => {
+    const order = [
+      "Requiere acción",
+      "Oportunidades",
+      "Vigilar",
+      "Sin acción",
+    ].map((title) => src.indexOf(`title="${title}"`));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it("drops the L2 tab bar and the Confirmar tab from the chrome", () => {
+    expect(src).not.toMatch(/HOY_VIEW_TABS/);
+    expect(src).not.toMatch(/data-testid="hoy-view-tabs"/);
+    expect(src).not.toMatch(/HOY_VIEW\.confirmar/);
+    expect(src).not.toMatch(/<ConfirmPage/);
+  });
+
+  it("keeps ?view= deep links behind Ver detalles", () => {
+    expect(src).toMatch(/<MesaHoyDetailsMenu \/>/);
+    expect(src).toMatch(/view === HOY_VIEW\.oportunidades/);
+    expect(src).toMatch(/view === HOY_VIEW\.decisiones/);
+    expect(src).toMatch(/view === HOY_VIEW\.journal/);
+    expect(src).toMatch(/view === HOY_VIEW\.posiciones/);
+  });
+
+  it("signs from the drawer or /confirm, not from a Hoy tab", () => {
+    expect(src).toMatch(/openConfirmDrawer\(\)/);
+    expect(src).toMatch(/CONFIRM_PATH/);
+  });
+
+  it("shows the Datos freshness chip and no session dump nor Spine on the inbox", () => {
+    expect(src).toMatch(/<MesaDatosChip/);
+    expect(src).not.toMatch(/<MesaSessionStateCard/);
+    expect(src).not.toMatch(/<MesaOperationalHeaderStrip/);
+    const spineAt = src.indexOf("<DecisionSpineDetailPanel");
+    const inboxAt = src.indexOf('data-testid="hoy-inbox"');
+    expect(spineAt).toBeGreaterThan(inboxAt);
   });
 });

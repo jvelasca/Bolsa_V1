@@ -144,8 +144,36 @@ describe("operational-plan-view", () => {
 
   it("targetProgressHint distinguishes pending / touched / managed", () => {
     expect(targetProgressHint(false, false)).toBe("○ pendiente");
-    expect(targetProgressHint(true, false)).toBe("● alcanzado");
+    expect(targetProgressHint(true, false)).toBe(
+      "● alcanzado · ○ pendiente de gestión",
+    );
     expect(targetProgressHint(true, true)).toBe("✓ gestionado");
     expect(targetProgressHint(false, true)).toBe("✓ gestionado");
+  });
+
+  it("H2 — target1AchievedAt on aggregate.targets (no positionState)", () => {
+    const plan = buildOperationalPlanFromPosition({
+      aggregate: {
+        instrumentId: "nvda",
+        symbol: "NVDA",
+        entry: 100,
+        currentPrice: 104,
+        protection: {
+          currentStop: 100,
+          protectHint: false,
+          discrepancy: false,
+        },
+        targets: {
+          target1: 112,
+          target2: 124,
+          target1AchievedAt: "2026-08-27T10:00:00Z",
+        },
+        risk: { unrealizedR: 0.5, openRiskR: null },
+        thesisSnapshot: { direction: "long" },
+      } as never,
+      markPrice: 104,
+    });
+    expect(plan.target1Managed).toBe(true);
+    expect(plan.target1Touched).toBe(false);
   });
 });

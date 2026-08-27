@@ -85,16 +85,24 @@ export const DECISIONES_LABEL = "Decisiones" as const;
 export const DECISION_SPINE_PATH = DECISIONES_PATH;
 export const DECISION_SPINE_LABEL = DECISIONES_LABEL;
 
-/** Vistas Hoy (`?view=`). */
+/**
+ * Vistas Hoy (`?view=`).
+ *
+ * V1.23 — Hoy es un inbox: `resumen` es la superficie; el resto son detalles
+ * accesibles por «Ver detalles» o deep-link. Confirmar ya no es vista de Hoy:
+ * la firma vive en el drawer y en `/confirm`.
+ */
 export const HOY_VIEW = {
   resumen: "resumen",
   posiciones: "posiciones",
   oportunidades: "oportunidades",
   decisiones: "decisiones",
   journal: "journal",
-  confirmar: "confirmar",
 } as const;
 export type HoyView = (typeof HOY_VIEW)[keyof typeof HOY_VIEW];
+
+/** Menú de detalles en Hoy (sustituye a las pestañas L2). */
+export const HOY_DETALLES_LABEL = "Ver detalles" as const;
 
 export function hoyViewHref(view: HoyView): string {
   if (view === HOY_VIEW.resumen) return MESA_PATH;

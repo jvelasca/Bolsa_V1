@@ -38,6 +38,16 @@ import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { SEÑALES_PATH } from "@/features/confirm/daily-nav";
 import { MesaWhatIfPanel } from "@/features/mesa/mesa-what-if-panel";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
+import { OpportunityScoreBars } from "@/features/mesa/opportunity-score-bars";
+import {
+  PRIORITY_NOT_AN_ORDER,
+  buildOpportunityFunnelClocks,
+  buildOpportunityFunnelSteps,
+  formatFunnelTitle,
+  formatPriorityScore,
+  opportunityResultLabel,
+  opportunityResultTone,
+} from "@/features/mesa/mesa-opportunity-language";
 
 /** Universo diario de Opportunity Discovery = Estudio (ADR-024 / V1.21). */
 export const DEFAULT_OPPORTUNITY_UNIVERSE_LIST_ID = ESTUDIO_LIST_ID;
@@ -151,18 +161,29 @@ function OpportunityCard({
   const opinion =
     study?.opinion != null ? JOURNAL_STUDY_OPINION_LABELS[study.opinion] : "—";
   const priority = rankRow.operationalPriority;
+  const result = opportunityResultLabel(rankRow, entriesBlocked);
 
   return (
     <div
       className="rounded-md border border-border/60 bg-muted/20 px-3 py-2"
       data-testid={`mesa-candidate-${row.symbol}`}
       data-category={rankRow.category}
+      data-result={result}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-medium">
             {rankRow.rank != null ? `#${rankRow.rank} ` : ""}
             {row.symbol}
+            <span
+              className={cn(
+                "ml-2 text-[10px] font-semibold uppercase tracking-wide",
+                opportunityResultTone(result),
+              )}
+              data-testid={`mesa-candidate-result-${row.symbol}`}
+            >
+              {result}
+            </span>
           </p>
           <p
             className={cn(
@@ -179,16 +200,26 @@ function OpportunityCard({
         </div>
         <div className="text-right">
           <p className="text-sm font-semibold tabular-nums">
-            Opportunity {rankRow.quality}/100
+            {formatPriorityScore(rankRow.quality)}
+          </p>
+          <p
+            className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            data-testid={`mesa-candidate-not-order-${row.symbol}`}
+          >
+            {PRIORITY_NOT_AN_ORDER}
           </p>
           <p className="text-[10px] text-muted-foreground">
             {rankRow.qualityLabel}
           </p>
         </div>
       </div>
+      <OpportunityScoreBars
+        rankRow={rankRow}
+        className="mt-2"
+        testId={`mesa-candidate-bars-${row.symbol}`}
+      />
       <p className="mt-1 text-[10px] text-muted-foreground">
-        Quality {rankRow.quality} · Portfolio Fit {rankRow.suitability} ·
-        Operability {rankRow.operability}
+        Resultado: {result}
         <span className="ml-1 italic">(provisional · ≠ permiso)</span>
       </p>
       <dl className="mt-2 grid gap-1 text-[11px] sm:grid-cols-2">
@@ -269,10 +300,8 @@ function FunnelStrip({
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const universeLabel =
-    funnel.universeListId === "estudio" || !funnel.universeListId
-      ? "Estudio"
-      : funnel.universeListId;
+  const steps = buildOpportunityFunnelSteps(funnel);
+  const clocks = buildOpportunityFunnelClocks(funnel);
   return (
     <div
       className="rounded-md border border-border/50 bg-background/40 px-3 py-2 text-[11px]"
@@ -280,10 +309,12 @@ function FunnelStrip({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-muted-foreground">
-          {universeLabel} {funnel.universeCount} → Screening{" "}
-          {funnel.screenedCount} → Hits {funnel.hitCount} → Analizadas{" "}
-          {funnel.analyzedCount} → Setup {funnel.setupCount} → Encaje{" "}
-          {funnel.portfolioFitCount} → Operables {funnel.operableCount}
+          {steps.map((s, i) => (
+            <span key={s.label}>
+              {i > 0 ? " → " : null}
+              {s.label} {s.count}
+            </span>
+          ))}
         </p>
         <button
           type="button"
@@ -291,27 +322,38 @@ function FunnelStrip({
           onClick={onToggle}
           data-testid="mesa-funnel-why"
         >
-          {expanded ? "Ocultar embudo" : "¿Por qué no aparecen más?"}
+          {expanded
+            ? "Ocultar embudo"
+            : formatFunnelTitle(funnel.operableCount)}
         </button>
       </div>
       {expanded ? (
-        <ol
-          className="mt-2 list-decimal space-y-0.5 pl-4 text-muted-foreground"
-          data-testid="mesa-funnel-detail"
-        >
-          <li>Universo configurado: {funnel.universeCount}</li>
-          <li>Screening (último scan): {funnel.screenedCount}</li>
-          <li>Hits: {funnel.hitCount}</li>
-          <li>Análisis reciente: {funnel.analyzedCount}</li>
-          <li>Con setup (strength + R/R): {funnel.setupCount}</li>
-          <li>Encaje cartera: {funnel.portfolioFitCount}</li>
-          <li>Operables ahora: {funnel.operableCount}</li>
-          {funnel.scanStale ? (
-            <li className="text-amber-800 dark:text-amber-200">
-              Scan ausente o &gt;48h — amplía/actualiza en Señales
-            </li>
-          ) : null}
-        </ol>
+        <div className="mt-2 space-y-2" data-testid="mesa-funnel-detail">
+          <ol className="list-decimal space-y-0.5 pl-4 text-muted-foreground">
+            {steps.map((s) => (
+              <li key={s.label}>
+                {s.label}: {s.count}
+                <span className="ml-1 text-[10px]">({s.hint})</span>
+              </li>
+            ))}
+            {funnel.scanStale ? (
+              <li className="text-amber-800 dark:text-amber-200">
+                Scan ausente o &gt;48h — amplía/actualiza en Señales
+              </li>
+            ) : null}
+          </ol>
+          <dl
+            className="grid gap-1 rounded border border-border/40 bg-muted/20 px-2 py-1.5 sm:grid-cols-3"
+            data-testid="mesa-funnel-clocks"
+          >
+            {clocks.map((c) => (
+              <div key={c.id}>
+                <dt className="text-[10px] text-muted-foreground">{c.label}</dt>
+                <dd className="tabular-nums font-medium">{c.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       ) : null}
     </div>
   );
@@ -559,6 +601,7 @@ export function MesaCandidatesPanel({
         open={drawerRow != null}
         onClose={() => setDrawerRow(null)}
         rankRow={drawerRow}
+        entriesBlocked={entriesBlocked}
         portfolioRisk={portfolioRisk}
         positions={positions}
         equity={equity}

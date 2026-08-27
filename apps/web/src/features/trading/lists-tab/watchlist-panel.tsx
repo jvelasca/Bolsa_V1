@@ -16,7 +16,7 @@ function WatchlistPanelTabs({
     <div
       className="grid shrink-0 grid-cols-2 gap-1 border-b border-border bg-muted/20 p-1"
       role="tablist"
-      aria-label="Watchlist"
+      aria-label="Listas y valores"
     >
       {(
         [

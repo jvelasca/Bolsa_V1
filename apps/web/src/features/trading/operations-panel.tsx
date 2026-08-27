@@ -8,15 +8,14 @@ import { cn } from "@/lib/utils";
 
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 import { formatPct, formatPrice } from "@/features/charts/chart-utils";
 import { usePendingOrders } from "@/features/trading/use-pending-orders";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
-import {
-  MesaPositionExitActions,
-  mesaPositionShowsRoute,
-} from "@/features/mesa/mesa-position-row";
+import { mesaPositionShowsRoute } from "@/features/mesa/mesa-position-row";
 import { PositionRoutePanel } from "@/features/mesa/position-route-panel";
+import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
 
 type OperationsTab = "open" | "pending";
 
@@ -40,10 +39,39 @@ function formatR(value: number | null | undefined): string {
   return `${sign}${value.toFixed(2)}R`;
 }
 
-export function OperationsPanel() {
+/**
+ * Operaciones (dock inferior de Mercado / Libro en Hoy).
+ *
+ * Con `scopeToActiveChart` filtra al valor del gráfico activo (contexto del
+ * cockpit) y permite volver a ver la cuenta entera. Reducir / Salir encolan y
+ * abren el drawer de Confirm: no se sale de Mercado.
+ */
+export function OperationsPanel({
+  scopeToActiveChart = false,
+}: {
+  scopeToActiveChart?: boolean;
+} = {}) {
   const [tab, setTab] = useState<OperationsTab>("open");
+  const [accountWide, setAccountWide] = useState(false);
 
   const { pendingOrders, removePendingOrder } = usePendingOrders();
+
+  const activeInstrumentId = useWorkspaceStore((s) =>
+    scopeToActiveChart
+      ? (s.workspace.charts.find(
+          (chartTab) => chartTab.id === s.workspace.activeChartId,
+        )?.instrumentId ?? null)
+      : null,
+  );
+  const activeSymbol = useWorkspaceStore((s) =>
+    scopeToActiveChart
+      ? (s.workspace.charts.find(
+          (chartTab) => chartTab.id === s.workspace.activeChartId,
+        )?.label ?? null)
+      : null,
+  );
+  const scopeInstrumentId =
+    scopeToActiveChart && !accountWide ? activeInstrumentId : null;
 
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId } = useActiveAccount();
@@ -86,11 +114,29 @@ export function OperationsPanel() {
     return map;
   }, [boardQuery.data]);
 
-  const positions = portfolioQuery.data?.data.positions ?? [];
+  const allPositions = useMemo(
+    () => portfolioQuery.data?.data.positions ?? [],
+    [portfolioQuery.data],
+  );
+  const positions = useMemo(
+    () =>
+      scopeInstrumentId
+        ? allPositions.filter((p) => p.instrumentId === scopeInstrumentId)
+        : allPositions,
+    [allPositions, scopeInstrumentId],
+  );
+
+  const scopedPending = useMemo(
+    () =>
+      scopeInstrumentId
+        ? pendingOrders.filter((o) => o.instrumentId === scopeInstrumentId)
+        : pendingOrders,
+    [pendingOrders, scopeInstrumentId],
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="scroll-area flex shrink-0 gap-0.5 overflow-x-auto border-b border-border px-1">
+      <div className="scroll-area flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border px-1">
         {(
           [
             ["open", "Operaciones abiertas"],
@@ -116,11 +162,25 @@ export function OperationsPanel() {
               <span className="ml-1 opacity-70">({positions.length})</span>
             )}
 
-            {id === "pending" && pendingOrders.length > 0 && (
-              <span className="ml-1 opacity-70">({pendingOrders.length})</span>
+            {id === "pending" && scopedPending.length > 0 && (
+              <span className="ml-1 opacity-70">({scopedPending.length})</span>
             )}
           </button>
         ))}
+
+        {scopeToActiveChart && activeInstrumentId ? (
+          <button
+            type="button"
+            className="ml-auto shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+            onClick={() => setAccountWide((v) => !v)}
+            data-testid="operations-scope-toggle"
+            title="Alterna entre el valor del gráfico activo y toda la cuenta"
+          >
+            {accountWide
+              ? "Cuenta entera"
+              : `Solo ${activeSymbol ?? "valor activo"}`}
+          </button>
+        ) : null}
       </div>
 
       {tab === "open" && (
@@ -139,7 +199,9 @@ export function OperationsPanel() {
 
           {!portfolioQuery.isLoading && positions.length === 0 && (
             <p className="p-4 text-center text-xs text-muted-foreground">
-              Sin posiciones abiertas
+              {scopeInstrumentId
+                ? `Sin posición abierta en ${activeSymbol ?? "este valor"}`
+                : "Sin posiciones abiertas"}
             </p>
           )}
 
@@ -236,12 +298,13 @@ export function OperationsPanel() {
                         </td>
 
                         <td className="px-2 py-1">
-                          <MesaPositionExitActions
+                          <PositionExitDrawerActions
                             position={pos}
-                            study={study}
+                            compact
                             protectPlan={protectPlanByInstrument.get(
                               pos.instrumentId,
                             )}
+                            className="items-end"
                           />
                         </td>
                       </tr>
@@ -263,14 +326,15 @@ export function OperationsPanel() {
 
       {tab === "pending" && (
         <div className="scroll-area min-h-0 flex-1 overflow-auto">
-          {pendingOrders.length === 0 && (
+          {scopedPending.length === 0 && (
             <p className="p-4 text-center text-xs text-muted-foreground">
-              Sin órdenes pendientes — crea una orden pendiente a precio desde
-              el diálogo de operación.
+              {scopeInstrumentId
+                ? `Sin órdenes pendientes en ${activeSymbol ?? "este valor"}.`
+                : "Sin órdenes pendientes — crea una orden pendiente a precio desde el diálogo de operación."}
             </p>
           )}
 
-          {pendingOrders.length > 0 && (
+          {scopedPending.length > 0 && (
             <table className="w-full text-[11px]">
               <thead className="sticky top-0 bg-card/95 text-muted-foreground">
                 <tr className="border-b border-border">
@@ -287,7 +351,7 @@ export function OperationsPanel() {
               </thead>
 
               <tbody>
-                {pendingOrders.map((order) => (
+                {scopedPending.map((order) => (
                   <tr
                     key={order.id}
                     className="border-b border-border/50 hover:bg-accent/30"

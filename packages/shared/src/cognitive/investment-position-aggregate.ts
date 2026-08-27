@@ -78,7 +78,12 @@ export type InvestmentPositionAggregateV1 = {
     protectHint: boolean;
     discrepancy: boolean;
   };
-  targets: { target1: number | null; target2: number | null };
+  targets: {
+    target1: number | null;
+    target2: number | null;
+    /** ISO — sello H2: T1 gestionado (≠ precio alcanzó). */
+    target1AchievedAt: string | null;
+  };
   currentState: PositionManagementStateV1;
   nextAction: MesaNextActionV1;
 };
@@ -96,6 +101,8 @@ export type BuildInvestmentPositionAggregateInput = {
       currentStop?: number | null;
       target1?: number | null;
       target2?: number | null;
+      /** ISO — sello H2: T1 gestionado (reduce firmado). */
+      target1AchievedAt?: string | null;
       tradePlanId?: string | null;
       unrealizedR?: number | null;
       plannedEntry?: number | null;
@@ -308,6 +315,10 @@ export function buildInvestmentPositionAggregate(
     targets: {
       target1: currentPlan.target1,
       target2: currentPlan.target2,
+      target1AchievedAt:
+        typeof op?.target1AchievedAt === "string" && op.target1AchievedAt
+          ? op.target1AchievedAt
+          : null,
     },
     currentState,
     nextAction,

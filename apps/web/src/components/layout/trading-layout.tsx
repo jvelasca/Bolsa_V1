@@ -29,7 +29,7 @@ function pxToPct(px: number, total: number) {
 
 /**
  * Terminal Mercado / TRADING (ADR-019 + ADR-040):
- * columna izq. = Watchlist | Gráfico + Operaciones;
+ * columna izq. = Listas | Gráfico + Operaciones;
  * columna der. = Operativa a altura completa (hasta TradingStatusBar).
  * Sin HoyCommandStrip ni MesaOperationalBar — candidatos viven en Hoy.
  *
@@ -111,7 +111,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
         className="flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <DockZone
-          title="Watchlist"
+          title="Listas"
           open
           maximized
           onClose={layout.toggleLists}
@@ -138,7 +138,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
           onToggleMaximize={layout.maximizeOperations}
           className="flex-1"
         >
-          <OperationsPanel />
+          <OperationsPanel scopeToActiveChart />
         </DockZone>
       </div>
     );
@@ -169,7 +169,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
             {showLists && (
               <>
                 <DockZone
-                  title="Watchlist"
+                  title="Listas"
                   open
                   maximized={layout.listsMaximized}
                   onClose={layout.toggleLists}
@@ -242,7 +242,7 @@ export function TradingLayout({ children }: { children: ReactNode }) {
                   minHeight: 96,
                 }}
               >
-                <OperationsPanel />
+                <OperationsPanel scopeToActiveChart />
               </DockZone>
             </>
           )}

@@ -61,7 +61,15 @@ export type OpportunityFunnelV1 = {
   setupCount: number;
   portfolioFitCount: number;
   operableCount: number;
+  /**
+   * Ranking as-of = último scan Estudio. null si no hay scan
+   * (nunca inventar «ahora»).
+   */
   asOf: string | null;
+  /** Tres relojes (detalle). rankingAsOf ≡ asOf. */
+  marketDataAsOf: string | null;
+  analysisAsOf: string | null;
+  rankingAsOf: string | null;
   universeListId: string | null;
   scanStale: boolean;
   provisional: true;
@@ -125,6 +133,8 @@ export type OpportunityDiscoveryInputV1 = {
   universeCount?: number;
   universeListId?: string | null;
   scanUpdatedAt?: string | null;
+  /** Último bar OHLCV conocido (opcional; tres relojes). */
+  marketDataAsOf?: string | null;
   board?: DecisionBoardV1 | null;
   priorityCtx?: PortfolioContextForPriorityV1;
   now?: Date;
@@ -466,6 +476,13 @@ export function buildOpportunityRanking(
   const maxQuality =
     ranked.length === 0 ? 0 : Math.max(...ranked.map((r) => r.quality));
 
+  const rankingAsOf = input.scanUpdatedAt ?? null;
+  let analysisAsOf: string | null = null;
+  for (const s of analyzed) {
+    const at = typeof s.studiedAt === "string" ? s.studiedAt : null;
+    if (at && (!analysisAsOf || at > analysisAsOf)) analysisAsOf = at;
+  }
+
   const funnel: OpportunityFunnelV1 = {
     universeCount: input.universeCount ?? 0,
     screenedCount,
@@ -474,7 +491,10 @@ export function buildOpportunityRanking(
     setupCount: withSetup.length,
     portfolioFitCount,
     operableCount,
-    asOf: input.scanUpdatedAt ?? now.toISOString(),
+    asOf: rankingAsOf,
+    marketDataAsOf: input.marketDataAsOf ?? null,
+    analysisAsOf,
+    rankingAsOf,
     universeListId: input.universeListId ?? null,
     scanStale,
     provisional: true,

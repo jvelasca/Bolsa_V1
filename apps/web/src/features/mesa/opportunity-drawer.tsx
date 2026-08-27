@@ -21,6 +21,14 @@ import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { MesaWhatIfPanel } from "@/features/mesa/mesa-what-if-panel";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
+import { OpportunityScoreBars } from "@/features/mesa/opportunity-score-bars";
+import {
+  PRIORITY_NOT_AN_ORDER,
+  formatPriorityScore,
+  opportunityResultLabel,
+  opportunityResultTone,
+} from "@/features/mesa/mesa-opportunity-language";
+import { cn } from "@/lib/utils";
 import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 import { openHitInTrading } from "@/features/screeners/open-hit-in-trading";
 import { useWorkspaceStore } from "@/stores/workspace-store";
@@ -35,6 +43,7 @@ type OpportunityDrawerProps = {
   equity: number | null;
   cash: number | null;
   sectorByInstrumentId?: Record<string, string | null | undefined>;
+  entriesBlocked?: boolean;
 };
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -55,6 +64,7 @@ export function OpportunityDrawer({
   equity,
   cash,
   sectorByInstrumentId,
+  entriesBlocked = false,
 }: OpportunityDrawerProps) {
   const navigate = useNavigate();
   const openChartTab = useWorkspaceStore((s) => s.openChartTab);
@@ -71,6 +81,7 @@ export function OpportunityDrawer({
   const sector = row.instrumentId
     ? (sectorByInstrumentId?.[row.instrumentId] ?? null)
     : null;
+  const result = opportunityResultLabel(rankRow, entriesBlocked);
 
   function handleVerEnMercado() {
     if (!row.instrumentId) return;
@@ -92,11 +103,39 @@ export function OpportunityDrawer({
     <Dialog
       open={open}
       onClose={onClose}
-      title={`${row.symbol} · Opportunity ${rankRow.quality}/100`}
-      description={`${OPPORTUNITY_CATEGORY_LABEL[rankRow.category]} · ${rankRow.qualityLabel} · ranking ≠ permiso ≠ BUY`}
+      title={`${row.symbol} · ${formatPriorityScore(rankRow.quality)}`}
+      description={`${PRIORITY_NOT_AN_ORDER} · ${OPPORTUNITY_CATEGORY_LABEL[rankRow.category]} · ${rankRow.qualityLabel}`}
       className="max-w-lg"
     >
       <div className="space-y-4" data-testid="opportunity-drawer">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Resultado
+            </p>
+            <p
+              className={cn(
+                "text-sm font-semibold uppercase tracking-wide",
+                opportunityResultTone(result),
+              )}
+              data-testid="opportunity-drawer-result"
+            >
+              {result}
+            </p>
+          </div>
+          <span
+            className="rounded border border-border/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
+            data-testid="opportunity-drawer-not-order"
+          >
+            {PRIORITY_NOT_AN_ORDER}
+          </span>
+        </div>
+
+        <OpportunityScoreBars
+          rankRow={rankRow}
+          testId="opportunity-drawer-bars"
+        />
+
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <Field label="Tesis / opinión" value={opinion} />
           <Field
@@ -110,10 +149,6 @@ export function OpportunityDrawer({
           <Field
             label="Estado"
             value={`${row.statusLabel} · Gate ${row.gate}`}
-          />
-          <Field
-            label="Portfolio Fit"
-            value={`${rankRow.suitability} / Operability ${rankRow.operability}`}
           />
           {study?.hasOperationalPlan ? (
             <div className="sm:col-span-2">

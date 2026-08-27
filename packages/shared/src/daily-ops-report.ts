@@ -4,11 +4,14 @@
  * @see docs/engineering/daily-ops-report-brief-2026-08-04.md
  */
 
-import type { AccountSummaryDto, LedgerEntryDto } from './accounts.js';
-import type { InstrumentDailyOpinionV1 } from './instrument-daily-opinion.js';
-import type { OpinionChannelLevel } from './opinion-channel-map.js';
+import type { AccountSummaryDto, LedgerEntryDto } from "./accounts.js";
+import type { InstrumentDailyOpinionV1 } from "./instrument-daily-opinion.js";
+import type { OpinionChannelLevel } from "./opinion-channel-map.js";
 
-export const DAILY_OPS_REPORT_SCHEMA = 'daily_ops_report_v1' as const;
+export const DAILY_OPS_REPORT_SCHEMA = "daily_ops_report_v1" as const;
+
+/** Membresía Estudio resuelta: ok | empty | unavailable (infra ≠ 0 candidatos). */
+export type EstudioUniverseStatusV1 = "ok" | "empty" | "unavailable";
 
 export type DailyOpsWeekDayV1 = {
   /** YYYY-MM-DD */
@@ -52,6 +55,13 @@ export type DailyOpsReportV1 = {
   /** Opiniones crudas opcionales (debug / reuso). */
   opinionDetails?: InstrumentDailyOpinionV1[];
   notes: string[];
+  /**
+   * Estado del universo Estudio.
+   * unavailable ≠ empty: no interpretar fallo de infra como «0 oportunidades».
+   */
+  estudioStatus: EstudioUniverseStatusV1;
+  /** Tamaño de membresía Estudio (antes del filtro). */
+  estudioCount: number;
 };
 
 export type DailyOpsReportResponseV1 = {

@@ -373,6 +373,8 @@ async def get_daily_ops_report(
             "channels": bundle.channels,
             "opinions": bundle.opinions,
             "notes": bundle.notes,
+            "estudioStatus": bundle.estudio_status,
+            "estudioCount": bundle.estudio_count,
         }
     }
 

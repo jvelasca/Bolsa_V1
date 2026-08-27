@@ -135,18 +135,6 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
     );
   }, [instrumentId, portfolioQuery.data]);
 
-  const activePosition = useMemo(() => {
-    if (!instrumentId) return null;
-    const positions = portfolioQuery.data?.data.positions ?? [];
-    return (
-      positions.find(
-        (p) =>
-          p.instrumentId === instrumentId &&
-          Math.abs(Number(p.quantity ?? 0)) > 0,
-      ) ?? null
-    );
-  }, [instrumentId, portfolioQuery.data]);
-
   const { faByInstrument, taByInstrument, scoresLoading } =
     useInstrumentsHubScores(studyIds);
 
@@ -342,9 +330,6 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
         <OperativaCockpitCard
           instrumentId={instrumentId}
           symbol={symbol}
-          accountId={effectiveAccountId}
-          inEstudio={inEstudio}
-          position={activePosition}
           opinion={activeOpinion ?? null}
           opinionLoading={opinionsQuery.isLoading || scoresLoading}
           canPropose={
@@ -360,16 +345,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
               const { addToEstudioMembership } =
                 await import("@/features/trading/estudio-membership");
               const { added, ids } = await addToEstudioMembership([
-                {
-                  id: instrumentId,
-                  symbol,
-                  yahooSymbol: symbol,
-                  name: symbol,
-                  exchange: "—",
-                  country: "—",
-                  currency: "EUR",
-                  assetClass: "equity",
-                },
+                { instrumentId, symbol, name: symbol },
               ]);
               if (added <= 0) return;
               upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
@@ -405,23 +381,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
                 const { addToEstudioMembership } =
                   await import("@/features/trading/estudio-membership");
                 const { added, ids } = await addToEstudioMembership([
-                  {
-                    id: instrumentId,
-                    symbol,
-                    yahooSymbol: symbol,
-                    name: symbol,
-                    exchange: "—",
-                    country: "—",
-                    currency: "EUR",
-                    sector: null,
-                    isActive: true,
-                    meta: {
-                      barCount: 0,
-                      lastSync: null,
-                      lastClose: null,
-                      changePct: null,
-                    },
-                  },
+                  { instrumentId, symbol, name: symbol },
                 ]);
                 if (added <= 0) return;
                 upsertStudyMembers([{ instrumentId, symbol, name: symbol }]);
@@ -445,9 +405,14 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
 
       <TradingOperativaSection
         sectionId="recommendation"
-        title="Recomendación"
+        title="¿Por qué? · Ver detalles"
         summary={pulseSummary}
       >
+        <p className="text-[10px] leading-snug text-muted-foreground">
+          Evidencia y herramientas. La acción del día está arriba, en la tarjeta
+          del valor (fase), no aquí.
+        </p>
+
         <div className="flex flex-wrap items-center justify-between gap-1">
           <DecisionPackageChipsBar
             action={packageChips.action}
@@ -531,7 +496,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
                   ? "Cambia a SEMI en Configuración para Proponer F3"
                   : requiresEstudio && !inEstudio
                     ? "Añade el valor a Estudio primero"
-                    : "Propose → cola Confirm (Camino C)"
+                    : "Atajo avanzado: Propose → cola Confirm (Camino C). El CTA del día está en la tarjeta del valor."
               }
               onClick={() => proposeMutation.mutate()}
             >
@@ -539,7 +504,7 @@ export function TradingOperativaPanel({ className }: { className?: string }) {
                 ? "Proponiendo…"
                 : !canEnqueueConfirm
                   ? "Proponer F3 (pasa a SEMI)"
-                  : "Proponer F3 → Confirm"}
+                  : "Proponer F3 → Confirm (avanzado)"}
             </button>
             <MesaTipButton tip="operativa-proponer" className="mt-0.5" />
           </div>

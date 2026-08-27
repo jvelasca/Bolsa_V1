@@ -3,6 +3,7 @@
  */
 
 import { hoyViewHref, HOY_VIEW } from "@/features/confirm/daily-nav";
+import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
 
 export function mesaJournalTesisHref(
   instrumentId: string,
@@ -40,8 +41,9 @@ export function mesaOportunidadesHref(): string {
   return hoyViewHref(HOY_VIEW.oportunidades);
 }
 
+/** V1.23 — la firma no es vista de Hoy: drawer + `/confirm`. */
 export function mesaConfirmarHref(): string {
-  return hoyViewHref(HOY_VIEW.confirmar);
+  return CONFIRM_PATH;
 }
 
 export function mesaJournalHref(): string {

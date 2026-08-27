@@ -1,52 +1,35 @@
 /**
  * Cockpit Mercado — ¿Qué hago? sobre el valor del gráfico activo.
- * Proyección OperationalPlanView (misma que Hoy/Journal). No BUY gigante.
  *
- * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md
+ * Panel contextual por fase (V1.23 Fase 3): VIGILAR / DESCUBIERTO no muestran
+ * niveles (anti-ruido); PREPARADA → POSICIÓN muestran `OperationalPlanView`
+ * (misma proyección que Hoy / Journal). Confirm sigue siendo la firma.
+ *
+ * @see docs/engineering/diseno-mercado-2-0-cockpit-2026-08-27.md §3
  */
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-import type {
-  DecisionJournalStudyViewV1,
-  InstrumentDailyOpinionV1,
-  PositionDto,
-} from "@bolsa/shared";
-import {
-  buildInvestmentPositionAggregate,
-  buildOperationalPlanFromPosition,
-  buildOperationalPlanFromStudy,
-  pickPositionStudies,
-  studiesByDecisionIdMap,
-  studiesByInstrumentMap,
-} from "@bolsa/shared";
-import { api } from "@/lib/api";
+import { useState } from "react";
+import { formatPrice } from "@/features/charts/chart-utils";
 import { OperationalPlanView } from "@/features/mesa/operational-plan-view";
+import type { InstrumentDailyOpinionV1 } from "@bolsa/shared";
 import {
   formatConfirmDrawerCtaLabel,
   openConfirmDrawer,
 } from "@/features/confirm/confirm-drawer";
-import {
-  CONFIRM_PATH,
-  hoyViewHref,
-  HOY_VIEW,
-} from "@/features/confirm/daily-nav";
-import { useSupervisedF3QueueStore } from "@/stores/supervised-f3-queue-store";
+import { useTradingLayoutStore } from "@/stores/trading-layout-store";
 import { cn } from "@/lib/utils";
 import {
   MERCADO_COCKPIT_PHASE_LABEL,
+  mercadoCockpitNoLevelsCopy,
   mercadoCockpitPrimaryCta,
-  resolveMercadoCockpitPhase,
   type MercadoCockpitPhase,
 } from "@/features/trading/operativa-cockpit-phase";
+import { PositionExitDrawerActions } from "@/features/trading/position-exit-drawer-actions";
+import { useInstrumentOperationalContext } from "@/features/trading/use-instrument-operational-context";
 
 type OperativaCockpitCardProps = {
   instrumentId: string | null;
   symbol: string;
-  accountId: string | null;
-  inEstudio: boolean;
-  position: PositionDto | null;
   opinion?: InstrumentDailyOpinionV1 | null;
   opinionLoading?: boolean;
   onAddToEstudio?: () => void;
@@ -60,6 +43,8 @@ function phaseTone(phase: MercadoCockpitPhase): string {
   switch (phase) {
     case "posicion":
       return "border-emerald-600/40 bg-emerald-500/5";
+    case "confirmada":
+      return "border-teal-600/40 bg-teal-500/5";
     case "disparada":
     case "propuesta":
       return "border-amber-600/40 bg-amber-500/5";
@@ -75,9 +60,6 @@ function phaseTone(phase: MercadoCockpitPhase): string {
 export function OperativaCockpitCard({
   instrumentId,
   symbol,
-  accountId,
-  inEstudio,
-  position,
   opinion,
   opinionLoading,
   onAddToEstudio,
@@ -87,73 +69,13 @@ export function OperativaCockpitCard({
   className,
 }: OperativaCockpitCardProps) {
   const [whyOpen, setWhyOpen] = useState(false);
-  const queueItems = useSupervisedF3QueueStore((s) => s.items);
-  const confirmQueueCount = queueItems.length;
-  const inConfirmQueue = useMemo(() => {
-    if (!instrumentId) return false;
-    return queueItems.some((i) => i.payload.instrumentId === instrumentId);
-  }, [instrumentId, queueItems]);
+  const context = useInstrumentOperationalContext(instrumentId);
+  const operationsOpen = useTradingLayoutStore((s) => s.operationsOpen);
+  const toggleOperations = useTradingLayoutStore((s) => s.toggleOperations);
 
-  // Same source as Mesa Hoy / Libro — projection only; no history endpoint.
-  const studiesQuery = useQuery({
-    queryKey: ["decision-studies", accountId, "mesa"],
-    queryFn: () => api.getDecisionStudies(accountId!, { limit: 200 }),
-    enabled: Boolean(accountId),
-    staleTime: 30_000,
-  });
-
-  const studies = studiesQuery.data?.data?.studies ?? [];
-  const byInstrument = useMemo(
-    () => studiesByInstrumentMap(studies),
-    [studies],
-  );
-  const byDecision = useMemo(() => studiesByDecisionIdMap(studies), [studies]);
-
-  const { study, originStudy } = useMemo(() => {
-    if (!instrumentId) {
-      return {
-        study: null as DecisionJournalStudyViewV1 | null,
-        originStudy: null as DecisionJournalStudyViewV1 | null,
-      };
-    }
-    if (position && Math.abs(Number(position.quantity ?? 0)) > 0) {
-      const pair = pickPositionStudies(position, byDecision, byInstrument);
-      return {
-        study: pair.evolutionStudy,
-        originStudy: pair.originStudy,
-      };
-    }
-    const soft = byInstrument.get(instrumentId) ?? null;
-    return { study: soft, originStudy: soft };
-  }, [instrumentId, position, byInstrument, byDecision]);
-
-  const plan = useMemo(() => {
-    if (position && Math.abs(Number(position.quantity ?? 0)) > 0) {
-      const aggregate = buildInvestmentPositionAggregate({
-        position,
-        study,
-        originStudy: originStudy ?? study,
-      });
-      return buildOperationalPlanFromPosition({
-        aggregate,
-        markPrice: position.lastPrice ?? null,
-      });
-    }
-    return buildOperationalPlanFromStudy(study);
-  }, [position, study, originStudy]);
-
-  const phase = resolveMercadoCockpitPhase({
-    instrumentId,
-    inEstudio,
-    hasOpenPosition: Boolean(
-      position && Math.abs(Number(position.quantity ?? 0)) > 0,
-    ),
-    inConfirmQueue,
-    tradePlanStatus: study?.tradePlanStatus ?? null,
-    hasOperationalPlan: study?.hasOperationalPlan === true || plan.hasPlan,
-  });
-
+  const { phase, plan, study, position, trailing } = context;
   const primaryLabel = mercadoCockpitPrimaryCta(phase);
+  const noLevelsCopy = mercadoCockpitNoLevelsCopy(phase);
 
   if (!instrumentId) {
     return (
@@ -163,8 +85,9 @@ export function OperativaCockpitCard({
           className,
         )}
         data-testid="operativa-cockpit"
+        data-phase="sin_contexto"
       >
-        Selecciona un valor en listas o gráfico.
+        {noLevelsCopy}
       </div>
     );
   }
@@ -185,7 +108,7 @@ export function OperativaCockpitCard({
             {symbol}
           </p>
           <p className="text-[10px] text-muted-foreground">
-            Universo: {inEstudio ? "Estudio" : "fuera de Estudio"}
+            Universo: {context.inEstudio ? "Estudio" : "fuera de Estudio"}
             {opinion?.asOfBarDate ? ` · as-of ${opinion.asOfBarDate}` : null}
           </p>
         </div>
@@ -197,14 +120,50 @@ export function OperativaCockpitCard({
         </span>
       </div>
 
-      {studiesQuery.isLoading ? (
+      {context.loading ? (
         <p className="text-[11px] text-muted-foreground">Cargando plan…</p>
-      ) : (
+      ) : context.showsPlanLevels ? (
         <OperationalPlanView
           plan={plan}
           testId={`operativa-cockpit-plan-${symbol}`}
         />
+      ) : (
+        <p
+          className="text-[11px] leading-snug text-muted-foreground"
+          data-testid="operativa-cockpit-no-levels"
+        >
+          {noLevelsCopy ?? plan.emptyCopy}
+        </p>
       )}
+
+      {trailing.show ? (
+        <p
+          className="text-[10px] leading-snug text-muted-foreground"
+          data-testid="operativa-cockpit-trailing"
+          data-trailing-status={trailing.statusLabel ?? "recogido"}
+        >
+          <span className="font-medium text-foreground">
+            {trailing.stopVigenteLabel}
+          </span>
+          {trailing.stopVigente != null
+            ? ` ${formatPrice(trailing.stopVigente)}`
+            : " —"}
+          {trailing.stopSugerido != null ? (
+            <>
+              {" · "}
+              <span className="font-medium text-foreground/90">
+                {trailing.stopSugeridoLabel}
+              </span>
+              {` ${formatPrice(trailing.stopSugerido)}`}
+            </>
+          ) : null}
+          {trailing.statusLabel === "Revisar"
+            ? " · Revisar — trail activo sin stop sugerido resoluble."
+            : trailing.statusLabel === "No aplicado"
+              ? " · No aplicado — propuesta; Confirm firma."
+              : " · recogido en el stop vigente."}
+        </p>
+      ) : null}
 
       <div className="flex flex-col gap-1">
         {phase === "descubierto" && onAddToEstudio ? (
@@ -231,43 +190,46 @@ export function OperativaCockpitCard({
           </button>
         ) : null}
 
-        {phase === "propuesta" || phase === "disparada" ? (
+        {phase === "propuesta" ||
+        (phase === "disparada" && context.confirmQueueCount > 0) ? (
           <button
             type="button"
             className="rounded-md border border-amber-700/35 bg-amber-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-amber-500/20"
             onClick={() => openConfirmDrawer()}
             data-testid="operativa-cockpit-cta-confirm"
           >
-            {phase === "propuesta"
-              ? formatConfirmDrawerCtaLabel(confirmQueueCount)
-              : "Revisar y confirmar"}
+            {formatConfirmDrawerCtaLabel(context.confirmQueueCount)}
           </button>
         ) : null}
 
-        {phase === "posicion" ? (
-          <div className="flex flex-wrap gap-1">
-            <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
-              Mantener
-            </span>
-            <Link
-              to={hoyViewHref(HOY_VIEW.posiciones)}
-              className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-accent"
-            >
-              Reducir / salir
-            </Link>
-            <Link
-              to={CONFIRM_PATH}
-              className="rounded-md border border-border px-2 py-1 text-xs font-medium hover:bg-accent"
-            >
-              Confirmar
-            </Link>
-          </div>
+        {phase === "confirmada" ? (
+          <button
+            type="button"
+            className="rounded-md border border-teal-700/35 bg-teal-500/10 px-2 py-1.5 text-left text-xs font-medium hover:bg-teal-500/20"
+            onClick={() => {
+              if (!operationsOpen) toggleOperations();
+            }}
+            data-testid="operativa-cockpit-cta-operaciones"
+            title="Firma hecha · fill pendiente — mira Operaciones abajo"
+          >
+            {primaryLabel}
+          </button>
+        ) : null}
+
+        {phase === "posicion" && position ? (
+          <PositionExitDrawerActions position={position} showMaintain />
         ) : null}
 
         {phase === "vigilar" ? (
-          <p className="text-[10px] text-muted-foreground">
-            En supervisión. Sin disparador de entrada todavía — Ranking ≠ BUY.
-          </p>
+          <button
+            type="button"
+            className="w-fit rounded-md border border-border px-2 py-1 text-[11px] font-medium hover:bg-accent"
+            onClick={() => setWhyOpen(true)}
+            data-testid="operativa-cockpit-cta-vigilar"
+            title="Ya está en Estudio: sin disparador todavía — mira el análisis"
+          >
+            {primaryLabel}
+          </button>
         ) : null}
       </div>
 

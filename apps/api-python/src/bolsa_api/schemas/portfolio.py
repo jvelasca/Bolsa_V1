@@ -32,6 +32,8 @@ class OperationalPositionDto(BaseModel):
     current_stop: float | None = Field(alias="currentStop")
     target1: float | None = None
     target2: float | None = None
+    # H2 — sello de gestión T1 (≠ precio alcanzó el nivel).
+    target1_achieved_at: str | None = Field(default=None, alias="target1AchievedAt")
     trade_plan_id: str = Field(alias="tradePlanId")
     unrealized_r: float | None = Field(default=None, alias="unrealizedR")
     planned_entry: float | None = Field(default=None, alias="plannedEntry")

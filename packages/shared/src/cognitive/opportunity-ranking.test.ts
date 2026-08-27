@@ -81,6 +81,34 @@ describe("opportunity-ranking", () => {
     });
     expect(ranking.funnel.screenedCount).toBe(0);
     expect(ranking.funnel.scanStale).toBe(true);
+    expect(ranking.funnel.asOf).toBeNull();
+    expect(ranking.funnel.rankingAsOf).toBeNull();
+  });
+
+  it("funnel.asOf is scan time — never wall-clock when scan missing", () => {
+    const ranking = buildOpportunityRanking({
+      studies: [study()],
+      universeCount: 10,
+      screenedCount: 0,
+      scanUpdatedAt: null,
+      now: new Date("2026-08-27T12:00:00Z"),
+    });
+    expect(ranking.funnel.asOf).toBeNull();
+    expect(ranking.funnel.analysisAsOf).toBe("2026-08-27T10:00:00Z");
+  });
+
+  it("funnel.asOf equals scanUpdatedAt when scan present", () => {
+    const ranking = buildOpportunityRanking({
+      studies: [study()],
+      universeCount: 10,
+      screenedCount: 10,
+      scanUpdatedAt: "2026-08-27T08:31:00Z",
+      marketDataAsOf: "2026-08-27T00:00:00Z",
+      now: new Date("2026-08-27T12:00:00Z"),
+    });
+    expect(ranking.funnel.asOf).toBe("2026-08-27T08:31:00Z");
+    expect(ranking.funnel.rankingAsOf).toBe("2026-08-27T08:31:00Z");
+    expect(ranking.funnel.marketDataAsOf).toBe("2026-08-27T00:00:00Z");
   });
 
   it("categorizes NOT_FOR_PORTFOLIO when quality high and suitability low", () => {

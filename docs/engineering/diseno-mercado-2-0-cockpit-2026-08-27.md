@@ -1,8 +1,8 @@
 # Diseño — Mercado 2.0 (cockpit)
 
-> **AsOf:** 2026-08-27 · **Estado:** **SLICE 1 en código** — cockpit card en Operativa (fase + OperationalPlanView + CTAs). Pulso/Lab siguen debajo.
-> **Padre:** [`traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md`](./traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md) · [ADR-041](../adr/041-operational-coherence.md) · [ADR-040](../adr/040-user-information-architecture.md) §8.
-> **Regla:** Slice 1 monta `OperativaCockpitCard` en Mercado · Operativa. No nuevas puertas L1.
+> **AsOf:** 2026-08-27 · **Estado:** **SLICE 2 en código (V1.23)** — overlays del plan en gráfico · `InstrumentOperationalContext` · Listas Estudio-first · Operaciones filtradas · Pulso/Lab bajo «¿Por qué?».
+> **Padre:** [`traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md`](./traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md) · [ADR-040](../adr/040-user-information-architecture.md) §9 · [ADR-041](../adr/041-operational-coherence.md).
+> **Regla:** No nuevas puertas L1. Shell dock intacto; cambia el contenido contextual.
 
 ---
 

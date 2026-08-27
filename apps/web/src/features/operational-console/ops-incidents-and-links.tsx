@@ -101,7 +101,7 @@ export function OpsQuickLinksSection({
       testId: "ops-link-journal",
     },
     {
-      to: "/mesa?view=confirmar",
+      to: "/confirm",
       label: "Confirmar",
       hint: `Cola SEMI (${pendingConfirm} pendientes)`,
       testId: "ops-link-confirm",

@@ -135,9 +135,16 @@ export function OperationalPlanView({
           data-testid={`${testId}-trailing`}
         >
           <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-200">
-            Trailing (propuesta)
+            ↗ Trailing sugerido
           </p>
           <dl className="mt-1 space-y-0.5">
+            <Row
+              label="Stop vigente"
+              value={
+                plan.stopVigente != null ? formatPrice(plan.stopVigente) : "—"
+              }
+              tone="stop"
+            />
             {plan.trailingPeakPrice != null ? (
               <Row
                 label="Máximo alcanzado"
@@ -171,8 +178,11 @@ export function OperationalPlanView({
               />
             ) : null}
           </dl>
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            Propuesta thin · SEMI firma · no empeora el stop vigente solo
+          <p className="mt-1 text-[10px] font-medium text-amber-800 dark:text-amber-200">
+            ⚠ No aplicado
+          </p>
+          <p className="mt-0.5 text-[10px] text-muted-foreground">
+            Propuesta thin · SEMI firma · no empeora el stop vigente
           </p>
         </div>
       ) : null}

@@ -644,6 +644,7 @@ export function ChartWorkspacePage() {
                     isLoading={chartInitialLoading}
                     instrumentId={instrumentId}
                     symbol={activeTab.label}
+                    showOperationalPlanLevels
                     onOpenSyncDialog={() =>
                       openInstrumentSyncDialog(instrumentId!, activeTab.label)
                     }

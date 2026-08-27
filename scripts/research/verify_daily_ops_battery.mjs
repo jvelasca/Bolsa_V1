@@ -6,7 +6,7 @@
  *   pnpm test:daily-ops              # offline: fases 1–6
  *   pnpm test:daily-ops:offline      # alias explícito
  *   pnpm test:daily-ops -- --with-semi # incluye pytest F3 + slice SEMI ya en web-trading
- *   pnpm test:daily-ops -- --with-report # R1–R4 + digest infra
+ *   pnpm test:daily-ops -- --with-report # digest email/pdf (report unit tests are offline)
  *   pnpm test:daily-ops -- --smoke   # API smokes DÍA D + SEMI F3
  *
  * Freeze: Confirm = firma · PAPER_D_EXECUTE off · AUTO off · LIVE experimental.
@@ -62,7 +62,7 @@ if (withSemi) {
 if (withReport) {
   phase += 1;
   ok =
-    runPytest(`${phase}/${totalOffline} Python daily ops report + digest`, pyDailyOpsReportTests) &&
+    runPytest(`${phase}/${totalOffline} Python daily ops digest infra`, pyDailyOpsReportTests) &&
     ok;
 }
 

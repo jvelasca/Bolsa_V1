@@ -217,8 +217,25 @@ export function AsesorDailyOpsPanel() {
               </h2>
               <p className="mt-1 text-sm text-white/70">
                 {asOf} · modo {book.mode.toUpperCase()} · Estudio{" "}
-                {studyIds.length} valores
+                {report?.estudioCount ?? studyIds.length} valores
               </p>
+              {report?.estudioStatus === "unavailable" ? (
+                <p
+                  className="mt-2 rounded-md border border-rose-400/40 bg-rose-950/40 px-2 py-1.5 text-xs text-rose-100"
+                  data-testid="asesor-estudio-unavailable"
+                >
+                  Estudio no disponible — no se puede generar Daily Ops del
+                  universo. Esto no significa «0 oportunidades».
+                </p>
+              ) : null}
+              {report?.estudioStatus === "empty" ? (
+                <p
+                  className="mt-2 rounded-md border border-amber-400/40 bg-amber-950/40 px-2 py-1.5 text-xs text-amber-100"
+                  data-testid="asesor-estudio-empty"
+                >
+                  Estudio vacío — 0 valores en el universo supervisado.
+                </p>
+              ) : null}
             </div>
             <div className="flex flex-wrap gap-1.5">
               <Link

@@ -95,3 +95,18 @@ Si hace falta explicar Decision Spine / Consola ops / Journal / Libro para respo
 - **Hoy** = command center del día: Actuar / Priorizar / Cobertura (KPI). No dump de membresía Estudio (~180).
 - **Asesor** explica; no es una Mesa. **Cartera** gestiona lo ya comprado. **Laboratorio** prueba estrategias.
 - Ver [ADR-041](./041-operational-coherence.md) §1.1 enmienda · [relevo V1.22](../engineering/traspaso-relevo-v1-22-mercado-cockpit-freeze-2026-08-27.md).
+
+## 9. Enmienda V1.23 — UX Consolidation
+
+**Fecha:** 2026-08-27
+
+- **Hoy = inbox de 4 niveles:** Requiere acción · Oportunidades · Vigilar · Sin acción. Sin pestañas L2 en el chrome.
+- **Confirmar** no es vista de Hoy: firma = drawer + `/confirm`.
+- Detalles (Decisiones / Journal / Libro / Consola) detrás de **«Ver detalles»**; deep-links `?view=` intactos.
+- **Mercado** = cockpit operativo completo: Listas (Estudio primero) | Gráfico (overlays del plan) | Operativa contextual | Operaciones filtradas al valor.
+- Panel derecho por fase (`InstrumentOperationalContext`): en estudio **no** se muestran Entrada/Stop/T1/T2.
+- Ranking visual: **Prioridad N/100** + **NO ES UNA ORDEN** (nunca BUY).
+- Asesor: Análisis / Tesis / Journal / Investigación — sin CTA operativo primario.
+- Honestidad Estudio: `estudioStatus` = `ok` | `empty` | `unavailable` (fallo ≠ 0 candidatos).
+- Sin motores nuevos · Ranking ≠ BUY · Confirm = firma · trail ≠ autoridad.
+- Ver [diseño Mercado 2.0](../engineering/diseno-mercado-2-0-cockpit-2026-08-27.md) · [relevo V1.23](../engineering/traspaso-relevo-v1-23-ux-consolidation-2026-08-27.md).

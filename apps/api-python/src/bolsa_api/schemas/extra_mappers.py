@@ -148,6 +148,12 @@ def attach_operational_positions(
             current_stop=_finite_or_none(state_dict.get("currentStop")),
             target1=_finite_or_none(state_dict.get("target1")),
             target2=_finite_or_none(state_dict.get("target2")),
+            target1_achieved_at=(
+                str(state_dict["target1AchievedAt"])
+                if isinstance(state_dict.get("target1AchievedAt"), str)
+                and state_dict.get("target1AchievedAt")
+                else None
+            ),
             trade_plan_id=str(
                 state_dict.get("tradePlanId") or getattr(rec, "trade_plan_id", "") or ""
             ),

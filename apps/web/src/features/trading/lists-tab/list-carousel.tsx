@@ -49,6 +49,16 @@ function resolveCarouselLists(
 
   const items: InstrumentListSummaryDto[] = [];
 
+  // V1.23 — orden producto: Estudio → Cartera → resto (watchlists / catálogos).
+  const estudioId = resolveEstudioListId(apiLists);
+  if (estudioId && !hidden.has(estudioId) && !seen.has(estudioId)) {
+    const estudio = apiLists.find((entry) => entry.id === estudioId);
+    if (estudio) {
+      seen.add(estudio.id);
+      items.push(estudio);
+    }
+  }
+
   for (const list of virtualLists) {
     if (hidden.has(list.id)) continue;
 
@@ -56,16 +66,6 @@ function resolveCarouselLists(
       seen.add(list.id);
 
       items.push(list);
-    }
-  }
-
-  // Estudio API siempre visible (universo supervisión); no depende de pines.
-  const estudioId = resolveEstudioListId(apiLists);
-  if (estudioId && !hidden.has(estudioId) && !seen.has(estudioId)) {
-    const estudio = apiLists.find((entry) => entry.id === estudioId);
-    if (estudio) {
-      seen.add(estudio.id);
-      items.push(estudio);
     }
   }
 

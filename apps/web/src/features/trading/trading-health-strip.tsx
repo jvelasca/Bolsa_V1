@@ -1,12 +1,17 @@
 /**
  * Línea mínima de salud operativa en el terminal Mercado (ADR-040).
  * Sin candidatos, sin cola F3, sin «Hoy», sin venue toggle.
- * Venue / kill / OE-1 viven en Hoy → estado operativo / Cuentas.
+ * V1.23 — chip Datos = frescura del último scan Estudio (48h).
  */
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { deriveMesaRegimeHint } from "@bolsa/shared";
+import {
+  buildScanFreshnessChip,
+  deriveMesaRegimeHint,
+  ESTUDIO_LIST_ID,
+} from "@bolsa/shared";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useActiveAccount } from "@/features/accounts/use-active-account";
@@ -41,21 +46,39 @@ export function TradingHealthStrip({ className }: TradingHealthStripProps) {
     staleTime: 15_000,
   });
 
-  const healthQuery = useQuery({
-    queryKey: ["health"],
-    queryFn: api.getHealth,
-    refetchInterval: 30_000,
-    retry: 1,
+  const scanJobsQuery = useQuery({
+    queryKey: ["scan-jobs", "estudio-freshness"],
+    queryFn: () => api.getScanJobs(),
+    staleTime: 60_000,
   });
 
   const selfEvalQuery = useOpsSelfEval(effectiveAccountId);
   const board = boardQuery.data?.data;
   const regimeHint = board ? deriveMesaRegimeHint(board) : null;
   const killOn = killQuery.data?.effective === true;
-  const dataOk = healthQuery.isSuccess && !healthQuery.isError;
   const recon = portfolioReconStatusFromReport(selfEvalQuery.data);
   const riskOk = !killOn && recon !== "drift";
   const accountOk = Boolean(effectiveAccountId);
+
+  const scanChip = useMemo(() => {
+    const jobs = scanJobsQuery.data?.data ?? [];
+    const completed = jobs
+      .filter(
+        (j) =>
+          j.status === "completed" &&
+          (j.payload?.universe?.listId === ESTUDIO_LIST_ID ||
+            j.payload?.universe?.listId === "estudio"),
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.completedAt ?? b.updatedAt).getTime() -
+          new Date(a.completedAt ?? a.updatedAt).getTime(),
+      );
+    const latest = completed[0] ?? null;
+    return buildScanFreshnessChip({
+      scanUpdatedAt: latest?.completedAt ?? latest?.updatedAt ?? null,
+    });
+  }, [scanJobsQuery.data]);
 
   const mercadoLabel = killOn
     ? "Mercado bloqueado"
@@ -94,10 +117,15 @@ export function TradingHealthStrip({ className }: TradingHealthStripProps) {
       <span
         className={cn(
           "font-medium",
-          dataOk ? "text-foreground" : "text-amber-700 dark:text-amber-300",
+          scanChip.tone === "fresh" && "text-emerald-700 dark:text-emerald-300",
+          scanChip.tone === "stale" && "text-amber-700 dark:text-amber-300",
+          scanChip.tone === "missing" && "text-rose-700 dark:text-rose-300",
         )}
+        data-testid="trading-health-datos-chip"
+        data-tone={scanChip.tone}
+        title={scanChip.label}
       >
-        {okLabel(dataOk, "Datos")}
+        {scanChip.label}
       </span>
       <span aria-hidden>·</span>
       <span

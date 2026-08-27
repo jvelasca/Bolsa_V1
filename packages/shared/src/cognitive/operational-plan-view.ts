@@ -84,10 +84,10 @@ function targetTouchedByPrice(
   return isShort ? price <= target : price >= target;
 }
 
-/** Copy honesto: pendiente / alcanzado (tocado) / gestionado. */
+/** Copy honesto: pendiente / alcanzado (tocado) / pendiente de gestión / gestionado. */
 export function targetProgressHint(touched: boolean, managed: boolean): string {
   if (managed) return "✓ gestionado";
-  if (touched) return "● alcanzado";
+  if (touched) return "● alcanzado · ○ pendiente de gestión";
   return "○ pendiente";
 }
 
@@ -260,7 +260,11 @@ export function buildOperationalPlanFromPosition(input: {
       : "long";
   const isShort = direction === "short";
   const t1Touched = targetTouchedByPrice(isShort, price, t1);
-  const t1Managed = Boolean(ps?.target1AchievedAt);
+  const t1Managed = Boolean(
+    ps?.target1AchievedAt ??
+    (typeof agg?.targets.target1AchievedAt === "string" &&
+      agg.targets.target1AchievedAt),
+  );
   const t2Touched = targetTouchedByPrice(isShort, price, t2);
   const t2Managed = false;
   const t1Reached = t1Touched || t1Managed;

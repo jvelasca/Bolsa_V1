@@ -227,4 +227,70 @@ async def test_h1_filter_subset_intersects() -> None:
     )
     assert opinions.called_with[0] == ["a", "c"]
     assert [row["instrumentId"] for row in bundle.opinions] == ["a", "c"]
+    assert bundle.estudio_status == "ok"
+    assert bundle.estudio_count == 3
 
+
+@pytest.mark.asyncio
+async def test_estudio_empty_vs_unavailable() -> None:
+    """V1.23 — empty ≠ unavailable; no fingir 0 candidatos por fallo de infra."""
+    as_of = date(2026, 8, 27)
+
+    empty_uc = GetDailyOpsReport(
+        _FakeSummary(),  # type: ignore[arg-type]
+        _FakeLedger([]),  # type: ignore[arg-type]
+        _FakeF3([]),  # type: ignore[arg-type]
+        opinion_repo=_FakeOpinions(),  # type: ignore[arg-type]
+        get_estudio=_FakeEstudio([]),
+    )
+    empty = await empty_uc.execute("acc-1", as_of=as_of)
+    assert empty.estudio_status == "empty"
+    assert empty.estudio_count == 0
+    assert empty.opinions == []
+    assert any("Estudio vacío" in n for n in empty.notes)
+    assert not any("no disponible" in n for n in empty.notes)
+
+    none_uc = GetDailyOpsReport(
+        _FakeSummary(),  # type: ignore[arg-type]
+        _FakeLedger([]),  # type: ignore[arg-type]
+        _FakeF3([]),  # type: ignore[arg-type]
+        opinion_repo=_FakeOpinions(),  # type: ignore[arg-type]
+        get_estudio=None,
+    )
+    unavailable = await none_uc.execute("acc-1", as_of=as_of)
+    assert unavailable.estudio_status == "unavailable"
+    assert unavailable.estudio_count == 0
+    assert unavailable.opinions == []
+    assert any("no disponible" in n for n in unavailable.notes)
+
+
+class _BrokenEstudio:
+    async def execute(self, list_id: str) -> Any:
+        raise RuntimeError("db down")
+
+
+class _NoneDetailEstudio:
+    async def execute(self, list_id: str) -> Any:
+        return None
+
+
+class _BadShapeEstudio:
+    async def execute(self, list_id: str) -> Any:
+        return SimpleNamespace(instrument_ids="not-a-list")
+
+
+@pytest.mark.asyncio
+async def test_estudio_unavailable_on_infra_failure() -> None:
+    as_of = date(2026, 8, 27)
+    for port in (_BrokenEstudio(), _NoneDetailEstudio(), _BadShapeEstudio()):
+        uc = GetDailyOpsReport(
+            _FakeSummary(),  # type: ignore[arg-type]
+            _FakeLedger([]),  # type: ignore[arg-type]
+            _FakeF3([]),  # type: ignore[arg-type]
+            opinion_repo=_FakeOpinions(),  # type: ignore[arg-type]
+            get_estudio=port,  # type: ignore[arg-type]
+        )
+        bundle = await uc.execute("acc-1", as_of=as_of)
+        assert bundle.estudio_status == "unavailable"
+        assert bundle.opinions == []
+        assert any("no disponible" in n for n in bundle.notes)

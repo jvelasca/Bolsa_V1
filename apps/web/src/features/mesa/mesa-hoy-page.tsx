@@ -1,14 +1,16 @@
 /**
- * Hoy — command center diario (ADR-037 + ADR-040 · V1.22).
- * Jobs: Actuar · Priorizar · Cobertura KPI. Journal = propose.
- * Vista ?view=cobertura = epic posterior.
+ * Hoy — inbox diario (ADR-037 + ADR-040 · V1.23 Fase 4).
+ *
+ * Cuatro bloques: Requiere acción · Oportunidades · Vigilar · Sin acción.
+ * Las vistas de detalle salen del chrome (menú «Ver detalles»); los deep-links
+ * `?view=` siguen vivos. La firma es el drawer de Confirmar / `/confirm`.
  */
 
 import { useMemo, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
-import type { ProtectPlanV1 } from "@bolsa/shared";
+import type { ExitSuggestedActionV1, ProtectPlanV1 } from "@bolsa/shared";
 import {
   buildMesaActionQueue,
   buildMesaOperationalHeader,
@@ -21,6 +23,7 @@ import {
   buildInvestmentPositionAggregate,
   computeSectorExposurePct,
   filterMesaAttentionItems,
+  mapMesaNextAction,
   mesaEntriesBlocked,
   pickPositionStudies,
   studiesByDecisionIdMap,
@@ -40,30 +43,45 @@ import {
   portfolioReconStatusFromReport,
   useOpsSelfEval,
 } from "@/features/operational-console/use-ops-self-eval";
-import { MesaOperationalHeaderStrip } from "@/features/mesa/mesa-operational-header";
-import { MesaSessionStateCard } from "@/features/mesa/mesa-session-state-card";
 import { MesaCoberturaKpi } from "@/features/mesa/mesa-cobertura-kpi";
-import { MesaLevelSection } from "@/features/mesa/mesa-level-section";
+import { MesaInboxBlock } from "@/features/mesa/mesa-inbox-block";
+import { MesaHoyDetailsMenu } from "@/features/mesa/mesa-hoy-details-menu";
+import { MesaDatosChip } from "@/features/mesa/mesa-datos-chip";
+import { MesaOpportunitiesTeaser } from "@/features/mesa/mesa-opportunities-teaser";
+import { MesaWatchList } from "@/features/mesa/mesa-watch-list";
 import { MesaAttentionQueue } from "@/features/mesa/mesa-attention-queue";
 import { MesaPositionsSummary } from "@/features/mesa/mesa-positions-summary";
 import { MesaDecisionAlertsPanel } from "@/features/mesa/mesa-decision-alerts-panel";
 import { MesaLibroPanel } from "@/features/mesa/mesa-libro-panel";
 import { DecisionSpineDetailPanel } from "@/features/mesa/decision-spine-detail-panel";
 import { mesaOperationalConsoleHref } from "@/features/mesa/mesa-nav-links";
-import { HOY_VIEW_TABS, parseHoyView } from "@/features/mesa/mesa-hoy-view";
-import {
-  HOY_VIEW,
-  hoyViewHref,
-  type HoyView,
-} from "@/features/confirm/daily-nav";
-import { ConfirmPage } from "@/features/confirm/confirm-page";
+import { parseHoyView } from "@/features/mesa/mesa-hoy-view";
+import { HOY_VIEW, hoyViewHref } from "@/features/confirm/daily-nav";
+import { CONFIRM_PATH } from "@/features/confirm/confirm-nav";
+import { openConfirmDrawer } from "@/features/confirm/confirm-drawer";
 import { DecisionJournalPage } from "@/features/decision-journal/decision-journal-page";
 import { api } from "@/lib/api";
 import { useActiveAccountQueryKey } from "@/stores/active-account-store";
-import { cn } from "@/lib/utils";
 
 const STUDIES_LIMIT = 200;
 const MESA_REFETCH_MS = 60_000;
+
+const EXIT_SUGGESTED_ACTIONS = new Set([
+  "hold",
+  "protect",
+  "reduce",
+  "full_exit",
+]);
+
+/** El wire trae `suggestedAction` como string; no se asume acción desconocida. */
+function parseExitSuggestedAction(
+  raw: string | null | undefined,
+): ExitSuggestedActionV1 | null {
+  if (raw && EXIT_SUGGESTED_ACTIONS.has(raw)) {
+    return raw as ExitSuggestedActionV1;
+  }
+  return null;
+}
 
 function formatHoyDate(d = new Date()): string {
   return d.toLocaleDateString(undefined, {
@@ -76,23 +94,12 @@ function formatHoyDate(d = new Date()): string {
 export function MesaHoyPage() {
   const accountScope = useActiveAccountQueryKey();
   const { effectiveAccountId, account } = useActiveAccount();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const view = parseHoyView(
     searchParams.get("view"),
     searchParams.get("focus"),
   );
   const libroRef = useRef<HTMLDivElement | null>(null);
-
-  function setView(next: HoyView) {
-    const params = new URLSearchParams(searchParams);
-    params.delete("focus");
-    if (next === HOY_VIEW.resumen) {
-      params.delete("view");
-    } else {
-      params.set("view", next);
-    }
-    setSearchParams(params, { replace: true });
-  }
 
   const selfEvalQuery = useOpsSelfEval(effectiveAccountId);
   const portfolioReconStatus = portfolioReconStatusFromReport(
@@ -513,6 +520,45 @@ export function MesaHoyPage() {
     [decisionAlerts, positionAggregates, portfolioRisk],
   );
 
+  const pendingSignature = Math.max(
+    board?.buckets?.pendingConfirm ?? 0,
+    board?.semiF3Queue?.length ?? 0,
+  );
+
+  /** Posiciones cuya siguiente acción es Proteger / Reducir / Salir. */
+  const positionsNeedingAction = useMemo(() => {
+    const discrepancySymbols = new Set(
+      protectionDiscrepancies.map((d) => d.symbol),
+    );
+    const out: Array<{ symbol: string; label: string }> = [];
+    for (const position of positions) {
+      const next = mapMesaNextAction({
+        hasOpenPosition: true,
+        protectPlan: protectPlanByInstrument.get(position.instrumentId) ?? null,
+        exitSuggestedAction: parseExitSuggestedAction(
+          position.operational?.exitPlan?.suggestedAction,
+        ),
+        protectionDiscrepancy: discrepancySymbols.has(position.symbol),
+      });
+      if (
+        next.kind === "protect" ||
+        next.kind === "reduce" ||
+        next.kind === "exit"
+      ) {
+        out.push({ symbol: position.symbol, label: next.label });
+      }
+    }
+    return out;
+  }, [positions, protectPlanByInstrument, protectionDiscrepancies]);
+
+  const watchRows = useMemo(
+    () => opportunityRanking.all.filter((row) => row.category === "WATCH"),
+    [opportunityRanking],
+  );
+
+  const requiereAccionCount =
+    attentionItems.length + pendingSignature + positionsNeedingAction.length;
+
   const isRefreshing =
     boardQuery.isFetching ||
     portfolioQuery.isFetching ||
@@ -547,44 +593,38 @@ export function MesaHoyPage() {
               {formatHoyDate()}
               {account ? ` · ${account.name}` : ""} — ¿qué debo hacer?
             </p>
+            <div className="mt-2">
+              <MesaDatosChip
+                scanUpdatedAt={opportunityRanking.funnel.rankingAsOf}
+              />
+            </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={refreshAll}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={`mr-1.5 h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-            Actualizar
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={refreshAll}
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={`mr-1.5 h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              Actualizar
+            </Button>
+            <MesaHoyDetailsMenu />
+          </div>
         </div>
 
-        <nav
-          className="flex flex-wrap gap-1 border-b border-border pb-2"
-          aria-label="Vistas de Hoy"
-          data-testid="hoy-view-tabs"
-        >
-          {HOY_VIEW_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setView(tab.id)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                view === tab.id
-                  ? "bg-accent text-primary"
-                  : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-              )}
-              data-testid={`hoy-tab-${tab.id}`}
-              aria-current={view === tab.id ? "page" : undefined}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+        {view !== HOY_VIEW.resumen ? (
+          <Link
+            to={hoyViewHref(HOY_VIEW.resumen)}
+            className="inline-block text-xs text-primary hover:underline"
+            data-testid="hoy-back-to-inbox"
+          >
+            ← Volver a Hoy
+          </Link>
+        ) : null}
 
         {incidentsFailed ? (
           <div
@@ -623,88 +663,125 @@ export function MesaHoyPage() {
         ) : null}
 
         {view === HOY_VIEW.resumen ? (
-          <>
-            <MesaLevelSection
-              level={1}
-              title="Qué ocurre"
-              description="Mercado, riesgo, datos y sistema — sin ejecutar."
-              testId="mesa-level-occurs"
+          <div className="space-y-6" data-testid="hoy-inbox">
+            <MesaInboxBlock
+              title="Requiere acción"
+              description="Atención, firmas pendientes y posiciones que piden Proteger / Reducir / Salir."
+              count={requiereAccionCount}
+              emptyLabel="Nada requiere tu acción"
+              testId="mesa-inbox-requiere-accion"
             >
-              <MesaOperationalHeaderStrip header={operationalHeader} />
-              <MesaSessionStateCard session={sessionState} />
-              <MesaCoberturaKpi
-                frescos={opportunityRanking.funnel.analyzedCount}
-                universeCount={opportunityRanking.funnel.universeCount}
-              />
+              {pendingSignature > 0 ? (
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm"
+                  data-testid="mesa-inbox-f3-pending"
+                >
+                  <p className="font-medium text-amber-950 dark:text-amber-100">
+                    {pendingSignature} pendiente
+                    {pendingSignature === 1 ? "" : "s"} de firma
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-primary hover:underline"
+                      onClick={() => openConfirmDrawer()}
+                    >
+                      Abrir Confirm
+                    </button>
+                    <Link
+                      to={CONFIRM_PATH}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Ir a /confirm
+                    </Link>
+                  </div>
+                </div>
+              ) : null}
+              <MesaAttentionQueue items={attentionItems} board={board} />
+              {positionsNeedingAction.length > 0 ? (
+                <ul
+                  className="space-y-1 rounded-md border border-border/60 px-3 py-2 text-xs"
+                  data-testid="mesa-inbox-positions-action"
+                >
+                  {positionsNeedingAction.map((row) => (
+                    <li key={row.symbol} className="flex justify-between gap-2">
+                      <span className="font-medium">{row.symbol}</span>
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => openConfirmDrawer()}
+                      >
+                        {row.label}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
               <MesaDecisionAlertsPanel
                 alerts={decisionAlerts}
                 unifiedAlerts={unifiedAlerts}
               />
-            </MesaLevelSection>
+            </MesaInboxBlock>
 
-            <MesaLevelSection
-              level={2}
-              title="Qué debo hacer"
-              description="Actuar — atención y posiciones. Confirm es la firma."
-              testId="mesa-level-do"
+            <MesaInboxBlock
+              title="Oportunidades"
+              description="Prioridad del ranking — no es una orden. Confirm firma."
+              count={opportunityRanking.top.length}
+              emptyLabel="Sin oportunidades TOP"
+              testId="mesa-inbox-oportunidades"
             >
-              <MesaAttentionQueue items={attentionItems} board={board} />
-              <MesaPositionsSummary
-                positions={positions}
-                protectPlanByInstrument={protectPlanByInstrument}
-                studiesByInstrument={studiesMap}
-                studiesByDecisionId={studiesByDecision}
+              <MesaOpportunitiesTeaser
+                rows={opportunityRanking.top}
+                entriesBlocked={entriesBlocked}
+                operableCount={opportunityRanking.funnel.operableCount}
+                verTodasHref={hoyViewHref(HOY_VIEW.oportunidades)}
               />
-              <p className="text-xs text-muted-foreground">
-                {attentionItems.length} en atención · {positions.length}{" "}
-                posiciones
-              </p>
-            </MesaLevelSection>
+            </MesaInboxBlock>
 
-            <MesaLevelSection
-              level={3}
-              title="Qué podría hacer"
-              description="Priorizar — TOP oportunidades (ranking ≠ BUY). Detalle en Oportunidades."
-              testId="mesa-level-could"
+            <MesaInboxBlock
+              title="Vigilar"
+              description="Interesantes todavía no preparadas — sin CTA de compra."
+              count={watchRows.length}
+              emptyLabel="Nada en vigilancia"
+              testId="mesa-inbox-vigilar"
             >
+              <MesaWatchList rows={watchRows} />
+            </MesaInboxBlock>
+
+            <MesaInboxBlock
+              title="Sin acción"
+              description="Cobertura Estudio y frescura — información secundaria."
+              count={null}
+              testId="mesa-inbox-sin-accion"
+              headerRight={
+                <MesaDatosChip
+                  scanUpdatedAt={opportunityRanking.funnel.rankingAsOf}
+                />
+              }
+            >
+              <MesaCoberturaKpi
+                frescos={opportunityRanking.funnel.analyzedCount}
+                universeCount={opportunityRanking.funnel.universeCount}
+              />
               <div
-                className="rounded-md border border-border/60 bg-muted/10 px-4 py-3 text-sm"
-                data-testid="mesa-resumen-priorizar"
+                className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
+                data-testid="mesa-system-health-link"
               >
                 <p className="font-medium">
-                  {opportunityRanking.top.length} oportunidades TOP
-                  {opportunityRanking.funnel.operableCount > 0
-                    ? ` · ${opportunityRanking.funnel.operableCount} operables`
-                    : ""}
+                  Estado operativo: {operationalHeader.operationalStatusLabel}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  El ranking prioriza; no autoriza. Confirm firma.
+                  Salud del sistema, recon e incidentes — solo si hace falta.
                 </p>
                 <Link
-                  to={hoyViewHref(HOY_VIEW.oportunidades)}
-                  className="mt-2 inline-block text-xs font-medium text-primary hover:underline"
+                  to={mesaOperationalConsoleHref()}
+                  className="mt-2 inline-block text-xs text-primary hover:underline"
                 >
-                  Ver oportunidades →
+                  Detalles operativos →
                 </Link>
               </div>
-            </MesaLevelSection>
-
-            <div
-              className="rounded-md border border-border/60 bg-muted/20 px-4 py-3 text-sm"
-              data-testid="mesa-system-health-link"
-            >
-              <p className="font-medium">Estado operativo</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Salud del sistema, recon e incidentes — solo si hace falta.
-              </p>
-              <Link
-                to={mesaOperationalConsoleHref()}
-                className="mt-2 inline-block text-xs text-primary hover:underline"
-              >
-                Detalles operativos →
-              </Link>
-            </div>
-          </>
+            </MesaInboxBlock>
+          </div>
         ) : null}
 
         {view === HOY_VIEW.posiciones ? (
@@ -747,12 +824,6 @@ export function MesaHoyPage() {
               isLoading={boardQuery.isLoading}
               isError={boardQuery.isError}
             />
-          </div>
-        ) : null}
-
-        {view === HOY_VIEW.confirmar ? (
-          <div data-testid="hoy-view-confirmar" className="-mx-4 sm:-mx-6">
-            <ConfirmPage />
           </div>
         ) : null}
 

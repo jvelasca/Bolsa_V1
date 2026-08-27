@@ -1,14 +1,23 @@
 /**
  * Vistas de Hoy (`?view=`) + compat `?focus=` (ADR-040).
+ *
+ * V1.23 Fase 4 — Hoy es un inbox de cuatro bloques. Las vistas de detalle ya
+ * no son pestañas de chrome: se abren desde «Ver detalles» o por deep-link.
  */
 
-import { HOY_VIEW, type HoyView } from "@/features/confirm/daily-nav";
+import {
+  HOY_VIEW,
+  OPERATIONAL_CONSOLE_PATH,
+  hoyViewHref,
+  type HoyView,
+} from "@/features/confirm/daily-nav";
 
 const VALID: ReadonlySet<string> = new Set(Object.values(HOY_VIEW));
 
 /**
  * Resuelve la vista activa.
  * Compat V1.19: focus=spine → decisiones; focus=libro → posiciones.
+ * `view=confirmar` (V1.22) cae en resumen: la firma vive en `/confirm`.
  */
 export function parseHoyView(
   viewRaw: string | null,
@@ -22,14 +31,45 @@ export function parseHoyView(
   return HOY_VIEW.resumen;
 }
 
-export const HOY_VIEW_TABS: ReadonlyArray<{
-  id: HoyView;
+/** Bloques del inbox (orden de lectura garantizado). */
+export const HOY_INBOX_BLOCKS = [
+  { id: "requiere-accion", title: "Requiere acción" },
+  { id: "oportunidades", title: "Oportunidades" },
+  { id: "vigilar", title: "Vigilar" },
+  { id: "sin-accion", title: "Sin acción" },
+] as const;
+
+export type HoyInboxBlockId = (typeof HOY_INBOX_BLOCKS)[number]["id"];
+
+/** Menú «Ver detalles» — no son puertas L1 ni pestañas. */
+export const HOY_DETAIL_ITEMS: ReadonlyArray<{
+  id: string;
   label: string;
+  href: string;
+  hint: string;
 }> = [
-  { id: HOY_VIEW.resumen, label: "Resumen" },
-  { id: HOY_VIEW.posiciones, label: "Posiciones" },
-  { id: HOY_VIEW.oportunidades, label: "Oportunidades" },
-  { id: HOY_VIEW.decisiones, label: "Decisiones" },
-  { id: HOY_VIEW.confirmar, label: "Confirmar" },
-  { id: HOY_VIEW.journal, label: "Journal" },
+  {
+    id: "decisiones",
+    label: "Decisiones",
+    href: hoyViewHref(HOY_VIEW.decisiones),
+    hint: "Sesiones, gates y vetos",
+  },
+  {
+    id: "journal",
+    label: "Journal",
+    href: hoyViewHref(HOY_VIEW.journal),
+    hint: "Tesis, evolución e historial",
+  },
+  {
+    id: "posiciones",
+    label: "Libro / Posiciones",
+    href: hoyViewHref(HOY_VIEW.posiciones),
+    hint: "Posiciones abiertas y órdenes",
+  },
+  {
+    id: "consola",
+    label: "Consola",
+    href: OPERATIONAL_CONSOLE_PATH,
+    hint: "Salud operativa, recon e incidentes",
+  },
 ];
