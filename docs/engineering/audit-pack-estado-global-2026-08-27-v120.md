@@ -1,8 +1,8 @@
 # Audit pack — estado global v1.20 (Arquitectura de usuario / consolidación UX)
 
-> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.20-beta` → `cb849514`** (feature `a28e4a93`). Partida **`v1.19-beta` → `dc9327d`**.
+> **AsOf:** 2026-08-27 · **Tag (stamp):** **`v1.20-beta` → `4c0bfe7b`** (feature `a28e4a93`). Partida **`v1.19-beta` → `dc9327d`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · [ADR-040](../adr/040-user-information-architecture.md) · ADR-037 §8 · pack previo [`audit-pack-estado-global-2026-08-27-v119.md`](./audit-pack-estado-global-2026-08-27-v119.md).
-> **Para:** auditoría cruzada post-v1.20 · Release tag CI (pin tras GREEN).
+> **Para:** auditoría cruzada post-v1.20 · Release tag CI [GREEN](https://github.com/jvelasca/Bolsa_V1/actions/runs/33088471949).
 
 ---
 
@@ -36,18 +36,20 @@ Ciclo **V1.20** **CERRADO** (arquitectura de información de usuario + cleanup d
 
 ## 2. Batería (local, 2026-08-27)
 
-| Gate                                          | Resultado                  |
-| --------------------------------------------- | -------------------------- |
-| Web `tsc --noEmit`                            | OK                         |
-| Web daily-nav + mesa-hoy + zone1 + candidates | **35** passed              |
-| `pnpm test:decision-spine`                    | **497** (sin cambio spine) |
+| Gate                          | Resultado                  |
+| ----------------------------- | -------------------------- |
+| Web `tsc --noEmit`            | OK                         |
+| `pnpm test:daily-ops:offline` | **1145** (6 fases)         |
+| `pnpm test:decision-spine`    | **497** (sin cambio spine) |
 
 ```bash
 pnpm --filter @bolsa/web exec tsc --noEmit
-pnpm --filter @bolsa/web test -- daily-nav mesa-zone1 mesa-hoy-view mesa-candidates mesa-hoy
+pnpm test:daily-ops:offline
 pnpm test:decision-spine
-# expect: 497 passed
+# expect: daily-ops 1145 · spine 497
 ```
+
+Manifest: `scripts/research/daily-ops-manifest.mjs`. Fases: shared 355 · web Mesa 89 · web Trading 121 · web CORE-R 50 · py spine 497 · py operativa 33.
 
 Spine: **497** (v1.19) → **497** (v1.20; UX-only).
 
