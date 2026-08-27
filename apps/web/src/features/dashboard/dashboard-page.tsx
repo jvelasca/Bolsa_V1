@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/card";
 import {
   accountTypeShortLabel,
-  useActivateAccount,
   useActiveAccount,
 } from "@/features/accounts/use-active-account";
 import { HELP_CONTENT_AS_OF } from "@/features/help/help-content-as-of";
@@ -65,7 +64,6 @@ function Metric({
 function ActiveAccountPanel() {
   const { account, effectiveAccountId, accounts, isLoading } =
     useActiveAccount();
-  const activate = useActivateAccount();
   const openWizard = useUiStore((s) => s.openCreateAccountWizard);
 
   const summaryQuery = useQuery({
@@ -106,8 +104,8 @@ function ActiveAccountPanel() {
               </div>
               <p className="max-w-xl text-sm text-muted-foreground">
                 Con esta cuenta opera toda la app (Trading, barra inferior,
-                órdenes e historial). Se restaura al reabrir. El resto son
-                cuentas disponibles para cambiar cuando quieras.
+                órdenes e historial). Se restaura al reabrir. Cambia o limpia
+                demos en Cuentas — aquí no listamos el catálogo completo.
               </p>
             </>
           ) : (
@@ -168,29 +166,22 @@ function ActiveAccountPanel() {
       )}
 
       {otherAccounts.length > 0 && (
-        <div className="mt-4 border-t border-border pt-3">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Otras cuentas disponibles ({otherAccounts.length})
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
+          <p className="text-sm text-muted-foreground">
+            {otherAccounts.length} otra
+            {otherAccounts.length === 1 ? "" : "s"} cuenta
+            {otherAccounts.length === 1 ? "" : "s"} activa
+            {otherAccounts.length === 1 ? "" : "s"} — gestionar en Cuentas (no
+            se listan aquí).
           </p>
-          <ul className="flex flex-wrap gap-2">
-            {otherAccounts.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  disabled={activate.isPending}
-                  onClick={() => void activate.mutateAsync(item.id)}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-sm hover:border-primary/40 hover:bg-accent disabled:opacity-50"
-                  title="Usar ahora como cuenta activa"
-                >
-                  <span className="text-[10px] uppercase text-muted-foreground">
-                    {accountTypeShortLabel(item.type)}
-                  </span>
-                  <span className="font-medium">{item.name}</span>
-                  <span className="text-xs text-primary">Usar</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <Link
+            to="/accounts"
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-sm hover:bg-accent"
+            data-testid="overview-other-accounts-link"
+          >
+            Ver cuentas
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
       )}
     </section>
