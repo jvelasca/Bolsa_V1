@@ -49,4 +49,4 @@ Inbox único: `MARKET | DECISION | POSITION | RISK | SYSTEM` sobre alertas exist
 
 - Correlación/stress en fase separada vs stub (`portfolioStressRiskR`)
 - Endpoint read-only backend para scenario (opcional)
-- Opportunity Engine / best next R
+- Opportunity Engine / best next R — **primera rebanada (contrato):** `OpportunityEvidenceV1` + `projectOpportunityEvidence` (Quality pura) + `BestNextRProjectionV1` en [`opportunity-evidence.ts`](../../packages/shared/src/cognitive/opportunity-evidence.ts). Provisional, ≠ BUY, ≠ Permission. **Aún pendiente:** cablear Quality de Priority al evidence (pesos 35/35/30 intactos), UI Mesa, endpoint, Actionability v1.
