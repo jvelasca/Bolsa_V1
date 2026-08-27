@@ -71,14 +71,16 @@ Confirm = firma · DEX-1…5 · `PAPER_D_EXECUTE` off · AUTO off · BETA · Sce
 
 ## 4. Deuda restante (explícita)
 
-| ID      | Limitación                         | Severidad                                              |
-| ------- | ---------------------------------- | ------------------------------------------------------ |
-| STRESS  | `portfolioStressRiskR` stub        | Producto V1.19+                                        |
-| OPP     | Opportunity Engine                 | Producto                                               |
-| V118    | Position → DecisionPackage durable | ADR-038 · **L1+L2a CERRADOS** (B-read/backfill parked) |
-| LAB-B   | Backtest ≠ TradingPolicy           | Lab                                                    |
-| THAW    | Accept estricto 60d/50/70/55       | Deuda larga                                            |
-| AUTO-ON | AUTO on / LIVE producción          | Freeze                                                 |
+| ID      | Limitación                                                           | Severidad                                              |
+| ------- | -------------------------------------------------------------------- | ------------------------------------------------------ |
+| STRESS  | `portfolioStressRiskR` stub → **MVP `concurrent_stops_v0` en v1.18** | Histórico → pack v118                                  |
+| OPP     | Opportunity Engine → **Evidence V1 contrato en v1.18** (UI parked)   | Histórico → pack v118                                  |
+| V118    | Position → DecisionPackage durable                                   | ADR-038 · **L1+L2a CERRADOS** (B-read/backfill parked) |
+| LAB-B   | Backtest ≠ TradingPolicy                                             | Lab                                                    |
+| THAW    | Accept estricto 60d/50/70/55                                         | Deuda larga                                            |
+| AUTO-ON | AUTO on / LIVE producción                                            | Freeze                                                 |
+
+> **Sucesor:** [`audit-pack-estado-global-2026-08-27-v118.md`](./audit-pack-estado-global-2026-08-27-v118.md) · tag `v1.18-beta`.
 
 ---
 
