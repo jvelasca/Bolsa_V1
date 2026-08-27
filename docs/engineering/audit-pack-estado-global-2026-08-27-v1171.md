@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.17.1 (Hardening + refinamiento Mesa)
 
-> **AsOf:** 2026-08-27 · **Tag:** **`v1.17.1-beta`** (stamp al publicar). Partida **`v1.17-beta` → `62ebc4f`**.
+> **AsOf:** 2026-08-27 · **Tag:** **`v1.17.1-beta` → `e0ae633`**. Partida **`v1.17-beta` → `62ebc4f`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · plan [`plan-v1171-hardening-2026-08-27.md`](./plan-v1171-hardening-2026-08-27.md) · ADR-038 · ADR-039 · pack previo [`audit-pack-estado-global-2026-08-27-v117.md`](./audit-pack-estado-global-2026-08-27-v117.md).
 > **Para:** auditoría cruzada post-hardening · Release tag CI.
 

@@ -1,7 +1,7 @@
 # RELEVO — tag v1.17.1-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v1171.md`](./audit-pack-estado-global-2026-08-27-v1171.md) · [`traspaso-relevo-tag-v1-17-beta-2026-08-27.md`](./traspaso-relevo-tag-v1-17-beta-2026-08-27.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.17.1-beta` (hardening + refino Mesa). SHA stamp en `CURRENT_SYSTEM` tras tag.
+> **Estado:** **PUBLICACIÓN** — tag `v1.17.1-beta` → `e0ae633` (hardening + refino Mesa).
 > **Arranque chat nuevo / auditor:** pack v1171 + plan-v1171 + ADR-038/039 + `CURRENT_SYSTEM.md` + este relevo.
 
 ---
@@ -18,7 +18,7 @@
 
 | Pieza        | Valor                                                                                            |
 | ------------ | ------------------------------------------------------------------------------------------------ |
-| Tag          | `v1.17.1-beta`                                                                                   |
+| Tag          | `v1.17.1-beta` → `e0ae633`                                                                       |
 | Previo       | `v1.17-beta` → `62ebc4f`                                                                         |
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v1171.md`](./audit-pack-estado-global-2026-08-27-v1171.md) |
 | Spine        | `pnpm test:decision-spine` **495**                                                               |
