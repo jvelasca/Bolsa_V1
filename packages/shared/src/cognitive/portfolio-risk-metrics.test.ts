@@ -5,6 +5,7 @@ import {
   computeSectorExposurePct,
   portfolioRiskLimitR,
   sumPortfolioOpenRiskR,
+  sumPortfolioStressRiskR,
   sumPortfolioUnrealizedR,
 } from "./portfolio-risk-metrics.js";
 
@@ -57,8 +58,55 @@ describe("portfolio-risk-metrics", () => {
 
   it("buildPortfolioRiskSnapshot", () => {
     const snap = buildPortfolioRiskSnapshot({ positions: [] });
-    expect(snap.portfolioStressRiskR).toBeNull();
+    expect(snap.portfolioStressRiskR).toBe(0);
     expect(snap.portfolioRiskLimitR).toBe(5);
+  });
+
+  describe("sumPortfolioStressRiskR (concurrent_stops_v0)", () => {
+    it("empty portfolio → 0", () => {
+      expect(sumPortfolioStressRiskR([])).toBe(0);
+    });
+
+    it("two complete positions → sum of openRiskR", () => {
+      const positions = [
+        {
+          avgCost: 100,
+          quantity: 10,
+          operational: { currentStop: 95, direction: "long" },
+          study: { stop: 95, riskAmount: 500 },
+        },
+        {
+          avgCost: 50,
+          quantity: 20,
+          operational: { currentStop: 48, direction: "long" },
+          study: { stop: 48, riskAmount: 200 },
+        },
+      ];
+      // (5*10)/500 + (2*20)/200 = 0.1 + 0.2 = 0.3
+      expect(sumPortfolioStressRiskR(positions)).toBe(0.3);
+      expect(sumPortfolioOpenRiskR(positions)).toBe(0.3);
+    });
+
+    it("one missing openRiskR → null (no partial cota)", () => {
+      const positions = [
+        {
+          avgCost: 100,
+          quantity: 10,
+          operational: { currentStop: 95, direction: "long" },
+          study: { stop: 95, riskAmount: 500 },
+        },
+        {
+          avgCost: 50,
+          quantity: 20,
+          operational: { currentStop: 48, direction: "long" },
+          // sin riskAmount → openRiskR null
+        },
+      ];
+      expect(computePositionOpenRiskR(positions[1]!)).toBeNull();
+      expect(sumPortfolioStressRiskR(positions)).toBeNull();
+      // Open risk sigue sumando parciales; stress exige cobertura completa.
+      expect(sumPortfolioOpenRiskR(positions)).toBe(0.1);
+    });
   });
 
   it("computeSectorExposurePct weights market value by equity", () => {

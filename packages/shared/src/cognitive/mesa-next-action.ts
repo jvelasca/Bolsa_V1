@@ -220,7 +220,7 @@ export type MesaOperationalHeaderV1 = {
   portfolioPnLR: number | null;
   /** R en riesgo si stops actuales se ejecutan. */
   portfolioOpenRiskR: number | null;
-  /** Stub stress risk — pendiente dominio correlación. */
+  /** Cota concurrente stops (`concurrent_stops_v0`); null si cobertura incompleta. ≠ VaR/correlación. */
   portfolioStressRiskR: number | null;
   /** @deprecated Usar portfolioPnLR */
   totalRiskR: number | null;
