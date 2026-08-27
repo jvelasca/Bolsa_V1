@@ -1,6 +1,6 @@
 # Audit pack — estado global v1.17 (Sesión operativa diaria)
 
-> **AsOf:** 2026-08-27 · **Tag:** **`v1.17-beta` → `_pendiente_stamp_`**. Partida **`v1.16-beta` → `f16119b`**.
+> **AsOf:** 2026-08-27 · **Tag:** **`v1.17-beta` → `62ebc4f`** (feature) · stamp docs en HEAD. Partida **`v1.16-beta` → `f16119b`**.
 > **Padre:** [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md) · plan [`plan-v117-v121-operational-depth-2026-08-27.md`](./plan-v117-v121-operational-depth-2026-08-27.md) · ADR-037 §7 · ADR-038 · ADR-039 · pack previo [`audit-pack-estado-global-2026-08-26-v116.md`](./audit-pack-estado-global-2026-08-26-v116.md).
 > **Para:** auditoría externa / GitHub Actions Release tag CI · cierre ciclo **Sesión operativa 2.0** (post AUDITORIA 1 + 2).
 

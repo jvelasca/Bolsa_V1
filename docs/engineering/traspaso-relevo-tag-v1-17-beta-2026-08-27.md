@@ -1,7 +1,7 @@
 # RELEVO — tag v1.17-beta → auditoría (2026-08-27)
 
 > **Padre:** [`audit-pack-estado-global-2026-08-27-v117.md`](./audit-pack-estado-global-2026-08-27-v117.md) · [`traspaso-relevo-tag-v1-16-beta-2026-08-26.md`](./traspaso-relevo-tag-v1-16-beta-2026-08-26.md) · [`CURRENT_SYSTEM.md`](../CURRENT_SYSTEM.md).
-> **Estado:** **PUBLICACIÓN** — tag `v1.17-beta` → `_pendiente_stamp_`. **Release tag CI:** pendiente pin GREEN.
+> **Estado:** **PUBLICACIÓN** — tag `v1.17-beta` sobre stamp docs (feature `62ebc4f`). **Release tag CI:** pendiente pin GREEN.
 > **Arranque chat nuevo / auditor:** pack v117 + ADR-037 §7 + ADR-038/039 + `CURRENT_SYSTEM.md` + relevos P0/F1–F4 + este relevo.
 
 ---
@@ -18,7 +18,7 @@
 
 | Pieza        | Valor                                                                                          |
 | ------------ | ---------------------------------------------------------------------------------------------- |
-| Tag          | `v1.17-beta` → `_pendiente_stamp_`                                                             |
+| Tag          | `v1.17-beta` → feature `62ebc4f` + stamp docs                                                  |
 | Previo       | `v1.16-beta` → `f16119b`                                                                       |
 | Pack auditor | [`audit-pack-estado-global-2026-08-27-v117.md`](./audit-pack-estado-global-2026-08-27-v117.md) |
 | Spine        | `pnpm test:decision-spine` **489** (2026-08-27)                                                |
