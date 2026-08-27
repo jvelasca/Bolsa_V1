@@ -239,6 +239,12 @@ export function MesaPositionRow({
   const stopForDist = protection.executed.value ?? protection.proposal.value;
   const distPct = stopDistancePct(position.lastPrice, stopForDist);
 
+  const nextAction = buildInvestmentPositionAggregate({
+    position,
+    study,
+    protectPlan,
+  }).nextAction;
+
   return (
     <div
       className="border-b border-border/50 px-3 py-2 last:border-b-0 hover:bg-accent/20"
@@ -247,6 +253,12 @@ export function MesaPositionRow({
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-[88px]">
           <div className="font-medium">{position.symbol}</div>
+          <div
+            className="text-[10px] text-muted-foreground"
+            data-testid={`mesa-position-action-${position.symbol}`}
+          >
+            Acción: {nextAction.label}
+          </div>
           {study?.opinion ? (
             <div className="text-[10px] text-muted-foreground">
               {JOURNAL_STUDY_OPINION_LABELS[study.opinion]}

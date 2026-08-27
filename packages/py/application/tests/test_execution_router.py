@@ -117,6 +117,51 @@ async def test_execute_inform_only_skips_paper_d_execute_gate(monkeypatch) -> No
     assert result.actions[0].status == "inform_only"
 
 
+@pytest.mark.asyncio
+async def test_entry_short_skipped_as_unsupported(monkeypatch) -> None:
+    monkeypatch.delenv("PAPER_D_EXECUTE", raising=False)
+    policy = ExecutionPolicyRecord(
+        id="pol-inform-short",
+        name="inform-short",
+        definition={"signalKinds": ["entry_short"]},
+        mode="inform_only",
+        account_id=None,
+        strategy_definition_id=None,
+        origin="test",
+        enabled=True,
+        user_id=None,
+        created_at="2026-08-26T00:00:00Z",
+        updated_at="2026-08-26T00:00:00Z",
+    )
+    router = ExecutionRouter(
+        policy_repo=_FakePolicyRepo(policy),  # type: ignore[arg-type]
+        account_repo=object(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=object(),  # type: ignore[arg-type]
+        portfolio_summary=object(),  # type: ignore[arg-type]
+    )
+    result = await router.execute(
+        "pol-inform-short",
+        [
+            {
+                "instrumentId": "inst-1",
+                "signal": {
+                    "id": "sig-1",
+                    "instrumentId": "inst-1",
+                    "timestamp": "2026-08-26T12:00:00Z",
+                    "kind": "entry_short",
+                    "strategyVersion": 1,
+                    "barIndex": 0,
+                    "price": 10.0,
+                },
+            }
+        ],
+    )
+    assert result.actions[0].status == "skipped"
+    assert result.actions[0].reason == "unsupported_short"
+
+
 def test_signal_kind_to_trade_type() -> None:
     assert signal_kind_to_trade_type("entry_long") == "buy"
     assert signal_kind_to_trade_type("exit") == "sell"

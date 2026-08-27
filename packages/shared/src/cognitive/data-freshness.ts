@@ -24,6 +24,7 @@ export const DATA_FRESHNESS_THRESHOLD_MINUTES = 5 * 24 * 60;
 export function buildDataFreshness(input: {
   lastBarDate?: string | null;
   queryFailed?: boolean;
+  noFreshnessProbe?: boolean;
   now?: Date;
   thresholdMinutes?: number;
   source?: string;
@@ -40,6 +41,17 @@ export function buildDataFreshness(input: {
       status: "error",
       thresholdMinutes,
       label: "No consultado",
+    };
+  }
+
+  if (input.noFreshnessProbe) {
+    return {
+      asOf: null,
+      source,
+      ageMinutes: null,
+      status: "missing",
+      thresholdMinutes,
+      label: "Sin referencia (sin posiciones)",
     };
   }
 
@@ -130,6 +142,9 @@ export function mesaDataFreshnessFromContract(
       label: freshness.label,
       ageMinutes: freshness.ageMinutes,
     };
+  }
+  if (freshness.status === "missing") {
+    return { state: "stale", label: freshness.label, ageMinutes: 0 };
   }
   return { state: "unknown", label: freshness.label };
 }

@@ -194,6 +194,28 @@ def test_policy_gate_blocks_auto_live_without_edge():
     assert any(r.rule == "EdgeReportRequired" for r in result.evaluated_rules)
 
 
+def test_policy_gate_blocks_paper_auto_edge_thresholds_without_live_flag():
+    result = evaluate_policy_gate(
+        MODERATE_POLICY,
+        symbol="MSFT",
+        asset_class="equities",
+        market_cap_usd=3e12,
+        average_daily_volume_usd=1e9,
+        risk_pct_of_account=0.5,
+        reward_to_risk_ratio=2.5,
+        leverage=1.0,
+        has_stop_loss=True,
+        open_positions_count=1,
+        portfolio_concentration_pct=3.0,
+        auto_live=False,
+        enforce_edge_thresholds=True,
+        edge_report_present=False,
+        credibility=90,
+    )
+    assert result.passed is False
+    assert any(r.rule == "EdgeReportRequired" for r in result.evaluated_rules)
+
+
 def test_wfe_and_monte_carlo_skeleton():
     assert walk_forward_efficiency(2.0, 1.5) == 0.75
     assert walk_forward_efficiency(0.0, 1.0) == 0.0

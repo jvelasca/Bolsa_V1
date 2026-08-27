@@ -254,8 +254,15 @@ export function buildMesaOperationalHeader(input: {
   entriesBlocked?: boolean;
   vetoed?: number;
   lastBarDate?: string | null;
+  /** Sin instrumento de referencia (p. ej. cartera vacía) — no fingir frescura. */
+  noFreshnessProbe?: boolean;
   boardQueryFailed?: boolean;
   incidentsQueryFailed?: boolean;
+  portfolioQueryFailed?: boolean;
+  summaryQueryFailed?: boolean;
+  studiesQueryFailed?: boolean;
+  killQueryFailed?: boolean;
+  selfEvalQueryFailed?: boolean;
   brokerVenue?: "paper" | "live" | null;
   paperDExecuteEnv?: boolean;
   readinessState?: string | null;
@@ -270,11 +277,18 @@ export function buildMesaOperationalHeader(input: {
   }
 
   const queryFailed = Boolean(
-    input.boardQueryFailed || input.incidentsQueryFailed,
+    input.boardQueryFailed ||
+    input.incidentsQueryFailed ||
+    input.portfolioQueryFailed ||
+    input.summaryQueryFailed ||
+    input.studiesQueryFailed ||
+    input.killQueryFailed ||
+    input.selfEvalQueryFailed,
   );
   const dataFreshnessContract = buildDataFreshness({
     lastBarDate: input.lastBarDate,
     queryFailed,
+    noFreshnessProbe: input.noFreshnessProbe === true && !queryFailed,
   });
   const statusDetail = buildMesaOperationalStatusDetail({
     killSwitchEffective: input.killSwitchEffective,

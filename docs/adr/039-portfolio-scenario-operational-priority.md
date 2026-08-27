@@ -43,8 +43,10 @@ Inbox único: `MARKET | DECISION | POSITION | RISK | SYSTEM` sobre alertas exist
 - [`portfolio-scenario.ts`](../../packages/shared/src/cognitive/portfolio-scenario.ts)
 - [`unified-alerts.ts`](../../packages/shared/src/cognitive/unified-alerts.ts)
 - What-if UI evoluciona a tabla scenario, no suma naive.
+- **V1.17.1:** sizing del candidato = TradePlan (`initialRiskR` / `quantity` × distancia / `positionValue`). Sin stub 1R ni notional `* 10`. `sectorConcentration` (HHI sectorial). Unknown sector = warning de dato, no cero.
 
-## Pending AUDITORIA 2
+## Pending
 
-- Correlación/stress en fase separada vs stub
+- Correlación/stress en fase separada vs stub (`portfolioStressRiskR`)
 - Endpoint read-only backend para scenario (opcional)
+- Opportunity Engine / best next R

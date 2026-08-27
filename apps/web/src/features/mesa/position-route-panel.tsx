@@ -77,6 +77,18 @@ export function PositionRoutePanel({
       <p className="text-[10px] text-muted-foreground">
         PLAN — lo que debería ocurrir. Confirm es la firma humana.
       </p>
+      {aggregate.originalPlanAvailable &&
+      aggregate.originalPlan?.stop != null &&
+      aggregate.currentPlan.stop != null &&
+      aggregate.originalPlan.stop !== aggregate.currentPlan.stop ? (
+        <p
+          className="text-[10px] text-muted-foreground"
+          data-testid={`position-stop-revision-${position.symbol}`}
+        >
+          Stop {formatPrice(aggregate.originalPlan.stop)} →{" "}
+          {formatPrice(aggregate.currentPlan.stop)}
+        </p>
+      ) : null}
     </div>
   );
 }

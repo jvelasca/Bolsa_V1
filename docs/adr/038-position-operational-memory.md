@@ -25,6 +25,7 @@ V1.16 entregó Mesa desk con proyecciones UI. AUDITORIA 1 identifica que la **po
 - Implementación en [`packages/shared/src/cognitive/investment-position-aggregate.ts`](../../packages/shared/src/cognitive/investment-position-aggregate.ts).
 - Mesa consume agregado; Libro y SEMI 2.0 podrán reutilizar el mismo builder.
 - No se persiste un mega-documento; el agregado es proyección read-only.
+- **V1.17.1:** `originalPlan` (fill: `plannedEntry`/`initialStop`) ≠ `currentPlan` (stop/targets actuales). El study actual **no** pisa el original. `thesisSnapshot.direction` es `long`|`short` (autoridad post-fill). Reconstrucción Position→DecisionPackage durable queda V1.18.
 
 ## Non-goals
 

@@ -156,6 +156,36 @@ def test_gate_auto_live_veto_without_edge_report():
     )
 
 
+def test_gate_paper_auto_veto_without_edge_report_keeps_auto_live_false():
+    inputs = TechnicalInputs(
+        rsi=68,
+        adx=32,
+        plus_di=28,
+        minus_di=15,
+        obv_slope=1.0,
+        price_slope=1.0,
+        close=150,
+        sma_20=145,
+        sma_50=140,
+    )
+    package, _, _ = build_decision_package_ta("inst-aapl", inputs)
+    ctx = ProposedTradeContext(
+        symbol="AAPL",
+        market_cap_usd=3e12,
+        average_daily_volume_usd=1e9,
+        risk_pct_of_account=0.5,
+        reward_to_risk_ratio=2.2,
+        has_stop_loss=True,
+        hours_to_earnings=72,
+        auto_live=False,
+        enforce_edge_thresholds=True,
+        edge_report=None,
+    )
+    gated = gate_decision_package(package, MODERATE_POLICY, ctx)
+    assert ctx.auto_live is False
+    assert gated.execution_allowed is False
+
+
 def test_psr_benchmark_zero():
     psr = probabilistic_sharpe_ratio(2.0, n_obs=100, skew=0.0, kurtosis=3.0, sr_benchmark=0.0)
     assert psr > 0.9

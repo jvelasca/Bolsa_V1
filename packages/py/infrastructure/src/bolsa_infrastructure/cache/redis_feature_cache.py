@@ -3,15 +3,40 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import json
 import pickle
 from collections.abc import Callable
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import redis
 
 T = TypeVar("T")
 
-REDIS_KEY_PREFIX = "bolsa:features:v1:"
+REDIS_KEY_PREFIX = "bolsa:features:v2:"
+
+
+def _checksum(blob: bytes) -> str:
+    return hashlib.sha256(blob).hexdigest()
+
+
+def encode_feature_payload(value: Any) -> str:
+    blob = pickle.dumps(value)
+    return json.dumps(
+        {
+            "sha256": _checksum(blob),
+            "blob": base64.b64encode(blob).decode("ascii"),
+        }
+    )
+
+
+def decode_feature_payload(raw: str) -> Any:
+    payload = json.loads(raw)
+    digest = payload["sha256"]
+    blob = base64.b64decode(str(payload["blob"]).encode("ascii"))
+    if _checksum(blob) != digest:
+        raise ValueError("Feature cache checksum mismatch")
+    return pickle.loads(blob)
 
 
 class RedisFeatureCache:
@@ -38,7 +63,7 @@ class RedisFeatureCache:
 
         if raw is not None:
             try:
-                value = pickle.loads(base64.b64decode(raw.encode("ascii")))
+                value = decode_feature_payload(raw)
                 self.hits += 1
                 return value  # type: ignore[no-any-return]
             except Exception:
@@ -47,7 +72,7 @@ class RedisFeatureCache:
         self.misses += 1
         value = builder()
         try:
-            encoded = base64.b64encode(pickle.dumps(value)).decode("ascii")
+            encoded = encode_feature_payload(value)
             self._redis.setex(redis_key, int(self.ttl_seconds), encoded)
         except Exception:
             pass

@@ -261,6 +261,9 @@ export interface OperationalPositionDto {
   target2: number | null;
   tradePlanId: string;
   unrealizedR?: number | null;
+  plannedEntry?: number | null;
+  actualEntry?: number | null;
+  initialStop?: number | null;
   exitPlan?: OperationalExitPlanDto | null;
 }
 
@@ -275,6 +278,8 @@ export interface PositionDto {
   marketValue: number | null;
   unrealizedPnl: number | null;
   unrealizedPnlPct: number | null;
+  /** Sector del instrumento cuando el API lo proyecta (puede faltar). */
+  sector?: string | null;
   operational?: OperationalPositionDto | null;
 }
 

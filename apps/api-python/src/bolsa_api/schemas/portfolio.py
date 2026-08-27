@@ -34,6 +34,9 @@ class OperationalPositionDto(BaseModel):
     target2: float | None = None
     trade_plan_id: str = Field(alias="tradePlanId")
     unrealized_r: float | None = Field(default=None, alias="unrealizedR")
+    planned_entry: float | None = Field(default=None, alias="plannedEntry")
+    actual_entry: float | None = Field(default=None, alias="actualEntry")
+    initial_stop: float | None = Field(default=None, alias="initialStop")
     exit_plan: OperationalExitPlanDto | None = Field(default=None, alias="exitPlan")
 
 

@@ -478,6 +478,10 @@ class DecisionJournalStudyDto(BaseModel):
     target2: float | None = None
     expected_rr: float | None = Field(default=None, alias="expectedRR")
     risk_amount: float | None = Field(default=None, alias="riskAmount")
+    quantity: float | None = None
+    initial_risk_r: float | None = Field(default=None, alias="initialRiskR")
+    position_value: float | None = Field(default=None, alias="positionValue")
+    direction: str | None = None
     has_operational_plan: bool = Field(alias="hasOperationalPlan")
     user_thesis: Any | None = Field(default=None, alias="userThesis")
     decision_summary: str | None = Field(default=None, alias="decisionSummary")

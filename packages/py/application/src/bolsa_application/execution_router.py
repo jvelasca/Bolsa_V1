@@ -136,6 +136,17 @@ def signal_kind_to_trade_type(kind: str) -> Literal["buy", "sell"] | None:
     return None
 
 
+def _unsupported_short_skip(instrument_id: str, kind: str) -> ExecutionActionResult | None:
+    if kind == "entry_short":
+        return ExecutionActionResult(
+            instrument_id=instrument_id,
+            signal_kind=kind,
+            status="skipped",
+            reason="unsupported_short",
+        )
+    return None
+
+
 def _signal_from_hit(hit: dict[str, Any]) -> SignalEventV1:
     raw = hit.get("signal") or {}
     return SignalEventV1(
@@ -203,6 +214,7 @@ class ExecutionRouter:
         live_recon: LiveReconLookup | None = None,
         incident_store: OperationalIncidentStore | None = None,
         journal_writer: Any | None = None,
+        instrument_data_status: Any | None = None,
     ) -> None:
         self._policies = policy_repo
         self._accounts = account_repo
@@ -221,6 +233,25 @@ class ExecutionRouter:
         self._live_recon = live_recon
         self._incident_store = incident_store
         self._journal_writer = journal_writer
+        self._instrument_data_status = instrument_data_status
+
+    async def _resolve_sanity_warnings(
+        self, instrument_id: str
+    ) -> tuple[str, ...] | RiskDecision:
+        """Sanity de barras (split/dividendo). Indisponibilidad = veto fail-closed."""
+        if self._instrument_data_status is None:
+            return ()
+        try:
+            status = await self._instrument_data_status.execute(instrument_id)
+            if status is None:
+                return ()
+            return tuple(getattr(status, "sanity_warnings", ()) or ())
+        except Exception:  # noqa: BLE001
+            return RiskDecision(
+                verdict="DENY",
+                reasons=("instrument_data_status:lookup_failed",),
+                guard=None,
+            )
 
     async def _resolve_recon_kwargs(
         self,
@@ -448,6 +479,10 @@ class ExecutionRouter:
                         )
                     )
                     continue
+                short_skip = _unsupported_short_skip(signal.instrument_id, kind)
+                if short_skip is not None:
+                    actions.append(short_skip)
+                    continue
                 await self._emit_signal(signal, policy)
                 action = await self._evaluate_live_dry_run(
                     policy,
@@ -476,6 +511,10 @@ class ExecutionRouter:
                         reason="signalKind no permitido por la política",
                     )
                 )
+                continue
+            short_skip = _unsupported_short_skip(signal.instrument_id, kind)
+            if short_skip is not None:
+                actions.append(short_skip)
                 continue
 
             await self._emit_signal(signal, policy)
@@ -708,36 +747,42 @@ class ExecutionRouter:
                 if isinstance(recon, RiskDecision):
                     guard_decision = recon
                 else:
-                    guard_decision = check_opening(
-                        profile=profile,
-                        instrument_id=signal.instrument_id,
-                        symbol=symbol,
-                        trade_type=trade_type,
-                        quantity=quantity,
-                        price=price,
-                        signal_kind=str(signal.kind),
-                        equity=equity,
-                        open_positions_count=len(summary.positions),
-                        event_calendar=self._event_calendar,
-                        auto_live=False,  # paper_auto ≠ live; D3 auto-live cuando mode=live_auto
-                        edge_report=edge_report,
-                        account_daily_drawdown_pct=dds.daily_pct,
-                        account_weekly_drawdown_pct=dds.weekly_pct,
-                        account_max_drawdown_pct=dds.max_pct,
-                        kill_switch=await effective_kill_switch(),
-                        book_max_open_positions=_book_max_open_positions(policy),
-                        portfolio_positions=_basket_positions_from_summary(summary),
-                        proposal_sector=(
-                            hit.get("sector") if isinstance(hit, dict) else None
-                        ),
-                        last_bar_timestamp=getattr(signal, "timestamp", None) or None,
-                        require_fresh_data=True,
-                        has_open_mandate=has_open_mandate,
-                        mandate_strategy_id=mandate_strategy_id,
-                        require_account_mandate=require_account_mandate,
-                        proposal_strategy_id=self._proposal_strategy_id(signal),
-                        **recon,
-                    )
+                    sanity = await self._resolve_sanity_warnings(signal.instrument_id)
+                    if isinstance(sanity, RiskDecision):
+                        guard_decision = sanity
+                    else:
+                        guard_decision = check_opening(
+                            profile=profile,
+                            instrument_id=signal.instrument_id,
+                            symbol=symbol,
+                            trade_type=trade_type,
+                            quantity=quantity,
+                            price=price,
+                            signal_kind=str(signal.kind),
+                            equity=equity,
+                            open_positions_count=len(summary.positions),
+                            event_calendar=self._event_calendar,
+                            auto_live=False,  # paper_auto ≠ live
+                            enforce_edge_thresholds=True,
+                            edge_report=edge_report,
+                            account_daily_drawdown_pct=dds.daily_pct,
+                            account_weekly_drawdown_pct=dds.weekly_pct,
+                            account_max_drawdown_pct=dds.max_pct,
+                            kill_switch=await effective_kill_switch(),
+                            book_max_open_positions=_book_max_open_positions(policy),
+                            portfolio_positions=_basket_positions_from_summary(summary),
+                            proposal_sector=(
+                                hit.get("sector") if isinstance(hit, dict) else None
+                            ),
+                            last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                            require_fresh_data=True,
+                            has_open_mandate=has_open_mandate,
+                            mandate_strategy_id=mandate_strategy_id,
+                            require_account_mandate=require_account_mandate,
+                            proposal_strategy_id=self._proposal_strategy_id(signal),
+                            sanity_warnings=sanity,
+                            **recon,
+                        )
             auto_decision_id = str(signal.id or idem_key)
             await append_journal_event(
                 self._journal_writer,
@@ -1021,34 +1066,39 @@ class ExecutionRouter:
             if isinstance(recon, RiskDecision):
                 guard_decision = recon
             else:
-                guard_decision = check_opening(
-                    profile=profile,
-                    instrument_id=signal.instrument_id,
-                    symbol=str(hit.get("symbol") or signal.instrument_id),
-                    trade_type=trade_type,
-                    quantity=max(quantity, 1e-9),
-                    price=price,
-                    signal_kind=str(signal.kind),
-                    equity=equity,
-                    open_positions_count=len(summary.positions),
-                    event_calendar=self._event_calendar,
-                    auto_live=True,
-                    edge_report=edge_report,
-                    account_daily_drawdown_pct=dds.daily_pct,
-                    account_weekly_drawdown_pct=dds.weekly_pct,
-                    account_max_drawdown_pct=dds.max_pct,
-                    kill_switch=await effective_kill_switch(),
-                    book_max_open_positions=_book_max_open_positions(policy),
-                    portfolio_positions=_basket_positions_from_summary(summary),
-                    proposal_sector=hit.get("sector"),
-                    last_bar_timestamp=getattr(signal, "timestamp", None) or None,
-                    require_fresh_data=True,
-                    has_open_mandate=has_open_mandate,
-                    mandate_strategy_id=mandate_strategy_id,
-                    require_account_mandate=require_account_mandate,
-                    proposal_strategy_id=self._proposal_strategy_id(signal),
-                    **recon,
-                )
+                sanity = await self._resolve_sanity_warnings(signal.instrument_id)
+                if isinstance(sanity, RiskDecision):
+                    guard_decision = sanity
+                else:
+                    guard_decision = check_opening(
+                        profile=profile,
+                        instrument_id=signal.instrument_id,
+                        symbol=str(hit.get("symbol") or signal.instrument_id),
+                        trade_type=trade_type,
+                        quantity=max(quantity, 1e-9),
+                        price=price,
+                        signal_kind=str(signal.kind),
+                        equity=equity,
+                        open_positions_count=len(summary.positions),
+                        event_calendar=self._event_calendar,
+                        auto_live=True,
+                        edge_report=edge_report,
+                        account_daily_drawdown_pct=dds.daily_pct,
+                        account_weekly_drawdown_pct=dds.weekly_pct,
+                        account_max_drawdown_pct=dds.max_pct,
+                        kill_switch=await effective_kill_switch(),
+                        book_max_open_positions=_book_max_open_positions(policy),
+                        portfolio_positions=_basket_positions_from_summary(summary),
+                        proposal_sector=hit.get("sector"),
+                        last_bar_timestamp=getattr(signal, "timestamp", None) or None,
+                        require_fresh_data=True,
+                        has_open_mandate=has_open_mandate,
+                        mandate_strategy_id=mandate_strategy_id,
+                        require_account_mandate=require_account_mandate,
+                        proposal_strategy_id=self._proposal_strategy_id(signal),
+                        sanity_warnings=sanity,
+                        **recon,
+                    )
         guard = guard_decision.guard
         lineage_live = {
             "signalId": signal.id,

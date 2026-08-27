@@ -201,6 +201,22 @@ function CandidateCard({
                   : "—"}
               </dd>
             </div>
+            <div>
+              <dt className="text-muted-foreground">R plan</dt>
+              <dd>
+                {study.initialRiskR != null
+                  ? `${study.initialRiskR.toFixed(2)}R`
+                  : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Notional</dt>
+              <dd>
+                {study.positionValue != null
+                  ? formatPrice(study.positionValue)
+                  : "—"}
+              </dd>
+            </div>
           </>
         ) : (
           <div className="sm:col-span-2">
@@ -208,6 +224,14 @@ function CandidateCard({
           </div>
         )}
       </dl>
+      {!(sectorByInstrumentId?.[row.instrumentId ?? ""] ?? "").trim() ? (
+        <p
+          className="mt-1 text-[10px] text-amber-800 dark:text-amber-200"
+          data-testid={`mesa-candidate-sector-missing-${row.symbol}`}
+        >
+          Sector: — (dato incompleto)
+        </p>
+      ) : null}
       {!priority?.operability.operable &&
       (priority?.operability.blockReasons.length ?? 0) > 0 ? (
         <p className="mt-1 text-[10px] text-amber-800 dark:text-amber-200">
@@ -215,6 +239,12 @@ function CandidateCard({
         </p>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span
+          className="rounded border border-border/50 px-1.5 py-0.5 text-[10px] text-muted-foreground"
+          data-testid={`mesa-candidate-action-${row.symbol}`}
+        >
+          Acción: {mapCandidateNextAction(row, entriesBlocked).label}
+        </span>
         <CandidateNextAction row={row} entriesBlocked={entriesBlocked} />
         <MesaWhatIfPanel
           row={row}

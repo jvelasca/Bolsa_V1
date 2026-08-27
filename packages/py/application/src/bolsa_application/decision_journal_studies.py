@@ -24,6 +24,10 @@ _EMPTY_GEOMETRY: dict[str, Any] = {
     "target2": None,
     "expectedRR": None,
     "riskAmount": None,
+    "quantity": None,
+    "initialRiskR": None,
+    "positionValue": None,
+    "direction": None,
     "hasOperationalPlan": False,
 }
 
@@ -97,6 +101,9 @@ def journal_study_geometry(plan: dict[str, Any] | None) -> dict[str, Any]:
         return dict(_EMPTY_GEOMETRY)
     if not journal_study_has_valid_stop(plan):
         return dict(_EMPTY_GEOMETRY)
+    qty = _finite(plan.get("quantity"))
+    direction_raw = str(plan.get("direction") or "")
+    direction = direction_raw if direction_raw in {"long", "short"} else None
     return {
         "entry": _finite(plan.get("entry")),
         "stop": _finite(_camel(plan, "structuralStop", "structural_stop")),
@@ -104,6 +111,10 @@ def journal_study_geometry(plan: dict[str, Any] | None) -> dict[str, Any]:
         "target2": _finite(_camel(plan, "target2", "target_2")),
         "expectedRR": _finite(_camel(plan, "expectedRR", "expected_rr")),
         "riskAmount": _finite(_camel(plan, "riskAmount", "risk_amount")),
+        "quantity": qty if qty is not None and qty > 0 else None,
+        "initialRiskR": _finite(_camel(plan, "initialRiskR", "initial_risk_r")),
+        "positionValue": _finite(_camel(plan, "positionValue", "position_value")),
+        "direction": direction,
         "hasOperationalPlan": True,
     }
 
@@ -500,6 +511,10 @@ class DecisionJournalStudyView:
     target2: float | None = None
     expected_rr: float | None = None
     risk_amount: float | None = None
+    quantity: float | None = None
+    initial_risk_r: float | None = None
+    position_value: float | None = None
+    direction: str | None = None
     user_thesis: None = None
     decision_summary: str | None = None
     analysis_notes: list[str] = field(default_factory=list)
@@ -535,6 +550,10 @@ class DecisionJournalStudyView:
             "target2": self.target2,
             "expectedRR": self.expected_rr,
             "riskAmount": self.risk_amount,
+            "quantity": self.quantity,
+            "initialRiskR": self.initial_risk_r,
+            "positionValue": self.position_value,
+            "direction": self.direction,
             "hasOperationalPlan": self.has_operational_plan,
             "userThesis": None,
             "decisionSummary": self.decision_summary,
@@ -707,6 +726,10 @@ def build_study_view(
         target2=geometry["target2"],
         expected_rr=geometry["expectedRR"],
         risk_amount=geometry["riskAmount"],
+        quantity=geometry["quantity"],
+        initial_risk_r=geometry["initialRiskR"],
+        position_value=geometry["positionValue"],
+        direction=geometry["direction"],
         decision_summary=notes[0] if notes else None,
         analysis_notes=notes,
         trends=map_journal_study_trends(facts, opinion),

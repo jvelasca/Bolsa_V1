@@ -7,6 +7,7 @@ import type { DecisionJournalStudyViewV1 } from "./decision-journal-study.js";
 import type { ExitSuggestedActionV1 } from "./exit-plan.js";
 import type { ProtectPlanV1 } from "./protect-plan.js";
 import type { PositionStatusV1 } from "./position-state.js";
+import type { TradePlanDirectionV1 } from "./trade-plan.js";
 import {
   mapPositionNextAction,
   type MesaNextActionV1,
@@ -22,24 +23,37 @@ export type PositionManagementStateV1 = {
   openRiskR: number | null;
 };
 
+export type PositionPlanLevelsV1 = {
+  entry: number | null;
+  stop: number | null;
+  target1: number | null;
+  target2: number | null;
+};
+
 export type InvestmentPositionAggregateV1 = {
   symbol: string;
   instrumentId: string;
   originDecisionId: string | null;
-  thesisSnapshot: Pick<
-    DecisionJournalStudyViewV1,
-    | "status"
-    | "opinion"
-    | "tradePlanStatus"
-    | "hasOperationalPlan"
-    | "strength"
-    | "entry"
-    | "stop"
-    | "target1"
-    | "target2"
-    | "expectedRR"
-    | "riskAmount"
-  > | null;
+  thesisSnapshot:
+    | (Pick<
+        DecisionJournalStudyViewV1,
+        | "status"
+        | "opinion"
+        | "tradePlanStatus"
+        | "hasOperationalPlan"
+        | "strength"
+        | "entry"
+        | "stop"
+        | "target1"
+        | "target2"
+        | "expectedRR"
+        | "riskAmount"
+      > & { direction: "long" | "short" })
+    | null;
+  originalPlan: PositionPlanLevelsV1 | null;
+  originalPlanAvailable: boolean;
+  currentPlan: PositionPlanLevelsV1;
+  /** @deprecated Usar originalPlan / currentPlan. */
   tradePlanSnapshot: {
     entry: number | null;
     stop: number | null;
@@ -77,6 +91,9 @@ export type BuildInvestmentPositionAggregateInput = {
       target1?: number | null;
       target2?: number | null;
       unrealizedR?: number | null;
+      plannedEntry?: number | null;
+      actualEntry?: number | null;
+      initialStop?: number | null;
       exitPlan?: {
         suggestedAction?: ExitSuggestedActionV1 | string | null;
       } | null;
@@ -86,6 +103,18 @@ export type BuildInvestmentPositionAggregateInput = {
   protectPlan?: Pick<ProtectPlanV1, "status" | "suggestedProtectStop"> | null;
   originDecisionId?: string | null;
 };
+
+function finiteNumber(n: unknown): number | null {
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+function resolveDirection(
+  operationalDirection?: string | null,
+  studyDirection?: TradePlanDirectionV1 | null,
+): "long" | "short" {
+  const raw = (operationalDirection ?? studyDirection ?? "long").toLowerCase();
+  return raw === "short" ? "short" : "long";
+}
 
 export function buildInvestmentPositionAggregate(
   input: BuildInvestmentPositionAggregateInput,
@@ -101,10 +130,28 @@ export function buildInvestmentPositionAggregate(
     protectPlan,
   });
 
-  const executedEntry = position.avgCost;
-  const plannedEntry = study?.entry ?? executedEntry;
-  const executedStop = op?.currentStop ?? null;
-  const plannedStop = study?.stop ?? null;
+  const executedEntry = finiteNumber(op?.actualEntry) ?? position.avgCost;
+  const executedStop = finiteNumber(op?.currentStop);
+  const originalEntry = finiteNumber(op?.plannedEntry);
+  const originalStop = finiteNumber(op?.initialStop);
+  const originalPlanAvailable = originalEntry != null || originalStop != null;
+  const originalPlan: PositionPlanLevelsV1 | null = originalPlanAvailable
+    ? {
+        entry: originalEntry,
+        stop: originalStop,
+        target1: null,
+        target2: null,
+      }
+    : null;
+
+  const currentPlan: PositionPlanLevelsV1 = {
+    entry: executedEntry,
+    stop: executedStop,
+    target1: finiteNumber(op?.target1) ?? study?.target1 ?? null,
+    target2: finiteNumber(op?.target2) ?? study?.target2 ?? null,
+  };
+
+  const direction = resolveDirection(op?.direction, study?.direction ?? null);
 
   const openRiskR = computePositionOpenRiskR({
     avgCost: position.avgCost,
@@ -155,14 +202,18 @@ export function buildInvestmentPositionAggregate(
           target2: study.target2,
           expectedRR: study.expectedRR,
           riskAmount: study.riskAmount,
+          direction,
         }
       : null,
+    originalPlan,
+    originalPlanAvailable,
+    currentPlan,
     tradePlanSnapshot: {
-      entry: study?.entry ?? null,
-      stop: plannedStop,
-      target1: study?.target1 ?? op?.target1 ?? null,
-      target2: study?.target2 ?? op?.target2 ?? null,
-      plannedEntry,
+      entry: currentPlan.entry,
+      stop: currentPlan.stop,
+      target1: currentPlan.target1,
+      target2: currentPlan.target2,
+      plannedEntry: originalPlan?.entry ?? null,
       executedEntry,
       executedStop,
     },
@@ -176,8 +227,8 @@ export function buildInvestmentPositionAggregate(
       discrepancy: protection.discrepancy,
     },
     targets: {
-      target1: op?.target1 ?? study?.target1 ?? null,
-      target2: op?.target2 ?? study?.target2 ?? null,
+      target1: currentPlan.target1,
+      target2: currentPlan.target2,
     },
     currentState,
     nextAction,
@@ -202,9 +253,7 @@ export function buildPositionRouteLevels(
   const t1 = aggregate.targets.target1;
   const t2 = aggregate.targets.target2;
   const riskAmount = aggregate.thesisSnapshot?.riskAmount;
-  const isShort =
-    (aggregate.thesisSnapshot as { direction?: string } | null)?.direction ===
-    "short";
+  const isShort = aggregate.thesisSnapshot?.direction === "short";
 
   function distancePct(from: number, to: number): number | null {
     if (!Number.isFinite(from) || from === 0) return null;

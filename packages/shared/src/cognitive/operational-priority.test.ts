@@ -85,4 +85,40 @@ describe("operational-priority", () => {
     expect(p.suitability.value).toBeLessThan(50);
     expect(p.verdict).toBe("NO_OPERAR");
   });
+
+  it("penalizes missing sector and Unknown portfolio exposure", () => {
+    const withSector = computeOperationalPriority(row({ symbol: "AAA" }), {
+      entriesBlocked: false,
+      candidateSector: "Tech",
+      sectorExposurePct: { Tech: 10 },
+      maxSectorExposurePct: 40,
+      portfolioRisk: {
+        portfolioPnLR: 0,
+        portfolioOpenRiskR: 1,
+        portfolioStressRiskR: null,
+        portfolioRiskLimitR: 5,
+      },
+    });
+    const missing = computeOperationalPriority(row({ symbol: "BBB" }), {
+      entriesBlocked: false,
+      candidateSector: null,
+      sectorExposurePct: { Unknown: 12 },
+      maxSectorExposurePct: 40,
+      portfolioRisk: {
+        portfolioPnLR: 0,
+        portfolioOpenRiskR: 1,
+        portfolioStressRiskR: null,
+        portfolioRiskLimitR: 5,
+      },
+    });
+    expect(missing.suitability.value).toBeLessThan(
+      withSector.suitability.value,
+    );
+    expect(
+      missing.suitability.factors.some((f) => f.includes("desconocido")),
+    ).toBe(true);
+    expect(missing.suitability.factors.some((f) => f.includes("Unknown"))).toBe(
+      true,
+    );
+  });
 });

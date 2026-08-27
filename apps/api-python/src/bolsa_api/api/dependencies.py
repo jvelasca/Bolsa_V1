@@ -1364,6 +1364,7 @@ def get_execution_router_use_case(session: AsyncSession) -> ExecutionRouter:
         live_recon=get_live_recon_lookup(session),
         incident_store=get_operational_incident_store(session),
         journal_writer=get_journal_writer(session),
+        instrument_data_status=get_instrument_data_status_use_case(session),
     )
 
 

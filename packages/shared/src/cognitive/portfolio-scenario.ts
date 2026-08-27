@@ -20,6 +20,9 @@ export type PortfolioScenarioColumnV1 = {
   cashPct: number | null;
   openRiskR: number | null;
   sectorExposurePct: Record<string, number>;
+  /** HHI sobre pesos sectoriales (no concentración por posición). */
+  sectorConcentration: number | null;
+  /** @deprecated Usar sectorConcentration. */
   concentration: number | null;
   mandateFit: "OK" | "WARN" | "VETO" | "—";
   portfolioFit: "OK" | "WARN" | "VETO" | "—";
@@ -77,23 +80,47 @@ function herfindahl(concentrations: number[]): number | null {
   return Math.round(sum * 100) / 100;
 }
 
+function finitePositive(n: unknown): n is number {
+  return typeof n === "number" && Number.isFinite(n) && n > 0;
+}
+
 function candidateRiskR(candidate: MesaCandidateRowV1): number | null {
   const study = candidate.study;
-  if (study?.riskAmount != null && study.entry != null && study.stop != null) {
-    const dist = Math.abs(study.entry - study.stop);
-    if (dist > 0) return 1;
+  if (!study) return null;
+  if (finitePositive(study.initialRiskR)) {
+    return Math.round(study.initialRiskR * 100) / 100;
+  }
+  const entry = study.entry;
+  const stop = study.stop;
+  const quantity = study.quantity;
+  const riskAmount = study.riskAmount;
+  if (
+    finitePositive(entry) &&
+    stop != null &&
+    Number.isFinite(stop) &&
+    finitePositive(quantity) &&
+    finitePositive(riskAmount)
+  ) {
+    const dist = Math.abs(entry - stop);
+    if (dist <= 0) return null;
+    return Math.round(((dist * quantity) / riskAmount) * 100) / 100;
   }
   return null;
 }
 
 function candidateNotional(candidate: MesaCandidateRowV1): number | null {
   const study = candidate.study;
-  if (study?.entry != null && study.riskAmount != null) {
-    const dist = study.stop != null ? Math.abs(study.entry - study.stop) : 0;
-    if (dist > 0) {
-      return (study.riskAmount / dist) * study.entry;
-    }
-    return study.riskAmount * 10;
+  if (!study) return null;
+  if (finitePositive(study.positionValue)) return study.positionValue;
+  const entry = study.entry;
+  if (finitePositive(study.quantity) && finitePositive(entry)) {
+    return study.quantity * entry;
+  }
+  const stop = study.stop;
+  const riskAmount = study.riskAmount;
+  if (finitePositive(entry) && stop != null && finitePositive(riskAmount)) {
+    const dist = Math.abs(entry - stop);
+    if (dist > 0) return (riskAmount / dist) * entry;
   }
   return null;
 }
@@ -111,7 +138,10 @@ export function buildPortfolioScenario(
       maxAcceptableLossPct: input.maxAcceptableLossPct,
     });
 
-  const currentOpenRiskR = sumPortfolioOpenRiskR(input.positions);
+  const summedOpenRiskR = sumPortfolioOpenRiskR(input.positions);
+  /** Cartera vacía = 0R abierto (no null). Posiciones sin sizing → null (no inventar). */
+  const currentOpenRiskR =
+    summedOpenRiskR ?? (input.positions.length === 0 ? 0 : null);
   const addRiskR = candidateRiskR(input.candidate);
   const notional = candidateNotional(input.candidate);
 
@@ -150,6 +180,10 @@ export function buildPortfolioScenario(
       ? Math.round((currentOpenRiskR + addRiskR) * 100) / 100
       : addRiskR;
 
+  if (addRiskR == null || notional == null) {
+    warnings.push("Sizing no disponible — no se inventa notional");
+  }
+
   if (afterOpenRiskR != null && afterOpenRiskR > riskLimitR) {
     warnings.push(`Riesgo agregado elevado (>${riskLimitR}R límite mandato)`);
   }
@@ -159,6 +193,12 @@ export function buildPortfolioScenario(
     if (pct > maxSector) {
       warnings.push(`Concentración sector ${sector}: ${pct}%`);
     }
+  }
+
+  const unknownPct =
+    (afterSectors.Unknown ?? 0) || (currentSectors.Unknown ?? 0);
+  if (unknownPct > 0) {
+    warnings.push(`Datos sectoriales incompletos (${unknownPct}%)`);
   }
 
   const mandateFit: PortfolioScenarioColumnV1["mandateFit"] =
@@ -173,8 +213,13 @@ export function buildPortfolioScenario(
   let verdict: PortfolioScenarioVerdictV1 = "INSUFFICIENT_DATA";
   let verdictReason: string | null = null;
 
+  const sizingMissing = addRiskR == null || notional == null;
+
   if (equity != null && currentOpenRiskR != null) {
-    if (
+    if (sizingMissing) {
+      verdict = "INSUFFICIENT_DATA";
+      verdictReason = "Sizing no disponible — no se inventa notional";
+    } else if (
       mandateFit === "VETO" ||
       portfolioFit === "VETO" ||
       warnings.some((w) => w.includes("Concentración"))
@@ -190,6 +235,9 @@ export function buildPortfolioScenario(
       verdict = "COMPATIBLE";
       verdictReason = "Operación compatible con cartera actual";
     }
+  } else if (sizingMissing) {
+    verdict = "INSUFFICIENT_DATA";
+    verdictReason = "Sizing no disponible — no se inventa notional";
   }
 
   const currentConc = herfindahl(Object.values(currentSectors));
@@ -203,6 +251,7 @@ export function buildPortfolioScenario(
       cashPct: currentCashPct,
       openRiskR: currentOpenRiskR,
       sectorExposurePct: currentSectors,
+      sectorConcentration: currentConc,
       concentration: currentConc,
       mandateFit: "OK",
       portfolioFit: "OK",
@@ -213,6 +262,7 @@ export function buildPortfolioScenario(
       cashPct: afterCashPct,
       openRiskR: afterOpenRiskR,
       sectorExposurePct: afterSectors,
+      sectorConcentration: afterConc,
       concentration: afterConc,
       mandateFit,
       portfolioFit,

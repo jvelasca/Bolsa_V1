@@ -21,6 +21,8 @@ function candidate(
       entry: 100,
       stop: 95,
       riskAmount: 500,
+      quantity: 100,
+      initialRiskR: 1,
       invalidation: [],
     } as MesaCandidateRowV1["study"],
     ...partial,
@@ -122,5 +124,107 @@ describe("buildPortfolioScenario", () => {
     });
     expect(s.riskLimitR).toBe(0.5);
     expect(s.verdict).toBe("NO_RECOMENDADA");
+  });
+
+  it("uses TradePlan quantity for candidate R, not a 1R stub", () => {
+    const s = buildPortfolioScenario({
+      candidate: candidate({
+        study: {
+          sessionId: "s1",
+          instrumentId: "i1",
+          symbol: "NVDA",
+          studiedAt: "2026-08-26T10:00:00Z",
+          status: "active",
+          hasOperationalPlan: true,
+          entry: 100,
+          stop: 95,
+          riskAmount: 500,
+          quantity: 50,
+          invalidation: [],
+        } as MesaCandidateRowV1["study"],
+      }),
+      positions: [
+        {
+          avgCost: 50,
+          quantity: 100,
+          marketValue: 30_000,
+          operational: { currentStop: 48, direction: "long" },
+          study: { stop: 48, riskAmount: 200 },
+        },
+      ],
+      equity: 100_000,
+      cash: 60_000,
+      riskTolerance: "moderate",
+    });
+    expect(s.after.openRiskR).toBe(1.5);
+    expect(s.verdict).toBe("COMPATIBLE");
+  });
+
+  it("does not invent notional when stop is missing", () => {
+    const s = buildPortfolioScenario({
+      candidate: candidate({
+        study: {
+          sessionId: "s1",
+          instrumentId: "i1",
+          symbol: "NVDA",
+          studiedAt: "2026-08-26T10:00:00Z",
+          status: "active",
+          hasOperationalPlan: true,
+          entry: 100,
+          stop: null,
+          riskAmount: 500,
+          invalidation: [],
+        } as MesaCandidateRowV1["study"],
+      }),
+      positions: [
+        {
+          avgCost: 50,
+          quantity: 100,
+          marketValue: 30_000,
+          operational: { currentStop: 48, direction: "long" },
+          study: { stop: 48, riskAmount: 200 },
+        },
+      ],
+      equity: 100_000,
+      cash: 60_000,
+    });
+    expect(s.verdict).toBe("INSUFFICIENT_DATA");
+    expect(s.warnings.some((w) => w.includes("no se inventa notional"))).toBe(
+      true,
+    );
+    expect(s.after.openRiskR).toBeNull();
+  });
+
+  it("warns when Unknown sector exposure is present", () => {
+    const s = buildPortfolioScenario({
+      candidate: candidate(),
+      candidateSector: "Technology",
+      positions: [
+        {
+          avgCost: 50,
+          quantity: 100,
+          marketValue: 40_000,
+          sector: "Technology",
+          operational: { currentStop: 48, direction: "long" },
+          study: { stop: 48, riskAmount: 500 },
+        },
+        {
+          avgCost: 80,
+          quantity: 50,
+          marketValue: 12_000,
+          sector: null,
+          operational: { currentStop: 75, direction: "long" },
+          study: { stop: 75, riskAmount: 500 },
+        },
+      ],
+      equity: 100_000,
+      cash: 48_000,
+      riskTolerance: "moderate",
+    });
+    expect(s.current.sectorExposurePct.Unknown).toBe(12);
+    expect(
+      s.warnings.some((w) => w.includes("Datos sectoriales incompletos")),
+    ).toBe(true);
+    expect(s.current.sectorConcentration).not.toBeNull();
   });
 });

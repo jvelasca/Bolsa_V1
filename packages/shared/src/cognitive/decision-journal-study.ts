@@ -98,6 +98,10 @@ export type JournalStudyGeometryV1 = {
   target2: number | null;
   expectedRR: number | null;
   riskAmount: number | null;
+  quantity: number | null;
+  initialRiskR: number | null;
+  positionValue: number | null;
+  direction: TradePlanDirectionV1 | null;
   hasOperationalPlan: boolean;
 };
 
@@ -143,6 +147,10 @@ export type DecisionJournalStudyViewV1 = {
   target2: number | null;
   expectedRR: number | null;
   riskAmount: number | null;
+  quantity: number | null;
+  initialRiskR: number | null;
+  positionValue: number | null;
+  direction: TradePlanDirectionV1 | null;
   hasOperationalPlan: boolean;
   userThesis: null;
   decisionSummary: string | null;
@@ -212,6 +220,10 @@ const EMPTY_GEOMETRY: JournalStudyGeometryV1 = {
   target2: null,
   expectedRR: null,
   riskAmount: null,
+  quantity: null,
+  initialRiskR: null,
+  positionValue: null,
+  direction: null,
   hasOperationalPlan: false,
 };
 
@@ -251,6 +263,7 @@ export function journalStudyGeometry(
     return EMPTY_GEOMETRY;
   }
   if (!journalStudyHasValidStop(plan)) return EMPTY_GEOMETRY;
+  const qty = finiteNumber(plan.quantity);
   return {
     entry: finiteNumber(plan.entry),
     stop: finiteNumber(plan.structuralStop),
@@ -258,6 +271,13 @@ export function journalStudyGeometry(
     target2: finiteNumber(plan.target2),
     expectedRR: finiteNumber(plan.expectedRR),
     riskAmount: finiteNumber(plan.riskAmount),
+    quantity: qty != null && qty > 0 ? qty : null,
+    initialRiskR: finiteNumber(plan.initialRiskR),
+    positionValue: finiteNumber(plan.positionValue),
+    direction:
+      plan.direction === "long" || plan.direction === "short"
+        ? plan.direction
+        : null,
     hasOperationalPlan: true,
   };
 }
@@ -698,6 +718,10 @@ export function buildJournalStudyView(
     target2: geometry.target2,
     expectedRR: geometry.expectedRR,
     riskAmount: geometry.riskAmount,
+    quantity: geometry.quantity,
+    initialRiskR: geometry.initialRiskR,
+    positionValue: geometry.positionValue,
+    direction: geometry.direction,
     hasOperationalPlan: geometry.hasOperationalPlan,
     userThesis: null,
     decisionSummary: analysisNotes[0] ?? null,

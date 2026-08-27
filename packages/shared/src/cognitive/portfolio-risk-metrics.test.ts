@@ -28,6 +28,16 @@ describe("portfolio-risk-metrics", () => {
     expect(sumPortfolioOpenRiskR(positions)).toBe(0.3);
   });
 
+  it("computePositionOpenRiskR returns null without riskAmount (no 1R stub)", () => {
+    expect(
+      computePositionOpenRiskR({
+        avgCost: 100,
+        quantity: 10,
+        operational: { currentStop: 95, direction: "long" },
+      }),
+    ).toBeNull();
+  });
+
   it("computePositionOpenRiskR returns 0 at breakeven stop", () => {
     expect(
       computePositionOpenRiskR({

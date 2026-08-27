@@ -157,6 +157,7 @@ export function MesaHoyPage() {
     queryFn: () => api.getDataStatus(mesaFreshnessInstrumentId!),
     enabled: Boolean(mesaFreshnessInstrumentId),
     staleTime: 60_000,
+    refetchInterval: MESA_REFETCH_MS,
   });
   const mesaLastBarDate = mesaDataStatusQuery.data?.data?.lastBarDate ?? null;
 
@@ -170,7 +171,7 @@ export function MesaHoyPage() {
             quantity: p.quantity,
             lastPrice: p.lastPrice,
             marketValue: p.marketValue,
-            sector: sectorByInstrumentId[p.instrumentId] ?? null,
+            sector: p.sector ?? sectorByInstrumentId[p.instrumentId] ?? null,
             operational: p.operational,
             study,
           };
@@ -184,7 +185,7 @@ export function MesaHoyPage() {
       computeSectorExposurePct(
         positions.map((p) => ({
           marketValue: p.marketValue,
-          sector: sectorByInstrumentId[p.instrumentId] ?? null,
+          sector: p.sector ?? sectorByInstrumentId[p.instrumentId] ?? null,
         })),
         portfolio?.totalEquity ?? null,
       ),
@@ -198,7 +199,7 @@ export function MesaHoyPage() {
         quantity: p.quantity,
         lastPrice: p.lastPrice,
         marketValue: p.marketValue,
-        sector: sectorByInstrumentId[p.instrumentId] ?? null,
+        sector: p.sector ?? sectorByInstrumentId[p.instrumentId] ?? null,
         operational: p.operational,
         study: studiesMap.get(p.instrumentId) ?? null,
       })),
@@ -280,8 +281,14 @@ export function MesaHoyPage() {
         entriesBlocked,
         vetoed,
         lastBarDate: mesaLastBarDate,
+        noFreshnessProbe: positions.length === 0,
         boardQueryFailed: boardQuery.isError,
         incidentsQueryFailed: incidentsFailed,
+        portfolioQueryFailed: portfolioQuery.isError,
+        summaryQueryFailed: summaryQuery.isError,
+        studiesQueryFailed: studiesQuery.isError,
+        killQueryFailed: killQuery.isError,
+        selfEvalQueryFailed: selfEvalQuery.isError,
         brokerVenue: killQuery.data?.brokerVenue ?? null,
         paperDExecuteEnv: killQuery.data?.paperDExecuteEnv === true,
         readinessState: selfEvalQuery.data?.operationalReadiness?.state ?? null,
@@ -299,6 +306,11 @@ export function MesaHoyPage() {
       mesaLastBarDate,
       boardQuery.isError,
       incidentsFailed,
+      portfolioQuery.isError,
+      summaryQuery.isError,
+      studiesQuery.isError,
+      killQuery.isError,
+      selfEvalQuery.isError,
       killQuery.data,
       selfEvalQuery.data,
     ],

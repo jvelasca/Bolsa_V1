@@ -56,6 +56,10 @@ export function MesaWhatIfPanel({
   const topSectorCurrent = Object.entries(
     scenario.current.sectorExposurePct,
   ).sort((a, b) => b[1] - a[1])[0];
+  const unknownPct =
+    scenario.after.sectorExposurePct.Unknown ??
+    scenario.current.sectorExposurePct.Unknown ??
+    0;
 
   if (!open) {
     return (
@@ -131,6 +135,15 @@ export function MesaWhatIfPanel({
         <dd className="text-right tabular-nums">
           {topSectorAfter ? `${topSectorAfter[0]} ${topSectorAfter[1]}%` : "—"}
         </dd>
+        {unknownPct > 0 ? (
+          <>
+            <dt className="text-muted-foreground">Unknown</dt>
+            <dd className="text-right tabular-nums">{unknownPct}%</dd>
+            <dd className="text-right tabular-nums">
+              {cell(scenario.after.sectorExposurePct.Unknown, "%")}
+            </dd>
+          </>
+        ) : null}
         <dt className="text-muted-foreground">Fit</dt>
         <dd className="text-right">{scenario.current.portfolioFit}</dd>
         <dd className="text-right">{scenario.after.portfolioFit}</dd>
@@ -142,11 +155,20 @@ export function MesaWhatIfPanel({
             "font-medium",
             scenario.verdict === "COMPATIBLE" && "text-emerald-700",
             scenario.verdict === "NO_RECOMENDADA" && "text-rose-700",
+            scenario.verdict === "INSUFFICIENT_DATA" &&
+              "text-amber-800 dark:text-amber-200",
           )}
+          data-testid={`mesa-whatif-verdict-${row.symbol}`}
         >
           {scenario.verdict}
         </span>
         {scenario.verdictReason ? ` — ${scenario.verdictReason}` : ""}
+      </p>
+      <p className="text-muted-foreground">
+        Concentración sectorial:{" "}
+        {scenario.after.sectorConcentration != null
+          ? scenario.after.sectorConcentration.toFixed(2)
+          : "—"}
       </p>
       <p className="text-muted-foreground">Límite mandato: {limit}R</p>
       {scenario.warnings.length > 0 ? (

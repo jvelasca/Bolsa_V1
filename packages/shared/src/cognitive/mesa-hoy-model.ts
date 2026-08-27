@@ -4,11 +4,17 @@
  */
 
 import type { DecisionBoardV1 } from "../decision-board.js";
-import type { DecisionJournalStudyViewV1 } from "./decision-journal-study.js";
+import {
+  DECISION_JOURNAL_STUDY_ARTIFACT,
+  DECISION_JOURNAL_STUDY_SCHEMA,
+  journalStudyGeometry,
+  type DecisionJournalStudyViewV1,
+} from "./decision-journal-study.js";
 import type { OperationalIncidentV1 } from "./operational-incident.js";
-import type { TradePlanStatusV1 } from "./trade-plan.js";
+import type { TradePlanStatusV1, TradePlanV1 } from "./trade-plan.js";
 import {
   buildActionQueue,
+  readCanonicalTradePlan,
   type HoyActionKindV1,
   type HoyQueueItemV1,
 } from "./hoy-queue.js";
@@ -127,6 +133,93 @@ export function buildInstrumentIdBySymbol(
   return map;
 }
 
+/**
+ * Overlay geometría del TradePlan vivo del board sobre el study del journal.
+ * El board es SoT de sizing operativo; el study puede ir atrasado.
+ */
+export function overlayLiveTradePlanOnStudy(
+  study: DecisionJournalStudyViewV1 | null,
+  livePlan: TradePlanV1 | null | undefined,
+): DecisionJournalStudyViewV1 | null {
+  const geometry = journalStudyGeometry(livePlan ?? null);
+  if (!geometry.hasOperationalPlan) return study;
+  if (!study) {
+    return {
+      artifactType: DECISION_JOURNAL_STUDY_ARTIFACT,
+      schemaVersion: DECISION_JOURNAL_STUDY_SCHEMA,
+      sessionId: livePlan?.decisionId ?? "board-live",
+      decisionId: livePlan?.decisionId ?? null,
+      instrumentId: livePlan?.instrumentId ?? "",
+      symbol: null,
+      name: null,
+      studiedAt: new Date(0).toISOString(),
+      ageMs: null,
+      period: null,
+      timeframe: null,
+      opinion: null,
+      status: "in_progress",
+      strength: null,
+      strengthBand: null,
+      vigencia: null,
+      entry: geometry.entry,
+      stop: geometry.stop,
+      target1: geometry.target1,
+      target2: geometry.target2,
+      expectedRR: geometry.expectedRR,
+      riskAmount: geometry.riskAmount,
+      quantity: geometry.quantity,
+      initialRiskR: geometry.initialRiskR,
+      positionValue: geometry.positionValue,
+      direction: geometry.direction,
+      hasOperationalPlan: true,
+      userThesis: null,
+      decisionSummary: null,
+      analysisNotes: [],
+      trends: [],
+      consensus: { bullish: 0, bearish: 0, neutral: 0, total: 0 },
+      indicators: { primary: null, confirmation: null },
+      invalidation: [],
+      nextReviewAt: null,
+      tradePlanStatus: livePlan?.status ?? null,
+      action: null,
+    };
+  }
+  return {
+    ...study,
+    entry: geometry.entry ?? study.entry,
+    stop: geometry.stop ?? study.stop,
+    target1: geometry.target1 ?? study.target1,
+    target2: geometry.target2 ?? study.target2,
+    expectedRR: geometry.expectedRR ?? study.expectedRR,
+    riskAmount: geometry.riskAmount ?? study.riskAmount,
+    quantity: geometry.quantity ?? study.quantity,
+    initialRiskR: geometry.initialRiskR ?? study.initialRiskR,
+    positionValue: geometry.positionValue ?? study.positionValue,
+    direction: geometry.direction ?? study.direction,
+    hasOperationalPlan: true,
+    tradePlanStatus: livePlan?.status ?? study.tradePlanStatus,
+  };
+}
+
+function findLiveTradePlanForSymbol(
+  board: DecisionBoardV1 | null | undefined,
+  symbol: string,
+): TradePlanV1 | null {
+  if (!board) return null;
+  const key = symbol.trim().toUpperCase();
+  for (const session of board.decisionSessions) {
+    if (session.symbol?.trim().toUpperCase() !== key) continue;
+    const plan = readCanonicalTradePlan(session).plan;
+    if (plan) return plan;
+  }
+  for (const row of board.semiF3Queue) {
+    if (row.symbol?.trim().toUpperCase() !== key) continue;
+    const plan = readCanonicalTradePlan(row).plan;
+    if (plan) return plan;
+  }
+  return null;
+}
+
 export function enrichMesaCandidates(
   rows: MesaEntryQueueRowV1[],
   board: DecisionBoardV1 | null | undefined,
@@ -138,7 +231,12 @@ export function enrichMesaCandidates(
     const study = instrumentId
       ? (studiesByInstrument.get(instrumentId) ?? null)
       : null;
-    return { ...row, instrumentId, study };
+    const livePlan = findLiveTradePlanForSymbol(board, row.symbol);
+    return {
+      ...row,
+      instrumentId,
+      study: overlayLiveTradePlanOnStudy(study, livePlan),
+    };
   });
 }
 

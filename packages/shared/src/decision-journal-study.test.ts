@@ -60,6 +60,9 @@ describe("journalStudyGeometry honesty", () => {
     expect(geo.stop).toBeNull();
     expect(geo.target1).toBeNull();
     expect(geo.target2).toBeNull();
+    expect(geo.quantity).toBeNull();
+    expect(geo.initialRiskR).toBeNull();
+    expect(geo.positionValue).toBeNull();
     expect(NO_OPERATIONAL_PLAN_COPY).toMatch(/plan operativo/i);
   });
 
@@ -67,13 +70,23 @@ describe("journalStudyGeometry honesty", () => {
     expect(journalStudyGeometry(null).hasOperationalPlan).toBe(false);
   });
 
-  it("TRIGGERED + valid stop exposes entry/SL/TP", () => {
-    const geo = journalStudyGeometry(triggeredPlan());
+  it("TRIGGERED + valid stop exposes entry/SL/TP and TradePlan sizing", () => {
+    const geo = journalStudyGeometry(
+      triggeredPlan({
+        quantity: 10,
+        initialRiskR: 0.8,
+        positionValue: 1500,
+      }),
+    );
     expect(geo.hasOperationalPlan).toBe(true);
     expect(geo.entry).toBe(150);
     expect(geo.stop).toBe(142.3);
     expect(geo.target1).toBe(158.4);
     expect(geo.target2).toBe(165.8);
+    expect(geo.quantity).toBe(10);
+    expect(geo.initialRiskR).toBe(0.8);
+    expect(geo.positionValue).toBe(1500);
+    expect(geo.direction).toBe("long");
   });
 
   it("ARMED + valid stop exposes geometry (thesis has a stop, not yet triggered)", () => {

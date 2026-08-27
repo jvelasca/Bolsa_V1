@@ -26,7 +26,7 @@
 Engineering Index  (este doc)
 ├── Architecture
 │   ├── ARCHITECTURE.md
-│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-26** tag `v1.12-beta` → `369b5d1` · ADR-034 OI-1…OE-1 CERRADOS · ADR-035 OR-1/3/4/5/6 CERRADOS · OR-2 PARTIAL · next = V1.13 DEX-1
+│   ├── CURRENT_SYSTEM.md ← **SoT corto 2026-08-27** tag `v1.17.1-beta` · [`plan-v1171-hardening-2026-08-27.md`](./plan-v1171-hardening-2026-08-27.md) · pack [`audit-pack-estado-global-2026-08-27-v1171.md`](./audit-pack-estado-global-2026-08-27-v1171.md)
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md
 │   ├── PROJECT_PREMISES.md

@@ -161,6 +161,16 @@ describe("mesa-hoy-page invariants", () => {
     expect(header.operationalStatusLabel).not.toBe("Normal");
   });
 
+  it("fail-closed on portfolio query failure", () => {
+    const header = buildMesaOperationalHeader({
+      portfolioQueryFailed: true,
+      incidentCount: 0,
+    });
+    expect(header.operationalStatus).toBe("attention");
+    expect(header.dataFreshness.state).toBe("error");
+    expect(header.operationalStatusLabel).not.toBe("Normal");
+  });
+
   it("attention extra items have a stable id per symbol", () => {
     const items = filterMesaAttentionItems([], 5, [
       {

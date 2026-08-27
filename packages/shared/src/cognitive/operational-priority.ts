@@ -98,7 +98,15 @@ function scoreSuitability(
   let value = 70;
 
   const sector = ctx.candidateSector?.trim();
-  if (sector && ctx.sectorExposurePct) {
+  if (!sector) {
+    value -= 15;
+    factors.push("Sector desconocido");
+    const unknownPct = ctx.sectorExposurePct?.Unknown ?? 0;
+    if (unknownPct > 0) {
+      value -= 10;
+      factors.push(`Cartera con Unknown ${unknownPct}%`);
+    }
+  } else if (ctx.sectorExposurePct) {
     const current = ctx.sectorExposurePct[sector] ?? 0;
     const max = ctx.maxSectorExposurePct ?? 40;
     if (current >= max) {

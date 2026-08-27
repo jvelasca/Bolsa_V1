@@ -165,6 +165,25 @@ describe("buildMesaOperationalHeader", () => {
     expect(h.dataFreshness.label).toBe("No consultado");
   });
 
+  it("fail-closed on portfolio query failure", () => {
+    const h = buildMesaOperationalHeader({
+      boardQueryFailed: false,
+      incidentsQueryFailed: false,
+      portfolioQueryFailed: true,
+    });
+    expect(h.operationalStatus).toBe("attention");
+    expect(h.dataFreshness.state).toBe("error");
+  });
+
+  it("empty portfolio marks data freshness as no probe", () => {
+    const h = buildMesaOperationalHeader({
+      positions: [],
+      noFreshnessProbe: true,
+    });
+    expect(h.dataFreshness.label).toMatch(/sin posiciones/i);
+    expect(h.dataFreshness.state).toBe("stale");
+  });
+
   it("sums portfolio R when available", () => {
     const h = buildMesaOperationalHeader({
       positions: [

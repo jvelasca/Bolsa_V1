@@ -19,6 +19,7 @@ export type PortfolioPositionRiskInput = {
     stop?: number | null;
     riskAmount?: number | null;
     initialRiskR?: number | null;
+    quantity?: number | null;
   } | null;
 };
 
@@ -68,7 +69,7 @@ export function computePositionOpenRiskR(
     return round2(lossAtStop / riskAmount);
   }
 
-  return 1;
+  return null;
 }
 
 /** Riesgo abierto agregado — suma de R si todos los stops se ejecutan. */

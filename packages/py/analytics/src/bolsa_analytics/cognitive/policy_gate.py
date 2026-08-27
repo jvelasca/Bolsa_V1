@@ -79,6 +79,7 @@ def evaluate_policy_gate(
     monte_carlo_p_value: float | None = None,
     edge_report_present: bool = False,
     auto_live: bool = False,
+    enforce_edge_thresholds: bool = False,
     account_daily_drawdown_pct: float | None = None,
     account_weekly_drawdown_pct: float | None = None,
     account_max_drawdown_pct: float | None = None,
@@ -315,7 +316,7 @@ def evaluate_policy_gate(
         push(_rule("HighImpactMacroBlackout", "clear", "active", False, "Macro high-impact activo"))
 
     ev = policy.evidence
-    if auto_live:
+    if auto_live or enforce_edge_thresholds:
         if ev.require_edge_report_for_auto_live:
             push(
                 _rule(

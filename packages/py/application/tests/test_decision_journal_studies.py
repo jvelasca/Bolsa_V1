@@ -125,6 +125,27 @@ def test_triggered_geometry_exposes_levels() -> None:
     assert geo["hasOperationalPlan"] is True
     assert geo["stop"] == 142.3
     assert geo["target1"] == 158.4
+    assert geo["quantity"] is None
+    assert geo["direction"] == "long"
+
+
+def test_triggered_geometry_exposes_trade_plan_sizing() -> None:
+    geo = journal_study_geometry(
+        {
+            "status": "TRIGGERED",
+            "direction": "long",
+            "entry": 150,
+            "structuralStop": 142.3,
+            "quantity": 10,
+            "initialRiskR": 0.8,
+            "positionValue": 1500,
+            "whyNot": [],
+        }
+    )
+    assert geo["quantity"] == 10
+    assert geo["initialRiskR"] == 0.8
+    assert geo["positionValue"] == 1500
+    assert geo["direction"] == "long"
 
 
 def test_status_watch_no_stop_directional_is_no_target() -> None:

@@ -1,10 +1,11 @@
 """Ciclo I3 — HTTP ``paper_auto`` exige ``PAPER_D_EXECUTE`` (sin thaw).
 
 Paper D ya bloquea execute sin env. ``POST /execution-policies/{id}/route`` y
-``POST /scans/jobs/{id}/execute`` no lo hacían.
+``POST /scans/jobs/{id}/execute`` también llaman a este helper.
 
-Este gate **no** vive en ``ExecutionRouter``: la batería spine llama al Router
-sin el env. ``inform_only`` / ``alert`` / ``live_auto`` no pasan por aquí.
+V1.17.1: el mismo gate vive también en ``ExecutionRouter.execute()`` para que
+un cuarto camino que llame al Router directamente no se salte el flag.
+``inform_only`` / ``alert`` / ``live_auto`` no pasan por aquí.
 """
 
 from __future__ import annotations

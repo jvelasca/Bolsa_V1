@@ -150,6 +150,9 @@ def attach_operational_positions(
                 state.get("tradePlanId") or getattr(rec, "trade_plan_id", "") or ""
             ),
             unrealized_r=_finite_or_none(state.get("unrealizedR")),
+            planned_entry=_finite_or_none(state.get("plannedEntry")),
+            actual_entry=_finite_or_none(state.get("actualEntry")),
+            initial_stop=_finite_or_none(state.get("initialStop")),
             exit_plan=exit_plan,
         )
     return dto

@@ -116,11 +116,16 @@ def _paper_policy() -> ExecutionPolicyRecord:
     )
 
 
-def _entry_long_signal(*, timestamp: str | None = None) -> SignalEventV1:
+def _entry_long_signal(
+    *,
+    timestamp: str | None = None,
+    instrument_id: str = "inst-new",
+    signal_id: str = "sig-ds08",
+) -> SignalEventV1:
     ts = timestamp or datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     return SignalEventV1(
-        id="sig-ds08",
-        instrument_id="inst-new",
+        id=signal_id,
+        instrument_id=instrument_id,
         timestamp=ts,
         kind="entry_long",
         strategy_definition_id="st-1",
@@ -235,13 +240,49 @@ async def test_ds03_auto_no_open_mandate_does_not_execute_trade() -> None:
     assert fake_trade.calls == []
 
 
+class _FakeInstrumentDataStatus:
+    def __init__(self, warnings: tuple[str, ...]) -> None:
+        self._warnings = warnings
+
+    async def execute(self, instrument_id: str) -> Any:
+        return type("Status", (), {"sanity_warnings": self._warnings})()
+
+
+def _passing_edge_report():
+    from bolsa_analytics.cognitive.edge_report import (
+        StatisticalSuiteResult,
+        build_edge_report,
+    )
+
+    suite = StatisticalSuiteResult(
+        trials_n=120,
+        walk_forward_efficiency=0.92,
+        monte_carlo_p_value=0.01,
+        dsr=0.87,
+        psr=0.91,
+        bootstrap_alpha_ci_lower=0.01,
+        bootstrap_alpha_ci_upper=0.05,
+        stress_survival_rate=0.9,
+    )
+    return build_edge_report("st-1", suite)
+
+
+async def _attach_passing_edge(router: ExecutionRouter) -> None:
+    async def _ok(_policy: ExecutionPolicyRecord):
+        return _passing_edge_report()
+
+    router._resolve_edge_report = _ok  # type: ignore[method-assign]
+
+
 @pytest.mark.asyncio
 async def test_ds03_auto_open_mandate_matching_strategy_executes() -> None:
-    """DS-03 — AUTO: tenure abierto + estrategia alineada → fill."""
+    """DS-03 — AUTO: tenure abierto + estrategia alineada + edge OK → fill."""
     fake_trade = _FakeExecuteTrade(return_result=True)
-    result = await _router_with_mandates(
+    router = _router_with_mandates(
         _empty_summary(), fake_trade, _FakeMandatesOpen("st-1")
-    )._execute_paper_trade(
+    )
+    await _attach_passing_edge(router)
+    result = await router._execute_paper_trade(
         _paper_policy(),
         _entry_long_signal(),
         hit={"sector": "tech", "instrumentId": "inst-new"},
@@ -250,3 +291,149 @@ async def test_ds03_auto_open_mandate_matching_strategy_executes() -> None:
 
     assert result.status == "trade_executed"
     assert len(fake_trade.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_missing_edge_does_not_execute_trade() -> None:
+    """V1.17.1 — paper_auto sin EdgeReport no rellena (umbrales, auto_live=False)."""
+    fake_trade = _FakeExecuteTrade(return_result=True)
+    result = await _router_with_mandates(
+        _empty_summary(), fake_trade, _FakeMandatesOpen("st-1")
+    )._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(instrument_id="inst-no-edge", signal_id="sig-no-edge"),
+        hit={"sector": "tech", "instrumentId": "inst-no-edge"},
+        sizing_value=4.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason is not None
+    assert result.reason.startswith("Risk Engine:")
+    assert fake_trade.calls == []
+
+
+def _luck_edge_report():
+    from bolsa_analytics.cognitive.edge_report import EdgeReport, StatisticalSuiteResult
+
+    return EdgeReport(
+        edge_report_id="EDGE-luck-test",
+        version="1.0.0",
+        strategy_or_signal_ref="st-1",
+        created_at="2026-08-27T00:00:00Z",
+        suite=StatisticalSuiteResult(trials_n=5, dsr=0.1),
+        credibility=40.0,
+        edge_score=40.0,
+        band="luck",
+    )
+
+
+async def _attach_luck_edge(router: ExecutionRouter) -> None:
+    async def _luck(_policy: ExecutionPolicyRecord):
+        return _luck_edge_report()
+
+    router._resolve_edge_report = _luck  # type: ignore[method-assign]
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_luck_edge_does_not_execute_trade() -> None:
+    """V1.17.1 — EdgeReport band=luck veta paper_auto (enforce_edge_thresholds, auto_live=False)."""
+    fake_trade = _FakeExecuteTrade(return_result=True)
+    router = _router_with_mandates(
+        _empty_summary(), fake_trade, _FakeMandatesOpen("st-1")
+    )
+    await _attach_luck_edge(router)
+    result = await router._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(instrument_id="inst-luck", signal_id="sig-luck"),
+        hit={"sector": "tech", "instrumentId": "inst-luck"},
+        sizing_value=4.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason is not None
+    assert "edge_band_luck" in result.reason
+    assert fake_trade.calls == []
+
+
+class _FakeInstrumentDataStatusBoom:
+    async def execute(self, instrument_id: str) -> Any:
+        raise RuntimeError("status unavailable")
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_sanity_lookup_failed_vetoes() -> None:
+    """V1.17.1 — fallo de GetInstrumentDataStatus → DENY fail-closed."""
+    fake_trade = _FakeExecuteTrade(return_result=True)
+    router = ExecutionRouter(
+        policy_repo=object(),  # type: ignore[arg-type]
+        account_repo=_FakeAccountRepo(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=fake_trade,  # type: ignore[arg-type]
+        portfolio_summary=_empty_summary(),  # type: ignore[arg-type]
+        profile_store=None,
+        mandates=_FakeMandatesOpen("st-1"),  # type: ignore[arg-type]
+        instrument_data_status=_FakeInstrumentDataStatusBoom(),
+    )
+    await _attach_passing_edge(router)
+    result = await router._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(instrument_id="inst-status-boom", signal_id="sig-status-boom"),
+        hit={"sector": "tech", "instrumentId": "inst-status-boom"},
+        sizing_value=4.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason is not None
+    assert "instrument_data_status:lookup_failed" in result.reason
+    assert fake_trade.calls == []
+
+
+def _router_with_sanity(
+    warnings: tuple[str, ...],
+    trade: _FakeExecuteTrade,
+) -> ExecutionRouter:
+    return ExecutionRouter(
+        policy_repo=object(),  # type: ignore[arg-type]
+        account_repo=_FakeAccountRepo(),  # type: ignore[arg-type]
+        strategy_repo=object(),  # type: ignore[arg-type]
+        backtest_repo=object(),  # type: ignore[arg-type]
+        execute_trade=trade,  # type: ignore[arg-type]
+        portfolio_summary=_empty_summary(),  # type: ignore[arg-type]
+        profile_store=None,
+        mandates=_FakeMandatesOpen("st-1"),  # type: ignore[arg-type]
+        instrument_data_status=_FakeInstrumentDataStatus(warnings),
+    )
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_sanity_split_vetoes() -> None:
+    fake_trade = _FakeExecuteTrade(return_result=True)
+    router = _router_with_sanity(
+        ("movimiento 55.00% en 2024-01-01 — revisar split/dividendo",),
+        fake_trade,
+    )
+    await _attach_passing_edge(router)
+    result = await router._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(instrument_id="inst-split", signal_id="sig-split"),
+        hit={"sector": "tech", "instrumentId": "inst-split"},
+        sizing_value=4.0,
+    )
+    assert result.status == "skipped"
+    assert result.reason is not None
+    assert "split" in result.reason.lower() or "sanity" in result.reason.lower() or "risk_veto" in result.reason.lower() or "dividendo" in result.reason.lower()
+    assert fake_trade.calls == []
+
+
+@pytest.mark.asyncio
+async def test_paper_auto_sanity_gap_only_allows() -> None:
+    fake_trade = _FakeExecuteTrade(return_result=True)
+    router = _router_with_sanity(("gap de 2 días",), fake_trade)
+    await _attach_passing_edge(router)
+    result = await router._execute_paper_trade(
+        _paper_policy(),
+        _entry_long_signal(instrument_id="inst-gap-ok", signal_id="sig-gap"),
+        hit={"sector": "tech", "instrumentId": "inst-gap-ok"},
+        sizing_value=4.0,
+    )
+    assert result.status == "trade_executed", result.reason
+    assert len(fake_trade.calls) == 1
+

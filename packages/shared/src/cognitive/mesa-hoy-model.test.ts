@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { DecisionBoardV1 } from "../decision-board.js";
+import type { DecisionJournalStudyViewV1 } from "./decision-journal-study.js";
 import {
   buildMesaSessionState,
+  enrichMesaCandidates,
   filterMesaAttentionItems,
   mesaEntriesBlocked,
+  overlayLiveTradePlanOnStudy,
 } from "./mesa-hoy-model.js";
 import type { HoyQueueItemV1 } from "./hoy-queue.js";
+import type { MesaEntryQueueRowV1 } from "./mesa-entry-queue.js";
+import { buildPortfolioScenario } from "./portfolio-scenario.js";
 
 const baseItem = (overrides: Partial<HoyQueueItemV1> = {}): HoyQueueItemV1 => ({
   id: "x",
@@ -157,5 +162,98 @@ describe("mesa-hoy-model", () => {
     expect(attention).toHaveLength(1);
     expect(attention[0]?.symbol).toBe("MSFT");
     expect(attention[0]?.recommendedAction).toBe("REVISAR PROTECCIÓN");
+  });
+
+  it("overlays live board TradePlan sizing onto study without qty", () => {
+    const study = {
+      sessionId: "stale",
+      instrumentId: "i1",
+      symbol: "AAF",
+      studiedAt: "2026-08-26T10:00:00Z",
+      status: "in_progress",
+      hasOperationalPlan: true,
+      entry: 100,
+      stop: 95,
+      quantity: null,
+      initialRiskR: null,
+      positionValue: null,
+      riskAmount: 50,
+    } as DecisionJournalStudyViewV1;
+
+    const board: DecisionBoardV1 = {
+      ...emptyBoard,
+      decisionSessions: [
+        {
+          sessionId: "s-live",
+          kind: "propose",
+          status: "open",
+          instrumentId: "i1",
+          symbol: "AAF",
+          createdAt: "2026-08-27T10:00:00Z",
+          gate: "PASS",
+          tradePlan: {
+            artifactType: "ART-TRADE-PLAN",
+            schemaVersion: "1.0.0",
+            decisionId: "d-live",
+            instrumentId: "i1",
+            direction: "long",
+            status: "TRIGGERED",
+            entryReady: true,
+            structuralStop: 95,
+            entry: 100,
+            quantity: 10,
+            initialRiskR: 1.5,
+            positionValue: 1000,
+            riskAmount: 50,
+            target1: 110,
+            expectedRR: 2,
+          },
+        },
+      ],
+    };
+
+    const rows: MesaEntryQueueRowV1[] = [
+      {
+        symbol: "AAF",
+        status: "TRIGGERED",
+        statusLabel: "Listo",
+        gate: "PASS",
+      },
+    ];
+    const enriched = enrichMesaCandidates(
+      rows,
+      board,
+      new Map([["i1", study]]),
+    );
+    expect(enriched[0]?.study?.quantity).toBe(10);
+    expect(enriched[0]?.study?.initialRiskR).toBe(1.5);
+    expect(enriched[0]?.study?.positionValue).toBe(1000);
+
+    const scenario = buildPortfolioScenario({
+      candidate: enriched[0]!,
+      positions: [],
+      equity: 5000,
+      cash: 5000,
+      candidateSector: "Tech",
+    });
+    expect(scenario.verdict).toBe("COMPATIBLE");
+    expect(scenario.after.openRiskR).toBe(1.5);
+  });
+
+  it("overlay ignores WATCH live plan geometry", () => {
+    const merged = overlayLiveTradePlanOnStudy(null, {
+      artifactType: "ART-TRADE-PLAN",
+      schemaVersion: "1.0.0",
+      decisionId: "d1",
+      instrumentId: "i1",
+      direction: "long",
+      status: "WATCH",
+      entryReady: false,
+      structuralStop: 95,
+      entry: 100,
+      quantity: 10,
+      initialRiskR: 1,
+    });
+    expect(merged).toBeNull();
   });
 });

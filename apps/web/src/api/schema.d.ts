@@ -7391,6 +7391,12 @@ export interface components {
             tradePlanId: string;
             /** Unrealizedr */
             unrealizedR?: number | null;
+            /** Plannedentry */
+            plannedEntry?: number | null;
+            /** Actualentry */
+            actualEntry?: number | null;
+            /** Initialstop */
+            initialStop?: number | null;
         };
         /**
          * OpinionTelemetryDto

@@ -40,6 +40,7 @@ class ProposedTradeContext:
     edge_report_present: bool = False
     edge_report: EdgeReport | None = None
     auto_live: bool = False
+    enforce_edge_thresholds: bool = False
     account_daily_drawdown_pct: float | None = None
     account_weekly_drawdown_pct: float | None = None
     account_max_drawdown_pct: float | None = None
@@ -167,6 +168,7 @@ def gate_decision_package(
         monte_carlo_p_value=mc_p,
         edge_report_present=edge_present,
         auto_live=trade.auto_live,
+        enforce_edge_thresholds=trade.enforce_edge_thresholds,
         account_daily_drawdown_pct=trade.account_daily_drawdown_pct,
         account_weekly_drawdown_pct=trade.account_weekly_drawdown_pct,
         account_max_drawdown_pct=trade.account_max_drawdown_pct,
@@ -196,8 +198,8 @@ def gate_decision_package(
             ),
         )
 
-    # D3: bloqueo auto-live explícito vía EdgeReport / umbrales Policy
-    if trade.auto_live:
+    # D3: bloqueo auto-live / paper_auto con umbrales de EdgeReport (sin confundir paper con live)
+    if trade.auto_live or trade.enforce_edge_thresholds:
         al = check_auto_live(policy, edge_report=trade.edge_report)
         if not al.allowed:
             from bolsa_analytics.cognitive.policy_gate import PolicyRuleResult
