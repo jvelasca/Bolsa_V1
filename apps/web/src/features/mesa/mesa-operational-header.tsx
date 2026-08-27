@@ -88,7 +88,12 @@ export function MesaOperationalHeaderStrip({
         <Chip
           label="Régimen"
           value={regime}
-          tone={regime === "—" ? "neutral" : "ok"}
+          tone="neutral"
+          title={
+            regime === "—"
+              ? "Régimen no disponible — no se asume operable"
+              : undefined
+          }
         />
         <Chip
           label="P&L cartera"
@@ -110,7 +115,7 @@ export function MesaOperationalHeaderStrip({
           label="Datos"
           value={header.dataFreshness.label}
           tone={freshnessTone(header.dataFreshness.state)}
-          title="DS-05 — no se asume frescura si el dato no está disponible"
+          title="DS-05 — no se asume frescura si el dato no está disponible; muestra parcial ≠ cartera completa"
         />
         <button
           type="button"
@@ -128,7 +133,7 @@ export function MesaOperationalHeaderStrip({
         <Chip
           label="Modo"
           value={header.modeLabel}
-          tone="ok"
+          tone="neutral"
           title={header.modeDetail}
         />
       </div>

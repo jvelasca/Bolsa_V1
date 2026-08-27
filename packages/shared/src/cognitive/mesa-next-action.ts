@@ -256,6 +256,10 @@ export function buildMesaOperationalHeader(input: {
   lastBarDate?: string | null;
   /** Sin instrumento de referencia (p. ej. cartera vacía) — no fingir frescura. */
   noFreshnessProbe?: boolean;
+  /**
+   * Probe parcial (solo 1 de N posiciones) — chip Datos no verde por omisión.
+   */
+  freshnessPartialSample?: { probed: number; total: number } | null;
   boardQueryFailed?: boolean;
   incidentsQueryFailed?: boolean;
   portfolioQueryFailed?: boolean;
@@ -289,6 +293,7 @@ export function buildMesaOperationalHeader(input: {
     lastBarDate: input.lastBarDate,
     queryFailed,
     noFreshnessProbe: input.noFreshnessProbe === true && !queryFailed,
+    partialSample: input.freshnessPartialSample,
   });
   const statusDetail = buildMesaOperationalStatusDetail({
     killSwitchEffective: input.killSwitchEffective,

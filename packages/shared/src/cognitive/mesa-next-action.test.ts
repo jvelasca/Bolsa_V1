@@ -184,6 +184,16 @@ describe("buildMesaOperationalHeader", () => {
     expect(h.dataFreshness.state).toBe("stale");
   });
 
+  it("multi-position partial probe is not green fresh", () => {
+    const last = new Date("2026-08-26T11:30:00Z").toISOString();
+    const h = buildMesaOperationalHeader({
+      lastBarDate: last,
+      freshnessPartialSample: { probed: 1, total: 4 },
+    });
+    expect(h.dataFreshness.state).not.toBe("fresh");
+    expect(h.dataFreshness.label).toMatch(/muestra parcial \(1\/4\)/i);
+  });
+
   it("sums portfolio R when available", () => {
     const h = buildMesaOperationalHeader({
       positions: [

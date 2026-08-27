@@ -171,6 +171,29 @@ describe("mesa-hoy-page invariants", () => {
     expect(header.operationalStatusLabel).not.toBe("Normal");
   });
 
+  it("candidate next action never says COMPRAR", () => {
+    for (const status of [
+      "TRIGGERED",
+      "ARMED",
+      "WATCH",
+      "BLOCKED",
+      "EXPIRED",
+    ] as const) {
+      const next = mapCandidateNextAction(
+        {
+          symbol: "X",
+          status,
+          statusLabel: status,
+          gate: "PASS",
+          study: { hasOperationalPlan: true } as never,
+        },
+        false,
+      );
+      expect(next.label).not.toMatch(/comprar/i);
+      expect(next.allowsEntry).toBe(false);
+    }
+  });
+
   it("attention extra items have a stable id per symbol", () => {
     const items = filterMesaAttentionItems([], 5, [
       {

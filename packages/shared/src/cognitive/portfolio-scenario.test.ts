@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { MesaCandidateRowV1 } from "./mesa-hoy-model.js";
-import { buildPortfolioScenario } from "./portfolio-scenario.js";
+import {
+  buildPortfolioScenario,
+  PORTFOLIO_SCENARIO_GATES_NOT_EVALUATED_WARNING,
+} from "./portfolio-scenario.js";
 
 function candidate(
   partial: Partial<MesaCandidateRowV1> = {},
@@ -48,6 +51,9 @@ describe("buildPortfolioScenario", () => {
     });
     expect(s.verdict).toBe("COMPATIBLE");
     expect(s.riskLimitR).toBe(5);
+    expect(s.warnings).toContain(
+      PORTFOLIO_SCENARIO_GATES_NOT_EVALUATED_WARNING,
+    );
   });
 
   it("NO_RECOMENDADA when projected open risk exceeds limit", () => {
