@@ -361,6 +361,45 @@ export function studiesByInstrumentMap(
   return map;
 }
 
+/** V1.18 L1 — índice por decisionId (origen Position→Package). */
+export function studiesByDecisionIdMap(
+  studies: DecisionJournalStudyViewV1[],
+): Map<string, DecisionJournalStudyViewV1> {
+  const map = new Map<string, DecisionJournalStudyViewV1>();
+  for (const study of studies) {
+    const id = study.decisionId?.trim();
+    if (id) map.set(id, study);
+  }
+  return map;
+}
+
+export type PositionStudyPairV1 = {
+  /** Study cuyo decisionId === tradePlanId (origen). */
+  originStudy: DecisionJournalStudyViewV1 | null;
+  /** Último study del instrumento (evolución / Next Action). */
+  evolutionStudy: DecisionJournalStudyViewV1 | null;
+};
+
+/**
+ * Soft-join por instrumento solo para evolución.
+ * Origen exige match por decisionId (= operational.tradePlanId).
+ */
+export function pickPositionStudies(
+  position: {
+    instrumentId: string;
+    operational?: { tradePlanId?: string | null } | null;
+  },
+  studiesByDecisionId: Map<string, DecisionJournalStudyViewV1>,
+  studiesByInstrument: Map<string, DecisionJournalStudyViewV1>,
+): PositionStudyPairV1 {
+  const tradePlanId = position.operational?.tradePlanId?.trim() || null;
+  const originStudy = tradePlanId
+    ? (studiesByDecisionId.get(tradePlanId) ?? null)
+    : null;
+  const evolutionStudy = studiesByInstrument.get(position.instrumentId) ?? null;
+  return { originStudy, evolutionStudy };
+}
+
 export function buildMesaActionQueue(
   board: DecisionBoardV1 | null | undefined,
 ): HoyQueueItemV1[] {

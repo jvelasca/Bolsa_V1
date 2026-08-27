@@ -5,6 +5,7 @@
 import { Link } from "react-router-dom";
 import type { DecisionJournalStudyViewV1, ProtectPlanV1 } from "@bolsa/shared";
 import type { PositionDto } from "@bolsa/shared";
+import { pickPositionStudies } from "@bolsa/shared";
 import {
   Card,
   CardContent,
@@ -22,10 +23,12 @@ export function MesaPositionsSummary({
   positions,
   protectPlanByInstrument,
   studiesByInstrument,
+  studiesByDecisionId,
 }: {
   positions: PositionDto[];
   protectPlanByInstrument: Map<string, ProtectPlanV1>;
   studiesByInstrument: Map<string, DecisionJournalStudyViewV1>;
+  studiesByDecisionId: Map<string, DecisionJournalStudyViewV1>;
 }) {
   return (
     <Card data-testid="mesa-positions-summary">
@@ -49,18 +52,23 @@ export function MesaPositionsSummary({
             Sin posiciones abiertas
           </p>
         ) : (
-          positions.map((position) => (
-            <MesaPositionRow
-              key={position.id}
-              position={position}
-              protectPlan={protectPlanByInstrument.get(position.instrumentId)}
-              study={studiesByInstrument.get(position.instrumentId) ?? null}
-              showRoute={mesaPositionShowsRoute(
-                position,
-                studiesByInstrument.get(position.instrumentId),
-              )}
-            />
-          ))
+          positions.map((position) => {
+            const { originStudy, evolutionStudy } = pickPositionStudies(
+              position,
+              studiesByDecisionId,
+              studiesByInstrument,
+            );
+            return (
+              <MesaPositionRow
+                key={position.id}
+                position={position}
+                protectPlan={protectPlanByInstrument.get(position.instrumentId)}
+                study={evolutionStudy}
+                originStudy={originStudy}
+                showRoute={mesaPositionShowsRoute(position, evolutionStudy)}
+              />
+            );
+          })
         )}
       </CardContent>
     </Card>

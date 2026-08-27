@@ -1,5 +1,5 @@
 /**
- * Position = memoria operativa (V1.17).
+ * Position = memoria operativa (V1.17 + V1.18 L1 lineage).
  * Agregado reconstruible desde dominio existente — sin mega-clase persistida.
  */
 
@@ -14,6 +14,10 @@ import {
 } from "./mesa-next-action.js";
 import { buildMesaProtectionState } from "./mesa-protection-state.js";
 import { computePositionOpenRiskR } from "./portfolio-risk-metrics.js";
+import {
+  resolvePositionOriginLineage,
+  type PositionLineageRefV1,
+} from "./position-lineage.js";
 
 export type PositionManagementStateV1 = {
   status: PositionStatusV1 | string;
@@ -34,6 +38,8 @@ export type InvestmentPositionAggregateV1 = {
   symbol: string;
   instrumentId: string;
   originDecisionId: string | null;
+  /** V1.18 L1 — lineage fail-closed (soft-join instrumento ≠ origen). */
+  lineage: PositionLineageRefV1;
   thesisSnapshot:
     | (Pick<
         DecisionJournalStudyViewV1,
@@ -90,6 +96,7 @@ export type BuildInvestmentPositionAggregateInput = {
       currentStop?: number | null;
       target1?: number | null;
       target2?: number | null;
+      tradePlanId?: string | null;
       unrealizedR?: number | null;
       plannedEntry?: number | null;
       actualEntry?: number | null;
@@ -99,7 +106,13 @@ export type BuildInvestmentPositionAggregateInput = {
       } | null;
     } | null;
   };
+  /**
+   * Study de evolución (último propose / instrumento) — Next Action, targets vivos.
+   * No es autoridad de origen salvo que su decisionId coincida con tradePlanId.
+   */
   study?: DecisionJournalStudyViewV1 | null;
+  /** Study/paquete de nacimiento (match por decisionId). */
+  originStudy?: DecisionJournalStudyViewV1 | null;
   protectPlan?: Pick<ProtectPlanV1, "status" | "suggestedProtectStop"> | null;
   originDecisionId?: string | null;
 };
@@ -121,6 +134,22 @@ export function buildInvestmentPositionAggregate(
 ): InvestmentPositionAggregateV1 {
   const { position, study, protectPlan } = input;
   const op = position.operational;
+  const originStudyCandidate = input.originStudy ?? study ?? null;
+
+  const lineage = resolvePositionOriginLineage({
+    originDecisionId: input.originDecisionId,
+    tradePlanId: op?.tradePlanId,
+    positionInstrumentId: position.instrumentId,
+    originStudy: originStudyCandidate,
+  });
+
+  const originThesisStudy =
+    lineage.packageAvailable &&
+    originStudyCandidate &&
+    (originStudyCandidate.decisionId ?? "").trim() === lineage.originDecisionId
+      ? originStudyCandidate
+      : null;
+
   const protection = buildMesaProtectionState({
     study,
     exitSuggestedStop:
@@ -151,7 +180,10 @@ export function buildInvestmentPositionAggregate(
     target2: finiteNumber(op?.target2) ?? study?.target2 ?? null,
   };
 
-  const direction = resolveDirection(op?.direction, study?.direction ?? null);
+  const direction = resolveDirection(
+    op?.direction,
+    originThesisStudy?.direction ?? study?.direction ?? null,
+  );
 
   const openRiskR = computePositionOpenRiskR({
     avgCost: position.avgCost,
@@ -188,20 +220,21 @@ export function buildInvestmentPositionAggregate(
   return {
     symbol: position.symbol,
     instrumentId: position.instrumentId,
-    originDecisionId: input.originDecisionId ?? null,
-    thesisSnapshot: study
+    originDecisionId: lineage.originDecisionId,
+    lineage,
+    thesisSnapshot: originThesisStudy
       ? {
-          status: study.status,
-          opinion: study.opinion,
-          tradePlanStatus: study.tradePlanStatus,
-          hasOperationalPlan: study.hasOperationalPlan,
-          strength: study.strength,
-          entry: study.entry,
-          stop: study.stop,
-          target1: study.target1,
-          target2: study.target2,
-          expectedRR: study.expectedRR,
-          riskAmount: study.riskAmount,
+          status: originThesisStudy.status,
+          opinion: originThesisStudy.opinion,
+          tradePlanStatus: originThesisStudy.tradePlanStatus,
+          hasOperationalPlan: originThesisStudy.hasOperationalPlan,
+          strength: originThesisStudy.strength,
+          entry: originThesisStudy.entry,
+          stop: originThesisStudy.stop,
+          target1: originThesisStudy.target1,
+          target2: originThesisStudy.target2,
+          expectedRR: originThesisStudy.expectedRR,
+          riskAmount: originThesisStudy.riskAmount,
           direction,
         }
       : null,

@@ -20,6 +20,8 @@ import {
   computeSectorExposurePct,
   filterMesaAttentionItems,
   mesaEntriesBlocked,
+  pickPositionStudies,
+  studiesByDecisionIdMap,
   studiesByInstrumentMap,
 } from "@bolsa/shared";
 import { Button } from "@/components/ui/button";
@@ -112,6 +114,10 @@ export function MesaHoyPage() {
     [studiesQuery.data],
   );
   const studiesMap = useMemo(() => studiesByInstrumentMap(studies), [studies]);
+  const studiesByDecision = useMemo(
+    () => studiesByDecisionIdMap(studies),
+    [studies],
+  );
 
   const sectorByInstrumentId = useMemo(() => {
     const out: Record<string, string | null | undefined> = {};
@@ -339,15 +345,20 @@ export function MesaHoyPage() {
   const positionAggregates = useMemo(
     () =>
       positions.map((position) => {
-        const study = studiesMap.get(position.instrumentId) ?? null;
+        const { originStudy, evolutionStudy } = pickPositionStudies(
+          position,
+          studiesByDecision,
+          studiesMap,
+        );
         const protectPlan = protectPlanByInstrument.get(position.instrumentId);
         return buildInvestmentPositionAggregate({
           position,
-          study,
+          study: evolutionStudy,
+          originStudy,
           protectPlan,
         });
       }),
-    [positions, studiesMap, protectPlanByInstrument],
+    [positions, studiesMap, studiesByDecision, protectPlanByInstrument],
   );
 
   const unifiedAlerts = useMemo(
@@ -470,6 +481,7 @@ export function MesaHoyPage() {
             positions={positions}
             protectPlanByInstrument={protectPlanByInstrument}
             studiesByInstrument={studiesMap}
+            studiesByDecisionId={studiesByDecision}
           />
         </MesaLevelSection>
 

@@ -5,9 +5,12 @@ import {
 } from "./investment-position-aggregate.js";
 import type { DecisionJournalStudyViewV1 } from "./decision-journal-study.js";
 
-function study(): DecisionJournalStudyViewV1 {
+function study(
+  overrides: Partial<DecisionJournalStudyViewV1> = {},
+): DecisionJournalStudyViewV1 {
   return {
     sessionId: "s1",
+    decisionId: "D1",
     instrumentId: "i1",
     symbol: "AAPL",
     studiedAt: "2026-08-26T10:00:00Z",
@@ -21,6 +24,7 @@ function study(): DecisionJournalStudyViewV1 {
     riskAmount: 1000,
     tradePlanStatus: "TRIGGERED",
     invalidation: [],
+    ...overrides,
   } as DecisionJournalStudyViewV1;
 }
 
@@ -36,6 +40,7 @@ describe("investment-position-aggregate", () => {
         operational: {
           status: "OPEN",
           direction: "long",
+          tradePlanId: "D1",
           currentStop: 178,
           target1: 198,
           target2: 210,
@@ -44,8 +49,12 @@ describe("investment-position-aggregate", () => {
         },
       },
       study: study(),
+      originStudy: study(),
     });
     expect(agg.entry).toBe(182);
+    expect(agg.originDecisionId).toBe("D1");
+    expect(agg.lineage.packageAvailable).toBe(true);
+    expect(agg.thesisSnapshot?.entry).toBe(180);
     expect(agg.nextAction.kind).toBe("review_proposal");
     expect(agg.risk.openRiskR).not.toBeNull();
   });
@@ -60,12 +69,14 @@ describe("investment-position-aggregate", () => {
         lastPrice: 194,
         operational: {
           direction: "long",
+          tradePlanId: "D1",
           currentStop: 178,
           target1: 198,
           target2: 210,
         },
       },
       study: study(),
+      originStudy: study(),
     });
     const levels = buildPositionRouteLevels(agg);
     expect(levels.some((l) => l.label === "PRECIO")).toBe(true);
@@ -75,7 +86,7 @@ describe("investment-position-aggregate", () => {
 
   it("mutated study does not overwrite original plan", () => {
     const day3Study = {
-      ...study(),
+      ...study({ decisionId: "D1" }),
       entry: 103,
       stop: 98,
       target1: 112,
@@ -89,6 +100,7 @@ describe("investment-position-aggregate", () => {
         lastPrice: 104,
         operational: {
           direction: "long",
+          tradePlanId: "D1",
           plannedEntry: 100,
           actualEntry: 100,
           initialStop: 95,
@@ -98,6 +110,7 @@ describe("investment-position-aggregate", () => {
         },
       },
       study: day3Study,
+      originStudy: day3Study,
     });
     expect(agg.originalPlanAvailable).toBe(true);
     expect(agg.originalPlan?.entry).toBe(100);
@@ -116,13 +129,83 @@ describe("investment-position-aggregate", () => {
         lastPrice: 194,
         operational: {
           direction: "long",
+          tradePlanId: "D1",
           currentStop: 178,
         },
       },
       study: study(),
+      originStudy: study(),
     });
     expect(agg.originalPlanAvailable).toBe(false);
     expect(agg.originalPlan).toBeNull();
     expect(agg.tradePlanSnapshot.plannedEntry).toBeNull();
+  });
+
+  it("wires originDecisionId from operational.tradePlanId", () => {
+    const agg = buildInvestmentPositionAggregate({
+      position: {
+        symbol: "AAPL",
+        instrumentId: "i1",
+        quantity: 10,
+        avgCost: 182,
+        operational: { tradePlanId: "D1", direction: "long" },
+      },
+    });
+    expect(agg.originDecisionId).toBe("D1");
+    expect(agg.lineage.orphanReason).toBe("session_not_found");
+    expect(agg.thesisSnapshot).toBeNull();
+  });
+
+  it("does not adopt other-decision study as thesisSnapshot (orphan)", () => {
+    const other = study({ decisionId: "D-OTHER", entry: 999 });
+    const agg = buildInvestmentPositionAggregate({
+      position: {
+        symbol: "AAPL",
+        instrumentId: "i1",
+        quantity: 10,
+        avgCost: 182,
+        lastPrice: 190,
+        operational: {
+          tradePlanId: "D1",
+          direction: "long",
+          currentStop: 178,
+        },
+      },
+      study: other,
+      originStudy: other,
+    });
+    expect(agg.originDecisionId).toBe("D1");
+    expect(agg.lineage.packageAvailable).toBe(false);
+    expect(agg.thesisSnapshot).toBeNull();
+    expect(agg.lineage.orphanReason).toBe("package_missing");
+  });
+
+  it("uses matching originStudy for thesis while evolution study drives targets", () => {
+    const origin = study({ decisionId: "D1", entry: 180, riskAmount: 1000 });
+    const evolution = study({
+      decisionId: "D-LATER",
+      entry: 190,
+      target1: 220,
+      target2: 240,
+    });
+    const agg = buildInvestmentPositionAggregate({
+      position: {
+        symbol: "AAPL",
+        instrumentId: "i1",
+        quantity: 10,
+        avgCost: 182,
+        lastPrice: 194,
+        operational: {
+          tradePlanId: "D1",
+          direction: "long",
+          currentStop: 178,
+        },
+      },
+      study: evolution,
+      originStudy: origin,
+    });
+    expect(agg.lineage.packageAvailable).toBe(true);
+    expect(agg.thesisSnapshot?.entry).toBe(180);
+    expect(agg.currentPlan.target1).toBe(220);
   });
 });

@@ -7,6 +7,9 @@ import {
   filterMesaAttentionItems,
   mesaEntriesBlocked,
   overlayLiveTradePlanOnStudy,
+  pickPositionStudies,
+  studiesByDecisionIdMap,
+  studiesByInstrumentMap,
 } from "./mesa-hoy-model.js";
 import type { HoyQueueItemV1 } from "./hoy-queue.js";
 import type { MesaEntryQueueRowV1 } from "./mesa-entry-queue.js";
@@ -255,5 +258,27 @@ describe("mesa-hoy-model", () => {
       initialRiskR: 1,
     });
     expect(merged).toBeNull();
+  });
+
+  it("pickPositionStudies resolves origin by decisionId not instrument soft-join", () => {
+    const origin = {
+      decisionId: "D1",
+      instrumentId: "i1",
+      symbol: "AAPL",
+    } as DecisionJournalStudyViewV1;
+    const later = {
+      decisionId: "D-LATER",
+      instrumentId: "i1",
+      symbol: "AAPL",
+    } as DecisionJournalStudyViewV1;
+    const byDecision = studiesByDecisionIdMap([origin, later]);
+    const byInstrument = studiesByInstrumentMap([later]);
+    const pair = pickPositionStudies(
+      { instrumentId: "i1", operational: { tradePlanId: "D1" } },
+      byDecision,
+      byInstrument,
+    );
+    expect(pair.originStudy?.decisionId).toBe("D1");
+    expect(pair.evolutionStudy?.decisionId).toBe("D-LATER");
   });
 });

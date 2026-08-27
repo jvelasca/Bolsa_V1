@@ -33,6 +33,7 @@ export * from "./mesa-hoy-model.js";
 export * from "./data-freshness.js";
 export * from "./portfolio-risk-metrics.js";
 export * from "./investment-position-aggregate.js";
+export * from "./position-lineage.js";
 export * from "./mesa-operational-health.js";
 export * from "./operational-priority.js";
 export * from "./portfolio-scenario.js";

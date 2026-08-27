@@ -14,15 +14,21 @@ import { cn } from "@/lib/utils";
 type PositionRoutePanelProps = {
   position: PositionDto;
   study?: DecisionJournalStudyViewV1 | null;
+  originStudy?: DecisionJournalStudyViewV1 | null;
   className?: string;
 };
 
 export function PositionRoutePanel({
   position,
   study,
+  originStudy,
   className,
 }: PositionRoutePanelProps) {
-  const aggregate = buildInvestmentPositionAggregate({ position, study });
+  const aggregate = buildInvestmentPositionAggregate({
+    position,
+    study,
+    originStudy,
+  });
   const op = position.operational;
   const hasPlan = study?.hasOperationalPlan === true;
   const stop = op?.currentStop ?? (hasPlan ? study?.stop : null);

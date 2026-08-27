@@ -49,11 +49,13 @@ export function MesaPositionNextActionButton({
   position,
   protectPlan,
   study,
+  originStudy,
   compact = true,
 }: {
   position: PositionDto;
   protectPlan?: ProtectPlanV1 | null;
   study?: DecisionJournalStudyViewV1 | null;
+  originStudy?: DecisionJournalStudyViewV1 | null;
   compact?: boolean;
 }) {
   const { effectiveAccountId } = useActiveAccount();
@@ -62,6 +64,7 @@ export function MesaPositionNextActionButton({
   const nextAction = buildInvestmentPositionAggregate({
     position,
     study,
+    originStudy,
     protectPlan,
   }).nextAction;
 
@@ -212,11 +215,13 @@ export function MesaPositionRow({
   position,
   protectPlan,
   study,
+  originStudy,
   showRoute = false,
 }: {
   position: PositionDto;
   protectPlan?: ProtectPlanV1 | null;
   study?: DecisionJournalStudyViewV1 | null;
+  originStudy?: DecisionJournalStudyViewV1 | null;
   showRoute?: boolean;
 }) {
   const operational = position.operational ?? null;
@@ -242,6 +247,7 @@ export function MesaPositionRow({
   const nextAction = buildInvestmentPositionAggregate({
     position,
     study,
+    originStudy,
     protectPlan,
   }).nextAction;
 
@@ -321,12 +327,17 @@ export function MesaPositionRow({
             position={position}
             protectPlan={protectPlan}
             study={study}
+            originStudy={originStudy}
           />
         </div>
       </div>
       {showRoute ? (
         <div className="mt-2 pl-1">
-          <PositionRoutePanel position={position} study={study} />
+          <PositionRoutePanel
+            position={position}
+            study={study}
+            originStudy={originStudy}
+          />
         </div>
       ) : null}
     </div>
